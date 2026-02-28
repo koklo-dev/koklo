@@ -1,0 +1,36 @@
+id: daily_standup
+name: "Daily Standup"
+version: "1.0"
+
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1-5"
+    timezone: "Europe/Paris"
+
+steps:
+  - id: collect_data
+    type: parallel
+    steps:
+      - id: github_activity
+        type: github_action
+        action: get_activity
+        inputs:
+          since: "yesterday"
+          repo: "koklo"
+
+      - id: linear_status
+        type: linear_action
+        action: get_sprint_status
+
+      - id: ci_status
+        type: github_action
+        action: get_workflow_status
+
+  - id: post_standup
+    type: discord_notify
+    depends_on: [collect_data]
+    channel: standup
+    message: |
+      🌅 Standup Koklo — {date}
+      CI: {ci_status.last_build_status}
+      In progress: {linear_status.in_progress_tickets}

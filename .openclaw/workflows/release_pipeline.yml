@@ -1,0 +1,51 @@
+id: release_pipeline
+name: "Release Pipeline - Koklo Community"
+version: "1.0"
+
+triggers:
+  - type: git_tag
+    pattern: "v*.*.*"
+  - type: discord_command
+    command: "/release"
+    channel: orchestration_status
+
+inputs:
+  - name: release_type
+    type: enum
+    values: [patch, minor, major]
+    default: minor
+
+steps:
+  - id: notify_start
+    type: discord_notify
+    channel: releases
+    message: "🚀 Release pipeline started ({release_type})"
+
+  - id: run_full_checks
+    type: shell
+    depends_on: [notify_start]
+    command: "bash scripts/bmad-quality-check.sh"
+    discord_channel: tests
+
+  - id: security_audit
+    type: agent
+    agent: security
+    depends_on: [run_full_checks]
+    discord_channel: security
+
+  - id: generate_changelog
+    type: agent
+    agent: scribe
+    depends_on: [security_audit]
+    outputs: [changelog_md, version_next]
+
+  - id: gate_release_approval
+    type: human_gate
+    depends_on: [generate_changelog]
+    discord_channel: releases
+    message: "Approve release {version_next}? ✅/❌"
+    reactions: ["✅", "❌"]
+
+on_error:
+  discord_channel: releases
+  message: "❌ Release workflow failed at {failed_step}"

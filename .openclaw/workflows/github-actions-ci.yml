@@ -1,0 +1,150 @@
+name: CI + Discord Notifications
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    types: [opened, closed, synchronize]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  ci:
+    name: CI Pipeline
+    runs-on: [self-hosted, linux, x64, rust]
+
+    steps:
+      # 1. Notification démarrage
+      - name: 📢 Notify CI Start
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHAN_CI_STATUS: ${{ secrets.CHAN_CI_STATUS }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node .openclaw/discord/notify.js ci-start
+
+      # 2. Checkout
+      - uses: actions/checkout@v4
+
+      # 3. Cache Rust
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # 4. Cache Node
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      # 5. Tests Rust
+      - name: 🦀 Tests Rust
+        id: rust_tests
+        run: |
+          cargo test --workspace 2>&1 | tee /tmp/rust_test.log
+          echo "status=$?" >> $GITHUB_OUTPUT
+
+      # 6. Tests TypeScript
+      - name: 📦 Install deps
+        run: npm ci
+
+      - name: 🧪 Tests Vitest
+        id: ts_tests
+        run: |
+          npm run test -- --coverage --reporter=json 2>&1 | tee /tmp/ts_test.log
+          echo "coverage=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')" >> $GITHUB_OUTPUT
+
+      # 7. Tests E2E Playwright
+      - name: 🎭 Tests E2E Playwright
+        id: e2e_tests
+        run: npm run test:e2e
+
+      # 8. Poster résultats dans #tests
+      - name: 📊 Post test results to Discord
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHAN_TESTS: ${{ secrets.CHAN_TESTS }}
+          CI_COVERAGE: ${{ steps.ts_tests.outputs.coverage }}
+        run: |
+          node -e "
+            const { execSync } = require('child_process');
+            const rust = require('fs').readFileSync('/tmp/rust_test.log', 'utf8');
+            const rustPassed = rust.match(/test result: ok\. (\d+) passed/)?.[1] || '?';
+            const rustFailed = rust.match(/(\d+) failed/)?.[1] || '0';
+
+            // Envoyer dans #tests via l'API Discord directement
+            const body = JSON.stringify({
+              embeds: [{
+                color: rustFailed === '0' ? 0x00D084 : 0xFF4757,
+                title: rustFailed === '0' ? '✅ Tests OK' : '❌ Tests en échec',
+                fields: [
+                  { name: 'Rust', value: rustFailed === '0' ? rustPassed + ' passed' : rustFailed + ' failed', inline: true },
+                  { name: 'Coverage', value: process.env.CI_COVERAGE + '%', inline: true },
+                  { name: 'Branch', value: '${{ github.ref_name }}', inline: true },
+                ],
+                timestamp: new Date().toISOString(),
+              }]
+            });
+
+            const https = require('https');
+            const req = https.request({
+              hostname: 'discord.com',
+              path: '/api/v10/channels/' + process.env.CHAN_TESTS + '/messages',
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bot ' + process.env.DISCORD_BOT_TOKEN, 'Content-Length': Buffer.byteLength(body) }
+            }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => console.log('Posted tests to Discord')); });
+            req.write(body); req.end();
+          "
+
+      # 9. Succès
+      - name: ✅ Notify CI Success
+        if: success()
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHAN_CI_STATUS: ${{ secrets.CHAN_CI_STATUS }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_COVERAGE: ${{ steps.ts_tests.outputs.coverage }}
+        run: node .openclaw/discord/notify.js ci-success
+
+      # 10. Échec
+      - name: ❌ Notify CI Failure
+        if: failure()
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHAN_CI_STATUS: ${{ secrets.CHAN_CI_STATUS }}
+          DISCORD_DEV_ID: ${{ secrets.DISCORD_DEV_ID }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          FAILED_STEP: ${{ github.job }}
+        run: node .openclaw/discord/notify.js ci-failure
+
+  # ─────────────────────────────────────────────────────────────
+  # Notification PR ouverte
+  pr-notify:
+    name: PR Discord Notification
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 🔀 Notify PR Opened
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHAN_PULL_REQUESTS: ${{ secrets.CHAN_PULL_REQUESTS }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: node .openclaw/discord/notify.js pr-opened
