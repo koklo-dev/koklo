@@ -1,0 +1,8 @@
+[package]
+name = "koklo-doc-generator"
+version = "0.1.0"
+edition = "2021"
+description = "doc-generator crate for Koklo Community"
+
+[dependencies]
+anyhow = { workspace = true }

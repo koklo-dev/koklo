@@ -1,0 +1,8 @@
+[package]
+name = "koklo-storage"
+version = "0.1.0"
+edition = "2021"
+description = "storage crate for Koklo Community"
+
+[dependencies]
+anyhow = { workspace = true }

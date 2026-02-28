@@ -1,0 +1,11 @@
+{
+  "name": "@koklo/trpc-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo building @koklo/trpc-client",
+    "lint": "echo linting @koklo/trpc-client",
+    "typecheck": "echo typechecking @koklo/trpc-client"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@koklo/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo building @koklo/ui",
+    "lint": "echo linting @koklo/ui",
+    "typecheck": "echo typechecking @koklo/ui"
+  }
+}

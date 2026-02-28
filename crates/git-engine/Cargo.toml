@@ -1,0 +1,8 @@
+[package]
+name = "koklo-git-engine"
+version = "0.1.0"
+edition = "2021"
+description = "git-engine crate for Koklo Community"
+
+[dependencies]
+anyhow = { workspace = true }

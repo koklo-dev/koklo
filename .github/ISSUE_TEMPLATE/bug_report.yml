@@ -1,0 +1,12 @@
+name: Bug report
+description: Report a bug in Koklo Community
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+    validations:
+      required: true

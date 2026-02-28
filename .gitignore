@@ -1,0 +1,32 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+dist/
+.turbo/
+
+# Tauri
+apps/desktop/src-tauri/target/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Never ignore koklo-ee; it should not exist in this repository.

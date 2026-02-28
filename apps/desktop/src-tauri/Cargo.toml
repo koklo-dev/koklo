@@ -1,0 +1,9 @@
+[package]
+name = "koklo-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Koklo desktop application shell"
+
+[dependencies]
+anyhow = { workspace = true }
+koklo-core = { path = "../../../crates/core" }

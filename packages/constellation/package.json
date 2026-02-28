@@ -1,0 +1,11 @@
+{
+  "name": "@koklo/constellation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo building @koklo/constellation",
+    "lint": "echo linting @koklo/constellation",
+    "typecheck": "echo typechecking @koklo/constellation"
+  }
+}

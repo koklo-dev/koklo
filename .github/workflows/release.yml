@@ -1,0 +1,14 @@
+name: Release - Community
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build artifacts
+        run: echo "Build and publish community release artifacts"

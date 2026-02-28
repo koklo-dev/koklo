@@ -1,0 +1,8 @@
+[package]
+name = "koklo-shell"
+version = "0.1.0"
+edition = "2021"
+description = "shell crate for Koklo Community"
+
+[dependencies]
+anyhow = { workspace = true }

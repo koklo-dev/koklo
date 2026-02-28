@@ -1,0 +1,8 @@
+[package]
+name = "koklo-agent-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "agent-runtime crate for Koklo Community"
+
+[dependencies]
+anyhow = { workspace = true }

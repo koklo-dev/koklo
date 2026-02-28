@@ -1,0 +1,8 @@
+[package]
+name = "koklo-ticket-system"
+version = "0.1.0"
+edition = "2021"
+description = "ticket-system crate for Koklo Community"
+
+[dependencies]
+anyhow = { workspace = true }

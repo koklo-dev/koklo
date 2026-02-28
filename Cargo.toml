@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+  "apps/desktop/src-tauri",
+  "apps/cli",
+  "crates/core",
+  "crates/storage",
+  "crates/workflow-engine",
+  "crates/agent-runtime",
+  "crates/providers",
+  "crates/git-engine",
+  "crates/doc-generator",
+  "crates/ticket-system",
+  "crates/shell",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Koklo Team <team@koklo.dev>"]
+license = "AGPL-3.0"
+repository = "https://github.com/koklo/koklo"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+anyhow = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+async-trait = "0.1"

@@ -1,0 +1,8 @@
+[package]
+name = "koklo-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Koklo command line interface"
+
+[dependencies]
+anyhow = { workspace = true }
