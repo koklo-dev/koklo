@@ -12,7 +12,7 @@ env:
 jobs:
   boundary-check:
     name: Boundary Check (Open Core)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vps30]
     steps:
       - uses: actions/checkout@v4
       - name: Check open/ee boundary
@@ -21,7 +21,7 @@ jobs:
   rust-checks:
     name: Rust - Build & Test
     needs: boundary-check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vps30]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -37,7 +37,7 @@ jobs:
 
   frontend-checks:
     name: TypeScript - Build & Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vps30]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
