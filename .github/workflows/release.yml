@@ -20,7 +20,7 @@ concurrency:
 jobs:
   preview:
     if: github.event.action != 'closed' && github.event.pull_request.head.ref == 'develop'
-    runs-on: [self-hosted, linux, x64, vps30]
+    runs-on: ubuntu-latest
     outputs:
       next_tag: ${{ steps.next.outputs.next_tag }}
     steps:
@@ -59,7 +59,7 @@ jobs:
 
   release:
     if: github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop'
-    runs-on: [self-hosted, linux, x64, vps30]
+    runs-on: ubuntu-latest
     outputs:
       next_tag: ${{ steps.next.outputs.next_tag }}
     steps:
