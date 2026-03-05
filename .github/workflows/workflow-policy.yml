@@ -1,0 +1,11 @@
+name: Workflow Policy
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  policy:
+    uses: koklo-dev/.github/.github/workflows/workflow-policy.yml@feat/reusable-workflows-release-policy
