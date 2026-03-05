@@ -1,12 +1,52 @@
 name: Bug report
-description: Report a bug in Koklo Community
+description: Report a reproducible bug
 title: "[Bug]: "
-labels: ["bug"]
+labels:
+  - bug
 body:
-  - type: textarea
-    id: description
+  - type: markdown
     attributes:
-      label: Description
+      value: |
+        Thanks for reporting this bug. Please provide enough detail to reproduce.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
       description: What happened?
+      placeholder: A clear description of the bug.
     validations:
       required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List exact steps.
+      placeholder: |
+        1. Go to ...
+        2. Run ...
+        3. See error ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Paste relevant logs, stack traces, screenshots.
+      render: shell
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: App/CLI/version if known.
+      placeholder: v0.0.0
+    validations:
+      required: false
