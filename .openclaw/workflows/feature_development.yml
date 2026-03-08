@@ -1,0 +1,103 @@
+id: feature_development
+name: "Feature Development - Koklo Community"
+version: "1.0"
+
+triggers:
+  - type: manual
+  - type: discord_command
+    command: "/feature"
+    channel: orchestration_status
+
+inputs:
+  - name: feature_title
+    type: string
+    required: true
+  - name: feature_description
+    type: string
+    required: true
+  - name: linear_ticket_id
+    type: string
+    required: false
+  - name: rigor_mode
+    type: enum
+    values: [light, standard, strict]
+    default: standard
+
+steps:
+  - id: notify_start
+    type: discord_notify
+    channel: orchestration_status
+    message: |
+      🚀 Feature started: {feature_title}
+      Mode: {rigor_mode}
+    create_thread: true
+    thread_name: "feat: {feature_title}"
+
+  - id: generate_spec
+    type: agent
+    agent: pm
+    discord_channel: agent_logs
+    discord_thread: "{notify_start.thread_id}"
+
+  - id: gate_spec_approval
+    type: human_gate
+    depends_on: [generate_spec]
+    skip_if: "rigor_mode == 'light'"
+    discord_channel: orchestration_status
+    discord_thread: "{notify_start.thread_id}"
+    message: "Spec ready for approval. React ✅ or ❌"
+    reactions: ["✅", "❌"]
+
+  - id: generate_plan
+    type: agent
+    agent: architect
+    depends_on: [gate_spec_approval]
+    discord_channel: agent_logs
+    discord_thread: "{notify_start.thread_id}"
+
+  - id: gate_plan_approval
+    type: human_gate
+    depends_on: [generate_plan]
+    skip_if: "rigor_mode == 'light'"
+    discord_channel: orchestration_status
+    discord_thread: "{notify_start.thread_id}"
+    message: "Plan ready for approval. React ✅ or ❌"
+    reactions: ["✅", "❌"]
+
+  - id: implement
+    type: agent
+    agent: developer
+    depends_on: [gate_plan_approval]
+    discord_channel: agent_logs
+    discord_thread: "{notify_start.thread_id}"
+
+  - id: run_quality_checks
+    type: shell
+    depends_on: [implement]
+    command: "bash scripts/bmad-quality-check.sh"
+    discord_channel: tests
+
+  - id: security_scan
+    type: agent
+    agent: security
+    depends_on: [implement]
+    parallel_with: [run_quality_checks]
+    discord_channel: security
+
+  - id: code_review
+    type: agent
+    agent: reviewer
+    depends_on: [run_quality_checks, security_scan]
+    discord_channel: pull_requests
+
+  - id: create_pr
+    type: github_action
+    depends_on: [code_review]
+    action: create_pull_request
+    inputs:
+      title: "{feature_title}"
+      labels: ["feature", "ai-generated"]
+
+on_error:
+  discord_channel: orchestration_status
+  message: "❌ Feature workflow failed at {failed_step}: {error_message}"

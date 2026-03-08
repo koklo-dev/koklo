@@ -1,0 +1,115 @@
+project:
+  name: koklo
+  description: "Koklo Community - AI-assisted software development OS"
+  repo: https://github.com/koklo-dev/koklo
+  language: rust+typescript
+  framework: tauri
+
+integrations:
+  discord:
+    enabled: true
+    bot_token: "${DISCORD_BOT_TOKEN}"
+    guild_id: "${DISCORD_GUILD_ID}"
+    channels:
+      orchestration_status: "${CHAN_ORCHESTRATION_STATUS}"
+      backlog: "${CHAN_BACKLOG}"
+      decisions: "${CHAN_DECISIONS}"
+      dev_feed: "${CHAN_DEV_FEED}"
+      agent_logs: "${CHAN_AGENT_LOGS}"
+      pull_requests: "${CHAN_PULL_REQUESTS}"
+      ci_status: "${CHAN_CI_STATUS}"
+      tests: "${CHAN_TESTS}"
+      sentry_alerts: "${CHAN_SENTRY_ALERTS}"
+      releases: "${CHAN_RELEASES}"
+      metrics: "${CHAN_METRICS}"
+      infra: "${CHAN_INFRA}"
+      security: "${CHAN_SECURITY}"
+      standup: "${CHAN_STANDUP}"
+      sprint: "${CHAN_SPRINT}"
+
+  github:
+    enabled: true
+    token: "${GITHUB_TOKEN}"
+    org: "koklo-dev"
+    repo: "koklo"
+    default_branch: develop
+
+  linear:
+    enabled: true
+    api_key: "${LINEAR_API_KEY}"
+    team_id: "${LINEAR_TEAM_ID}"
+
+  sentry:
+    enabled: true
+    dsn: "${SENTRY_DSN}"
+    org: "koklo"
+    project: "koklo-desktop"
+
+llm:
+  provider: anthropic
+  model: claude-sonnet-4-5
+  model_heavy: claude-opus-4-5
+  model_fast: claude-haiku-4-5
+  api_key: "${ANTHROPIC_API_KEY}"
+
+# BMAD v6-compatible dispatch. No conflict with _bmad installation.
+agents:
+  - id: pm
+    type: bmad
+    bmad_command: "/bmad-agent-bmm-pm"
+    customize: "_bmad/_config/agents/bmm-pm.customize.yaml"
+    model: claude-sonnet-4-5
+
+  - id: analyst
+    type: bmad
+    bmad_command: "/bmad-agent-bmm-analyst"
+    customize: "_bmad/_config/agents/bmm-analyst.customize.yaml"
+    model: claude-sonnet-4-5
+
+  - id: architect
+    type: bmad
+    bmad_command: "/bmad-agent-bmm-architect"
+    customize: "_bmad/_config/agents/bmm-architect.customize.yaml"
+    model: claude-opus-4-5
+
+  - id: developer
+    type: bmad
+    bmad_command: "/bmad-agent-bmm-dev"
+    customize: "_bmad/_config/agents/bmm-dev.customize.yaml"
+    model: claude-sonnet-4-5
+
+  - id: reviewer
+    type: bmad
+    bmad_command: "/bmad-bmm-code-review"
+    model: claude-sonnet-4-5
+
+  - id: security
+    type: bmad
+    bmad_command: "/bmad-review-adversarial-general"
+    model: claude-opus-4-5
+
+  - id: qa
+    type: bmad
+    bmad_command: "/bmad-agent-bmm-qa"
+    customize: "_bmad/_config/agents/bmm-qa.customize.yaml"
+    model: claude-sonnet-4-5
+
+  - id: scribe
+    type: bmad
+    bmad_command: "/bmad-agent-bmm-tech-writer"
+    customize: "_bmad/_config/agents/bmm-tech-writer.customize.yaml"
+    model: claude-haiku-4-5
+
+standup:
+  enabled: true
+  schedule: "0 9 * * 1-5"
+  channel: standup
+
+gates:
+  approvers:
+    architecture: ["@jo"]
+    security: ["@jo"]
+    release: ["@jo"]
+    pr_merge: ["@jo", "@dev2"]
+  reminder_after_minutes: 30
+  timeout_hours: 24
