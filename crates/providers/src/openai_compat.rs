@@ -17,6 +17,10 @@ pub(crate) struct OpenAICompatProvider {
     /// Env var that holds the API key (for error messages).
     pub(crate) api_key_env: String,
     pub(crate) client: reqwest::Client,
+    /// Extra HTTP headers appended to every request (e.g. `HTTP-Referer` for OpenRouter).
+    pub(crate) extra_headers: Vec<(String, String)>,
+    /// Extra JSON keys merged into the top-level request body (e.g. `"provider": {...}`).
+    pub(crate) extra_body: Option<serde_json::Value>,
 }
 
 impl OpenAICompatProvider {
@@ -37,6 +41,8 @@ impl OpenAICompatProvider {
                 .timeout(Duration::from_secs(120))
                 .build()
                 .unwrap_or_default(),
+            extra_headers: vec![],
+            extra_body: None,
         }
     }
 }
@@ -119,16 +125,24 @@ impl LlmProvider for OpenAICompatProvider {
             .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
             .collect();
 
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "model": self.model,
             "messages": api_messages,
             "stream": true
         });
 
+        // Merge extra_body into the request body (e.g. OpenRouter `provider` routing).
+        if let (Some(extra), Some(obj)) = (&self.extra_body, body.as_object_mut()) {
+            if let Some(extra_obj) = extra.as_object() {
+                obj.extend(extra_obj.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+        }
+
         let client = self.client.clone();
         let url = format!("{}/chat/completions", self.base_url);
         let api_key = self.api_key.clone();
         let body_clone = body.clone();
+        let extra_headers = self.extra_headers.clone();
 
         let resp = with_retry(
             || {
@@ -136,14 +150,16 @@ impl LlmProvider for OpenAICompatProvider {
                 let url = url.clone();
                 let api_key = api_key.clone();
                 let body = body_clone.clone();
+                let extra_headers = extra_headers.clone();
                 async move {
-                    client
+                    let mut req = client
                         .post(&url)
                         .header("Authorization", format!("Bearer {}", api_key))
-                        .header("Content-Type", "application/json")
-                        .json(&body)
-                        .send()
-                        .await
+                        .header("Content-Type", "application/json");
+                    for (k, v) in &extra_headers {
+                        req = req.header(k.as_str(), v.as_str());
+                    }
+                    req.json(&body).send().await
                 }
             },
             3,
