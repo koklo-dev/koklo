@@ -498,7 +498,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_and_get_session() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Auth JWT", "sdd", "/home/user/myproject").await.unwrap();
+        let session = mgr
+            .create_session("Auth JWT", "sdd", "/home/user/myproject")
+            .await
+            .unwrap();
         assert_eq!(session.feature_title, "Auth JWT");
         assert_eq!(session.status, "pending");
         assert_eq!(session.preset, "sdd");
@@ -549,8 +552,12 @@ mod tests {
     #[tokio::test]
     async fn test_list_sessions() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        mgr.create_session("feature A", "sdd", "/proj/a").await.unwrap();
-        mgr.create_session("feature B", "bmad", "/proj/b").await.unwrap();
+        mgr.create_session("feature A", "sdd", "/proj/a")
+            .await
+            .unwrap();
+        mgr.create_session("feature B", "bmad", "/proj/b")
+            .await
+            .unwrap();
         let sessions = mgr.list_sessions().await.unwrap();
         assert_eq!(sessions.len(), 2);
     }
@@ -558,9 +565,15 @@ mod tests {
     #[tokio::test]
     async fn test_list_sessions_for_project() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        mgr.create_session("feature A", "sdd", "/proj/alpha").await.unwrap();
-        mgr.create_session("feature B", "sdd", "/proj/alpha").await.unwrap();
-        mgr.create_session("feature C", "sdd", "/proj/beta").await.unwrap();
+        mgr.create_session("feature A", "sdd", "/proj/alpha")
+            .await
+            .unwrap();
+        mgr.create_session("feature B", "sdd", "/proj/alpha")
+            .await
+            .unwrap();
+        mgr.create_session("feature C", "sdd", "/proj/beta")
+            .await
+            .unwrap();
         let alpha = mgr.list_sessions_for_project("/proj/alpha").await.unwrap();
         assert_eq!(alpha.len(), 2);
         let beta = mgr.list_sessions_for_project("/proj/beta").await.unwrap();
@@ -572,7 +585,10 @@ mod tests {
     #[tokio::test]
     async fn test_record_and_list_artifacts() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Artifact Test", "sdd", "").await.unwrap();
+        let session = mgr
+            .create_session("Artifact Test", "sdd", "")
+            .await
+            .unwrap();
         let artifact = mgr
             .record_artifact(&session.id, "spec", "/tmp/spec.md", 1234)
             .await
@@ -639,7 +655,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_agent_logs_since() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Incremental Test", "sdd", "").await.unwrap();
+        let session = mgr
+            .create_session("Incremental Test", "sdd", "")
+            .await
+            .unwrap();
         mgr.record_agent_log(&session.id, "spec", "pm", "msg1")
             .await
             .unwrap();
