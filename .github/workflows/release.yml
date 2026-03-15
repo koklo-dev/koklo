@@ -1,4 +1,4 @@
-name: Release - Community
+name: Release - Infra
 
 on:
   pull_request:
