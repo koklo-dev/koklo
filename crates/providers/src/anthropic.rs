@@ -150,17 +150,18 @@ mod tests {
 
     #[test]
     fn test_from_config_with_literal_key() {
+        // Use a unique env var name to avoid races with other tests that touch ANTHROPIC_API_KEY.
+        let var = "ANTHROPIC_API_KEY_TEST_CONFIG";
         let entry = ProviderTomlEntry {
-            api_key_env: Some("ANTHROPIC_API_KEY".to_string()),
+            api_key_env: Some(var.to_string()),
             model: Some("claude-haiku-4-5-20251001".to_string()),
             ..Default::default()
         };
-        // Set the env var for this test
-        std::env::set_var("ANTHROPIC_API_KEY", "sk-test-literal");
+        std::env::set_var(var, "sk-test-literal");
         let p = AnthropicProvider::from_config(&entry).unwrap();
         assert_eq!(p.model, "claude-haiku-4-5-20251001");
         assert_eq!(p.provider_name(), "anthropic");
-        std::env::remove_var("ANTHROPIC_API_KEY");
+        std::env::remove_var(var);
     }
 
     #[test]
