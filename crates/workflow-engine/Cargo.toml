@@ -1,8 +1,21 @@
 [package]
 name = "koklo-workflow-engine"
-version = "0.1.0"
-edition = "2021"
-description = "workflow-engine crate for Koklo Community"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+description = "Pipeline orchestration engine for koklo"
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+koklo-events = { path = "../events" }
+koklo-storage = { path = "../storage" }
+koklo-providers = { path = "../providers" }
+koklo-agent-runtime = { path = "../agent-runtime" }
+octocrab = "0.39"

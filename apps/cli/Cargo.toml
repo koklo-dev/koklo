@@ -1,8 +1,32 @@
 [package]
 name = "koklo-cli"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 description = "Koklo command line interface"
+
+[[bin]]
+name = "koklo"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+which = { workspace = true }
+
+koklo-core = { path = "../../crates/core" }
+koklo-storage = { path = "../../crates/storage" }
+koklo-events = { path = "../../crates/events" }
+koklo-workflow-engine = { path = "../../crates/workflow-engine" }
+koklo-providers = { path = "../../crates/providers" }
+koklo-shell = { path = "../../crates/shell" }
+koklo-agent-runtime = { path = "../../crates/agent-runtime" }

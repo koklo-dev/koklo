@@ -1,8 +1,15 @@
 [package]
 name = "koklo-storage"
-version = "0.1.0"
-edition = "2021"
-description = "storage crate for Koklo Community"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+description = "SQLite-backed session storage for koklo"
 
 [dependencies]
 anyhow = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

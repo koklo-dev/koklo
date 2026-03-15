@@ -1,0 +1,78 @@
+name: Auto PR develop → main
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  auto-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          set -euo pipefail
+
+          COMMITS=$(git log origin/main..HEAD --pretty=format:"%s" --no-merges)
+
+          if [ -z "$COMMITS" ]; then
+            echo "body=_No new commits since last release._" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          FEAT=$(echo "$COMMITS" | grep -E "^feat(\(.+\))?[!:]?" | sed 's/^/- /' || true)
+          FIX=$(echo  "$COMMITS" | grep -E "^fix(\(.+\))?[!:]?"  | sed 's/^/- /' || true)
+          OTHER=$(echo "$COMMITS" | grep -vE "^feat(\(.+\))?[!:]?|^fix(\(.+\))?[!:]?|^Merge " | sed 's/^/- /' || true)
+
+          BODY=""
+          if [ -n "$FEAT" ]; then
+            BODY+="## Features"$'\n'"$FEAT"$'\n\n'
+          fi
+          if [ -n "$FIX" ]; then
+            BODY+="## Fixes"$'\n'"$FIX"$'\n\n'
+          fi
+          if [ -n "$OTHER" ]; then
+            BODY+="## Other"$'\n'"$OTHER"$'\n'
+          fi
+
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Create or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY: ${{ steps.changelog.outputs.body }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER=$(gh pr list \
+            --base main \
+            --head develop \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            gh pr create \
+              --base main \
+              --head develop \
+              --title "chore(release): develop → main" \
+              --body "$BODY"
+            echo "PR created." >> "${GITHUB_STEP_SUMMARY}"
+          else
+            gh pr edit "$PR_NUMBER" --body "$BODY"
+            echo "PR #${PR_NUMBER} updated." >> "${GITHUB_STEP_SUMMARY}"
+          fi
