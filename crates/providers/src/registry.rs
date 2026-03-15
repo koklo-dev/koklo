@@ -114,6 +114,7 @@ mod tests {
     use super::*;
     use crate::config::{AgentTomlConfig, PipelineTomlConfig, ProviderTomlEntry};
 
+    #[allow(dead_code)]
     fn make_toml_with_anthropic(key_set: bool) -> PipelineTomlConfig {
         if key_set {
             std::env::set_var("ANTHROPIC_API_KEY", "sk-test");

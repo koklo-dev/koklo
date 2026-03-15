@@ -5,7 +5,7 @@
 //! - ControlledShell: shows command to human before executing
 use anyhow::Result;
 use async_trait::async_trait;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Output from running a command inside a sandbox.
 #[derive(Debug, Clone)]
@@ -19,7 +19,7 @@ pub struct SandboxOutput {
 #[async_trait]
 pub trait Sandbox: Send + Sync {
     /// Run a shell command in the sandbox, return its output.
-    async fn run(&self, command: &str, workdir: &PathBuf) -> Result<SandboxOutput>;
+    async fn run(&self, command: &str, workdir: &Path) -> Result<SandboxOutput>;
 }
 
 /// Read-only sandbox using process-level restrictions.
@@ -36,7 +36,7 @@ impl LandlockSandbox {
 
 #[async_trait]
 impl Sandbox for LandlockSandbox {
-    async fn run(&self, command: &str, workdir: &PathBuf) -> Result<SandboxOutput> {
+    async fn run(&self, command: &str, workdir: &Path) -> Result<SandboxOutput> {
         tracing::info!("LandlockSandbox running: {}", command);
         // In production, apply Landlock rules before spawning.
         // For now: run with restricted env vars and no write access checks.
@@ -69,7 +69,7 @@ impl BubblewrapSandbox {
 
 #[async_trait]
 impl Sandbox for BubblewrapSandbox {
-    async fn run(&self, command: &str, workdir: &PathBuf) -> Result<SandboxOutput> {
+    async fn run(&self, command: &str, workdir: &Path) -> Result<SandboxOutput> {
         tracing::info!("BubblewrapSandbox running: {}", command);
         // Build bwrap command with appropriate restrictions
         let mut bwrap_args = vec![
@@ -130,7 +130,7 @@ impl ControlledShell {
 
 #[async_trait]
 impl Sandbox for ControlledShell {
-    async fn run(&self, command: &str, workdir: &PathBuf) -> Result<SandboxOutput> {
+    async fn run(&self, command: &str, workdir: &Path) -> Result<SandboxOutput> {
         // Print command for human review
         println!("\n[CONTROLLED SHELL] About to execute:");
         println!("  $ {}", command);

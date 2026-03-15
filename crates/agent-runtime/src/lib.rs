@@ -41,14 +41,14 @@ impl AgentRunner {
         let messages = vec![Message::system(system_prompt), Message::user(user_prompt)];
 
         let bus = self.bus.clone();
-        let phase = self.config.phase.clone();
+        let phase = self.config.phase;
 
         let mut result = String::new();
         self.provider
             .complete_stream(messages, &mut |chunk| {
                 if !chunk.text.is_empty() {
                     bus.send(PipelineEvent::AgentLog {
-                        phase: phase.clone(),
+                        phase,
                         message: chunk.text.clone(),
                     });
                     result.push_str(&chunk.text);

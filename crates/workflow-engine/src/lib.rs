@@ -209,7 +209,7 @@ impl PipelineOrchestrator {
             .await?
             .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
 
-        let preset = PresetKind::from_str(&session.preset).unwrap_or_else(|| {
+        let preset = PresetKind::parse(&session.preset).unwrap_or_else(|| {
             tracing::warn!(
                 "Unknown preset '{}' in session {}, falling back to SDD",
                 session.preset,

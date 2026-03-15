@@ -10,10 +10,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// The variant names map 1-to-1 with the `--preset` CLI flag and the
 /// `[workflow] preset` TOML key (case-insensitive).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PresetKind {
     /// Koklo's own Spec-Driven Development — the default 5-phase pipeline.
+    #[default]
     Sdd,
     /// [BMAD Method v6](https://github.com/bmad-code-org/BMAD-METHOD) — agile,
     /// expert-agent workflow (8 phases).
@@ -32,7 +33,7 @@ pub enum PresetKind {
 impl PresetKind {
     /// Parse a preset name from a string (case-insensitive).
     /// Accepts common aliases: `"spec-kit"`, `"spec_kit"` → [`PresetKind::SpecKit`].
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "sdd" => Some(Self::Sdd),
             "bmad" => Some(Self::Bmad),
@@ -94,12 +95,6 @@ impl PresetKind {
             Self::Light,
             Self::Custom,
         ]
-    }
-}
-
-impl Default for PresetKind {
-    fn default() -> Self {
-        Self::Sdd
     }
 }
 
@@ -204,7 +199,7 @@ mod tests {
     fn from_str_roundtrip() {
         for &kind in PresetKind::all() {
             assert_eq!(
-                PresetKind::from_str(kind.as_str()),
+                PresetKind::parse(kind.as_str()),
                 Some(kind),
                 "roundtrip failed for {:?}",
                 kind
@@ -214,15 +209,15 @@ mod tests {
 
     #[test]
     fn from_str_speckit_aliases() {
-        assert_eq!(PresetKind::from_str("spec-kit"), Some(PresetKind::SpecKit));
-        assert_eq!(PresetKind::from_str("spec_kit"), Some(PresetKind::SpecKit));
-        assert_eq!(PresetKind::from_str("SPECKIT"), Some(PresetKind::SpecKit));
+        assert_eq!(PresetKind::parse("spec-kit"), Some(PresetKind::SpecKit));
+        assert_eq!(PresetKind::parse("spec_kit"), Some(PresetKind::SpecKit));
+        assert_eq!(PresetKind::parse("SPECKIT"), Some(PresetKind::SpecKit));
     }
 
     #[test]
     fn from_str_unknown_returns_none() {
-        assert_eq!(PresetKind::from_str("unknown"), None);
-        assert_eq!(PresetKind::from_str(""), None);
+        assert_eq!(PresetKind::parse("unknown"), None);
+        assert_eq!(PresetKind::parse(""), None);
     }
 
     #[test]

@@ -34,7 +34,7 @@ use koklo_workflow_engine::{
     GithubConfig, PipelineConfig, PipelineOrchestrator,
 };
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
@@ -430,7 +430,7 @@ async fn main() -> Result<()> {
 // ── preset parser (for clap value_parser) ────────────────────────────────────
 
 fn parse_preset(s: &str) -> Result<PresetKind, String> {
-    PresetKind::from_str(s).ok_or_else(|| {
+    PresetKind::parse(s).ok_or_else(|| {
         format!(
             "Unknown preset '{}'. Valid: sdd, bmad, speckit, light, custom",
             s
@@ -532,7 +532,7 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
             .workflow
             .preset
             .as_deref()
-            .and_then(PresetKind::from_str)
+            .and_then(PresetKind::parse)
             .unwrap_or_default()
     });
 
@@ -658,7 +658,7 @@ async fn cmd_init(path: &PathBuf, preset: PresetKind, yes: bool) -> Result<()> {
 }
 
 /// Detect the likely project stack and return a suggested preset.
-fn detect_stack_preset(dir: &PathBuf) -> PresetKind {
+fn detect_stack_preset(dir: &Path) -> PresetKind {
     if dir.join("Cargo.toml").exists() {
         return PresetKind::Sdd; // Rust → SDD
     }
@@ -722,8 +722,8 @@ async fn cmd_session_list() -> Result<()> {
         println!("No sessions found.");
     } else {
         println!(
-            "{:<38} {:<8} {:<30} {}",
-            "SESSION ID", "PRESET", "FEATURE", "STATUS"
+            "{:<38} {:<8} {:<30} STATUS",
+            "SESSION ID", "PRESET", "FEATURE"
         );
         println!("{}", "-".repeat(88));
         for s in sessions {
@@ -752,7 +752,7 @@ async fn cmd_session_show(id: &str) -> Result<()> {
             if phases.is_empty() {
                 println!("No phases recorded.");
             } else {
-                println!("{:<14} {:<12} {}", "PHASE", "STATUS", "COMPLETED");
+                println!("{:<14} {:<12} COMPLETED", "PHASE", "STATUS");
                 println!("{}", "-".repeat(50));
                 for p in phases {
                     println!(
@@ -787,7 +787,7 @@ async fn cmd_agent_list() -> Result<()> {
         }
     }
     let dir = agents_dir();
-    println!("{:<22} {}", "AGENT", "SYSTEM PROMPT");
+    println!("{:<22} SYSTEM PROMPT", "AGENT");
     println!("{}", "-".repeat(60));
     for name in &seen {
         let prompt_path = dir.join(format!("{}.md", name));
@@ -881,10 +881,7 @@ async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
 
 /// `koklo workflow list`
 fn cmd_workflow_list() {
-    println!(
-        "{:<10} {:<30} {:<8} {}",
-        "PRESET", "NAME", "PHASES", "REFERENCE"
-    );
+    println!("{:<10} {:<30} {:<8} REFERENCE", "PRESET", "NAME", "PHASES");
     println!("{}", "-".repeat(75));
     for &kind in PresetKind::all() {
         let phases = phases_for_preset(kind);
@@ -901,7 +898,7 @@ fn cmd_workflow_list() {
 
 /// `koklo workflow show <preset>`
 fn cmd_workflow_show(preset_str: &str) -> Result<()> {
-    let kind = PresetKind::from_str(preset_str).ok_or_else(|| {
+    let kind = PresetKind::parse(preset_str).ok_or_else(|| {
         anyhow::anyhow!(
             "Unknown preset '{}'. Run `koklo workflow list`.",
             preset_str
@@ -952,7 +949,7 @@ async fn cmd_artifacts_list(session_id: &str) -> Result<()> {
     if artifacts.is_empty() {
         println!("No artifacts recorded for session {}.", session_id);
     } else {
-        println!("{:<14} {:<12} {}", "PHASE", "SIZE", "PATH");
+        println!("{:<14} {:<12} PATH", "PHASE", "SIZE");
         println!("{}", "-".repeat(70));
         for a in artifacts {
             println!("{:<14} {:<12} {}", a.phase, a.size_bytes, a.path);
@@ -989,7 +986,7 @@ async fn cmd_provider_list() -> Result<()> {
         println!("No providers configured. Run `koklo init` or edit .koklo/pipeline.toml.");
         return Ok(());
     }
-    println!("{:<20} {:<30} {}", "NAME", "MODEL", "STATUS");
+    println!("{:<20} {:<30} STATUS", "NAME", "MODEL");
     println!("{}", "-".repeat(65));
     for (name, entry) in &toml_config.providers {
         let model = entry.model.as_deref().unwrap_or("-");

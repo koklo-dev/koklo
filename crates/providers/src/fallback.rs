@@ -82,6 +82,7 @@ mod tests {
     use std::sync::Arc;
 
     struct SuccessProvider;
+    #[allow(dead_code)]
     struct FailProvider(ProviderError);
 
     // Helper to build a typed ProviderError that can be downcast
