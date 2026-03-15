@@ -59,4 +59,12 @@ model = "claude-opus-4-6"
 # [providers.ollama]
 # base_url = "http://localhost:11434"
 # model = "llama3.2"
+
+# [providers.openrouter]
+# api_key_env = "OPENROUTER_API_KEY"
+# model = "anthropic/claude-opus-4-6"
+# [providers.openrouter.routing]
+# data_collection = "deny"
+# allow_fallbacks = true
+# sort = "price"
 "#;

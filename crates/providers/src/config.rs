@@ -41,6 +41,59 @@ pub struct AgentTomlConfig {
     pub sandbox: Option<String>,
 }
 
+/// OpenRouter provider-level routing config (`[providers.openrouter.routing]`).
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ProviderRouting {
+    /// Preferred provider order (e.g. `["Anthropic", "OpenAI"]`).
+    pub order: Option<Vec<String>>,
+    /// Restrict to these providers only.
+    pub only: Option<Vec<String>>,
+    /// Exclude these providers.
+    pub ignore: Option<Vec<String>>,
+    /// Whether to allow fallbacks. Default: `true`.
+    pub allow_fallbacks: Option<bool>,
+    /// Data collection policy: `"allow"` or `"deny"`.
+    pub data_collection: Option<String>,
+    /// Require Zero Data Retention agreement.
+    pub zdr: Option<bool>,
+    /// Sort strategy: `"price"`, `"throughput"`, or `"latency"`.
+    pub sort: Option<String>,
+    /// Max price filter, e.g. `{ "prompt": "0.5", "completion": "1.0" }`.
+    pub max_price: Option<serde_json::Value>,
+}
+
+impl ProviderRouting {
+    /// Serialize non-`None` fields into a JSON object for the OpenRouter `provider` key.
+    pub fn to_json(&self) -> serde_json::Value {
+        let mut obj = serde_json::Map::new();
+        if let Some(ref v) = self.order {
+            obj.insert("order".to_string(), serde_json::json!(v));
+        }
+        if let Some(ref v) = self.only {
+            obj.insert("only".to_string(), serde_json::json!(v));
+        }
+        if let Some(ref v) = self.ignore {
+            obj.insert("ignore".to_string(), serde_json::json!(v));
+        }
+        if let Some(v) = self.allow_fallbacks {
+            obj.insert("allow_fallbacks".to_string(), serde_json::json!(v));
+        }
+        if let Some(ref v) = self.data_collection {
+            obj.insert("data_collection".to_string(), serde_json::json!(v));
+        }
+        if let Some(v) = self.zdr {
+            obj.insert("zdr".to_string(), serde_json::json!(v));
+        }
+        if let Some(ref v) = self.sort {
+            obj.insert("sort".to_string(), serde_json::json!(v));
+        }
+        if let Some(ref v) = self.max_price {
+            obj.insert("max_price".to_string(), v.clone());
+        }
+        serde_json::Value::Object(obj)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ProviderTomlEntry {
     /// Env var name holding the API key (e.g. `"ANTHROPIC_API_KEY"`).
@@ -49,6 +102,8 @@ pub struct ProviderTomlEntry {
     pub base_url: Option<String>,
     /// Optional fallback provider name.
     pub fallback: Option<String>,
+    /// OpenRouter routing config (only used when `provider = "openrouter"`).
+    pub routing: Option<ProviderRouting>,
 }
 
 impl PipelineTomlConfig {
@@ -103,6 +158,30 @@ timeout_secs = 120
         let cfg = PipelineTomlConfig::load_from_project_root(root).unwrap();
         assert!(cfg.providers.is_empty());
         assert!(cfg.agents.is_empty());
+    }
+
+    #[test]
+    fn test_parse_openrouter_routing() {
+        let raw = r#"
+[providers.openrouter]
+api_key_env = "OPENROUTER_API_KEY"
+model = "anthropic/claude-opus-4-6"
+
+[providers.openrouter.routing]
+data_collection = "deny"
+allow_fallbacks = true
+sort = "price"
+"#;
+        let cfg: PipelineTomlConfig = toml::from_str(raw).unwrap();
+        let entry = &cfg.providers["openrouter"];
+        let routing = entry.routing.as_ref().unwrap();
+        assert_eq!(routing.data_collection.as_deref(), Some("deny"));
+        assert_eq!(routing.allow_fallbacks, Some(true));
+        assert_eq!(routing.sort.as_deref(), Some("price"));
+        let json = routing.to_json();
+        assert_eq!(json["data_collection"].as_str().unwrap(), "deny");
+        assert_eq!(json["allow_fallbacks"].as_bool().unwrap(), true);
+        assert_eq!(json["sort"].as_str().unwrap(), "price");
     }
 
     #[test]

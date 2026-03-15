@@ -7,6 +7,7 @@ use crate::error::ProviderError;
 use crate::mistral::MistralProvider;
 use crate::ollama::OllamaProvider;
 use crate::openai::OpenAIProvider;
+use crate::openrouter::OpenRouterProvider;
 use crate::LlmProvider;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -19,6 +20,7 @@ const KNOWN_NAMES: &[&str] = &[
     "ollama",
     "claude-code",
     "codex",
+    "openrouter",
 ];
 
 pub struct ProviderRegistry {
@@ -102,6 +104,7 @@ fn build_one(name: &str, entry: &ProviderTomlEntry) -> Result<Arc<dyn LlmProvide
         "ollama" => Ok(Arc::new(OllamaProvider::from_config(entry)?)),
         "claude-code" => Ok(Arc::new(ClaudeCodeCliProvider::from_config(entry)?)),
         "codex" => Ok(Arc::new(CodexCliProvider::from_config(entry)?)),
+        "openrouter" => Ok(Arc::new(OpenRouterProvider::from_config(entry)?)),
         _ => Err(ProviderError::UnknownProvider {
             name: name.to_string(),
             known: KNOWN_NAMES.join(", "),
