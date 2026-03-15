@@ -1034,7 +1034,9 @@ async fn cmd_monitor(
         let resolved = if p == "." {
             find_project_root().unwrap_or_else(|_| std::env::current_dir().unwrap())
         } else {
-            PathBuf::from(p).canonicalize().unwrap_or_else(|_| PathBuf::from(p))
+            PathBuf::from(p)
+                .canonicalize()
+                .unwrap_or_else(|_| PathBuf::from(p))
         };
         Some(resolved.to_string_lossy().into_owned())
     } else {
