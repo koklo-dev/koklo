@@ -37,11 +37,17 @@ pub struct MonitorApp {
     last_seq: i64,
     focus: Panel,
     storage: Arc<SessionManager>,
+    /// When `Some`, only sessions from this project path are shown.
+    project_filter: Option<String>,
 }
 
 impl MonitorApp {
-    pub async fn new(session_filter: Option<&str>, storage: Arc<SessionManager>) -> Result<Self> {
-        let sessions = storage.list_sessions().await?;
+    pub async fn new(
+        session_filter: Option<&str>,
+        project_filter: Option<String>,
+        storage: Arc<SessionManager>,
+    ) -> Result<Self> {
+        let sessions = Self::load_sessions(&storage, project_filter.as_deref()).await?;
         let selected_session = if let Some(filter) = session_filter {
             sessions
                 .iter()
@@ -70,12 +76,25 @@ impl MonitorApp {
             last_seq,
             focus: Panel::Sessions,
             storage,
+            project_filter,
         })
+    }
+
+    async fn load_sessions(
+        storage: &SessionManager,
+        project_filter: Option<&str>,
+    ) -> Result<Vec<Session>> {
+        if let Some(path) = project_filter {
+            storage.list_sessions_for_project(path).await
+        } else {
+            storage.list_sessions().await
+        }
     }
 
     /// Poll the DB for new data. Returns `true` if anything changed.
     pub async fn tick(&mut self) -> Result<bool> {
-        let new_sessions = self.storage.list_sessions().await?;
+        let new_sessions =
+            Self::load_sessions(&self.storage, self.project_filter.as_deref()).await?;
         let changed = new_sessions.len() != self.sessions.len();
         self.sessions = new_sessions;
 
@@ -290,12 +309,13 @@ impl MonitorApp {
 pub async fn run_monitor(
     session_filter: Option<String>,
     follow: bool,
+    project_filter: Option<String>,
     storage: Arc<SessionManager>,
 ) -> Result<()> {
     if follow {
-        run_follow_mode(session_filter, storage).await
+        run_follow_mode(session_filter, project_filter, storage).await
     } else {
-        run_tui_mode(session_filter, storage).await
+        run_tui_mode(session_filter, project_filter, storage).await
     }
 }
 
@@ -303,9 +323,10 @@ pub async fn run_monitor(
 
 async fn run_follow_mode(
     session_filter: Option<String>,
+    project_filter: Option<String>,
     storage: Arc<SessionManager>,
 ) -> Result<()> {
-    let sessions = storage.list_sessions().await?;
+    let sessions = MonitorApp::load_sessions(&storage, project_filter.as_deref()).await?;
     let session = if let Some(ref filter) = session_filter {
         sessions
             .iter()
@@ -352,14 +373,18 @@ async fn run_follow_mode(
 
 // ── TUI mode ───────────────────────────────────────────────────────────────────
 
-async fn run_tui_mode(session_filter: Option<String>, storage: Arc<SessionManager>) -> Result<()> {
+async fn run_tui_mode(
+    session_filter: Option<String>,
+    project_filter: Option<String>,
+    storage: Arc<SessionManager>,
+) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = MonitorApp::new(session_filter.as_deref(), storage).await?;
+    let mut app = MonitorApp::new(session_filter.as_deref(), project_filter, storage).await?;
     let result = tui_event_loop(&mut terminal, &mut app).await;
 
     disable_raw_mode()?;
