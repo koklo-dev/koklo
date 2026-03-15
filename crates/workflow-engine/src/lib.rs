@@ -49,11 +49,15 @@ impl GithubConfig {
 /// Configuration for the pipeline.
 #[derive(Clone)]
 pub struct PipelineConfig {
+    /// Path to the global SQLite database (`~/.koklo/koklo.db`).
     pub db_path: String,
     pub artifacts_dir: PathBuf,
-    pub agents_dir: PathBuf,
-    /// Path to the `.koklo/` directory for project context (USER.md, MEMORY.md, memories/).
-    pub context_dir: Option<PathBuf>,
+    /// Global koklo home directory (`~/.koklo/`).
+    pub global_home: PathBuf,
+    /// Project-level `.koklo/` directory. `None` when outside any project.
+    pub project_context: Option<PathBuf>,
+    /// Absolute path of the current project root (recorded on each session).
+    pub project_path: String,
     /// Workflow preset used when none is specified at the call site.
     pub preset: PresetKind,
     /// Default provider used when no per-agent override is set.
@@ -143,7 +147,7 @@ impl PipelineOrchestrator {
     ) -> Result<String> {
         let session = self
             .storage
-            .create_session(feature_title, preset.as_str())
+            .create_session(feature_title, preset.as_str(), &self.config.project_path)
             .await?;
         let session_id = session.id.clone();
         tracing::info!(
@@ -325,14 +329,13 @@ impl PipelineOrchestrator {
             .create_phase_record(session_id, &phase.to_string())
             .await?;
 
-        let system_prompt_file = self.config.agents_dir.join(format!("{}.md", agent_name));
         let config = AgentConfig {
             name: agent_name.to_string(),
             phase,
-            system_prompt_file,
+            agent_slug: agent_name.to_string(),
             timeout_secs: 300,
-            agents_dir: Some(self.config.agents_dir.clone()),
-            context_dir: self.config.context_dir.clone(),
+            global_home: self.config.global_home.clone(),
+            project_context: self.config.project_context.clone(),
         };
 
         let provider = self.config.resolve_provider_for_agent(agent_name);
@@ -452,16 +455,18 @@ impl PipelineOrchestrator {
         }
     }
 
-    /// Append a session summary to `.koklo/memories/YYYY-MM-DD.md`.
+    /// Append a session summary to the memories directory.
+    ///
+    /// Writes to the project memories dir if available, otherwise global.
     async fn write_memory_log(
         &self,
         session: &Session,
         preset: PresetKind,
         start_time: chrono::DateTime<Utc>,
     ) -> Result<()> {
-        let ctx_dir = match &self.config.context_dir {
+        let ctx_dir = match &self.config.project_context {
             Some(d) => d.clone(),
-            None => return Ok(()),
+            None => self.config.global_home.clone(),
         };
 
         let phases = self.storage.get_phases_for_session(&session.id).await?;
@@ -622,8 +627,9 @@ mod tests {
         PipelineConfig {
             db_path: "sqlite://test.db".to_string(),
             artifacts_dir: PathBuf::from("/tmp"),
-            agents_dir: PathBuf::from("/tmp"),
-            context_dir: None,
+            global_home: PathBuf::from("/tmp"),
+            project_context: None,
+            project_path: String::new(),
             preset: PresetKind::Sdd,
             default_provider: default,
             agent_providers,
