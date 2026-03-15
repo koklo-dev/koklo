@@ -105,13 +105,23 @@ pnpm dev
 
 That's it. Koklo detects your project, suggests a preset, and you're ready to go.
 
-### Or point Koklo at an existing project
+### Or use the CLI directly
 
 ```bash
-koklo .
+# Install the CLI
+cargo install --path apps/cli
+
+# Initialise in an existing project (auto-detects stack, creates .koklo/pipeline.toml)
+koklo init
+
+# Run a pipeline — choose your methodology
+koklo run feature "Auth JWT"                    # SDD (default, 5 phases)
+koklo run --preset bmad    feature "Add OAuth2" # BMAD Method (8 phases)
+koklo run --preset speckit feature "Refactor"  # GitHub Spec Kit (6 phases)
+koklo run --preset light   task    "Fix typo"  # Minimal (3 phases)
 ```
 
-Koklo scans your repo, detects the stack, and proposes a workflow. You choose the level: **Light**, **Standard**, or **Strict**.
+→ **[Full CLI reference →  apps/cli/README.md](apps/cli/README.md)**
 
 ---
 
@@ -123,7 +133,7 @@ Koklo is built as a modular monorepo with **12 functional blocks**:
 koklo/
 ├── apps/
 │   ├── desktop/            # Tauri desktop application
-│   ├── cli/                # CLI launcher (koklo .)
+│   ├── cli/                # koklo CLI — see apps/cli/README.md
 │   ├── web/                # Web interface (cloud)
 │   └── sync-server/        # Synchronization server
 │
@@ -149,7 +159,8 @@ koklo/
 │   └── trpc-client/        # tRPC client
 │
 └── agents/                  # Agent definitions (Markdown)
-    ├── built-in/           # 8 built-in agents
+    ├── built-in/           # 10 built-in agents (pm, architect, developer, qa, reviewer,
+    │                       #   analyst, security, doc-writer, constitution-writer, task-planner)
     └── marketplace/        # Community agents
 ```
 
@@ -194,16 +205,18 @@ You are a senior security engineer...
 
 ### Built-in Agents
 
-| Agent | Role |
-|-------|------|
-| 🏗️ Architect | Validates architecture, suggests patterns |
-| 🔒 Security | OWASP, CVE scanning, fix suggestions |
-| 🧪 Tester | Unit, integration, E2E test generation |
-| 📝 Doc Writer | README, API docs, changelog, ADR |
-| 🔍 Reviewer | Automated code review, code smells |
-| ⚡ Performance | Bottleneck detection, profiling |
-| 🔧 Refactoring | Tech debt reduction |
-| 📊 DB Designer | Schema design, query optimization |
+| Agent | Preset(s) | Role |
+|-------|-----------|------|
+| 📋 PM | All | Product specification (`spec.md`) |
+| 🏗️ Architect | All | Technical plan (`plan.md`) |
+| 💻 Developer | All | Code implementation |
+| 🧪 QA | SDD, BMAD | Test suite |
+| 🔍 Reviewer | All | Code review + PR (`review.md`) |
+| 📊 Analyst | BMAD | Business analysis, Gherkin acceptance criteria (`analysis.md`) |
+| 🔒 Security | BMAD | OWASP Top 10, CVE scan, structured JSON report |
+| 📝 Doc Writer | BMAD | README / CHANGELOG / ADR updates |
+| 📜 Constitution Writer | Spec Kit | Project constitution & principles (`CONSTITUTION.md`) |
+| 🗂️ Task Planner | Spec Kit | Atomic task decomposition with dependency graph (`tasks.md`) |
 
 ---
 
@@ -211,10 +224,11 @@ You are a senior security engineer...
 
 Koklo doesn't impose a methodology. It provides **presets** you can use, customize, or ignore:
 
-- **SDD** (Spec-Driven Development) — Spec → Plan → Tasks → Implement → Verify
-- **BMAD** — Business Model-Aware Development with phase-based chat
-- **Light** — Skip the ceremony, jump straight to tasks
-- **Custom** — Build your own workflow DAG
+- **SDD** (Spec-Driven Development) — Spec → Plan → Implement → Test → Review *(default, 5 phases)*
+- **BMAD** ([BMAD Method v6](https://github.com/bmad-code-org/BMAD-METHOD)) — Analysis → Spec → Plan → Implement → Test → Review → Security → Docs *(8 phases)*
+- **Spec Kit** ([GitHub Spec Kit](https://github.com/github/spec-kit)) — Constitution → Spec → Plan → Tasks → Implement → Review *(6 phases)*
+- **Light** — Spec → Implement → Review *(minimal, 3 phases)*
+- **Custom** — Define your own phase list in `.koklo/workflow.toml`
 
 > *"Bring your method. Koklo adds control, traceability, and execution."*
 
