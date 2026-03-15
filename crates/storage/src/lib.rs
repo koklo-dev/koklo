@@ -44,6 +44,8 @@ pub struct Session {
     pub status: String,
     /// Workflow preset used for this session (e.g. `"sdd"`, `"bmad"`).
     pub preset: String,
+    /// Absolute path of the project root at the time the session was created.
+    pub project_path: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -185,22 +187,44 @@ impl SessionManager {
                 .await?;
         }
 
+        // Migration 004 — project_path column.
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM schema_migrations WHERE version = 4")
+                .fetch_one(&self.pool)
+                .await?;
+        if count == 0 {
+            sqlx::query(include_str!("../migrations/004_project_path.sql"))
+                .execute(&self.pool)
+                .await?;
+            let now = Utc::now().to_rfc3339();
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (4, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+        }
+
         Ok(())
     }
 
-    /// Create a new session with the given title and workflow preset.
-    pub async fn create_session(&self, feature_title: &str, preset: &str) -> Result<Session> {
+    /// Create a new session with the given title, workflow preset, and project path.
+    pub async fn create_session(
+        &self,
+        feature_title: &str,
+        preset: &str,
+        project_path: &str,
+    ) -> Result<Session> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         sqlx::query(
             "INSERT INTO sessions \
-             (id, feature_title, status, preset, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?)",
+             (id, feature_title, status, preset, project_path, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(feature_title)
         .bind("pending")
         .bind(preset)
+        .bind(project_path)
         .bind(&now)
         .bind(&now)
         .execute(&self.pool)
@@ -210,6 +234,7 @@ impl SessionManager {
             feature_title: feature_title.to_string(),
             status: "pending".to_string(),
             preset: preset.to_string(),
+            project_path: project_path.to_string(),
             created_at: now.clone(),
             updated_at: now,
         })
@@ -217,7 +242,7 @@ impl SessionManager {
 
     pub async fn get_session(&self, id: &str) -> Result<Option<Session>> {
         let row = sqlx::query_as::<_, Session>(
-            "SELECT id, feature_title, status, preset, created_at, updated_at \
+            "SELECT id, feature_title, status, preset, project_path, created_at, updated_at \
              FROM sessions WHERE id = ?",
         )
         .bind(id)
@@ -228,9 +253,21 @@ impl SessionManager {
 
     pub async fn list_sessions(&self) -> Result<Vec<Session>> {
         let rows = sqlx::query_as::<_, Session>(
-            "SELECT id, feature_title, status, preset, created_at, updated_at \
+            "SELECT id, feature_title, status, preset, project_path, created_at, updated_at \
              FROM sessions ORDER BY created_at DESC",
         )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// List sessions for a specific project root path, most recent first.
+    pub async fn list_sessions_for_project(&self, path: &str) -> Result<Vec<Session>> {
+        let rows = sqlx::query_as::<_, Session>(
+            "SELECT id, feature_title, status, preset, project_path, created_at, updated_at \
+             FROM sessions WHERE project_path = ? ORDER BY created_at DESC",
+        )
+        .bind(path)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -461,20 +498,22 @@ mod tests {
     #[tokio::test]
     async fn test_create_and_get_session() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Auth JWT", "sdd").await.unwrap();
+        let session = mgr.create_session("Auth JWT", "sdd", "/home/user/myproject").await.unwrap();
         assert_eq!(session.feature_title, "Auth JWT");
         assert_eq!(session.status, "pending");
         assert_eq!(session.preset, "sdd");
+        assert_eq!(session.project_path, "/home/user/myproject");
 
         let fetched = mgr.get_session(&session.id).await.unwrap().unwrap();
         assert_eq!(fetched.id, session.id);
         assert_eq!(fetched.preset, "sdd");
+        assert_eq!(fetched.project_path, "/home/user/myproject");
     }
 
     #[tokio::test]
     async fn test_create_session_bmad_preset() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Feature X", "bmad").await.unwrap();
+        let session = mgr.create_session("Feature X", "bmad", "").await.unwrap();
         assert_eq!(session.preset, "bmad");
         let fetched = mgr.get_session(&session.id).await.unwrap().unwrap();
         assert_eq!(fetched.preset, "bmad");
@@ -483,7 +522,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_status() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("test feature", "sdd").await.unwrap();
+        let session = mgr.create_session("test feature", "sdd", "").await.unwrap();
         mgr.update_session_status(&session.id, "running")
             .await
             .unwrap();
@@ -495,7 +534,7 @@ mod tests {
     #[tokio::test]
     async fn test_phase_records() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("test feature", "sdd").await.unwrap();
+        let session = mgr.create_session("test feature", "sdd", "").await.unwrap();
         let phase = mgr.create_phase_record(&session.id, "spec").await.unwrap();
         assert_eq!(phase.phase, "spec");
 
@@ -510,16 +549,30 @@ mod tests {
     #[tokio::test]
     async fn test_list_sessions() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        mgr.create_session("feature A", "sdd").await.unwrap();
-        mgr.create_session("feature B", "bmad").await.unwrap();
+        mgr.create_session("feature A", "sdd", "/proj/a").await.unwrap();
+        mgr.create_session("feature B", "bmad", "/proj/b").await.unwrap();
         let sessions = mgr.list_sessions().await.unwrap();
         assert_eq!(sessions.len(), 2);
     }
 
     #[tokio::test]
+    async fn test_list_sessions_for_project() {
+        let mgr = SessionManager::in_memory().await.unwrap();
+        mgr.create_session("feature A", "sdd", "/proj/alpha").await.unwrap();
+        mgr.create_session("feature B", "sdd", "/proj/alpha").await.unwrap();
+        mgr.create_session("feature C", "sdd", "/proj/beta").await.unwrap();
+        let alpha = mgr.list_sessions_for_project("/proj/alpha").await.unwrap();
+        assert_eq!(alpha.len(), 2);
+        let beta = mgr.list_sessions_for_project("/proj/beta").await.unwrap();
+        assert_eq!(beta.len(), 1);
+        let none = mgr.list_sessions_for_project("/proj/gamma").await.unwrap();
+        assert!(none.is_empty());
+    }
+
+    #[tokio::test]
     async fn test_record_and_list_artifacts() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Artifact Test", "sdd").await.unwrap();
+        let session = mgr.create_session("Artifact Test", "sdd", "").await.unwrap();
         let artifact = mgr
             .record_artifact(&session.id, "spec", "/tmp/spec.md", 1234)
             .await
@@ -536,7 +589,7 @@ mod tests {
     #[tokio::test]
     async fn test_record_gate_decision() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Gate Test", "sdd").await.unwrap();
+        let session = mgr.create_session("Gate Test", "sdd", "").await.unwrap();
         let decision = mgr
             .record_gate_decision(&session.id, "spec", "approve", Some("LGTM"))
             .await
@@ -562,7 +615,7 @@ mod tests {
     #[tokio::test]
     async fn test_record_and_get_agent_logs() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Log Test", "sdd").await.unwrap();
+        let session = mgr.create_session("Log Test", "sdd", "").await.unwrap();
         let log1 = mgr
             .record_agent_log(&session.id, "spec", "pm", "Starting spec...")
             .await
@@ -586,7 +639,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_agent_logs_since() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let session = mgr.create_session("Incremental Test", "sdd").await.unwrap();
+        let session = mgr.create_session("Incremental Test", "sdd", "").await.unwrap();
         mgr.record_agent_log(&session.id, "spec", "pm", "msg1")
             .await
             .unwrap();
@@ -606,8 +659,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_log_seq_is_per_session() {
         let mgr = SessionManager::in_memory().await.unwrap();
-        let s1 = mgr.create_session("Session A", "sdd").await.unwrap();
-        let s2 = mgr.create_session("Session B", "sdd").await.unwrap();
+        let s1 = mgr.create_session("Session A", "sdd", "").await.unwrap();
+        let s2 = mgr.create_session("Session B", "sdd", "").await.unwrap();
         let l1 = mgr
             .record_agent_log(&s1.id, "spec", "pm", "s1 log")
             .await

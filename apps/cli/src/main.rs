@@ -21,6 +21,7 @@
 //!   resume        → session resume <id>
 //! ```
 
+mod home_dirs;
 mod monitor;
 
 use anyhow::Result;
@@ -167,6 +168,7 @@ enum Commands {
     ///   koklo monitor
     ///   koklo monitor --session <id>
     ///   koklo monitor --follow <id>
+    ///   koklo monitor --project .
     Monitor {
         /// Focus on a specific session from launch (prefix match).
         #[arg(long)]
@@ -175,6 +177,10 @@ enum Commands {
         /// Plain text stream mode — no TUI, good for CI/scripting.
         #[arg(long, value_name = "SESSION_ID")]
         follow: Option<String>,
+
+        /// Filter sessions to the given project directory (use `.` for current dir).
+        #[arg(long, value_name = "PROJECT_DIR")]
+        project: Option<String>,
     },
 
     /// Manage project context files (.koklo/USER.md, MEMORY.md, memories/).
@@ -365,7 +371,11 @@ async fn main() -> Result<()> {
             ProviderCommands::Test { name } => cmd_provider_test(&name).await?,
         },
 
-        Commands::Monitor { session, follow } => cmd_monitor(session, follow).await?,
+        Commands::Monitor {
+            session,
+            follow,
+            project,
+        } => cmd_monitor(session, follow, project).await?,
 
         Commands::Context(sub) => match sub {
             ContextCommands::Show => cmd_context_show().await?,
@@ -536,13 +546,16 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
             .unwrap_or_default()
     });
 
+    let global_home = home_dirs::koklo_home();
+    let project_context_dir = project_root.join(".koklo");
+    let project_context = if project_context_dir.exists() {
+        Some(project_context_dir)
+    } else {
+        None
+    };
+
     let config = PipelineConfig {
-        db_path: toml_config
-            .pipeline
-            .db_path
-            .clone()
-            .or_else(|| std::env::var("KOKLO_DB_PATH").ok())
-            .unwrap_or_else(|| "sqlite://koklo-sessions.db".to_string()),
+        db_path: home_dirs::koklo_db_path(),
         artifacts_dir: PathBuf::from(
             toml_config
                 .pipeline
@@ -550,14 +563,9 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
                 .as_deref()
                 .unwrap_or("docs/planning_artifacts"),
         ),
-        agents_dir: PathBuf::from(
-            toml_config
-                .pipeline
-                .agents_dir
-                .as_deref()
-                .unwrap_or("agents/built-in"),
-        ),
-        context_dir: Some(project_root.join(".koklo")),
+        global_home,
+        project_context,
+        project_path: project_root.to_string_lossy().into_owned(),
         preset,
         default_provider,
         agent_providers,
@@ -568,29 +576,15 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
     PipelineOrchestrator::new(config).await
 }
 
-/// Return the DB path from config or environment.
+/// Open the global koklo database (`~/.koklo/koklo.db`).
 async fn open_storage() -> Result<koklo_storage::SessionManager> {
-    let project_root = find_project_root()?;
-    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root)?;
-    let db_path = toml_config
-        .pipeline
-        .db_path
-        .or_else(|| std::env::var("KOKLO_DB_PATH").ok())
-        .unwrap_or_else(|| "sqlite://koklo-sessions.db".to_string());
+    let db_path = home_dirs::koklo_db_path();
     koklo_storage::SessionManager::open(&db_path).await
 }
 
-/// Return the agents directory from config.
+/// Returns the global agents directory (`~/.koklo/agents/`).
 fn agents_dir() -> PathBuf {
-    let project_root = find_project_root().unwrap_or_else(|_| PathBuf::from("."));
-    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root).unwrap_or_default();
-    PathBuf::from(
-        toml_config
-            .pipeline
-            .agents_dir
-            .as_deref()
-            .unwrap_or("agents/built-in"),
-    )
+    home_dirs::koklo_home().join("agents")
 }
 
 // ── command handlers ──────────────────────────────────────────────────────────
@@ -603,20 +597,31 @@ async fn cmd_init(path: &PathBuf, preset: PresetKind, yes: bool) -> Result<()> {
         path.clone()
     };
 
+    println!("Initializing koklo...\n");
+
+    // ── Step 1: ensure global home ──────────────────────────────────────────
+    let global_home = home_dirs::ensure_home()?;
+    println!("Global home: {}/", global_home.display());
+    println!("  config.toml    ✓");
+    println!("  USER.md        ✓  (edit to tell agents who you are)");
+    println!("  koklo.db       will be created on first run");
+
+    // ── Step 2: create project .koklo/ ──────────────────────────────────────
     let koklo_dir = target.join(".koklo");
     let toml_path = koklo_dir.join("pipeline.toml");
 
-    if toml_path.exists() {
-        println!("Already initialised: {}", toml_path.display());
-        println!("Use `koklo config init` to reconfigure.");
+    if toml_path.exists() && !yes {
+        println!("\nProject: {}", target.display());
+        println!("  .koklo/pipeline.toml   already exists");
+        println!("\nUse `koklo config init` to reconfigure.");
         return Ok(());
     }
 
-    // Detect project stack
+    // Detect project stack for preset suggestion
     let detected_preset = detect_stack_preset(&target);
     let chosen_preset = if !yes && detected_preset != preset {
         println!(
-            "Detected stack suggests '{}' preset. You specified '{}'. Using '{}'.",
+            "\nDetected stack suggests '{}' preset. You specified '{}'. Using '{}'.",
             detected_preset.as_str(),
             preset.as_str(),
             preset.as_str()
@@ -628,7 +633,7 @@ async fn cmd_init(path: &PathBuf, preset: PresetKind, yes: bool) -> Result<()> {
 
     if !yes {
         println!(
-            "Initialising Koklo in: {}\nPreset: {} — {}\nCreate .koklo/pipeline.toml? [Y/n] ",
+            "\nProject: {}\nPreset:  {} — {}\nCreate .koklo/pipeline.toml? [Y/n] ",
             target.display(),
             chosen_preset.as_str(),
             chosen_preset.display_name()
@@ -645,15 +650,21 @@ async fn cmd_init(path: &PathBuf, preset: PresetKind, yes: bool) -> Result<()> {
     std::fs::create_dir_all(&koklo_dir)?;
     write_default_pipeline_toml(&toml_path, chosen_preset)?;
 
-    println!(
-        "Initialised: {}\nPreset: {} ({})",
-        toml_path.display(),
-        chosen_preset.as_str(),
-        chosen_preset.display_name()
-    );
-    println!("\nNext steps:");
-    println!("  koklo run feature \"<title>\"");
-    println!("  koklo workflow list");
+    // Create PROJECT.md template if it doesn't exist.
+    let project_md = koklo_dir.join("PROJECT.md");
+    if !project_md.exists() {
+        std::fs::write(
+            &project_md,
+            "# Project Constitution\n\n\
+             <!-- Describe this project: tech stack, conventions, goals. -->\n\
+             <!-- This file is injected into every agent prompt for this project. -->\n",
+        )?;
+    }
+
+    println!("\nProject: {}", target.display());
+    println!("  .koklo/pipeline.toml   ✓ created");
+    println!("  .koklo/PROJECT.md      ✓ created  (edit to add project constitution)");
+    println!("\nRun `koklo run feature \"your feature\"` to start.");
     Ok(())
 }
 
@@ -674,22 +685,21 @@ fn detect_stack_preset(dir: &Path) -> PresetKind {
     PresetKind::Sdd // default
 }
 
-/// Write a minimal `.koklo/pipeline.toml` with the given preset.
+/// Write a minimal `.koklo/pipeline.toml` for this project.
+///
+/// The DB path and agents directory are always global (`~/.koklo/`) and are
+/// not stored in the project config.
 fn write_default_pipeline_toml(path: &PathBuf, preset: PresetKind) -> Result<()> {
     let content = format!(
         r#"[pipeline]
-db_path = "sqlite://koklo-sessions.db"
 artifacts_dir = "docs/planning_artifacts"
-agents_dir = "agents/built-in"
 
 [workflow]
 preset = "{preset}"
 
-[providers.ollama]
-base_url = "http://127.0.0.1:11434"
-
-[providers.anthropic]
-api_key_env = "ANTHROPIC_API_KEY"
+# Provider overrides are optional — global ~/.koklo/config.toml is used by default.
+# [providers.anthropic]
+# model = "claude-haiku-4-5-20251001"
 "#,
         preset = preset.as_str()
     );
@@ -806,20 +816,22 @@ async fn cmd_agent_show(name: &str) -> Result<()> {
     use koklo_agent_runtime::{build_system_prompt, AgentConfig};
     use koklo_events::Phase;
 
-    let dir = agents_dir();
-    let path = dir.join(format!("{}.md", name));
-    if !path.exists() {
-        anyhow::bail!("Agent '{}' not found (expected: {})", name, path.display());
-    }
-
+    let global_home = home_dirs::koklo_home();
     let project_root = find_project_root()?;
+    let project_context_dir = project_root.join(".koklo");
+    let project_context = if project_context_dir.exists() {
+        Some(project_context_dir)
+    } else {
+        None
+    };
+
     let config = AgentConfig {
         name: name.to_string(),
         phase: Phase::Spec, // placeholder — doesn't affect prompt assembly
-        system_prompt_file: path,
+        agent_slug: name.to_string(),
         timeout_secs: 0,
-        agents_dir: Some(dir),
-        context_dir: Some(project_root.join(".koklo")),
+        global_home,
+        project_context,
     };
 
     let prompt = build_system_prompt(&config)?;
@@ -1004,32 +1016,47 @@ async fn cmd_provider_list() -> Result<()> {
     Ok(())
 }
 
-/// `koklo monitor [--session <id>] [--follow <id>]`
-async fn cmd_monitor(session: Option<String>, follow: Option<String>) -> Result<()> {
+/// `koklo monitor [--session <id>] [--follow <id>] [--project <dir>]`
+async fn cmd_monitor(
+    session: Option<String>,
+    follow: Option<String>,
+    project: Option<String>,
+) -> Result<()> {
     let storage = std::sync::Arc::new(open_storage().await?);
     let (session_filter, follow_mode) = if let Some(id) = follow {
         (Some(id), true)
     } else {
         (session, false)
     };
-    monitor::run_monitor(session_filter, follow_mode, storage).await
+
+    // Resolve --project . to an absolute path.
+    let project_filter = if let Some(ref p) = project {
+        let resolved = if p == "." {
+            find_project_root().unwrap_or_else(|_| std::env::current_dir().unwrap())
+        } else {
+            PathBuf::from(p).canonicalize().unwrap_or_else(|_| PathBuf::from(p))
+        };
+        Some(resolved.to_string_lossy().into_owned())
+    } else {
+        None
+    };
+
+    monitor::run_monitor(session_filter, follow_mode, project_filter, storage).await
 }
 
 /// `koklo context show`
 async fn cmd_context_show() -> Result<()> {
+    let global_home = home_dirs::koklo_home();
     let project_root = find_project_root()?;
     let koklo_dir = project_root.join(".koklo");
 
-    let context_files = [
+    // ── Global context ──────────────────────────────────────────────────────
+    println!("Global context: {}/", global_home.display());
+    for (file, desc) in &[
         ("USER.md", "Who the user is"),
-        ("MEMORY.md", "Long-term hand-curated memory"),
-    ];
-
-    println!("Context directory: {}", koklo_dir.display());
-    println!();
-
-    for (file, desc) in &context_files {
-        let path = koklo_dir.join(file);
+        ("MEMORY.md", "Long-term memory"),
+    ] {
+        let path = global_home.join(file);
         if path.exists() {
             let content = std::fs::read_to_string(&path)?;
             let first_line = content.lines().next().unwrap_or("(empty)");
@@ -1039,25 +1066,56 @@ async fn cmd_context_show() -> Result<()> {
             println!("  {} — {} (not found)", file, desc);
         }
     }
+    let global_memories = global_home.join("memories");
+    if global_memories.exists() {
+        let count = std::fs::read_dir(&global_memories)
+            .map(|d| d.count())
+            .unwrap_or(0);
+        println!("  memories/ ({} files)", count);
+    } else {
+        println!("  memories/ (no logs yet)");
+    }
 
-    // Show memories/
-    let memories_dir = koklo_dir.join("memories");
-    if memories_dir.exists() {
-        let mut entries: Vec<_> = std::fs::read_dir(&memories_dir)?
-            .filter_map(|e| e.ok())
-            .collect();
-        entries.sort_by_key(|e| e.file_name());
-        println!();
-        println!("  memories/ ({} files)", entries.len());
-        for entry in entries.iter().rev().take(3) {
-            println!("    {}", entry.file_name().to_string_lossy());
+    // ── Project context ─────────────────────────────────────────────────────
+    println!();
+    if koklo_dir.exists() {
+        println!("Project context: {}/", koklo_dir.display());
+        for (file, desc) in &[
+            ("PROJECT.md", "Project constitution"),
+            ("MEMORY.md", "Project memory"),
+        ] {
+            let path = koklo_dir.join(file);
+            if path.exists() {
+                let content = std::fs::read_to_string(&path)?;
+                let first_line = content.lines().next().unwrap_or("(empty)");
+                println!("  {} — {} ✓", file, desc);
+                println!("    {}", first_line);
+            } else {
+                println!("  {} — {} (not found)", file, desc);
+            }
         }
-        if entries.len() > 3 {
-            println!("    ... and {} more", entries.len() - 3);
+        let proj_memories = koklo_dir.join("memories");
+        if proj_memories.exists() {
+            let mut entries: Vec<_> = std::fs::read_dir(&proj_memories)?
+                .filter_map(|e| e.ok())
+                .collect();
+            entries.sort_by_key(|e| e.file_name());
+            println!("  memories/ ({} files)", entries.len());
+            for entry in entries.iter().rev().take(3) {
+                println!("    {}", entry.file_name().to_string_lossy());
+            }
+            if entries.len() > 3 {
+                println!("    ... and {} more", entries.len() - 3);
+            }
+        } else {
+            println!("  memories/ (no project session logs yet)");
         }
     } else {
-        println!();
-        println!("  memories/ (no session logs yet)");
+        println!(
+            "Project context: (none — no .koklo/ in {})",
+            project_root.display()
+        );
+        println!("  Run `koklo init` to create one.");
     }
 
     Ok(())
