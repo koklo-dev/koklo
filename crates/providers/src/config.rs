@@ -180,7 +180,7 @@ sort = "price"
         assert_eq!(routing.sort.as_deref(), Some("price"));
         let json = routing.to_json();
         assert_eq!(json["data_collection"].as_str().unwrap(), "deny");
-        assert_eq!(json["allow_fallbacks"].as_bool().unwrap(), true);
+        assert!(json["allow_fallbacks"].as_bool().unwrap());
         assert_eq!(json["sort"].as_str().unwrap(), "price");
     }
 
