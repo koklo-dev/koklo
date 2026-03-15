@@ -89,7 +89,11 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
 
     // [1] global fallback constitution
     maybe_read(
-        config.global_home.join("agents").join("shared").join("PROJECT.md"),
+        config
+            .global_home
+            .join("agents")
+            .join("shared")
+            .join("PROJECT.md"),
         &mut parts,
     );
 
@@ -106,7 +110,10 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
 
     // [5] global daily log
     maybe_read(
-        config.global_home.join("memories").join(format!("{today}.md")),
+        config
+            .global_home
+            .join("memories")
+            .join(format!("{today}.md")),
         &mut parts,
     );
 
@@ -117,10 +124,7 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
 
     // [7] project daily log
     if let Some(ctx) = &config.project_context {
-        maybe_read(
-            ctx.join("memories").join(format!("{today}.md")),
-            &mut parts,
-        );
+        maybe_read(ctx.join("memories").join(format!("{today}.md")), &mut parts);
     }
 
     // [8-10] global per-agent identity files
@@ -144,10 +148,7 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
             .project_context
             .as_ref()
             .map(|ctx| ctx.join("agents").join(format!("{slug}.md")));
-        let global_role = config
-            .global_home
-            .join("agents")
-            .join(format!("{slug}.md"));
+        let global_role = config.global_home.join("agents").join(format!("{slug}.md"));
 
         if let Some(path) = project_role.filter(|p| p.exists()) {
             std::fs::read_to_string(path)?
