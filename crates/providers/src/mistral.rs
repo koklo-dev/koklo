@@ -28,8 +28,8 @@ impl MistralProvider {
             std::env::var("MISTRAL_API_KEY").map_err(|_| ProviderError::MissingApiKey {
                 var_name: "MISTRAL_API_KEY".to_string(),
             })?;
-        let model = std::env::var("MISTRAL_MODEL")
-            .unwrap_or_else(|_| "mistral-large-latest".to_string());
+        let model =
+            std::env::var("MISTRAL_MODEL").unwrap_or_else(|_| "mistral-large-latest".to_string());
         Ok(Self::new(api_key, model))
     }
 

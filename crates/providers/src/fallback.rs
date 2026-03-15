@@ -39,7 +39,11 @@ impl LlmProvider for FallbackProvider {
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<String> {
-        match self.primary.complete_stream(messages.clone(), on_chunk).await {
+        match self
+            .primary
+            .complete_stream(messages.clone(), on_chunk)
+            .await
+        {
             Ok(text) => Ok(text),
             Err(e) => {
                 if let Some(pe) = e.downcast_ref::<ProviderError>() {
@@ -100,7 +104,10 @@ mod tests {
             _messages: Vec<Message>,
             on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
         ) -> Result<String> {
-            on_chunk(StreamChunk { text: "ok".into(), finished: true });
+            on_chunk(StreamChunk {
+                text: "ok".into(),
+                finished: true,
+            });
             Ok("ok".to_string())
         }
         fn provider_name(&self) -> &str {
@@ -175,7 +182,9 @@ mod tests {
             name: "x".into(),
             install_hint: "y".into()
         }));
-        assert!(is_fallback_worthy(&ProviderError::RateLimited { attempts: 3 }));
+        assert!(is_fallback_worthy(&ProviderError::RateLimited {
+            attempts: 3
+        }));
         assert!(is_fallback_worthy(&ProviderError::Timeout { secs: 30 }));
         assert!(is_fallback_worthy(&ProviderError::HttpError {
             status: 503,

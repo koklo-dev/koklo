@@ -87,7 +87,13 @@ impl PresetKind {
 
     /// All variants in display order.
     pub fn all() -> &'static [PresetKind] {
-        &[Self::Sdd, Self::Bmad, Self::SpecKit, Self::Light, Self::Custom]
+        &[
+            Self::Sdd,
+            Self::Bmad,
+            Self::SpecKit,
+            Self::Light,
+            Self::Custom,
+        ]
     }
 }
 
@@ -222,14 +228,22 @@ mod tests {
     #[test]
     fn all_variants_have_display_name() {
         for &kind in PresetKind::all() {
-            assert!(!kind.display_name().is_empty(), "{:?} has empty display_name", kind);
+            assert!(
+                !kind.display_name().is_empty(),
+                "{:?} has empty display_name",
+                kind
+            );
         }
     }
 
     #[test]
     fn all_variants_have_description() {
         for &kind in PresetKind::all() {
-            assert!(!kind.description().is_empty(), "{:?} has empty description", kind);
+            assert!(
+                !kind.description().is_empty(),
+                "{:?} has empty description",
+                kind
+            );
         }
     }
 

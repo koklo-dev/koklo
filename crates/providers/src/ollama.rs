@@ -122,10 +122,16 @@ impl LlmProvider for OllamaProvider {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
                     if let Some(t) = json["message"]["content"].as_str() {
                         full_text.push_str(t);
-                        on_chunk(StreamChunk { text: t.to_string(), finished: false });
+                        on_chunk(StreamChunk {
+                            text: t.to_string(),
+                            finished: false,
+                        });
                     }
                     if json["done"].as_bool().unwrap_or(false) {
-                        on_chunk(StreamChunk { text: String::new(), finished: true });
+                        on_chunk(StreamChunk {
+                            text: String::new(),
+                            finished: true,
+                        });
                     }
                 }
             }

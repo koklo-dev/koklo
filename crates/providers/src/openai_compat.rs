@@ -55,9 +55,15 @@ where
         match f().await {
             Ok(resp) if resp.status().as_u16() == 429 => {
                 if attempt == max_attempts {
-                    return Err(ProviderError::RateLimited { attempts: max_attempts });
+                    return Err(ProviderError::RateLimited {
+                        attempts: max_attempts,
+                    });
                 }
-                tracing::warn!("Rate limited (attempt {}), retrying in {}s", attempt, delay_secs);
+                tracing::warn!(
+                    "Rate limited (attempt {}), retrying in {}s",
+                    attempt,
+                    delay_secs
+                );
                 tokio::time::sleep(Duration::from_secs(delay_secs)).await;
                 delay_secs *= 2;
             }
@@ -71,20 +77,33 @@ where
                 delay_secs *= 2;
             }
             Err(e) => {
-                return Err(ProviderError::HttpError { status: 0, body: e.to_string() });
+                return Err(ProviderError::HttpError {
+                    status: 0,
+                    body: e.to_string(),
+                });
             }
         }
     }
-    Err(ProviderError::RateLimited { attempts: max_attempts })
+    Err(ProviderError::RateLimited {
+        attempts: max_attempts,
+    })
 }
 
 /// Map HTTP error codes to typed ProviderError variants.
 pub(crate) fn map_http_error(status: u16, body: &str, api_key_env: &str) -> ProviderError {
     match status {
-        401 | 403 => ProviderError::MissingApiKey { var_name: api_key_env.to_string() },
+        401 | 403 => ProviderError::MissingApiKey {
+            var_name: api_key_env.to_string(),
+        },
         429 => ProviderError::RateLimited { attempts: 1 },
-        s if s >= 500 => ProviderError::HttpError { status, body: body.to_string() },
-        _ => ProviderError::HttpError { status, body: body.to_string() },
+        s if s >= 500 => ProviderError::HttpError {
+            status,
+            body: body.to_string(),
+        },
+        _ => ProviderError::HttpError {
+            status,
+            body: body.to_string(),
+        },
     }
 }
 
@@ -141,8 +160,8 @@ impl LlmProvider for OpenAICompatProvider {
         let mut stream = resp.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|_e| {
-                ProviderError::StreamInterrupted { bytes: full_text.len() }
+            let chunk = chunk.map_err(|_e| ProviderError::StreamInterrupted {
+                bytes: full_text.len(),
             })?;
             let text = String::from_utf8_lossy(&chunk);
             for line in text.lines() {
@@ -151,11 +170,12 @@ impl LlmProvider for OpenAICompatProvider {
                         break;
                     }
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                        if let Some(t) =
-                            json["choices"][0]["delta"]["content"].as_str()
-                        {
+                        if let Some(t) = json["choices"][0]["delta"]["content"].as_str() {
                             full_text.push_str(t);
-                            on_chunk(StreamChunk { text: t.to_string(), finished: false });
+                            on_chunk(StreamChunk {
+                                text: t.to_string(),
+                                finished: false,
+                            });
                         }
                     }
                 }
@@ -165,7 +185,10 @@ impl LlmProvider for OpenAICompatProvider {
         if full_text.trim().is_empty() {
             return Err(ProviderError::EmptyResponse.into());
         }
-        on_chunk(StreamChunk { text: String::new(), finished: true });
+        on_chunk(StreamChunk {
+            text: String::new(),
+            finished: true,
+        });
         Ok(full_text)
     }
 
@@ -239,12 +262,11 @@ mod tests {
             "OPENAI_API_KEY",
         );
         let messages = vec![crate::Message::user("hi")];
-        let err = p
-            .complete_stream(messages, &mut |_| {})
-            .await
-            .unwrap_err();
+        let err = p.complete_stream(messages, &mut |_| {}).await.unwrap_err();
         let pe = err.downcast_ref::<ProviderError>().unwrap();
-        assert!(matches!(pe, ProviderError::MissingApiKey { var_name } if var_name == "OPENAI_API_KEY"));
+        assert!(
+            matches!(pe, ProviderError::MissingApiKey { var_name } if var_name == "OPENAI_API_KEY")
+        );
     }
 
     #[tokio::test]
@@ -257,18 +279,10 @@ mod tests {
             .mount(&server)
             .await;
 
-        let p = OpenAICompatProvider::new(
-            "key",
-            "gpt-4o",
-            server.uri(),
-            "openai",
-            "OPENAI_API_KEY",
-        );
+        let p =
+            OpenAICompatProvider::new("key", "gpt-4o", server.uri(), "openai", "OPENAI_API_KEY");
         let messages = vec![crate::Message::user("hi")];
-        let err = p
-            .complete_stream(messages, &mut |_| {})
-            .await
-            .unwrap_err();
+        let err = p.complete_stream(messages, &mut |_| {}).await.unwrap_err();
         let pe = err.downcast_ref::<ProviderError>().unwrap();
         assert!(matches!(pe, ProviderError::RateLimited { attempts: 3 }));
         server.verify().await;

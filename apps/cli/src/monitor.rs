@@ -40,10 +40,7 @@ pub struct MonitorApp {
 }
 
 impl MonitorApp {
-    pub async fn new(
-        session_filter: Option<&str>,
-        storage: Arc<SessionManager>,
-    ) -> Result<Self> {
+    pub async fn new(session_filter: Option<&str>, storage: Arc<SessionManager>) -> Result<Self> {
         let sessions = storage.list_sessions().await?;
         let selected_session = if let Some(filter) = session_filter {
             sessions
@@ -96,7 +93,10 @@ impl MonitorApp {
         let phases_changed = new_phases.len() != self.phases.len();
         self.phases = new_phases;
 
-        let new_logs = self.storage.get_agent_logs_since(&sid, self.last_seq).await?;
+        let new_logs = self
+            .storage
+            .get_agent_logs_since(&sid, self.last_seq)
+            .await?;
         if !new_logs.is_empty() {
             self.last_seq = new_logs.last().map(|l| l.seq).unwrap_or(self.last_seq);
             self.logs.extend(new_logs);
@@ -352,10 +352,7 @@ async fn run_follow_mode(
 
 // ── TUI mode ───────────────────────────────────────────────────────────────────
 
-async fn run_tui_mode(
-    session_filter: Option<String>,
-    storage: Arc<SessionManager>,
-) -> Result<()> {
+async fn run_tui_mode(session_filter: Option<String>, storage: Arc<SessionManager>) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen)?;

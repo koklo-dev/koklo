@@ -149,7 +149,6 @@ enum Commands {
     Provider(ProviderCommands),
 
     // ── Backward-compatible aliases ───────────────────────────────────────────
-
     /// [alias] Show status of pipeline sessions (same as `session list/show`).
     Status {
         /// Session ID to inspect (omit for all sessions).
@@ -187,7 +186,6 @@ enum Commands {
     Context(ContextCommands),
 
     // ── Future stubs ──────────────────────────────────────────────────────────
-
     /// [coming soon] Integrated ticket system — Phase 5.
     Tickets,
     /// [coming soon] Multi-provider deployment — Phase 10.
@@ -327,9 +325,11 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Init { path, preset, yes } => cmd_init(&path, preset, yes).await?,
-        Commands::Run { preset, pipeline_type, title } => {
-            cmd_run(preset, &pipeline_type, &title).await?
-        }
+        Commands::Run {
+            preset,
+            pipeline_type,
+            title,
+        } => cmd_run(preset, &pipeline_type, &title).await?,
 
         Commands::Session(sub) => match sub {
             SessionCommands::List => cmd_session_list().await?,
@@ -354,9 +354,7 @@ async fn main() -> Result<()> {
         },
 
         Commands::Artifacts(sub) => match sub {
-            ArtifactsCommands::List { session_id } => {
-                cmd_artifacts_list(&session_id).await?
-            }
+            ArtifactsCommands::List { session_id } => cmd_artifacts_list(&session_id).await?,
             ArtifactsCommands::Show { session_id, phase } => {
                 cmd_artifacts_show(&session_id, &phase).await?
             }
@@ -367,9 +365,7 @@ async fn main() -> Result<()> {
             ProviderCommands::Test { name } => cmd_provider_test(&name).await?,
         },
 
-        Commands::Monitor { session, follow } => {
-            cmd_monitor(session, follow).await?
-        }
+        Commands::Monitor { session, follow } => cmd_monitor(session, follow).await?,
 
         Commands::Context(sub) => match sub {
             ContextCommands::Show => cmd_context_show().await?,
@@ -434,8 +430,12 @@ async fn main() -> Result<()> {
 // ── preset parser (for clap value_parser) ────────────────────────────────────
 
 fn parse_preset(s: &str) -> Result<PresetKind, String> {
-    PresetKind::from_str(s)
-        .ok_or_else(|| format!("Unknown preset '{}'. Valid: sdd, bmad, speckit, light, custom", s))
+    PresetKind::from_str(s).ok_or_else(|| {
+        format!(
+            "Unknown preset '{}'. Valid: sdd, bmad, speckit, light, custom",
+            s
+        )
+    })
 }
 
 // ── orchestrator construction ─────────────────────────────────────────────────
@@ -583,8 +583,7 @@ async fn open_storage() -> Result<koklo_storage::SessionManager> {
 /// Return the agents directory from config.
 fn agents_dir() -> PathBuf {
     let project_root = find_project_root().unwrap_or_else(|_| PathBuf::from("."));
-    let toml_config =
-        PipelineTomlConfig::load_from_project_root(&project_root).unwrap_or_default();
+    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root).unwrap_or_default();
     PathBuf::from(
         toml_config
             .pipeline
@@ -858,7 +857,10 @@ async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
     let system_prompt = if system_prompt_file.exists() {
         std::fs::read_to_string(&system_prompt_file)?
     } else {
-        format!("You are the {} agent for the koklo AI development pipeline.", name)
+        format!(
+            "You are the {} agent for the koklo AI development pipeline.",
+            name
+        )
     };
 
     println!("Running agent '{}'...\n", name);
@@ -899,8 +901,12 @@ fn cmd_workflow_list() {
 
 /// `koklo workflow show <preset>`
 fn cmd_workflow_show(preset_str: &str) -> Result<()> {
-    let kind = PresetKind::from_str(preset_str)
-        .ok_or_else(|| anyhow::anyhow!("Unknown preset '{}'. Run `koklo workflow list`.", preset_str))?;
+    let kind = PresetKind::from_str(preset_str).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Unknown preset '{}'. Run `koklo workflow list`.",
+            preset_str
+        )
+    })?;
     let phases = phases_for_preset(kind);
     println!("{} — {}", kind.display_name(), kind.description());
     if let Some(url) = kind.reference_url() {
@@ -924,7 +930,10 @@ async fn cmd_config_show() -> Result<()> {
         println!("# {}", toml_path.display());
         println!("{}", content);
     } else {
-        println!("No .koklo/pipeline.toml found in or above {}.", project_root.display());
+        println!(
+            "No .koklo/pipeline.toml found in or above {}.",
+            project_root.display()
+        );
         println!("Run `koklo init` to create one.");
     }
     Ok(())
@@ -1071,7 +1080,9 @@ async fn cmd_context_init() -> Result<()> {
     }
 
     println!("Creating .koklo/USER.md");
-    println!("This file is injected into every agent prompt so agents know who they're working with.");
+    println!(
+        "This file is injected into every agent prompt so agents know who they're working with."
+    );
     println!();
 
     println!("Your name (or handle): ");
@@ -1097,7 +1108,11 @@ async fn cmd_context_init() -> Result<()> {
          - Flag trade-offs explicitly\n",
         if name.is_empty() { "Unknown" } else { &name },
         if role.is_empty() { "Developer" } else { &role },
-        if stack.is_empty() { "Not specified" } else { &stack },
+        if stack.is_empty() {
+            "Not specified"
+        } else {
+            &stack
+        },
     );
 
     std::fs::write(&user_md, &content)?;

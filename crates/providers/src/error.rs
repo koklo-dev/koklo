@@ -52,7 +52,9 @@ mod tests {
 
     #[test]
     fn test_missing_api_key_message() {
-        let e = ProviderError::MissingApiKey { var_name: "TEST_KEY".to_string() };
+        let e = ProviderError::MissingApiKey {
+            var_name: "TEST_KEY".to_string(),
+        };
         let msg = e.to_string();
         assert!(msg.contains("TEST_KEY"));
         assert!(msg.contains("export"));

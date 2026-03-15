@@ -17,7 +17,9 @@ impl ClaudeCodeCliProvider {
             name: "claude".to_string(),
             install_hint: "Install from: https://claude.ai/download or `npm install -g @anthropic-ai/claude-code`".to_string(),
         })?;
-        Ok(Self { mode: CliMode::detect_from_env() })
+        Ok(Self {
+            mode: CliMode::detect_from_env(),
+        })
     }
 }
 
@@ -61,8 +63,14 @@ impl LlmProvider for ClaudeCodeCliProvider {
             return Err(ProviderError::EmptyResponse.into());
         }
 
-        on_chunk(StreamChunk { text: text.clone(), finished: false });
-        on_chunk(StreamChunk { text: String::new(), finished: true });
+        on_chunk(StreamChunk {
+            text: text.clone(),
+            finished: false,
+        });
+        on_chunk(StreamChunk {
+            text: String::new(),
+            finished: true,
+        });
         Ok(text)
     }
 

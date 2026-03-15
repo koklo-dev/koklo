@@ -12,8 +12,14 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-const KNOWN_NAMES: &[&str] =
-    &["anthropic", "openai", "mistral", "ollama", "claude-code", "codex"];
+const KNOWN_NAMES: &[&str] = &[
+    "anthropic",
+    "openai",
+    "mistral",
+    "ollama",
+    "claude-code",
+    "codex",
+];
 
 pub struct ProviderRegistry {
     providers: HashMap<String, Arc<dyn LlmProvider>>,
@@ -131,10 +137,8 @@ mod tests {
     #[test]
     fn test_unknown_provider_name_fails_at_build() {
         let mut cfg = PipelineTomlConfig::default();
-        cfg.providers.insert(
-            "fancy-llm".to_string(),
-            ProviderTomlEntry::default(),
-        );
+        cfg.providers
+            .insert("fancy-llm".to_string(), ProviderTomlEntry::default());
         let result = ProviderRegistry::build(&cfg);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();

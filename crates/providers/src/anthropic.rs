@@ -22,11 +22,12 @@ impl AnthropicProvider {
     }
 
     pub fn from_env() -> Result<Self, ProviderError> {
-        let api_key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
-            ProviderError::MissingApiKey { var_name: "ANTHROPIC_API_KEY".to_string() }
-        })?;
-        let model = std::env::var("ANTHROPIC_MODEL")
-            .unwrap_or_else(|_| "claude-opus-4-6".to_string());
+        let api_key =
+            std::env::var("ANTHROPIC_API_KEY").map_err(|_| ProviderError::MissingApiKey {
+                var_name: "ANTHROPIC_API_KEY".to_string(),
+            })?;
+        let model =
+            std::env::var("ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-opus-4-6".to_string());
         Ok(Self::new(api_key, model))
     }
 
@@ -107,7 +108,10 @@ impl LlmProvider for AnthropicProvider {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(t) = json["delta"]["text"].as_str() {
                             full_text.push_str(t);
-                            on_chunk(StreamChunk { text: t.to_string(), finished: false });
+                            on_chunk(StreamChunk {
+                                text: t.to_string(),
+                                finished: false,
+                            });
                         }
                     }
                 }
@@ -117,7 +121,10 @@ impl LlmProvider for AnthropicProvider {
         if full_text.trim().is_empty() {
             return Err(ProviderError::EmptyResponse.into());
         }
-        on_chunk(StreamChunk { text: String::new(), finished: true });
+        on_chunk(StreamChunk {
+            text: String::new(),
+            finished: true,
+        });
         Ok(full_text)
     }
 

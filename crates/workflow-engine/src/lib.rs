@@ -38,10 +38,8 @@ impl GithubConfig {
         let token = std::env::var("GITHUB_TOKEN").ok()?;
         Some(Self {
             token,
-            owner: std::env::var("KOKLO_GITHUB_OWNER")
-                .unwrap_or_else(|_| "koklo-dev".to_string()),
-            repo: std::env::var("KOKLO_GITHUB_REPO")
-                .unwrap_or_else(|_| "koklo".to_string()),
+            owner: std::env::var("KOKLO_GITHUB_OWNER").unwrap_or_else(|_| "koklo-dev".to_string()),
+            repo: std::env::var("KOKLO_GITHUB_REPO").unwrap_or_else(|_| "koklo".to_string()),
             base_branch: std::env::var("KOKLO_BASE_BRANCH")
                 .unwrap_or_else(|_| "develop".to_string()),
         })
@@ -118,7 +116,11 @@ impl PipelineOrchestrator {
     pub async fn new(config: PipelineConfig) -> Result<Self> {
         let storage = Arc::new(SessionManager::open(&config.db_path).await?);
         let bus = EventBus::new(256);
-        Ok(Self { config, storage, bus })
+        Ok(Self {
+            config,
+            storage,
+            bus,
+        })
     }
 
     pub fn event_bus(&self) -> EventBus {
@@ -167,15 +169,12 @@ impl PipelineOrchestrator {
             let mut rx = log_bus.subscribe();
             while let Ok(event) = rx.recv().await {
                 if let PipelineEvent::AgentLog { phase, message } = event {
-                    let agent_name =
-                        phase_map.get(&phase.to_string()).copied().unwrap_or("unknown");
+                    let agent_name = phase_map
+                        .get(&phase.to_string())
+                        .copied()
+                        .unwrap_or("unknown");
                     log_storage
-                        .record_agent_log(
-                            &log_session_id,
-                            &phase.to_string(),
-                            agent_name,
-                            &message,
-                        )
+                        .record_agent_log(&log_session_id, &phase.to_string(), agent_name, &message)
                         .await
                         .ok();
                 }
@@ -192,10 +191,7 @@ impl PipelineOrchestrator {
         tracing::info!("Pipeline completed: session={}", session_id);
 
         // Append session summary to .koklo/memories/YYYY-MM-DD.md
-        if let Err(e) = self
-            .write_memory_log(&session, preset, start_time)
-            .await
-        {
+        if let Err(e) = self.write_memory_log(&session, preset, start_time).await {
             tracing::warn!("Memory log write failed (non-fatal): {}", e);
         }
 
@@ -329,10 +325,7 @@ impl PipelineOrchestrator {
             .create_phase_record(session_id, &phase.to_string())
             .await?;
 
-        let system_prompt_file = self
-            .config
-            .agents_dir
-            .join(format!("{}.md", agent_name));
+        let system_prompt_file = self.config.agents_dir.join(format!("{}.md", agent_name));
         let config = AgentConfig {
             name: agent_name.to_string(),
             phase,
@@ -406,9 +399,7 @@ impl PipelineOrchestrator {
         let url = pr
             .html_url
             .map(|u| u.to_string())
-            .unwrap_or_else(|| {
-                format!("https://github.com/{}/{}/pulls", gh.owner, gh.repo)
-            });
+            .unwrap_or_else(|| format!("https://github.com/{}/{}/pulls", gh.owner, gh.repo));
         Ok(url)
     }
 
@@ -566,10 +557,7 @@ fn format_duration(secs: i64) -> String {
     }
 }
 
-fn phase_duration_str(
-    started_at: &Option<String>,
-    completed_at: &Option<String>,
-) -> String {
+fn phase_duration_str(started_at: &Option<String>, completed_at: &Option<String>) -> String {
     if let (Some(start), Some(end)) = (started_at, completed_at) {
         if let (Ok(s), Ok(e)) = (
             chrono::DateTime::parse_from_rfc3339(start),
@@ -630,9 +618,7 @@ mod tests {
         default: Arc<dyn LlmProvider>,
         agent_providers: HashMap<String, Arc<dyn LlmProvider>>,
     ) -> PipelineConfig {
-        let registry = Arc::new(
-            ProviderRegistry::build(&PipelineTomlConfig::default()).unwrap(),
-        );
+        let registry = Arc::new(ProviderRegistry::build(&PipelineTomlConfig::default()).unwrap());
         PipelineConfig {
             db_path: "sqlite://test.db".to_string(),
             artifacts_dir: PathBuf::from("/tmp"),
@@ -657,8 +643,10 @@ mod tests {
 
     #[test]
     fn test_resolve_provider_agent_toml_override() {
-        let default: Arc<dyn LlmProvider> =
-            Arc::new(OllamaProvider::new("http://127.0.0.1:11434", "default-model"));
+        let default: Arc<dyn LlmProvider> = Arc::new(OllamaProvider::new(
+            "http://127.0.0.1:11434",
+            "default-model",
+        ));
         let pm: Arc<dyn LlmProvider> =
             Arc::new(OllamaProvider::new("http://127.0.0.1:11434", "pm-model"));
         let mut agent_providers = HashMap::new();

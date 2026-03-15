@@ -1,8 +1,8 @@
 //! Configuration types for `.koklo/pipeline.toml`.
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use anyhow::Result;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PipelineTomlConfig {
@@ -60,8 +60,7 @@ impl PipelineTomlConfig {
         }
         let text = std::fs::read_to_string(&path)
             .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))?;
-        toml::from_str(&text)
-            .map_err(|e| anyhow::anyhow!("Invalid pipeline.toml: {}", e))
+        toml::from_str(&text).map_err(|e| anyhow::anyhow!("Invalid pipeline.toml: {}", e))
     }
 }
 

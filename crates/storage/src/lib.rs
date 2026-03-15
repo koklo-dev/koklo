@@ -147,12 +147,10 @@ impl SessionManager {
                 .execute(&self.pool)
                 .await?;
             let now = Utc::now().to_rfc3339();
-            sqlx::query(
-                "INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?)",
-            )
-            .bind(&now)
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
         }
 
         // Migration 002 — preset column + artifact size + gate note.
@@ -165,12 +163,10 @@ impl SessionManager {
                 .execute(&self.pool)
                 .await?;
             let now = Utc::now().to_rfc3339();
-            sqlx::query(
-                "INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?)",
-            )
-            .bind(&now)
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
         }
 
         // Migration 003 — agent_logs table.
@@ -183,12 +179,10 @@ impl SessionManager {
                 .execute(&self.pool)
                 .await?;
             let now = Utc::now().to_rfc3339();
-            sqlx::query(
-                "INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?)",
-            )
-            .bind(&now)
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
         }
 
         Ok(())
@@ -253,11 +247,7 @@ impl SessionManager {
         Ok(())
     }
 
-    pub async fn create_phase_record(
-        &self,
-        session_id: &str,
-        phase: &str,
-    ) -> Result<PhaseRecord> {
+    pub async fn create_phase_record(&self, session_id: &str, phase: &str) -> Result<PhaseRecord> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         sqlx::query(
@@ -289,22 +279,17 @@ impl SessionManager {
         error: Option<&str>,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        sqlx::query(
-            "UPDATE phases SET status = ?, completed_at = ?, error = ? WHERE id = ?",
-        )
-        .bind(status)
-        .bind(&now)
-        .bind(error)
-        .bind(phase_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE phases SET status = ?, completed_at = ?, error = ? WHERE id = ?")
+            .bind(status)
+            .bind(&now)
+            .bind(error)
+            .bind(phase_id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
-    pub async fn get_phases_for_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<PhaseRecord>> {
+    pub async fn get_phases_for_session(&self, session_id: &str) -> Result<Vec<PhaseRecord>> {
         let rows = sqlx::query_as::<_, PhaseRecord>(
             "SELECT id, session_id, phase, status, started_at, completed_at, error \
              FROM phases WHERE session_id = ?",
@@ -373,12 +358,11 @@ impl SessionManager {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         // Determine next seq for this session.
-        let (next_seq,): (i64,) = sqlx::query_as(
-            "SELECT COALESCE(MAX(seq), 0) + 1 FROM agent_logs WHERE session_id = ?",
-        )
-        .bind(session_id)
-        .fetch_one(&self.pool)
-        .await?;
+        let (next_seq,): (i64,) =
+            sqlx::query_as("SELECT COALESCE(MAX(seq), 0) + 1 FROM agent_logs WHERE session_id = ?")
+                .bind(session_id)
+                .fetch_one(&self.pool)
+                .await?;
         sqlx::query(
             "INSERT INTO agent_logs \
              (id, session_id, phase, agent_name, message, seq, created_at) \
@@ -500,7 +484,9 @@ mod tests {
     async fn test_update_status() {
         let mgr = SessionManager::in_memory().await.unwrap();
         let session = mgr.create_session("test feature", "sdd").await.unwrap();
-        mgr.update_session_status(&session.id, "running").await.unwrap();
+        mgr.update_session_status(&session.id, "running")
+            .await
+            .unwrap();
 
         let fetched = mgr.get_session(&session.id).await.unwrap().unwrap();
         assert_eq!(fetched.status, "running");
@@ -513,7 +499,9 @@ mod tests {
         let phase = mgr.create_phase_record(&session.id, "spec").await.unwrap();
         assert_eq!(phase.phase, "spec");
 
-        mgr.complete_phase(&phase.id, "completed", None).await.unwrap();
+        mgr.complete_phase(&phase.id, "completed", None)
+            .await
+            .unwrap();
         let phases = mgr.get_phases_for_session(&session.id).await.unwrap();
         assert_eq!(phases.len(), 1);
         assert_eq!(phases[0].status, "completed");
@@ -599,9 +587,15 @@ mod tests {
     async fn test_get_agent_logs_since() {
         let mgr = SessionManager::in_memory().await.unwrap();
         let session = mgr.create_session("Incremental Test", "sdd").await.unwrap();
-        mgr.record_agent_log(&session.id, "spec", "pm", "msg1").await.unwrap();
-        mgr.record_agent_log(&session.id, "spec", "pm", "msg2").await.unwrap();
-        mgr.record_agent_log(&session.id, "spec", "pm", "msg3").await.unwrap();
+        mgr.record_agent_log(&session.id, "spec", "pm", "msg1")
+            .await
+            .unwrap();
+        mgr.record_agent_log(&session.id, "spec", "pm", "msg2")
+            .await
+            .unwrap();
+        mgr.record_agent_log(&session.id, "spec", "pm", "msg3")
+            .await
+            .unwrap();
 
         let since = mgr.get_agent_logs_since(&session.id, 1).await.unwrap();
         assert_eq!(since.len(), 2);
@@ -614,8 +608,14 @@ mod tests {
         let mgr = SessionManager::in_memory().await.unwrap();
         let s1 = mgr.create_session("Session A", "sdd").await.unwrap();
         let s2 = mgr.create_session("Session B", "sdd").await.unwrap();
-        let l1 = mgr.record_agent_log(&s1.id, "spec", "pm", "s1 log").await.unwrap();
-        let l2 = mgr.record_agent_log(&s2.id, "spec", "pm", "s2 log").await.unwrap();
+        let l1 = mgr
+            .record_agent_log(&s1.id, "spec", "pm", "s1 log")
+            .await
+            .unwrap();
+        let l2 = mgr
+            .record_agent_log(&s2.id, "spec", "pm", "s2 log")
+            .await
+            .unwrap();
         // Each session starts from seq=1 independently.
         assert_eq!(l1.seq, 1);
         assert_eq!(l2.seq, 1);

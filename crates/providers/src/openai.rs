@@ -24,11 +24,11 @@ impl OpenAIProvider {
     }
 
     pub fn from_env() -> Result<Self, ProviderError> {
-        let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| ProviderError::MissingApiKey {
-            var_name: "OPENAI_API_KEY".to_string(),
-        })?;
-        let model =
-            std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+        let api_key =
+            std::env::var("OPENAI_API_KEY").map_err(|_| ProviderError::MissingApiKey {
+                var_name: "OPENAI_API_KEY".to_string(),
+            })?;
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
         Ok(Self::new(api_key, model))
     }
 

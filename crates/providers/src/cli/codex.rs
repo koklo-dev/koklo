@@ -16,9 +16,13 @@ impl CodexCliProvider {
     pub fn from_config(_entry: &ProviderTomlEntry) -> Result<Self, ProviderError> {
         which::which("codex").map_err(|_| ProviderError::CliNotInstalled {
             name: "codex".to_string(),
-            install_hint: "Install from: https://github.com/openai/codex or `npm install -g @openai/codex`".to_string(),
+            install_hint:
+                "Install from: https://github.com/openai/codex or `npm install -g @openai/codex`"
+                    .to_string(),
         })?;
-        Ok(Self { mode: CliMode::detect_from_env() })
+        Ok(Self {
+            mode: CliMode::detect_from_env(),
+        })
     }
 
     #[allow(dead_code)] // used by PTY mode / future home-dir resolution
@@ -71,8 +75,14 @@ impl LlmProvider for CodexCliProvider {
             return Err(ProviderError::EmptyResponse.into());
         }
 
-        on_chunk(StreamChunk { text: text.clone(), finished: false });
-        on_chunk(StreamChunk { text: String::new(), finished: true });
+        on_chunk(StreamChunk {
+            text: text.clone(),
+            finished: false,
+        });
+        on_chunk(StreamChunk {
+            text: String::new(),
+            finished: true,
+        });
         Ok(text)
     }
 

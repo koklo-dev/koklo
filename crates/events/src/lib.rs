@@ -1,6 +1,6 @@
 //! Pipeline event bus — tokio broadcast channel.
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tokio::sync::broadcast;
 
 /// Pipeline execution phases.
@@ -59,13 +59,38 @@ pub enum GateAction {
 /// Events emitted by the pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PipelineEvent {
-    PhaseStarted { phase: Phase, session_id: String },
-    PhaseCompleted { phase: Phase, session_id: String },
-    PhaseFailed { phase: Phase, session_id: String, error: String },
-    AgentLog { phase: Phase, message: String },
-    GateRequired { phase: Phase, session_id: String, description: String },
-    GateResolved { phase: Phase, session_id: String, action: GateAction },
-    PrCreated { session_id: String, url: String, title: String },
+    PhaseStarted {
+        phase: Phase,
+        session_id: String,
+    },
+    PhaseCompleted {
+        phase: Phase,
+        session_id: String,
+    },
+    PhaseFailed {
+        phase: Phase,
+        session_id: String,
+        error: String,
+    },
+    AgentLog {
+        phase: Phase,
+        message: String,
+    },
+    GateRequired {
+        phase: Phase,
+        session_id: String,
+        description: String,
+    },
+    GateResolved {
+        phase: Phase,
+        session_id: String,
+        action: GateAction,
+    },
+    PrCreated {
+        session_id: String,
+        url: String,
+        title: String,
+    },
 }
 
 /// Wrapper around a tokio broadcast channel.

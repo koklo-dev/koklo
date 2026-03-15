@@ -27,17 +27,18 @@ pub struct AgentRunner {
 
 impl AgentRunner {
     pub fn new(config: AgentConfig, provider: Arc<dyn LlmProvider>, bus: EventBus) -> Self {
-        Self { config, provider, bus }
+        Self {
+            config,
+            provider,
+            bus,
+        }
     }
 
     /// Run the agent with the given user prompt. Returns the full LLM response.
     pub async fn run(&self, _session_id: &str, user_prompt: &str) -> Result<String> {
         let system_prompt = build_system_prompt(&self.config)?;
 
-        let messages = vec![
-            Message::system(system_prompt),
-            Message::user(user_prompt),
-        ];
+        let messages = vec![Message::system(system_prompt), Message::user(user_prompt)];
 
         let bus = self.bus.clone();
         let phase = self.config.phase.clone();
@@ -87,7 +88,10 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
         maybe_read(ctx_dir.join("USER.md"), &mut parts);
         maybe_read(ctx_dir.join("MEMORY.md"), &mut parts);
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        maybe_read(ctx_dir.join("memories").join(format!("{today}.md")), &mut parts);
+        maybe_read(
+            ctx_dir.join("memories").join(format!("{today}.md")),
+            &mut parts,
+        );
     }
 
     // [5-7] per-agent identity from agents/built-in/<slug>/
@@ -110,7 +114,10 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
             "System prompt file not found: {:?}, using default",
             config.system_prompt_file
         );
-        format!("You are the {} agent for the koklo AI development pipeline.", config.name)
+        format!(
+            "You are the {} agent for the koklo AI development pipeline.",
+            config.name
+        )
     };
     parts.push(role);
 

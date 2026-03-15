@@ -73,10 +73,7 @@ impl Sandbox for BubblewrapSandbox {
         tracing::info!("BubblewrapSandbox running: {}", command);
         // Build bwrap command with appropriate restrictions
         let mut bwrap_args = vec![
-            "--bind", "/", "/",
-            "--proc", "/proc",
-            "--dev", "/dev",
-            "--tmpfs", "/tmp",
+            "--bind", "/", "/", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
         ];
         if !self.network {
             bwrap_args.push("--unshare-net");
