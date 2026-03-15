@@ -12,6 +12,7 @@ members = [
   "crates/doc-generator",
   "crates/ticket-system",
   "crates/shell",
+  "crates/events",
 ]
 
 [workspace.package]
@@ -31,3 +32,12 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+ratatui = "0.26"
+crossterm = "0.27"
+reqwest = { version = "0.11", features = ["json", "stream", "rustls-tls"], default-features = false }
+tokio-stream = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+toml = { version = "0.8", features = ["parse"] }
+which = "6"
