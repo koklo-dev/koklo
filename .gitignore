@@ -19,8 +19,16 @@ apps/desktop/src-tauri/target/
 *.sqlite-shm
 *.sqlite-wal
 
-# koklo session logs (auto-generated, not versioned)
-.koklo/memories/
+# koklo — local project config (never versioned)
+.koklo/
+
+# Legacy BMAD / OpenClaw installation artifacts
+_bmad/
+_bmad-output/
+.bmad/
+.agents/
+.claude/
+agents/
 
 # Env
 .env
