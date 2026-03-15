@@ -14,17 +14,19 @@ pub mod mistral;
 pub mod ollama;
 pub mod openai;
 pub(crate) mod openai_compat;
+pub mod openrouter;
 pub mod registry;
 
 pub use anthropic::AnthropicProvider;
 pub use cli::claude_code::ClaudeCodeCliProvider;
 pub use cli::codex::CodexCliProvider;
-pub use config::{AgentTomlConfig, PipelineTomlConfig, ProviderTomlEntry};
+pub use config::{AgentTomlConfig, PipelineTomlConfig, ProviderRouting, ProviderTomlEntry};
 pub use error::ProviderError;
 pub use fallback::FallbackProvider;
 pub use mistral::MistralProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
+pub use openrouter::OpenRouterProvider;
 pub use registry::ProviderRegistry;
 
 use anyhow::Result;
