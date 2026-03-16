@@ -370,9 +370,8 @@ fn build_mount_plan(
             .iter(),
     );
 
-    let (post_tmp_create_dirs, pre_tmp_create_dirs): (Vec<_>, Vec<_>) = create_dirs
-        .into_iter()
-        .partition(|path| is_under_tmp(path));
+    let (post_tmp_create_dirs, pre_tmp_create_dirs): (Vec<_>, Vec<_>) =
+        create_dirs.into_iter().partition(|path| is_under_tmp(path));
 
     Ok(MountPlan {
         pre_tmp_create_dirs,
