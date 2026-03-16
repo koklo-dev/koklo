@@ -1401,6 +1401,7 @@ dependencies = [
  "koklo-storage",
  "koklo-workflow-engine",
  "ratatui",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",

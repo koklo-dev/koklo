@@ -117,6 +117,53 @@ impl PipelineTomlConfig {
             .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))?;
         toml::from_str(&text).map_err(|e| anyhow::anyhow!("Invalid pipeline.toml: {}", e))
     }
+
+    /// Load from a specific path (used for `~/.koklo/config.toml`).
+    /// Returns defaults if the file is absent or unreadable.
+    pub fn load_from_path(path: &Path) -> Result<Self> {
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))?;
+        toml::from_str(&text)
+            .map_err(|e| anyhow::anyhow!("Invalid config at {}: {}", path.display(), e))
+    }
+
+    /// Merge `self` (global) with `project` (project-level) config.
+    ///
+    /// - Providers: project wins on name collision.
+    /// - `pipeline.default_provider`: project wins if `Some`.
+    /// - Other pipeline/workflow fields: project wins if `Some`.
+    pub fn merge(self, project: Self) -> Self {
+        let mut providers = self.providers;
+        for (k, v) in project.providers {
+            providers.insert(k, v);
+        }
+        let mut agents = self.agents;
+        for (k, v) in project.agents {
+            agents.insert(k, v);
+        }
+        Self {
+            pipeline: PipelineSection {
+                db_path: project.pipeline.db_path.or(self.pipeline.db_path),
+                artifacts_dir: project
+                    .pipeline
+                    .artifacts_dir
+                    .or(self.pipeline.artifacts_dir),
+                agents_dir: project.pipeline.agents_dir.or(self.pipeline.agents_dir),
+                default_provider: project
+                    .pipeline
+                    .default_provider
+                    .or(self.pipeline.default_provider),
+            },
+            workflow: WorkflowSection {
+                preset: project.workflow.preset.or(self.workflow.preset),
+            },
+            agents,
+            providers,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -130,8 +177,9 @@ mod tests {
 db_path = "test.db"
 artifacts_dir = "docs/artifacts"
 
-[providers.anthropic]
-api_key_env = "ANTHROPIC_API_KEY"
+[providers.openrouter]
+api_key_env = "OPENROUTER_API_KEY"
+model = "anthropic/claude-opus-4-6"
 
 [providers.ollama]
 base_url = "http://127.0.0.1:11434"
@@ -143,7 +191,7 @@ timeout_secs = 120
 "#;
         let cfg: PipelineTomlConfig = toml::from_str(raw).unwrap();
         assert_eq!(cfg.pipeline.db_path.as_deref(), Some("test.db"));
-        assert!(cfg.providers.contains_key("anthropic"));
+        assert!(cfg.providers.contains_key("openrouter"));
         assert_eq!(
             cfg.providers["ollama"].base_url.as_deref(),
             Some("http://127.0.0.1:11434")
@@ -196,5 +244,65 @@ sort = "price"
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("pipeline.toml"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_load_from_path_missing_returns_default() {
+        let path = Path::new("/tmp/koklo_test_nonexistent_config_xyz_12345.toml");
+        let cfg = PipelineTomlConfig::load_from_path(path).unwrap();
+        assert!(cfg.providers.is_empty());
+        assert!(cfg.agents.is_empty());
+        assert!(cfg.pipeline.default_provider.is_none());
+    }
+
+    #[test]
+    fn test_merge_project_overrides_global_provider() {
+        let mut global = PipelineTomlConfig::default();
+        global.providers.insert(
+            "openrouter".to_string(),
+            ProviderTomlEntry {
+                model: Some("anthropic/claude-opus-4-6".to_string()),
+                ..Default::default()
+            },
+        );
+        global.providers.insert(
+            "ollama".to_string(),
+            ProviderTomlEntry {
+                model: Some("llama3.2".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let mut project = PipelineTomlConfig::default();
+        project.providers.insert(
+            "ollama".to_string(),
+            ProviderTomlEntry {
+                model: Some("qwen2.5-coder:7b".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let merged = global.merge(project);
+        assert_eq!(
+            merged.providers["openrouter"].model.as_deref(),
+            Some("anthropic/claude-opus-4-6")
+        );
+        // project wins for ollama
+        assert_eq!(
+            merged.providers["ollama"].model.as_deref(),
+            Some("qwen2.5-coder:7b")
+        );
+    }
+
+    #[test]
+    fn test_merge_default_provider_project_wins() {
+        let mut global = PipelineTomlConfig::default();
+        global.pipeline.default_provider = Some("openrouter".to_string());
+
+        let mut project = PipelineTomlConfig::default();
+        project.pipeline.default_provider = Some("ollama".to_string());
+
+        let merged = global.merge(project);
+        assert_eq!(merged.pipeline.default_provider.as_deref(), Some("ollama"));
     }
 }
