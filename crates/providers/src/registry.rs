@@ -27,24 +27,21 @@ impl std::fmt::Debug for ProviderRegistry {
 impl ProviderRegistry {
     /// Build the registry from TOML config.
     ///
-    /// - Fails if an unknown provider name appears in `[providers.*]`.
+    /// - Warns and skips providers with unknown names (allows old configs to keep working).
     /// - Warns and skips providers that cannot be created (missing key, CLI absent).
     /// - Fails if an agent's `provider` field references a provider that didn't build.
     pub fn build(config: &PipelineTomlConfig) -> Result<Self> {
-        // Validate all provider names first
-        for name in config.providers.keys() {
-            if !KNOWN_NAMES.contains(&name.as_str()) {
-                return Err(ProviderError::UnknownProvider {
-                    name: name.clone(),
-                    known: KNOWN_NAMES.join(", "),
-                }
-                .into());
-            }
-        }
-
-        // Build providers, warn and skip failures
+        // Build providers, warn and skip failures or unknown names
         let mut providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
         for (name, entry) in &config.providers {
+            if !KNOWN_NAMES.contains(&name.as_str()) {
+                tracing::warn!(
+                    "Provider '{}' is not supported (known: {}), skipping",
+                    name,
+                    KNOWN_NAMES.join(", ")
+                );
+                continue;
+            }
             match build_one(name, entry) {
                 Ok(p) => {
                     providers.insert(name.clone(), p);
@@ -104,14 +101,14 @@ mod tests {
     use crate::config::{AgentTomlConfig, PipelineTomlConfig, ProviderTomlEntry};
 
     #[test]
-    fn test_unknown_provider_name_fails_at_build() {
+    fn test_unknown_provider_name_is_skipped_with_warning() {
         let mut cfg = PipelineTomlConfig::default();
         cfg.providers
             .insert("fancy-llm".to_string(), ProviderTomlEntry::default());
-        let result = ProviderRegistry::build(&cfg);
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("fancy-llm"));
+        // Should succeed (warn and skip), not fail
+        let registry = ProviderRegistry::build(&cfg).unwrap();
+        // Unknown provider is simply absent from the registry
+        assert!(registry.get("fancy-llm").is_none());
     }
 
     #[test]
