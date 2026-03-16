@@ -4,6 +4,7 @@
 //! the DB path, agent directory, and first-run initialisation.
 
 use anyhow::Result;
+use koklo_providers::PipelineTomlConfig;
 use std::path::PathBuf;
 
 /// Returns `$KOKLO_HOME` if set, otherwise `~/.koklo/`.
@@ -50,21 +51,30 @@ pub fn ensure_home() -> Result<PathBuf> {
     Ok(home)
 }
 
+/// Load `~/.koklo/config.toml` as a `PipelineTomlConfig`.
+/// Returns `Default` if the file is missing or cannot be parsed.
+pub fn load_global_config() -> PipelineTomlConfig {
+    let path = koklo_home().join("config.toml");
+    PipelineTomlConfig::load_from_path(&path).unwrap_or_default()
+}
+
 const DEFAULT_CONFIG_TOML: &str = r#"# koklo global configuration
 
-[providers.anthropic]
-api_key_env = "ANTHROPIC_API_KEY"
-model = "claude-opus-4-6"
-
-# [providers.ollama]
-# base_url = "http://localhost:11434"
-# model = "llama3.2"
-
+# ── Cloud ───────────────────────────────────────────────────────────────────
+# OpenRouter: single API key, 300+ models. Set OPENROUTER_API_KEY to enable.
 # [providers.openrouter]
 # api_key_env = "OPENROUTER_API_KEY"
 # model = "anthropic/claude-opus-4-6"
-# [providers.openrouter.routing]
-# data_collection = "deny"
-# allow_fallbacks = true
-# sort = "price"
+
+# ── Local bridges ───────────────────────────────────────────────────────────
+# Claude Code CLI bridge (no API key needed — uses local `claude` binary)
+[providers.claude-code]
+
+# Codex CLI bridge (no API key needed — uses local `codex` binary)
+# [providers.codex]
+
+# ── Local models ────────────────────────────────────────────────────────────
+# [providers.ollama]
+# base_url = "http://localhost:11434"
+# model = "llama3.2"
 "#;

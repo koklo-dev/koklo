@@ -27,8 +27,7 @@ mod monitor;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use koklo_providers::{
-    AnthropicProvider, LlmProvider, MistralProvider, OllamaProvider, OpenAIProvider,
-    PipelineTomlConfig, ProviderRegistry,
+    LlmProvider, OllamaProvider, OpenRouterProvider, PipelineTomlConfig, ProviderRegistry,
 };
 use koklo_workflow_engine::{
     presets::{phases_for_preset, PresetKind},
@@ -304,8 +303,59 @@ enum ProviderCommands {
     List,
     /// Test connectivity to a provider.
     Test {
-        /// Provider name (e.g. ollama, anthropic).
+        /// Provider name (e.g. ollama, openrouter).
         name: String,
+    },
+    /// Add or update a provider in the config.
+    ///
+    /// Examples:
+    ///   koklo provider add openrouter
+    ///   koklo provider add openrouter --model "anthropic/claude-opus-4-6"
+    ///   koklo provider add ollama --model qwen2.5-coder:7b --project
+    Add {
+        /// Provider name (openrouter, ollama, claude-code, codex).
+        name: String,
+        /// Model name (uses smart default if omitted).
+        #[arg(long)]
+        model: Option<String>,
+        /// Env var holding the API key (uses smart default if omitted).
+        #[arg(long)]
+        key_env: Option<String>,
+        /// Base URL (uses smart default if omitted).
+        #[arg(long)]
+        base_url: Option<String>,
+        /// Write to project .koklo/pipeline.toml instead of global ~/.koklo/config.toml.
+        #[arg(long)]
+        project: bool,
+    },
+    /// Remove a provider from the config.
+    Remove {
+        /// Provider name to remove.
+        name: String,
+        /// Remove from project config instead of global config.
+        #[arg(long)]
+        project: bool,
+    },
+    /// Set the default provider.
+    ///
+    /// Examples:
+    ///   koklo provider set-default claude-code
+    ///   koklo provider set-default ollama --project
+    SetDefault {
+        /// Provider name to set as default.
+        name: String,
+        /// Write to project config instead of global config.
+        #[arg(long)]
+        project: bool,
+    },
+    /// Show API usage for configured providers.
+    ///
+    /// Examples:
+    ///   koklo provider usage
+    ///   koklo provider usage openrouter
+    Usage {
+        /// Show usage for a specific provider only.
+        name: Option<String>,
     },
 }
 
@@ -369,6 +419,20 @@ async fn main() -> Result<()> {
         Commands::Provider(sub) => match sub {
             ProviderCommands::List => cmd_provider_list().await?,
             ProviderCommands::Test { name } => cmd_provider_test(&name).await?,
+            ProviderCommands::Add {
+                name,
+                model,
+                key_env,
+                base_url,
+                project,
+            } => cmd_provider_add(&name, model, key_env, base_url, project).await?,
+            ProviderCommands::Remove { name, project } => {
+                cmd_provider_remove(&name, project).await?
+            }
+            ProviderCommands::SetDefault { name, project } => {
+                cmd_provider_set_default(&name, project).await?
+            }
+            ProviderCommands::Usage { name } => cmd_provider_usage(name).await?,
         },
 
         Commands::Monitor {
@@ -467,12 +531,30 @@ fn find_project_root() -> Result<PathBuf> {
 /// Select the default provider.
 ///
 /// Priority:
+/// 0. `toml_default` field from merged config (highest priority)
 /// 1. `KOKLO_PROVIDER` env var → registry lookup
-/// 2. `ANTHROPIC_API_KEY` set → AnthropicProvider
-/// 3. `OPENAI_API_KEY` set → OpenAIProvider
-/// 4. `MISTRAL_API_KEY` set → MistralProvider
-/// 5. OllamaProvider (fallback)
-fn determine_default_provider(registry: &ProviderRegistry) -> Result<Arc<dyn LlmProvider>> {
+/// 2. `OPENROUTER_API_KEY` set → openrouter
+/// 3. OllamaProvider (fallback)
+fn determine_default_provider(
+    registry: &ProviderRegistry,
+    toml_default: Option<&str>,
+) -> Result<Arc<dyn LlmProvider>> {
+    // 0. TOML default_provider (merged pipeline config)
+    if let Some(name) = toml_default {
+        if let Some(p) = registry.get(name) {
+            tracing::info!(
+                "Default provider: '{}' (from config default_provider)",
+                name
+            );
+            return Ok(p);
+        }
+        tracing::warn!(
+            "Config default_provider='{}' not in registry, falling back",
+            name
+        );
+    }
+
+    // 1. KOKLO_PROVIDER env var
     if let Ok(name) = std::env::var("KOKLO_PROVIDER") {
         if let Some(p) = registry.get(&name) {
             tracing::info!("Default provider: '{}' (from KOKLO_PROVIDER)", name);
@@ -481,33 +563,21 @@ fn determine_default_provider(registry: &ProviderRegistry) -> Result<Arc<dyn Llm
         tracing::warn!("KOKLO_PROVIDER='{}' not in registry, falling back", name);
     }
 
-    if std::env::var("ANTHROPIC_API_KEY").is_ok() {
-        let p: Arc<dyn LlmProvider> = match registry.get("anthropic") {
+    // 2. OPENROUTER_API_KEY set → openrouter
+    if let Ok(api_key) = std::env::var("OPENROUTER_API_KEY") {
+        let p: Arc<dyn LlmProvider> = match registry.get("openrouter") {
             Some(p) => p,
-            None => Arc::new(AnthropicProvider::from_env()?),
+            None => Arc::new(OpenRouterProvider::new(
+                api_key,
+                "openai/gpt-4o".to_string(),
+                None,
+            )),
         };
-        tracing::info!("Default provider: anthropic (ANTHROPIC_API_KEY)");
+        tracing::info!("Default provider: openrouter (OPENROUTER_API_KEY)");
         return Ok(p);
     }
 
-    if std::env::var("OPENAI_API_KEY").is_ok() {
-        let p: Arc<dyn LlmProvider> = match registry.get("openai") {
-            Some(p) => p,
-            None => Arc::new(OpenAIProvider::from_env()?),
-        };
-        tracing::info!("Default provider: openai (OPENAI_API_KEY)");
-        return Ok(p);
-    }
-
-    if std::env::var("MISTRAL_API_KEY").is_ok() {
-        let p: Arc<dyn LlmProvider> = match registry.get("mistral") {
-            Some(p) => p,
-            None => Arc::new(MistralProvider::from_env()?),
-        };
-        tracing::info!("Default provider: mistral (MISTRAL_API_KEY)");
-        return Ok(p);
-    }
-
+    // 3. Ollama fallback
     let p: Arc<dyn LlmProvider> = match registry.get("ollama") {
         Some(p) => p,
         None => Arc::new(OllamaProvider::from_env()),
@@ -516,17 +586,20 @@ fn determine_default_provider(registry: &ProviderRegistry) -> Result<Arc<dyn Llm
     Ok(p)
 }
 
-/// Build a `PipelineOrchestrator` from `.koklo/pipeline.toml` + environment,
-/// using the given preset (overrides the TOML default).
+/// Build a `PipelineOrchestrator` from `~/.koklo/config.toml` + `.koklo/pipeline.toml`
+/// (project overrides global) + environment, using the given preset.
 async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<PipelineOrchestrator> {
     let project_root = find_project_root()?;
     tracing::debug!("Project root: {}", project_root.display());
 
-    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root)?;
-    let registry = Arc::new(ProviderRegistry::build(&toml_config)?);
+    let global = home_dirs::load_global_config();
+    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let merged = global.merge(project);
+
+    let registry = Arc::new(ProviderRegistry::build(&merged)?);
 
     let mut agent_providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
-    for (agent_name, agent_cfg) in &toml_config.agents {
+    for (agent_name, agent_cfg) in &merged.agents {
         if let Some(ref provider_name) = agent_cfg.provider {
             if let Some(p) = registry.get(provider_name) {
                 agent_providers.insert(agent_name.clone(), p);
@@ -534,11 +607,12 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
         }
     }
 
-    let default_provider = determine_default_provider(&registry)?;
+    let default_provider =
+        determine_default_provider(&registry, merged.pipeline.default_provider.as_deref())?;
 
-    // Preset resolution: explicit override > CLI TOML default > SDD
+    // Preset resolution: explicit override > merged TOML default > SDD
     let preset = preset_override.unwrap_or_else(|| {
-        toml_config
+        merged
             .workflow
             .preset
             .as_deref()
@@ -557,7 +631,7 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
     let config = PipelineConfig {
         db_path: home_dirs::koklo_db_path(),
         artifacts_dir: PathBuf::from(
-            toml_config
+            merged
                 .pipeline
                 .artifacts_dir
                 .as_deref()
@@ -698,8 +772,8 @@ artifacts_dir = "docs/planning_artifacts"
 preset = "{preset}"
 
 # Provider overrides are optional — global ~/.koklo/config.toml is used by default.
-# [providers.anthropic]
-# model = "claude-haiku-4-5-20251001"
+# [providers.openrouter]
+# model = "anthropic/claude-opus-4-6"
 "#,
         preset = preset.as_str()
     );
@@ -860,9 +934,12 @@ async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
 
     // Build a minimal orchestrator to get the provider.
     let project_root = find_project_root()?;
-    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root)?;
-    let registry = Arc::new(ProviderRegistry::build(&toml_config)?);
-    let provider = determine_default_provider(&registry)?;
+    let global = home_dirs::load_global_config();
+    let project_cfg = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let merged = global.merge(project_cfg);
+    let registry = Arc::new(ProviderRegistry::build(&merged)?);
+    let provider =
+        determine_default_provider(&registry, merged.pipeline.default_provider.as_deref())?;
 
     let dir = agents_dir();
     let system_prompt_file = dir.join(format!("{}.md", name));
@@ -932,18 +1009,23 @@ fn cmd_workflow_show(preset_str: &str) -> Result<()> {
 
 /// `koklo config show`
 async fn cmd_config_show() -> Result<()> {
+    // Global config
+    let global_path = home_dirs::koklo_home().join("config.toml");
+    println!("# Global: {}", global_path.display());
+    if global_path.exists() {
+        println!("{}", std::fs::read_to_string(&global_path)?);
+    } else {
+        println!("(not found — run `koklo init` to create)\n");
+    }
+
+    // Project config
     let project_root = find_project_root()?;
     let toml_path = project_root.join(".koklo").join("pipeline.toml");
+    println!("# Project: {}", toml_path.display());
     if toml_path.exists() {
-        let content = std::fs::read_to_string(&toml_path)?;
-        println!("# {}", toml_path.display());
-        println!("{}", content);
+        println!("{}", std::fs::read_to_string(&toml_path)?);
     } else {
-        println!(
-            "No .koklo/pipeline.toml found in or above {}.",
-            project_root.display()
-        );
-        println!("Run `koklo init` to create one.");
+        println!("(not found — run `koklo init` to create)\n");
     }
     Ok(())
 }
@@ -992,16 +1074,37 @@ async fn cmd_artifacts_show(session_id: &str, phase: &str) -> Result<()> {
 
 /// `koklo provider list`
 async fn cmd_provider_list() -> Result<()> {
+    let global = home_dirs::load_global_config();
     let project_root = find_project_root()?;
-    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root)?;
-    if toml_config.providers.is_empty() {
-        println!("No providers configured. Run `koklo init` or edit .koklo/pipeline.toml.");
+    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let merged = global.clone().merge(project.clone());
+
+    if merged.providers.is_empty() {
+        println!("No providers configured.");
+        println!("Run `koklo provider add <name>` or edit ~/.koklo/config.toml.");
         return Ok(());
     }
-    println!("{:<20} {:<30} STATUS", "NAME", "MODEL");
-    println!("{}", "-".repeat(65));
-    for (name, entry) in &toml_config.providers {
+
+    let default_name = merged.pipeline.default_provider.as_deref();
+
+    println!("{:<22} {:<30} {:<10} STATUS", "NAME", "MODEL", "SOURCE");
+    println!("{}", "─".repeat(75));
+    let mut names: Vec<&String> = merged.providers.keys().collect();
+    names.sort();
+    for name in names {
+        let entry = &merged.providers[name];
+        let source = if project.providers.contains_key(name) {
+            "project"
+        } else {
+            "global"
+        };
         let model = entry.model.as_deref().unwrap_or("-");
+        let is_default = default_name == Some(name.as_str());
+        let display_name = if is_default {
+            format!("{} *", name)
+        } else {
+            name.clone()
+        };
         let status = if let Some(ref key_env) = entry.api_key_env {
             if std::env::var(key_env).is_ok() {
                 "configured"
@@ -1011,7 +1114,16 @@ async fn cmd_provider_list() -> Result<()> {
         } else {
             "configured"
         };
-        println!("{:<20} {:<30} {}", name, model, status);
+        println!(
+            "{:<22} {:<30} {:<10} {}",
+            display_name, model, source, status
+        );
+    }
+    if default_name.is_some() {
+        println!();
+        println!(
+            "  * = default provider  |  global = ~/.koklo/config.toml  |  project = .koklo/pipeline.toml"
+        );
     }
     Ok(())
 }
@@ -1193,9 +1305,11 @@ async fn cmd_context_init() -> Result<()> {
 
 /// `koklo provider test <name>`
 async fn cmd_provider_test(name: &str) -> Result<()> {
+    let global = home_dirs::load_global_config();
     let project_root = find_project_root()?;
-    let toml_config = PipelineTomlConfig::load_from_project_root(&project_root)?;
-    let registry = Arc::new(ProviderRegistry::build(&toml_config)?);
+    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let merged = global.merge(project);
+    let registry = Arc::new(ProviderRegistry::build(&merged)?);
 
     let provider = registry
         .get(name)
@@ -1219,5 +1333,180 @@ async fn cmd_provider_test(name: &str) -> Result<()> {
             eprintln!("\nProvider '{}' failed: {}", name, e);
         }
     }
+    Ok(())
+}
+
+/// `koklo provider add <name> [--model M] [--key-env K] [--base-url U] [--project]`
+async fn cmd_provider_add(
+    name: &str,
+    model: Option<String>,
+    key_env: Option<String>,
+    base_url: Option<String>,
+    project: bool,
+) -> Result<()> {
+    use koklo_providers::ProviderTomlEntry;
+
+    // Smart defaults per known provider name
+    let (default_key_env, default_model, default_base_url): (
+        Option<&str>,
+        Option<&str>,
+        Option<&str>,
+    ) = match name {
+        "openrouter" => (Some("OPENROUTER_API_KEY"), Some("openai/gpt-4o"), None),
+        "ollama" => (None, Some("llama3.2"), Some("http://localhost:11434")),
+        "claude-code" | "codex" => (None, None, None),
+        _ => (None, None, None),
+    };
+
+    let entry = ProviderTomlEntry {
+        api_key_env: key_env.or_else(|| default_key_env.map(String::from)),
+        model: model.or_else(|| default_model.map(String::from)),
+        base_url: base_url.or_else(|| default_base_url.map(String::from)),
+        ..Default::default()
+    };
+
+    let (config_path, mut config) = load_writable_config(project)?;
+
+    config.providers.insert(name.to_string(), entry);
+
+    write_config(&config_path, &config)?;
+    println!("Added provider '{}' to {}", name, config_path.display());
+    Ok(())
+}
+
+/// `koklo provider remove <name> [--project]`
+async fn cmd_provider_remove(name: &str, project: bool) -> Result<()> {
+    let (config_path, mut config) = load_writable_config(project)?;
+
+    if config.providers.remove(name).is_none() {
+        println!("Provider '{}' not found in config.", name);
+        return Ok(());
+    }
+
+    write_config(&config_path, &config)?;
+    println!("Removed provider '{}' from {}", name, config_path.display());
+    Ok(())
+}
+
+/// `koklo provider set-default <name> [--project]`
+async fn cmd_provider_set_default(name: &str, project: bool) -> Result<()> {
+    let (config_path, mut config) = load_writable_config(project)?;
+    config.pipeline.default_provider = Some(name.to_string());
+    write_config(&config_path, &config)?;
+    println!(
+        "Default provider set to '{}' in {}",
+        name,
+        config_path.display()
+    );
+    Ok(())
+}
+
+/// `koklo provider usage [name]`
+async fn cmd_provider_usage(name: Option<String>) -> Result<()> {
+    let global = home_dirs::load_global_config();
+    let project_root = find_project_root()?;
+    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let merged = global.merge(project);
+
+    if merged.providers.is_empty() {
+        println!("No providers configured. Run `koklo provider add <name>`.");
+        return Ok(());
+    }
+
+    let names_to_show: Vec<String> = if let Some(n) = name {
+        vec![n]
+    } else {
+        let mut keys: Vec<String> = merged.providers.keys().cloned().collect();
+        keys.sort();
+        keys
+    };
+
+    println!("{:<14} {:<16} {:<12} TIER", "PROVIDER", "USAGE", "LIMIT");
+    println!("{}", "─".repeat(55));
+
+    for pname in &names_to_show {
+        if pname == "openrouter" {
+            if let Some(entry) = merged.providers.get(pname) {
+                let key_env = entry.api_key_env.as_deref().unwrap_or("OPENROUTER_API_KEY");
+                match std::env::var(key_env) {
+                    Ok(api_key) => match fetch_openrouter_usage(&api_key).await {
+                        Ok(info) => {
+                            let usage = format!("${:.2}", info.usage);
+                            let limit = info
+                                .limit
+                                .map(|l| format!("${:.2}", l))
+                                .unwrap_or_else(|| "unlimited".to_string());
+                            let tier = if info.is_free_tier { "free" } else { "paid" };
+                            println!("{:<14} {:<16} {:<12} {}", pname, usage, limit, tier);
+                        }
+                        Err(e) => {
+                            println!("{:<14} error: {}", pname, e);
+                        }
+                    },
+                    Err(_) => {
+                        println!("{:<14} missing key ({})", pname, key_env);
+                    }
+                }
+            } else {
+                println!("{:<14} not configured", pname);
+            }
+        } else {
+            println!("{:<14} local — no usage data", pname);
+        }
+    }
+    Ok(())
+}
+
+struct OpenRouterKeyInfo {
+    usage: f64,
+    limit: Option<f64>,
+    is_free_tier: bool,
+}
+
+async fn fetch_openrouter_usage(api_key: &str) -> Result<OpenRouterKeyInfo> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .get("https://openrouter.ai/api/v1/auth/key")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("OpenRouter request failed: {}", e))?;
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("OpenRouter response parse failed: {}", e))?;
+    let data = &json["data"];
+
+    Ok(OpenRouterKeyInfo {
+        usage: data["usage"].as_f64().unwrap_or(0.0),
+        limit: data["limit"].as_f64(),
+        is_free_tier: data["is_free_tier"].as_bool().unwrap_or(true),
+    })
+}
+
+/// Load the config file and its path for write operations.
+/// If `project` is true, uses `.koklo/pipeline.toml`; otherwise `~/.koklo/config.toml`.
+fn load_writable_config(project: bool) -> Result<(PathBuf, PipelineTomlConfig)> {
+    if project {
+        let project_root = find_project_root()?;
+        let path = project_root.join(".koklo").join("pipeline.toml");
+        let config = PipelineTomlConfig::load_from_project_root(&project_root)?;
+        Ok((path, config))
+    } else {
+        let path = home_dirs::koklo_home().join("config.toml");
+        let config = home_dirs::load_global_config();
+        Ok((path, config))
+    }
+}
+
+/// Serialize a `PipelineTomlConfig` and write it to `path`.
+fn write_config(path: &PathBuf, config: &PipelineTomlConfig) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let toml_str = toml::to_string_pretty(config)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
+    std::fs::write(path, toml_str)?;
     Ok(())
 }
