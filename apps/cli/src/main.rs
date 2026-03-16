@@ -1346,6 +1346,31 @@ async fn cmd_provider_add(
 ) -> Result<()> {
     use koklo_providers::ProviderTomlEntry;
 
+    // Guard: --key-env takes an env var NAME (e.g. OPENROUTER_API_KEY), not the key value.
+    if let Some(ref k) = key_env {
+        if looks_like_api_key(k) {
+            anyhow::bail!(
+                "'{}' looks like an API key value, not an env var name.\n\
+                 --key-env expects the NAME of the environment variable that holds the key.\n\
+                 \n\
+                 Usage:\n\
+                 \n\
+                   export OPENROUTER_API_KEY='{}'\n\
+                   koklo provider add {} [--key-env OPENROUTER_API_KEY]\n\
+                 \n\
+                 Or use a custom var name:\n\
+                 \n\
+                   export MY_KEY='{}'\n\
+                   koklo provider add {} --key-env MY_KEY",
+                k,
+                k,
+                name,
+                k,
+                name
+            );
+        }
+    }
+
     // Smart defaults per known provider name
     let (default_key_env, default_model, default_base_url): (
         Option<&str>,
@@ -1372,6 +1397,18 @@ async fn cmd_provider_add(
     write_config(&config_path, &config)?;
     println!("Added provider '{}' to {}", name, config_path.display());
     Ok(())
+}
+
+/// Returns true if `s` looks like an API key value rather than an env var name.
+/// Env var names are typically UPPER_SNAKE_CASE; keys often start with known
+/// prefixes (sk-, sk-or-, pk-, ...) or contain lowercase letters.
+fn looks_like_api_key(s: &str) -> bool {
+    let key_prefixes = ["sk-", "pk-", "ak-", "key-", "Bearer "];
+    if key_prefixes.iter().any(|p| s.starts_with(p)) {
+        return true;
+    }
+    // Env var names are [A-Z0-9_] only; anything with lowercase or other chars is suspicious
+    s.chars().any(|c| c.is_lowercase())
 }
 
 /// `koklo provider remove <name> [--project]`
@@ -1428,6 +1465,17 @@ async fn cmd_provider_usage(name: Option<String>) -> Result<()> {
         if pname == "openrouter" {
             if let Some(entry) = merged.providers.get(pname) {
                 let key_env = entry.api_key_env.as_deref().unwrap_or("OPENROUTER_API_KEY");
+                // Detect misconfiguration: api_key_env was set to the key value, not a var name
+                if looks_like_api_key(key_env) {
+                    println!(
+                        "{:<14} misconfigured — api_key_env contains a key value, not a var name",
+                        pname
+                    );
+                    println!("  Fix:  koklo provider remove openrouter");
+                    println!("        export OPENROUTER_API_KEY='<your-key>'");
+                    println!("        koklo provider add openrouter");
+                    continue;
+                }
                 match std::env::var(key_env) {
                     Ok(api_key) => match fetch_openrouter_usage(&api_key).await {
                         Ok(info) => {
@@ -1444,7 +1492,8 @@ async fn cmd_provider_usage(name: Option<String>) -> Result<()> {
                         }
                     },
                     Err(_) => {
-                        println!("{:<14} missing key ({})", pname, key_env);
+                        println!("{:<14} env var {} is not set", pname, key_env);
+                        println!("  Fix:  export {}='<your-key>'", key_env);
                     }
                 }
             } else {
