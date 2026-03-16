@@ -1445,6 +1445,31 @@ async fn cmd_provider_add(
         }
     }
 
+    // Guard: --key-env takes an env var NAME (e.g. OPENROUTER_API_KEY), not the key value.
+    if let Some(ref k) = key_env {
+        if looks_like_api_key(k) {
+            anyhow::bail!(
+                "'{}' looks like an API key value, not an env var name.\n\
+                 --key-env expects the NAME of the environment variable that holds the key.\n\
+                 \n\
+                 Usage:\n\
+                 \n\
+                   export OPENROUTER_API_KEY='{}'\n\
+                   koklo provider add {} [--key-env OPENROUTER_API_KEY]\n\
+                 \n\
+                 Or use a custom var name:\n\
+                 \n\
+                   export MY_KEY='{}'\n\
+                   koklo provider add {} --key-env MY_KEY",
+                k,
+                k,
+                name,
+                k,
+                name
+            );
+        }
+    }
+
     // Smart defaults per known provider name
     let (default_key_env, default_model, default_smoke_model, default_base_url): (
         Option<&str>,
