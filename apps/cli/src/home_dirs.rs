@@ -28,7 +28,7 @@ pub fn koklo_db_path() -> String {
 
 /// Ensures `~/.koklo/` and its required subdirectories exist.
 ///
-/// Creates template files (`USER.md`, `config.toml`) on first run.
+/// Creates template files (`USER.md`, `config.toml`, `secrets.toml`) on first run.
 /// Returns the path to the global home directory.
 pub fn ensure_home() -> Result<PathBuf> {
     let home = koklo_home();
@@ -48,6 +48,12 @@ pub fn ensure_home() -> Result<PathBuf> {
         std::fs::write(&config, DEFAULT_CONFIG_TOML)?;
     }
 
+    let secrets = home.join("secrets.toml");
+    if !secrets.exists() {
+        std::fs::write(&secrets, DEFAULT_SECRETS_TOML)?;
+        set_private_file_permissions(&secrets)?;
+    }
+
     Ok(home)
 }
 
@@ -64,7 +70,8 @@ const DEFAULT_CONFIG_TOML: &str = r#"# koklo global configuration
 # OpenRouter: single API key, 300+ models. Set OPENROUTER_API_KEY to enable.
 # [providers.openrouter]
 # api_key_env = "OPENROUTER_API_KEY"
-# model = "anthropic/claude-opus-4-6"
+# model = "openai/gpt-4o"
+# smoke_model = "google/gemma-3-4b-it:free"
 
 # ── Local bridges ───────────────────────────────────────────────────────────
 # Claude Code CLI bridge (no API key needed — uses local `claude` binary)
@@ -78,3 +85,28 @@ const DEFAULT_CONFIG_TOML: &str = r#"# koklo global configuration
 # base_url = "http://localhost:11434"
 # model = "llama3.2"
 "#;
+
+const DEFAULT_SECRETS_TOML: &str = r#"# koklo secrets
+#
+# This file is loaded by the CLI for non-interactive runs.
+# Keep permissions strict (0600 on Unix).
+#
+# [env]
+# OPENROUTER_API_KEY = "sk-or-v1-..."
+# ANTHROPIC_API_KEY = "sk-ant-..."
+"#;
+
+#[cfg(unix)]
+fn set_private_file_permissions(path: &std::path::Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut perms = std::fs::metadata(path)?.permissions();
+    perms.set_mode(0o600);
+    std::fs::set_permissions(path, perms)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_private_file_permissions(_path: &std::path::Path) -> Result<()> {
+    Ok(())
+}

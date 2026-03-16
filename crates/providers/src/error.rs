@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
-    #[error("Missing API key: ${var_name} is not set. Run: export {var_name}=<your-key>")]
+    #[error("Missing API key: ${var_name} is not set. Run `export {var_name}=...` or add it to $KOKLO_HOME/secrets.toml under [env].")]
     MissingApiKey { var_name: String },
 
     #[error("CLI tool '{name}' is not installed. {install_hint}")]
@@ -41,6 +41,9 @@ pub enum ProviderError {
 
     #[error("Config error: {0}")]
     Config(String),
+
+    #[error("Sandbox error: {0}")]
+    Sandbox(String),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
