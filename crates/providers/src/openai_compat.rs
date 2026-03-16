@@ -23,30 +23,6 @@ pub(crate) struct OpenAICompatProvider {
     pub(crate) extra_body: Option<serde_json::Value>,
 }
 
-impl OpenAICompatProvider {
-    pub(crate) fn new(
-        api_key: impl Into<String>,
-        model: impl Into<String>,
-        base_url: impl Into<String>,
-        name: impl Into<String>,
-        api_key_env: impl Into<String>,
-    ) -> Self {
-        Self {
-            api_key: api_key.into(),
-            model: model.into(),
-            base_url: base_url.into(),
-            name: name.into(),
-            api_key_env: api_key_env.into(),
-            client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(120))
-                .build()
-                .unwrap_or_default(),
-            extra_headers: vec![],
-            extra_body: None,
-        }
-    }
-}
-
 /// Retry up to `max_attempts` on 429 or timeout, with exponential backoff (1s → 2s → 4s).
 pub(crate) async fn with_retry<F, Fut>(
     f: F,
@@ -214,6 +190,32 @@ impl LlmProvider for OpenAICompatProvider {
 
     fn model_name(&self) -> Option<&str> {
         Some(&self.model)
+    }
+}
+
+#[cfg(test)]
+impl OpenAICompatProvider {
+    pub(crate) fn new(
+        api_key: impl Into<String>,
+        model: impl Into<String>,
+        base_url: impl Into<String>,
+        name: impl Into<String>,
+        api_key_env: impl Into<String>,
+    ) -> Self {
+        use std::time::Duration;
+        Self {
+            api_key: api_key.into(),
+            model: model.into(),
+            base_url: base_url.into(),
+            name: name.into(),
+            api_key_env: api_key_env.into(),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(120))
+                .build()
+                .unwrap_or_default(),
+            extra_headers: vec![],
+            extra_body: None,
+        }
     }
 }
 
