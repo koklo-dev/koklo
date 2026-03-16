@@ -264,7 +264,18 @@ async fn run_with_bwrap(
 
     let mut bwrap = tokio::process::Command::new("bwrap");
     bwrap.arg("--die-with-parent").arg("--new-session");
-    for dir in &mount_plan.create_dirs {
+    for dir in &mount_plan.pre_tmp_create_dirs {
+        bwrap.arg("--dir").arg(dir);
+    }
+    bwrap
+        .arg("--proc")
+        .arg("/proc")
+        .arg("--dev")
+        .arg("/dev")
+        .arg("--tmpfs")
+        .arg("/tmp");
+
+    for dir in &mount_plan.post_tmp_create_dirs {
         bwrap.arg("--dir").arg(dir);
     }
     for path in &mount_plan.read_only_paths {
@@ -273,15 +284,7 @@ async fn run_with_bwrap(
     for path in &mount_plan.writable_paths {
         bwrap.arg("--bind").arg(path).arg(path);
     }
-    bwrap
-        .arg("--proc")
-        .arg("/proc")
-        .arg("--dev")
-        .arg("/dev")
-        .arg("--tmpfs")
-        .arg("/tmp")
-        .arg("--chdir")
-        .arg(&resolved_workdir);
+    bwrap.arg("--chdir").arg(&resolved_workdir);
 
     if !network {
         bwrap.arg("--unshare-net");
@@ -312,7 +315,8 @@ fn resolve_program(program: &str) -> Result<PathBuf> {
 
 #[derive(Debug, Default)]
 struct MountPlan {
-    create_dirs: Vec<PathBuf>,
+    pre_tmp_create_dirs: Vec<PathBuf>,
+    post_tmp_create_dirs: Vec<PathBuf>,
     read_only_paths: Vec<PathBuf>,
     writable_paths: Vec<PathBuf>,
 }
@@ -366,8 +370,13 @@ fn build_mount_plan(
             .iter(),
     );
 
+    let (post_tmp_create_dirs, pre_tmp_create_dirs): (Vec<_>, Vec<_>) = create_dirs
+        .into_iter()
+        .partition(|path| is_under_tmp(path));
+
     Ok(MountPlan {
-        create_dirs,
+        pre_tmp_create_dirs,
+        post_tmp_create_dirs,
         read_only_paths: read_only_paths.into_iter().collect(),
         writable_paths: writable_mounts.into_iter().collect(),
     })
@@ -483,14 +492,19 @@ where
     }
 
     let mut parents: Vec<_> = parents.into_iter().collect();
-    parents.sort_by_key(path_depth);
+    parents.sort_by_key(|path| path_depth(path));
     parents
 }
 
-fn path_depth(path: &PathBuf) -> usize {
+fn path_depth(path: &Path) -> usize {
     path.components()
         .filter(|component| component.as_os_str() != OsStr::new("/"))
         .count()
+}
+
+fn is_under_tmp(path: &Path) -> bool {
+    let tmp_root = Path::new("/tmp");
+    path == tmp_root || path.starts_with(tmp_root)
 }
 
 #[cfg(test)]
