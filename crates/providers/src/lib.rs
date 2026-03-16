@@ -13,6 +13,7 @@ pub mod ollama;
 pub(crate) mod openai_compat;
 pub mod openrouter;
 pub mod registry;
+pub mod secrets;
 
 pub use cli::claude_code::ClaudeCodeCliProvider;
 pub use cli::codex::CodexCliProvider;
@@ -22,6 +23,7 @@ pub use fallback::FallbackProvider;
 pub use ollama::OllamaProvider;
 pub use openrouter::OpenRouterProvider;
 pub use registry::ProviderRegistry;
+pub use secrets::{has_secret, load_secrets_into_env, resolve_secret, secrets_path};
 
 use anyhow::Result;
 use async_trait::async_trait;

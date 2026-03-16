@@ -5,6 +5,7 @@
 use crate::config::{ProviderRouting, ProviderTomlEntry};
 use crate::error::ProviderError;
 use crate::openai_compat::OpenAICompatProvider;
+use crate::resolve_secret;
 use crate::{LlmProvider, Message, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -40,7 +41,7 @@ impl OpenRouterProvider {
 
     pub fn from_config(entry: &ProviderTomlEntry) -> Result<Self, ProviderError> {
         let var_name = entry.api_key_env.as_deref().unwrap_or("OPENROUTER_API_KEY");
-        let api_key = std::env::var(var_name).map_err(|_| ProviderError::MissingApiKey {
+        let api_key = resolve_secret(var_name).ok_or_else(|| ProviderError::MissingApiKey {
             var_name: var_name.to_string(),
         })?;
         let model = entry
@@ -112,6 +113,25 @@ mod tests {
         let p = OpenRouterProvider::from_config(&entry).unwrap();
         assert_eq!(p.model_name(), Some("openai/gpt-4o"));
         std::env::remove_var("OPENROUTER_API_KEY");
+    }
+
+    #[test]
+    fn test_from_config_reads_key_from_secrets_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let secrets = dir.path().join("secrets.toml");
+        std::fs::write(&secrets, "[env]\nOPENROUTER_API_KEY = \"sk-or-test\"\n").unwrap();
+        std::env::remove_var("OPENROUTER_API_KEY");
+        std::env::set_var("KOKLO_SECRETS_FILE", &secrets);
+
+        let entry = ProviderTomlEntry {
+            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            model: Some("google/gemma-3-4b-it:free".to_string()),
+            ..Default::default()
+        };
+        let p = OpenRouterProvider::from_config(&entry).unwrap();
+        assert_eq!(p.model_name(), Some("google/gemma-3-4b-it:free"));
+
+        std::env::remove_var("KOKLO_SECRETS_FILE");
     }
 
     #[test]

@@ -22,11 +22,14 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 enum Panel {
     Sessions,
+    Phases,
     Log,
 }
+
+const SPINNER: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// Live-updating TUI monitor application.
 pub struct MonitorApp {
@@ -39,6 +42,10 @@ pub struct MonitorApp {
     storage: Arc<SessionManager>,
     /// When `Some`, only sessions from this project path are shown.
     project_filter: Option<String>,
+    /// Incremented on every tick to drive spinner animation.
+    tick_count: usize,
+    /// Index of the phase selected in the Phases panel. `None` = follow live phase.
+    selected_phase: Option<usize>,
 }
 
 impl MonitorApp {
@@ -77,6 +84,8 @@ impl MonitorApp {
             focus: Panel::Sessions,
             storage,
             project_filter,
+            tick_count: 0,
+            selected_phase: None,
         })
     }
 
@@ -93,6 +102,7 @@ impl MonitorApp {
 
     /// Poll the DB for new data. Returns `true` if anything changed.
     pub async fn tick(&mut self) -> Result<bool> {
+        self.tick_count = self.tick_count.wrapping_add(1);
         let new_sessions =
             Self::load_sessions(&self.storage, self.project_filter.as_deref()).await?;
         let changed = new_sessions.len() != self.sessions.len();
@@ -192,26 +202,47 @@ impl MonitorApp {
     }
 
     fn render_phases(&self, frame: &mut Frame, area: Rect) {
+        let border_style = if self.focus == Panel::Phases {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default()
+        };
+
         let session_label = self
             .sessions
             .get(self.selected_session)
             .map(|s| short_id(&s.id))
             .unwrap_or_else(|| "—".to_string());
 
+        let spinner_frame = SPINNER[self.tick_count % SPINNER.len()];
         let items: Vec<ListItem> = self
             .phases
             .iter()
-            .map(|p| {
-                let icon = status_icon(&p.status);
+            .enumerate()
+            .map(|(i, p)| {
+                let icon = if p.status == "running" {
+                    spinner_frame
+                } else {
+                    status_icon(&p.status)
+                };
                 let dur = phase_dur_str(&p.started_at, &p.completed_at);
-                ListItem::new(format!("{} {}{}", icon, p.phase, dur))
+                let selected = self.selected_phase == Some(i);
+                let style = if selected {
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(format!("{} {}{}", icon, p.phase, dur)).style(style)
             })
             .collect();
 
         let list = List::new(items).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("PHASES — {}", session_label)),
+                .title(format!("PHASES — {}", session_label))
+                .border_style(border_style),
         );
         frame.render_widget(list, area);
     }
@@ -229,30 +260,52 @@ impl MonitorApp {
             .map(|s| short_id(&s.id))
             .unwrap_or_else(|| "—".to_string());
 
-        let current_phase = self
-            .phases
-            .iter()
-            .find(|p| p.status == "running")
-            .or_else(|| self.phases.last())
-            .map(|p| p.phase.as_str())
-            .unwrap_or("—");
+        // Determine which phase logs to show.
+        let (display_phase, is_live) = if let Some(i) = self.selected_phase {
+            // Explicit phase selection from the Phases panel.
+            let name = self.phases.get(i).map(|p| p.phase.as_str()).unwrap_or("—");
+            let running = self
+                .phases
+                .get(i)
+                .map(|p| p.status == "running")
+                .unwrap_or(false);
+            (name, running)
+        } else {
+            // Default: follow the live running phase (or last completed).
+            let running = self.phases.iter().find(|p| p.status == "running");
+            let phase = running.or_else(|| self.phases.last());
+            let name = phase.map(|p| p.phase.as_str()).unwrap_or("—");
+            (name, running.is_some())
+        };
 
-        let agent_name = self
+        let filtered_logs: Vec<&AgentLogRecord> = self
             .logs
+            .iter()
+            .filter(|l| l.phase == display_phase)
+            .collect();
+
+        let agent_name = filtered_logs
             .last()
             .map(|l| l.agent_name.as_str())
             .unwrap_or("—");
 
+        let spinner_frame = SPINNER[self.tick_count % SPINNER.len()];
+        let phase_label = if is_live {
+            format!("{} {}", spinner_frame, display_phase)
+        } else {
+            display_phase.to_string()
+        };
+
         let title = format!(
             "{}  ·  session {}  ·  {}",
-            agent_name, session_label, current_phase
+            agent_name, session_label, phase_label
         );
 
         // Show only the lines that fit in the visible area (scroll to bottom).
         let visible_height = area.height.saturating_sub(2) as usize;
-        let start = self.logs.len().saturating_sub(visible_height);
+        let start = filtered_logs.len().saturating_sub(visible_height);
 
-        let items: Vec<ListItem> = self.logs[start..]
+        let items: Vec<ListItem> = filtered_logs[start..]
             .iter()
             .map(|log| {
                 let time = log.created_at.get(11..19).unwrap_or("??:??:??");
@@ -270,7 +323,11 @@ impl MonitorApp {
     }
 
     fn render_statusbar(&self, frame: &mut Frame, area: Rect) {
-        let text = "[q] quit  [↑↓] select session  [Tab] switch panel  [r] refresh";
+        let text = match self.focus {
+            Panel::Sessions => "[q] quit  [↑↓] select session  [Tab] next panel  [r] refresh",
+            Panel::Phases => "[q] quit  [↑↓] select phase  [Esc] live view  [Tab] next panel",
+            Panel::Log => "[q] quit  [Tab] next panel  [r] refresh",
+        };
         let para = Paragraph::new(text).style(Style::default().fg(Color::DarkGray));
         frame.render_widget(para, area);
     }
@@ -291,15 +348,49 @@ impl MonitorApp {
 
     fn toggle_focus(&mut self) {
         self.focus = match self.focus {
-            Panel::Sessions => Panel::Log,
+            Panel::Sessions => Panel::Phases,
+            Panel::Phases => Panel::Log,
             Panel::Log => Panel::Sessions,
         };
+    }
+
+    fn handle_up(&mut self) {
+        match self.focus {
+            Panel::Sessions => self.select_prev(),
+            Panel::Phases => self.phase_prev(),
+            Panel::Log => {}
+        }
+    }
+
+    fn handle_down(&mut self) {
+        match self.focus {
+            Panel::Sessions => self.select_next(),
+            Panel::Phases => self.phase_next(),
+            Panel::Log => {}
+        }
+    }
+
+    fn phase_prev(&mut self) {
+        match self.selected_phase {
+            Some(0) | None => {}
+            Some(i) => self.selected_phase = Some(i - 1),
+        }
+    }
+
+    fn phase_next(&mut self) {
+        let max = self.phases.len().saturating_sub(1);
+        self.selected_phase = Some(match self.selected_phase {
+            None => 0,
+            Some(i) if i < max => i + 1,
+            Some(i) => i,
+        });
     }
 
     fn reset_for_session(&mut self) {
         self.logs.clear();
         self.phases.clear();
         self.last_seq = 0;
+        self.selected_phase = None;
     }
 }
 
@@ -412,9 +503,11 @@ async fn tui_event_loop(
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('Q') => break,
-                    KeyCode::Up => app.select_prev(),
-                    KeyCode::Down => app.select_next(),
+                    KeyCode::Up => app.handle_up(),
+                    KeyCode::Down => app.handle_down(),
                     KeyCode::Tab => app.toggle_focus(),
+                    // Esc in Phases panel clears phase selection (back to live view).
+                    KeyCode::Esc => app.selected_phase = None,
                     KeyCode::Char('r') => {
                         app.tick().await?;
                     }

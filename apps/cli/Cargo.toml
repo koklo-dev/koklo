@@ -24,6 +24,7 @@ serde_json = { workspace = true }
 toml = { workspace = true }
 which = { workspace = true }
 dirs = { workspace = true }
+tempfile = "3"
 
 koklo-core = { path = "../../crates/core" }
 koklo-storage = { path = "../../crates/storage" }
