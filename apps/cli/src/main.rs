@@ -26,8 +26,10 @@ mod monitor;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use koklo_providers::registry::build_provider;
 use koklo_providers::{
-    LlmProvider, OllamaProvider, OpenRouterProvider, PipelineTomlConfig, ProviderRegistry,
+    has_secret, load_secrets_into_env, resolve_secret, ClaudeCodeCliProvider, LlmProvider,
+    OllamaProvider, OpenRouterProvider, PipelineTomlConfig, ProviderRegistry, ProviderTomlEntry,
 };
 use koklo_workflow_engine::{
     presets::{phases_for_preset, PresetKind},
@@ -377,6 +379,9 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
+    let _ = home_dirs::ensure_home();
+    load_secrets_into_env();
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -564,7 +569,7 @@ fn determine_default_provider(
     }
 
     // 2. OPENROUTER_API_KEY set → openrouter
-    if let Ok(api_key) = std::env::var("OPENROUTER_API_KEY") {
+    if let Some(api_key) = resolve_secret("OPENROUTER_API_KEY") {
         let p: Arc<dyn LlmProvider> = match registry.get("openrouter") {
             Some(p) => p,
             None => Arc::new(OpenRouterProvider::new(
@@ -586,10 +591,16 @@ fn determine_default_provider(
     Ok(p)
 }
 
-/// Build a `PipelineOrchestrator` from `~/.koklo/config.toml` + `.koklo/pipeline.toml`
+/// Build a `PipelineOrchestrator` from `$KOKLO_HOME/config.toml` + `.koklo/pipeline.toml`
 /// (project overrides global) + environment, using the given preset.
-async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<PipelineOrchestrator> {
-    let project_root = find_project_root()?;
+async fn build_orchestrator(
+    project_root_override: Option<PathBuf>,
+    preset_override: Option<PresetKind>,
+) -> Result<PipelineOrchestrator> {
+    let project_root = match project_root_override {
+        Some(path) => path,
+        None => find_project_root()?,
+    };
     tracing::debug!("Project root: {}", project_root.display());
 
     let global = home_dirs::load_global_config();
@@ -599,11 +610,15 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
     let registry = Arc::new(ProviderRegistry::build(&merged)?);
 
     let mut agent_providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
+    let mut agent_sandboxes: HashMap<String, String> = HashMap::new();
     for (agent_name, agent_cfg) in &merged.agents {
         if let Some(ref provider_name) = agent_cfg.provider {
             if let Some(p) = registry.get(provider_name) {
                 agent_providers.insert(agent_name.clone(), p);
             }
+        }
+        if let Some(ref sandbox_name) = agent_cfg.sandbox {
+            agent_sandboxes.insert(agent_name.clone(), sandbox_name.clone());
         }
     }
 
@@ -643,6 +658,10 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
         preset,
         default_provider,
         agent_providers,
+        agent_sandboxes,
+        controlled_shell: std::env::var("KOKLO_CONTROLLED_SHELL")
+            .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+            .unwrap_or(false),
         provider_registry: registry,
         github: GithubConfig::from_env(),
     };
@@ -650,13 +669,13 @@ async fn build_orchestrator(preset_override: Option<PresetKind>) -> Result<Pipel
     PipelineOrchestrator::new(config).await
 }
 
-/// Open the global koklo database (`~/.koklo/koklo.db`).
+/// Open the global koklo database (`$KOKLO_HOME/koklo.db`).
 async fn open_storage() -> Result<koklo_storage::SessionManager> {
     let db_path = home_dirs::koklo_db_path();
     koklo_storage::SessionManager::open(&db_path).await
 }
 
-/// Returns the global agents directory (`~/.koklo/agents/`).
+/// Returns the global agents directory (`$KOKLO_HOME/agents/`).
 fn agents_dir() -> PathBuf {
     home_dirs::koklo_home().join("agents")
 }
@@ -761,7 +780,7 @@ fn detect_stack_preset(dir: &Path) -> PresetKind {
 
 /// Write a minimal `.koklo/pipeline.toml` for this project.
 ///
-/// The DB path and agents directory are always global (`~/.koklo/`) and are
+/// The DB path and agents directory are always global (`$KOKLO_HOME/`) and are
 /// not stored in the project config.
 fn write_default_pipeline_toml(path: &PathBuf, preset: PresetKind) -> Result<()> {
     let content = format!(
@@ -771,7 +790,7 @@ artifacts_dir = "docs/planning_artifacts"
 [workflow]
 preset = "{preset}"
 
-# Provider overrides are optional — global ~/.koklo/config.toml is used by default.
+# Provider overrides are optional — global $KOKLO_HOME/config.toml is used by default.
 # [providers.openrouter]
 # model = "anthropic/claude-opus-4-6"
 "#,
@@ -792,9 +811,23 @@ async fn cmd_run(preset: PresetKind, pipeline_type: &str, title: &str) -> Result
             );
         }
     }
-    let orchestrator = build_orchestrator(Some(preset)).await?;
+    let orchestrator = build_orchestrator(None, Some(preset)).await?;
     let session_id = orchestrator.run_feature_with_preset(title, preset).await?;
-    println!("\nPipeline complete — session: {}", session_id);
+    let storage = open_storage().await?;
+    if let Some(session) = storage.get_session(&session_id).await? {
+        println!(
+            "\nPipeline complete — session: {}\nWorkspace: {}\nBranch: {}",
+            session_id,
+            session.workspace_path,
+            if session.workspace_branch.is_empty() {
+                "(shared project tree)"
+            } else {
+                &session.workspace_branch
+            }
+        );
+    } else {
+        println!("\nPipeline complete — session: {}", session_id);
+    }
     Ok(())
 }
 
@@ -829,6 +862,16 @@ async fn cmd_session_show(id: &str) -> Result<()> {
             println!("Feature:  {}", s.feature_title);
             println!("Preset:   {}", s.preset);
             println!("Status:   {}", s.status);
+            println!("Project:  {}", s.project_path);
+            println!("Workspace: {}", s.workspace_path);
+            println!(
+                "Branch:   {}",
+                if s.workspace_branch.is_empty() {
+                    "(shared project tree)"
+                } else {
+                    &s.workspace_branch
+                }
+            );
             println!("Created:  {}", s.created_at);
             println!("Updated:  {}", s.updated_at);
             println!();
@@ -855,9 +898,27 @@ async fn cmd_session_show(id: &str) -> Result<()> {
 
 /// `koklo session resume <id>`
 async fn cmd_session_resume(id: &str) -> Result<()> {
-    let orchestrator = build_orchestrator(None).await?;
+    let storage = open_storage().await?;
+    let session = storage
+        .get_session(id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Session not found: {}", id))?;
+    let orchestrator = build_orchestrator(Some(PathBuf::from(&session.project_path)), None).await?;
     orchestrator.resume(id).await?;
-    println!("\nSession {} resumed and completed.", id);
+    let session = storage
+        .get_session(id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Session not found after resume: {}", id))?;
+    println!(
+        "\nSession {} resumed and completed.\nWorkspace: {}\nBranch: {}",
+        id,
+        session.workspace_path,
+        if session.workspace_branch.is_empty() {
+            "(shared project tree)"
+        } else {
+            &session.workspace_branch
+        }
+    );
     Ok(())
 }
 
@@ -1081,7 +1142,7 @@ async fn cmd_provider_list() -> Result<()> {
 
     if merged.providers.is_empty() {
         println!("No providers configured.");
-        println!("Run `koklo provider add <name>` or edit ~/.koklo/config.toml.");
+        println!("Run `koklo provider add <name>` or edit $KOKLO_HOME/config.toml.");
         return Ok(());
     }
 
@@ -1106,7 +1167,7 @@ async fn cmd_provider_list() -> Result<()> {
             name.clone()
         };
         let status = if let Some(ref key_env) = entry.api_key_env {
-            if std::env::var(key_env).is_ok() {
+            if has_secret(key_env) {
                 "configured"
             } else {
                 "missing key"
@@ -1122,7 +1183,7 @@ async fn cmd_provider_list() -> Result<()> {
     if default_name.is_some() {
         println!();
         println!(
-            "  * = default provider  |  global = ~/.koklo/config.toml  |  project = .koklo/pipeline.toml"
+            "  * = default provider  |  global = $KOKLO_HOME/config.toml  |  project = .koklo/pipeline.toml"
         );
     }
     Ok(())
@@ -1309,11 +1370,26 @@ async fn cmd_provider_test(name: &str) -> Result<()> {
     let project_root = find_project_root()?;
     let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
     let merged = global.merge(project);
-    let registry = Arc::new(ProviderRegistry::build(&merged)?);
-
-    let provider = registry
-        .get(name)
-        .ok_or_else(|| anyhow::anyhow!("Provider '{}' not found in registry.", name))?;
+    let smoke_dir = if name == "claude-code" {
+        Some(tempfile::tempdir()?)
+    } else {
+        None
+    };
+    let provider: Arc<dyn LlmProvider> = if let Some(dir) = &smoke_dir {
+        Arc::new(ClaudeCodeCliProvider::with_working_dir(
+            dir.path().to_path_buf(),
+        )?)
+    } else {
+        let entry = merged
+            .providers
+            .get(name)
+            .ok_or_else(|| anyhow::anyhow!("Provider '{}' is not configured.", name))?;
+        let mut smoke_entry = entry.clone();
+        if let Some(smoke_model) = &entry.smoke_model {
+            smoke_entry.model = Some(smoke_model.clone());
+        }
+        build_provider(name, &smoke_entry)?
+    };
 
     println!("Testing provider '{}'...", name);
     use koklo_providers::Message;
@@ -1344,7 +1420,30 @@ async fn cmd_provider_add(
     base_url: Option<String>,
     project: bool,
 ) -> Result<()> {
-    use koklo_providers::ProviderTomlEntry;
+    // Guard: --key-env takes an env var NAME (e.g. OPENROUTER_API_KEY), not the key value.
+    if let Some(ref k) = key_env {
+        if looks_like_api_key(k) {
+            anyhow::bail!(
+                "'{}' looks like an API key value, not an env var name.\n\
+                 --key-env expects the NAME of the environment variable that holds the key.\n\
+                 \n\
+                 Usage:\n\
+                 \n\
+                   export OPENROUTER_API_KEY='{}'\n\
+                   koklo provider add {} [--key-env OPENROUTER_API_KEY]\n\
+                 \n\
+                 Or use a custom var name:\n\
+                 \n\
+                   export MY_KEY='{}'\n\
+                   koklo provider add {} --key-env MY_KEY",
+                k,
+                k,
+                name,
+                k,
+                name
+            );
+        }
+    }
 
     // Guard: --key-env takes an env var NAME (e.g. OPENROUTER_API_KEY), not the key value.
     if let Some(ref k) = key_env {
@@ -1372,20 +1471,27 @@ async fn cmd_provider_add(
     }
 
     // Smart defaults per known provider name
-    let (default_key_env, default_model, default_base_url): (
+    let (default_key_env, default_model, default_smoke_model, default_base_url): (
+        Option<&str>,
         Option<&str>,
         Option<&str>,
         Option<&str>,
     ) = match name {
-        "openrouter" => (Some("OPENROUTER_API_KEY"), Some("openai/gpt-4o"), None),
-        "ollama" => (None, Some("llama3.2"), Some("http://localhost:11434")),
-        "claude-code" | "codex" => (None, None, None),
-        _ => (None, None, None),
+        "openrouter" => (
+            Some("OPENROUTER_API_KEY"),
+            Some("openai/gpt-4o"),
+            Some("google/gemma-3-4b-it:free"),
+            None,
+        ),
+        "ollama" => (None, Some("llama3.2"), None, Some("http://localhost:11434")),
+        "claude-code" | "codex" => (None, None, None, None),
+        _ => (None, None, None, None),
     };
 
     let entry = ProviderTomlEntry {
         api_key_env: key_env.or_else(|| default_key_env.map(String::from)),
         model: model.or_else(|| default_model.map(String::from)),
+        smoke_model: default_smoke_model.map(String::from),
         base_url: base_url.or_else(|| default_base_url.map(String::from)),
         ..Default::default()
     };
@@ -1535,7 +1641,7 @@ async fn fetch_openrouter_usage(api_key: &str) -> Result<OpenRouterKeyInfo> {
 }
 
 /// Load the config file and its path for write operations.
-/// If `project` is true, uses `.koklo/pipeline.toml`; otherwise `~/.koklo/config.toml`.
+/// If `project` is true, uses `.koklo/pipeline.toml`; otherwise `$KOKLO_HOME/config.toml`.
 fn load_writable_config(project: bool) -> Result<(PathBuf, PipelineTomlConfig)> {
     if project {
         let project_root = find_project_root()?;

@@ -42,7 +42,7 @@ impl ProviderRegistry {
                 );
                 continue;
             }
-            match build_one(name, entry) {
+            match build_provider(name, entry) {
                 Ok(p) => {
                     providers.insert(name.clone(), p);
                 }
@@ -82,7 +82,10 @@ impl ProviderRegistry {
     }
 }
 
-fn build_one(name: &str, entry: &ProviderTomlEntry) -> Result<Arc<dyn LlmProvider>, ProviderError> {
+pub fn build_provider(
+    name: &str,
+    entry: &ProviderTomlEntry,
+) -> Result<Arc<dyn LlmProvider>, ProviderError> {
     match name {
         "openrouter" => Ok(Arc::new(OpenRouterProvider::from_config(entry)?)),
         "ollama" => Ok(Arc::new(OllamaProvider::from_config(entry)?)),

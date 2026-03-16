@@ -3,6 +3,10 @@ pub mod claude_code;
 pub mod codex;
 
 use crate::Message;
+use crate::ProviderError;
+use koklo_shell::{CommandSpec, Sandbox, SandboxOutput};
+use std::path::Path;
+use std::sync::Arc;
 
 /// How to invoke a CLI tool.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,10 +81,24 @@ pub fn flatten_messages_to_prompt(messages: &[Message]) -> String {
     parts.join("\n\n")
 }
 
+pub async fn run_sandboxed_command(
+    sandbox: &Arc<dyn Sandbox>,
+    workdir: &Path,
+    program: &str,
+    args: &[String],
+) -> Result<SandboxOutput, ProviderError> {
+    let spec = CommandSpec::new(program).args(args.iter().cloned());
+    sandbox
+        .run_command(&spec, workdir)
+        .await
+        .map_err(|err| ProviderError::Sandbox(err.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Message;
+    use koklo_shell::{BubblewrapSandbox, LandlockSandbox};
 
     #[test]
     fn test_detect_subprocess_on_wsl() {
@@ -150,5 +168,43 @@ mod tests {
         assert!(check_claude_session("Please login to continue"));
         assert!(check_claude_session("Session expired, authenticate again"));
         assert!(!check_claude_session("Here is the answer to your question"));
+    }
+
+    #[tokio::test]
+    async fn test_run_sandboxed_command_reports_pwd() {
+        let sandbox: Arc<dyn Sandbox> = Arc::new(LandlockSandbox::new(vec![]));
+        let out = run_sandboxed_command(&sandbox, Path::new("/tmp"), "pwd", &[])
+            .await
+            .unwrap();
+        assert_eq!(out.exit_code, 0);
+        assert_eq!(out.stdout.trim(), "/tmp");
+    }
+
+    #[tokio::test]
+    async fn test_run_sandboxed_command_enforces_workspace_write_policy() {
+        if !koklo_shell::bwrap_available() {
+            return;
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = tmp.path().join("workspace");
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+
+        let sandbox: Arc<dyn Sandbox> = Arc::new(BubblewrapSandbox::with_writable_paths(
+            vec![workspace.clone()],
+            true,
+        ));
+        let args = vec![
+            "-c".to_string(),
+            format!("touch {}", outside.join("blocked.txt").display()),
+        ];
+        let out = run_sandboxed_command(&sandbox, tmp.path(), "sh", &args)
+            .await
+            .unwrap();
+
+        assert_ne!(out.exit_code, 0);
+        assert!(!outside.join("blocked.txt").exists());
     }
 }

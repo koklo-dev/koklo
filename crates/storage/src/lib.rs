@@ -46,6 +46,10 @@ pub struct Session {
     pub preset: String,
     /// Absolute path of the project root at the time the session was created.
     pub project_path: String,
+    /// Absolute path of the isolated session workspace. Falls back to `project_path`.
+    pub workspace_path: String,
+    /// Dedicated branch attached to the session workspace when Git isolation is available.
+    pub workspace_branch: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -203,6 +207,22 @@ impl SessionManager {
                 .await?;
         }
 
+        // Migration 005 — workspace metadata for isolated session execution.
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM schema_migrations WHERE version = 5")
+                .fetch_one(&self.pool)
+                .await?;
+        if count == 0 {
+            sqlx::query(include_str!("../migrations/005_workspace.sql"))
+                .execute(&self.pool)
+                .await?;
+            let now = Utc::now().to_rfc3339();
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (5, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+        }
+
         Ok(())
     }
 
@@ -217,14 +237,16 @@ impl SessionManager {
         let now = Utc::now().to_rfc3339();
         sqlx::query(
             "INSERT INTO sessions \
-             (id, feature_title, status, preset, project_path, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+             (id, feature_title, status, preset, project_path, workspace_path, workspace_branch, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(feature_title)
         .bind("pending")
         .bind(preset)
         .bind(project_path)
+        .bind(project_path)
+        .bind("")
         .bind(&now)
         .bind(&now)
         .execute(&self.pool)
@@ -235,14 +257,37 @@ impl SessionManager {
             status: "pending".to_string(),
             preset: preset.to_string(),
             project_path: project_path.to_string(),
+            workspace_path: project_path.to_string(),
+            workspace_branch: String::new(),
             created_at: now.clone(),
             updated_at: now,
         })
     }
 
+    pub async fn update_session_workspace(
+        &self,
+        id: &str,
+        workspace_path: &str,
+        workspace_branch: &str,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE sessions \
+             SET workspace_path = ?, workspace_branch = ?, updated_at = ? \
+             WHERE id = ?",
+        )
+        .bind(workspace_path)
+        .bind(workspace_branch)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn get_session(&self, id: &str) -> Result<Option<Session>> {
         let row = sqlx::query_as::<_, Session>(
-            "SELECT id, feature_title, status, preset, project_path, created_at, updated_at \
+            "SELECT id, feature_title, status, preset, project_path, workspace_path, workspace_branch, created_at, updated_at \
              FROM sessions WHERE id = ?",
         )
         .bind(id)
@@ -253,7 +298,7 @@ impl SessionManager {
 
     pub async fn list_sessions(&self) -> Result<Vec<Session>> {
         let rows = sqlx::query_as::<_, Session>(
-            "SELECT id, feature_title, status, preset, project_path, created_at, updated_at \
+            "SELECT id, feature_title, status, preset, project_path, workspace_path, workspace_branch, created_at, updated_at \
              FROM sessions ORDER BY created_at DESC",
         )
         .fetch_all(&self.pool)
@@ -264,7 +309,7 @@ impl SessionManager {
     /// List sessions for a specific project root path, most recent first.
     pub async fn list_sessions_for_project(&self, path: &str) -> Result<Vec<Session>> {
         let rows = sqlx::query_as::<_, Session>(
-            "SELECT id, feature_title, status, preset, project_path, created_at, updated_at \
+            "SELECT id, feature_title, status, preset, project_path, workspace_path, workspace_branch, created_at, updated_at \
              FROM sessions WHERE project_path = ? ORDER BY created_at DESC",
         )
         .bind(path)

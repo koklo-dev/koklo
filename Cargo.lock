@@ -1404,6 +1404,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "toml",
  "tracing",
@@ -1458,12 +1459,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "dirs",
  "futures-util",
+ "koklo-shell",
  "portable-pty",
  "reqwest",
  "serde",
  "serde_json",
  "strip-ansi-escapes",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
@@ -1480,8 +1484,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "serde",
+ "tempfile",
  "tokio",
  "tracing",
+ "which",
 ]
 
 [[package]]
@@ -1514,10 +1520,12 @@ dependencies = [
  "koklo-agent-runtime",
  "koklo-events",
  "koklo-providers",
+ "koklo-shell",
  "koklo-storage",
  "octocrab",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
 ]

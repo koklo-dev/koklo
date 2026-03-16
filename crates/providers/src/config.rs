@@ -99,6 +99,8 @@ pub struct ProviderTomlEntry {
     /// Env var name holding the API key (e.g. `"ANTHROPIC_API_KEY"`).
     pub api_key_env: Option<String>,
     pub model: Option<String>,
+    /// Optional cheaper/free model used only by `koklo provider test`.
+    pub smoke_model: Option<String>,
     pub base_url: Option<String>,
     /// Optional fallback provider name.
     pub fallback: Option<String>,
@@ -180,6 +182,7 @@ artifacts_dir = "docs/artifacts"
 [providers.openrouter]
 api_key_env = "OPENROUTER_API_KEY"
 model = "anthropic/claude-opus-4-6"
+smoke_model = "google/gemma-3-4b-it:free"
 
 [providers.ollama]
 base_url = "http://127.0.0.1:11434"
@@ -192,6 +195,10 @@ timeout_secs = 120
         let cfg: PipelineTomlConfig = toml::from_str(raw).unwrap();
         assert_eq!(cfg.pipeline.db_path.as_deref(), Some("test.db"));
         assert!(cfg.providers.contains_key("openrouter"));
+        assert_eq!(
+            cfg.providers["openrouter"].smoke_model.as_deref(),
+            Some("google/gemma-3-4b-it:free")
+        );
         assert_eq!(
             cfg.providers["ollama"].base_url.as_deref(),
             Some("http://127.0.0.1:11434")
@@ -214,6 +221,7 @@ timeout_secs = 120
 [providers.openrouter]
 api_key_env = "OPENROUTER_API_KEY"
 model = "anthropic/claude-opus-4-6"
+smoke_model = "google/gemma-3-4b-it:free"
 
 [providers.openrouter.routing]
 data_collection = "deny"

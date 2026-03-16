@@ -206,6 +206,16 @@ Manage LLM provider connections.
 ```bash
 koklo provider list              # show configured providers + key status
 koklo provider test ollama       # send a test prompt, check connectivity
+koklo provider test openrouter   # uses smoke_model when configured
+```
+
+API keys do not have to come from an interactive shell. Koklo loads secrets from
+`$KOKLO_HOME/secrets.toml` or `$KOKLO_SECRETS_FILE` for non-interactive runs:
+
+```toml
+[env]
+OPENROUTER_API_KEY = "sk-or-v1-..."
+ANTHROPIC_API_KEY = "sk-ant-..."
 ```
 
 ---
@@ -249,6 +259,11 @@ sandbox      = "bubblewrap"
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
 
+[providers.openrouter]
+api_key_env = "OPENROUTER_API_KEY"
+model = "openai/gpt-4o"
+smoke_model = "google/gemma-3-4b-it:free"
+
 [providers.ollama]
 base_url = "http://127.0.0.1:11434"
 ```
@@ -262,6 +277,8 @@ base_url = "http://127.0.0.1:11434"
 | `MISTRAL_API_KEY` | — | Use Mistral as LLM provider |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama endpoint (fallback) |
 | `OLLAMA_MODEL` | `qwen2.5-coder:7b` | Local model |
+| `KOKLO_HOME` | `~/.koklo` | Global Koklo config, DB, agents, secrets |
+| `KOKLO_SECRETS_FILE` | `$KOKLO_HOME/secrets.toml` | Override secrets file path for non-interactive runs |
 | `KOKLO_PROVIDER` | — | Override default provider by name |
 | `KOKLO_PROVIDER_<AGENT>` | — | Override provider for a specific agent (e.g. `KOKLO_PROVIDER_PM=anthropic`) |
 | `GITHUB_TOKEN` | — | Enable PR creation in Review phase |
