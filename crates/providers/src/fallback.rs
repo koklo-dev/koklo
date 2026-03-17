@@ -3,6 +3,7 @@ use crate::error::ProviderError;
 use crate::{LlmProvider, Message, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
+use koklo_events::CompletionUsage;
 use std::sync::Arc;
 
 /// Wraps a primary and secondary provider.
@@ -38,13 +39,13 @@ impl LlmProvider for FallbackProvider {
         &self,
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-    ) -> Result<String> {
+    ) -> Result<(String, CompletionUsage)> {
         match self
             .primary
             .complete_stream(messages.clone(), on_chunk)
             .await
         {
-            Ok(text) => Ok(text),
+            Ok(result) => Ok(result),
             Err(e) => {
                 if let Some(pe) = e.downcast_ref::<ProviderError>() {
                     if is_fallback_worthy(pe) {
@@ -104,12 +105,13 @@ mod tests {
             &self,
             _messages: Vec<Message>,
             on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-        ) -> Result<String> {
+        ) -> Result<(String, CompletionUsage)> {
             on_chunk(StreamChunk {
                 text: "ok".into(),
                 finished: true,
+                tool_event: None,
             });
-            Ok("ok".to_string())
+            Ok(("ok".to_string(), CompletionUsage::default()))
         }
         fn provider_name(&self) -> &str {
             "success"
@@ -124,7 +126,7 @@ mod tests {
             &self,
             _messages: Vec<Message>,
             _on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-        ) -> Result<String> {
+        ) -> Result<(String, CompletionUsage)> {
             Err((self.0)())
         }
         fn provider_name(&self) -> &str {
@@ -140,7 +142,7 @@ mod tests {
         );
         let result = fb.complete_stream(vec![], &mut |_| {}).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "ok");
+        assert_eq!(result.unwrap().0, "ok");
     }
 
     #[tokio::test]
@@ -151,7 +153,7 @@ mod tests {
         );
         let result = fb.complete_stream(vec![], &mut |_| {}).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "ok");
+        assert_eq!(result.unwrap().0, "ok");
     }
 
     #[tokio::test]

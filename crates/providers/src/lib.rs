@@ -27,24 +27,57 @@ pub use secrets::{has_secret, load_secrets_into_env, resolve_secret, secrets_pat
 
 use anyhow::Result;
 use async_trait::async_trait;
+use koklo_events::{CompletionUsage, CostDisplay};
 use serde::{Deserialize, Serialize};
+
+/// Tool event carried inside a `StreamChunk`.
+#[derive(Debug, Clone)]
+pub enum ToolEvent {
+    /// The agent invoked a tool.
+    Call {
+        tool_name: String,
+        input_summary: String,
+    },
+    /// The agent received a tool result.
+    Result {
+        tool_name: String,
+        output_summary: String,
+    },
+}
 
 /// A chunk of streamed text from an LLM.
 #[derive(Debug, Clone)]
 pub struct StreamChunk {
     pub text: String,
     pub finished: bool,
+    /// Optional tool event (CLI providers in stream-json mode).
+    pub tool_event: Option<ToolEvent>,
 }
 
 /// Trait every LLM provider must implement.
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
     /// Stream a completion for the given messages. Calls `on_chunk` for each chunk.
+    /// Returns the full response text and token usage.
     async fn complete_stream(
         &self,
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-    ) -> Result<String>;
+    ) -> Result<(String, CompletionUsage)>;
+
+    /// Compute the cost for a given usage. Returns `None` if not applicable.
+    fn compute_cost(&self, _usage: &CompletionUsage) -> Option<CostDisplay> {
+        None
+    }
+
+    /// Provider/model key for display (e.g. `"openrouter/gpt-4o"`).
+    fn provider_model_key(&self) -> String {
+        format!(
+            "{}/{}",
+            self.provider_name(),
+            self.model_name().unwrap_or("unknown")
+        )
+    }
 
     /// Stable identifier for this provider (e.g. `"anthropic"`, `"claude-code-cli"`).
     fn provider_name(&self) -> &str;

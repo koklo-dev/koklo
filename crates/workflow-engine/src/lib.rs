@@ -9,9 +9,13 @@
 pub mod presets;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::Utc;
-use koklo_agent_runtime::{AgentConfig, AgentRunner};
-use koklo_events::{EventBus, GateAction, Phase, PipelineEvent};
+use koklo_agent_runtime::{AgentConfig, AgentRunResult, AgentRunner};
+use koklo_events::{
+    CompletionUsage, CostDisplay, EventBus, GateAction, GateChannel, GateDisplay, GateResponse,
+    Phase, PipelineEvent,
+};
 use koklo_providers::{ClaudeCodeCliProvider, CodexCliProvider, LlmProvider, ProviderRegistry};
 use koklo_shell::{BubblewrapSandbox, ControlledShell, LandlockSandbox, Sandbox};
 use koklo_storage::{Session, SessionManager};
@@ -77,6 +81,51 @@ pub struct PipelineConfig {
     pub github: Option<GithubConfig>,
 }
 
+/// Handles a gate checkpoint.
+#[async_trait]
+pub trait GateHandler: Send + Sync {
+    async fn handle(&self, display: GateDisplay) -> Result<GateResponse>;
+}
+
+/// StdinGateHandler: reads from stdin. Used by --no-tui / CI.
+pub struct StdinGateHandler;
+
+#[async_trait]
+impl GateHandler for StdinGateHandler {
+    async fn handle(&self, display: GateDisplay) -> Result<GateResponse> {
+        println!(
+            "\n[GATE] Phase '{}' complete. Approve? [y/N] ",
+            display.phase
+        );
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim().to_lowercase();
+        if trimmed == "y" || trimmed == "yes" {
+            Ok(GateResponse::Approve)
+        } else {
+            Ok(GateResponse::Reject)
+        }
+    }
+}
+
+/// TuiGateHandler: deposits request in GateChannel, awaits TUI response.
+pub struct TuiGateHandler {
+    channel: GateChannel,
+}
+
+impl TuiGateHandler {
+    pub fn new(channel: GateChannel) -> Self {
+        Self { channel }
+    }
+}
+
+#[async_trait]
+impl GateHandler for TuiGateHandler {
+    async fn handle(&self, display: GateDisplay) -> Result<GateResponse> {
+        self.channel.deposit_and_await(display).await
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SandboxMode {
     ReadOnly,
@@ -87,6 +136,14 @@ enum SandboxMode {
 struct SandboxDirective {
     mode: Option<SandboxMode>,
     controlled: bool,
+}
+
+enum PhaseRunOutcome {
+    Completed {
+        output: String,
+        usage: CompletionUsage,
+        cost: Option<CostDisplay>,
+    },
 }
 
 impl PipelineConfig {
@@ -227,6 +284,7 @@ pub struct PipelineOrchestrator {
     config: PipelineConfig,
     storage: Arc<SessionManager>,
     bus: EventBus,
+    gate_handler: Arc<dyn GateHandler>,
 }
 
 impl PipelineOrchestrator {
@@ -237,11 +295,30 @@ impl PipelineOrchestrator {
             config,
             storage,
             bus,
+            gate_handler: Arc::new(StdinGateHandler),
+        })
+    }
+
+    pub async fn new_with_gate(
+        config: PipelineConfig,
+        gate_handler: Arc<dyn GateHandler>,
+    ) -> Result<Self> {
+        let storage = Arc::new(SessionManager::open(&config.db_path).await?);
+        let bus = EventBus::new(256);
+        Ok(Self {
+            config,
+            storage,
+            bus,
+            gate_handler,
         })
     }
 
     pub fn event_bus(&self) -> EventBus {
         self.bus.clone()
+    }
+
+    pub fn storage_handle(&self) -> Arc<SessionManager> {
+        Arc::clone(&self.storage)
     }
 
     /// Run the full pipeline for a new feature using the preset in [`PipelineConfig`].
@@ -298,7 +375,12 @@ impl PipelineOrchestrator {
         tokio::spawn(async move {
             let mut rx = log_bus.subscribe();
             while let Ok(event) = rx.recv().await {
-                if let PipelineEvent::AgentLog { phase, message } = event {
+                if let PipelineEvent::AgentLog {
+                    phase,
+                    session_id: _,
+                    message,
+                } = event
+                {
                     let agent_name = phase_map
                         .get(&phase.to_string())
                         .copied()
@@ -312,8 +394,20 @@ impl PipelineOrchestrator {
         });
 
         let start_time = Utc::now();
-        self.run_phases_from(&session, preset, &HashSet::new())
+        let completed = self
+            .run_phases_from(&session, preset, &HashSet::new())
             .await?;
+        if !completed {
+            tracing::info!(
+                "Pipeline paused awaiting user input: session={}",
+                session_id
+            );
+            return Ok(session_id);
+        }
+
+        self.bus.send(PipelineEvent::SessionCompleted {
+            session_id: session_id.clone(),
+        });
 
         self.storage
             .update_session_status(&session_id, "completed")
@@ -368,7 +462,11 @@ impl PipelineOrchestrator {
         self.storage
             .update_session_status(session_id, "running")
             .await?;
-        self.run_phases_from(&session, preset, &completed).await?;
+        let finished = self.run_phases_from(&session, preset, &completed).await?;
+        if !finished {
+            tracing::info!("Session {} paused awaiting user input", session_id);
+            return Ok(());
+        }
         self.storage
             .update_session_status(session_id, "completed")
             .await?;
@@ -382,7 +480,7 @@ impl PipelineOrchestrator {
         session: &Session,
         preset: PresetKind,
         skip: &HashSet<String>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let phases = phases_for_preset(preset);
 
         for (phase, agent_name) in &phases {
@@ -391,8 +489,8 @@ impl PipelineOrchestrator {
                 continue;
             }
 
-            let output = match self.run_phase(session, *phase, agent_name).await {
-                Ok(out) => out,
+            let phase_outcome = match self.run_phase(session, *phase, agent_name).await {
+                Ok(result) => result,
                 Err(e) => {
                     tracing::error!("Phase {} failed: {}", phase, e);
                     self.bus.send(PipelineEvent::PhaseFailed {
@@ -406,6 +504,12 @@ impl PipelineOrchestrator {
                     return Err(e);
                 }
             };
+
+            let PhaseRunOutcome::Completed {
+                output,
+                usage,
+                cost,
+            } = phase_outcome;
 
             if *phase == Phase::Review {
                 if let Some(gh) = &self.config.github {
@@ -430,13 +534,18 @@ impl PipelineOrchestrator {
                 }
             }
 
-            self.gate(&session.id, *phase).await?;
+            self.gate(&session.id, *phase, Some(usage), cost).await?;
         }
 
-        Ok(())
+        Ok(true)
     }
 
-    async fn run_phase(&self, session: &Session, phase: Phase, agent_name: &str) -> Result<String> {
+    async fn run_phase(
+        &self,
+        session: &Session,
+        phase: Phase,
+        agent_name: &str,
+    ) -> Result<PhaseRunOutcome> {
         self.bus.send(PipelineEvent::PhaseStarted {
             phase,
             session_id: session.id.to_string(),
@@ -462,7 +571,7 @@ impl PipelineOrchestrator {
             phase,
             Some(&workspace_root),
         );
-        let runner = AgentRunner::new(config, provider, self.bus.clone());
+        let runner = AgentRunner::new(config, Arc::clone(&provider), self.bus.clone());
         let prompt = format!(
             "Feature: {}\nSession: {}\nWorkspace: {}",
             session.feature_title,
@@ -473,9 +582,10 @@ impl PipelineOrchestrator {
         // Emit an immediate log entry so the monitor shows activity before the LLM responds.
         self.bus.send(PipelineEvent::AgentLog {
             phase,
+            session_id: session.id.clone(),
             message: format!("▶ {} — waiting for {} response…", phase, agent_name),
         });
-        let output = runner.run(&session.id, &prompt).await?;
+        let AgentRunResult { output, usage } = runner.run(&session.id, &prompt).await?;
 
         let artifact_path = self.resolve_artifact_path(&workspace_root, &session.id, phase);
         if let Some(parent) = artifact_path.parent() {
@@ -494,6 +604,47 @@ impl PipelineOrchestrator {
             )
             .await?;
 
+        // Compute cost
+        let cost = provider.compute_cost(&usage);
+        let (cost_usd, cost_kind) = match &cost {
+            Some(CostDisplay::Usd(v)) => (Some(*v), "usd"),
+            Some(CostDisplay::Subscription) => (None, "subscription"),
+            Some(CostDisplay::Free) => (None, "free"),
+            None => (None, "usd"),
+        };
+
+        // Record usage in DB
+        self.storage
+            .record_usage(
+                &session.id,
+                &phase.to_string(),
+                agent_name,
+                provider.provider_name(),
+                provider.model_name(),
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                cost_usd,
+                cost_kind,
+            )
+            .await?;
+
+        // Record full output for FTS search
+        self.storage
+            .record_agent_output(&session.id, &phase.to_string(), agent_name, &output)
+            .await?;
+
+        // Emit usage event
+        self.bus.send(PipelineEvent::UsageUpdate {
+            session_id: session.id.clone(),
+            phase,
+            agent_name: agent_name.to_string(),
+            provider: provider.provider_name().to_string(),
+            model: provider.model_name().map(|s| s.to_string()),
+            prompt_tokens: usage.prompt_tokens,
+            completion_tokens: usage.completion_tokens,
+            cost: cost.clone(),
+        });
+
         self.storage
             .complete_phase(&phase_record.id, "completed", None)
             .await?;
@@ -501,7 +652,11 @@ impl PipelineOrchestrator {
             phase,
             session_id: session.id.to_string(),
         });
-        Ok(output)
+        Ok(PhaseRunOutcome::Completed {
+            output,
+            usage,
+            cost,
+        })
     }
 
     async fn create_github_pr(
@@ -537,46 +692,55 @@ impl PipelineOrchestrator {
         Ok(url)
     }
 
-    async fn gate(&self, session_id: &str, phase: Phase) -> Result<()> {
+    async fn gate(
+        &self,
+        session_id: &str,
+        phase: Phase,
+        usage: Option<CompletionUsage>,
+        cost: Option<CostDisplay>,
+    ) -> Result<()> {
+        let description = format!("Review '{}' phase output and approve to continue.", phase);
+
         self.bus.send(PipelineEvent::GateRequired {
             phase,
             session_id: session_id.to_string(),
-            description: format!("Review '{}' phase output and approve to continue.", phase),
+            description: description.clone(),
         });
 
-        println!("\n[GATE] Phase '{}' complete. Approve? [y/N] ", phase);
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        let trimmed = input.trim().to_lowercase();
-
-        let action = if trimmed == "y" || trimmed == "yes" {
-            GateAction::Approve
-        } else {
-            GateAction::Reject
+        let display = GateDisplay {
+            phase,
+            session_id: session_id.to_string(),
+            description,
+            usage,
+            cost,
         };
 
-        // Record the gate decision in the database.
+        let response = self.gate_handler.handle(display).await?;
+
+        let action_str = match &response {
+            GateResponse::Approve => "approve",
+            GateResponse::Reject => "reject",
+            GateResponse::Edit(_) => "edit",
+        };
+
         self.storage
-            .record_gate_decision(
-                session_id,
-                &phase.to_string(),
-                match &action {
-                    GateAction::Approve => "approve",
-                    GateAction::Reject => "reject",
-                    GateAction::Edit(_) => "edit",
-                },
-                None,
-            )
+            .record_gate_decision(session_id, &phase.to_string(), action_str, None)
             .await?;
+
+        let gate_action = match &response {
+            GateResponse::Approve => GateAction::Approve,
+            GateResponse::Reject => GateAction::Reject,
+            GateResponse::Edit(p) => GateAction::Edit(p.clone()),
+        };
 
         self.bus.send(PipelineEvent::GateResolved {
             phase,
             session_id: session_id.to_string(),
-            action: action.clone(),
+            action: gate_action,
         });
 
-        match action {
-            GateAction::Approve => Ok(()),
+        match response {
+            GateResponse::Approve => Ok(()),
             _ => {
                 self.storage
                     .update_session_status(session_id, "paused")
@@ -996,17 +1160,22 @@ mod tests {
             &self,
             messages: Vec<Message>,
             on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-        ) -> Result<String> {
+        ) -> Result<(String, koklo_events::CompletionUsage)> {
             *self.messages.lock().unwrap() = messages;
             on_chunk(StreamChunk {
                 text: self.response.clone(),
                 finished: false,
+                tool_event: None,
             });
             on_chunk(StreamChunk {
                 text: String::new(),
                 finished: true,
+                tool_event: None,
             });
-            Ok(self.response.clone())
+            Ok((
+                self.response.clone(),
+                koklo_events::CompletionUsage::default(),
+            ))
         }
 
         fn provider_name(&self) -> &str {
@@ -1262,9 +1431,10 @@ mod tests {
             config,
             storage,
             bus: EventBus::new(16),
+            gate_handler: Arc::new(StdinGateHandler),
         };
 
-        let output = orchestrator
+        let PhaseRunOutcome::Completed { output, .. } = orchestrator
             .run_phase(&session, Phase::Spec, "pm")
             .await
             .unwrap();
@@ -1336,6 +1506,7 @@ mod tests {
             config,
             storage,
             bus: EventBus::new(16),
+            gate_handler: Arc::new(StdinGateHandler),
         };
 
         orchestrator
@@ -1400,6 +1571,7 @@ mod tests {
                     .unwrap(),
             ),
             bus: EventBus::new(16),
+            gate_handler: Arc::new(StdinGateHandler),
         };
 
         let workspace = orchestrator

@@ -1,14 +1,17 @@
-//! OpenAI Codex CLI provider (subprocess).
+//! OpenAI Codex CLI provider (subprocess, real-time streaming).
 use super::{check_claude_session, flatten_messages_to_prompt, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{LlmProvider, Message, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
+use koklo_events::CompletionUsage;
 use koklo_shell::Sandbox;
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 
 pub struct CodexCliProvider {
     #[allow(dead_code)] // used when `pty` feature is enabled
@@ -92,6 +95,25 @@ struct CodexExecItem {
     text: String,
 }
 
+/// Extract the text from an `item.completed` / `agent_message` NDJSON line,
+/// for real-time streaming.  Returns `None` for all other event types.
+fn extract_agent_message_text(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || !trimmed.starts_with('{') {
+        return None;
+    }
+    let event = serde_json::from_str::<CodexExecEvent>(trimmed).ok()?;
+    if event.event_type != "item.completed" {
+        return None;
+    }
+    let item = event.item?;
+    if item.item_type == "agent_message" && !item.text.trim().is_empty() {
+        Some(item.text)
+    } else {
+        None
+    }
+}
+
 fn parse_codex_exec_output(stdout: &str) -> Result<String, ProviderError> {
     let mut last_message = None;
     for line in stdout.lines() {
@@ -124,9 +146,9 @@ impl LlmProvider for CodexCliProvider {
         &self,
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-    ) -> Result<String> {
+    ) -> Result<(String, CompletionUsage)> {
         let prompt = flatten_messages_to_prompt(&messages);
-        let args = Self::build_exec_args(prompt);
+        let args = Self::build_exec_args(prompt.clone());
 
         if let (Some(sandbox), Some(dir)) = (&self.sandbox, &self.working_dir) {
             let output = super::run_sandboxed_command(sandbox, dir, "codex", &args).await?;
@@ -157,27 +179,59 @@ impl LlmProvider for CodexCliProvider {
             on_chunk(StreamChunk {
                 text: text.clone(),
                 finished: false,
+                tool_event: None,
             });
             on_chunk(StreamChunk {
                 text: String::new(),
                 finished: true,
+                tool_event: None,
             });
-            return Ok(text);
+            let usage = CompletionUsage {
+                prompt_tokens: (prompt.len() / 4) as u32,
+                completion_tokens: (text.len() / 4) as u32,
+            };
+            return Ok((text, usage));
         }
 
         let mut command = tokio::process::Command::new("codex");
-        command.args(&args);
+        command
+            .args(&args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         if let Some(dir) = &self.working_dir {
             command.current_dir(dir);
         }
 
-        let output = command.output().await.map_err(ProviderError::Io)?;
+        let mut child = command.spawn().map_err(ProviderError::Io)?;
+        let stdout = child.stdout.take().expect("stdout is piped");
+        let stderr = child.stderr.take().expect("stderr is piped");
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let combined = format!("{}{}", stdout, stderr);
+        // Drain stderr in background to prevent pipe deadlock.
+        let stderr_handle = tokio::spawn(async move {
+            let mut buf = String::new();
+            BufReader::new(stderr).read_to_string(&mut buf).await.ok();
+            buf
+        });
 
-        // Codex uses similar session patterns to claude
+        // Stream NDJSON line-by-line, emitting agent_message text in real time.
+        let mut lines = BufReader::new(stdout).lines();
+        let mut full_ndjson = String::new();
+        while let Some(line) = lines.next_line().await.map_err(ProviderError::Io)? {
+            if let Some(text) = extract_agent_message_text(&line) {
+                on_chunk(StreamChunk {
+                    text: format!("{}\n", text),
+                    finished: false,
+                    tool_event: None,
+                });
+            }
+            full_ndjson.push_str(&line);
+            full_ndjson.push('\n');
+        }
+
+        let status = child.wait().await.map_err(ProviderError::Io)?;
+        let stderr_content = stderr_handle.await.unwrap_or_default();
+        let combined = format!("{}{}", full_ndjson, stderr_content);
+
         if check_claude_session(&combined) {
             return Err(ProviderError::CliSessionExpired {
                 auth_command: "codex login".to_string(),
@@ -185,28 +239,30 @@ impl LlmProvider for CodexCliProvider {
             .into());
         }
 
-        if !output.status.success() {
+        if !status.success() {
             return Err(ProviderError::HttpError {
-                status: output.status.code().unwrap_or(1) as u16,
-                body: stderr.into_owned(),
+                status: status.code().unwrap_or(1) as u16,
+                body: stderr_content,
             }
             .into());
         }
 
-        let text = parse_codex_exec_output(&stdout)?;
+        // Use the full NDJSON to extract the final agent message.
+        let text = parse_codex_exec_output(&full_ndjson)?;
         if text.trim().is_empty() {
             return Err(ProviderError::EmptyResponse.into());
         }
 
         on_chunk(StreamChunk {
-            text: text.clone(),
-            finished: false,
-        });
-        on_chunk(StreamChunk {
             text: String::new(),
             finished: true,
+            tool_event: None,
         });
-        Ok(text)
+        let usage = CompletionUsage {
+            prompt_tokens: (prompt.len() / 4) as u32,
+            completion_tokens: (text.len() / 4) as u32,
+        };
+        Ok((text, usage))
     }
 
     fn provider_name(&self) -> &str {
