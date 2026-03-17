@@ -18,7 +18,7 @@ use koklo_events::{
 };
 use koklo_providers::{ClaudeCodeCliProvider, CodexCliProvider, LlmProvider, ProviderRegistry};
 use koklo_shell::{BubblewrapSandbox, ControlledShell, LandlockSandbox, Sandbox};
-use koklo_storage::{Session, SessionManager};
+use koklo_storage::{Session, SessionManager, UsageRecordInput};
 use presets::{phases_for_preset, PresetKind};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -613,19 +613,21 @@ impl PipelineOrchestrator {
             None => (None, "usd"),
         };
 
+        let phase_name = phase.to_string();
+
         // Record usage in DB
         self.storage
-            .record_usage(
-                &session.id,
-                &phase.to_string(),
+            .record_usage(UsageRecordInput {
+                session_id: &session.id,
+                phase: &phase_name,
                 agent_name,
-                provider.provider_name(),
-                provider.model_name(),
-                usage.prompt_tokens,
-                usage.completion_tokens,
+                provider: provider.provider_name(),
+                model: provider.model_name(),
+                prompt_tokens: usage.prompt_tokens,
+                completion_tokens: usage.completion_tokens,
                 cost_usd,
                 cost_kind,
-            )
+            })
             .await?;
 
         // Record full output for FTS search
