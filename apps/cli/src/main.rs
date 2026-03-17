@@ -22,6 +22,7 @@
 //! ```
 
 mod home_dirs;
+mod md_render;
 mod monitor;
 
 use anyhow::Result;
