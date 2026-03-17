@@ -1441,6 +1441,7 @@ dependencies = [
 name = "koklo-events"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "serde",
  "serde_json",
  "tokio",
@@ -1461,6 +1462,7 @@ dependencies = [
  "async-trait",
  "dirs",
  "futures-util",
+ "koklo-events",
  "koklo-shell",
  "portable-pty",
  "reqwest",

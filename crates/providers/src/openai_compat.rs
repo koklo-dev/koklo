@@ -5,6 +5,7 @@ use crate::{LlmProvider, Message, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures_util::StreamExt;
+use koklo_events::CompletionUsage;
 use std::time::Duration;
 
 /// Shared OpenAI-compatible provider. Fields are `pub(crate)` for thin wrappers.
@@ -95,7 +96,7 @@ impl LlmProvider for OpenAICompatProvider {
         &self,
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-    ) -> Result<String> {
+    ) -> Result<(String, CompletionUsage)> {
         let api_messages: Vec<_> = messages
             .iter()
             .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
@@ -104,7 +105,8 @@ impl LlmProvider for OpenAICompatProvider {
         let mut body = serde_json::json!({
             "model": self.model,
             "messages": api_messages,
-            "stream": true
+            "stream": true,
+            "stream_options": { "include_usage": true }
         });
 
         // Merge extra_body into the request body (e.g. OpenRouter `provider` routing).
@@ -149,6 +151,7 @@ impl LlmProvider for OpenAICompatProvider {
         }
 
         let mut full_text = String::new();
+        let mut usage = CompletionUsage::default();
         let mut stream = resp.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
@@ -167,7 +170,17 @@ impl LlmProvider for OpenAICompatProvider {
                             on_chunk(StreamChunk {
                                 text: t.to_string(),
                                 finished: false,
+                                tool_event: None,
                             });
+                        }
+                        // Parse usage from final chunk (when stream_options.include_usage=true)
+                        if let Some(u) = json.get("usage") {
+                            if let Some(pt) = u["prompt_tokens"].as_u64() {
+                                usage.prompt_tokens = pt as u32;
+                            }
+                            if let Some(ct) = u["completion_tokens"].as_u64() {
+                                usage.completion_tokens = ct as u32;
+                            }
                         }
                     }
                 }
@@ -180,8 +193,9 @@ impl LlmProvider for OpenAICompatProvider {
         on_chunk(StreamChunk {
             text: String::new(),
             finished: true,
+            tool_event: None,
         });
-        Ok(full_text)
+        Ok((full_text, usage))
     }
 
     fn provider_name(&self) -> &str {
@@ -255,7 +269,7 @@ mod tests {
         );
         let messages = vec![crate::Message::user("hi")];
         let mut chunks = vec![];
-        let result = p
+        let (result, _usage) = p
             .complete_stream(messages, &mut |c| chunks.push(c.text.clone()))
             .await
             .unwrap();
