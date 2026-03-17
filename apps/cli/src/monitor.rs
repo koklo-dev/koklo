@@ -670,12 +670,7 @@ impl MonitorApp {
         let flush_agent_buf = |buf: &mut String, out: &mut Vec<Line>| {
             if !buf.is_empty() {
                 let text = std::mem::take(buf);
-                for raw_line in text.lines() {
-                    out.push(Line::from(Span::styled(
-                        raw_line.to_string(),
-                        Style::default(),
-                    )));
-                }
+                out.append(&mut crate::md_render::markdown_to_lines(&text));
             }
         };
 
