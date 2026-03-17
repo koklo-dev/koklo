@@ -123,6 +123,20 @@ pub struct UsageRecord {
     pub recorded_at: String,
 }
 
+/// Input payload for recording a single usage row.
+#[derive(Debug, Clone)]
+pub struct UsageRecordInput<'a> {
+    pub session_id: &'a str,
+    pub phase: &'a str,
+    pub agent_name: &'a str,
+    pub provider: &'a str,
+    pub model: Option<&'a str>,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub cost_usd: Option<f64>,
+    pub cost_kind: &'a str,
+}
+
 /// A full agent output stored for long-term memory + FTS.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AgentOutputRecord {
@@ -626,18 +640,7 @@ impl SessionManager {
     }
 
     /// Record LLM usage for a phase/agent call.
-    pub async fn record_usage(
-        &self,
-        session_id: &str,
-        phase: &str,
-        agent_name: &str,
-        provider: &str,
-        model: Option<&str>,
-        prompt_tokens: u32,
-        completion_tokens: u32,
-        cost_usd: Option<f64>,
-        cost_kind: &str,
-    ) -> Result<UsageRecord> {
+    pub async fn record_usage(&self, usage: UsageRecordInput<'_>) -> Result<UsageRecord> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         sqlx::query(
@@ -646,29 +649,29 @@ impl SessionManager {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
-        .bind(session_id)
-        .bind(phase)
-        .bind(agent_name)
-        .bind(provider)
-        .bind(model)
-        .bind(prompt_tokens as i64)
-        .bind(completion_tokens as i64)
-        .bind(cost_usd)
-        .bind(cost_kind)
+        .bind(usage.session_id)
+        .bind(usage.phase)
+        .bind(usage.agent_name)
+        .bind(usage.provider)
+        .bind(usage.model)
+        .bind(usage.prompt_tokens as i64)
+        .bind(usage.completion_tokens as i64)
+        .bind(usage.cost_usd)
+        .bind(usage.cost_kind)
         .bind(&now)
         .execute(&self.pool)
         .await?;
         Ok(UsageRecord {
             id,
-            session_id: session_id.to_string(),
-            phase: phase.to_string(),
-            agent_name: agent_name.to_string(),
-            provider: provider.to_string(),
-            model: model.map(|s| s.to_string()),
-            prompt_tokens: prompt_tokens as i64,
-            completion_tokens: completion_tokens as i64,
-            cost_usd,
-            cost_kind: cost_kind.to_string(),
+            session_id: usage.session_id.to_string(),
+            phase: usage.phase.to_string(),
+            agent_name: usage.agent_name.to_string(),
+            provider: usage.provider.to_string(),
+            model: usage.model.map(|s| s.to_string()),
+            prompt_tokens: usage.prompt_tokens as i64,
+            completion_tokens: usage.completion_tokens as i64,
+            cost_usd: usage.cost_usd,
+            cost_kind: usage.cost_kind.to_string(),
             recorded_at: now,
         })
     }
