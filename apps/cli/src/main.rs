@@ -26,6 +26,7 @@ mod monitor;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use koklo_events::GateChannel;
 use koklo_providers::registry::build_provider;
 use koklo_providers::{
     has_secret, load_secrets_into_env, resolve_secret, ClaudeCodeCliProvider, LlmProvider,
@@ -33,7 +34,7 @@ use koklo_providers::{
 };
 use koklo_workflow_engine::{
     presets::{phases_for_preset, PresetKind},
-    GithubConfig, PipelineConfig, PipelineOrchestrator,
+    GateHandler, GithubConfig, PipelineConfig, PipelineOrchestrator, TuiGateHandler,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -86,6 +87,7 @@ enum Commands {
     ///   koklo run --preset bmad feature "Add OAuth2"
     ///   koklo run --preset speckit feature "Refactor storage"
     ///   koklo run --preset light task "Fix typo in README"
+    ///   koklo run --no-tui feature "Auth JWT"
     Run {
         /// Workflow preset to use.
         #[arg(long, default_value = "sdd", value_parser = parse_preset)]
@@ -98,6 +100,10 @@ enum Commands {
         /// Title / description of the work item.
         #[arg(value_name = "TITLE")]
         title: String,
+
+        /// Disable TUI; use stdin for gates (CI, scripting).
+        #[arg(long)]
+        no_tui: bool,
     },
 
     /// Manage pipeline sessions.
@@ -390,7 +396,8 @@ async fn main() -> Result<()> {
             preset,
             pipeline_type,
             title,
-        } => cmd_run(preset, &pipeline_type, &title).await?,
+            no_tui,
+        } => cmd_run(preset, &pipeline_type, &title, no_tui).await?,
 
         Commands::Session(sub) => match sub {
             SessionCommands::List => cmd_session_list().await?,
@@ -800,8 +807,8 @@ preset = "{preset}"
     Ok(())
 }
 
-/// `koklo run [--preset P] <type> <title>`
-async fn cmd_run(preset: PresetKind, pipeline_type: &str, title: &str) -> Result<()> {
+/// `koklo run [--preset P] [--no-tui] <type> <title>`
+async fn cmd_run(preset: PresetKind, pipeline_type: &str, title: &str, no_tui: bool) -> Result<()> {
     match pipeline_type {
         "feature" | "task" | "bug" => {}
         other => {
@@ -811,24 +818,153 @@ async fn cmd_run(preset: PresetKind, pipeline_type: &str, title: &str) -> Result
             );
         }
     }
-    let orchestrator = build_orchestrator(None, Some(preset)).await?;
-    let session_id = orchestrator.run_feature_with_preset(title, preset).await?;
-    let storage = open_storage().await?;
-    if let Some(session) = storage.get_session(&session_id).await? {
-        println!(
-            "\nPipeline complete — session: {}\nWorkspace: {}\nBranch: {}",
-            session_id,
-            session.workspace_path,
-            if session.workspace_branch.is_empty() {
-                "(shared project tree)"
-            } else {
-                &session.workspace_branch
-            }
-        );
-    } else {
-        println!("\nPipeline complete — session: {}", session_id);
+
+    if no_tui || std::env::var("CI").is_ok() {
+        // Original behavior: stdin gates, no TUI
+        let orchestrator = build_orchestrator(None, Some(preset)).await?;
+        let session_id = orchestrator.run_feature_with_preset(title, preset).await?;
+        let storage = open_storage().await?;
+        if let Some(session) = storage.get_session(&session_id).await? {
+            println!(
+                "\nPipeline complete — session: {}\nWorkspace: {}\nBranch: {}",
+                session_id,
+                session.workspace_path,
+                if session.workspace_branch.is_empty() {
+                    "(shared project tree)"
+                } else {
+                    &session.workspace_branch
+                }
+            );
+        } else {
+            println!("\nPipeline complete — session: {}", session_id);
+        }
+        return Ok(());
     }
+
+    // TUI mode
+    let gate_channel = GateChannel::new();
+    let tui_gate_channel = gate_channel.clone_handle();
+
+    let orch = {
+        let gate_handler: Arc<dyn GateHandler> = Arc::new(TuiGateHandler::new(gate_channel));
+        build_orchestrator_with_gate(None, Some(preset), gate_handler).await?
+    };
+
+    let event_rx = orch.event_bus().subscribe(); // subscribe BEFORE spawn
+    let storage = orch.storage_handle();
+
+    // TUI owns stdout; suppress raw agent streaming and route everything
+    // through the event bus/monitor instead.
+    koklo_agent_runtime::set_stdout_streaming_enabled(false);
+
+    let title_owned = title.to_string();
+    let pipeline =
+        tokio::spawn(async move { orch.run_feature_with_preset(&title_owned, preset).await });
+
+    // TUI blocks until user quits
+    let preset_phase_names: Vec<String> = koklo_workflow_engine::presets::phases_for_preset(preset)
+        .into_iter()
+        .map(|(phase, _)| phase.to_string())
+        .collect();
+    monitor::run_integrated_tui(
+        storage,
+        Some(event_rx),
+        Some(tui_gate_channel),
+        preset_phase_names,
+    )
+    .await?;
+
+    // Wait for pipeline to finish
+    match pipeline.await {
+        Ok(Ok(session_id)) => {
+            println!("\nPipeline complete — session: {}", session_id);
+        }
+        Ok(Err(e)) => {
+            eprintln!("\nPipeline error: {}", e);
+        }
+        Err(e) => {
+            eprintln!("\nPipeline task panicked: {}", e);
+        }
+    }
+
     Ok(())
+}
+
+/// Build a `PipelineOrchestrator` with a custom gate handler.
+async fn build_orchestrator_with_gate(
+    project_root_override: Option<PathBuf>,
+    preset_override: Option<PresetKind>,
+    gate_handler: Arc<dyn GateHandler>,
+) -> Result<PipelineOrchestrator> {
+    let project_root = match project_root_override {
+        Some(path) => path,
+        None => find_project_root()?,
+    };
+    tracing::debug!("Project root: {}", project_root.display());
+
+    let global = home_dirs::load_global_config();
+    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let merged = global.merge(project);
+
+    let registry = Arc::new(ProviderRegistry::build(&merged)?);
+
+    let mut agent_providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
+    let mut agent_sandboxes: HashMap<String, String> = HashMap::new();
+    for (agent_name, agent_cfg) in &merged.agents {
+        if let Some(ref provider_name) = agent_cfg.provider {
+            if let Some(p) = registry.get(provider_name) {
+                agent_providers.insert(agent_name.clone(), p);
+            }
+        }
+        if let Some(ref sandbox_name) = agent_cfg.sandbox {
+            agent_sandboxes.insert(agent_name.clone(), sandbox_name.clone());
+        }
+    }
+
+    let default_provider =
+        determine_default_provider(&registry, merged.pipeline.default_provider.as_deref())?;
+
+    let preset = preset_override.unwrap_or_else(|| {
+        merged
+            .workflow
+            .preset
+            .as_deref()
+            .and_then(PresetKind::parse)
+            .unwrap_or_default()
+    });
+
+    let global_home = home_dirs::koklo_home();
+    let project_context_dir = project_root.join(".koklo");
+    let project_context = if project_context_dir.exists() {
+        Some(project_context_dir)
+    } else {
+        None
+    };
+
+    let config = PipelineConfig {
+        db_path: home_dirs::koklo_db_path(),
+        artifacts_dir: PathBuf::from(
+            merged
+                .pipeline
+                .artifacts_dir
+                .as_deref()
+                .unwrap_or("docs/planning_artifacts"),
+        ),
+        global_home,
+        project_context,
+        project_path: project_root.to_string_lossy().into_owned(),
+        preset,
+        default_provider,
+        agent_providers,
+        agent_sandboxes,
+        controlled_shell: std::env::var("KOKLO_CONTROLLED_SHELL")
+            .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+            .unwrap_or(false),
+        provider_registry: registry,
+        github: GithubConfig::from_env(),
+    };
+
+    PipelineOrchestrator::new_with_gate(config, gate_handler).await
 }
 
 /// `koklo session list`
@@ -1017,7 +1153,7 @@ async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
     use koklo_providers::Message;
     let messages = vec![Message::system(system_prompt), Message::user(prompt)];
     let mut output = String::new();
-    provider
+    let (_text, _usage) = provider
         .complete_stream(messages, &mut |chunk| {
             if !chunk.text.is_empty() {
                 print!("{}", chunk.text);

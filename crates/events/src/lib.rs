@@ -1,7 +1,8 @@
 //! Pipeline event bus — tokio broadcast channel.
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio::sync::broadcast;
+use std::sync::{Arc, Mutex};
+use tokio::sync::{broadcast, oneshot};
 
 /// Pipeline execution phases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,6 +57,118 @@ pub enum GateAction {
     Edit(PathBuf),
 }
 
+/// Token usage returned by each provider call.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CompletionUsage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+}
+
+impl CompletionUsage {
+    pub fn total_tokens(&self) -> u32 {
+        self.prompt_tokens + self.completion_tokens
+    }
+}
+
+/// Pricing for cost computation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPricing {
+    /// USD per million input tokens.
+    pub input_per_mtok: f64,
+    /// USD per million output tokens.
+    pub output_per_mtok: f64,
+}
+
+impl ModelPricing {
+    pub fn compute_cost(&self, usage: &CompletionUsage) -> f64 {
+        (usage.prompt_tokens as f64 * self.input_per_mtok
+            + usage.completion_tokens as f64 * self.output_per_mtok)
+            / 1_000_000.0
+    }
+}
+
+/// How to display cost based on provider mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CostDisplay {
+    Usd(f64),
+    Subscription,
+    Free,
+}
+
+/// Gate response from the user.
+#[derive(Debug)]
+pub enum GateResponse {
+    Approve,
+    Reject,
+    Edit(std::path::PathBuf),
+}
+
+/// Display information for a gate (no sender — cloneable).
+#[derive(Debug, Clone)]
+pub struct GateDisplay {
+    pub phase: Phase,
+    pub session_id: String,
+    pub description: String,
+    pub usage: Option<CompletionUsage>,
+    pub cost: Option<CostDisplay>,
+}
+
+/// Gate request placed in the channel by the TuiGateHandler.
+/// Contains display info + the oneshot sender to respond.
+pub struct GateRequest {
+    pub display: GateDisplay,
+    pub responder: oneshot::Sender<GateResponse>,
+}
+
+/// In-memory coordination channel between the pipeline and the TUI.
+/// Does NOT go through the broadcast event bus.
+#[derive(Clone)]
+pub struct GateChannel {
+    inner: Arc<Mutex<Option<GateRequest>>>,
+}
+
+impl Default for GateChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GateChannel {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn clone_handle(&self) -> Self {
+        self.clone()
+    }
+
+    /// Called by TuiGateHandler: deposit a request and await response.
+    pub async fn deposit_and_await(&self, display: GateDisplay) -> anyhow::Result<GateResponse> {
+        let (tx, rx) = oneshot::channel();
+        let req = GateRequest {
+            display,
+            responder: tx,
+        };
+        {
+            let mut guard = self.inner.lock().unwrap();
+            *guard = Some(req);
+        }
+        rx.await
+            .map_err(|_| anyhow::anyhow!("Gate channel closed — TUI quit?"))
+    }
+
+    /// Called by the TUI tick: take the pending request (display + sender).
+    pub fn take_pending(&self) -> Option<GateRequest> {
+        self.inner.lock().unwrap().take()
+    }
+
+    pub fn has_pending(&self) -> bool {
+        self.inner.lock().unwrap().is_some()
+    }
+}
+
 /// Events emitted by the pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PipelineEvent {
@@ -74,6 +187,7 @@ pub enum PipelineEvent {
     },
     AgentLog {
         phase: Phase,
+        session_id: String,
         message: String,
     },
     GateRequired {
@@ -90,6 +204,36 @@ pub enum PipelineEvent {
         session_id: String,
         url: String,
         title: String,
+    },
+    UsageUpdate {
+        session_id: String,
+        phase: Phase,
+        agent_name: String,
+        provider: String,
+        model: Option<String>,
+        prompt_tokens: u32,
+        completion_tokens: u32,
+        cost: Option<CostDisplay>,
+    },
+    SessionCompleted {
+        session_id: String,
+    },
+    /// A CLI agent invoked a tool (file edit, bash command, etc.).
+    ToolCall {
+        phase: Phase,
+        session_id: String,
+        /// Tool name, e.g. `"Write"`, `"Bash"`, `"Edit"`.
+        tool_name: String,
+        /// Short summary of the input (file path or command, ≤60 chars).
+        input_summary: String,
+    },
+    /// A CLI agent received a tool result.
+    ToolResult {
+        phase: Phase,
+        session_id: String,
+        tool_name: String,
+        /// First line of output, or `"ok"` / `"exit 0"`.
+        output_summary: String,
     },
 }
 
@@ -158,5 +302,20 @@ mod tests {
         let p = Phase::Spec;
         let _q = p; // copy
         let _r = p; // still usable after copy
+    }
+
+    #[test]
+    fn test_completion_usage_total() {
+        let u = CompletionUsage {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+        };
+        assert_eq!(u.total_tokens(), 150);
+    }
+
+    #[test]
+    fn test_gate_channel_basic() {
+        let ch = GateChannel::new();
+        assert!(!ch.has_pending());
     }
 }

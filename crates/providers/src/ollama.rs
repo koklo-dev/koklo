@@ -5,6 +5,7 @@ use crate::{LlmProvider, Message, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures_util::StreamExt;
+use koklo_events::{CompletionUsage, CostDisplay};
 
 pub struct OllamaProvider {
     pub base_url: String,
@@ -72,7 +73,7 @@ impl LlmProvider for OllamaProvider {
         &self,
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-    ) -> Result<String> {
+    ) -> Result<(String, CompletionUsage)> {
         let api_messages: Vec<_> = messages
             .iter()
             .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
@@ -110,6 +111,7 @@ impl LlmProvider for OllamaProvider {
         }
 
         let mut full_text = String::new();
+        let mut usage = CompletionUsage::default();
         let mut stream = resp.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
@@ -125,12 +127,21 @@ impl LlmProvider for OllamaProvider {
                         on_chunk(StreamChunk {
                             text: t.to_string(),
                             finished: false,
+                            tool_event: None,
                         });
                     }
                     if json["done"].as_bool().unwrap_or(false) {
+                        // Parse usage from final chunk
+                        if let Some(pt) = json["prompt_eval_count"].as_u64() {
+                            usage.prompt_tokens = pt as u32;
+                        }
+                        if let Some(ct) = json["eval_count"].as_u64() {
+                            usage.completion_tokens = ct as u32;
+                        }
                         on_chunk(StreamChunk {
                             text: String::new(),
                             finished: true,
+                            tool_event: None,
                         });
                     }
                 }
@@ -140,7 +151,11 @@ impl LlmProvider for OllamaProvider {
         if full_text.trim().is_empty() {
             return Err(ProviderError::EmptyResponse.into());
         }
-        Ok(full_text)
+        Ok((full_text, usage))
+    }
+
+    fn compute_cost(&self, _usage: &CompletionUsage) -> Option<CostDisplay> {
+        Some(CostDisplay::Free)
     }
 
     fn provider_name(&self) -> &str {

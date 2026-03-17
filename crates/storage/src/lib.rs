@@ -106,6 +106,64 @@ pub struct GateDecisionRecord {
     pub decided_at: String,
 }
 
+/// A usage record for a single agent call.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct UsageRecord {
+    pub id: String,
+    pub session_id: String,
+    pub phase: String,
+    pub agent_name: String,
+    pub provider: String,
+    pub model: Option<String>,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub cost_usd: Option<f64>,
+    /// 'usd' | 'subscription' | 'free'
+    pub cost_kind: String,
+    pub recorded_at: String,
+}
+
+/// A full agent output stored for long-term memory + FTS.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AgentOutputRecord {
+    pub id: String,
+    pub session_id: String,
+    pub phase: String,
+    pub agent_name: String,
+    pub content: String,
+    pub created_at: String,
+}
+
+/// Result from an FTS5 search.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutputSearchResult {
+    pub id: String,
+    pub session_id: String,
+    pub phase: String,
+    pub agent_name: String,
+    pub snippet: String,
+    pub created_at: String,
+}
+
+/// Per-phase usage summary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseUsageSummary {
+    pub phase: String,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub cost_usd: Option<f64>,
+}
+
+/// Session-level usage summary (grouped by phase).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionUsageSummary {
+    pub session_id: String,
+    pub phases: Vec<PhaseUsageSummary>,
+    pub total_prompt_tokens: i64,
+    pub total_completion_tokens: i64,
+    pub total_cost_usd: Option<f64>,
+}
+
 /// Manages pipeline sessions in SQLite.
 pub struct SessionManager {
     pool: SqlitePool,
@@ -218,6 +276,38 @@ impl SessionManager {
                 .await?;
             let now = Utc::now().to_rfc3339();
             sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (5, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // Migration 006 — usage_records table.
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM schema_migrations WHERE version = 6")
+                .fetch_one(&self.pool)
+                .await?;
+        if count == 0 {
+            sqlx::query(include_str!("../migrations/006_usage_records.sql"))
+                .execute(&self.pool)
+                .await?;
+            let now = Utc::now().to_rfc3339();
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (6, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // Migration 007 — agent_outputs + FTS5.
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM schema_migrations WHERE version = 7")
+                .fetch_one(&self.pool)
+                .await?;
+        if count == 0 {
+            sqlx::query(include_str!("../migrations/007_agent_outputs_fts.sql"))
+                .execute(&self.pool)
+                .await?;
+            let now = Utc::now().to_rfc3339();
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (7, ?)")
                 .bind(&now)
                 .execute(&self.pool)
                 .await?;
@@ -533,6 +623,157 @@ impl SessionManager {
             note: note.map(|s| s.to_string()),
             decided_at: now,
         })
+    }
+
+    /// Record LLM usage for a phase/agent call.
+    pub async fn record_usage(
+        &self,
+        session_id: &str,
+        phase: &str,
+        agent_name: &str,
+        provider: &str,
+        model: Option<&str>,
+        prompt_tokens: u32,
+        completion_tokens: u32,
+        cost_usd: Option<f64>,
+        cost_kind: &str,
+    ) -> Result<UsageRecord> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "INSERT INTO usage_records \
+             (id, session_id, phase, agent_name, provider, model, prompt_tokens, completion_tokens, cost_usd, cost_kind, recorded_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(session_id)
+        .bind(phase)
+        .bind(agent_name)
+        .bind(provider)
+        .bind(model)
+        .bind(prompt_tokens as i64)
+        .bind(completion_tokens as i64)
+        .bind(cost_usd)
+        .bind(cost_kind)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(UsageRecord {
+            id,
+            session_id: session_id.to_string(),
+            phase: phase.to_string(),
+            agent_name: agent_name.to_string(),
+            provider: provider.to_string(),
+            model: model.map(|s| s.to_string()),
+            prompt_tokens: prompt_tokens as i64,
+            completion_tokens: completion_tokens as i64,
+            cost_usd,
+            cost_kind: cost_kind.to_string(),
+            recorded_at: now,
+        })
+    }
+
+    /// Get usage summary grouped by phase for a session.
+    pub async fn get_session_usage_summary(&self, session_id: &str) -> Result<SessionUsageSummary> {
+        let rows: Vec<(String, i64, i64, Option<f64>)> = sqlx::query_as(
+            "SELECT phase, SUM(prompt_tokens), SUM(completion_tokens), SUM(cost_usd) \
+             FROM usage_records WHERE session_id = ? GROUP BY phase",
+        )
+        .bind(session_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let phases: Vec<PhaseUsageSummary> = rows
+            .iter()
+            .map(|(phase, pt, ct, cost)| PhaseUsageSummary {
+                phase: phase.clone(),
+                prompt_tokens: *pt,
+                completion_tokens: *ct,
+                cost_usd: *cost,
+            })
+            .collect();
+
+        let total_prompt: i64 = phases.iter().map(|p| p.prompt_tokens).sum();
+        let total_completion: i64 = phases.iter().map(|p| p.completion_tokens).sum();
+        let total_cost: Option<f64> = {
+            let costs: Vec<f64> = phases.iter().filter_map(|p| p.cost_usd).collect();
+            if costs.is_empty() {
+                None
+            } else {
+                Some(costs.iter().sum())
+            }
+        };
+
+        Ok(SessionUsageSummary {
+            session_id: session_id.to_string(),
+            phases,
+            total_prompt_tokens: total_prompt,
+            total_completion_tokens: total_completion,
+            total_cost_usd: total_cost,
+        })
+    }
+
+    /// Record a full agent output for long-term memory + FTS.
+    pub async fn record_agent_output(
+        &self,
+        session_id: &str,
+        phase: &str,
+        agent_name: &str,
+        content: &str,
+    ) -> Result<AgentOutputRecord> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "INSERT INTO agent_outputs \
+             (id, session_id, phase, agent_name, content, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(session_id)
+        .bind(phase)
+        .bind(agent_name)
+        .bind(content)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(AgentOutputRecord {
+            id,
+            session_id: session_id.to_string(),
+            phase: phase.to_string(),
+            agent_name: agent_name.to_string(),
+            content: content.to_string(),
+            created_at: now,
+        })
+    }
+
+    /// Full-text search across agent outputs using FTS5.
+    pub async fn search_outputs(&self, query: &str) -> Result<Vec<OutputSearchResult>> {
+        // Use FTS5 MATCH with snippet() function
+        let rows: Vec<(String, String, String, String, String, String)> = sqlx::query_as(
+            "SELECT ao.id, ao.session_id, ao.phase, ao.agent_name, \
+             snippet(agent_outputs_fts, 0, '[', ']', '...', 20), ao.created_at \
+             FROM agent_outputs ao \
+             JOIN agent_outputs_fts ON agent_outputs_fts.rowid = ao.rowid \
+             WHERE agent_outputs_fts MATCH ? \
+             ORDER BY ao.created_at DESC LIMIT 50",
+        )
+        .bind(query)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(
+                |(id, session_id, phase, agent_name, snippet, created_at)| OutputSearchResult {
+                    id,
+                    session_id,
+                    phase,
+                    agent_name,
+                    snippet,
+                    created_at,
+                },
+            )
+            .collect())
     }
 }
 

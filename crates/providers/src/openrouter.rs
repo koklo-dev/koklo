@@ -9,16 +9,86 @@ use crate::resolve_secret;
 use crate::{LlmProvider, Message, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
+use koklo_events::{CompletionUsage, CostDisplay};
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
+
+/// In-memory cache of OpenRouter model pricing (fetched at first use).
+pub struct PricingCache {
+    cache: RwLock<HashMap<String, (f64, f64)>>, // model_id -> (input_per_mtok, output_per_mtok)
+    client: reqwest::Client,
+    api_key: String,
+}
+
+impl PricingCache {
+    pub fn new(api_key: String, client: reqwest::Client) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            client,
+            api_key,
+        }
+    }
+
+    /// Get pricing for a model. Fetches from OpenRouter API if not cached.
+    pub async fn get_pricing(&self, model: &str) -> Option<(f64, f64)> {
+        {
+            let cache = self.cache.read().await;
+            if let Some(pricing) = cache.get(model) {
+                return Some(*pricing);
+            }
+        }
+        // Fetch from API
+        if let Ok(resp) = self
+            .client
+            .get("https://openrouter.ai/api/v1/models")
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .send()
+            .await
+        {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                if let Some(models) = json["data"].as_array() {
+                    let mut cache = self.cache.write().await;
+                    for m in models {
+                        if let (Some(id), Some(pricing)) = (m["id"].as_str(), m.get("pricing")) {
+                            // pricing.prompt and pricing.completion are in USD/token
+                            // multiply by 1_000_000 for /Mtok
+                            let input = pricing["prompt"]
+                                .as_str()
+                                .and_then(|s| s.parse::<f64>().ok())
+                                .unwrap_or(0.0)
+                                * 1_000_000.0;
+                            let output = pricing["completion"]
+                                .as_str()
+                                .and_then(|s| s.parse::<f64>().ok())
+                                .unwrap_or(0.0)
+                                * 1_000_000.0;
+                            cache.insert(id.to_string(), (input, output));
+                        }
+                    }
+                    return cache.get(model).copied();
+                }
+            }
+        }
+        None
+    }
+}
 
 pub struct OpenRouterProvider {
     pub(crate) inner: OpenAICompatProvider,
+    pricing_cache: Arc<PricingCache>,
 }
 
 impl OpenRouterProvider {
     const BASE_URL: &'static str = "https://openrouter.ai/api/v1";
 
     pub fn new(api_key: String, model: String, routing: Option<ProviderRouting>) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(120))
+            .build()
+            .unwrap_or_default();
+        let pricing_cache = Arc::new(PricingCache::new(api_key.clone(), client.clone()));
         Self {
             inner: OpenAICompatProvider {
                 api_key,
@@ -26,16 +96,14 @@ impl OpenRouterProvider {
                 base_url: Self::BASE_URL.to_string(),
                 name: "openrouter".to_string(),
                 api_key_env: "OPENROUTER_API_KEY".to_string(),
-                client: reqwest::Client::builder()
-                    .timeout(Duration::from_secs(120))
-                    .build()
-                    .unwrap_or_default(),
+                client,
                 extra_headers: vec![
                     ("HTTP-Referer".to_string(), "https://koklo.dev".to_string()),
                     ("X-Title".to_string(), "koklo".to_string()),
                 ],
                 extra_body: routing.map(|r| serde_json::json!({ "provider": r.to_json() })),
             },
+            pricing_cache,
         }
     }
 
@@ -58,8 +126,23 @@ impl LlmProvider for OpenRouterProvider {
         &self,
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
-    ) -> Result<String> {
+    ) -> Result<(String, CompletionUsage)> {
         self.inner.complete_stream(messages, on_chunk).await
+    }
+
+    fn compute_cost(&self, usage: &CompletionUsage) -> Option<CostDisplay> {
+        // Use cached pricing if available (synchronous cache read)
+        let model = &self.inner.model;
+        let cache = self.pricing_cache.cache.try_read().ok()?;
+        if let Some((input_per_mtok, output_per_mtok)) = cache.get(model.as_str()) {
+            let cost = (usage.prompt_tokens as f64 * input_per_mtok
+                + usage.completion_tokens as f64 * output_per_mtok)
+                / 1_000_000.0;
+            Some(CostDisplay::Usd(cost))
+        } else {
+            // No cached pricing yet — return None (will be fetched async next call)
+            None
+        }
     }
 
     fn provider_name(&self) -> &str {
@@ -187,10 +270,13 @@ mod tests {
         // Override base_url with mock server
         let mut inner = p.inner;
         inner.base_url = server.uri();
-        let p2 = OpenRouterProvider { inner };
+        let p2 = OpenRouterProvider {
+            inner,
+            pricing_cache: p.pricing_cache.clone(),
+        };
 
         let messages = vec![crate::Message::user("hello")];
-        let result = p2.complete_stream(messages, &mut |_| {}).await.unwrap();
+        let (result, _usage) = p2.complete_stream(messages, &mut |_| {}).await.unwrap();
         assert_eq!(result, "ok");
         server.verify().await;
     }
@@ -218,7 +304,10 @@ mod tests {
         );
         let mut inner = p.inner;
         inner.base_url = server.uri();
-        let p2 = OpenRouterProvider { inner };
+        let p2 = OpenRouterProvider {
+            inner,
+            pricing_cache: p.pricing_cache.clone(),
+        };
 
         let messages = vec![crate::Message::user("hello")];
         p2.complete_stream(messages, &mut |_| {}).await.unwrap();

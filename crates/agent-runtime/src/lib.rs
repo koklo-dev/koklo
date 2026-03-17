@@ -1,9 +1,16 @@
 //! Agent execution runtime — loads system prompts and dispatches LLM calls.
 use anyhow::Result;
-use koklo_events::{EventBus, Phase, PipelineEvent};
-use koklo_providers::{LlmProvider, Message};
+use koklo_events::{CompletionUsage, EventBus, Phase, PipelineEvent};
+use koklo_providers::{LlmProvider, Message, ToolEvent};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+static STREAM_STDOUT: AtomicBool = AtomicBool::new(true);
+
+pub fn set_stdout_streaming_enabled(enabled: bool) {
+    STREAM_STDOUT.store(enabled, Ordering::Relaxed);
+}
 
 /// Configuration for a single agent.
 #[derive(Debug, Clone)]
@@ -26,6 +33,11 @@ pub struct AgentRunner {
     bus: EventBus,
 }
 
+pub struct AgentRunResult {
+    pub output: String,
+    pub usage: CompletionUsage,
+}
+
 impl AgentRunner {
     pub fn new(config: AgentConfig, provider: Arc<dyn LlmProvider>, bus: EventBus) -> Self {
         Self {
@@ -35,30 +47,63 @@ impl AgentRunner {
         }
     }
 
-    /// Run the agent with the given user prompt. Returns the full LLM response.
-    pub async fn run(&self, _session_id: &str, user_prompt: &str) -> Result<String> {
+    /// Run the agent with the given user prompt. Returns the full LLM response and token usage.
+    pub async fn run(&self, session_id: &str, user_prompt: &str) -> Result<AgentRunResult> {
         let system_prompt = build_system_prompt(&self.config)?;
 
         let messages = vec![Message::system(system_prompt), Message::user(user_prompt)];
 
         let bus = self.bus.clone();
         let phase = self.config.phase;
+        let session_id_str = session_id.to_string();
 
         let mut result = String::new();
-        self.provider
+        let (_, usage) = self
+            .provider
             .complete_stream(messages, &mut |chunk| {
                 if !chunk.text.is_empty() {
                     bus.send(PipelineEvent::AgentLog {
                         phase,
+                        session_id: session_id_str.clone(),
                         message: chunk.text.clone(),
                     });
                     result.push_str(&chunk.text);
-                    print!("{}", chunk.text);
+                    if STREAM_STDOUT.load(Ordering::Relaxed) {
+                        print!("{}", chunk.text);
+                    }
+                }
+                match chunk.tool_event {
+                    Some(ToolEvent::Call {
+                        tool_name,
+                        input_summary,
+                    }) => {
+                        bus.send(PipelineEvent::ToolCall {
+                            phase,
+                            session_id: session_id_str.clone(),
+                            tool_name,
+                            input_summary,
+                        });
+                    }
+                    Some(ToolEvent::Result {
+                        tool_name,
+                        output_summary,
+                    }) => {
+                        bus.send(PipelineEvent::ToolResult {
+                            phase,
+                            session_id: session_id_str.clone(),
+                            tool_name,
+                            output_summary,
+                        });
+                    }
+                    None => {}
                 }
             })
             .await?;
 
-        Ok(result)
+        Ok(AgentRunResult {
+            output: result,
+            usage,
+        })
     }
 }
 
