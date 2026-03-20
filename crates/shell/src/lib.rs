@@ -586,8 +586,9 @@ mod tests {
 
         let sandbox = BubblewrapSandbox::with_paths(vec![workspace.clone()], vec![workspace], true);
         let cmd = format!("cat {}", outside.join("secret.txt").display());
+        let workdir = tmp.path().join("workspace");
 
-        let out = sandbox.run(&cmd, tmp.path()).await.unwrap();
+        let out = sandbox.run(&cmd, &workdir).await.unwrap();
 
         assert_ne!(out.exit_code, 0);
         assert!(!out.stdout.contains("top-secret"));
