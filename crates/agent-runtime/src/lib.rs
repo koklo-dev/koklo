@@ -50,6 +50,19 @@ pub struct AgentRunResult {
     pub usage: CompletionUsage,
 }
 
+struct AgentTurnContext<'a> {
+    bus: &'a EventBus,
+    phase: Phase,
+    session_id: &'a str,
+    agent_name: &'a str,
+    interaction_mode: ProviderInteractionMode,
+}
+
+struct TextBuffers<'a> {
+    result: &'a mut String,
+    turn_text: &'a mut String,
+}
+
 #[async_trait]
 pub trait UserInputHandler: Send + Sync {
     async fn request_input(&self, display: UserInputDisplay) -> Result<Vec<String>>;
@@ -107,20 +120,26 @@ impl AgentRunner {
 
             let mut turn_text = String::new();
             let mut parser = (!native_user_input).then(SyntheticUserInputParser::default);
+            let turn_context = AgentTurnContext {
+                bus: &bus,
+                phase,
+                session_id: &session_id_str,
+                agent_name: &agent_name,
+                interaction_mode: provider_capabilities.interaction_mode,
+            };
             let mut session = Arc::clone(&self.provider)
                 .start_session(messages.clone())
                 .await?;
             let usage = loop {
                 match session.next_event().await? {
                     ProviderSessionEvent::Event(event) => {
+                        let mut buffers = TextBuffers {
+                            result: &mut result,
+                            turn_text: &mut turn_text,
+                        };
                         if let Some(interruption) = handle_provider_event(
-                            &bus,
-                            phase,
-                            &session_id_str,
-                            &agent_name,
-                            provider_capabilities.interaction_mode,
-                            &mut result,
-                            &mut turn_text,
+                            &turn_context,
+                            &mut buffers,
                             parser.as_mut(),
                             event,
                         ) {
@@ -182,16 +201,11 @@ impl AgentRunner {
             if let Some(parser) = parser.as_mut() {
                 let flushed = parser.finish();
                 if !flushed.is_empty() {
-                    emit_text_delta(
-                        &bus,
-                        phase,
-                        &session_id_str,
-                        &agent_name,
-                        &mut result,
-                        &mut turn_text,
-                        None,
-                        &flushed,
-                    );
+                    let mut buffers = TextBuffers {
+                        result: &mut result,
+                        turn_text: &mut turn_text,
+                    };
+                    emit_text_delta(&turn_context, &mut buffers, None, &flushed);
                 }
                 if let Some(request) = parser.take_request() {
                     let display = UserInputDisplay {
@@ -253,12 +267,8 @@ impl AgentRunner {
 }
 
 fn emit_text_delta(
-    bus: &EventBus,
-    phase: Phase,
-    session_id: &str,
-    agent_name: &str,
-    result: &mut String,
-    turn_text: &mut String,
+    context: &AgentTurnContext<'_>,
+    buffers: &mut TextBuffers<'_>,
     parser: Option<&mut SyntheticUserInputParser>,
     text: &str,
 ) {
@@ -272,24 +282,24 @@ fn emit_text_delta(
         if visible.is_empty() {
             continue;
         }
-        bus.send(PipelineEvent::AgentLog {
-            phase,
-            session_id: session_id.to_string(),
+        context.bus.send(PipelineEvent::AgentLog {
+            phase: context.phase,
+            session_id: context.session_id.to_string(),
             message: visible.clone(),
         });
-        bus.send(PipelineEvent::Transcript {
+        context.bus.send(PipelineEvent::Transcript {
             item: TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Agent,
                 TranscriptItemKind::MessageDelta,
                 TranscriptItemStatus::Streaming,
                 visible.clone(),
             ),
         });
-        result.push_str(&visible);
-        turn_text.push_str(&visible);
+        buffers.result.push_str(&visible);
+        buffers.turn_text.push_str(&visible);
         if STREAM_STDOUT.load(Ordering::Relaxed) {
             print!("{}", visible);
         }
@@ -297,21 +307,14 @@ fn emit_text_delta(
 }
 
 fn handle_provider_event(
-    bus: &EventBus,
-    phase: Phase,
-    session_id: &str,
-    agent_name: &str,
-    interaction_mode: ProviderInteractionMode,
-    result: &mut String,
-    turn_text: &mut String,
+    context: &AgentTurnContext<'_>,
+    buffers: &mut TextBuffers<'_>,
     parser: Option<&mut SyntheticUserInputParser>,
     event: ProviderEvent,
 ) -> Option<RuntimeInterruption> {
     match event {
         ProviderEvent::MessageDelta { text } => {
-            emit_text_delta(
-                bus, phase, session_id, agent_name, result, turn_text, parser, &text,
-            );
+            emit_text_delta(context, buffers, parser, &text);
             None
         }
         ProviderEvent::MessageCompleted => None,
@@ -320,16 +323,16 @@ fn handle_provider_event(
             tool_name,
             input_summary,
         } => {
-            bus.send(PipelineEvent::ToolCall {
-                phase,
-                session_id: session_id.to_string(),
+            context.bus.send(PipelineEvent::ToolCall {
+                phase: context.phase,
+                session_id: context.session_id.to_string(),
                 tool_name: tool_name.clone(),
                 input_summary: input_summary.clone(),
             });
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Tool,
                 TranscriptItemKind::ToolCall,
                 TranscriptItemStatus::Pending,
@@ -338,9 +341,9 @@ fn handle_provider_event(
             .with_payload(json!({
                 "tool_name": tool_name,
                 "input_summary": input_summary,
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
@@ -354,16 +357,16 @@ fn handle_provider_event(
             output_summary,
             success,
         } => {
-            bus.send(PipelineEvent::ToolResult {
-                phase,
-                session_id: session_id.to_string(),
+            context.bus.send(PipelineEvent::ToolResult {
+                phase: context.phase,
+                session_id: context.session_id.to_string(),
                 tool_name: tool_name.clone(),
                 output_summary: output_summary.clone(),
             });
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Tool,
                 TranscriptItemKind::ToolResult,
                 if success == Some(false) {
@@ -377,9 +380,9 @@ fn handle_provider_event(
                 "tool_name": tool_name,
                 "output_summary": output_summary,
                 "success": success,
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
@@ -389,18 +392,18 @@ fn handle_provider_event(
         }
         ProviderEvent::Reasoning { item_id, text } => {
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Agent,
                 TranscriptItemKind::Reasoning,
                 TranscriptItemStatus::Info,
                 text.clone(),
             )
             .with_payload(json!({
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
@@ -410,18 +413,18 @@ fn handle_provider_event(
         }
         ProviderEvent::Plan { item_id, text } => {
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Agent,
                 TranscriptItemKind::Plan,
                 TranscriptItemStatus::Info,
                 text.clone(),
             )
             .with_payload(json!({
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
@@ -437,9 +440,9 @@ fn handle_provider_event(
             output,
         } => {
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Tool,
                 TranscriptItemKind::Command,
                 if status == "failed" {
@@ -455,9 +458,9 @@ fn handle_provider_event(
                 "status": status,
                 "exit_code": exit_code,
                 "output": output,
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
@@ -472,9 +475,9 @@ fn handle_provider_event(
             status,
         } => {
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Tool,
                 TranscriptItemKind::FileChange,
                 if status == "failed" {
@@ -487,9 +490,9 @@ fn handle_provider_event(
             .with_payload(json!({
                 "files": files,
                 "status": status,
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
@@ -501,18 +504,18 @@ fn handle_provider_event(
             let request_id = item_id.unwrap_or_else(|| Uuid::new_v4().to_string());
             let display = UserInputDisplay {
                 request_id,
-                session_id: session_id.to_string(),
-                phase: Some(phase),
-                agent_name: Some(agent_name.to_string()),
+                session_id: context.session_id.to_string(),
+                phase: Some(context.phase),
+                agent_name: Some(context.agent_name.to_string()),
                 questions,
             };
             emit_user_input_request(
-                bus,
-                session_id,
-                phase,
-                agent_name,
+                context.bus,
+                context.session_id,
+                context.phase,
+                context.agent_name,
                 &display,
-                interaction_mode_label(interaction_mode),
+                interaction_mode_label(context.interaction_mode),
             );
             Some(RuntimeInterruption::UserInput(display))
         }
@@ -531,12 +534,12 @@ fn handle_provider_event(
                 details,
             };
             emit_approval_request(
-                bus,
-                session_id,
-                phase,
-                agent_name,
+                context.bus,
+                context.session_id,
+                context.phase,
+                context.agent_name,
                 &request,
-                interaction_mode_label(interaction_mode),
+                interaction_mode_label(context.interaction_mode),
             );
             Some(RuntimeInterruption::Approval(request))
         }
@@ -546,9 +549,9 @@ fn handle_provider_event(
             value,
         } => {
             let item = TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                Some(agent_name.to_string()),
+                context.session_id.to_string(),
+                Some(context.phase),
+                Some(context.agent_name.to_string()),
                 TranscriptSource::Provider,
                 TranscriptItemKind::Message,
                 TranscriptItemStatus::Info,
@@ -557,9 +560,9 @@ fn handle_provider_event(
             .with_payload(json!({
                 "kind": kind,
                 "value": value,
-                "interaction_mode": interaction_mode_label(interaction_mode),
+                "interaction_mode": interaction_mode_label(context.interaction_mode),
             }));
-            bus.send(PipelineEvent::Transcript {
+            context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
                     None => item,
