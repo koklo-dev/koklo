@@ -11,15 +11,19 @@ pub mod presets;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
-use koklo_agent_runtime::{AgentConfig, AgentRunResult, AgentRunner};
+use koklo_agent_runtime::{
+    AgentConfig, AgentRunResult, AgentRunner, ApprovalHandler, UserInputHandler,
+};
 use koklo_events::{
     CompletionUsage, CostDisplay, EventBus, GateAction, GateChannel, GateDisplay, GateResponse,
-    Phase, PipelineEvent,
+    Phase, PipelineEvent, TranscriptItem, TranscriptItemKind, TranscriptItemStatus,
+    TranscriptSource, UserInputChannel, UserInputDisplay,
 };
 use koklo_providers::{ClaudeCodeCliProvider, CodexCliProvider, LlmProvider, ProviderRegistry};
 use koklo_shell::{BubblewrapSandbox, ControlledShell, LandlockSandbox, Sandbox};
 use koklo_storage::{Session, SessionManager, UsageRecordInput};
 use presets::{phases_for_preset, PresetKind};
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -87,6 +91,11 @@ pub trait GateHandler: Send + Sync {
     async fn handle(&self, display: GateDisplay) -> Result<GateResponse>;
 }
 
+#[async_trait]
+pub trait PipelineUserInputHandler: Send + Sync {
+    async fn handle(&self, display: UserInputDisplay) -> Result<Vec<String>>;
+}
+
 /// StdinGateHandler: reads from stdin. Used by --no-tui / CI.
 pub struct StdinGateHandler;
 
@@ -123,6 +132,70 @@ impl TuiGateHandler {
 impl GateHandler for TuiGateHandler {
     async fn handle(&self, display: GateDisplay) -> Result<GateResponse> {
         self.channel.deposit_and_await(display).await
+    }
+}
+
+pub struct StdinUserInputHandler;
+
+#[async_trait]
+impl PipelineUserInputHandler for StdinUserInputHandler {
+    async fn handle(&self, display: UserInputDisplay) -> Result<Vec<String>> {
+        let mut answers = Vec::with_capacity(display.questions.len());
+        for question in display.questions {
+            println!("\n[QUESTION] {}", question.header);
+            println!("{}", question.question);
+            if let Some(options) = &question.options {
+                if !options.is_empty() {
+                    println!("Options: {}", options.join(" | "));
+                }
+            }
+            print!("> ");
+            use std::io::Write as _;
+            std::io::stdout().flush()?;
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            answers.push(input.trim().to_string());
+        }
+        Ok(answers)
+    }
+}
+
+pub struct TuiUserInputHandler {
+    channel: UserInputChannel,
+}
+
+impl TuiUserInputHandler {
+    pub fn new(channel: UserInputChannel) -> Self {
+        Self { channel }
+    }
+}
+
+#[async_trait]
+impl PipelineUserInputHandler for TuiUserInputHandler {
+    async fn handle(&self, display: UserInputDisplay) -> Result<Vec<String>> {
+        self.channel.deposit_and_await(display).await
+    }
+}
+
+struct RuntimeUserInputHandler {
+    inner: Arc<dyn PipelineUserInputHandler>,
+}
+
+#[async_trait]
+impl UserInputHandler for RuntimeUserInputHandler {
+    async fn request_input(&self, display: UserInputDisplay) -> Result<Vec<String>> {
+        self.inner.handle(display).await
+    }
+}
+
+struct RuntimeApprovalHandler {
+    inner: Arc<dyn GateHandler>,
+}
+
+#[async_trait]
+impl ApprovalHandler for RuntimeApprovalHandler {
+    async fn request_approval(&self, display: GateDisplay) -> Result<GateResponse> {
+        self.inner.handle(display).await
     }
 }
 
@@ -285,6 +358,7 @@ pub struct PipelineOrchestrator {
     storage: Arc<SessionManager>,
     bus: EventBus,
     gate_handler: Arc<dyn GateHandler>,
+    user_input_handler: Arc<dyn PipelineUserInputHandler>,
 }
 
 impl PipelineOrchestrator {
@@ -296,12 +370,21 @@ impl PipelineOrchestrator {
             storage,
             bus,
             gate_handler: Arc::new(StdinGateHandler),
+            user_input_handler: Arc::new(StdinUserInputHandler),
         })
     }
 
     pub async fn new_with_gate(
         config: PipelineConfig,
         gate_handler: Arc<dyn GateHandler>,
+    ) -> Result<Self> {
+        Self::new_with_handlers(config, gate_handler, Arc::new(StdinUserInputHandler)).await
+    }
+
+    pub async fn new_with_handlers(
+        config: PipelineConfig,
+        gate_handler: Arc<dyn GateHandler>,
+        user_input_handler: Arc<dyn PipelineUserInputHandler>,
     ) -> Result<Self> {
         let storage = Arc::new(SessionManager::open(&config.db_path).await?);
         let bus = EventBus::new(256);
@@ -310,6 +393,7 @@ impl PipelineOrchestrator {
             storage,
             bus,
             gate_handler,
+            user_input_handler,
         })
     }
 
@@ -319,6 +403,10 @@ impl PipelineOrchestrator {
 
     pub fn storage_handle(&self) -> Arc<SessionManager> {
         Arc::clone(&self.storage)
+    }
+
+    fn emit_transcript(&self, item: TranscriptItem) {
+        self.bus.send(PipelineEvent::Transcript { item });
     }
 
     /// Run the full pipeline for a new feature using the preset in [`PipelineConfig`].
@@ -375,20 +463,30 @@ impl PipelineOrchestrator {
         tokio::spawn(async move {
             let mut rx = log_bus.subscribe();
             while let Ok(event) = rx.recv().await {
-                if let PipelineEvent::AgentLog {
-                    phase,
-                    session_id: _,
-                    message,
-                } = event
-                {
-                    let agent_name = phase_map
-                        .get(&phase.to_string())
-                        .copied()
-                        .unwrap_or("unknown");
-                    log_storage
-                        .record_agent_log(&log_session_id, &phase.to_string(), agent_name, &message)
-                        .await
-                        .ok();
+                match event {
+                    PipelineEvent::AgentLog {
+                        phase,
+                        session_id: _,
+                        message,
+                    } => {
+                        let agent_name = phase_map
+                            .get(&phase.to_string())
+                            .copied()
+                            .unwrap_or("unknown");
+                        log_storage
+                            .record_agent_log(
+                                &log_session_id,
+                                &phase.to_string(),
+                                agent_name,
+                                &message,
+                            )
+                            .await
+                            .ok();
+                    }
+                    PipelineEvent::Transcript { item } => {
+                        log_storage.record_transcript_item(&item).await.ok();
+                    }
+                    _ => {}
                 }
             }
         });
@@ -408,6 +506,18 @@ impl PipelineOrchestrator {
         self.bus.send(PipelineEvent::SessionCompleted {
             session_id: session_id.clone(),
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session_id.clone(),
+                None,
+                None,
+                TranscriptSource::System,
+                TranscriptItemKind::SessionLifecycle,
+                TranscriptItemStatus::Completed,
+                "session completed",
+            )
+            .with_payload(json!({ "status": "completed" })),
+        );
 
         self.storage
             .update_session_status(&session_id, "completed")
@@ -498,6 +608,18 @@ impl PipelineOrchestrator {
                         session_id: session.id.to_string(),
                         error: e.to_string(),
                     });
+                    self.emit_transcript(
+                        TranscriptItem::new(
+                            session.id.clone(),
+                            Some(*phase),
+                            Some((*agent_name).to_string()),
+                            TranscriptSource::System,
+                            TranscriptItemKind::PhaseLifecycle,
+                            TranscriptItemStatus::Failed,
+                            format!("phase {} failed", phase),
+                        )
+                        .with_payload(json!({ "error": e.to_string(), "status": "failed" })),
+                    );
                     self.storage
                         .update_session_status(&session.id, "failed")
                         .await?;
@@ -550,6 +672,18 @@ impl PipelineOrchestrator {
             phase,
             session_id: session.id.to_string(),
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session.id.clone(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::System,
+                TranscriptItemKind::PhaseLifecycle,
+                TranscriptItemStatus::Streaming,
+                format!("phase {} started", phase),
+            )
+            .with_payload(json!({ "status": "started" })),
+        );
 
         let phase_record = self
             .storage
@@ -571,7 +705,17 @@ impl PipelineOrchestrator {
             phase,
             Some(&workspace_root),
         );
-        let runner = AgentRunner::new(config, Arc::clone(&provider), self.bus.clone());
+        let runner = AgentRunner::new(
+            config,
+            Arc::clone(&provider),
+            self.bus.clone(),
+            Arc::new(RuntimeApprovalHandler {
+                inner: Arc::clone(&self.gate_handler),
+            }),
+            Arc::new(RuntimeUserInputHandler {
+                inner: Arc::clone(&self.user_input_handler),
+            }),
+        );
         let prompt = format!(
             "Feature: {}\nSession: {}\nWorkspace: {}",
             session.feature_title,
@@ -585,6 +729,18 @@ impl PipelineOrchestrator {
             session_id: session.id.clone(),
             message: format!("▶ {} — waiting for {} response…", phase, agent_name),
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session.id.clone(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::System,
+                TranscriptItemKind::Message,
+                TranscriptItemStatus::Info,
+                format!("waiting for {} response", agent_name),
+            )
+            .with_payload(json!({ "phase": phase.to_string(), "agent": agent_name })),
+        );
         let AgentRunResult { output, usage } = runner.run(&session.id, &prompt).await?;
 
         let artifact_path = self.resolve_artifact_path(&workspace_root, &session.id, phase);
@@ -646,6 +802,35 @@ impl PipelineOrchestrator {
             completion_tokens: usage.completion_tokens,
             cost: cost.clone(),
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session.id.clone(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Provider,
+                TranscriptItemKind::Usage,
+                TranscriptItemStatus::Completed,
+                format!(
+                    "{} prompt / {} completion tokens",
+                    usage.prompt_tokens, usage.completion_tokens
+                ),
+            )
+            .with_payload(json!({
+                "provider": provider.provider_name(),
+                "model": provider.model_name(),
+                "prompt_tokens": usage.prompt_tokens,
+                "completion_tokens": usage.completion_tokens,
+                "cost": cost,
+                "capabilities": {
+                    "streaming_text": provider.capabilities().streaming_text,
+                    "usage_native": provider.capabilities().usage_native,
+                    "tool_calls_native": provider.capabilities().tool_calls_native,
+                    "approvals_native": provider.capabilities().approvals_native,
+                    "user_input_native": provider.capabilities().user_input_native,
+                    "reasoning_visible": provider.capabilities().reasoning_visible,
+                }
+            })),
+        );
 
         self.storage
             .complete_phase(&phase_record.id, "completed", None)
@@ -654,6 +839,18 @@ impl PipelineOrchestrator {
             phase,
             session_id: session.id.to_string(),
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session.id.clone(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::System,
+                TranscriptItemKind::PhaseLifecycle,
+                TranscriptItemStatus::Completed,
+                format!("phase {} completed", phase),
+            )
+            .with_payload(json!({ "status": "completed" })),
+        );
         Ok(PhaseRunOutcome::Completed {
             output,
             usage,
@@ -708,6 +905,21 @@ impl PipelineOrchestrator {
             session_id: session_id.to_string(),
             description: description.clone(),
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                None,
+                TranscriptSource::System,
+                TranscriptItemKind::ApprovalRequest,
+                TranscriptItemStatus::Pending,
+                description.clone(),
+            )
+            .with_payload(json!({
+                "usage": usage,
+                "cost": cost,
+            })),
+        );
 
         let display = GateDisplay {
             phase,
@@ -715,6 +927,7 @@ impl PipelineOrchestrator {
             description,
             usage,
             cost,
+            allow_edit: true,
         };
 
         let response = self.gate_handler.handle(display).await?;
@@ -725,8 +938,17 @@ impl PipelineOrchestrator {
             GateResponse::Edit(_) => "edit",
         };
 
+        let action_note = match &response {
+            GateResponse::Edit(path) => Some(path.display().to_string()),
+            _ => None,
+        };
         self.storage
-            .record_gate_decision(session_id, &phase.to_string(), action_str, None)
+            .record_gate_decision(
+                session_id,
+                &phase.to_string(),
+                action_str,
+                action_note.as_deref(),
+            )
             .await?;
 
         let gate_action = match &response {
@@ -740,14 +962,39 @@ impl PipelineOrchestrator {
             session_id: session_id.to_string(),
             action: gate_action,
         });
+        self.emit_transcript(
+            TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                None,
+                TranscriptSource::User,
+                TranscriptItemKind::ApprovalDecision,
+                TranscriptItemStatus::Resolved,
+                format!("gate {} for {}", action_str, phase),
+            )
+            .with_payload(json!({
+                "action": action_str,
+                "path": action_note,
+            })),
+        );
 
         match response {
             GateResponse::Approve => Ok(()),
-            _ => {
+            GateResponse::Reject => {
                 self.storage
                     .update_session_status(session_id, "paused")
                     .await?;
                 anyhow::bail!("Gate rejected at phase '{}' — session paused", phase)
+            }
+            GateResponse::Edit(path) => {
+                self.storage
+                    .update_session_status(session_id, "paused")
+                    .await?;
+                anyhow::bail!(
+                    "Gate paused at phase '{}' for edits in '{}'",
+                    phase,
+                    path.display()
+                )
             }
         }
     }
@@ -1164,16 +1411,8 @@ mod tests {
             on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
         ) -> Result<(String, koklo_events::CompletionUsage)> {
             *self.messages.lock().unwrap() = messages;
-            on_chunk(StreamChunk {
-                text: self.response.clone(),
-                finished: false,
-                tool_event: None,
-            });
-            on_chunk(StreamChunk {
-                text: String::new(),
-                finished: true,
-                tool_event: None,
-            });
+            on_chunk(StreamChunk::text(self.response.clone()));
+            on_chunk(StreamChunk::finished());
             Ok((
                 self.response.clone(),
                 koklo_events::CompletionUsage::default(),
@@ -1434,6 +1673,7 @@ mod tests {
             storage,
             bus: EventBus::new(16),
             gate_handler: Arc::new(StdinGateHandler),
+            user_input_handler: Arc::new(StdinUserInputHandler),
         };
 
         let PhaseRunOutcome::Completed { output, .. } = orchestrator
@@ -1509,6 +1749,7 @@ mod tests {
             storage,
             bus: EventBus::new(16),
             gate_handler: Arc::new(StdinGateHandler),
+            user_input_handler: Arc::new(StdinUserInputHandler),
         };
 
         orchestrator
@@ -1574,6 +1815,7 @@ mod tests {
             ),
             bus: EventBus::new(16),
             gate_handler: Arc::new(StdinGateHandler),
+            user_input_handler: Arc::new(StdinUserInputHandler),
         };
 
         let workspace = orchestrator

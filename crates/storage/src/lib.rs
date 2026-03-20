@@ -1,6 +1,7 @@
 //! SQLite-backed session storage.
 use anyhow::Result;
 use chrono::Utc;
+use koklo_events::TranscriptItem;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::str::FromStr;
@@ -91,6 +92,32 @@ pub struct AgentLogRecord {
     /// Monotonically increasing sequence number per session.
     pub seq: i64,
     pub created_at: String,
+}
+
+/// A typed transcript item recorded for a session.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct TranscriptItemRecord {
+    pub id: String,
+    pub session_id: String,
+    pub phase: Option<String>,
+    pub agent_name: Option<String>,
+    pub source: String,
+    pub kind: String,
+    pub status: String,
+    pub item_key: Option<String>,
+    pub summary: String,
+    pub payload_json: Option<String>,
+    /// Monotonically increasing sequence number per session.
+    pub seq: i64,
+    pub created_at: String,
+}
+
+impl TranscriptItemRecord {
+    pub fn payload(&self) -> Option<serde_json::Value> {
+        self.payload_json
+            .as_deref()
+            .and_then(|value| serde_json::from_str(value).ok())
+    }
 }
 
 /// A human gate decision recorded for auditing.
@@ -322,6 +349,22 @@ impl SessionManager {
                 .await?;
             let now = Utc::now().to_rfc3339();
             sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (7, ?)")
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // Migration 008 — typed transcript items.
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM schema_migrations WHERE version = 8")
+                .fetch_one(&self.pool)
+                .await?;
+        if count == 0 {
+            sqlx::query(include_str!("../migrations/008_transcript_items.sql"))
+                .execute(&self.pool)
+                .await?;
+            let now = Utc::now().to_rfc3339();
+            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (8, ?)")
                 .bind(&now)
                 .execute(&self.pool)
                 .await?;
@@ -606,6 +649,95 @@ impl SessionManager {
         Ok(rows)
     }
 
+    /// Record a typed transcript item for a session.
+    pub async fn record_transcript_item(
+        &self,
+        item: &TranscriptItem,
+    ) -> Result<TranscriptItemRecord> {
+        let now = Utc::now().to_rfc3339();
+        let (next_seq,): (i64,) = sqlx::query_as(
+            "SELECT COALESCE(MAX(seq), 0) + 1 FROM transcript_items WHERE session_id = ?",
+        )
+        .bind(&item.session_id)
+        .fetch_one(&self.pool)
+        .await?;
+        let payload_json = item
+            .payload
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
+        let phase = item.phase.map(|phase| phase.to_string());
+        let source = enum_label(&item.source);
+        let kind = enum_label(&item.kind);
+        let status = enum_label(&item.status);
+        sqlx::query(
+            "INSERT INTO transcript_items \
+             (id, session_id, phase, agent_name, source, kind, status, item_key, summary, payload_json, seq, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&item.id)
+        .bind(&item.session_id)
+        .bind(&phase)
+        .bind(&item.agent_name)
+        .bind(&source)
+        .bind(&kind)
+        .bind(&status)
+        .bind(&item.item_key)
+        .bind(&item.summary)
+        .bind(&payload_json)
+        .bind(next_seq)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(TranscriptItemRecord {
+            id: item.id.clone(),
+            session_id: item.session_id.clone(),
+            phase,
+            agent_name: item.agent_name.clone(),
+            source,
+            kind,
+            status,
+            item_key: item.item_key.clone(),
+            summary: item.summary.clone(),
+            payload_json,
+            seq: next_seq,
+            created_at: now,
+        })
+    }
+
+    /// Return all transcript items for a session, ordered by seq.
+    pub async fn get_transcript_items_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<TranscriptItemRecord>> {
+        let rows = sqlx::query_as::<_, TranscriptItemRecord>(
+            "SELECT id, session_id, phase, agent_name, source, kind, status, item_key, summary, payload_json, seq, created_at \
+             FROM transcript_items WHERE session_id = ? ORDER BY seq ASC",
+        )
+        .bind(session_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Return transcript items with seq > `after_seq` (incremental polling).
+    pub async fn get_transcript_items_since(
+        &self,
+        session_id: &str,
+        after_seq: i64,
+    ) -> Result<Vec<TranscriptItemRecord>> {
+        let rows = sqlx::query_as::<_, TranscriptItemRecord>(
+            "SELECT id, session_id, phase, agent_name, source, kind, status, item_key, summary, payload_json, seq, created_at \
+             FROM transcript_items WHERE session_id = ? AND seq > ? ORDER BY seq ASC",
+        )
+        .bind(session_id)
+        .bind(after_seq)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Record a gate decision for auditing.
     pub async fn record_gate_decision(
         &self,
@@ -778,6 +910,22 @@ impl SessionManager {
             )
             .collect())
     }
+}
+
+fn enum_label(value: &impl std::fmt::Debug) -> String {
+    let debug = format!("{:?}", value);
+    let mut out = String::with_capacity(debug.len() + 4);
+    for (idx, ch) in debug.chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if idx > 0 {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -980,5 +1128,56 @@ mod tests {
         // Each session starts from seq=1 independently.
         assert_eq!(l1.seq, 1);
         assert_eq!(l2.seq, 1);
+    }
+
+    #[tokio::test]
+    async fn test_record_and_get_transcript_items() {
+        let mgr = SessionManager::in_memory().await.unwrap();
+        let session = mgr
+            .create_session("Transcript Test", "sdd", "")
+            .await
+            .unwrap();
+        let first = TranscriptItem::new(
+            session.id.clone(),
+            None,
+            Some("developer".to_string()),
+            koklo_events::TranscriptSource::Agent,
+            koklo_events::TranscriptItemKind::MessageDelta,
+            koklo_events::TranscriptItemStatus::Streaming,
+            "hello",
+        );
+        let second = TranscriptItem::new(
+            session.id.clone(),
+            Some(koklo_events::Phase::Implement),
+            Some("developer".to_string()),
+            koklo_events::TranscriptSource::Tool,
+            koklo_events::TranscriptItemKind::ToolCall,
+            koklo_events::TranscriptItemStatus::Pending,
+            "rg src",
+        )
+        .with_payload(serde_json::json!({ "tool_name": "bash" }));
+
+        let rec1 = mgr.record_transcript_item(&first).await.unwrap();
+        let rec2 = mgr.record_transcript_item(&second).await.unwrap();
+
+        assert_eq!(rec1.seq, 1);
+        assert_eq!(rec2.seq, 2);
+        assert_eq!(rec2.kind, "tool_call");
+        assert!(rec2.payload().is_some());
+
+        let all = mgr
+            .get_transcript_items_for_session(&session.id)
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].summary, "hello");
+        assert_eq!(all[1].phase.as_deref(), Some("implement"));
+
+        let since = mgr
+            .get_transcript_items_since(&session.id, 1)
+            .await
+            .unwrap();
+        assert_eq!(since.len(), 1);
+        assert_eq!(since[0].summary, "rg src");
     }
 }

@@ -1,8 +1,10 @@
 //! Pipeline event bus — tokio broadcast channel.
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, oneshot};
+use uuid::Uuid;
 
 /// Pipeline execution phases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +47,24 @@ impl std::fmt::Display for Phase {
             Phase::Docs => write!(f, "docs"),
             Phase::Constitution => write!(f, "constitution"),
             Phase::Tasks => write!(f, "tasks"),
+        }
+    }
+}
+
+impl Phase {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "spec" => Some(Self::Spec),
+            "plan" => Some(Self::Plan),
+            "implement" => Some(Self::Implement),
+            "test" => Some(Self::Test),
+            "review" => Some(Self::Review),
+            "analysis" => Some(Self::Analysis),
+            "security" => Some(Self::Security),
+            "docs" => Some(Self::Docs),
+            "constitution" => Some(Self::Constitution),
+            "tasks" => Some(Self::Tasks),
+            _ => None,
         }
     }
 }
@@ -111,6 +131,27 @@ pub struct GateDisplay {
     pub description: String,
     pub usage: Option<CompletionUsage>,
     pub cost: Option<CostDisplay>,
+    pub allow_edit: bool,
+}
+
+/// Structured question presented to the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserInputQuestion {
+    pub id: String,
+    pub header: String,
+    pub question: String,
+    pub options: Option<Vec<String>>,
+    pub is_secret: bool,
+}
+
+/// Display information for a user input request (no sender — cloneable).
+#[derive(Debug, Clone)]
+pub struct UserInputDisplay {
+    pub request_id: String,
+    pub session_id: String,
+    pub phase: Option<Phase>,
+    pub agent_name: Option<String>,
+    pub questions: Vec<UserInputQuestion>,
 }
 
 /// Gate request placed in the channel by the TuiGateHandler.
@@ -118,6 +159,103 @@ pub struct GateDisplay {
 pub struct GateRequest {
     pub display: GateDisplay,
     pub responder: oneshot::Sender<GateResponse>,
+}
+
+/// User input request placed in the channel by the runtime.
+pub struct UserInputRequest {
+    pub display: UserInputDisplay,
+    pub responder: oneshot::Sender<Vec<String>>,
+}
+
+/// High-level origin of a transcript item.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TranscriptSource {
+    Agent,
+    Tool,
+    Provider,
+    System,
+    User,
+}
+
+/// Structured transcript item kind used by the runtime and TUI.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TranscriptItemKind {
+    MessageDelta,
+    Message,
+    ToolCall,
+    ToolResult,
+    Reasoning,
+    Plan,
+    Command,
+    FileChange,
+    UserInputRequest,
+    UserInputResponse,
+    ApprovalRequest,
+    ApprovalDecision,
+    Usage,
+    PhaseLifecycle,
+    SessionLifecycle,
+}
+
+/// Item lifecycle / display status.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TranscriptItemStatus {
+    Pending,
+    Streaming,
+    Completed,
+    Failed,
+    Resolved,
+    Info,
+}
+
+/// One typed record in a session transcript.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptItem {
+    pub id: String,
+    pub session_id: String,
+    pub phase: Option<Phase>,
+    pub agent_name: Option<String>,
+    pub source: TranscriptSource,
+    pub kind: TranscriptItemKind,
+    pub status: TranscriptItemStatus,
+    pub item_key: Option<String>,
+    pub summary: String,
+    pub payload: Option<Value>,
+}
+
+impl TranscriptItem {
+    pub fn new(
+        session_id: impl Into<String>,
+        phase: Option<Phase>,
+        agent_name: Option<String>,
+        source: TranscriptSource,
+        kind: TranscriptItemKind,
+        status: TranscriptItemStatus,
+        summary: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            session_id: session_id.into(),
+            phase,
+            agent_name,
+            source,
+            kind,
+            status,
+            item_key: None,
+            summary: summary.into(),
+            payload: None,
+        }
+    }
+
+    pub fn with_item_key(mut self, item_key: impl Into<String>) -> Self {
+        self.item_key = Some(item_key.into());
+        self
+    }
+
+    pub fn with_payload(mut self, payload: Value) -> Self {
+        self.payload = Some(payload);
+        self
+    }
 }
 
 /// In-memory coordination channel between the pipeline and the TUI.
@@ -169,9 +307,61 @@ impl GateChannel {
     }
 }
 
+/// In-memory coordination channel for agent questions and user responses.
+#[derive(Clone)]
+pub struct UserInputChannel {
+    inner: Arc<Mutex<Option<UserInputRequest>>>,
+}
+
+impl Default for UserInputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UserInputChannel {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn clone_handle(&self) -> Self {
+        self.clone()
+    }
+
+    pub async fn deposit_and_await(
+        &self,
+        display: UserInputDisplay,
+    ) -> anyhow::Result<Vec<String>> {
+        let (tx, rx) = oneshot::channel();
+        let req = UserInputRequest {
+            display,
+            responder: tx,
+        };
+        {
+            let mut guard = self.inner.lock().unwrap();
+            *guard = Some(req);
+        }
+        rx.await
+            .map_err(|_| anyhow::anyhow!("User input channel closed — TUI quit?"))
+    }
+
+    pub fn take_pending(&self) -> Option<UserInputRequest> {
+        self.inner.lock().unwrap().take()
+    }
+
+    pub fn has_pending(&self) -> bool {
+        self.inner.lock().unwrap().is_some()
+    }
+}
+
 /// Events emitted by the pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PipelineEvent {
+    Transcript {
+        item: TranscriptItem,
+    },
     PhaseStarted {
         phase: Phase,
         session_id: String,

@@ -6,7 +6,9 @@ use crate::config::{ProviderRouting, ProviderTomlEntry};
 use crate::error::ProviderError;
 use crate::openai_compat::OpenAICompatProvider;
 use crate::resolve_secret;
-use crate::{LlmProvider, Message, StreamChunk};
+use crate::{
+    compat_session, LlmProvider, Message, ProviderCapabilities, ProviderSession, StreamChunk,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use koklo_events::{CompletionUsage, CostDisplay};
@@ -122,6 +124,13 @@ impl OpenRouterProvider {
 
 #[async_trait]
 impl LlmProvider for OpenRouterProvider {
+    async fn start_session(
+        self: Arc<Self>,
+        messages: Vec<Message>,
+    ) -> Result<Box<dyn ProviderSession>> {
+        Ok(compat_session(self, messages))
+    }
+
     async fn complete_stream(
         &self,
         messages: Vec<Message>,
@@ -147,6 +156,17 @@ impl LlmProvider for OpenRouterProvider {
 
     fn provider_name(&self) -> &str {
         "openrouter"
+    }
+
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            streaming_text: true,
+            usage_native: true,
+            tool_calls_native: false,
+            approvals_native: false,
+            user_input_native: false,
+            reasoning_visible: false,
+        }
     }
 
     fn model_name(&self) -> Option<&str> {

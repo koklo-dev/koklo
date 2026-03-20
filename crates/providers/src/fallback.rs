@@ -106,11 +106,8 @@ mod tests {
             _messages: Vec<Message>,
             on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
         ) -> Result<(String, CompletionUsage)> {
-            on_chunk(StreamChunk {
-                text: "ok".into(),
-                finished: true,
-                tool_event: None,
-            });
+            on_chunk(StreamChunk::text("ok"));
+            on_chunk(StreamChunk::finished());
             Ok(("ok".to_string(), CompletionUsage::default()))
         }
         fn provider_name(&self) -> &str {

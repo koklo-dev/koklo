@@ -1,10 +1,20 @@
 //! Agent execution runtime — loads system prompts and dispatches LLM calls.
 use anyhow::Result;
-use koklo_events::{CompletionUsage, EventBus, Phase, PipelineEvent};
-use koklo_providers::{LlmProvider, Message, ToolEvent};
+use async_trait::async_trait;
+use koklo_events::{
+    CompletionUsage, EventBus, GateDisplay, GateResponse, Phase, PipelineEvent, TranscriptItem,
+    TranscriptItemKind, TranscriptItemStatus, TranscriptSource, UserInputDisplay,
+    UserInputQuestion,
+};
+use koklo_providers::{
+    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
+    ProviderEvent, ProviderSessionEvent, UserInputPayload,
+};
+use serde_json::json;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use uuid::Uuid;
 
 static STREAM_STDOUT: AtomicBool = AtomicBool::new(true);
 
@@ -31,6 +41,8 @@ pub struct AgentRunner {
     config: AgentConfig,
     provider: Arc<dyn LlmProvider>,
     bus: EventBus,
+    approval_handler: Arc<dyn ApprovalHandler>,
+    user_input_handler: Arc<dyn UserInputHandler>,
 }
 
 pub struct AgentRunResult {
@@ -38,73 +50,743 @@ pub struct AgentRunResult {
     pub usage: CompletionUsage,
 }
 
+#[async_trait]
+pub trait UserInputHandler: Send + Sync {
+    async fn request_input(&self, display: UserInputDisplay) -> Result<Vec<String>>;
+}
+
+#[async_trait]
+pub trait ApprovalHandler: Send + Sync {
+    async fn request_approval(&self, display: GateDisplay) -> Result<GateResponse>;
+}
+
 impl AgentRunner {
-    pub fn new(config: AgentConfig, provider: Arc<dyn LlmProvider>, bus: EventBus) -> Self {
+    pub fn new(
+        config: AgentConfig,
+        provider: Arc<dyn LlmProvider>,
+        bus: EventBus,
+        approval_handler: Arc<dyn ApprovalHandler>,
+        user_input_handler: Arc<dyn UserInputHandler>,
+    ) -> Self {
         Self {
             config,
             provider,
             bus,
+            approval_handler,
+            user_input_handler,
         }
     }
 
     /// Run the agent with the given user prompt. Returns the full LLM response and token usage.
     pub async fn run(&self, session_id: &str, user_prompt: &str) -> Result<AgentRunResult> {
-        let system_prompt = build_system_prompt(&self.config)?;
+        let native_user_input = self.provider.capabilities().user_input_native;
+        let system_prompt = if native_user_input {
+            build_system_prompt(&self.config)?
+        } else {
+            with_user_input_protocol(build_system_prompt(&self.config)?)
+        };
 
-        let messages = vec![Message::system(system_prompt), Message::user(user_prompt)];
-
+        let mut messages = vec![Message::system(system_prompt), Message::user(user_prompt)];
         let bus = self.bus.clone();
         let phase = self.config.phase;
         let session_id_str = session_id.to_string();
+        let agent_name = self.config.name.clone();
+        let approval_handler = Arc::clone(&self.approval_handler);
+        let user_input_handler = Arc::clone(&self.user_input_handler);
 
         let mut result = String::new();
-        let (_, usage) = self
-            .provider
-            .complete_stream(messages, &mut |chunk| {
-                if !chunk.text.is_empty() {
-                    bus.send(PipelineEvent::AgentLog {
+        let mut final_usage = CompletionUsage::default();
+        let mut turn_count = 0usize;
+
+        loop {
+            turn_count += 1;
+            if turn_count > 8 {
+                anyhow::bail!("Too many user-input turns for {}", agent_name);
+            }
+
+            let mut turn_text = String::new();
+            let mut parser = (!native_user_input).then(SyntheticUserInputParser::default);
+            let mut session = Arc::clone(&self.provider)
+                .start_session(messages.clone())
+                .await?;
+            let usage = loop {
+                match session.next_event().await? {
+                    ProviderSessionEvent::Event(event) => {
+                        if let Some(interruption) = handle_provider_event(
+                            &bus,
+                            phase,
+                            &session_id_str,
+                            &agent_name,
+                            &mut result,
+                            &mut turn_text,
+                            parser.as_mut(),
+                            event,
+                        ) {
+                            match interruption {
+                                RuntimeInterruption::UserInput(display) => {
+                                    let answers =
+                                        user_input_handler.request_input(display.clone()).await?;
+                                    emit_user_input_response(
+                                        &bus,
+                                        &session_id_str,
+                                        phase,
+                                        &agent_name,
+                                        &display,
+                                        &answers,
+                                    );
+                                    session
+                                        .send_user_input(UserInputPayload {
+                                            request_id: Some(display.request_id),
+                                            answers,
+                                        })
+                                        .await?;
+                                }
+                                RuntimeInterruption::Approval(request) => {
+                                    let response = approval_handler
+                                        .request_approval(GateDisplay {
+                                            phase,
+                                            session_id: session_id_str.clone(),
+                                            description: request.description.clone(),
+                                            usage: None,
+                                            cost: None,
+                                            allow_edit: false,
+                                        })
+                                        .await?;
+                                    emit_approval_response(
+                                        &bus,
+                                        &session_id_str,
+                                        phase,
+                                        &agent_name,
+                                        &request,
+                                        &response,
+                                    );
+                                    session
+                                        .resolve_approval(ProviderApprovalPayload {
+                                            request_id: Some(request.request_id.clone()),
+                                            decision: map_gate_response(response),
+                                        })
+                                        .await?;
+                                }
+                            }
+                        }
+                    }
+                    ProviderSessionEvent::Finished { usage, .. } => break usage,
+                }
+            };
+
+            final_usage.prompt_tokens += usage.prompt_tokens;
+            final_usage.completion_tokens += usage.completion_tokens;
+
+            if let Some(parser) = parser.as_mut() {
+                let flushed = parser.finish();
+                if !flushed.is_empty() {
+                    emit_text_delta(
+                        &bus,
                         phase,
+                        &session_id_str,
+                        &agent_name,
+                        &mut result,
+                        &mut turn_text,
+                        None,
+                        &flushed,
+                    );
+                }
+                if let Some(request) = parser.take_request() {
+                    let display = UserInputDisplay {
+                        request_id: request.request_id.clone(),
                         session_id: session_id_str.clone(),
-                        message: chunk.text.clone(),
-                    });
-                    result.push_str(&chunk.text);
-                    if STREAM_STDOUT.load(Ordering::Relaxed) {
-                        print!("{}", chunk.text);
-                    }
+                        phase: Some(phase),
+                        agent_name: Some(agent_name.clone()),
+                        questions: request.questions.clone(),
+                    };
+                    emit_user_input_request(&bus, &session_id_str, phase, &agent_name, &display);
+                    let answers = user_input_handler.request_input(display.clone()).await?;
+                    emit_user_input_response(
+                        &bus,
+                        &session_id_str,
+                        phase,
+                        &agent_name,
+                        &display,
+                        &answers,
+                    );
+
+                    messages.push(Message::assistant(format_user_input_request_for_history(
+                        &display.questions,
+                    )));
+                    messages.push(Message::user(format_user_input_answers_for_history(
+                        &display.questions,
+                        &answers,
+                    )));
+                    continue;
                 }
-                match chunk.tool_event {
-                    Some(ToolEvent::Call {
-                        tool_name,
-                        input_summary,
-                    }) => {
-                        bus.send(PipelineEvent::ToolCall {
-                            phase,
-                            session_id: session_id_str.clone(),
-                            tool_name,
-                            input_summary,
-                        });
-                    }
-                    Some(ToolEvent::Result {
-                        tool_name,
-                        output_summary,
-                    }) => {
-                        bus.send(PipelineEvent::ToolResult {
-                            phase,
-                            session_id: session_id_str.clone(),
-                            tool_name,
-                            output_summary,
-                        });
-                    }
-                    None => {}
-                }
-            })
-            .await?;
+            }
+
+            bus.send(PipelineEvent::Transcript {
+                item: TranscriptItem::new(
+                    session_id_str.clone(),
+                    Some(phase),
+                    Some(agent_name.clone()),
+                    TranscriptSource::Agent,
+                    TranscriptItemKind::Message,
+                    TranscriptItemStatus::Completed,
+                    "message completed",
+                ),
+            });
+
+            break;
+        }
 
         Ok(AgentRunResult {
             output: result,
-            usage,
+            usage: final_usage,
         })
     }
+}
+
+fn emit_text_delta(
+    bus: &EventBus,
+    phase: Phase,
+    session_id: &str,
+    agent_name: &str,
+    result: &mut String,
+    turn_text: &mut String,
+    parser: Option<&mut SyntheticUserInputParser>,
+    text: &str,
+) {
+    let segments = if let Some(parser) = parser {
+        parser.push(text)
+    } else {
+        vec![TextSegment::Visible(text.to_string())]
+    };
+    for segment in segments {
+        let TextSegment::Visible(visible) = segment;
+        if visible.is_empty() {
+            continue;
+        }
+        bus.send(PipelineEvent::AgentLog {
+            phase,
+            session_id: session_id.to_string(),
+            message: visible.clone(),
+        });
+        bus.send(PipelineEvent::Transcript {
+            item: TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Agent,
+                TranscriptItemKind::MessageDelta,
+                TranscriptItemStatus::Streaming,
+                visible.clone(),
+            ),
+        });
+        result.push_str(&visible);
+        turn_text.push_str(&visible);
+        if STREAM_STDOUT.load(Ordering::Relaxed) {
+            print!("{}", visible);
+        }
+    }
+}
+
+fn handle_provider_event(
+    bus: &EventBus,
+    phase: Phase,
+    session_id: &str,
+    agent_name: &str,
+    result: &mut String,
+    turn_text: &mut String,
+    parser: Option<&mut SyntheticUserInputParser>,
+    event: ProviderEvent,
+) -> Option<RuntimeInterruption> {
+    match event {
+        ProviderEvent::MessageDelta { text } => {
+            emit_text_delta(
+                bus, phase, session_id, agent_name, result, turn_text, parser, &text,
+            );
+            None
+        }
+        ProviderEvent::MessageCompleted => None,
+        ProviderEvent::ToolCall {
+            item_id,
+            tool_name,
+            input_summary,
+        } => {
+            bus.send(PipelineEvent::ToolCall {
+                phase,
+                session_id: session_id.to_string(),
+                tool_name: tool_name.clone(),
+                input_summary: input_summary.clone(),
+            });
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Tool,
+                TranscriptItemKind::ToolCall,
+                TranscriptItemStatus::Pending,
+                format!("{} {}", tool_name, input_summary),
+            )
+            .with_payload(json!({
+                "tool_name": tool_name,
+                "input_summary": input_summary,
+            }));
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+        ProviderEvent::ToolResult {
+            item_id,
+            tool_name,
+            output_summary,
+            success,
+        } => {
+            bus.send(PipelineEvent::ToolResult {
+                phase,
+                session_id: session_id.to_string(),
+                tool_name: tool_name.clone(),
+                output_summary: output_summary.clone(),
+            });
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Tool,
+                TranscriptItemKind::ToolResult,
+                if success == Some(false) {
+                    TranscriptItemStatus::Failed
+                } else {
+                    TranscriptItemStatus::Completed
+                },
+                format!("{} {}", tool_name, output_summary),
+            )
+            .with_payload(json!({
+                "tool_name": tool_name,
+                "output_summary": output_summary,
+                "success": success,
+            }));
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+        ProviderEvent::Reasoning { item_id, text } => {
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Agent,
+                TranscriptItemKind::Reasoning,
+                TranscriptItemStatus::Info,
+                text.clone(),
+            );
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+        ProviderEvent::Plan { item_id, text } => {
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Agent,
+                TranscriptItemKind::Plan,
+                TranscriptItemStatus::Info,
+                text.clone(),
+            );
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+        ProviderEvent::Command {
+            item_id,
+            command,
+            status,
+            exit_code,
+            output,
+        } => {
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Tool,
+                TranscriptItemKind::Command,
+                if status == "failed" {
+                    TranscriptItemStatus::Failed
+                } else if status == "completed" {
+                    TranscriptItemStatus::Completed
+                } else {
+                    TranscriptItemStatus::Streaming
+                },
+                command.clone(),
+            )
+            .with_payload(json!({
+                "status": status,
+                "exit_code": exit_code,
+                "output": output,
+            }));
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+        ProviderEvent::FileChange {
+            item_id,
+            summary,
+            files,
+            status,
+        } => {
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Tool,
+                TranscriptItemKind::FileChange,
+                if status == "failed" {
+                    TranscriptItemStatus::Failed
+                } else {
+                    TranscriptItemStatus::Completed
+                },
+                summary.clone(),
+            )
+            .with_payload(json!({
+                "files": files,
+                "status": status,
+            }));
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+        ProviderEvent::UserInputRequest { item_id, questions } => {
+            let request_id = item_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+            let display = UserInputDisplay {
+                request_id,
+                session_id: session_id.to_string(),
+                phase: Some(phase),
+                agent_name: Some(agent_name.to_string()),
+                questions,
+            };
+            emit_user_input_request(bus, session_id, phase, agent_name, &display);
+            Some(RuntimeInterruption::UserInput(display))
+        }
+        ProviderEvent::ApprovalRequest {
+            item_id,
+            request_id,
+            kind,
+            description,
+            details,
+        } => {
+            let request = RuntimeApprovalRequest {
+                request_id,
+                item_id,
+                kind,
+                description,
+                details,
+            };
+            emit_approval_request(bus, session_id, phase, agent_name, &request);
+            Some(RuntimeInterruption::Approval(request))
+        }
+        ProviderEvent::Metadata {
+            item_id,
+            kind,
+            value,
+        } => {
+            let item = TranscriptItem::new(
+                session_id.to_string(),
+                Some(phase),
+                Some(agent_name.to_string()),
+                TranscriptSource::Provider,
+                TranscriptItemKind::Message,
+                TranscriptItemStatus::Info,
+                format!("provider metadata: {}", kind),
+            )
+            .with_payload(json!({
+                "kind": kind,
+                "value": value,
+            }));
+            bus.send(PipelineEvent::Transcript {
+                item: match item_id {
+                    Some(id) => item.with_item_key(id),
+                    None => item,
+                },
+            });
+            None
+        }
+    }
+}
+
+enum RuntimeInterruption {
+    UserInput(UserInputDisplay),
+    Approval(RuntimeApprovalRequest),
+}
+
+struct RuntimeApprovalRequest {
+    request_id: String,
+    item_id: Option<String>,
+    kind: ProviderApprovalKind,
+    description: String,
+    details: serde_json::Value,
+}
+
+fn emit_user_input_request(
+    bus: &EventBus,
+    session_id: &str,
+    phase: Phase,
+    agent_name: &str,
+    display: &UserInputDisplay,
+) {
+    let item = TranscriptItem::new(
+        session_id.to_string(),
+        Some(phase),
+        Some(agent_name.to_string()),
+        TranscriptSource::System,
+        TranscriptItemKind::UserInputRequest,
+        TranscriptItemStatus::Pending,
+        format!("{} question(s) for the user", display.questions.len()),
+    )
+    .with_item_key(display.request_id.clone())
+    .with_payload(json!({ "questions": display.questions }));
+    bus.send(PipelineEvent::Transcript { item });
+}
+
+fn emit_approval_request(
+    bus: &EventBus,
+    session_id: &str,
+    phase: Phase,
+    agent_name: &str,
+    request: &RuntimeApprovalRequest,
+) {
+    let item = TranscriptItem::new(
+        session_id.to_string(),
+        Some(phase),
+        Some(agent_name.to_string()),
+        TranscriptSource::System,
+        TranscriptItemKind::ApprovalRequest,
+        TranscriptItemStatus::Pending,
+        request.description.clone(),
+    )
+    .with_item_key(request.request_id.clone())
+    .with_payload(json!({
+        "item_id": request.item_id,
+        "kind": format!("{:?}", request.kind),
+        "details": request.details,
+    }));
+    bus.send(PipelineEvent::Transcript { item });
+}
+
+fn emit_user_input_response(
+    bus: &EventBus,
+    session_id: &str,
+    phase: Phase,
+    agent_name: &str,
+    display: &UserInputDisplay,
+    answers: &[String],
+) {
+    let answers_payload = display
+        .questions
+        .iter()
+        .zip(answers.iter())
+        .map(|(question, answer)| {
+            json!({
+                "id": question.id,
+                "header": question.header,
+                "question": question.question,
+                "answer": answer,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let item = TranscriptItem::new(
+        session_id.to_string(),
+        Some(phase),
+        Some(agent_name.to_string()),
+        TranscriptSource::User,
+        TranscriptItemKind::UserInputResponse,
+        TranscriptItemStatus::Resolved,
+        format!("answered {} question(s)", answers_payload.len()),
+    )
+    .with_item_key(display.request_id.clone())
+    .with_payload(json!({ "answers": answers_payload }));
+    bus.send(PipelineEvent::Transcript { item });
+}
+
+fn emit_approval_response(
+    bus: &EventBus,
+    session_id: &str,
+    phase: Phase,
+    agent_name: &str,
+    request: &RuntimeApprovalRequest,
+    response: &GateResponse,
+) {
+    let (action, path) = match response {
+        GateResponse::Approve => ("approve", None),
+        GateResponse::Reject => ("reject", None),
+        GateResponse::Edit(path) => ("edit", Some(path.display().to_string())),
+    };
+    let item = TranscriptItem::new(
+        session_id.to_string(),
+        Some(phase),
+        Some(agent_name.to_string()),
+        TranscriptSource::User,
+        TranscriptItemKind::ApprovalDecision,
+        TranscriptItemStatus::Resolved,
+        format!("{} approval for {}", action, request.description),
+    )
+    .with_item_key(request.request_id.clone())
+    .with_payload(json!({
+        "action": action,
+        "path": path,
+        "item_id": request.item_id,
+        "kind": format!("{:?}", request.kind),
+    }));
+    bus.send(PipelineEvent::Transcript { item });
+}
+
+fn map_gate_response(response: GateResponse) -> ProviderApprovalDecision {
+    match response {
+        GateResponse::Approve => ProviderApprovalDecision::Approve,
+        GateResponse::Reject => ProviderApprovalDecision::Reject,
+        GateResponse::Edit(path) => ProviderApprovalDecision::Edit {
+            path: Some(path.display().to_string()),
+        },
+    }
+}
+
+fn with_user_input_protocol(system_prompt: String) -> String {
+    format!(
+        "{system_prompt}\n\n---\n\n\
+If you need clarification or a decision from the user before you can continue, \
+respond with ONLY one XML block in this exact form and no surrounding prose:\n\
+<koklo:user-input>{{\"questions\":[{{\"id\":\"clarify\",\"header\":\"Clarification\",\"question\":\"Your question here\",\"options\":null,\"is_secret\":false}}]}}</koklo:user-input>\n\
+You may include 1 to 3 questions. Once Koklo provides the answers, continue the task normally."
+    )
+}
+
+fn format_user_input_request_for_history(questions: &[UserInputQuestion]) -> String {
+    let formatted = questions
+        .iter()
+        .map(|question| format!("- {}: {}", question.header, question.question))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("Requesting user input:\n{}", formatted)
+}
+
+fn format_user_input_answers_for_history(
+    questions: &[UserInputQuestion],
+    answers: &[String],
+) -> String {
+    questions
+        .iter()
+        .zip(answers.iter())
+        .map(|(question, answer)| format!("{}: {}", question.header, answer))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const USER_INPUT_OPEN_TAG: &str = "<koklo:user-input>";
+const USER_INPUT_CLOSE_TAG: &str = "</koklo:user-input>";
+
+#[derive(Debug)]
+enum TextSegment {
+    Visible(String),
+}
+
+#[derive(Debug, Default)]
+struct SyntheticUserInputParser {
+    buffer: String,
+    request: Option<SyntheticUserInputRequest>,
+}
+
+#[derive(Debug, Clone)]
+struct SyntheticUserInputRequest {
+    request_id: String,
+    questions: Vec<UserInputQuestion>,
+}
+
+impl SyntheticUserInputParser {
+    fn push(&mut self, chunk: &str) -> Vec<TextSegment> {
+        self.buffer.push_str(chunk);
+        let mut visible = Vec::new();
+
+        loop {
+            if let Some(start) = self.buffer.find(USER_INPUT_OPEN_TAG) {
+                if start > 0 {
+                    visible.push(TextSegment::Visible(self.buffer[..start].to_string()));
+                    self.buffer.drain(..start);
+                }
+
+                if let Some(end) = self.buffer.find(USER_INPUT_CLOSE_TAG) {
+                    let json_start = USER_INPUT_OPEN_TAG.len();
+                    let json_text = self.buffer[json_start..end].trim().to_string();
+                    self.buffer.drain(..end + USER_INPUT_CLOSE_TAG.len());
+                    if let Ok(request) = parse_synthetic_user_input_request(&json_text) {
+                        self.request = Some(request);
+                    } else {
+                        visible.push(TextSegment::Visible(format!(
+                            "{}{}{}",
+                            USER_INPUT_OPEN_TAG, json_text, USER_INPUT_CLOSE_TAG
+                        )));
+                    }
+                    continue;
+                }
+                break;
+            }
+
+            let keep = USER_INPUT_OPEN_TAG.len().saturating_sub(1);
+            let flush_len = self.buffer.len().saturating_sub(keep);
+            if flush_len > 0 {
+                visible.push(TextSegment::Visible(self.buffer[..flush_len].to_string()));
+                self.buffer.drain(..flush_len);
+            }
+            break;
+        }
+
+        visible
+    }
+
+    fn finish(&mut self) -> String {
+        std::mem::take(&mut self.buffer)
+    }
+
+    fn take_request(&mut self) -> Option<SyntheticUserInputRequest> {
+        self.request.take()
+    }
+}
+
+fn parse_synthetic_user_input_request(json_text: &str) -> Result<SyntheticUserInputRequest> {
+    #[derive(serde::Deserialize)]
+    struct Payload {
+        questions: Vec<UserInputQuestion>,
+    }
+
+    let payload: Payload = serde_json::from_str(json_text)?;
+    if payload.questions.is_empty() {
+        anyhow::bail!("empty questions");
+    }
+    Ok(SyntheticUserInputRequest {
+        request_id: Uuid::new_v4().to_string(),
+        questions: payload.questions,
+    })
 }
 
 /// Build the layered system prompt for an agent.
@@ -227,6 +909,8 @@ fn maybe_read(path: PathBuf, parts: &mut Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use koklo_providers::StreamChunk;
+    use std::sync::Mutex;
 
     fn test_config(slug: &str) -> AgentConfig {
         AgentConfig {
@@ -325,5 +1009,107 @@ mod tests {
 
         let prompt = build_system_prompt(&config).unwrap();
         assert!(prompt.contains("global pm role"));
+    }
+
+    #[test]
+    fn synthetic_parser_extracts_request_block() {
+        let mut parser = SyntheticUserInputParser::default();
+        let out = parser.push("before <koklo:user-input>{\"questions\":[{\"id\":\"a\",\"header\":\"Need\",\"question\":\"Which path?\",\"options\":null,\"is_secret\":false}]}</koklo:user-input> after");
+        let visible = out
+            .into_iter()
+            .map(|segment| match segment {
+                TextSegment::Visible(text) => text,
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        assert_eq!(visible, "before ");
+        let request = parser.take_request().unwrap();
+        assert_eq!(request.questions.len(), 1);
+        assert_eq!(parser.finish(), " after");
+    }
+
+    struct ScriptedProvider {
+        outputs: Mutex<Vec<String>>,
+    }
+
+    #[async_trait]
+    impl LlmProvider for ScriptedProvider {
+        async fn complete_stream(
+            &self,
+            _messages: Vec<Message>,
+            on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
+        ) -> Result<(String, CompletionUsage)> {
+            let next = self.outputs.lock().unwrap().remove(0);
+            on_chunk(StreamChunk::text(next.clone()));
+            on_chunk(StreamChunk::finished());
+            Ok((
+                next,
+                CompletionUsage {
+                    prompt_tokens: 10,
+                    completion_tokens: 5,
+                },
+            ))
+        }
+
+        fn provider_name(&self) -> &str {
+            "scripted"
+        }
+    }
+
+    struct RecordingInputHandler {
+        answers: Vec<String>,
+        seen_questions: Mutex<Vec<String>>,
+    }
+
+    #[async_trait]
+    impl UserInputHandler for RecordingInputHandler {
+        async fn request_input(&self, display: UserInputDisplay) -> Result<Vec<String>> {
+            self.seen_questions.lock().unwrap().extend(
+                display
+                    .questions
+                    .iter()
+                    .map(|question| question.question.clone()),
+            );
+            Ok(self.answers.clone())
+        }
+    }
+
+    struct RecordingApprovalHandler;
+
+    #[async_trait]
+    impl ApprovalHandler for RecordingApprovalHandler {
+        async fn request_approval(&self, _display: GateDisplay) -> Result<GateResponse> {
+            Ok(GateResponse::Approve)
+        }
+    }
+
+    #[tokio::test]
+    async fn agent_runner_replays_after_user_input_request() {
+        let provider = Arc::new(ScriptedProvider {
+            outputs: Mutex::new(vec![
+                "<koklo:user-input>{\"questions\":[{\"id\":\"clarify\",\"header\":\"Clarification\",\"question\":\"Which module?\",\"options\":null,\"is_secret\":false}]}</koklo:user-input>".to_string(),
+                "Working in billing module.\n".to_string(),
+            ]),
+        });
+        let handler = Arc::new(RecordingInputHandler {
+            answers: vec!["billing".to_string()],
+            seen_questions: Mutex::new(Vec::new()),
+        });
+        let runner = AgentRunner::new(
+            test_config("pm"),
+            provider,
+            EventBus::new(32),
+            Arc::new(RecordingApprovalHandler),
+            handler,
+        );
+
+        let result = runner
+            .run("session-1", "Need implementation")
+            .await
+            .unwrap();
+
+        assert_eq!(result.output, "Working in billing module.\n");
+        assert_eq!(result.usage.prompt_tokens, 20);
+        assert_eq!(result.usage.completion_tokens, 10);
     }
 }
