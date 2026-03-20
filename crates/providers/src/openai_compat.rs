@@ -167,11 +167,7 @@ impl LlmProvider for OpenAICompatProvider {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(t) = json["choices"][0]["delta"]["content"].as_str() {
                             full_text.push_str(t);
-                            on_chunk(StreamChunk {
-                                text: t.to_string(),
-                                finished: false,
-                                tool_event: None,
-                            });
+                            on_chunk(StreamChunk::text(t));
                         }
                         // Parse usage from final chunk (when stream_options.include_usage=true)
                         if let Some(u) = json.get("usage") {
@@ -190,11 +186,7 @@ impl LlmProvider for OpenAICompatProvider {
         if full_text.trim().is_empty() {
             return Err(ProviderError::EmptyResponse.into());
         }
-        on_chunk(StreamChunk {
-            text: String::new(),
-            finished: true,
-            tool_event: None,
-        });
+        on_chunk(StreamChunk::finished());
         Ok((full_text, usage))
     }
 
