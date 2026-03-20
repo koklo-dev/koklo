@@ -8,7 +8,7 @@ use koklo_events::{
 };
 use koklo_providers::{
     LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
-    ProviderEvent, ProviderSessionEvent, UserInputPayload,
+    ProviderEvent, ProviderInteractionMode, ProviderSessionEvent, UserInputPayload,
 };
 use serde_json::json;
 use std::path::PathBuf;
@@ -79,7 +79,8 @@ impl AgentRunner {
 
     /// Run the agent with the given user prompt. Returns the full LLM response and token usage.
     pub async fn run(&self, session_id: &str, user_prompt: &str) -> Result<AgentRunResult> {
-        let native_user_input = self.provider.capabilities().user_input_native;
+        let provider_capabilities = self.provider.capabilities();
+        let native_user_input = provider_capabilities.user_input_native;
         let system_prompt = if native_user_input {
             build_system_prompt(&self.config)?
         } else {
@@ -117,6 +118,7 @@ impl AgentRunner {
                             phase,
                             &session_id_str,
                             &agent_name,
+                            provider_capabilities.interaction_mode,
                             &mut result,
                             &mut turn_text,
                             parser.as_mut(),
@@ -199,7 +201,14 @@ impl AgentRunner {
                         agent_name: Some(agent_name.clone()),
                         questions: request.questions.clone(),
                     };
-                    emit_user_input_request(&bus, &session_id_str, phase, &agent_name, &display);
+                    emit_user_input_request(
+                        &bus,
+                        &session_id_str,
+                        phase,
+                        &agent_name,
+                        &display,
+                        "synthetic",
+                    );
                     let answers = user_input_handler.request_input(display.clone()).await?;
                     emit_user_input_response(
                         &bus,
@@ -292,6 +301,7 @@ fn handle_provider_event(
     phase: Phase,
     session_id: &str,
     agent_name: &str,
+    interaction_mode: ProviderInteractionMode,
     result: &mut String,
     turn_text: &mut String,
     parser: Option<&mut SyntheticUserInputParser>,
@@ -328,6 +338,7 @@ fn handle_provider_event(
             .with_payload(json!({
                 "tool_name": tool_name,
                 "input_summary": input_summary,
+                "interaction_mode": interaction_mode_label(interaction_mode),
             }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
@@ -366,6 +377,7 @@ fn handle_provider_event(
                 "tool_name": tool_name,
                 "output_summary": output_summary,
                 "success": success,
+                "interaction_mode": interaction_mode_label(interaction_mode),
             }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
@@ -384,7 +396,10 @@ fn handle_provider_event(
                 TranscriptItemKind::Reasoning,
                 TranscriptItemStatus::Info,
                 text.clone(),
-            );
+            )
+            .with_payload(json!({
+                "interaction_mode": interaction_mode_label(interaction_mode),
+            }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -402,7 +417,10 @@ fn handle_provider_event(
                 TranscriptItemKind::Plan,
                 TranscriptItemStatus::Info,
                 text.clone(),
-            );
+            )
+            .with_payload(json!({
+                "interaction_mode": interaction_mode_label(interaction_mode),
+            }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -437,6 +455,7 @@ fn handle_provider_event(
                 "status": status,
                 "exit_code": exit_code,
                 "output": output,
+                "interaction_mode": interaction_mode_label(interaction_mode),
             }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
@@ -468,6 +487,7 @@ fn handle_provider_event(
             .with_payload(json!({
                 "files": files,
                 "status": status,
+                "interaction_mode": interaction_mode_label(interaction_mode),
             }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
@@ -486,7 +506,14 @@ fn handle_provider_event(
                 agent_name: Some(agent_name.to_string()),
                 questions,
             };
-            emit_user_input_request(bus, session_id, phase, agent_name, &display);
+            emit_user_input_request(
+                bus,
+                session_id,
+                phase,
+                agent_name,
+                &display,
+                interaction_mode_label(interaction_mode),
+            );
             Some(RuntimeInterruption::UserInput(display))
         }
         ProviderEvent::ApprovalRequest {
@@ -503,7 +530,14 @@ fn handle_provider_event(
                 description,
                 details,
             };
-            emit_approval_request(bus, session_id, phase, agent_name, &request);
+            emit_approval_request(
+                bus,
+                session_id,
+                phase,
+                agent_name,
+                &request,
+                interaction_mode_label(interaction_mode),
+            );
             Some(RuntimeInterruption::Approval(request))
         }
         ProviderEvent::Metadata {
@@ -523,6 +557,7 @@ fn handle_provider_event(
             .with_payload(json!({
                 "kind": kind,
                 "value": value,
+                "interaction_mode": interaction_mode_label(interaction_mode),
             }));
             bus.send(PipelineEvent::Transcript {
                 item: match item_id {
@@ -554,6 +589,7 @@ fn emit_user_input_request(
     phase: Phase,
     agent_name: &str,
     display: &UserInputDisplay,
+    interaction_mode: &str,
 ) {
     let item = TranscriptItem::new(
         session_id.to_string(),
@@ -565,7 +601,10 @@ fn emit_user_input_request(
         format!("{} question(s) for the user", display.questions.len()),
     )
     .with_item_key(display.request_id.clone())
-    .with_payload(json!({ "questions": display.questions }));
+    .with_payload(json!({
+        "questions": display.questions,
+        "interaction_mode": interaction_mode,
+    }));
     bus.send(PipelineEvent::Transcript { item });
 }
 
@@ -575,6 +614,7 @@ fn emit_approval_request(
     phase: Phase,
     agent_name: &str,
     request: &RuntimeApprovalRequest,
+    interaction_mode: &str,
 ) {
     let item = TranscriptItem::new(
         session_id.to_string(),
@@ -590,6 +630,7 @@ fn emit_approval_request(
         "item_id": request.item_id,
         "kind": format!("{:?}", request.kind),
         "details": request.details,
+        "interaction_mode": interaction_mode,
     }));
     bus.send(PipelineEvent::Transcript { item });
 }
@@ -669,6 +710,14 @@ fn map_gate_response(response: GateResponse) -> ProviderApprovalDecision {
         GateResponse::Edit(path) => ProviderApprovalDecision::Edit {
             path: Some(path.display().to_string()),
         },
+    }
+}
+
+fn interaction_mode_label(mode: ProviderInteractionMode) -> &'static str {
+    match mode {
+        ProviderInteractionMode::Native => "native",
+        ProviderInteractionMode::Normalized => "normalized",
+        ProviderInteractionMode::Synthetic => "synthetic",
     }
 }
 

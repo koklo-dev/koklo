@@ -1,25 +1,34 @@
 //! Claude Code CLI provider.
 //!
-//! Uses `claude --print --output-format stream-json --dangerously-skip-permissions`
-//! to get structured NDJSON with tool events (ToolCall / ToolResult).
+//! Uses `claude --print --output-format stream-json` to get structured NDJSON
+//! with tool events, and optionally bridges native permission prompts back into
+//! the Koklo runtime via `--permission-prompt-tool`.
 
 use super::{check_claude_session, flatten_messages_to_prompt, strip_ansi, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    compat_session, LlmProvider, Message, ProviderCapabilities, ProviderEvent, ProviderSession,
-    ProviderSessionEvent, StreamChunk, UserInputPayload,
+    compat_session, LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
+    ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderInteractionMode,
+    ProviderSession, ProviderSessionEvent, StreamChunk, UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use koklo_events::{CompletionUsage, CostDisplay, UserInputQuestion};
 use koklo_shell::Sandbox;
-use std::collections::HashMap;
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
+use std::env;
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+use tempfile::TempDir;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin};
 use tokio::sync::{mpsc, Mutex};
+use tokio::time::{sleep, Duration};
+
+const CLAUDE_PERMISSION_TOOL_NAME: &str = "koklo_permission_prompt";
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
 
@@ -63,8 +72,9 @@ fn claude_cost_display(usage: &CompletionUsage) -> Option<CostDisplay> {
 pub struct ClaudeCodeCliProvider {
     #[allow(dead_code)]
     mode: CliMode,
-    working_dir: Option<std::path::PathBuf>,
+    working_dir: Option<PathBuf>,
     sandbox: Option<Arc<dyn Sandbox>>,
+    supports_permission_prompt_tool: bool,
 }
 
 impl ClaudeCodeCliProvider {
@@ -74,20 +84,22 @@ impl ClaudeCodeCliProvider {
             mode: CliMode::detect_from_env(),
             working_dir: None,
             sandbox: None,
+            supports_permission_prompt_tool: detect_permission_prompt_tool_support(),
         })
     }
 
-    pub fn with_working_dir(working_dir: std::path::PathBuf) -> Result<Self, ProviderError> {
+    pub fn with_working_dir(working_dir: PathBuf) -> Result<Self, ProviderError> {
         Self::validate_install()?;
         Ok(Self {
             mode: CliMode::detect_from_env(),
             working_dir: Some(working_dir),
             sandbox: None,
+            supports_permission_prompt_tool: detect_permission_prompt_tool_support(),
         })
     }
 
     pub fn with_context(
-        working_dir: std::path::PathBuf,
+        working_dir: PathBuf,
         sandbox: Arc<dyn Sandbox>,
     ) -> Result<Self, ProviderError> {
         Self::validate_install()?;
@@ -95,6 +107,7 @@ impl ClaudeCodeCliProvider {
             mode: CliMode::detect_from_env(),
             working_dir: Some(working_dir),
             sandbox: Some(sandbox),
+            supports_permission_prompt_tool: detect_permission_prompt_tool_support(),
         })
     }
 
@@ -104,6 +117,34 @@ impl ClaudeCodeCliProvider {
             install_hint: "Install from: https://claude.ai/download or `npm install -g @anthropic-ai/claude-code`".to_string(),
         })?;
         Ok(())
+    }
+
+    fn build_stream_json_args(permission_bridge: Option<&ClaudePermissionBridge>) -> Vec<String> {
+        let mut args = vec![
+            "--print".to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
+            "--input-format".to_string(),
+            "stream-json".to_string(),
+            "--replay-user-messages".to_string(),
+            "--brief".to_string(),
+        ];
+
+        if let Some(bridge) = permission_bridge {
+            args.push("--strict-mcp-config".to_string());
+            args.push("--mcp-config".to_string());
+            args.push(bridge.mcp_config_json.clone());
+            args.push("--permission-prompt-tool".to_string());
+            args.push(CLAUDE_PERMISSION_TOOL_NAME.to_string());
+        } else {
+            args.push("--dangerously-skip-permissions".to_string());
+        }
+
+        args
+    }
+
+    fn supports_native_approvals(&self) -> bool {
+        self.sandbox.is_none() && self.supports_permission_prompt_tool
     }
 
     // ── Layer A: stream-json subprocess ──────────────────────────────────────
@@ -224,26 +265,18 @@ impl ClaudeCodeCliProvider {
         Ok((full_text, usage))
     }
 
-    fn build_stream_json_args() -> Vec<String> {
-        vec![
-            "--print".to_string(),
-            "--output-format".to_string(),
-            "stream-json".to_string(),
-            "--input-format".to_string(),
-            "stream-json".to_string(),
-            "--replay-user-messages".to_string(),
-            "--brief".to_string(),
-            "--dangerously-skip-permissions".to_string(),
-        ]
-    }
-
     async fn spawn_stream_json_session(
         &self,
         messages: Vec<Message>,
     ) -> Result<Box<dyn ProviderSession>> {
+        let permission_bridge = if self.supports_native_approvals() {
+            Some(ClaudePermissionBridge::new()?)
+        } else {
+            None
+        };
         let mut command = tokio::process::Command::new("claude");
         command
-            .args(Self::build_stream_json_args())
+            .args(Self::build_stream_json_args(permission_bridge.as_ref()))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -264,6 +297,17 @@ impl ClaudeCodeCliProvider {
         });
 
         let (sender, receiver) = mpsc::unbounded_channel::<Result<ProviderSessionEvent>>();
+        let pending_approvals = Arc::new(Mutex::new(HashSet::<String>::new()));
+        let permission_tool_name = permission_bridge
+            .as_ref()
+            .map(|bridge| bridge.tool_name.clone());
+        if let Some(bridge) = permission_bridge.as_ref() {
+            tokio::spawn(run_claude_permission_bridge_poller(
+                bridge.requests_dir(),
+                Arc::clone(&pending_approvals),
+                sender.clone(),
+            ));
+        }
         tokio::spawn(async move {
             let mut tool_name_registry: HashMap<String, String> = HashMap::new();
             let mut lines = BufReader::new(stdout).lines();
@@ -291,6 +335,9 @@ impl ClaudeCodeCliProvider {
                                     input_summary,
                                     input,
                                 } => {
+                                    if permission_tool_name.as_deref() == Some(name.as_str()) {
+                                        continue;
+                                    }
                                     if let Some(questions) =
                                         parse_claude_user_input_questions(&name, &input)
                                     {
@@ -313,6 +360,9 @@ impl ClaudeCodeCliProvider {
                                     }
                                 }
                                 StreamJsonEvent::ToolResult { tool_name, summary } => {
+                                    if permission_tool_name.as_deref() == Some(tool_name.as_str()) {
+                                        continue;
+                                    }
                                     let _ = sender.send(Ok(ProviderSessionEvent::Event(
                                         ProviderEvent::ToolResult {
                                             item_id: None,
@@ -366,6 +416,8 @@ impl ClaudeCodeCliProvider {
             stdin: Mutex::new(stdin),
             child,
             receiver,
+            pending_approvals,
+            permission_bridge,
         };
         session
             .send_user_message(flatten_messages_to_prompt(&messages))
@@ -374,10 +426,144 @@ impl ClaudeCodeCliProvider {
     }
 }
 
+struct ClaudePermissionBridge {
+    tempdir: TempDir,
+    tool_name: String,
+    mcp_config_json: String,
+}
+
+impl ClaudePermissionBridge {
+    fn new() -> Result<Self> {
+        let tempdir = tempfile::tempdir()?;
+        std::fs::create_dir_all(tempdir.path().join("requests"))?;
+        std::fs::create_dir_all(tempdir.path().join("responses"))?;
+
+        let command = env::current_exe()
+            .ok()
+            .and_then(|path| path.into_os_string().into_string().ok())
+            .unwrap_or_else(|| "koklo".to_string());
+        let bridge_dir = tempdir.path().display().to_string();
+        let mcp_config_json = serde_json::json!({
+            "mcpServers": {
+                "koklo-permission-bridge": {
+                    "command": command,
+                    "args": [
+                        "internal",
+                        "claude-permission-bridge",
+                        "--bridge-dir",
+                        bridge_dir
+                    ],
+                    "env": {}
+                }
+            }
+        })
+        .to_string();
+
+        Ok(Self {
+            tempdir,
+            tool_name: CLAUDE_PERMISSION_TOOL_NAME.to_string(),
+            mcp_config_json,
+        })
+    }
+
+    fn requests_dir(&self) -> PathBuf {
+        self.tempdir.path().join("requests")
+    }
+
+    fn responses_dir(&self) -> PathBuf {
+        self.tempdir.path().join("responses")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeApprovalRequestFile {
+    request_id: String,
+    kind: String,
+    description: String,
+    details: serde_json::Value,
+}
+
+async fn run_claude_permission_bridge_poller(
+    requests_dir: PathBuf,
+    pending_approvals: Arc<Mutex<HashSet<String>>>,
+    sender: mpsc::UnboundedSender<Result<ProviderSessionEvent>>,
+) {
+    let mut seen = HashSet::new();
+    loop {
+        let Ok(entries) = std::fs::read_dir(&requests_dir) else {
+            break;
+        };
+
+        let mut paths = entries
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+            .collect::<Vec<_>>();
+        paths.sort();
+
+        for path in paths {
+            if !seen.insert(path.clone()) {
+                continue;
+            }
+
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(request) = serde_json::from_slice::<ClaudeApprovalRequestFile>(&bytes) else {
+                continue;
+            };
+            pending_approvals
+                .lock()
+                .await
+                .insert(request.request_id.clone());
+            let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                ProviderEvent::ApprovalRequest {
+                    item_id: None,
+                    request_id: request.request_id,
+                    kind: parse_claude_approval_kind(&request.kind),
+                    description: request.description,
+                    details: request.details,
+                },
+            )));
+        }
+
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+fn parse_claude_approval_kind(kind: &str) -> ProviderApprovalKind {
+    match kind {
+        "command_execution" => ProviderApprovalKind::CommandExecution,
+        "file_change" => ProviderApprovalKind::FileChange,
+        _ => ProviderApprovalKind::Permissions,
+    }
+}
+
+fn detect_permission_prompt_tool_support() -> bool {
+    let Ok(output) = std::process::Command::new("claude")
+        .args([
+            "--permission-prompt-tool",
+            CLAUDE_PERMISSION_TOOL_NAME,
+            "--help",
+        ])
+        .output()
+    else {
+        return false;
+    };
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    output.status.success()
+        && !stderr.contains("unknown option")
+        && !stderr.contains("Unknown option")
+        && !stdout.contains("Unknown option")
+}
+
 struct ClaudeStreamJsonSession {
     stdin: Mutex<ChildStdin>,
     child: Arc<Mutex<Child>>,
     receiver: mpsc::UnboundedReceiver<Result<ProviderSessionEvent>>,
+    pending_approvals: Arc<Mutex<HashSet<String>>>,
+    permission_bridge: Option<ClaudePermissionBridge>,
 }
 
 impl ClaudeStreamJsonSession {
@@ -419,6 +605,33 @@ impl ProviderSession for ClaudeStreamJsonSession {
     async fn send_user_input(&mut self, input: UserInputPayload) -> Result<()> {
         let message = input.answers.join("\n");
         self.send_user_message(message).await
+    }
+
+    async fn resolve_approval(&mut self, approval: ProviderApprovalPayload) -> Result<()> {
+        let Some(request_id) = approval.request_id else {
+            anyhow::bail!("missing Claude approval request id")
+        };
+        let Some(bridge) = self.permission_bridge.as_ref() else {
+            anyhow::bail!("Claude session does not have a permission bridge")
+        };
+
+        let mut pending = self.pending_approvals.lock().await;
+        if !pending.remove(&request_id) {
+            anyhow::bail!("unknown Claude approval request id: {}", request_id);
+        }
+        drop(pending);
+
+        let decision = match approval.decision {
+            ProviderApprovalDecision::Approve => "approve",
+            ProviderApprovalDecision::Reject => "reject",
+            ProviderApprovalDecision::Edit { .. } => "reject",
+        };
+        let response_path = bridge.responses_dir().join(format!("{request_id}.json"));
+        std::fs::write(
+            response_path,
+            serde_json::to_vec_pretty(&serde_json::json!({ "decision": decision }))?,
+        )?;
+        Ok(())
     }
 
     async fn cancel(&mut self) -> Result<()> {
@@ -498,9 +711,14 @@ impl LlmProvider for ClaudeCodeCliProvider {
             streaming_text: true,
             usage_native: true,
             tool_calls_native: true,
-            approvals_native: false,
+            approvals_native: self.supports_native_approvals(),
             user_input_native: true,
             reasoning_visible: false,
+            interaction_mode: if self.supports_native_approvals() {
+                ProviderInteractionMode::Native
+            } else {
+                ProviderInteractionMode::Normalized
+            },
         }
     }
 
