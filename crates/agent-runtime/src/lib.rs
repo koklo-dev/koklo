@@ -909,7 +909,10 @@ fn maybe_read(path: PathBuf, parts: &mut Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use koklo_providers::StreamChunk;
+    use koklo_providers::{
+        ProviderApprovalKind, ProviderApprovalPayload, ProviderEvent, ProviderSession,
+        ProviderSessionEvent, StreamChunk,
+    };
     use std::sync::Mutex;
 
     fn test_config(slug: &str) -> AgentConfig {
@@ -1083,6 +1086,79 @@ mod tests {
         }
     }
 
+    struct NativeApprovalProvider {
+        approvals: Arc<Mutex<Vec<ProviderApprovalPayload>>>,
+    }
+
+    struct NativeApprovalSession {
+        approvals: Arc<Mutex<Vec<ProviderApprovalPayload>>>,
+        events: Vec<ProviderSessionEvent>,
+    }
+
+    #[async_trait]
+    impl ProviderSession for NativeApprovalSession {
+        async fn next_event(&mut self) -> Result<ProviderSessionEvent> {
+            if self.events.is_empty() {
+                anyhow::bail!("no more events in test session")
+            }
+            Ok(self.events.remove(0))
+        }
+
+        async fn resolve_approval(&mut self, approval: ProviderApprovalPayload) -> Result<()> {
+            self.approvals.lock().unwrap().push(approval);
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl LlmProvider for NativeApprovalProvider {
+        async fn start_session(
+            self: Arc<Self>,
+            _messages: Vec<Message>,
+        ) -> Result<Box<dyn ProviderSession>> {
+            Ok(Box::new(NativeApprovalSession {
+                approvals: Arc::clone(&self.approvals),
+                events: vec![
+                    ProviderSessionEvent::Event(ProviderEvent::ApprovalRequest {
+                        item_id: Some("cmd-1".to_string()),
+                        request_id: "approval-1".to_string(),
+                        kind: ProviderApprovalKind::CommandExecution,
+                        description: "Approve cargo test".to_string(),
+                        details: serde_json::json!({ "command": "cargo test" }),
+                    }),
+                    ProviderSessionEvent::Finished {
+                        output: "done".to_string(),
+                        usage: CompletionUsage {
+                            prompt_tokens: 1,
+                            completion_tokens: 2,
+                        },
+                    },
+                ],
+            }))
+        }
+
+        async fn complete_stream(
+            &self,
+            _messages: Vec<Message>,
+            _on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
+        ) -> Result<(String, CompletionUsage)> {
+            anyhow::bail!("complete_stream should not be used in this test")
+        }
+
+        fn capabilities(&self) -> koklo_providers::ProviderCapabilities {
+            koklo_providers::ProviderCapabilities {
+                streaming_text: true,
+                approvals_native: true,
+                user_input_native: true,
+                ..Default::default()
+            }
+        }
+
+        fn provider_name(&self) -> &str {
+            "native-approval"
+        }
+    }
+
     #[tokio::test]
     async fn agent_runner_replays_after_user_input_request() {
         let provider = Arc::new(ScriptedProvider {
@@ -1111,5 +1187,37 @@ mod tests {
         assert_eq!(result.output, "Working in billing module.\n");
         assert_eq!(result.usage.prompt_tokens, 20);
         assert_eq!(result.usage.completion_tokens, 10);
+    }
+
+    #[tokio::test]
+    async fn agent_runner_resolves_native_provider_approval() {
+        let approvals = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(NativeApprovalProvider {
+            approvals: Arc::clone(&approvals),
+        });
+        let runner = AgentRunner::new(
+            test_config("pm"),
+            provider,
+            EventBus::new(32),
+            Arc::new(RecordingApprovalHandler),
+            Arc::new(RecordingInputHandler {
+                answers: vec![],
+                seen_questions: Mutex::new(Vec::new()),
+            }),
+        );
+
+        let result = runner
+            .run("session-approval", "Need approval")
+            .await
+            .unwrap();
+
+        assert_eq!(result.output, "");
+        let approvals = approvals.lock().unwrap();
+        assert_eq!(approvals.len(), 1);
+        assert_eq!(approvals[0].request_id.as_deref(), Some("approval-1"));
+        assert!(matches!(
+            approvals[0].decision,
+            ProviderApprovalDecision::Approve
+        ));
     }
 }
