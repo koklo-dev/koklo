@@ -10,7 +10,15 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-const KNOWN_NAMES: &[&str] = &["openrouter", "ollama", "claude-code", "codex"];
+const KNOWN_NAMES: &[&str] = &["openrouter", "ollama", "claude-code", "codex-cli"];
+
+fn canonical_provider_name(name: &str) -> &str {
+    match name {
+        "codex" => "codex-cli",
+        "claude-code-cli" => "claude-code",
+        other => other,
+    }
+}
 
 pub struct ProviderRegistry {
     providers: HashMap<String, Arc<dyn LlmProvider>>,
@@ -34,7 +42,8 @@ impl ProviderRegistry {
         // Build providers, warn and skip failures or unknown names
         let mut providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
         for (name, entry) in &config.providers {
-            if !KNOWN_NAMES.contains(&name.as_str()) {
+            let canonical = canonical_provider_name(name);
+            if !KNOWN_NAMES.contains(&canonical) {
                 tracing::warn!(
                     "Provider '{}' is not supported (known: {}), skipping",
                     name,
@@ -42,9 +51,9 @@ impl ProviderRegistry {
                 );
                 continue;
             }
-            match build_provider(name, entry) {
+            match build_provider(canonical, entry) {
                 Ok(p) => {
-                    providers.insert(name.clone(), p);
+                    providers.insert(canonical.to_string(), p);
                 }
                 Err(e) => {
                     tracing::warn!("Provider '{}' unavailable: {}", name, e);
@@ -55,7 +64,8 @@ impl ProviderRegistry {
         // Cross-check: every agent that specifies a provider must have it available
         for (agent_name, agent_cfg) in &config.agents {
             if let Some(ref provider_name) = agent_cfg.provider {
-                if !providers.contains_key(provider_name.as_str()) {
+                let canonical = canonical_provider_name(provider_name);
+                if !providers.contains_key(canonical) {
                     return Err(ProviderError::Config(format!(
                         "Agent '{}' references provider '{}' which is not available. \
                          Check that the provider is configured and its credentials are set.",
@@ -73,7 +83,7 @@ impl ProviderRegistry {
     ///
     /// Callers should log a warning and fall back to the default when `None` is returned.
     pub fn get(&self, name: &str) -> Option<Arc<dyn LlmProvider>> {
-        self.providers.get(name).cloned()
+        self.providers.get(canonical_provider_name(name)).cloned()
     }
 
     /// Return an iterator over all available (name, provider) pairs.
@@ -86,11 +96,11 @@ pub fn build_provider(
     name: &str,
     entry: &ProviderTomlEntry,
 ) -> Result<Arc<dyn LlmProvider>, ProviderError> {
-    match name {
+    match canonical_provider_name(name) {
         "openrouter" => Ok(Arc::new(OpenRouterProvider::from_config(entry)?)),
         "ollama" => Ok(Arc::new(OllamaProvider::from_config(entry)?)),
         "claude-code" => Ok(Arc::new(ClaudeCodeCliProvider::from_config(entry)?)),
-        "codex" => Ok(Arc::new(CodexCliProvider::from_config(entry)?)),
+        "codex-cli" => Ok(Arc::new(CodexCliProvider::from_config(entry)?)),
         _ => Err(ProviderError::UnknownProvider {
             name: name.to_string(),
             known: KNOWN_NAMES.join(", "),
@@ -169,5 +179,25 @@ mod tests {
         let cfg = PipelineTomlConfig::default();
         let registry = ProviderRegistry::build(&cfg).unwrap();
         assert!(registry.get("openrouter").is_none());
+    }
+
+    #[test]
+    fn test_codex_cli_alias_resolves_to_codex_provider() {
+        let mut cfg = PipelineTomlConfig::default();
+        cfg.providers
+            .insert("codex-cli".to_string(), ProviderTomlEntry::default());
+        let registry = ProviderRegistry::build(&cfg).unwrap();
+        assert!(registry.get("codex-cli").is_some());
+        assert!(registry.get("codex").is_some());
+    }
+
+    #[test]
+    fn test_claude_code_cli_alias_resolves_to_claude_provider() {
+        let mut cfg = PipelineTomlConfig::default();
+        cfg.providers
+            .insert("claude-code-cli".to_string(), ProviderTomlEntry::default());
+        let registry = ProviderRegistry::build(&cfg).unwrap();
+        assert!(registry.get("claude-code").is_some());
+        assert!(registry.get("claude-code-cli").is_some());
     }
 }

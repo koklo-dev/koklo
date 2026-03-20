@@ -2,7 +2,8 @@
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    compat_session, LlmProvider, Message, ProviderCapabilities, ProviderSession, StreamChunk,
+    normalized_session, LlmProvider, Message, ProviderCapabilities, ProviderInteractionMode,
+    ProviderSession, StreamChunk,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -76,7 +77,7 @@ impl LlmProvider for OllamaProvider {
         self: Arc<Self>,
         messages: Vec<Message>,
     ) -> Result<Box<dyn ProviderSession>> {
-        Ok(compat_session(self, messages))
+        Ok(normalized_session(self, messages))
     }
 
     async fn complete_stream(
@@ -168,6 +169,7 @@ impl LlmProvider for OllamaProvider {
             approvals_native: false,
             user_input_native: false,
             reasoning_visible: false,
+            interaction_mode: ProviderInteractionMode::Synthetic,
         }
     }
 

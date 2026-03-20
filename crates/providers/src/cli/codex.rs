@@ -4,8 +4,8 @@ use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
     compat_session, LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
-    ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderSession,
-    ProviderSessionEvent, StreamChunk, UserInputPayload,
+    ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderInteractionMode,
+    ProviderSession, ProviderSessionEvent, StreamChunk, UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -1225,6 +1225,7 @@ impl LlmProvider for CodexCliProvider {
             approvals_native: true,
             user_input_native: true,
             reasoning_visible: true,
+            interaction_mode: ProviderInteractionMode::Native,
         }
     }
 

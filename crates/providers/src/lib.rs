@@ -58,6 +58,19 @@ pub struct ProviderCapabilities {
     pub approvals_native: bool,
     pub user_input_native: bool,
     pub reasoning_visible: bool,
+    pub interaction_mode: ProviderInteractionMode,
+}
+
+/// How much of the interactive contract is implemented natively by the provider.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProviderInteractionMode {
+    /// Provider exposes the Koklo contract with native structured interactions.
+    Native,
+    /// Provider is adapted into the Koklo contract with normalized events.
+    Normalized,
+    /// Provider requires Koklo to synthesize parts of the interaction loop.
+    #[default]
+    Synthetic,
 }
 
 /// Response payload sent back into an interactive provider session.
@@ -192,6 +205,11 @@ struct CompatProviderSession {
     task: Option<JoinHandle<()>>,
 }
 
+struct NormalizedProviderSession {
+    receiver: mpsc::UnboundedReceiver<Result<ProviderSessionEvent>>,
+    task: Option<JoinHandle<()>>,
+}
+
 pub(crate) fn compat_session<P>(
     provider: Arc<P>,
     messages: Vec<Message>,
@@ -202,7 +220,56 @@ where
     Box::new(CompatProviderSession::spawn(provider, messages))
 }
 
+pub(crate) fn normalized_session<P>(
+    provider: Arc<P>,
+    messages: Vec<Message>,
+) -> Box<dyn ProviderSession>
+where
+    P: LlmProvider + ?Sized + 'static,
+{
+    Box::new(NormalizedProviderSession::spawn(provider, messages))
+}
+
 impl CompatProviderSession {
+    fn spawn<P>(provider: Arc<P>, messages: Vec<Message>) -> Self
+    where
+        P: LlmProvider + ?Sized + 'static,
+    {
+        let (sender, receiver) = mpsc::unbounded_channel::<Result<ProviderSessionEvent>>();
+        let task = tokio::spawn(async move {
+            let mut sender = Some(sender);
+            let result = provider
+                .complete_stream(messages, &mut |chunk| {
+                    if let Some(tx) = sender.as_ref() {
+                        for event in chunk_into_session_events(chunk) {
+                            let _ = tx.send(Ok(event));
+                        }
+                    }
+                })
+                .await;
+
+            match result {
+                Ok((output, usage)) => {
+                    if let Some(tx) = sender.take() {
+                        let _ = tx.send(Ok(ProviderSessionEvent::Finished { output, usage }));
+                    }
+                }
+                Err(error) => {
+                    if let Some(tx) = sender.take() {
+                        let _ = tx.send(Err(error));
+                    }
+                }
+            }
+        });
+
+        Self {
+            receiver,
+            task: Some(task),
+        }
+    }
+}
+
+impl NormalizedProviderSession {
     fn spawn<P>(provider: Arc<P>, messages: Vec<Message>) -> Self
     where
         P: LlmProvider + ?Sized + 'static,
@@ -258,7 +325,32 @@ impl ProviderSession for CompatProviderSession {
     }
 }
 
+#[async_trait]
+impl ProviderSession for NormalizedProviderSession {
+    async fn next_event(&mut self) -> Result<ProviderSessionEvent> {
+        match self.receiver.recv().await {
+            Some(result) => result,
+            None => anyhow::bail!("normalized provider session ended unexpectedly"),
+        }
+    }
+
+    async fn cancel(&mut self) -> Result<()> {
+        if let Some(task) = self.task.take() {
+            task.abort();
+        }
+        Ok(())
+    }
+}
+
 impl Drop for CompatProviderSession {
+    fn drop(&mut self) {
+        if let Some(task) = self.task.take() {
+            task.abort();
+        }
+    }
+}
+
+impl Drop for NormalizedProviderSession {
     fn drop(&mut self) {
         if let Some(task) = self.task.take() {
             task.abort();
@@ -401,6 +493,7 @@ pub trait LlmProvider: Send + Sync {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             streaming_text: true,
+            interaction_mode: ProviderInteractionMode::Synthetic,
             ..ProviderCapabilities::default()
         }
     }

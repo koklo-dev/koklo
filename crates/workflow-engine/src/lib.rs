@@ -828,6 +828,7 @@ impl PipelineOrchestrator {
                     "approvals_native": provider.capabilities().approvals_native,
                     "user_input_native": provider.capabilities().user_input_native,
                     "reasoning_visible": provider.capabilities().reasoning_visible,
+                    "interaction_mode": format!("{:?}", provider.capabilities().interaction_mode),
                 }
             })),
         );

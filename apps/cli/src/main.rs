@@ -22,6 +22,7 @@
 //! ```
 
 mod home_dirs;
+mod mcp_bridge;
 mod md_render;
 mod monitor;
 
@@ -215,6 +216,9 @@ enum Commands {
     Voice,
     /// [coming soon] IDE bridge — Phase 7.
     Ide,
+
+    #[command(hide = true, subcommand)]
+    Internal(InternalCommands),
 }
 
 // ── session subcommands ───────────────────────────────────────────────────────
@@ -379,6 +383,15 @@ enum ContextCommands {
     Init,
 }
 
+#[derive(Subcommand)]
+enum InternalCommands {
+    #[command(hide = true)]
+    ClaudePermissionBridge {
+        #[arg(long, value_name = "DIR")]
+        bridge_dir: PathBuf,
+    },
+}
+
 // ── entry point ───────────────────────────────────────────────────────────────
 
 #[tokio::main]
@@ -510,6 +523,11 @@ async fn main() -> Result<()> {
                  See roadmap at https://github.com/koklo-dev/koklo"
             );
         }
+        Commands::Internal(sub) => match sub {
+            InternalCommands::ClaudePermissionBridge { bridge_dir } => {
+                mcp_bridge::run_claude_permission_bridge(&bridge_dir)?
+            }
+        },
     }
 
     Ok(())
@@ -524,6 +542,47 @@ fn parse_preset(s: &str) -> Result<PresetKind, String> {
             s
         )
     })
+}
+
+fn canonical_provider_name(name: &str) -> &str {
+    match name {
+        "codex" => "codex-cli",
+        "claude-code-cli" => "claude-code",
+        other => other,
+    }
+}
+
+fn provider_name_candidates(name: &str) -> Vec<&str> {
+    let canonical = canonical_provider_name(name);
+    match canonical {
+        "codex-cli" => vec!["codex-cli", "codex"],
+        "claude-code" => vec!["claude-code", "claude-code-cli"],
+        other => vec![other],
+    }
+}
+
+fn normalize_pipeline_config(config: &mut PipelineTomlConfig) {
+    config.pipeline.default_provider = config
+        .pipeline
+        .default_provider
+        .as_deref()
+        .map(canonical_provider_name)
+        .map(str::to_string);
+
+    for agent in config.agents.values_mut() {
+        agent.provider = agent
+            .provider
+            .as_deref()
+            .map(canonical_provider_name)
+            .map(str::to_string);
+    }
+
+    let mut normalized = std::collections::HashMap::new();
+    for (name, entry) in std::mem::take(&mut config.providers) {
+        let canonical = canonical_provider_name(&name).to_string();
+        normalized.entry(canonical).or_insert(entry);
+    }
+    config.providers = normalized;
 }
 
 // ── orchestrator construction ─────────────────────────────────────────────────
@@ -1279,9 +1338,11 @@ async fn cmd_artifacts_show(session_id: &str, phase: &str) -> Result<()> {
 
 /// `koklo provider list`
 async fn cmd_provider_list() -> Result<()> {
-    let global = home_dirs::load_global_config();
+    let mut global = home_dirs::load_global_config();
     let project_root = find_project_root()?;
-    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let mut project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    normalize_pipeline_config(&mut global);
+    normalize_pipeline_config(&mut project);
     let merged = global.clone().merge(project.clone());
 
     if merged.providers.is_empty() {
@@ -1510,11 +1571,14 @@ async fn cmd_context_init() -> Result<()> {
 
 /// `koklo provider test <name>`
 async fn cmd_provider_test(name: &str) -> Result<()> {
-    let global = home_dirs::load_global_config();
+    let canonical_name = canonical_provider_name(name);
+    let mut global = home_dirs::load_global_config();
     let project_root = find_project_root()?;
-    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let mut project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    normalize_pipeline_config(&mut global);
+    normalize_pipeline_config(&mut project);
     let merged = global.merge(project);
-    let smoke_dir = if name == "claude-code" {
+    let smoke_dir = if canonical_name == "claude-code" {
         Some(tempfile::tempdir()?)
     } else {
         None
@@ -1526,16 +1590,16 @@ async fn cmd_provider_test(name: &str) -> Result<()> {
     } else {
         let entry = merged
             .providers
-            .get(name)
-            .ok_or_else(|| anyhow::anyhow!("Provider '{}' is not configured.", name))?;
+            .get(canonical_name)
+            .ok_or_else(|| anyhow::anyhow!("Provider '{}' is not configured.", canonical_name))?;
         let mut smoke_entry = entry.clone();
         if let Some(smoke_model) = &entry.smoke_model {
             smoke_entry.model = Some(smoke_model.clone());
         }
-        build_provider(name, &smoke_entry)?
+        build_provider(canonical_name, &smoke_entry)?
     };
 
-    println!("Testing provider '{}'...", name);
+    println!("Testing provider '{}'...", canonical_name);
     use koklo_providers::Message;
     let messages = vec![Message::user("Reply with exactly: OK".to_string())];
     match provider
@@ -1547,10 +1611,10 @@ async fn cmd_provider_test(name: &str) -> Result<()> {
         .await
     {
         Ok(_) => {
-            println!("\nProvider '{}': OK", name);
+            println!("\nProvider '{}': OK", canonical_name);
         }
         Err(e) => {
-            eprintln!("\nProvider '{}' failed: {}", name, e);
+            eprintln!("\nProvider '{}' failed: {}", canonical_name, e);
         }
     }
     Ok(())
@@ -1564,6 +1628,7 @@ async fn cmd_provider_add(
     base_url: Option<String>,
     project: bool,
 ) -> Result<()> {
+    let canonical_name = canonical_provider_name(name);
     // Guard: --key-env takes an env var NAME (e.g. OPENROUTER_API_KEY), not the key value.
     if let Some(ref k) = key_env {
         if looks_like_api_key(k) {
@@ -1576,40 +1641,15 @@ async fn cmd_provider_add(
                    export OPENROUTER_API_KEY='{}'\n\
                    koklo provider add {} [--key-env OPENROUTER_API_KEY]\n\
                  \n\
-                 Or use a custom var name:\n\
+                Or use a custom var name:\n\
                  \n\
                    export MY_KEY='{}'\n\
                    koklo provider add {} --key-env MY_KEY",
                 k,
                 k,
-                name,
+                canonical_name,
                 k,
-                name
-            );
-        }
-    }
-
-    // Guard: --key-env takes an env var NAME (e.g. OPENROUTER_API_KEY), not the key value.
-    if let Some(ref k) = key_env {
-        if looks_like_api_key(k) {
-            anyhow::bail!(
-                "'{}' looks like an API key value, not an env var name.\n\
-                 --key-env expects the NAME of the environment variable that holds the key.\n\
-                 \n\
-                 Usage:\n\
-                 \n\
-                   export OPENROUTER_API_KEY='{}'\n\
-                   koklo provider add {} [--key-env OPENROUTER_API_KEY]\n\
-                 \n\
-                 Or use a custom var name:\n\
-                 \n\
-                   export MY_KEY='{}'\n\
-                   koklo provider add {} --key-env MY_KEY",
-                k,
-                k,
-                name,
-                k,
-                name
+                canonical_name
             );
         }
     }
@@ -1620,7 +1660,7 @@ async fn cmd_provider_add(
         Option<&str>,
         Option<&str>,
         Option<&str>,
-    ) = match name {
+    ) = match canonical_name {
         "openrouter" => (
             Some("OPENROUTER_API_KEY"),
             Some("openai/gpt-4o"),
@@ -1641,11 +1681,17 @@ async fn cmd_provider_add(
     };
 
     let (config_path, mut config) = load_writable_config(project)?;
-
-    config.providers.insert(name.to_string(), entry);
+    for candidate in provider_name_candidates(canonical_name) {
+        config.providers.remove(candidate);
+    }
+    config.providers.insert(canonical_name.to_string(), entry);
 
     write_config(&config_path, &config)?;
-    println!("Added provider '{}' to {}", name, config_path.display());
+    println!(
+        "Added provider '{}' to {}",
+        canonical_name,
+        config_path.display()
+    );
     Ok(())
 }
 
@@ -1663,26 +1709,37 @@ fn looks_like_api_key(s: &str) -> bool {
 
 /// `koklo provider remove <name> [--project]`
 async fn cmd_provider_remove(name: &str, project: bool) -> Result<()> {
+    let canonical_name = canonical_provider_name(name);
     let (config_path, mut config) = load_writable_config(project)?;
 
-    if config.providers.remove(name).is_none() {
-        println!("Provider '{}' not found in config.", name);
+    let mut removed = false;
+    for candidate in provider_name_candidates(canonical_name) {
+        removed |= config.providers.remove(candidate).is_some();
+    }
+
+    if !removed {
+        println!("Provider '{}' not found in config.", canonical_name);
         return Ok(());
     }
 
     write_config(&config_path, &config)?;
-    println!("Removed provider '{}' from {}", name, config_path.display());
+    println!(
+        "Removed provider '{}' from {}",
+        canonical_name,
+        config_path.display()
+    );
     Ok(())
 }
 
 /// `koklo provider set-default <name> [--project]`
 async fn cmd_provider_set_default(name: &str, project: bool) -> Result<()> {
+    let canonical_name = canonical_provider_name(name);
     let (config_path, mut config) = load_writable_config(project)?;
-    config.pipeline.default_provider = Some(name.to_string());
+    config.pipeline.default_provider = Some(canonical_name.to_string());
     write_config(&config_path, &config)?;
     println!(
         "Default provider set to '{}' in {}",
-        name,
+        canonical_name,
         config_path.display()
     );
     Ok(())
@@ -1690,9 +1747,11 @@ async fn cmd_provider_set_default(name: &str, project: bool) -> Result<()> {
 
 /// `koklo provider usage [name]`
 async fn cmd_provider_usage(name: Option<String>) -> Result<()> {
-    let global = home_dirs::load_global_config();
+    let mut global = home_dirs::load_global_config();
     let project_root = find_project_root()?;
-    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    let mut project = PipelineTomlConfig::load_from_project_root(&project_root)?;
+    normalize_pipeline_config(&mut global);
+    normalize_pipeline_config(&mut project);
     let merged = global.merge(project);
 
     if merged.providers.is_empty() {
@@ -1701,7 +1760,7 @@ async fn cmd_provider_usage(name: Option<String>) -> Result<()> {
     }
 
     let names_to_show: Vec<String> = if let Some(n) = name {
-        vec![n]
+        vec![canonical_provider_name(&n).to_string()]
     } else {
         let mut keys: Vec<String> = merged.providers.keys().cloned().collect();
         keys.sort();
@@ -1790,11 +1849,13 @@ fn load_writable_config(project: bool) -> Result<(PathBuf, PipelineTomlConfig)> 
     if project {
         let project_root = find_project_root()?;
         let path = project_root.join(".koklo").join("pipeline.toml");
-        let config = PipelineTomlConfig::load_from_project_root(&project_root)?;
+        let mut config = PipelineTomlConfig::load_from_project_root(&project_root)?;
+        normalize_pipeline_config(&mut config);
         Ok((path, config))
     } else {
         let path = home_dirs::koklo_home().join("config.toml");
-        let config = home_dirs::load_global_config();
+        let mut config = home_dirs::load_global_config();
+        normalize_pipeline_config(&mut config);
         Ok((path, config))
     }
 }
@@ -1808,4 +1869,49 @@ fn write_config(path: &PathBuf, config: &PipelineTomlConfig) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     std::fs::write(path, toml_str)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_provider_aliases_map_to_canonical_names() {
+        assert_eq!(canonical_provider_name("codex"), "codex-cli");
+        assert_eq!(canonical_provider_name("codex-cli"), "codex-cli");
+        assert_eq!(canonical_provider_name("claude-code-cli"), "claude-code");
+        assert_eq!(canonical_provider_name("openrouter"), "openrouter");
+    }
+
+    #[test]
+    fn normalize_pipeline_config_rewrites_provider_keys_and_defaults() {
+        let mut config = PipelineTomlConfig::default();
+        config.pipeline.default_provider = Some("codex-cli".to_string());
+        config
+            .providers
+            .insert("codex-cli".to_string(), ProviderTomlEntry::default());
+        config.agents.insert(
+            "developer".to_string(),
+            koklo_providers::AgentTomlConfig {
+                provider: Some("claude-code-cli".to_string()),
+                ..Default::default()
+            },
+        );
+
+        normalize_pipeline_config(&mut config);
+
+        assert_eq!(
+            config.pipeline.default_provider.as_deref(),
+            Some("codex-cli")
+        );
+        assert!(config.providers.contains_key("codex-cli"));
+        assert!(!config.providers.contains_key("codex"));
+        assert_eq!(
+            config
+                .agents
+                .get("developer")
+                .and_then(|agent| agent.provider.as_deref()),
+            Some("claude-code")
+        );
+    }
 }
