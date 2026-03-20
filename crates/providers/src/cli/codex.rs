@@ -311,7 +311,7 @@ impl ProviderSession for CodexAppServerSession {
         let answers = input
             .answers
             .into_iter()
-            .zip(pending.question_ids.into_iter())
+            .zip(pending.question_ids)
             .map(|(answer, question_id)| {
                 (
                     question_id,
@@ -420,10 +420,7 @@ async fn run_codex_app_server_stdout(
 
                     let request_id = id_to_key(id);
                     let result = if let Some(error) = message.get("error") {
-                        Err(anyhow::anyhow!(
-                            "Codex app-server error: {}",
-                            error.to_string()
-                        ))
+                        Err(anyhow::anyhow!("Codex app-server error: {}", error))
                     } else {
                         Ok(message.get("result").cloned().unwrap_or_else(|| json!({})))
                     };
@@ -937,7 +934,7 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
         .rest
         .get("status")
         .and_then(|value| value.as_str())
-        .unwrap_or_else(|| match event_type {
+        .unwrap_or(match event_type {
             "item.started" => "in_progress",
             "item.completed" => "completed",
             _ => "updated",
