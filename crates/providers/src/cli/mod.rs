@@ -120,8 +120,10 @@ mod tests {
 
     #[test]
     fn test_detect_on_normal_linux() {
-        // Without pty feature, always Subprocess
         let result = detect_from_proc_version("Linux version 5.15.0-generic");
+        #[cfg(feature = "pty")]
+        assert_eq!(result, CliMode::Pty);
+        #[cfg(not(feature = "pty"))]
         assert_eq!(result, CliMode::Subprocess);
     }
 
