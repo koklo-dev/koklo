@@ -1,11 +1,14 @@
 //! Ollama local LLM provider.
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
-use crate::{LlmProvider, Message, StreamChunk};
+use crate::{
+    compat_session, LlmProvider, Message, ProviderCapabilities, ProviderSession, StreamChunk,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use koklo_events::{CompletionUsage, CostDisplay};
+use std::sync::Arc;
 
 pub struct OllamaProvider {
     pub base_url: String,
@@ -69,6 +72,13 @@ impl OllamaProvider {
 
 #[async_trait]
 impl LlmProvider for OllamaProvider {
+    async fn start_session(
+        self: Arc<Self>,
+        messages: Vec<Message>,
+    ) -> Result<Box<dyn ProviderSession>> {
+        Ok(compat_session(self, messages))
+    }
+
     async fn complete_stream(
         &self,
         messages: Vec<Message>,
@@ -124,11 +134,7 @@ impl LlmProvider for OllamaProvider {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
                     if let Some(t) = json["message"]["content"].as_str() {
                         full_text.push_str(t);
-                        on_chunk(StreamChunk {
-                            text: t.to_string(),
-                            finished: false,
-                            tool_event: None,
-                        });
+                        on_chunk(StreamChunk::text(t));
                     }
                     if json["done"].as_bool().unwrap_or(false) {
                         // Parse usage from final chunk
@@ -138,11 +144,7 @@ impl LlmProvider for OllamaProvider {
                         if let Some(ct) = json["eval_count"].as_u64() {
                             usage.completion_tokens = ct as u32;
                         }
-                        on_chunk(StreamChunk {
-                            text: String::new(),
-                            finished: true,
-                            tool_event: None,
-                        });
+                        on_chunk(StreamChunk::finished());
                     }
                 }
             }
@@ -156,6 +158,17 @@ impl LlmProvider for OllamaProvider {
 
     fn compute_cost(&self, _usage: &CompletionUsage) -> Option<CostDisplay> {
         Some(CostDisplay::Free)
+    }
+
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            streaming_text: true,
+            usage_native: true,
+            tool_calls_native: false,
+            approvals_native: false,
+            user_input_native: false,
+            reasoning_visible: false,
+        }
     }
 
     fn provider_name(&self) -> &str {

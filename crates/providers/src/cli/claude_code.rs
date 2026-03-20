@@ -6,15 +6,20 @@
 use super::{check_claude_session, flatten_messages_to_prompt, strip_ansi, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
-use crate::{LlmProvider, Message, StreamChunk, ToolEvent};
+use crate::{
+    compat_session, LlmProvider, Message, ProviderCapabilities, ProviderEvent, ProviderSession,
+    ProviderSessionEvent, StreamChunk, UserInputPayload,
+};
 use anyhow::Result;
 use async_trait::async_trait;
-use koklo_events::{CompletionUsage, CostDisplay};
+use koklo_events::{CompletionUsage, CostDisplay, UserInputQuestion};
 use koklo_shell::Sandbox;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin};
+use tokio::sync::{mpsc, Mutex};
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
 
@@ -151,35 +156,28 @@ impl ClaudeCodeCliProvider {
                 match event {
                     StreamJsonEvent::Text(t) => {
                         let chunk = format!("{}\n", t);
-                        on_chunk(StreamChunk {
-                            text: chunk.clone(),
-                            finished: false,
-                            tool_event: None,
-                        });
+                        on_chunk(StreamChunk::text(chunk.clone()));
                         full_text.push_str(&chunk);
                     }
                     StreamJsonEvent::ToolCall {
+                        id: _,
                         name,
                         input_summary,
+                        input: _,
                     } => {
-                        on_chunk(StreamChunk {
-                            text: String::new(),
-                            finished: false,
-                            tool_event: Some(ToolEvent::Call {
-                                tool_name: name,
-                                input_summary,
-                            }),
-                        });
+                        on_chunk(StreamChunk::event(ProviderEvent::ToolCall {
+                            item_id: None,
+                            tool_name: name,
+                            input_summary,
+                        }));
                     }
                     StreamJsonEvent::ToolResult { tool_name, summary } => {
-                        on_chunk(StreamChunk {
-                            text: String::new(),
-                            finished: false,
-                            tool_event: Some(ToolEvent::Result {
-                                tool_name,
-                                output_summary: summary,
-                            }),
-                        });
+                        on_chunk(StreamChunk::event(ProviderEvent::ToolResult {
+                            item_id: None,
+                            tool_name,
+                            output_summary: summary,
+                            success: None,
+                        }));
                     }
                     StreamJsonEvent::Usage {
                         input_tokens,
@@ -219,15 +217,218 @@ impl ClaudeCodeCliProvider {
             return Err(ProviderError::EmptyResponse.into());
         }
 
-        on_chunk(StreamChunk {
-            text: String::new(),
-            finished: true,
-            tool_event: None,
-        });
+        on_chunk(StreamChunk::finished());
 
         let usage =
             final_usage.unwrap_or_else(|| estimate_usage_from_text(&full_text, prompt.len()));
         Ok((full_text, usage))
+    }
+
+    fn build_stream_json_args() -> Vec<String> {
+        vec![
+            "--print".to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
+            "--input-format".to_string(),
+            "stream-json".to_string(),
+            "--replay-user-messages".to_string(),
+            "--brief".to_string(),
+            "--dangerously-skip-permissions".to_string(),
+        ]
+    }
+
+    async fn spawn_stream_json_session(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<Box<dyn ProviderSession>> {
+        let mut command = tokio::process::Command::new("claude");
+        command
+            .args(Self::build_stream_json_args())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(dir) = &self.working_dir {
+            command.current_dir(dir);
+        }
+
+        let mut child = command.spawn().map_err(ProviderError::Io)?;
+        let stdin = child.stdin.take().expect("stdin is piped");
+        let stdout = child.stdout.take().expect("stdout is piped");
+        let stderr = child.stderr.take().expect("stderr is piped");
+        let child = Arc::new(Mutex::new(child));
+
+        let stderr_handle = tokio::spawn(async move {
+            let mut buf = String::new();
+            BufReader::new(stderr).read_to_string(&mut buf).await.ok();
+            buf
+        });
+
+        let (sender, receiver) = mpsc::unbounded_channel::<Result<ProviderSessionEvent>>();
+        tokio::spawn(async move {
+            let mut tool_name_registry: HashMap<String, String> = HashMap::new();
+            let mut lines = BufReader::new(stdout).lines();
+            let mut turn_output = String::new();
+
+            loop {
+                match lines.next_line().await {
+                    Ok(Some(line)) => {
+                        let trimmed = line.trim();
+                        if trimmed.is_empty() || !trimmed.starts_with('{') {
+                            continue;
+                        }
+                        for event in parse_stream_json_line(trimmed, &mut tool_name_registry) {
+                            match event {
+                                StreamJsonEvent::Text(text) => {
+                                    let chunk = format!("{}\n", text);
+                                    turn_output.push_str(&chunk);
+                                    let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                                        ProviderEvent::MessageDelta { text: chunk },
+                                    )));
+                                }
+                                StreamJsonEvent::ToolCall {
+                                    id,
+                                    name,
+                                    input_summary,
+                                    input,
+                                } => {
+                                    if let Some(questions) =
+                                        parse_claude_user_input_questions(&name, &input)
+                                    {
+                                        let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                                            ProviderEvent::UserInputRequest {
+                                                item_id: Some(id.unwrap_or_else(|| {
+                                                    format!("claude-user-{}", name)
+                                                })),
+                                                questions,
+                                            },
+                                        )));
+                                    } else {
+                                        let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                                            ProviderEvent::ToolCall {
+                                                item_id: None,
+                                                tool_name: name,
+                                                input_summary,
+                                            },
+                                        )));
+                                    }
+                                }
+                                StreamJsonEvent::ToolResult { tool_name, summary } => {
+                                    let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                                        ProviderEvent::ToolResult {
+                                            item_id: None,
+                                            tool_name,
+                                            output_summary: summary,
+                                            success: None,
+                                        },
+                                    )));
+                                }
+                                StreamJsonEvent::Usage {
+                                    input_tokens,
+                                    output_tokens,
+                                    ..
+                                } => {
+                                    let usage = CompletionUsage {
+                                        prompt_tokens: input_tokens,
+                                        completion_tokens: output_tokens,
+                                    };
+                                    let output = std::mem::take(&mut turn_output);
+                                    let _ = sender
+                                        .send(Ok(ProviderSessionEvent::Finished { output, usage }));
+                                }
+                                StreamJsonEvent::Other => {}
+                            }
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(error) => {
+                        let _ = sender.send(Err(ProviderError::Io(error).into()));
+                        return;
+                    }
+                }
+            }
+
+            let stderr_content = stderr_handle.await.unwrap_or_default();
+            if check_claude_session(&stderr_content) {
+                let _ = sender.send(Err(ProviderError::CliSessionExpired {
+                    auth_command: "claude auth login".to_string(),
+                }
+                .into()));
+            } else if !stderr_content.trim().is_empty() {
+                let _ = sender.send(Err(ProviderError::HttpError {
+                    status: 1,
+                    body: stderr_content,
+                }
+                .into()));
+            }
+        });
+
+        let session = ClaudeStreamJsonSession {
+            stdin: Mutex::new(stdin),
+            child,
+            receiver,
+        };
+        session
+            .send_user_message(flatten_messages_to_prompt(&messages))
+            .await?;
+        Ok(Box::new(session))
+    }
+}
+
+struct ClaudeStreamJsonSession {
+    stdin: Mutex<ChildStdin>,
+    child: Arc<Mutex<Child>>,
+    receiver: mpsc::UnboundedReceiver<Result<ProviderSessionEvent>>,
+}
+
+impl ClaudeStreamJsonSession {
+    async fn send_user_message(&self, text: String) -> Result<()> {
+        let line = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": text,
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let mut stdin = self.stdin.lock().await;
+        stdin
+            .write_all(line.as_bytes())
+            .await
+            .map_err(ProviderError::Io)?;
+        stdin.write_all(b"\n").await.map_err(ProviderError::Io)?;
+        stdin.flush().await.map_err(ProviderError::Io)?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl ProviderSession for ClaudeStreamJsonSession {
+    async fn next_event(&mut self) -> Result<ProviderSessionEvent> {
+        match self.receiver.recv().await {
+            Some(result) => result,
+            None => anyhow::bail!("claude stream-json session ended unexpectedly"),
+        }
+    }
+
+    async fn send_user_input(&mut self, input: UserInputPayload) -> Result<()> {
+        let message = input.answers.join("\n");
+        self.send_user_message(message).await
+    }
+
+    async fn cancel(&mut self) -> Result<()> {
+        self.child
+            .lock()
+            .await
+            .kill()
+            .await
+            .map_err(ProviderError::Io)?;
+        Ok(())
     }
 }
 
@@ -235,6 +436,16 @@ impl ClaudeCodeCliProvider {
 
 #[async_trait]
 impl LlmProvider for ClaudeCodeCliProvider {
+    async fn start_session(
+        self: Arc<Self>,
+        messages: Vec<Message>,
+    ) -> Result<Box<dyn ProviderSession>> {
+        if self.sandbox.is_some() {
+            return Ok(compat_session(self, messages));
+        }
+        self.spawn_stream_json_session(messages).await
+    }
+
     async fn complete_stream(
         &self,
         messages: Vec<Message>,
@@ -268,16 +479,8 @@ impl LlmProvider for ClaudeCodeCliProvider {
             if text.trim().is_empty() {
                 return Err(ProviderError::EmptyResponse.into());
             }
-            on_chunk(StreamChunk {
-                text: text.clone(),
-                finished: false,
-                tool_event: None,
-            });
-            on_chunk(StreamChunk {
-                text: String::new(),
-                finished: true,
-                tool_event: None,
-            });
+            on_chunk(StreamChunk::text(text.clone()));
+            on_chunk(StreamChunk::finished());
             let usage = estimate_usage_from_text(&text, prompt.len());
             return Ok((text, usage));
         }
@@ -290,6 +493,17 @@ impl LlmProvider for ClaudeCodeCliProvider {
         claude_cost_display(usage)
     }
 
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            streaming_text: true,
+            usage_native: true,
+            tool_calls_native: true,
+            approvals_native: false,
+            user_input_native: true,
+            reasoning_visible: false,
+        }
+    }
+
     fn provider_name(&self) -> &str {
         "claude-code-cli"
     }
@@ -300,8 +514,10 @@ impl LlmProvider for ClaudeCodeCliProvider {
 enum StreamJsonEvent {
     Text(String),
     ToolCall {
+        id: Option<String>,
         name: String,
         input_summary: String,
+        input: serde_json::Value,
     },
     ToolResult {
         tool_name: String,
@@ -349,15 +565,18 @@ fn parse_stream_json_line(
                             events.push(StreamJsonEvent::Text(std::mem::take(&mut text_buf)));
                         }
                         let name = item["name"].as_str().unwrap_or("tool").to_string();
-                        let id = item["id"].as_str().unwrap_or("").to_string();
+                        let id = item["id"].as_str().map(str::to_string);
                         // Register id → name for matching tool results later.
-                        if !id.is_empty() {
-                            tool_name_registry.insert(id, name.clone());
+                        if let Some(tool_use_id) = &id {
+                            tool_name_registry.insert(tool_use_id.clone(), name.clone());
                         }
-                        let input_summary = extract_input_summary(&item["input"], &name);
+                        let input = item["input"].clone();
+                        let input_summary = extract_input_summary(&input, &name);
                         events.push(StreamJsonEvent::ToolCall {
+                            id,
                             name,
                             input_summary,
+                            input,
                         });
                     }
                     _ => {}
@@ -396,6 +615,30 @@ fn parse_stream_json_line(
         }
         _ => vec![],
     }
+}
+
+fn parse_claude_user_input_questions(
+    tool_name: &str,
+    input: &serde_json::Value,
+) -> Option<Vec<UserInputQuestion>> {
+    if tool_name != "SendUserMessage" {
+        return None;
+    }
+
+    let prompt = input
+        .get("message")
+        .and_then(|value| value.as_str())
+        .or_else(|| input.get("prompt").and_then(|value| value.as_str()))
+        .or_else(|| input.get("question").and_then(|value| value.as_str()))
+        .filter(|value| !value.trim().is_empty())?;
+
+    Some(vec![UserInputQuestion {
+        id: "claude_reply".to_string(),
+        header: "Claude".to_string(),
+        question: prompt.to_string(),
+        options: None,
+        is_secret: false,
+    }])
 }
 
 /// Extract a short (≤60 char) summary from a tool's input JSON.
@@ -464,7 +707,7 @@ mod tests {
         let events = parse_stream_json_line(line, &mut reg);
         assert_eq!(events.len(), 1);
         assert!(
-            matches!(&events[0], StreamJsonEvent::ToolCall { name, input_summary }
+            matches!(&events[0], StreamJsonEvent::ToolCall { name, input_summary, .. }
                 if name == "Write" && input_summary == "src/lib.rs")
         );
         assert_eq!(reg.get("abc").unwrap(), "Write");
@@ -508,5 +751,17 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert!(matches!(&events[0], StreamJsonEvent::Text(t) if t == "Here is the file:"));
         assert!(matches!(&events[1], StreamJsonEvent::ToolCall { name, .. } if name == "Read"));
+    }
+
+    #[test]
+    fn test_parse_send_user_message_questions() {
+        let questions = parse_claude_user_input_questions(
+            "SendUserMessage",
+            &serde_json::json!({ "message": "Which file should I edit?" }),
+        )
+        .unwrap();
+        assert_eq!(questions.len(), 1);
+        assert_eq!(questions[0].question, "Which file should I edit?");
+        assert_eq!(questions[0].header, "Claude");
     }
 }

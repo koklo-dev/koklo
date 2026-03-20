@@ -1382,6 +1382,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1446,6 +1447,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -1499,6 +1501,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "koklo-events",
  "serde",
  "serde_json",
  "sqlx",

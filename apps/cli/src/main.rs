@@ -27,7 +27,7 @@ mod monitor;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use koklo_events::GateChannel;
+use koklo_events::{GateChannel, UserInputChannel};
 use koklo_providers::registry::build_provider;
 use koklo_providers::{
     has_secret, load_secrets_into_env, resolve_secret, ClaudeCodeCliProvider, LlmProvider,
@@ -35,7 +35,8 @@ use koklo_providers::{
 };
 use koklo_workflow_engine::{
     presets::{phases_for_preset, PresetKind},
-    GateHandler, GithubConfig, PipelineConfig, PipelineOrchestrator, TuiGateHandler,
+    GateHandler, GithubConfig, PipelineConfig, PipelineOrchestrator, PipelineUserInputHandler,
+    TuiGateHandler, TuiUserInputHandler,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -845,10 +846,14 @@ async fn cmd_run(preset: PresetKind, pipeline_type: &str, title: &str, no_tui: b
     // TUI mode
     let gate_channel = GateChannel::new();
     let tui_gate_channel = gate_channel.clone_handle();
+    let user_input_channel = UserInputChannel::new();
+    let tui_user_input_channel = user_input_channel.clone_handle();
 
     let orch = {
         let gate_handler: Arc<dyn GateHandler> = Arc::new(TuiGateHandler::new(gate_channel));
-        build_orchestrator_with_gate(None, Some(preset), gate_handler).await?
+        let user_input_handler: Arc<dyn PipelineUserInputHandler> =
+            Arc::new(TuiUserInputHandler::new(user_input_channel));
+        build_orchestrator_with_gate(None, Some(preset), gate_handler, user_input_handler).await?
     };
 
     let event_rx = orch.event_bus().subscribe(); // subscribe BEFORE spawn
@@ -871,6 +876,7 @@ async fn cmd_run(preset: PresetKind, pipeline_type: &str, title: &str, no_tui: b
         storage,
         Some(event_rx),
         Some(tui_gate_channel),
+        Some(tui_user_input_channel),
         preset_phase_names,
     )
     .await?;
@@ -896,6 +902,7 @@ async fn build_orchestrator_with_gate(
     project_root_override: Option<PathBuf>,
     preset_override: Option<PresetKind>,
     gate_handler: Arc<dyn GateHandler>,
+    user_input_handler: Arc<dyn PipelineUserInputHandler>,
 ) -> Result<PipelineOrchestrator> {
     let project_root = match project_root_override {
         Some(path) => path,
@@ -965,7 +972,7 @@ async fn build_orchestrator_with_gate(
         github: GithubConfig::from_env(),
     };
 
-    PipelineOrchestrator::new_with_gate(config, gate_handler).await
+    PipelineOrchestrator::new_with_handlers(config, gate_handler, user_input_handler).await
 }
 
 /// `koklo session list`
