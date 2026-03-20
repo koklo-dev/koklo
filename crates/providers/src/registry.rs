@@ -112,6 +112,42 @@ pub fn build_provider(
 mod tests {
     use super::*;
     use crate::config::{AgentTomlConfig, PipelineTomlConfig, ProviderTomlEntry};
+    use crate::{Message, ProviderCapabilities, ProviderSession, StreamChunk};
+    use async_trait::async_trait;
+    use koklo_events::CompletionUsage;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    struct DummyProvider;
+
+    #[async_trait]
+    impl LlmProvider for DummyProvider {
+        async fn complete_stream(
+            &self,
+            _messages: Vec<Message>,
+            _on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
+        ) -> Result<(String, CompletionUsage)> {
+            Ok((String::new(), CompletionUsage::default()))
+        }
+
+        async fn start_session(
+            self: Arc<Self>,
+            _messages: Vec<Message>,
+        ) -> Result<Box<dyn ProviderSession>>
+        where
+            Self: 'static,
+        {
+            anyhow::bail!("dummy provider does not start sessions")
+        }
+
+        fn capabilities(&self) -> ProviderCapabilities {
+            ProviderCapabilities::default()
+        }
+
+        fn provider_name(&self) -> &str {
+            "dummy"
+        }
+    }
 
     #[test]
     fn test_unknown_provider_name_is_skipped_with_warning() {
@@ -183,20 +219,18 @@ mod tests {
 
     #[test]
     fn test_codex_cli_alias_resolves_to_codex_provider() {
-        let mut cfg = PipelineTomlConfig::default();
-        cfg.providers
-            .insert("codex-cli".to_string(), ProviderTomlEntry::default());
-        let registry = ProviderRegistry::build(&cfg).unwrap();
+        let mut providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
+        providers.insert("codex-cli".to_string(), Arc::new(DummyProvider));
+        let registry = ProviderRegistry { providers };
         assert!(registry.get("codex-cli").is_some());
         assert!(registry.get("codex").is_some());
     }
 
     #[test]
     fn test_claude_code_cli_alias_resolves_to_claude_provider() {
-        let mut cfg = PipelineTomlConfig::default();
-        cfg.providers
-            .insert("claude-code-cli".to_string(), ProviderTomlEntry::default());
-        let registry = ProviderRegistry::build(&cfg).unwrap();
+        let mut providers: HashMap<String, Arc<dyn LlmProvider>> = HashMap::new();
+        providers.insert("claude-code".to_string(), Arc::new(DummyProvider));
+        let registry = ProviderRegistry { providers };
         assert!(registry.get("claude-code").is_some());
         assert!(registry.get("claude-code-cli").is_some());
     }
