@@ -4,6 +4,11 @@
 //! - Default: ratatui TUI with sessions + phases + log panels
 //! - `--follow`: plain text stream (for CI / scripting)
 
+use crate::plain_render::PlainRenderEngine;
+use crate::render_model::{
+    build_transcript_render_model, RenderBlock, RenderBlockBody, RenderBlockKind, RenderTone,
+    TranscriptLiveModel, TranscriptRenderModel,
+};
 use anyhow::Result;
 use koklo_events::{
     CostDisplay, GateChannel, GateDisplay, GateResponse, PipelineEvent, TranscriptItem,
@@ -20,6 +25,8 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Row, Table},
     Frame, Terminal,
 };
+use std::collections::HashMap;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -125,6 +132,8 @@ pub struct MonitorApp {
     command_input: String,
     command_feedback: Option<CommandFeedback>,
     pending_user_input: Option<PendingUserInput>,
+    /// Bus event overrides for phase status — survives DB rebuilds.
+    bus_phase_status: HashMap<String, (String, Option<String>)>,
 }
 
 impl MonitorApp {
@@ -181,6 +190,7 @@ impl MonitorApp {
             command_input: String::new(),
             command_feedback: None,
             pending_user_input: None,
+            bus_phase_status: HashMap::new(),
         })
     }
 
@@ -238,6 +248,7 @@ impl MonitorApp {
             command_input: String::new(),
             command_feedback: None,
             pending_user_input: None,
+            bus_phase_status: HashMap::new(),
         })
     }
 
@@ -274,7 +285,11 @@ impl MonitorApp {
                 match rx.try_recv() {
                     Ok(event) => collected.push(event),
                     Err(broadcast::error::TryRecvError::Empty) => break,
-                    Err(_) => break, // lagged or closed
+                    Err(broadcast::error::TryRecvError::Lagged(n)) => {
+                        tracing::warn!("Event bus lagged, missed {} events", n);
+                        continue; // cursor auto-reset, next try_recv gets oldest available
+                    }
+                    Err(broadcast::error::TryRecvError::Closed) => break,
                 }
             }
             collected
@@ -331,6 +346,22 @@ impl MonitorApp {
             self.selected_session = self.sessions.len() - 1;
         }
 
+        // In integrated mode, auto-select the live pipeline session so the DB
+        // poll and phase display match the bus events.
+        if let Some(live_id) = &self.live_session_id {
+            if let Some(pos) = self.sessions.iter().position(|s| &s.id == live_id) {
+                if self.selected_session != pos {
+                    self.selected_session = pos;
+                    // Reset seq so the DB poll doesn't skip items for the new session.
+                    // Bus-sourced transcript items are already in self.transcript;
+                    // the DB poll will add any DB-only items (e.g. from storage listener).
+                    // Duplicates are benign (rendered identically, just extra entries).
+                    self.last_seq = self.transcript.last().map(|l| l.seq).unwrap_or(0);
+                    changed = true;
+                }
+            }
+        }
+
         if self.sessions.is_empty() {
             return Ok(changed);
         }
@@ -343,7 +374,6 @@ impl MonitorApp {
         if self.preset_phase_names.is_empty() {
             self.phases = new_phases;
         } else {
-            use std::collections::HashMap;
             let db_map: HashMap<String, PhaseRecord> = new_phases
                 .into_iter()
                 .map(|p| (p.phase.clone(), p))
@@ -363,6 +393,18 @@ impl MonitorApp {
                     })
                 })
                 .collect();
+        }
+        // Re-apply bus event overrides so that a PhaseStarted received before the
+        // DB record exists is not regressed back to "pending" by the DB rebuild.
+        for phase in &mut self.phases {
+            if let Some((bus_status, bus_started_at)) = self.bus_phase_status.get(&phase.phase) {
+                if phase_status_rank(bus_status) > phase_status_rank(&phase.status) {
+                    phase.status = bus_status.clone();
+                    if bus_status == "running" && phase.started_at.is_none() {
+                        phase.started_at = bus_started_at.clone();
+                    }
+                }
+            }
         }
 
         let new_logs = self
@@ -417,13 +459,18 @@ impl MonitorApp {
                 if self.live_session_id.is_none() {
                     self.live_session_id = Some(session_id.clone());
                 }
+                let now = chrono::Utc::now().to_rfc3339();
+                self.bus_phase_status.insert(
+                    phase.to_string(),
+                    ("running".to_string(), Some(now.clone())),
+                );
                 if let Some(p) = self
                     .phases
                     .iter_mut()
                     .find(|p| p.phase == phase.to_string())
                 {
                     p.status = "running".to_string();
-                    p.started_at = Some(chrono::Utc::now().to_rfc3339());
+                    p.started_at = Some(now);
                     p.session_id = session_id;
                 }
             }
@@ -431,6 +478,8 @@ impl MonitorApp {
                 phase,
                 session_id: _,
             } => {
+                self.bus_phase_status
+                    .insert(phase.to_string(), ("completed".to_string(), None));
                 if let Some(p) = self
                     .phases
                     .iter_mut()
@@ -441,6 +490,8 @@ impl MonitorApp {
                 }
             }
             PipelineEvent::PhaseFailed { phase, .. } => {
+                self.bus_phase_status
+                    .insert(phase.to_string(), ("failed".to_string(), None));
                 if let Some(p) = self
                     .phases
                     .iter_mut()
@@ -661,9 +712,16 @@ impl MonitorApp {
                 .unwrap_or(false);
             (name, running)
         } else {
-            // Default: follow the live running phase (or last completed).
+            // Default: follow the live running phase, or fall back to the last
+            // completed/failed phase so that content stays visible between phases
+            // (e.g. during gate approval after spec completes).
             let running = self.phases.iter().find(|p| p.status == "running");
-            let phase = running.or_else(|| self.phases.last());
+            let last_done = self
+                .phases
+                .iter()
+                .rev()
+                .find(|p| p.status == "completed" || p.status == "failed");
+            let phase = running.or(last_done).or_else(|| self.phases.last());
             let name = phase.map(|p| p.phase.as_str()).unwrap_or("—");
             (name, running.is_some())
         };
@@ -696,39 +754,172 @@ impl MonitorApp {
             agent_name, session_label, phase_label
         );
 
-        let visible_height = area.height.saturating_sub(2) as usize;
+        let render_model = build_transcript_render_model(filtered_logs.iter().copied());
+        let live_model = render_model.live_model();
+        let sections = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(9), Constraint::Min(8)])
+            .split(area);
 
-        let mut all_styled: Vec<Line> = Vec::new();
-        let mut agent_buf = String::new();
+        self.render_live_overview(frame, sections[0], &live_model);
+        self.render_transcript_timeline(frame, sections[1], &render_model, &title, border_style);
+    }
 
-        let flush_agent_buf = |buf: &mut String, out: &mut Vec<Line>| {
-            if !buf.is_empty() {
-                let text = std::mem::take(buf);
-                out.append(&mut crate::md_render::markdown_to_lines(&text));
-            }
-        };
+    fn render_live_overview(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        live_model: &TranscriptLiveModel,
+    ) {
+        let mut cards = vec![
+            (
+                "ASSISTANT",
+                live_model.latest_assistant.as_ref(),
+                Style::default().fg(Color::White),
+            ),
+            (
+                "THINKING",
+                live_model.latest_thinking.as_ref(),
+                Style::default().fg(Color::Cyan),
+            ),
+            (
+                "ACTIVITY",
+                live_model.latest_activity.as_ref(),
+                Style::default().fg(Color::Yellow),
+            ),
+        ];
 
-        for log in &filtered_logs {
-            if log.kind == "message_delta" {
-                agent_buf.push_str(&log.summary);
-                continue;
-            }
+        if let Some(pending) = live_model.pending.last() {
+            cards.push((
+                "WAITING",
+                Some(pending),
+                Style::default().fg(Color::Magenta),
+            ));
+        }
 
-            if log.kind == "message" && log.summary == "message completed" {
-                continue;
-            }
+        let constraints = vec![Constraint::Ratio(1, cards.len() as u32); cards.len()];
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(constraints)
+            .split(area);
 
-            if !agent_buf.is_empty() {
-                flush_agent_buf(&mut agent_buf, &mut all_styled);
-            }
-            for raw_line in timeline_lines(log) {
-                let style = timeline_style(log);
-                all_styled.push(Line::from(Span::styled(raw_line, style)));
+        let pending_count = live_model.pending.len();
+        for ((title, block, title_style), card_area) in cards.into_iter().zip(columns.iter()) {
+            if title == "ACTIVITY" {
+                self.render_live_activity_card(
+                    frame,
+                    *card_area,
+                    live_card_title(title, pending_count, block),
+                    &live_model.recent_activity,
+                    title_style,
+                );
+            } else {
+                self.render_live_card(
+                    frame,
+                    *card_area,
+                    live_card_title(title, pending_count, block),
+                    block,
+                    title_style,
+                );
             }
         }
-        flush_agent_buf(&mut agent_buf, &mut all_styled);
+    }
 
-        // Scroll to bottom.
+    fn render_live_card(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        title: String,
+        block: Option<&RenderBlock>,
+        title_style: Style,
+    ) {
+        let max_lines = area.height.saturating_sub(2) as usize;
+        let lines = block
+            .map(|block| card_lines(block, max_lines))
+            .filter(|lines| !lines.is_empty())
+            .unwrap_or_else(|| {
+                vec![Line::from(Span::styled(
+                    "No activity yet",
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
+                ))]
+            });
+
+        let border_style = block
+            .map(|block| tone_style(block.tone))
+            .unwrap_or_default();
+        let para = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(border_style)
+                    .title(Span::styled(
+                        title,
+                        title_style.add_modifier(Modifier::BOLD),
+                    )),
+            )
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(para, area);
+    }
+
+    fn render_live_activity_card(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        title: String,
+        blocks: &[RenderBlock],
+        title_style: Style,
+    ) {
+        let max_lines = area.height.saturating_sub(2) as usize;
+        let lines = if blocks.is_empty() {
+            vec![Line::from(Span::styled(
+                "No activity yet",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            ))]
+        } else {
+            activity_card_lines(blocks, max_lines)
+        };
+
+        let border_style = blocks
+            .last()
+            .map(|block| tone_style(block.tone))
+            .unwrap_or_default();
+        let para = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(border_style)
+                    .title(Span::styled(
+                        title,
+                        title_style.add_modifier(Modifier::BOLD),
+                    )),
+            )
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(para, area);
+    }
+
+    fn render_transcript_timeline(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        render_model: &TranscriptRenderModel,
+        title: &str,
+        border_style: Style,
+    ) {
+        let visible_height = area.height.saturating_sub(2) as usize;
+        let mut all_styled: Vec<Line> = Vec::new();
+        let mut previous_kind = None;
+        for block in &render_model.blocks {
+            if previous_kind != Some(block.kind) {
+                all_styled.push(timeline_section_header(block.kind));
+                previous_kind = Some(block.kind);
+            }
+            all_styled.extend(block_lines(block));
+        }
+
         let start = all_styled.len().saturating_sub(visible_height);
         let display_lines: Vec<Line> = all_styled[start..].to_vec();
 
@@ -736,7 +927,7 @@ impl MonitorApp {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(title)
+                    .title(format!("{title}  ·  TIMELINE"))
                     .border_style(border_style),
             )
             .wrap(ratatui::widgets::Wrap { trim: false });
@@ -775,16 +966,17 @@ impl MonitorApp {
             },
         };
 
+        let live_badge = self.status_badge();
         let status_text = if let Some(feedback) = &self.command_feedback {
             if cost_part.is_empty() {
-                feedback.text.clone()
+                format!("{}  |  {}", live_badge, feedback.text)
             } else {
-                format!("{}  |  {}", feedback.text, cost_part)
+                format!("{}  |  {}  |  {}", live_badge, feedback.text, cost_part)
             }
         } else if cost_part.is_empty() {
-            nav_text.to_string()
+            format!("{}  |  {}", live_badge, nav_text)
         } else {
-            format!("{}  |  {}", nav_text, cost_part)
+            format!("{}  |  {}  |  {}", live_badge, nav_text, cost_part)
         };
 
         let style = match self
@@ -799,6 +991,28 @@ impl MonitorApp {
         };
         let para = Paragraph::new(status_text).style(style);
         frame.render_widget(para, area);
+    }
+
+    fn status_badge(&self) -> String {
+        if self.mode == TuiMode::GateOverlay {
+            return "WAITING APPROVAL".to_string();
+        }
+        if let Some(pending) = &self.pending_user_input {
+            return format!(
+                "WAITING INPUT {}/{}",
+                pending.answers.len() + 1,
+                pending.questions.len()
+            );
+        }
+        let pending_count = build_transcript_render_model(self.transcript.iter())
+            .live_model()
+            .pending
+            .len();
+        if pending_count > 0 {
+            format!("LIVE · waiting {}", pending_count)
+        } else {
+            "LIVE".to_string()
+        }
     }
 
     fn render_command_bar(&self, frame: &mut Frame, area: Rect) {
@@ -1366,6 +1580,7 @@ async fn run_follow_mode(
     );
 
     let mut last_seq: i64 = 0;
+    let mut render_engine = PlainRenderEngine::new(true);
     let tick = Duration::from_millis(500);
 
     loop {
@@ -1374,15 +1589,10 @@ async fn run_follow_mode(
         let items = storage
             .get_transcript_items_since(&session.id, last_seq)
             .await?;
-        for item in &items {
-            let time = item.created_at.get(11..19).unwrap_or("??:??:??");
-            if item.kind == "message_delta" {
-                print!("{}", item.summary);
-            } else {
-                for line in timeline_lines(item) {
-                    println!("[{}] {}", time, line);
-                }
-            }
+        let rendered = render_engine.push_records(items.clone());
+        if !rendered.is_empty() {
+            print!("{rendered}");
+            let _ = std::io::stdout().flush();
         }
         if let Some(last) = items.last() {
             last_seq = last.seq;
@@ -1586,6 +1796,17 @@ fn phase_dur_str(started_at: &Option<String>, completed_at: &Option<String>) -> 
     String::new()
 }
 
+/// Rank phase statuses so bus overrides only advance forward, never regress.
+fn phase_status_rank(status: &str) -> u8 {
+    match status {
+        "pending" => 0,
+        "running" => 1,
+        "completed" => 2,
+        "failed" => 2,
+        _ => 0,
+    }
+}
+
 fn transcript_record_from_event(item: TranscriptItem, seq: i64) -> TranscriptItemRecord {
     TranscriptItemRecord {
         id: item.id,
@@ -1687,53 +1908,199 @@ fn parse_command_action(input: &str) -> Result<Option<CommandAction>> {
     Ok(Some(action))
 }
 
-fn timeline_lines(item: &TranscriptItemRecord) -> Vec<String> {
-    let prefix = match item.kind.as_str() {
-        "tool_call" => "⚙",
-        "tool_result" => "↳",
-        "reasoning" => "⋯",
-        "plan" => "☰",
-        "command" => "$",
-        "file_change" => "Δ",
-        "approval_request" => "?",
-        "approval_decision" => "✓",
-        "usage" => "◷",
-        "phase_lifecycle" => "•",
-        "session_lifecycle" => "■",
-        _ => "·",
-    };
-    item.summary
-        .lines()
-        .map(|line| format!("{} {}", prefix, line))
-        .collect()
-}
-
-fn timeline_style(item: &TranscriptItemRecord) -> Style {
-    match item.kind.as_str() {
-        "tool_call" => Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::DIM),
-        "tool_result" => {
-            if item.status == "failed" {
-                Style::default().fg(Color::Red).add_modifier(Modifier::DIM)
-            } else {
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::DIM)
-            }
-        }
-        "reasoning" => Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-        "plan" => Style::default().fg(Color::Blue).add_modifier(Modifier::DIM),
-        "command" => Style::default().fg(Color::LightYellow),
-        "file_change" => Style::default().fg(Color::Magenta),
-        "approval_request" => Style::default().fg(Color::Yellow),
-        "approval_decision" => Style::default().fg(Color::Green),
-        "usage" => Style::default().fg(Color::DarkGray),
-        "phase_lifecycle" | "session_lifecycle" => Style::default()
+fn tone_style(tone: RenderTone) -> Style {
+    match tone {
+        RenderTone::Default => Style::default(),
+        RenderTone::Muted => Style::default()
             .fg(Color::DarkGray)
             .add_modifier(Modifier::DIM),
-        _ => Style::default(),
+        RenderTone::Info => Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+        RenderTone::Success => Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::DIM),
+        RenderTone::Warning => Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::DIM),
+        RenderTone::Error => Style::default().fg(Color::Red).add_modifier(Modifier::DIM),
     }
+}
+
+fn block_lines(block: &RenderBlock) -> Vec<Line<'static>> {
+    match &block.body {
+        RenderBlockBody::Markdown(text) => crate::md_render::markdown_to_lines(text),
+        RenderBlockBody::Lines(lines) => {
+            let style = tone_style(block.tone);
+            lines
+                .iter()
+                .map(|line| Line::from(Span::styled(line.clone(), style)))
+                .collect()
+        }
+    }
+}
+
+fn preview_lines(block: &RenderBlock, max_lines: usize) -> Vec<Line<'static>> {
+    if max_lines == 0 {
+        return Vec::new();
+    }
+
+    let mut lines = block_lines(block);
+    if lines.len() > max_lines {
+        lines = lines.split_off(lines.len().saturating_sub(max_lines));
+    }
+    lines
+}
+
+fn card_lines(block: &RenderBlock, max_lines: usize) -> Vec<Line<'static>> {
+    if max_lines == 0 {
+        return Vec::new();
+    }
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(
+            block_time(block),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            block_status_label(block),
+            tone_style(block.tone).add_modifier(Modifier::BOLD),
+        ),
+    ])];
+
+    if max_lines == 1 {
+        return lines;
+    }
+
+    let mut preview = preview_lines(block, max_lines.saturating_sub(1));
+    if preview.is_empty() {
+        preview.push(Line::from(""));
+    }
+    lines.extend(preview);
+    lines
+}
+
+fn activity_card_lines(blocks: &[RenderBlock], max_lines: usize) -> Vec<Line<'static>> {
+    if max_lines == 0 {
+        return Vec::new();
+    }
+
+    let mut lines = Vec::new();
+    for block in blocks {
+        if lines.len() >= max_lines {
+            break;
+        }
+
+        let style = tone_style(block.tone);
+        let summary = compact_block_summary(block);
+        lines.push(Line::from(vec![
+            Span::styled(
+                block_time(block),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                block_status_label(block),
+                style.add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  "),
+            Span::styled(summary, style),
+        ]));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(""));
+    }
+    lines
+}
+
+fn block_time(block: &RenderBlock) -> String {
+    block
+        .created_at
+        .as_deref()
+        .and_then(|value| value.get(11..19))
+        .unwrap_or("??:??:??")
+        .to_string()
+}
+
+fn block_status_label(block: &RenderBlock) -> String {
+    match block.status.as_deref() {
+        Some("pending") => "pending".to_string(),
+        Some("streaming") => "streaming".to_string(),
+        Some("completed") | Some("resolved") => "done".to_string(),
+        Some("failed") => "failed".to_string(),
+        Some(other) => other.replace('_', " "),
+        None => block_kind_label(block.kind).to_ascii_lowercase(),
+    }
+}
+
+fn compact_block_summary(block: &RenderBlock) -> String {
+    match &block.body {
+        RenderBlockBody::Markdown(text) => text
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .unwrap_or("assistant update")
+            .trim()
+            .to_string(),
+        RenderBlockBody::Lines(lines) => lines
+            .iter()
+            .find(|line| !line.trim().is_empty())
+            .map(|line| line.trim().to_string())
+            .unwrap_or_else(|| block_kind_label(block.kind).to_ascii_lowercase()),
+    }
+}
+
+fn live_card_title(title: &str, pending_count: usize, block: Option<&RenderBlock>) -> String {
+    let icon = match title {
+        "ASSISTANT" => "✦",
+        "THINKING" => "⋯",
+        "ACTIVITY" => "⚙",
+        "WAITING" => "?",
+        _ => "•",
+    };
+    if title == "WAITING" && pending_count > 1 {
+        format!("{icon} {title} ({pending_count})")
+    } else if let Some(block) = block {
+        format!("{icon} {} · {}", title, block_kind_label(block.kind))
+    } else {
+        format!("{icon} {title}")
+    }
+}
+
+fn block_kind_label(kind: RenderBlockKind) -> &'static str {
+    match kind {
+        RenderBlockKind::Assistant => "Assistant",
+        RenderBlockKind::Reasoning => "Reasoning",
+        RenderBlockKind::Plan => "Plan",
+        RenderBlockKind::Tool => "Tools",
+        RenderBlockKind::Command => "Commands",
+        RenderBlockKind::FileChange => "Files",
+        RenderBlockKind::Approval => "Approval",
+        RenderBlockKind::UserInput => "Input",
+        RenderBlockKind::Usage => "Usage",
+        RenderBlockKind::Lifecycle => "Lifecycle",
+        RenderBlockKind::Metadata => "Metadata",
+    }
+}
+
+fn timeline_section_header(kind: RenderBlockKind) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!("── {} ", block_kind_label(kind).to_uppercase()),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "────────────────────────",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        ),
+    ])
 }
 
 fn truncate_left(text: &str, max: usize) -> String {
@@ -1757,7 +2124,11 @@ fn truncate_left_offset(text: &str, max: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_command_action, CommandAction, Panel};
+    use super::{
+        activity_card_lines, block_kind_label, live_card_title, parse_command_action,
+        timeline_section_header, CommandAction, Panel,
+    };
+    use crate::render_model::{RenderBlock, RenderBlockBody, RenderBlockKind, RenderTone};
     use std::path::PathBuf;
 
     #[test]
@@ -1779,5 +2150,144 @@ mod tests {
     fn rejects_unknown_command() {
         let err = parse_command_action("/wat").unwrap_err();
         assert!(err.to_string().contains("Unknown command"));
+    }
+
+    #[test]
+    fn live_waiting_card_title_shows_count() {
+        assert_eq!(live_card_title("WAITING", 3, None), "? WAITING (3)");
+    }
+
+    #[test]
+    fn timeline_header_uses_kind_label() {
+        let header = timeline_section_header(RenderBlockKind::Command);
+        assert!(header
+            .spans
+            .iter()
+            .any(|span| span.content.contains("COMMANDS")));
+        assert_eq!(block_kind_label(RenderBlockKind::FileChange), "Files");
+    }
+
+    #[test]
+    fn live_card_title_includes_block_label() {
+        let block = RenderBlock {
+            kind: RenderBlockKind::Reasoning,
+            tone: RenderTone::Info,
+            source_kind: "reasoning".to_string(),
+            status: Some("streaming".to_string()),
+            item_key: Some("r1".to_string()),
+            created_at: None,
+            body: RenderBlockBody::Lines(vec!["⋯ inspecting".to_string()]),
+        };
+
+        assert_eq!(
+            live_card_title("THINKING", 0, Some(&block)),
+            "⋯ THINKING · Reasoning"
+        );
+    }
+
+    #[test]
+    fn activity_card_lines_show_recent_summaries() {
+        let command = RenderBlock {
+            kind: RenderBlockKind::Command,
+            tone: RenderTone::Warning,
+            source_kind: "command".to_string(),
+            status: Some("completed".to_string()),
+            item_key: Some("cmd-1".to_string()),
+            created_at: Some("2026-01-01T12:00:00Z".to_string()),
+            body: RenderBlockBody::Lines(vec!["$ cargo test -p koklo-cli".to_string()]),
+        };
+        let file_change = RenderBlock {
+            kind: RenderBlockKind::FileChange,
+            tone: RenderTone::Info,
+            source_kind: "file_change".to_string(),
+            status: Some("updated".to_string()),
+            item_key: Some("patch-1".to_string()),
+            created_at: Some("2026-01-01T12:00:01Z".to_string()),
+            body: RenderBlockBody::Lines(vec!["Δ apps/cli/src/monitor.rs".to_string()]),
+        };
+
+        let lines = activity_card_lines(&[command, file_change], 3);
+        let rendered = lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>();
+
+        assert!(rendered[0].contains("cargo test -p koklo-cli"));
+        assert!(rendered[1].contains("apps/cli/src/monitor.rs"));
+    }
+
+    #[test]
+    fn phase_status_rank_orders_correctly() {
+        use super::phase_status_rank;
+        assert!(phase_status_rank("running") > phase_status_rank("pending"));
+        assert!(phase_status_rank("completed") > phase_status_rank("running"));
+        assert!(phase_status_rank("failed") > phase_status_rank("running"));
+        assert_eq!(phase_status_rank("completed"), phase_status_rank("failed"));
+    }
+
+    #[test]
+    fn bus_phase_override_survives_db_rebuild() {
+        use koklo_storage::PhaseRecord;
+        use std::collections::HashMap;
+
+        // Simulate: bus says "spec" is running, but DB hasn't caught up yet.
+        let preset_phases = ["spec".to_string(), "dev".to_string()];
+        let bus_phase_status: HashMap<String, (String, Option<String>)> = {
+            let mut m = HashMap::new();
+            m.insert(
+                "spec".to_string(),
+                (
+                    "running".to_string(),
+                    Some("2026-01-01T00:00:00Z".to_string()),
+                ),
+            );
+            m
+        };
+
+        // DB returns no phases (not yet inserted).
+        let db_phases: Vec<PhaseRecord> = vec![];
+
+        // Rebuild from preset (same logic as tick())
+        let db_map: HashMap<String, PhaseRecord> = db_phases
+            .into_iter()
+            .map(|p| (p.phase.clone(), p))
+            .collect();
+        let mut phases: Vec<PhaseRecord> = preset_phases
+            .iter()
+            .map(|name| {
+                db_map.get(name).cloned().unwrap_or_else(|| PhaseRecord {
+                    id: format!("pending-{}", name),
+                    session_id: "test-session".to_string(),
+                    phase: name.clone(),
+                    status: "pending".to_string(),
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                })
+            })
+            .collect();
+
+        // Re-apply bus overrides
+        for phase in &mut phases {
+            if let Some((bus_status, bus_started_at)) = bus_phase_status.get(&phase.phase) {
+                if super::phase_status_rank(bus_status) > super::phase_status_rank(&phase.status) {
+                    phase.status = bus_status.clone();
+                    if bus_status == "running" && phase.started_at.is_none() {
+                        phase.started_at = bus_started_at.clone();
+                    }
+                }
+            }
+        }
+
+        assert_eq!(phases[0].phase, "spec");
+        assert_eq!(phases[0].status, "running");
+        assert!(phases[0].started_at.is_some());
+        assert_eq!(phases[1].phase, "dev");
+        assert_eq!(phases[1].status, "pending");
     }
 }

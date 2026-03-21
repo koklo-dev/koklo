@@ -3,9 +3,9 @@ use super::{check_claude_session, flatten_messages_to_prompt, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    compat_session, LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
-    ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderInteractionMode,
-    ProviderSession, ProviderSessionEvent, StreamChunk, UserInputPayload,
+    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
+    ProviderCapabilities, ProviderEvent, ProviderInteractionMode, ProviderSession,
+    ProviderSessionEvent, StreamChunk, UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -173,7 +173,7 @@ impl CodexCliProvider {
             .send_request(
                 "thread/start",
                 json!({
-                    "approvalPolicy": "manual",
+                    "approvalPolicy": "untrusted",
                     "cwd": self.working_dir.as_ref().map(|dir| dir.display().to_string()),
                     "ephemeral": true,
                     "personality": "pragmatic",
@@ -541,7 +541,7 @@ fn handle_codex_notification(
     turns: &mut HashMap<String, CodexTurnState>,
 ) {
     match method {
-        "agentMessage/delta" => {
+        "agentMessage/delta" | "item/agentMessage/delta" => {
             let Some(turn_id) = params.get("turnId").and_then(|value| value.as_str()) else {
                 return;
             };
@@ -559,7 +559,10 @@ fn handle_codex_notification(
                 },
             )));
         }
-        "reasoningText/delta" | "reasoningSummaryText/delta" => {
+        "reasoningText/delta"
+        | "reasoningSummaryText/delta"
+        | "item/reasoning/textDelta"
+        | "item/reasoning/summaryTextDelta" => {
             if let (Some(item_id), Some(delta)) = (
                 params.get("itemId").and_then(|value| value.as_str()),
                 params.get("delta").and_then(|value| value.as_str()),
@@ -570,7 +573,7 @@ fn handle_codex_notification(
                 })));
             }
         }
-        "plan/delta" | "turn/planUpdated" => {
+        "plan/delta" | "item/plan/delta" => {
             if let Some(delta) = params.get("delta").and_then(|value| value.as_str()) {
                 let item_id = params
                     .get("itemId")
@@ -582,7 +585,26 @@ fn handle_codex_notification(
                 })));
             }
         }
-        "commandExecution/outputDelta" => {
+        "turn/planUpdated" | "turn/plan/updated" => {
+            let item_id = params
+                .get("itemId")
+                .and_then(|value| value.as_str())
+                .map(str::to_string);
+            let plan_text = params
+                .get("delta")
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+                .or_else(|| format_plan_from_steps(params.get("plan")));
+            if let Some(text) = plan_text.filter(|text| !text.trim().is_empty()) {
+                let _ = sender.send(Ok(ProviderSessionEvent::Event(ProviderEvent::Plan {
+                    item_id,
+                    text,
+                })));
+            }
+        }
+        "commandExecution/outputDelta"
+        | "command/exec/outputDelta"
+        | "item/commandExecution/outputDelta" => {
             if let (Some(item_id), Some(delta)) = (
                 params.get("itemId").and_then(|value| value.as_str()),
                 params.get("delta").and_then(|value| value.as_str()),
@@ -593,6 +615,23 @@ fn handle_codex_notification(
                     status: "updated".to_string(),
                     exit_code: None,
                     output: Some(delta.to_string()),
+                })));
+            }
+        }
+        "item/fileChange/outputDelta" => {
+            if let (Some(item_id), Some(delta)) = (
+                params.get("itemId").and_then(|value| value.as_str()),
+                params.get("delta").and_then(|value| value.as_str()),
+            ) {
+                let summary = delta.trim();
+                if summary.is_empty() {
+                    return;
+                }
+                let _ = sender.send(Ok(ProviderSessionEvent::Event(ProviderEvent::FileChange {
+                    item_id: Some(item_id.to_string()),
+                    summary: summary.to_string(),
+                    files: Vec::new(),
+                    status: "updated".to_string(),
                 })));
             }
         }
@@ -880,7 +919,7 @@ fn parse_codex_exec_output(stdout: &str) -> Result<String, ProviderError> {
         }
 
         if let Some(item) = event.item {
-            if item.item_type == "agent_message" {
+            if matches!(item.item_type.as_str(), "agent_message" | "agentMessage") {
                 if let Some(text) = item
                     .rest
                     .get("text")
@@ -894,6 +933,45 @@ fn parse_codex_exec_output(stdout: &str) -> Result<String, ProviderError> {
     }
 
     last_message.ok_or(ProviderError::EmptyResponse)
+}
+
+fn format_plan_items(items: &[Value]) -> Option<String> {
+    let summary = items
+        .iter()
+        .filter_map(|todo| {
+            let text = todo.get("text").and_then(|value| value.as_str())?;
+            let done = todo
+                .get("completed")
+                .or_else(|| todo.get("done"))
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            Some(format!("[{}] {}", if done { "x" } else { " " }, text))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    (!summary.trim().is_empty()).then_some(summary)
+}
+
+fn format_plan_from_steps(plan: Option<&Value>) -> Option<String> {
+    let summary = plan?
+        .as_array()?
+        .iter()
+        .filter_map(|step| {
+            let text = step.get("step").and_then(|value| value.as_str())?;
+            let status = step
+                .get("status")
+                .and_then(|value| value.as_str())
+                .unwrap_or("pending");
+            let marker = match status {
+                "completed" => "x",
+                "inProgress" | "in_progress" => "~",
+                _ => " ",
+            };
+            Some(format!("[{marker}] {text}"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    (!summary.trim().is_empty()).then_some(summary)
 }
 
 fn parse_codex_stream_line(line: &str) -> (Vec<ProviderEvent>, Option<CompletionUsage>) {
@@ -942,7 +1020,7 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
         .to_string();
 
     let provider_event = match item.item_type.as_str() {
-        "agent_message" => item
+        "agent_message" | "agentMessage" => item
             .rest
             .get("text")
             .and_then(|value| value.as_str())
@@ -954,34 +1032,49 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
             .rest
             .get("text")
             .and_then(|value| value.as_str())
+            .map(str::to_string)
+            .or_else(|| {
+                item.rest
+                    .get("summary")
+                    .and_then(Value::as_array)
+                    .map(|parts| {
+                        parts
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    })
+            })
+            .or_else(|| {
+                item.rest
+                    .get("content")
+                    .and_then(Value::as_array)
+                    .map(|parts| {
+                        parts
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    })
+            })
             .filter(|text| !text.trim().is_empty())
-            .map(|text| ProviderEvent::Reasoning {
-                item_id,
-                text: text.to_string(),
-            }),
+            .map(|text| ProviderEvent::Reasoning { item_id, text }),
         "todo_list" => item
             .rest
             .get("items")
             .and_then(|value| value.as_array())
-            .map(|items| {
-                let summary = items
-                    .iter()
-                    .filter_map(|todo| {
-                        let text = todo.get("text").and_then(|value| value.as_str())?;
-                        let done = todo
-                            .get("completed")
-                            .and_then(|value| value.as_bool())
-                            .unwrap_or(false);
-                        Some(format!("[{}] {}", if done { "x" } else { " " }, text))
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                ProviderEvent::Plan {
-                    item_id,
-                    text: summary,
-                }
+            .and_then(|items| format_plan_items(items))
+            .map(|text| ProviderEvent::Plan { item_id, text }),
+        "plan" => item
+            .rest
+            .get("text")
+            .and_then(|value| value.as_str())
+            .filter(|text| !text.trim().is_empty())
+            .map(|text| ProviderEvent::Plan {
+                item_id,
+                text: text.to_string(),
             }),
-        "command_execution" => {
+        "command_execution" | "commandExecution" => {
             let command = item
                 .rest
                 .get("command")
@@ -991,9 +1084,14 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
             let output = item
                 .rest
                 .get("aggregated_output")
+                .or_else(|| item.rest.get("aggregatedOutput"))
                 .and_then(|value| value.as_str())
                 .map(|value| value.to_string());
-            let exit_code = item.rest.get("exit_code").and_then(|value| value.as_i64());
+            let exit_code = item
+                .rest
+                .get("exit_code")
+                .or_else(|| item.rest.get("exitCode"))
+                .and_then(|value| value.as_i64());
             Some(ProviderEvent::Command {
                 item_id,
                 command,
@@ -1002,7 +1100,7 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
                 output,
             })
         }
-        "file_change" => {
+        "file_change" | "fileChange" => {
             let files = item
                 .rest
                 .get("changes")
@@ -1027,7 +1125,7 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
                 status,
             })
         }
-        "mcp_tool_call" => {
+        "mcp_tool_call" | "mcpToolCall" => {
             let server = item
                 .rest
                 .get("server")
@@ -1071,15 +1169,16 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
                 })
             }
         }
-        "web_search" => item
-            .rest
-            .get("query")
-            .and_then(|value| value.as_str())
-            .map(|query| ProviderEvent::ToolCall {
-                item_id,
-                tool_name: "web_search".to_string(),
-                input_summary: query.to_string(),
-            }),
+        "web_search" | "webSearch" => {
+            item.rest
+                .get("query")
+                .and_then(|value| value.as_str())
+                .map(|query| ProviderEvent::ToolCall {
+                    item_id,
+                    tool_name: "web_search".to_string(),
+                    input_summary: query.to_string(),
+                })
+        }
         other => Some(ProviderEvent::Metadata {
             item_id,
             kind: other.to_string(),
@@ -1096,9 +1195,8 @@ impl LlmProvider for CodexCliProvider {
         self: Arc<Self>,
         messages: Vec<Message>,
     ) -> Result<Box<dyn ProviderSession>> {
-        if self.sandbox.is_some() {
-            return Ok(compat_session(self, messages));
-        }
+        // Always use the app-server session for real-time streaming.
+        // The sandbox is only used as a fallback in complete_stream (exec mode).
         self.spawn_app_server_session(messages).await
     }
 
@@ -1312,5 +1410,88 @@ WARNING: cache issue
         assert_eq!(request.item_id.as_deref(), Some("cmd-1"));
         assert_eq!(request.kind, ProviderApprovalKind::CommandExecution);
         assert!(request.description.contains("cargo test -p koklo-cli"));
+    }
+
+    #[test]
+    fn test_parse_codex_stream_line_supports_camel_case_item_types() {
+        let line = r#"{"type":"item.completed","item":{"id":"cmd-1","type":"commandExecution","command":"cargo test -p koklo-cli","aggregatedOutput":"ok\n","exitCode":0,"status":"completed"}}"#;
+
+        let (events, usage) = parse_codex_stream_line(line);
+        assert!(usage.is_none());
+        assert!(matches!(
+            events.as_slice(),
+            [ProviderEvent::Command {
+                item_id,
+                command,
+                status,
+                exit_code,
+                output,
+            }] if item_id.as_deref() == Some("cmd-1")
+                && command == "cargo test -p koklo-cli"
+                && status == "completed"
+                && *exit_code == Some(0)
+                && output.as_deref() == Some("ok\n")
+        ));
+    }
+
+    #[test]
+    fn test_handle_codex_notification_supports_v2_methods() {
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let mut turns = HashMap::new();
+
+        handle_codex_notification(
+            "turn/plan/updated",
+            json!({
+                "turnId": "turn-1",
+                "threadId": "thread-1",
+                "plan": [
+                    { "step": "Inspect files", "status": "completed" },
+                    { "step": "Patch renderer", "status": "inProgress" }
+                ]
+            }),
+            &sender,
+            &mut turns,
+        );
+
+        let event = receiver.try_recv().expect("plan event").expect("ok event");
+        assert!(matches!(
+            event,
+            ProviderSessionEvent::Event(ProviderEvent::Plan { text, .. })
+                if text == "[x] Inspect files\n[~] Patch renderer"
+        ));
+    }
+
+    #[test]
+    fn test_handle_codex_notification_emits_file_change_delta() {
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let mut turns = HashMap::new();
+
+        handle_codex_notification(
+            "item/fileChange/outputDelta",
+            json!({
+                "itemId": "patch-1",
+                "turnId": "turn-1",
+                "threadId": "thread-1",
+                "delta": "Updated apps/cli/src/monitor.rs"
+            }),
+            &sender,
+            &mut turns,
+        );
+
+        let event = receiver
+            .try_recv()
+            .expect("file change event")
+            .expect("ok event");
+        assert!(matches!(
+            event,
+            ProviderSessionEvent::Event(ProviderEvent::FileChange {
+                item_id,
+                summary,
+                status,
+                ..
+            }) if item_id.as_deref() == Some("patch-1")
+                && summary == "Updated apps/cli/src/monitor.rs"
+                && status == "updated"
+        ));
     }
 }

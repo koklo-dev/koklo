@@ -7,8 +7,9 @@ use koklo_events::{
     UserInputQuestion,
 };
 use koklo_providers::{
-    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
-    ProviderEvent, ProviderInteractionMode, ProviderSessionEvent, UserInputPayload,
+    canonical_approval_kind, LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
+    ProviderApprovalPayload, ProviderEvent, ProviderInteractionMode, ProviderSessionEvent,
+    UserInputPayload,
 };
 use serde_json::json;
 use std::path::PathBuf;
@@ -302,6 +303,7 @@ fn emit_text_delta(
         buffers.turn_text.push_str(&visible);
         if STREAM_STDOUT.load(Ordering::Relaxed) {
             print!("{}", visible);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
         }
     }
 }
@@ -338,11 +340,14 @@ fn handle_provider_event(
                 TranscriptItemStatus::Pending,
                 format!("{} {}", tool_name, input_summary),
             )
-            .with_payload(json!({
-                "tool_name": tool_name,
-                "input_summary": input_summary,
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::ToolCall {
+                    item_id: item_id.clone(),
+                    tool_name: tool_name.clone(),
+                    input_summary: input_summary.clone(),
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -376,12 +381,15 @@ fn handle_provider_event(
                 },
                 format!("{} {}", tool_name, output_summary),
             )
-            .with_payload(json!({
-                "tool_name": tool_name,
-                "output_summary": output_summary,
-                "success": success,
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::ToolResult {
+                    item_id: item_id.clone(),
+                    tool_name: tool_name.clone(),
+                    output_summary: output_summary.clone(),
+                    success,
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -400,9 +408,13 @@ fn handle_provider_event(
                 TranscriptItemStatus::Info,
                 text.clone(),
             )
-            .with_payload(json!({
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::Reasoning {
+                    item_id: item_id.clone(),
+                    text: text.clone(),
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -421,9 +433,13 @@ fn handle_provider_event(
                 TranscriptItemStatus::Info,
                 text.clone(),
             )
-            .with_payload(json!({
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::Plan {
+                    item_id: item_id.clone(),
+                    text: text.clone(),
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -454,12 +470,16 @@ fn handle_provider_event(
                 },
                 command.clone(),
             )
-            .with_payload(json!({
-                "status": status,
-                "exit_code": exit_code,
-                "output": output,
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::Command {
+                    item_id: item_id.clone(),
+                    command: command.clone(),
+                    status: status.clone(),
+                    exit_code,
+                    output: output.clone(),
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -487,11 +507,15 @@ fn handle_provider_event(
                 },
                 summary.clone(),
             )
-            .with_payload(json!({
-                "files": files,
-                "status": status,
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::FileChange {
+                    item_id: item_id.clone(),
+                    summary: summary.clone(),
+                    files: files.clone(),
+                    status: status.clone(),
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -557,11 +581,14 @@ fn handle_provider_event(
                 TranscriptItemStatus::Info,
                 format!("provider metadata: {}", kind),
             )
-            .with_payload(json!({
-                "kind": kind,
-                "value": value,
-                "interaction_mode": interaction_mode_label(context.interaction_mode),
-            }));
+            .with_payload(provider_contract_payload(
+                ProviderEvent::Metadata {
+                    item_id: item_id.clone(),
+                    kind: kind.clone(),
+                    value: value.clone(),
+                },
+                context.interaction_mode,
+            ));
             context.bus.send(PipelineEvent::Transcript {
                 item: match item_id {
                     Some(id) => item.with_item_key(id),
@@ -604,10 +631,16 @@ fn emit_user_input_request(
         format!("{} question(s) for the user", display.questions.len()),
     )
     .with_item_key(display.request_id.clone())
-    .with_payload(json!({
-        "questions": display.questions,
-        "interaction_mode": interaction_mode,
-    }));
+    .with_payload(runtime_contract_payload(
+        "user_input_request",
+        "pending",
+        Some(display.request_id.as_str()),
+        json!({
+            "question_count": display.questions.len(),
+            "questions": display.questions,
+            "interaction_mode": interaction_mode,
+        }),
+    ));
     bus.send(PipelineEvent::Transcript { item });
 }
 
@@ -629,12 +662,18 @@ fn emit_approval_request(
         request.description.clone(),
     )
     .with_item_key(request.request_id.clone())
-    .with_payload(json!({
-        "item_id": request.item_id,
-        "kind": format!("{:?}", request.kind),
-        "details": request.details,
-        "interaction_mode": interaction_mode,
-    }));
+    .with_payload(runtime_contract_payload(
+        "approval_request",
+        "pending",
+        Some(request.request_id.as_str()),
+        json!({
+            "item_id": request.item_id,
+            "approval_kind": canonical_approval_kind(request.kind),
+            "description": request.description,
+            "details": request.details,
+            "interaction_mode": interaction_mode,
+        }),
+    ));
     bus.send(PipelineEvent::Transcript { item });
 }
 
@@ -670,7 +709,12 @@ fn emit_user_input_response(
         format!("answered {} question(s)", answers_payload.len()),
     )
     .with_item_key(display.request_id.clone())
-    .with_payload(json!({ "answers": answers_payload }));
+    .with_payload(runtime_contract_payload(
+        "user_input_response",
+        "resolved",
+        Some(display.request_id.as_str()),
+        json!({ "answers": answers_payload }),
+    ));
     bus.send(PipelineEvent::Transcript { item });
 }
 
@@ -697,12 +741,17 @@ fn emit_approval_response(
         format!("{} approval for {}", action, request.description),
     )
     .with_item_key(request.request_id.clone())
-    .with_payload(json!({
-        "action": action,
-        "path": path,
-        "item_id": request.item_id,
-        "kind": format!("{:?}", request.kind),
-    }));
+    .with_payload(runtime_contract_payload(
+        "approval_decision",
+        "resolved",
+        Some(request.request_id.as_str()),
+        json!({
+            "action": action,
+            "path": path,
+            "item_id": request.item_id,
+            "approval_kind": canonical_approval_kind(request.kind),
+        }),
+    ));
     bus.send(PipelineEvent::Transcript { item });
 }
 
@@ -722,6 +771,38 @@ fn interaction_mode_label(mode: ProviderInteractionMode) -> &'static str {
         ProviderInteractionMode::Normalized => "normalized",
         ProviderInteractionMode::Synthetic => "synthetic",
     }
+}
+
+fn provider_contract_payload(
+    event: ProviderEvent,
+    interaction_mode: ProviderInteractionMode,
+) -> serde_json::Value {
+    let mut payload = event.canonical_payload();
+    if let Some(map) = payload.as_object_mut() {
+        map.insert(
+            "interaction_mode".to_string(),
+            json!(interaction_mode_label(interaction_mode)),
+        );
+    }
+    payload
+}
+
+fn runtime_contract_payload(
+    event_name: &str,
+    event_status: &str,
+    item_id: Option<&str>,
+    mut payload: serde_json::Value,
+) -> serde_json::Value {
+    if let Some(map) = payload.as_object_mut() {
+        map.insert(
+            "contract_version".to_string(),
+            json!(ProviderEvent::CONTRACT_VERSION),
+        );
+        map.insert("event_name".to_string(), json!(event_name));
+        map.insert("event_status".to_string(), json!(event_status));
+        map.insert("item_id".to_string(), json!(item_id));
+    }
+    payload
 }
 
 fn with_user_input_protocol(system_prompt: String) -> String {
@@ -1271,5 +1352,73 @@ mod tests {
             approvals[0].decision,
             ProviderApprovalDecision::Approve
         ));
+    }
+
+    #[test]
+    fn provider_contract_payload_adds_interaction_mode() {
+        let payload = provider_contract_payload(
+            ProviderEvent::ToolCall {
+                item_id: Some("tool-1".to_string()),
+                tool_name: "Read".to_string(),
+                input_summary: "Cargo.toml".to_string(),
+            },
+            ProviderInteractionMode::Native,
+        );
+
+        assert_eq!(
+            payload
+                .get("contract_version")
+                .and_then(serde_json::Value::as_str),
+            Some(ProviderEvent::CONTRACT_VERSION)
+        );
+        assert_eq!(
+            payload
+                .get("event_name")
+                .and_then(serde_json::Value::as_str),
+            Some("tool_call")
+        );
+        assert_eq!(
+            payload
+                .get("interaction_mode")
+                .and_then(serde_json::Value::as_str),
+            Some("native")
+        );
+        assert_eq!(
+            payload.get("tool_kind").and_then(serde_json::Value::as_str),
+            Some("read")
+        );
+    }
+
+    #[test]
+    fn runtime_contract_payload_adds_contract_fields() {
+        let payload = runtime_contract_payload(
+            "approval_decision",
+            "resolved",
+            Some("approval-1"),
+            json!({ "action": "approve" }),
+        );
+
+        assert_eq!(
+            payload
+                .get("contract_version")
+                .and_then(serde_json::Value::as_str),
+            Some(ProviderEvent::CONTRACT_VERSION)
+        );
+        assert_eq!(
+            payload
+                .get("event_name")
+                .and_then(serde_json::Value::as_str),
+            Some("approval_decision")
+        );
+        assert_eq!(
+            payload
+                .get("event_status")
+                .and_then(serde_json::Value::as_str),
+            Some("resolved")
+        );
+        assert_eq!(
+            payload.get("item_id").and_then(serde_json::Value::as_str),
+            Some("approval-1")
+        );
     }
 }

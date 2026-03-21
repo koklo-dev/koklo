@@ -29,7 +29,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use koklo_events::{CompletionUsage, CostDisplay, UserInputQuestion};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -159,6 +159,202 @@ pub enum ProviderEvent {
         kind: String,
         value: Value,
     },
+}
+
+impl ProviderEvent {
+    pub const CONTRACT_VERSION: &'static str = "koklo.provider_event.v1";
+
+    pub fn item_id(&self) -> Option<&str> {
+        match self {
+            ProviderEvent::MessageDelta { .. } | ProviderEvent::MessageCompleted => None,
+            ProviderEvent::ToolCall { item_id, .. }
+            | ProviderEvent::ToolResult { item_id, .. }
+            | ProviderEvent::Reasoning { item_id, .. }
+            | ProviderEvent::Plan { item_id, .. }
+            | ProviderEvent::Command { item_id, .. }
+            | ProviderEvent::FileChange { item_id, .. }
+            | ProviderEvent::UserInputRequest { item_id, .. }
+            | ProviderEvent::ApprovalRequest { item_id, .. }
+            | ProviderEvent::Metadata { item_id, .. } => item_id.as_deref(),
+        }
+    }
+
+    pub fn canonical_event_name(&self) -> &'static str {
+        match self {
+            ProviderEvent::MessageDelta { .. } => "assistant_text_delta",
+            ProviderEvent::MessageCompleted => "assistant_text_completed",
+            ProviderEvent::ToolCall { .. } => "tool_call",
+            ProviderEvent::ToolResult { .. } => "tool_result",
+            ProviderEvent::Reasoning { .. } => "reasoning_delta",
+            ProviderEvent::Plan { .. } => "plan_update",
+            ProviderEvent::Command { .. } => "command_update",
+            ProviderEvent::FileChange { .. } => "file_change",
+            ProviderEvent::UserInputRequest { .. } => "user_input_request",
+            ProviderEvent::ApprovalRequest { .. } => "approval_request",
+            ProviderEvent::Metadata { .. } => "provider_metadata",
+        }
+    }
+
+    pub fn canonical_status(&self) -> &'static str {
+        match self {
+            ProviderEvent::MessageDelta { .. } => "streaming",
+            ProviderEvent::MessageCompleted => "completed",
+            ProviderEvent::ToolCall { .. } => "pending",
+            ProviderEvent::ToolResult {
+                success: Some(false),
+                ..
+            } => "failed",
+            ProviderEvent::ToolResult { .. } => "completed",
+            ProviderEvent::Reasoning { .. } => "streaming",
+            ProviderEvent::Plan { .. } => "info",
+            ProviderEvent::Command { status, .. } => match status.as_str() {
+                "completed" => "completed",
+                "failed" => "failed",
+                "in_progress" | "updated" => "streaming",
+                _ => "streaming",
+            },
+            ProviderEvent::FileChange { status, .. } => match status.as_str() {
+                "failed" => "failed",
+                "completed" => "completed",
+                _ => "streaming",
+            },
+            ProviderEvent::UserInputRequest { .. } | ProviderEvent::ApprovalRequest { .. } => {
+                "pending"
+            }
+            ProviderEvent::Metadata { .. } => "info",
+        }
+    }
+
+    pub fn canonical_payload(&self) -> Value {
+        let mut payload = match self {
+            ProviderEvent::MessageDelta { text } => json!({
+                "text": text,
+            }),
+            ProviderEvent::MessageCompleted => json!({}),
+            ProviderEvent::ToolCall {
+                tool_name,
+                input_summary,
+                ..
+            } => json!({
+                "tool_name": tool_name,
+                "tool_kind": canonical_tool_kind(tool_name),
+                "input_summary": input_summary,
+            }),
+            ProviderEvent::ToolResult {
+                tool_name,
+                output_summary,
+                success,
+                ..
+            } => json!({
+                "tool_name": tool_name,
+                "tool_kind": canonical_tool_kind(tool_name),
+                "output_summary": output_summary,
+                "success": success,
+            }),
+            ProviderEvent::Reasoning { text, .. } => json!({
+                "text": text,
+            }),
+            ProviderEvent::Plan { text, .. } => json!({
+                "text": text,
+            }),
+            ProviderEvent::Command {
+                command,
+                status,
+                exit_code,
+                output,
+                ..
+            } => json!({
+                "command": command,
+                "status": status,
+                "exit_code": exit_code,
+                "output": output,
+            }),
+            ProviderEvent::FileChange {
+                summary,
+                files,
+                status,
+                ..
+            } => json!({
+                "summary": summary,
+                "files": files,
+                "file_count": files.len(),
+                "status": status,
+            }),
+            ProviderEvent::UserInputRequest { questions, .. } => json!({
+                "question_count": questions.len(),
+                "questions": questions,
+            }),
+            ProviderEvent::ApprovalRequest {
+                request_id,
+                kind,
+                description,
+                details,
+                ..
+            } => json!({
+                "request_id": request_id,
+                "approval_kind": canonical_approval_kind(*kind),
+                "description": description,
+                "details": details,
+            }),
+            ProviderEvent::Metadata { kind, value, .. } => json!({
+                "kind": kind,
+                "value": value,
+            }),
+        };
+
+        if let Some(map) = payload.as_object_mut() {
+            map.insert(
+                "contract_version".to_string(),
+                json!(Self::CONTRACT_VERSION),
+            );
+            map.insert("event_name".to_string(), json!(self.canonical_event_name()));
+            map.insert("event_status".to_string(), json!(self.canonical_status()));
+            map.insert("item_id".to_string(), json!(self.item_id()));
+        }
+
+        payload
+    }
+}
+
+pub fn canonical_tool_kind(tool_name: &str) -> &'static str {
+    let lower = tool_name.trim().to_ascii_lowercase();
+    if lower.is_empty() {
+        return "other";
+    }
+    if lower.contains("read") {
+        return "read";
+    }
+    if lower.contains("grep") || lower.contains("glob") || lower.contains("search") {
+        return "search";
+    }
+    if lower.contains("edit") || lower.contains("patch") {
+        return "edit";
+    }
+    if lower == "write" || lower.contains("write") {
+        return "write";
+    }
+    if lower.contains("bash") || lower.contains("command") || lower.contains("exec") {
+        return "command";
+    }
+    if lower.contains("web_search") || lower.contains("web-search") {
+        return "search";
+    }
+    if lower.contains("sendusermessage") || lower.contains("ask_user") {
+        return "user_input";
+    }
+    if lower.contains('/') {
+        return "mcp";
+    }
+    "other"
+}
+
+pub fn canonical_approval_kind(kind: ProviderApprovalKind) -> &'static str {
+    match kind {
+        ProviderApprovalKind::CommandExecution => "command_execution",
+        ProviderApprovalKind::FileChange => "file_change",
+        ProviderApprovalKind::Permissions => "permissions",
+        ProviderApprovalKind::PatchApply => "patch_apply",
+    }
 }
 
 /// Stream item emitted by a provider session.
@@ -625,5 +821,51 @@ mod tests {
         assert!(!p.base_url.is_empty());
         assert!(!p.model.is_empty());
         assert_eq!(p.provider_name(), "ollama");
+    }
+
+    #[test]
+    fn test_canonical_tool_kind_normalizes_common_cli_tools() {
+        assert_eq!(canonical_tool_kind("Read"), "read");
+        assert_eq!(canonical_tool_kind("Grep"), "search");
+        assert_eq!(canonical_tool_kind("Edit"), "edit");
+        assert_eq!(canonical_tool_kind("Write"), "write");
+        assert_eq!(canonical_tool_kind("Bash"), "command");
+        assert_eq!(canonical_tool_kind("web_search"), "search");
+        assert_eq!(canonical_tool_kind("mcp/filesystem"), "mcp");
+    }
+
+    #[test]
+    fn test_provider_event_canonical_payload_includes_contract_fields() {
+        let payload = ProviderEvent::ToolCall {
+            item_id: Some("tool-1".to_string()),
+            tool_name: "Read".to_string(),
+            input_summary: "Cargo.toml".to_string(),
+        }
+        .canonical_payload();
+
+        assert_eq!(
+            payload.get("contract_version").and_then(Value::as_str),
+            Some(ProviderEvent::CONTRACT_VERSION)
+        );
+        assert_eq!(
+            payload.get("event_name").and_then(Value::as_str),
+            Some("tool_call")
+        );
+        assert_eq!(
+            payload.get("event_status").and_then(Value::as_str),
+            Some("pending")
+        );
+        assert_eq!(
+            payload.get("item_id").and_then(Value::as_str),
+            Some("tool-1")
+        );
+        assert_eq!(
+            payload.get("tool_kind").and_then(Value::as_str),
+            Some("read")
+        );
+        assert_eq!(
+            payload.get("input_summary").and_then(Value::as_str),
+            Some("Cargo.toml")
+        );
     }
 }

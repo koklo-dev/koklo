@@ -25,6 +25,8 @@ mod home_dirs;
 mod mcp_bridge;
 mod md_render;
 mod monitor;
+mod plain_render;
+mod render_model;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -32,7 +34,8 @@ use koklo_events::{GateChannel, UserInputChannel};
 use koklo_providers::registry::build_provider;
 use koklo_providers::{
     has_secret, load_secrets_into_env, resolve_secret, ClaudeCodeCliProvider, LlmProvider,
-    OllamaProvider, OpenRouterProvider, PipelineTomlConfig, ProviderRegistry, ProviderTomlEntry,
+    OllamaProvider, OpenRouterProvider, PipelineTomlConfig, ProviderRegistry, ProviderSessionEvent,
+    ProviderTomlEntry,
 };
 use koklo_workflow_engine::{
     presets::{phases_for_preset, PresetKind},
@@ -40,9 +43,12 @@ use koklo_workflow_engine::{
     TuiGateHandler, TuiUserInputHandler,
 };
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
+
+use crate::plain_render::{provider_event_to_record, PlainRenderEngine};
 
 // ── CLI structure ─────────────────────────────────────────────────────────────
 
@@ -1219,15 +1225,19 @@ async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
     println!("Running agent '{}'...\n", name);
     use koklo_providers::Message;
     let messages = vec![Message::system(system_prompt), Message::user(prompt)];
-    let mut output = String::new();
-    let (_text, _usage) = provider
-        .complete_stream(messages, &mut |chunk| {
-            if !chunk.text.is_empty() {
-                print!("{}", chunk.text);
-                output.push_str(&chunk.text);
-            }
-        })
-        .await?;
+    let mut session = Arc::clone(&provider).start_session(messages).await?;
+    let mut render_engine = PlainRenderEngine::new(true);
+    let mut seq = 0i64;
+
+    while let ProviderSessionEvent::Event(event) = session.next_event().await? {
+        seq += 1;
+        let record = provider_event_to_record(event, seq, Some(name));
+        let rendered = render_engine.push_record(record);
+        if !rendered.is_empty() {
+            print!("{rendered}");
+            let _ = std::io::stdout().flush();
+        }
+    }
     println!();
     Ok(())
 }

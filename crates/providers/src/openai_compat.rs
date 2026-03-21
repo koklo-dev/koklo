@@ -1,7 +1,7 @@
 //! Shared OpenAI-protocol HTTP SSE implementation.
 //! Used by both OpenAIProvider and MistralProvider.
 use crate::error::ProviderError;
-use crate::{LlmProvider, Message, StreamChunk};
+use crate::{LlmProvider, Message, ProviderEvent, StreamChunk};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures_util::StreamExt;
@@ -153,21 +153,38 @@ impl LlmProvider for OpenAICompatProvider {
         let mut full_text = String::new();
         let mut usage = CompletionUsage::default();
         let mut stream = resp.bytes_stream();
+        let mut line_buffer = String::new();
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|_e| ProviderError::StreamInterrupted {
                 bytes: full_text.len(),
             })?;
-            let text = String::from_utf8_lossy(&chunk);
-            for line in text.lines() {
-                if let Some(data) = line.strip_prefix("data: ") {
+            line_buffer.push_str(&String::from_utf8_lossy(&chunk));
+            while let Some(pos) = line_buffer.find('\n') {
+                let line = line_buffer[..pos].to_string();
+                line_buffer.drain(..=pos);
+                let trimmed = line.trim();
+                if let Some(data) = trimmed.strip_prefix("data: ") {
                     if data.trim() == "[DONE]" {
                         break;
                     }
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                        if let Some(t) = json["choices"][0]["delta"]["content"].as_str() {
-                            full_text.push_str(t);
-                            on_chunk(StreamChunk::text(t));
+                        if let Some(delta) = json["choices"][0].get("delta") {
+                            if let Some(t) = delta["content"].as_str() {
+                                if !t.is_empty() {
+                                    full_text.push_str(t);
+                                    on_chunk(StreamChunk::text(t));
+                                }
+                            }
+                            if let Some(r) = delta.get("reasoning_content").and_then(|v| v.as_str())
+                            {
+                                if !r.is_empty() {
+                                    on_chunk(StreamChunk::event(ProviderEvent::Reasoning {
+                                        item_id: None,
+                                        text: r.to_string(),
+                                    }));
+                                }
+                            }
                         }
                         // Parse usage from final chunk (when stream_options.include_usage=true)
                         if let Some(u) = json.get("usage") {
@@ -310,5 +327,80 @@ mod tests {
         let pe = err.downcast_ref::<ProviderError>().unwrap();
         assert!(matches!(pe, ProviderError::RateLimited { attempts: 3 }));
         server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn test_sse_line_split_across_chunks() {
+        // Simulate a TCP split: the SSE line is cut between two byte chunks.
+        let server = MockServer::start().await;
+        let full_sse =
+            "data: {\"choices\":[{\"delta\":{\"content\":\"split\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n\n"
+                .to_string();
+        // Split mid-JSON to simulate TCP fragmentation
+        let split_at = 25;
+        let part1 = &full_sse[..split_at];
+        let part2 = &full_sse[split_at..];
+        let body = format!("{}{}", part1, part2);
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let p = OpenAICompatProvider::new(
+            "test-key",
+            "gpt-4o",
+            server.uri(),
+            "openai",
+            "OPENAI_API_KEY",
+        );
+        let messages = vec![crate::Message::user("hi")];
+        let mut chunks = vec![];
+        let (result, _usage) = p
+            .complete_stream(messages, &mut |c| {
+                if !c.text.is_empty() {
+                    chunks.push(c.text.clone());
+                }
+            })
+            .await
+            .unwrap();
+        assert_eq!(result, "split");
+        assert!(chunks.contains(&"split".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_sse_reasoning_content() {
+        let server = MockServer::start().await;
+        let body = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking hard\"},\"finish_reason\":null}]}\n\n\
+                    data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":null}]}\n\n\
+                    data: [DONE]\n\n";
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let p = OpenAICompatProvider::new(
+            "test-key",
+            "model",
+            server.uri(),
+            "openai",
+            "OPENAI_API_KEY",
+        );
+        let messages = vec![crate::Message::user("hi")];
+        let mut saw_reasoning = false;
+        let (result, _usage) = p
+            .complete_stream(messages, &mut |c| {
+                for event in &c.events {
+                    if matches!(event, crate::ProviderEvent::Reasoning { text, .. } if text == "thinking hard")
+                    {
+                        saw_reasoning = true;
+                    }
+                }
+            })
+            .await
+            .unwrap();
+        assert_eq!(result, "answer");
+        assert!(saw_reasoning, "should have emitted a Reasoning event");
     }
 }
