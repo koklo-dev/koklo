@@ -359,18 +359,30 @@ impl SessionManager {
             sqlx::query_as("SELECT COUNT(*) FROM schema_migrations WHERE version = 8")
                 .fetch_one(&self.pool)
                 .await?;
-        if count == 0 {
+        let transcript_items_exists = self.table_exists("transcript_items").await?;
+        if count == 0 || !transcript_items_exists {
             sqlx::query(include_str!("../migrations/008_transcript_items.sql"))
                 .execute(&self.pool)
                 .await?;
-            let now = Utc::now().to_rfc3339();
-            sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (8, ?)")
-                .bind(&now)
-                .execute(&self.pool)
-                .await?;
+            if count == 0 {
+                let now = Utc::now().to_rfc3339();
+                sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (8, ?)")
+                    .bind(&now)
+                    .execute(&self.pool)
+                    .await?;
+            }
         }
 
         Ok(())
+    }
+
+    async fn table_exists(&self, table_name: &str) -> Result<bool> {
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?")
+                .bind(table_name)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(count > 0)
     }
 
     /// Create a new session with the given title, workflow preset, and project path.
@@ -1063,6 +1075,29 @@ mod tests {
         let mgr = SessionManager::in_memory().await.unwrap();
         // Second call to migrate should be a no-op.
         mgr.migrate().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_migrate_repairs_missing_transcript_items_table_when_version_marker_exists() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            "CREATE TABLE schema_migrations \
+             (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (8, ?)")
+            .bind(Utc::now().to_rfc3339())
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let mgr = SessionManager { pool };
+        mgr.migrate().await.unwrap();
+
+        let exists = mgr.table_exists("transcript_items").await.unwrap();
+        assert!(exists);
     }
 
     #[tokio::test]
