@@ -166,7 +166,7 @@ impl LlmProvider for OpenRouterProvider {
             tool_calls_native: false,
             approvals_native: false,
             user_input_native: false,
-            reasoning_visible: false,
+            reasoning_visible: true,
             interaction_mode: ProviderInteractionMode::Synthetic,
         }
     }
