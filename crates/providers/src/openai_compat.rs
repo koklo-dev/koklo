@@ -176,8 +176,7 @@ impl LlmProvider for OpenAICompatProvider {
                                     on_chunk(StreamChunk::text(t));
                                 }
                             }
-                            if let Some(r) =
-                                delta.get("reasoning_content").and_then(|v| v.as_str())
+                            if let Some(r) = delta.get("reasoning_content").and_then(|v| v.as_str())
                             {
                                 if !r.is_empty() {
                                     on_chunk(StreamChunk::event(ProviderEvent::Reasoning {
@@ -334,9 +333,9 @@ mod tests {
     async fn test_sse_line_split_across_chunks() {
         // Simulate a TCP split: the SSE line is cut between two byte chunks.
         let server = MockServer::start().await;
-        let full_sse = format!(
-            "data: {{\"choices\":[{{\"delta\":{{\"content\":\"split\"}},\"finish_reason\":null}}]}}\n\ndata: [DONE]\n\n"
-        );
+        let full_sse =
+            "data: {\"choices\":[{\"delta\":{\"content\":\"split\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n\n"
+                .to_string();
         // Split mid-JSON to simulate TCP fragmentation
         let split_at = 25;
         let part1 = &full_sse[..split_at];

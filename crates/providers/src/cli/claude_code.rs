@@ -8,9 +8,9 @@ use super::{check_claude_session, flatten_messages_to_prompt, strip_ansi, CliMod
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
-    ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderInteractionMode,
-    ProviderSession, ProviderSessionEvent, StreamChunk, UserInputPayload,
+    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
+    ProviderCapabilities, ProviderEvent, ProviderInteractionMode, ProviderSession,
+    ProviderSessionEvent, StreamChunk, UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -851,15 +851,12 @@ fn parse_stream_json_line(
         // Streaming content deltas — emitted during generation before the final
         // "assistant" block.  Handling these gives the TUI live text updates.
         "content_block_delta" => {
-            match val["delta"]["type"].as_str().unwrap_or("") {
-                "text_delta" => {
-                    if let Some(t) = val["delta"]["text"].as_str() {
-                        if !t.is_empty() {
-                            return vec![StreamJsonEvent::TextDelta(t.to_string())];
-                        }
+            if val["delta"]["type"].as_str().unwrap_or("") == "text_delta" {
+                if let Some(t) = val["delta"]["text"].as_str() {
+                    if !t.is_empty() {
+                        return vec![StreamJsonEvent::TextDelta(t.to_string())];
                     }
                 }
-                _ => {}
             }
             vec![]
         }

@@ -65,6 +65,9 @@ fn load_secrets_map() -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     struct EnvGuard {
         key: &'static str,
@@ -97,6 +100,7 @@ mod tests {
 
     #[test]
     fn test_resolve_secret_prefers_environment() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let _secret_path = EnvGuard::unset("KOKLO_SECRETS_FILE");
         let _secret = EnvGuard::set("KOKLO_TEST_SECRET_ENV", "from-env");
 
@@ -108,6 +112,7 @@ mod tests {
 
     #[test]
     fn test_resolve_secret_falls_back_to_secrets_file() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let dir = tempfile::tempdir().unwrap();
         let secrets = dir.path().join("secrets.toml");
         std::fs::write(&secrets, "[env]\nKOKLO_TEST_SECRET_FILE = \"from-file\"\n").unwrap();
@@ -123,6 +128,7 @@ mod tests {
 
     #[test]
     fn test_load_secrets_into_env_sets_missing_values_only() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let dir = tempfile::tempdir().unwrap();
         let secrets = dir.path().join("secrets.toml");
         std::fs::write(
@@ -143,6 +149,7 @@ mod tests {
 
     #[test]
     fn test_secrets_path_uses_koklo_home_when_set() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let dir = tempfile::tempdir().unwrap();
         let _home = EnvGuard::set("KOKLO_HOME", dir.path().display().to_string());
         let _secret_path = EnvGuard::unset("KOKLO_SECRETS_FILE");

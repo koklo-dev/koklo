@@ -186,13 +186,13 @@ mod tests {
 
     #[test]
     fn test_agent_references_unavailable_provider_fails() {
-        // openrouter key NOT set, so it won't build
-        std::env::remove_var("OPENROUTER_API_KEY");
+        let unique_var = "KOKLO_TEST_REG_OPENROUTER_MISSING_KEY_XYZ123";
+        std::env::remove_var(unique_var);
         let mut cfg = PipelineTomlConfig::default();
         cfg.providers.insert(
             "openrouter".to_string(),
             ProviderTomlEntry {
-                api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+                api_key_env: Some(unique_var.to_string()),
                 ..Default::default()
             },
         );

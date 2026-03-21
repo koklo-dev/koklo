@@ -356,11 +356,7 @@ impl MonitorApp {
                     // Bus-sourced transcript items are already in self.transcript;
                     // the DB poll will add any DB-only items (e.g. from storage listener).
                     // Duplicates are benign (rendered identically, just extra entries).
-                    self.last_seq = self
-                        .transcript
-                        .last()
-                        .map(|l| l.seq)
-                        .unwrap_or(0);
+                    self.last_seq = self.transcript.last().map(|l| l.seq).unwrap_or(0);
                     changed = true;
                 }
             }
@@ -464,8 +460,10 @@ impl MonitorApp {
                     self.live_session_id = Some(session_id.clone());
                 }
                 let now = chrono::Utc::now().to_rfc3339();
-                self.bus_phase_status
-                    .insert(phase.to_string(), ("running".to_string(), Some(now.clone())));
+                self.bus_phase_status.insert(
+                    phase.to_string(),
+                    ("running".to_string(), Some(now.clone())),
+                );
                 if let Some(p) = self
                     .phases
                     .iter_mut()
@@ -806,7 +804,7 @@ impl MonitorApp {
             .split(area);
 
         let pending_count = live_model.pending.len();
-        for ((title, block, title_style), card_area) in cards.into_iter().zip(columns.into_iter()) {
+        for ((title, block, title_style), card_area) in cards.into_iter().zip(columns.iter()) {
             if title == "ACTIVITY" {
                 self.render_live_activity_card(
                     frame,
@@ -850,7 +848,7 @@ impl MonitorApp {
 
         let border_style = block
             .map(|block| tone_style(block.tone))
-            .unwrap_or_else(Style::default);
+            .unwrap_or_default();
         let para = Paragraph::new(Text::from(lines))
             .block(
                 Block::default()
@@ -888,7 +886,7 @@ impl MonitorApp {
         let border_style = blocks
             .last()
             .map(|block| tone_style(block.tone))
-            .unwrap_or_else(Style::default);
+            .unwrap_or_default();
         let para = Paragraph::new(Text::from(lines))
             .block(
                 Block::default()
@@ -2238,12 +2236,15 @@ mod tests {
         use std::collections::HashMap;
 
         // Simulate: bus says "spec" is running, but DB hasn't caught up yet.
-        let preset_phases = vec!["spec".to_string(), "dev".to_string()];
+        let preset_phases = ["spec".to_string(), "dev".to_string()];
         let bus_phase_status: HashMap<String, (String, Option<String>)> = {
             let mut m = HashMap::new();
             m.insert(
                 "spec".to_string(),
-                ("running".to_string(), Some("2026-01-01T00:00:00Z".to_string())),
+                (
+                    "running".to_string(),
+                    Some("2026-01-01T00:00:00Z".to_string()),
+                ),
             );
             m
         };
