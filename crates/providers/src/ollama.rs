@@ -124,15 +124,19 @@ impl LlmProvider for OllamaProvider {
         let mut full_text = String::new();
         let mut usage = CompletionUsage::default();
         let mut stream = resp.bytes_stream();
+        let mut line_buffer = String::new();
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            let text = String::from_utf8_lossy(&chunk);
-            for line in text.lines() {
-                if line.is_empty() {
+            line_buffer.push_str(&String::from_utf8_lossy(&chunk));
+            while let Some(pos) = line_buffer.find('\n') {
+                let line = line_buffer[..pos].to_string();
+                line_buffer.drain(..=pos);
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
                     continue;
                 }
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed) {
                     if let Some(t) = json["message"]["content"].as_str() {
                         full_text.push_str(t);
                         on_chunk(StreamChunk::text(t));
@@ -212,5 +216,37 @@ mod tests {
         let p = OllamaProvider::from_config(&entry).unwrap();
         assert_eq!(p.base_url, "http://192.168.1.10:11434");
         assert_eq!(p.model, "llama3:8b");
+    }
+
+    #[tokio::test]
+    async fn test_ndjson_line_split_across_chunks() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // Two NDJSON lines, the first one is split across TCP chunks
+        let body = "{\"message\":{\"content\":\"hello\"},\"done\":false}\n\
+                    {\"message\":{\"content\":\" world\"},\"done\":false}\n\
+                    {\"message\":{\"content\":\"\"},\"done\":true,\"prompt_eval_count\":5,\"eval_count\":3}\n";
+        Mock::given(method("POST"))
+            .and(path("/api/chat"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let p = OllamaProvider::new(server.uri(), "test-model");
+        let messages = vec![crate::Message::user("hi")];
+        let mut chunks = vec![];
+        let (result, usage) = p
+            .complete_stream(messages, &mut |c| {
+                if !c.text.is_empty() {
+                    chunks.push(c.text.clone());
+                }
+            })
+            .await
+            .unwrap();
+        assert_eq!(result, "hello world");
+        assert_eq!(usage.prompt_tokens, 5);
+        assert_eq!(usage.completion_tokens, 3);
     }
 }

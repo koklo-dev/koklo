@@ -8,7 +8,7 @@ use super::{check_claude_session, flatten_messages_to_prompt, strip_ansi, CliMod
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    compat_session, LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
+    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
     ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderInteractionMode,
     ProviderSession, ProviderSessionEvent, StreamChunk, UserInputPayload,
 };
@@ -122,12 +122,12 @@ impl ClaudeCodeCliProvider {
     fn build_stream_json_args(permission_bridge: Option<&ClaudePermissionBridge>) -> Vec<String> {
         let mut args = vec![
             "--print".to_string(),
+            "--verbose".to_string(),
             "--output-format".to_string(),
             "stream-json".to_string(),
             "--input-format".to_string(),
             "stream-json".to_string(),
             "--replay-user-messages".to_string(),
-            "--brief".to_string(),
         ];
 
         if let Some(bridge) = permission_bridge {
@@ -187,6 +187,7 @@ impl ClaudeCodeCliProvider {
         let mut lines = BufReader::new(stdout).lines();
         let mut full_text = String::new();
         let mut final_usage: Option<CompletionUsage> = None;
+        let mut has_streamed_deltas = false;
 
         while let Some(line) = lines.next_line().await.map_err(ProviderError::Io)? {
             let trimmed = line.trim();
@@ -195,26 +196,38 @@ impl ClaudeCodeCliProvider {
             }
             for event in parse_stream_json_line(trimmed, &mut tool_name_registry) {
                 match event {
+                    StreamJsonEvent::TextDelta(t) => {
+                        has_streamed_deltas = true;
+                        on_chunk(StreamChunk::text(t.clone()));
+                        full_text.push_str(&t);
+                    }
                     StreamJsonEvent::Text(t) => {
-                        let chunk = format!("{}\n", t);
-                        on_chunk(StreamChunk::text(chunk.clone()));
-                        full_text.push_str(&chunk);
+                        // Skip final block text if we already streamed deltas.
+                        if !has_streamed_deltas {
+                            let chunk = format!("{}\n", t);
+                            on_chunk(StreamChunk::text(chunk.clone()));
+                            full_text.push_str(&chunk);
+                        }
                     }
                     StreamJsonEvent::ToolCall {
-                        id: _,
+                        id,
                         name,
                         input_summary,
                         input: _,
                     } => {
                         on_chunk(StreamChunk::event(ProviderEvent::ToolCall {
-                            item_id: None,
+                            item_id: id,
                             tool_name: name,
                             input_summary,
                         }));
                     }
-                    StreamJsonEvent::ToolResult { tool_name, summary } => {
+                    StreamJsonEvent::ToolResult {
+                        id,
+                        tool_name,
+                        summary,
+                    } => {
                         on_chunk(StreamChunk::event(ProviderEvent::ToolResult {
-                            item_id: None,
+                            item_id: id,
                             tool_name,
                             output_summary: summary,
                             success: None,
@@ -312,6 +325,7 @@ impl ClaudeCodeCliProvider {
             let mut tool_name_registry: HashMap<String, String> = HashMap::new();
             let mut lines = BufReader::new(stdout).lines();
             let mut turn_output = String::new();
+            let mut has_streamed_deltas = false;
 
             loop {
                 match lines.next_line().await {
@@ -322,12 +336,22 @@ impl ClaudeCodeCliProvider {
                         }
                         for event in parse_stream_json_line(trimmed, &mut tool_name_registry) {
                             match event {
-                                StreamJsonEvent::Text(text) => {
-                                    let chunk = format!("{}\n", text);
-                                    turn_output.push_str(&chunk);
+                                StreamJsonEvent::TextDelta(text) => {
+                                    has_streamed_deltas = true;
+                                    turn_output.push_str(&text);
                                     let _ = sender.send(Ok(ProviderSessionEvent::Event(
-                                        ProviderEvent::MessageDelta { text: chunk },
+                                        ProviderEvent::MessageDelta { text },
                                     )));
+                                }
+                                StreamJsonEvent::Text(text) => {
+                                    // Skip final block text if already streamed via deltas.
+                                    if !has_streamed_deltas {
+                                        let chunk = format!("{}\n", text);
+                                        turn_output.push_str(&chunk);
+                                        let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                                            ProviderEvent::MessageDelta { text: chunk },
+                                        )));
+                                    }
                                 }
                                 StreamJsonEvent::ToolCall {
                                     id,
@@ -352,20 +376,24 @@ impl ClaudeCodeCliProvider {
                                     } else {
                                         let _ = sender.send(Ok(ProviderSessionEvent::Event(
                                             ProviderEvent::ToolCall {
-                                                item_id: None,
+                                                item_id: id,
                                                 tool_name: name,
                                                 input_summary,
                                             },
                                         )));
                                     }
                                 }
-                                StreamJsonEvent::ToolResult { tool_name, summary } => {
+                                StreamJsonEvent::ToolResult {
+                                    id,
+                                    tool_name,
+                                    summary,
+                                } => {
                                     if permission_tool_name.as_deref() == Some(tool_name.as_str()) {
                                         continue;
                                     }
                                     let _ = sender.send(Ok(ProviderSessionEvent::Event(
                                         ProviderEvent::ToolResult {
-                                            item_id: None,
+                                            item_id: id,
                                             tool_name,
                                             output_summary: summary,
                                             success: None,
@@ -653,9 +681,8 @@ impl LlmProvider for ClaudeCodeCliProvider {
         self: Arc<Self>,
         messages: Vec<Message>,
     ) -> Result<Box<dyn ProviderSession>> {
-        if self.sandbox.is_some() {
-            return Ok(compat_session(self, messages));
-        }
+        // Always use the stream-json session for real-time streaming.
+        // The sandbox is only used as a fallback in complete_stream (exec mode).
         self.spawn_stream_json_session(messages).await
     }
 
@@ -730,7 +757,10 @@ impl LlmProvider for ClaudeCodeCliProvider {
 // ── stream-json parsing ───────────────────────────────────────────────────────
 
 enum StreamJsonEvent {
+    /// Complete text from a final "assistant" block (end-of-turn).
     Text(String),
+    /// Incremental text from a `content_block_delta` (streaming token).
+    TextDelta(String),
     ToolCall {
         id: Option<String>,
         name: String,
@@ -738,6 +768,7 @@ enum StreamJsonEvent {
         input: serde_json::Value,
     },
     ToolResult {
+        id: Option<String>,
         tool_name: String,
         summary: String,
     },
@@ -761,6 +792,18 @@ fn parse_stream_json_line(
 ) -> Vec<StreamJsonEvent> {
     let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else {
         return vec![];
+    };
+
+    // Claude Code stream-json wraps API events in {"type":"stream_event","event":{...}}.
+    // Unwrap the envelope if present; otherwise use the top-level value directly.
+    let val = if val["type"].as_str() == Some("stream_event") {
+        if let Some(inner) = val.get("event") {
+            inner
+        } else {
+            return vec![];
+        }
+    } else {
+        &val
     };
 
     match val["type"].as_str().unwrap_or("") {
@@ -805,6 +848,47 @@ fn parse_stream_json_line(
             }
             events
         }
+        // Streaming content deltas — emitted during generation before the final
+        // "assistant" block.  Handling these gives the TUI live text updates.
+        "content_block_delta" => {
+            match val["delta"]["type"].as_str().unwrap_or("") {
+                "text_delta" => {
+                    if let Some(t) = val["delta"]["text"].as_str() {
+                        if !t.is_empty() {
+                            return vec![StreamJsonEvent::TextDelta(t.to_string())];
+                        }
+                    }
+                }
+                _ => {}
+            }
+            vec![]
+        }
+        "content_block_start" => {
+            // tool_use blocks arrive here; register the id→name mapping early.
+            if val["content_block"]["type"].as_str() == Some("tool_use") {
+                let name = val["content_block"]["name"]
+                    .as_str()
+                    .unwrap_or("tool")
+                    .to_string();
+                if let Some(id) = val["content_block"]["id"].as_str() {
+                    tool_name_registry.insert(id.to_string(), name);
+                }
+            }
+            vec![]
+        }
+        // message_delta carries usage info at end of message
+        "message_delta" => {
+            if let Some(usage) = val.get("usage") {
+                let input_tokens = usage["input_tokens"].as_u64().unwrap_or(0) as u32;
+                let output_tokens = usage["output_tokens"].as_u64().unwrap_or(0) as u32;
+                return vec![StreamJsonEvent::Usage {
+                    input_tokens,
+                    output_tokens,
+                    cost_usd: None,
+                }];
+            }
+            vec![]
+        }
         // Claude Code uses "tool" or "tool_result" depending on version.
         "tool" | "tool_result" => {
             let tool_use_id = val["tool_use_id"].as_str().unwrap_or("").to_string();
@@ -819,7 +903,11 @@ fn parse_stream_json_line(
                 .and_then(|t| t.lines().next())
                 .unwrap_or("ok")
                 .to_string();
-            vec![StreamJsonEvent::ToolResult { tool_name, summary }]
+            vec![StreamJsonEvent::ToolResult {
+                id: (!tool_use_id.is_empty()).then_some(tool_use_id),
+                tool_name,
+                summary,
+            }]
         }
         "result" => {
             let input_tokens = val["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32;
@@ -939,8 +1027,8 @@ mod tests {
         let events = parse_stream_json_line(line, &mut reg);
         assert_eq!(events.len(), 1);
         assert!(
-            matches!(&events[0], StreamJsonEvent::ToolResult { tool_name, summary }
-                if tool_name == "Write" && summary == "ok")
+            matches!(&events[0], StreamJsonEvent::ToolResult { id, tool_name, summary }
+                if id.as_deref() == Some("abc") && tool_name == "Write" && summary == "ok")
         );
     }
 
@@ -981,5 +1069,43 @@ mod tests {
         assert_eq!(questions.len(), 1);
         assert_eq!(questions[0].question, "Which file should I edit?");
         assert_eq!(questions[0].header, "Claude");
+    }
+
+    #[test]
+    fn test_parse_content_block_delta_text() {
+        // Bare format (without stream_event envelope)
+        let line = r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello "}}"#;
+        let mut reg = HashMap::new();
+        let events = parse_stream_json_line(line, &mut reg);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], StreamJsonEvent::TextDelta(t) if t == "Hello "));
+    }
+
+    #[test]
+    fn test_parse_stream_event_envelope_text_delta() {
+        // Real Claude Code format: stream_event wrapping content_block_delta
+        let line = r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"world"}}}"#;
+        let mut reg = HashMap::new();
+        let events = parse_stream_json_line(line, &mut reg);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], StreamJsonEvent::TextDelta(t) if t == "world"));
+    }
+
+    #[test]
+    fn test_parse_stream_event_envelope_content_block_start() {
+        let line = r#"{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"t1","name":"Bash","input":{}}}}"#;
+        let mut reg = HashMap::new();
+        let events = parse_stream_json_line(line, &mut reg);
+        assert!(events.is_empty());
+        assert_eq!(reg.get("t1").unwrap(), "Bash");
+    }
+
+    #[test]
+    fn test_parse_content_block_start_tool_use_registers_name() {
+        let line = r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"xyz","name":"Read","input":{}}}"#;
+        let mut reg = HashMap::new();
+        let events = parse_stream_json_line(line, &mut reg);
+        assert!(events.is_empty());
+        assert_eq!(reg.get("xyz").unwrap(), "Read");
     }
 }
