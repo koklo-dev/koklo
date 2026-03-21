@@ -1229,18 +1229,13 @@ async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
     let mut render_engine = PlainRenderEngine::new(true);
     let mut seq = 0i64;
 
-    loop {
-        match session.next_event().await? {
-            ProviderSessionEvent::Event(event) => {
-                seq += 1;
-                let record = provider_event_to_record(event, seq, Some(name));
-                let rendered = render_engine.push_record(record);
-                if !rendered.is_empty() {
-                    print!("{rendered}");
-                    let _ = std::io::stdout().flush();
-                }
-            }
-            ProviderSessionEvent::Finished { .. } => break,
+    while let ProviderSessionEvent::Event(event) = session.next_event().await? {
+        seq += 1;
+        let record = provider_event_to_record(event, seq, Some(name));
+        let rendered = render_engine.push_record(record);
+        if !rendered.is_empty() {
+            print!("{rendered}");
+            let _ = std::io::stdout().flush();
         }
     }
     println!();

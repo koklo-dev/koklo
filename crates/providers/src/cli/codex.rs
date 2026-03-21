@@ -3,9 +3,9 @@ use super::{check_claude_session, flatten_messages_to_prompt, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind,
-    ProviderApprovalPayload, ProviderCapabilities, ProviderEvent, ProviderInteractionMode,
-    ProviderSession, ProviderSessionEvent, StreamChunk, UserInputPayload,
+    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
+    ProviderCapabilities, ProviderEvent, ProviderInteractionMode, ProviderSession,
+    ProviderSessionEvent, StreamChunk, UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
