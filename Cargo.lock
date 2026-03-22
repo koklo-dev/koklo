@@ -1471,6 +1471,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "shell-words",
  "strip-ansi-escapes",
  "tempfile",
  "thiserror 1.0.69",

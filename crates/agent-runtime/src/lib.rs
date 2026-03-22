@@ -454,6 +454,7 @@ fn handle_provider_event(
             status,
             exit_code,
             output,
+            details,
         } => {
             let item = TranscriptItem::new(
                 context.session_id.to_string(),
@@ -477,6 +478,7 @@ fn handle_provider_event(
                     status: status.clone(),
                     exit_code,
                     output: output.clone(),
+                    details: details.clone(),
                 },
                 context.interaction_mode,
             ));
@@ -493,6 +495,7 @@ fn handle_provider_event(
             summary,
             files,
             status,
+            details,
         } => {
             let item = TranscriptItem::new(
                 context.session_id.to_string(),
@@ -502,8 +505,10 @@ fn handle_provider_event(
                 TranscriptItemKind::FileChange,
                 if status == "failed" {
                     TranscriptItemStatus::Failed
-                } else {
+                } else if status == "completed" {
                     TranscriptItemStatus::Completed
+                } else {
+                    TranscriptItemStatus::Streaming
                 },
                 summary.clone(),
             )
@@ -513,6 +518,7 @@ fn handle_provider_event(
                     summary: summary.clone(),
                     files: files.clone(),
                     status: status.clone(),
+                    details: details.clone(),
                 },
                 context.interaction_mode,
             ));
