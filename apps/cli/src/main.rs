@@ -732,6 +732,7 @@ async fn build_orchestrator(
         preset,
         default_provider,
         agent_providers,
+        provider_entries: merged.providers.clone(),
         agent_sandboxes,
         controlled_shell: std::env::var("KOKLO_CONTROLLED_SHELL")
             .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
@@ -1029,6 +1030,7 @@ async fn build_orchestrator_with_gate(
         preset,
         default_provider,
         agent_providers,
+        provider_entries: merged.providers.clone(),
         agent_sandboxes,
         controlled_shell: std::env::var("KOKLO_CONTROLLED_SHELL")
             .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
