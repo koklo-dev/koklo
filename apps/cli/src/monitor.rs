@@ -59,6 +59,21 @@ enum FeedbackLevel {
     Error,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LiveOverviewCardKind {
+    Waiting,
+    Assistant,
+    Thinking,
+    Activity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TerminalLayout {
+    Wide,
+    Stacked,
+    Compact,
+}
+
 #[derive(Clone, Debug)]
 struct CommandFeedback {
     text: String,
@@ -134,6 +149,8 @@ pub struct MonitorApp {
     pending_user_input: Option<PendingUserInput>,
     /// Bus event overrides for phase status — survives DB rebuilds.
     bus_phase_status: HashMap<String, (String, Option<String>)>,
+    /// Number of log lines kept above the live tail. `0` means follow live output.
+    log_scroll: usize,
 }
 
 impl MonitorApp {
@@ -191,6 +208,7 @@ impl MonitorApp {
             command_feedback: None,
             pending_user_input: None,
             bus_phase_status: HashMap::new(),
+            log_scroll: 0,
         })
     }
 
@@ -249,6 +267,7 @@ impl MonitorApp {
             command_feedback: None,
             pending_user_input: None,
             bus_phase_status: HashMap::new(),
+            log_scroll: 0,
         })
     }
 
@@ -564,6 +583,7 @@ impl MonitorApp {
             TuiMode::Summary => self.render_summary(frame),
             _ => {
                 let area = frame.size();
+                let layout_mode = terminal_layout(area);
 
                 let outer = Layout::default()
                     .direction(Direction::Vertical)
@@ -578,19 +598,48 @@ impl MonitorApp {
                 let command_area = outer[1];
                 let status_area = outer[2];
 
-                let cols = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(28), Constraint::Percentage(72)])
-                    .split(main_area);
+                let (sidebar, content) = match layout_mode {
+                    TerminalLayout::Wide => {
+                        let cols = Layout::default()
+                            .direction(Direction::Horizontal)
+                            .constraints([Constraint::Percentage(24), Constraint::Percentage(76)])
+                            .split(main_area);
+                        (cols[0], cols[1])
+                    }
+                    TerminalLayout::Stacked => {
+                        let cols = Layout::default()
+                            .direction(Direction::Horizontal)
+                            .constraints([Constraint::Length(28), Constraint::Min(40)])
+                            .split(main_area);
+                        (cols[0], cols[1])
+                    }
+                    TerminalLayout::Compact => {
+                        let cols = Layout::default()
+                            .direction(Direction::Horizontal)
+                            .constraints([Constraint::Length(22), Constraint::Min(24)])
+                            .split(main_area);
+                        (cols[0], cols[1])
+                    }
+                };
 
-                let left_rows = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
-                    .split(cols[0]);
+                let left_rows = match layout_mode {
+                    TerminalLayout::Wide => Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+                        .split(sidebar),
+                    TerminalLayout::Stacked => Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Length(8), Constraint::Min(8)])
+                        .split(sidebar),
+                    TerminalLayout::Compact => Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Length(6), Constraint::Min(6)])
+                        .split(sidebar),
+                };
 
                 self.render_sessions(frame, left_rows[0]);
                 self.render_phases(frame, left_rows[1]);
-                self.render_logs(frame, cols[1]);
+                self.render_logs(frame, content);
                 self.render_command_bar(frame, command_area);
                 self.render_statusbar(frame, status_area);
 
@@ -604,11 +653,7 @@ impl MonitorApp {
     }
 
     fn render_sessions(&self, frame: &mut Frame, area: Rect) {
-        let border_style = if self.focus == Panel::Sessions {
-            Style::default().fg(Color::Yellow)
-        } else {
-            Style::default()
-        };
+        let border_style = sidebar_border_style(self.focus == Panel::Sessions);
 
         let items: Vec<ListItem> = self
             .sessions
@@ -624,9 +669,11 @@ impl MonitorApp {
                         .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM)
                 };
                 ListItem::new(format!(
-                    "{} {}  {}  {}",
+                    " {} {}  {}  {}",
                     icon, short_id, short_title, s.status
                 ))
                 .style(style)
@@ -636,18 +683,17 @@ impl MonitorApp {
         let list = List::new(items).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("SESSIONS")
+                .title(Span::styled(
+                    "Sessions",
+                    sidebar_title_style(self.focus == Panel::Sessions),
+                ))
                 .border_style(border_style),
         );
         frame.render_widget(list, area);
     }
 
     fn render_phases(&self, frame: &mut Frame, area: Rect) {
-        let border_style = if self.focus == Panel::Phases {
-            Style::default().fg(Color::Yellow)
-        } else {
-            Style::default()
-        };
+        let border_style = sidebar_border_style(self.focus == Panel::Phases);
 
         let session_label = self
             .sessions
@@ -674,26 +720,27 @@ impl MonitorApp {
                         .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM)
                 };
-                ListItem::new(format!("{} {}{}", icon, p.phase, dur)).style(style)
+                ListItem::new(format!(" {} {}{}", icon, p.phase, dur)).style(style)
             })
             .collect();
 
         let list = List::new(items).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("PHASES — {}", session_label))
+                .title(Span::styled(
+                    format!("Phases · {session_label}"),
+                    sidebar_title_style(self.focus == Panel::Phases),
+                ))
                 .border_style(border_style),
         );
         frame.render_widget(list, area);
     }
 
     fn render_logs(&self, frame: &mut Frame, area: Rect) {
-        let border_style = if self.focus == Panel::Log {
-            Style::default().fg(Color::Yellow)
-        } else {
-            Style::default()
-        };
+        let border_style = log_border_style(self.focus == Panel::Log);
 
         let session_label = self
             .sessions
@@ -701,41 +748,8 @@ impl MonitorApp {
             .map(|s| short_id(&s.id))
             .unwrap_or_else(|| "—".to_string());
 
-        // Determine which phase logs to show.
-        let (display_phase, is_live) = if let Some(i) = self.selected_phase {
-            // Explicit phase selection from the Phases panel.
-            let name = self.phases.get(i).map(|p| p.phase.as_str()).unwrap_or("—");
-            let running = self
-                .phases
-                .get(i)
-                .map(|p| p.status == "running")
-                .unwrap_or(false);
-            (name, running)
-        } else {
-            // Default: follow the live running phase, or fall back to the last
-            // completed/failed phase so that content stays visible between phases
-            // (e.g. during gate approval after spec completes).
-            let running = self.phases.iter().find(|p| p.status == "running");
-            let last_done = self
-                .phases
-                .iter()
-                .rev()
-                .find(|p| p.status == "completed" || p.status == "failed");
-            let phase = running.or(last_done).or_else(|| self.phases.last());
-            let name = phase.map(|p| p.phase.as_str()).unwrap_or("—");
-            (name, running.is_some())
-        };
-
-        let filtered_logs: Vec<&TranscriptItemRecord> = self
-            .transcript
-            .iter()
-            .filter(|l| {
-                l.phase
-                    .as_deref()
-                    .map(|phase| phase == display_phase)
-                    .unwrap_or(true)
-            })
-            .collect();
+        let (display_phase, is_live) = self.display_phase_info();
+        let filtered_logs = self.filtered_logs_for_selected_phase();
 
         let agent_name = filtered_logs
             .last()
@@ -756,13 +770,34 @@ impl MonitorApp {
 
         let render_model = build_transcript_render_model(filtered_logs.iter().copied());
         let live_model = render_model.live_model();
-        let sections = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(9), Constraint::Min(8)])
-            .split(area);
+        let overview_cards = select_live_overview_cards(&live_model);
+        let overview_height = live_overview_height(&overview_cards);
 
-        self.render_live_overview(frame, sections[0], &live_model);
-        self.render_transcript_timeline(frame, sections[1], &render_model, &title, border_style);
+        if overview_height == 0 {
+            self.render_transcript_timeline(
+                frame,
+                area,
+                &render_model,
+                &title,
+                border_style,
+                self.log_scroll,
+            );
+        } else {
+            let sections = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(overview_height), Constraint::Min(8)])
+                .split(area);
+
+            self.render_live_overview(frame, sections[0], &live_model, &overview_cards);
+            self.render_transcript_timeline(
+                frame,
+                sections[1],
+                &render_model,
+                &title,
+                border_style,
+                self.log_scroll,
+            );
+        }
     }
 
     fn render_live_overview(
@@ -770,33 +805,8 @@ impl MonitorApp {
         frame: &mut Frame,
         area: Rect,
         live_model: &TranscriptLiveModel,
+        cards: &[LiveOverviewCardKind],
     ) {
-        let mut cards = vec![
-            (
-                "ASSISTANT",
-                live_model.latest_assistant.as_ref(),
-                Style::default().fg(Color::White),
-            ),
-            (
-                "THINKING",
-                live_model.latest_thinking.as_ref(),
-                Style::default().fg(Color::Cyan),
-            ),
-            (
-                "ACTIVITY",
-                live_model.latest_activity.as_ref(),
-                Style::default().fg(Color::Yellow),
-            ),
-        ];
-
-        if let Some(pending) = live_model.pending.last() {
-            cards.push((
-                "WAITING",
-                Some(pending),
-                Style::default().fg(Color::Magenta),
-            ));
-        }
-
         let constraints = vec![Constraint::Ratio(1, cards.len() as u32); cards.len()];
         let columns = Layout::default()
             .direction(Direction::Horizontal)
@@ -804,8 +814,31 @@ impl MonitorApp {
             .split(area);
 
         let pending_count = live_model.pending.len();
-        for ((title, block, title_style), card_area) in cards.into_iter().zip(columns.iter()) {
-            if title == "ACTIVITY" {
+        for (card, card_area) in cards.iter().copied().zip(columns.iter()) {
+            let (title, block, title_style) = match card {
+                LiveOverviewCardKind::Waiting => (
+                    "WAITING",
+                    live_model.pending.last(),
+                    Style::default().fg(Color::Magenta),
+                ),
+                LiveOverviewCardKind::Assistant => (
+                    "ASSISTANT",
+                    live_model.latest_assistant.as_ref(),
+                    Style::default().fg(Color::White),
+                ),
+                LiveOverviewCardKind::Thinking => (
+                    "THINKING",
+                    live_model.latest_thinking.as_ref(),
+                    Style::default().fg(Color::Cyan),
+                ),
+                LiveOverviewCardKind::Activity => (
+                    "ACTIVITY",
+                    live_model.latest_activity.as_ref(),
+                    Style::default().fg(Color::Yellow),
+                ),
+            };
+
+            if card == LiveOverviewCardKind::Activity {
                 self.render_live_activity_card(
                     frame,
                     *card_area,
@@ -849,7 +882,7 @@ impl MonitorApp {
         let border_style = block
             .map(|block| tone_style(block.tone))
             .unwrap_or_default();
-        let para = Paragraph::new(Text::from(lines))
+        let para = Paragraph::new(Text::from(inset_lines(lines, 1)))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -887,7 +920,7 @@ impl MonitorApp {
             .last()
             .map(|block| tone_style(block.tone))
             .unwrap_or_default();
-        let para = Paragraph::new(Text::from(lines))
+        let para = Paragraph::new(Text::from(inset_lines(lines, 1)))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -908,6 +941,7 @@ impl MonitorApp {
         render_model: &TranscriptRenderModel,
         title: &str,
         border_style: Style,
+        scroll_lines: usize,
     ) {
         let visible_height = area.height.saturating_sub(2) as usize;
         let mut all_styled: Vec<Line> = Vec::new();
@@ -920,14 +954,20 @@ impl MonitorApp {
             all_styled.extend(block_lines(block));
         }
 
-        let start = all_styled.len().saturating_sub(visible_height);
-        let display_lines: Vec<Line> = all_styled[start..].to_vec();
+        let (start, end, clamped_scroll) =
+            timeline_window(all_styled.len(), visible_height, scroll_lines);
+        let display_lines: Vec<Line> = inset_lines(all_styled[start..end].to_vec(), 1);
+        let log_title = if clamped_scroll == 0 {
+            format!("{title}  ·  LOG · live")
+        } else {
+            format!("{title}  ·  LOG · -{clamped_scroll} lines")
+        };
 
         let para = Paragraph::new(Text::from(display_lines))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(format!("{title}  ·  TIMELINE"))
+                    .title(log_title)
                     .border_style(border_style),
             )
             .wrap(ratatui::widgets::Wrap { trim: false });
@@ -962,22 +1002,26 @@ impl MonitorApp {
             TuiMode::Live => match self.focus {
                 Panel::Sessions => "[q] quit  [↑↓] select session  [Tab] next panel  [r] refresh",
                 Panel::Phases => "[q] quit  [↑↓] select phase  [Esc] live view  [Tab] next panel",
-                Panel::Log => "[q] quit  [Tab] next panel  [r] refresh  [/] commands",
+                Panel::Log => {
+                    "[q] quit  [↑↓/Pg] scroll log  [End] live  [Tab] next panel  [/] commands"
+                }
             },
         };
 
         let live_badge = self.status_badge();
-        let status_text = if let Some(feedback) = &self.command_feedback {
+        let status_text = format_status_line(
+            area.width.saturating_sub(1) as usize,
+            &live_badge,
+            self.command_feedback
+                .as_ref()
+                .map(|feedback| feedback.text.as_str()),
+            nav_text,
             if cost_part.is_empty() {
-                format!("{}  |  {}", live_badge, feedback.text)
+                None
             } else {
-                format!("{}  |  {}  |  {}", live_badge, feedback.text, cost_part)
-            }
-        } else if cost_part.is_empty() {
-            format!("{}  |  {}", live_badge, nav_text)
-        } else {
-            format!("{}  |  {}  |  {}", live_badge, nav_text, cost_part)
-        };
+                Some(cost_part.as_str())
+            },
+        );
 
         let style = match self
             .command_feedback
@@ -1010,6 +1054,8 @@ impl MonitorApp {
             .len();
         if pending_count > 0 {
             format!("LIVE · waiting {}", pending_count)
+        } else if self.log_scroll > 0 {
+            format!("LIVE · history -{}", self.log_scroll)
         } else {
             "LIVE".to_string()
         }
@@ -1035,6 +1081,8 @@ impl MonitorApp {
         } else {
             "COMMAND"
         };
+        let visible_width = area.width.saturating_sub(4) as usize;
+        let title = truncate_text(title, visible_width.max(1));
         let border_style = if self.command_input.is_empty() {
             Style::default()
         } else {
@@ -1055,7 +1103,6 @@ impl MonitorApp {
         } else {
             &self.command_input
         };
-        let visible_width = area.width.saturating_sub(4) as usize;
         let display = truncate_left(prompt, visible_width);
         let paragraph = Paragraph::new(display).block(
             Block::default()
@@ -1071,11 +1118,7 @@ impl MonitorApp {
 
     fn render_gate_overlay(&self, frame: &mut Frame) {
         let area = frame.size();
-        let width = (area.width * 60 / 100).max(50);
-        let height = 10u16;
-        let x = (area.width.saturating_sub(width)) / 2;
-        let y = (area.height.saturating_sub(height)) / 2;
-        let overlay_area = Rect::new(x, y, width, height);
+        let overlay_area = centered_overlay_rect(area, 60, 10, 32);
 
         frame.render_widget(Clear, overlay_area);
 
@@ -1098,7 +1141,19 @@ impl MonitorApp {
             } else {
                 "Cost: —".to_string()
             };
-            if d.allow_edit {
+            if overlay_area.width < 60 || overlay_area.height < 10 {
+                if d.allow_edit {
+                    format!(
+                        "GATE {}\n{}\n{}\n[Y] approve  [N] reject  [/edit <path>]",
+                        d.phase, usage_str, cost_str
+                    )
+                } else {
+                    format!(
+                        "APPROVAL {}\n{}\n{}\n[Y] approve  [N] reject",
+                        d.phase, usage_str, cost_str
+                    )
+                }
+            } else if d.allow_edit {
                 format!(
                     "GATE: Phase '{}' complete\n\n  {}\n  {}\n\n  [Y] Approve   [N] Reject   [/edit <path>] Pause for edits",
                     d.phase, usage_str, cost_str
@@ -1137,11 +1192,7 @@ impl MonitorApp {
         };
 
         let area = frame.size();
-        let width = (area.width * 65 / 100).max(56);
-        let height = 11u16;
-        let x = (area.width.saturating_sub(width)) / 2;
-        let y = (area.height.saturating_sub(height)) / 2;
-        let overlay_area = Rect::new(x, y, width, height);
+        let overlay_area = centered_overlay_rect(area, 65, 11, 36);
         frame.render_widget(Clear, overlay_area);
 
         let mut lines = vec![
@@ -1163,8 +1214,13 @@ impl MonitorApp {
                 lines.push(format!("Options: {}", options.join(" | ")));
             }
         }
-        lines.push(String::new());
-        lines.push("Submit with Enter or use /reply <text>.".to_string());
+        if overlay_area.height >= 9 {
+            lines.push(String::new());
+            lines.push("Submit with Enter or use /reply <text>.".to_string());
+        } else {
+            lines.push(String::new());
+            lines.push("Enter to submit.".to_string());
+        }
 
         let para = Paragraph::new(lines.join("\n")).block(
             Block::default()
@@ -1267,7 +1323,7 @@ impl MonitorApp {
         match self.focus {
             Panel::Sessions => self.select_prev(),
             Panel::Phases => self.phase_prev(),
-            Panel::Log => {}
+            Panel::Log => self.scroll_log_by(1, 1),
         }
     }
 
@@ -1275,14 +1331,41 @@ impl MonitorApp {
         match self.focus {
             Panel::Sessions => self.select_next(),
             Panel::Phases => self.phase_next(),
-            Panel::Log => {}
+            Panel::Log => self.scroll_log_toward_live(1),
+        }
+    }
+
+    pub fn handle_page_up(&mut self) {
+        if self.focus == Panel::Log {
+            self.scroll_log_by(10, 1);
+        }
+    }
+
+    pub fn handle_page_down(&mut self) {
+        if self.focus == Panel::Log {
+            self.scroll_log_toward_live(10);
+        }
+    }
+
+    pub fn handle_home(&mut self) {
+        if self.focus == Panel::Log {
+            self.log_scroll = self.max_log_scroll();
+        }
+    }
+
+    pub fn handle_end(&mut self) {
+        if self.focus == Panel::Log {
+            self.log_scroll = 0;
         }
     }
 
     fn phase_prev(&mut self) {
         match self.selected_phase {
             Some(0) | None => {}
-            Some(i) => self.selected_phase = Some(i - 1),
+            Some(i) => {
+                self.selected_phase = Some(i - 1);
+                self.log_scroll = 0;
+            }
         }
     }
 
@@ -1293,6 +1376,7 @@ impl MonitorApp {
             Some(i) if i < max => i + 1,
             Some(i) => i,
         });
+        self.log_scroll = 0;
     }
 
     fn reset_for_session(&mut self) {
@@ -1301,6 +1385,59 @@ impl MonitorApp {
         self.last_seq = 0;
         self.selected_phase = None;
         self.pending_user_input = None;
+        self.log_scroll = 0;
+    }
+
+    fn scroll_log_by(&mut self, delta: usize, minimum_step: usize) {
+        let step = delta.max(minimum_step);
+        let max_scroll = self.max_log_scroll();
+        self.log_scroll = (self.log_scroll + step).min(max_scroll);
+    }
+
+    fn scroll_log_toward_live(&mut self, delta: usize) {
+        self.log_scroll = self.log_scroll.saturating_sub(delta);
+    }
+
+    fn max_log_scroll(&self) -> usize {
+        let filtered_logs = self.filtered_logs_for_selected_phase();
+        let render_model = build_transcript_render_model(filtered_logs.iter().copied());
+        let total_lines = transcript_line_count(&render_model);
+        total_lines.saturating_sub(1)
+    }
+
+    fn filtered_logs_for_selected_phase(&self) -> Vec<&TranscriptItemRecord> {
+        let (display_phase, _) = self.display_phase_info();
+        self.transcript
+            .iter()
+            .filter(|l| {
+                l.phase
+                    .as_deref()
+                    .map(|phase| phase == display_phase)
+                    .unwrap_or(true)
+            })
+            .collect()
+    }
+
+    fn display_phase_info(&self) -> (&str, bool) {
+        if let Some(i) = self.selected_phase {
+            let name = self.phases.get(i).map(|p| p.phase.as_str()).unwrap_or("—");
+            let running = self
+                .phases
+                .get(i)
+                .map(|p| p.status == "running")
+                .unwrap_or(false);
+            (name, running)
+        } else {
+            let running = self.phases.iter().find(|p| p.status == "running");
+            let last_done = self
+                .phases
+                .iter()
+                .rev()
+                .find(|p| p.status == "completed" || p.status == "failed");
+            let phase = running.or(last_done).or_else(|| self.phases.last());
+            let name = phase.map(|p| p.phase.as_str()).unwrap_or("—");
+            (name, running.is_some())
+        }
     }
 
     pub fn handle_input_key(&mut self, key: KeyEvent) -> bool {
@@ -1438,6 +1575,7 @@ impl MonitorApp {
             CommandAction::Live => {
                 self.mode = TuiMode::Live;
                 self.selected_phase = None;
+                self.log_scroll = 0;
                 self.set_feedback("Returned to live view.", FeedbackLevel::Success);
             }
             CommandAction::Refresh => {
@@ -1665,9 +1803,16 @@ async fn tui_event_loop(
                     KeyCode::Char('q') | KeyCode::Char('Q') => break,
                     KeyCode::Up => app.handle_up(),
                     KeyCode::Down => app.handle_down(),
+                    KeyCode::PageUp => app.handle_page_up(),
+                    KeyCode::PageDown => app.handle_page_down(),
+                    KeyCode::Home => app.handle_home(),
+                    KeyCode::End => app.handle_end(),
                     KeyCode::Tab => app.toggle_focus(),
                     // Esc in Phases panel clears phase selection (back to live view).
-                    KeyCode::Esc => app.selected_phase = None,
+                    KeyCode::Esc => {
+                        app.selected_phase = None;
+                        app.log_scroll = 0;
+                    }
                     KeyCode::Char('r') => {
                         app.tick().await?;
                     }
@@ -1738,8 +1883,15 @@ async fn tui_integrated_event_loop(
                         KeyCode::Char('q') | KeyCode::Char('Q') => break,
                         KeyCode::Up => app.handle_up(),
                         KeyCode::Down => app.handle_down(),
+                        KeyCode::PageUp => app.handle_page_up(),
+                        KeyCode::PageDown => app.handle_page_down(),
+                        KeyCode::Home => app.handle_home(),
+                        KeyCode::End => app.handle_end(),
                         KeyCode::Tab => app.toggle_focus(),
-                        KeyCode::Esc => app.selected_phase = None,
+                        KeyCode::Esc => {
+                            app.selected_phase = None;
+                            app.log_scroll = 0;
+                        }
                         KeyCode::Char('r') => {
                             app.tick().await?;
                         }
@@ -1771,16 +1923,126 @@ fn status_icon(status: &str) -> &'static str {
     }
 }
 
+fn sidebar_border_style(focused: bool) -> Style {
+    if focused {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
+    }
+}
+
+fn sidebar_title_style(focused: bool) -> Style {
+    if focused {
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+            .fg(Color::Gray)
+            .add_modifier(Modifier::BOLD | Modifier::DIM)
+    }
+}
+
+fn log_border_style(focused: bool) -> Style {
+    if focused {
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    }
+}
+
 fn short_id(id: &str) -> String {
     id[..6.min(id.len())].to_string()
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
+    truncate_text(s, max)
+}
+
+fn truncate_text(text: &str, max: usize) -> String {
+    let count = text.chars().count();
+    if count <= max {
+        text.to_string()
+    } else if max <= 1 {
+        "…".to_string()
     } else {
-        format!("{}…", &s[..max.saturating_sub(1)])
+        let head = text.chars().take(max.saturating_sub(1)).collect::<String>();
+        format!("{head}…")
     }
+}
+
+fn terminal_layout(area: Rect) -> TerminalLayout {
+    if area.width < 72 || area.height < 22 {
+        TerminalLayout::Compact
+    } else if area.width < 110 || area.height < 30 {
+        TerminalLayout::Stacked
+    } else {
+        TerminalLayout::Wide
+    }
+}
+
+fn centered_overlay_rect(
+    area: Rect,
+    width_percent: u16,
+    desired_height: u16,
+    min_width: u16,
+) -> Rect {
+    let max_width = area.width.saturating_sub(2).max(1);
+    let max_height = area.height.saturating_sub(2).max(1);
+    let desired_width = area
+        .width
+        .saturating_mul(width_percent)
+        .saturating_div(100)
+        .max(min_width);
+    let width = desired_width.min(max_width);
+    let height = desired_height.min(max_height);
+    let x = area.x + area.width.saturating_sub(width) / 2;
+    let y = area.y + area.height.saturating_sub(height) / 2;
+    Rect::new(x, y, width, height)
+}
+
+fn format_status_line(
+    max_width: usize,
+    badge: &str,
+    feedback: Option<&str>,
+    nav_text: &str,
+    cost_text: Option<&str>,
+) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+
+    let mut line = truncate_text(badge, max_width);
+    let extras: Vec<&str> = if let Some(feedback) = feedback {
+        vec![feedback]
+    } else {
+        let mut parts = vec![nav_text];
+        if let Some(cost) = cost_text {
+            parts.push(cost);
+        }
+        parts
+    };
+
+    for extra in extras {
+        let candidate = format!("{line}  |  {extra}");
+        if candidate.chars().count() <= max_width {
+            line = candidate;
+            continue;
+        }
+
+        let reserved = format!("{line}  |  ");
+        let remaining = max_width.saturating_sub(reserved.chars().count());
+        if remaining > 0 {
+            line = format!("{reserved}{}", truncate_text(extra, remaining));
+        }
+        break;
+    }
+
+    line
 }
 
 fn phase_dur_str(started_at: &Option<String>, completed_at: &Option<String>) -> String {
@@ -1914,20 +2176,19 @@ fn tone_style(tone: RenderTone) -> Style {
         RenderTone::Muted => Style::default()
             .fg(Color::DarkGray)
             .add_modifier(Modifier::DIM),
-        RenderTone::Info => Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-        RenderTone::Success => Style::default()
-            .fg(Color::Green)
-            .add_modifier(Modifier::DIM),
-        RenderTone::Warning => Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::DIM),
-        RenderTone::Error => Style::default().fg(Color::Red).add_modifier(Modifier::DIM),
+        RenderTone::Info => Style::default().fg(Color::Cyan),
+        RenderTone::Success => Style::default().fg(Color::Green),
+        RenderTone::Warning => Style::default().fg(Color::Yellow),
+        RenderTone::Error => Style::default().fg(Color::Red),
     }
 }
 
 fn block_lines(block: &RenderBlock) -> Vec<Line<'static>> {
     match &block.body {
         RenderBlockBody::Markdown(text) => crate::md_render::markdown_to_lines(text),
+        RenderBlockBody::Lines(lines) if block.kind == RenderBlockKind::FileChange => {
+            style_file_change_lines(lines)
+        }
         RenderBlockBody::Lines(lines) => {
             let style = tone_style(block.tone);
             lines
@@ -1936,6 +2197,113 @@ fn block_lines(block: &RenderBlock) -> Vec<Line<'static>> {
                 .collect()
         }
     }
+}
+
+fn style_file_change_lines(lines: &[String]) -> Vec<Line<'static>> {
+    lines
+        .iter()
+        .map(|line| style_file_change_line(line))
+        .collect()
+}
+
+fn style_file_change_line(line: &str) -> Line<'static> {
+    let indent = line
+        .chars()
+        .take_while(|ch| ch.is_whitespace())
+        .collect::<String>();
+    let trimmed = line[indent.len()..].to_string();
+
+    let (style, accent) = if trimmed.starts_with('+') {
+        (
+            Style::default().fg(Color::Green).bg(Color::Rgb(16, 48, 24)),
+            "+ ",
+        )
+    } else if trimmed.starts_with('-') {
+        (
+            Style::default().fg(Color::Red).bg(Color::Rgb(56, 20, 20)),
+            "- ",
+        )
+    } else if trimmed.starts_with("@@") {
+        (
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+            "│ ",
+        )
+    } else if trimmed.starts_with('●') || trimmed.starts_with('Δ') {
+        (
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            "",
+        )
+    } else {
+        (Style::default().fg(Color::White), "")
+    };
+
+    let mut spans = Vec::new();
+    if !indent.is_empty() {
+        spans.push(Span::raw(indent));
+    }
+    if trimmed.starts_with('+') || trimmed.starts_with('-') {
+        spans.push(Span::styled(
+            accent.to_string(),
+            style.add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled(trimmed[1..].to_string(), style));
+    } else if trimmed.starts_with("@@") {
+        spans.push(Span::styled(accent.to_string(), style));
+        spans.push(Span::styled(trimmed, style));
+    } else {
+        spans.push(Span::styled(trimmed, style));
+    }
+    Line::from(spans)
+}
+
+fn inset_lines(lines: Vec<Line<'static>>, inset: usize) -> Vec<Line<'static>> {
+    if inset == 0 {
+        return lines;
+    }
+
+    let padding = " ".repeat(inset);
+    lines
+        .into_iter()
+        .map(|line| {
+            let mut spans = Vec::with_capacity(line.spans.len() + 1);
+            spans.push(Span::raw(padding.clone()));
+            spans.extend(line.spans);
+            Line::from(spans)
+        })
+        .collect()
+}
+
+fn transcript_line_count(render_model: &TranscriptRenderModel) -> usize {
+    let mut total = 0usize;
+    let mut previous_kind = None;
+    for block in &render_model.blocks {
+        if previous_kind != Some(block.kind) {
+            total += 1;
+            previous_kind = Some(block.kind);
+        }
+        total += block_lines(block).len();
+    }
+    total
+}
+
+fn timeline_window(
+    total_lines: usize,
+    visible_height: usize,
+    scroll_lines: usize,
+) -> (usize, usize, usize) {
+    if total_lines == 0 || visible_height == 0 {
+        return (0, 0, 0);
+    }
+
+    let max_scroll = total_lines.saturating_sub(visible_height);
+    let clamped_scroll = scroll_lines.min(max_scroll);
+    let end = total_lines.saturating_sub(clamped_scroll);
+    let start = end.saturating_sub(visible_height);
+    (start, end, clamped_scroll)
 }
 
 fn preview_lines(block: &RenderBlock, max_lines: usize) -> Vec<Line<'static>> {
@@ -2015,6 +2383,91 @@ fn activity_card_lines(blocks: &[RenderBlock], max_lines: usize) -> Vec<Line<'st
         lines.push(Line::from(""));
     }
     lines
+}
+
+fn select_live_overview_cards(live_model: &TranscriptLiveModel) -> Vec<LiveOverviewCardKind> {
+    let mut cards = Vec::new();
+
+    if !live_model.pending.is_empty() {
+        cards.push(LiveOverviewCardKind::Waiting);
+    }
+
+    if let Some(primary) = select_primary_live_overview_card(live_model) {
+        cards.push(primary);
+    }
+
+    cards
+}
+
+fn select_primary_live_overview_card(
+    live_model: &TranscriptLiveModel,
+) -> Option<LiveOverviewCardKind> {
+    let assistant = live_model.latest_assistant.as_ref().and_then(|block| {
+        is_live_block(block).then_some((
+            block.seq,
+            live_card_priority(LiveOverviewCardKind::Assistant),
+            LiveOverviewCardKind::Assistant,
+        ))
+    });
+    let thinking = live_model.latest_thinking.as_ref().and_then(|block| {
+        (is_live_block(block) || block_is_newer_than(block, live_model.latest_assistant.as_ref()))
+            .then_some((
+                block.seq,
+                live_card_priority(LiveOverviewCardKind::Thinking),
+                LiveOverviewCardKind::Thinking,
+            ))
+    });
+    let activity = live_model.latest_activity.as_ref().and_then(|block| {
+        (is_actionable_activity(block)
+            && (is_live_block(block)
+                || block_is_newer_than(block, live_model.latest_assistant.as_ref())))
+        .then_some((
+            block.seq,
+            live_card_priority(LiveOverviewCardKind::Activity),
+            LiveOverviewCardKind::Activity,
+        ))
+    });
+
+    [assistant, thinking, activity]
+        .into_iter()
+        .flatten()
+        .max_by_key(|(seq, priority, _)| (*seq, *priority))
+        .map(|(_, _, card)| card)
+}
+
+fn live_overview_height(cards: &[LiveOverviewCardKind]) -> u16 {
+    match cards.len() {
+        0 => 0,
+        1 => 6,
+        _ => 7,
+    }
+}
+
+fn is_live_block(block: &RenderBlock) -> bool {
+    matches!(
+        block.status.as_deref(),
+        Some("pending" | "streaming" | "in_progress" | "updated")
+    )
+}
+
+fn block_is_newer_than(block: &RenderBlock, other: Option<&RenderBlock>) -> bool {
+    other.map(|other| block.seq > other.seq).unwrap_or(true)
+}
+
+fn is_actionable_activity(block: &RenderBlock) -> bool {
+    matches!(
+        block.kind,
+        RenderBlockKind::Tool | RenderBlockKind::Command | RenderBlockKind::FileChange
+    )
+}
+
+fn live_card_priority(kind: LiveOverviewCardKind) -> u8 {
+    match kind {
+        LiveOverviewCardKind::Waiting => 0,
+        LiveOverviewCardKind::Assistant => 1,
+        LiveOverviewCardKind::Activity => 2,
+        LiveOverviewCardKind::Thinking => 3,
+    }
 }
 
 fn block_time(block: &RenderBlock) -> String {
@@ -2125,10 +2578,15 @@ fn truncate_left_offset(text: &str, max: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::{
-        activity_card_lines, block_kind_label, live_card_title, parse_command_action,
-        timeline_section_header, CommandAction, Panel,
+        activity_card_lines, block_kind_label, format_status_line, live_card_title,
+        live_overview_height, parse_command_action, select_live_overview_cards,
+        style_file_change_lines, terminal_layout, timeline_section_header, timeline_window,
+        CommandAction, LiveOverviewCardKind, Panel, TerminalLayout,
     };
-    use crate::render_model::{RenderBlock, RenderBlockBody, RenderBlockKind, RenderTone};
+    use crate::render_model::{
+        RenderBlock, RenderBlockBody, RenderBlockKind, RenderTone, TranscriptLiveModel,
+    };
+    use ratatui::{layout::Rect, style::Color};
     use std::path::PathBuf;
 
     #[test]
@@ -2175,6 +2633,7 @@ mod tests {
             source_kind: "reasoning".to_string(),
             status: Some("streaming".to_string()),
             item_key: Some("r1".to_string()),
+            seq: 10,
             created_at: None,
             body: RenderBlockBody::Lines(vec!["⋯ inspecting".to_string()]),
         };
@@ -2193,6 +2652,7 @@ mod tests {
             source_kind: "command".to_string(),
             status: Some("completed".to_string()),
             item_key: Some("cmd-1".to_string()),
+            seq: 1,
             created_at: Some("2026-01-01T12:00:00Z".to_string()),
             body: RenderBlockBody::Lines(vec!["$ cargo test -p koklo-cli".to_string()]),
         };
@@ -2202,6 +2662,7 @@ mod tests {
             source_kind: "file_change".to_string(),
             status: Some("updated".to_string()),
             item_key: Some("patch-1".to_string()),
+            seq: 2,
             created_at: Some("2026-01-01T12:00:01Z".to_string()),
             body: RenderBlockBody::Lines(vec!["Δ apps/cli/src/monitor.rs".to_string()]),
         };
@@ -2222,12 +2683,176 @@ mod tests {
     }
 
     #[test]
+    fn overview_hides_stale_completed_assistant_and_activity() {
+        let assistant = RenderBlock {
+            kind: RenderBlockKind::Assistant,
+            tone: RenderTone::Default,
+            source_kind: "message_delta".to_string(),
+            status: Some("completed".to_string()),
+            item_key: Some("a1".to_string()),
+            seq: 5,
+            created_at: None,
+            body: RenderBlockBody::Markdown("Final answer".to_string()),
+        };
+        let activity = RenderBlock {
+            kind: RenderBlockKind::Command,
+            tone: RenderTone::Warning,
+            source_kind: "command".to_string(),
+            status: Some("completed".to_string()),
+            item_key: Some("cmd-1".to_string()),
+            seq: 4,
+            created_at: None,
+            body: RenderBlockBody::Lines(vec!["$ cargo test".to_string()]),
+        };
+        let live = TranscriptLiveModel {
+            latest_assistant: Some(assistant),
+            latest_activity: Some(activity.clone()),
+            recent_activity: vec![activity],
+            ..TranscriptLiveModel::default()
+        };
+
+        let cards = select_live_overview_cards(&live);
+        assert!(cards.is_empty());
+        assert_eq!(live_overview_height(&cards), 0);
+    }
+
+    #[test]
+    fn overview_prefers_newer_activity_over_completed_assistant() {
+        let assistant = RenderBlock {
+            kind: RenderBlockKind::Assistant,
+            tone: RenderTone::Default,
+            source_kind: "message_delta".to_string(),
+            status: Some("completed".to_string()),
+            item_key: Some("a1".to_string()),
+            seq: 5,
+            created_at: None,
+            body: RenderBlockBody::Markdown("Final answer".to_string()),
+        };
+        let activity = RenderBlock {
+            kind: RenderBlockKind::Command,
+            tone: RenderTone::Warning,
+            source_kind: "command".to_string(),
+            status: Some("completed".to_string()),
+            item_key: Some("cmd-2".to_string()),
+            seq: 6,
+            created_at: None,
+            body: RenderBlockBody::Lines(vec!["$ cargo fmt".to_string()]),
+        };
+        let live = TranscriptLiveModel {
+            latest_assistant: Some(assistant),
+            latest_activity: Some(activity.clone()),
+            recent_activity: vec![activity],
+            ..TranscriptLiveModel::default()
+        };
+
+        assert_eq!(
+            select_live_overview_cards(&live),
+            vec![LiveOverviewCardKind::Activity]
+        );
+    }
+
+    #[test]
+    fn overview_keeps_waiting_and_primary_live_card_only() {
+        let waiting = RenderBlock {
+            kind: RenderBlockKind::Approval,
+            tone: RenderTone::Warning,
+            source_kind: "approval_request".to_string(),
+            status: Some("pending".to_string()),
+            item_key: Some("approval-1".to_string()),
+            seq: 7,
+            created_at: None,
+            body: RenderBlockBody::Lines(vec!["? Approve".to_string()]),
+        };
+        let assistant = RenderBlock {
+            kind: RenderBlockKind::Assistant,
+            tone: RenderTone::Default,
+            source_kind: "message_delta".to_string(),
+            status: Some("streaming".to_string()),
+            item_key: Some("a2".to_string()),
+            seq: 8,
+            created_at: None,
+            body: RenderBlockBody::Markdown("Working".to_string()),
+        };
+        let live = TranscriptLiveModel {
+            latest_assistant: Some(assistant),
+            pending: vec![waiting],
+            ..TranscriptLiveModel::default()
+        };
+
+        assert_eq!(
+            select_live_overview_cards(&live),
+            vec![
+                LiveOverviewCardKind::Waiting,
+                LiveOverviewCardKind::Assistant
+            ]
+        );
+        assert_eq!(live_overview_height(&select_live_overview_cards(&live)), 7);
+    }
+
+    #[test]
     fn phase_status_rank_orders_correctly() {
         use super::phase_status_rank;
         assert!(phase_status_rank("running") > phase_status_rank("pending"));
         assert!(phase_status_rank("completed") > phase_status_rank("running"));
         assert!(phase_status_rank("failed") > phase_status_rank("running"));
         assert_eq!(phase_status_rank("completed"), phase_status_rank("failed"));
+    }
+
+    #[test]
+    fn timeline_window_follows_live_tail_by_default() {
+        assert_eq!(timeline_window(20, 5, 0), (15, 20, 0));
+    }
+
+    #[test]
+    fn timeline_window_clamps_history_scroll() {
+        assert_eq!(timeline_window(20, 5, 999), (0, 5, 15));
+    }
+
+    #[test]
+    fn timeline_window_handles_empty_or_tiny_viewports() {
+        assert_eq!(timeline_window(0, 5, 3), (0, 0, 0));
+        assert_eq!(timeline_window(8, 0, 3), (0, 0, 0));
+    }
+
+    #[test]
+    fn terminal_layout_switches_at_small_sizes() {
+        assert_eq!(
+            terminal_layout(Rect::new(0, 0, 140, 40)),
+            TerminalLayout::Wide
+        );
+        assert_eq!(
+            terminal_layout(Rect::new(0, 0, 90, 28)),
+            TerminalLayout::Stacked
+        );
+        assert_eq!(
+            terminal_layout(Rect::new(0, 0, 60, 20)),
+            TerminalLayout::Compact
+        );
+    }
+
+    #[test]
+    fn status_line_prioritizes_core_information_when_narrow() {
+        let text = format_status_line(
+            28,
+            "LIVE",
+            None,
+            "[q] quit  [Tab] next panel",
+            Some("Tokens: 120"),
+        );
+        assert!(text.contains("LIVE"));
+        assert!(!text.contains("Tokens: 120"));
+    }
+
+    #[test]
+    fn file_change_lines_highlight_additions_and_removals() {
+        let lines = style_file_change_lines(&[
+            "● Update(src/lib.rs)".to_string(),
+            "- old line".to_string(),
+            "+ new line".to_string(),
+        ]);
+
+        assert_eq!(lines[1].spans[0].style.fg, Some(Color::Red));
+        assert_eq!(lines[2].spans[0].style.fg, Some(Color::Green));
     }
 
     #[test]

@@ -55,10 +55,16 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
                 Tag::CodeBlock(_) => {
                     flush_line(&mut current_spans, &mut lines);
                     in_code_block = true;
-                    style_stack.push(Style::default().fg(Color::Green).bg(Color::DarkGray));
+                    style_stack.push(Style::default().fg(Color::Cyan));
                 }
                 Tag::BlockQuote(_) => {
                     flush_line(&mut current_spans, &mut lines);
+                    current_spans.push(Span::styled(
+                        "▎ ",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    ));
                     style_stack.push(
                         Style::default()
                             .fg(Color::DarkGray)
@@ -127,6 +133,14 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
                     let text_str = text.to_string();
                     let mut sub_lines = text_str.split('\n').peekable();
                     while let Some(sub) = sub_lines.next() {
+                        if current_spans.is_empty() {
+                            current_spans.push(Span::styled(
+                                "│ ",
+                                Style::default()
+                                    .fg(Color::DarkGray)
+                                    .add_modifier(Modifier::BOLD),
+                            ));
+                        }
                         current_spans.push(Span::styled(sub.to_string(), style));
                         if sub_lines.peek().is_some() {
                             flush_line(&mut current_spans, &mut lines);
@@ -137,7 +151,9 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
                 }
             }
             Event::Code(code) => {
-                let style = Style::default().fg(Color::Green).bg(Color::DarkGray);
+                let style = Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD);
                 current_spans.push(Span::styled(code.to_string(), style));
             }
             Event::SoftBreak => {
@@ -203,12 +219,12 @@ mod tests {
     fn code_block_preserves_lines() {
         let input = "```\nline1\nline2\n```";
         let lines = markdown_to_lines(input);
-        let green_lines: Vec<_> = lines
+        let code_lines: Vec<_> = lines
             .iter()
-            .filter(|l| l.spans.iter().any(|s| s.style.fg == Some(Color::Green)))
+            .filter(|l| l.spans.iter().any(|s| s.style.fg == Some(Color::Cyan)))
             .collect();
         assert!(
-            green_lines.len() >= 2,
+            code_lines.len() >= 2,
             "code block should have multiple lines"
         );
     }
@@ -216,11 +232,11 @@ mod tests {
     #[test]
     fn inline_code() {
         let lines = markdown_to_lines("use `foo` here");
-        let has_green = lines[0]
+        let has_code_style = lines[0]
             .spans
             .iter()
-            .any(|s| s.style.fg == Some(Color::Green));
-        assert!(has_green);
+            .any(|s| s.style.fg == Some(Color::Cyan));
+        assert!(has_code_style);
     }
 
     #[test]

@@ -321,6 +321,7 @@ mod tests {
                     status: "in_progress".to_string(),
                     exit_code: None,
                     output: Some("running tests\n".to_string()),
+                    details: None,
                 },
                 ProviderEvent::Command {
                     item_id: Some("cmd-1".to_string()),
@@ -328,6 +329,7 @@ mod tests {
                     status: "completed".to_string(),
                     exit_code: Some(0),
                     output: Some("test result: ok\n".to_string()),
+                    details: None,
                 },
                 ProviderEvent::FileChange {
                     item_id: Some("edit-1".to_string()),
@@ -337,6 +339,7 @@ mod tests {
                         "apps/cli/src/render_model.rs".to_string(),
                     ],
                     status: "completed".to_string(),
+                    details: None,
                 },
                 ProviderEvent::MessageDelta {
                     text: "Lot 5 snapshot coverage is in place.".to_string(),
@@ -354,6 +357,7 @@ mod tests {
 [00:00:00] $ cargo test -p koklo-cli
 [00:00:00] │ running tests
 [00:00:00] │ test result: ok
+[00:00:00] Δ updated monitor and renderer
 [00:00:00] Δ apps/cli/src/monitor.rs
 [00:00:00] Δ apps/cli/src/render_model.rs
 Lot 5 snapshot coverage is in place.";
@@ -396,6 +400,7 @@ Lot 5 snapshot coverage is in place.";
                         "apps/cli/src/render_model.rs".to_string(),
                     ],
                     status: "completed".to_string(),
+                    details: None,
                 },
                 ProviderEvent::MessageDelta {
                     text: "Lot 5 snapshot coverage is in place.".to_string(),
@@ -409,6 +414,7 @@ Lot 5 snapshot coverage is in place.";
 [00:00:00] ↳ Read loaded file
 [00:00:00] ⚙ Run cargo test -p koklo-cli
 [00:00:00] ↳ Bash completed
+[00:00:00] Δ updated monitor and renderer
 [00:00:00] Δ apps/cli/src/monitor.rs
 [00:00:00] Δ apps/cli/src/render_model.rs
 Lot 5 snapshot coverage is in place.";
