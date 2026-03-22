@@ -3,9 +3,10 @@ use super::{check_claude_session, flatten_messages_to_prompt, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
-    ProviderCapabilities, ProviderEvent, ProviderInteractionMode, ProviderSession,
-    ProviderSessionEvent, StreamChunk, UserInputPayload,
+    CommandDetails, FileChangeDetails, FileChangeEntry, LlmProvider, Message,
+    ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload, ProviderCapabilities,
+    ProviderEvent, ProviderInteractionMode, ProviderSession, ProviderSessionEvent, StreamChunk,
+    UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -615,6 +616,10 @@ fn handle_codex_notification(
                     status: "updated".to_string(),
                     exit_code: None,
                     output: Some(delta.to_string()),
+                    details: Some(CommandDetails {
+                        aggregated_output: Some(delta.to_string()),
+                        ..CommandDetails::default()
+                    }),
                 })));
             }
         }
@@ -632,6 +637,10 @@ fn handle_codex_notification(
                     summary: summary.to_string(),
                     files: Vec::new(),
                     status: "updated".to_string(),
+                    details: Some(FileChangeDetails {
+                        delta: Some(summary.to_string()),
+                        ..FileChangeDetails::default()
+                    }),
                 })));
             }
         }
@@ -902,6 +911,95 @@ struct CodexExecItem {
     rest: Value,
 }
 
+fn parse_command_text_and_argv(command: Option<&Value>) -> (String, Vec<String>) {
+    if let Some(parts) = command.and_then(Value::as_array) {
+        let argv = parts
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let text = if argv.is_empty() {
+            "command".to_string()
+        } else {
+            argv.join(" ")
+        };
+        return (text, argv);
+    }
+
+    let text = command
+        .and_then(Value::as_str)
+        .unwrap_or("command")
+        .to_string();
+    let argv = shell_words::split(&text).unwrap_or_default();
+    (text, argv)
+}
+
+fn parse_file_change_details(changes: Option<&Value>) -> Option<FileChangeDetails> {
+    let entries = changes
+        .and_then(Value::as_array)
+        .map(|changes| {
+            changes
+                .iter()
+                .map(|change| FileChangeEntry {
+                    path: change
+                        .get("path")
+                        .or_else(|| change.get("filePath"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    kind: change
+                        .get("kind")
+                        .or_else(|| change.get("status"))
+                        .or_else(|| change.get("action"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    patch: change
+                        .get("patch")
+                        .or_else(|| change.get("diff"))
+                        .or_else(|| change.get("unifiedDiff"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    lines: collect_change_text_lines(
+                        change.get("lines").or_else(|| change.get("preview")),
+                    ),
+                    added: collect_change_text_lines(change.get("added")),
+                    removed: collect_change_text_lines(change.get("removed")),
+                    summary: change
+                        .get("summary")
+                        .or_else(|| change.get("description"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if entries.is_empty() {
+        None
+    } else {
+        Some(FileChangeDetails {
+            changes: entries,
+            ..FileChangeDetails::default()
+        })
+    }
+}
+
+fn collect_change_text_lines(value: Option<&Value>) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    item.as_str()
+                        .map(str::to_string)
+                        .or_else(|| item.get("text").and_then(Value::as_str).map(str::to_string))
+                        .or_else(|| item.get("line").and_then(Value::as_str).map(str::to_string))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
 fn parse_codex_exec_output(stdout: &str) -> Result<String, ProviderError> {
     let mut last_message = None;
     for line in stdout.lines() {
@@ -1075,12 +1173,7 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
                 text: text.to_string(),
             }),
         "command_execution" | "commandExecution" => {
-            let command = item
-                .rest
-                .get("command")
-                .and_then(|value| value.as_str())
-                .unwrap_or("command")
-                .to_string();
+            let (command, argv) = parse_command_text_and_argv(item.rest.get("command"));
             let output = item
                 .rest
                 .get("aggregated_output")
@@ -1098,9 +1191,24 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
                 status,
                 exit_code,
                 output,
+                details: Some(CommandDetails {
+                    argv,
+                    cwd: item
+                        .rest
+                        .get("cwd")
+                        .and_then(|value| value.as_str())
+                        .map(str::to_string),
+                    aggregated_output: item
+                        .rest
+                        .get("aggregated_output")
+                        .or_else(|| item.rest.get("aggregatedOutput"))
+                        .and_then(|value| value.as_str())
+                        .map(str::to_string),
+                }),
             })
         }
         "file_change" | "fileChange" => {
+            let details = parse_file_change_details(item.rest.get("changes"));
             let files = item
                 .rest
                 .get("changes")
@@ -1123,6 +1231,7 @@ fn parse_codex_item_event(event_type: &str, item: CodexExecItem) -> Vec<Provider
                 summary,
                 files,
                 status,
+                details,
             })
         }
         "mcp_tool_call" | "mcpToolCall" => {
@@ -1426,6 +1535,7 @@ WARNING: cache issue
                 status,
                 exit_code,
                 output,
+                ..
             }] if item_id.as_deref() == Some("cmd-1")
                 && command == "cargo test -p koklo-cli"
                 && status == "completed"
@@ -1492,6 +1602,35 @@ WARNING: cache issue
             }) if item_id.as_deref() == Some("patch-1")
                 && summary == "Updated apps/cli/src/monitor.rs"
                 && status == "updated"
+        ));
+    }
+
+    #[test]
+    fn parse_completed_file_change_preserves_change_details() {
+        let item = CodexExecItem {
+            id: Some("patch-2".to_string()),
+            item_type: "file_change".to_string(),
+            rest: json!({
+                "status": "completed",
+                "changes": [{
+                    "path": "apps/cli/src/monitor.rs",
+                    "kind": "update",
+                    "patch": "@@ -1 +1 @@\n-old line\n+new line"
+                }]
+            }),
+        };
+
+        let events = parse_codex_item_event("item.completed", item);
+        assert!(matches!(
+            &events[0],
+            ProviderEvent::FileChange {
+                item_id,
+                files,
+                details: Some(details),
+                ..
+            } if item_id.as_deref() == Some("patch-2")
+                && files == &vec!["apps/cli/src/monitor.rs".to_string()]
+                && details.changes.len() == 1
         ));
     }
 }

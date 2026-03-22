@@ -26,6 +26,7 @@ koklo-events = { path = "../events" }
 futures-util = "0.3"
 strip-ansi-escapes = "0.2"
 tempfile = "3"
+shell-words = "1"
 
 [dependencies.portable-pty]
 version = "0.8"
