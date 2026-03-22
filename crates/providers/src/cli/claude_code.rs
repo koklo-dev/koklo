@@ -8,9 +8,10 @@ use super::{check_claude_session, flatten_messages_to_prompt, strip_ansi, CliMod
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    LlmProvider, Message, ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload,
-    ProviderCapabilities, ProviderEvent, ProviderInteractionMode, ProviderSession,
-    ProviderSessionEvent, StreamChunk, UserInputPayload,
+    CommandDetails, FileChangeDetails, FileChangeEntry, LlmProvider, Message,
+    ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload, ProviderCapabilities,
+    ProviderEvent, ProviderInteractionMode, ProviderSession, ProviderSessionEvent, StreamChunk,
+    UserInputPayload,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -181,8 +182,8 @@ impl ClaudeCodeCliProvider {
             buf
         });
 
-        // Track tool_use_id → tool_name for ToolResult events.
-        let mut tool_name_registry: HashMap<String, String> = HashMap::new();
+        // Track tool_use_id → invocation details for ToolResult events.
+        let mut tool_registry: HashMap<String, ClaudeToolInvocation> = HashMap::new();
 
         let mut lines = BufReader::new(stdout).lines();
         let mut full_text = String::new();
@@ -194,7 +195,7 @@ impl ClaudeCodeCliProvider {
             if trimmed.is_empty() || !trimmed.starts_with('{') {
                 continue;
             }
-            for event in parse_stream_json_line(trimmed, &mut tool_name_registry) {
+            for event in parse_stream_json_line(trimmed, &mut tool_registry) {
                 match event {
                     StreamJsonEvent::TextDelta(t) => {
                         has_streamed_deltas = true;
@@ -213,25 +214,28 @@ impl ClaudeCodeCliProvider {
                         id,
                         name,
                         input_summary,
-                        input: _,
+                        input,
                     } => {
-                        on_chunk(StreamChunk::event(ProviderEvent::ToolCall {
-                            item_id: id,
-                            tool_name: name,
-                            input_summary,
-                        }));
+                        for provider_event in
+                            emit_claude_tool_call_events(id, name, input_summary, input)
+                        {
+                            on_chunk(StreamChunk::event(provider_event));
+                        }
                     }
                     StreamJsonEvent::ToolResult {
                         id,
                         tool_name,
                         summary,
+                        content,
                     } => {
-                        on_chunk(StreamChunk::event(ProviderEvent::ToolResult {
-                            item_id: id,
-                            tool_name,
-                            output_summary: summary,
-                            success: None,
-                        }));
+                        let invocation = id
+                            .as_ref()
+                            .and_then(|tool_use_id| tool_registry.get(tool_use_id));
+                        for provider_event in emit_claude_tool_result_events(
+                            id, tool_name, summary, content, invocation,
+                        ) {
+                            on_chunk(StreamChunk::event(provider_event));
+                        }
                     }
                     StreamJsonEvent::Usage {
                         input_tokens,
@@ -322,7 +326,7 @@ impl ClaudeCodeCliProvider {
             ));
         }
         tokio::spawn(async move {
-            let mut tool_name_registry: HashMap<String, String> = HashMap::new();
+            let mut tool_registry: HashMap<String, ClaudeToolInvocation> = HashMap::new();
             let mut lines = BufReader::new(stdout).lines();
             let mut turn_output = String::new();
             let mut has_streamed_deltas = false;
@@ -334,7 +338,7 @@ impl ClaudeCodeCliProvider {
                         if trimmed.is_empty() || !trimmed.starts_with('{') {
                             continue;
                         }
-                        for event in parse_stream_json_line(trimmed, &mut tool_name_registry) {
+                        for event in parse_stream_json_line(trimmed, &mut tool_registry) {
                             match event {
                                 StreamJsonEvent::TextDelta(text) => {
                                     has_streamed_deltas = true;
@@ -374,31 +378,40 @@ impl ClaudeCodeCliProvider {
                                             },
                                         )));
                                     } else {
-                                        let _ = sender.send(Ok(ProviderSessionEvent::Event(
-                                            ProviderEvent::ToolCall {
-                                                item_id: id,
-                                                tool_name: name,
-                                                input_summary,
-                                            },
-                                        )));
+                                        for provider_event in emit_claude_tool_call_events(
+                                            id.clone(),
+                                            name.clone(),
+                                            input_summary.clone(),
+                                            input.clone(),
+                                        ) {
+                                            let _ = sender.send(Ok(ProviderSessionEvent::Event(
+                                                provider_event,
+                                            )));
+                                        }
                                     }
                                 }
                                 StreamJsonEvent::ToolResult {
                                     id,
                                     tool_name,
                                     summary,
+                                    content,
                                 } => {
                                     if permission_tool_name.as_deref() == Some(tool_name.as_str()) {
                                         continue;
                                     }
-                                    let _ = sender.send(Ok(ProviderSessionEvent::Event(
-                                        ProviderEvent::ToolResult {
-                                            item_id: id,
-                                            tool_name,
-                                            output_summary: summary,
-                                            success: None,
-                                        },
-                                    )));
+                                    let invocation = id
+                                        .as_ref()
+                                        .and_then(|tool_use_id| tool_registry.get(tool_use_id));
+                                    for provider_event in emit_claude_tool_result_events(
+                                        id.clone(),
+                                        tool_name.clone(),
+                                        summary.clone(),
+                                        content.clone(),
+                                        invocation,
+                                    ) {
+                                        let _ = sender
+                                            .send(Ok(ProviderSessionEvent::Event(provider_event)));
+                                    }
                                 }
                                 StreamJsonEvent::Usage {
                                     input_tokens,
@@ -771,6 +784,7 @@ enum StreamJsonEvent {
         id: Option<String>,
         tool_name: String,
         summary: String,
+        content: serde_json::Value,
     },
     Usage {
         input_tokens: u32,
@@ -782,13 +796,20 @@ enum StreamJsonEvent {
     Other,
 }
 
+#[derive(Debug, Clone, Default)]
+struct ClaudeToolInvocation {
+    name: String,
+    input_summary: String,
+    input: serde_json::Value,
+}
+
 /// Parse one NDJSON line from `--output-format stream-json`.
 ///
 /// Returns zero or more events (a single assistant content block can contain
 /// both text items and tool_use items).
 fn parse_stream_json_line(
     line: &str,
-    tool_name_registry: &mut HashMap<String, String>,
+    tool_registry: &mut HashMap<String, ClaudeToolInvocation>,
 ) -> Vec<StreamJsonEvent> {
     let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else {
         return vec![];
@@ -827,12 +848,19 @@ fn parse_stream_json_line(
                         }
                         let name = item["name"].as_str().unwrap_or("tool").to_string();
                         let id = item["id"].as_str().map(str::to_string);
-                        // Register id → name for matching tool results later.
-                        if let Some(tool_use_id) = &id {
-                            tool_name_registry.insert(tool_use_id.clone(), name.clone());
-                        }
                         let input = item["input"].clone();
                         let input_summary = extract_input_summary(&input, &name);
+                        // Register tool invocation so completion events can reuse the input.
+                        if let Some(tool_use_id) = &id {
+                            tool_registry.insert(
+                                tool_use_id.clone(),
+                                ClaudeToolInvocation {
+                                    name: name.clone(),
+                                    input_summary: input_summary.clone(),
+                                    input: input.clone(),
+                                },
+                            );
+                        }
                         events.push(StreamJsonEvent::ToolCall {
                             id,
                             name,
@@ -868,7 +896,18 @@ fn parse_stream_json_line(
                     .unwrap_or("tool")
                     .to_string();
                 if let Some(id) = val["content_block"]["id"].as_str() {
-                    tool_name_registry.insert(id.to_string(), name);
+                    let input = val["content_block"]
+                        .get("input")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!({}));
+                    tool_registry.insert(
+                        id.to_string(),
+                        ClaudeToolInvocation {
+                            input_summary: extract_input_summary(&input, &name),
+                            name,
+                            input,
+                        },
+                    );
                 }
             }
             vec![]
@@ -889,21 +928,24 @@ fn parse_stream_json_line(
         // Claude Code uses "tool" or "tool_result" depending on version.
         "tool" | "tool_result" => {
             let tool_use_id = val["tool_use_id"].as_str().unwrap_or("").to_string();
-            let tool_name = tool_name_registry
+            let tool_name = tool_registry
                 .get(&tool_use_id)
-                .cloned()
+                .map(|invocation| invocation.name.clone())
                 .unwrap_or_else(|| "tool".to_string());
-            let summary = val["content"]
-                .as_array()
-                .and_then(|arr| arr.first())
-                .and_then(|item| item["text"].as_str())
-                .and_then(|t| t.lines().next())
+            let content = val
+                .get("content")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!([]));
+            let summary = extract_claude_tool_result_text(&content)
+                .lines()
+                .next()
                 .unwrap_or("ok")
                 .to_string();
             vec![StreamJsonEvent::ToolResult {
                 id: (!tool_use_id.is_empty()).then_some(tool_use_id),
                 tool_name,
                 summary,
+                content,
             }]
         }
         "result" => {
@@ -918,6 +960,355 @@ fn parse_stream_json_line(
         }
         _ => vec![],
     }
+}
+
+fn emit_claude_tool_call_events(
+    item_id: Option<String>,
+    name: String,
+    input_summary: String,
+    input: serde_json::Value,
+) -> Vec<ProviderEvent> {
+    if is_claude_file_change_tool(&name) {
+        let files = collect_claude_file_paths(&input);
+        return vec![ProviderEvent::FileChange {
+            item_id,
+            summary: if input_summary.is_empty() {
+                files
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "file changes".to_string())
+            } else {
+                input_summary
+            },
+            files,
+            status: "in_progress".to_string(),
+            details: build_claude_file_change_details(&name, &input),
+        }];
+    }
+
+    if name == "Bash" {
+        let (command, argv) = parse_claude_command_text_and_argv(&input);
+        return vec![ProviderEvent::Command {
+            item_id,
+            command,
+            status: "in_progress".to_string(),
+            exit_code: None,
+            output: None,
+            details: Some(CommandDetails {
+                argv,
+                cwd: input
+                    .get("cwd")
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
+                aggregated_output: None,
+            }),
+        }];
+    }
+
+    vec![ProviderEvent::ToolCall {
+        item_id,
+        tool_name: name,
+        input_summary,
+    }]
+}
+
+fn emit_claude_tool_result_events(
+    item_id: Option<String>,
+    tool_name: String,
+    summary: String,
+    content: serde_json::Value,
+    invocation: Option<&ClaudeToolInvocation>,
+) -> Vec<ProviderEvent> {
+    if is_claude_file_change_tool(&tool_name) {
+        let (details, files, fallback_summary) = invocation
+            .map(|invocation| {
+                (
+                    build_claude_file_change_details(&tool_name, &invocation.input),
+                    collect_claude_file_paths(&invocation.input),
+                    if invocation.input_summary.is_empty() {
+                        "file changes".to_string()
+                    } else {
+                        invocation.input_summary.clone()
+                    },
+                )
+            })
+            .unwrap_or_else(|| (None, Vec::new(), summary.clone()));
+        let result_text = extract_claude_tool_result_text(&content);
+        let status = if looks_like_tool_failure(&result_text) {
+            "failed"
+        } else {
+            "completed"
+        };
+        return vec![ProviderEvent::FileChange {
+            item_id,
+            summary: if summary.trim().is_empty() || summary == "ok" {
+                fallback_summary
+            } else {
+                summary
+            },
+            files,
+            status: status.to_string(),
+            details,
+        }];
+    }
+
+    if tool_name == "Bash" {
+        let result_text = extract_claude_tool_result_text(&content);
+        let status = if looks_like_tool_failure(&result_text) {
+            "failed"
+        } else {
+            "completed"
+        };
+        let (command, argv, cwd) = invocation
+            .map(|invocation| {
+                let (command, argv) = parse_claude_command_text_and_argv(&invocation.input);
+                let cwd = invocation
+                    .input
+                    .get("cwd")
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string);
+                (command, argv, cwd)
+            })
+            .unwrap_or_else(|| (tool_name.clone(), Vec::new(), None));
+        return vec![ProviderEvent::Command {
+            item_id,
+            command,
+            status: status.to_string(),
+            exit_code: None,
+            output: (!result_text.trim().is_empty()).then_some(result_text.clone()),
+            details: Some(CommandDetails {
+                argv,
+                cwd,
+                aggregated_output: (!result_text.trim().is_empty()).then_some(result_text),
+            }),
+        }];
+    }
+
+    vec![ProviderEvent::ToolResult {
+        item_id,
+        tool_name,
+        output_summary: summary,
+        success: None,
+    }]
+}
+
+fn is_claude_file_change_tool(tool_name: &str) -> bool {
+    matches!(tool_name, "Write" | "Edit" | "MultiEdit" | "NotebookEdit")
+}
+
+fn collect_claude_file_paths(input: &serde_json::Value) -> Vec<String> {
+    let mut paths = Vec::new();
+
+    for key in ["file_path", "path", "notebook_path"] {
+        if let Some(path) = input.get(key).and_then(|value| value.as_str()) {
+            push_unique_path(&mut paths, path);
+        }
+    }
+
+    for key in ["edits", "changes", "replacements"] {
+        if let Some(items) = input.get(key).and_then(|value| value.as_array()) {
+            for item in items {
+                for path_key in ["file_path", "path", "notebook_path"] {
+                    if let Some(path) = item.get(path_key).and_then(|value| value.as_str()) {
+                        push_unique_path(&mut paths, path);
+                    }
+                }
+            }
+        }
+    }
+
+    paths
+}
+
+fn push_unique_path(paths: &mut Vec<String>, path: &str) {
+    let trimmed = path.trim();
+    if trimmed.is_empty() || paths.iter().any(|existing| existing == trimmed) {
+        return;
+    }
+    paths.push(trimmed.to_string());
+}
+
+fn build_claude_file_change_details(
+    tool_name: &str,
+    input: &serde_json::Value,
+) -> Option<FileChangeDetails> {
+    let default_path = input
+        .get("file_path")
+        .or_else(|| input.get("path"))
+        .or_else(|| input.get("notebook_path"))
+        .and_then(|value| value.as_str())
+        .map(str::to_string);
+
+    let entries = match tool_name {
+        "Write" => {
+            let added = limited_text_lines(input.get("content").and_then(|value| value.as_str()));
+            vec![FileChangeEntry {
+                path: default_path,
+                kind: Some("write".to_string()),
+                added,
+                summary: input
+                    .get("description")
+                    .or_else(|| input.get("instruction"))
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
+                ..FileChangeEntry::default()
+            }]
+        }
+        "Edit" => {
+            let removed =
+                limited_text_lines(input.get("old_string").and_then(|value| value.as_str()));
+            let added =
+                limited_text_lines(input.get("new_string").and_then(|value| value.as_str()));
+            vec![FileChangeEntry {
+                path: default_path,
+                kind: Some("update".to_string()),
+                removed,
+                added,
+                summary: input
+                    .get("instruction")
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string),
+                ..FileChangeEntry::default()
+            }]
+        }
+        "MultiEdit" => input
+            .get("edits")
+            .or_else(|| input.get("changes"))
+            .or_else(|| input.get("replacements"))
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, item)| FileChangeEntry {
+                        path: item
+                            .get("file_path")
+                            .or_else(|| item.get("path"))
+                            .and_then(|value| value.as_str())
+                            .map(str::to_string)
+                            .or_else(|| default_path.clone()),
+                        kind: Some("update".to_string()),
+                        lines: vec![format!("@@ edit {} @@", idx + 1)],
+                        removed: limited_text_lines(
+                            item.get("old_string").and_then(|value| value.as_str()),
+                        ),
+                        added: limited_text_lines(
+                            item.get("new_string").and_then(|value| value.as_str()),
+                        ),
+                        summary: item
+                            .get("instruction")
+                            .or_else(|| item.get("description"))
+                            .and_then(|value| value.as_str())
+                            .map(str::to_string),
+                        ..FileChangeEntry::default()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        "NotebookEdit" => {
+            let removed = limited_text_lines(
+                input
+                    .get("old_source")
+                    .or_else(|| input.get("source_before"))
+                    .and_then(|value| value.as_str()),
+            );
+            let added = limited_text_lines(
+                input
+                    .get("new_source")
+                    .or_else(|| input.get("content"))
+                    .or_else(|| input.get("source"))
+                    .and_then(|value| value.as_str()),
+            );
+            vec![FileChangeEntry {
+                path: default_path,
+                kind: Some("update".to_string()),
+                removed,
+                added,
+                summary: input
+                    .get("cell_id")
+                    .or_else(|| input.get("cellId"))
+                    .and_then(|value| value.as_str())
+                    .map(|cell| format!("cell {}", cell)),
+                ..FileChangeEntry::default()
+            }]
+        }
+        _ => Vec::new(),
+    };
+
+    let entries = entries
+        .into_iter()
+        .filter(|entry| {
+            entry.path.is_some()
+                || !entry.lines.is_empty()
+                || !entry.added.is_empty()
+                || !entry.removed.is_empty()
+                || entry.summary.is_some()
+        })
+        .collect::<Vec<_>>();
+
+    if entries.is_empty() {
+        None
+    } else {
+        Some(FileChangeDetails {
+            changes: entries,
+            ..FileChangeDetails::default()
+        })
+    }
+}
+
+fn limited_text_lines(text: Option<&str>) -> Vec<String> {
+    const MAX_LINES: usize = 24;
+
+    let Some(text) = text else {
+        return Vec::new();
+    };
+
+    let mut lines = text.lines().map(str::to_string).collect::<Vec<_>>();
+    if lines.len() > MAX_LINES {
+        lines.truncate(MAX_LINES);
+        lines.push("…".to_string());
+    }
+    lines
+}
+
+fn parse_claude_command_text_and_argv(input: &serde_json::Value) -> (String, Vec<String>) {
+    let command = input
+        .get("command")
+        .and_then(|value| value.as_str())
+        .unwrap_or("command")
+        .to_string();
+    let argv = shell_words::split(&command).unwrap_or_default();
+    (command, argv)
+}
+
+fn extract_claude_tool_result_text(content: &serde_json::Value) -> String {
+    if let Some(text) = content.as_str() {
+        return text.to_string();
+    }
+
+    content
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    item.get("text")
+                        .and_then(|value| value.as_str())
+                        .map(str::to_string)
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+}
+
+fn looks_like_tool_failure(text: &str) -> bool {
+    let lower = text.trim().to_ascii_lowercase();
+    !lower.is_empty()
+        && (lower.contains("error")
+            || lower.contains("failed")
+            || lower.contains("permission denied")
+            || lower.contains("command exited with"))
 }
 
 fn parse_claude_user_input_questions(
@@ -1013,18 +1404,24 @@ mod tests {
             matches!(&events[0], StreamJsonEvent::ToolCall { name, input_summary, .. }
                 if name == "Write" && input_summary == "src/lib.rs")
         );
-        assert_eq!(reg.get("abc").unwrap(), "Write");
+        assert_eq!(reg.get("abc").unwrap().name, "Write");
     }
 
     #[test]
     fn test_parse_tool_result() {
         let line = r#"{"type":"tool_result","tool_use_id":"abc","content":[{"type":"text","text":"ok\nsome detail"}]}"#;
         let mut reg = HashMap::new();
-        reg.insert("abc".to_string(), "Write".to_string());
+        reg.insert(
+            "abc".to_string(),
+            ClaudeToolInvocation {
+                name: "Write".to_string(),
+                ..ClaudeToolInvocation::default()
+            },
+        );
         let events = parse_stream_json_line(line, &mut reg);
         assert_eq!(events.len(), 1);
         assert!(
-            matches!(&events[0], StreamJsonEvent::ToolResult { id, tool_name, summary }
+            matches!(&events[0], StreamJsonEvent::ToolResult { id, tool_name, summary, .. }
                 if id.as_deref() == Some("abc") && tool_name == "Write" && summary == "ok")
         );
     }
@@ -1094,7 +1491,7 @@ mod tests {
         let mut reg = HashMap::new();
         let events = parse_stream_json_line(line, &mut reg);
         assert!(events.is_empty());
-        assert_eq!(reg.get("t1").unwrap(), "Bash");
+        assert_eq!(reg.get("t1").unwrap().name, "Bash");
     }
 
     #[test]
@@ -1103,6 +1500,69 @@ mod tests {
         let mut reg = HashMap::new();
         let events = parse_stream_json_line(line, &mut reg);
         assert!(events.is_empty());
-        assert_eq!(reg.get("xyz").unwrap(), "Read");
+        assert_eq!(reg.get("xyz").unwrap().name, "Read");
+    }
+
+    #[test]
+    fn edit_tool_call_emits_structured_file_change() {
+        let events = emit_claude_tool_call_events(
+            Some("edit-1".to_string()),
+            "Edit".to_string(),
+            "src/lib.rs".to_string(),
+            serde_json::json!({
+                "file_path": "src/lib.rs",
+                "old_string": "old line",
+                "new_string": "new line"
+            }),
+        );
+
+        assert!(matches!(
+            &events[0],
+            ProviderEvent::FileChange {
+                item_id: Some(id),
+                details: Some(details),
+                ..
+            } if id == "edit-1"
+                && details.changes.iter().any(|change|
+                    change.path.as_deref() == Some("src/lib.rs")
+                        && change.removed == vec!["old line".to_string()]
+                        && change.added == vec!["new line".to_string()])
+        ));
+    }
+
+    #[test]
+    fn bash_tool_result_emits_command_with_output() {
+        let invocation = ClaudeToolInvocation {
+            name: "Bash".to_string(),
+            input_summary: "cargo test".to_string(),
+            input: serde_json::json!({
+                "command": "cargo test",
+                "cwd": "/tmp/project"
+            }),
+        };
+
+        let events = emit_claude_tool_result_events(
+            Some("bash-1".to_string()),
+            "Bash".to_string(),
+            "ok".to_string(),
+            serde_json::json!([
+                {"type": "text", "text": "line 1\nline 2"}
+            ]),
+            Some(&invocation),
+        );
+
+        assert!(matches!(
+            &events[0],
+            ProviderEvent::Command {
+                item_id: Some(id),
+                command,
+                output: Some(output),
+                details: Some(details),
+                ..
+            } if id == "bash-1"
+                && command == "cargo test"
+                && output == "line 1\nline 2"
+                && details.cwd.as_deref() == Some("/tmp/project")
+        ));
     }
 }
