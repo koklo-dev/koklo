@@ -104,6 +104,42 @@ pub enum ProviderApprovalKind {
     PatchApply,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandDetails {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub argv: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregated_output: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileChangeEntry {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lines: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub added: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileChangeDetails {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<FileChangeEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta: Option<String>,
+}
+
 /// Normalized event stream emitted by providers.
 #[derive(Debug, Clone)]
 pub enum ProviderEvent {
@@ -136,12 +172,14 @@ pub enum ProviderEvent {
         status: String,
         exit_code: Option<i64>,
         output: Option<String>,
+        details: Option<CommandDetails>,
     },
     FileChange {
         item_id: Option<String>,
         summary: String,
         files: Vec<String>,
         status: String,
+        details: Option<FileChangeDetails>,
     },
     UserInputRequest {
         item_id: Option<String>,
@@ -162,7 +200,7 @@ pub enum ProviderEvent {
 }
 
 impl ProviderEvent {
-    pub const CONTRACT_VERSION: &'static str = "koklo.provider_event.v1";
+    pub const CONTRACT_VERSION: &'static str = "koklo.provider_event.v2";
 
     pub fn item_id(&self) -> Option<&str> {
         match self {
@@ -262,23 +300,38 @@ impl ProviderEvent {
                 status,
                 exit_code,
                 output,
+                details,
                 ..
             } => json!({
                 "command": command,
                 "status": status,
                 "exit_code": exit_code,
                 "output": output,
+                "details": details,
+                "argv": details.as_ref().map(|details| details.argv.clone()).filter(|argv| !argv.is_empty()),
+                "cwd": details.as_ref().and_then(|details| details.cwd.clone()),
+                "aggregated_output": details
+                    .as_ref()
+                    .and_then(|details| details.aggregated_output.clone())
+                    .or_else(|| output.clone()),
             }),
             ProviderEvent::FileChange {
                 summary,
                 files,
                 status,
+                details,
                 ..
             } => json!({
                 "summary": summary,
                 "files": files,
                 "file_count": files.len(),
                 "status": status,
+                "details": details,
+                "delta": details.as_ref().and_then(|details| details.delta.clone()),
+                "changes": details
+                    .as_ref()
+                    .map(|details| details.changes.clone())
+                    .filter(|changes| !changes.is_empty()),
             }),
             ProviderEvent::UserInputRequest { questions, .. } => json!({
                 "question_count": questions.len(),
