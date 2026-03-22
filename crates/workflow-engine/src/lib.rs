@@ -19,7 +19,10 @@ use koklo_events::{
     Phase, PipelineEvent, TranscriptItem, TranscriptItemKind, TranscriptItemStatus,
     TranscriptSource, UserInputChannel, UserInputDisplay,
 };
-use koklo_providers::{ClaudeCodeCliProvider, CodexCliProvider, LlmProvider, ProviderRegistry};
+use koklo_providers::{
+    ClaudeCodeCliProvider, CodexCliProvider, LlmProvider, OllamaProvider, OpenRouterProvider,
+    ProviderRegistry, ProviderTomlEntry,
+};
 use koklo_shell::{BubblewrapSandbox, ControlledShell, LandlockSandbox, Sandbox};
 use koklo_storage::{Session, SessionManager, UsageRecordInput};
 use presets::{phases_for_preset, PresetKind};
@@ -75,6 +78,8 @@ pub struct PipelineConfig {
     pub default_provider: Arc<dyn LlmProvider>,
     /// Per-agent provider overrides (keyed by agent name, e.g. `"pm"`, `"developer"`).
     pub agent_providers: HashMap<String, Arc<dyn LlmProvider>>,
+    /// Raw provider entries from merged TOML config, used to reconstruct workspace-bound providers.
+    pub provider_entries: HashMap<String, ProviderTomlEntry>,
     /// Optional per-agent sandbox directives from `pipeline.toml`.
     pub agent_sandboxes: HashMap<String, String>,
     /// When true, wrap local CLI execution in `ControlledShell`.
@@ -302,6 +307,54 @@ impl PipelineConfig {
                     );
                     provider
                 }
+            },
+            "openrouter" => match self.provider_entries.get("openrouter") {
+                Some(entry) => match match sandbox {
+                    Some(sandbox) => OpenRouterProvider::with_context_from_config(
+                        entry,
+                        workspace_root.to_path_buf(),
+                        sandbox,
+                    ),
+                    None => OpenRouterProvider::with_working_dir_from_config(
+                        entry,
+                        workspace_root.to_path_buf(),
+                    ),
+                } {
+                    Ok(p) => Arc::new(p),
+                    Err(err) => {
+                        tracing::warn!(
+                            "Failed to pin OpenRouter provider to workspace {}: {}",
+                            workspace_root.display(),
+                            err
+                        );
+                        provider
+                    }
+                },
+                None => provider,
+            },
+            "ollama" => match self.provider_entries.get("ollama") {
+                Some(entry) => match match sandbox {
+                    Some(sandbox) => OllamaProvider::with_context_from_config(
+                        entry,
+                        workspace_root.to_path_buf(),
+                        sandbox,
+                    ),
+                    None => OllamaProvider::with_working_dir_from_config(
+                        entry,
+                        workspace_root.to_path_buf(),
+                    ),
+                } {
+                    Ok(p) => Arc::new(p),
+                    Err(err) => {
+                        tracing::warn!(
+                            "Failed to pin Ollama provider to workspace {}: {}",
+                            workspace_root.display(),
+                            err
+                        );
+                        provider
+                    }
+                },
+                None => provider,
             },
             _ => provider,
         }
@@ -1483,6 +1536,7 @@ mod tests {
             preset: PresetKind::Sdd,
             default_provider: default,
             agent_providers,
+            provider_entries: HashMap::new(),
             agent_sandboxes: HashMap::new(),
             controlled_shell: false,
             provider_registry: registry,
@@ -1647,6 +1701,7 @@ mod tests {
             preset: PresetKind::Sdd,
             default_provider: Arc::new(provider),
             agent_providers: HashMap::new(),
+            provider_entries: HashMap::new(),
             agent_sandboxes: HashMap::new(),
             controlled_shell: false,
             provider_registry: Arc::new(
@@ -1723,6 +1778,7 @@ mod tests {
                 "qwen2.5-coder:7b",
             )),
             agent_providers: HashMap::new(),
+            provider_entries: HashMap::new(),
             agent_sandboxes: HashMap::new(),
             controlled_shell: false,
             provider_registry: Arc::new(
@@ -1799,6 +1855,7 @@ mod tests {
                 "qwen2.5-coder:7b",
             )),
             agent_providers: HashMap::new(),
+            provider_entries: HashMap::new(),
             agent_sandboxes: HashMap::new(),
             controlled_shell: false,
             provider_registry: Arc::new(
