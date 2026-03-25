@@ -1,3 +1,4 @@
+#[path = "agents/mod.rs"]
 mod agents;
 mod catalog;
 mod profile;
