@@ -49,6 +49,13 @@ enum Panel {
 enum TuiMode {
     Live,
     GateOverlay,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+enum Route {
+    Dashboard,
+    Workspace,
+    SessionDetail,
     Summary,
 }
 
@@ -105,6 +112,8 @@ enum CommandAction {
     Reject,
     Edit(PathBuf),
     Reply(String),
+    Dashboard,
+    Workspace,
     Focus(Panel),
     Live,
     Refresh,
@@ -119,7 +128,7 @@ pub struct MonitorApp {
     sessions: Vec<Session>,
     phases: Vec<PhaseRecord>,
     transcript: Vec<TranscriptItemRecord>,
-    selected_session: usize,
+    selected_session_id: Option<String>,
     last_seq: i64,
     focus: Panel,
     storage: Arc<SessionManager>,
@@ -140,6 +149,7 @@ pub struct MonitorApp {
     running_cost: Option<f64>,
     has_subscription_cost: bool,
     mode: TuiMode,
+    route: Route,
     session_usage: Option<SessionUsageSummary>,
     live_session_id: Option<String>,
     /// Preset phase names in order — used to pre-populate the phase panel as "pending".
@@ -151,6 +161,8 @@ pub struct MonitorApp {
     bus_phase_status: HashMap<String, (String, Option<String>)>,
     /// Number of log lines kept above the live tail. `0` means follow live output.
     log_scroll: usize,
+    current_dir: String,
+    current_project_root: Option<String>,
 }
 
 impl MonitorApp {
@@ -160,31 +172,18 @@ impl MonitorApp {
         storage: Arc<SessionManager>,
     ) -> Result<Self> {
         let sessions = Self::load_sessions(&storage, project_filter.as_deref()).await?;
-        let selected_session = if let Some(filter) = session_filter {
-            sessions
-                .iter()
-                .position(|s| s.id.starts_with(filter))
-                .unwrap_or(0)
-        } else {
-            0
-        };
-
-        let (phases, transcript) = if !sessions.is_empty() {
-            let sid = &sessions[selected_session].id;
-            let p = storage.get_phases_for_session(sid).await?;
-            let l = storage.get_transcript_items_for_session(sid).await?;
-            (p, l)
-        } else {
-            (vec![], vec![])
-        };
+        let selected_session_id = Self::resolve_selected_session_id(&sessions, session_filter);
+        let (phases, transcript) =
+            Self::load_session_data(&storage, selected_session_id.as_deref()).await?;
 
         let last_seq = transcript.last().map(|l| l.seq).unwrap_or(0);
+        let current_project_root = detect_project_root();
 
         Ok(Self {
             sessions,
             phases,
             transcript,
-            selected_session,
+            selected_session_id,
             last_seq,
             focus: Panel::Sessions,
             storage,
@@ -201,6 +200,11 @@ impl MonitorApp {
             running_cost: None,
             has_subscription_cost: false,
             mode: TuiMode::Live,
+            route: if session_filter.is_some() {
+                Route::SessionDetail
+            } else {
+                Route::Dashboard
+            },
             session_usage: None,
             live_session_id: None,
             preset_phase_names: vec![],
@@ -209,6 +213,8 @@ impl MonitorApp {
             pending_user_input: None,
             bus_phase_status: HashMap::new(),
             log_scroll: 0,
+            current_dir: current_dir_string(),
+            current_project_root,
         })
     }
 
@@ -222,30 +228,18 @@ impl MonitorApp {
         preset_phases: Vec<String>,
     ) -> Result<Self> {
         let sessions = Self::load_sessions(&storage, project_filter.as_deref()).await?;
-        let selected_session = if let Some(filter) = session_filter {
-            sessions
-                .iter()
-                .position(|s| s.id.starts_with(filter))
-                .unwrap_or(0)
-        } else {
-            0
-        };
-        let (phases, transcript) = if !sessions.is_empty() {
-            let sid = &sessions[selected_session].id;
-            let p = storage.get_phases_for_session(sid).await?;
-            let l = storage.get_transcript_items_for_session(sid).await?;
-            (p, l)
-        } else {
-            (vec![], vec![])
-        };
+        let selected_session_id = Self::resolve_selected_session_id(&sessions, session_filter);
+        let (phases, transcript) =
+            Self::load_session_data(&storage, selected_session_id.as_deref()).await?;
         let last_seq = transcript.last().map(|l| l.seq).unwrap_or(0);
+        let current_project_root = detect_project_root();
         Ok(Self {
             sessions,
             phases,
             transcript,
-            selected_session,
+            selected_session_id,
             last_seq,
-            focus: Panel::Sessions,
+            focus: Panel::Log,
             storage,
             project_filter,
             tick_count: 0,
@@ -260,6 +254,7 @@ impl MonitorApp {
             running_cost: None,
             has_subscription_cost: false,
             mode: TuiMode::Live,
+            route: Route::SessionDetail,
             session_usage: None,
             live_session_id: None,
             preset_phase_names: preset_phases,
@@ -268,6 +263,8 @@ impl MonitorApp {
             pending_user_input: None,
             bus_phase_status: HashMap::new(),
             log_scroll: 0,
+            current_dir: current_dir_string(),
+            current_project_root,
         })
     }
 
@@ -280,6 +277,74 @@ impl MonitorApp {
         } else {
             storage.list_sessions().await
         }
+    }
+
+    async fn load_session_data(
+        storage: &SessionManager,
+        session_id: Option<&str>,
+    ) -> Result<(Vec<PhaseRecord>, Vec<TranscriptItemRecord>)> {
+        if let Some(session_id) = session_id {
+            let phases = storage.get_phases_for_session(session_id).await?;
+            let transcript = storage.get_transcript_items_for_session(session_id).await?;
+            Ok((phases, transcript))
+        } else {
+            Ok((vec![], vec![]))
+        }
+    }
+
+    fn resolve_selected_session_id(
+        sessions: &[Session],
+        session_filter: Option<&str>,
+    ) -> Option<String> {
+        if let Some(filter) = session_filter {
+            sessions
+                .iter()
+                .find(|session| session.id.starts_with(filter))
+                .map(|session| session.id.clone())
+        } else {
+            sessions.first().map(|session| session.id.clone())
+        }
+    }
+
+    fn selected_session(&self) -> Option<&Session> {
+        self.selected_session_id.as_ref().and_then(|selected_id| {
+            self.sessions
+                .iter()
+                .find(|session| &session.id == selected_id)
+        })
+    }
+
+    fn selected_session_index(&self) -> Option<usize> {
+        self.selected_session_id.as_ref().and_then(|selected_id| {
+            self.sessions
+                .iter()
+                .position(|session| &session.id == selected_id)
+        })
+    }
+
+    fn set_selected_session_by_index(&mut self, index: usize) {
+        if let Some(session) = self.sessions.get(index) {
+            self.selected_session_id = Some(session.id.clone());
+            self.reset_for_session();
+        }
+    }
+
+    fn ensure_selected_session(&mut self) {
+        if self
+            .selected_session_id
+            .as_ref()
+            .map(|selected_id| {
+                self.sessions
+                    .iter()
+                    .any(|session| &session.id == selected_id)
+            })
+            .unwrap_or(false)
+        {
+            return;
+        }
+
+        self.selected_session_id = self.sessions.first().map(|session| session.id.clone());
+        self.reset_for_session();
     }
 
     /// Poll the DB and event bus for new data. Returns `true` if anything changed.
@@ -360,17 +425,14 @@ impl MonitorApp {
             changed = true;
         }
         self.sessions = new_sessions;
-
-        if self.selected_session >= self.sessions.len() && !self.sessions.is_empty() {
-            self.selected_session = self.sessions.len() - 1;
-        }
+        self.ensure_selected_session();
 
         // In integrated mode, auto-select the live pipeline session so the DB
         // poll and phase display match the bus events.
         if let Some(live_id) = &self.live_session_id {
             if let Some(pos) = self.sessions.iter().position(|s| &s.id == live_id) {
-                if self.selected_session != pos {
-                    self.selected_session = pos;
+                if self.selected_session_index() != Some(pos) {
+                    self.selected_session_id = Some(live_id.clone());
                     // Reset seq so the DB poll doesn't skip items for the new session.
                     // Bus-sourced transcript items are already in self.transcript;
                     // the DB poll will add any DB-only items (e.g. from storage listener).
@@ -381,11 +443,11 @@ impl MonitorApp {
             }
         }
 
-        if self.sessions.is_empty() {
+        let Some(session) = self.selected_session() else {
             return Ok(changed);
-        }
+        };
 
-        let sid = self.sessions[self.selected_session].id.clone();
+        let sid = session.id.clone();
         let new_phases = self.storage.get_phases_for_session(&sid).await?;
         if new_phases.len() != self.phases.len() {
             changed = true;
@@ -472,7 +534,7 @@ impl MonitorApp {
                 if let Ok(usage) = self.storage.get_session_usage_summary(&session_id).await {
                     self.session_usage = Some(usage);
                 }
-                self.mode = TuiMode::Summary;
+                self.route = Route::Summary;
             }
             PipelineEvent::PhaseStarted { phase, session_id } => {
                 if self.live_session_id.is_none() {
@@ -579,81 +641,144 @@ impl MonitorApp {
     }
 
     pub fn render(&self, frame: &mut Frame) {
-        match self.mode {
-            TuiMode::Summary => self.render_summary(frame),
-            _ => {
-                let area = frame.size();
-                let layout_mode = terminal_layout(area);
+        let area = frame.size();
+        let outer = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(1),
+                Constraint::Length(3),
+                Constraint::Length(1),
+            ])
+            .split(area);
 
-                let outer = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Min(1),
-                        Constraint::Length(3),
-                        Constraint::Length(1),
-                    ])
-                    .split(area);
+        let main_area = outer[0];
+        let command_area = outer[1];
+        let status_area = outer[2];
 
-                let main_area = outer[0];
-                let command_area = outer[1];
-                let status_area = outer[2];
+        match self.route {
+            Route::Dashboard => self.render_dashboard(frame, main_area),
+            Route::Workspace => self.render_workspace(frame, main_area),
+            Route::SessionDetail => self.render_session_detail(frame, main_area),
+            Route::Summary => self.render_summary(frame, main_area),
+        }
 
-                let (sidebar, content) = match layout_mode {
-                    TerminalLayout::Wide => {
-                        let cols = Layout::default()
-                            .direction(Direction::Horizontal)
-                            .constraints([Constraint::Percentage(24), Constraint::Percentage(76)])
-                            .split(main_area);
-                        (cols[0], cols[1])
-                    }
-                    TerminalLayout::Stacked => {
-                        let cols = Layout::default()
-                            .direction(Direction::Horizontal)
-                            .constraints([Constraint::Length(28), Constraint::Min(40)])
-                            .split(main_area);
-                        (cols[0], cols[1])
-                    }
-                    TerminalLayout::Compact => {
-                        let cols = Layout::default()
-                            .direction(Direction::Horizontal)
-                            .constraints([Constraint::Length(22), Constraint::Min(24)])
-                            .split(main_area);
-                        (cols[0], cols[1])
-                    }
-                };
+        self.render_command_bar(frame, command_area);
+        self.render_statusbar(frame, status_area);
 
-                let left_rows = match layout_mode {
-                    TerminalLayout::Wide => Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
-                        .split(sidebar),
-                    TerminalLayout::Stacked => Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Length(8), Constraint::Min(8)])
-                        .split(sidebar),
-                    TerminalLayout::Compact => Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Length(6), Constraint::Min(6)])
-                        .split(sidebar),
-                };
-
-                self.render_sessions(frame, left_rows[0]);
-                self.render_phases(frame, left_rows[1]);
-                self.render_logs(frame, content);
-                self.render_command_bar(frame, command_area);
-                self.render_statusbar(frame, status_area);
-
-                if self.mode == TuiMode::GateOverlay {
-                    self.render_gate_overlay(frame);
-                } else if self.pending_user_input.is_some() {
-                    self.render_user_input_overlay(frame);
-                }
-            }
+        if self.mode == TuiMode::GateOverlay {
+            self.render_gate_overlay(frame);
+        } else if self.pending_user_input.is_some() {
+            self.render_user_input_overlay(frame);
         }
     }
 
-    fn render_sessions(&self, frame: &mut Frame, area: Rect) {
+    fn render_dashboard(&self, frame: &mut Frame, area: Rect) {
+        let layout_mode = terminal_layout(area);
+        let sections = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(match layout_mode {
+                    TerminalLayout::Wide => 9,
+                    TerminalLayout::Stacked => 9,
+                    TerminalLayout::Compact => 13,
+                }),
+                Constraint::Min(12),
+            ])
+            .split(area);
+
+        self.render_dashboard_overview(frame, sections[0], layout_mode);
+
+        let lower = match layout_mode {
+            TerminalLayout::Wide => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(34), Constraint::Percentage(66)])
+                .split(sections[1]),
+            TerminalLayout::Stacked => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(32), Constraint::Min(40)])
+                .split(sections[1]),
+            TerminalLayout::Compact => Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(10), Constraint::Min(10)])
+                .split(sections[1]),
+        };
+
+        self.render_sessions(frame, lower[0], "Sessions");
+        self.render_dashboard_selected_session(frame, lower[1]);
+    }
+
+    fn render_workspace(&self, frame: &mut Frame, area: Rect) {
+        let layout_mode = terminal_layout(area);
+        let sections = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(match layout_mode {
+                    TerminalLayout::Wide => 9,
+                    TerminalLayout::Stacked => 10,
+                    TerminalLayout::Compact => 13,
+                }),
+                Constraint::Min(12),
+            ])
+            .split(area);
+
+        self.render_workspace_overview(frame, sections[0], layout_mode);
+
+        let lower = match layout_mode {
+            TerminalLayout::Wide => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(sections[1]),
+            TerminalLayout::Stacked => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+                .split(sections[1]),
+            TerminalLayout::Compact => Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(10), Constraint::Min(10)])
+                .split(sections[1]),
+        };
+
+        self.render_workspace_scope(frame, lower[0]);
+        self.render_workspace_selected_session(frame, lower[1]);
+    }
+
+    fn render_session_detail(&self, frame: &mut Frame, area: Rect) {
+        let layout_mode = terminal_layout(area);
+        let content = match layout_mode {
+            TerminalLayout::Wide => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(24), Constraint::Percentage(76)])
+                .split(area),
+            TerminalLayout::Stacked => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(28), Constraint::Min(40)])
+                .split(area),
+            TerminalLayout::Compact => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(22), Constraint::Min(24)])
+                .split(area),
+        };
+
+        let sidebar = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(match layout_mode {
+                    TerminalLayout::Wide => 6,
+                    TerminalLayout::Stacked => 7,
+                    TerminalLayout::Compact => 8,
+                }),
+                Constraint::Min(8),
+            ])
+            .split(content[0]);
+
+        self.render_session_header(frame, sidebar[0]);
+        self.render_phases(frame, sidebar[1]);
+        self.render_logs(frame, content[1]);
+    }
+
+    fn render_sessions(&self, frame: &mut Frame, area: Rect, title: &str) {
         let border_style = sidebar_border_style(self.focus == Panel::Sessions);
+        let selected_index = self.selected_session_index();
 
         let items: Vec<ListItem> = self
             .sessions
@@ -663,7 +788,7 @@ impl MonitorApp {
                 let icon = status_icon(&s.status);
                 let short_id = short_id(&s.id);
                 let short_title = truncate(&s.feature_title, 14);
-                let style = if i == self.selected_session {
+                let style = if selected_index == Some(i) {
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD)
@@ -684,7 +809,7 @@ impl MonitorApp {
             Block::default()
                 .borders(Borders::ALL)
                 .title(Span::styled(
-                    "Sessions",
+                    title,
                     sidebar_title_style(self.focus == Panel::Sessions),
                 ))
                 .border_style(border_style),
@@ -692,12 +817,326 @@ impl MonitorApp {
         frame.render_widget(list, area);
     }
 
+    fn render_dashboard_overview(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        layout_mode: TerminalLayout,
+    ) {
+        let cards = match layout_mode {
+            TerminalLayout::Compact => Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(4),
+                    Constraint::Length(4),
+                    Constraint::Length(4),
+                ])
+                .split(area),
+            TerminalLayout::Wide | TerminalLayout::Stacked => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(34),
+                    Constraint::Percentage(33),
+                    Constraint::Percentage(33),
+                ])
+                .split(area),
+        };
+
+        let (running, paused, completed) = self.session_counts();
+        render_info_card(
+            frame,
+            cards[0],
+            "Koklo",
+            &[
+                format!("Version {}", env!("CARGO_PKG_VERSION")),
+                format!("{} sessions tracked", self.sessions.len()),
+                format!("{running} running  {paused} paused  {completed} done"),
+            ],
+        );
+        render_info_card(
+            frame,
+            cards[1],
+            "Project",
+            &[
+                format!(
+                    "Root {}",
+                    truncate_path(
+                        self.current_project_root
+                            .as_deref()
+                            .unwrap_or("not detected"),
+                        34
+                    )
+                ),
+                format!(
+                    "Filter {}",
+                    truncate_path(self.project_filter.as_deref().unwrap_or("all sessions"), 33)
+                ),
+                format!("Current dir {}", truncate_path(&self.current_dir, 30)),
+            ],
+        );
+        render_info_card(
+            frame,
+            cards[2],
+            "Navigation",
+            &[
+                "Enter opens the selected session".to_string(),
+                "W opens the workspace screen".to_string(),
+                "S opens the session summary".to_string(),
+            ],
+        );
+    }
+
+    fn render_dashboard_selected_session(&self, frame: &mut Frame, area: Rect) {
+        let lines = if let Some(session) = self.selected_session() {
+            vec![
+                format!("Feature: {}", session.feature_title),
+                format!("Session: {}", short_id(&session.id)),
+                format!("Status: {}  Preset: {}", session.status, session.preset),
+                format!(
+                    "Workspace: {}",
+                    truncate_path(
+                        &session.workspace_path,
+                        area.width.saturating_sub(4) as usize
+                    )
+                ),
+                format!(
+                    "Project: {}",
+                    truncate_path(&session.project_path, area.width.saturating_sub(4) as usize)
+                ),
+                format!("Branch: {}", session_branch_label(session)),
+                format!("Updated: {}", session.updated_at),
+            ]
+        } else {
+            vec![
+                "No session selected.".to_string(),
+                String::new(),
+                "Run `koklo run ...` to create a session.".to_string(),
+            ]
+        };
+
+        let para = Paragraph::new(lines.join("\n"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Selected Session"),
+            )
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(para, area);
+    }
+
+    fn render_workspace_overview(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        layout_mode: TerminalLayout,
+    ) {
+        let cards = match layout_mode {
+            TerminalLayout::Compact => Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(4),
+                    Constraint::Length(4),
+                    Constraint::Length(4),
+                ])
+                .split(area),
+            TerminalLayout::Wide | TerminalLayout::Stacked => Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(34),
+                    Constraint::Percentage(33),
+                    Constraint::Percentage(33),
+                ])
+                .split(area),
+        };
+
+        let project_sessions = self.sessions_for_current_project();
+        let workspace_sessions = self.sessions_for_selected_workspace();
+        let selected_label = self
+            .selected_session()
+            .map(|session| short_id(&session.id))
+            .unwrap_or_else(|| "—".to_string());
+
+        render_info_card(
+            frame,
+            cards[0],
+            "Workspace",
+            &[
+                format!("Current dir {}", truncate_path(&self.current_dir, 30)),
+                format!(
+                    "Project root {}",
+                    truncate_path(
+                        self.current_project_root
+                            .as_deref()
+                            .unwrap_or("not detected"),
+                        28
+                    )
+                ),
+                format!("Selected session {selected_label}"),
+            ],
+        );
+        render_info_card(
+            frame,
+            cards[1],
+            "Scope",
+            &[
+                format!("{project_sessions} sessions match current project"),
+                format!("{workspace_sessions} sessions share selected workspace"),
+                format!(
+                    "Filter {}",
+                    truncate_path(self.project_filter.as_deref().unwrap_or("all sessions"), 30)
+                ),
+            ],
+        );
+        render_info_card(
+            frame,
+            cards[2],
+            "Navigation",
+            &[
+                "Up/Down changes the selected session".to_string(),
+                "Enter opens the session detail".to_string(),
+                "Esc returns to the dashboard".to_string(),
+            ],
+        );
+    }
+
+    fn render_workspace_scope(&self, frame: &mut Frame, area: Rect) {
+        let project_root = self
+            .current_project_root
+            .as_deref()
+            .unwrap_or("not detected");
+        let lines = vec![
+            format!("Current dir: {}", self.current_dir),
+            format!("Project root: {}", project_root),
+            format!(
+                "Monitor filter: {}",
+                self.project_filter.as_deref().unwrap_or("all sessions")
+            ),
+            String::new(),
+            format!(
+                "Sessions in current project: {}",
+                self.sessions_for_current_project()
+            ),
+            format!(
+                "Sessions in selected workspace: {}",
+                self.sessions_for_selected_workspace()
+            ),
+        ];
+
+        let para = Paragraph::new(lines.join("\n"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Current Scope"),
+            )
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(para, area);
+    }
+
+    fn render_workspace_selected_session(&self, frame: &mut Frame, area: Rect) {
+        let lines = if let Some(session) = self.selected_session() {
+            vec![
+                format!("Feature: {}", session.feature_title),
+                format!("Session: {}  ·  {}", short_id(&session.id), session.status),
+                format!("Preset: {}", session.preset),
+                format!("Project path: {}", session.project_path),
+                format!("Workspace path: {}", session.workspace_path),
+                format!("Workspace branch: {}", session_branch_label(session)),
+                format!("Updated: {}", session.updated_at),
+            ]
+        } else {
+            vec![
+                "No session selected.".to_string(),
+                String::new(),
+                "Use Up/Down to pick a session from the dashboard first.".to_string(),
+            ]
+        };
+
+        let para = Paragraph::new(lines.join("\n"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Selected Session Workspace"),
+            )
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(para, area);
+    }
+
+    fn render_session_header(&self, frame: &mut Frame, area: Rect) {
+        let lines = if let Some(session) = self.selected_session() {
+            vec![
+                format!(
+                    "{}  ·  {}  ·  preset {}",
+                    short_id(&session.id),
+                    session.status,
+                    session.preset
+                ),
+                session.feature_title.clone(),
+                format!(
+                    "workspace: {}",
+                    truncate_path(
+                        &session.workspace_path,
+                        area.width.saturating_sub(4) as usize
+                    )
+                ),
+                format!("branch: {}", session_branch_label(session)),
+            ]
+        } else {
+            vec![
+                "No session selected.".to_string(),
+                "Press Esc to return to the dashboard.".to_string(),
+            ]
+        };
+
+        let para = Paragraph::new(lines.join("\n"))
+            .block(Block::default().borders(Borders::ALL).title("Session"))
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(para, area);
+    }
+
+    fn session_counts(&self) -> (usize, usize, usize) {
+        let running = self
+            .sessions
+            .iter()
+            .filter(|session| session.status == "running")
+            .count();
+        let paused = self
+            .sessions
+            .iter()
+            .filter(|session| session.status == "paused")
+            .count();
+        let completed = self
+            .sessions
+            .iter()
+            .filter(|session| session.status == "completed")
+            .count();
+        (running, paused, completed)
+    }
+
+    fn sessions_for_current_project(&self) -> usize {
+        let Some(project_root) = self.current_project_root.as_deref() else {
+            return 0;
+        };
+        self.sessions
+            .iter()
+            .filter(|session| session.project_path == project_root)
+            .count()
+    }
+
+    fn sessions_for_selected_workspace(&self) -> usize {
+        let Some(selected) = self.selected_session() else {
+            return 0;
+        };
+        self.sessions
+            .iter()
+            .filter(|session| session.workspace_path == selected.workspace_path)
+            .count()
+    }
+
     fn render_phases(&self, frame: &mut Frame, area: Rect) {
         let border_style = sidebar_border_style(self.focus == Panel::Phases);
 
         let session_label = self
-            .sessions
-            .get(self.selected_session)
+            .selected_session()
             .map(|s| short_id(&s.id))
             .unwrap_or_else(|| "—".to_string());
 
@@ -743,8 +1182,7 @@ impl MonitorApp {
         let border_style = log_border_style(self.focus == Panel::Log);
 
         let session_label = self
-            .sessions
-            .get(self.selected_session)
+            .selected_session()
             .map(|s| short_id(&s.id))
             .unwrap_or_else(|| "—".to_string());
 
@@ -995,16 +1433,18 @@ impl MonitorApp {
                 "[Enter] submit  [Y/N] quick approve-reject  [/edit <path>]"
             }
             TuiMode::GateOverlay => "[Enter] submit  [Y/N] quick approve-reject",
-            TuiMode::Summary => "[q] quit  [Tab] live",
-            TuiMode::Live if self.pending_user_input.is_some() => {
-                "[Enter] answer  [/reply <text>]  [Tab] panels"
-            }
-            TuiMode::Live => match self.focus {
-                Panel::Sessions => "[q] quit  [↑↓] select session  [Tab] next panel  [r] refresh",
-                Panel::Phases => "[q] quit  [↑↓] select phase  [Esc] live view  [Tab] next panel",
-                Panel::Log => {
-                    "[q] quit  [↑↓/Pg] scroll log  [End] live  [Tab] next panel  [/] commands"
+            TuiMode::Live if self.pending_user_input.is_some() => "[Enter] answer  [/reply <text>]",
+            TuiMode::Live => match self.route {
+                Route::Dashboard => {
+                    "[q] quit  [↑↓] select session  [Enter] open  [w] workspace  [r] refresh"
                 }
+                Route::Workspace => "[q] quit  [↑↓] select session  [Enter] open  [Esc] dashboard",
+                Route::SessionDetail => match self.focus {
+                    Panel::Phases => "[q] quit  [↑↓] select phase  [Tab] log  [Esc] dashboard",
+                    Panel::Log => "[q] quit  [↑↓/Pg] scroll log  [Tab] phases  [Esc] dashboard",
+                    Panel::Sessions => "[q] quit  [Esc] dashboard",
+                },
+                Route::Summary => "[q] quit  [Esc] session  [/] commands",
             },
         };
 
@@ -1052,12 +1492,18 @@ impl MonitorApp {
             .live_model()
             .pending
             .len();
-        if pending_count > 0 {
-            format!("LIVE · waiting {}", pending_count)
-        } else if self.log_scroll > 0 {
-            format!("LIVE · history -{}", self.log_scroll)
+        let route = match self.route {
+            Route::Dashboard => "DASHBOARD",
+            Route::Workspace => "WORKSPACE",
+            Route::SessionDetail => "SESSION",
+            Route::Summary => "SUMMARY",
+        };
+        if self.route == Route::SessionDetail && pending_count > 0 {
+            format!("{route} · waiting {}", pending_count)
+        } else if self.route == Route::SessionDetail && self.log_scroll > 0 {
+            format!("{route} · history -{}", self.log_scroll)
         } else {
-            "LIVE".to_string()
+            route.to_string()
         }
     }
 
@@ -1098,7 +1544,12 @@ impl MonitorApp {
             } else if self.pending_user_input.is_some() {
                 "Type your answer or /reply <text>"
             } else {
-                "Type /help for commands"
+                match self.route {
+                    Route::Dashboard => "Type /help, /workspace or press Enter on a session",
+                    Route::Workspace => "Type /help, /dashboard or press Enter on a session",
+                    Route::SessionDetail => "Type /help, /summary or Esc for dashboard",
+                    Route::Summary => "Type /help, /live or Esc for session",
+                }
             }
         } else {
             &self.command_input
@@ -1231,9 +1682,7 @@ impl MonitorApp {
         frame.render_widget(para, overlay_area);
     }
 
-    fn render_summary(&self, frame: &mut Frame) {
-        let area = frame.size();
-
+    fn render_summary(&self, frame: &mut Frame, area: Rect) {
         let header = Row::new(vec!["Phase", "Tokens", "Cost"])
             .style(Style::default().add_modifier(Modifier::BOLD))
             .bottom_margin(1);
@@ -1279,7 +1728,7 @@ impl MonitorApp {
         rows.push(Row::new(vec![
             "".to_string(),
             "".to_string(),
-            "[q] quit  [Tab] live".to_string(),
+            "[q] quit  [Esc] session".to_string(),
         ]));
 
         let widths = [
@@ -1290,7 +1739,10 @@ impl MonitorApp {
         let table = Table::new(rows, widths).header(header).block(
             Block::default().borders(Borders::ALL).title(format!(
                 "SESSION SUMMARY — {}",
-                self.live_session_id.as_deref().unwrap_or("—")
+                self.selected_session()
+                    .map(|session| short_id(&session.id))
+                    .or_else(|| self.live_session_id.as_deref().map(short_id))
+                    .unwrap_or_else(|| "—".to_string())
             )),
         );
 
@@ -1298,40 +1750,56 @@ impl MonitorApp {
     }
 
     fn select_prev(&mut self) {
-        if self.selected_session > 0 {
-            self.selected_session -= 1;
-            self.reset_for_session();
+        if let Some(index) = self.selected_session_index() {
+            if index > 0 {
+                self.set_selected_session_by_index(index - 1);
+            }
+        } else if !self.sessions.is_empty() {
+            self.set_selected_session_by_index(0);
         }
     }
 
     fn select_next(&mut self) {
-        if self.selected_session + 1 < self.sessions.len() {
-            self.selected_session += 1;
-            self.reset_for_session();
+        if let Some(index) = self.selected_session_index() {
+            if index + 1 < self.sessions.len() {
+                self.set_selected_session_by_index(index + 1);
+            }
+        } else if !self.sessions.is_empty() {
+            self.set_selected_session_by_index(0);
         }
     }
 
     pub fn toggle_focus(&mut self) {
-        self.focus = match self.focus {
-            Panel::Sessions => Panel::Phases,
-            Panel::Phases => Panel::Log,
-            Panel::Log => Panel::Sessions,
+        self.focus = match self.route {
+            Route::Dashboard | Route::Workspace => Panel::Sessions,
+            Route::SessionDetail | Route::Summary => match self.focus {
+                Panel::Phases => Panel::Log,
+                _ => Panel::Phases,
+            },
         };
     }
 
     pub fn handle_up(&mut self) {
-        match self.focus {
-            Panel::Sessions => self.select_prev(),
-            Panel::Phases => self.phase_prev(),
-            Panel::Log => self.scroll_log_by(1, 1),
+        match self.route {
+            Route::Dashboard | Route::Workspace => self.select_prev(),
+            Route::SessionDetail => match self.focus {
+                Panel::Phases => self.phase_prev(),
+                Panel::Log => self.scroll_log_by(1, 1),
+                Panel::Sessions => self.select_prev(),
+            },
+            Route::Summary => {}
         }
     }
 
     pub fn handle_down(&mut self) {
-        match self.focus {
-            Panel::Sessions => self.select_next(),
-            Panel::Phases => self.phase_next(),
-            Panel::Log => self.scroll_log_toward_live(1),
+        match self.route {
+            Route::Dashboard | Route::Workspace => self.select_next(),
+            Route::SessionDetail => match self.focus {
+                Panel::Phases => self.phase_next(),
+                Panel::Log => self.scroll_log_toward_live(1),
+                Panel::Sessions => self.select_next(),
+            },
+            Route::Summary => {}
         }
     }
 
@@ -1357,6 +1825,35 @@ impl MonitorApp {
         if self.focus == Panel::Log {
             self.log_scroll = 0;
         }
+    }
+
+    async fn open_selected_session(&mut self) -> Result<()> {
+        self.route = Route::SessionDetail;
+        self.focus = Panel::Log;
+        let (phases, transcript) =
+            Self::load_session_data(&self.storage, self.selected_session_id.as_deref()).await?;
+        self.phases = phases;
+        self.transcript = transcript;
+        self.last_seq = self.transcript.last().map(|item| item.seq).unwrap_or(0);
+        Ok(())
+    }
+
+    fn go_to_dashboard(&mut self) {
+        self.route = Route::Dashboard;
+        self.focus = Panel::Sessions;
+        self.selected_phase = None;
+        self.log_scroll = 0;
+    }
+
+    fn go_to_workspace(&mut self) {
+        self.route = Route::Workspace;
+        self.focus = Panel::Sessions;
+        self.selected_phase = None;
+        self.log_scroll = 0;
+    }
+
+    fn go_to_summary(&mut self) {
+        self.route = Route::Summary;
     }
 
     fn phase_prev(&mut self) {
@@ -1385,6 +1882,7 @@ impl MonitorApp {
         self.last_seq = 0;
         self.selected_phase = None;
         self.pending_user_input = None;
+        self.session_usage = None;
         self.log_scroll = 0;
     }
 
@@ -1446,10 +1944,18 @@ impl MonitorApp {
         }
 
         match key.code {
-            KeyCode::Enter => true,
+            KeyCode::Enter => {
+                !self.command_input.is_empty()
+                    || self.pending_user_input.is_some()
+                    || self.mode == TuiMode::GateOverlay
+            }
             KeyCode::Backspace => {
-                self.command_input.pop();
-                true
+                if self.command_input.is_empty() {
+                    false
+                } else {
+                    self.command_input.pop();
+                    true
+                }
             }
             KeyCode::Char(c) => {
                 if self.command_input.is_empty()
@@ -1517,9 +2023,17 @@ impl MonitorApp {
         match action {
             CommandAction::Help => {
                 self.set_feedback(
-                    "Commands: /help /approve /reject /edit <path> /reply <text> /focus <sessions|phases|log> /live /refresh /summary /quit",
+                    "Commands: /help /approve /reject /edit <path> /reply <text> /dashboard /workspace /focus <sessions|phases|log> /live /refresh /summary /quit",
                     FeedbackLevel::Info,
                 );
+            }
+            CommandAction::Dashboard => {
+                self.go_to_dashboard();
+                self.set_feedback("Returned to dashboard.", FeedbackLevel::Success);
+            }
+            CommandAction::Workspace => {
+                self.go_to_workspace();
+                self.set_feedback("Showing workspace view.", FeedbackLevel::Success);
             }
             CommandAction::Approve => {
                 if self.mode == TuiMode::GateOverlay {
@@ -1569,22 +2083,38 @@ impl MonitorApp {
                 }
             }
             CommandAction::Focus(panel) => {
-                self.focus = panel;
-                self.set_feedback("Focus updated.", FeedbackLevel::Success);
+                if self.route == Route::SessionDetail {
+                    self.focus = panel;
+                    self.set_feedback("Focus updated.", FeedbackLevel::Success);
+                } else {
+                    self.set_feedback(
+                        "Panel focus is only available in session detail.",
+                        FeedbackLevel::Error,
+                    );
+                }
             }
             CommandAction::Live => {
-                self.mode = TuiMode::Live;
+                self.route = Route::SessionDetail;
                 self.selected_phase = None;
                 self.log_scroll = 0;
-                self.set_feedback("Returned to live view.", FeedbackLevel::Success);
+                self.focus = Panel::Log;
+                self.set_feedback("Returned to session view.", FeedbackLevel::Success);
             }
             CommandAction::Refresh => {
                 self.tick().await?;
                 self.set_feedback("Refreshed.", FeedbackLevel::Success);
             }
             CommandAction::Summary => {
+                if self.session_usage.is_none() {
+                    if let Some(session) = self.selected_session() {
+                        if let Ok(usage) = self.storage.get_session_usage_summary(&session.id).await
+                        {
+                            self.session_usage = Some(usage);
+                        }
+                    }
+                }
                 if self.session_usage.is_some() {
-                    self.mode = TuiMode::Summary;
+                    self.go_to_summary();
                     self.set_feedback("Showing session summary.", FeedbackLevel::Success);
                 } else {
                     self.set_feedback(
@@ -1799,24 +2329,55 @@ async fn tui_event_loop(
                     }
                     continue;
                 }
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Char('Q') => break,
-                    KeyCode::Up => app.handle_up(),
-                    KeyCode::Down => app.handle_down(),
-                    KeyCode::PageUp => app.handle_page_up(),
-                    KeyCode::PageDown => app.handle_page_down(),
-                    KeyCode::Home => app.handle_home(),
-                    KeyCode::End => app.handle_end(),
-                    KeyCode::Tab => app.toggle_focus(),
-                    // Esc in Phases panel clears phase selection (back to live view).
-                    KeyCode::Esc => {
-                        app.selected_phase = None;
-                        app.log_scroll = 0;
-                    }
-                    KeyCode::Char('r') => {
-                        app.tick().await?;
-                    }
-                    _ => {}
+                match app.route.clone() {
+                    Route::Dashboard => match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                        KeyCode::Up => app.handle_up(),
+                        KeyCode::Down => app.handle_down(),
+                        KeyCode::Enter => app.open_selected_session().await?,
+                        KeyCode::Char('w') | KeyCode::Char('W') => app.go_to_workspace(),
+                        KeyCode::Char('s') | KeyCode::Char('S') => {
+                            app.execute_command(CommandAction::Summary).await?;
+                        }
+                        KeyCode::Char('r') => {
+                            app.tick().await?;
+                        }
+                        _ => {}
+                    },
+                    Route::Workspace => match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                        KeyCode::Up => app.handle_up(),
+                        KeyCode::Down => app.handle_down(),
+                        KeyCode::Enter => app.open_selected_session().await?,
+                        KeyCode::Esc | KeyCode::Backspace => app.go_to_dashboard(),
+                        KeyCode::Char('r') => {
+                            app.tick().await?;
+                        }
+                        _ => {}
+                    },
+                    Route::SessionDetail => match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                        KeyCode::Up => app.handle_up(),
+                        KeyCode::Down => app.handle_down(),
+                        KeyCode::PageUp => app.handle_page_up(),
+                        KeyCode::PageDown => app.handle_page_down(),
+                        KeyCode::Home => app.handle_home(),
+                        KeyCode::End => app.handle_end(),
+                        KeyCode::Tab => app.toggle_focus(),
+                        KeyCode::Esc | KeyCode::Backspace => app.go_to_dashboard(),
+                        KeyCode::Char('s') | KeyCode::Char('S') => {
+                            app.execute_command(CommandAction::Summary).await?;
+                        }
+                        KeyCode::Char('r') => {
+                            app.tick().await?;
+                        }
+                        _ => {}
+                    },
+                    Route::Summary => match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                        KeyCode::Esc | KeyCode::Backspace => app.route = Route::SessionDetail,
+                        _ => {}
+                    },
                 }
             }
         }
@@ -1874,28 +2435,57 @@ async fn tui_integrated_event_loop(
                         }
                         _ => {}
                     },
-                    TuiMode::Summary => match key.code {
-                        KeyCode::Char('q') | KeyCode::Char('Q') => break,
-                        KeyCode::Tab => app.mode = TuiMode::Live,
-                        _ => {}
-                    },
-                    TuiMode::Live => match key.code {
-                        KeyCode::Char('q') | KeyCode::Char('Q') => break,
-                        KeyCode::Up => app.handle_up(),
-                        KeyCode::Down => app.handle_down(),
-                        KeyCode::PageUp => app.handle_page_up(),
-                        KeyCode::PageDown => app.handle_page_down(),
-                        KeyCode::Home => app.handle_home(),
-                        KeyCode::End => app.handle_end(),
-                        KeyCode::Tab => app.toggle_focus(),
-                        KeyCode::Esc => {
-                            app.selected_phase = None;
-                            app.log_scroll = 0;
-                        }
-                        KeyCode::Char('r') => {
-                            app.tick().await?;
-                        }
-                        _ => {}
+                    TuiMode::Live => match app.route.clone() {
+                        Route::Dashboard => match key.code {
+                            KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                            KeyCode::Up => app.handle_up(),
+                            KeyCode::Down => app.handle_down(),
+                            KeyCode::Enter => app.open_selected_session().await?,
+                            KeyCode::Char('w') | KeyCode::Char('W') => app.go_to_workspace(),
+                            KeyCode::Char('s') | KeyCode::Char('S') => {
+                                app.execute_command(CommandAction::Summary).await?;
+                            }
+                            KeyCode::Char('r') => {
+                                app.tick().await?;
+                            }
+                            _ => {}
+                        },
+                        Route::Workspace => match key.code {
+                            KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                            KeyCode::Up => app.handle_up(),
+                            KeyCode::Down => app.handle_down(),
+                            KeyCode::Enter => app.open_selected_session().await?,
+                            KeyCode::Esc | KeyCode::Backspace => app.go_to_dashboard(),
+                            KeyCode::Char('r') => {
+                                app.tick().await?;
+                            }
+                            _ => {}
+                        },
+                        Route::SessionDetail => match key.code {
+                            KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                            KeyCode::Up => app.handle_up(),
+                            KeyCode::Down => app.handle_down(),
+                            KeyCode::PageUp => app.handle_page_up(),
+                            KeyCode::PageDown => app.handle_page_down(),
+                            KeyCode::Home => app.handle_home(),
+                            KeyCode::End => app.handle_end(),
+                            KeyCode::Tab => app.toggle_focus(),
+                            KeyCode::Esc | KeyCode::Backspace => app.go_to_dashboard(),
+                            KeyCode::Char('s') | KeyCode::Char('S') => {
+                                app.execute_command(CommandAction::Summary).await?;
+                            }
+                            KeyCode::Char('r') => {
+                                app.tick().await?;
+                            }
+                            _ => {}
+                        },
+                        Route::Summary => match key.code {
+                            KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                            KeyCode::Esc | KeyCode::Backspace => {
+                                app.route = Route::SessionDetail;
+                            }
+                            _ => {}
+                        },
                     },
                 }
             }
@@ -1955,6 +2545,13 @@ fn log_border_style(focused: bool) -> Style {
     }
 }
 
+fn render_info_card(frame: &mut Frame, area: Rect, title: &str, lines: &[String]) {
+    let para = Paragraph::new(lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title(title))
+        .wrap(ratatui::widgets::Wrap { trim: false });
+    frame.render_widget(para, area);
+}
+
 fn short_id(id: &str) -> String {
     id[..6.min(id.len())].to_string()
 }
@@ -1972,6 +2569,36 @@ fn truncate_text(text: &str, max: usize) -> String {
     } else {
         let head = text.chars().take(max.saturating_sub(1)).collect::<String>();
         format!("{head}…")
+    }
+}
+
+fn truncate_path(path: &str, max: usize) -> String {
+    truncate_left(path, max.max(1))
+}
+
+fn session_branch_label(session: &Session) -> String {
+    if session.workspace_branch.is_empty() {
+        "(shared project tree)".to_string()
+    } else {
+        session.workspace_branch.clone()
+    }
+}
+
+fn current_dir_string() -> String {
+    std::env::current_dir()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "unknown".to_string())
+}
+
+fn detect_project_root() -> Option<String> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        if dir.join(".koklo").exists() {
+            return Some(dir.to_string_lossy().into_owned());
+        }
+        if !dir.pop() {
+            return None;
+        }
     }
 }
 
@@ -2142,6 +2769,8 @@ fn parse_command_action(input: &str) -> Result<Option<CommandAction>> {
         "/help" | "/?" | "/commands" => CommandAction::Help,
         "/approve" | "/yes" => CommandAction::Approve,
         "/reject" | "/no" => CommandAction::Reject,
+        "/dashboard" | "/home" => CommandAction::Dashboard,
+        "/workspace" | "/ws" => CommandAction::Workspace,
         "/edit" => {
             if rest.is_empty() {
                 anyhow::bail!("Usage: /edit <path>");
@@ -2593,6 +3222,12 @@ mod tests {
     fn parses_focus_command() {
         let parsed = parse_command_action("/focus log").unwrap();
         assert_eq!(parsed, Some(CommandAction::Focus(Panel::Log)));
+    }
+
+    #[test]
+    fn parses_workspace_command() {
+        let parsed = parse_command_action("/workspace").unwrap();
+        assert_eq!(parsed, Some(CommandAction::Workspace));
     }
 
     #[test]
