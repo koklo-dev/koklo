@@ -85,6 +85,7 @@ async fn dispatch_session(command: SessionCommands) -> Result<()> {
 async fn dispatch_agent(command: AgentCommands) -> Result<()> {
     match command {
         AgentCommands::List => commands::cmd_agent_list().await?,
+        AgentCommands::Sync { force } => commands::cmd_agent_sync(force).await?,
         AgentCommands::Show { name } => commands::cmd_agent_show(&name).await?,
         AgentCommands::Run { name, input } => commands::cmd_agent_run(&name, input).await?,
     }

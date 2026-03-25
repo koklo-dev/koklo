@@ -80,6 +80,7 @@ pub(crate) enum Commands {
     ///   koklo agent list
     ///   koklo agent show security
     ///   koklo agent run pm --input "Add user authentication"
+    ///   koklo agent sync --force
     #[command(subcommand)]
     Agent(AgentCommands),
 
@@ -195,6 +196,12 @@ pub(crate) enum SessionCommands {
 pub(crate) enum AgentCommands {
     /// List all built-in agents.
     List,
+    /// Sync built-in agent profiles into ~/.koklo/agents.
+    Sync {
+        /// Overwrite built-in fragment files when they already exist.
+        #[arg(long)]
+        force: bool,
+    },
     /// Show the system prompt for an agent.
     Show {
         /// Agent name (e.g. pm, architect, security).
@@ -445,5 +452,17 @@ mod tests {
             .to_string();
 
         assert!(err.contains("Unknown preset 'wat'"));
+    }
+
+    #[test]
+    fn parses_agent_sync_force() {
+        let cli = Cli::try_parse_from(["koklo", "agent", "sync", "--force"]).unwrap();
+
+        match cli.command {
+            Commands::Agent(AgentCommands::Sync { force }) => {
+                assert!(force);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 }
