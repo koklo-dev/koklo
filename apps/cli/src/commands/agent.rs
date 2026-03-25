@@ -17,12 +17,15 @@ pub(crate) async fn cmd_agent_list() -> Result<()> {
         }
     }
     let dir = agents_dir();
-    println!("{:<22} SYSTEM PROMPT", "AGENT");
+    println!("{:<22} PROMPT SOURCE", "AGENT");
     println!("{}", "-".repeat(60));
     for name in &seen {
-        let prompt_path = dir.join(format!("{}.md", name));
-        let status = if prompt_path.exists() {
-            prompt_path.to_string_lossy().into_owned()
+        let prompt_dir = dir.join(name);
+        let legacy_prompt = dir.join(format!("{}.md", name));
+        let status = if prompt_dir.is_dir() {
+            prompt_dir.to_string_lossy().into_owned()
+        } else if legacy_prompt.exists() {
+            format!("{} [legacy]", legacy_prompt.to_string_lossy())
         } else {
             "(prompt file not found)".to_string()
         };
@@ -59,6 +62,9 @@ pub(crate) async fn cmd_agent_show(name: &str) -> Result<()> {
 }
 
 pub(crate) async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<()> {
+    use koklo_agent_runtime::{build_system_prompt, AgentConfig};
+    use koklo_events::Phase;
+
     let prompt = match input {
         Some(prompt) => prompt,
         None => {
@@ -84,16 +90,21 @@ pub(crate) async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<(
     let provider =
         determine_default_provider(&registry, merged.pipeline.default_provider.as_deref())?;
 
-    let dir = agents_dir();
-    let system_prompt_file = dir.join(format!("{}.md", name));
-    let system_prompt = if system_prompt_file.exists() {
-        std::fs::read_to_string(&system_prompt_file)?
+    let global_home = home_dirs::koklo_home();
+    let project_context_dir = project_root.join(".koklo");
+    let project_context = if project_context_dir.exists() {
+        Some(project_context_dir)
     } else {
-        format!(
-            "You are the {} agent for the koklo AI development pipeline.",
-            name
-        )
+        None
     };
+    let system_prompt = build_system_prompt(&AgentConfig {
+        name: name.to_string(),
+        phase: Phase::Spec,
+        agent_slug: name.to_string(),
+        timeout_secs: 0,
+        global_home,
+        project_context,
+    })?;
 
     println!("Running agent '{}'...\n", name);
     use koklo_providers::Message;
@@ -112,5 +123,25 @@ pub(crate) async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<(
         }
     }
     println!();
+    Ok(())
+}
+
+pub(crate) async fn cmd_agent_sync(force: bool) -> Result<()> {
+    let summary = home_dirs::sync_builtin_agents(force)?;
+
+    println!(
+        "Agent profiles synced in {}/agents",
+        home_dirs::koklo_home().display()
+    );
+    println!("  created: {}", summary.created);
+    println!("  updated: {}", summary.updated);
+    println!("  skipped: {}", summary.skipped);
+    println!("  migrated legacy: {}", summary.migrated_legacy);
+    if !force {
+        println!("  mode: safe (existing files preserved, use --force to refresh built-ins)");
+    } else {
+        println!("  mode: force (built-in fragments refreshed when names match)");
+    }
+
     Ok(())
 }

@@ -17,6 +17,7 @@ pub(crate) async fn cmd_init(path: &PathBuf, preset: PresetKind, yes: bool) -> R
     println!("Global home: {}/", global_home.display());
     println!("  config.toml    ✓");
     println!("  USER.md        ✓  (edit to tell agents who you are)");
+    println!("  agents/        ✓  (rich agent profiles in ~/.koklo/agents/<agent>/)");
     println!("  koklo.db       will be created on first run");
 
     let koklo_dir = target.join(".koklo");

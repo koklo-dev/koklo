@@ -9,7 +9,7 @@ mod run;
 mod session;
 mod workflow;
 
-pub(crate) use agent::{cmd_agent_list, cmd_agent_run, cmd_agent_show};
+pub(crate) use agent::{cmd_agent_list, cmd_agent_run, cmd_agent_show, cmd_agent_sync};
 pub(crate) use artifacts::{cmd_artifacts_list, cmd_artifacts_show};
 pub(crate) use config::{cmd_config_init, cmd_config_show};
 pub(crate) use context::{cmd_context_init, cmd_context_show};
