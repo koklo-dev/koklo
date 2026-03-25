@@ -29,6 +29,8 @@ _bmad-output/
 .agents/
 .claude/
 agents/
+!crates/agent-runtime/src/builtin_agents/agents/
+!crates/agent-runtime/src/builtin_agents/agents/**
 
 # Env
 .env

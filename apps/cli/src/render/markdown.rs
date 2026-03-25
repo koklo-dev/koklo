@@ -1,4 +1,4 @@
-//! Markdown → ratatui `Line`/`Span` renderer.
+//! Markdown -> ratatui `Line`/`Span` renderer.
 //!
 //! Parses CommonMark via `pulldown-cmark` and maps events to styled ratatui
 //! lines suitable for the TUI log panel.
@@ -16,7 +16,7 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut current_spans: Vec<Span<'static>> = Vec::new();
     let mut style_stack: Vec<Style> = Vec::new();
-    let mut list_stack: Vec<Option<u64>> = Vec::new(); // None = unordered, Some(n) = ordered
+    let mut list_stack: Vec<Option<u64>> = Vec::new();
     let mut in_code_block = false;
 
     let flush_line = |spans: &mut Vec<Span<'static>>, out: &mut Vec<Line<'static>>| {
@@ -80,7 +80,6 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
                     let bullet = match list_stack.last() {
                         Some(Some(n)) => {
                             let s = format!("{}{n}. ", indent);
-                            // Increment for next item.
                             if let Some(Some(ref mut num)) = list_stack.last_mut() {
                                 *num += 1;
                             }
@@ -91,7 +90,6 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
                     current_spans.push(Span::styled(bullet, Style::default().fg(Color::Yellow)));
                 }
                 Tag::Paragraph => {
-                    // Add blank line between paragraphs (but not at the start).
                     if !lines.is_empty() {
                         lines.push(Line::from(""));
                     }
@@ -129,7 +127,6 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
             Event::Text(text) => {
                 let style = current_style(&style_stack);
                 if in_code_block {
-                    // Preserve multi-line code block formatting.
                     let text_str = text.to_string();
                     let mut sub_lines = text_str.split('\n').peekable();
                     while let Some(sub) = sub_lines.next() {
@@ -181,13 +178,10 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
         }
     }
 
-    // Flush any remaining spans.
     if !current_spans.is_empty() {
         lines.push(Line::from(current_spans));
     }
 
-    // If input was empty or whitespace-only, return at least one empty line
-    // to match the previous behavior of always producing output.
     if lines.is_empty() && !input.is_empty() {
         lines.push(Line::from(""));
     }
@@ -209,7 +203,6 @@ mod tests {
     fn headings_are_bold() {
         let lines = markdown_to_lines("# Title\n## Sub");
         assert!(lines.len() >= 2);
-        // H1 should have BOLD modifier
         let h1_style = lines[0].spans[0].style;
         assert!(h1_style.add_modifier.contains(Modifier::BOLD));
         assert_eq!(h1_style.fg, Some(Color::Cyan));

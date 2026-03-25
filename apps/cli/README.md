@@ -159,7 +159,13 @@ koklo agent run architect         # reads input from stdin
 | `constitution-writer` | Spec Kit | Project constitution (`CONSTITUTION.md`) |
 | `task-planner` | Spec Kit | Atomic task decomposition (`tasks.md`) |
 
-Agent prompts live in `agents/built-in/<name>.md`. Edit them to customise behaviour without recompiling.
+Agent prompts live in `~/.koklo/agents/<name>/` as multiple Markdown fragments such as `IDENTITY.md`, `SOUL.md`, `AGENTS.md`, and `GUARDRAILS.md`. Edit them to customise behaviour without recompiling.
+
+```bash
+koklo agent list
+koklo agent sync
+koklo agent sync --force
+```
 
 ---
 
@@ -244,7 +250,7 @@ These commands are registered and print a helpful message — they won't crash:
 [pipeline]
 db_path       = "sqlite://koklo-sessions.db"
 artifacts_dir = "docs/planning_artifacts"
-agents_dir    = "agents/built-in"
+agents_dir    = ".koklo/agents"
 
 [workflow]
 preset = "sdd"   # sdd | bmad | speckit | light | custom
@@ -252,7 +258,7 @@ preset = "sdd"   # sdd | bmad | speckit | light | custom
 [agents.developer]
 provider     = "anthropic"
 model        = "claude-opus-4-6"
-system_prompt = "agents/built-in/developer.md"
+system_prompt = ".koklo/agents/developer/IDENTITY.md"
 timeout_secs = 600
 sandbox      = "bubblewrap"
 

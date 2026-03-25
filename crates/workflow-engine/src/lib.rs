@@ -769,12 +769,9 @@ impl PipelineOrchestrator {
                 inner: Arc::clone(&self.user_input_handler),
             }),
         );
-        let prompt = format!(
-            "Feature: {}\nSession: {}\nWorkspace: {}",
-            session.feature_title,
-            session.id,
-            workspace_root.display()
-        );
+        let prompt = self
+            .build_phase_prompt(session, phase, agent_name, &workspace_root)
+            .await?;
 
         // Emit an immediate log entry so the monitor shows activity before the LLM responds.
         self.bus.send(PipelineEvent::AgentLog {
@@ -1100,6 +1097,53 @@ impl PipelineOrchestrator {
             .project_context
             .as_ref()
             .map(|_| self.workspace_root(session).join(".koklo"))
+    }
+
+    async fn build_phase_prompt(
+        &self,
+        session: &Session,
+        phase: Phase,
+        agent_name: &str,
+        workspace_root: &Path,
+    ) -> Result<String> {
+        let output_artifact = self.resolve_artifact_path(workspace_root, &session.id, phase);
+        let artifacts = self.storage.list_artifacts(&session.id).await?;
+
+        let ordered_prior_artifacts = phases_for_preset(self.config.preset)
+            .into_iter()
+            .take_while(|(candidate, _)| *candidate != phase)
+            .filter_map(|(candidate, _)| {
+                let phase_name = candidate.to_string();
+                artifacts
+                    .iter()
+                    .find(|artifact| artifact.phase == phase_name)
+                    .map(|artifact| (phase_name, artifact.path.clone()))
+            })
+            .collect::<Vec<_>>();
+
+        let mut prompt = format!(
+            "Feature: {}\nSession: {}\nPhase: {}\nAgent: {}\nWorkspace: {}\nOutput artifact: {}",
+            session.feature_title,
+            session.id,
+            phase,
+            agent_name,
+            workspace_root.display(),
+            output_artifact.display()
+        );
+
+        if ordered_prior_artifacts.is_empty() {
+            prompt.push_str("\nAvailable prior artifacts: none yet.");
+        } else {
+            prompt.push_str("\nAvailable prior artifacts:");
+            for (prior_phase, path) in ordered_prior_artifacts {
+                prompt.push_str(&format!("\n- {}: {}", prior_phase, path));
+            }
+            prompt.push_str(
+                "\nRead the relevant prior artifacts before acting. Respect your role boundaries from the system prompt.",
+            );
+        }
+
+        Ok(prompt)
     }
 
     fn resolve_artifact_path(
@@ -1745,12 +1789,89 @@ mod tests {
         assert!(messages[1]
             .content
             .contains(&format!("Workspace: {}", workspace_root.display())));
+        assert!(messages[1].content.contains("Output artifact:"));
 
         let artifact_path = workspace_root
             .join("docs")
             .join("planning_artifacts")
             .join(format!("{}-spec.md", session.id));
         assert_eq!(fs::read_to_string(artifact_path).unwrap(), "spec output");
+    }
+
+    #[tokio::test]
+    async fn test_run_phase_lists_prior_artifacts_in_user_prompt() {
+        use std::fs;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace_root = tmp.path().join("workspace");
+        fs::create_dir_all(&workspace_root).unwrap();
+
+        let provider = RecordingProvider::new("openrouter", Some("openai/gpt-4o"), "dev output");
+        let provider_handle = provider.clone();
+        let config = PipelineConfig {
+            db_path: "sqlite::memory:".to_string(),
+            artifacts_dir: PathBuf::from("docs/planning_artifacts"),
+            global_home: tmp.path().join("global"),
+            project_context: Some(workspace_root.join(".koklo")),
+            project_path: workspace_root.to_string_lossy().into_owned(),
+            preset: PresetKind::Light,
+            default_provider: Arc::new(provider),
+            agent_providers: HashMap::new(),
+            provider_entries: HashMap::new(),
+            agent_sandboxes: HashMap::new(),
+            controlled_shell: false,
+            provider_registry: Arc::new(
+                ProviderRegistry::build(&PipelineTomlConfig::default()).unwrap(),
+            ),
+            github: None,
+        };
+        let storage = Arc::new(SessionManager::in_memory().await.unwrap());
+        let session = storage
+            .create_session("feature", "light", &workspace_root.to_string_lossy())
+            .await
+            .unwrap();
+        storage
+            .update_session_workspace(&session.id, &workspace_root.to_string_lossy(), "")
+            .await
+            .unwrap();
+
+        let spec_artifact = workspace_root
+            .join("docs")
+            .join("planning_artifacts")
+            .join(format!("{}-spec.md", session.id));
+        fs::create_dir_all(spec_artifact.parent().unwrap()).unwrap();
+        fs::write(&spec_artifact, "spec output").unwrap();
+        storage
+            .record_artifact(
+                &session.id,
+                "spec",
+                &spec_artifact.to_string_lossy(),
+                "spec output".len() as i64,
+            )
+            .await
+            .unwrap();
+
+        let session = storage.get_session(&session.id).await.unwrap().unwrap();
+        let orchestrator = PipelineOrchestrator {
+            config,
+            storage,
+            bus: EventBus::new(16),
+            gate_handler: Arc::new(StdinGateHandler),
+            user_input_handler: Arc::new(StdinUserInputHandler),
+        };
+
+        orchestrator
+            .run_phase(&session, Phase::Implement, "developer")
+            .await
+            .unwrap();
+
+        let messages = provider_handle.recorded_messages();
+        assert_eq!(messages.len(), 2);
+        assert!(messages[1].content.contains("Available prior artifacts:"));
+        assert!(messages[1]
+            .content
+            .contains(spec_artifact.to_string_lossy().as_ref()));
+        assert!(messages[1].content.contains("Output artifact:"));
     }
 
     #[tokio::test]
