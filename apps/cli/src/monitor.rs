@@ -1004,7 +1004,7 @@ impl MonitorApp {
             .current_project_root
             .as_deref()
             .unwrap_or("not detected");
-        let lines = vec![
+        let lines = [
             format!("Current dir: {}", self.current_dir),
             format!("Project root: {}", project_root),
             format!(
