@@ -25,6 +25,12 @@ pub enum PresetKind {
     SpecKit,
     /// Light — minimal 3-phase pipeline for small changes.
     Light,
+    /// Bugfix Fastlane — focused 4-phase pipeline for hotfixes.
+    Bugfix,
+    /// Release Prep — documentation & validation pipeline for releases.
+    Release,
+    /// SDD Strict — extended SDD with security audit and docs (7 phases).
+    Strict,
     /// Custom — loads phase list from `.koklo/workflow.toml`.
     /// Falls back to [`PresetKind::Sdd`] if the file is absent or malformed.
     Custom,
@@ -39,6 +45,9 @@ impl PresetKind {
             "bmad" => Some(Self::Bmad),
             "speckit" | "spec-kit" | "spec_kit" => Some(Self::SpecKit),
             "light" => Some(Self::Light),
+            "bugfix" | "bug-fix" | "bug_fix" => Some(Self::Bugfix),
+            "release" | "release-prep" | "release_prep" => Some(Self::Release),
+            "strict" | "sdd-strict" | "sdd_strict" => Some(Self::Strict),
             "custom" => Some(Self::Custom),
             _ => None,
         }
@@ -51,6 +60,9 @@ impl PresetKind {
             Self::Bmad => "bmad",
             Self::SpecKit => "speckit",
             Self::Light => "light",
+            Self::Bugfix => "bugfix",
+            Self::Release => "release",
+            Self::Strict => "strict",
             Self::Custom => "custom",
         }
     }
@@ -62,6 +74,9 @@ impl PresetKind {
             Self::Bmad => "BMAD Method v6",
             Self::SpecKit => "GitHub Spec Kit",
             Self::Light => "Minimal ceremony",
+            Self::Bugfix => "Bugfix Fastlane",
+            Self::Release => "Release Prep",
+            Self::Strict => "SDD Strict",
             Self::Custom => "Custom (from .koklo/workflow.toml)",
         }
     }
@@ -73,6 +88,9 @@ impl PresetKind {
             Self::Bmad => "Agile framework with expert agents (8 phases)",
             Self::SpecKit => "Specification-driven: specs become executable (6 phases)",
             Self::Light => "Skip ceremony, jump to implementation (3 phases)",
+            Self::Bugfix => "Fast pipeline for hotfixes (4 phases)",
+            Self::Release => "Documentation & validation for releases (3 phases)",
+            Self::Strict => "Extended SDD with security audit and docs (7 phases)",
             Self::Custom => "Loads phase list from .koklo/workflow.toml",
         }
     }
@@ -82,7 +100,12 @@ impl PresetKind {
         match self {
             Self::Bmad => Some("https://github.com/bmad-code-org/BMAD-METHOD"),
             Self::SpecKit => Some("https://github.com/github/spec-kit"),
-            _ => None,
+            Self::Bugfix
+            | Self::Release
+            | Self::Strict
+            | Self::Sdd
+            | Self::Light
+            | Self::Custom => None,
         }
     }
 
@@ -93,6 +116,9 @@ impl PresetKind {
             Self::Bmad,
             Self::SpecKit,
             Self::Light,
+            Self::Bugfix,
+            Self::Release,
+            Self::Strict,
             Self::Custom,
         ]
     }
@@ -143,6 +169,26 @@ pub fn phases_for_preset(kind: PresetKind) -> Vec<(Phase, &'static str)> {
             (Phase::Implement, "developer"),
             (Phase::Review, "reviewer"),
         ],
+        PresetKind::Bugfix => vec![
+            (Phase::Spec, "pm"),
+            (Phase::Implement, "developer"),
+            (Phase::Test, "qa"),
+            (Phase::Review, "reviewer"),
+        ],
+        PresetKind::Release => vec![
+            (Phase::Docs, "doc-writer"),
+            (Phase::Test, "qa"),
+            (Phase::Review, "reviewer"),
+        ],
+        PresetKind::Strict => vec![
+            (Phase::Spec, "pm"),
+            (Phase::Plan, "architect"),
+            (Phase::Implement, "developer"),
+            (Phase::Test, "qa"),
+            (Phase::Security, "security"),
+            (Phase::Review, "reviewer"),
+            (Phase::Docs, "doc-writer"),
+        ],
     }
 }
 
@@ -185,6 +231,63 @@ mod tests {
     #[test]
     fn light_has_exactly_3_phases() {
         assert_eq!(phases_for_preset(PresetKind::Light).len(), 3);
+    }
+
+    #[test]
+    fn bugfix_has_exactly_4_phases() {
+        assert_eq!(phases_for_preset(PresetKind::Bugfix).len(), 4);
+    }
+
+    #[test]
+    fn release_has_exactly_3_phases() {
+        assert_eq!(phases_for_preset(PresetKind::Release).len(), 3);
+    }
+
+    #[test]
+    fn strict_has_exactly_7_phases() {
+        assert_eq!(phases_for_preset(PresetKind::Strict).len(), 7);
+    }
+
+    #[test]
+    fn bugfix_starts_with_spec() {
+        let phases = phases_for_preset(PresetKind::Bugfix);
+        assert_eq!(phases[0].0, Phase::Spec);
+        assert_eq!(phases[0].1, "pm");
+    }
+
+    #[test]
+    fn release_starts_with_docs() {
+        let phases = phases_for_preset(PresetKind::Release);
+        assert_eq!(phases[0].0, Phase::Docs);
+        assert_eq!(phases[0].1, "doc-writer");
+    }
+
+    #[test]
+    fn strict_includes_security() {
+        let phases = phases_for_preset(PresetKind::Strict);
+        assert!(phases.iter().any(|(p, _)| *p == Phase::Security));
+    }
+
+    #[test]
+    fn from_str_bugfix_aliases() {
+        assert_eq!(PresetKind::parse("bugfix"), Some(PresetKind::Bugfix));
+        assert_eq!(PresetKind::parse("bug-fix"), Some(PresetKind::Bugfix));
+        assert_eq!(PresetKind::parse("bug_fix"), Some(PresetKind::Bugfix));
+        assert_eq!(PresetKind::parse("BUGFIX"), Some(PresetKind::Bugfix));
+    }
+
+    #[test]
+    fn from_str_release_aliases() {
+        assert_eq!(PresetKind::parse("release"), Some(PresetKind::Release));
+        assert_eq!(PresetKind::parse("release-prep"), Some(PresetKind::Release));
+        assert_eq!(PresetKind::parse("release_prep"), Some(PresetKind::Release));
+    }
+
+    #[test]
+    fn from_str_strict_aliases() {
+        assert_eq!(PresetKind::parse("strict"), Some(PresetKind::Strict));
+        assert_eq!(PresetKind::parse("sdd-strict"), Some(PresetKind::Strict));
+        assert_eq!(PresetKind::parse("sdd_strict"), Some(PresetKind::Strict));
     }
 
     #[test]
@@ -248,6 +351,9 @@ mod tests {
         assert!(PresetKind::SpecKit.reference_url().is_some());
         assert!(PresetKind::Sdd.reference_url().is_none());
         assert!(PresetKind::Light.reference_url().is_none());
+        assert!(PresetKind::Bugfix.reference_url().is_none());
+        assert!(PresetKind::Release.reference_url().is_none());
+        assert!(PresetKind::Strict.reference_url().is_none());
     }
 
     #[test]
