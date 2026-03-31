@@ -1,8 +1,9 @@
 use anyhow::Result;
 
 use super::{
-    AgentCommands, ArtifactsCommands, Cli, Commands, ConfigCommands, ContextCommands,
-    InternalCommands, ProviderCommands, SessionCommands, WorkflowCommands,
+    AgentCommands, ArtifactsCommands, Cli, Commands, ConfigCommands, ContextCommands, DocsCommands,
+    IdeCommands, InternalCommands, ProviderCommands, SessionCommands, TicketCommands,
+    WorkflowCommands,
 };
 use crate::commands;
 
@@ -35,6 +36,9 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
         } => commands::cmd_monitor(session, follow, project).await?,
 
         Commands::Context(subcommand) => dispatch_context(subcommand).await?,
+        Commands::Docs(subcommand) => dispatch_docs(subcommand).await?,
+        Commands::Ide(subcommand) => dispatch_ide(subcommand).await?,
+        Commands::Tickets(subcommand) => dispatch_tickets(subcommand).await?,
 
         Commands::Status { session_id } => match session_id {
             Some(id) => commands::cmd_session_show(&id).await?,
@@ -42,13 +46,11 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
         },
         Commands::Resume { session_id } => commands::cmd_session_resume(&session_id).await?,
 
-        Commands::Tickets
-        | Commands::Deploy
+        Commands::Deploy
         | Commands::Sync
         | Commands::Constellation
         | Commands::Marketplace
-        | Commands::Voice
-        | Commands::Ide => unreachable!("future stub commands are handled above"),
+        | Commands::Voice => unreachable!("future stub commands are handled above"),
 
         Commands::Internal(subcommand) => match subcommand {
             InternalCommands::ClaudePermissionBridge { bridge_dir } => {
@@ -60,15 +62,46 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
     Ok(())
 }
 
+async fn dispatch_ide(command: IdeCommands) -> Result<()> {
+    match command {
+        IdeCommands::Detect => commands::cmd_ide_detect().await?,
+        IdeCommands::Open { file, line } => commands::cmd_ide_open(&file, line).await?,
+    }
+    Ok(())
+}
+
+async fn dispatch_docs(command: DocsCommands) -> Result<()> {
+    match command {
+        DocsCommands::Readme { output } => commands::cmd_docs_readme(output).await?,
+        DocsCommands::Changelog { since } => commands::cmd_docs_changelog(since).await?,
+        DocsCommands::Adr { title } => commands::cmd_docs_adr(&title).await?,
+    }
+    Ok(())
+}
+
+async fn dispatch_tickets(command: TicketCommands) -> Result<()> {
+    match command {
+        TicketCommands::List { status } => commands::cmd_tickets_list(status).await?,
+        TicketCommands::Create {
+            title,
+            description,
+            priority,
+            tags,
+        } => commands::cmd_tickets_create(&title, description, priority, tags).await?,
+        TicketCommands::Show { id } => commands::cmd_tickets_show(&id).await?,
+        TicketCommands::Update { id, status } => commands::cmd_tickets_update(&id, &status).await?,
+        TicketCommands::Close { id } => commands::cmd_tickets_close(&id).await?,
+    }
+    Ok(())
+}
+
 fn future_stub_info(command: &Commands) -> Option<(&'static str, &'static str)> {
     match command {
-        Commands::Tickets => Some(("Tickets", "Phase 5 (Integrated Ticketing)")),
         Commands::Deploy => Some(("Deploy", "Phase 10 (Multi-provider Deployment)")),
         Commands::Sync => Some(("Sync", "Phase 12 (Cloud Collaboration)")),
         Commands::Constellation => Some(("Constellation", "Phase 9 (Git Visualisation)")),
         Commands::Marketplace => Some(("Marketplace", "Phase 11 (Agent Marketplace)")),
         Commands::Voice => Some(("Voice", "Phase 8 (Voice Input)")),
-        Commands::Ide => Some(("IDE Bridge", "Phase 7 (IDE Integration)")),
         _ => None,
     }
 }
@@ -159,16 +192,16 @@ mod tests {
     #[test]
     fn future_stub_info_maps_expected_commands() {
         assert_eq!(
-            future_stub_info(&Commands::Tickets),
-            Some(("Tickets", "Phase 5 (Integrated Ticketing)"))
-        );
-        assert_eq!(
-            future_stub_info(&Commands::Ide),
-            Some(("IDE Bridge", "Phase 7 (IDE Integration)"))
-        );
-        assert_eq!(
             future_stub_info(&Commands::Marketplace),
             Some(("Marketplace", "Phase 11 (Agent Marketplace)"))
+        );
+        assert_eq!(
+            future_stub_info(&Commands::Deploy),
+            Some(("Deploy", "Phase 10 (Multi-provider Deployment)"))
+        );
+        assert_eq!(
+            future_stub_info(&Commands::Voice),
+            Some(("Voice", "Phase 8 (Voice Input)"))
         );
     }
 
