@@ -34,3 +34,6 @@ koklo-workflow-engine = { path = "../../crates/workflow-engine" }
 koklo-providers = { path = "../../crates/providers" }
 koklo-shell = { path = "../../crates/shell" }
 koklo-agent-runtime = { path = "../../crates/agent-runtime" }
+koklo-ticket-system = { path = "../../crates/ticket-system" }
+koklo-doc-generator = { path = "../../crates/doc-generator" }
+koklo-git-engine = { path = "../../crates/git-engine" }
