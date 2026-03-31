@@ -211,6 +211,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let repo = Repository::init(dir.path()).unwrap();
 
+        // Configure user identity so commits work in CI (no global git config)
+        {
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "Test").unwrap();
+            config.set_str("user.email", "test@test.com").unwrap();
+        }
+
         // Create initial commit so HEAD exists
         {
             let sig = git2::Signature::now("Test", "test@test.com").unwrap();
