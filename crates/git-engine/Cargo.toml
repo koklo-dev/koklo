@@ -6,3 +6,7 @@ description = "git-engine crate for Koklo Community"
 
 [dependencies]
 anyhow = { workspace = true }
+git2 = { version = "0.19", features = ["vendored-openssl"] }
+
+[dev-dependencies]
+tempfile = "3"
