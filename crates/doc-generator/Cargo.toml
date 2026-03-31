@@ -2,7 +2,11 @@
 name = "koklo-doc-generator"
 version = "0.1.0"
 edition = "2021"
-description = "doc-generator crate for Koklo Community"
+description = "Documentation generation utilities for Koklo"
 
 [dependencies]
 anyhow = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
