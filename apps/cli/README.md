@@ -29,13 +29,15 @@ koklo run feature "Auth JWT"
 koklo run --preset bmad    feature "Add OAuth2"
 koklo run --preset speckit feature "Refactor storage layer"
 koklo run --preset light   task    "Fix typo in README"
+koklo run --preset bugfix  bug     "Fix login crash"
+koklo run --preset strict  feature "Payment integration"
 ```
 
 ---
 
 ## Workflow Presets
 
-Koklo ships four built-in presets. Choose the methodology that fits your project.
+Koklo ships seven built-in presets. Choose the methodology that fits your project.
 
 ```bash
 koklo workflow list
@@ -48,6 +50,9 @@ sdd        Spec-Driven Development        5
 bmad       BMAD Method v6                 8        https://github.com/bmad-code-org/BMAD-METHOD
 speckit    GitHub Spec Kit                6        https://github.com/github/spec-kit
 light      Minimal ceremony               3
+bugfix     Bugfix Fastlane                4
+release    Release Prep                   3
+strict     SDD Strict                     7
 custom     Custom (from .koklo/workflow.toml) 5
 ```
 
@@ -75,6 +80,25 @@ Constitution-Writer → PM (Spec) → Architect (Plan) → Task-Planner (Tasks)
 
 ```
 PM (Spec) → Developer (Implement) → Reviewer (Review)
+```
+
+### Bugfix — Bugfix Fastlane
+
+```
+PM (Spec) → Developer (Implement) → QA (Test) → Reviewer (Review)
+```
+
+### Release — Release Prep
+
+```
+Doc-Writer (Docs) → QA (Test) → Reviewer (Review)
+```
+
+### Strict — SDD Strict
+
+```
+PM (Spec) → Architect (Plan) → Developer (Implement) → QA (Test)
+  → Security (Security) → Reviewer (Review) → Doc-Writer (Docs)
 ```
 
 ### Custom
@@ -109,6 +133,9 @@ koklo run feature "Auth JWT"                   # SDD (default)
 koklo run --preset bmad    feature "Add OAuth2"
 koklo run --preset speckit feature "Refactor storage"
 koklo run --preset light   task    "Fix typo"
+koklo run --preset bugfix  bug     "Fix login crash"
+koklo run --preset release feature "v0.2.0 release"
+koklo run --preset strict  feature "Payment integration"
 ```
 
 If `GITHUB_TOKEN` is set, the Review phase creates a PR on the configured repository.
@@ -148,16 +175,16 @@ koklo agent run architect         # reads input from stdin
 
 | Agent | Presets | Role |
 |-------|---------|------|
-| `pm` | All | Product spec (`spec.md`) |
-| `architect` | All | Technical plan (`plan.md`) |
-| `developer` | All | Code implementation |
-| `qa` | SDD, BMAD | Test suite |
+| `pm` | SDD, Bugfix, Strict, SpecKit, Light | Product spec (`spec.md`) |
+| `architect` | SDD, BMAD, Strict, SpecKit | Technical plan (`plan.md`) |
+| `developer` | SDD, BMAD, Bugfix, Strict, SpecKit, Light | Code implementation |
+| `qa` | SDD, BMAD, Bugfix, Strict, Release | Test suite |
 | `reviewer` | All | Code review + PR (`review.md`) |
 | `analyst` | BMAD | Business analysis (`analysis.md`) |
-| `security` | BMAD | OWASP security report (`security-report.md`) |
-| `doc-writer` | BMAD | README / CHANGELOG / ADR updates |
-| `constitution-writer` | Spec Kit | Project constitution (`CONSTITUTION.md`) |
-| `task-planner` | Spec Kit | Atomic task decomposition (`tasks.md`) |
+| `security` | BMAD, Strict | OWASP security report (`security-report.md`) |
+| `doc-writer` | BMAD, Strict, Release | README / CHANGELOG / ADR updates |
+| `constitution-writer` | SpecKit | Project constitution (`CONSTITUTION.md`) |
+| `task-planner` | SpecKit | Atomic task decomposition (`tasks.md`) |
 
 Agent prompts live in `~/.koklo/agents/<name>/` as multiple Markdown fragments such as `IDENTITY.md`, `SOUL.md`, `AGENTS.md`, and `GUARDRAILS.md`. Edit them to customise behaviour without recompiling.
 
@@ -210,9 +237,16 @@ koklo artifacts show <session-id> spec    # print spec.md content
 Manage LLM provider connections.
 
 ```bash
-koklo provider list              # show configured providers + key status
-koklo provider test ollama       # send a test prompt, check connectivity
-koklo provider test openrouter   # uses smoke_model when configured
+koklo provider list                                  # show configured providers + key status
+koklo provider test ollama                           # send a test prompt, check connectivity
+koklo provider test openrouter                       # uses smoke_model when configured
+koklo provider add openrouter --model "anthropic/claude-opus-4-6"
+koklo provider add ollama --model qwen2.5-coder:7b --project
+koklo provider remove openrouter
+koklo provider set-default claude-code
+koklo provider set-default ollama --project          # project-level override
+koklo provider usage                                 # show API usage for all providers
+koklo provider usage openrouter                      # show usage for a specific provider
 ```
 
 API keys do not have to come from an interactive shell. Koklo loads secrets from
@@ -226,14 +260,83 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 
 ---
 
+### `koklo monitor`
+
+Live TUI dashboard showing what agents are doing.
+
+```bash
+koklo monitor                         # interactive TUI dashboard
+koklo monitor --session <id>          # focus on a specific session (prefix match)
+koklo monitor --follow <id>           # plain-text stream mode (for CI/scripting)
+koklo monitor --project .             # filter sessions to current project directory
+```
+
+---
+
+### `koklo context`
+
+Manage project context files.
+
+```bash
+koklo context show                    # list and preview context files
+koklo context init                    # create .koklo/USER.md interactively
+```
+
+---
+
+### `koklo tickets`
+
+Local ticket management backed by SQLite.
+
+```bash
+koklo tickets list                              # list all tickets
+koklo tickets list --status open                # filter by status
+koklo tickets create "Fix login bug" --priority high
+koklo tickets create "Add caching" -p medium -d "Redis layer for API responses"
+koklo tickets show <id>                         # full details (prefix match on ID)
+koklo tickets update <id> --status in-progress
+koklo tickets close <id>
+```
+
+Statuses: `open`, `in-progress`, `done`, `closed`.
+Priorities: `low`, `medium`, `high`, `critical`.
+
+---
+
+### `koklo docs`
+
+Generate documentation from your project.
+
+```bash
+koklo docs readme                    # generate a README skeleton to stdout
+koklo docs readme -o README.md       # write directly to file
+koklo docs changelog                 # generate CHANGELOG from git log (last 50 commits)
+koklo docs changelog --since v0.1.0  # only commits since a tag
+koklo docs adr "Use SQLite"          # generate an ADR skeleton
+```
+
+---
+
+### `koklo ide`
+
+Open files in your editor.
+
+```bash
+koklo ide detect                      # show which editor would be used
+koklo ide open src/main.rs            # open file in detected editor
+koklo ide open src/main.rs --line 42  # open at specific line
+```
+
+Editor detection order: `$KOKLO_EDITOR` → `$EDITOR` → auto-detect (`cursor`, `code`, `zed`, `nvim`, `vim`, `nano`).
+
+---
+
 ### Future commands (coming soon)
 
 These commands are registered and print a helpful message — they won't crash:
 
 | Command | Phase | Description |
 |---------|-------|-------------|
-| `koklo tickets` | 5 | Integrated ticketing |
-| `koklo ide` | 7 | IDE bridge |
 | `koklo voice` | 8 | Voice input (Whisper.cpp) |
 | `koklo constellation` | 9 | Git visualization |
 | `koklo deploy` | 10 | Multi-provider deployment |
@@ -253,7 +356,7 @@ artifacts_dir = "docs/planning_artifacts"
 agents_dir    = ".koklo/agents"
 
 [workflow]
-preset = "sdd"   # sdd | bmad | speckit | light | custom
+preset = "sdd"   # sdd | bmad | speckit | light | bugfix | release | strict | custom
 
 [agents.developer]
 provider     = "anthropic"
