@@ -157,8 +157,25 @@ pub(crate) enum Commands {
     #[command(subcommand)]
     Context(ContextCommands),
 
-    /// [coming soon] Integrated ticket system — Phase 5.
-    Tickets,
+    /// Generate documentation.
+    ///
+    /// Examples:
+    ///   koklo docs readme
+    ///   koklo docs changelog --since v0.1.0
+    ///   koklo docs adr "Use SQLite for storage"
+    #[command(subcommand)]
+    Docs(DocsCommands),
+
+    /// Manage local tickets.
+    ///
+    /// Examples:
+    ///   koklo tickets list
+    ///   koklo tickets create "Fix login bug" --priority high
+    ///   koklo tickets show <id>
+    ///   koklo tickets update <id> --status done
+    ///   koklo tickets close <id>
+    #[command(subcommand)]
+    Tickets(TicketCommands),
     /// [coming soon] Multi-provider deployment — Phase 10.
     Deploy,
     /// [coming soon] Cloud collaboration sync — Phase 12.
@@ -169,8 +186,13 @@ pub(crate) enum Commands {
     Marketplace,
     /// [coming soon] Voice input — Phase 8.
     Voice,
-    /// [coming soon] IDE bridge — Phase 7.
-    Ide,
+    /// Open files in your editor.
+    ///
+    /// Examples:
+    ///   koklo ide detect
+    ///   koklo ide open src/main.rs --line 42
+    #[command(subcommand)]
+    Ide(IdeCommands),
 
     #[command(hide = true, subcommand)]
     Internal(InternalCommands),
@@ -331,6 +353,83 @@ pub(crate) enum ContextCommands {
 }
 
 #[derive(Debug, Subcommand)]
+pub(crate) enum IdeCommands {
+    /// Detect which editor would be used.
+    Detect,
+    /// Open a file in your editor.
+    Open {
+        /// File path to open.
+        file: String,
+        /// Line number to jump to.
+        #[arg(long, short = 'l')]
+        line: Option<u32>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum DocsCommands {
+    /// Generate a README skeleton from the current project.
+    Readme {
+        /// Write to file instead of stdout.
+        #[arg(long, short = 'o')]
+        output: Option<String>,
+    },
+    /// Generate a CHANGELOG from git history.
+    Changelog {
+        /// Only include commits since this tag.
+        #[arg(long)]
+        since: Option<String>,
+    },
+    /// Generate an Architecture Decision Record skeleton.
+    Adr {
+        /// Title of the ADR.
+        title: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum TicketCommands {
+    /// List tickets.
+    List {
+        /// Filter by status (open, in-progress, done, closed).
+        #[arg(long)]
+        status: Option<String>,
+    },
+    /// Create a new ticket.
+    Create {
+        /// Ticket title.
+        title: String,
+        /// Description of the ticket.
+        #[arg(long, short = 'd')]
+        description: Option<String>,
+        /// Priority: low, medium, high, critical (default: medium).
+        #[arg(long, short = 'p')]
+        priority: Option<String>,
+        /// Comma-separated tags.
+        #[arg(long)]
+        tags: Option<String>,
+    },
+    /// Show details of a ticket.
+    Show {
+        /// Ticket ID (prefix match).
+        id: String,
+    },
+    /// Update ticket status.
+    Update {
+        /// Ticket ID (prefix match).
+        id: String,
+        /// New status: open, in-progress, done, closed.
+        #[arg(long)]
+        status: String,
+    },
+    /// Close a ticket.
+    Close {
+        /// Ticket ID (prefix match).
+        id: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 pub(crate) enum InternalCommands {
     #[command(hide = true)]
     ClaudePermissionBridge {
@@ -342,7 +441,7 @@ pub(crate) enum InternalCommands {
 fn parse_preset(s: &str) -> Result<PresetKind, String> {
     PresetKind::parse(s).ok_or_else(|| {
         format!(
-            "Unknown preset '{}'. Valid: sdd, bmad, speckit, light, custom",
+            "Unknown preset '{}'. Valid: sdd, bmad, speckit, light, bugfix, release, strict, custom",
             s
         )
     })
