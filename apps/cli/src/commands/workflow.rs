@@ -15,6 +15,8 @@ pub(crate) fn cmd_workflow_list() {
             url
         );
     }
+    println!();
+    println!("Run `koklo preset list` to see custom presets.");
 }
 
 pub(crate) fn cmd_workflow_show(preset_str: &str) -> Result<()> {

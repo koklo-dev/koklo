@@ -5,9 +5,12 @@
 
 use anyhow::Result;
 use koklo_agent_runtime::{
-    builtin_agent_files, builtin_agent_slugs, builtin_shared_project_prompt,
+    builtin_agent_files, builtin_agent_profile_data, builtin_agent_slugs,
+    builtin_shared_project_prompt,
 };
 use koklo_providers::PipelineTomlConfig;
+use koklo_storage::{SeedAgent, SeedPreset, SessionManager};
+use koklo_workflow_engine::presets::{phases_for_preset, PresetKind};
 use std::path::PathBuf;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -191,6 +194,58 @@ const DEFAULT_SECRETS_TOML: &str = r#"# koklo secrets
 # OPENROUTER_API_KEY = "sk-or-v1-..."
 # ANTHROPIC_API_KEY = "sk-ant-..."
 "#;
+
+/// Seed built-in presets and agents into the SQLite database.
+///
+/// Called once at CLI startup after migrations.  The operations are idempotent.
+pub async fn seed_database(storage: &SessionManager) -> Result<()> {
+    // --- Seed presets ---
+    let mut seed_presets = Vec::new();
+    for &kind in PresetKind::all() {
+        if kind == PresetKind::Custom {
+            continue; // Custom is a sentinel, not a real preset
+        }
+        let phases: Vec<(String, String)> = phases_for_preset(kind)
+            .into_iter()
+            .map(|(phase, agent)| (phase.to_string(), agent.to_string()))
+            .collect();
+        seed_presets.push(SeedPreset {
+            slug: kind.as_str().to_string(),
+            display_name: kind.display_name().to_string(),
+            description: kind.description().to_string(),
+            reference_url: kind.reference_url().map(|s| s.to_string()),
+            phases,
+        });
+    }
+    storage.seed_presets(&seed_presets).await?;
+
+    // --- Seed agents ---
+    let mut seed_agents = Vec::new();
+    for slug in builtin_agent_slugs() {
+        if let Some((display_name, title, emoji, scalar_fields, list_fields)) =
+            builtin_agent_profile_data(slug)
+        {
+            let fragments: Vec<(String, String, i32)> = builtin_agent_files(slug)
+                .unwrap_or_default()
+                .into_iter()
+                .enumerate()
+                .map(|(i, (name, content))| (name, content, i as i32))
+                .collect();
+            seed_agents.push(SeedAgent {
+                slug: slug.to_string(),
+                display_name,
+                title,
+                emoji,
+                scalar_fields,
+                list_fields,
+                fragments,
+            });
+        }
+    }
+    storage.seed_agents(&seed_agents).await?;
+
+    Ok(())
+}
 
 #[cfg(unix)]
 fn set_private_file_permissions(path: &std::path::Path) -> Result<()> {
