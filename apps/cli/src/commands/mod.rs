@@ -6,6 +6,7 @@ mod docs;
 mod ide;
 mod init;
 mod monitor;
+mod preset;
 mod provider;
 mod run;
 mod session;
@@ -20,6 +21,7 @@ pub(crate) use docs::{cmd_docs_adr, cmd_docs_changelog, cmd_docs_readme};
 pub(crate) use ide::{cmd_ide_detect, cmd_ide_open};
 pub(crate) use init::cmd_init;
 pub(crate) use monitor::cmd_monitor;
+pub(crate) use preset::{cmd_preset_create, cmd_preset_delete, cmd_preset_list, cmd_preset_show};
 pub(crate) use provider::{
     cmd_provider_add, cmd_provider_list, cmd_provider_remove, cmd_provider_set_default,
     cmd_provider_test, cmd_provider_usage,
