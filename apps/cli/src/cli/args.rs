@@ -92,6 +92,16 @@ pub(crate) enum Commands {
     #[command(subcommand)]
     Workflow(WorkflowCommands),
 
+    /// Manage custom presets (create, list, delete).
+    ///
+    /// Examples:
+    ///   koklo preset list
+    ///   koklo preset create my-flow --phases spec:pm,implement:developer,review:reviewer
+    ///   koklo preset show my-flow
+    ///   koklo preset delete my-flow
+    #[command(subcommand)]
+    Preset(PresetCommands),
+
     /// View project configuration.
     ///
     /// Examples:
@@ -247,6 +257,36 @@ pub(crate) enum WorkflowCommands {
     Show {
         /// Preset name (sdd, bmad, speckit, light, custom).
         preset: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum PresetCommands {
+    /// List all presets (built-in + custom).
+    List,
+    /// Show the phase sequence for a preset.
+    Show {
+        /// Preset slug (e.g. sdd, my-custom-flow).
+        slug: String,
+    },
+    /// Create a custom preset.
+    Create {
+        /// Unique slug for the preset (e.g. my-flow).
+        slug: String,
+        /// Display name.
+        #[arg(long)]
+        name: Option<String>,
+        /// Description.
+        #[arg(long)]
+        description: Option<String>,
+        /// Comma-separated phase:agent pairs (e.g. spec:pm,implement:developer,review:reviewer).
+        #[arg(long)]
+        phases: String,
+    },
+    /// Delete a custom preset (soft-delete).
+    Delete {
+        /// Preset slug to delete.
+        slug: String,
     },
 }
 

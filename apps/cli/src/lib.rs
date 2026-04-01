@@ -41,6 +41,12 @@ pub(crate) use support::home as home_dirs;
 
 pub async fn run() -> Result<()> {
     initialize_runtime();
+    // Seed built-in presets and agents into the DB (idempotent).
+    if let Ok(storage) = open_storage().await {
+        if let Err(e) = home_dirs::seed_database(&storage).await {
+            tracing::warn!("DB seeding failed (non-fatal): {}", e);
+        }
+    }
     cli::run().await
 }
 

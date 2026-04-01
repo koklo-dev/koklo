@@ -2,8 +2,8 @@ use anyhow::Result;
 
 use super::{
     AgentCommands, ArtifactsCommands, Cli, Commands, ConfigCommands, ContextCommands, DocsCommands,
-    IdeCommands, InternalCommands, ProviderCommands, SessionCommands, TicketCommands,
-    WorkflowCommands,
+    IdeCommands, InternalCommands, PresetCommands, ProviderCommands, SessionCommands,
+    TicketCommands, WorkflowCommands,
 };
 use crate::commands;
 
@@ -25,6 +25,7 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
         Commands::Session(subcommand) => dispatch_session(subcommand).await?,
         Commands::Agent(subcommand) => dispatch_agent(subcommand).await?,
         Commands::Workflow(subcommand) => dispatch_workflow(subcommand).await?,
+        Commands::Preset(subcommand) => dispatch_preset(subcommand).await?,
         Commands::Config(subcommand) => dispatch_config(subcommand).await?,
         Commands::Artifacts(subcommand) => dispatch_artifacts(subcommand).await?,
         Commands::Provider(subcommand) => dispatch_provider(subcommand).await?,
@@ -177,6 +178,21 @@ async fn dispatch_context(command: ContextCommands) -> Result<()> {
     match command {
         ContextCommands::Show => commands::cmd_context_show().await?,
         ContextCommands::Init => commands::cmd_context_init().await?,
+    }
+    Ok(())
+}
+
+async fn dispatch_preset(command: PresetCommands) -> Result<()> {
+    match command {
+        PresetCommands::List => commands::cmd_preset_list().await?,
+        PresetCommands::Show { slug } => commands::cmd_preset_show(&slug).await?,
+        PresetCommands::Create {
+            slug,
+            name,
+            description,
+            phases,
+        } => commands::cmd_preset_create(&slug, name, description, &phases).await?,
+        PresetCommands::Delete { slug } => commands::cmd_preset_delete(&slug).await?,
     }
     Ok(())
 }
