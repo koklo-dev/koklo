@@ -750,6 +750,7 @@ impl PipelineOrchestrator {
             timeout_secs: 300,
             global_home: self.config.global_home.clone(),
             project_context: self.workspace_project_context(session),
+            memory_overrides: None,
         };
 
         let workspace_root = self.workspace_root(session);
