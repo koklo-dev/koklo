@@ -13,4 +13,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+koklo-core = { path = "../core" }
 koklo-events = { path = "../events" }
+
+[dev-dependencies]
+tempfile = "3"

@@ -8,4 +8,5 @@ description = "Shared core types and extension traits"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
+sqlx = { workspace = true }
 uuid = { workspace = true }
