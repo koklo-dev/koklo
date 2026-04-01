@@ -13,4 +13,10 @@ pub struct AgentConfig {
     pub global_home: PathBuf,
     /// Project-level `.koklo/` directory. `None` when outside any project.
     pub project_context: Option<PathBuf>,
+    /// Optional DB-sourced memory content injected into the system prompt.
+    ///
+    /// When set, these replace the file-based memory layers (4–7) in the
+    /// prompt.  Each entry is `(label, content)`.  The caller is responsible
+    /// for querying the database and populating this field.
+    pub memory_overrides: Option<Vec<(String, String)>>,
 }
