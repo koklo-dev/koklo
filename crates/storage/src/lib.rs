@@ -1185,6 +1185,7 @@ impl SessionManager {
     }
 
     /// Create a custom preset.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_preset(
         &self,
         owner_scope: &str,
@@ -1730,6 +1731,7 @@ impl SessionManager {
     // -----------------------------------------------------------------------
 
     /// Insert or update an MCP server.
+    #[allow(clippy::too_many_arguments)]
     pub async fn upsert_mcp_server(
         &self,
         name: &str,
@@ -1986,16 +1988,16 @@ impl SessionManager {
             let command = config.get("command").and_then(|v| v.as_str());
             let args_json = config
                 .get("args")
-                .map(|v| serde_json::to_string(v))
+                .map(serde_json::to_string)
                 .transpose()?;
             let url = config.get("url").and_then(|v| v.as_str());
             let env_json = config
                 .get("env")
-                .map(|v| serde_json::to_string(v))
+                .map(serde_json::to_string)
                 .transpose()?;
             let headers_json = config
                 .get("headers")
-                .map(|v| serde_json::to_string(v))
+                .map(serde_json::to_string)
                 .transpose()?;
 
             self.upsert_mcp_server(
