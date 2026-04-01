@@ -44,6 +44,7 @@ pub fn builtin_agent_files(slug: &str) -> Option<Vec<BuiltinAgentFile>> {
 /// Returns the profile metadata for a built-in agent, suitable for DB seeding.
 ///
 /// Returns `(display_name, title, emoji, scalar_fields, list_fields)`.
+#[allow(clippy::type_complexity)]
 pub fn builtin_agent_profile_data(
     slug: &str,
 ) -> Option<(

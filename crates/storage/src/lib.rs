@@ -1986,15 +1986,9 @@ impl SessionManager {
                 .unwrap_or("stdio");
 
             let command = config.get("command").and_then(|v| v.as_str());
-            let args_json = config
-                .get("args")
-                .map(serde_json::to_string)
-                .transpose()?;
+            let args_json = config.get("args").map(serde_json::to_string).transpose()?;
             let url = config.get("url").and_then(|v| v.as_str());
-            let env_json = config
-                .get("env")
-                .map(serde_json::to_string)
-                .transpose()?;
+            let env_json = config.get("env").map(serde_json::to_string).transpose()?;
             let headers_json = config
                 .get("headers")
                 .map(serde_json::to_string)
