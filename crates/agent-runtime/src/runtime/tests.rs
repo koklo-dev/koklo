@@ -19,6 +19,7 @@ fn test_config(slug: &str) -> AgentConfig {
         timeout_secs: 120,
         global_home: PathBuf::from("/nonexistent/koklo_home"),
         project_context: None,
+        memory_overrides: None,
     }
 }
 

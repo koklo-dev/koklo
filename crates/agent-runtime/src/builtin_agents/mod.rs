@@ -41,6 +41,88 @@ pub fn builtin_agent_files(slug: &str) -> Option<Vec<BuiltinAgentFile>> {
     ])
 }
 
+/// Returns the profile metadata for a built-in agent, suitable for DB seeding.
+///
+/// Returns `(display_name, title, emoji, scalar_fields, list_fields)`.
+#[allow(clippy::type_complexity)]
+pub fn builtin_agent_profile_data(
+    slug: &str,
+) -> Option<(
+    String,
+    String,
+    String,
+    Vec<(String, String)>,
+    Vec<(String, Vec<String>)>,
+)> {
+    let profile = catalog::profile(slug)?;
+    let scalars = vec![
+        ("theme".to_string(), profile.theme.to_string()),
+        ("vibe".to_string(), profile.vibe.to_string()),
+        ("mission".to_string(), profile.mission.to_string()),
+        (
+            "role_in_system".to_string(),
+            profile.role_in_system.to_string(),
+        ),
+    ];
+    let lists = vec![
+        (
+            "always_load_first".to_string(),
+            profile
+                .always_load_first
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        ),
+        (
+            "responsibilities".to_string(),
+            profile
+                .responsibilities
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        ),
+        (
+            "personality".to_string(),
+            profile.personality.iter().map(|s| s.to_string()).collect(),
+        ),
+        (
+            "communication_style".to_string(),
+            profile
+                .communication_style
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        ),
+        (
+            "handoff_rules".to_string(),
+            profile
+                .handoff_rules
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        ),
+        (
+            "guardrails".to_string(),
+            profile.guardrails.iter().map(|s| s.to_string()).collect(),
+        ),
+        (
+            "escalation_triggers".to_string(),
+            profile
+                .escalation_triggers
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        ),
+    ];
+    Some((
+        profile.name.to_string(),
+        profile.title.to_string(),
+        profile.emoji.to_string(),
+        scalars,
+        lists,
+    ))
+}
+
 pub fn builtin_agent_prompt(slug: &str) -> Option<String> {
     builtin_agent_files(slug).map(|files| {
         files

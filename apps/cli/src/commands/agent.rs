@@ -10,26 +10,42 @@ use crate::{
 };
 
 pub(crate) async fn cmd_agent_list() -> Result<()> {
-    let mut seen = std::collections::BTreeSet::new();
-    for &kind in PresetKind::all() {
-        for (_, name) in phases_for_preset(kind) {
-            seen.insert(name);
+    let storage = crate::open_storage().await?;
+    let agents = storage.list_agents(None, None).await?;
+
+    if agents.is_empty() {
+        // Fallback to file-based listing if DB is empty.
+        let mut seen = std::collections::BTreeSet::new();
+        for &kind in PresetKind::all() {
+            for (_, name) in phases_for_preset(kind) {
+                seen.insert(name);
+            }
         }
-    }
-    let dir = agents_dir();
-    println!("{:<22} PROMPT SOURCE", "AGENT");
-    println!("{}", "-".repeat(60));
-    for name in &seen {
-        let prompt_dir = dir.join(name);
-        let legacy_prompt = dir.join(format!("{}.md", name));
-        let status = if prompt_dir.is_dir() {
-            prompt_dir.to_string_lossy().into_owned()
-        } else if legacy_prompt.exists() {
-            format!("{} [legacy]", legacy_prompt.to_string_lossy())
-        } else {
-            "(prompt file not found)".to_string()
-        };
-        println!("{:<22} {}", name, status);
+        let dir = agents_dir();
+        println!("{:<22} PROMPT SOURCE", "AGENT");
+        println!("{}", "-".repeat(60));
+        for name in &seen {
+            let prompt_dir = dir.join(name);
+            let legacy_prompt = dir.join(format!("{}.md", name));
+            let status = if prompt_dir.is_dir() {
+                prompt_dir.to_string_lossy().into_owned()
+            } else if legacy_prompt.exists() {
+                format!("{} [legacy]", legacy_prompt.to_string_lossy())
+            } else {
+                "(prompt file not found)".to_string()
+            };
+            println!("{:<22} {}", name, status);
+        }
+    } else {
+        println!("{:<18} {:<22} {:<10} SCOPE", "SLUG", "NAME", "BUILT-IN");
+        println!("{}", "-".repeat(65));
+        for agent in &agents {
+            let builtin = if agent.is_builtin { "yes" } else { "no" };
+            println!(
+                "{:<18} {:<22} {:<10} {}",
+                agent.slug, agent.display_name, builtin, agent.owner_scope
+            );
+        }
     }
     Ok(())
 }
@@ -54,6 +70,7 @@ pub(crate) async fn cmd_agent_show(name: &str) -> Result<()> {
         timeout_secs: 0,
         global_home,
         project_context,
+        memory_overrides: None,
     };
 
     let prompt = build_system_prompt(&config)?;
@@ -104,6 +121,7 @@ pub(crate) async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<(
         timeout_secs: 0,
         global_home,
         project_context,
+        memory_overrides: None,
     })?;
 
     println!("Running agent '{}'...\n", name);
