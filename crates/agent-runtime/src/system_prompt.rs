@@ -30,18 +30,30 @@ pub fn build_system_prompt(config: &AgentConfig) -> Result<String> {
     }
 
     maybe_read(config.global_home.join("USER.md"), &mut parts);
-    maybe_read(config.global_home.join("MEMORY.md"), &mut parts);
-    maybe_read(
-        config
-            .global_home
-            .join("memories")
-            .join(format!("{today}.md")),
-        &mut parts,
-    );
 
-    if let Some(ctx) = &config.project_context {
-        maybe_read(ctx.join("MEMORY.md"), &mut parts);
-        maybe_read(ctx.join("memories").join(format!("{today}.md")), &mut parts);
+    // Memory layers: prefer DB-sourced overrides when available,
+    // falling back to file-based memories.
+    if let Some(overrides) = &config.memory_overrides {
+        for (_label, content) in overrides {
+            let trimmed = content.trim();
+            if !trimmed.is_empty() {
+                parts.push(trimmed.to_string());
+            }
+        }
+    } else {
+        maybe_read(config.global_home.join("MEMORY.md"), &mut parts);
+        maybe_read(
+            config
+                .global_home
+                .join("memories")
+                .join(format!("{today}.md")),
+            &mut parts,
+        );
+
+        if let Some(ctx) = &config.project_context {
+            maybe_read(ctx.join("MEMORY.md"), &mut parts);
+            maybe_read(ctx.join("memories").join(format!("{today}.md")), &mut parts);
+        }
     }
 
     let mut agent_fragment_count =
@@ -153,6 +165,7 @@ mod tests {
             timeout_secs: 120,
             global_home: PathBuf::from("/nonexistent/koklo_home"),
             project_context: None,
+            memory_overrides: None,
         }
     }
 
@@ -191,6 +204,7 @@ mod tests {
             timeout_secs: 120,
             global_home,
             project_context: Some(project_ctx),
+            memory_overrides: None,
         };
 
         let prompt = build_system_prompt(&config).unwrap();
@@ -216,6 +230,7 @@ mod tests {
             timeout_secs: 120,
             global_home,
             project_context: Some(project_ctx),
+            memory_overrides: None,
         };
 
         let prompt = build_system_prompt(&config).unwrap();
@@ -244,6 +259,7 @@ mod tests {
             timeout_secs: 120,
             global_home,
             project_context: Some(project_ctx),
+            memory_overrides: None,
         };
 
         let prompt = build_system_prompt(&config).unwrap();
@@ -254,5 +270,33 @@ mod tests {
         assert!(identity_pos < task_pos);
         assert!(task_pos < output_pos);
         assert!(!prompt.contains("PM Agent"));
+    }
+
+    #[test]
+    fn build_system_prompt_memory_overrides_replace_file_based_memories() {
+        let tmp = tempfile::tempdir().unwrap();
+        let global_home = tmp.path().join("global");
+
+        // Create a file-based MEMORY.md that should NOT appear when overrides are set.
+        std::fs::create_dir_all(&global_home).unwrap();
+        std::fs::write(global_home.join("MEMORY.md"), "file-based memory").unwrap();
+
+        let config = AgentConfig {
+            name: "pm".to_string(),
+            phase: Phase::Spec,
+            agent_slug: "pm".to_string(),
+            timeout_secs: 120,
+            global_home,
+            project_context: None,
+            memory_overrides: Some(vec![
+                ("global".to_string(), "DB global memory".to_string()),
+                ("project".to_string(), "DB project memory".to_string()),
+            ]),
+        };
+
+        let prompt = build_system_prompt(&config).unwrap();
+        assert!(prompt.contains("DB global memory"));
+        assert!(prompt.contains("DB project memory"));
+        assert!(!prompt.contains("file-based memory"));
     }
 }

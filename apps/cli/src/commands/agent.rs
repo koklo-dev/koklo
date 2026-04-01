@@ -70,6 +70,7 @@ pub(crate) async fn cmd_agent_show(name: &str) -> Result<()> {
         timeout_secs: 0,
         global_home,
         project_context,
+        memory_overrides: None,
     };
 
     let prompt = build_system_prompt(&config)?;
@@ -120,6 +121,7 @@ pub(crate) async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<(
         timeout_secs: 0,
         global_home,
         project_context,
+        memory_overrides: None,
     })?;
 
     println!("Running agent '{}'...\n", name);
