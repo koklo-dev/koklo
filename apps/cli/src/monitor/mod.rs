@@ -11,7 +11,7 @@ use crate::render::model::{
 use crate::render::plain::PlainRenderEngine;
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -39,14 +39,17 @@ use tokio::sync::{broadcast, oneshot};
 
 mod app;
 mod commands;
+pub mod components;
 mod events;
 mod format;
-mod layout;
+pub mod layout;
 mod render;
 mod runtime;
+pub mod screens;
 mod terminal;
 #[cfg(test)]
 mod tests;
+pub mod theme;
 mod transcript;
 mod types;
 
@@ -54,7 +57,7 @@ mod types;
 pub(crate) use self::commands::parse_command_action;
 pub(crate) use self::events::*;
 pub(crate) use self::format::*;
-pub(crate) use self::layout::*;
+pub(crate) use self::layout::{centered_overlay_rect, terminal_layout};
 pub(crate) use self::terminal::*;
 pub(crate) use self::transcript::*;
 pub(crate) use self::types::*;

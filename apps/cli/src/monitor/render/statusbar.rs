@@ -37,7 +37,9 @@ impl MonitorApp {
                     Panel::Sessions => "[q] quit  [Esc] dashboard",
                 },
                 Route::Summary => "[q] quit  [Esc] session  [/] commands",
+                _ => "[q] quit  [↑↓] navigate  [Esc] back  [Ctrl+K] commands",
             },
+            TuiMode::CommandPalette => "[↑↓] select  [Enter] open  [Esc] close",
         };
 
         let live_badge = self.status_badge();
@@ -91,6 +93,7 @@ impl MonitorApp {
             Route::Workspace => "WORKSPACE",
             Route::SessionDetail => "SESSION",
             Route::Summary => "SUMMARY",
+            _ => self.ui.route.badge(),
         };
         if self.ui.route == Route::SessionDetail && pending_count > 0 {
             format!("{route} · waiting {}", pending_count)

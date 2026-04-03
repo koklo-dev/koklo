@@ -192,7 +192,7 @@ impl MonitorApp {
         frame.render_widget(para, area);
     }
 
-    fn session_counts(&self) -> (usize, usize, usize) {
+    pub(crate) fn session_counts(&self) -> (usize, usize, usize) {
         let running = self
             .state
             .sessions

@@ -44,6 +44,7 @@ impl MonitorApp {
                     Route::Workspace => "Type /help, /dashboard or press Enter on a session",
                     Route::SessionDetail => "Type /help, /summary or Esc for dashboard",
                     Route::Summary => "Type /help, /live or Esc for session",
+                    _ => "Type /help or navigate with sidebar",
                 }
             }
         } else {

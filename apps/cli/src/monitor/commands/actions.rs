@@ -15,6 +15,12 @@ impl MonitorApp {
             CommandAction::Refresh => self.handle_refresh_command().await?,
             CommandAction::Summary => self.handle_summary_command().await?,
             CommandAction::Quit => return Ok(true),
+            CommandAction::Navigate(route) => {
+                self.ui.router.navigate(route.clone());
+                self.ui.route = route;
+                self.ui.focus_zone = FocusZone::Main;
+                self.set_feedback("Navigation effectuée.", FeedbackLevel::Success);
+            }
         }
 
         Ok(false)
