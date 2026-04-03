@@ -22,35 +22,52 @@ impl MonitorApp {
 
     pub fn toggle_focus(&mut self) {
         self.ui.focus = match self.ui.route {
-            Route::Dashboard | Route::Workspace => Panel::Sessions,
-            Route::SessionDetail | Route::Summary => match self.ui.focus {
+            Route::Dashboard
+            | Route::Workspace
+            | Route::ProjectHome
+            | Route::ConversationHistory => Panel::Sessions,
+            Route::SessionDetail
+            | Route::Summary
+            | Route::Conversation
+            | Route::ExecutionProgress => match self.ui.focus {
                 Panel::Phases => Panel::Log,
                 _ => Panel::Phases,
             },
+            _ => Panel::Sessions,
         };
     }
 
     pub fn handle_up(&mut self) {
         match self.ui.route {
-            Route::Dashboard | Route::Workspace => self.select_prev(),
-            Route::SessionDetail => match self.ui.focus {
-                Panel::Phases => self.phase_prev(),
-                Panel::Log => self.scroll_log_by(1, 1),
-                Panel::Sessions => self.select_prev(),
-            },
-            Route::Summary => {}
+            Route::Dashboard
+            | Route::Workspace
+            | Route::ProjectHome
+            | Route::ConversationHistory => self.select_prev(),
+            Route::SessionDetail | Route::Conversation | Route::ExecutionProgress => {
+                match self.ui.focus {
+                    Panel::Phases => self.phase_prev(),
+                    Panel::Log => self.scroll_log_by(1, 1),
+                    Panel::Sessions => self.select_prev(),
+                }
+            }
+            _ => {}
         }
     }
 
     pub fn handle_down(&mut self) {
         match self.ui.route {
-            Route::Dashboard | Route::Workspace => self.select_next(),
-            Route::SessionDetail => match self.ui.focus {
-                Panel::Phases => self.phase_next(),
-                Panel::Log => self.scroll_log_toward_live(1),
-                Panel::Sessions => self.select_next(),
-            },
-            Route::Summary => {}
+            Route::Dashboard
+            | Route::Workspace
+            | Route::ProjectHome
+            | Route::ConversationHistory => self.select_next(),
+            Route::SessionDetail | Route::Conversation | Route::ExecutionProgress => {
+                match self.ui.focus {
+                    Panel::Phases => self.phase_next(),
+                    Panel::Log => self.scroll_log_toward_live(1),
+                    Panel::Sessions => self.select_next(),
+                }
+            }
+            _ => {}
         }
     }
 
@@ -80,7 +97,9 @@ impl MonitorApp {
 
     pub(crate) async fn open_selected_session(&mut self) -> Result<()> {
         self.ui.route = Route::SessionDetail;
+        self.ui.router.push(Route::SessionDetail);
         self.ui.focus = Panel::Log;
+        self.ui.focus_zone = FocusZone::Main;
         let (phases, transcript) =
             Self::load_session_data(&self.storage, self.state.selected_session_id.as_deref())
                 .await?;
@@ -97,13 +116,16 @@ impl MonitorApp {
 
     pub(crate) fn go_to_dashboard(&mut self) {
         self.ui.route = Route::Dashboard;
+        self.ui.router.navigate(Route::Dashboard);
         self.ui.focus = Panel::Sessions;
+        self.ui.focus_zone = FocusZone::Main;
         self.state.selected_phase = None;
         self.state.log_scroll = 0;
     }
 
     pub(crate) fn go_to_workspace(&mut self) {
         self.ui.route = Route::Workspace;
+        self.ui.router.push(Route::Workspace);
         self.ui.focus = Panel::Sessions;
         self.state.selected_phase = None;
         self.state.log_scroll = 0;
@@ -111,6 +133,7 @@ impl MonitorApp {
 
     pub(crate) fn go_to_summary(&mut self) {
         self.ui.route = Route::Summary;
+        self.ui.router.push(Route::Summary);
     }
 
     fn phase_prev(&mut self) {

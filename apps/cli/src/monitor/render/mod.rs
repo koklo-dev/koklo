@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub(super) use super::*;
 
 mod command_bar;

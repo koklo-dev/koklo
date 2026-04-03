@@ -89,6 +89,7 @@ pub(crate) fn truncate_left(text: &str, max: usize) -> String {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn truncate_left_offset(text: &str, max: usize) -> usize {
     truncate_left(text, max).chars().count()
 }
@@ -119,6 +120,7 @@ pub(crate) fn detect_project_root() -> Option<String> {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn format_status_line(
     max_width: usize,
     badge: &str,
