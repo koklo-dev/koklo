@@ -16,6 +16,12 @@ impl MonitorApp {
         let last_seq = transcript.last().map(|l| l.seq).unwrap_or(0);
         let current_project_root = detect_project_root();
 
+        let initial_route = if session_filter.is_some() {
+            Route::SessionDetail
+        } else {
+            Route::ProjectHome
+        };
+
         Ok(Self {
             state: MonitorState {
                 sessions,
@@ -35,19 +41,24 @@ impl MonitorApp {
             },
             ui: MonitorUiState {
                 focus: Panel::Sessions,
+                focus_zone: FocusZone::Main,
                 tick_count: 0,
                 running_tokens: 0,
                 running_cost: None,
                 has_subscription_cost: false,
                 mode: TuiMode::Live,
-                route: if session_filter.is_some() {
-                    Route::SessionDetail
-                } else {
-                    Route::Dashboard
-                },
+                route: initial_route.clone(),
+                router: Router::new(initial_route),
+                sidebar_collapsed: false,
                 command_input: String::new(),
                 command_feedback: None,
                 pending_user_input: None,
+                palette_query: String::new(),
+                palette_selected: 0,
+                search_query: String::new(),
+                active_tab: 0,
+                kanban_col: 0,
+                kanban_row: 0,
             },
             runtime: MonitorRuntimeState {
                 event_rx: None,
@@ -60,6 +71,7 @@ impl MonitorApp {
             storage,
         })
     }
+
     pub async fn new_integrated(
         storage: Arc<SessionManager>,
         event_rx: Option<broadcast::Receiver<PipelineEvent>>,
@@ -75,6 +87,7 @@ impl MonitorApp {
             Self::load_session_data(&storage, selected_session_id.as_deref()).await?;
         let last_seq = transcript.last().map(|l| l.seq).unwrap_or(0);
         let current_project_root = detect_project_root();
+
         Ok(Self {
             state: MonitorState {
                 sessions,
@@ -94,15 +107,24 @@ impl MonitorApp {
             },
             ui: MonitorUiState {
                 focus: Panel::Log,
+                focus_zone: FocusZone::Main,
                 tick_count: 0,
                 running_tokens: 0,
                 running_cost: None,
                 has_subscription_cost: false,
                 mode: TuiMode::Live,
                 route: Route::SessionDetail,
+                router: Router::new(Route::SessionDetail),
+                sidebar_collapsed: false,
                 command_input: String::new(),
                 command_feedback: None,
                 pending_user_input: None,
+                palette_query: String::new(),
+                palette_selected: 0,
+                search_query: String::new(),
+                active_tab: 0,
+                kanban_col: 0,
+                kanban_row: 0,
             },
             runtime: MonitorRuntimeState {
                 event_rx,
