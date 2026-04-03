@@ -41,6 +41,17 @@ pub(crate) fn parse_command_action(input: &str) -> Result<Option<CommandAction>>
         "/refresh" | "/reload" => CommandAction::Refresh,
         "/summary" => CommandAction::Summary,
         "/quit" | "/exit" => CommandAction::Quit,
+        // V2 navigation commands
+        "/tickets" | "/tasks" => CommandAction::Navigate(Route::Tasks),
+        "/git" | "/code" => CommandAction::Navigate(Route::CodeGit),
+        "/workflows" => CommandAction::Navigate(Route::Workflows),
+        "/agents" => CommandAction::Navigate(Route::AssistantSelector),
+        "/settings" | "/config" => CommandAction::Navigate(Route::Settings),
+        "/history" => CommandAction::Navigate(Route::ConversationHistory),
+        "/bmad" => CommandAction::Navigate(Route::BmadMode),
+        "/files" => CommandAction::Navigate(Route::FileExplorer),
+        "/results" => CommandAction::Navigate(Route::StructuredResults),
+        "/conversation" | "/chat" => CommandAction::Navigate(Route::Conversation),
         other => anyhow::bail!("Unknown command: {}", other),
     };
 
