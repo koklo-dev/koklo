@@ -39,16 +39,17 @@ fn rejects_unknown_command() {
 
 #[test]
 fn live_waiting_card_title_shows_count() {
-    assert_eq!(live_card_title("WAITING", 3, None), "? WAITING (3)");
+    assert_eq!(live_card_title("WAITING", 3, None), "◌ WAITING (3)");
 }
 
 #[test]
 fn timeline_header_uses_kind_label() {
-    let header = timeline_section_header(RenderBlockKind::Command);
+    let header = timeline_section_header(RenderBlockKind::Command, 3);
     assert!(header
         .spans
         .iter()
-        .any(|span| span.content.contains("COMMANDS")));
+        .any(|span| span.content.contains("commands")));
+    assert!(header.spans.iter().any(|span| span.content.contains("(3)")));
     assert_eq!(block_kind_label(RenderBlockKind::FileChange), "Files");
 }
 
@@ -67,7 +68,7 @@ fn live_card_title_includes_block_label() {
 
     assert_eq!(
         live_card_title("THINKING", 0, Some(&block)),
-        "⋯ THINKING · Reasoning"
+        "● THINKING · Reasoning"
     );
 }
 

@@ -35,7 +35,7 @@ impl TextAccumulator {
                 source_kind: record.kind.clone(),
                 status: Some(record.status.clone()),
                 markdown: false,
-                prefix: "⋯",
+                prefix: "│",
                 item_key: record.item_key.clone(),
                 seq: record.seq,
                 created_at: Some(record.created_at.clone()),
@@ -143,7 +143,7 @@ impl CommandAccumulator {
                 self.output
                     .lines()
                     .filter(|line| !line.is_empty())
-                    .map(|line| format!("│ {}", line)),
+                    .map(|line| format!("  │ {}", line)),
             );
         }
         RenderBlock {

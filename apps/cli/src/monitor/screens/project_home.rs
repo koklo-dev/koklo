@@ -8,10 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::monitor::components::{
-    empty_state::EmptyState,
-    info_card::InfoCard,
-};
+use crate::monitor::components::{empty_state::EmptyState, info_card::InfoCard};
 use crate::monitor::format::{short_id, truncate_path};
 use crate::monitor::layout::terminal_layout;
 use crate::monitor::theme::{colors, icons, styles};
