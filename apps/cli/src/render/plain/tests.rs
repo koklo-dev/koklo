@@ -121,14 +121,14 @@ fn snapshot_codex_live_render() {
     );
 
     let expected = "\
-[00:00:00] ⋯ Inspecting workspace state
+[00:00:00] │ Inspecting workspace state
 [00:00:00] ☰ [ ] inspect files
 [00:00:00] ☰ [x] update renderer
-[00:00:00] ⚙ Read apps/cli/src/monitor.rs
-[00:00:00] ↳ Read loaded file
+[00:00:00] ● Read: apps/cli/src/monitor.rs
+[00:00:00]   → Read loaded file
 [00:00:00] $ cargo test -p koklo-cli
-[00:00:00] │ running tests
-[00:00:00] │ test result: ok
+[00:00:00]   │ running tests
+[00:00:00]   │ test result: ok
 [00:00:00] Δ updated monitor and renderer
 [00:00:00] Δ apps/cli/src/monitor.rs
 [00:00:00] Δ apps/cli/src/render_model.rs
@@ -182,10 +182,10 @@ fn snapshot_claude_live_render() {
     );
 
     let expected = "\
-[00:00:00] ⚙ Read apps/cli/src/monitor.rs
-[00:00:00] ↳ Read loaded file
-[00:00:00] ⚙ Run cargo test -p koklo-cli
-[00:00:00] ↳ Bash completed
+[00:00:00] ● Read: apps/cli/src/monitor.rs
+[00:00:00]   → Read loaded file
+[00:00:00] ● Run: cargo test -p koklo-cli
+[00:00:00]   → Bash completed
 [00:00:00] Δ updated monitor and renderer
 [00:00:00] Δ apps/cli/src/monitor.rs
 [00:00:00] Δ apps/cli/src/render_model.rs

@@ -9,8 +9,6 @@ use crate::monitor::components::{
 };
 use crate::monitor::layout::shell::ShellLayout;
 
-
-
 impl MonitorApp {
     pub fn render(&self, frame: &mut Frame) {
         let area = frame.size();

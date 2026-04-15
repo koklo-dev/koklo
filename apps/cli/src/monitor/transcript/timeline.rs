@@ -45,18 +45,60 @@ pub(crate) fn block_kind_label(kind: RenderBlockKind) -> &'static str {
     }
 }
 
-pub(crate) fn timeline_section_header(kind: RenderBlockKind) -> Line<'static> {
+fn section_icon(kind: RenderBlockKind) -> &'static str {
+    match kind {
+        RenderBlockKind::Assistant => "✦",
+        RenderBlockKind::Reasoning => "◆",
+        RenderBlockKind::Plan => "☰",
+        RenderBlockKind::Tool => "⚙",
+        RenderBlockKind::Command => "$",
+        RenderBlockKind::FileChange => "△",
+        RenderBlockKind::Approval => "⏳",
+        RenderBlockKind::UserInput => "❯",
+        RenderBlockKind::Usage => "◷",
+        RenderBlockKind::Lifecycle => "●",
+        RenderBlockKind::Metadata => "·",
+    }
+}
+
+fn section_color(kind: RenderBlockKind) -> Color {
+    match kind {
+        RenderBlockKind::Assistant => Color::White,
+        RenderBlockKind::Reasoning => Color::Cyan,
+        RenderBlockKind::Plan => Color::Cyan,
+        RenderBlockKind::Tool => Color::Yellow,
+        RenderBlockKind::Command => Color::Yellow,
+        RenderBlockKind::FileChange => Color::Blue,
+        RenderBlockKind::Approval => Color::Magenta,
+        RenderBlockKind::UserInput => Color::Magenta,
+        RenderBlockKind::Usage => Color::DarkGray,
+        RenderBlockKind::Lifecycle => Color::DarkGray,
+        RenderBlockKind::Metadata => Color::DarkGray,
+    }
+}
+
+pub(crate) fn timeline_section_header(kind: RenderBlockKind, count: usize) -> Line<'static> {
+    let icon = section_icon(kind);
+    let color = section_color(kind);
+    let label = block_kind_label(kind).to_lowercase();
+    let count_str = if count > 1 {
+        format!(" ({count})")
+    } else {
+        String::new()
+    };
+
     Line::from(vec![
+        Span::styled(format!("  {icon} "), Style::default().fg(color)),
         Span::styled(
-            format!("── {} ", block_kind_label(kind).to_uppercase()),
+            format!("{label}{count_str} "),
             Style::default()
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            "────────────────────────",
+            "─".repeat(32),
             Style::default()
-                .fg(Color::DarkGray)
+                .fg(Color::Rgb(50, 50, 50))
                 .add_modifier(Modifier::DIM),
         ),
     ])
