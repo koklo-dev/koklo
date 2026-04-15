@@ -165,11 +165,11 @@ pub(crate) fn block_time(block: &RenderBlock) -> String {
 
 pub(crate) fn block_status_label(block: &RenderBlock) -> String {
     match block.status.as_deref() {
-        Some("pending") => "pending".to_string(),
-        Some("streaming") => "streaming".to_string(),
-        Some("completed") | Some("resolved") => "done".to_string(),
-        Some("failed") => "failed".to_string(),
-        Some(other) => other.replace('_', " "),
+        Some("pending") => "● pending".to_string(),
+        Some("streaming") => "● streaming".to_string(),
+        Some("completed") | Some("resolved") => "✓ done".to_string(),
+        Some("failed") => "✗ failed".to_string(),
+        Some(other) => format!("· {}", other.replace('_', " ")),
         None => block_kind_label(block.kind).to_ascii_lowercase(),
     }
 }
@@ -196,11 +196,11 @@ pub(crate) fn live_card_title(
     block: Option<&RenderBlock>,
 ) -> String {
     let icon = match title {
-        "ASSISTANT" => "✦",
-        "THINKING" => "⋯",
-        "ACTIVITY" => "⚙",
-        "WAITING" => "?",
-        _ => "•",
+        "ASSISTANT" => "●",
+        "THINKING" => "●",
+        "ACTIVITY" => "●",
+        "WAITING" => "◌",
+        _ => "●",
     };
     if title == "WAITING" && pending_count > 1 {
         format!("{icon} {title} ({pending_count})")

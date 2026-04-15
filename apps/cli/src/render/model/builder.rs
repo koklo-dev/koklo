@@ -119,7 +119,7 @@ pub(super) fn render_record(record: &TranscriptItemRecord) -> RenderBlock {
             item_key: record.item_key.clone(),
             seq: record.seq,
             created_at: Some(record.created_at.clone()),
-            body: RenderBlockBody::Lines(vec![format!("⚙ {}", format_tool_call(&payload, record))]),
+            body: RenderBlockBody::Lines(vec![format!("● {}", format_tool_call(&payload, record))]),
         },
         "tool_result" => RenderBlock {
             kind: RenderBlockKind::Tool,
@@ -130,7 +130,7 @@ pub(super) fn render_record(record: &TranscriptItemRecord) -> RenderBlock {
             seq: record.seq,
             created_at: Some(record.created_at.clone()),
             body: RenderBlockBody::Lines(vec![format!(
-                "↳ {}",
+                "  → {}",
                 format_tool_result(&payload, record)
             )]),
         },
@@ -270,13 +270,13 @@ pub(super) fn format_tool_call(payload: &Option<Value>, record: &TranscriptItemR
         .unwrap_or("other");
 
     match tool_kind {
-        "read" => format!("Read {}", input_summary),
-        "search" => format!("Search {}", input_summary),
-        "edit" => format!("Edit {}", input_summary),
-        "write" => format!("Write {}", input_summary),
-        "command" => format!("Run {}", input_summary),
-        "user_input" => format!("Ask user {}", input_summary),
-        "mcp" => format!("Call {} {}", tool_name, input_summary),
+        "read" => format!("Read: {}", input_summary),
+        "search" => format!("Search: {}", input_summary),
+        "edit" => format!("Edit: {}", input_summary),
+        "write" => format!("Write: {}", input_summary),
+        "command" => format!("Run: {}", input_summary),
+        "user_input" => format!("Ask user: {}", input_summary),
+        "mcp" => format!("Call {}: {}", tool_name, input_summary),
         _ => {
             if input_summary.is_empty() {
                 format!("Call {}", tool_name)
