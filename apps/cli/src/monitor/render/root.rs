@@ -33,7 +33,7 @@ impl MonitorApp {
         // Breadcrumb (1 line at top of main)
         if main_area.height > 6 {
             let crumbs = self.ui.router.breadcrumbs();
-            let crumb_refs: Vec<&str> = crumbs.iter().map(|s| *s).collect();
+            let crumb_refs: Vec<&str> = crumbs.to_vec();
             let breadcrumb_area = Rect::new(main_area.x, main_area.y, main_area.width, 1);
             Breadcrumb::new(&crumb_refs).render(frame, breadcrumb_area);
 
