@@ -73,7 +73,7 @@ fn format_file_change_summary(summary: &str) -> Vec<String> {
             .enumerate()
             .map(|(idx, line)| {
                 if idx == 0 && !looks_like_diff_line(line) {
-                    format!("● {line}")
+                    format!("● {}", truncate_path(line))
                 } else {
                     line.to_string()
                 }
@@ -139,7 +139,11 @@ fn extract_change_entry_lines(change: &Value) -> Vec<String> {
             .or_else(|| change.get("action"))
             .and_then(Value::as_str)
             .unwrap_or("Update");
-        lines.push(format!("● {}({})", title_case_word(verb), path));
+        lines.push(format!(
+            "● {}({})",
+            title_case_word(verb),
+            truncate_path(path)
+        ));
     }
 
     if let Some(diff) = change
@@ -225,4 +229,34 @@ fn looks_like_diff_line(line: &str) -> bool {
 
 fn looks_like_file_path(line: &str) -> bool {
     line.contains('/') || line.ends_with(".rs") || line.ends_with(".toml") || line.ends_with(".md")
+}
+
+/// Shorten long paths by keeping the last meaningful segments.
+/// `/home/user/.koklo/worktrees/app-very-long-hash/src/Entity/Funding.php`
+/// becomes `…/src/Entity/Funding.php`.
+fn truncate_path(path: &str) -> &str {
+    const MAX_PATH_LEN: usize = 60;
+    if path.len() <= MAX_PATH_LEN {
+        return path;
+    }
+    // Walk backwards through '/' separators to find a short-enough suffix
+    let bytes = path.as_bytes();
+    let mut last_slash = path.len();
+    for i in (0..bytes.len()).rev() {
+        if bytes[i] == b'/' {
+            if path.len() - i < MAX_PATH_LEN {
+                // "…" + suffix fits
+                last_slash = i;
+            } else {
+                break;
+            }
+        }
+    }
+    if last_slash < path.len() {
+        &path[last_slash..]
+    } else {
+        // No good break point — just return the last MAX_PATH_LEN chars
+        let start = path.len().saturating_sub(MAX_PATH_LEN - 1);
+        &path[start..]
+    }
 }

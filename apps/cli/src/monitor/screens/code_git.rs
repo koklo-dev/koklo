@@ -10,10 +10,7 @@ use ratatui::{
 
 use crate::monitor::components::{card, empty_state::EmptyState};
 use crate::monitor::format::{session_branch_label, short_id, truncate_path};
-use crate::monitor::theme::{
-    colors, icons,
-    styles,
-};
+use crate::monitor::theme::{colors, icons, styles};
 use crate::monitor::types::MonitorApp;
 
 impl MonitorApp {

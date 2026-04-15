@@ -49,7 +49,7 @@ fn renders_tool_call_from_canonical_payload() {
     assert_eq!(model.blocks.len(), 1);
     assert!(matches!(
         &model.blocks[0].body,
-        RenderBlockBody::Lines(lines) if lines == &vec!["⚙ Read Cargo.toml".to_string()]
+        RenderBlockBody::Lines(lines) if lines == &vec!["● Read: Cargo.toml".to_string()]
     ));
 }
 
@@ -84,8 +84,8 @@ fn merges_command_updates_by_item_key() {
         RenderBlockBody::Lines(lines)
             if lines == &vec![
                 "$ cargo test".to_string(),
-                "│ line 1".to_string(),
-                "│ line 2".to_string(),
+                "  │ line 1".to_string(),
+                "  │ line 2".to_string(),
             ]
     ));
 }
