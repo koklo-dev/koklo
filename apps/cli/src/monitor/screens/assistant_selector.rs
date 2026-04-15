@@ -117,8 +117,7 @@ impl MonitorApp {
     ) {
         let items: Vec<ListItem> = agents
             .iter()
-            .enumerate()
-            .map(|(_i, agent)| {
+            .map(|agent| {
                 let style = Style::default().fg(colors::TEXT_SECONDARY);
                 ListItem::new(vec![
                     Line::from(vec![
