@@ -10,6 +10,7 @@ use koklo_providers::{
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio::time::{sleep, Duration};
 
 fn test_config(slug: &str) -> AgentConfig {
     AgentConfig {
@@ -94,6 +95,82 @@ struct NativeApprovalProvider {
 struct NativeApprovalSession {
     approvals: Arc<Mutex<Vec<ProviderApprovalPayload>>>,
     events: Vec<ProviderSessionEvent>,
+}
+
+struct HangingSession;
+
+#[async_trait]
+impl ProviderSession for HangingSession {
+    async fn next_event(&mut self) -> Result<ProviderSessionEvent> {
+        sleep(Duration::from_millis(200)).await;
+        Ok(ProviderSessionEvent::Finished {
+            output: String::new(),
+            usage: koklo_events::CompletionUsage::default(),
+        })
+    }
+}
+
+struct SlowStartProvider;
+
+#[async_trait]
+impl LlmProvider for SlowStartProvider {
+    async fn start_session(
+        self: Arc<Self>,
+        _messages: Vec<Message>,
+    ) -> Result<Box<dyn ProviderSession>> {
+        sleep(Duration::from_millis(200)).await;
+        Ok(Box::new(HangingSession))
+    }
+
+    async fn complete_stream(
+        &self,
+        _messages: Vec<Message>,
+        _on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
+    ) -> Result<(String, koklo_events::CompletionUsage)> {
+        anyhow::bail!("complete_stream should not be used in this test")
+    }
+
+    fn capabilities(&self) -> koklo_providers::ProviderCapabilities {
+        koklo_providers::ProviderCapabilities {
+            user_input_native: true,
+            ..Default::default()
+        }
+    }
+
+    fn provider_name(&self) -> &str {
+        "slow-start"
+    }
+}
+
+struct NoFirstEventProvider;
+
+#[async_trait]
+impl LlmProvider for NoFirstEventProvider {
+    async fn start_session(
+        self: Arc<Self>,
+        _messages: Vec<Message>,
+    ) -> Result<Box<dyn ProviderSession>> {
+        Ok(Box::new(HangingSession))
+    }
+
+    async fn complete_stream(
+        &self,
+        _messages: Vec<Message>,
+        _on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
+    ) -> Result<(String, koklo_events::CompletionUsage)> {
+        anyhow::bail!("complete_stream should not be used in this test")
+    }
+
+    fn capabilities(&self) -> koklo_providers::ProviderCapabilities {
+        koklo_providers::ProviderCapabilities {
+            user_input_native: true,
+            ..Default::default()
+        }
+    }
+
+    fn provider_name(&self) -> &str {
+        "no-first-event"
+    }
 }
 
 #[async_trait]
@@ -220,6 +297,56 @@ async fn agent_runner_resolves_native_provider_approval() {
         approvals[0].decision,
         ProviderApprovalDecision::Approve
     ));
+}
+
+#[tokio::test]
+async fn agent_runner_times_out_on_slow_provider_start() {
+    std::env::set_var("KOKLO_PROVIDER_START_TIMEOUT_MS", "50");
+
+    let runner = AgentRunner::new(
+        test_config("pm"),
+        Arc::new(SlowStartProvider),
+        EventBus::new(32),
+        Arc::new(RecordingApprovalHandler),
+        Arc::new(RecordingInputHandler {
+            answers: vec![],
+            seen_questions: Mutex::new(Vec::new()),
+        }),
+    );
+
+    let error = runner
+        .run("session-timeout-start", "Need implementation")
+        .await
+        .err()
+        .expect("expected timeout");
+    assert!(error.to_string().contains("start_session timed out"));
+
+    std::env::remove_var("KOKLO_PROVIDER_START_TIMEOUT_MS");
+}
+
+#[tokio::test]
+async fn agent_runner_times_out_when_provider_never_emits_first_event() {
+    std::env::set_var("KOKLO_PROVIDER_FIRST_EVENT_TIMEOUT_MS", "50");
+
+    let runner = AgentRunner::new(
+        test_config("pm"),
+        Arc::new(NoFirstEventProvider),
+        EventBus::new(32),
+        Arc::new(RecordingApprovalHandler),
+        Arc::new(RecordingInputHandler {
+            answers: vec![],
+            seen_questions: Mutex::new(Vec::new()),
+        }),
+    );
+
+    let error = runner
+        .run("session-timeout-first-event", "Need implementation")
+        .await
+        .err()
+        .expect("expected timeout");
+    assert!(error.to_string().contains("first-event timeout"));
+
+    std::env::remove_var("KOKLO_PROVIDER_FIRST_EVENT_TIMEOUT_MS");
 }
 
 #[test]
