@@ -122,6 +122,16 @@ impl GateHandler for StdinGateHandler {
     }
 }
 
+/// AutoApproveGateHandler: approves every phase gate. Used for non-interactive benchmark runs.
+pub struct AutoApproveGateHandler;
+
+#[async_trait]
+impl GateHandler for AutoApproveGateHandler {
+    async fn handle(&self, _display: GateDisplay) -> Result<GateResponse> {
+        Ok(GateResponse::Approve)
+    }
+}
+
 /// TuiGateHandler: deposits request in GateChannel, awaits TUI response.
 pub struct TuiGateHandler {
     channel: GateChannel,
@@ -273,7 +283,11 @@ impl PipelineConfig {
         let Some(workspace_root) = workspace_root else {
             return provider;
         };
-        let sandbox = self.make_phase_sandbox(agent_name, phase, workspace_root);
+        let sandbox = if self.should_wrap_native_cli_provider(provider.provider_name()) {
+            self.make_phase_sandbox(agent_name, phase, workspace_root)
+        } else {
+            None
+        };
 
         match provider.provider_name() {
             "claude-code-cli" => match match sandbox {
@@ -397,12 +411,51 @@ impl PipelineConfig {
                 controlled: false,
             })
     }
+
+    fn should_disable_git_worktree(&self) -> bool {
+        if env_flag("KOKLO_FORCE_GIT_WORKTREE") {
+            return false;
+        }
+        if env_flag("KOKLO_DISABLE_GIT_WORKTREE") {
+            return true;
+        }
+        if self.default_provider.provider_name() == "codex-cli" {
+            return true;
+        }
+        self.agent_providers
+            .values()
+            .any(|provider| provider.provider_name() == "codex-cli")
+    }
+
+    fn should_wrap_native_cli_provider(&self, provider_name: &str) -> bool {
+        if env_flag("KOKLO_WRAP_NATIVE_CLI_PROVIDER_SANDBOX") {
+            return true;
+        }
+        !matches!(provider_name, "codex-cli" | "claude-code-cli")
+    }
 }
 
 #[derive(Debug, Clone)]
 struct SessionWorkspace {
     root: PathBuf,
     branch: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct TokenBudget {
+    soft: Option<u64>,
+    hard: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct TokenBudgetConfig {
+    session: TokenBudget,
+    phase: TokenBudget,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct PromptBudgetMode {
+    compact_context: bool,
 }
 
 /// The main pipeline orchestrator.
@@ -652,6 +705,9 @@ impl PipelineOrchestrator {
                 continue;
             }
 
+            self.enforce_session_token_budget(&session.id, *phase).await?;
+            self.enforce_phase_token_budget(&session.id, *phase).await?;
+
             let phase_outcome = match self.run_phase(session, *phase, agent_name).await {
                 Ok(result) => result,
                 Err(e) => {
@@ -713,6 +769,236 @@ impl PipelineOrchestrator {
         }
 
         Ok(true)
+    }
+
+    async fn enforce_session_token_budget(&self, session_id: &str, next_phase: Phase) -> Result<()> {
+        let budget = token_budget_from_env().session;
+        if budget.soft.is_none() && budget.hard.is_none() {
+            return Ok(());
+        }
+
+        let usage = self.storage.get_session_usage_summary(session_id).await?;
+        let total_tokens =
+            (usage.total_prompt_tokens.max(0) + usage.total_completion_tokens.max(0)) as u64;
+
+        match evaluate_token_budget(total_tokens, budget) {
+            TokenBudgetStatus::WithinBudget => Ok(()),
+            TokenBudgetStatus::SoftExceeded { soft } => {
+                self.emit_transcript(
+                    TranscriptItem::new(
+                        session_id.to_string(),
+                        Some(next_phase),
+                        None,
+                        TranscriptSource::System,
+                        TranscriptItemKind::Usage,
+                        TranscriptItemStatus::Info,
+                        format!(
+                            "token budget warning before {}: {} tokens used (soft cap {})",
+                            next_phase, total_tokens, soft
+                        ),
+                    )
+                    .with_payload(json!({
+                        "budget_scope": "session",
+                        "budget_kind": "soft",
+                        "soft_limit": soft,
+                        "total_tokens": total_tokens,
+                        "next_phase": next_phase.to_string(),
+                    })),
+                );
+                Ok(())
+            }
+            TokenBudgetStatus::HardExceeded { hard } => {
+                self.emit_transcript(
+                    TranscriptItem::new(
+                        session_id.to_string(),
+                        Some(next_phase),
+                        None,
+                        TranscriptSource::System,
+                        TranscriptItemKind::Usage,
+                        TranscriptItemStatus::Failed,
+                        format!(
+                            "token budget exceeded before {}: {} tokens used (hard cap {})",
+                            next_phase, total_tokens, hard
+                        ),
+                    )
+                    .with_payload(json!({
+                        "budget_scope": "session",
+                        "budget_kind": "hard",
+                        "hard_limit": hard,
+                        "total_tokens": total_tokens,
+                        "next_phase": next_phase.to_string(),
+                    })),
+                );
+                anyhow::bail!(
+                    "Session token hard budget exceeded before phase '{}': {} >= {}",
+                    next_phase,
+                    total_tokens,
+                    hard
+                )
+            }
+        }
+    }
+
+    async fn phase_token_total(&self, session_id: &str, phase: Phase) -> Result<u64> {
+        let usage = self.storage.get_session_usage_summary(session_id).await?;
+        Ok(usage
+            .phases
+            .iter()
+            .find(|entry| entry.phase == phase.to_string())
+            .map(|entry| (entry.prompt_tokens.max(0) + entry.completion_tokens.max(0)) as u64)
+            .unwrap_or(0))
+    }
+
+    async fn prompt_budget_mode(&self, session_id: &str, phase: Phase) -> Result<PromptBudgetMode> {
+        let budgets = token_budget_from_env();
+        if budgets.session.soft.is_none()
+            && budgets.session.hard.is_none()
+            && budgets.phase.soft.is_none()
+            && budgets.phase.hard.is_none()
+        {
+            return Ok(PromptBudgetMode::default());
+        }
+
+        let usage = self.storage.get_session_usage_summary(session_id).await?;
+        let session_tokens =
+            (usage.total_prompt_tokens.max(0) + usage.total_completion_tokens.max(0)) as u64;
+        let phase_tokens = usage
+            .phases
+            .iter()
+            .find(|entry| entry.phase == phase.to_string())
+            .map(|entry| (entry.prompt_tokens.max(0) + entry.completion_tokens.max(0)) as u64)
+            .unwrap_or(0);
+
+        Ok(prompt_budget_mode_from_usage(
+            session_tokens,
+            phase_tokens,
+            budgets,
+        ))
+    }
+
+    async fn report_phase_budget_status(&self, session_id: &str, phase: Phase) -> Result<()> {
+        let budget = token_budget_from_env().phase;
+        if budget.soft.is_none() && budget.hard.is_none() {
+            return Ok(());
+        }
+
+        let phase_tokens = self.phase_token_total(session_id, phase).await?;
+        match evaluate_token_budget(phase_tokens, budget) {
+            TokenBudgetStatus::WithinBudget => Ok(()),
+            TokenBudgetStatus::SoftExceeded { soft } => {
+                self.emit_transcript(
+                    TranscriptItem::new(
+                        session_id.to_string(),
+                        Some(phase),
+                        None,
+                        TranscriptSource::System,
+                        TranscriptItemKind::Usage,
+                        TranscriptItemStatus::Info,
+                        format!(
+                            "phase token budget warning after {}: {} tokens used in phase (soft cap {})",
+                            phase, phase_tokens, soft
+                        ),
+                    )
+                    .with_payload(json!({
+                        "budget_scope": "phase",
+                        "budget_kind": "soft",
+                        "soft_limit": soft,
+                        "phase_tokens": phase_tokens,
+                        "phase": phase.to_string(),
+                    })),
+                );
+                Ok(())
+            }
+            TokenBudgetStatus::HardExceeded { hard } => {
+                self.emit_transcript(
+                    TranscriptItem::new(
+                        session_id.to_string(),
+                        Some(phase),
+                        None,
+                        TranscriptSource::System,
+                        TranscriptItemKind::Usage,
+                        TranscriptItemStatus::Failed,
+                        format!(
+                            "phase token budget exceeded after {}: {} tokens used in phase (hard cap {})",
+                            phase, phase_tokens, hard
+                        ),
+                    )
+                    .with_payload(json!({
+                        "budget_scope": "phase",
+                        "budget_kind": "hard",
+                        "hard_limit": hard,
+                        "phase_tokens": phase_tokens,
+                        "phase": phase.to_string(),
+                    })),
+                );
+                Ok(())
+            }
+        }
+    }
+
+    async fn enforce_phase_token_budget(&self, session_id: &str, phase: Phase) -> Result<()> {
+        let budget = token_budget_from_env().phase;
+        if budget.soft.is_none() && budget.hard.is_none() {
+            return Ok(());
+        }
+
+        let phase_tokens = self.phase_token_total(session_id, phase).await?;
+        match evaluate_token_budget(phase_tokens, budget) {
+            TokenBudgetStatus::WithinBudget => Ok(()),
+            TokenBudgetStatus::SoftExceeded { soft } => {
+                self.emit_transcript(
+                    TranscriptItem::new(
+                        session_id.to_string(),
+                        Some(phase),
+                        None,
+                        TranscriptSource::System,
+                        TranscriptItemKind::Usage,
+                        TranscriptItemStatus::Info,
+                        format!(
+                            "phase token budget warning before {}: {} tokens already used in phase (soft cap {})",
+                            phase, phase_tokens, soft
+                        ),
+                    )
+                    .with_payload(json!({
+                        "budget_scope": "phase",
+                        "budget_kind": "soft",
+                        "soft_limit": soft,
+                        "phase_tokens": phase_tokens,
+                        "phase": phase.to_string(),
+                    })),
+                );
+                Ok(())
+            }
+            TokenBudgetStatus::HardExceeded { hard } => {
+                self.emit_transcript(
+                    TranscriptItem::new(
+                        session_id.to_string(),
+                        Some(phase),
+                        None,
+                        TranscriptSource::System,
+                        TranscriptItemKind::Usage,
+                        TranscriptItemStatus::Failed,
+                        format!(
+                            "phase token budget exceeded before {}: {} tokens already used in phase (hard cap {})",
+                            phase, phase_tokens, hard
+                        ),
+                    )
+                    .with_payload(json!({
+                        "budget_scope": "phase",
+                        "budget_kind": "hard",
+                        "hard_limit": hard,
+                        "phase_tokens": phase_tokens,
+                        "phase": phase.to_string(),
+                    })),
+                );
+                anyhow::bail!(
+                    "Phase token hard budget exceeded before phase '{}': {} >= {}",
+                    phase,
+                    phase_tokens,
+                    hard
+                )
+            }
+        }
     }
 
     async fn run_phase(
@@ -792,13 +1078,19 @@ impl PipelineOrchestrator {
             )
             .with_payload(json!({ "phase": phase.to_string(), "agent": agent_name })),
         );
-        let AgentRunResult { output, usage } = runner.run(&session.id, &prompt).await?;
+        let AgentRunResult {
+            output,
+            usage,
+            metrics,
+        } = runner.run(&session.id, &prompt).await?;
 
         let artifact_path = self.resolve_artifact_path(&workspace_root, &session.id, phase);
+        let handoff_path = self.resolve_handoff_artifact_path(&workspace_root, &session.id, phase);
         if let Some(parent) = artifact_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
         tokio::fs::write(&artifact_path, &output).await?;
+        tokio::fs::write(&handoff_path, build_handoff_artifact(phase, agent_name, &output)).await?;
 
         // Record artifact in the database.
         let size_bytes = output.len() as i64;
@@ -837,6 +1129,8 @@ impl PipelineOrchestrator {
             })
             .await?;
 
+        self.report_phase_budget_status(&session.id, phase).await?;
+
         // Record full output for FTS search
         self.storage
             .record_agent_output(&session.id, &phase.to_string(), agent_name, &output)
@@ -871,6 +1165,13 @@ impl PipelineOrchestrator {
                 "model": provider.model_name(),
                 "prompt_tokens": usage.prompt_tokens,
                 "completion_tokens": usage.completion_tokens,
+                "system_prompt_chars": metrics.system_prompt_chars,
+                "system_prompt_tokens_estimate": metrics.system_prompt_tokens_estimate,
+                "system_prompt_cache_hit": metrics.system_prompt_cache_hit,
+                "system_prompt_build_ms": metrics.system_prompt_build_ms,
+                "phase_prompt_chars": metrics.user_prompt_chars,
+                "phase_prompt_tokens_estimate": metrics.user_prompt_tokens_estimate,
+                "turn_count": metrics.total_turns,
                 "cost": cost,
                 "capabilities": {
                     "streaming_text": provider.capabilities().streaming_text,
@@ -1109,8 +1410,9 @@ impl PipelineOrchestrator {
     ) -> Result<String> {
         let output_artifact = self.resolve_artifact_path(workspace_root, &session.id, phase);
         let artifacts = self.storage.list_artifacts(&session.id).await?;
+        let budget_mode = self.prompt_budget_mode(&session.id, phase).await?;
 
-        let ordered_prior_artifacts = phases_for_preset(self.config.preset)
+        let mut ordered_prior_artifacts = phases_for_preset(self.config.preset)
             .into_iter()
             .take_while(|(candidate, _)| *candidate != phase)
             .filter_map(|(candidate, _)| {
@@ -1118,9 +1420,23 @@ impl PipelineOrchestrator {
                 artifacts
                     .iter()
                     .find(|artifact| artifact.phase == phase_name)
-                    .map(|artifact| (phase_name, artifact.path.clone()))
+                    .map(|artifact| {
+                        let handoff_path =
+                            self.resolve_handoff_artifact_path(workspace_root, &session.id, candidate);
+                        let preferred_path = if handoff_path.exists() {
+                            handoff_path.to_string_lossy().into_owned()
+                        } else {
+                            artifact.path.clone()
+                        };
+                        (phase_name, preferred_path)
+                    })
             })
             .collect::<Vec<_>>();
+
+        if budget_mode.compact_context && ordered_prior_artifacts.len() > 2 {
+            let keep_from = ordered_prior_artifacts.len() - 2;
+            ordered_prior_artifacts = ordered_prior_artifacts.split_off(keep_from);
+        }
 
         let mut prompt = format!(
             "Feature: {}\nSession: {}\nPhase: {}\nAgent: {}\nWorkspace: {}\nOutput artifact: {}",
@@ -1135,12 +1451,23 @@ impl PipelineOrchestrator {
         if ordered_prior_artifacts.is_empty() {
             prompt.push_str("\nAvailable prior artifacts: none yet.");
         } else {
-            prompt.push_str("\nAvailable prior artifacts:");
+            prompt.push_str("\nAvailable prior handoff artifacts:");
             for (prior_phase, path) in ordered_prior_artifacts {
                 prompt.push_str(&format!("\n- {}: {}", prior_phase, path));
             }
             prompt.push_str(
-                "\nRead the relevant prior artifacts before acting. Respect your role boundaries from the system prompt.",
+                "\nPrefer the compact handoff artifact first. Only open the full artifact when the handoff is insufficient. Respect your role boundaries from the system prompt.",
+            );
+        }
+
+        if let Some(contract) = phase_output_contract(phase, agent_name) {
+            prompt.push_str("\nRequired output shape:");
+            prompt.push_str(contract);
+        }
+
+        if budget_mode.compact_context {
+            prompt.push_str(
+                "\nBudget mode: compact.\n- Start from the listed handoff artifacts only.\n- Re-read full artifacts only when strictly required.\n- Keep the output concise and action-oriented.\n- Avoid broad exploration, repeated summaries, and unnecessary restatements.",
             );
         }
 
@@ -1161,11 +1488,33 @@ impl PipelineOrchestrator {
         base.join(format!("{}-{}.md", session_id, phase))
     }
 
+    fn resolve_handoff_artifact_path(
+        &self,
+        workspace_root: &Path,
+        session_id: &str,
+        phase: Phase,
+    ) -> PathBuf {
+        let base = if self.config.artifacts_dir.is_absolute() {
+            self.config.artifacts_dir.clone()
+        } else {
+            workspace_root.join(&self.config.artifacts_dir)
+        };
+        base.join(format!("{}-{}-handoff.md", session_id, phase))
+    }
+
     fn create_git_workspace(
         &self,
         session_id: &str,
         project_path: &Path,
     ) -> Result<Option<SessionWorkspace>> {
+        if self.config.should_disable_git_worktree() {
+            tracing::info!(
+                "Skipping dedicated git worktree for session {} because git worktree isolation is disabled for this provider mix",
+                session_id
+            );
+            return Ok(None);
+        }
+
         let Some(repo_root) = self.git_repo_root(project_path)? else {
             return Ok(None);
         };
@@ -1389,6 +1738,115 @@ fn sanitize_workspace_component(value: &str) -> String {
     out.trim_matches('-').to_string()
 }
 
+fn build_handoff_artifact(phase: Phase, agent_name: &str, output: &str) -> String {
+    let excerpt = compact_handoff_excerpt(output, 40, 2200);
+    format!(
+        "# {} handoff\n\nagent: {}\nsummary: compact handoff generated from full artifact\n\n{}",
+        phase, agent_name, excerpt
+    )
+}
+
+fn compact_handoff_excerpt(output: &str, max_lines: usize, max_chars: usize) -> String {
+    let mut selected = Vec::new();
+    for line in output.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.is_empty() {
+            continue;
+        }
+        selected.push(trimmed.to_string());
+        if selected.len() >= max_lines {
+            selected.push("…".to_string());
+            break;
+        }
+    }
+    let joined = selected.join("\n");
+    if joined.chars().count() > max_chars {
+        let truncated = joined.chars().take(max_chars).collect::<String>();
+        format!("{truncated}\n…")
+    } else {
+        joined
+    }
+}
+
+fn phase_output_contract(phase: Phase, agent_name: &str) -> Option<&'static str> {
+    match (phase, agent_name) {
+        (Phase::Spec, "pm") => Some(
+            "\n- Use exactly these sections in order: Problem, Scope, Non-goals, Constraints, Acceptance Criteria, Risks, Handoff Notes.\n- Keep each section short and concrete.\n- Acceptance Criteria must be a flat bullet list.\n- Prefer explicit facts and decisions over narrative explanation.\n- If evidence is missing, say it in Risks or Handoff Notes instead of expanding the spec.",
+        ),
+        (Phase::Plan, "architect") => Some(
+            "\n- Use exactly these sections in order: Decision, Touched Areas, Plan, Edge Cases, Validation, Risks.\n- Plan must be an ordered list with the minimum steps needed.\n- Touched Areas must name files, modules, APIs, or schemas when known.\n- Keep tradeoff discussion inside Decision or Risks; do not add a broad essay.",
+        ),
+        (Phase::Review, "reviewer") => Some(
+            "\n- Start with Findings.\n- If there are findings, list them by severity with concrete file or behavior references.\n- Then use exactly these trailing sections when needed: Readiness, Missing Evidence, Follow-ups.\n- If there are no findings, say so explicitly in Findings and keep the rest brief.\n- Do not rewrite the implementation summary unless it is needed to explain a defect.",
+        ),
+        _ => None,
+    }
+}
+
+fn token_budget_from_env() -> TokenBudgetConfig {
+    TokenBudgetConfig {
+        session: TokenBudget {
+            soft: parse_budget_env("KOKLO_TOKEN_BUDGET_SOFT"),
+            hard: parse_budget_env("KOKLO_TOKEN_BUDGET_HARD"),
+        },
+        phase: TokenBudget {
+            soft: parse_budget_env("KOKLO_TOKEN_BUDGET_PHASE_SOFT"),
+            hard: parse_budget_env("KOKLO_TOKEN_BUDGET_PHASE_HARD"),
+        },
+    }
+}
+
+fn parse_budget_env(name: &str) -> Option<u64> {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+}
+
+fn env_flag(name: &str) -> bool {
+    matches!(
+        std::env::var(name).ok().as_deref(),
+        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES") | Some("on") | Some("ON")
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TokenBudgetStatus {
+    WithinBudget,
+    SoftExceeded { soft: u64 },
+    HardExceeded { hard: u64 },
+}
+
+fn evaluate_token_budget(total_tokens: u64, budget: TokenBudget) -> TokenBudgetStatus {
+    if let Some(hard) = budget.hard {
+        if total_tokens >= hard {
+            return TokenBudgetStatus::HardExceeded { hard };
+        }
+    }
+    if let Some(soft) = budget.soft {
+        if total_tokens >= soft {
+            return TokenBudgetStatus::SoftExceeded { soft };
+        }
+    }
+    TokenBudgetStatus::WithinBudget
+}
+
+fn prompt_budget_mode_from_usage(
+    session_tokens: u64,
+    phase_tokens: u64,
+    budgets: TokenBudgetConfig,
+) -> PromptBudgetMode {
+    PromptBudgetMode {
+        compact_context: matches!(
+            evaluate_token_budget(session_tokens, budgets.session),
+            TokenBudgetStatus::SoftExceeded { .. } | TokenBudgetStatus::HardExceeded { .. }
+        ) || matches!(
+            evaluate_token_budget(phase_tokens, budgets.phase),
+            TokenBudgetStatus::SoftExceeded { .. } | TokenBudgetStatus::HardExceeded { .. }
+        ),
+    }
+}
+
 fn render_git_error(output: &std::process::Output) -> String {
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     if !stderr.is_empty() {
@@ -1598,6 +2056,22 @@ mod tests {
         assert_eq!(p.provider_name(), "ollama");
     }
 
+    #[tokio::test]
+    async fn test_auto_approve_gate_handler_always_approves() {
+        let response = AutoApproveGateHandler
+            .handle(GateDisplay {
+                phase: Phase::Spec,
+                session_id: "session-123".to_string(),
+                description: "approve".to_string(),
+                usage: None,
+                cost: None,
+                allow_edit: false,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(response, GateResponse::Approve));
+    }
+
     #[test]
     fn test_resolve_provider_agent_toml_override() {
         let default: Arc<dyn LlmProvider> = Arc::new(OllamaProvider::new(
@@ -1658,6 +2132,38 @@ mod tests {
     }
 
     #[test]
+    fn test_should_disable_git_worktree_for_codex_provider() {
+        std::env::remove_var("KOKLO_DISABLE_GIT_WORKTREE");
+        std::env::remove_var("KOKLO_FORCE_GIT_WORKTREE");
+        let default: Arc<dyn LlmProvider> =
+            Arc::new(RecordingProvider::new("codex-cli", Some("test-model"), "ok"));
+        let cfg = make_test_config(default, HashMap::new());
+        assert!(cfg.should_disable_git_worktree());
+    }
+
+    #[test]
+    fn test_force_git_worktree_overrides_codex_disable() {
+        std::env::remove_var("KOKLO_DISABLE_GIT_WORKTREE");
+        std::env::set_var("KOKLO_FORCE_GIT_WORKTREE", "1");
+        let default: Arc<dyn LlmProvider> =
+            Arc::new(RecordingProvider::new("codex-cli", Some("test-model"), "ok"));
+        let cfg = make_test_config(default, HashMap::new());
+        assert!(!cfg.should_disable_git_worktree());
+        std::env::remove_var("KOKLO_FORCE_GIT_WORKTREE");
+    }
+
+    #[test]
+    fn test_native_cli_providers_do_not_wrap_external_sandbox_by_default() {
+        std::env::remove_var("KOKLO_WRAP_NATIVE_CLI_PROVIDER_SANDBOX");
+        let default: Arc<dyn LlmProvider> =
+            Arc::new(RecordingProvider::new("codex-cli", Some("test-model"), "ok"));
+        let cfg = make_test_config(default, HashMap::new());
+        assert!(!cfg.should_wrap_native_cli_provider("codex-cli"));
+        assert!(!cfg.should_wrap_native_cli_provider("claude-code-cli"));
+        assert!(cfg.should_wrap_native_cli_provider("openrouter"));
+    }
+
+    #[test]
     fn test_default_sandbox_mode_by_phase() {
         assert_eq!(
             default_sandbox_mode_for_phase(Phase::Spec),
@@ -1708,6 +2214,115 @@ mod tests {
         let directive = cfg.agent_sandbox_directive("developer");
         assert_eq!(directive.mode, Some(SandboxMode::ReadOnly));
         assert!(!directive.controlled);
+    }
+
+    #[test]
+    fn test_evaluate_token_budget_prefers_hard_limit() {
+        let status = evaluate_token_budget(
+            1200,
+            TokenBudget {
+                soft: Some(800),
+                hard: Some(1000),
+            },
+        );
+        assert_eq!(status, TokenBudgetStatus::HardExceeded { hard: 1000 });
+    }
+
+    #[test]
+    fn test_evaluate_token_budget_warns_on_soft_limit() {
+        let status = evaluate_token_budget(
+            900,
+            TokenBudget {
+                soft: Some(800),
+                hard: Some(1000),
+            },
+        );
+        assert_eq!(status, TokenBudgetStatus::SoftExceeded { soft: 800 });
+    }
+
+    #[test]
+    fn test_evaluate_token_budget_allows_within_budget() {
+        let status = evaluate_token_budget(
+            500,
+            TokenBudget {
+                soft: Some(800),
+                hard: Some(1000),
+            },
+        );
+        assert_eq!(status, TokenBudgetStatus::WithinBudget);
+    }
+
+    #[test]
+    fn test_token_budget_from_env_reads_session_and_phase_limits() {
+        std::env::set_var("KOKLO_TOKEN_BUDGET_SOFT", "1200");
+        std::env::set_var("KOKLO_TOKEN_BUDGET_HARD", "1800");
+        std::env::set_var("KOKLO_TOKEN_BUDGET_PHASE_SOFT", "400");
+        std::env::set_var("KOKLO_TOKEN_BUDGET_PHASE_HARD", "700");
+
+        let budget = token_budget_from_env();
+        assert_eq!(
+            budget,
+            TokenBudgetConfig {
+                session: TokenBudget {
+                    soft: Some(1200),
+                    hard: Some(1800),
+                },
+                phase: TokenBudget {
+                    soft: Some(400),
+                    hard: Some(700),
+                },
+            }
+        );
+
+        std::env::remove_var("KOKLO_TOKEN_BUDGET_SOFT");
+        std::env::remove_var("KOKLO_TOKEN_BUDGET_HARD");
+        std::env::remove_var("KOKLO_TOKEN_BUDGET_PHASE_SOFT");
+        std::env::remove_var("KOKLO_TOKEN_BUDGET_PHASE_HARD");
+    }
+
+    #[test]
+    fn test_prompt_budget_mode_uses_soft_budget_constraints() {
+        let mode = prompt_budget_mode_from_usage(
+            1200,
+            0,
+            TokenBudgetConfig {
+                session: TokenBudget {
+                    soft: Some(1000),
+                    hard: Some(2000),
+                },
+                phase: TokenBudget::default(),
+            },
+        );
+        assert!(mode.compact_context);
+
+        let mode = prompt_budget_mode_from_usage(
+            100,
+            450,
+            TokenBudgetConfig {
+                session: TokenBudget::default(),
+                phase: TokenBudget {
+                    soft: Some(400),
+                    hard: Some(800),
+                },
+            },
+        );
+        assert!(mode.compact_context);
+
+        let mode = prompt_budget_mode_from_usage(
+            100,
+            200,
+            TokenBudgetConfig {
+                session: TokenBudget {
+                    soft: Some(1000),
+                    hard: Some(2000),
+                },
+                phase: TokenBudget {
+                    soft: Some(400),
+                    hard: Some(800),
+                },
+            },
+        );
+        assert!(!mode.compact_context);
     }
 
     #[tokio::test]
@@ -1868,11 +2483,40 @@ mod tests {
 
         let messages = provider_handle.recorded_messages();
         assert_eq!(messages.len(), 2);
-        assert!(messages[1].content.contains("Available prior artifacts:"));
+        assert!(messages[1].content.contains("Available prior handoff artifacts:"));
         assert!(messages[1]
             .content
             .contains(spec_artifact.to_string_lossy().as_ref()));
         assert!(messages[1].content.contains("Output artifact:"));
+        assert!(!messages[1].content.contains("Required output shape:"));
+    }
+
+
+    #[test]
+    fn test_build_handoff_artifact_is_compact() {
+        let output = (1..=100)
+            .map(|idx| format!("line {idx}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let handoff = build_handoff_artifact(Phase::Spec, "pm", &output);
+        assert!(handoff.contains("# spec handoff"));
+        assert!(handoff.contains("agent: pm"));
+        assert!(handoff.chars().count() < output.chars().count());
+    }
+
+    #[test]
+    fn test_phase_output_contracts_cover_deterministic_agents() {
+        let pm = phase_output_contract(Phase::Spec, "pm").unwrap();
+        assert!(pm.contains("Problem, Scope, Non-goals"));
+        assert!(pm.contains("Acceptance Criteria"));
+
+        let architect = phase_output_contract(Phase::Plan, "architect").unwrap();
+        assert!(architect.contains("Decision, Touched Areas, Plan"));
+        assert!(architect.contains("ordered list"));
+
+        let reviewer = phase_output_contract(Phase::Review, "reviewer").unwrap();
+        assert!(reviewer.contains("Start with Findings"));
+        assert!(reviewer.contains("Readiness, Missing Evidence, Follow-ups"));
     }
 
     #[tokio::test]
@@ -2013,6 +2657,64 @@ mod tests {
         )
         .unwrap();
         assert_eq!(branch_name.trim(), "koklo/session/session-123");
+    }
+
+    #[test]
+    fn test_create_git_workspace_returns_none_when_git_worktree_disabled() {
+        use std::fs;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let repo_root = tmp.path().join("repo");
+        let global_home = tmp.path().join("global-home");
+        fs::create_dir_all(&repo_root).unwrap();
+        fs::create_dir_all(&global_home).unwrap();
+
+        run_test_git(&repo_root, &["init"]).unwrap();
+        run_test_git(&repo_root, &["config", "user.email", "koklo@example.test"]).unwrap();
+        run_test_git(&repo_root, &["config", "user.name", "Koklo Test"]).unwrap();
+        fs::write(repo_root.join("README.md"), "hello").unwrap();
+        run_test_git(&repo_root, &["add", "README.md"]).unwrap();
+        run_test_git(&repo_root, &["commit", "-m", "init"]).unwrap();
+
+        let config = PipelineConfig {
+            db_path: "sqlite::memory:".to_string(),
+            artifacts_dir: PathBuf::from("docs/planning_artifacts"),
+            global_home: global_home.clone(),
+            project_context: Some(repo_root.join(".koklo")),
+            project_path: repo_root.to_string_lossy().into_owned(),
+            preset: PresetKind::Sdd,
+            default_provider: Arc::new(RecordingProvider::new(
+                "codex-cli",
+                Some("test-model"),
+                "ok",
+            )),
+            agent_providers: HashMap::new(),
+            provider_entries: HashMap::new(),
+            agent_sandboxes: HashMap::new(),
+            controlled_shell: false,
+            provider_registry: Arc::new(
+                ProviderRegistry::build(&PipelineTomlConfig::default()).unwrap(),
+            ),
+            github: None,
+        };
+        let orchestrator = PipelineOrchestrator {
+            config,
+            storage: Arc::new(
+                tokio::runtime::Runtime::new()
+                    .unwrap()
+                    .block_on(SessionManager::in_memory())
+                    .unwrap(),
+            ),
+            bus: EventBus::new(16),
+            gate_handler: Arc::new(StdinGateHandler),
+            user_input_handler: Arc::new(StdinUserInputHandler),
+        };
+
+        let workspace = orchestrator
+            .create_git_workspace("session-123", &repo_root)
+            .unwrap();
+
+        assert!(workspace.is_none());
     }
 
     fn run_test_git(dir: &Path, args: &[&str]) -> Result<std::process::Output> {
