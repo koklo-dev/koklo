@@ -52,6 +52,10 @@ pub(crate) enum Commands {
         #[arg(long, default_value = "sdd", value_parser = parse_preset)]
         preset: PresetKind,
 
+        /// Execution mode controlling preset auto-routing.
+        #[arg(long, default_value = "auto", value_parser = parse_run_mode)]
+        mode: RunMode,
+
         /// Pipeline type (currently: feature, task, bug).
         #[arg(value_name = "TYPE")]
         pipeline_type: String,
@@ -478,10 +482,45 @@ pub(crate) enum InternalCommands {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RunMode {
+    Auto,
+    Short,
+    Standard,
+    Patch,
+    Review,
+    Audit,
+    Deep,
+}
+
+impl RunMode {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(Self::Auto),
+            "short" => Some(Self::Short),
+            "standard" => Some(Self::Standard),
+            "patch" => Some(Self::Patch),
+            "review" => Some(Self::Review),
+            "audit" => Some(Self::Audit),
+            "deep" => Some(Self::Deep),
+            _ => None,
+        }
+    }
+}
+
 fn parse_preset(s: &str) -> Result<PresetKind, String> {
     PresetKind::parse(s).ok_or_else(|| {
         format!(
             "Unknown preset '{}'. Valid: sdd, bmad, speckit, light, bugfix, release, strict, custom",
+            s
+        )
+    })
+}
+
+fn parse_run_mode(s: &str) -> Result<RunMode, String> {
+    RunMode::parse(s).ok_or_else(|| {
+        format!(
+            "Unknown mode '{}'. Valid: auto, short, standard, patch, review, audit, deep",
             s
         )
     })
@@ -507,11 +546,13 @@ mod tests {
         match cli.command {
             Commands::Run {
                 preset,
+                mode,
                 pipeline_type,
                 title,
                 no_tui,
             } => {
                 assert_eq!(preset, PresetKind::Bmad);
+                assert_eq!(mode, RunMode::Auto);
                 assert_eq!(pipeline_type, "feature");
                 assert_eq!(title, "Ship auth");
                 assert!(no_tui);

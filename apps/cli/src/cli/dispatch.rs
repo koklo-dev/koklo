@@ -17,10 +17,11 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
         Commands::Init { path, preset, yes } => commands::cmd_init(&path, preset, yes).await?,
         Commands::Run {
             preset,
+            mode,
             pipeline_type,
             title,
             no_tui,
-        } => commands::cmd_run(preset, &pipeline_type, &title, no_tui).await?,
+        } => commands::cmd_run(preset, mode, &pipeline_type, &title, no_tui).await?,
 
         Commands::Session(subcommand) => dispatch_session(subcommand).await?,
         Commands::Agent(subcommand) => dispatch_agent(subcommand).await?,
