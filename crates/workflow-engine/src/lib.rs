@@ -705,7 +705,8 @@ impl PipelineOrchestrator {
                 continue;
             }
 
-            self.enforce_session_token_budget(&session.id, *phase).await?;
+            self.enforce_session_token_budget(&session.id, *phase)
+                .await?;
             self.enforce_phase_token_budget(&session.id, *phase).await?;
 
             let phase_outcome = match self.run_phase(session, *phase, agent_name).await {
@@ -771,7 +772,11 @@ impl PipelineOrchestrator {
         Ok(true)
     }
 
-    async fn enforce_session_token_budget(&self, session_id: &str, next_phase: Phase) -> Result<()> {
+    async fn enforce_session_token_budget(
+        &self,
+        session_id: &str,
+        next_phase: Phase,
+    ) -> Result<()> {
         let budget = token_budget_from_env().session;
         if budget.soft.is_none() && budget.hard.is_none() {
             return Ok(());
@@ -1090,7 +1095,11 @@ impl PipelineOrchestrator {
             tokio::fs::create_dir_all(parent).await?;
         }
         tokio::fs::write(&artifact_path, &output).await?;
-        tokio::fs::write(&handoff_path, build_handoff_artifact(phase, agent_name, &output)).await?;
+        tokio::fs::write(
+            &handoff_path,
+            build_handoff_artifact(phase, agent_name, &output),
+        )
+        .await?;
 
         // Record artifact in the database.
         let size_bytes = output.len() as i64;
@@ -1421,8 +1430,11 @@ impl PipelineOrchestrator {
                     .iter()
                     .find(|artifact| artifact.phase == phase_name)
                     .map(|artifact| {
-                        let handoff_path =
-                            self.resolve_handoff_artifact_path(workspace_root, &session.id, candidate);
+                        let handoff_path = self.resolve_handoff_artifact_path(
+                            workspace_root,
+                            &session.id,
+                            candidate,
+                        );
                         let preferred_path = if handoff_path.exists() {
                             handoff_path.to_string_lossy().into_owned()
                         } else {
@@ -1806,7 +1818,13 @@ fn parse_budget_env(name: &str) -> Option<u64> {
 fn env_flag(name: &str) -> bool {
     matches!(
         std::env::var(name).ok().as_deref(),
-        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES") | Some("on") | Some("ON")
+        Some("1")
+            | Some("true")
+            | Some("TRUE")
+            | Some("yes")
+            | Some("YES")
+            | Some("on")
+            | Some("ON")
     )
 }
 
@@ -2135,8 +2153,11 @@ mod tests {
     fn test_should_disable_git_worktree_for_codex_provider() {
         std::env::remove_var("KOKLO_DISABLE_GIT_WORKTREE");
         std::env::remove_var("KOKLO_FORCE_GIT_WORKTREE");
-        let default: Arc<dyn LlmProvider> =
-            Arc::new(RecordingProvider::new("codex-cli", Some("test-model"), "ok"));
+        let default: Arc<dyn LlmProvider> = Arc::new(RecordingProvider::new(
+            "codex-cli",
+            Some("test-model"),
+            "ok",
+        ));
         let cfg = make_test_config(default, HashMap::new());
         assert!(cfg.should_disable_git_worktree());
     }
@@ -2145,8 +2166,11 @@ mod tests {
     fn test_force_git_worktree_overrides_codex_disable() {
         std::env::remove_var("KOKLO_DISABLE_GIT_WORKTREE");
         std::env::set_var("KOKLO_FORCE_GIT_WORKTREE", "1");
-        let default: Arc<dyn LlmProvider> =
-            Arc::new(RecordingProvider::new("codex-cli", Some("test-model"), "ok"));
+        let default: Arc<dyn LlmProvider> = Arc::new(RecordingProvider::new(
+            "codex-cli",
+            Some("test-model"),
+            "ok",
+        ));
         let cfg = make_test_config(default, HashMap::new());
         assert!(!cfg.should_disable_git_worktree());
         std::env::remove_var("KOKLO_FORCE_GIT_WORKTREE");
@@ -2155,8 +2179,11 @@ mod tests {
     #[test]
     fn test_native_cli_providers_do_not_wrap_external_sandbox_by_default() {
         std::env::remove_var("KOKLO_WRAP_NATIVE_CLI_PROVIDER_SANDBOX");
-        let default: Arc<dyn LlmProvider> =
-            Arc::new(RecordingProvider::new("codex-cli", Some("test-model"), "ok"));
+        let default: Arc<dyn LlmProvider> = Arc::new(RecordingProvider::new(
+            "codex-cli",
+            Some("test-model"),
+            "ok",
+        ));
         let cfg = make_test_config(default, HashMap::new());
         assert!(!cfg.should_wrap_native_cli_provider("codex-cli"));
         assert!(!cfg.should_wrap_native_cli_provider("claude-code-cli"));
@@ -2483,14 +2510,15 @@ mod tests {
 
         let messages = provider_handle.recorded_messages();
         assert_eq!(messages.len(), 2);
-        assert!(messages[1].content.contains("Available prior handoff artifacts:"));
+        assert!(messages[1]
+            .content
+            .contains("Available prior handoff artifacts:"));
         assert!(messages[1]
             .content
             .contains(spec_artifact.to_string_lossy().as_ref()));
         assert!(messages[1].content.contains("Output artifact:"));
         assert!(!messages[1].content.contains("Required output shape:"));
     }
-
 
     #[test]
     fn test_build_handoff_artifact_is_compact() {

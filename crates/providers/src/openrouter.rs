@@ -353,8 +353,8 @@ impl OpenRouterSyntheticSession {
             anyhow::bail!("openrouter synthetic loop exceeded 12 turns");
         }
 
-        self.pending.push_back(Ok(ProviderSessionEvent::Event(
-            ProviderEvent::Metadata {
+        self.pending
+            .push_back(Ok(ProviderSessionEvent::Event(ProviderEvent::Metadata {
                 item_id: None,
                 kind: "synthetic_request_metrics".to_string(),
                 value: serde_json::json!({
@@ -365,8 +365,7 @@ impl OpenRouterSyntheticSession {
                     "reinjected_read_chars": self.reinjected_read_chars,
                     "reinjected_command_chars": self.reinjected_command_chars,
                 }),
-            },
-        )));
+            })));
 
         let mut streamed_events = Vec::new();
         let (raw_output, usage) = self
@@ -463,8 +462,8 @@ impl OpenRouterSyntheticSession {
                 let history_entry = format_read_result_for_history(&path, &content);
                 self.reinjected_read_chars += history_entry.chars().count();
                 self.messages.push(Message::user(history_entry));
-                self.pending.push_back(Ok(ProviderSessionEvent::Event(
-                    ProviderEvent::Metadata {
+                self.pending
+                    .push_back(Ok(ProviderSessionEvent::Event(ProviderEvent::Metadata {
                         item_id: None,
                         kind: "tool_context_metrics".to_string(),
                         value: serde_json::json!({
@@ -473,8 +472,7 @@ impl OpenRouterSyntheticSession {
                             "path": path,
                             "reinjected_chars": self.reinjected_read_chars,
                         }),
-                    },
-                )));
+                    })));
                 Ok(())
             }
             SyntheticAction::RunCommand { command, cwd } => {
