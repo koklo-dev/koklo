@@ -9,7 +9,7 @@ pub use builtin_agents::{
     builtin_shared_project_prompt, BuiltinAgentFile,
 };
 pub use runtime::{
-    set_stdout_streaming_enabled, AgentConfig, AgentRunResult, AgentRunner, ApprovalHandler,
-    UserInputHandler,
+    set_reasoning_visibility, set_stdout_streaming_enabled, AgentConfig, AgentRunResult,
+    AgentRunner, ApprovalHandler, UserInputHandler,
 };
 pub use system_prompt::build_system_prompt;

@@ -130,7 +130,7 @@ pub fn builtin_agent_prompt(slug: &str) -> Option<String> {
             .map(|(_, content)| content.trim())
             .filter(|content| !content.is_empty())
             .collect::<Vec<_>>()
-            .join("\n\n---\n\n")
+            .join("\n\n")
     })
 }
 
@@ -164,7 +164,15 @@ mod tests {
             .unwrap();
 
         assert!(guardrails.contains("Do not claim validation you did not run"));
-        assert!(guardrails.contains("Escalation Triggers"));
+        assert!(guardrails.contains("Escalate When"));
         assert!(guardrails.contains("required validation cannot be run"));
+    }
+
+    #[test]
+    fn builtin_prompt_is_compact() {
+        let prompt = builtin_agent_prompt("pm").unwrap();
+        assert!(!prompt.contains("---"));
+        assert!(!prompt.contains("# IDENTITY.md"));
+        assert!(prompt.contains("Mission:"));
     }
 }
