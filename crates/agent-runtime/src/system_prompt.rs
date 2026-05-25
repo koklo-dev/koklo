@@ -83,7 +83,10 @@ fn build_system_prompt_uncached(config: &AgentConfig, today: &str) -> Result<Str
     } else {
         maybe_read(config.global_home.join("MEMORY.md"), &mut parts);
         maybe_read(
-            config.global_home.join("memories").join(format!("{today}.md")),
+            config
+                .global_home
+                .join("memories")
+                .join(format!("{today}.md")),
             &mut parts,
         );
 
@@ -161,9 +164,15 @@ fn collect_source_snapshot(config: &AgentConfig, today: &str) -> Result<Vec<Stri
     let mut snapshot = Vec::new();
     let slug = &config.agent_slug;
 
-    collect_dir_snapshot(config.global_home.join("agents").join("shared"), &mut snapshot)?;
+    collect_dir_snapshot(
+        config.global_home.join("agents").join("shared"),
+        &mut snapshot,
+    )?;
     collect_file_snapshot(
-        config.project_context.as_ref().map(|ctx| ctx.join("PROJECT.md")),
+        config
+            .project_context
+            .as_ref()
+            .map(|ctx| ctx.join("PROJECT.md")),
         &mut snapshot,
     )?;
     collect_file_snapshot(Some(config.global_home.join("USER.md")), &mut snapshot)?;
@@ -176,11 +185,19 @@ fn collect_source_snapshot(config: &AgentConfig, today: &str) -> Result<Vec<Stri
     } else {
         collect_file_snapshot(Some(config.global_home.join("MEMORY.md")), &mut snapshot)?;
         collect_file_snapshot(
-            Some(config.global_home.join("memories").join(format!("{today}.md"))),
+            Some(
+                config
+                    .global_home
+                    .join("memories")
+                    .join(format!("{today}.md")),
+            ),
             &mut snapshot,
         )?;
         collect_file_snapshot(
-            config.project_context.as_ref().map(|ctx| ctx.join("MEMORY.md")),
+            config
+                .project_context
+                .as_ref()
+                .map(|ctx| ctx.join("MEMORY.md")),
             &mut snapshot,
         )?;
         collect_file_snapshot(
@@ -195,7 +212,10 @@ fn collect_source_snapshot(config: &AgentConfig, today: &str) -> Result<Vec<Stri
     collect_dir_snapshot(config.global_home.join("agents").join(slug), &mut snapshot)?;
     if let Some(ctx) = &config.project_context {
         collect_dir_snapshot(ctx.join("agents").join(slug), &mut snapshot)?;
-        collect_file_snapshot(Some(ctx.join("agents").join(format!("{slug}.md"))), &mut snapshot)?;
+        collect_file_snapshot(
+            Some(ctx.join("agents").join(format!("{slug}.md"))),
+            &mut snapshot,
+        )?;
     }
     collect_file_snapshot(
         Some(config.global_home.join("agents").join(format!("{slug}.md"))),

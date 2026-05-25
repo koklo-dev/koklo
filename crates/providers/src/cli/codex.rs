@@ -3,8 +3,7 @@ use super::{check_claude_session, flatten_messages_to_compact_prompt, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
-    compat_session,
-    CommandDetails, FileChangeDetails, FileChangeEntry, LlmProvider, Message,
+    compat_session, CommandDetails, FileChangeDetails, FileChangeEntry, LlmProvider, Message,
     ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload, ProviderCapabilities,
     ProviderEvent, ProviderInteractionMode, ProviderSession, ProviderSessionEvent, StreamChunk,
     UserInputPayload,
