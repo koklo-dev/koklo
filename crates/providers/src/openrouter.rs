@@ -271,6 +271,8 @@ struct OpenRouterSyntheticSession {
     turn_count: usize,
     next_id: usize,
     final_output: String,
+    reinjected_read_chars: usize,
+    reinjected_command_chars: usize,
 }
 
 impl OpenRouterSyntheticSession {
@@ -284,6 +286,8 @@ impl OpenRouterSyntheticSession {
             turn_count: 0,
             next_id: 0,
             final_output: String::new(),
+            reinjected_read_chars: 0,
+            reinjected_command_chars: 0,
         }
     }
 
@@ -348,6 +352,21 @@ impl OpenRouterSyntheticSession {
         if self.turn_count > 12 {
             anyhow::bail!("openrouter synthetic loop exceeded 12 turns");
         }
+
+        self.pending.push_back(Ok(ProviderSessionEvent::Event(
+            ProviderEvent::Metadata {
+                item_id: None,
+                kind: "synthetic_request_metrics".to_string(),
+                value: serde_json::json!({
+                    "provider": "openrouter",
+                    "turn_count": self.turn_count,
+                    "message_count": self.messages.len(),
+                    "history_chars": history_chars(&self.messages),
+                    "reinjected_read_chars": self.reinjected_read_chars,
+                    "reinjected_command_chars": self.reinjected_command_chars,
+                }),
+            },
+        )));
 
         let mut streamed_events = Vec::new();
         let (raw_output, usage) = self
@@ -441,10 +460,21 @@ impl OpenRouterSyntheticSession {
                         success: Some(true),
                     },
                 )));
-                self.messages
-                    .push(Message::user(format_read_result_for_history(
-                        &path, &content,
-                    )));
+                let history_entry = format_read_result_for_history(&path, &content);
+                self.reinjected_read_chars += history_entry.chars().count();
+                self.messages.push(Message::user(history_entry));
+                self.pending.push_back(Ok(ProviderSessionEvent::Event(
+                    ProviderEvent::Metadata {
+                        item_id: None,
+                        kind: "tool_context_metrics".to_string(),
+                        value: serde_json::json!({
+                            "provider": "openrouter",
+                            "tool_kind": "read_file",
+                            "path": path,
+                            "reinjected_chars": self.reinjected_read_chars,
+                        }),
+                    },
+                )));
                 Ok(())
             }
             SyntheticAction::RunCommand { command, cwd } => {
@@ -537,30 +567,21 @@ impl OpenRouterSyntheticSession {
 }
 
 fn synthetic_tool_loop_prompt() -> &'static str {
-    "You are operating inside Koklo's synthetic tool loop.\n\
-Return exactly one JSON object and nothing else.\n\
-Valid actions:\n\
-{\"type\":\"finish\",\"message\":\"final answer for the user\"}\n\
-{\"type\":\"message\",\"message\":\"final answer for the user\"}\n\
-{\"type\":\"read_file\",\"path\":\"relative/path.rs\",\"start_line\":1,\"max_lines\":200}\n\
+    "Return exactly one JSON object.\n\
+Actions:\n\
+{\"type\":\"finish\",\"message\":\"answer\"}\n\
+{\"type\":\"message\",\"message\":\"answer\"}\n\
+{\"type\":\"read_file\",\"path\":\"path.rs\",\"start_line\":1,\"max_lines\":200}\n\
 {\"type\":\"run_command\",\"command\":\"cargo test -p koklo-cli\",\"cwd\":\".\"}\n\
-{\"type\":\"ask_user\",\"question\":\"Which file should I edit?\",\"header\":\"Need input\"}\n\
-{\"type\":\"write_file\",\"path\":\"notes/todo.md\",\"content\":\"new file contents\"}\n\
+{\"type\":\"ask_user\",\"question\":\"Which file?\",\"header\":\"Input\"}\n\
+{\"type\":\"write_file\",\"path\":\"notes/todo.md\",\"content\":\"text\"}\n\
 {\"type\":\"edit_file\",\"path\":\"src/lib.rs\",\"old_string\":\"before\",\"new_string\":\"after\",\"replace_all\":false}\n\
-Rules:\n\
-- Prefer read_file before run_command when you need repository context.\n\
-- Prefer edit_file over write_file when modifying an existing file.\n\
-- Use workspace-relative paths.\n\
-- Do not use Markdown fences.\n\
-- Use finish when you have enough information."
+Rules: workspace-relative paths; no markdown fences; prefer read_file for code context; prefer edit_file for existing files; use finish when done."
 }
 
 fn synthetic_repair_prompt(raw_output: &str) -> String {
     format!(
-        "Your previous response was invalid for Koklo's action protocol.\n\
-Return exactly one valid JSON object matching one of the documented action shapes and nothing else.\n\
-Do not include explanations, prose, or Markdown fences.\n\
-Previous response:\n```text\n{raw_output}\n```"
+        "Invalid response. Return one valid JSON action only. No prose. No markdown fences.\nPrevious:\n```text\n{raw_output}\n```"
     )
 }
 
@@ -729,8 +750,27 @@ fn summarize_read_result(content: &str) -> String {
     }
 }
 
+fn history_chars(messages: &[Message]) -> usize {
+    messages
+        .iter()
+        .map(|message| message.content.chars().count())
+        .sum()
+}
+
 fn format_read_result_for_history(path: &str, content: &str) -> String {
-    format!("Tool result: read_file\npath: {path}\n\n```text\n{content}\n```")
+    let excerpt = bounded_history_excerpt(content, 24, 1200);
+    if excerpt.is_empty() {
+        format!(
+            "Tool result: read_file\npath: {path}\nsummary: {}",
+            summarize_read_result(content)
+        )
+    } else {
+        format!(
+            "Tool result: read_file\npath: {path}\nsummary: {}\nexcerpt:\n```text\n{}\n```",
+            summarize_read_result(content),
+            excerpt
+        )
+    }
 }
 
 fn format_user_input_for_history(question: &str, answer: &[String]) -> String {
@@ -741,13 +781,61 @@ fn format_user_input_for_history(question: &str, answer: &[String]) -> String {
 }
 
 fn format_command_result_for_history(command: &str, cwd: &Path, output: &SandboxOutput) -> String {
-    format!(
-        "Tool result: run_command\ncommand: {command}\ncwd: {}\nexit_code: {}\nstdout:\n{}\nstderr:\n{}",
-        cwd.display(),
-        output.exit_code,
-        output.stdout,
-        output.stderr
-    )
+    let stdout_excerpt = bounded_history_excerpt(&output.stdout, 20, 900);
+    let stderr_excerpt = bounded_history_excerpt(&output.stderr, 20, 900);
+    let mut lines = vec![
+        "Tool result: run_command".to_string(),
+        format!("command: {command}"),
+        format!("cwd: {}", cwd.display()),
+        format!("exit_code: {}", output.exit_code),
+        format!("stdout_summary: {}", summarize_blob(&output.stdout)),
+        format!("stderr_summary: {}", summarize_blob(&output.stderr)),
+    ];
+    if !stdout_excerpt.is_empty() {
+        lines.push("stdout_excerpt:".to_string());
+        lines.push("```text".to_string());
+        lines.push(stdout_excerpt);
+        lines.push("```".to_string());
+    }
+    if !stderr_excerpt.is_empty() {
+        lines.push("stderr_excerpt:".to_string());
+        lines.push("```text".to_string());
+        lines.push(stderr_excerpt);
+        lines.push("```".to_string());
+    }
+    lines.join("\n")
+}
+
+fn summarize_blob(text: &str) -> String {
+    let chars = text.chars().count();
+    let lines = text.lines().count();
+    if chars == 0 {
+        "empty".to_string()
+    } else {
+        format!("{lines} line(s), {chars} char(s)")
+    }
+}
+
+fn bounded_history_excerpt(text: &str, max_lines: usize, max_chars: usize) -> String {
+    let mut out = String::new();
+    for (idx, line) in text.lines().enumerate() {
+        if idx >= max_lines {
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push('…');
+            break;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(line);
+        if out.chars().count() > max_chars {
+            let truncated = out.chars().take(max_chars).collect::<String>();
+            return format!("{truncated}\n…");
+        }
+    }
+    out
 }
 
 fn resolve_existing_workspace_path(workspace_root: &Path, raw_path: &str) -> Result<PathBuf> {
@@ -980,12 +1068,22 @@ impl ProviderSession for OpenRouterSyntheticSession {
                         "Approved command: {}",
                         pending.command
                     )));
-                    self.messages
-                        .push(Message::user(format_command_result_for_history(
-                            &pending.command,
-                            &cwd,
-                            &output,
-                        )));
+                    let history_entry =
+                        format_command_result_for_history(&pending.command, &cwd, &output);
+                    self.reinjected_command_chars += history_entry.chars().count();
+                    self.messages.push(Message::user(history_entry));
+                    self.pending.push_back(Ok(ProviderSessionEvent::Event(
+                        ProviderEvent::Metadata {
+                            item_id: None,
+                            kind: "tool_context_metrics".to_string(),
+                            value: serde_json::json!({
+                                "provider": "openrouter",
+                                "tool_kind": "run_command",
+                                "command": pending.command,
+                                "reinjected_chars": self.reinjected_command_chars,
+                            }),
+                        },
+                    )));
                 }
                 PendingApproval::File(pending) => {
                     let workspace_root = self.provider.workspace_root()?;
@@ -1301,6 +1399,38 @@ mod tests {
             .messages
             .last()
             .is_some_and(|message| message.content.contains("hello")));
+    }
+
+    #[test]
+    fn read_file_history_is_bounded() {
+        let content = (1..=100)
+            .map(|idx| format!("{idx:>4} line {idx}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let history = format_read_result_for_history("README.md", &content);
+        assert!(history.contains("summary: 100 line(s)"));
+        assert!(history.contains("excerpt:"));
+        assert!(history.chars().count() < content.chars().count());
+    }
+
+    #[test]
+    fn command_history_is_bounded() {
+        let stdout = "ok\n".repeat(200);
+        let stderr = "warn\n".repeat(200);
+        let history = format_command_result_for_history(
+            "cargo test",
+            Path::new("."),
+            &SandboxOutput {
+                stdout,
+                stderr,
+                exit_code: 0,
+            },
+        );
+        assert!(history.contains("stdout_summary:"));
+        assert!(history.contains("stderr_summary:"));
+        assert!(history.contains("stdout_excerpt:"));
+        assert!(history.contains("stderr_excerpt:"));
+        assert!(history.chars().count() < 3000);
     }
 
     #[tokio::test]
