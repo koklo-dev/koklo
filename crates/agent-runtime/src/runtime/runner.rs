@@ -7,7 +7,7 @@ use crate::synthetic_user_input::{
     format_user_input_answers_for_history, format_user_input_request_for_history,
     with_user_input_protocol, SyntheticUserInputParser,
 };
-use crate::system_prompt::build_system_prompt;
+use crate::system_prompt::build_system_prompt_with_metrics;
 use anyhow::Result;
 use koklo_events::{
     CompletionUsage, EventBus, GateDisplay, PipelineEvent, TranscriptItem, TranscriptItemKind,
@@ -18,8 +18,11 @@ use koklo_providers::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
+use tokio::time::{timeout, Duration};
 
 static STREAM_STDOUT: AtomicBool = AtomicBool::new(true);
+static REASONING_VISIBLE: AtomicBool = AtomicBool::new(true);
 
 pub fn set_stdout_streaming_enabled(enabled: bool) {
     STREAM_STDOUT.store(enabled, Ordering::Relaxed);
@@ -29,9 +32,36 @@ pub(crate) fn stream_stdout_enabled() -> bool {
     STREAM_STDOUT.load(Ordering::Relaxed)
 }
 
+pub fn set_reasoning_visibility(enabled: bool) {
+    REASONING_VISIBLE.store(enabled, Ordering::Relaxed);
+}
+
+pub(crate) fn reasoning_visible() -> bool {
+    REASONING_VISIBLE.load(Ordering::Relaxed)
+}
+
 pub struct AgentRunResult {
     pub output: String,
     pub usage: CompletionUsage,
+    pub metrics: AgentRunMetrics,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct AgentRunMetrics {
+    pub system_prompt_chars: usize,
+    pub system_prompt_tokens_estimate: u32,
+    pub system_prompt_cache_hit: bool,
+    pub system_prompt_build_ms: u128,
+    pub user_prompt_chars: usize,
+    pub user_prompt_tokens_estimate: u32,
+    pub total_turns: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ProviderTimeoutConfig {
+    start_timeout_ms: u64,
+    first_event_timeout_ms: u64,
+    idle_event_timeout_ms: u64,
 }
 
 /// Runs a single agent: loads prompt, calls LLM, streams events.
@@ -63,12 +93,19 @@ impl AgentRunner {
     /// Run the agent with the given user prompt. Returns the full LLM response and token usage.
     pub async fn run(&self, session_id: &str, user_prompt: &str) -> Result<AgentRunResult> {
         let provider_capabilities = self.provider.capabilities();
+        let provider_name = self.provider.provider_name().to_string();
+        let provider_timeout_config = provider_timeout_config_from_env();
         let native_user_input = provider_capabilities.user_input_native;
+        let prompt_build_started = Instant::now();
+        let system_prompt_build = build_system_prompt_with_metrics(&self.config)?;
+        let system_prompt_build_ms = prompt_build_started.elapsed().as_millis();
         let system_prompt = if native_user_input {
-            build_system_prompt(&self.config)?
+            system_prompt_build.prompt
         } else {
-            with_user_input_protocol(build_system_prompt(&self.config)?)
+            with_user_input_protocol(system_prompt_build.prompt)
         };
+        let system_prompt_chars = system_prompt.chars().count();
+        let user_prompt_chars = user_prompt.chars().count();
 
         let mut messages = vec![Message::system(system_prompt), Message::user(user_prompt)];
         let bus = self.bus.clone();
@@ -97,11 +134,102 @@ impl AgentRunner {
                 agent_name: &agent_name,
                 interaction_mode: provider_capabilities.interaction_mode,
             };
-            let mut session = Arc::clone(&self.provider)
-                .start_session(messages.clone())
-                .await?;
+            let session_start = Instant::now();
+            let mut session = timeout(
+                Duration::from_millis(provider_timeout_config.start_timeout_ms),
+                Arc::clone(&self.provider).start_session(messages.clone()),
+            )
+            .await
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "Provider '{}' start_session timed out after {} ms",
+                    provider_name,
+                    provider_timeout_config.start_timeout_ms
+                )
+            })??;
+            let session_start_ms = session_start.elapsed().as_millis();
+            emit_provider_runtime_probe(
+                &bus,
+                &session_id_str,
+                phase,
+                &agent_name,
+                TranscriptItemStatus::Info,
+                format!(
+                    "provider session started in {} ms ({})",
+                    session_start_ms, provider_name
+                ),
+                serde_json::json!({
+                    "provider": provider_name,
+                    "probe": "session_started",
+                    "duration_ms": session_start_ms,
+                    "turn_count": turn_count,
+                }),
+            );
+
+            let mut saw_provider_event = false;
             let usage = loop {
-                match session.next_event().await? {
+                let wait_timeout_ms = if saw_provider_event {
+                    provider_timeout_config.idle_event_timeout_ms
+                } else {
+                    provider_timeout_config.first_event_timeout_ms
+                };
+                let next_event = timeout(
+                    Duration::from_millis(wait_timeout_ms),
+                    session.next_event(),
+                )
+                .await
+                .map_err(|_| {
+                    let probe = if saw_provider_event {
+                        "provider_idle_timeout"
+                    } else {
+                        "provider_first_event_timeout"
+                    };
+                    let summary = if saw_provider_event {
+                        format!(
+                            "provider idle timeout after {} ms ({})",
+                            wait_timeout_ms, provider_name
+                        )
+                    } else {
+                        format!(
+                            "provider first-event timeout after {} ms ({})",
+                            wait_timeout_ms, provider_name
+                        )
+                    };
+                    emit_provider_runtime_probe(
+                        &bus,
+                        &session_id_str,
+                        phase,
+                        &agent_name,
+                        TranscriptItemStatus::Failed,
+                        summary.clone(),
+                        serde_json::json!({
+                            "provider": provider_name,
+                            "probe": probe,
+                            "timeout_ms": wait_timeout_ms,
+                            "turn_count": turn_count,
+                        }),
+                    );
+                    anyhow::anyhow!("{summary}")
+                })??;
+
+                if !saw_provider_event {
+                    saw_provider_event = true;
+                    emit_provider_runtime_probe(
+                        &bus,
+                        &session_id_str,
+                        phase,
+                        &agent_name,
+                        TranscriptItemStatus::Info,
+                        format!("provider first event received ({})", provider_name),
+                        serde_json::json!({
+                            "provider": provider_name,
+                            "probe": "first_event_received",
+                            "turn_count": turn_count,
+                        }),
+                    );
+                }
+
+                match next_event {
                     ProviderSessionEvent::Event(event) => {
                         let mut buffers = TextBuffers {
                             result: &mut result,
@@ -232,6 +360,61 @@ impl AgentRunner {
         Ok(AgentRunResult {
             output: result,
             usage: final_usage,
+            metrics: AgentRunMetrics {
+                system_prompt_chars,
+                system_prompt_tokens_estimate: estimate_tokens_from_chars(system_prompt_chars),
+                system_prompt_cache_hit: system_prompt_build.cache_hit,
+                system_prompt_build_ms,
+                user_prompt_chars,
+                user_prompt_tokens_estimate: estimate_tokens_from_chars(user_prompt_chars),
+                total_turns: turn_count,
+            },
         })
     }
+}
+
+fn estimate_tokens_from_chars(chars: usize) -> u32 {
+    (chars / 4) as u32
+}
+
+fn provider_timeout_config_from_env() -> ProviderTimeoutConfig {
+    ProviderTimeoutConfig {
+        start_timeout_ms: parse_timeout_ms_env("KOKLO_PROVIDER_START_TIMEOUT_MS", 20_000),
+        first_event_timeout_ms: parse_timeout_ms_env(
+            "KOKLO_PROVIDER_FIRST_EVENT_TIMEOUT_MS",
+            30_000,
+        ),
+        idle_event_timeout_ms: parse_timeout_ms_env("KOKLO_PROVIDER_IDLE_TIMEOUT_MS", 120_000),
+    }
+}
+
+fn parse_timeout_ms_env(name: &str, default: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn emit_provider_runtime_probe(
+    bus: &EventBus,
+    session_id: &str,
+    phase: koklo_events::Phase,
+    agent_name: &str,
+    status: TranscriptItemStatus,
+    summary: String,
+    payload: serde_json::Value,
+) {
+    bus.send(PipelineEvent::Transcript {
+        item: TranscriptItem::new(
+            session_id.to_string(),
+            Some(phase),
+            Some(agent_name.to_string()),
+            TranscriptSource::Provider,
+            TranscriptItemKind::Message,
+            status,
+            summary,
+        )
+        .with_payload(payload),
+    });
 }

@@ -4,6 +4,7 @@ use super::transcript::{
 };
 use super::types::{AgentTurnContext, RuntimeApprovalRequest, RuntimeInterruption, TextBuffers};
 use crate::synthetic_user_input::SyntheticUserInputParser;
+use crate::runtime::reasoning_visible;
 use koklo_events::{
     PipelineEvent, TranscriptItemKind, TranscriptItemStatus, TranscriptSource, UserInputDisplay,
 };
@@ -81,6 +82,9 @@ pub(crate) fn handle_provider_event(
             None
         }
         ProviderEvent::Reasoning { item_id, text } => {
+            if !reasoning_visible() {
+                return None;
+            }
             emit_provider_transcript(
                 context,
                 item_id.clone(),
@@ -93,6 +97,9 @@ pub(crate) fn handle_provider_event(
             None
         }
         ProviderEvent::Plan { item_id, text } => {
+            if !reasoning_visible() {
+                return None;
+            }
             emit_provider_transcript(
                 context,
                 item_id.clone(),
