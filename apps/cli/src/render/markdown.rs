@@ -109,10 +109,8 @@ pub fn markdown_to_lines(input: &str) -> Vec<Line<'static>> {
                     };
                     current_spans.push(Span::styled(bullet, Style::default().fg(Color::Yellow)));
                 }
-                Tag::Paragraph => {
-                    if !lines.is_empty() {
-                        lines.push(Line::from(""));
-                    }
+                Tag::Paragraph if !lines.is_empty() => {
+                    lines.push(Line::from(""));
                 }
                 _ => {}
             },
