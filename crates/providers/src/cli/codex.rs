@@ -1,8 +1,9 @@
 //! OpenAI Codex CLI provider (subprocess, real-time streaming).
-use super::{check_claude_session, flatten_messages_to_prompt, CliMode};
+use super::{check_claude_session, flatten_messages_to_compact_prompt, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
+    compat_session,
     CommandDetails, FileChangeDetails, FileChangeEntry, LlmProvider, Message,
     ProviderApprovalDecision, ProviderApprovalKind, ProviderApprovalPayload, ProviderCapabilities,
     ProviderEvent, ProviderInteractionMode, ProviderSession, ProviderSessionEvent, StreamChunk,
@@ -14,7 +15,7 @@ use koklo_events::{CompletionUsage, UserInputQuestion};
 use koklo_shell::Sandbox;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -22,12 +23,18 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin};
 use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::time::{timeout, Duration};
 
 pub struct CodexCliProvider {
     #[allow(dead_code)] // used when `pty` feature is enabled
     mode: CliMode,
     working_dir: Option<PathBuf>,
     sandbox: Option<Arc<dyn Sandbox>>,
+}
+
+struct FallbackProviderSession {
+    pending: VecDeque<Result<ProviderSessionEvent>>,
+    inner: Box<dyn ProviderSession>,
 }
 
 impl CodexCliProvider {
@@ -98,6 +105,14 @@ impl CodexCliProvider {
         ]
     }
 
+    fn app_server_start_timeout_ms() -> u64 {
+        std::env::var("KOKLO_CODEX_APP_SERVER_START_TIMEOUT_MS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(3_000)
+    }
+
     async fn spawn_app_server_session(
         &self,
         messages: Vec<Message>,
@@ -128,6 +143,13 @@ impl CodexCliProvider {
             Arc::new(Mutex::new(HashMap::<String, CodexPendingApproval>::new()));
         let next_id = Arc::new(AtomicU64::new(1));
         let (sender, receiver) = mpsc::unbounded_channel::<Result<ProviderSessionEvent>>();
+        let prompt = flatten_messages_to_compact_prompt(&messages);
+        let _ = sender.send(Ok(request_metrics_event(
+            "codex-cli",
+            &prompt,
+            messages.len(),
+            true,
+        )));
 
         let stderr_handle = tokio::spawn(async move {
             let mut buf = String::new();
@@ -200,7 +222,7 @@ impl CodexCliProvider {
                     "input": [
                         {
                             "type": "text",
-                            "text": flatten_messages_to_prompt(&messages),
+                            "text": prompt,
                         }
                     ],
                 }),
@@ -209,6 +231,49 @@ impl CodexCliProvider {
 
         Ok(Box::new(session))
     }
+
+    fn fallback_session(
+        self: Arc<Self>,
+        messages: Vec<Message>,
+        reason: String,
+        timeout_ms: u64,
+    ) -> Box<dyn ProviderSession> {
+        let inner = compat_session(self, messages);
+        let metadata = ProviderSessionEvent::Event(ProviderEvent::Metadata {
+            item_id: None,
+            kind: "session_fallback".to_string(),
+            value: json!({
+                "provider": "codex-cli",
+                "fallback": "exec",
+                "from": "app-server",
+                "reason": reason,
+                "app_server_start_timeout_ms": timeout_ms,
+            }),
+        });
+        Box::new(FallbackProviderSession {
+            pending: VecDeque::from([Ok(metadata)]),
+            inner,
+        })
+    }
+}
+
+fn request_metrics_event(
+    provider: &str,
+    prompt: &str,
+    message_count: usize,
+    interactive_session: bool,
+) -> ProviderSessionEvent {
+    ProviderSessionEvent::Event(ProviderEvent::Metadata {
+        item_id: None,
+        kind: "request_metrics".to_string(),
+        value: json!({
+            "provider": provider,
+            "message_count": message_count,
+            "flattened_prompt_chars": prompt.chars().count(),
+            "flattened_prompt_bytes": prompt.len(),
+            "interactive_session": interactive_session,
+        }),
+    })
 }
 
 #[derive(Default)]
@@ -289,6 +354,28 @@ impl CodexAppServerSession {
         stdin.write_all(b"\n").await.map_err(ProviderError::Io)?;
         stdin.flush().await.map_err(ProviderError::Io)?;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ProviderSession for FallbackProviderSession {
+    async fn next_event(&mut self) -> Result<ProviderSessionEvent> {
+        if let Some(event) = self.pending.pop_front() {
+            return event;
+        }
+        self.inner.next_event().await
+    }
+
+    async fn send_user_input(&mut self, input: UserInputPayload) -> Result<()> {
+        self.inner.send_user_input(input).await
+    }
+
+    async fn resolve_approval(&mut self, approval: ProviderApprovalPayload) -> Result<()> {
+        self.inner.resolve_approval(approval).await
+    }
+
+    async fn cancel(&mut self) -> Result<()> {
+        self.inner.cancel().await
     }
 }
 
@@ -1304,9 +1391,26 @@ impl LlmProvider for CodexCliProvider {
         self: Arc<Self>,
         messages: Vec<Message>,
     ) -> Result<Box<dyn ProviderSession>> {
-        // Always use the app-server session for real-time streaming.
-        // The sandbox is only used as a fallback in complete_stream (exec mode).
-        self.spawn_app_server_session(messages).await
+        let timeout_ms = Self::app_server_start_timeout_ms();
+        let fallback_messages = messages.clone();
+        match timeout(
+            Duration::from_millis(timeout_ms),
+            self.spawn_app_server_session(messages),
+        )
+        .await
+        {
+            Ok(Ok(session)) => Ok(session),
+            Ok(Err(error)) => Ok(self.fallback_session(
+                fallback_messages,
+                format!("app-server error: {error}"),
+                timeout_ms,
+            )),
+            Err(_) => Ok(self.fallback_session(
+                fallback_messages,
+                format!("app-server start timed out after {} ms", timeout_ms),
+                timeout_ms,
+            )),
+        }
     }
 
     async fn complete_stream(
@@ -1314,7 +1418,18 @@ impl LlmProvider for CodexCliProvider {
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(String, CompletionUsage)> {
-        let prompt = flatten_messages_to_prompt(&messages);
+        let prompt = flatten_messages_to_compact_prompt(&messages);
+        on_chunk(StreamChunk::event(ProviderEvent::Metadata {
+            item_id: None,
+            kind: "request_metrics".to_string(),
+            value: json!({
+                "provider": "codex-cli",
+                "message_count": messages.len(),
+                "flattened_prompt_chars": prompt.chars().count(),
+                "flattened_prompt_bytes": prompt.len(),
+                "interactive_session": false,
+            }),
+        }));
         let args = Self::build_exec_args(prompt.clone());
 
         if let (Some(sandbox), Some(dir)) = (&self.sandbox, &self.working_dir) {
