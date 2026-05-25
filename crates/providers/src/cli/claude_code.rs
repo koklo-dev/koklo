@@ -4,7 +4,9 @@
 //! with tool events, and optionally bridges native permission prompts back into
 //! the Koklo runtime via `--permission-prompt-tool`.
 
-use super::{check_claude_session, flatten_messages_to_prompt, strip_ansi, CliMode};
+use super::{
+    check_claude_session, flatten_messages_to_compact_prompt, strip_ansi, CliMode,
+};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
@@ -145,7 +147,9 @@ impl ClaudeCodeCliProvider {
     }
 
     fn supports_native_approvals(&self) -> bool {
-        self.sandbox.is_none() && self.supports_permission_prompt_tool
+        self.sandbox.is_none()
+            && self.supports_permission_prompt_tool
+            && !claude_permission_bridge_disabled()
     }
 
     // ── Layer A: stream-json subprocess ──────────────────────────────────────
@@ -155,6 +159,17 @@ impl ClaudeCodeCliProvider {
         prompt: &str,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(String, CompletionUsage)> {
+        on_chunk(StreamChunk::event(ProviderEvent::Metadata {
+            item_id: None,
+            kind: "request_metrics".to_string(),
+            value: serde_json::json!({
+                "provider": "claude-code",
+                "message_count": 1,
+                "flattened_prompt_chars": prompt.chars().count(),
+                "flattened_prompt_bytes": prompt.len(),
+                "replay_user_messages": false,
+            }),
+        }));
         let args = vec![
             "--print".to_string(),
             "--output-format".to_string(),
@@ -314,6 +329,7 @@ impl ClaudeCodeCliProvider {
         });
 
         let (sender, receiver) = mpsc::unbounded_channel::<Result<ProviderSessionEvent>>();
+        let request_metrics_sender = sender.clone();
         let pending_approvals = Arc::new(Mutex::new(HashSet::<String>::new()));
         let permission_tool_name = permission_bridge
             .as_ref()
@@ -453,6 +469,12 @@ impl ClaudeCodeCliProvider {
             }
         });
 
+        let flattened_prompt = flatten_messages_to_compact_prompt(&messages);
+        let _ = request_metrics_sender.send(Ok(request_metrics_event(
+            &flattened_prompt,
+            messages.len(),
+            true,
+        )));
         let session = ClaudeStreamJsonSession {
             stdin: Mutex::new(stdin),
             child,
@@ -460,9 +482,7 @@ impl ClaudeCodeCliProvider {
             pending_approvals,
             permission_bridge,
         };
-        session
-            .send_user_message(flatten_messages_to_prompt(&messages))
-            .await?;
+        session.send_user_message(flattened_prompt).await?;
         Ok(Box::new(session))
     }
 }
@@ -599,6 +619,20 @@ fn detect_permission_prompt_tool_support() -> bool {
         && !stdout.contains("Unknown option")
 }
 
+fn claude_permission_bridge_disabled() -> bool {
+    if env_flag("KOKLO_ENABLE_CLAUDE_PERMISSION_BRIDGE") {
+        return false;
+    }
+    env_flag("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE")
+}
+
+fn env_flag(name: &str) -> bool {
+    matches!(
+        env::var(name).ok().as_deref(),
+        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES") | Some("on") | Some("ON")
+    )
+}
+
 struct ClaudeStreamJsonSession {
     stdin: Mutex<ChildStdin>,
     child: Arc<Mutex<Child>>,
@@ -704,7 +738,7 @@ impl LlmProvider for ClaudeCodeCliProvider {
         messages: Vec<Message>,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(String, CompletionUsage)> {
-        let prompt = flatten_messages_to_prompt(&messages);
+        let prompt = flatten_messages_to_compact_prompt(&messages);
 
         // ── Sandboxed path (unchanged) ────────────────────────────────────────
         if let (Some(sandbox), Some(dir)) = (&self.sandbox, &self.working_dir) {
@@ -765,6 +799,24 @@ impl LlmProvider for ClaudeCodeCliProvider {
     fn provider_name(&self) -> &str {
         "claude-code-cli"
     }
+}
+
+fn request_metrics_event(
+    prompt: &str,
+    message_count: usize,
+    replay_user_messages: bool,
+) -> ProviderSessionEvent {
+    ProviderSessionEvent::Event(ProviderEvent::Metadata {
+        item_id: None,
+        kind: "request_metrics".to_string(),
+        value: serde_json::json!({
+            "provider": "claude-code",
+            "message_count": message_count,
+            "flattened_prompt_chars": prompt.chars().count(),
+            "flattened_prompt_bytes": prompt.len(),
+            "replay_user_messages": replay_user_messages,
+        }),
+    })
 }
 
 // ── stream-json parsing ───────────────────────────────────────────────────────
@@ -1564,5 +1616,13 @@ mod tests {
                 && output == "line 1\nline 2"
                 && details.cwd.as_deref() == Some("/tmp/project")
         ));
+    }
+
+    #[test]
+    fn disable_permission_bridge_env_is_respected() {
+        std::env::remove_var("KOKLO_ENABLE_CLAUDE_PERMISSION_BRIDGE");
+        std::env::set_var("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE", "1");
+        assert!(claude_permission_bridge_disabled());
+        std::env::remove_var("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE");
     }
 }
