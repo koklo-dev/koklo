@@ -31,6 +31,10 @@ pub enum PresetKind {
     Release,
     /// SDD Strict — extended SDD with security audit and docs (7 phases).
     Strict,
+    /// Review — validation and review pipeline for existing changes.
+    Review,
+    /// Audit — analysis and security-focused pipeline without implementation.
+    Audit,
     /// Custom — loads phase list from `.koklo/workflow.toml`.
     /// Falls back to [`PresetKind::Sdd`] if the file is absent or malformed.
     Custom,
@@ -48,6 +52,8 @@ impl PresetKind {
             "bugfix" | "bug-fix" | "bug_fix" => Some(Self::Bugfix),
             "release" | "release-prep" | "release_prep" => Some(Self::Release),
             "strict" | "sdd-strict" | "sdd_strict" => Some(Self::Strict),
+            "review" => Some(Self::Review),
+            "audit" => Some(Self::Audit),
             "custom" => Some(Self::Custom),
             _ => None,
         }
@@ -63,6 +69,8 @@ impl PresetKind {
             Self::Bugfix => "bugfix",
             Self::Release => "release",
             Self::Strict => "strict",
+            Self::Review => "review",
+            Self::Audit => "audit",
             Self::Custom => "custom",
         }
     }
@@ -77,6 +85,8 @@ impl PresetKind {
             Self::Bugfix => "Bugfix Fastlane",
             Self::Release => "Release Prep",
             Self::Strict => "SDD Strict",
+            Self::Review => "Review Only",
+            Self::Audit => "Audit Only",
             Self::Custom => "Custom (from .koklo/workflow.toml)",
         }
     }
@@ -91,6 +101,8 @@ impl PresetKind {
             Self::Bugfix => "Fast pipeline for hotfixes (4 phases)",
             Self::Release => "Documentation & validation for releases (3 phases)",
             Self::Strict => "Extended SDD with security audit and docs (7 phases)",
+            Self::Review => "Validate and review existing changes (2 phases)",
+            Self::Audit => "Analysis + security + review without implementation (3 phases)",
             Self::Custom => "Loads phase list from .koklo/workflow.toml",
         }
     }
@@ -103,6 +115,8 @@ impl PresetKind {
             Self::Bugfix
             | Self::Release
             | Self::Strict
+            | Self::Review
+            | Self::Audit
             | Self::Sdd
             | Self::Light
             | Self::Custom => None,
@@ -119,6 +133,8 @@ impl PresetKind {
             Self::Bugfix,
             Self::Release,
             Self::Strict,
+            Self::Review,
+            Self::Audit,
             Self::Custom,
         ]
     }
@@ -178,6 +194,12 @@ pub fn phases_for_preset(kind: PresetKind) -> Vec<(Phase, &'static str)> {
         PresetKind::Release => vec![
             (Phase::Docs, "doc-writer"),
             (Phase::Test, "qa"),
+            (Phase::Review, "reviewer"),
+        ],
+        PresetKind::Review => vec![(Phase::Test, "qa"), (Phase::Review, "reviewer")],
+        PresetKind::Audit => vec![
+            (Phase::Analysis, "analyst"),
+            (Phase::Security, "security"),
             (Phase::Review, "reviewer"),
         ],
         PresetKind::Strict => vec![
@@ -249,6 +271,16 @@ mod tests {
     }
 
     #[test]
+    fn review_has_exactly_2_phases() {
+        assert_eq!(phases_for_preset(PresetKind::Review).len(), 2);
+    }
+
+    #[test]
+    fn audit_has_exactly_3_phases() {
+        assert_eq!(phases_for_preset(PresetKind::Audit).len(), 3);
+    }
+
+    #[test]
     fn bugfix_starts_with_spec() {
         let phases = phases_for_preset(PresetKind::Bugfix);
         assert_eq!(phases[0].0, Phase::Spec);
@@ -265,6 +297,20 @@ mod tests {
     #[test]
     fn strict_includes_security() {
         let phases = phases_for_preset(PresetKind::Strict);
+        assert!(phases.iter().any(|(p, _)| *p == Phase::Security));
+    }
+
+    #[test]
+    fn review_starts_with_test() {
+        let phases = phases_for_preset(PresetKind::Review);
+        assert_eq!(phases[0].0, Phase::Test);
+        assert_eq!(phases[0].1, "qa");
+    }
+
+    #[test]
+    fn audit_includes_analysis_and_security() {
+        let phases = phases_for_preset(PresetKind::Audit);
+        assert_eq!(phases[0].0, Phase::Analysis);
         assert!(phases.iter().any(|(p, _)| *p == Phase::Security));
     }
 
