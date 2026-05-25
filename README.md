@@ -121,7 +121,7 @@ koklo run --preset speckit feature "Refactor"  # GitHub Spec Kit (6 phases)
 koklo run --preset light   task    "Fix typo"  # Minimal (3 phases)
 ```
 
-→ **[Full CLI reference →  apps/cli/README.md](apps/cli/README.md)**
+→ **[Full CLI reference → apps/cli/README.md](apps/cli/README.md)**
 
 ---
 
