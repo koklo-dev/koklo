@@ -4,9 +4,7 @@
 //! with tool events, and optionally bridges native permission prompts back into
 //! the Koklo runtime via `--permission-prompt-tool`.
 
-use super::{
-    check_claude_session, flatten_messages_to_compact_prompt, strip_ansi, CliMode,
-};
+use super::{check_claude_session, flatten_messages_to_compact_prompt, strip_ansi, CliMode};
 use crate::config::ProviderTomlEntry;
 use crate::error::ProviderError;
 use crate::{
@@ -629,7 +627,13 @@ fn claude_permission_bridge_disabled() -> bool {
 fn env_flag(name: &str) -> bool {
     matches!(
         env::var(name).ok().as_deref(),
-        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES") | Some("on") | Some("ON")
+        Some("1")
+            | Some("true")
+            | Some("TRUE")
+            | Some("yes")
+            | Some("YES")
+            | Some("on")
+            | Some("ON")
     )
 }
 
