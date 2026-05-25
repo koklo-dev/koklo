@@ -81,6 +81,46 @@ pub fn flatten_messages_to_prompt(messages: &[Message]) -> String {
     parts.join("\n\n")
 }
 
+/// Compact message flattening for Codex CLI.
+///
+/// Uses short role markers and merges adjacent turns of the same role.
+pub fn flatten_messages_to_compact_prompt(messages: &[Message]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current_role: Option<&str> = None;
+    let mut current_content = String::new();
+
+    for msg in messages {
+        let role = match msg.role.as_str() {
+            "system" => "SYS",
+            "user" => "USR",
+            "assistant" => "AST",
+            other => other,
+        };
+
+        if current_role == Some(role) {
+            if !current_content.is_empty() {
+                current_content.push('\n');
+            }
+            current_content.push_str(msg.content.trim());
+            continue;
+        }
+
+        if let Some(previous_role) = current_role.take() {
+            parts.push(format!("{previous_role}:\n{}", current_content.trim()));
+            current_content.clear();
+        }
+
+        current_role = Some(role);
+        current_content.push_str(msg.content.trim());
+    }
+
+    if let Some(role) = current_role {
+        parts.push(format!("{role}:\n{}", current_content.trim()));
+    }
+
+    parts.join("\n\n")
+}
+
 pub async fn run_sandboxed_command(
     sandbox: &Arc<dyn Sandbox>,
     workdir: &Path,
@@ -163,6 +203,21 @@ mod tests {
         let prompt = flatten_messages_to_prompt(&messages);
         assert!(prompt.contains("[Assistant]"));
         assert!(prompt.contains("q2"));
+    }
+
+    #[test]
+    fn test_flatten_messages_to_compact_prompt() {
+        let messages = vec![
+            Message::system("sys"),
+            Message::user("q1"),
+            Message::user("q2"),
+            Message::assistant("a1"),
+        ];
+        let prompt = flatten_messages_to_compact_prompt(&messages);
+        assert!(prompt.contains("SYS:\nsys"));
+        assert!(prompt.contains("USR:\nq1\nq2"));
+        assert!(prompt.contains("AST:\na1"));
+        assert!(!prompt.contains("[System]"));
     }
 
     #[test]
