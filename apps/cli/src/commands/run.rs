@@ -55,13 +55,11 @@ pub(crate) async fn cmd_run(
     }
 
     if no_tui || std::env::var("CI").is_ok() {
-        let gate_handler: Arc<dyn GateHandler> = match std::env::var("KOKLO_NO_TUI_GATE_MODE")
-            .ok()
-            .as_deref()
-        {
-            Some("stdin") => Arc::new(StdinGateHandler),
-            _ => Arc::new(AutoApproveGateHandler),
-        };
+        let gate_handler: Arc<dyn GateHandler> =
+            match std::env::var("KOKLO_NO_TUI_GATE_MODE").ok().as_deref() {
+                Some("stdin") => Arc::new(StdinGateHandler),
+                _ => Arc::new(AutoApproveGateHandler),
+            };
         let user_input_handler: Arc<dyn PipelineUserInputHandler> =
             Arc::new(koklo_workflow_engine::StdinUserInputHandler);
         let orchestrator = build_orchestrator_with_gate(
@@ -389,8 +387,10 @@ mod tests {
 
     #[test]
     fn complexity_assessment_detects_large_scope() {
-        let assessment =
-            assess_complexity("feature", "Refactor payment integration architecture and database migration");
+        let assessment = assess_complexity(
+            "feature",
+            "Refactor payment integration architecture and database migration",
+        );
         assert_eq!(assessment.band, ComplexityBand::Large);
         assert!(assessment.score >= 4);
     }
@@ -403,14 +403,24 @@ mod tests {
 
     #[test]
     fn routing_reason_mentions_complexity_score() {
-        let reason = routing_reason(PresetKind::Sdd, PresetKind::Light, "task", "Fix typo in README");
+        let reason = routing_reason(
+            PresetKind::Sdd,
+            PresetKind::Light,
+            "task",
+            "Fix typo in README",
+        );
         assert!(reason.contains("small complexity score"));
     }
 
     #[test]
     fn patch_mode_routes_to_minimal_presets() {
         assert_eq!(
-            resolve_execution_preset(PresetKind::Bmad, RunMode::Patch, "feature", "Change CTA copy"),
+            resolve_execution_preset(
+                PresetKind::Bmad,
+                RunMode::Patch,
+                "feature",
+                "Change CTA copy"
+            ),
             PresetKind::Light
         );
         assert_eq!(
@@ -422,7 +432,12 @@ mod tests {
     #[test]
     fn review_mode_routes_to_review_preset() {
         assert_eq!(
-            resolve_execution_preset(PresetKind::Sdd, RunMode::Review, "feature", "Review current changes"),
+            resolve_execution_preset(
+                PresetKind::Sdd,
+                RunMode::Review,
+                "feature",
+                "Review current changes"
+            ),
             PresetKind::Review
         );
     }
@@ -441,7 +456,9 @@ mod tests {
         std::env::remove_var("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE");
         configure_non_interactive_provider_overrides(true);
         assert_eq!(
-            std::env::var("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE").ok().as_deref(),
+            std::env::var("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE")
+                .ok()
+                .as_deref(),
             Some("1")
         );
         std::env::remove_var("KOKLO_DISABLE_CLAUDE_PERMISSION_BRIDGE");

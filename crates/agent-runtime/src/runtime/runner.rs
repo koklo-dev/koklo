@@ -173,44 +173,42 @@ impl AgentRunner {
                 } else {
                     provider_timeout_config.first_event_timeout_ms
                 };
-                let next_event = timeout(
-                    Duration::from_millis(wait_timeout_ms),
-                    session.next_event(),
-                )
-                .await
-                .map_err(|_| {
-                    let probe = if saw_provider_event {
-                        "provider_idle_timeout"
-                    } else {
-                        "provider_first_event_timeout"
-                    };
-                    let summary = if saw_provider_event {
-                        format!(
-                            "provider idle timeout after {} ms ({})",
-                            wait_timeout_ms, provider_name
-                        )
-                    } else {
-                        format!(
-                            "provider first-event timeout after {} ms ({})",
-                            wait_timeout_ms, provider_name
-                        )
-                    };
-                    emit_provider_runtime_probe(
-                        &bus,
-                        &session_id_str,
-                        phase,
-                        &agent_name,
-                        TranscriptItemStatus::Failed,
-                        summary.clone(),
-                        serde_json::json!({
-                            "provider": provider_name,
-                            "probe": probe,
-                            "timeout_ms": wait_timeout_ms,
-                            "turn_count": turn_count,
-                        }),
-                    );
-                    anyhow::anyhow!("{summary}")
-                })??;
+                let next_event =
+                    timeout(Duration::from_millis(wait_timeout_ms), session.next_event())
+                        .await
+                        .map_err(|_| {
+                            let probe = if saw_provider_event {
+                                "provider_idle_timeout"
+                            } else {
+                                "provider_first_event_timeout"
+                            };
+                            let summary = if saw_provider_event {
+                                format!(
+                                    "provider idle timeout after {} ms ({})",
+                                    wait_timeout_ms, provider_name
+                                )
+                            } else {
+                                format!(
+                                    "provider first-event timeout after {} ms ({})",
+                                    wait_timeout_ms, provider_name
+                                )
+                            };
+                            emit_provider_runtime_probe(
+                                &bus,
+                                &session_id_str,
+                                phase,
+                                &agent_name,
+                                TranscriptItemStatus::Failed,
+                                summary.clone(),
+                                serde_json::json!({
+                                    "provider": provider_name,
+                                    "probe": probe,
+                                    "timeout_ms": wait_timeout_ms,
+                                    "turn_count": turn_count,
+                                }),
+                            );
+                            anyhow::anyhow!("{summary}")
+                        })??;
 
                 if !saw_provider_event {
                     saw_provider_event = true;

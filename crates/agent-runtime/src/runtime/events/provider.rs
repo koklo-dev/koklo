@@ -3,8 +3,8 @@ use super::transcript::{
     emit_provider_transcript, emit_text_delta, emit_user_input_request, transcript_status,
 };
 use super::types::{AgentTurnContext, RuntimeApprovalRequest, RuntimeInterruption, TextBuffers};
-use crate::synthetic_user_input::SyntheticUserInputParser;
 use crate::runtime::reasoning_visible;
+use crate::synthetic_user_input::SyntheticUserInputParser;
 use koklo_events::{
     PipelineEvent, TranscriptItemKind, TranscriptItemStatus, TranscriptSource, UserInputDisplay,
 };

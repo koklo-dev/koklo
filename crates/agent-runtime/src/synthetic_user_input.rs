@@ -82,7 +82,9 @@ impl SyntheticUserInputParser {
                     if let Ok(request) = parse_synthetic_user_input_request(&json_text) {
                         self.request = Some(request);
                     } else {
-                        visible.push(TextSegment::Visible(format!("{open_tag}{json_text}{close_tag}")));
+                        visible.push(TextSegment::Visible(format!(
+                            "{open_tag}{json_text}{close_tag}"
+                        )));
                     }
                     continue;
                 }
@@ -200,7 +202,8 @@ mod tests {
     #[test]
     fn synthetic_parser_extracts_request_block() {
         let mut parser = SyntheticUserInputParser::default();
-        let out = parser.push("before <koklo:ui>{\"q\":[{\"q\":\"Which path?\"}]}</koklo:ui> after");
+        let out =
+            parser.push("before <koklo:ui>{\"q\":[{\"q\":\"Which path?\"}]}</koklo:ui> after");
         let visible = out
             .into_iter()
             .map(|segment| match segment {
