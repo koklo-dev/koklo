@@ -14,31 +14,60 @@
   "specialized_agents": [],
   "specialized_workflows": [],
   "specialized_skills": [],
-  "clarifications_pending": ["Audit command is TO CLARIFY because no repository audit script was detected.","Coverage tool is TO CLARIFY because no repository coverage configuration was detected.","Some README architecture modules are planned but not present in the current tree, such as apps/web, sync-server, pr-manager, deploy-abstract, voice, collab, and ide-bridge."],
-  "last_updated": "2026-06-01",
-  "last_workflow_run": null,
-  "last_workflow_stage": null,
-  "last_workflow_result": null,
+  "clarifications_pending": [],
+  "clarifications_resolved": [
+    {
+      "date": "2026-06-01",
+      "task": "US-001",
+      "answer": "No repository-wide audit command exists yet. Current available audit surface is pnpm audit for JS dependencies; Rust audit tooling must be added as a backlog follow-up."
+    },
+    {
+      "date": "2026-06-01",
+      "task": "US-001",
+      "answer": "No repository-wide coverage tool is configured. Coverage verification remains blocked until a Rust/TypeScript coverage command is added as backlog follow-up."
+    },
+    {
+      "date": "2026-06-01",
+      "task": "US-001",
+      "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
+    }
+  ],
+  "last_updated": "2026-06-01T11:19:09+02:00",
+  "last_workflow_run": "spike-research",
+  "last_workflow_stage": "finalization",
+  "last_workflow_result": "passed",
   "active_workflow_run": null,
-  "workflow_runs": [],
-  "last_task_completed": null,
+  "workflow_runs": [
+    {
+      "id": "spike-research-20260601111909",
+      "workflow": "spike-research",
+      "sprint": "001",
+      "task": "US-001",
+      "result": "passed",
+      "completed_at": "2026-06-01T11:19:09+02:00"
+    }
+  ],
+  "last_task_completed": "US-001",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",
       "name": "koklo",
       "role": "core",
+      "stack": "Rust workspace + Tauri 2 + TypeScript/React pnpm workspace",
       "description": "Repo principal open core de Koklo : monorepo Rust/Tauri/React, CLI, desktop app, crates backend et packages frontend."
     },
     {
       "path": "/home/devops/perso/projets/koklo/koklo-ee",
       "name": "koklo-ee",
       "role": "enterprise",
+      "stack": "Rust workspace",
       "description": "Repo de la partie entreprise de Koklo."
     },
     {
       "path": "/home/devops/perso/projets/koklo/koklo-storybook",
       "name": "koklo-storybook",
       "role": "storybook",
+      "stack": "TypeScript/React/Vite/Storybook",
       "description": "Repo contenant le Storybook, les composants et certains ecrans pour l'application desktop."
     }
   ]
