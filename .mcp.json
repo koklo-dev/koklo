@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "cve-mcp": {
+      "command": "/home/devops/.agent-setup/vendor/cve-mcp-server/.venv/bin/python",
+      "args": ["-m", "cve_mcp.server"],
+      "cwd": "/home/devops/.agent-setup/vendor/cve-mcp-server"
+    }
+  }
+}

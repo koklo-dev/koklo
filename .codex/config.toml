@@ -1,0 +1,12 @@
+# Project-local Codex CLI config — MCP servers mirrored from .mcp.json (Claude Code).
+# Codex merges this with ~/.codex/config.toml; the closer file wins.
+# Project-local config only loads when the project is marked trusted.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+[mcp_servers.cve-mcp]
+command = "/home/devops/.agent-setup/vendor/cve-mcp-server/.venv/bin/python"
+args = ["-m", "cve_mcp.server"]
+cwd = "/home/devops/.agent-setup/vendor/cve-mcp-server"

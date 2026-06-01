@@ -27,6 +27,34 @@
 
 </div>
 
+<!-- generated-by: /init-project -->
+## Multi-Agent Workflow
+
+This project uses an agent-driven workflow. See:
+- `.claude/CLAUDE.md` — entry point for Claude Code sessions
+- `AGENTS.md` — entry point for Codex CLI sessions
+- `/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md` — non-negotiable engineering rules
+- `/home/devops/perso/projets/MyVault/Dev/koklo/agents/<role>/` — agent definitions and memory
+- `/home/devops/perso/projets/MyVault/Dev/koklo/workflows/definitions/` — named workflow definitions
+- `/home/devops/perso/projets/MyVault/Dev/koklo/sprints/` — backlog and sprint files
+- `/home/devops/perso/projets/MyVault/Dev/koklo/workflows/runs/` — persisted workflow-run artifacts and handoffs
+
+Run sprint-scoped orchestration:
+```text
+/sprint 001
+/sprint 001 US-001
+```
+
+Run direct workflow orchestration:
+```text
+/run-workflow analyze-design-dev-review US-001
+```
+
+Migrate an older initialized project:
+```text
+/upgrade-project
+```
+
 ---
 
 ## The Problem
