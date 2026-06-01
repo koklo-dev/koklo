@@ -1173,8 +1173,12 @@ mod tests {
 
     #[test]
     fn test_from_config_missing_key() {
-        std::env::remove_var("OPENROUTER_API_KEY");
-        let entry = ProviderTomlEntry::default();
+        let unique_var = "KOKLO_TEST_OPENROUTER_MISSING_KEY_XYZ123";
+        std::env::remove_var(unique_var);
+        let entry = ProviderTomlEntry {
+            api_key_env: Some(unique_var.to_string()),
+            ..Default::default()
+        };
         let result = OpenRouterProvider::from_config(&entry);
         assert!(matches!(result, Err(ProviderError::MissingApiKey { .. })));
     }
