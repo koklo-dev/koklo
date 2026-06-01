@@ -1,0 +1,45 @@
+{
+  "project_name": "koklo",
+  "project_type": "existing",
+  "stack": "Rust workspace + Tauri 2 desktop + TypeScript/React pnpm workspace",
+  "architecture_style": "modular monorepo with Rust crates, Tauri desktop app, CLI app, TypeScript packages, SQLite storage, workflow/agent modules",
+  "vault_path": "/home/devops/perso/projets/MyVault/Dev",
+  "vault_project_path": "/home/devops/perso/projets/MyVault/Dev/koklo",
+  "vision_source": "/home/devops/perso/projets/MyVault/Dev/koklo/vision.md",
+  "vision_mode": "verbatim",
+  "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
+  "current_sprint": 1,
+  "completed_sprints": [],
+  "active_agents": [],
+  "specialized_agents": [],
+  "specialized_workflows": [],
+  "specialized_skills": [],
+  "clarifications_pending": ["Audit command is TO CLARIFY because no repository audit script was detected.","Coverage tool is TO CLARIFY because no repository coverage configuration was detected.","Some README architecture modules are planned but not present in the current tree, such as apps/web, sync-server, pr-manager, deploy-abstract, voice, collab, and ide-bridge."],
+  "last_updated": "2026-06-01",
+  "last_workflow_run": null,
+  "last_workflow_stage": null,
+  "last_workflow_result": null,
+  "active_workflow_run": null,
+  "workflow_runs": [],
+  "last_task_completed": null,
+  "repos": [
+    {
+      "path": "/home/devops/RustroverProjects/koklo",
+      "name": "koklo",
+      "role": "core",
+      "description": "Repo principal open core de Koklo : monorepo Rust/Tauri/React, CLI, desktop app, crates backend et packages frontend."
+    },
+    {
+      "path": "/home/devops/perso/projets/koklo/koklo-ee",
+      "name": "koklo-ee",
+      "role": "enterprise",
+      "description": "Repo de la partie entreprise de Koklo."
+    },
+    {
+      "path": "/home/devops/perso/projets/koklo/koklo-storybook",
+      "name": "koklo-storybook",
+      "role": "storybook",
+      "description": "Repo contenant le Storybook, les composants et certains ecrans pour l'application desktop."
+    }
+  ]
+}
