@@ -8,4 +8,8 @@ description = "Koklo desktop application shell"
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
 koklo-storage = { path = "../../../crates/storage" }
+koklo-events = { path = "../../../crates/events" }
+koklo-providers = { path = "../../../crates/providers" }

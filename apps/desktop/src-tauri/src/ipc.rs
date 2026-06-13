@@ -14,7 +14,7 @@
 //! TypeScript contract; their Rust adapters land when the Tauri command runtime
 //! and a DB pool are wired into the desktop shell (later P2 sprint).
 
-use koklo_storage::{Session, TranscriptItemRecord};
+use koklo_storage::{Session, SessionUsageSummary, TranscriptItemRecord};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -117,6 +117,29 @@ pub fn transcript_since(rows: Vec<TranscriptItemRecord>, since_seq: i64) -> Vec<
         .collect()
 }
 
+/// Session token/cost roll-up (Settings → usage meter). Pure projection of
+/// `koklo_storage::SessionUsageSummary`; phase breakdown is dropped (the meter
+/// only needs the totals).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageSummaryDto {
+    pub session_id: String,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub cost_usd: Option<f64>,
+}
+
+impl From<SessionUsageSummary> for UsageSummaryDto {
+    fn from(s: SessionUsageSummary) -> Self {
+        Self {
+            session_id: s.session_id,
+            prompt_tokens: s.total_prompt_tokens,
+            completion_tokens: s.total_completion_tokens,
+            cost_usd: s.total_cost_usd,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +218,22 @@ mod tests {
     #[test]
     fn contract_version_is_pinned() {
         assert_eq!(IPC_CONTRACT_VERSION, "koklo.ipc.v1");
+    }
+
+    #[test]
+    fn usage_summary_dto_projects_totals() {
+        let summary = SessionUsageSummary {
+            session_id: "s1".to_string(),
+            phases: vec![],
+            total_prompt_tokens: 1200,
+            total_completion_tokens: 340,
+            total_cost_usd: Some(0.21),
+        };
+        let dto = UsageSummaryDto::from(summary);
+        assert_eq!(dto.prompt_tokens, 1200);
+        assert_eq!(dto.completion_tokens, 340);
+        assert_eq!(dto.cost_usd, Some(0.21));
+        let json = serde_json::to_value(&dto).unwrap();
+        assert!(json.get("costUsd").is_some());
     }
 }

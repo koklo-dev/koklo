@@ -1459,9 +1459,13 @@ name = "koklo-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "koklo-events",
+ "koklo-providers",
  "koklo-storage",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
