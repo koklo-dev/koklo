@@ -104,8 +104,7 @@ pub(crate) async fn cmd_agent_run(name: &str, input: Option<String>) -> Result<(
     let project_config = PipelineTomlConfig::load_from_project_root(&project_root)?;
     let merged = global.merge(project_config);
     let registry = Arc::new(ProviderRegistry::build(&merged)?);
-    let provider =
-        determine_default_provider(&registry, merged.pipeline.default_provider.as_deref())?;
+    let provider = determine_default_provider(&registry, &merged).await?;
 
     let global_home = home_dirs::koklo_home();
     let project_context_dir = project_root.join(".koklo");

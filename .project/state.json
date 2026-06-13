@@ -8,7 +8,7 @@
   "vision_source": "/home/devops/perso/projets/MyVault/Dev/koklo/vision.md",
   "vision_mode": "verbatim",
   "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
-  "current_sprint": 2,
+  "current_sprint": 3,
   "completed_sprints": [],
   "active_agents": [],
   "specialized_agents": [],
@@ -32,8 +32,8 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-13T11:36:00+02:00",
-  "last_workflow_run": "product-owner-developer-qa-reviewer",
+  "last_updated": "2026-06-13T12:30:00+02:00",
+  "last_workflow_run": "analyst-developer-qa-reviewer",
   "last_workflow_stage": "qa-reviewer",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
@@ -77,9 +77,25 @@
       "task": "US-005",
       "result": "passed",
       "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613115450",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "003",
+      "task": "US-006",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:55:00+02:00"
+    },
+    {
+      "id": "analyst-developer-qa-reviewer-20260613121559",
+      "workflow": "analyst-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: detect local claude/codex + Rust protocol library",
+      "result": "passed",
+      "completed_at": "2026-06-13T12:30:00+02:00"
     }
   ],
-  "last_task_completed": "all",
+  "last_task_completed": "ad-hoc: local CLI detection + ADR-025",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",

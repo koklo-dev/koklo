@@ -7,6 +7,7 @@
 
 pub mod cli;
 pub mod config;
+pub mod detect;
 pub mod error;
 pub mod fallback;
 pub mod ollama;
@@ -18,6 +19,9 @@ pub mod secrets;
 pub use cli::claude_code::ClaudeCodeCliProvider;
 pub use cli::codex::CodexCliProvider;
 pub use config::{AgentTomlConfig, PipelineTomlConfig, ProviderRouting, ProviderTomlEntry};
+pub use detect::{
+    detect_provider, list_ollama_models, ollama_base_url, DetectionSource, ProviderDetection,
+};
 pub use error::ProviderError;
 pub use fallback::FallbackProvider;
 pub use ollama::OllamaProvider;
