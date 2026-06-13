@@ -1422,7 +1422,6 @@ dependencies = [
  "crossterm",
  "dirs",
  "koklo-agent-runtime",
- "koklo-core",
  "koklo-doc-generator",
  "koklo-events",
  "koklo-git-engine",
@@ -1460,7 +1459,6 @@ name = "koklo-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "koklo-core",
 ]
 
 [[package]]
@@ -1537,7 +1535,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "koklo-core",
  "koklo-events",
  "serde",
  "serde_json",

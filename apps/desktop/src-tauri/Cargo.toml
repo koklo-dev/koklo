@@ -6,4 +6,3 @@ description = "Koklo desktop application shell"
 
 [dependencies]
 anyhow = { workspace = true }
-koklo-core = { path = "../../../crates/core" }
