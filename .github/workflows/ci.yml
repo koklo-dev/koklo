@@ -34,6 +34,14 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Tests
         run: cargo test --workspace
+      - name: Happy-path E2E (mock LLM)
+        # Explicit P1 §4 gate. The deterministic, model-free end-to-end test
+        # (apps/cli/tests/happy_path.rs) is already covered by the workspace
+        # run above; it is pinned here as a named gate so a happy-path
+        # regression is obvious in the CI summary. See CONTRIBUTING.md.
+        run: cargo test -p koklo-cli --test happy_path
+        env:
+          RUST_BACKTRACE: 1
 
   frontend-checks:
     name: TypeScript - Build & Lint
