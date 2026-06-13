@@ -102,6 +102,12 @@ Koklo ships today as a **Rust CLI**. The desktop app is Phase 2 and not yet read
 ### Prerequisites
 
 - **Rust** ≥ 1.75 with Cargo — install via [rustup](https://rustup.rs).
+- **One LLM provider.** Koklo auto-detects the first one that's actually ready, in order:
+  1. **Claude Code CLI** or **Codex CLI** installed and authenticated (uses your existing subscription),
+  2. an **`OPENROUTER_API_KEY`** in your environment,
+  3. a running **Ollama** with the model pulled (`ollama pull qwen2.5-coder:7b`).
+
+  You don't pick one manually — whatever is available is used. See [Configure a provider](#configure-a-provider) to override per agent.
 
 Nothing else is required to run the CLI: no Node.js, pnpm, or Tauri/system libraries (those are only needed to hack on the desktop app).
 
@@ -125,12 +131,20 @@ koklo --version   # koklo 0.1.0
 
 ### Run your first pipeline
 
+The fastest path is the guided first run, which checks your provider and walks you through the first pipeline:
+
+```bash
+koklo start
+```
+
+Prefer to drive it yourself?
+
 ```bash
 # Initialise Koklo in your project (auto-detects stack, creates .koklo/pipeline.toml)
 koklo init
 
 # Run a minimal 3-phase pipeline
-koklo run --preset light   task    "Fix a typo in the README"
+koklo run --preset light   task    "Add a one-paragraph project description to the README"
 
 # …or the default Spec-Driven Development flow (5 phases)
 koklo run                  feature "Auth JWT"
@@ -140,17 +154,19 @@ koklo run --preset bmad    feature "Add OAuth2"      # BMAD Method (8 phases)
 koklo run --preset speckit feature "Refactor storage" # GitHub Spec Kit (6 phases)
 ```
 
-Running headless (CI, scripting)? Add `--no-tui` to approve gates from stdin.
+When the run finishes, the generated artifacts (`spec.md`, `implement.md`, `review.md`, …) are written to **`docs/planning_artifacts/`** in your project — the final summary prints the exact path.
+
+Running headless (CI, scripting)? Add `--no-tui` to approve gates from stdin. A failed run exits non-zero so CI can detect it.
 
 → **[Full CLI reference → apps/cli/README.md](apps/cli/README.md)**
 
 ### Configure a provider
 
-Koklo is LLM-agnostic. Choose a provider per agent with a `KOKLO_PROVIDER_<AGENT>` environment variable or in `.koklo/pipeline.toml`. Resolution order per agent: `KOKLO_PROVIDER_<AGENT>` env var → `agent_providers` map in the TOML → `default_provider`.
+Koklo is LLM-agnostic. By default it **auto-detects** an available provider (a ready Claude Code/Codex CLI → an `OPENROUTER_API_KEY` → an Ollama server with the model pulled). To pin one explicitly, set it per agent with a `KOKLO_PROVIDER_<AGENT>` environment variable or in `.koklo/pipeline.toml`. Resolution order per agent: `KOKLO_PROVIDER_<AGENT>` env var → `agent_providers` map in the TOML → `default_provider` → auto-detection.
 
 | Provider | Setup | Configuration |
 |----------|-------|---------------|
-| **Ollama** — local, offline, free | Run `ollama serve` | `OLLAMA_BASE_URL` (default `http://localhost:11434`), `OLLAMA_MODEL` (default `qwen2.5-coder:7b`) |
+| **Ollama** — local, offline, free | `ollama serve`, then **`ollama pull qwen2.5-coder:7b`** (Koklo skips Ollama until the model is pulled) | `OLLAMA_BASE_URL` (default `http://localhost:11434`), `OLLAMA_MODEL` (default `qwen2.5-coder:7b`) |
 | **OpenRouter** — BYOK gateway | `export OPENROUTER_API_KEY=…` then `koklo provider add openrouter` | `OPENROUTER_API_KEY` |
 | **Claude Code CLI** | Install and authenticate the `claude` CLI | — (uses your existing session) |
 | **Codex CLI** | Install and authenticate the `codex` CLI | — (uses your existing session) |

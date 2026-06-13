@@ -1,7 +1,7 @@
 //! First-run provider auto-detection and global config precedence.
 //!
 //! Resolution order:
-//!   1. A running Ollama server (local, free, zero-config)
+//!   1. A running Ollama server with the configured model pulled (local, free)
 //!   2. A locally-installed agent CLI on `PATH` — `claude` then `codex`
 //!      (uses the user's existing subscription, no API key)
 //!   3. An API key in the environment / secrets file (e.g. `OPENROUTER_API_KEY`)
@@ -31,7 +31,7 @@ const ENV_KEY_PROVIDERS: &[(&str, &str)] = &[("OPENROUTER_API_KEY", "openrouter"
 /// Why a provider was selected during auto-detection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DetectionSource {
-    /// A reachable Ollama server exposing at least one model.
+    /// A reachable Ollama server with the configured model pulled.
     Ollama {
         base_url: String,
         models: Vec<String>,
@@ -81,6 +81,34 @@ pub fn ollama_base_url(config: &PipelineTomlConfig) -> String {
         .unwrap_or_else(|| DEFAULT_OLLAMA_URL.to_string())
 }
 
+/// Default Ollama model used when none is configured (mirrors the provider).
+pub const DEFAULT_OLLAMA_MODEL: &str = "qwen2.5-coder:7b";
+
+/// Resolve the Ollama model that the provider would actually run, following
+/// config → `OLLAMA_MODEL` → default — the same precedence as the provider.
+pub fn configured_ollama_model(config: &PipelineTomlConfig) -> String {
+    config
+        .providers
+        .get("ollama")
+        .and_then(|entry| entry.model.clone())
+        .or_else(|| std::env::var("OLLAMA_MODEL").ok())
+        .unwrap_or_else(|| DEFAULT_OLLAMA_MODEL.to_string())
+}
+
+/// Whether the model Koklo would run is among the pulled Ollama models.
+///
+/// Ollama reports tagged names (`qwen2.5-coder:7b`, `llama3:latest`). A bare
+/// configured name (`llama3`) matches its `:latest` tag and any `name:tag`
+/// variant, so "Ollama is running but the model isn't pulled" is detected
+/// instead of picking a provider that would fail on first use.
+fn ollama_model_available(available: &[String], wanted: &str) -> bool {
+    available.iter().any(|name| {
+        name == wanted
+            || name == &format!("{wanted}:latest")
+            || (!wanted.contains(':') && name.starts_with(&format!("{wanted}:")))
+    })
+}
+
 /// List local Ollama model names from `<base_url>/api/tags`.
 ///
 /// Returns an error when the server is unreachable or returns a non-success
@@ -125,8 +153,12 @@ fn config_provider(config: &PipelineTomlConfig) -> Option<String> {
 /// touching process-global env, `PATH`, or the network.
 pub async fn detect_provider(config: &PipelineTomlConfig) -> ProviderDetection {
     let base_url = ollama_base_url(config);
+    let wanted_model = configured_ollama_model(config);
     let ollama = match list_ollama_models(&base_url).await {
-        Ok(models) if !models.is_empty() => Some((base_url, models)),
+        // Only pick Ollama when the model we'd actually run is pulled; a
+        // running-but-empty (or wrong-model) Ollama falls through to a CLI /
+        // cloud provider that is ready to use.
+        Ok(models) if ollama_model_available(&models, &wanted_model) => Some((base_url, models)),
         _ => None,
     };
     let local_cli = LOCAL_CLI_PROVIDERS
@@ -356,13 +388,32 @@ mod tests {
         assert!(list_ollama_models("http://127.0.0.1:1").await.is_err());
     }
 
+    #[test]
+    fn ollama_model_available_matches_exact_and_latest_and_tagged() {
+        let pulled = vec!["qwen2.5-coder:7b".to_string(), "llama3:latest".to_string()];
+        // Exact tagged match.
+        assert!(ollama_model_available(&pulled, "qwen2.5-coder:7b"));
+        // Bare name matches its `:latest` tag.
+        assert!(ollama_model_available(&pulled, "llama3"));
+        // Bare name matches any `name:tag` variant.
+        assert!(ollama_model_available(
+            &["qwen2.5-coder:7b".to_string()],
+            "qwen2.5-coder"
+        ));
+        // Not pulled.
+        assert!(!ollama_model_available(&pulled, "mistral"));
+        assert!(!ollama_model_available(&[], "qwen2.5-coder:7b"));
+    }
+
     #[tokio::test]
-    async fn detect_provider_returns_ollama_against_live_tags() {
+    async fn detect_provider_returns_ollama_when_configured_model_is_pulled() {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/tags"))
             .respond_with(
-                ResponseTemplate::new(200).set_body_string(r#"{"models":[{"name":"llama3.2"}]}"#),
+                ResponseTemplate::new(200).set_body_string(
+                    r#"{"models":[{"name":"qwen2.5-coder:7b"},{"name":"llama3.2"}]}"#,
+                ),
             )
             .mount(&server)
             .await;
@@ -382,5 +433,43 @@ mod tests {
             ProviderDetection::Detected { ref provider, source: DetectionSource::Ollama { .. } }
                 if provider == "ollama"
         ));
+    }
+
+    #[tokio::test]
+    async fn detect_provider_skips_ollama_when_configured_model_not_pulled() {
+        // Ollama is running but only has an unrelated model — the model Koklo
+        // would run (`qwen2.5-coder:7b` by default) is absent, so Ollama must
+        // NOT be selected. What it falls through to (local CLI, env key, config,
+        // or needs-selection) depends on the host, so assert only that Ollama
+        // was skipped — that is the behaviour under test.
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/tags"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(r#"{"models":[{"name":"llava:7b"}]}"#),
+            )
+            .mount(&server)
+            .await;
+
+        let mut cfg = PipelineTomlConfig::default();
+        cfg.providers.insert(
+            "ollama".to_string(),
+            ProviderTomlEntry {
+                base_url: Some(server.uri()),
+                ..Default::default()
+            },
+        );
+
+        let detection = detect_provider(&cfg).await;
+        assert!(
+            !matches!(
+                detection,
+                ProviderDetection::Detected {
+                    source: DetectionSource::Ollama { .. },
+                    ..
+                }
+            ),
+            "Ollama must not be selected when its configured model is not pulled, got {detection:?}"
+        );
     }
 }

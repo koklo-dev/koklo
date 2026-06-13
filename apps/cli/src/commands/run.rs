@@ -69,24 +69,13 @@ pub(crate) async fn cmd_run(
             user_input_handler,
         )
         .await?;
+        let artifacts_dir = orchestrator.artifacts_dir().to_path_buf();
         let session_id = orchestrator
             .run_feature_with_preset(title, execution_preset)
             .await?;
         let storage = open_storage().await?;
-        if let Some(session) = storage.get_session(&session_id).await? {
-            println!(
-                "\nPipeline complete — session: {}\nWorkspace: {}\nBranch: {}",
-                session_id,
-                session.workspace_path,
-                if session.workspace_branch.is_empty() {
-                    "(shared project tree)"
-                } else {
-                    &session.workspace_branch
-                }
-            );
-        } else {
-            println!("\nPipeline complete — session: {}", session_id);
-        }
+        let session = storage.get_session(&session_id).await?;
+        print_completion(&session_id, session.as_ref(), &artifacts_dir);
         return Ok(());
     }
 
@@ -110,6 +99,8 @@ pub(crate) async fn cmd_run(
 
     let event_rx = orchestrator.event_bus().subscribe();
     let storage = orchestrator.storage_handle();
+    let storage_for_summary = Arc::clone(&storage);
+    let artifacts_dir = orchestrator.artifacts_dir().to_path_buf();
 
     koklo_agent_runtime::set_stdout_streaming_enabled(false);
 
@@ -135,17 +126,55 @@ pub(crate) async fn cmd_run(
 
     match pipeline.await {
         Ok(Ok(session_id)) => {
-            println!("\nPipeline complete — session: {}", session_id);
+            let session = storage_for_summary
+                .get_session(&session_id)
+                .await
+                .ok()
+                .flatten();
+            print_completion(&session_id, session.as_ref(), &artifacts_dir);
+            Ok(())
         }
+        // Propagate failures so the process exits non-zero (CI/scripting can
+        // detect them) instead of printing an error and exiting 0.
         Ok(Err(error)) => {
             eprintln!("\nPipeline error: {}", error);
+            Err(error)
         }
         Err(error) => {
             eprintln!("\nPipeline task panicked: {}", error);
+            Err(anyhow::anyhow!("pipeline task panicked: {error}"))
         }
     }
+}
 
-    Ok(())
+/// Print the end-of-run summary: session id, workspace, branch, and where the
+/// generated artifacts landed in the user's project.
+fn print_completion(
+    session_id: &str,
+    session: Option<&koklo_storage::Session>,
+    artifacts_dir: &std::path::Path,
+) {
+    let Some(session) = session else {
+        println!("\nPipeline complete — session: {}", session_id);
+        return;
+    };
+    let branch = if session.workspace_branch.is_empty() {
+        "(shared project tree)"
+    } else {
+        &session.workspace_branch
+    };
+    let artifacts_location = if artifacts_dir.is_absolute() {
+        artifacts_dir.to_path_buf()
+    } else {
+        std::path::Path::new(&session.project_path).join(artifacts_dir)
+    };
+    println!(
+        "\nPipeline complete — session: {}\nWorkspace: {}\nBranch: {}\nArtifacts: {}",
+        session_id,
+        session.workspace_path,
+        branch,
+        artifacts_location.display(),
+    );
 }
 
 fn configure_non_interactive_provider_overrides(non_interactive: bool) {
