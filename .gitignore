@@ -49,3 +49,7 @@ Thumbs.db
 
 # OpenClaw
 .openclaw/.env
+/prompt-constellation-maquette.txt
+/prompt-onboarding-steps.txt
+/prompt-settings-detail.txt
+/prompt-workflows-koklo.txt
