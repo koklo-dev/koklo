@@ -8,7 +8,7 @@
   "vision_source": "/home/devops/perso/projets/MyVault/Dev/koklo/vision.md",
   "vision_mode": "verbatim",
   "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
-  "current_sprint": 1,
+  "current_sprint": 2,
   "completed_sprints": [],
   "active_agents": [],
   "specialized_agents": [],
@@ -32,9 +32,9 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-01T11:19:09+02:00",
-  "last_workflow_run": "spike-research",
-  "last_workflow_stage": "finalization",
+  "last_updated": "2026-06-13T11:36:00+02:00",
+  "last_workflow_run": "product-owner-developer-qa-reviewer",
+  "last_workflow_stage": "qa-reviewer",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
   "workflow_runs": [
@@ -45,9 +45,41 @@
       "task": "US-001",
       "result": "passed",
       "completed_at": "2026-06-01T11:19:09+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613112400",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-002",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613112401",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-003",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613112402",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-004",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "product-owner-developer-qa-reviewer-20260613112403",
+      "workflow": "product-owner-developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-005",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
     }
   ],
-  "last_task_completed": "US-001",
+  "last_task_completed": "all",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",
