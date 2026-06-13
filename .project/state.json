@@ -8,7 +8,7 @@
   "vision_source": "/home/devops/perso/projets/MyVault/Dev/koklo/vision.md",
   "vision_mode": "verbatim",
   "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
-  "current_sprint": 5,
+  "current_sprint": 6,
   "completed_sprints": [3, 4],
   "active_agents": [],
   "specialized_agents": [],
@@ -32,8 +32,8 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-13T22:40:00+02:00",
-  "last_workflow_run": "spike-research",
+  "last_updated": "2026-06-14T00:18:00+02:00",
+  "last_workflow_run": "developer-qa-reviewer",
   "last_workflow_stage": "final-summary",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
@@ -141,9 +141,25 @@
       "task": "US-012",
       "result": "passed",
       "completed_at": "2026-06-13T22:26:00+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260614000024",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "006",
+      "task": "US-013",
+      "result": "passed",
+      "completed_at": "2026-06-14T00:30:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260614001303",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "006",
+      "task": "US-014",
+      "result": "passed",
+      "completed_at": "2026-06-14T00:18:00+02:00"
     }
   ],
-  "last_task_completed": "US-012",
+  "last_task_completed": "US-014",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",

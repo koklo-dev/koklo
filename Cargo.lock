@@ -1459,6 +1459,9 @@ name = "koklo-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "koklo-storage",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

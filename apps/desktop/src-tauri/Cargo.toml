@@ -6,3 +6,6 @@ description = "Koklo desktop application shell"
 
 [dependencies]
 anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+koklo-storage = { path = "../../../crates/storage" }
