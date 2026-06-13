@@ -30,6 +30,18 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::time::{sleep, Duration};
 
 const CLAUDE_PERMISSION_TOOL_NAME: &str = "koklo_permission_prompt";
+const CLAUDE_PERMISSION_MCP_SERVER: &str = "koklo-permission-bridge";
+
+/// Fully-qualified name Claude Code uses to reference an MCP tool: it namespaces
+/// every MCP tool as `mcp__<server>__<tool>`. Passing the bare tool name to
+/// `--permission-prompt-tool` never matches, surfacing as
+/// "MCP tool koklo_permission_prompt ... not found".
+fn claude_permission_tool_qualified() -> String {
+    format!(
+        "mcp__{}__{}",
+        CLAUDE_PERMISSION_MCP_SERVER, CLAUDE_PERMISSION_TOOL_NAME
+    )
+}
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
 
@@ -136,7 +148,7 @@ impl ClaudeCodeCliProvider {
             args.push("--mcp-config".to_string());
             args.push(bridge.mcp_config_json.clone());
             args.push("--permission-prompt-tool".to_string());
-            args.push(CLAUDE_PERMISSION_TOOL_NAME.to_string());
+            args.push(claude_permission_tool_qualified());
         } else {
             args.push("--dangerously-skip-permissions".to_string());
         }
@@ -1418,6 +1430,32 @@ fn extract_input_summary(input: &serde_json::Value, tool_name: &str) -> String {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn test_permission_tool_qualified_name_matches_mcp_namespacing() {
+        // Claude Code references MCP tools as `mcp__<server>__<tool>`. The bare
+        // tool name passed to `--permission-prompt-tool` never matches, which
+        // surfaced as "MCP tool koklo_permission_prompt ... not found".
+        assert_eq!(
+            claude_permission_tool_qualified(),
+            "mcp__koklo-permission-bridge__koklo_permission_prompt"
+        );
+    }
+
+    #[test]
+    fn test_permission_prompt_args_use_qualified_tool_name() {
+        let bridge = ClaudePermissionBridge::new().expect("bridge");
+        let args = ClaudeCodeCliProvider::build_stream_json_args(Some(&bridge));
+        let idx = args
+            .iter()
+            .position(|a| a == "--permission-prompt-tool")
+            .expect("--permission-prompt-tool present");
+        assert_eq!(args[idx + 1], claude_permission_tool_qualified());
+        // The MCP server key in the config must match the qualified namespace.
+        assert!(bridge
+            .mcp_config_json
+            .contains(CLAUDE_PERMISSION_MCP_SERVER));
+    }
 
     #[test]
     fn test_extract_input_summary_write() {
