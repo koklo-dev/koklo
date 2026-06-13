@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "echo building @koklo/ui",
-    "lint": "echo linting @koklo/ui",
-    "typecheck": "echo typechecking @koklo/ui"
+    "build": "echo '[@koklo/ui] no-op: package is a P2 placeholder, nothing built (see sprints/backlog)'",
+    "lint": "echo '[@koklo/ui] no-op: no linter configured, deferred to P2 (see sprints/backlog)'",
+    "typecheck": "echo '[@koklo/ui] no-op: no sources to typecheck yet, deferred to P2 (see sprints/backlog)'"
   }
 }

@@ -44,7 +44,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   frontend-checks:
-    name: TypeScript - Build & Lint
+    name: Frontend - Desktop scaffold compile (P1 minimal)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,9 +56,24 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
-      - run: pnpm run typecheck
-      - run: pnpm run build
+      # Frontend quality gating is intentionally MINIMAL at P1 and deferred to P2.
+      #
+      # The workspace-wide `pnpm run lint` / `typecheck` / `build` scripts used to
+      # run here, but @koklo/ui, @koklo/constellation and @koklo/trpc-client (and
+      # the desktop `lint`) only expose echo-stub scripts (`echo linting @koklo/...`).
+      # Running them produced a misleading green that implied frontend quality was
+      # verified when nothing was actually checked. Those fake-green steps are
+      # removed (sprint-005 US-011).
+      #
+      # The only genuine frontend signal available at P1 is that the desktop
+      # scaffold type-checks (`tsc --noEmit`) and builds (`vite build`), so we run
+      # exactly that — scoped to @koklo/desktop — and nothing more. Real ESLint,
+      # cross-package typecheck and unit/a11y tests are P2 scope; re-enable full
+      # gating when the frontend is built for real (see sprints/backlog).
+      - name: Desktop scaffold typecheck (tsc --noEmit)
+        run: pnpm --filter @koklo/desktop run typecheck
+      - name: Desktop scaffold build (vite build)
+        run: pnpm --filter @koklo/desktop run build
 
   dependency-audit:
     name: Dependency Audit (Rust + pnpm)

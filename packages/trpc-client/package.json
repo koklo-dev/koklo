@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "echo building @koklo/trpc-client",
-    "lint": "echo linting @koklo/trpc-client",
-    "typecheck": "echo typechecking @koklo/trpc-client"
+    "build": "echo '[@koklo/trpc-client] no-op: package is a P2 placeholder, nothing built (see sprints/backlog)'",
+    "lint": "echo '[@koklo/trpc-client] no-op: no linter configured, deferred to P2 (see sprints/backlog)'",
+    "typecheck": "echo '[@koklo/trpc-client] no-op: no sources to typecheck yet, deferred to P2 (see sprints/backlog)'"
   }
 }
