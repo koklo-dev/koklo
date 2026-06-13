@@ -10,6 +10,7 @@ pub mod config;
 pub mod detect;
 pub mod error;
 pub mod fallback;
+pub mod mock;
 pub mod ollama;
 pub(crate) mod openai_compat;
 pub mod openrouter;
@@ -24,6 +25,7 @@ pub use detect::{
 };
 pub use error::ProviderError;
 pub use fallback::FallbackProvider;
+pub use mock::MockProvider;
 pub use ollama::OllamaProvider;
 pub use openrouter::OpenRouterProvider;
 pub use registry::ProviderRegistry;
