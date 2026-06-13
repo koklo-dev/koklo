@@ -39,6 +39,23 @@ pub(crate) enum Commands {
         yes: bool,
     },
 
+    /// Guided first-run setup: detect context, pick the light preset, resolve a
+    /// provider, and run a first pipeline to a generated artifact.
+    ///
+    /// Examples:
+    ///   koklo start
+    ///   koklo start --yes
+    ///   koklo start "Add a health check endpoint"
+    Start {
+        /// First work item to generate a spec for (uses a sensible default if omitted).
+        #[arg(value_name = "TITLE")]
+        title: Option<String>,
+
+        /// Skip interactive prompts; fail fast if no provider is auto-detected.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+
     /// Run a workflow pipeline.
     ///
     /// Examples:

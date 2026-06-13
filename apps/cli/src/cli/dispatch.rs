@@ -15,6 +15,7 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
 
     match cli.command {
         Commands::Init { path, preset, yes } => commands::cmd_init(&path, preset, yes).await?,
+        Commands::Start { title, yes } => commands::cmd_start(yes, title).await?,
         Commands::Run {
             preset,
             mode,

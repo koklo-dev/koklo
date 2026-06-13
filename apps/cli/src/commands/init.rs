@@ -95,7 +95,7 @@ fn detect_stack_preset(dir: &Path) -> PresetKind {
     PresetKind::Sdd
 }
 
-fn write_default_pipeline_toml(path: &PathBuf, preset: PresetKind) -> Result<()> {
+pub(crate) fn write_default_pipeline_toml(path: &PathBuf, preset: PresetKind) -> Result<()> {
     let content = format!(
         r#"[pipeline]
 artifacts_dir = "docs/planning_artifacts"
