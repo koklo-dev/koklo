@@ -225,6 +225,7 @@
 }
 
 html, body {
+  margin: 0;
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
