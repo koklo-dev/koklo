@@ -59,6 +59,27 @@ describe("createKokloClient — invoke adapter", () => {
     expect(result.map((l) => l.seq)).toEqual([2, 3]);
   });
 
+  it("routes sessions.run with its complete typed input", async () => {
+    const started = sessionDto("s2");
+    const invokeFn = vi.fn<InvokeFn>().mockResolvedValue(started);
+    const client = createKokloClient({ invokeFn });
+
+    const result = await client.sessions.run({
+      type: "feature",
+      title: "Desktop run",
+      preset: "light",
+      projectPath: "/repo",
+    });
+
+    expect(invokeFn).toHaveBeenCalledWith(contract.sessions.run.command, {
+      type: "feature",
+      title: "Desktop run",
+      preset: "light",
+      projectPath: "/repo",
+    });
+    expect(result.id).toBe("s2");
+  });
+
   it("propagates invoke rejections to the caller", async () => {
     const invokeFn = vi.fn<InvokeFn>().mockRejectedValue(new Error("ipc down"));
     const client = createKokloClient({ invokeFn });

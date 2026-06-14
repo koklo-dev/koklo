@@ -39,9 +39,12 @@ export interface SessionDto {
   updatedAt: string;
 }
 
-export interface CreateSessionInput {
-  featureTitle: string;
-  preset: string;
+export type RunType = "feature" | "bug" | "task";
+
+export interface RunSessionInput {
+  type: RunType;
+  title: string;
+  preset: "light" | "sdd" | "bmad" | "speckit";
   projectPath: string;
 }
 
@@ -177,15 +180,15 @@ export type InferEvent<T> = T extends SubscriptionDef<unknown, infer E> ? E : ne
 
 /**
  * The full IPC contract. Each leaf names the Tauri command (or event) it binds to.
- * Command names are `<namespace>.<method>` so Rust and TS share one string.
+ * Rust-safe command identifiers are `<namespace>_<method>`; the typed client
+ * preserves the namespace/method API (`client.sessions.run(...)`).
  */
 export interface KokloContract {
   sessions: {
     list: ProcedureDef<void, SessionDto[]>;
     listForProject: ProcedureDef<{ projectPath: string }, SessionDto[]>;
     get: ProcedureDef<{ id: string }, SessionDto | null>;
-    create: ProcedureDef<CreateSessionInput, SessionDto>;
-    updateStatus: ProcedureDef<{ id: string; status: string }, void>;
+    run: ProcedureDef<RunSessionInput, SessionDto>;
     usage: ProcedureDef<{ sessionId: string }, UsageSummaryDto>;
   };
   transcript: {
@@ -218,12 +221,11 @@ export interface KokloContract {
  */
 export const contract = {
   sessions: {
-    list: { command: "sessions.list" },
-    listForProject: { command: "sessions.listForProject" },
-    get: { command: "sessions.get" },
-    create: { command: "sessions.create" },
-    updateStatus: { command: "sessions.updateStatus" },
-    usage: { command: "sessions.usage" },
+    list: { command: "sessions_list" },
+    listForProject: { command: "sessions_list_for_project" },
+    get: { command: "sessions_get" },
+    run: { command: "sessions_run" },
+    usage: { command: "sessions_usage" },
   },
   transcript: {
     list: { command: "transcript.list" },
