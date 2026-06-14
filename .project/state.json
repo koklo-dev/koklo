@@ -8,8 +8,13 @@
   "vision_source": "/home/devops/perso/projets/MyVault/Dev/koklo/vision.md",
   "vision_mode": "verbatim",
   "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
-  "current_sprint": 7,
-  "completed_sprints": [3, 4, 6],
+  "current_sprint": 8,
+  "completed_sprints": [
+    3,
+    4,
+    6,
+    7
+  ],
   "active_agents": [],
   "specialized_agents": [],
   "specialized_workflows": [],
@@ -32,9 +37,9 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-14T01:05:00+02:00",
-  "last_workflow_run": "developer-qa-reviewer",
-  "last_workflow_stage": "final-summary",
+  "last_updated": "2026-06-14T12:29:11+02:00",
+  "last_workflow_run": "tech-lead-developer-qa-reviewer",
+  "last_workflow_stage": "03-qa-reviewer",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
   "workflow_runs": [
@@ -165,9 +170,33 @@
       "task": "US-015",
       "result": "passed",
       "completed_at": "2026-06-14T01:05:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260614011707",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "007",
+      "task": "US-016",
+      "result": "passed",
+      "completed_at": "2026-06-14T09:00:07+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260614092613",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "008",
+      "task": "US-017",
+      "result": "failed",
+      "completed_at": "2026-06-14T09:26:13+02:00"
+    },
+    {
+      "id": "tech-lead-developer-qa-reviewer-20260614094219",
+      "workflow": "tech-lead-developer-qa-reviewer",
+      "sprint": "008",
+      "task": "US-017-A",
+      "result": "passed",
+      "completed_at": "2026-06-14T12:29:11+02:00"
     }
   ],
-  "last_task_completed": "US-015",
+  "last_task_completed": "US-017-A",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",
