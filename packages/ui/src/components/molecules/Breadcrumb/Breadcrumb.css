@@ -1,0 +1,41 @@
+.kk-breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.kk-breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.kk-breadcrumb-sep {
+  color: var(--color-fg-muted);
+  display: flex;
+  align-items: center;
+}
+.kk-breadcrumb-avatar {
+  flex-shrink: 0;
+}
+.kk-breadcrumb-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-fg-secondary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.kk-breadcrumb-btn:hover {
+  color: var(--color-fg);
+  background: var(--color-surface);
+}
+.kk-breadcrumb-current {
+  color: var(--color-fg);
+}

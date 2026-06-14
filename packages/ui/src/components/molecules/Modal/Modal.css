@@ -1,0 +1,59 @@
+/* ── Scrim / layer ───────────────────────────────────── */
+.kk-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--scrim-color);
+  backdrop-filter: blur(var(--scrim-blur));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kk-fade var(--dur-base) var(--ease-out);
+}
+
+/* ── Panel ───────────────────────────────────────────── */
+.kk-modal {
+  background: var(--color-bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  width: min(480px, calc(100vw - 48px));
+  box-shadow: var(--shadow-lg);
+  animation: kk-modal-in var(--dur-base) var(--ease-out);
+  outline: none;
+}
+
+.kk-modal-md { width: min(600px, calc(100vw - 48px)); }
+.kk-modal-lg { width: min(800px, calc(100vw - 48px)); }
+
+@keyframes kk-modal-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Content ─────────────────────────────────────────── */
+.kk-modal-title {
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.005em;
+  color: var(--color-fg);
+  margin: 0;
+}
+
+.kk-modal-desc {
+  margin: var(--space-3) 0 var(--space-6);
+  font-size: var(--text-base);
+  color: var(--color-fg-secondary);
+  line-height: var(--lh-normal);
+}
+
+.kk-modal-body {
+  margin-bottom: var(--space-6);
+}
+
+/* ── Actions ─────────────────────────────────────────── */
+.kk-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}

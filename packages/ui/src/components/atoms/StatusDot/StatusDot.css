@@ -1,0 +1,17 @@
+.kk-status-dot-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.kk-status-dot {
+  border-radius: var(--radius-full);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.kk-status-pulse .kk-status-dot {
+  animation: kk-pulse 1.6s ease-in-out infinite;
+}
+.kk-status-dot-label {
+  font-size: var(--text-xs);
+  color: var(--color-fg);
+}

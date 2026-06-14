@@ -1,0 +1,61 @@
+.kk-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  color: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.kk-avatar-xs  { width: 20px; height: 20px; font-size: 7px; }
+.kk-avatar-sm  { width: 24px; height: 24px; font-size: 9px; }
+.kk-avatar-md  { width: 32px; height: 32px; font-size: 12px; }
+.kk-avatar-lg  { width: 40px; height: 40px; font-size: 15px; }
+.kk-avatar-xl  { width: 48px; height: 48px; font-size: 18px; }
+
+/* Square shape for org / project avatars */
+.kk-avatar-square {
+  border-radius: var(--radius-lg);
+}
+
+.kk-avatar-ring {
+  outline: 2px solid var(--color-bg);
+  outline-offset: 1px;
+}
+
+.kk-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Avatar stack */
+.kk-avatar-stack {
+  display: inline-flex;
+  align-items: center;
+}
+.kk-avatar-stack .kk-avatar + .kk-avatar,
+.kk-avatar-stack .kk-avatar + .kk-avatar-overflow {
+  margin-left: -6px;
+}
+.kk-avatar-overflow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-hover);
+  color: var(--color-fg-secondary);
+  font-size: 9px;
+  font-weight: var(--fw-semibold);
+  border: 2px solid var(--color-bg);
+  flex-shrink: 0;
+}
+.kk-avatar-overflow-xs  { width: 20px; height: 20px; font-size: 7px; }
+.kk-avatar-overflow-sm  { width: 24px; height: 24px; font-size: 9px; }
+.kk-avatar-overflow-md  { width: 32px; height: 32px; font-size: 10px; }
+.kk-avatar-overflow-lg  { width: 40px; height: 40px; font-size: 12px; }

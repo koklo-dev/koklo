@@ -1,0 +1,39 @@
+.kk-empty {
+  min-height: 152px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: var(--space-5);
+  gap: var(--space-3);
+}
+
+.kk-empty-icon {
+  color: var(--color-fg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kk-empty-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--text-xl);
+  line-height: var(--lh-snug);
+  color: var(--color-fg);
+  margin: 0;
+}
+
+.kk-empty-desc {
+  font-size: var(--text-sm);
+  color: var(--color-fg-secondary);
+  max-width: 43ch;
+  line-height: var(--lh-normal);
+  margin: 0;
+}
+
+.kk-empty-action {
+  display: flex;
+  justify-content: center;
+}
