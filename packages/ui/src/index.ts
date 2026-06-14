@@ -50,6 +50,8 @@ export type {
   RiskLevel,
   ActionState,
 } from "./components/organisms/AiActionCard/AiActionCard";
+export { BootScreen } from "./components/organisms/BootScreen/BootScreen";
+export type { BootScreenProps } from "./components/organisms/BootScreen/BootScreen";
 export { Shell } from "./components/organisms/Shell/Shell";
 export type { ShellProps } from "./components/organisms/Shell/Shell";
 export type { SidebarProps, SidebarNavItem } from "./components/organisms/Sidebar/Sidebar";
