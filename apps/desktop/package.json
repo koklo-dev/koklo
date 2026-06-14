@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "lint": "echo '[@koklo/desktop] no-op: no ESLint configured yet, deferred to P2 (see sprints/backlog)'",
-    "typecheck": "tsc --noEmit"
+    "build": "pnpm exec tsc -p tsconfig.build.json && pnpm exec vite build",
+    "lint": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "react": "^18.3.1",

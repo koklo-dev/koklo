@@ -34,7 +34,11 @@ importers:
         specifier: ^5.4.11
         version: 5.4.21
 
-  packages/constellation: {}
+  packages/constellation:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/trpc-client:
     dependencies:
@@ -49,7 +53,11 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9
 
-  packages/ui: {}
+  packages/ui:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
 packages:
 

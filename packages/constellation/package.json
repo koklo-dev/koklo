@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "echo '[@koklo/constellation] no-op: package is a P2 placeholder, nothing built (see sprints/backlog)'",
-    "lint": "echo '[@koklo/constellation] no-op: no linter configured, deferred to P2 (see sprints/backlog)'",
-    "typecheck": "echo '[@koklo/constellation] no-op: no sources to typecheck yet, deferred to P2 (see sprints/backlog)'"
+    "build": "pnpm exec tsc -p tsconfig.build.json",
+    "lint": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
   }
 }

@@ -12,9 +12,9 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "lint": "echo '[@koklo/trpc-client] no-op: no ESLint configured yet, deferred to P2 (see sprints/backlog US-016)'",
-    "typecheck": "tsc --noEmit",
+    "build": "pnpm exec tsc -p tsconfig.build.json",
+    "lint": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
