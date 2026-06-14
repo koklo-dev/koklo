@@ -5,6 +5,11 @@
   border-radius: var(--radius-full);
   font-family: var(--font-sans);
   font-weight: var(--fw-semibold);
+  line-height: 1;
+  /* Trim Inter's asymmetric half-leading so the initials are optically centered
+     (cap-top to alphabetic baseline) rather than sitting visually high. */
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
   color: #fff;
   flex-shrink: 0;
   overflow: hidden;
@@ -52,6 +57,9 @@
   color: var(--color-fg-secondary);
   font-size: 9px;
   font-weight: var(--fw-semibold);
+  line-height: 1;
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
   border: 2px solid var(--color-bg);
   flex-shrink: 0;
 }

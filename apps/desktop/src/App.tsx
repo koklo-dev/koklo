@@ -1,6 +1,7 @@
 import { Shell, Toaster } from "@koklo/ui";
 import { SessionsScreen } from "./screens/Sessions";
 import { kokloClient } from "./lib/client";
+import { useTheme } from "./lib/theme";
 
 /**
  * Desktop root. For US-017 the only wired screen is Sessions, mounted inside the
@@ -10,6 +11,7 @@ import { kokloClient } from "./lib/client";
 export function App() {
   // The open-project path; sourced from a project context once routing lands.
   const projectPath = ".";
+  const { isDark, toggle } = useTheme();
 
   return (
     <Toaster>
@@ -22,6 +24,8 @@ export function App() {
         }}
         topbar={{
           breadcrumbs: [{ label: "koklo" }, { label: "Sessions" }],
+          isDark,
+          onThemeToggle: toggle,
         }}
       >
         <SessionsScreen client={kokloClient} projectPath={projectPath} />

@@ -10,6 +10,10 @@
   font-size: var(--text-base);
   font-weight: var(--fw-medium);
   line-height: 1;
+  /* Trim Inter's asymmetric half-leading so the label is optically centered
+     (cap-top to alphabetic baseline) rather than sitting visually high. */
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
   cursor: pointer;
   border: 1px solid transparent;
   transition:

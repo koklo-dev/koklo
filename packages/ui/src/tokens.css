@@ -9,30 +9,30 @@
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("../fonts/Inter-Variable.woff2") format("woff2-variations"),
-       url("../fonts/Inter-Variable.woff2") format("woff2");
+  src: url("./fonts/Inter-Variable.woff2") format("woff2-variations"),
+       url("./fonts/Inter-Variable.woff2") format("woff2");
 }
 @font-face {
   font-family: "Instrument Serif";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("../fonts/InstrumentSerif-Regular.woff2") format("woff2");
+  src: url("./fonts/InstrumentSerif-Regular.woff2") format("woff2");
 }
 @font-face {
   font-family: "Instrument Serif";
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url("../fonts/InstrumentSerif-Italic.woff2") format("woff2");
+  src: url("./fonts/InstrumentSerif-Italic.woff2") format("woff2");
 }
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
   font-weight: 100 800;
   font-display: swap;
-  src: url("../fonts/JetBrainsMono-Variable.woff2") format("woff2-variations"),
-       url("../fonts/JetBrainsMono-Variable.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Variable.woff2") format("woff2-variations"),
+       url("./fonts/JetBrainsMono-Variable.woff2") format("woff2");
 }
 
 /* ---------- Light theme (default) ---------- */
