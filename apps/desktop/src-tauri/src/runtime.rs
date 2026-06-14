@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
 /// A [`TranscriptSink`] backed by the Tauri app handle: every live transcript line is
 /// emitted on the contract event channel, where the TS client's `transcript.subscribe`
@@ -195,6 +195,23 @@ async fn transcript_since(
         .map_err(|error| error.to_string())
 }
 
+/// Hand off from the frontend boot flow: close the frameless `splashscreen`
+/// window and reveal the (initially hidden) `main` window. Driven from the
+/// backend so it needs no `core:window` capability — closing a *different*
+/// window from the frontend is denied unless that window is itself granted the
+/// permission, whereas the backend has full window access. Missing windows are
+/// ignored so the command is safe to call more than once.
+#[tauri::command]
+fn finish_boot(app: tauri::AppHandle) {
+    if let Some(splash) = app.get_webview_window("splashscreen") {
+        let _ = splash.close();
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
 pub fn run() {
     let state = tauri::async_runtime::block_on(DesktopState::load())
         .expect("failed to initialize Koklo desktop state");
@@ -214,7 +231,8 @@ pub fn run() {
             sessions_get,
             sessions_usage,
             transcript_list,
-            transcript_since
+            transcript_since,
+            finish_boot
         ])
         .run(tauri::generate_context!())
         .expect("error while running Koklo desktop");

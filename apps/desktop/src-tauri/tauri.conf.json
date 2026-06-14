@@ -12,9 +12,25 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Koklo",
         "width": 1200,
-        "height": 800
+        "height": 800,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "splashscreen",
+        "title": "Koklo",
+        "width": 480,
+        "height": 320,
+        "center": true,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "visible": true
       }
     ]
   },
