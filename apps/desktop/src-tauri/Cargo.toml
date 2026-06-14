@@ -14,11 +14,11 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 dirs = { workspace = true }
-tauri = { version = "=2.9.5" }
+tauri = { version = "=2.11.2", features = [] }
 koklo-storage = { path = "../../../crates/storage" }
 koklo-events = { path = "../../../crates/events" }
 koklo-providers = { path = "../../../crates/providers" }
 koklo-workflow-engine = { path = "../../../crates/workflow-engine" }
 
 [build-dependencies]
-tauri-build = { version = "=2.5.4" }
+tauri-build = { version = "=2.6.2", features = [] }
