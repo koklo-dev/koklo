@@ -11,6 +11,8 @@ export interface SessionsScreenProps {
   client: SessionsClient;
   /** Project root the New Run should target. */
   projectPath: string;
+  /** Open a session's transcript (roadmap P2 §4 navigation). */
+  onOpenSession?: (session: SessionDto) => void;
 }
 
 /**
@@ -18,7 +20,7 @@ export interface SessionsScreenProps {
  * through `sessions.run` (US-017-A backend). All visuals come from `@koklo/ui`;
  * this component only orchestrates data and state.
  */
-export function SessionsScreen({ client, projectPath }: SessionsScreenProps) {
+export function SessionsScreen({ client, projectPath, onOpenSession }: SessionsScreenProps) {
   const { toast } = useToast();
   const [load, setLoad] = useState<LoadState>("loading");
   const [sessions, setSessions] = useState<SessionDto[]>([]);
@@ -127,7 +129,10 @@ export function SessionsScreen({ client, projectPath }: SessionsScreenProps) {
                 key={card.id}
                 {...card}
                 selected={selectedId === card.id}
-                onSelect={() => setSelectedId(card.id)}
+                onSelect={() => {
+                  setSelectedId(card.id);
+                  onOpenSession?.(dto);
+                }}
               />
             );
           })}

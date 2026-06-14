@@ -54,3 +54,6 @@ Thumbs.db
 /prompt-onboarding-steps.txt
 /prompt-settings-detail.txt
 /prompt-workflows-koklo.txt
+
+# Pipeline run artifacts copied back into the project tree (koklo run / desktop sessions)
+planning_artifacts/

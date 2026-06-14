@@ -1,5 +1,6 @@
+use crate::bridge::{pump_transcript, TranscriptSink};
 use crate::handlers;
-use crate::ipc::{SessionDto, UsageSummaryDto};
+use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto};
 use crate::sessions::{self, RunSessionInput, RunSpec, SessionRunner};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -15,13 +16,33 @@ use koklo_workflow_engine::{
 };
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use tauri::State;
+use tauri::{Emitter, State};
+
+/// A [`TranscriptSink`] backed by the Tauri app handle: every live transcript line is
+/// emitted on the contract event channel, where the TS client's `transcript.subscribe`
+/// listener filters it by `sessionId` (US-014). Cloneable and `'static` so the EventBus
+/// pump can own one per run.
+#[derive(Clone)]
+struct AppHandleSink {
+    app: tauri::AppHandle,
+}
+
+impl TranscriptSink for AppHandleSink {
+    fn emit_line(&self, channel: &str, line: &TranscriptLineDto) -> Result<()> {
+        self.app
+            .emit(channel, line.clone())
+            .map_err(|error| anyhow!("failed to emit transcript line: {error}"))
+    }
+}
 
 pub struct WorkflowEngineRunner {
     gate_channel: GateChannel,
     user_input_channel: UserInputChannel,
+    /// Set once the Tauri app is built (in `setup`); lets a run stream live lines into the
+    /// window. `None` only in the brief window before setup, or in headless tests.
+    app: Arc<OnceLock<tauri::AppHandle>>,
 }
 
 impl WorkflowEngineRunner {
@@ -29,6 +50,7 @@ impl WorkflowEngineRunner {
         Self {
             gate_channel,
             user_input_channel,
+            app: Arc::new(OnceLock::new()),
         }
     }
 }
@@ -50,6 +72,17 @@ impl SessionRunner for WorkflowEngineRunner {
             Arc::new(TuiUserInputHandler::new(self.user_input_channel.clone())),
         )
         .await?;
+
+        // Stream live transcript lines into the window. Subscribe to the EventBus BEFORE
+        // the pipeline starts so no early line is missed (the broadcast channel buffers);
+        // the pump exits when the run ends and the bus closes. Skipped only in headless
+        // tests where no AppHandle was set (roadmap P2 §4 — live streaming).
+        if let Some(app) = self.app.get() {
+            let receiver = orchestrator.event_bus().subscribe();
+            let sink = AppHandleSink { app: app.clone() };
+            tokio::spawn(pump_transcript(receiver, sink));
+        }
+
         let title = spec.title.clone();
         let project_path = spec.project_path.clone();
         let preset = spec.preset.as_str().to_string();
@@ -141,17 +174,47 @@ async fn sessions_usage(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command(rename_all = "camelCase")]
+async fn transcript_list(
+    state: State<'_, DesktopState>,
+    session_id: String,
+) -> Result<Vec<TranscriptLineDto>, String> {
+    handlers::transcript_list(&state.storage, &session_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(rename_all = "camelCase")]
+async fn transcript_since(
+    state: State<'_, DesktopState>,
+    session_id: String,
+    since_seq: i64,
+) -> Result<Vec<TranscriptLineDto>, String> {
+    handlers::transcript_since(&state.storage, &session_id, since_seq)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 pub fn run() {
     let state = tauri::async_runtime::block_on(DesktopState::load())
         .expect("failed to initialize Koklo desktop state");
+    // Share the runner's AppHandle slot so `setup` can populate it once the app exists;
+    // the live transcript pump reads it when a run starts.
+    let app_slot = Arc::clone(&state.runner.app);
     tauri::Builder::default()
         .manage(state)
+        .setup(move |app| {
+            let _ = app_slot.set(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             sessions_run,
             sessions_list,
             sessions_list_for_project,
             sessions_get,
-            sessions_usage
+            sessions_usage,
+            transcript_list,
+            transcript_since
         ])
         .run(tauri::generate_context!())
         .expect("error while running Koklo desktop");

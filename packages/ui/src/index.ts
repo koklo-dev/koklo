@@ -17,6 +17,8 @@ export { StatusDot } from "./components/atoms/StatusDot/StatusDot";
 export type { StatusDotProps, StatusDotVariant } from "./components/atoms/StatusDot/StatusDot";
 export { Spinner } from "./components/atoms/Spinner/Spinner";
 export type { SpinnerProps } from "./components/atoms/Spinner/Spinner";
+export { TypingIndicator } from "./components/atoms/TypingIndicator/TypingIndicator";
+export type { TypingIndicatorProps } from "./components/atoms/TypingIndicator/TypingIndicator";
 export { Button } from "./components/atoms/Button/Button";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./components/atoms/Button/Button";
 export { Input } from "./components/atoms/Input/Input";
@@ -38,6 +40,16 @@ export { Toast, Toaster } from "./components/molecules/Toast/Toast";
 export type { ToastProps, ToasterProps, ToastItem, ToastTone } from "./components/molecules/Toast/Toast";
 export { useToast } from "./components/molecules/Toast/ToastContext";
 export type { ToasterContextValue } from "./components/molecules/Toast/ToastContext";
+export { MessageBubble } from "./components/molecules/MessageBubble/MessageBubble";
+export type { MessageBubbleProps, MessageRole } from "./components/molecules/MessageBubble/MessageBubble";
+export { CodeBlock } from "./components/molecules/CodeBlock/CodeBlock";
+export type { CodeBlockProps, CodeLine } from "./components/molecules/CodeBlock/CodeBlock";
+export { AiActionCard } from "./components/organisms/AiActionCard/AiActionCard";
+export type {
+  AiActionCardProps,
+  RiskLevel,
+  ActionState,
+} from "./components/organisms/AiActionCard/AiActionCard";
 export { Shell } from "./components/organisms/Shell/Shell";
 export type { ShellProps } from "./components/organisms/Shell/Shell";
 export type { SidebarProps, SidebarNavItem } from "./components/organisms/Sidebar/Sidebar";

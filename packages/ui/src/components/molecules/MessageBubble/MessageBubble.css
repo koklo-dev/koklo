@@ -1,0 +1,108 @@
+/* Two-column grid: avatar left | content right */
+.kk-msg {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* ── Avatar column ── */
+.kk-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  color: var(--color-fg-secondary);
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  margin-top: 3px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.kk-msg-user .kk-msg-avatar {
+  background: var(--color-accent);
+  color: #1C1917;
+}
+
+.kk-msg-assistant .kk-msg-avatar {
+  background: #1E3A5F;
+  color: #fff;
+}
+
+/* ── Content column ── */
+.kk-msg-body {
+  min-width: 0;
+}
+
+.kk-msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.kk-msg-role {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-fg);
+  letter-spacing: -0.005em;
+}
+
+.kk-msg-when {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Bubble ── */
+.kk-msg-bubble {
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+}
+
+.kk-msg-user .kk-msg-bubble {
+  background: #FFFAF0;
+  border: 1px solid #FCD34D33;
+  color: var(--color-fg);
+}
+
+.kk-msg-assistant .kk-msg-bubble {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
+}
+
+.kk-msg-content {
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* ── Typing indicator ── */
+.kk-typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+}
+
+.kk-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-fg-muted);
+  animation: kk-typing 1300ms ease-in-out infinite;
+}
+.kk-typing-dot:nth-child(2) { animation-delay: 200ms; }
+.kk-typing-dot:nth-child(3) { animation-delay: 400ms; }

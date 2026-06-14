@@ -228,9 +228,13 @@ export const contract = {
     usage: { command: "sessions_usage" },
   },
   transcript: {
-    list: { command: "transcript.list" },
-    since: { command: "transcript.since" },
-    subscribe: { event: "transcript.subscribe" },
+    // Tauri command identifiers cannot contain dots (they are Rust fn names); the
+    // underscore form mirrors the `sessions_*` convention. Tauri *event* names also
+    // forbid `.` (only alphanumerics, `-`, `/`, `:`, `_`), so the subscribe channel uses
+    // `:` and must stay in lock-step with `bridge::TRANSCRIPT_CHANNEL` on the Rust side.
+    list: { command: "transcript_list" },
+    since: { command: "transcript_since" },
+    subscribe: { event: "transcript:subscribe" },
   },
   gates: {
     pending: { command: "gates.pending" },

@@ -19,7 +19,10 @@ use tokio::sync::broadcast;
 /// Tauri event channel the live transcript subscription listens on. Mirrors
 /// `contract.transcript.subscribe.event` on the TS side. One channel carries every
 /// session's lines; the client filters by `line.sessionId` (see US-014).
-pub const TRANSCRIPT_CHANNEL: &str = "transcript.subscribe";
+///
+/// Tauri event names forbid `.` (only alphanumerics, `-`, `/`, `:`, `_` are allowed),
+/// so the separator is `:` — this MUST match the TS contract's `subscribe.event`.
+pub const TRANSCRIPT_CHANNEL: &str = "transcript:subscribe";
 
 /// The window the bridge emits into. The production impl forwards to
 /// `tauri::Emitter::emit(channel, line)`; tests use a recording sink.
