@@ -2,5 +2,24 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Koklo",
   "version": "0.1.0",
-  "identifier": "dev.koklo.app"
+  "identifier": "dev.koklo.app",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Koklo",
+        "width": 1200,
+        "height": 800
+      }
+    ]
+  },
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
 }

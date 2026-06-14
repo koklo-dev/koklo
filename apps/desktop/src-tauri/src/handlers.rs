@@ -6,14 +6,10 @@
 //! reimplemented here — that is the architectural rule (logic lives in Rust crates; this
 //! layer only marshals).
 //!
-//! These are the testable cores. The trivial `#[tauri::command]` wrappers that pull
-//! `Storage` / `GateChannel` from Tauri managed state and forward to these functions land
-//! with the Tauri command runtime (later P2 sprint); modeling the cores as plain functions
-//! over their dependencies is what lets every handler be unit-tested without booting Tauri.
-//!
-//! Out of scope for US-015 (deferred, not regressed): `sessions.create`/`run` (needs
-//! workflow-engine orchestration) and `worktrees.create/prune/switch` (needs git-engine
-//! worktree ops). They stay contract-declared; see the backlog.
+//! These are the testable cores. The `#[tauri::command]` wrappers in [`crate::runtime`]
+//! pull managed state and forward to these functions. `sessions.run` lives in
+//! [`crate::sessions`] because it adds a workflow-engine runner boundary. Worktree mutation
+//! remains deferred until git-engine exposes real worktree operations.
 
 use crate::gates::{GateDecisionInput, GateDto};
 use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto};
