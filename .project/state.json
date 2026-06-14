@@ -10,10 +10,14 @@
   "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
   "current_sprint": 8,
   "completed_sprints": [
+    1,
+    2,
     3,
     4,
+    5,
     6,
-    7
+    7,
+    8
   ],
   "active_agents": [],
   "specialized_agents": [],
@@ -37,7 +41,7 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-14T13:42:00+02:00",
+  "last_updated": "2026-06-14T19:40:00+02:00",
   "last_workflow_run": "analyze-design-dev-review",
   "last_workflow_stage": "final-summary",
   "last_workflow_result": "passed",
