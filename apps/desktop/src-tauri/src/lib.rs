@@ -1,5 +1,6 @@
 //! Desktop bootstrap library for Koklo Community.
 
+pub mod account;
 pub mod bridge;
 pub mod gates;
 pub mod handlers;

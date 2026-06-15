@@ -70,6 +70,14 @@ fn light_preset_happy_path_completes_with_mock_provider() {
     git(project_path, &["add", "."]);
     git(project_path, &["commit", "--quiet", "-m", "init fixture"]);
 
+    // Koklo requires a local account before `run`; provision one in the isolated
+    // home so the gate passes non-interactively (mirrors `koklo account setup`).
+    std::fs::write(
+        home_path.join("account.toml"),
+        "name = \"Koklo Test\"\nemail = \"test@koklo.dev\"\ncreated_at = 0\n",
+    )
+    .unwrap();
+
     // --- 2. Run the light preset without the TUI ---
     let output = koklo_cmd(project_path, home_path)
         .args([

@@ -212,6 +212,28 @@ fn finish_boot(app: tauri::AppHandle) {
     }
 }
 
+/// `account.get` — the saved local account, or `null` when onboarding is pending.
+/// Drives the desktop boot gate (`UserSetupScreen` shows when this is `null`).
+#[tauri::command]
+fn account_get() -> Result<Option<crate::account::AccountDto>, String> {
+    crate::account::account_get(&koklo_home()).map_err(|error| error.to_string())
+}
+
+/// `account.save` — persist the local identity submitted by `UserSetupScreen`.
+/// Shares `~/.koklo/account.toml` with the CLI. Avatar is not persisted (v1).
+#[tauri::command(rename_all = "camelCase")]
+fn account_save(
+    name: String,
+    email: String,
+    role: Option<String>,
+) -> Result<crate::account::AccountDto, String> {
+    crate::account::account_save(
+        &koklo_home(),
+        crate::account::AccountInput { name, email, role },
+    )
+    .map_err(|error| error.to_string())
+}
+
 pub fn run() {
     let state = tauri::async_runtime::block_on(DesktopState::load())
         .expect("failed to initialize Koklo desktop state");
@@ -232,6 +254,8 @@ pub fn run() {
             sessions_usage,
             transcript_list,
             transcript_since,
+            account_get,
+            account_save,
             finish_boot
         ])
         .run(tauri::generate_context!())

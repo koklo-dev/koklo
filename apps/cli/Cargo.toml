@@ -27,6 +27,7 @@ dirs = { workspace = true }
 tempfile = "3"
 pulldown-cmark = { version = "0.13", default-features = false }
 
+koklo-core = { path = "../../crates/core" }
 koklo-storage = { path = "../../crates/storage" }
 koklo-events = { path = "../../crates/events" }
 koklo-workflow-engine = { path = "../../crates/workflow-engine" }

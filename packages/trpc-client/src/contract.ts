@@ -39,6 +39,26 @@ export interface SessionDto {
   updatedAt: string;
 }
 
+/**
+ * The local account — a passwordless local identity (← `koklo_core::account::LocalAccount`).
+ * Required before the desktop Shell or CLI primary commands are usable. Shared with
+ * the CLI via `~/.koklo/account.toml`. Drives the `UserSetupScreen` onboarding gate.
+ */
+export interface AccountDto {
+  name: string;
+  email: string;
+  role: string | null;
+  /** Creation time, Unix epoch seconds. */
+  createdAt: number;
+}
+
+/** What `UserSetupScreen` submits. Avatar is captured in-UI only (not persisted, v1). */
+export interface AccountInput {
+  name: string;
+  email: string;
+  role?: string | null;
+}
+
 export type RunType = "feature" | "bug" | "task";
 
 export interface RunSessionInput {
@@ -184,6 +204,12 @@ export type InferEvent<T> = T extends SubscriptionDef<unknown, infer E> ? E : ne
  * preserves the namespace/method API (`client.sessions.run(...)`).
  */
 export interface KokloContract {
+  account: {
+    /** The saved local account, or `null` while onboarding is pending. */
+    get: ProcedureDef<void, AccountDto | null>;
+    /** Persist the local identity from `UserSetupScreen`. */
+    save: ProcedureDef<AccountInput, AccountDto>;
+  };
   sessions: {
     list: ProcedureDef<void, SessionDto[]>;
     listForProject: ProcedureDef<{ projectPath: string }, SessionDto[]>;
@@ -220,6 +246,10 @@ export interface KokloContract {
  * so adding a procedure in one place keeps client and backend in lock-step.
  */
 export const contract = {
+  account: {
+    get: { command: "account_get" },
+    save: { command: "account_save" },
+  },
   sessions: {
     list: { command: "sessions_list" },
     listForProject: { command: "sessions_list_for_project" },

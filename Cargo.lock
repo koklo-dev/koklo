@@ -2418,6 +2418,7 @@ dependencies = [
  "crossterm",
  "dirs 5.0.1",
  "koklo-agent-runtime",
+ "koklo-core",
  "koklo-doc-generator",
  "koklo-events",
  "koklo-git-engine",
@@ -2447,6 +2448,8 @@ dependencies = [
  "async-trait",
  "serde",
  "sqlx",
+ "tempfile",
+ "toml 0.8.23",
  "uuid",
 ]
 
@@ -2458,6 +2461,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dirs 5.0.1",
+ "koklo-core",
  "koklo-events",
  "koklo-providers",
  "koklo-storage",
@@ -2466,6 +2470,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tempfile",
  "tokio",
  "tracing",
 ]

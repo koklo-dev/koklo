@@ -86,6 +86,14 @@ pub(crate) enum Commands {
         no_tui: bool,
     },
 
+    /// Manage your local account (required before first use).
+    ///
+    /// Examples:
+    ///   koklo account show
+    ///   koklo account setup
+    #[command(subcommand)]
+    Account(AccountCommands),
+
     /// Manage pipeline sessions.
     ///
     /// Examples:
@@ -227,6 +235,14 @@ pub(crate) enum Commands {
 
     #[command(hide = true, subcommand)]
     Internal(InternalCommands),
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum AccountCommands {
+    /// Show your local account.
+    Show,
+    /// Create or replace your local account (interactive).
+    Setup,
 }
 
 #[derive(Debug, Subcommand)]

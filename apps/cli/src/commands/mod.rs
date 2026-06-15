@@ -1,3 +1,4 @@
+mod account;
 mod agent;
 mod artifacts;
 mod config;
@@ -14,6 +15,7 @@ mod start;
 mod tickets;
 mod workflow;
 
+pub(crate) use account::{cmd_account_setup, cmd_account_show, ensure_account};
 pub(crate) use agent::{cmd_agent_list, cmd_agent_run, cmd_agent_show, cmd_agent_sync};
 pub(crate) use artifacts::{cmd_artifacts_list, cmd_artifacts_show};
 pub(crate) use config::{cmd_config_init, cmd_config_show};
