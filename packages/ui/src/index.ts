@@ -52,6 +52,11 @@ export type {
 } from "./components/organisms/AiActionCard/AiActionCard";
 export { BootScreen } from "./components/organisms/BootScreen/BootScreen";
 export type { BootScreenProps } from "./components/organisms/BootScreen/BootScreen";
+export { UserSetupScreen } from "./components/organisms/UserSetupScreen/UserSetupScreen";
+export type {
+  UserSetupScreenProps,
+  UserSetupValues,
+} from "./components/organisms/UserSetupScreen/UserSetupScreen";
 export { Shell } from "./components/organisms/Shell/Shell";
 export type { ShellProps } from "./components/organisms/Shell/Shell";
 export type { SidebarProps, SidebarNavItem } from "./components/organisms/Sidebar/Sidebar";
