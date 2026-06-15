@@ -42,7 +42,7 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-14T23:02:00+02:00",
+  "last_updated": "2026-06-15T08:11:47+02:00",
   "last_workflow_run": "analyst-designer-developer-qa-reviewer",
   "last_workflow_stage": "final-summary",
   "last_workflow_result": "passed",
@@ -223,6 +223,14 @@
       "task": "ad-hoc: desktop boot screen on app startup",
       "result": "passed",
       "completed_at": "2026-06-14T23:02:00+02:00"
+    },
+    {
+      "id": "analyst-designer-developer-qa-reviewer-20260615081147",
+      "workflow": "analyst-designer-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: local account onboarding (desktop + CLI)",
+      "result": "passed",
+      "completed_at": "2026-06-15T08:35:00+02:00"
     }
   ],
   "last_task_completed": "US-018",
