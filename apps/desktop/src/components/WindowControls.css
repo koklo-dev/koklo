@@ -1,0 +1,13 @@
+.kk-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 8px;
+  margin-left: 4px;
+  border-left: var(--border-default);
+  flex-shrink: 0;
+}
+
+.kk-window-controls-close:hover {
+  color: #e5534b;
+}

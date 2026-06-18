@@ -207,6 +207,7 @@ fn finish_boot(app: tauri::AppHandle) {
         let _ = splash.close();
     }
     if let Some(main) = app.get_webview_window("main") {
+        let _ = main.set_icon(tauri::include_image!("icons/icon.png"));
         let _ = main.show();
         let _ = main.set_focus();
     }

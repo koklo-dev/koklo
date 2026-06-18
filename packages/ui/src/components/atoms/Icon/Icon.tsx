@@ -12,6 +12,7 @@ export type IconName =
   | 'Marketplace' | 'CheckCircle' | 'Logo'
   | 'Sun' | 'Moon' | 'Conversation' | 'Cycle' | 'LayoutGrid' | 'ArrowDownAZ'
   | 'TypeStory' | 'TypeTask' | 'TypeBug' | 'TypeSubtask' | 'TypeSpike'
+  | 'Minus'
 
 export interface IconProps {
   name: IconName
@@ -98,6 +99,7 @@ const paths: Record<IconName, ReactNode> = {
   TypeBug: <><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 7l-3 2"/><path d="M5 7l3 2"/><path d="M19 13h-3"/><path d="M5 13h3"/><path d="M19 19l-3-2"/><path d="M5 19l3-2"/><path d="M12 2v4"/></>,
   TypeSubtask: <><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M21 13v6a2 2 0 0 1-2 2h-6"/><path d="M13 17h6"/></>,
   TypeSpike: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+  Minus: <line x1="5" y1="12" x2="19" y2="12"/>,
   Logo: null, // handled specially below
 }
 

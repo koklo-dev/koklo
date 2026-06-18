@@ -21,6 +21,8 @@ export { TypingIndicator } from "./components/atoms/TypingIndicator/TypingIndica
 export type { TypingIndicatorProps } from "./components/atoms/TypingIndicator/TypingIndicator";
 export { Button } from "./components/atoms/Button/Button";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./components/atoms/Button/Button";
+export { IconButton } from "./components/atoms/IconButton/IconButton";
+export type { IconButtonProps, IconButtonVariant, IconButtonSize } from "./components/atoms/IconButton/IconButton";
 export { Input } from "./components/atoms/Input/Input";
 export type { InputProps, InputSize } from "./components/atoms/Input/Input";
 export { Select } from "./components/atoms/Select/Select";

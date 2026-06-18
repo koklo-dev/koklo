@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Breadcrumb, type BreadcrumbItem } from '../../molecules/Breadcrumb/Breadcrumb'
 import { SearchInput } from '../../atoms/SearchInput/SearchInput'
 import { IconButton } from '../../atoms/IconButton/IconButton'
@@ -9,6 +10,12 @@ export interface TopBarProps {
   hasNotification?: boolean
   panelOpen?: boolean
   isDark?: boolean
+  /** Mark the header as a native drag region (Tauri / Electron frameless windows). */
+  dragRegion?: boolean
+  /** Slot rendered before the breadcrumb — use for a logo or app icon. */
+  leadingSlot?: ReactNode
+  /** Slot rendered after all action buttons — use for window controls or custom actions. */
+  trailingSlot?: ReactNode
   onSearchOpen?: () => void
   onNotificationClick?: () => void
   onThemeToggle?: () => void
@@ -21,6 +28,9 @@ export function TopBar({
   hasNotification,
   panelOpen,
   isDark = false,
+  dragRegion = false,
+  leadingSlot,
+  trailingSlot,
   onSearchOpen,
   onNotificationClick,
   onThemeToggle,
@@ -28,7 +38,11 @@ export function TopBar({
   onPanelToggle,
 }: TopBarProps) {
   return (
-    <header className="kk-topbar">
+    <header
+      className="kk-topbar"
+      {...(dragRegion ? { 'data-tauri-drag-region': '' } : {})}
+    >
+      {leadingSlot}
       <Breadcrumb items={breadcrumbs} />
       <div className="kk-topbar-right">
         <SearchInput
@@ -64,6 +78,7 @@ export function TopBar({
           onClick={onPanelToggle}
         />
       </div>
+      {trailingSlot}
     </header>
   )
 }

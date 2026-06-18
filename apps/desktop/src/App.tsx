@@ -8,6 +8,7 @@ import { useTheme } from "./lib/theme";
 import { useAppBoot } from "./lib/bootModel";
 import { useAccount, sidebarUser } from "./lib/accountModel";
 import { revealMainWindow } from "./lib/splash";
+import { WindowControls } from "./components/WindowControls";
 
 /** Local view router: the Sessions list, or one session's live transcript. */
 type View = { screen: "sessions" } | { screen: "transcript"; session: SessionDto };
@@ -66,6 +67,8 @@ export function App() {
             : [{ label: "koklo" }, { label: "Sessions" }],
           isDark,
           onThemeToggle: toggle,
+          dragRegion: true,
+          trailingSlot: <WindowControls />,
         }}
       >
         {isTranscript ? (
