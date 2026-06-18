@@ -1,0 +1,25 @@
+.kk-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 48px;
+  border-bottom: var(--border-default);
+  background: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.kk-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.kk-topbar-search {
+  width: 180px;
+}
+
+.kk-topbar-theme-toggle.kk-iconbtn-active {
+  color: var(--color-accent);
+}

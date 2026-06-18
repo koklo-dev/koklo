@@ -1,3 +1,3 @@
 fn main() {
-    println!("koklo desktop bootstrap");
+    koklo_desktop::run();
 }

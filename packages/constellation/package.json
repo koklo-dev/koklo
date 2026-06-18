@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "echo building @koklo/constellation",
-    "lint": "echo linting @koklo/constellation",
-    "typecheck": "echo typechecking @koklo/constellation"
+    "build": "pnpm exec tsc -p tsconfig.build.json",
+    "lint": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
   }
 }

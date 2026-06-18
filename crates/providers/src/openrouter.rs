@@ -1185,40 +1185,43 @@ mod tests {
 
     #[test]
     fn test_from_config_with_key_and_model() {
-        std::env::set_var("OPENROUTER_API_KEY", "sk-or-test");
+        let key_var = "KOKLO_TEST_OR_KEYMODEL_XYZ";
+        std::env::set_var(key_var, "sk-or-test");
         let entry = ProviderTomlEntry {
-            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            api_key_env: Some(key_var.to_string()),
             model: Some("anthropic/claude-opus-4-6".to_string()),
             ..Default::default()
         };
         let p = OpenRouterProvider::from_config(&entry).unwrap();
         assert_eq!(p.provider_name(), "openrouter");
         assert_eq!(p.model_name(), Some("anthropic/claude-opus-4-6"));
-        std::env::remove_var("OPENROUTER_API_KEY");
+        std::env::remove_var(key_var);
     }
 
     #[test]
     fn test_default_model_is_gpt4o() {
-        std::env::set_var("OPENROUTER_API_KEY", "sk-or-test");
+        let key_var = "KOKLO_TEST_OR_DEFMODEL_XYZ";
+        std::env::set_var(key_var, "sk-or-test");
         let entry = ProviderTomlEntry {
-            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            api_key_env: Some(key_var.to_string()),
             ..Default::default()
         };
         let p = OpenRouterProvider::from_config(&entry).unwrap();
         assert_eq!(p.model_name(), Some("openai/gpt-4o"));
-        std::env::remove_var("OPENROUTER_API_KEY");
+        std::env::remove_var(key_var);
     }
 
     #[test]
     fn test_from_config_reads_key_from_secrets_file() {
+        let key_var = "KOKLO_TEST_OR_SECRETS_XYZ";
         let dir = tempfile::tempdir().unwrap();
         let secrets = dir.path().join("secrets.toml");
-        std::fs::write(&secrets, "[env]\nOPENROUTER_API_KEY = \"sk-or-test\"\n").unwrap();
-        std::env::remove_var("OPENROUTER_API_KEY");
+        std::fs::write(&secrets, format!("[env]\n{key_var} = \"sk-or-test\"\n")).unwrap();
+        std::env::remove_var(key_var);
         std::env::set_var("KOKLO_SECRETS_FILE", &secrets);
 
         let entry = ProviderTomlEntry {
-            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            api_key_env: Some(key_var.to_string()),
             model: Some("google/gemma-3-4b-it:free".to_string()),
             ..Default::default()
         };
@@ -1230,9 +1233,12 @@ mod tests {
 
     #[test]
     fn test_extra_body_contains_provider_when_routing_set() {
-        std::env::set_var("OPENROUTER_API_KEY", "sk-or-test");
+        // Unique key-env var so this test never races other tests that mutate
+        // the shared `OPENROUTER_API_KEY` (cargo runs tests in one process).
+        let key_var = "KOKLO_TEST_OR_ROUTING_KEY_XYZ";
+        std::env::set_var(key_var, "sk-or-test");
         let entry = ProviderTomlEntry {
-            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            api_key_env: Some(key_var.to_string()),
             routing: Some(ProviderRouting {
                 zdr: Some(true),
                 data_collection: Some("deny".to_string()),
@@ -1249,19 +1255,20 @@ mod tests {
             "deny"
         );
         assert!(!extra_body["provider"]["allow_fallbacks"].as_bool().unwrap());
-        std::env::remove_var("OPENROUTER_API_KEY");
+        std::env::remove_var(key_var);
     }
 
     #[test]
     fn test_no_extra_body_when_no_routing() {
-        std::env::set_var("OPENROUTER_API_KEY", "sk-or-test");
+        let key_var = "KOKLO_TEST_OR_NO_ROUTING_KEY_XYZ";
+        std::env::set_var(key_var, "sk-or-test");
         let entry = ProviderTomlEntry {
-            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            api_key_env: Some(key_var.to_string()),
             ..Default::default()
         };
         let p = OpenRouterProvider::from_config(&entry).unwrap();
         assert!(p.inner.extra_body.is_none());
-        std::env::remove_var("OPENROUTER_API_KEY");
+        std::env::remove_var(key_var);
     }
 
     #[tokio::test]

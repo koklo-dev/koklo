@@ -1,0 +1,75 @@
+.kk-input {
+  display: block;
+  width: 100%;
+  height: var(--btn-md);
+  padding: 0 12px;
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-fg);
+  background: var(--color-bg);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+  -webkit-font-smoothing: antialiased;
+  outline: none;
+}
+
+.kk-input::placeholder {
+  color: var(--color-fg-muted);
+}
+
+.kk-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.kk-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-surface);
+}
+
+.kk-input-error {
+  border-color: var(--color-danger);
+  border-width: 2px;
+}
+.kk-input-error:focus {
+  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-danger);
+}
+
+.kk-input-sm { height: var(--btn-sm); font-size: var(--text-sm); padding: 0 10px; }
+.kk-input-lg { height: var(--btn-lg); font-size: var(--text-md); padding: 0 16px; }
+
+/* Input wrapper with icon */
+.kk-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.kk-input-wrapper .kk-input {
+  padding-left: 34px;
+}
+.kk-input-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+.kk-input-adornment {
+  position: absolute;
+  right: 10px;
+  color: var(--color-fg-muted);
+  display: flex;
+  align-items: center;
+}
+
+/* Error message */
+.kk-input-error-msg {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}

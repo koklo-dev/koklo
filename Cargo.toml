@@ -20,7 +20,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Koklo Team <team@koklo.dev>"]
 license = "AGPL-3.0"
-repository = "https://github.com/koklo/koklo"
+repository = "https://github.com/koklo-dev/koklo"
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }

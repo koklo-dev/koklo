@@ -8,8 +8,18 @@
   "vision_source": "/home/devops/perso/projets/MyVault/Dev/koklo/vision.md",
   "vision_mode": "verbatim",
   "engineering_spec": "/home/devops/perso/projets/MyVault/Dev/koklo/spec/engineering-standards.md",
-  "current_sprint": 1,
-  "completed_sprints": [],
+  "current_sprint": 9,
+  "completed_sprints": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
   "active_agents": [],
   "specialized_agents": [],
   "specialized_workflows": [],
@@ -32,9 +42,9 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-01T11:19:09+02:00",
-  "last_workflow_run": "spike-research",
-  "last_workflow_stage": "finalization",
+  "last_updated": "2026-06-15T08:11:47+02:00",
+  "last_workflow_run": "analyst-designer-developer-qa-reviewer",
+  "last_workflow_stage": "final-summary",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
   "workflow_runs": [
@@ -45,9 +55,185 @@
       "task": "US-001",
       "result": "passed",
       "completed_at": "2026-06-01T11:19:09+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613112400",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-002",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613112401",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-003",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613112402",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-004",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "product-owner-developer-qa-reviewer-20260613112403",
+      "workflow": "product-owner-developer-qa-reviewer",
+      "sprint": "002",
+      "task": "US-005",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:36:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613115450",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "003",
+      "task": "US-006",
+      "result": "passed",
+      "completed_at": "2026-06-13T11:55:00+02:00"
+    },
+    {
+      "id": "analyst-developer-qa-reviewer-20260613121559",
+      "workflow": "analyst-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: detect local claude/codex + Rust protocol library",
+      "result": "passed",
+      "completed_at": "2026-06-13T12:30:00+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260613134144",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "003",
+      "task": "US-007",
+      "result": "passed",
+      "completed_at": "2026-06-13T13:41:44+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613143403",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "004",
+      "task": "US-008",
+      "result": "passed",
+      "completed_at": "2026-06-13T14:34:03+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613144231",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "004",
+      "task": "US-009",
+      "result": "passed",
+      "completed_at": "2026-06-13T14:46:32+02:00"
+    },
+    {
+      "id": "tech-lead-developer-qa-reviewer-20260613154201",
+      "workflow": "tech-lead-developer-qa-reviewer",
+      "sprint": "005",
+      "task": "US-010",
+      "result": "passed",
+      "completed_at": "2026-06-13T15:42:01+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260613161215",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "005",
+      "task": "US-011",
+      "result": "passed",
+      "completed_at": "2026-06-13T16:20:00+02:00"
+    },
+    {
+      "id": "spike-research-20260613222156",
+      "workflow": "spike-research",
+      "sprint": "005",
+      "task": "US-012",
+      "result": "passed",
+      "completed_at": "2026-06-13T22:26:00+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260614000024",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "006",
+      "task": "US-013",
+      "result": "passed",
+      "completed_at": "2026-06-14T00:30:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260614001303",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "006",
+      "task": "US-014",
+      "result": "passed",
+      "completed_at": "2026-06-14T00:18:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260614010000",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "007",
+      "task": "US-015",
+      "result": "passed",
+      "completed_at": "2026-06-14T01:05:00+02:00"
+    },
+    {
+      "id": "developer-qa-reviewer-20260614011707",
+      "workflow": "developer-qa-reviewer",
+      "sprint": "007",
+      "task": "US-016",
+      "result": "passed",
+      "completed_at": "2026-06-14T09:00:07+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260614092613",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "008",
+      "task": "US-017",
+      "result": "failed",
+      "completed_at": "2026-06-14T09:26:13+02:00"
+    },
+    {
+      "id": "tech-lead-developer-qa-reviewer-20260614094219",
+      "workflow": "tech-lead-developer-qa-reviewer",
+      "sprint": "008",
+      "task": "US-017-A",
+      "result": "passed",
+      "completed_at": "2026-06-14T12:29:11+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260614132410",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "008",
+      "task": "US-017",
+      "result": "passed",
+      "completed_at": "2026-06-14T13:42:00+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260614194018",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "009",
+      "task": "US-018",
+      "result": "passed",
+      "completed_at": "2026-06-14T20:05:00+02:00"
+    },
+    {
+      "id": "analyst-designer-developer-qa-reviewer-20260614225434",
+      "workflow": "analyst-designer-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: desktop boot screen on app startup",
+      "result": "passed",
+      "completed_at": "2026-06-14T23:02:00+02:00"
+    },
+    {
+      "id": "analyst-designer-developer-qa-reviewer-20260615081147",
+      "workflow": "analyst-designer-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: local account onboarding (desktop + CLI)",
+      "result": "passed",
+      "completed_at": "2026-06-15T08:35:00+02:00"
     }
   ],
-  "last_task_completed": "US-001",
+  "last_task_completed": "US-018",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",

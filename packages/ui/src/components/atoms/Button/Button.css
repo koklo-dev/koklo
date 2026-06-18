@@ -1,0 +1,136 @@
+.kk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--btn-md);
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  /* Trim Inter's asymmetric half-leading so the label is optically centered
+     (cap-top to alphabetic baseline) rather than sitting visually high. */
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+  text-decoration: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.kk-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.kk-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Variants */
+.kk-btn-primary {
+  background: var(--color-accent);
+  color: var(--color-primary-dark);
+  border-color: transparent;
+}
+.kk-btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  color: var(--color-fg-inverse);
+}
+
+.kk-btn-secondary {
+  background: transparent;
+  color: var(--color-fg-secondary);
+  border-color: var(--color-border);
+}
+.kk-btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border-color: var(--color-fg-muted);
+}
+
+.kk-btn-ghost {
+  background: transparent;
+  color: var(--color-fg-secondary);
+  border-color: transparent;
+}
+.kk-btn-ghost:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.kk-btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: transparent;
+}
+.kk-btn-danger:hover:not(:disabled) {
+  background: #B91C1C;
+}
+
+.kk-btn-danger-ghost {
+  background: transparent;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.kk-btn-danger-ghost:hover:not(:disabled) {
+  background: var(--color-danger-light);
+}
+
+.kk-btn-bmad {
+  background: var(--color-bmad-btn);
+  color: #fff;
+  border-color: transparent;
+}
+.kk-btn-bmad:hover:not(:disabled) {
+  background: #6D28D9;
+}
+
+.kk-btn-success {
+  background: var(--color-success);
+  color: #fff;
+  border-color: transparent;
+}
+.kk-btn-success:hover:not(:disabled) {
+  background: #15803D;
+}
+
+/* Sizes */
+.kk-btn-sm {
+  height: var(--btn-sm);
+  padding: 0 12px;
+  font-size: var(--text-sm);
+  gap: 4px;
+}
+.kk-btn-lg {
+  height: var(--btn-lg);
+  padding: 0 24px;
+  font-size: var(--text-md);
+}
+
+/* Loading */
+.kk-btn-loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.kk-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: kk-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}

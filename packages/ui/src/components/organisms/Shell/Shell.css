@@ -1,0 +1,39 @@
+.kk-shell {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* Center column: topbar + scrollable page + optional footer */
+.kk-shell-center {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Scrollable content area */
+.kk-shell-page {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Optional fixed footer (composer, etc.) */
+.kk-shell-footer {
+  flex-shrink: 0;
+  border-top: var(--border-default);
+  padding: 12px 20px;
+  background: var(--color-bg);
+}
+
+/* Right panel slot */
+.kk-shell-right {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}

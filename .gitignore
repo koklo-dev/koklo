@@ -10,6 +10,7 @@ dist/
 
 # Tauri
 apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/schemas/
 
 # SQLite
 *.db
@@ -49,3 +50,10 @@ Thumbs.db
 
 # OpenClaw
 .openclaw/.env
+/prompt-constellation-maquette.txt
+/prompt-onboarding-steps.txt
+/prompt-settings-detail.txt
+/prompt-workflows-koklo.txt
+
+# Pipeline run artifacts copied back into the project tree (koklo run / desktop sessions)
+planning_artifacts/

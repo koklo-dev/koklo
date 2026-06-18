@@ -1,0 +1,72 @@
+.kk-iconbtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-fg-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.kk-iconbtn:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.kk-iconbtn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.kk-iconbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Variants */
+.kk-iconbtn-primary:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.kk-iconbtn-ghost {
+  color: var(--color-fg-muted);
+}
+
+.kk-iconbtn-danger:hover:not(:disabled) {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+/* Active state */
+.kk-iconbtn-active {
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+/* Sizes */
+.kk-iconbtn-sm { width: 24px; height: 24px; border-radius: var(--radius-sm); }
+.kk-iconbtn-lg { width: 36px; height: 36px; }
+
+/* Notification dot */
+.kk-iconbtn-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  border: 1.5px solid var(--color-bg);
+}
+.kk-iconbtn-dot-danger {
+  background: var(--color-danger);
+}

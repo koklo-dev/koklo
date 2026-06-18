@@ -3,6 +3,7 @@ use crate::cli::claude_code::ClaudeCodeCliProvider;
 use crate::cli::codex::CodexCliProvider;
 use crate::config::{PipelineTomlConfig, ProviderTomlEntry};
 use crate::error::ProviderError;
+use crate::mock::MockProvider;
 use crate::ollama::OllamaProvider;
 use crate::openrouter::OpenRouterProvider;
 use crate::LlmProvider;
@@ -10,7 +11,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-const KNOWN_NAMES: &[&str] = &["openrouter", "ollama", "claude-code", "codex-cli"];
+const KNOWN_NAMES: &[&str] = &["openrouter", "ollama", "claude-code", "codex-cli", "mock"];
 
 fn canonical_provider_name(name: &str) -> &str {
     match name {
@@ -101,6 +102,7 @@ pub fn build_provider(
         "ollama" => Ok(Arc::new(OllamaProvider::from_config(entry)?)),
         "claude-code" => Ok(Arc::new(ClaudeCodeCliProvider::from_config(entry)?)),
         "codex-cli" => Ok(Arc::new(CodexCliProvider::from_config(entry)?)),
+        "mock" => Ok(Arc::new(MockProvider::from_config(entry)?)),
         _ => Err(ProviderError::UnknownProvider {
             name: name.to_string(),
             known: KNOWN_NAMES.join(", "),

@@ -1,8 +1,5 @@
 <div align="center">
 
-<!-- LOGO -->
-<img src="assets/koklo-logo.svg" alt="Koklo Logo" width="120" />
-
 # KOKLO
 
 ### The OS for AI-Assisted Software Development
@@ -12,18 +9,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub Stars](https://img.shields.io/github/stars/koklo-dev/koklo?style=social)](https://github.com/koklo-dev/koklo/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/koklo-dev/koklo?style=social)](https://github.com/koklo-dev/koklo/network/members)
-[![Discord](https://img.shields.io/discord/XXXXXXXXX?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/koklo)
 [![Contributors](https://img.shields.io/github/contributors/koklo-dev/koklo)](https://github.com/koklo-dev/koklo/graphs/contributors)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/koklo-dev/koklo/blob/main/CONTRIBUTING.md)
-
-[Website](https://koklo.dev) · [Docs](https://docs.koklo.dev) · [Discord](https://discord.gg/koklo) · [Roadmap](https://github.com/koklo-dev/koklo/projects/1) · [Contributing](CONTRIBUTING.md)
-
-<br />
-
-<!-- HERO VISUAL -->
-<img src="assets/koklo-hero-screenshot.png" alt="Koklo Desktop App" width="680" />
-
-<br />
 
 </div>
 
@@ -111,45 +97,93 @@ It's not an IDE extension. It's not another chatbot. It's the **cockpit** where 
 
 ## 🚀 Quick Start
 
+Koklo ships today as a **Rust CLI**. The desktop app is Phase 2 and not yet ready for daily use (see the [Roadmap](#️-roadmap)) — the CLI is the supported way to use Koklo now.
+
 ### Prerequisites
 
-- **Rust** ≥ 1.75
-- **Node.js** ≥ 20
-- **pnpm** ≥ 9
+- **Rust** ≥ 1.75 with Cargo — install via [rustup](https://rustup.rs).
+- **One LLM provider — any single one is enough.** Koklo does **not** impose a provider (Ollama is *not* required). It auto-detects the first one that's actually ready, in this exact resolution order (mirrors `crates/providers/src/detect.rs`):
+  1. a running **Ollama** with the configured model pulled (`ollama pull qwen2.5-coder:7b`) — local, offline, free;
+  2. a local **Claude Code** CLI, then **Codex** CLI, installed and authenticated — reuses your existing subscription, no key;
+  3. an **`OPENROUTER_API_KEY`** in your environment or `~/.koklo/secrets.toml`;
+  4. a provider pinned in `.koklo/pipeline.toml` or `~/.koklo/config.toml`.
 
-### Install & Run
+  You don't pick one manually — whatever is ready wins, and a running-but-empty Ollama is skipped so detection falls through to the next option. See [Configure a provider](#configure-a-provider) to pin one explicitly.
+
+Nothing else is required to run the CLI: no Node.js, pnpm, or Tauri/system libraries (those are only needed to hack on the desktop app).
+
+### Install
 
 ```bash
-# Clone the repository
+# From a local checkout
 git clone https://github.com/koklo-dev/koklo.git
 cd koklo
-
-# Install dependencies
-pnpm install
-
-# Run the desktop app in development mode
-pnpm dev
-```
-
-That's it. Koklo detects your project, suggests a preset, and you're ready to go.
-
-### Or use the CLI directly
-
-```bash
-# Install the CLI
 cargo install --path apps/cli
 
-# Initialise in an existing project (auto-detects stack, creates .koklo/pipeline.toml)
-koklo init
-
-# Run a pipeline — choose your methodology
-koklo run feature "Auth JWT"                    # SDD (default, 5 phases)
-koklo run --preset bmad    feature "Add OAuth2" # BMAD Method (8 phases)
-koklo run --preset speckit feature "Refactor"  # GitHub Spec Kit (6 phases)
-koklo run --preset light   task    "Fix typo"  # Minimal (3 phases)
+# …or directly from Git, no clone (name the package — the repo has two binaries)
+cargo install --git https://github.com/koklo-dev/koklo koklo-cli
 ```
 
+Verify:
+
+```bash
+koklo --version   # koklo 0.1.0
+```
+
+### Run your first pipeline
+
+**Recommended first run — `koklo start`.** This is the guided onboarding entry point: it detects your project, auto-detects a provider, picks the fast `light` preset, and runs a first pipeline through to a generated artifact.
+
+```bash
+koklo start
+```
+
+Prefer to drive it yourself?
+
+```bash
+# Initialise Koklo in your project (auto-detects stack, creates .koklo/pipeline.toml)
+koklo init
+
+# Run a minimal 3-phase pipeline (a self-contained task that always yields an artifact)
+koklo run --preset light   task    "Add a hello world function"
+
+# …or the default Spec-Driven Development flow (5 phases)
+koklo run                  feature "Auth JWT"
+
+# Other methodologies
+koklo run --preset bmad    feature "Add OAuth2"      # BMAD Method (8 phases)
+koklo run --preset speckit feature "Refactor storage" # GitHub Spec Kit (6 phases)
+```
+
+> **On presets:** `koklo init` records a preset matched to your stack in `.koklo/pipeline.toml` — `sdd` for Rust/Python/Go, `speckit` for Node. The `--preset light` flag on `koklo run` **overrides** that per-run, giving you the quickest 3-phase flow for a first run. Drop the flag to use your project's configured preset. `koklo start` always uses `light`.
+>
+> Pick a task that produces something on its own (like *"Add a hello world function"*) for your very first run — open-ended tasks that depend on existing files (e.g. *"fix the typo"* on an empty repo) can make agents correctly **block** instead of generating an artifact.
+
+When the run finishes, the generated artifacts (`spec.md`, `implement.md`, `review.md`, …) are written to **`docs/planning_artifacts/`** in your project — the final summary prints the exact path.
+
+Running headless (CI, scripting)? Add `--no-tui` to approve gates from stdin. A failed run exits non-zero so CI can detect it.
+
 → **[Full CLI reference → apps/cli/README.md](apps/cli/README.md)**
+
+### Configure a provider
+
+Koklo is LLM-agnostic. By default it **auto-detects** an available provider in this order: an Ollama server with the configured model pulled → a ready Claude Code CLI → a ready Codex CLI → an `OPENROUTER_API_KEY`. To pin one explicitly, set it per agent with a `KOKLO_PROVIDER_<AGENT>` environment variable or in `.koklo/pipeline.toml`. Resolution order per agent: `KOKLO_PROVIDER_<AGENT>` env var → `agent_providers` map in the TOML → `default_provider` → auto-detection.
+
+The table below lists providers in auto-detection precedence order:
+
+| Provider | Setup | Configuration |
+|----------|-------|---------------|
+| **Ollama** — local, offline, free | `ollama serve`, then **`ollama pull qwen2.5-coder:7b`** (Koklo skips Ollama until the model is pulled) | `OLLAMA_BASE_URL` (default `http://localhost:11434`), `OLLAMA_MODEL` (default `qwen2.5-coder:7b`) |
+| **Claude Code CLI** | Install and authenticate the `claude` CLI | — (uses your existing session) |
+| **Codex CLI** | Install and authenticate the `codex` CLI | — (uses your existing session) |
+| **OpenRouter** — BYOK gateway | `export OPENROUTER_API_KEY=…` then `koklo provider add openrouter` | `OPENROUTER_API_KEY` |
+
+Inspect and test what's configured:
+
+```bash
+koklo provider list
+koklo provider test ollama
+```
 
 ---
 
@@ -391,9 +425,7 @@ We believe in meritocracy. Every maintainer started with a single PR.
 
 The Koklo core is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPLv3).
 
-Premium features located in the `ee/` directory are covered by the [Koklo Commercial License](ee/LICENSE).
-
-See [Licenses & CLA](docs/licenses.md) for full details.
+Premium features are covered by the [Koklo Commercial License](LICENSE-COMMERCIAL.md).
 
 ---
 

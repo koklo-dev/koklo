@@ -1,0 +1,68 @@
+/* Sessions screen layout — vendored faithfully from koklo-storybook
+   (src/stories/screens/Sessions.css). Screen-level layout only; all visual
+   styling lives in the @koklo/ui design-system components (kk- token classes). */
+.ses-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-7);
+  max-width: 880px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.ses-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.ses-head h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.ses-head p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-fg-muted);
+  max-width: 52ch;
+}
+
+.ses-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ses-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-9) var(--space-5);
+  color: var(--color-fg-muted);
+  font-size: var(--text-sm);
+}
+
+/* New Run form */
+.ses-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ses-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ses-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-fg);
+}

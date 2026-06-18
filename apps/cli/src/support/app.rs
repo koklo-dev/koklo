@@ -1,7 +1,8 @@
 use anyhow::Result;
 use koklo_providers::{
-    resolve_secret, LlmProvider, OllamaProvider, OpenRouterProvider, PipelineTomlConfig,
-    ProviderRegistry,
+    detect_provider, ollama_base_url, resolve_secret, ClaudeCodeCliProvider, CodexCliProvider,
+    DetectionSource, LlmProvider, OllamaProvider, OpenRouterProvider, PipelineTomlConfig,
+    ProviderDetection, ProviderError, ProviderRegistry, ProviderTomlEntry,
 };
 use koklo_workflow_engine::{
     presets::PresetKind, GateHandler, GithubConfig, PipelineConfig, PipelineOrchestrator,
@@ -70,63 +71,133 @@ pub(crate) fn find_project_root() -> Result<PathBuf> {
 
 /// Select the default provider.
 ///
-/// Priority:
-/// 0. `toml_default` field from merged config (highest priority)
-/// 1. `KOKLO_PROVIDER` env var → registry lookup
-/// 2. `OPENROUTER_API_KEY` set → openrouter
-/// 3. OllamaProvider (fallback)
-pub(crate) fn determine_default_provider(
+/// `KOKLO_PROVIDER` is an imperative override and wins outright when it names a
+/// buildable provider. Otherwise auto-detection runs in the US-006 precedence
+/// order — Ollama, env keys, `~/.koklo/config.toml`, interactive prompt — and a
+/// failure to detect surfaces an actionable [`ProviderError::NoProviderDetected`].
+pub(crate) async fn determine_default_provider(
     registry: &ProviderRegistry,
-    toml_default: Option<&str>,
+    config: &PipelineTomlConfig,
 ) -> Result<Arc<dyn LlmProvider>> {
-    if let Some(name) = toml_default {
-        if let Some(p) = registry.get(name) {
-            tracing::info!(
-                "Default provider: '{}' (from config default_provider)",
-                name
-            );
-            return Ok(p);
-        }
-        tracing::warn!(
-            "Config default_provider='{}' not in registry, falling back",
-            name
-        );
-    }
-
     if let Ok(name) = std::env::var("KOKLO_PROVIDER") {
         if let Some(p) = registry.get(&name) {
             tracing::info!("Default provider: '{}' (from KOKLO_PROVIDER)", name);
             return Ok(p);
         }
-        tracing::warn!("KOKLO_PROVIDER='{}' not in registry, falling back", name);
+        tracing::warn!(
+            "KOKLO_PROVIDER='{}' not buildable, falling back to detection",
+            name
+        );
     }
 
-    if let Some(api_key) = resolve_secret("OPENROUTER_API_KEY") {
-        let p: Arc<dyn LlmProvider> = match registry.get("openrouter") {
-            Some(p) => p,
-            None => Arc::new(OpenRouterProvider::new(
-                api_key,
-                "openai/gpt-4o".to_string(),
-                None,
-            )),
-        };
-        tracing::info!("Default provider: openrouter (OPENROUTER_API_KEY)");
+    match detect_provider(config).await {
+        ProviderDetection::Detected { provider, source } => {
+            if let Some(p) = build_detected_provider(registry, &provider, &source) {
+                tracing::info!(
+                    "Default provider: '{}' (detected via {})",
+                    provider,
+                    source.describe()
+                );
+                return Ok(p);
+            }
+            tracing::warn!(
+                "Detected provider '{}' could not be built; prompting / erroring",
+                provider
+            );
+        }
+        ProviderDetection::NeedsSelection => {}
+    }
+
+    if let Some(p) = prompt_for_provider(registry)? {
         return Ok(p);
     }
 
-    let p: Arc<dyn LlmProvider> = match registry.get("ollama") {
-        Some(p) => p,
-        None => Arc::new(OllamaProvider::from_env()),
-    };
-    tracing::info!("Default provider: ollama (fallback)");
-    Ok(p)
+    Err(ProviderError::NoProviderDetected {
+        ollama_url: ollama_base_url(config),
+    }
+    .into())
+}
+
+/// Materialise a detected provider name into a live provider, preferring the
+/// registry-built instance and falling back to an env-constructed one for the
+/// zero-config Ollama / OpenRouter cases.
+fn build_detected_provider(
+    registry: &ProviderRegistry,
+    name: &str,
+    source: &DetectionSource,
+) -> Option<Arc<dyn LlmProvider>> {
+    if let Some(p) = registry.get(name) {
+        return Some(p);
+    }
+    match name {
+        "ollama" => Some(Arc::new(OllamaProvider::from_env())),
+        "claude-code" => ClaudeCodeCliProvider::from_config(&ProviderTomlEntry::default())
+            .ok()
+            .map(|p| Arc::new(p) as Arc<dyn LlmProvider>),
+        "codex-cli" => CodexCliProvider::from_config(&ProviderTomlEntry::default())
+            .ok()
+            .map(|p| Arc::new(p) as Arc<dyn LlmProvider>),
+        "openrouter" => {
+            let var_name = match source {
+                DetectionSource::EnvKey { var_name } => var_name.as_str(),
+                _ => "OPENROUTER_API_KEY",
+            };
+            resolve_secret(var_name).map(|api_key| {
+                Arc::new(OpenRouterProvider::new(
+                    api_key,
+                    "openai/gpt-4o".to_string(),
+                    None,
+                )) as Arc<dyn LlmProvider>
+            })
+        }
+        _ => None,
+    }
+}
+
+/// Interactive fallback (US-006 detection step 4). When stdin is a TTY, offer
+/// the buildable providers and let the user pick one. Returns `Ok(None)` when
+/// non-interactive or cancelled so the caller raises an actionable error.
+fn prompt_for_provider(registry: &ProviderRegistry) -> Result<Option<Arc<dyn LlmProvider>>> {
+    use std::io::{IsTerminal, Write};
+
+    if !std::io::stdin().is_terminal() {
+        return Ok(None);
+    }
+    let options: Vec<(String, Arc<dyn LlmProvider>)> = registry
+        .iter()
+        .map(|(name, p)| (name.to_string(), p.clone()))
+        .collect();
+    if options.is_empty() {
+        return Ok(None);
+    }
+
+    println!("No LLM provider was auto-detected. Choose one to continue:");
+    for (idx, (name, _)) in options.iter().enumerate() {
+        println!("  {}. {}", idx + 1, name);
+    }
+    print!("Selection [1-{}] (blank to cancel): ", options.len());
+    std::io::stdout().flush()?;
+
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    let choice = line.trim();
+    if choice.is_empty() {
+        return Ok(None);
+    }
+    match choice.parse::<usize>() {
+        Ok(idx) if idx >= 1 && idx <= options.len() => Ok(Some(options[idx - 1].1.clone())),
+        _ => {
+            println!("Invalid selection.");
+            Ok(None)
+        }
+    }
 }
 
 pub(crate) async fn build_orchestrator(
     project_root_override: Option<PathBuf>,
     preset_override: Option<PresetKind>,
 ) -> Result<PipelineOrchestrator> {
-    let config = build_pipeline_config(project_root_override, preset_override)?;
+    let config = build_pipeline_config(project_root_override, preset_override).await?;
     PipelineOrchestrator::new(config).await
 }
 
@@ -136,7 +207,7 @@ pub(crate) async fn build_orchestrator_with_gate(
     gate_handler: Arc<dyn GateHandler>,
     user_input_handler: Arc<dyn PipelineUserInputHandler>,
 ) -> Result<PipelineOrchestrator> {
-    let config = build_pipeline_config(project_root_override, preset_override)?;
+    let config = build_pipeline_config(project_root_override, preset_override).await?;
     PipelineOrchestrator::new_with_handlers(config, gate_handler, user_input_handler).await
 }
 
@@ -174,7 +245,7 @@ pub(crate) fn write_config(path: &PathBuf, config: &PipelineTomlConfig) -> Resul
     Ok(())
 }
 
-fn build_pipeline_config(
+async fn build_pipeline_config(
     project_root_override: Option<PathBuf>,
     preset_override: Option<PresetKind>,
 ) -> Result<PipelineConfig> {
@@ -203,8 +274,7 @@ fn build_pipeline_config(
         }
     }
 
-    let default_provider =
-        determine_default_provider(&registry, merged.pipeline.default_provider.as_deref())?;
+    let default_provider = determine_default_provider(&registry, &merged).await?;
 
     let preset = preset_override.unwrap_or_else(|| {
         merged

@@ -1,9 +1,10 @@
 use anyhow::Result;
+use std::io::IsTerminal;
 
 use super::{
-    AgentCommands, ArtifactsCommands, Cli, Commands, ConfigCommands, ContextCommands, DocsCommands,
-    IdeCommands, InternalCommands, PresetCommands, ProviderCommands, SessionCommands,
-    TicketCommands, WorkflowCommands,
+    AccountCommands, AgentCommands, ArtifactsCommands, Cli, Commands, ConfigCommands,
+    ContextCommands, DocsCommands, IdeCommands, InternalCommands, PresetCommands, ProviderCommands,
+    SessionCommands, TicketCommands, WorkflowCommands,
 };
 use crate::commands;
 
@@ -15,14 +16,24 @@ pub(crate) async fn dispatch(cli: Cli) -> Result<()> {
 
     match cli.command {
         Commands::Init { path, preset, yes } => commands::cmd_init(&path, preset, yes).await?,
+        Commands::Start { title, yes } => {
+            // Koklo cannot be used without a local account; create one interactively
+            // unless the run is non-interactive (`--yes` or no TTY).
+            commands::ensure_account(!yes && std::io::stdin().is_terminal())?;
+            commands::cmd_start(yes, title).await?
+        }
         Commands::Run {
             preset,
             mode,
             pipeline_type,
             title,
             no_tui,
-        } => commands::cmd_run(preset, mode, &pipeline_type, &title, no_tui).await?,
+        } => {
+            commands::ensure_account(std::io::stdin().is_terminal())?;
+            commands::cmd_run(preset, mode, &pipeline_type, &title, no_tui).await?
+        }
 
+        Commands::Account(subcommand) => dispatch_account(subcommand).await?,
         Commands::Session(subcommand) => dispatch_session(subcommand).await?,
         Commands::Agent(subcommand) => dispatch_agent(subcommand).await?,
         Commands::Workflow(subcommand) => dispatch_workflow(subcommand).await?,
@@ -106,6 +117,14 @@ fn future_stub_info(command: &Commands) -> Option<(&'static str, &'static str)> 
         Commands::Voice => Some(("Voice", "Phase 8 (Voice Input)")),
         _ => None,
     }
+}
+
+async fn dispatch_account(command: AccountCommands) -> Result<()> {
+    match command {
+        AccountCommands::Show => commands::cmd_account_show().await?,
+        AccountCommands::Setup => commands::cmd_account_setup().await?,
+    }
+    Ok(())
 }
 
 async fn dispatch_session(command: SessionCommands) -> Result<()> {

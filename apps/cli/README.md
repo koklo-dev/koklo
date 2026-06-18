@@ -4,11 +4,36 @@ Autonomous AI development pipeline — run multi-phase AI workflows from your te
 
 ## Install
 
+### Prerequisites
+
+- **Rust** ≥ 1.75 with Cargo (edition 2021). Install via [rustup](https://rustup.rs).
+
+Installing `koklo` does **not** require Node.js, pnpm, or any Tauri/system libraries — those are only needed for the desktop app.
+
+### From a local checkout
+
 ```bash
-cargo install --path apps/cli
+git clone https://github.com/koklo-dev/koklo.git
+cd koklo
+cargo install --path apps/cli   # builds and installs the `koklo` binary
 ```
 
-Or run directly from the workspace:
+### Directly from Git (no clone)
+
+The repository contains two binary packages (`koklo-cli`, `koklo-desktop`), so the
+package must be named explicitly:
+
+```bash
+cargo install --git https://github.com/koklo-dev/koklo koklo-cli
+```
+
+Verify the install:
+
+```bash
+koklo --version   # -> koklo 0.1.0
+```
+
+Or run directly from the workspace without installing:
 
 ```bash
 cargo run -p koklo-cli -- <command>

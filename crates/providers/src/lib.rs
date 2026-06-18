@@ -7,8 +7,10 @@
 
 pub mod cli;
 pub mod config;
+pub mod detect;
 pub mod error;
 pub mod fallback;
+pub mod mock;
 pub mod ollama;
 pub(crate) mod openai_compat;
 pub mod openrouter;
@@ -18,8 +20,12 @@ pub mod secrets;
 pub use cli::claude_code::ClaudeCodeCliProvider;
 pub use cli::codex::CodexCliProvider;
 pub use config::{AgentTomlConfig, PipelineTomlConfig, ProviderRouting, ProviderTomlEntry};
+pub use detect::{
+    detect_provider, list_ollama_models, ollama_base_url, DetectionSource, ProviderDetection,
+};
 pub use error::ProviderError;
 pub use fallback::FallbackProvider;
+pub use mock::MockProvider;
 pub use ollama::OllamaProvider;
 pub use openrouter::OpenRouterProvider;
 pub use registry::ProviderRegistry;

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core permissions for the Koklo desktop window. Grants the frontend access to the Tauri event API so the live transcript subscription (US-018) can `listen`/`unlisten` on the EventBus→window channel; app-defined `#[tauri::command]` handlers (sessions_*, transcript_*, finish_boot) are allowed by default and need no entry here. The boot handoff (close splash + reveal main) runs in `finish_boot` on the backend, so it needs no `core:window` permission.",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:event:allow-emit",
+    "core:event:allow-emit-to"
+  ]
+}

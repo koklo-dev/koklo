@@ -211,39 +211,31 @@ fn next_request_id() -> String {
     format!("claude-approval-{nanos}-{counter}")
 }
 
+/// Read one MCP message. The MCP stdio transport is newline-delimited JSON
+/// (one JSON-RPC object per line) — NOT LSP-style `Content-Length` framing.
+/// Using the wrong framing meant Claude Code never completed the handshake,
+/// so the server exposed zero tools ("Available MCP tools: none").
 fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>> {
-    let mut content_length = None;
     loop {
         let mut line = String::new();
         let read = reader.read_line(&mut line)?;
         if read == 0 {
-            if content_length.is_none() {
-                return Ok(None);
-            }
-            anyhow::bail!("unexpected EOF while reading MCP headers");
+            return Ok(None);
         }
-
-        if line == "\r\n" {
-            break;
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
         }
-
-        let trimmed = line.trim_end_matches(['\r', '\n']);
-        if let Some(value) = trimmed.strip_prefix("Content-Length:") {
-            content_length = Some(value.trim().parse::<usize>()?);
-        }
+        let value =
+            serde_json::from_str(trimmed).context("invalid JSON-RPC message on MCP stdio")?;
+        return Ok(Some(value));
     }
-
-    let len = content_length.context("missing Content-Length header")?;
-    let mut body = vec![0_u8; len];
-    reader.read_exact(&mut body)?;
-    let value = serde_json::from_slice(&body)?;
-    Ok(Some(value))
 }
 
 fn write_message(writer: &mut impl Write, value: &Value) -> Result<()> {
     let body = serde_json::to_vec(value)?;
-    write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;
     writer.write_all(&body)?;
+    writer.write_all(b"\n")?;
     writer.flush()?;
     Ok(())
 }
@@ -257,4 +249,53 @@ fn jsonrpc_error(id: Value, code: i64, message: &str) -> Value {
             "message": message,
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn write_message_is_newline_delimited_json() {
+        // MCP stdio framing is one JSON object per line, no Content-Length headers.
+        let mut buf = Vec::new();
+        write_message(&mut buf, &json!({"jsonrpc": "2.0", "id": 1})).unwrap();
+        let text = String::from_utf8(buf).unwrap();
+        assert!(!text.contains("Content-Length"));
+        assert!(text.ends_with('\n'));
+        assert_eq!(text.matches('\n').count(), 1);
+        assert_eq!(text.trim(), r#"{"id":1,"jsonrpc":"2.0"}"#);
+    }
+
+    #[test]
+    fn read_message_round_trips_and_skips_blank_lines() {
+        let input = "\n{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/list\"}\n";
+        let mut reader = Cursor::new(input.as_bytes());
+        let msg = read_message(&mut reader).unwrap().expect("a message");
+        assert_eq!(msg.get("id").and_then(Value::as_u64), Some(7));
+        assert_eq!(
+            msg.get("method").and_then(Value::as_str),
+            Some("tools/list")
+        );
+        // EOF after the message yields None.
+        assert!(read_message(&mut reader).unwrap().is_none());
+    }
+
+    #[test]
+    fn tools_list_exposes_the_permission_tool() {
+        let dir = std::env::temp_dir();
+        let response = handle_request(
+            &dir,
+            &json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}),
+        )
+        .unwrap();
+        let names: Vec<&str> = response["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+        assert_eq!(names, vec![TOOL_NAME]);
+    }
 }

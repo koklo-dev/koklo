@@ -30,6 +30,19 @@ pub enum ProviderError {
     #[error("Unknown provider '{name}'. Known providers: {known}")]
     UnknownProvider { name: String, known: String },
 
+    #[error(
+        "No LLM provider could be auto-detected.\n\n\
+         Koklo looked for, in order:\n\
+         \x20 1. A running Ollama server at {ollama_url} — not reachable\n\
+         \x20 2. A cloud API key in the environment (OPENROUTER_API_KEY) — not set\n\
+         \x20 3. A provider in ~/.koklo/config.toml — none usable\n\n\
+         To get started, pick one:\n\
+         \x20 • Local (free):  run `ollama serve`, then `ollama pull llama3.2`\n\
+         \x20 • Cloud:         export OPENROUTER_API_KEY=sk-or-...\n\
+         \x20 • Configure:     run `koklo provider add <name>`"
+    )]
+    NoProviderDetected { ollama_url: String },
+
     #[error("All fallbacks exhausted. Last error: {last_error}")]
     FallbackExhausted { last_error: String },
 
@@ -71,6 +84,20 @@ mod tests {
         };
         assert!(e.to_string().contains("fancy"));
         assert!(e.to_string().contains("anthropic"));
+    }
+
+    #[test]
+    fn test_no_provider_detected_is_actionable() {
+        let e = ProviderError::NoProviderDetected {
+            ollama_url: "http://127.0.0.1:11434".to_string(),
+        };
+        let msg = e.to_string();
+        // Names every detection source and a concrete remediation for each.
+        assert!(msg.contains("http://127.0.0.1:11434"));
+        assert!(msg.contains("OPENROUTER_API_KEY"));
+        assert!(msg.contains("config.toml"));
+        assert!(msg.contains("ollama serve"));
+        assert!(msg.contains("koklo provider add"));
     }
 
     #[test]

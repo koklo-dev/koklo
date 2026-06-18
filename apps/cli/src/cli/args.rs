@@ -39,6 +39,23 @@ pub(crate) enum Commands {
         yes: bool,
     },
 
+    /// Guided first-run setup: detect context, pick the light preset, resolve a
+    /// provider, and run a first pipeline to a generated artifact.
+    ///
+    /// Examples:
+    ///   koklo start
+    ///   koklo start --yes
+    ///   koklo start "Add a health check endpoint"
+    Start {
+        /// First work item to generate a spec for (uses a sensible default if omitted).
+        #[arg(value_name = "TITLE")]
+        title: Option<String>,
+
+        /// Skip interactive prompts; fail fast if no provider is auto-detected.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+
     /// Run a workflow pipeline.
     ///
     /// Examples:
@@ -68,6 +85,14 @@ pub(crate) enum Commands {
         #[arg(long)]
         no_tui: bool,
     },
+
+    /// Manage your local account (required before first use).
+    ///
+    /// Examples:
+    ///   koklo account show
+    ///   koklo account setup
+    #[command(subcommand)]
+    Account(AccountCommands),
 
     /// Manage pipeline sessions.
     ///
@@ -210,6 +235,14 @@ pub(crate) enum Commands {
 
     #[command(hide = true, subcommand)]
     Internal(InternalCommands),
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum AccountCommands {
+    /// Show your local account.
+    Show,
+    /// Create or replace your local account (interactive).
+    Setup,
 }
 
 #[derive(Debug, Subcommand)]

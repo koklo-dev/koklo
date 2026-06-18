@@ -34,9 +34,17 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Tests
         run: cargo test --workspace
+      - name: Happy-path E2E (mock LLM)
+        # Explicit P1 §4 gate. The deterministic, model-free end-to-end test
+        # (apps/cli/tests/happy_path.rs) is already covered by the workspace
+        # run above; it is pinned here as a named gate so a happy-path
+        # regression is obvious in the CI summary. See CONTRIBUTING.md.
+        run: cargo test -p koklo-cli --test happy_path
+        env:
+          RUST_BACKTRACE: 1
 
   frontend-checks:
-    name: TypeScript - Build & Lint
+    name: Frontend - TypeScript gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +56,46 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
-      - run: pnpm run typecheck
-      - run: pnpm run build
+      - name: Workspace lint
+        run: pnpm run lint
+      - name: Workspace typecheck
+        run: pnpm run typecheck
+      - name: Workspace build
+        run: pnpm run build
+
+  dependency-audit:
+    name: Dependency Audit (Rust + pnpm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Audit dependencies (high/critical block)
+        run: bash scripts/audit.sh
+
+  coverage:
+    name: Coverage (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+      # Report-only until the coverage baseline reaches the spec §2 threshold (80%).
+      # Flip to blocking by removing KOKLO_COVERAGE_LINE_MIN once the debt is cleared
+      # (backlog follow-up). Locally, `bash scripts/coverage.sh` enforces 80% by default.
+      - name: Measure coverage
+        run: KOKLO_COVERAGE_LINE_MIN=0 bash scripts/coverage.sh

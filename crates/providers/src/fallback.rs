@@ -24,6 +24,9 @@ pub fn is_fallback_worthy(e: &ProviderError) -> bool {
     match e {
         ProviderError::CliNotInstalled { .. } => true,
         ProviderError::CliSessionExpired { .. } => true,
+        // Ollama is reachable but the configured model isn't pulled — another
+        // configured provider may be ready, so try it rather than hard-failing.
+        ProviderError::OllamaModelNotFound { .. } => true,
         ProviderError::PtyUnavailable => true,
         ProviderError::RateLimited { .. } => true,
         ProviderError::Timeout { .. } => true,
@@ -184,6 +187,10 @@ mod tests {
         }));
         assert!(is_fallback_worthy(&ProviderError::RateLimited {
             attempts: 3
+        }));
+        assert!(is_fallback_worthy(&ProviderError::OllamaModelNotFound {
+            model: "qwen2.5-coder:7b".into(),
+            available: "none found".into(),
         }));
         assert!(is_fallback_worthy(&ProviderError::Timeout { secs: 30 }));
         assert!(is_fallback_worthy(&ProviderError::HttpError {

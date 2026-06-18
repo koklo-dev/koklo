@@ -511,6 +511,13 @@ impl PipelineOrchestrator {
         Arc::clone(&self.storage)
     }
 
+    /// The configured artifacts directory (relative to a project root, or
+    /// absolute). Used by the CLI to tell the user where generated artifacts
+    /// land in their project.
+    pub fn artifacts_dir(&self) -> &Path {
+        &self.config.artifacts_dir
+    }
+
     fn emit_transcript(&self, item: TranscriptItem) {
         self.bus.send(PipelineEvent::Transcript { item });
     }
@@ -629,6 +636,16 @@ impl PipelineOrchestrator {
             .update_session_status(&session_id, "completed")
             .await?;
         tracing::info!("Pipeline completed: session={}", session_id);
+
+        // Surface artifacts in the user's project (copied out of the isolated
+        // worktree). Non-fatal: a copy failure must not fail a completed run.
+        match self.copy_artifacts_to_project(&session).await {
+            Ok(Some(dst)) => {
+                tracing::info!("Artifacts copied to project: {}", dst.display());
+            }
+            Ok(None) => {}
+            Err(e) => tracing::warn!("Copying artifacts to project failed (non-fatal): {}", e),
+        }
 
         // Append session summary to .koklo/memories/YYYY-MM-DD.md
         if let Err(e) = self.write_memory_log(&session, preset, start_time).await {
@@ -1395,6 +1412,37 @@ impl PipelineOrchestrator {
         })
     }
 
+    /// Copy generated `*.md` artifacts from the isolated session worktree back
+    /// into the user's project, so "from zero to a generated artifact" lands
+    /// where the user actually works rather than hidden under
+    /// `~/.koklo/worktrees/...`. No-op when the run already happened in the
+    /// project tree or `artifacts_dir` is absolute. Returns the destination
+    /// directory when files were copied. Best-effort: callers treat errors as
+    /// non-fatal.
+    async fn copy_artifacts_to_project(&self, session: &Session) -> Result<Option<PathBuf>> {
+        let workspace_root = self.workspace_root(session);
+        let project_root = PathBuf::from(&session.project_path);
+        if workspace_root == project_root || self.config.artifacts_dir.is_absolute() {
+            return Ok(None);
+        }
+        let src = workspace_root.join(&self.config.artifacts_dir);
+        if !src.exists() {
+            return Ok(None);
+        }
+        let dst = project_root.join(&self.config.artifacts_dir);
+        tokio::fs::create_dir_all(&dst).await?;
+        let mut copied = 0usize;
+        let mut entries = tokio::fs::read_dir(&src).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "md") {
+                tokio::fs::copy(&path, dst.join(entry.file_name())).await?;
+                copied += 1;
+            }
+        }
+        Ok((copied > 0).then_some(dst))
+    }
+
     fn workspace_root(&self, session: &Session) -> PathBuf {
         if session.workspace_path.is_empty() {
             PathBuf::from(&session.project_path)
@@ -1567,10 +1615,21 @@ impl PipelineOrchestrator {
                 branch.clone(),
             ]
         } else {
-            let base_ref = self
-                .run_git(&repo_root, &["rev-parse", "--verify", "HEAD"])?
-                .stdout;
-            let base_ref = String::from_utf8_lossy(&base_ref).trim().to_string();
+            let head = self.run_git(&repo_root, &["rev-parse", "--verify", "HEAD"])?;
+            if !head.status.success() {
+                // Commitless repo (fresh `git init`, no commit yet): there is no
+                // base commit for `git worktree add` to fork, which otherwise
+                // fails with a cryptic "invalid reference". Fall back to running
+                // in the project tree so the first run works from a bare repo and
+                // artifacts land directly in the user's project.
+                tracing::info!(
+                    "Repo at {} has no commits yet; running session {} in the project tree (no isolated worktree). Make an initial commit to enable per-session isolation.",
+                    repo_root.display(),
+                    session_id
+                );
+                return Ok(None);
+            }
+            let base_ref = String::from_utf8_lossy(&head.stdout).trim().to_string();
             vec![
                 "worktree".to_string(),
                 "add".to_string(),
