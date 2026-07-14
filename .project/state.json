@@ -42,10 +42,10 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-06-18T13:53:43+02:00",
+  "last_updated": "2026-07-14T16:00:47+02:00",
   "last_workflow_run": "analyze-design-dev-review",
   "last_workflow_stage": "final-summary",
-  "last_workflow_result": "passed",
+  "last_workflow_result": "failed",
   "active_workflow_run": null,
   "workflow_runs": [
     {
@@ -239,6 +239,14 @@
       "task": "ad-hoc: custom title bar / frameless chrome desktop",
       "result": "passed",
       "completed_at": "2026-06-18T13:53:43+02:00"
+    },
+    {
+      "id": "analyze-design-dev-review-20260714155117",
+      "workflow": "analyze-design-dev-review",
+      "sprint": "010",
+      "task": "US-019",
+      "result": "failed",
+      "completed_at": "2026-07-14T16:00:47+02:00"
     }
   ],
   "last_task_completed": "US-018",
