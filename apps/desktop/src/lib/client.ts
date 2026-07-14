@@ -4,5 +4,8 @@
  * tests can inject a mock without a running Tauri runtime.
  */
 import { createKokloClient, type KokloClient } from "@koklo/trpc-client";
+import { createBrowserClient, hasTauriRuntime } from "./browserClient";
 
-export const kokloClient: KokloClient = createKokloClient();
+export const kokloClient: KokloClient = hasTauriRuntime()
+  ? createKokloClient()
+  : createBrowserClient();

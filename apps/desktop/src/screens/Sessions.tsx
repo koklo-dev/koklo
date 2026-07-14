@@ -29,6 +29,7 @@ export interface SessionsScreenProps {
   /** Open a session's transcript (roadmap P2 §4 navigation). */
   onOpenSession?: (session: SessionDto) => void;
   onPendingGateCountChange?: (count: number) => void;
+  openRunModalSignal?: number;
 }
 
 /**
@@ -40,6 +41,7 @@ export function SessionsScreen({
   client,
   onOpenSession,
   onPendingGateCountChange,
+  openRunModalSignal = 0,
 }: SessionsScreenProps) {
   const { toast } = useToast();
   const [load, setLoad] = useState<LoadState>("loading");
@@ -82,6 +84,12 @@ export function SessionsScreen({
   useEffect(() => {
     onPendingGateCountChange?.(pendingGateCount(pendingGates));
   }, [onPendingGateCountChange, pendingGates]);
+
+  useEffect(() => {
+    if (openRunModalSignal > 0) {
+      setModalOpen(true);
+    }
+  }, [openRunModalSignal]);
 
   const handleSubmit = useCallback(
     async (form: RunForm) => {

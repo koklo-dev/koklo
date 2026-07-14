@@ -22,9 +22,17 @@ type View = { screen: "sessions" } | { screen: "transcript"; session: SessionDto
 export function App() {
   const { isDark, toggle } = useTheme();
   const [view, setView] = useState<View>({ screen: "sessions" });
+  const [openRunModalToken, setOpenRunModalToken] = useState(0);
   const [pendingGateCount, setPendingGateCount] = useState(0);
   const boot = useAppBoot();
   const { state: account, save: saveAccount } = useAccount(kokloClient);
+  const isTranscript = view.screen === "transcript";
+
+  const showSessions = () => setView({ screen: "sessions" });
+  const openNewRun = () => {
+    showSessions();
+    setOpenRunModalToken((value) => value + 1);
+  };
 
   // Once the app is ready, reveal the (hidden) main window and dismiss the
   // frameless splash window so the user only sees the shell when it's painted.
@@ -34,6 +42,10 @@ export function App() {
       void revealMainWindow();
     }
   }, [boot.phase]);
+
+  useEffect(() => {
+    document.title = isTranscript ? `${view.session.title} · Koklo` : "Koklo";
+  }, [isTranscript, view]);
 
   // The splash window owns the boot screen under Tauri; this inline render is the
   // graceful fallback for browser dev (no splash window). The Tauri main window
@@ -50,8 +62,6 @@ export function App() {
     return <UserSetupScreen onComplete={(values) => void saveAccount(values)} />;
   }
 
-  const isTranscript = view.screen === "transcript";
-
   return (
     <Toaster>
       <ErrorBoundary>
@@ -62,6 +72,10 @@ export function App() {
             activeItemId: "sessions",
             user: sidebarUser(account.account),
           }}
+          onNavClick={(id) => {
+            if (id === "sessions") showSessions();
+          }}
+          onNewSession={openNewRun}
           topbar={{
             breadcrumbs: isTranscript
               ? [{ label: "koklo" }, { label: "Sessions" }, { label: view.session.title }]
@@ -83,6 +97,7 @@ export function App() {
           ) : (
             <SessionsScreen
               client={kokloClient}
+              openRunModalSignal={openRunModalToken}
               onPendingGateCountChange={setPendingGateCount}
               onOpenSession={(session) => setView({ screen: "transcript", session })}
             />

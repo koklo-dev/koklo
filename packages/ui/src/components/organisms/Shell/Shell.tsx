@@ -49,6 +49,7 @@ export function Shell({
         <TopBar
           {...topbar}
           panelOpen={panelOpen}
+          onNewClick={onNewSession}
           onPanelToggle={onPanelToggle}
         />
 
