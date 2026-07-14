@@ -131,6 +131,7 @@ export interface GateDto {
 
 export interface GateDecisionInput {
   sessionId: string;
+  requestId?: string | null;
   action: GateDecision;
   note?: string;
   /** Only meaningful when `action === "edit"`. */

@@ -210,6 +210,7 @@ async fn gates_pending(
 async fn gates_decide(
     state: State<'_, DesktopState>,
     session_id: String,
+    request_id: Option<String>,
     action: String,
     note: Option<String>,
     edit_path: Option<String>,
@@ -219,6 +220,7 @@ async fn gates_decide(
         &state.storage,
         GateDecisionInput {
             session_id,
+            request_id,
             action,
             note,
             edit_path,

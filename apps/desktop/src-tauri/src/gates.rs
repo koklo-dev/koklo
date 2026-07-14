@@ -27,7 +27,7 @@ impl GateDto {
         let details = r.payload();
         let kind = details
             .as_ref()
-            .and_then(|p| p.get("kind"))
+            .and_then(|p| p.get("approval_kind").or_else(|| p.get("kind")))
             .and_then(Value::as_str)
             .unwrap_or("command_execution")
             .to_string();
@@ -37,7 +37,11 @@ impl GateDto {
             kind,
             description: r.summary,
             request_id: r.item_key,
-            details,
+            details: details
+                .as_ref()
+                .and_then(|payload| payload.get("details"))
+                .cloned()
+                .or(details),
         }
     }
 }
@@ -75,6 +79,8 @@ pub fn gates_pending(rows: Vec<TranscriptItemRecord>) -> Vec<GateDto> {
 #[serde(rename_all = "camelCase")]
 pub struct GateDecisionInput {
     pub session_id: String,
+    #[serde(default)]
+    pub request_id: Option<String>,
     pub action: String,
     #[serde(default)]
     pub note: Option<String>,
@@ -125,7 +131,7 @@ mod tests {
     fn gates_pending_keeps_only_unresolved_approvals() {
         let rows = vec![
             message(1),
-            approval("pending", Some(r#"{"kind":"command_execution"}"#)),
+            approval("pending", Some(r#"{"approval_kind":"command_execution"}"#)),
             approval("resolved", None),
         ];
         let gates = gates_pending(rows);
@@ -144,6 +150,16 @@ mod tests {
     }
 
     #[test]
+    fn gate_dto_extracts_nested_details_when_present() {
+        let gates = gates_pending(vec![approval(
+            "pending",
+            Some(r#"{"approval_kind":"file_change","details":{"path":"src/lib.rs"}}"#),
+        )]);
+        assert_eq!(gates[0].kind, "file_change");
+        assert_eq!(gates[0].details.as_ref().unwrap()["path"], "src/lib.rs");
+    }
+
+    #[test]
     fn gate_dto_serializes_camel_case() {
         let gates = gates_pending(vec![approval("pending", None)]);
         let json = serde_json::to_value(&gates[0]).unwrap();
@@ -158,7 +174,7 @@ mod tests {
         decision.kind = "approval_decision".to_string();
         decision.seq = 5;
         let gates = gates_pending(vec![
-            approval("pending", Some(r#"{"kind":"command_execution"}"#)),
+            approval("pending", Some(r#"{"approval_kind":"command_execution"}"#)),
             decision,
         ]);
         assert!(gates.is_empty());

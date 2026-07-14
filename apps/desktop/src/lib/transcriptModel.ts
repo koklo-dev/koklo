@@ -5,11 +5,11 @@
  * component per render type; all classification, replay/merge, auto-scroll, and
  * projection logic lives here (clean-architecture §1).
  */
-import type { CodeLine } from "@koklo/ui";
+import type { ActionState, CodeLine } from "@koklo/ui";
 import type { KokloClient, TranscriptKind, TranscriptLineDto } from "@koklo/trpc-client";
 
 /** Only the slice of the client the screen needs — keeps tests trivial to mock. */
-export type TranscriptClient = Pick<KokloClient, "transcript">;
+export type TranscriptClient = Pick<KokloClient, "transcript" | "gates">;
 
 /**
  * The four render buckets the transcript distinguishes visually (AC#1), plus
@@ -137,12 +137,16 @@ export function latestUsage(lines: readonly TranscriptLineDto[]): UsageTotals | 
   const usage = lines.filter((l) => l.kind === "usage");
   if (usage.length === 0) return null;
   const last = usage[usage.length - 1].payload as Record<string, unknown> | null;
-  const num = (v: unknown): number => (typeof v === "number" ? v : 0);
-  const cost = last && typeof last.costUsd === "number" ? last.costUsd : null;
+  // The runtime persists snake_case totals; older lines used camelCase.
+  const num = (...values: unknown[]): number => {
+    const found = values.find((v) => typeof v === "number");
+    return typeof found === "number" ? found : 0;
+  };
+  const rawCost = [last?.costUsd, last?.cost_usd, last?.cost].find((v) => typeof v === "number");
   return {
-    promptTokens: num(last?.promptTokens),
-    completionTokens: num(last?.completionTokens),
-    costUsd: cost,
+    promptTokens: num(last?.promptTokens, last?.prompt_tokens),
+    completionTokens: num(last?.completionTokens, last?.completion_tokens),
+    costUsd: typeof rawCost === "number" ? rawCost : null,
   };
 }
 
@@ -172,4 +176,67 @@ export async function loadAndSubscribe(
   const history = await client.transcript.list({ sessionId });
   const unlisten = await client.transcript.subscribe({ sessionId }, onLine);
   return { history, unlisten };
+}
+
+function gateActionOf(line: TranscriptLineDto): string | null {
+  const payload = line.payload;
+  if (!payload || typeof payload !== "object") return null;
+  const action = (payload as Record<string, unknown>).action;
+  return typeof action === "string" ? action : null;
+}
+
+/**
+ * Stable identity of a gate request/decision line. Provider gates carry the
+ * provider `request_id` in `itemKey`; orchestrator phase gates historically
+ * persisted no item_key, so they fall back to a phase-scoped key — a phase
+ * blocks at most one gate at a time, so the phase is a sufficient identity.
+ */
+export function gateRequestKey(line: TranscriptLineDto): string | null {
+  return line.itemKey ?? (line.phase ? `phase:${line.phase}` : null);
+}
+
+export function gateResolutionByRequestId(
+  lines: readonly TranscriptLineDto[],
+): ReadonlyMap<string, "approve" | "reject" | "edit"> {
+  const resolved = new Map<string, "approve" | "reject" | "edit">();
+  for (const line of lines) {
+    if (line.kind !== "approval_decision") continue;
+    const key = gateRequestKey(line);
+    if (!key) continue;
+    const action = gateActionOf(line);
+    if (action === "approve" || action === "reject" || action === "edit") {
+      resolved.set(key, action);
+    }
+  }
+  return resolved;
+}
+
+export function gateActionState(
+  line: TranscriptLineDto,
+  resolved: ReadonlyMap<string, "approve" | "reject" | "edit">,
+  optimisticResolvedIds: ReadonlySet<string>,
+): ActionState {
+  if (line.kind === "approval_decision") {
+    return gateActionOf(line) === "reject" ? "rejected" : "applied";
+  }
+  if (line.kind !== "approval_request") return "pending";
+  const key = gateRequestKey(line);
+  if (!key) return "pending";
+  if (optimisticResolvedIds.has(key)) return "applied";
+  const decision = resolved.get(key);
+  if (decision === "reject") return "rejected";
+  if (decision) return "applied";
+  return "pending";
+}
+
+export function canDecideGate(
+  line: TranscriptLineDto,
+  resolved: ReadonlyMap<string, "approve" | "reject" | "edit">,
+  optimisticResolvedIds: ReadonlySet<string>,
+): boolean {
+  return (
+    line.kind === "approval_request" &&
+    gateRequestKey(line) !== null &&
+    gateActionState(line, resolved, optimisticResolvedIds) === "pending"
+  );
 }

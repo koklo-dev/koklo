@@ -1277,37 +1277,15 @@ impl PipelineOrchestrator {
         usage: Option<CompletionUsage>,
         cost: Option<CostDisplay>,
     ) -> Result<()> {
-        let description = format!("Review '{}' phase output and approve to continue.", phase);
+        let (item, display) = phase_gate_request(session_id, phase, usage, cost);
+        let request_id = display.request_id.clone();
 
         self.bus.send(PipelineEvent::GateRequired {
             phase,
             session_id: session_id.to_string(),
-            description: description.clone(),
+            description: display.description.clone(),
         });
-        self.emit_transcript(
-            TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                None,
-                TranscriptSource::System,
-                TranscriptItemKind::ApprovalRequest,
-                TranscriptItemStatus::Pending,
-                description.clone(),
-            )
-            .with_payload(json!({
-                "usage": usage,
-                "cost": cost,
-            })),
-        );
-
-        let display = GateDisplay {
-            phase,
-            session_id: session_id.to_string(),
-            description,
-            usage,
-            cost,
-            allow_edit: true,
-        };
+        self.emit_transcript(item);
 
         let response = self.gate_handler.handle(display).await?;
 
@@ -1341,21 +1319,23 @@ impl PipelineOrchestrator {
             session_id: session_id.to_string(),
             action: gate_action,
         });
-        self.emit_transcript(
-            TranscriptItem::new(
-                session_id.to_string(),
-                Some(phase),
-                None,
-                TranscriptSource::User,
-                TranscriptItemKind::ApprovalDecision,
-                TranscriptItemStatus::Resolved,
-                format!("gate {} for {}", action_str, phase),
-            )
-            .with_payload(json!({
-                "action": action_str,
-                "path": action_note,
-            })),
-        );
+        let mut decision_item = TranscriptItem::new(
+            session_id.to_string(),
+            Some(phase),
+            None,
+            TranscriptSource::User,
+            TranscriptItemKind::ApprovalDecision,
+            TranscriptItemStatus::Resolved,
+            format!("gate {} for {}", action_str, phase),
+        )
+        .with_payload(json!({
+            "action": action_str,
+            "path": action_note,
+        }));
+        if let Some(request_id) = request_id {
+            decision_item = decision_item.with_item_key(request_id);
+        }
+        self.emit_transcript(decision_item);
 
         match response {
             GateResponse::Approve => Ok(()),
@@ -1982,6 +1962,47 @@ fn parse_sandbox_directive(value: &str) -> Option<SandboxDirective> {
     Some(SandboxDirective { mode, controlled })
 }
 
+/// Build the transcript item and gate display for an orchestrator phase gate.
+///
+/// Both sides share one request identity (the transcript item's id doubles as
+/// the gate `request_id`/`item_key`), so the desktop can match the persisted
+/// `approval_request` row against the live pending gate and offer a decision —
+/// phase gates used to persist no `item_key` at all, which left the transcript
+/// card read-only (US-019 manual-smoke regression).
+fn phase_gate_request(
+    session_id: &str,
+    phase: Phase,
+    usage: Option<CompletionUsage>,
+    cost: Option<CostDisplay>,
+) -> (TranscriptItem, GateDisplay) {
+    let description = format!("Review '{}' phase output and approve to continue.", phase);
+    let item = TranscriptItem::new(
+        session_id.to_string(),
+        Some(phase),
+        None,
+        TranscriptSource::System,
+        TranscriptItemKind::ApprovalRequest,
+        TranscriptItemStatus::Pending,
+        description.clone(),
+    )
+    .with_payload(json!({
+        "usage": usage,
+        "cost": cost,
+    }));
+    let request_id = item.id.clone();
+    let item = item.with_item_key(request_id.clone());
+    let display = GateDisplay {
+        phase,
+        session_id: session_id.to_string(),
+        request_id: Some(request_id),
+        description,
+        usage,
+        cost,
+        allow_edit: true,
+    };
+    (item, display)
+}
+
 fn format_duration(secs: i64) -> String {
     if secs < 60 {
         format!("{}s", secs)
@@ -2133,12 +2154,30 @@ mod tests {
         assert_eq!(p.provider_name(), "ollama");
     }
 
+    #[test]
+    fn phase_gate_request_carries_a_shared_request_identity() {
+        let (item, display) = phase_gate_request("session-123", Phase::Spec, None, None);
+
+        assert!(matches!(item.kind, TranscriptItemKind::ApprovalRequest));
+        let request_id = display
+            .request_id
+            .expect("phase gate must expose a request_id");
+        assert_eq!(
+            item.item_key.as_deref(),
+            Some(request_id.as_str()),
+            "the persisted approval_request row and the live gate must share one identity"
+        );
+        assert_eq!(display.session_id, "session-123");
+        assert!(display.allow_edit);
+    }
+
     #[tokio::test]
     async fn test_auto_approve_gate_handler_always_approves() {
         let response = AutoApproveGateHandler
             .handle(GateDisplay {
                 phase: Phase::Spec,
                 session_id: "session-123".to_string(),
+                request_id: None,
                 description: "approve".to_string(),
                 usage: None,
                 cost: None,

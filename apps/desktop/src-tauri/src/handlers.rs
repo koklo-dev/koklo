@@ -89,11 +89,28 @@ pub async fn gates_decide(
     storage: &SessionManager,
     input: GateDecisionInput,
 ) -> Result<()> {
+    let pending = channel.pending_display().ok_or_else(|| {
+        anyhow!("no live pending gate to decide; the desktop runtime likely restarted")
+    })?;
+    if pending.session_id != input.session_id {
+        return Err(anyhow!(
+            "pending gate belongs to session `{}`, not `{}`",
+            pending.session_id,
+            input.session_id
+        ));
+    }
+    if let Some(request_id) = input.request_id.as_deref() {
+        if pending.request_id.as_deref() != Some(request_id) {
+            return Err(anyhow!(
+                "pending gate request mismatch: expected `{request_id}`"
+            ));
+        }
+    }
     let request = channel
         .take_pending()
-        .ok_or_else(|| anyhow!("no pending gate to decide"))?;
-    let phase = request.display.phase.to_string();
-    let session_id = request.display.session_id.clone();
+        .ok_or_else(|| anyhow!("pending gate disappeared before it could be decided"))?;
+    let phase = pending.phase.to_string();
+    let session_id = pending.session_id;
     let (action_label, response) = match input.action.as_str() {
         "approve" => ("approve", GateResponse::Approve),
         "reject" => ("reject", GateResponse::Reject),
@@ -216,6 +233,7 @@ mod tests {
             let display = GateDisplay {
                 phase: Phase::Implement,
                 session_id: session.id.clone(),
+                request_id: Some("req-1".to_string()),
                 description: "Approve the plan?".to_string(),
                 usage: None,
                 cost: None,
@@ -234,6 +252,7 @@ mod tests {
             &storage,
             GateDecisionInput {
                 session_id: session.id.clone(),
+                request_id: Some("req-1".to_string()),
                 action: "approve".to_string(),
                 note: Some("LGTM".to_string()),
                 edit_path: None,
@@ -262,6 +281,7 @@ mod tests {
             let display = GateDisplay {
                 phase: Phase::Implement,
                 session_id: session.id.clone(),
+                request_id: Some("req-1".to_string()),
                 description: "Approve the plan?".to_string(),
                 usage: None,
                 cost: None,
@@ -279,6 +299,7 @@ mod tests {
             &storage,
             GateDecisionInput {
                 session_id: session.id.clone(),
+                request_id: Some("req-1".to_string()),
                 action: "approve".to_string(),
                 note: None,
                 edit_path: None,
@@ -304,6 +325,7 @@ mod tests {
             &storage,
             GateDecisionInput {
                 session_id: "s1".to_string(),
+                request_id: Some("req-1".to_string()),
                 action: "approve".to_string(),
                 note: None,
                 edit_path: None,
@@ -311,7 +333,92 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(err.to_string().contains("no pending gate"));
+        assert!(err.to_string().contains("no live pending gate"));
+    }
+
+    #[tokio::test]
+    async fn gates_decide_rejects_session_mismatch() {
+        let storage = seeded_storage().await;
+        let session = storage.create_session("A", "sdd", "/repo").await.unwrap();
+        let other = storage.create_session("B", "sdd", "/repo").await.unwrap();
+        let channel = GateChannel::new();
+
+        let awaiting = {
+            let channel = channel.clone();
+            let display = GateDisplay {
+                phase: Phase::Implement,
+                session_id: session.id.clone(),
+                request_id: Some("req-1".to_string()),
+                description: "Approve the plan?".to_string(),
+                usage: None,
+                cost: None,
+                allow_edit: false,
+            };
+            tokio::spawn(async move { channel.deposit_and_await(display).await })
+        };
+        tokio::task::yield_now().await;
+        while !channel.has_pending() {
+            tokio::task::yield_now().await;
+        }
+
+        let err = gates_decide(
+            &channel,
+            &storage,
+            GateDecisionInput {
+                session_id: other.id,
+                request_id: Some("req-1".to_string()),
+                action: "approve".to_string(),
+                note: None,
+                edit_path: None,
+            },
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err.to_string().contains("belongs to session"));
+        awaiting.abort();
+    }
+
+    #[tokio::test]
+    async fn gates_decide_rejects_request_id_mismatch() {
+        let storage = seeded_storage().await;
+        let session = storage.create_session("A", "sdd", "/repo").await.unwrap();
+        let channel = GateChannel::new();
+
+        let awaiting = {
+            let channel = channel.clone();
+            let display = GateDisplay {
+                phase: Phase::Implement,
+                session_id: session.id.clone(),
+                request_id: Some("req-1".to_string()),
+                description: "Approve the plan?".to_string(),
+                usage: None,
+                cost: None,
+                allow_edit: false,
+            };
+            tokio::spawn(async move { channel.deposit_and_await(display).await })
+        };
+        tokio::task::yield_now().await;
+        while !channel.has_pending() {
+            tokio::task::yield_now().await;
+        }
+
+        let err = gates_decide(
+            &channel,
+            &storage,
+            GateDecisionInput {
+                session_id: session.id,
+                request_id: Some("req-99".to_string()),
+                action: "approve".to_string(),
+                note: None,
+                edit_path: None,
+            },
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err.to_string().contains("request mismatch"));
+        awaiting.abort();
     }
 
     #[test]

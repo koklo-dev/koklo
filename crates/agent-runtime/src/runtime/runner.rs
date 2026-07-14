@@ -263,6 +263,7 @@ impl AgentRunner {
                                         .request_approval(GateDisplay {
                                             phase,
                                             session_id: session_id_str.clone(),
+                                            request_id: Some(request.request_id.clone()),
                                             description: request.description.clone(),
                                             usage: None,
                                             cost: None,

@@ -51,8 +51,8 @@ export function SessionsScreen({
   } | null>(null);
   const [decidingKey, setDecidingKey] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoad("loading");
+  const refresh = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoad("loading");
     try {
       const nextSessions = await client.sessions.list();
       const nextPendingGates = await loadPendingGates(client, nextSessions);
@@ -70,6 +70,13 @@ export function SessionsScreen({
   }, [refresh]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      void refresh(false);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
+
+  useEffect(() => {
     onPendingGateCountChange?.(pendingGateCount(pendingGates));
   }, [onPendingGateCountChange, pendingGates]);
 
@@ -84,7 +91,7 @@ export function SessionsScreen({
           title: "Run started",
           description: `“${session.title}” is now running in a new worktree.`,
         });
-        await refresh();
+        await refresh(false);
       } catch (err) {
         toast({
           tone: "danger",
@@ -113,6 +120,7 @@ export function SessionsScreen({
     try {
       await client.gates.decide({
         sessionId: decision.item.session.id,
+        requestId: decision.item.gate.requestId,
         action: decision.action,
       });
       setPendingGates((prev) => removePendingGate(prev, decision.item));
@@ -122,7 +130,7 @@ export function SessionsScreen({
         title: copy.toastTitle,
         description: `${decision.item.session.title} resumed from the ${decision.item.gate.phase} gate.`,
       });
-      void refresh();
+      void refresh(false);
     } catch (err) {
       toast({
         tone: "danger",

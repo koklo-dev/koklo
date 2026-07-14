@@ -8,6 +8,7 @@ import { useTheme } from "./lib/theme";
 import { useAppBoot } from "./lib/bootModel";
 import { useAccount, sidebarUser } from "./lib/accountModel";
 import { revealMainWindow } from "./lib/splash";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WindowControls } from "./components/WindowControls";
 
 /** Local view router: the Sessions list, or one session's live transcript. */
@@ -55,40 +56,42 @@ export function App() {
 
   return (
     <Toaster>
-      <Shell
-        sidebar={{
-          orgName: "Koklo",
-          projectName: "koklo",
-          activeItemId: "sessions",
-          user: sidebarUser(account.account),
-        }}
-        topbar={{
-          breadcrumbs: isTranscript
-            ? [{ label: "koklo" }, { label: "Sessions" }, { label: view.session.title }]
-            : [{ label: "koklo" }, { label: "Sessions" }],
-          hasNotification: pendingGateCount > 0,
-          isDark,
-          onThemeToggle: toggle,
-          dragRegion: true,
-          trailingSlot: <WindowControls />,
-        }}
-      >
-        {isTranscript ? (
-          <TranscriptScreen
-            client={kokloClient}
-            sessionId={view.session.id}
-            sessionTitle={view.session.title}
-            onBack={() => setView({ screen: "sessions" })}
-          />
-        ) : (
-          <SessionsScreen
-            client={kokloClient}
-            projectPath={projectPath}
-            onPendingGateCountChange={setPendingGateCount}
-            onOpenSession={(session) => setView({ screen: "transcript", session })}
-          />
-        )}
-      </Shell>
+      <ErrorBoundary>
+        <Shell
+          sidebar={{
+            orgName: "Koklo",
+            projectName: "koklo",
+            activeItemId: "sessions",
+            user: sidebarUser(account.account),
+          }}
+          topbar={{
+            breadcrumbs: isTranscript
+              ? [{ label: "koklo" }, { label: "Sessions" }, { label: view.session.title }]
+              : [{ label: "koklo" }, { label: "Sessions" }],
+            hasNotification: pendingGateCount > 0,
+            isDark,
+            onThemeToggle: toggle,
+            dragRegion: true,
+            trailingSlot: <WindowControls />,
+          }}
+        >
+          {isTranscript ? (
+            <TranscriptScreen
+              client={kokloClient}
+              sessionId={view.session.id}
+              sessionTitle={view.session.title}
+              onBack={() => setView({ screen: "sessions" })}
+            />
+          ) : (
+            <SessionsScreen
+              client={kokloClient}
+              projectPath={projectPath}
+              onPendingGateCountChange={setPendingGateCount}
+              onOpenSession={(session) => setView({ screen: "transcript", session })}
+            />
+          )}
+        </Shell>
+      </ErrorBoundary>
     </Toaster>
   );
 }

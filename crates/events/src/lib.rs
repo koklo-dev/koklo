@@ -128,6 +128,7 @@ pub enum GateResponse {
 pub struct GateDisplay {
     pub phase: Phase,
     pub session_id: String,
+    pub request_id: Option<String>,
     pub description: String,
     pub usage: Option<CompletionUsage>,
     pub cost: Option<CostDisplay>,
@@ -300,6 +301,14 @@ impl GateChannel {
     /// Called by the TUI tick: take the pending request (display + sender).
     pub fn take_pending(&self) -> Option<GateRequest> {
         self.inner.lock().unwrap().take()
+    }
+
+    pub fn pending_display(&self) -> Option<GateDisplay> {
+        self.inner
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|request| request.display.clone())
     }
 
     pub fn has_pending(&self) -> bool {
