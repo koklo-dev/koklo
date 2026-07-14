@@ -10,9 +10,8 @@
 //!   - [`transcript_since`] — an incremental, cursor-based fetch (the shape the
 //!     live transcript subscription replays from).
 //!
-//! The remaining namespaces (gates, providers, worktrees) are declared in the
-//! TypeScript contract; their Rust adapters land when the Tauri command runtime
-//! and a DB pool are wired into the desktop shell (later P2 sprint).
+//! The remaining namespaces (gates, providers, worktrees) extend this contract
+//! as the desktop runtime grows.
 
 use koklo_storage::{Session, SessionUsageSummary, TranscriptItemRecord};
 use serde::Serialize;
@@ -127,6 +126,18 @@ pub struct UsageSummaryDto {
     pub prompt_tokens: i64,
     pub completion_tokens: i64,
     pub cost_usd: Option<f64>,
+}
+
+/// A session worktree row for the desktop manager. Derived from persisted sessions,
+/// plus one runtime-selected `is_active` marker from the desktop shell.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeDto {
+    pub session_id: String,
+    pub path: String,
+    pub branch: String,
+    pub is_active: bool,
+    pub status: String,
 }
 
 impl From<SessionUsageSummary> for UsageSummaryDto {

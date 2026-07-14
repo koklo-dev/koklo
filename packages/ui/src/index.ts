@@ -31,6 +31,11 @@ export { Modal } from "./components/molecules/Modal/Modal";
 export type { ModalProps, ModalSize } from "./components/molecules/Modal/Modal";
 export { EmptyState } from "./components/molecules/EmptyState/EmptyState";
 export type { EmptyStateProps } from "./components/molecules/EmptyState/EmptyState";
+export { WorktreeSwitcher } from "./components/molecules/WorktreeSwitcher/WorktreeSwitcher";
+export type {
+  WorktreeSwitcherProps,
+  WorktreeSwitcherItem,
+} from "./components/molecules/WorktreeSwitcher/WorktreeSwitcher";
 export { SessionCard } from "./components/molecules/SessionCard/SessionCard";
 export type {
   SessionCardProps,

@@ -12,7 +12,7 @@
 //! remains deferred until git-engine exposes real worktree operations.
 
 use crate::gates::{GateDecisionInput, GateDto};
-use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto};
+use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto, WorktreeDto};
 use crate::providers::{provider_detection_dto, provider_dtos, ProviderDto};
 use anyhow::{anyhow, Result};
 use koklo_events::{GateChannel, GateResponse};
@@ -157,6 +157,39 @@ pub fn providers_detect(
             .map(|p| p.capabilities().interaction_mode)
             .unwrap_or_default()
     })
+}
+
+// ── worktrees ───────────────────────────────────────────────────────────────
+
+pub async fn worktrees_list(
+    storage: &SessionManager,
+    koklo_home: &std::path::Path,
+) -> Result<Vec<WorktreeDto>> {
+    crate::worktrees::list(storage, koklo_home).await
+}
+
+pub async fn worktrees_create(
+    storage: &SessionManager,
+    koklo_home: &std::path::Path,
+    session_id: &str,
+) -> Result<WorktreeDto> {
+    crate::worktrees::create(storage, session_id, koklo_home).await
+}
+
+pub async fn worktrees_switch(
+    storage: &SessionManager,
+    koklo_home: &std::path::Path,
+    path: &str,
+) -> Result<()> {
+    crate::worktrees::switch(storage, koklo_home, path).await
+}
+
+pub async fn worktrees_prune(
+    storage: &SessionManager,
+    koklo_home: &std::path::Path,
+    path: &str,
+) -> Result<()> {
+    crate::worktrees::prune(storage, koklo_home, path).await
 }
 
 #[cfg(test)]

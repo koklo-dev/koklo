@@ -9,6 +9,7 @@ pub mod ipc;
 pub mod providers;
 pub mod runtime;
 pub mod sessions;
+pub mod worktrees;
 
 pub fn app_name() -> &'static str {
     "koklo-desktop"

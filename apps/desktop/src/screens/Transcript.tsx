@@ -38,6 +38,8 @@ export interface TranscriptScreenProps {
   client: TranscriptClient;
   sessionId: string;
   sessionTitle?: string;
+  worktreePath?: string;
+  worktreeBranch?: string;
   /** Back to the Sessions list. */
   onBack?: () => void;
 }
@@ -95,7 +97,14 @@ function TranscriptLine({
  * live lines; renders one DS component per line type with pausable auto-scroll. All
  * logic lives in `transcriptModel`; this component only wires data → DS.
  */
-export function TranscriptScreen({ client, sessionId, sessionTitle, onBack }: TranscriptScreenProps) {
+export function TranscriptScreen({
+  client,
+  sessionId,
+  sessionTitle,
+  worktreePath,
+  worktreeBranch,
+  onBack,
+}: TranscriptScreenProps) {
   const { toast } = useToast();
   const [load, setLoad] = useState<LoadState>("loading");
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -256,6 +265,12 @@ export function TranscriptScreen({ client, sessionId, sessionTitle, onBack }: Tr
             </Button>
           )}
           <h1>{sessionTitle ?? "Transcript"}</h1>
+          {(worktreeBranch || worktreePath) && (
+            <span className="tr-worktree" title={worktreePath ?? worktreeBranch ?? undefined}>
+              <Icon name={worktreePath ? "Folder" : "Branch"} size={12} aria-hidden />
+              {worktreeBranch ?? worktreePath}
+            </span>
+          )}
           {phase && (
             <Badge variant="info" icon={<Icon name="Workflow" size={10} aria-hidden />}>
               {phase}

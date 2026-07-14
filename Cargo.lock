@@ -2463,6 +2463,7 @@ dependencies = [
  "dirs 5.0.1",
  "koklo-core",
  "koklo-events",
+ "koklo-git-engine",
  "koklo-providers",
  "koklo-storage",
  "koklo-workflow-engine",

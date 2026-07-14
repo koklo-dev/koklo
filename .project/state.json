@@ -42,8 +42,8 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-07-14T20:40:45+02:00",
-  "last_workflow_run": "developer-qa-reviewer",
+  "last_updated": "2026-07-14T22:33:05+02:00",
+  "last_workflow_run": "analyst-test-writer-developer-qa-reviewer",
   "last_workflow_stage": "final-summary",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
@@ -287,9 +287,33 @@
       "task": "US-021",
       "result": "passed",
       "completed_at": "2026-07-14T20:40:45+02:00"
+    },
+    {
+      "id": "spike-research-20260714205345",
+      "workflow": "spike-research",
+      "sprint": "011",
+      "task": "US-022",
+      "result": "failed",
+      "completed_at": "2026-07-14T20:53:45+02:00"
+    },
+    {
+      "id": "designer-developer-qa-reviewer-20260714214756",
+      "workflow": "designer-developer-qa-reviewer",
+      "sprint": "011",
+      "task": "US-021b",
+      "result": "passed",
+      "completed_at": "2026-07-14T21:49:25+02:00"
+    },
+    {
+      "id": "analyst-test-writer-developer-qa-reviewer-20260714221215",
+      "workflow": "analyst-test-writer-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: worktree switcher scroll + prune regression",
+      "result": "passed",
+      "completed_at": "2026-07-14T22:33:05+02:00"
     }
   ],
-  "last_task_completed": "US-021",
+  "last_task_completed": "ad-hoc: worktree switcher scroll + prune regression",
   "repos": [
     {
       "path": "/home/devops/RustroverProjects/koklo",

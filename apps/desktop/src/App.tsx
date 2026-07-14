@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import type { SessionDto } from "@koklo/trpc-client";
-import { BootScreen, Shell, Toaster, UserSetupScreen } from "@koklo/ui";
+import {
+  BootScreen,
+  Shell,
+  Toaster,
+  UserSetupScreen,
+  WorktreeSwitcher,
+  type WorktreeSwitcherItem,
+} from "@koklo/ui";
 import { SessionsScreen } from "./screens/Sessions";
 import { TranscriptScreen } from "./screens/Transcript";
 import { kokloClient } from "./lib/client";
@@ -10,6 +17,7 @@ import { useAccount, sidebarUser } from "./lib/accountModel";
 import { revealMainWindow } from "./lib/splash";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WindowControls } from "./components/WindowControls";
+import { loadWorktreeItems, type WorktreeViewItem } from "./lib/worktreesModel";
 
 /** Local view router: the Sessions list, or one session's live transcript. */
 type View = { screen: "sessions" } | { screen: "transcript"; session: SessionDto };
@@ -24,6 +32,12 @@ export function App() {
   const [view, setView] = useState<View>({ screen: "sessions" });
   const [openRunModalToken, setOpenRunModalToken] = useState(0);
   const [pendingGateCount, setPendingGateCount] = useState(0);
+  const [sessions, setSessions] = useState<SessionDto[]>([]);
+  const [worktrees, setWorktrees] = useState<WorktreeViewItem[]>([]);
+  const [worktreeBusy, setWorktreeBusy] = useState<{
+    itemId: string | null;
+    action: "switch" | "prune" | null;
+  }>({ itemId: null, action: null });
   const boot = useAppBoot();
   const { state: account, save: saveAccount } = useAccount(kokloClient);
   const isTranscript = view.screen === "transcript";
@@ -46,6 +60,52 @@ export function App() {
   useEffect(() => {
     document.title = isTranscript ? `${view.session.title} · Koklo` : "Koklo";
   }, [isTranscript, view]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const items = await loadWorktreeItems(kokloClient, sessions);
+        if (!cancelled) setWorktrees(items);
+      } catch {
+        if (!cancelled) setWorktrees([]);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [sessions]);
+
+  const handleSwitchWorktree = async (item: WorktreeSwitcherItem) => {
+    const selected = worktrees.find((entry) => entry.id === item.id);
+    if (!selected) return;
+    setWorktreeBusy({ itemId: selected.id, action: "switch" });
+    try {
+      await kokloClient.worktrees.switch({ path: selected.path });
+      const next = sessions.find((session) => session.id === selected.sessionId);
+      if (next) setView({ screen: "transcript", session: next });
+      setWorktrees(await loadWorktreeItems(kokloClient, sessions));
+    } finally {
+      setWorktreeBusy({ itemId: null, action: null });
+    }
+  };
+
+  const handlePruneWorktree = async (item: WorktreeSwitcherItem) => {
+    const selected = worktrees.find((entry) => entry.id === item.id);
+    if (!selected) return;
+    setWorktreeBusy({ itemId: selected.id, action: "prune" });
+    try {
+      await kokloClient.worktrees.prune({ path: selected.path });
+      setWorktrees(await loadWorktreeItems(kokloClient, sessions));
+    } finally {
+      setWorktreeBusy({ itemId: null, action: null });
+    }
+  };
 
   // The splash window owns the boot screen under Tauri; this inline render is the
   // graceful fallback for browser dev (no splash window). The Tauri main window
@@ -84,6 +144,15 @@ export function App() {
             isDark,
             onThemeToggle: toggle,
             dragRegion: true,
+            leadingSlot: (
+              <WorktreeSwitcher
+                items={worktrees}
+                busyItemId={worktreeBusy.itemId}
+                busyAction={worktreeBusy.action}
+                onSelect={(item) => void handleSwitchWorktree(item)}
+                onPrune={(item) => void handlePruneWorktree(item)}
+              />
+            ),
             trailingSlot: <WindowControls />,
           }}
         >
@@ -92,6 +161,8 @@ export function App() {
               client={kokloClient}
               sessionId={view.session.id}
               sessionTitle={view.session.title}
+              worktreePath={view.session.workspacePath}
+              worktreeBranch={view.session.workspaceBranch}
               onBack={() => setView({ screen: "sessions" })}
             />
           ) : (
@@ -99,6 +170,7 @@ export function App() {
               client={kokloClient}
               openRunModalSignal={openRunModalToken}
               onPendingGateCountChange={setPendingGateCount}
+              onSessionsChange={setSessions}
               onOpenSession={(session) => setView({ screen: "transcript", session })}
             />
           )}

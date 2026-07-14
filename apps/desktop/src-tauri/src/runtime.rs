@@ -2,7 +2,7 @@ use crate::bridge::{pump_transcript, TranscriptSink};
 use crate::config::{database_path, koklo_home, pipeline_config};
 use crate::gates::{GateDecisionInput, GateDto};
 use crate::handlers;
-use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto};
+use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto, WorktreeDto};
 use crate::sessions::{self, RunSessionInput, RunSpec, SessionRunner};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -263,6 +263,51 @@ fn account_save(
     .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+async fn providers_list() -> Result<Vec<crate::providers::ProviderDto>, String> {
+    let registry = koklo_providers::ProviderRegistry::build(
+        &koklo_providers::config::PipelineTomlConfig::default(),
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(handlers::providers_list(&registry))
+}
+
+#[tauri::command]
+async fn providers_detect() -> Result<Option<crate::providers::ProviderDto>, String> {
+    Ok(None)
+}
+
+#[tauri::command]
+async fn worktrees_list(state: State<'_, DesktopState>) -> Result<Vec<WorktreeDto>, String> {
+    handlers::worktrees_list(&state.storage, &koklo_home())
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(rename_all = "camelCase")]
+async fn worktrees_create(
+    state: State<'_, DesktopState>,
+    session_id: String,
+) -> Result<WorktreeDto, String> {
+    handlers::worktrees_create(&state.storage, &koklo_home(), &session_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(rename_all = "camelCase")]
+async fn worktrees_switch(state: State<'_, DesktopState>, path: String) -> Result<(), String> {
+    handlers::worktrees_switch(&state.storage, &koklo_home(), &path)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(rename_all = "camelCase")]
+async fn worktrees_prune(state: State<'_, DesktopState>, path: String) -> Result<(), String> {
+    handlers::worktrees_prune(&state.storage, &koklo_home(), &path)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 pub fn run() {
     let state = tauri::async_runtime::block_on(DesktopState::load())
         .expect("failed to initialize Koklo desktop state");
@@ -285,6 +330,12 @@ pub fn run() {
             transcript_since,
             gates_pending,
             gates_decide,
+            providers_list,
+            providers_detect,
+            worktrees_list,
+            worktrees_create,
+            worktrees_switch,
+            worktrees_prune,
             account_get,
             account_save,
             finish_boot

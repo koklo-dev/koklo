@@ -6,6 +6,7 @@
 
 use anyhow::{Context, Result};
 use git2::{DiffOptions, Repository, StatusOptions};
+use std::fs;
 use std::path::Path;
 
 /// Status of a single file in the working tree.
@@ -188,6 +189,29 @@ impl GitEngine {
     }
 }
 
+/// Remove a Koklo-managed worktree directory from disk.
+///
+/// Guardrail: only paths under a `.koklo/worktrees/` segment are accepted.
+pub fn prune_worktree(path: &Path) -> Result<()> {
+    let normalized = path
+        .canonicalize()
+        .or_else(|_| Ok::<_, std::io::Error>(path.to_path_buf()))
+        .context("failed to resolve worktree path")?;
+    let as_text = normalized.to_string_lossy();
+    if !as_text.contains("/.koklo/worktrees/") && !as_text.contains("\\.koklo\\worktrees\\") {
+        anyhow::bail!(
+            "refusing to prune `{}` because it is not under .koklo/worktrees",
+            normalized.display()
+        );
+    }
+    if !normalized.exists() {
+        return Ok(());
+    }
+    fs::remove_dir_all(&normalized)
+        .with_context(|| format!("failed to prune worktree `{}`", normalized.display()))?;
+    Ok(())
+}
+
 fn diff_to_string(diff: &git2::Diff) -> Result<String> {
     let mut buf = Vec::new();
     diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
@@ -319,5 +343,27 @@ mod tests {
         let sub = dir.path().join("not-a-repo");
         fs::create_dir_all(&sub).unwrap();
         assert!(GitEngine::open(&sub).is_err());
+    }
+
+    #[test]
+    fn prune_worktree_removes_koklo_worktree_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let worktree = dir.path().join(".koklo/worktrees/session-a");
+        fs::create_dir_all(&worktree).unwrap();
+        fs::write(worktree.join("file.txt"), "ok").unwrap();
+
+        prune_worktree(&worktree).unwrap();
+
+        assert!(!worktree.exists());
+    }
+
+    #[test]
+    fn prune_worktree_rejects_non_koklo_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let unrelated = dir.path().join("other/session-a");
+        fs::create_dir_all(&unrelated).unwrap();
+
+        assert!(prune_worktree(&unrelated).is_err());
+        assert!(unrelated.exists());
     }
 }

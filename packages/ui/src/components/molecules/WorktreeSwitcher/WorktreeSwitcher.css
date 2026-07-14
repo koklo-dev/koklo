@@ -1,0 +1,195 @@
+.kk-worktree-switcher {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.kk-worktree-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 228px;
+  max-width: 320px;
+  height: 36px;
+  padding: 0 12px;
+  border: var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.kk-worktree-trigger:hover,
+.kk-worktree-trigger-open {
+  background: var(--color-surface-hover);
+}
+
+.kk-worktree-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.kk-worktree-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--color-accent);
+}
+
+.kk-worktree-trigger-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.kk-worktree-trigger-label,
+.kk-worktree-eyebrow {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+.kk-worktree-trigger-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.kk-worktree-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: min(460px, calc(100vw - 80px));
+  padding: 14px;
+  border: var(--border-default);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+  z-index: 80;
+}
+
+.kk-worktree-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.kk-worktree-panel-head h3 {
+  margin: 2px 0 0;
+  font-size: var(--text-lg);
+}
+
+.kk-worktree-empty {
+  margin: 0;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+}
+
+.kk-worktree-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(420px, calc(100vh - 220px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.kk-worktree-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.kk-worktree-select {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex: 1;
+  padding: 12px;
+  border: var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.kk-worktree-select:hover,
+.kk-worktree-row.is-active .kk-worktree-select {
+  background: var(--color-surface-hover);
+}
+
+.kk-worktree-select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.kk-worktree-row-main,
+.kk-worktree-row-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.kk-worktree-row-main {
+  min-width: 0;
+  gap: 4px;
+}
+
+.kk-worktree-row-meta {
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.kk-worktree-row-title {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.kk-worktree-row-branch {
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+}
+
+.kk-worktree-row-path {
+  color: var(--color-fg-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+@media (max-width: 900px) {
+  .kk-worktree-trigger {
+    min-width: 0;
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .kk-worktree-trigger-copy,
+  .kk-worktree-trigger .kk-badge {
+    display: none;
+  }
+
+  .kk-worktree-panel {
+    left: auto;
+    right: 0;
+    width: min(360px, calc(100vw - 32px));
+  }
+}

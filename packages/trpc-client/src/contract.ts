@@ -272,13 +272,13 @@ export const contract = {
     decide: { command: "gates_decide" },
   },
   providers: {
-    list: { command: "providers.list" },
-    detect: { command: "providers.detect" },
+    list: { command: "providers_list" },
+    detect: { command: "providers_detect" },
   },
   worktrees: {
-    list: { command: "worktrees.list" },
-    create: { command: "worktrees.create" },
-    prune: { command: "worktrees.prune" },
-    switch: { command: "worktrees.switch" },
+    list: { command: "worktrees_list" },
+    create: { command: "worktrees_create" },
+    prune: { command: "worktrees_prune" },
+    switch: { command: "worktrees_switch" },
   },
 } as const satisfies KokloContract;
