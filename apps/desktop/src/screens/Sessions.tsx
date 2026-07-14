@@ -3,7 +3,13 @@ import type { GateDecision, SessionDto } from "@koklo/trpc-client";
 import { Button, EmptyState, Icon, Modal, SessionCard, Spinner, useToast } from "@koklo/ui";
 import { PendingGateCenter } from "../components/PendingGateCenter";
 import { RunModal } from "../components/RunModal";
-import { submitRun, toCardProps, type RunForm, type SessionsClient } from "../lib/sessionsModel";
+import {
+  saveLastProjectPath,
+  submitRun,
+  toCardProps,
+  type RunForm,
+  type SessionsClient,
+} from "../lib/sessionsModel";
 import {
   decisionCopy,
   gateDescription,
@@ -20,8 +26,6 @@ type LoadState = "loading" | "ready" | "error";
 
 export interface SessionsScreenProps {
   client: SessionsClient;
-  /** Project root the New Run should target. */
-  projectPath: string;
   /** Open a session's transcript (roadmap P2 §4 navigation). */
   onOpenSession?: (session: SessionDto) => void;
   onPendingGateCountChange?: (count: number) => void;
@@ -34,7 +38,6 @@ export interface SessionsScreenProps {
  */
 export function SessionsScreen({
   client,
-  projectPath,
   onOpenSession,
   onPendingGateCountChange,
 }: SessionsScreenProps) {
@@ -84,7 +87,8 @@ export function SessionsScreen({
     async (form: RunForm) => {
       setSubmitting(true);
       try {
-        const session = await submitRun(client, form, projectPath);
+        const session = await submitRun(client, form);
+        saveLastProjectPath(window.localStorage, form.projectPath.trim());
         setModalOpen(false);
         toast({
           tone: "success",
@@ -102,7 +106,7 @@ export function SessionsScreen({
         setSubmitting(false);
       }
     },
-    [client, projectPath, refresh, toast],
+    [client, refresh, toast],
   );
 
   const requestDecision = useCallback(

@@ -20,8 +20,6 @@ type View = { screen: "sessions" } | { screen: "transcript"; session: SessionDto
  * routing and the Gate screen (§5) land in later sprints.
  */
 export function App() {
-  // The open-project path; sourced from a project context once routing lands.
-  const projectPath = ".";
   const { isDark, toggle } = useTheme();
   const [view, setView] = useState<View>({ screen: "sessions" });
   const [pendingGateCount, setPendingGateCount] = useState(0);
@@ -85,7 +83,6 @@ export function App() {
           ) : (
             <SessionsScreen
               client={kokloClient}
-              projectPath={projectPath}
               onPendingGateCountChange={setPendingGateCount}
               onOpenSession={(session) => setView({ screen: "transcript", session })}
             />

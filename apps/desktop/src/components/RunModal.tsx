@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { RunType } from "@koklo/trpc-client";
 import { Modal, Input, Select, Button, type SessionPreset } from "@koklo/ui";
-import { PRESETS, RUN_TYPES, type RunForm } from "../lib/sessionsModel";
+import { loadLastProjectPath, PRESETS, RUN_TYPES, type RunForm } from "../lib/sessionsModel";
 
 const TYPE_LABELS: Record<RunType, string> = {
   feature: "Feature",
@@ -26,13 +26,14 @@ export interface RunModalProps {
   onSubmit: (form: RunForm) => void;
 }
 
-/** New Run modal — captures run type, title, and preset, then starts the run. */
+/** New Run modal — captures run type, title, project path, and preset, then starts the run. */
 export function RunModal({ open, submitting = false, onClose, onSubmit }: RunModalProps) {
   const [type, setType] = useState<RunType>("feature");
   const [title, setTitle] = useState("");
+  const [projectPath, setProjectPath] = useState(() => loadLastProjectPath(window.localStorage));
   const [preset, setPreset] = useState<SessionPreset>("light");
 
-  const start = () => onSubmit({ type, title, preset });
+  const start = () => onSubmit({ type, title, preset, projectPath });
 
   return (
     <Modal
@@ -70,6 +71,19 @@ export function RunModal({ open, submitting = false, onClose, onSubmit }: RunMod
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Short, action-oriented summary"
+          />
+        </div>
+
+        <div className="ses-field">
+          <label htmlFor="run-project-path" className="ses-label">
+            Project path
+          </label>
+          <Input
+            id="run-project-path"
+            name="projectPath"
+            value={projectPath}
+            onChange={(e) => setProjectPath(e.target.value)}
+            placeholder="/absolute/path/to/your/project"
           />
         </div>
 

@@ -1,4 +1,5 @@
 use crate::bridge::{pump_transcript, TranscriptSink};
+use crate::config::{database_path, koklo_home, pipeline_config};
 use crate::gates::{GateDecisionInput, GateDto};
 use crate::handlers;
 use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto};
@@ -6,17 +7,9 @@ use crate::sessions::{self, RunSessionInput, RunSpec, SessionRunner};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use koklo_events::{GateChannel, UserInputChannel};
-use koklo_providers::registry::build_provider;
-use koklo_providers::{
-    detect_provider, LlmProvider, PipelineTomlConfig, ProviderDetection, ProviderRegistry,
-    ProviderTomlEntry,
-};
 use koklo_storage::SessionManager;
-use koklo_workflow_engine::{
-    GithubConfig, PipelineConfig, PipelineOrchestrator, TuiGateHandler, TuiUserInputHandler,
-};
+use koklo_workflow_engine::{PipelineOrchestrator, TuiGateHandler, TuiUserInputHandler};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tauri::{Emitter, Manager, State};
@@ -300,120 +293,6 @@ pub fn run() {
         .expect("error while running Koklo desktop");
 }
 
-async fn pipeline_config(spec: &RunSpec) -> Result<PipelineConfig> {
-    let project_root = PathBuf::from(&spec.project_path);
-    if !project_root.is_dir() {
-        return Err(anyhow!(
-            "projectPath `{}` is not an existing directory",
-            spec.project_path
-        ));
-    }
-    let global_home = koklo_home();
-    let global = PipelineTomlConfig::load_from_path(&global_home.join("config.toml"))?;
-    let project = PipelineTomlConfig::load_from_project_root(&project_root)?;
-    let merged = global.merge(project);
-    let registry = Arc::new(ProviderRegistry::build(&merged)?);
-    let default_provider = resolve_provider(&merged, &registry).await?;
-    let agent_providers = merged
-        .agents
-        .iter()
-        .filter_map(|(name, config)| {
-            config
-                .provider
-                .as_deref()
-                .and_then(|provider| registry.get(provider))
-                .map(|provider| (name.clone(), provider))
-        })
-        .collect();
-    let agent_sandboxes = merged
-        .agents
-        .iter()
-        .filter_map(|(name, config)| {
-            config
-                .sandbox
-                .as_ref()
-                .map(|sandbox| (name.clone(), sandbox.clone()))
-        })
-        .collect();
-
-    Ok(PipelineConfig {
-        db_path: database_path(),
-        artifacts_dir: PathBuf::from(
-            merged
-                .pipeline
-                .artifacts_dir
-                .as_deref()
-                .unwrap_or("docs/planning_artifacts"),
-        ),
-        global_home,
-        project_context: project_root
-            .join(".koklo")
-            .is_dir()
-            .then(|| project_root.join(".koklo")),
-        project_path: spec.project_path.clone(),
-        preset: spec.preset,
-        default_provider,
-        agent_providers,
-        provider_entries: merged.providers,
-        agent_sandboxes,
-        controlled_shell: env_flag("KOKLO_CONTROLLED_SHELL"),
-        provider_registry: registry,
-        github: GithubConfig::from_env(),
-    })
-}
-
-async fn resolve_provider(
-    config: &PipelineTomlConfig,
-    registry: &ProviderRegistry,
-) -> Result<Arc<dyn LlmProvider>> {
-    if let Some(name) = std::env::var("KOKLO_PROVIDER")
-        .ok()
-        .or_else(|| config.pipeline.default_provider.clone())
-    {
-        return registry.get(&name).ok_or_else(|| {
-            anyhow!("provider `{name}` is configured but unavailable; check credentials and binary installation")
-        });
-    }
-    if let ProviderDetection::Detected { provider, .. } = detect_provider(config).await {
-        if let Some(instance) = registry.get(&provider) {
-            return Ok(instance);
-        }
-        return build_provider(&provider, &ProviderTomlEntry::default()).map_err(Into::into);
-    }
-    Err(anyhow!(
-        "no provider detected; configure KOKLO_PROVIDER, a local Claude/Codex CLI, Ollama, or OpenRouter"
-    ))
-}
-
-/// Resolve the run's project root. Not implemented yet (TDD red) — the tests
-/// below pin the contract: relative paths must be refused, because they resolve
-/// against the Tauri process cwd (`src-tauri` under `tauri dev`), where pipeline
-/// artifact writes trip the dev watcher and restart the whole app.
-fn validated_project_root(path: &str) -> Result<PathBuf> {
-    Ok(PathBuf::from(path))
-}
-
-fn koklo_home() -> PathBuf {
-    std::env::var("KOKLO_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_else(|| Path::new(".").to_path_buf())
-                .join(".koklo")
-        })
-}
-
-fn database_path() -> String {
-    std::env::var("KOKLO_DB_PATH")
-        .unwrap_or_else(|_| koklo_home().join("koklo.db").to_string_lossy().into_owned())
-}
-
-fn env_flag(name: &str) -> bool {
-    std::env::var(name)
-        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
-}
-
 async fn wait_for_started_session(
     storage: &SessionManager,
     existing_ids: &HashSet<String>,
@@ -464,31 +343,5 @@ mod tests {
                 .unwrap();
 
         assert_eq!(found, new.id);
-    }
-
-    #[test]
-    fn validated_project_root_rejects_relative_paths() {
-        for relative in [".", "sub/dir", "../elsewhere", ""] {
-            let error = validated_project_root(relative)
-                .expect_err("a relative projectPath must be refused");
-            assert!(
-                error.to_string().contains("absolute"),
-                "error for `{relative}` should explain the absolute-path requirement, got: {error}"
-            );
-        }
-    }
-
-    #[test]
-    fn validated_project_root_rejects_a_missing_directory() {
-        let error = validated_project_root("/nonexistent/koklo-test-dir")
-            .expect_err("a missing directory must be refused");
-        assert!(error.to_string().contains("existing directory"));
-    }
-
-    #[test]
-    fn validated_project_root_accepts_an_absolute_directory() {
-        let dir = std::env::temp_dir();
-        let root = validated_project_root(&dir.to_string_lossy()).unwrap();
-        assert_eq!(root, dir);
     }
 }

@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod bridge;
+pub(crate) mod config;
 pub mod gates;
 pub mod handlers;
 pub mod ipc;

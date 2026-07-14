@@ -74,20 +74,47 @@ export interface RunForm {
   type: RunType;
   title: string;
   preset: SessionPreset;
+  projectPath: string;
+}
+
+/**
+ * POSIX (`/…`) or Windows (`C:\…`, `C:/…`) absolute path. Anything else —
+ * including `.` and `~` — resolves against the backend process cwd, which is
+ * `src-tauri` under `tauri dev`: pipeline artifacts written there restart the
+ * app through the dev watcher (the "app closes when the gate opens" bug).
+ */
+export function isAbsolutePath(path: string): boolean {
+  return /^(\/|[A-Za-z]:[\\/])/.test(path);
 }
 
 /**
  * Validate the New Run form and start the run through the real `sessions.run`
  * IPC procedure (US-017-A backend). Throws a user-actionable error on invalid
- * input; the trimmed title is what reaches the backend.
+ * input; the trimmed title and project path are what reach the backend.
  */
-export async function submitRun(
-  client: SessionsClient,
-  form: RunForm,
-  projectPath: string,
-): Promise<SessionDto> {
+export async function submitRun(client: SessionsClient, form: RunForm): Promise<SessionDto> {
   const title = form.title.trim();
   if (!title) throw new Error("Title is required to start a run.");
+  const projectPath = form.projectPath.trim();
+  if (!projectPath) throw new Error("Project path is required to start a run.");
+  if (!isAbsolutePath(projectPath)) {
+    throw new Error(
+      "Project path must be absolute (e.g. /home/you/project) — relative paths would target the app's own files.",
+    );
+  }
   const input: RunSessionInput = { type: form.type, title, preset: form.preset, projectPath };
   return client.sessions.run(input);
+}
+
+const LAST_PROJECT_PATH_KEY = "koklo.lastProjectPath";
+
+/** Storage slice used for the RunModal's remembered project path (test-injectable). */
+export type KeyValueStore = Pick<Storage, "getItem" | "setItem">;
+
+export function loadLastProjectPath(store: KeyValueStore): string {
+  return store.getItem(LAST_PROJECT_PATH_KEY) ?? "";
+}
+
+export function saveLastProjectPath(store: KeyValueStore, path: string): void {
+  store.setItem(LAST_PROJECT_PATH_KEY, path);
 }
