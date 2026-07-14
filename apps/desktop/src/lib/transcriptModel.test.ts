@@ -12,6 +12,9 @@ import {
   latestUsage,
   isNearBottom,
   loadAndSubscribe,
+  gateResolutionByRequestId,
+  gateActionState,
+  canDecideGate,
   type TranscriptClient,
 } from "./transcriptModel";
 
@@ -165,5 +168,90 @@ describe("loadAndSubscribe", () => {
     expect(got).toBe(history);
     unlisten();
     expect(calls).toEqual(["list", "subscribe", "unlisten"]);
+  });
+});
+
+describe("gate approval rendering", () => {
+  it("marks a request resolved once a matching approval_decision exists", () => {
+    const request = line({ seq: 1, kind: "approval_request", itemKey: "req-1", summary: "Approve" });
+    const decision = line({
+      seq: 2,
+      kind: "approval_decision",
+      itemKey: "req-1",
+      payload: { action: "approve" },
+      summary: "Approved",
+    });
+    const resolved = gateResolutionByRequestId([request, decision]);
+    expect(gateActionState(request, resolved, new Set())).toBe("applied");
+    expect(canDecideGate(request, resolved, new Set())).toBe(false);
+  });
+
+  it("keeps a pending approval interactive until it is decided", () => {
+    const request = line({ seq: 1, kind: "approval_request", itemKey: "req-1", summary: "Approve" });
+    const resolved = gateResolutionByRequestId([request]);
+    expect(gateActionState(request, resolved, new Set())).toBe("pending");
+    expect(canDecideGate(request, resolved, new Set())).toBe(true);
+  });
+
+  it("treats an optimistic local decision as applied before replay catches up", () => {
+    const request = line({ seq: 1, kind: "approval_request", itemKey: "req-1", summary: "Approve" });
+    const resolved = gateResolutionByRequestId([request]);
+    expect(gateActionState(request, resolved, new Set(["req-1"]))).toBe("applied");
+    expect(canDecideGate(request, resolved, new Set(["req-1"]))).toBe(false);
+  });
+});
+
+describe("orchestrator phase gates (no itemKey)", () => {
+  // Regression: real phase gates persist `approval_request` rows with an empty
+  // item_key (DB evidence, session aa5a1045 seq 44) — they must stay decidable.
+  it("keeps a phase gate decidable when the request carries no itemKey", () => {
+    const request = line({
+      seq: 44,
+      kind: "approval_request",
+      status: "pending",
+      phase: "spec",
+      summary: "Review 'spec' phase output and approve to continue.",
+    });
+    const resolved = gateResolutionByRequestId([request]);
+    expect(gateActionState(request, resolved, new Set())).toBe("pending");
+    expect(canDecideGate(request, resolved, new Set())).toBe(true);
+  });
+
+  it("resolves a phase gate by phase when its decision also has no itemKey", () => {
+    const request = line({ seq: 1, kind: "approval_request", status: "pending", phase: "spec" });
+    const decision = line({
+      seq: 2,
+      kind: "approval_decision",
+      status: "resolved",
+      phase: "spec",
+      payload: { action: "approve" },
+    });
+    const resolved = gateResolutionByRequestId([request, decision]);
+    expect(gateActionState(request, resolved, new Set())).toBe("applied");
+    expect(canDecideGate(request, resolved, new Set())).toBe(false);
+  });
+
+  it("tracks optimistic phase-gate decisions under the phase-scoped key", () => {
+    const request = line({ seq: 1, kind: "approval_request", status: "pending", phase: "spec" });
+    const resolved = gateResolutionByRequestId([request]);
+    expect(gateActionState(request, resolved, new Set(["phase:spec"]))).toBe("applied");
+    expect(canDecideGate(request, resolved, new Set(["phase:spec"]))).toBe(false);
+  });
+});
+
+describe("latestUsage payload casing", () => {
+  it("reads the snake_case totals the runtime persists", () => {
+    // Regression: real usage rows persist prompt_tokens/completion_tokens
+    // (DB evidence, session aa5a1045 seq 42); the header showed 0 tok.
+    const usage = line({
+      seq: 42,
+      kind: "usage",
+      payload: { prompt_tokens: 97721, completion_tokens: 2371, cost: null },
+    });
+    expect(latestUsage([usage])).toEqual({
+      promptTokens: 97721,
+      completionTokens: 2371,
+      costUsd: null,
+    });
   });
 });
