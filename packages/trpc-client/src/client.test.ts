@@ -34,6 +34,11 @@ function line(sessionId: string, seq: number): TranscriptLineDto {
 }
 
 describe("createKokloClient — invoke adapter", () => {
+  it("registers gate procedures with Rust-safe command identifiers", () => {
+    expect(contract.gates.pending.command).toBe("gates_pending");
+    expect(contract.gates.decide.command).toBe("gates_decide");
+  });
+
   it("routes a no-arg query to its contract command name", async () => {
     const invokeFn = vi.fn<InvokeFn>().mockResolvedValue([sessionDto("s1")]);
     const client = createKokloClient({ invokeFn });
