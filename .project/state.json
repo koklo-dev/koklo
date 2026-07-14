@@ -42,8 +42,8 @@
       "answer": "The absent README architecture modules are roadmap/planned modules, not current implementation claims. The vision was reviewed and no edit was needed."
     }
   ],
-  "last_updated": "2026-07-14T17:48:00+02:00",
-  "last_workflow_run": "analyst-designer-developer-qa-reviewer",
+  "last_updated": "2026-07-14T18:45:00+02:00",
+  "last_workflow_run": "analyst-developer-qa-reviewer",
   "last_workflow_stage": "final-summary",
   "last_workflow_result": "passed",
   "active_workflow_run": null,
@@ -255,6 +255,14 @@
       "task": "ad-hoc: gate approval UI crash + missing approve buttons + empty transcript (US-019 manual smoke follow-up)",
       "result": "passed",
       "completed_at": "2026-07-14T17:48:00+02:00"
+    },
+    {
+      "id": "analyst-developer-qa-reviewer-20260714180127",
+      "workflow": "analyst-developer-qa-reviewer",
+      "sprint": null,
+      "task": "ad-hoc: app closes and relaunches when a phase gate opens",
+      "result": "passed",
+      "completed_at": "2026-07-14T18:45:00+02:00"
     }
   ],
   "last_task_completed": "US-018",
