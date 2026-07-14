@@ -1,4 +1,5 @@
 use crate::bridge::{pump_transcript, TranscriptSink};
+use crate::gates::{GateDecisionInput, GateDto};
 use crate::handlers;
 use crate::ipc::{SessionDto, TranscriptLineDto, UsageSummaryDto};
 use crate::sessions::{self, RunSessionInput, RunSpec, SessionRunner};
@@ -195,6 +196,38 @@ async fn transcript_since(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command(rename_all = "camelCase")]
+async fn gates_pending(
+    state: State<'_, DesktopState>,
+    session_id: String,
+) -> Result<Vec<GateDto>, String> {
+    handlers::gates_pending(&state.storage, &session_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(rename_all = "camelCase")]
+async fn gates_decide(
+    state: State<'_, DesktopState>,
+    session_id: String,
+    action: String,
+    note: Option<String>,
+    edit_path: Option<String>,
+) -> Result<(), String> {
+    handlers::gates_decide(
+        &state.runner.gate_channel,
+        &state.storage,
+        GateDecisionInput {
+            session_id,
+            action,
+            note,
+            edit_path,
+        },
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
 /// Hand off from the frontend boot flow: close the frameless `splashscreen`
 /// window and reveal the (initially hidden) `main` window. Driven from the
 /// backend so it needs no `core:window` capability — closing a *different*
@@ -255,6 +288,8 @@ pub fn run() {
             sessions_usage,
             transcript_list,
             transcript_since,
+            gates_pending,
+            gates_decide,
             account_get,
             account_save,
             finish_boot

@@ -147,6 +147,7 @@ mod tests {
     use super::*;
     use koklo_events::{GateDisplay, Phase};
     use koklo_providers::config::PipelineTomlConfig;
+    use std::time::Duration;
 
     async fn seeded_storage() -> SessionManager {
         // `in_memory` already runs migrations.
@@ -246,6 +247,52 @@ mod tests {
         // Audited under the phase carried by the pending gate.
         let gates = gates_pending(&storage, &session.id).await.unwrap();
         assert!(gates.is_empty()); // no persisted approval_request rows in this path
+    }
+
+    #[tokio::test]
+    async fn gates_decide_releases_the_waiting_pipeline_within_one_second() {
+        let storage = seeded_storage().await;
+        let session = storage
+            .create_session("Gated", "sdd", "/repo")
+            .await
+            .unwrap();
+        let channel = GateChannel::new();
+        let awaiting = {
+            let channel = channel.clone();
+            let display = GateDisplay {
+                phase: Phase::Implement,
+                session_id: session.id.clone(),
+                description: "Approve the plan?".to_string(),
+                usage: None,
+                cost: None,
+                allow_edit: false,
+            };
+            tokio::spawn(async move { channel.deposit_and_await(display).await })
+        };
+        tokio::task::yield_now().await;
+        while !channel.has_pending() {
+            tokio::task::yield_now().await;
+        }
+
+        gates_decide(
+            &channel,
+            &storage,
+            GateDecisionInput {
+                session_id: session.id.clone(),
+                action: "approve".to_string(),
+                note: None,
+                edit_path: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let response = tokio::time::timeout(Duration::from_secs(1), awaiting)
+            .await
+            .expect("gate should unblock promptly")
+            .unwrap()
+            .unwrap();
+        assert!(matches!(response, GateResponse::Approve));
     }
 
     #[tokio::test]

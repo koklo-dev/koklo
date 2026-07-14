@@ -267,8 +267,8 @@ export const contract = {
     subscribe: { event: "transcript:subscribe" },
   },
   gates: {
-    pending: { command: "gates.pending" },
-    decide: { command: "gates.decide" },
+    pending: { command: "gates_pending" },
+    decide: { command: "gates_decide" },
   },
   providers: {
     list: { command: "providers.list" },

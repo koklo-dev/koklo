@@ -10,7 +10,7 @@ export const RUN_TYPES: readonly RunType[] = ["feature", "bug", "task"];
 export const PRESETS: readonly SessionPreset[] = ["light", "sdd", "bmad", "speckit"];
 
 /** Only the slice of the client this screen needs — keeps tests trivial to mock. */
-export type SessionsClient = Pick<KokloClient, "sessions">;
+export type SessionsClient = Pick<KokloClient, "sessions" | "gates">;
 
 /** Map a backend status string to a DS `SessionStatus`, tolerating synonyms. */
 export function toSessionStatus(status: string): SessionStatus {

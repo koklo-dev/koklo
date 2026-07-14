@@ -47,8 +47,25 @@ impl GateDto {
 /// session transcript (no new query path — the caller passes
 /// `Storage::get_transcript_items_for_session`).
 pub fn gates_pending(rows: Vec<TranscriptItemRecord>) -> Vec<GateDto> {
+    let resolved = rows
+        .iter()
+        .filter(|r| r.kind == "approval_decision")
+        .map(|r| (r.seq, r.phase.clone(), r.item_key.clone()))
+        .collect::<Vec<_>>();
     rows.into_iter()
-        .filter(|r| r.kind == "approval_request" && r.status == "pending")
+        .filter(|r| {
+            r.kind == "approval_request"
+                && r.status == "pending"
+                && !resolved.iter().any(|(seq, phase, item_key)| {
+                    if *seq <= r.seq {
+                        return false;
+                    }
+                    match (&r.item_key, item_key) {
+                        (Some(request_id), Some(decision_id)) => request_id == decision_id,
+                        _ => *phase == r.phase,
+                    }
+                })
+        })
         .map(GateDto::from_pending)
         .collect()
 }
@@ -133,5 +150,29 @@ mod tests {
         assert!(json.get("sessionId").is_some());
         assert!(json.get("requestId").is_some());
         assert!(json.get("session_id").is_none());
+    }
+
+    #[test]
+    fn resolved_gate_is_filtered_out_by_matching_request_id() {
+        let mut decision = approval("resolved", Some(r#"{"action":"approve"}"#));
+        decision.kind = "approval_decision".to_string();
+        decision.seq = 5;
+        let gates = gates_pending(vec![
+            approval("pending", Some(r#"{"kind":"command_execution"}"#)),
+            decision,
+        ]);
+        assert!(gates.is_empty());
+    }
+
+    #[test]
+    fn resolved_gate_is_filtered_out_by_phase_when_request_id_is_missing() {
+        let mut request = approval("pending", None);
+        request.item_key = None;
+        let mut decision = approval("resolved", Some(r#"{"action":"approve"}"#));
+        decision.kind = "approval_decision".to_string();
+        decision.item_key = None;
+        decision.seq = 5;
+        let gates = gates_pending(vec![request, decision]);
+        assert!(gates.is_empty());
     }
 }

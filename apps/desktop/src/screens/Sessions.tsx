@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import type { SessionDto } from "@koklo/trpc-client";
-import { Button, EmptyState, Icon, SessionCard, Spinner, useToast } from "@koklo/ui";
+import type { GateDecision, SessionDto } from "@koklo/trpc-client";
+import { Button, EmptyState, Icon, Modal, SessionCard, Spinner, useToast } from "@koklo/ui";
+import { PendingGateCenter } from "../components/PendingGateCenter";
 import { RunModal } from "../components/RunModal";
 import { submitRun, toCardProps, type RunForm, type SessionsClient } from "../lib/sessionsModel";
+import {
+  decisionCopy,
+  gateDescription,
+  gateKey,
+  gateKindLabel,
+  loadPendingGates,
+  pendingGateCount,
+  removePendingGate,
+  type PendingGateItem,
+} from "../lib/gatesModel";
 import "./Sessions.css";
 
 type LoadState = "loading" | "ready" | "error";
@@ -13,6 +24,7 @@ export interface SessionsScreenProps {
   projectPath: string;
   /** Open a session's transcript (roadmap P2 §4 navigation). */
   onOpenSession?: (session: SessionDto) => void;
+  onPendingGateCountChange?: (count: number) => void;
 }
 
 /**
@@ -20,20 +32,35 @@ export interface SessionsScreenProps {
  * through `sessions.run` (US-017-A backend). All visuals come from `@koklo/ui`;
  * this component only orchestrates data and state.
  */
-export function SessionsScreen({ client, projectPath, onOpenSession }: SessionsScreenProps) {
+export function SessionsScreen({
+  client,
+  projectPath,
+  onOpenSession,
+  onPendingGateCountChange,
+}: SessionsScreenProps) {
   const { toast } = useToast();
   const [load, setLoad] = useState<LoadState>("loading");
   const [sessions, setSessions] = useState<SessionDto[]>([]);
+  const [pendingGates, setPendingGates] = useState<PendingGateItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [decision, setDecision] = useState<{
+    action: Extract<GateDecision, "approve" | "reject">;
+    item: PendingGateItem;
+  } | null>(null);
+  const [decidingKey, setDecidingKey] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoad("loading");
     try {
-      setSessions(await client.sessions.list());
+      const nextSessions = await client.sessions.list();
+      const nextPendingGates = await loadPendingGates(client, nextSessions);
+      setSessions(nextSessions);
+      setPendingGates(nextPendingGates);
       setLoad("ready");
     } catch {
+      setPendingGates([]);
       setLoad("error");
     }
   }, [client]);
@@ -41,6 +68,10 @@ export function SessionsScreen({ client, projectPath, onOpenSession }: SessionsS
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    onPendingGateCountChange?.(pendingGateCount(pendingGates));
+  }, [onPendingGateCountChange, pendingGates]);
 
   const handleSubmit = useCallback(
     async (form: RunForm) => {
@@ -67,6 +98,43 @@ export function SessionsScreen({ client, projectPath, onOpenSession }: SessionsS
     [client, projectPath, refresh, toast],
   );
 
+  const requestDecision = useCallback(
+    (action: Extract<GateDecision, "approve" | "reject">, item: PendingGateItem) => {
+      setDecision({ action, item });
+    },
+    [],
+  );
+
+  const confirmDecision = useCallback(async () => {
+    if (!decision) return;
+    const key = gateKey(decision.item);
+    const copy = decisionCopy(decision.action);
+    setDecidingKey(key);
+    try {
+      await client.gates.decide({
+        sessionId: decision.item.session.id,
+        action: decision.action,
+      });
+      setPendingGates((prev) => removePendingGate(prev, decision.item));
+      setDecision(null);
+      toast({
+        tone: copy.toastTone,
+        title: copy.toastTitle,
+        description: `${decision.item.session.title} resumed from the ${decision.item.gate.phase} gate.`,
+      });
+      void refresh();
+    } catch (err) {
+      toast({
+        tone: "danger",
+        title: "Gate decision failed",
+        description:
+          err instanceof Error ? err.message : "The gate could not be updated on the backend.",
+      });
+    } finally {
+      setDecidingKey(null);
+    }
+  }, [client, decision, refresh, toast]);
+
   return (
     <div className="ses-page">
       <header className="ses-head">
@@ -82,6 +150,16 @@ export function SessionsScreen({ client, projectPath, onOpenSession }: SessionsS
           New Run
         </Button>
       </header>
+
+      {load === "ready" && (
+        <PendingGateCenter
+          items={pendingGates}
+          busyKey={decidingKey}
+          onApprove={(item) => requestDecision("approve", item)}
+          onReject={(item) => requestDecision("reject", item)}
+          onOpenSession={(item) => onOpenSession?.(item.session)}
+        />
+      )}
 
       {load === "loading" && (
         <div className="ses-loading" role="status">
@@ -145,6 +223,41 @@ export function SessionsScreen({ client, projectPath, onOpenSession }: SessionsS
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmit}
       />
+
+      <Modal
+        open={decision !== null}
+        onClose={() => (decidingKey ? undefined : setDecision(null))}
+        title={decision ? decisionCopy(decision.action).title : "Review gate"}
+        description={
+          decision
+            ? `${gateKindLabel(decision.item.gate.kind)} · ${decision.item.session.title}`
+            : undefined
+        }
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => setDecision(null)} disabled={Boolean(decidingKey)}>
+              Cancel
+            </Button>
+            <Button
+              variant={decision?.action === "reject" ? "danger" : "primary"}
+              onClick={() => void confirmDecision()}
+              loading={Boolean(decidingKey)}
+              disabled={Boolean(decidingKey)}
+            >
+              {decision ? decisionCopy(decision.action).confirm : "Confirm"}
+            </Button>
+          </>
+        }
+      >
+        {decision && (
+          <div className="ses-form">
+            <div className="ses-field">
+              <span className="ses-label">Gate</span>
+              <p>{gateDescription(decision.item)}</p>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

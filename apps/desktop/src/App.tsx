@@ -23,6 +23,7 @@ export function App() {
   const projectPath = ".";
   const { isDark, toggle } = useTheme();
   const [view, setView] = useState<View>({ screen: "sessions" });
+  const [pendingGateCount, setPendingGateCount] = useState(0);
   const boot = useAppBoot();
   const { state: account, save: saveAccount } = useAccount(kokloClient);
 
@@ -65,6 +66,7 @@ export function App() {
           breadcrumbs: isTranscript
             ? [{ label: "koklo" }, { label: "Sessions" }, { label: view.session.title }]
             : [{ label: "koklo" }, { label: "Sessions" }],
+          hasNotification: pendingGateCount > 0,
           isDark,
           onThemeToggle: toggle,
           dragRegion: true,
@@ -82,6 +84,7 @@ export function App() {
           <SessionsScreen
             client={kokloClient}
             projectPath={projectPath}
+            onPendingGateCountChange={setPendingGateCount}
             onOpenSession={(session) => setView({ screen: "transcript", session })}
           />
         )}
