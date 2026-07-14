@@ -3,9 +3,9 @@
  *
  * Vendored faithfully from the `koklo-storybook` source of truth (same `kk-`
  * token classes, same markup — no re-styling) so `apps/desktop` can consume the
- * DS without depending on the private Storybook repo. This is the screen-scoped
- * subset US-017 needs; the full DS port (Shell/Sidebar/TopBar + remaining
- * components) is the sprint-010 `packages/ui` consolidation (US-020).
+ * DS without depending on the private Storybook repo. Per ADR-028, `packages/ui`
+ * intentionally uses a copy-in port model and exports source files directly so
+ * the workspace resolves TS + CSS live.
  *
  * Import the token stylesheet once at the app root: `@koklo/ui/tokens.css`.
  */
