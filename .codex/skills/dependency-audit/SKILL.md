@@ -15,7 +15,7 @@ Scan project dependencies for known vulnerabilities and license issues; block on
 - [ ] Offline mirror or network available to the audit tool
 
 ## Procedure (strict order)
-1. Run audit: `TO CLARIFY`
+1. Run audit: `bash scripts/audit.sh`
 2. Parse findings: count critical, high, medium.
 3. Cross-check licenses against an allowlist (no GPL in proprietary code, etc.).
 

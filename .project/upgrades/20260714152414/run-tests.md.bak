@@ -23,7 +23,7 @@ Run the full test suite with coverage; block on failure or coverage below spec.
 
 ### expect-pass (default)
 1. Run tests with coverage: `cargo test --workspace`
-2. Parse coverage output from `bash scripts/coverage.sh`.
+2. Parse coverage output from `TO CLARIFY`.
 3. Compare against `agent-setup/spec/engineering-standards.md` thresholds (overall ≥ 80%, new code ≥ 90%).
 
 ### expect-fail (TDD red phase only)

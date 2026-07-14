@@ -1,10 +1,13 @@
 # Product Design Context
+<!-- generated-by: /upgrade-project -->
 
 ## Who we're designing for
-Developers and software teams who want an AI-assisted development cockpit with local control, traceability, governance, integrated ticketing, workflows, documentation, and deployment support.
+Developers who currently bounce between many disconnected tools across the software delivery lifecycle and want one controlled workspace for AI-assisted development.
 
 ## Brand voice
-Pragmatic, control-oriented, privacy-first, traceable, and developer-focused.
+Confident, operational, and control-oriented. Koklo should feel privacy-first, traceable, and pragmatic: "zero frustration, full control," more cockpit than chatbot.
 
 ## Anti-references (styles to avoid)
-Avoid positioning or designing Koklo as an IDE extension, another chatbot, or another fragmented tool in a chain of disconnected development services.
+- Generic "just another chat app" presentation
+- IDE-extension-only framing
+- Fragmented multi-tool workflow aesthetics that reinforce chaos instead of control
