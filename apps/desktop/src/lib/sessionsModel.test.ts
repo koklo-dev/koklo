@@ -6,6 +6,9 @@ import {
   formatTimestamp,
   toCardProps,
   submitRun,
+  isAbsolutePath,
+  loadLastProjectPath,
+  saveLastProjectPath,
   type SessionsClient,
 } from "./sessionsModel";
 
@@ -70,11 +73,12 @@ describe("submitRun", () => {
   it("calls sessions.run with the trimmed, mapped input", async () => {
     const run = vi.fn(async () => baseDto);
     const client = { sessions: { run } } as unknown as SessionsClient;
-    const result = await submitRun(
-      client,
-      { type: "feature", title: "  Add OAuth login  ", preset: "light" },
-      "/home/me/proj",
-    );
+    const result = await submitRun(client, {
+      type: "feature",
+      title: "  Add OAuth login  ",
+      preset: "light",
+      projectPath: "/home/me/proj",
+    });
     expect(run).toHaveBeenCalledWith({
       type: "feature",
       title: "Add OAuth login",
@@ -87,8 +91,78 @@ describe("submitRun", () => {
     const run = vi.fn(async () => baseDto);
     const client = { sessions: { run } } as unknown as SessionsClient;
     await expect(
-      submitRun(client, { type: "task", title: "   ", preset: "light" }, "/p"),
+      submitRun(client, { type: "task", title: "   ", preset: "light", projectPath: "/p" }),
     ).rejects.toThrow(/title is required/i);
     expect(run).not.toHaveBeenCalled();
+  });
+  // A relative projectPath resolves against the Tauri process cwd (src-tauri in
+  // dev), where the pipeline's artifact writes restart the dev watcher. The form
+  // must refuse anything non-absolute before it reaches the backend.
+  it("rejects a relative projectPath without calling the backend", async () => {
+    const run = vi.fn(async () => baseDto);
+    const client = { sessions: { run } } as unknown as SessionsClient;
+    await expect(
+      submitRun(client, { type: "feature", title: "Fix login", preset: "light", projectPath: "." }),
+    ).rejects.toThrow(/absolute/i);
+    await expect(
+      submitRun(client, {
+        type: "feature",
+        title: "Fix login",
+        preset: "light",
+        projectPath: "sub/dir",
+      }),
+    ).rejects.toThrow(/absolute/i);
+    expect(run).not.toHaveBeenCalled();
+  });
+  it("rejects an empty projectPath without calling the backend", async () => {
+    const run = vi.fn(async () => baseDto);
+    const client = { sessions: { run } } as unknown as SessionsClient;
+    await expect(
+      submitRun(client, { type: "feature", title: "Fix login", preset: "light", projectPath: "  " }),
+    ).rejects.toThrow(/project path/i);
+    expect(run).not.toHaveBeenCalled();
+  });
+  it("trims the projectPath it sends to the backend", async () => {
+    const run = vi.fn(async () => baseDto);
+    const client = { sessions: { run } } as unknown as SessionsClient;
+    await submitRun(client, {
+      type: "feature",
+      title: "Fix login",
+      preset: "light",
+      projectPath: " /home/me/proj ",
+    });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ projectPath: "/home/me/proj" }));
+  });
+});
+
+describe("isAbsolutePath", () => {
+  it("accepts POSIX and Windows absolute paths", () => {
+    expect(isAbsolutePath("/home/me/proj")).toBe(true);
+    expect(isAbsolutePath("C:\\work\\proj")).toBe(true);
+    expect(isAbsolutePath("C:/work/proj")).toBe(true);
+  });
+  it("refuses relative, empty, and home-shorthand paths", () => {
+    expect(isAbsolutePath(".")).toBe(false);
+    expect(isAbsolutePath("sub/dir")).toBe(false);
+    expect(isAbsolutePath("")).toBe(false);
+    expect(isAbsolutePath("~/proj")).toBe(false);
+  });
+});
+
+describe("last project path persistence", () => {
+  const memoryStorage = () => {
+    const data = new Map<string, string>();
+    return {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+    };
+  };
+  it("round-trips the last used project path", () => {
+    const storage = memoryStorage();
+    saveLastProjectPath(storage, "/home/me/proj");
+    expect(loadLastProjectPath(storage)).toBe("/home/me/proj");
+  });
+  it("returns an empty string when nothing was saved", () => {
+    expect(loadLastProjectPath(memoryStorage())).toBe("");
   });
 });

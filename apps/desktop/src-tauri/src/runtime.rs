@@ -385,6 +385,14 @@ async fn resolve_provider(
     ))
 }
 
+/// Resolve the run's project root. Not implemented yet (TDD red) — the tests
+/// below pin the contract: relative paths must be refused, because they resolve
+/// against the Tauri process cwd (`src-tauri` under `tauri dev`), where pipeline
+/// artifact writes trip the dev watcher and restart the whole app.
+fn validated_project_root(path: &str) -> Result<PathBuf> {
+    Ok(PathBuf::from(path))
+}
+
 fn koklo_home() -> PathBuf {
     std::env::var("KOKLO_HOME")
         .map(PathBuf::from)
@@ -456,5 +464,31 @@ mod tests {
                 .unwrap();
 
         assert_eq!(found, new.id);
+    }
+
+    #[test]
+    fn validated_project_root_rejects_relative_paths() {
+        for relative in [".", "sub/dir", "../elsewhere", ""] {
+            let error = validated_project_root(relative)
+                .expect_err("a relative projectPath must be refused");
+            assert!(
+                error.to_string().contains("absolute"),
+                "error for `{relative}` should explain the absolute-path requirement, got: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn validated_project_root_rejects_a_missing_directory() {
+        let error = validated_project_root("/nonexistent/koklo-test-dir")
+            .expect_err("a missing directory must be refused");
+        assert!(error.to_string().contains("existing directory"));
+    }
+
+    #[test]
+    fn validated_project_root_accepts_an_absolute_directory() {
+        let dir = std::env::temp_dir();
+        let root = validated_project_root(&dir.to_string_lossy()).unwrap();
+        assert_eq!(root, dir);
     }
 }
