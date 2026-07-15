@@ -39,6 +39,20 @@ pnpm typecheck    # vérification TypeScript
 pnpm test         # tests (vitest)
 ```
 
+## E2E natif Tauri
+
+Le repo contient maintenant un harness séparé `@koklo/desktop-native-e2e` pour
+tester la vraie app native via WebdriverIO + `@wdio/tauri-service`.
+
+Depuis la racine :
+
+```bash
+pnpm test:desktop-native
+```
+
+Ce chemin ne passe pas par le navigateur Vite: il build puis lance la vraie
+binaire `koklo-desktop` avec un `KOKLO_HOME` temporaire isolé.
+
 ## Pré-requis système (Linux)
 
 Si le premier build Rust échoue, installe les libs WebKitGTK :

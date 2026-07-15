@@ -6,7 +6,10 @@
   "scripts": {
     "build": "pnpm -r run build",
     "lint": "pnpm -r run lint",
-    "typecheck": "pnpm -r run typecheck"
+    "postinstall": "node apps/desktop-native-e2e/scripts/patch-wdio-tauri-service.mjs",
+    "typecheck": "pnpm -r run typecheck",
+    "test:desktop-native": "pnpm --filter @koklo/desktop-native-e2e test",
+    "test:desktop-native:ci": "xvfb-run -a pnpm --filter @koklo/desktop-native-e2e test"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0"

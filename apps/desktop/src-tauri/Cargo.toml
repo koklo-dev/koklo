@@ -15,6 +15,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 dirs = { workspace = true }
 tauri = { version = "=2.11.2", features = [] }
+tauri-plugin-wdio-webdriver = "1"
 koklo-core = { path = "../../../crates/core" }
 koklo-git-engine = { path = "../../../crates/git-engine" }
 koklo-storage = { path = "../../../crates/storage" }

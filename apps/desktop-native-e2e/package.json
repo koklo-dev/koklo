@@ -1,0 +1,19 @@
+{
+  "name": "@koklo/desktop-native-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --check wdio.conf.js",
+    "lint": "node --check wdio.conf.js && node --check specs/native-smoke.spec.js && node --check scripts/resolve-app-binary.mjs && node --check scripts/run-native-e2e.mjs",
+    "typecheck": "pnpm run lint",
+    "test": "node ./scripts/run-native-e2e.mjs"
+  },
+  "devDependencies": {
+    "@wdio/cli": "^9.19.0",
+    "@wdio/local-runner": "^9.19.0",
+    "@wdio/mocha-framework": "^9.19.0",
+    "@wdio/spec-reporter": "^9.19.0",
+    "@wdio/tauri-service": "^1.2.0"
+  }
+}

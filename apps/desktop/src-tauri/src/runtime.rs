@@ -314,7 +314,7 @@ pub fn run() {
     // Share the runner's AppHandle slot so `setup` can populate it once the app exists;
     // the live transcript pump reads it when a run starts.
     let app_slot = Arc::clone(&state.runner.app);
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(state)
         .setup(move |app| {
             let _ = app_slot.set(app.handle().clone());
@@ -339,7 +339,10 @@ pub fn run() {
             account_get,
             account_save,
             finish_boot
-        ])
+        ]);
+    #[cfg(debug_assertions)]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    builder
         .run(tauri::generate_context!())
         .expect("error while running Koklo desktop");
 }
