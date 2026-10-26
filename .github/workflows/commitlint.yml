@@ -33,7 +33,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/commitlint" \
             "@commitlint/cli@${COMMITLINT_VERSION}" "@commitlint/config-conventional@${COMMITLINT_VERSION}"
-          echo "COMMITLINT_PRESET=$RUNNER_TEMP/commitlint/node_modules/@commitlint/config-conventional" >> "$GITHUB_ENV"
+          echo "COMMITLINT_PRESET=$RUNNER_TEMP/commitlint/node_modules/@commitlint/config-conventional/lib/index.js" >> "$GITHUB_ENV"
           echo "COMMITLINT_BIN=$RUNNER_TEMP/commitlint/node_modules/.bin/commitlint" >> "$GITHUB_ENV"
 
       - name: Pull request title
