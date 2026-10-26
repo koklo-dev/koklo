@@ -4,19 +4,122 @@
   "stack": "node",
   "architecture_style": "monorepo pnpm + Turborepo, ports et adaptateurs (packages/domain pur) (source: vision §16.2, §17.1)",
   "stack_profile": {
-    "languages": [],
-    "package_manager": null,
+    "languages": [
+      "typescript"
+    ],
+    "package_manager": "pnpm",
     "commands": {
-      "install": null,
-      "lint": null,
-      "test": null,
-      "build": null,
-      "dev": null,
-      "e2e": null
+      "install": "pnpm install --frozen-lockfile",
+      "lint": "pnpm lint",
+      "test": "pnpm test",
+      "build": "pnpm build",
+      "dev": "pnpm dev",
+      "e2e": "pnpm e2e"
     },
-    "packages": [],
-    "shared_paths": [],
-    "notes": null
+    "packages": [
+      {
+        "name": "web",
+        "label": "pkg:web",
+        "path": "apps/web"
+      },
+      {
+        "name": "api",
+        "label": "pkg:api",
+        "path": "apps/api"
+      },
+      {
+        "name": "worker",
+        "label": "pkg:worker",
+        "path": "apps/worker"
+      },
+      {
+        "name": "contract",
+        "label": "pkg:contract",
+        "path": "packages/contract"
+      },
+      {
+        "name": "db",
+        "label": "pkg:db",
+        "path": "packages/db"
+      },
+      {
+        "name": "domain",
+        "label": "pkg:domain",
+        "path": "packages/domain"
+      },
+      {
+        "name": "schema",
+        "label": "pkg:schema",
+        "path": "packages/schema"
+      },
+      {
+        "name": "github",
+        "label": "pkg:github",
+        "path": "packages/github"
+      },
+      {
+        "name": "rules",
+        "label": "pkg:rules",
+        "path": "packages/rules"
+      },
+      {
+        "name": "delivery",
+        "label": "pkg:delivery",
+        "path": "packages/delivery"
+      },
+      {
+        "name": "cli",
+        "label": "pkg:cli",
+        "path": "packages/cli"
+      },
+      {
+        "name": "ui",
+        "label": "pkg:ui",
+        "path": "packages/ui"
+      },
+      {
+        "name": "config",
+        "label": "pkg:config",
+        "path": "packages/config"
+      },
+      {
+        "name": "e2e",
+        "label": "pkg:e2e",
+        "path": "e2e"
+      },
+      {
+        "name": "infra",
+        "label": "pkg:infra",
+        "path": ".github"
+      },
+      {
+        "name": "design",
+        "label": "pkg:design",
+        "path": "design"
+      }
+    ],
+    "shared_paths": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "turbo.json",
+      "biome.json",
+      "tsconfig.json",
+      ".nvmrc",
+      ".gitignore",
+      "README.md",
+      "docs/adr",
+      ".koklo",
+      "scripts",
+      "docker-compose.yml",
+      ".deploy",
+      "release-please-config.json",
+      ".release-please-manifest.json",
+      "apps/web/Dockerfile",
+      "apps/api/Dockerfile",
+      "apps/worker/Dockerfile"
+    ],
+    "notes": "Labels pkg:* → chemins explicites (vision §16.2). shared_paths : fichiers racine touchés par plusieurs paquets (lockfile, configs) et fichiers de déploiement (§20.4)."
   },
   "vault_path": "/home/devops/perso/projets/MyVault",
   "vault_project_path": "/home/devops/perso/projets/MyVault/koklo-v2",
