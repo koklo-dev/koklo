@@ -1,0 +1,34 @@
+# Mises à jour automatiques des dépendances (vision §16.1, TK-6).
+# Les commits suivent Conventional Commits pour passer commitlint.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    open-pull-requests-limit: 5
+
+  # Les Dockerfile vivent dans apps/*/ (web, api, worker).
+  - package-ecosystem: docker
+    directories:
+      - /apps/*
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    open-pull-requests-limit: 5
