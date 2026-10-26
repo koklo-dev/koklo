@@ -1,0 +1,27 @@
+{
+  "$comment": "Declarative screenshot specification. Run capture-screenshots.sh to regenerate every image. Never paste screenshots by hand: they rot silently.",
+  "base_url": "http://localhost:3000",
+  "start_command": null,
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "color_scheme": "light",
+  "locale": null,
+  "auth": null,
+  "shots": [
+    {
+      "id": "example-home",
+      "title": "Home screen",
+      "path": "/",
+      "wait_for": null,
+      "steps": [],
+      "highlight": [],
+      "annotations": [],
+      "mask": [],
+      "clip_selector": null,
+      "full_page": false,
+      "enabled": false
+    }
+  ]
+}
