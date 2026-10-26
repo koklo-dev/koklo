@@ -27,11 +27,35 @@ TO DOCUMENT — one paragraph: purpose, users, current state.
 | Change history | [changelog/reports/](changelog/reports/) |
 
 ## Getting productive
-TO DOCUMENT — install, run, test, and the smallest useful change with the exact
-commands, so they can be copy-pasted.
+Prerequisites: Node 24 (`nvm use` reads `.nvmrc`) and pnpm at the version pinned by
+`packageManager` in `package.json` (Corepack picks it up).
+
+```bash
+pnpm install --frozen-lockfile
+pnpm lint        # turbo run lint  (biome ci)
+pnpm typecheck   # turbo run typecheck
+pnpm test        # turbo run test  (vitest run --coverage)
+pnpm build       # turbo run build
+pnpm dev         # turbo run dev
+pnpm e2e         # turbo run e2e (no workspace defines this task yet)
+```
+
+Layout and shared configuration (`packages/config`): see
+[architecture.md](architecture.md#monorepo-workspace-tk-1). Running a task for one
+package: `pnpm --filter @koklo/config test`. The smallest useful change at this stage
+is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
 
 ## Conventions that are not obvious from the code
-TO DOCUMENT — naming, layering rules, what must never be done here, and why.
+- Quality limits are defined once, in `packages/config/biome.json`: functions of at
+  most 50 lines, cognitive complexity at most 15, no explicit `any`. Do not override
+  them per package; split the code instead.
+- `packages/config/fixtures/` holds deliberately 50- and 51-line functions that prove the
+  line limit; the root Biome config ignores that folder. Do not "fix" the 51-line one.
+- TypeScript is `strict` with `noUncheckedIndexedAccess`; extend
+  `@koklo/config/tsconfig.base.json`.
+- The layout decision is recorded in
+  [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
+- Other conventions: TO DOCUMENT.
 
 ## Commits, releases and dependency updates
 - Commits must follow Conventional Commits (enforced by the `commitlint` workflow);
