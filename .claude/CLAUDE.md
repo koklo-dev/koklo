@@ -9,6 +9,7 @@
 - Vision: `/home/devops/perso/projets/MyVault/koklo-v2/vision.md` (source of truth, never auto-edit)
 - State: `.project/state.json`
 - Engineering spec: `/home/devops/perso/projets/MyVault/koklo-v2/spec/engineering-standards.md` (read before coding)
+- Design: `DESIGN.md` (identité, tokens, typographie, icônes, formes, accessibilité — **lire avant tout travail sur `apps/web` ou `packages/ui`**) et `PRODUCT.md` (publics, ton, anti-références). Les maquettes citées dans `DESIGN.md` sont un artefact privé : pour un agent, seul le texte de `DESIGN.md` fait foi
 - Effective rules: run `engineering-rules explain --agent <role> --path <scope>`
 - Workflow runs: `/home/devops/perso/projets/MyVault/koklo-v2/workflows/runs/`
 

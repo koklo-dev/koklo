@@ -30,27 +30,39 @@
   "specialized_workflows": [],
   "specialized_skills": [],
   "skill_packs": {
-    "requested_mode": "auto",
+    "requested_mode": "auto,web,react",
     "detected": [
       "core",
       "health-audit"
     ],
     "selected": [
       "core",
-      "health-audit"
+      "health-audit",
+      "react",
+      "web"
     ],
     "installed": [
       "architecture-auditor",
       "codebase-auditor",
+      "composition-patterns",
       "condition-based-waiting",
+      "core-web-vitals",
       "delivery-reviewer",
       "documentation-auditor",
+      "frontend-design",
+      "performance",
       "persistence-auditor",
       "plan-reviewer",
+      "react-best-practices",
+      "seo",
       "shipyard-quality-verdict",
       "systematic-debugging",
       "test-suite-auditor",
       "verification-before-completion",
+      "web-accessibility",
+      "web-best-practices",
+      "web-design-guidelines",
+      "web-quality-audit",
       "workflow-ledger"
     ],
     "missing": [],
@@ -62,6 +74,18 @@
       {
         "source": "superpowers",
         "commit": "44c9b2d6e889982ac18c27d05a19fefe335194e1"
+      },
+      {
+        "source": "web-quality-skills",
+        "commit": "95d6e255afe1596b557d7a8498517884438f5b3a"
+      },
+      {
+        "source": "anthropic-skills",
+        "commit": "b29e7cf65e5cb78a5ac33d582270551bc74a14eb"
+      },
+      {
+        "source": "vercel-agent-skills",
+        "commit": "7c180d9044c9ae2b442b567aad4e42a28dd5ed62"
       },
       {
         "source": "claude-codex-skills",

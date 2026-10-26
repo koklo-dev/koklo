@@ -47,6 +47,46 @@
     "shipyard-quality-verdict": {
       "installed_sha256": "aac2a17a450be97f5fb6576137b9f4a4b6250cbcfedb4b84040f2b6f8256277b",
       "source": "shipyard-native"
+    },
+    "web-quality-audit": {
+      "installed_sha256": "b39c62f24e6eea1ffb517924b738f052f3888f32a8a5ca3cf348c1b33aeea291",
+      "source": "web-quality-skills"
+    },
+    "performance": {
+      "installed_sha256": "f2e2a354e2ccb0b1b177872b7683e429ca6b79642e4aaac374859a9aefa40f25",
+      "source": "web-quality-skills"
+    },
+    "core-web-vitals": {
+      "installed_sha256": "6129e8dfdb38965242c0d11e4af6a7670c50484ddfe335d07ce3f4ec636d8ffb",
+      "source": "web-quality-skills"
+    },
+    "web-accessibility": {
+      "installed_sha256": "e7193cfa7082217ef89d9dd942c06e578774c0a52808703417e4d83fd3b3104c",
+      "source": "web-quality-skills"
+    },
+    "seo": {
+      "installed_sha256": "a06ca86d0b0cc75982ee10651bd7398c0242a13d91d3b4c8eae0bf1360d18b92",
+      "source": "web-quality-skills"
+    },
+    "web-best-practices": {
+      "installed_sha256": "432875ade263e2509fa6888ebc5cf6c65f93074be73924ad6cceb7ec3ba9ccef",
+      "source": "web-quality-skills"
+    },
+    "frontend-design": {
+      "installed_sha256": "1608ea77fbb6fc30d13a97d12cfa8ebf31358d40f0dd97beed24829d6b3f45dd",
+      "source": "anthropic-skills"
+    },
+    "web-design-guidelines": {
+      "installed_sha256": "f4647ca866a3accf763777f83e7682954f0187cd6bea7eea0399796652414e8f",
+      "source": "vercel-agent-skills"
+    },
+    "react-best-practices": {
+      "installed_sha256": "71ed7794962fa6e803ee83030517b5b93a9f70fbfeb431ec4535c5480a8d8355",
+      "source": "vercel-agent-skills"
+    },
+    "composition-patterns": {
+      "installed_sha256": "e38e0eaa609316b10423a9a138ed95e35099accd3f735585295c8a8f165c28a3",
+      "source": "vercel-agent-skills"
     }
   }
 }

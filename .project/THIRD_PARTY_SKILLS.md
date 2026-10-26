@@ -5,4 +5,7 @@
 | Source | Commit | License | Repository |
 |---|---|---|---|
 | superpowers | `44c9b2d6e889982ac18c27d05a19fefe335194e1` | MIT | https://github.com/obra/superpowers |
+| web-quality-skills | `95d6e255afe1596b557d7a8498517884438f5b3a` | MIT | https://github.com/addyosmani/web-quality-skills |
+| anthropic-skills | `b29e7cf65e5cb78a5ac33d582270551bc74a14eb` | Apache-2.0 | https://github.com/anthropics/skills |
+| vercel-agent-skills | `7c180d9044c9ae2b442b567aad4e42a28dd5ed62` | MIT | https://github.com/vercel-labs/agent-skills |
 | claude-codex-skills | `78028e67d928504bcdae7a9e8f5cb9f6aebcf048` | MIT | https://github.com/levnikolaevich/claude-code-skills |
