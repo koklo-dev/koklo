@@ -1,0 +1,57 @@
+# Commits et titre de PR en Conventional Commits (vision §17.3, §22 point 8).
+# Le titre compte autant que les commits : en « rebase and merge » ce sont les
+# commits qui atterrissent, en squash c'est le titre.
+name: commitlint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commitlint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMMITLINT_VERSION: 21.2.4
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+
+      - name: Install commitlint
+        run: |
+          npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/commitlint" \
+            "@commitlint/cli@${COMMITLINT_VERSION}" "@commitlint/config-conventional@${COMMITLINT_VERSION}"
+          echo "COMMITLINT_PRESET=$RUNNER_TEMP/commitlint/node_modules/@commitlint/config-conventional/lib/index.js" >> "$GITHUB_ENV"
+          echo "COMMITLINT_BIN=$RUNNER_TEMP/commitlint/node_modules/.bin/commitlint" >> "$GITHUB_ENV"
+
+      # Preuve que le gate échoue : un titre non conventionnel doit être rejeté.
+      # S'il passe, le preset ou la config est ignoré et ce step échoue.
+      - name: Un titre non conventionnel doit être rejeté
+        run: |
+          if printf '%s\n' "Add stuff" | "$COMMITLINT_BIN" --config .github/commitlint.config.mjs; then
+            echo "commitlint a accepté un titre non conventionnel" >&2
+            exit 1
+          fi
+
+      - name: Pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | "$COMMITLINT_BIN" --config .github/commitlint.config.mjs
+
+      - name: Commits of the pull request
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: '"$COMMITLINT_BIN" --config .github/commitlint.config.mjs --from "$BASE_SHA" --to "$HEAD_SHA"'
