@@ -64,6 +64,9 @@ flowchart TB
   `./tsconfig.base.json`, `./biome.json`, `./vitest` (`src/vitest.ts`).
   - `tsconfig.base.json`: `strict`, `noUncheckedIndexedAccess`, ES2023, `NodeNext`
     modules, `verbatimModuleSyntax`, `isolatedModules`.
+  - `tsconfig.json` (the package's own typecheck config): extends the base,
+    `noEmit`, `types: ["node"]`, and includes `src`, `test` and `*.ts` so the Biome
+    rule test in `test/` is type-checked.
   - `biome.json`: `noExcessiveLinesPerFunction` (error, `maxLines: 50`),
     `noExcessiveCognitiveComplexity` (error, `maxAllowedComplexity: 15`),
     `noExplicitAny` (error). The root `biome.json` extends it and ignores
