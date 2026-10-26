@@ -10,7 +10,25 @@ sources: []
 # Quality and operations
 
 ## Test strategy and evidence
-TO DOCUMENT — test levels, what each level guarantees, how to run them.
+- **Unit tests**: Vitest 5, run per package by `pnpm test` (`vitest run --coverage`,
+  through Turborepo). The shared config (`@koklo/config/vitest`) picks up
+  `src/**/*.test.ts` and `test/**/*.test.ts`, uses v8 coverage over `src/**/*.ts`
+  (excluding test files) and enforces **lines ≥ 80 %, branches ≥ 70 %** (CDC §19.2).
+  Coverage below a threshold fails the run.
+- **Lint rules under test** (`packages/config/test/biome-rules.test.ts`): runs
+  `biome ci` on `packages/config/fixtures/`. A 51-line function must fail with
+  `noExcessiveLinesPerFunction`; a 50-line function must pass.
+- Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
+  no package defines it yet).
+
+### Lint, types and build (workspace)
+- `pnpm lint`: `biome ci` per package, using the shared `packages/config/biome.json`
+  (formatter: spaces, line width 100; recommended rules plus the three error-level
+  rules listed in [architecture.md](architecture.md#monorepo-workspace-tk-1)).
+- `pnpm typecheck`: `tsc --noEmit` against `tsconfig.base.json` (TypeScript 7.0.2).
+- `pnpm build`: `packages/config` has nothing to build (`echo 'nothing to build'`).
+- Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,
+  Biome 2.6.3, Vitest 5.0.5, TypeScript 7.0.2.
 
 ## Quality gates
 Workflows in `.github/workflows/`: `ci.yml`, `commitlint.yml`, `security.yml`,

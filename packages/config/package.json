@@ -1,0 +1,24 @@
+{
+  "name": "@koklo/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./biome.json": "./biome.json",
+    "./vitest": "./src/vitest.ts"
+  },
+  "scripts": {
+    "lint": "biome ci --config-path=../.. .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "build": "echo 'nothing to build'"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

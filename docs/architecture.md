@@ -37,8 +37,42 @@ flowchart TB
 ```
 
 ## 4. Components and building blocks (C4 level 3)
-TO DOCUMENT — the internal structure of the containers that matter, module by
-module, with the rule that decides where new code goes.
+### Monorepo workspace (TK-1)
+The code is a pnpm workspace orchestrated by Turborepo
+([ADR 0001](adr/0001-monorepo-pnpm-turborepo.md)). `pnpm-workspace.yaml` declares
+`apps/*`, `packages/*` and `e2e`; at this stage only `packages/config` exists.
+
+```mermaid
+flowchart TB
+  root["root: package.json, turbo.json, biome.json, .nvmrc"] --> turbo{{Turborepo}}
+  turbo -->|"lint, typecheck, test, build, dev, e2e"| pkgs["apps/*, packages/*, e2e"]
+  cfg["packages/config (@koklo/config)"]
+  cfg -. "tsconfig.base.json" .-> pkgs
+  cfg -. "biome.json" .-> pkgs
+  cfg -. "vitest (sharedVitestConfig)" .-> pkgs
+  cfg -. "biome.json (extended)" .-> root
+```
+
+- **Root**: `package.json` pins `packageManager` (`pnpm@12.15.0`) and
+  `engines.node` (`>=24 <25`); `.nvmrc` is `24`. Each root script (`lint`, `typecheck`,
+  `test`, `build`, `dev`, `e2e`) is `turbo run <task>`.
+- **Turborepo tasks** (`turbo.json`): `typecheck` and `test` depend on `^build`;
+  `build` depends on `^build` and caches `dist/**` and `.next/**` except
+  `.next/cache/**` and `.next/dev/**`; `test` caches `coverage/**`; `dev` is
+  persistent and uncached; `e2e` is uncached.
+- **`@koklo/config`** (`packages/config`, private) exports three shared configs:
+  `./tsconfig.base.json`, `./biome.json`, `./vitest` (`src/vitest.ts`).
+  - `tsconfig.base.json`: `strict`, `noUncheckedIndexedAccess`, ES2023, `NodeNext`
+    modules, `verbatimModuleSyntax`, `isolatedModules`.
+  - `biome.json`: `noExcessiveLinesPerFunction` (error, `maxLines: 50`),
+    `noExcessiveCognitiveComplexity` (error, `maxAllowedComplexity: 15`),
+    `noExplicitAny` (error). The root `biome.json` extends it and ignores
+    `**/fixtures`, `coverage`, `dist`, `.next` and `pnpm-lock.yaml`.
+  - `vitest`: `sharedVitestConfig` (v8 coverage, thresholds `lines: 80`,
+    `branches: 70`, exported as `coverageThresholds`, CDC §19.2).
+- **Rule for new code**: every new workspace package exposes the `lint`, `typecheck`,
+  `test` and `build` scripts so it enters the Turborepo graph, and extends the shared
+  configs instead of redefining them.
 
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
