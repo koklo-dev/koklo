@@ -1,0 +1,7 @@
+{
+  "name": "trivy-vulnerable-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fixture TK-5 : lockfile volontairement vulnérable (minimist 1.2.5, CVE-2021-44906 critique). Ne jamais mettre à jour.",
+  "dependencies": { "minimist": "1.2.5" }
+}
