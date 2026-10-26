@@ -38,5 +38,10 @@ check "delivery -> message nomme le paquet" msg_has 'delivery' "$FX/below-delive
 # T2.4 --require-reports
 check "aucun rapport + --require-reports -> exit != 0" fails --require-reports "$FX/empty"
 check "aucun rapport sans option -> exit 0" passes "$FX/empty"
+# T2.6 un rapport par paquet testé
+check "paquet testé avec rapport -> exit 0" passes --expect apps/web,packages/domain "$FX/ok"
+check "paquet testé sans rapport -> exit != 0" fails --require-reports --expect apps/web,packages/domain "$FX/missing-domain"
+check "paquet sans rapport -> message nomme le paquet" msg_has 'packages/domain.*no coverage' --expect apps/web,packages/domain "$FX/missing-domain"
+check "--expect sans aucun rapport -> exit != 0" fails --expect packages/domain "$FX/empty"
 check "racine inexistante -> exit != 0" fails "$FX/does-not-exist"
 finish

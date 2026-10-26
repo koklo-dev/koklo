@@ -14,7 +14,10 @@ job_block() {
     awk -v j="$1" '$0 ~ ("^  " j ":") {on=1; next} on && /^  [A-Za-z0-9_-]+:/ {on=0} on' "$WF"
 }
 in_ci() { job_block ci | grep -Eq -- "$1"; }
-no_job_if() { ! job_block ci | grep -Eq '^    if:'; }
+job_if_always() { job_block ci | grep -Eq '^    if: always\(\)'; }
+guard_fails() { job_block ci | grep -Eq "needs\.changes\.result != 'success'"; }
+# Le garde doit précéder toute autre étape (le premier "- " du bloc steps).
+guard_first() { job_block ci | awk '/^    steps:/ {on=1; next} on && /^      - / {print; exit}' | grep -q 'Change detection succeeded'; }
 # Rang de la première ligne du job ci qui correspond.
 rank() { job_block ci | grep -nE -- "$1" | head -1 | cut -d: -f1; }
 before() {
@@ -52,7 +55,8 @@ check "ordre test < couverture" before 'turbo run .*test|pnpm test' 'check-cover
 check "ordre couverture < build" before 'check-coverage\.sh' 'turbo run .*build|pnpm build'
 # T2.5
 check "couverture: --require-reports" g "'--require-reports'"
-check "couverture: exigée seulement si des tests sont planifiés" g "steps\.plan\.outputs\.planned == 'true'"
+check "couverture: exigée seulement si des tests sont planifiés" g 'PLANNED: .*steps\.plan\.outputs\.planned'
+check "couverture: un rapport par paquet testé (--expect)" g -- '--expect "\$PACKAGES"'
 check "tests-planned.sh appelé" g 'tests-planned\.sh'
 check "tests-planned.sh présent" test -f "$HERE/tests-planned.sh"
 check "ordre plan < test" before 'tests-planned\.sh' 'turbo run test \$TURBO_ARGS$'
@@ -64,6 +68,8 @@ check "garde sur outputs.skills" g 'needs\.changes\.outputs\.skills'
 check "garde sur outputs.ci" g 'needs\.changes\.outputs\.ci'
 check "garde sur outputs.code" g 'needs\.changes\.outputs\.code'
 check "job ci dépend de changes" in_ci 'needs:.*changes'
-check "job ci jamais sauté (pas de if au niveau job)" no_job_if
+check "job ci : if: always() (jamais sauté si changes échoue)" job_if_always
+check "job ci : échec explicite si changes n'est pas success" guard_fails
+check "job ci : le garde est la première étape" guard_first
 check "couche agent vérifiée" g 'loop\.tickets'
 finish

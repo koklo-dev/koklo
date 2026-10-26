@@ -27,5 +27,8 @@ report below-domain packages/contract 100 100 100 100
 report below-delivery packages/delivery 95 100 85 100
 report below-delivery packages/contract 100 100 100 100
 
+# apps/web produit un rapport, packages/domain (testé) n'en produit aucun.
+report missing-domain apps/web 90 100 90 100
+
 mkdir -p empty
 touch empty/.gitkeep

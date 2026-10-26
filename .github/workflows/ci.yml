@@ -45,10 +45,19 @@ jobs:
 
   ci:
     needs: changes
+    # always() : si `changes` échoue, `ci` doit s'exécuter et échouer, pas être sauté —
+    # un check requis sauté compte comme réussi.
+    if: always()
     runs-on: ubuntu-latest
     env:
       TURBO_ARGS: ${{ github.event_name == 'pull_request' && '--affected' || '' }}
     steps:
+      - name: Change detection succeeded
+        if: needs.changes.result != 'success'
+        run: |
+          echo "::error::job 'changes' ended with '${{ needs.changes.result }}'"
+          exit 1
+
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
@@ -97,8 +106,14 @@ jobs:
       - name: Coverage thresholds
         if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
         env:
-          REQUIRE_REPORTS: ${{ steps.plan.outputs.planned == 'true' && '--require-reports' || '' }}
-        run: bash .github/scripts/check-coverage.sh $REQUIRE_REPORTS .
+          PLANNED: ${{ steps.plan.outputs.planned }}
+          PACKAGES: ${{ steps.plan.outputs.packages }}
+        run: |
+          if [ "$PLANNED" = "true" ]; then
+            bash .github/scripts/check-coverage.sh --require-reports --expect "$PACKAGES" .
+          else
+            bash .github/scripts/check-coverage.sh .
+          fi
 
       - name: Upload coverage summaries
         if: always() && needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
