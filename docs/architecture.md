@@ -119,5 +119,13 @@ Whether `main` or `develop` is the integration branch is not settled in the sour
 read: `security.yml` runs on both, the sprint range ends at `origin/develop`
 (ASSUMPTION: `develop` integrates, `main` releases; to confirm with an ADR).
 
+### Agent permissions in worktrees
+The delivery loop runs agents in git worktrees. Project-level permissions in
+`.claude/settings.json` (`permissions.allow`) let them work without prompts:
+`pnpm *`, `corepack *`, `bash .github/scripts/*.test.sh`, `engineering-rules *`, the
+shipyard scripts under `~/.claude/shipyard/bin/` (three spellings: absolute path,
+`$HOME`, quoted `"$HOME"`), and read access to the vault `koklo-v2/**`. The `deny`
+list is unchanged. Source: commit `9be9b7e` (#7).
+
 ## 7. Decisions
 Architecture decisions live in [decisions/](decisions/) as ADRs.
