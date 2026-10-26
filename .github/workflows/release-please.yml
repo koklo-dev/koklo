@@ -1,0 +1,25 @@
+# Release Please en mode manifeste (vision §16.2, TK-6) : sur main, ouvre et tient à
+# jour la PR de release à partir des Conventional Commits.
+# Config : release-please-config.json, .release-please-manifest.json.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
