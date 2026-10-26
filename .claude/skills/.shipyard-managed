@@ -1,0 +1,8 @@
+create-pr
+dependency-audit
+dependency-selection
+engineering-rules
+lint-and-format
+push-to-github
+run-tests
+validation-front

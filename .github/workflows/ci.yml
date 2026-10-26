@@ -1,0 +1,58 @@
+# CI minimale posée à l'initialisation (vision §22, TK-1).
+# Elle existe pour que la boucle Shipyard ait un check à attendre dès la
+# première PR : sans aucun check, `ci_is_green` attend 600 s puis conclut
+# `timeout`, et rien ne merge jamais.
+# Tant qu'il n'y a pas de package.json, seul le contrôle de la couche agent
+# s'exécute. Dès que TK-1 pose le workspace, les gates du §16.3 s'exécutent.
+# TK-1 remplace ce fichier par la CI complète du §22 point 8.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Agent layer is valid
+        run: jq -e '.loop.tickets == "vault"' .project/state.json
+
+      - name: Detect workspace
+        id: ws
+        run: |
+          if [ -f package.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+
+      - if: steps.ws.outputs.present == 'true'
+        uses: pnpm/action-setup@v6.1.0
+
+      - if: steps.ws.outputs.present == 'true'
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - if: steps.ws.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - if: steps.ws.outputs.present == 'true'
+        run: pnpm lint
+
+      - if: steps.ws.outputs.present == 'true'
+        run: pnpm typecheck
+
+      - if: steps.ws.outputs.present == 'true'
+        run: pnpm test
+
+      - if: steps.ws.outputs.present == 'true'
+        run: pnpm build

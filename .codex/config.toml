@@ -1,0 +1,8 @@
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+[mcp_servers.cve-mcp]
+command = "/home/devops/.shipyard/vendor/cve-mcp-server/.venv/bin/python"
+args = ["-m", "cve_mcp.server"]
+cwd = "/home/devops/.shipyard/vendor/cve-mcp-server"

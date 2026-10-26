@@ -1,0 +1,166 @@
+{
+  "enabledMcpjsonServers": ["context7", "cve-mcp"],
+  "permissions": {
+    "allow": [
+      "Bash(gh *)",
+      "Bash(git add *)",
+      "Bash(git add:*)",
+      "Bash(git clone *)",
+      "Bash(git commit *)",
+      "Bash(git commit:*)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(git merge:*)",
+      "Bash(git rebase *)",
+      "Bash(git rebase:*)",
+      "Bash(git pull *)",
+      "Bash(git push *)",
+      "Bash(git ls-remote *)",
+      "Bash(npm view *)",
+      "Bash(npm view:*)",
+      "Bash(composer show *)",
+      "Bash(composer show:*)",
+      "Bash(pip index versions *)",
+      "Bash(pip index versions:*)",
+      "Bash(cargo search *)",
+      "Bash(cargo search:*)",
+      "Bash(go list -m -versions *)",
+      "Bash(go list -m -versions:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:codeload.github.com)",
+      "WebFetch(domain:*.githubusercontent.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:*.npmjs.org)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:*.pypi.org)",
+      "WebFetch(domain:files.pythonhosted.org)",
+      "WebFetch(domain:proxy.golang.org)",
+      "WebFetch(domain:sum.golang.org)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:static.crates.io)",
+      "WebFetch(domain:*.crates.io)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "mcp__cve-mcp__*"
+    ],
+    "deny": [
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git commit --amend:*)",
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(.env.local)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.kube/**)",
+      "Edit(.env)",
+      "Edit(**/.env)",
+      "Edit(**/.env.local)",
+      "Edit(~/.ssh/**)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": false,
+    "autoAllowBashIfSandboxed": true,
+    "excludedCommands": [
+      "gh *",
+      "git clone *",
+      "git fetch *",
+      "git pull *",
+      "git push *",
+      "git ls-remote *"
+    ],
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "*.githubusercontent.com",
+        "registry.npmjs.org",
+        "*.npmjs.org",
+        "pypi.org",
+        "*.pypi.org",
+        "files.pythonhosted.org",
+        "proxy.golang.org",
+        "sum.golang.org",
+        "crates.io",
+        "static.crates.io",
+        "*.crates.io",
+        "cdn.playwright.dev",
+        "playwright.download.prss.microsoft.com"
+      ]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "shipyard guard: screening command...",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "shipyard docs: checking documentation debt...",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/doc-debt.sh\" report"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "shipyard docs: scoring documentation impact...",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/doc-debt.sh\" check"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/doc-debt.sh\" track"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Checking tracking file enforcement...",
+            "command": "jq --exit-status 'select(.tool_name == \"Skill\" and ((.tool_input.skill // \"\") | test(\"^(sprint|run-agent|run-workflow)$\"))) | {hookSpecificOutput:{hookEventName:\"PostToolUse\",additionalContext:(\"ENFORCEMENT: The \\(.tool_input.skill) skill just completed. You MUST now update tracking files before finishing: (1) tick sprint file checkboxes for every task whose acceptance criteria are fully verified, (2) update .project/state.json — set last_updated, last_workflow_run, last_task_completed, last_workflow_result; add sprint to completed_sprints only if DoD is met, (3) append a dated entry to relevant agent memory files, (4) update the backlog with any newly discovered items. Do NOT skip these steps — they are required by the sprint protocol.\")}}' 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

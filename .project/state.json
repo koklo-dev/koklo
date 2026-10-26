@@ -1,0 +1,137 @@
+{
+  "project_name": "koklo",
+  "project_type": "greenfield",
+  "stack": "node",
+  "architecture_style": "monorepo pnpm + Turborepo, ports et adaptateurs (packages/domain pur) (source: vision §16.2, §17.1)",
+  "stack_profile": {
+    "languages": [],
+    "package_manager": null,
+    "commands": {
+      "install": null,
+      "lint": null,
+      "test": null,
+      "build": null,
+      "dev": null,
+      "e2e": null
+    },
+    "packages": [],
+    "shared_paths": [],
+    "notes": null
+  },
+  "vault_path": "/home/devops/perso/projets/MyVault",
+  "vault_project_path": "/home/devops/perso/projets/MyVault/koklo-v2",
+  "vision_source": "/home/devops/perso/projets/MyVault/koklo-v2/vision.md",
+  "vision_mode": "verbatim",
+  "engineering_spec": "/home/devops/perso/projets/MyVault/koklo-v2/spec/engineering-standards.md",
+  "current_sprint": 1,
+  "completed_sprints": [],
+  "active_agents": [],
+  "specialized_agents": [],
+  "specialized_workflows": [],
+  "specialized_skills": [],
+  "skill_packs": {
+    "requested_mode": "auto",
+    "detected": [
+      "core",
+      "health-audit"
+    ],
+    "selected": [
+      "core",
+      "health-audit"
+    ],
+    "installed": [
+      "architecture-auditor",
+      "codebase-auditor",
+      "condition-based-waiting",
+      "delivery-reviewer",
+      "documentation-auditor",
+      "persistence-auditor",
+      "plan-reviewer",
+      "shipyard-quality-verdict",
+      "systematic-debugging",
+      "test-suite-auditor",
+      "verification-before-completion",
+      "workflow-ledger"
+    ],
+    "missing": [],
+    "disabled": [],
+    "conflicts": [],
+    "manifest_version": "2026.08.1",
+    "manifest_sha256": "787f05d066b5c9a5db222014c48cb1ecc76d75bceac97f61e45c5b62d443c9ee",
+    "sources": [
+      {
+        "source": "superpowers",
+        "commit": "44c9b2d6e889982ac18c27d05a19fefe335194e1"
+      },
+      {
+        "source": "claude-codex-skills",
+        "commit": "78028e67d928504bcdae7a9e8f5cb9f6aebcf048"
+      }
+    ]
+  },
+  "engineering_rules": {
+    "schema_version": 1,
+    "detected": [
+      "core"
+    ],
+    "selected": [
+      "ci",
+      "core",
+      "docker",
+      "node",
+      "privacy-rgpd",
+      "security",
+      "typescript"
+    ],
+    "packages": [],
+    "overrides": [],
+    "conflicts": [],
+    "catalog_version": "2026.08.3",
+    "catalog_sha256": "ead100a8afc242f6e27b646475a7e9323dd5b02557aae0847596d188187631df"
+  },
+  "documentation": {
+    "hook": true,
+    "target": null,
+    "docs_root": null,
+    "doc_version": null,
+    "last_pass": null,
+    "last_documented_commit": null,
+    "screenshots": {
+      "tool": null,
+      "last_capture": null
+    }
+  },
+  "clarifications_pending": [
+    "Décision 32 : renommer koklo-dev/koklo (legacy Rust, public) en koklo-legacy — nécessite le rôle ADMIN (le compte josias-koffi est MAINTAIN), puis créer koklo-dev/koklo privé (vision §23, annexe E §E.4)",
+    "Décision 28 : Better Auth à valider avant S004 (vision §23)",
+    "Décision 30 : GlitchTip + pino à valider avant S003 (vision §16.5)",
+    "Décision 31 : domaines app/api(-staging).koklo.dev à valider avant le premier déploiement staging ; les quatre enregistrements existent déjà chez Cloudflare (adoption apps/adopt/koklo.yaml requise, vision §20.5 étape 5)",
+    "Décision 8 : licence de la plateforme avant S011 (R4) (vision §23)",
+    "Mail : koklo.dev absent de zones/zones.yaml (mail:) dans infra (vision §20.5 étape 2)",
+    "FORMAT_CMD et AUDIT_CMD non fixés par le cadrage (vision §16.3)"
+  ],
+  "last_updated": "2026-10-26",
+  "last_workflow_run": null,
+  "last_workflow_stage": null,
+  "last_workflow_result": null,
+  "active_workflow_run": null,
+  "workflow_runs": [],
+  "last_task_completed": null,
+  "repos": [],
+  "loop": {
+    "status": "idle",
+    "current_iteration": null,
+    "current_issue": null,
+    "attempts": {},
+    "paused_reason": null,
+    "resume_after": null,
+    "board_id": null,
+    "board_owner": null,
+    "max_review_rounds": 4,
+    "max_attempts_per_issue": 3,
+    "max_iterations_per_sprint": 50,
+    "escalated_issues": [],
+    "blockers": [],
+    "tickets": "vault"
+  }
+}

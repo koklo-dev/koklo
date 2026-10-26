@@ -1,0 +1,52 @@
+{
+  "files": {
+    "systematic-debugging": {
+      "installed_sha256": "808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787",
+      "source": "superpowers"
+    },
+    "verification-before-completion": {
+      "installed_sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+      "source": "superpowers"
+    },
+    "plan-reviewer": {
+      "installed_sha256": "4bb0111227c8dee69d8e08471c561b0f0e70a2c02503c5cb7f710a0e020b275f",
+      "source": "claude-codex-skills"
+    },
+    "delivery-reviewer": {
+      "installed_sha256": "7abb5cb21287449ac3065fe53584c6793ff603d7bceab3d99c272526f6b26538",
+      "source": "claude-codex-skills"
+    },
+    "documentation-auditor": {
+      "installed_sha256": "357dab3a6aa123884ae55cda05677f391d26074718a19e9c8ceb7c7d045e4725",
+      "source": "claude-codex-skills"
+    },
+    "codebase-auditor": {
+      "installed_sha256": "cd69f3f42a252741cc97421e8b5b9125b8871bc2866931115f663ac2a7f5877a",
+      "source": "claude-codex-skills"
+    },
+    "test-suite-auditor": {
+      "installed_sha256": "4055807f8f94dcfbda29d72140a0c187f847599d094f677ece62702c8a70ef4a",
+      "source": "claude-codex-skills"
+    },
+    "architecture-auditor": {
+      "installed_sha256": "3944353adfa08fd1d6a722e78121705b3240eb08718ff7cd1d18ee312d3de5e7",
+      "source": "claude-codex-skills"
+    },
+    "persistence-auditor": {
+      "installed_sha256": "e7b390a65f1f3519c68dd5fbe3ba4557b0affdbd38e9c444e934237057aef830",
+      "source": "claude-codex-skills"
+    },
+    "workflow-ledger": {
+      "installed_sha256": "b5056701ff30c915f466a4b7471b2a8b138e745bce2865d3a1932550ba48f650",
+      "source": "shipyard-native"
+    },
+    "condition-based-waiting": {
+      "installed_sha256": "4a427edaed2c4017cf5701ea093558c0cbf05f3869b88707300ed1d20e2fb637",
+      "source": "shipyard-native"
+    },
+    "shipyard-quality-verdict": {
+      "installed_sha256": "aac2a17a450be97f5fb6576137b9f4a4b6250cbcfedb4b84040f2b6f8256277b",
+      "source": "shipyard-native"
+    }
+  }
+}
