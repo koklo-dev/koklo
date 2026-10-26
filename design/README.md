@@ -1,73 +1,49 @@
 # Design des écrans
 
-> Règle : **aucun écran n'est codé avant que son design soit validé par un humain.**
-> Ce dossier est l'historique de ces décisions : chaque réflexion, chaque maquette, chaque validation est un commit.
+> Historique versionné des décisions UI/UX, écran par écran.
+> Les fiches sont écrites par l'étape **Design** du workflow `koklo-delivery` : à chaque ticket qui touche un écran, avant les tests et le code.
+> Aucune validation humaine ne bloque le développement. On demande une modification d'écran après coup, au fil de l'eau.
 > Références : [`DESIGN.md`](../DESIGN.md) (identité, tokens, accessibilité) et [`PRODUCT.md`](../PRODUCT.md) (publics, ton).
 
-## Cycle d'un écran
+## Comment ça marche
 
-```
-ticket design (boucle) ──► statut: à valider ──► revue humaine ──┬─► statut: validé ──► ticket de code (boucle)
-                                                                  └─► statut: à revoir + retours.md ──► ticket design repris
-```
+1. Un ticket touche un écran (`pkg:web` ou `pkg:ui`) : le sous-agent designer crée ou met à jour `screens/<S-id>.md` selon le gabarit ci-dessous. Il ajoute une ligne d'historique qui cite le ticket.
+2. Les étapes suivantes (tests, code) s'appuient sur cette fiche. La PR résume la décision de design dans sa section « Workflow » et joint les captures réelles, en clair et en sombre.
+3. **Demander une modification** : ajouter un ticket dans le sprint en cours du vault, par exemple `- [ ] **[TK-n]** Écran S-projects : <changement>`, avec `pkg:web`. Le designer reprend la fiche, consigne le changement et sa raison, puis le code suit.
 
-1. **Ticket de design** (`pkg:design`, livré par la boucle) : la session lit `DESIGN.md`, `PRODUCT.md`, le cadrage et le contrat oRPC concerné, puis produit le dossier de l'écran (structure ci-dessous) avec `statut: à valider`.
-2. **Revue humaine** : lire `README.md` de l'écran et ses captures.
-   - Accord : sur une branche `design/valider-<S-id>`, passer `statut: validé` et remplir `validé_par` et `validé_le`, puis merger la PR soi-même.
-   - Désaccord : passer `statut: à revoir`, écrire les retours dans `retours.md`, puis décocher le ticket de design dans le sprint du vault pour que la boucle le reprenne.
-3. **Ticket de code** : il commence par lire le `README.md` de chaque écran cité. Si le statut n'est pas `validé`, la session s'arrête avec `NEEDS-HUMAN:`. Elle implémente exactement les états validés, et tout écart devient une question, jamais une improvisation.
-4. **Après le code** : l'écran est déclaré dans le manifeste de captures. La première capture est comparée à la maquette validée, puis approuvée à la main (`approve-baselines.sh`). Le gate visuel surveille ensuite toute dérive.
+Identifiants : `S-<slug>` (même convention que les écrans de spec, annexe A).
 
-Une session d'agent **ne passe jamais** un écran en `validé` : le job CI `design approval guard` refuse toute PR d'une branche `feat/*` (branches de la boucle) qui le fait.
-
-## Structure d'un écran : `screens/<S-id>-<slug>/`
-
-| Fichier | Contenu |
-|---|---|
-| `README.md` | En-tête (`id`, `titre`, `statut`, `version`, `tickets`, `validé_par`, `validé_le`) et la réflexion UI/UX, sections du gabarit ci-dessous |
-| `mockup.html` | Maquette statique autonome : tokens recopiés de `DESIGN.md`, données fictives, `?state=<état>` et `?theme=dark` |
-| `captures/<état>-<clair\|sombre>.png` | Une capture par état et par thème, produite par `pnpm design:capture` |
-| `retours.md` | Retours humains successifs, datés (créé à la première demande de reprise) |
-
-Identifiants : `S-<slug>` (même convention que les écrans de spec, annexe A). Les ressources communes (polices, icônes) sont dans `assets/`.
-
-## Gabarit de `README.md`
+## Gabarit d'une fiche `screens/<S-id>.md`
 
 ```markdown
 ---
 id: S-projects
 titre: Liste des projets
-statut: à valider          # à valider | validé | à revoir
 version: 1
-tickets: { design: TK-86, code: TK-14 }
-validé_par:
-validé_le:
 ---
-## 1. Problème et utilisateurs
+## 1. Utilisateurs et objectif
 Qui arrive ici (vue client / vue équipe, rôle du CDC §14), avec quel objectif, depuis où.
 ## 2. Tâches et parcours
 Tâche principale, tâches secondaires, entrées et sorties de l'écran, navigation.
 ## 3. Contenu
 Chaque donnée affichée et sa source (procédure du contrat oRPC), ordre d'importance.
 ## 4. États
-Vide, chargement, erreur, droits insuffisants, plus les états propres à l'écran. Un état = une capture.
+Vide, chargement, erreur, droits insuffisants, plus les états propres à l'écran.
 ## 5. Interactions et retours
-Actions possibles, confirmation, retour visuel, erreurs de saisie.
+Actions possibles, confirmations, retours visuels, erreurs de saisie.
 ## 6. Responsive
-Ce qui change sous 768 px (empilement, panneau de détail, cibles tactiles).
+Ce qui change sous 768 px.
 ## 7. Accessibilité
 Ordre de focus, libellés, `aria-label` des boutons d'icône, statuts doublés d'une icône, mouvement réduit.
 ## 8. Alternatives écartées
 Au moins deux options sérieuses, avec ce qui a fait trancher.
 ## 9. Questions ouvertes
-Ce qu'un humain doit trancher. Vide = rien à trancher.
+Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conforme à `DESIGN.md` est retenue en attendant.
 ## 10. Historique
-| Version | Date | Changement | Auteur |
+| Version | Date | Ticket | Changement et raison |
 ```
 
 ## Index des écrans
 
-| Écran | Statut | Ticket design | Ticket code |
-|---|---|---|---|
-
-<!-- Tenu à jour par chaque ticket de design ; vérifié par `pnpm design:check`. -->
+| Écran | Version | Dernier ticket |
+|---|---|---|

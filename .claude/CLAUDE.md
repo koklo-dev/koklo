@@ -10,7 +10,7 @@
 - State: `.project/state.json`
 - Engineering spec: `/home/devops/perso/projets/MyVault/koklo-v2/spec/engineering-standards.md` (read before coding)
 - Design: `DESIGN.md` (identité, tokens, typographie, icônes, formes, accessibilité — **lire avant tout travail sur `apps/web` ou `packages/ui`**) et `PRODUCT.md` (publics, ton, anti-références). Les maquettes citées dans `DESIGN.md` sont un artefact privé : pour un agent, seul le texte de `DESIGN.md` fait foi
-- Écrans : **design avant code** (`design/README.md`). Un ticket `pkg:web` ne code un écran que si `design/screens/<S-id>-*/README.md` porte `statut: validé` ; sinon `NEEDS-HUMAN:`. Un agent ne passe jamais un écran en `validé`
+- Workflow : chaque ticket suit `koklo-delivery` (analyse → design si écran → red → green → refactor, un sous-agent par étape, puis review et merge par la boucle). L'étape design tient à jour `design/screens/<S-id>.md` ; aucune validation humaine ne bloque le développement, les modifications d'écran se demandent après coup par ticket
 - Effective rules: run `engineering-rules explain --agent <role> --path <scope>`
 - Workflow runs: `/home/devops/perso/projets/MyVault/koklo-v2/workflows/runs/`
 

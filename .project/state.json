@@ -91,11 +91,6 @@
         "name": "infra",
         "label": "pkg:infra",
         "path": ".github"
-      },
-      {
-        "name": "design",
-        "label": "pkg:design",
-        "path": "design"
       }
     ],
     "shared_paths": [
@@ -117,9 +112,10 @@
       ".release-please-manifest.json",
       "apps/web/Dockerfile",
       "apps/api/Dockerfile",
-      "apps/worker/Dockerfile"
+      "apps/worker/Dockerfile",
+      "design"
     ],
-    "notes": "Labels pkg:* → chemins explicites (vision §16.2). shared_paths : fichiers racine touchés par plusieurs paquets (lockfile, configs) et fichiers de déploiement (§20.4)."
+    "notes": "Labels pkg:* → chemins explicites (vision §16.2). shared_paths : fichiers racine touchés par plusieurs paquets (lockfile, configs) et fichiers de déploiement (§20.4). design/ : fiches d'écran écrites par l'étape design du workflow koklo-delivery, partagé par tous les tickets."
   },
   "vault_path": "/home/devops/perso/projets/MyVault",
   "vault_project_path": "/home/devops/perso/projets/MyVault/koklo-v2",
