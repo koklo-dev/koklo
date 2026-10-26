@@ -43,7 +43,15 @@
       "WebFetch(domain:*.crates.io)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
-      "mcp__cve-mcp__*"
+      "mcp__cve-mcp__*",
+      "Bash(pnpm *)",
+      "Bash(corepack *)",
+      "Bash(bash .github/scripts/*.test.sh)",
+      "Bash(engineering-rules *)",
+      "Bash(/home/devops/.claude/shipyard/bin/*)",
+      "Bash($HOME/.claude/shipyard/bin/*)",
+      "Bash(\"$HOME/.claude/shipyard/bin/*)",
+      "Read(/home/devops/perso/projets/MyVault/koklo-v2/**)"
     ],
     "deny": [
       "Bash(curl:*)",
