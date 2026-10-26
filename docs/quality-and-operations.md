@@ -13,8 +13,64 @@ sources: []
 TO DOCUMENT — test levels, what each level guarantees, how to run them.
 
 ## Quality gates
-TO DOCUMENT — lint, types, coverage, dependency audit, security scan, and the
-blocking/advisory status of each.
+Workflows in `.github/workflows/`: `ci.yml`, `commitlint.yml`, `security.yml`,
+`release-please.yml`. Lint, types and coverage gates: TO DOCUMENT (`ci.yml` was not
+part of this sprint's range).
+
+### Security scan (`security.yml`)
+- Triggers: every pull request, and pushes to `develop` and `main`. Permissions
+  `contents: read`; concurrency per ref, `cancel-in-progress: true`.
+- Trivy is pinned (`TRIVY_VERSION: v0.76.1`, `aquasecurity/trivy-action@v0.36.0`).
+- Job `trivy` scans the repository filesystem (`scanners: vuln,secret`, severity
+  `HIGH,CRITICAL`, `ignore-unfixed: true`, `exit-code: 1`), skipping `.github/fixtures`.
+  Vulnerable dependencies or committed secrets fail the check.
+- Job `trivy-detects-critical` proves the gate is not blind: it scans
+  `.github/fixtures/trivy-vulnerable` (a deliberately vulnerable `package.json` and
+  lockfile) with `continue-on-error`, and fails unless the scan outcome was `failure`.
+  Never "fix" or remove that fixture.
+
+### Conventional Commits (`commitlint.yml`)
+- Trigger: pull request `opened`, `edited`, `synchronize`, `reopened`.
+- Installs `@commitlint/cli` and `@commitlint/config-conventional` at `21.2.4` into a
+  temporary directory; `.github/commitlint.config.mjs` extends the preset whose path
+  is passed through `COMMITLINT_PRESET` (falling back to the package name).
+- Steps: (1) a non-conventional title (`Add stuff`) must be rejected, otherwise the
+  gate is ignoring its config; (2) the PR title is linted; (3) every commit between the
+  PR base and head SHA is linted. The title matters as much as the commits: with
+  "rebase and merge" the commits land, with squash the title does.
+- Whether these checks are required by branch protection: TO DOCUMENT.
+
+## Delivery loop
+`.project/loop/` holds the autonomous delivery loop (shipyard). Summary taken from the
+header of `agent-loop.sh`:
+
+- Phase 1 (dev): pick a todo issue, create a worktree and branch, run the dev agent,
+  commit, push, open the PR, mark the issue `status:in-review`, move on. It never waits
+  for CI or a review.
+- Phase 2 (review), same run: for each in-review issue, a fresh review session waits for
+  green CI, applies the hard gates, then approves and rebase-merges (squash only if the
+  branch carries a merge commit). A non-approval feeds the verdict into a fix session;
+  round and conflict-fix progress is persisted per issue. Exhausted attempts mark the
+  issue `blocked` and send a notification.
+- Status source: the GitHub Project (current Sprint iteration + Status) when configured,
+  otherwise issue labels; labels are mirrored in Project mode.
+- Prompts: `prompt-dev.md`, `prompt-review.md`, `prompt-unblock.md`, `prompt-retro.md`,
+  `prompt-doc.md`. Per commit `3c63a2c`, each ticket follows the `koklo-delivery` workflow.
+
+| Script | Role (from its header) |
+|--------|------------------------|
+| `agent-loop.sh` | control flow of the loop |
+| `claude-invoke.sh` | single entry point for every Claude Code call; owns auth and quota back-off |
+| `ticket-backend.sh` | `ticket_*` contract isolating the loop from the ticket tracker |
+| `materialize-sprint-issues.sh` | projects unchecked vault sprint tasks into GitHub Issues/Project (idempotent) |
+| `upsert-project-issue.sh` | creates or reuses an exact-title issue and sets its Project/Sprint fields |
+| `vault-task-status.sh` | writes a task's delivery state back into the vault sprint file |
+| `security-alerts-to-issues.sh` | one board issue per vulnerable package from open Dependabot alerts (default minimum severity `high`) |
+| `purge-worktrees.sh` | reclaims disk from worktrees and stale local branches left by killed runs |
+| `notify.sh` | pluggable phone notifications; silent no-op when no backend is set |
+| `happy-pilot.sh` | tmux-wrapped Claude session to monitor and unblock the loop from mobile |
+
+Machine-specific settings go in `.project/loop/env.local` (git-ignored).
 
 ## Release and dependency automation (TK-6)
 

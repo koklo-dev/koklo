@@ -64,6 +64,7 @@ transactions: the conventions every module obeys.
 flowchart LR
   dev[Conventional Commit PR] --> ci[ci / commitlint / security]
   ci --> main[(main)]
+  loop[.project/loop delivery loop] -->|opens PR, merges when CI green + review approves| dev
   main --> rp[release-please workflow]
   rp --> pr[Release PR + CHANGELOG.md]
   pr -->|merge| tag[Tag + GitHub release]
@@ -72,6 +73,14 @@ flowchart LR
 
 Release Please runs in manifest mode, configured by `release-please-config.json`
 and `.release-please-manifest.json` at the repository root.
+
+The `security` workflow (Trivy) and the `commitlint` workflow gate every pull request;
+the delivery loop in `.project/loop/` produces most PRs and merges them. Gate details
+and the loop's phases are in
+[quality-and-operations.md](quality-and-operations.md#quality-gates).
+Whether `main` or `develop` is the integration branch is not settled in the sources
+read: `security.yml` runs on both, the sprint range ends at `origin/develop`
+(ASSUMPTION: `develop` integrates, `main` releases; to confirm with an ADR).
 
 ## 7. Decisions
 Architecture decisions live in [decisions/](decisions/) as ADRs.
