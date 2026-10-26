@@ -83,13 +83,22 @@ jobs:
         if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
         run: pnpm exec turbo run typecheck $TURBO_ARGS
 
+      # Une PR qui ne touche que des fichiers racine (scripts, biome.json, workflows…) ne
+      # rattache aucun paquet à turbo : aucun test, donc aucun rapport à exiger.
+      - name: Plan unit tests
+        id: plan
+        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
+        run: pnpm exec turbo run test $TURBO_ARGS --dry=json | bash .github/scripts/tests-planned.sh >> "$GITHUB_OUTPUT"
+
       - name: Unit tests with coverage
         if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
         run: pnpm exec turbo run test $TURBO_ARGS
 
       - name: Coverage thresholds
         if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: bash .github/scripts/check-coverage.sh --require-reports .
+        env:
+          REQUIRE_REPORTS: ${{ steps.plan.outputs.planned == 'true' && '--require-reports' || '' }}
+        run: bash .github/scripts/check-coverage.sh $REQUIRE_REPORTS .
 
       - name: Upload coverage summaries
         if: always() && needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'

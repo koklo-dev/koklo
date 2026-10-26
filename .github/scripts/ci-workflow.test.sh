@@ -51,7 +51,11 @@ check "ordre typecheck < test" before 'typecheck' 'turbo run .*test|pnpm test'
 check "ordre test < couverture" before 'turbo run .*test|pnpm test' 'check-coverage\.sh'
 check "ordre couverture < build" before 'check-coverage\.sh' 'turbo run .*build|pnpm build'
 # T2.5
-check "couverture: --require-reports" g 'check-coverage\.sh --require-reports'
+check "couverture: --require-reports" g "'--require-reports'"
+check "couverture: exigée seulement si des tests sont planifiés" g "steps\.plan\.outputs\.planned == 'true'"
+check "tests-planned.sh appelé" g 'tests-planned\.sh'
+check "tests-planned.sh présent" test -f "$HERE/tests-planned.sh"
+check "ordre plan < test" before 'tests-planned\.sh' 'turbo run test \$TURBO_ARGS$'
 # T3.5 / T3.6
 check "--affected" g -- '--affected'
 check "detect-changes.sh appelé" g 'detect-changes\.sh'
