@@ -17,5 +17,6 @@ check "sans clé tasks -> false" is '{}' planned=false
 check "tâche test sans script -> false" is '{"tasks":[{"task":"test","command":"<NONEXISTENT>"}]}' planned=false
 check "autres tâches seulement -> false" is '{"tasks":[{"task":"build","command":"tsc"}]}' planned=false
 check "mélange -> true" is '{"tasks":[{"task":"build","command":"tsc"},{"task":"test","command":"vitest"}]}' planned=true
-check "JSON invalide -> exit != 0" bash -c "echo nope | bash '$SUT'"
+fails() { ! printf '%s' "$1" | bash "$SUT"; }
+check "JSON invalide -> exit != 0" fails 'nope'
 finish
