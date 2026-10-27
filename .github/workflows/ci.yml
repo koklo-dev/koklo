@@ -44,7 +44,7 @@ jobs:
           cat "$GITHUB_OUTPUT"
 
   ci:
-    needs: changes
+    needs: [changes, e2e]
     # always() : si `changes` échoue, `ci` doit s'exécuter et échouer, pas être sauté —
     # un check requis sauté compte comme réussi.
     if: always()
@@ -56,6 +56,14 @@ jobs:
         if: needs.changes.result != 'success'
         run: |
           echo "::error::job 'changes' ended with '${{ needs.changes.result }}'"
+          exit 1
+
+      # `ci` est la seule vérification requise : sans ce garde, un e2e rouge ne bloque pas
+      # le merge. `skipped` reste accepté (e2e n'a pas lieu quand code=false).
+      - name: E2E did not fail
+        if: needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled'
+        run: |
+          echo "::error::job 'e2e' ended with '${{ needs.e2e.result }}'"
           exit 1
 
       - uses: actions/checkout@v7.0.1
