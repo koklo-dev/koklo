@@ -6,6 +6,9 @@ packages:
 allowBuilds:
   "@prisma/engines": true
   prisma: true
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
 
 # Temporaire (TK-11) : better-auth 1.7.14 a ete publie le 2026-10-26 (moins que le delai minimum
 # de la politique supply-chain de pnpm). A RETIRER des que le delai est ecoule (des le 2026-10-28)

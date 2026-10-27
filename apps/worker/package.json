@@ -1,0 +1,26 @@
+{
+  "name": "@koklo/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "biome ci --config-path=../.. .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "dev": "node --watch src/main.ts"
+  },
+  "dependencies": {
+    "@koklo/config": "workspace:*",
+    "pg-boss": "12.38.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@testcontainers/postgresql": "12.2.1",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
