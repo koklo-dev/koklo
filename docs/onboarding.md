@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 37e0fd3
+covers_commit: 5f350ca
 ---
 # Onboarding — humans and AI agents
 
