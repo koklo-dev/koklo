@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  CONTRACT_VERSION,
   contract,
   generateOpenApi,
   type HealthInput,
   type HealthOutput,
   type ProjectListOutput,
 } from "../src/index.ts";
+import { projectSchema } from "../src/schemas.ts";
 import { hashDocument, recordVersion } from "../src/versions.ts";
 
 const root = resolve(import.meta.dirname, "..");
@@ -64,14 +66,15 @@ describe("CT-2 contrat health", () => {
 });
 
 describe("CT-3 contrat project.list", () => {
-  it("sortie : tableau d'objets { id, key, name }", async () => {
+  it("sortie : tableau d'objets { id, name }, sans key (TK-10 D1)", async () => {
     const list = procedures()["project.list"];
     expect(list).toBeDefined();
     const out = list?.["~orpc"].outputSchemas?.[0];
     expect(await isValid(out, [])).toBe(true);
-    expect(await isValid(out, [{ id: UUID, key: "KOK", name: "Koklo" }])).toBe(true);
-    expect(await isValid(out, [{ key: "KOK", name: "Koklo" }])).toBe(false);
-    expect(await isValid(out, [{ id: UUID, key: "KOK" }])).toBe(false);
+    expect(await isValid(out, [{ id: UUID, name: "Koklo" }])).toBe(true);
+    expect(await isValid(out, [{ name: "Koklo" }])).toBe(false);
+    expect(await isValid(out, [{ id: UUID }])).toBe(false);
+    expect(Object.keys(projectSchema.shape).sort()).toEqual(["id", "name"]);
   });
 });
 
@@ -196,6 +199,14 @@ describe("CT-8b garde de version", () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const document = await generateOpenApi();
     expect(() => recordVersion(versions, version, document)).not.toThrow();
+  });
+});
+
+describe("CT-10 version du contrat (C3.2)", () => {
+  it("est en 0.2.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.2.0");
+    expect(CONTRACT_VERSION).toBe("0.2.0");
+    expect(Object.keys(readJson("openapi/versions.json"))).toEqual(["0.1.0", "0.2.0"]);
   });
 });
 

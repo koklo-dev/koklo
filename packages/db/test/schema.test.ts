@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { expectedTables, runPrismaOrThrow } from "./helpers/prisma-cli.ts";
-import { createTestDatabase, type TestDatabase } from "./helpers/test-database.ts";
+import { expectedTables, runPrismaOrThrow } from "../src/testing/prisma-cli.ts";
+import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
 

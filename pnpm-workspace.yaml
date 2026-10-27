@@ -6,3 +6,6 @@ packages:
 allowBuilds:
   "@prisma/engines": true
   prisma: true
+
+overrides:
+  multer: 2.5.0

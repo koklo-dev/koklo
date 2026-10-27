@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { packageRoot } from "./helpers/prisma-cli.ts";
+import { packageRoot } from "../src/testing/prisma-cli.ts";
 
 const rootPackage = JSON.parse(
   readFileSync(join(packageRoot, "..", "..", "package.json"), "utf8"),

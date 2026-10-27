@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 37ccf40
+covers_commit: e084ff1
 ---
 # Architecture
 
@@ -41,7 +41,7 @@ flowchart TB
 ### Monorepo workspace (TK-1)
 The code is a pnpm workspace orchestrated by Turborepo
 ([ADR 0001](adr/0001-monorepo-pnpm-turborepo.md)). `pnpm-workspace.yaml` declares
-`apps/*`, `packages/*` and `e2e`; at this stage only `packages/config` exists.
+`apps/*`, `packages/*` and `e2e`; `apps/api`, `packages/config`, `packages/contract` and `packages/db` exist.
 
 ```mermaid
 flowchart TB
@@ -215,6 +215,28 @@ flowchart LR
   down["migrations/TS_NAME/down.sql"] --> rb["pnpm db:rollback = scripts/rollback.ts"]
   rb -->|"prisma db execute --file"| pg
   rb -->|"DELETE FROM _prisma_migrations"| pg
+```
+
+### API application (TK-10)
+`apps/api` (`@koklo/api`, tag `api`, private) is a NestJS (Express platform) application
+that implements `@koklo/contract` with `@orpc/nest` (`@Implement`). It is compiled with
+`tsc` (decorators need `experimentalDecorators`; Node cannot strip them) and started with
+`pnpm --filter @koklo/api start`. Configuration is read once at startup and validated
+with Zod (`DATABASE_URL`, `PORT`, `APP_ENV`, `APP_VERSION`; see `apps/api/.env.example`).
+The `project` module keeps its port in `apps/api` ([ADR 0002](adr/0002-project-port-in-api.md)).
+`@koklo/db` now exports `createDbClient` (Prisma 7 + `@prisma/adapter-pg`), `seed` and
+`SEED_IDS`, plus the `@koklo/db/testing` sub-path used by integration tests; the Prisma
+client is generated into `packages/db/src/generated` (git-ignored) before build,
+typecheck and test.
+
+```mermaid
+flowchart LR
+  req["HTTP request"] --> ctl["ProjectController / HealthController (thin)"]
+  ctl --> svc["ProjectService / HealthService"]
+  svc --> port["ProjectRepository / DatabaseProbe (ports)"]
+  port --> adapter["Prisma adapters"]
+  adapter --> pg[("PostgreSQL")]
+  ctl -. "OrganizationContext (401 until TK-11)" .-> svc
 ```
 
 ## 5. Runtime views

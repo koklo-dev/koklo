@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 37ccf40
+covers_commit: e084ff1
 ---
 # Quality and operations
 
@@ -46,6 +46,13 @@ covers_commit: 37ccf40
   snake_case, uuid keys and `created_at`/`updated_at`. `root-scripts.test.ts` (T4.1)
   covers the root scripts; `rollback.test.ts` covers the rollback logic with fake ports.
   The database comes from Docker (random host port, never 5432) or `TEST_DATABASE_URL`.
+- **API tests** (`apps/api/test/`, `apps/api/src/project/project.service.test.ts`, TK-10):
+  `project-list.test.ts` (C1.x) runs the real Nest app on an ephemeral Postgres 17
+  (`@koklo/db/testing`, `migrate deploy`, seed): seed projects returned, tenant
+  isolation, deterministic order, empty organization, 401 by default, `INTERNAL` on
+  database failure. `health.test.ts` (C2.x) covers 200 / `INTERNAL` 500, the 2 s probe
+  timeout and `x-request-id`. `openapi.test.ts` (C3.1) and `config.test.ts` (C3.3)
+  cover `/openapi.json` and `.env.example` consistency.
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 

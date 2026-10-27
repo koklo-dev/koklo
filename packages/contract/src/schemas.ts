@@ -9,7 +9,6 @@ export const healthOutputSchema = z.object({
 
 export const projectSchema = z.object({
   id: z.uuid(),
-  key: z.string(),
   name: z.string(),
 });
 

@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 37ccf40
+covers_commit: e084ff1
 ---
 # Onboarding — humans and AI agents
 
@@ -80,8 +80,9 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
 - Every Prisma migration in `packages/db/prisma/migrations/` ships a `down.sql`, generated
   **before** `migrate dev`; procedure in `packages/db/README.md` and
   [domain-model.md](domain-model.md#persistence-and-migrations). Never edit
-  `packages/db/generated/` (git-ignored).
-- The layout decision is recorded in
+  `packages/db/src/generated/` (git-ignored, produced by `pnpm --filter @koklo/db generate`).
+- `apps/api` is run with `cp apps/api/.env.example apps/api/.env` then `pnpm --filter @koklo/api dev`; its integration tests start a throwaway Postgres through Docker (or use `TEST_DATABASE_URL`).
+- Decisions: [ADR 0002](adr/0002-project-port-in-api.md); the layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.
 

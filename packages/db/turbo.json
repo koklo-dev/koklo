@@ -1,1 +1,13 @@
-{ "extends": ["//"], "tags": ["db"] }
+{
+  "extends": ["//"],
+  "tags": ["db"],
+  "tasks": {
+    "generate": {
+      "inputs": ["prisma/schema.prisma", "prisma.config.ts"],
+      "outputs": ["src/generated/**"]
+    },
+    "typecheck": { "dependsOn": ["generate", "^build"] },
+    "test": { "dependsOn": ["generate", "^build"], "outputs": ["coverage/**"] },
+    "build": { "dependsOn": ["generate", "^build"], "outputs": ["dist/**"] }
+  }
+}

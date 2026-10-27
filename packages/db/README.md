@@ -14,7 +14,7 @@ cp packages/db/.env.example packages/db/.env       # ajuster le port si besoin
 pnpm db:migrate                                    # prisma migrate deploy
 pnpm db:rollback                                   # annule la dernière migration
 pnpm db:seed                                       # jeu de démo déterministe (idempotent)
-pnpm --filter @koklo/db generate                   # client dans packages/db/generated (ignoré par git)
+pnpm --filter @koklo/db generate                   # client dans packages/db/src/generated (ignoré par git)
 ```
 
 `DATABASE_URL` est lu dans l'environnement ou dans `packages/db/.env`.

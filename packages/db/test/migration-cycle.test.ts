@@ -8,8 +8,8 @@ import {
   runPrisma,
   runPrismaOrThrow,
   schemaPath,
-} from "./helpers/prisma-cli.ts";
-import { createTestDatabase, type TestDatabase } from "./helpers/test-database.ts";
+} from "../src/testing/prisma-cli.ts";
+import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 
 async function appTables(db: TestDatabase): Promise<string[]> {
   const rows = await db.query<{ table_name: string }>(
