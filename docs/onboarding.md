@@ -3,9 +3,10 @@ title: Onboarding — humans and AI agents
 audience: technical
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-26
+last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
+covers_commit: 5d36e27
 ---
 # Onboarding — humans and AI agents
 
@@ -53,6 +54,12 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   line limit; the root Biome config ignores that folder. Do not "fix" the 51-line one.
 - TypeScript is `strict` with `noUncheckedIndexedAccess`; extend
   `@koklo/config/tsconfig.base.json`.
+- Every new package declares its boundary tag in its own `turbo.json`
+  (`{ "extends": ["//"], "tags": ["<name>"] }`, name from vision §16.2) and imports
+  other packages only through their declared `exports`, never `pkg/src/...`. An
+  untagged package escapes the rules. `pnpm lint` enforces both; details in
+  [architecture.md](architecture.md#package-boundaries-tk-3) and
+  `packages/config/README.md`.
 - The layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.
