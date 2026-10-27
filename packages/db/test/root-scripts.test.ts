@@ -8,7 +8,7 @@ const rootPackage = JSON.parse(
 ) as { scripts?: Record<string, string> };
 
 describe("scripts racine (T4.1)", () => {
-  it.each(["db:migrate", "db:rollback"])("%s existe et délègue à @koklo/db", (name) => {
+  it.each(["db:migrate", "db:rollback", "db:seed"])("%s existe et délègue à @koklo/db", (name) => {
     const script = rootPackage.scripts?.[name];
 
     expect(script, `script racine ${name}`).toBeTruthy();

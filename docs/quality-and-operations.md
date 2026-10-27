@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 5f350ca
+covers_commit: 37ccf40
 ---
 # Quality and operations
 
@@ -171,6 +171,12 @@ Local database (TK-7): `docker-compose.yml` runs `postgres:17-alpine` on
 `.env.example`); `SHADOW_DATABASE_URL` is only needed for `migrate dev` and
 `migrate diff --to-migrations`. Other environments, secrets handling and deployment
 topology: TO DOCUMENT.
+
+Demo seed: `pnpm db:seed` (delegates to `@koklo/db` `seed`, `node scripts/seed.ts`)
+upserts fixed-id demo rows in a single transaction and rolls back on error. It is
+idempotent, but it overwrites any edit made to those rows (name, slug, email, role,
+dates). Test: `packages/db/test/seed.test.ts`; `root-scripts.test.ts` checks the root
+`db:seed` script. Demo emails use the reserved `.test` domain.
 
 Database rollback path: `pnpm db:rollback` undoes the latest migration (its `down.sql`,
 then removal of its `_prisma_migrations` row). It is not transactional, so take a backup

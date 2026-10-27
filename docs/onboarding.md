@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 5f350ca
+covers_commit: 37ccf40
 ---
 # Onboarding — humans and AI agents
 
@@ -41,6 +41,7 @@ pnpm dev         # turbo run dev
 pnpm e2e         # turbo run e2e (no workspace defines this task yet)
 pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
 pnpm db:rollback # undo the latest migration through its down.sql
+pnpm db:seed     # deterministic demo data (needs DATABASE_URL), safe to re-run
 ```
 
 Local database (TK-7): `docker compose up -d postgres` at the root (set `KOKLO_DB_PORT`

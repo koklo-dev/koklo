@@ -12,7 +12,8 @@
     "dev": "turbo run dev",
     "e2e": "turbo run e2e",
     "db:migrate": "pnpm --filter @koklo/db migrate",
-    "db:rollback": "pnpm --filter @koklo/db rollback"
+    "db:rollback": "pnpm --filter @koklo/db rollback",
+    "db:seed": "pnpm --filter @koklo/db seed"
   },
   "devDependencies": {
     "turbo": "2.11.10"
