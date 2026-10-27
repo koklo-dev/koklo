@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 9830e2e
+covers_commit: f442681
 ---
 # Onboarding — humans and AI agents
 
@@ -66,6 +66,12 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   `--destructive`, `--destructive-foreground`) live only in
   `packages/ui/src/styles/tentative.css`. Fonts are self-hosted through Fontsource: never
   add a Google Fonts link. See [architecture.md](architecture.md#ui-foundations-tk-13).
+- UI components and icons (TK-84): import from `@koklo/ui` only, never from a sub-path, and
+  never from `lucide-react` (Biome and a test reject it). Use `<Icon name="…" />`; to add an
+  icon, add its name to `ICON_NAMES` in `packages/ui/scripts/generate-icons.ts`, run
+  `pnpm --filter @koklo/ui icons:generate` and commit the generated files. An icon-only button
+  is an `IconButton` with a mandatory `aria-label`; a status is a `StatusBadge` with a label.
+  See [architecture.md](architecture.md#ui-components-and-icons-tk-84).
 - Quality limits are defined once, in `packages/config/biome.json`: functions of at
   most 50 lines, cognitive complexity at most 15, no explicit `any`. Do not override
   them per package; split the code instead.

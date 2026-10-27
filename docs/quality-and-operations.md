@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 9830e2e
+covers_commit: f442681
 ---
 # Quality and operations
 
@@ -71,6 +71,15 @@ covers_commit: 9830e2e
   weights; `status-typography.test.ts` covers the status variables and the type scale;
   `cn.test.ts` covers `cn`. Changing a "to confirm" value in `tentative.css` is validated by
   these same tests.
+- **UI components tests** (`packages/ui/test/`, TK-84, jsdom, same command): `icon.test.tsx`
+  (`Icon` sizes, filled/outline, decorative vs named), `icon-button.test.tsx` and
+  `helpers/a11y.ts` (an icon button without an accessible name fails the test),
+  `status-badge.test.tsx` (an icon for each of the three statuses), `shapes.test.tsx` (radii,
+  heights, borders of DESIGN.md §5), `components-behavior.test.tsx` (interaction of the Radix
+  components), `entrypoint.test.ts` (everything is exported from the entry point, no sub-path),
+  `no-lucide.test.ts` (no `lucide*` import in the workspace). The Biome rule
+  `noRestrictedImports` enforces the same ban in `pnpm lint`; `**/generated` and
+  `**/test-results` are excluded from Biome.
 - **Worker tests** (`apps/worker`, TK-12): `src/config.test.ts` covers `loadConfig`.
   `test/noop.integration.test.ts` starts a real `postgres:17-alpine` with
   `@testcontainers/postgresql`, calls `startWorker`, publishes a `noop` job with
@@ -98,7 +107,7 @@ covers_commit: 9830e2e
   justification and an expiry date; remove it once the file is split.
 - `pnpm typecheck`: `tsc --noEmit` against `tsconfig.base.json` (TypeScript 7.0.2).
 - `pnpm build`: `packages/config` has nothing to build (`echo 'nothing to build'`);
-  `packages/ui` compiles `cn` to `dist/` with `tsc -p tsconfig.build.json`.
+  `packages/ui` compiles its entry point (components, `Icon`, `cn`) to `dist/` with `tsc -p tsconfig.build.json`.
 - Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,
   Biome 2.6.3, Vitest 5.0.5, TypeScript 7.0.2.
 

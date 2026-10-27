@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 9830e2e
+covers_commit: f442681
 ---
 # Architecture
 
@@ -290,8 +290,9 @@ configured CSS-first (no `tailwind.config`), and `components.json` points shadcn
 | `fonts.css` | Self-hosted Fontsource fonts: Instrument Sans 400-700, JetBrains Mono 400-500 |
 | `index.css` | Entry point (`@import "@koklo/ui/styles.css"`): Tailwind, the files above, `@theme inline` mapping to shadcn names and `bg-status-*` utilities |
 
-`src/lib/cn.ts` (clsx + tailwind-merge) is the only code exported (`@koklo/ui`, built to
-`dist/`); the CSS files are exported raw (`./styles.css`, `./theme.css`, ...).
+`@koklo/ui` is built to `dist/` (`exports["."]`, entry point `src/index.ts`); the CSS files are
+exported raw (`./styles.css`, `./theme.css`, ...). Components, icons and `cn` are described in
+[UI components and icons (TK-84)](#ui-components-and-icons-tk-84).
 
 ```mermaid
 flowchart LR
@@ -305,6 +306,40 @@ flowchart LR
 ```
 
 Decision: [ADR 0004](adr/0004-ui-foundations-tokens-and-fonts.md).
+
+### UI components and icons (TK-84)
+`@koklo/ui` now also exports the shadcn/ui components of `DESIGN.md` §5 and the `Icon`
+component, **only** through its entry point `src/index.ts` (no sub-path export; checked by
+`test/entrypoint.test.ts`).
+
+| Area | Content |
+|------|---------|
+| `src/components/` | `Table`, `Badge`, `Tabs`, `Button`, `Sheet`, `Card`, `Accordion`, `Alert`, `Select`, `Popover`, `Resizable`, `Avatar`, `DropdownMenu` (shadcn/ui on the unified `radix-ui` package, `class-variance-authority`, `react-resizable-panels` v4), plus `IconButton` and `StatusBadge` |
+| `src/icons/icon.tsx` | `Icon`: inline `<svg>` (viewBox `0 -960 960 960`, `currentColor`); sizes 16/18/20/22/28 (default 20); `fill` selects the filled glyph (active state, statuses); decorative (`aria-hidden`) unless `title`, `aria-label` or `aria-labelledby` is given |
+| `src/icons/cache.ts` | `loadIcon` imports an icon module once on demand; `readIcon`/`primeIcon` read or pre-seed the cache; a name outside the registry renders an empty icon instead of throwing |
+| `src/icons/generated/` | One module per icon (`outline`, `filled` paths) and `registry.ts` (closed, typed `IconName` registry), generated from `@material-symbols/svg-400` (dev dependency) by `scripts/generate-icons.ts` |
+| `src/styles/index.css` | Two `@keyframes` (`overlay-in`, `content-in`, exposed as `animate-overlay-in` / `animate-content-in`) |
+
+- `IconButton` requires `aria-label` (type level) and renders a single decorative 20 px icon.
+- `StatusBadge` takes `status` (`validated` | `pending` | `revise`) and a mandatory `label`; it
+  always renders a filled icon (`check_circle`, `schedule`, `edit_note`), primed statically so it
+  renders without waiting.
+- Lucide is forbidden: Biome `noRestrictedImports` (root `biome.json`, patterns `lucide`,
+  `lucide-*`, `lucide/*`) and `test/no-lucide.test.ts`.
+
+```mermaid
+flowchart LR
+  app[apps/web] --> idx["@koklo/ui (src/index.ts)"]
+  idx --> comp[components/*]
+  idx --> icon[icons/icon.tsx]
+  comp --> radix[radix-ui, cva, react-resizable-panels]
+  comp --> icon
+  icon --> cache[icons/cache.ts]
+  cache -. "dynamic import on demand" .-> gen["icons/generated/<name>.ts"]
+  gen -. "icons:generate" .-> svg[(@material-symbols/svg-400)]
+```
+
+Decision: [ADR 0005](adr/0005-ui-components-icons-radix.md).
 
 ### Worker: pg-boss and `noop` job (TK-12)
 `apps/worker` (`@koklo/worker`, tag `worker`, private) is a **separate Node process**
@@ -396,4 +431,4 @@ which protects the vision file from agent edits.
 Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones are in `adr/`:
 [0001](adr/0001-monorepo-pnpm-turborepo.md), [0002](adr/0002-project-port-in-api.md),
 [0003](adr/0003-better-auth-session-guard.md),
-[0004](adr/0004-ui-foundations-tokens-and-fonts.md).
+[0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md).
