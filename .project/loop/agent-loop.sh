@@ -861,7 +861,12 @@ sync_pr_body() {  # sync_pr_body <issue> <pr> <worktree> <pr body> — refresh a
     [ -n "$pr" ] && [ -n "$body" ] || return 0
     f="$(mktemp)"
     render_pr_body "$n" "$wt" "$body" >"$f"
-    gh pr edit "$pr" --body-file "$f" >/dev/null 2>&1 \
+    # REST first: `gh pr edit` reads the PR through GraphQL, which fails outright
+    # ("Projects (classic) is being deprecated") on repositories gh still sees a
+    # classic project for — the body then never refreshed and the reviewer judged a
+    # stale one on every round. `gh pr edit` stays as the fallback for other setups.
+    gh api -X PATCH "repos/{owner}/{repo}/pulls/$pr" -F "body=@$f" >/dev/null 2>&1 \
+        || gh pr edit "$pr" --body-file "$f" >/dev/null 2>&1 \
         || log "issue #$n — mise à jour du corps de la PR #$pr échouée (non fatal)"
     rm -f "$f"
 }
