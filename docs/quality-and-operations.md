@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: e084ff1
+covers_commit: 476c046
 ---
 # Quality and operations
 
@@ -52,7 +52,14 @@ covers_commit: e084ff1
   isolation, deterministic order, empty organization, 401 by default, `INTERNAL` on
   database failure. `health.test.ts` (C2.x) covers 200 / `INTERNAL` 500, the 2 s probe
   timeout and `x-request-id`. `openapi.test.ts` (C3.1) and `config.test.ts` (C3.3)
-  cover `/openapi.json` and `.env.example` consistency.
+  cover `/openapi.json` and `.env.example` consistency. TK-11 adds `auth-session.test.ts`
+  (no, forged or expired cookie gives 401; a valid member gets the active organization's
+  projects; a client-supplied organization is ignored; no active organization or non-member
+  gives 401; `x-test-session` is accepted only with `APP_ENV=test`, malformed gives 401 not
+  500; `/health` and `/openapi.json` stay public; OpenAPI declares 401) and
+  `auth-oauth.test.ts` (`/api/auth/*` mounted and returns the GitHub authorization URL;
+  callback with a simulated GitHub creates user, account and session; unknown `state`
+  creates none).
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 
@@ -178,6 +185,12 @@ Local database (TK-7): `docker-compose.yml` runs `postgres:17-alpine` on
 `.env.example`); `SHADOW_DATABASE_URL` is only needed for `migrate dev` and
 `migrate diff --to-migrations`. Other environments, secrets handling and deployment
 topology: TO DOCUMENT.
+
+API secrets (TK-11): `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
+are set in each deployment's environment, never in `.env.example` or the repository. The
+GitHub OAuth App is one per environment, callback `<BETTER_AUTH_URL>/api/auth/callback/github`.
+The test session (`x-test-session`) exists only when `APP_ENV=test`: never run a deployed
+environment with that value. Secret storage and rotation: TO DOCUMENT.
 
 Demo seed: `pnpm db:seed` (delegates to `@koklo/db` `seed`, `node scripts/seed.ts`)
 upserts fixed-id demo rows in a single transaction and rolls back on error. It is
