@@ -136,7 +136,7 @@ flowchart LR
   lint["pnpm lint (root)"] --> turbo{{"turbo run lint"}}
   turbo --> pkg["@koklo/config lint"]
   pkg --> biome["biome ci"]
-  biome -->|"&&"| size["pnpm check:size"]
+  lint -->|"&&, outside the turbo cache"| size["pnpm check:size"]
   size --> cs["src/check-size.ts"]
   cs --> w["src/waivers.ts"]
   w --> y[(".koklo/waivers.yaml")]
@@ -153,9 +153,11 @@ expiry date and the author; otherwise the reason is `too-long`. A missing
 fail with an explicit message.
 
 Wiring: root `package.json` adds `check:size` (`pnpm --filter @koklo/config check:size`);
-`packages/config/package.json` runs `biome ci --config-path=../.. . && pnpm check:size`
-as its `lint`, so the root `pnpm lint` (Turborepo) includes the gate. The check scans
-the whole repository, not only the package.
+the root `lint` is `turbo run lint && pnpm check:size`. `packages/config` `lint` stays
+`biome ci --config-path=../.. .`: `check:size` must not live inside the cached turbo
+task, because it reads the whole repository and today's date (waiver expiry), which are
+not turbo inputs — a cache hit would replay a stale verdict. The check scans the whole
+repository, not only the package.
 
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
