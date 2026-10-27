@@ -1,0 +1,35 @@
+/* Typographie - DESIGN.md §3. */
+:root {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --text-page-title-font: var(--font-sans);
+  --text-page-title-size: 30px;
+  --text-page-title-weight: 600;
+  --text-page-title-tracking: -0.025em;
+
+  --text-section-title-font: var(--font-sans);
+  --text-section-title-size: 24px;
+  --text-section-title-weight: 600;
+  --text-section-title-tracking: -0.015em;
+
+  --text-body-font: var(--font-sans);
+  --text-body-size: 14px;
+  --text-body-weight: 400;
+  --text-body-tracking: normal;
+
+  --text-secondary-font: var(--font-sans);
+  --text-secondary-size: 13px;
+  --text-secondary-weight: 400;
+  --text-secondary-tracking: normal;
+
+  --text-caption-font: var(--font-sans);
+  --text-caption-size: 12px;
+  --text-caption-weight: 500;
+  --text-caption-tracking: normal;
+
+  --text-code-font: var(--font-mono);
+  --text-code-size: 12px;
+  --text-code-weight: 400;
+  --text-code-tracking: normal;
+}

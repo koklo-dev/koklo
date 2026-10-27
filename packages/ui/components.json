@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/index.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@koklo/ui/components",
+    "utils": "@koklo/ui/lib/cn",
+    "ui": "@koklo/ui/components/ui",
+    "lib": "@koklo/ui/lib",
+    "hooks": "@koklo/ui/hooks"
+  }
+}
