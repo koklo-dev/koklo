@@ -1,0 +1,33 @@
+{
+  "name": "@koklo/contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "lint": "biome ci --config-path=../.. .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "build": "tsc -p tsconfig.build.json",
+    "openapi:generate": "node scripts/generate-openapi.ts"
+  },
+  "dependencies": {
+    "@koklo/config": "workspace:*",
+    "@orpc/contract": "2.0.0-beta.46",
+    "@orpc/openapi": "2.0.0-beta.46",
+    "@orpc/zod": "2.0.0-beta.46",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

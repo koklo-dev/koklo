@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 35d2b8b
+covers_commit: c3841a8
 ---
 # Architecture
 
@@ -158,6 +158,27 @@ the root `lint` ends with `&& pnpm check:size` (after `turbo run lint`, `turbo b
 task, because it reads the whole repository and today's date (waiver expiry), which are
 not turbo inputs — a cache hit would replay a stale verdict. The check scans the whole
 repository, not only the package.
+
+### API contract package (TK-9)
+`packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2
+contract that other packages consume (see the `contract` edges in the boundaries
+diagram). It exports only through `exports["."]` (`dist/index.js`, built by
+`tsc -p tsconfig.build.json`); its dependencies are `@koklo/config`, `@orpc/contract`,
+`@orpc/openapi`, `@orpc/zod` (all oRPC at `2.0.0-beta.46`) and `zod` 4.6.7.
+Operations, errors and the version guard: [api-contract.md](api-contract.md).
+
+```mermaid
+flowchart LR
+  schemas["src/schemas.ts (Zod)"] --> contract["src/contract.ts"]
+  errors["src/errors.ts (typed errors)"] --> contract
+  contract --> openapi["src/openapi.ts generateOpenApi()"]
+  version["src/version.ts CONTRACT_VERSION"] --> openapi
+  openapi --> script["scripts/generate-openapi.ts"]
+  script --> files[("openapi/openapi.json + versions.json")]
+  files -.-> test{{"test/contract.test.ts"}}
+  openapi -.-> test
+  contract --> index["src/index.ts (public exports)"]
+```
 
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
