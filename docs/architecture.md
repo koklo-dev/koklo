@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 37e0fd3
+covers_commit: 5f350ca
 ---
 # Architecture
 
@@ -186,7 +186,7 @@ flowchart LR
 configured by `prisma.config.ts` (schema, migrations path, `DATABASE_URL`, optional
 `SHADOW_DATABASE_URL`; `.env` is loaded with `process.loadEnvFile()`). The generated
 client goes to `packages/db/generated/` (git-ignored, excluded from Biome). Dependencies:
-`@koklo/config`, `pg`; dev: `prisma` 7.10.1. `pnpm-workspace.yaml` allows the build
+`@koklo/config`, `@prisma/client` 7.10.1 (runtime), `pg`; dev: `prisma` 7.10.1. `pnpm-workspace.yaml` allows the build
 scripts of `prisma` and `@prisma/engines` (`allowBuilds`). Entities:
 [domain-model.md](domain-model.md).
 
