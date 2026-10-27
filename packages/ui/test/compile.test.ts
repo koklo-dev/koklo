@@ -1,23 +1,5 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { compile } from "tailwindcss";
 import { beforeAll, describe, expect, it } from "vitest";
-import { stylesDir } from "./helpers/paths.ts";
-
-const require = createRequire(import.meta.url);
-const ENTRY = join(stylesDir, "index.css");
-
-/** Résout un @import comme le ferait un bundler : relatif, sinon paquet npm. */
-async function loadStylesheet(id: string, base: string) {
-  const path =
-    id === "tailwindcss"
-      ? require.resolve("tailwindcss/index.css")
-      : id.startsWith(".")
-        ? join(base, id)
-        : require.resolve(id);
-  return { path, base: dirname(path), content: readFileSync(path, "utf8") };
-}
+import { compileIndexCss } from "./helpers/compile-css.ts";
 
 const CANDIDATES = [
   "bg-primary",
@@ -36,11 +18,7 @@ describe("CA3 - index.css compilé par Tailwind", () => {
   let output = "";
 
   beforeAll(async () => {
-    const compiler = await compile(readFileSync(ENTRY, "utf8"), {
-      base: stylesDir,
-      loadStylesheet,
-    });
-    output = compiler.build(CANDIDATES);
+    output = await compileIndexCss(CANDIDATES);
   });
 
   it("compile et produit les @font-face locaux des deux familles", () => {
