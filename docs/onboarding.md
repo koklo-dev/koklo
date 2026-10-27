@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 5d36e27
+covers_commit: c3841a8
 ---
 # Onboarding — humans and AI agents
 
@@ -64,6 +64,12 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   untagged package escapes the rules. `pnpm lint` enforces both; details in
   [architecture.md](architecture.md#package-boundaries-tk-3) and
   `packages/config/README.md`.
+- Changing the API contract (`packages/contract`) means bumping the version in
+  `package.json` **and** `src/version.ts`, then running
+  `pnpm --filter @koklo/contract openapi:generate` and committing
+  `openapi/openapi.json` and `openapi/versions.json`; otherwise the contract test fails
+  (see [api-contract.md](api-contract.md#compatibility-and-breaking-changes)). Never edit
+  those two files by hand. oRPC is pinned to a v2 beta on purpose.
 - The layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.

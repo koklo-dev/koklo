@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 35d2b8b
+covers_commit: c3841a8
 ---
 # Quality and operations
 
@@ -29,6 +29,15 @@ covers_commit: 35d2b8b
 - **Size gate under test** (`packages/config/test/check-size.test.ts`): covers the
   acceptance criteria of TK-2 (301-line source file fails, waiver handling, migrations
   and generated files not counted). Test names and fixtures: see the file.
+- **Contract tests** (`packages/contract/test/contract.test.ts`, TK-9): CT-2/CT-3 check
+  the `health` and `project.list` schemas by validating accepted and rejected values;
+  CT-4 checks explicit, unique method + path pairs (`GET /health`, `GET /projects`);
+  CT-5 checks the typed errors and the 401/403/500 responses in the OpenAPI; CT-6 checks
+  generation and determinism; CT-7/CT-8 are the guard "the OpenAPI does not change
+  without a version change" (generated document = `openapi/openapi.json`,
+  `info.version` = `package.json` version, sha256 = entry in `openapi/versions.json`);
+  CT-9 checks the public exports and inferred types. Details:
+  [api-contract.md](api-contract.md#compatibility-and-breaking-changes).
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 
