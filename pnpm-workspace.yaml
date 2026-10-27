@@ -8,6 +8,8 @@ allowBuilds:
   prisma: true
   # Dependances transitives de testcontainers : addons natifs facultatifs, refuses volontairement
   # (pas d'execution de scripts tiers) ; testcontainers fonctionne sans, ne pas passer a true.
+  # esbuild : le binaire vient du paquet optionnel de la plateforme, le postinstall n'est qu'une optimisation.
+  esbuild: false
   cpu-features: false
   protobufjs: false
   ssh2: false
