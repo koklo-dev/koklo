@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 540932a
+covers_commit: 73792d1
 ---
 # Onboarding — humans and AI agents
 
@@ -38,7 +38,7 @@ pnpm typecheck   # turbo run typecheck
 pnpm test        # turbo run test  (vitest run --coverage)
 pnpm build       # turbo run build
 pnpm dev         # turbo run dev
-pnpm e2e         # turbo run e2e (packages/ui and apps/web: Playwright, needs Chromium)
+pnpm e2e         # turbo run e2e (only packages/ui defines it: Playwright, needs Chromium)
 pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
 pnpm db:rollback # undo the latest migration through its down.sql
 pnpm db:seed     # deterministic demo data (needs DATABASE_URL), safe to re-run
@@ -100,17 +100,7 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   [domain-model.md](domain-model.md#persistence-and-migrations). Never edit
   `packages/db/src/generated/` (git-ignored, produced by `pnpm --filter @koklo/db generate`).
 - `apps/api` is run with `cp apps/api/.env.example apps/api/.env` then `pnpm --filter @koklo/api dev`. Since TK-11 it refuses to start without `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`), `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: create a GitHub OAuth App per environment with the callback `<BETTER_AUTH_URL>/api/auth/callback/github`, and never commit the secrets. With `APP_ENV=test`, the header `x-test-session: <userId>:<organizationId>` replaces the cookie (see [api-contract.md](api-contract.md#authentication-and-authorization)). Its integration tests start a throwaway Postgres through Docker (or use `TEST_DATABASE_URL`).
-- `apps/web` (TK-14): Next.js reads its configuration at run time, never at build time. Start it with
-  `API_URL=http://localhost:<api-port> APP_ENV=development APP_VERSION=0.0.0-dev pnpm --filter @koklo/web dev`
-  (all three are required; a missing one stops the proxy with `Configuration d'exécution invalide`).
-  Never add a `NEXT_PUBLIC_*` variable (a test rejects it). The browser only calls its own origin:
-  `/api/auth/*` and `/api/orpc/*` are relayed to `API_URL` by `src/proxy.ts`. Read
-  `apps/web/AGENTS.md` and `node_modules/next/dist/docs/` before touching Next.js APIs. Sign-in
-  needs the API's GitHub OAuth App (see above). `pnpm --filter @koklo/web e2e` needs no database: it
-  starts a stub API (`e2e/support/stub-api.ts`) and `next dev` on ports 3100/3101, and rewrites the
-  screenshots in `design/screens/captures/`. See [architecture.md](architecture.md#web-application-tk-14)
-  and [ADR 0006](adr/0006-web-same-origin-proxy-runtime-config.md). A screen change updates its sheet in `design/screens/`.
-- Decisions: [ADR 0002](adr/0002-project-port-in-api.md), [ADR 0003](adr/0003-better-auth-session-guard.md), [ADR 0006](adr/0006-web-same-origin-proxy-runtime-config.md); the layout decision is recorded in
+- Decisions: [ADR 0002](adr/0002-project-port-in-api.md), [ADR 0003](adr/0003-better-auth-session-guard.md); the layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.
 

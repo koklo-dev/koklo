@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 export type ProjectsState = "loading" | "empty" | "data" | "error";
 export type Theme = "light" | "dark";
@@ -22,5 +22,24 @@ export async function releaseHeld(): Promise<void> {
 
 /** Le thème par défaut est clair ; le sombre s'obtient par la bascule, comme pour une vraie personne. */
 export async function switchToDark(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Passer au thème sombre" }).first().click();
+  // Avant l'hydratation le clic est sans effet : on le rejoue jusqu'à ce que la classe `dark` soit posée.
+  await expect(async () => {
+    await page
+      .getByRole("button", { name: "Passer au thème sombre" })
+      .first()
+      .click({ timeout: 2_000 });
+    await expect(page.locator("html")).toHaveClass(/dark/, { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
+}
+
+/** Attend la fin des transitions CSS (bascule de thème) pour que la capture montre l'état final. */
+export async function settle(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
+        .map((a) => a.finished),
+    ),
+  );
 }

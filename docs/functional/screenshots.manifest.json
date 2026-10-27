@@ -22,32 +22,6 @@
       "clip_selector": null,
       "full_page": false,
       "enabled": false
-    },
-    {
-      "id": "login",
-      "title": "Sign-in page",
-      "path": "/login",
-      "wait_for": null,
-      "steps": [],
-      "highlight": [],
-      "annotations": [],
-      "mask": [],
-      "clip_selector": null,
-      "full_page": false,
-      "enabled": false
-    },
-    {
-      "id": "projects",
-      "title": "Projects page",
-      "path": "/projects",
-      "wait_for": null,
-      "steps": [],
-      "highlight": [],
-      "annotations": [],
-      "mask": [],
-      "clip_selector": null,
-      "full_page": false,
-      "enabled": false
     }
   ]
 }

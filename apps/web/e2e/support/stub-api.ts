@@ -31,9 +31,11 @@ function projectsResponse(): ReturnType<typeof json> {
     case "empty":
       return json(200, []);
     case "internal":
-      return json(500, { code: "INTERNAL", status: 500, message: "Internal error" });
+      return json(500, { defined: false, code: "INTERNAL", message: "Internal error" });
     case "unauthorized":
-      return json(401, { code: "UNAUTHORIZED", status: 401, message: "Unauthorized" });
+      // Session expirée : l'API la refuse ensuite aussi à /login (sinon le garde renverrait vers /projects).
+      scenario.session = false;
+      return json(401, { defined: false, code: "UNAUTHORIZED", message: "Unauthorized" });
     default:
       return json(200, PROJECTS);
   }

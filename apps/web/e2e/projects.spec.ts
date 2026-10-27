@@ -4,6 +4,7 @@ import {
   type ProjectsState,
   releaseHeld,
   setScenario,
+  settle,
   switchToDark,
   type Theme,
 } from "./support/helpers.ts";
@@ -28,6 +29,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
       await expect(page.getByTestId(testId)).toBeVisible();
       await expect(page.getByRole("heading", { level: 1, name: "Projets" })).toBeVisible();
       await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^((?!dark).)*$/);
+      await settle(page);
       await page.screenshot({
         path: `${CAPTURES_DIR}/S-projects/${state}-${theme}.png`,
         fullPage: true,

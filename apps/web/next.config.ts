@@ -8,6 +8,8 @@ const config: NextConfig = {
   poweredByHeader: false,
   // Dev uniquement : les e2e ouvrent http://127.0.0.1 ; sans cela le HMR (donc l'hydratation) est bloqué.
   allowedDevOrigins: ["127.0.0.1"],
+  // Dev uniquement : la pastille Next recouvre la bascule de thème (bas de la barre latérale) et intercepte les clics.
+  devIndicators: false,
 };
 
 export default config;
