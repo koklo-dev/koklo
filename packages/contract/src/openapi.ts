@@ -15,8 +15,8 @@ const sortKeys = (value: unknown): unknown => {
   return value;
 };
 
-/** Le générateur lit les statuts d'erreur dans une table à part : on la dérive du contrat. */
-const errorStatusMap = Object.fromEntries(
+/** Statut HTTP de chaque code d'erreur du contrat : le générateur OpenAPI et le serveur le lisent ici. */
+export const errorStatusMap: Record<string, number> = Object.fromEntries(
   [contract.health, contract.project.list].flatMap((procedure) =>
     Object.entries(procedure["~orpc"].errorMap).map(([code, item]) => [code, item.status]),
   ),

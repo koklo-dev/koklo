@@ -6,20 +6,20 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: e084ff1
 ---
 # API contract
 
 The contract lives in `packages/contract` (`@koklo/contract`, tag `contract`). It is
 written with oRPC v2 (`@orpc/contract`) and Zod; the OpenAPI document is generated from
-it. No server implements it yet: this section describes the contract only.
+it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-project-port-in-api.md).
 
 ## Exposed resources and operations
 
 | Operation | Method | Path | Auth | Notes |
 |-----------|--------|------|------|-------|
-| `health` | GET | `/health` | none declared | Liveness and contract version |
-| `project.list` | GET | `/projects` | session (declares `UNAUTHORIZED`, `FORBIDDEN`) | Lists projects |
+| `health` | GET | `/health` | none (public) | Database reachability and deployed version (`APP_VERSION`, `dev` by default) |
+| `project.list` | GET | `/projects` | session (declares `UNAUTHORIZED`, `FORBIDDEN`) | Lists the projects of the caller's organization |
 
 Method and path are explicit on every route, via `.meta(openapi({ method, path }))`
 (oRPC v2 syntax; `src/contract.ts`). The router shape is
@@ -32,7 +32,7 @@ Schemas are in `packages/contract/src/schemas.ts`:
 | Operation | Input | Output |
 |-----------|-------|--------|
 | `health` | `{}` (empty object) | `{ status: "ok", version: string }` |
-| `project.list` | none | array of `{ id: uuid, key: string, name: string }` |
+| `project.list` | none | array of `{ id: uuid, name: string }` (no project key: the CDC defines none) |
 
 TypeScript types are exported from the package index: `HealthInput`, `HealthOutput`,
 `ProjectListOutput`. Pagination and filtering: none defined (ASSUMPTION: to be added by
@@ -51,7 +51,9 @@ In the generated OpenAPI, the `INTERNAL` payload is the component schema `Intern
 
 ## Authentication and authorization
 The contract only declares the `UNAUTHORIZED` and `FORBIDDEN` errors on `project.list`.
-Where the check is enforced: TO DOCUMENT (no API implementation exists yet).
+`apps/api` enforces access server-side through the `OrganizationContext` port: its default implementation is closed and raises `UNAUTHORIZED` (401), so `GET /projects` answers 401 until the session (Better Auth, TK-11) provides the organization. `FORBIDDEN` is declared but not yet emitted. The repository port has no "list everything" method: every read is filtered by `organizationId`. The Prisma tenant-filter extension of CDC §18.4 does not exist yet.
+
+`GET /health` and `GET /openapi.json` are public. When the database does not answer within 2 s, `/health` returns `INTERNAL` (500) with `requestId` (`x-request-id` if given, otherwise a UUID); no connection detail is exposed.
 
 ## OpenAPI generation
 `generateOpenApi()` (`src/openapi.ts`) is pure (no I/O) and returns an OpenAPI 3.1.0
@@ -68,10 +70,10 @@ Error statuses are derived from the contract's own error maps, not written twice
 ```mermaid
 sequenceDiagram
   actor C as Client
-  participant A as API (not implemented yet)
+  participant A as API (apps/api)
   C->>A: GET /projects
   alt ok
-    A-->>C: 200 [{ id, key, name }]
+    A-->>C: 200 [{ id, name }]
   else no session
     A-->>C: 401 UNAUTHORIZED
   else forbidden

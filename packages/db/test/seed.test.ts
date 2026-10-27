@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SEED_IDS, seed } from "../src/seed.ts";
-import { runPrismaOrThrow } from "./helpers/prisma-cli.ts";
-import { createTestDatabase, type TestDatabase } from "./helpers/test-database.ts";
+import { runPrismaOrThrow } from "../src/testing/prisma-cli.ts";
+import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 
 const TABLES = ["users", "organizations", "members", "projects"] as const;
 
