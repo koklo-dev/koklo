@@ -908,8 +908,15 @@ merge_pr() {  # merge_pr <pr> — call under .merge.lock
 # here — an issue that just shipped cannot still be listed as waiting on a human,
 # and the triage phase merges issues that WERE blocked, so this is the only path
 # that reliably retires the entry.
-finalize_merged_issue() {  # finalize_merged_issue <issue> <pr> [from-label] [rounds]
-    local n="$1" pr="$2" from="${3:-$SHIPYARD_REVIEW_LABEL}" rounds="${4:-0}"
+#
+# `verified` = "criteria" means the loop's own reviewer approved this PR, and its
+# prompt approves only when every acceptance criterion is satisfied by the diff and
+# the tests: that verdict is what lets the vault tick them. The triage merge, which
+# acts on a decision it did not review itself, leaves them alone, as do a duplicate
+# closed by triage and an issue a human closed by hand.
+# SHIPYARD_TICK_CRITERIA=0 restores the old contract (criteria stay in the operator's hands).
+finalize_merged_issue() {  # finalize_merged_issue <issue> <pr> [from-label] [rounds] [verified]
+    local n="$1" pr="$2" from="${3:-$SHIPYARD_REVIEW_LABEL}" rounds="${4:-0}" verified="${5:-}"
     ticket_finalize "$n" "$from"
     _review_state_clear "$n"
     _triage_state_clear "$n"
@@ -918,7 +925,11 @@ finalize_merged_issue() {  # finalize_merged_issue <issue> <pr> [from-label] [ro
     # one event that can change its verdict — something landing on the base — and this
     # is that event, observable without asking GitHub about the whole chain again.
     _state_set '.loop.merged_total = ((.loop.merged_total // 0) + 1)' || true
-    vault_task_status "$n" done "PR #$pr"
+    if [ "$verified" = criteria ] && [ "${SHIPYARD_TICK_CRITERIA:-1}" != 0 ]; then
+        SHIPYARD_VAULT_TICK_CRITERIA=1 vault_task_status "$n" done "PR #$pr"
+    else
+        vault_task_status "$n" done "PR #$pr"
+    fi
     log "issue $(ticket_ref "$n") merged via PR #$pr ✅"
     [ -n "${RUN_LEDGER:-}" ] && printf 'merged\t%s\t%s\t%s\n' "$n" "$pr" "$rounds" >>"$RUN_LEDGER" 2>/dev/null || true
     shipyard_notify "✅ Issue $(ticket_ref "$n") mergée (PR #$pr)"
@@ -1850,7 +1861,7 @@ process_issue_review() {
                     return 1
                 }
             git worktree remove --force "$wt" 2>/dev/null || true
-            finalize_merged_issue "$n" "$pr" "$SHIPYARD_REVIEW_LABEL" "$round"
+            finalize_merged_issue "$n" "$pr" "$SHIPYARD_REVIEW_LABEL" "$round" criteria
             return 0
         fi
 
