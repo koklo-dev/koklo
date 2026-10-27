@@ -105,21 +105,22 @@ export async function checkSize(options: CheckSizeOptions): Promise<Violation[]>
   return violations;
 }
 
-async function main(): Promise<void> {
+/** Point d'entrée CLI : écrit les violations sur stderr et retourne le code de sortie. */
+export async function main(rootArg?: string): Promise<number> {
   const here = dirname(fileURLToPath(import.meta.url));
-  const root = resolve(process.argv[2] ?? join(here, "..", "..", ".."));
+  const root = resolve(rootArg ?? join(here, "..", "..", ".."));
   try {
     const violations = await checkSize({ root });
     for (const violation of violations) {
       console.error(`check:size ${violation.message}`);
     }
-    process.exitCode = violations.length > 0 ? 1 : 0;
+    return violations.length > 0 ? 1 : 0;
   } catch (error) {
     console.error(`check:size ${(error as Error).message}`);
-    process.exitCode = 1;
+    return 1;
   }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await main();
+  process.exitCode = await main(process.argv[2]);
 }

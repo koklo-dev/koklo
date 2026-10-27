@@ -9,7 +9,7 @@
     "./vitest": "./src/vitest.ts"
   },
   "scripts": {
-    "lint": "biome ci --config-path=../.. . && pnpm check:size",
+    "lint": "biome ci --config-path=../.. .",
     "check:size": "node src/check-size.ts ../..",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",

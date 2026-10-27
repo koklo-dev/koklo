@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import { checkSize } from "../src/check-size.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { checkSize, main } from "../src/check-size.ts";
 
 const script = fileURLToPath(new URL("../src/check-size.ts", import.meta.url));
 const packageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url));
+const rootPackageJsonPath = fileURLToPath(new URL("../../../package.json", import.meta.url));
 const TODAY = new Date("2026-06-15T12:00:00Z");
 
 const created: string[] = [];
@@ -326,13 +327,59 @@ describe("check-size : CLI (C1a, C1c, C2b, C2e)", () => {
   });
 });
 
+describe("check-size : main en-process", () => {
+  it("retourne 1 et journalise le fichier pour un source de 301 lignes", async () => {
+    const root = await makeRoot();
+    await put(root, "src/big.ts", lines(301));
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((msg) => void errors.push(msg));
+    try {
+      expect(await main(root)).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(errors.join("\n")).toContain("src/big.ts");
+  });
+
+  it("retourne 0 pour un dépôt conforme et 1 si waivers.yaml est invalide", async () => {
+    const root = await makeRoot();
+    await put(root, "src/ok.ts", lines(3));
+    expect(await main(root)).toBe(0);
+    await put(root, ".koklo/waivers.yaml", "waivers: [unclosed\n  - : :\n");
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(await main(root)).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("check-size : branchement lint (C1c)", () => {
-  it("le script lint appelle biome ci et check:size, et check:size est défini", async () => {
+  it("biome ci tourne dans turbo, et check:size hors cache à la racine, chaîné par &&", async () => {
+    const rootPkg = JSON.parse(await readFile(rootPackageJsonPath, "utf8")) as {
+      scripts: Record<string, string>;
+    };
     const pkg = JSON.parse(await readFile(packageJsonPath, "utf8")) as {
       scripts: Record<string, string>;
     };
     expect(pkg.scripts.lint).toContain("biome ci");
-    expect(pkg.scripts.lint).toContain("check:size");
-    expect(pkg.scripts["check:size"]).toBeTypeOf("string");
+    // check:size lit tout le dépôt et la date : il ne doit jamais passer par le cache turbo.
+    expect(pkg.scripts.lint).not.toContain("check:size");
+    expect(rootPkg.scripts.lint?.split("&&").map((part) => part.trim())).toEqual([
+      "turbo run lint",
+      "pnpm check:size",
+    ]);
+    expect(pkg.scripts["check:size"]).toBe("node src/check-size.ts ../..");
+  });
+
+  it("un fichier de 301 lignes hors de packages/config fait échouer le script, à chaque exécution", async () => {
+    const root = await makeRoot();
+    await put(root, "packages/config/src/ok.ts", lines(3));
+    expect(runCli(root).status).toBe(0);
+    await put(root, "packages/domain/src/big.ts", lines(301));
+    const result = runCli(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("packages/domain/src/big.ts");
   });
 });
