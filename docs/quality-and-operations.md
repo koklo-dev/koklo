@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: f442681
+covers_commit: 73792d1
 ---
 # Quality and operations
 
@@ -87,8 +87,16 @@ covers_commit: f442681
   (acceptance criterion of TK-12). The package's Vitest config raises `testTimeout`
   to 60 s and `hookTimeout` to 180 s (first image pull) and excludes `src/main.ts`
   from coverage. Requires Docker.
-- Other levels (e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task, no package
-  defines it yet).
+- **UI browser e2e** (`packages/ui/e2e/`, Playwright `1.64.1`, `pnpm e2e` / `pnpm --filter
+  @koklo/ui e2e`): `fonts.spec.ts` (no remote font request at load) and `components.spec.ts`
+  (TK-84). The latter bundles `e2e/fixture/main.tsx` with esbuild (code splitting, so generated
+  icons stay on-demand files), compiles `src/styles/index.css` with Tailwind, serves both from a
+  local HTTP server on a random port, then checks in Chromium: the three `StatusBadge` statuses
+  render a non-empty icon path, an `IconButton` icon loads, a `Sheet` opens as a dialog and closes
+  on Escape, a `Select` opens and picks an option, with no page error and no request outside the
+  local origin. `playwright.config.ts` reads `PLAYWRIGHT_CHANNEL` (e.g. `chrome`) to reuse an
+  installed browser; otherwise run `playwright install chromium`. Other packages define no e2e
+  yet.
 
 ### Lint, types and build (workspace)
 - `pnpm lint`: `biome ci` per package, using the shared `packages/config/biome.json`

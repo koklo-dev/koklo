@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: f442681
+covers_commit: 73792d1
 ---
 # Onboarding — humans and AI agents
 
@@ -38,7 +38,7 @@ pnpm typecheck   # turbo run typecheck
 pnpm test        # turbo run test  (vitest run --coverage)
 pnpm build       # turbo run build
 pnpm dev         # turbo run dev
-pnpm e2e         # turbo run e2e (no workspace defines this task yet)
+pnpm e2e         # turbo run e2e (only packages/ui defines it: Playwright, needs Chromium)
 pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
 pnpm db:rollback # undo the latest migration through its down.sql
 pnpm db:seed     # deterministic demo data (needs DATABASE_URL), safe to re-run
