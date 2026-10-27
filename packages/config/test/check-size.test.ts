@@ -366,10 +366,9 @@ describe("check-size : branchement lint (C1c)", () => {
     expect(pkg.scripts.lint).toContain("biome ci");
     // check:size lit tout le dépôt et la date : il ne doit jamais passer par le cache turbo.
     expect(pkg.scripts.lint).not.toContain("check:size");
-    expect(rootPkg.scripts.lint?.split("&&").map((part) => part.trim())).toEqual([
-      "turbo run lint",
-      "pnpm check:size",
-    ]);
+    const steps = rootPkg.scripts.lint?.split("&&").map((part) => part.trim()) ?? [];
+    expect(steps[0]).toBe("turbo run lint");
+    expect(steps.at(-1)).toBe("pnpm check:size");
     expect(pkg.scripts["check:size"]).toBe("node src/check-size.ts ../..");
   });
 

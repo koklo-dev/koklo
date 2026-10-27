@@ -153,7 +153,7 @@ expiry date and the author; otherwise the reason is `too-long`. A missing
 fail with an explicit message.
 
 Wiring: root `package.json` adds `check:size` (`pnpm --filter @koklo/config check:size`);
-the root `lint` is `turbo run lint && pnpm check:size`. `packages/config` `lint` stays
+the root `lint` ends with `&& pnpm check:size` (after `turbo run lint`, `turbo boundaries` and the deep-import check). `packages/config` `lint` stays
 `biome ci --config-path=../.. .`: `check:size` must not live inside the cached turbo
 task, because it reads the whole repository and today's date (waiver expiry), which are
 not turbo inputs — a cache hit would replay a stale verdict. The check scans the whole
