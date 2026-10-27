@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: f442681
+covers_commit: 540932a
 ---
 # What's new
 
@@ -21,3 +21,7 @@ commits. Link to the guide that explains each new capability.
   alerts, avatars and the Validée / À valider / À revoir status badge (always shown with an icon
   and a label, never by colour alone), with Material Symbols Rounded icons. They appear on screens
   as those are delivered; nothing to do on your side yet.
+- You can now sign in with your GitHub account and see the list of your projects, with clear loading,
+  empty and error messages and a light/dark switch (light by default, choice remembered). The layout
+  has a left sidebar on computers and a top bar on phones. Guide:
+  [Sign in with GitHub and view your projects](../guides/sign-in-and-view-projects.md). The logo is a temporary "K".

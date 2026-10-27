@@ -1,0 +1,12 @@
+@import "@koklo/ui/styles.css";
+@source "../../../../packages/ui/src";
+
+/* Pas de transition ni d'animation propre à l'application en mouvement réduit. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none;
+    transition: none;
+  }
+}

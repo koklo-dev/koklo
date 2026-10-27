@@ -15,3 +15,4 @@ packages/db/src/generated/
 .project/loop/env.local
 .project/.vault.lock
 .workflow/
+apps/web/next-env.d.ts

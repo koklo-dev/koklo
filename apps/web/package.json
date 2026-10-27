@@ -1,0 +1,48 @@
+{
+  "name": "@koklo/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "biome ci --config-path=../.. .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "build": "next build",
+    "start": "next start",
+    "dev": "next dev",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@koklo/config": "workspace:*",
+    "@koklo/contract": "workspace:*",
+    "@koklo/ui": "workspace:*",
+    "@orpc/client": "2.0.0-beta.46",
+    "@orpc/contract": "2.0.0-beta.46",
+    "@orpc/openapi": "2.0.0-beta.46",
+    "@orpc/tanstack-query": "2.0.0-beta.46",
+    "@tanstack/react-query": "5.105.0",
+    "better-auth": "1.7.14",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@biomejs/biome": "2.6.3",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitest/coverage-v8": "5.0.5",
+    "jsdom": "30.1.3",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
