@@ -22,3 +22,36 @@ L'étiquette est le nom court du paquet du §16.2 (`domain`, `db`, `contract`, `
 ### Tests
 
 `test/boundaries.test.ts` joue les règles du `turbo.json` racine sur les workspaces de `fixtures/boundaries/` : `domain` qui dépend de `db` fait échouer `turbo boundaries`, un import profond est refusé par `check-deep-imports`.
+
+## check:size (CDC §17.2)
+
+Plafonds de taille de fichier, vérifiés par `pnpm lint` (le `lint` du paquet enchaîne `biome ci` puis `check:size`) ou seuls par `pnpm check:size` à la racine.
+
+- fichier source (`.ts .tsx .js .jsx .mjs .cjs .mts .cts`) : 300 lignes max ;
+- fichier de test (`*.test.*`, `*.spec.*`, ou sous `test/ tests/ __tests__/ e2e/`) : 500 lignes max ;
+- ignorés : `node_modules`, `.git`, `.worktrees`, `.workflow`, `dist`, `.next`, `coverage`, dossiers `migrations/` et `generated/`, fichiers `*.generated.*` / `*.gen.*`, et fichiers dont les 5 premières lignes contiennent `@generated` ou `DO NOT EDIT`.
+
+La racine par défaut se déduit de l'emplacement du script ; `node src/check-size.ts <racine>` permet de la forcer. Sortie en code 1 avec une ligne par violation sur stderr.
+
+## Dérogations : `.koklo/waivers.yaml`
+
+```yaml
+waivers:
+  - file: packages/x/src/big.ts # relatif à la racine
+    rule: max-file-lines
+    justification: "..."
+    author: "prenom.nom"
+    expires: 2026-12-31 # YYYY-MM-DD, valable jusqu'à la fin du jour (UTC)
+```
+
+Les cinq champs sont obligatoires ; un fichier invalide fait échouer le contrôle. Une dérogation expirée redevient une violation (`waiver-expired`).
+
+```mermaid
+flowchart LR
+  A[fichier source ou test] --> B{au-dessus de la limite ?}
+  B -- non --> OK[ok]
+  B -- oui --> C{dérogation valide pour file + rule ?}
+  C -- oui --> OK
+  C -- expirée --> E[waiver-expired]
+  C -- aucune --> F[too-long]
+```

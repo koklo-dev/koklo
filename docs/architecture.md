@@ -113,6 +113,50 @@ flowchart LR
 - Both checks run from the root `lint` script:
   `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
 
+### File size gate `check:size` (TK-2)
+`packages/config` also owns the file-size limits (CDC §17.2), implemented in two
+modules that the package README ([packages/config/README.md](../packages/config/README.md))
+documents for users:
+
+- `src/check-size.ts`: walks the repository from a root (default: two levels above
+  the package; `node src/check-size.ts <root>` overrides it), counts lines of
+  `.ts .tsx .js .jsx .mjs .cjs .mts .cts` files and reports violations. Exported API:
+  `checkSize({ root, today? })`, `SOURCE_LIMIT` (300), `TEST_LIMIT` (500), `Violation`.
+  A file is a test when it matches `*.test.*` / `*.spec.*` or sits under `test/`,
+  `tests/`, `__tests__/` or `e2e/`.
+- `src/waivers.ts`: `loadWaivers(root)` parses `.koklo/waivers.yaml` (`yaml` 2.9.1),
+  `isExpired(waiver, today)` compares UTC calendar days.
+
+Not counted: `node_modules`, `.git`, `.worktrees`, `.workflow`, `.turbo`, `dist`,
+`.next`, `coverage`, `migrations/` and `generated/` directories, `*.generated.*` and
+`*.gen.*` files, and files with `@generated` or `DO NOT EDIT` in their first 5 lines.
+
+```mermaid
+flowchart LR
+  lint["pnpm lint (root)"] --> turbo{{"turbo run lint"}}
+  turbo --> pkg["@koklo/config lint"]
+  pkg --> biome["biome ci"]
+  biome -->|"&&"| size["pnpm check:size"]
+  size --> cs["src/check-size.ts"]
+  cs --> w["src/waivers.ts"]
+  w --> y[(".koklo/waivers.yaml")]
+  cs -->|"exit 1 + one stderr line per violation"| fail[lint fails]
+```
+
+A file over its limit is a violation unless a waiver with the same `file` (path
+relative to the root, `/` separators) and `rule: max-file-lines` has not expired.
+A waiver is valid through the end of its `expires` day (UTC). If only expired waivers
+match, the violation has reason `waiver-expired` and the message names the file, the
+expiry date and the author; otherwise the reason is `too-long`. A missing
+`waivers.yaml` means no waivers; an unreadable or incomplete one (all five fields
+`file`, `rule`, `justification`, `author`, `expires` are mandatory) makes the check
+fail with an explicit message.
+
+Wiring: root `package.json` adds `check:size` (`pnpm --filter @koklo/config check:size`);
+`packages/config/package.json` runs `biome ci --config-path=../.. . && pnpm check:size`
+as its `lint`, so the root `pnpm lint` (Turborepo) includes the gate. The check scans
+the whole repository, not only the package.
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).

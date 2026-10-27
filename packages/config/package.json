@@ -9,7 +9,8 @@
     "./vitest": "./src/vitest.ts"
   },
   "scripts": {
-    "lint": "biome ci --config-path=../.. .",
+    "lint": "biome ci --config-path=../.. . && pnpm check:size",
+    "check:size": "node src/check-size.ts ../..",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "build": "echo 'nothing to build'"
@@ -19,6 +20,7 @@
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.0.5",
     "typescript": "7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
   }
 }

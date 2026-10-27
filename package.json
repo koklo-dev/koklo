@@ -5,6 +5,7 @@
   "engines": { "node": ">=24 <25" },
   "scripts": {
     "lint": "turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts",
+    "check:size": "pnpm --filter @koklo/config check:size",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "build": "turbo run build",
