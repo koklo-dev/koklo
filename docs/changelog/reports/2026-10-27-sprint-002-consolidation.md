@@ -2,14 +2,29 @@
 doc_version: 0.1.0
 status: draft
 last_reviewed: 2026-10-27
-covers_commit: e084ff1
+covers_commit: 9830e2e
 ---
 # Period report — Sprint 2 consolidation (2026-10-27)
 
 Range: `b242ff2..origin/develop` (tier 1 computed, depth deep), extended with the
-`5f350ca..origin/develop` pass (tier 1, depth light) for TK-8. The database part
+`5f350ca..origin/develop` pass (tier 1, depth light) for TK-8, then by the
+`e084ff1..origin/develop` pass (tier 1, depth deep) for TK-10 and TK-11. The database part
 (TK-7) has its own [report](2026-10-27-TK-7.md), the seed (TK-8) has
-[its own](2026-10-27-TK-8.md).
+[its own](2026-10-27-TK-8.md), the API (TK-10) has [its own](2026-10-27-TK-10.md) and
+the sign-in (TK-11) has [its own](2026-10-27-TK-11.md).
+
+## API and sign-in (TK-10, TK-11)
+- `476c046` (TK-10): `apps/api`, NestJS + oRPC, `GET /health`, `project.list`, OpenAPI
+  document; contract 0.2.0 (breaking: `key` removed from project items);
+  `@koklo/db` gains `exports` and `createDbClient`. See
+  [ADR 0002](../../adr/0002-project-port-in-api.md).
+- `9830e2e` (TK-11): Better Auth with GitHub OAuth on `/api/auth/*`, `SessionGuard` on
+  `project.list` (typed 401 without a session), organization context read from the
+  `members` table. See [ADR 0003](../../adr/0003-better-auth-session-guard.md).
+  New required variables: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`,
+  `GITHUB_CLIENT_SECRET`.
+- Details: [architecture.md](../../architecture.md), [api-contract.md](../../api-contract.md),
+  [quality-and-operations.md](../../quality-and-operations.md).
 
 ## Summary
 Four commits: broader loop permissions for `docker` and `npx` dev commands
@@ -41,14 +56,15 @@ the diff (only `package.json` and `pnpm-lock.yaml` change), so it is not documen
 None: no screen. No functional guide, release note or screenshot written.
 
 ## Risks and Follow-ups
+- ADRs 0002 and 0003 now cover the API port and the session guard; the Prisma 7 ADR is still missing.
 - Missing ADR: Prisma 7 with reversible migrations through a hand-kept `down.sql`
   (checked by tests, applied by a custom rollback script) is a structural decision.
   ADRs are outside this pass's `impacted_docs`, so it is not written
-  (`docs/adr/` has only 0001).
+  (`docs/adr/` has no Prisma ADR).
 - Rollback is not transactional.
 - Whether CI runs the Docker-based `@koklo/db` tests: TO DOCUMENT.
 - The allow list now covers `docker` and `npx` commands; the risk was not reviewed
   here (ASSUMPTION: accepted for the loop).
 
 ## Traceability
-TK-7 · TK-8 · `37e0fd3` · `ca46aae` · `5f350ca` · `e084ff1`.
+TK-7 · TK-8 · TK-10 · TK-11 · `476c046` · `9830e2e` · `37e0fd3` · `ca46aae` · `5f350ca` · `e084ff1`.

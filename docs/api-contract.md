@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 476c046
+covers_commit: 9830e2e
 ---
 # API contract
 
