@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CAPTURES_DIR, setScenario, switchToDark } from "./support/helpers.ts";
+import { CAPTURES_DIR, setScenario, settle, switchToDark } from "./support/helpers.ts";
 
 test("sans session, /projects redirige vers /login", async ({ page }) => {
   await setScenario({ session: false, projects: "data" });
@@ -22,6 +22,7 @@ for (const theme of ["light", "dark"] as const) {
     const button = page.getByRole("button", { name: /Continuer avec GitHub/ });
     await button.focus();
     await expect(button).toBeFocused();
+    await settle(page);
     await page.screenshot({ path: `${CAPTURES_DIR}/S-login/default-${theme}.png`, fullPage: true });
   });
 }

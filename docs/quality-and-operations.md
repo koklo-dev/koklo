@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 540932a
+covers_commit: 73792d1
 ---
 # Quality and operations
 
@@ -97,17 +97,6 @@ covers_commit: 540932a
   local origin. `playwright.config.ts` reads `PLAYWRIGHT_CHANNEL` (e.g. `chrome`) to reuse an
   installed browser; otherwise run `playwright install chromium`. Other packages define no e2e
   yet.
-
-### Web application tests (TK-14)
-- Vitest (`apps/web/test/`, jsdom + Testing Library): `auth-guard` (redirections, `UNAUTHORIZED`),
-  `runtime-config` (valid and invalid env, no values in messages), `no-public-env` (no `NEXT_PUBLIC_*`
-  in the sources), `login-card`, `projects-view` (four states), `theme` (light default, persisted dark).
-- Playwright (`apps/web/e2e/`, `pnpm --filter @koklo/web e2e`, one worker): `login.spec.ts`
-  (guard redirects, keyboard focus, social sign-in request to the same origin), `projects.spec.ts`
-  (loading, empty, data, error in light and dark, shell landmarks, retry), `a11y.spec.ts`
-  (axe). A stub API (`e2e/support/stub-api.ts`, session + `project.list`) replaces the real API and
-  PostgreSQL. The runs write the screenshots to `design/screens/captures/`.
-  `PLAYWRIGHT_CHANNEL=chrome` reuses an installed Chrome. Whether CI runs `pnpm e2e`: TO DOCUMENT.
 
 ### Lint, types and build (workspace)
 - `pnpm lint`: `biome ci` per package, using the shared `packages/config/biome.json`
@@ -238,11 +227,6 @@ are set in each deployment's environment, never in `.env.example` or the reposit
 GitHub OAuth App is one per environment, callback `<BETTER_AUTH_URL>/api/auth/callback/github`.
 The test session (`x-test-session`) exists only when `APP_ENV=test`: never run a deployed
 environment with that value. Secret storage and rotation: TO DOCUMENT.
-
-Web application (TK-14): `apps/web` reads `API_URL` (internal URL of the API, never sent to the
-browser), `APP_ENV` and `APP_VERSION` from the process environment at start-up and on each proxied
-request; there is no build-time URL, so one `output: "standalone"` build is promoted unchanged
-between environments (vision §20.4). Container image, port and deployment: TO DOCUMENT.
 
 Demo seed: `pnpm db:seed` (delegates to `@koklo/db` `seed`, `node scripts/seed.ts`)
 upserts fixed-id demo rows in a single transaction and rolls back on error. It is
