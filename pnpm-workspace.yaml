@@ -6,6 +6,8 @@ packages:
 allowBuilds:
   "@prisma/engines": true
   prisma: true
+  # Dependances transitives de testcontainers : addons natifs facultatifs, refuses volontairement
+  # (pas d'execution de scripts tiers) ; testcontainers fonctionne sans, ne pas passer a true.
   cpu-features: false
   protobufjs: false
   ssh2: false
