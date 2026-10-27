@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: e084ff1
+covers_commit: 9830e2e
 ---
 # Domain model
 
@@ -64,6 +64,7 @@ No state machine is enforced in the database. `invitations.status` defaults to
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.
+- TK-11 changes no entity: the API session resolver reads `members` (membership of the user in the active organization) through Prisma to build the organization context.
 - Migrations live in `packages/db/prisma/migrations/`; the first is `20261027065954_init`.
   **Every migration folder must contain a non-empty `down.sql`** (tested).
 - To create one: edit the schema, generate `down.sql` with
