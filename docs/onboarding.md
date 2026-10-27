@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 73792d1
+covers_commit: ade3f4d
 ---
 # Onboarding — humans and AI agents
 
@@ -37,8 +37,8 @@ pnpm lint        # turbo run lint  (biome ci)
 pnpm typecheck   # turbo run typecheck
 pnpm test        # turbo run test  (vitest run --coverage)
 pnpm build       # turbo run build
-pnpm dev         # turbo run dev
-pnpm e2e         # turbo run e2e (only packages/ui defines it: Playwright, needs Chromium)
+pnpm dev         # Postgres (Compose) + web :3000 + api :3001 + worker (e2e/scripts/dev.ts)
+pnpm e2e         # real-stack e2e (TK-15): Compose Postgres, migrate, seed, build, api+web, Playwright (needs Docker + Chromium)
 pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
 pnpm db:rollback # undo the latest migration through its down.sql
 pnpm db:seed     # deterministic demo data (needs DATABASE_URL), safe to re-run
@@ -121,3 +121,7 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
 
 ## Current work and open threads
 TO DOCUMENT — active sprint focus, known debt, deliberate shortcuts.
+
+`pnpm dev` needs `apps/api/.env` for `BETTER_AUTH_SECRET` and `GITHUB_CLIENT_*` (see its
+`.env.example`); `DATABASE_URL`, `PORT` (3001), `BETTER_AUTH_URL` and the web `API_URL` get
+defaults aligned on `KOKLO_DB_PORT` / `KOKLO_API_PORT`, and any variable already exported wins.

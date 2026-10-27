@@ -9,8 +9,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "e2e": "turbo run e2e",
+    "dev": "node e2e/scripts/dev.ts",
+    "e2e": "node e2e/scripts/run.ts",
     "db:migrate": "pnpm --filter @koklo/db migrate",
     "db:rollback": "pnpm --filter @koklo/db rollback",
     "db:seed": "pnpm --filter @koklo/db seed"

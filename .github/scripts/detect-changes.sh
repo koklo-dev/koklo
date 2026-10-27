@@ -12,7 +12,7 @@ ci=false
 
 while IFS= read -r f; do
     case "$f" in
-    apps/* | packages/* | scripts/* | .deploy/* | \
+    apps/* | packages/* | e2e/* | scripts/* | .deploy/* | \
         package.json | pnpm-lock.yaml | pnpm-workspace.yaml | turbo.json | biome.json | \
         tsconfig.json | tsconfig.*.json | .nvmrc | docker-compose.yml)
         code=true ;;

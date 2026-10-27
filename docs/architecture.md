@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: f442681
+covers_commit: ade3f4d
 ---
 # Architecture
 
@@ -368,6 +368,30 @@ flowchart LR
   producer["any producer: boss.send('noop')"] --> db
 ```
 
+### Real-stack e2e and one-command dev (TK-15)
+Package `e2e/` (`@koklo/e2e`, Playwright) holds the browser test on the real stack, and the two
+root scripts that orchestrate processes: `pnpm e2e` → `e2e/scripts/run.ts`, `pnpm dev` →
+`e2e/scripts/dev.ts` (root `package.json`; they no longer go through `turbo run`).
+
+```mermaid
+flowchart LR
+  run[pnpm e2e: run.ts] --> pg[(Postgres, Compose project koklo-e2e)]
+  run --> mig[db:migrate + db:seed + build]
+  run --> api[API :3201]
+  run --> web[Web standalone :3200]
+  run --> pw[playwright test]
+  pw -->|signed session cookie| web
+  web -->|proxy| api --> pg
+  pw -.->|insert session row| pg
+```
+
+`pnpm dev` runs `docker compose up -d --wait postgres`, then `turbo run dev` (web :3000, API :3001,
+worker). Web and API ports are now distinct (`apps/web` dev is `next dev --port 3000`). Variables
+already exported win over the defaults; `turbo.json` passes the ports and auth variables through
+(`globalPassThroughEnv`, `dev.passThroughEnv`). Run steps and gates:
+[quality-and-operations.md](quality-and-operations.md#real-stack-e2e-tk-15) ·
+decision: [ADR 0007](adr/0007-real-stack-e2e-orchestration.md).
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).
@@ -431,4 +455,6 @@ which protects the vision file from agent edits.
 Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones are in `adr/`:
 [0001](adr/0001-monorepo-pnpm-turborepo.md), [0002](adr/0002-project-port-in-api.md),
 [0003](adr/0003-better-auth-session-guard.md),
-[0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md).
+[0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md),
+[0006](adr/0006-web-same-origin-proxy-runtime-config.md),
+[0007](adr/0007-real-stack-e2e-orchestration.md).
