@@ -54,6 +54,12 @@ FILE="$(grep -l -- "\*\*\[$TASK_ID\]\*\*" "$SPRINTS"/sprint-*.md 2>/dev/null | h
 # ── Render the status line ───────────────────────────────────────────────────
 TODAY="${SHIPYARD_VAULT_DATE:-$(date +%F)}"
 
+# Acceptance criteria are ticked only when the caller says they were verified —
+# the merge that follows an approving review, never a duplicate closed by triage
+# or an issue a human closed by hand. Off by default: a plain `done` still leaves
+# them alone, and no other transition ever un-ticks them.
+TICK_CRITERIA="${SHIPYARD_VAULT_TICK_CRITERIA:-0}"
+
 case "$STATE_NAME" in
     done)        BADGE="✅ **livrée**" ;;
     blocked)     BADGE="🔴 **bloquée**" ;;
@@ -107,8 +113,11 @@ trap 'rm -f "$tmp"' EXIT
 #  Without it the task line never matched: a prioritised task could be projected
 #  into an issue, developed and merged, and its sprint line still showed nothing
 #  — no badge, no tick — because every write-back silently matched no line.
-awk -v task="$TASK_ID" -v want="$STATE_NAME" -v status="$STATUS_LINE" '
-  BEGIN { marker = "<!-- shipyard-status:" task " -->" }
+#  `inblock` spans the task up to the next top-level item or heading; `incrit` is
+#  true only inside its acceptance-criteria bullet, so the Definition of Done, the
+#  next task and any other nested checkbox are never reached.
+awk -v task="$TASK_ID" -v want="$STATE_NAME" -v status="$STATUS_LINE" -v tick="$TICK_CRITERIA" '
+  BEGIN { marker = "<!-- shipyard-status:" task " -->"; inblock = 0; incrit = 0 }
   index($0, marker) > 0 { next }                       # drop the previous status line
   {
     if ($0 ~ ("^- \\[[ xX]\\] [^*]*\\*\\*\\[" task "\\]\\*\\*")) {
@@ -116,7 +125,13 @@ awk -v task="$TASK_ID" -v want="$STATE_NAME" -v status="$STATUS_LINE" '
       else                sub(/^- \[[^]]*\]/, "- [ ]")
       print
       if (status != "") print status
+      inblock = 1; incrit = 0
       next
+    }
+    if (inblock) {
+      if ($0 ~ /^- / || $0 ~ /^#/) { inblock = 0; incrit = 0 }
+      else if ($0 ~ /^  - /) { incrit = (tolower($0) ~ /acceptance criteria|crit(è|e)res d.acceptation/) }
+      else if (tick == "1" && want == "done" && incrit && $0 ~ /^    - \[ \] /) sub(/^    - \[ \]/, "    - [x]")
     }
     print
   }
