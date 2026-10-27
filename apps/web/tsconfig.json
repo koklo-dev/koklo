@@ -1,0 +1,14 @@
+{
+  "extends": "@koklo/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // Next résout ses sous-chemins (next/navigation…) sans « exports » : résolution bundler requise.
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["src", "test", "e2e", "*.ts", "next-env.d.ts", ".next/types/**/*.ts"]
+}

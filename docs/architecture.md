@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: f442681
+covers_commit: 540932a
 ---
 # Architecture
 
@@ -368,6 +368,51 @@ flowchart LR
   producer["any producer: boss.send('noop')"] --> db
 ```
 
+### Web application (TK-14)
+`apps/web` (`@koklo/web`, private) is the Next.js 16.4.3 App Router front end (React 19.3.1,
+Tailwind 4.3.3, UI only from `@koklo/ui`). It has two pages, `/login` and `/projects`; `/`
+redirects to `/projects`. The browser only ever talks to its own origin.
+
+- `src/proxy.ts` runs on every matched request (`/login`, `/projects`, `/api/auth/:path*`,
+  `/api/orpc/:path*`). It rewrites `/api/auth/*` to `API_URL` as is, and `/api/orpc/*` to
+  `API_URL` with the `/api/orpc` prefix removed (`src/lib/orpc-prefix.ts`). For the two pages
+  it calls `GET <API_URL>/api/auth/get-session` with the request cookies (`src/lib/session.ts`;
+  any network error or non-OK answer counts as "no session") and `resolveAccess`
+  (`src/lib/auth-guard.ts`) redirects: `/projects` without session → `/login`, `/login` with
+  session → `/projects`.
+- `src/lib/runtime-config.ts` — `readRuntimeConfig(process.env)` validates `API_URL` (URL),
+  `APP_ENV` and `APP_VERSION` with zod and throws `Configuration d'exécution invalide : <names>`
+  (names only, never values). No `NEXT_PUBLIC_*` variable is used (test
+  `test/no-public-env.test.ts`), so the same build is promotable: `next.config.ts` sets
+  `output: "standalone"` and `.next/standalone` contains no environment URL.
+- `src/lib/auth-client.ts` — Better Auth React client on the current origin. The login button
+  calls `signIn.social({ provider: "github", callbackURL: "/projects" })`.
+- `src/lib/orpc.ts` — typed client from `@koklo/contract` through `OpenAPILink` (base `/api/orpc`)
+  wrapped by `@orpc/tanstack-query` (`orpc`); `src/components/providers.tsx` supplies the
+  TanStack Query client. An `UNAUTHORIZED` error sends the user back to `/login`
+  (`redirectForError`); other errors are shown in the page.
+- `src/components/` — `AppShell` (sidebar 248 px from 768 px, stacked top bar below, page margin
+  32 px / 16 px on mobile, detail panel 380–440 px reserved and absent from the DOM), `LoginCard`,
+  `ProjectsPage` (query) and `ProjectsView` (four states: loading, empty, data, error with
+  "Réessayer"), `ThemeToggle`, `BrandMark` (the temporary "K").
+- `src/lib/theme.ts` — theme is light unless `dark` was stored in `localStorage` (`koklo-theme`),
+  whatever `prefers-color-scheme` says (H-24); `THEME_INIT_SCRIPT` applies it before first
+  paint to avoid a flash.
+
+```mermaid
+flowchart LR
+  browser([Browser]) -->|"/login, /projects"| proxy["src/proxy.ts"]
+  browser -->|"/api/auth/*"| proxy
+  browser -->|"/api/orpc/*"| proxy
+  proxy -->|"get-session + cookies"| api["apps/api (API_URL)"]
+  proxy -->|"rewrite"| api
+  proxy -->|"allowed"| pages["App Router pages"]
+  pages -->|"orpc project.list"| browser
+```
+
+Screens are specified in `design/screens/S-login.md` and `design/screens/S-projects.md`.
+Decision: [ADR 0006](adr/0006-web-same-origin-proxy-runtime-config.md).
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).
@@ -431,4 +476,5 @@ which protects the vision file from agent edits.
 Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones are in `adr/`:
 [0001](adr/0001-monorepo-pnpm-turborepo.md), [0002](adr/0002-project-port-in-api.md),
 [0003](adr/0003-better-auth-session-guard.md),
-[0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md).
+[0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md),
+[0006](adr/0006-web-same-origin-proxy-runtime-config.md).
