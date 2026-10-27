@@ -18,6 +18,14 @@
       "ui": { "dependencies": { "allow": ["config"] } }
     }
   },
+  "globalPassThroughEnv": [
+    "KOKLO_DB_PORT",
+    "KOKLO_API_PORT",
+    "E2E_DB_PORT",
+    "E2E_WEB_PORT",
+    "E2E_API_PORT",
+    "E2E_WEB_URL"
+  ],
   "tasks": {
     "lint": {},
     "typecheck": { "dependsOn": ["^build"] },
@@ -26,7 +34,21 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
-    "dev": { "cache": false, "persistent": true },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "PORT",
+        "API_URL",
+        "BETTER_AUTH_URL",
+        "BETTER_AUTH_SECRET",
+        "GITHUB_CLIENT_ID",
+        "GITHUB_CLIENT_SECRET",
+        "APP_ENV",
+        "APP_VERSION"
+      ]
+    },
     "e2e": { "cache": false }
   }
 }

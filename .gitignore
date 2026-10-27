@@ -16,3 +16,4 @@ packages/db/src/generated/
 .project/.vault.lock
 .workflow/
 apps/web/next-env.d.ts
+playwright-report/

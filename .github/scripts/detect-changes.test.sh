@@ -26,6 +26,11 @@ for f in 'apps/web/x.ts\n' 'packages/domain/src/a.ts\n' 'pnpm-lock.yaml\n' 'pack
     check "$f -> code=true" has "$f" code=true
 done
 
+# TK-15 : le paquet e2e/ déclenche les jobs de code
+for f in 'e2e/package.json\n' 'e2e/tests/projects.spec.ts\n'; do
+    check "$f -> code=true" has "$f" code=true
+done
+
 # T3.3 skills
 for f in 'shipyard/skills/x.md\n' '.claude/skills/x/SKILL.md\n' '.codex/skills/x/SKILL.md\n'; do
     check "$f -> skills=true" has "$f" skills=true

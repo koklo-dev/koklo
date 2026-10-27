@@ -29,6 +29,19 @@ before() {
 unpinned() { grep -E 'uses:' "$WF" | grep -vE '@v[0-9]+\.[0-9]+\.[0-9]+'; }
 no_unpinned() { ! unpinned | grep -q .; }
 
+e2e_block() { job_block e2e; }
+in_e2e() { e2e_block | grep -Eq -- "$1"; }
+# Rang de la première ligne du job e2e qui correspond.
+e2e_rank() { e2e_block | grep -nE -- "$1" | head -1 | cut -d: -f1; }
+e2e_before() {
+    local a b
+    a="$(e2e_rank "$1")"
+    b="$(e2e_rank "$2")"
+    [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]
+}
+e2e_no_secrets() { [ -n "$(e2e_block)" ] && ! e2e_block | grep -Eq 'secrets\.'; }
+e2e_pinned() { [ -n "$(e2e_block)" ] && ! e2e_block | grep -E 'uses:' | grep -vE '@v[0-9]+\.[0-9]+\.[0-9]+' | grep -q .; }
+
 # T1.3
 check "checkout v7.0.1" g 'actions/checkout@v7\.0\.1'
 check "pnpm/action-setup v6.1.0" g 'pnpm/action-setup@v6\.1\.0'
@@ -72,4 +85,22 @@ check "job ci : if: always() (jamais sauté si changes échoue)" job_if_always
 check "job ci : échec explicite si changes n'est pas success" guard_fails
 check "job ci : le garde est la première étape" guard_first
 check "couche agent vérifiée" g 'loop\.tickets'
+
+# TK-15 : job e2e (Playwright sur le vrai stack)
+check "job e2e présent" g '^  e2e:'
+check "e2e: dépend de changes" in_e2e 'needs:.*changes'
+check "e2e: déclenché par outputs.code" in_e2e "needs\.changes\.outputs\.code == 'true'"
+check "e2e: checkout épinglé" in_e2e 'actions/checkout@v7\.0\.1'
+check "e2e: pnpm/action-setup épinglé" in_e2e 'pnpm/action-setup@v6\.1\.0'
+check "e2e: setup-node épinglé" in_e2e 'actions/setup-node@v7\.1\.0'
+check "e2e: install --frozen-lockfile" in_e2e 'pnpm install --frozen-lockfile'
+check "e2e: installation du navigateur Playwright" in_e2e 'playwright install'
+check "e2e: lance pnpm e2e" in_e2e 'pnpm e2e'
+check "e2e: ordre install < navigateur" e2e_before 'pnpm install' 'playwright install'
+check "e2e: ordre navigateur < pnpm e2e" e2e_before 'playwright install' 'pnpm e2e'
+check "e2e: upload du rapport en cas d'échec" in_e2e 'actions/upload-artifact@v[0-9]+\.[0-9]+\.[0-9]+'
+check "e2e: upload conditionné par failure() ou always()" in_e2e 'if: (failure|always)\(\)'
+check "e2e: actions épinglées" e2e_pinned
+check "e2e: aucun secret réel (secrets.*)" e2e_no_secrets
+check "job ci conserve son nom stable" g '^  ci:'
 finish

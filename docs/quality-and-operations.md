@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 73792d1
+covers_commit: ade3f4d
 ---
 # Quality and operations
 
@@ -244,3 +244,15 @@ TO DOCUMENT — logs, metrics, traces, health checks, alerting.
 
 ## Risks, mitigations and runbook
 TO DOCUMENT — known risks, their mitigations, and what to do at 3am.
+
+## Real-stack e2e (TK-15)
+
+`pnpm e2e` (`e2e/scripts/run.ts`, package `@koklo/e2e`) starts a throw-away Compose project
+`koklo-e2e` (Postgres on `E2E_DB_PORT`, default 54329), runs migrate and seed, builds, starts the
+API (`E2E_API_PORT`, 3201, `APP_ENV=test`) and the standalone web server (`E2E_WEB_PORT`, 3200),
+then `playwright test`; the exit code is Playwright's and everything is torn down (`down -v`).
+The test creates a real Better Auth session row for the seed admin and signs the cookie with the
+fake e2e secret defined in the script (no real secret). It does not use the stub API of
+`apps/web/e2e`. The CI job `e2e` runs the same command (`pnpm --filter @koklo/e2e exec playwright
+install --with-deps chromium` first). `turbo run e2e` still only runs the stub-API suites of
+`apps/web` and `packages/ui`; the real-stack package exposes its Playwright call as `stack`.
