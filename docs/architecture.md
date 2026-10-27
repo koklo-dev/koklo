@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: 37e0fd3
 ---
 # Architecture
 
@@ -178,6 +178,34 @@ flowchart LR
   files -.-> test{{"test/contract.test.ts"}}
   openapi -.-> test
   contract --> index["src/index.ts (public exports)"]
+```
+
+### Database package (TK-7)
+`packages/db` (`@koklo/db`, tag `db`, private) owns the Prisma 7 schema
+(`prisma/schema.prisma`, PostgreSQL 17), the migrations and their rollback. Prisma is
+configured by `prisma.config.ts` (schema, migrations path, `DATABASE_URL`, optional
+`SHADOW_DATABASE_URL`; `.env` is loaded with `process.loadEnvFile()`). The generated
+client goes to `packages/db/generated/` (git-ignored, excluded from Biome). Dependencies:
+`@koklo/config`, `pg`; dev: `prisma` 7.10.1. `pnpm-workspace.yaml` allows the build
+scripts of `prisma` and `@prisma/engines` (`allowBuilds`). Entities:
+[domain-model.md](domain-model.md).
+
+Local database: `docker-compose.yml` at the root runs `postgres:17-alpine`
+(user/password/db `koklo`, bound to `127.0.0.1`, host port `KOKLO_DB_PORT`, default 5432,
+volume `koklo-postgres-data`, `pg_isready` healthcheck).
+
+Each migration folder carries a `migration.sql` and a `down.sql`. The rollback logic
+(`src/rollback.ts`) is pure and receives its side effects as ports, so it is unit-tested
+without a database; `scripts/rollback.ts` wires the real ports.
+
+```mermaid
+flowchart LR
+  schema["prisma/schema.prisma"] --> deploy["pnpm db:migrate = prisma migrate deploy"]
+  mig["migrations/TS_NAME/migration.sql"] --> deploy
+  deploy --> pg[("PostgreSQL 17 + _prisma_migrations")]
+  down["migrations/TS_NAME/down.sql"] --> rb["pnpm db:rollback = scripts/rollback.ts"]
+  rb -->|"prisma db execute --file"| pg
+  rb -->|"DELETE FROM _prisma_migrations"| pg
 ```
 
 ## 5. Runtime views

@@ -1,0 +1,55 @@
+import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const migrationsDir = join(packageRoot, "prisma", "migrations");
+export const schemaPath = join(packageRoot, "prisma", "schema.prisma");
+
+export const expectedTables = [
+  "users",
+  "sessions",
+  "accounts",
+  "verifications",
+  "organizations",
+  "members",
+  "invitations",
+  "projects",
+] as const;
+
+export interface CliResult {
+  status: number | null;
+  output: string;
+}
+
+/** Exécute la CLI Prisma du paquet contre `databaseUrl` (jamais d'autre base). */
+export function runPrisma(args: string[], databaseUrl: string): CliResult {
+  const bin = join(packageRoot, "node_modules", ".bin", "prisma");
+  const result = spawnSync(bin, args, {
+    cwd: packageRoot,
+    encoding: "utf8",
+    env: { ...process.env, DATABASE_URL: databaseUrl },
+  });
+  return { status: result.status, output: `${result.stdout}\n${result.stderr}` };
+}
+
+/** Comme `runPrisma` mais lève une erreur portant la sortie complète si le code est non nul. */
+export function runPrismaOrThrow(args: string[], databaseUrl: string): string {
+  const { status, output } = runPrisma(args, databaseUrl);
+  if (status !== 0) {
+    throw new Error(`prisma ${args.join(" ")} a échoué (code ${status})\n${output}`);
+  }
+  return output;
+}
+
+/** Noms des dossiers de migration, triés (ordre d'application). */
+export function listMigrationDirs(): string[] {
+  if (!existsSync(migrationsDir)) {
+    throw new Error(`Dossier de migrations absent : ${migrationsDir}`);
+  }
+  return readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
