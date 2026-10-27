@@ -10,4 +10,4 @@ Contrat oRPC (Zod) de l'API Koklo : procédures `health` (`GET /health`) et `pro
 
 - `openapi/openapi.json` est le document de référence, `openapi/versions.json` associe chaque version au sha256 de son document.
 - Le test `test/contract.test.ts` échoue si le document généré diffère du fichier, si `info.version` ≠ `version` de `package.json` ou si l'empreinte de la version courante diffère.
-- Pour modifier le contrat : changer la version dans `package.json` **et** `src/version.ts`, puis `pnpm --filter @koklo/contract openapi:generate`. `versions.json` ne doit qu'ajouter des lignes.
+- Pour modifier le contrat : changer la version dans `package.json` **et** `src/version.ts`, puis `pnpm --filter @koklo/contract openapi:generate`. `versions.json` ne doit qu'ajouter des lignes : `openapi:generate` échoue si la version courante est déjà enregistrée avec une autre empreinte (test CT-8b).

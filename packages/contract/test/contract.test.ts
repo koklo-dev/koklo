@@ -9,6 +9,7 @@ import {
   type HealthOutput,
   type ProjectListOutput,
 } from "../src/index.ts";
+import { hashDocument, recordVersion } from "../src/versions.ts";
 
 const root = resolve(import.meta.dirname, "..");
 const readJson = (rel: string) => JSON.parse(readFileSync(resolve(root, rel), "utf8"));
@@ -165,6 +166,36 @@ describe("CT-8 lien version et contenu", () => {
       .update(canonical(await generateOpenApi()))
       .digest("hex");
     expect(versions[version]).toBe(hash);
+  });
+});
+
+describe("CT-8b garde de version", () => {
+  const doc = { openapi: "3.1.0", paths: {} };
+
+  it("enregistre une nouvelle version et conserve les anciennes", () => {
+    expect(recordVersion({ "0.0.1": "abc" }, "0.1.0", doc)).toEqual({
+      "0.0.1": "abc",
+      "0.1.0": hashDocument(doc),
+    });
+  });
+
+  it("accepte de rejouer la même version avec le même document", () => {
+    const versions = { "0.1.0": hashDocument(doc) };
+    expect(recordVersion(versions, "0.1.0", doc)).toEqual(versions);
+  });
+
+  it("échoue si le document change sans changement de version", () => {
+    const versions = { "0.1.0": hashDocument(doc) };
+    expect(() => recordVersion(versions, "0.1.0", { ...doc, paths: { "/x": {} } })).toThrow(
+      /sans changement de version/,
+    );
+  });
+
+  it("accepte l'état committé : versions.json est cohérent avec le contrat actuel", async () => {
+    const { version } = readJson("package.json");
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    const document = await generateOpenApi();
+    expect(() => recordVersion(versions, version, document)).not.toThrow();
   });
 });
 
