@@ -42,6 +42,8 @@ e2e_before() {
 e2e_no_secrets() { [ -n "$(e2e_block)" ] && ! e2e_block | grep -Eq 'secrets\.'; }
 e2e_pinned() { [ -n "$(e2e_block)" ] && ! e2e_block | grep -E 'uses:' | grep -vE '@v[0-9]+\.[0-9]+\.[0-9]+' | grep -q .; }
 
+ci_accepts_e2e_skipped() { ! job_block ci | grep -Eq "needs\\.e2e\\.result != 'success'"; }
+
 # T1.3
 check "checkout v7.0.1" g 'actions/checkout@v7\.0\.1'
 check "pnpm/action-setup v6.1.0" g 'pnpm/action-setup@v6\.1\.0'
@@ -102,5 +104,8 @@ check "e2e: upload du rapport en cas d'échec" in_e2e 'actions/upload-artifact@v
 check "e2e: upload conditionné par failure() ou always()" in_e2e 'if: (failure|always)\(\)'
 check "e2e: actions épinglées" e2e_pinned
 check "e2e: aucun secret réel (secrets.*)" e2e_no_secrets
+check "job ci agrège e2e (needs)" in_ci 'needs:.*e2e'
+check "job ci : échec si e2e est en failure ou cancelled" in_ci "needs\\.e2e\\.result == 'failure' \\|\\| needs\\.e2e\\.result == 'cancelled'"
+check "job ci : e2e skipped reste accepté (pas de garde != 'success')" ci_accepts_e2e_skipped
 check "job ci conserve son nom stable" g '^  ci:'
 finish
