@@ -2,18 +2,21 @@
 doc_version: 0.1.0
 status: draft
 last_reviewed: 2026-10-27
-covers_commit: 5f350ca
+covers_commit: e084ff1
 ---
 # Period report — Sprint 2 consolidation (2026-10-27)
 
-Range: `b242ff2..origin/develop` (tier 1 computed, depth deep). The database part
-(TK-7) has its own [report](2026-10-27-TK-7.md).
+Range: `b242ff2..origin/develop` (tier 1 computed, depth deep), extended with the
+`5f350ca..origin/develop` pass (tier 1, depth light) for TK-8. The database part
+(TK-7) has its own [report](2026-10-27-TK-7.md), the seed (TK-8) has
+[its own](2026-10-27-TK-8.md).
 
 ## Summary
-Three commits: broader loop permissions for `docker` and `npx` dev commands
+Four commits: broader loop permissions for `docker` and `npx` dev commands
 (`37e0fd3`, `.claude/settings.json`), the `@koklo/db` package with its Prisma 7 schema
 and first reversible migration (`ca46aae`), and the `@prisma/client` runtime
-dependency (`5f350ca`).
+dependency (`5f350ca`), then the deterministic demo seed `pnpm db:seed` (TK-8,
+`e084ff1`: `packages/db/src/seed.ts`, `scripts/seed.ts`, root and package scripts, tests).
 
 ## Architecture and Runtime
 - `packages/db`: see [architecture.md](../../architecture.md#database-package-tk-7).
@@ -48,4 +51,4 @@ None: no screen. No functional guide, release note or screenshot written.
   here (ASSUMPTION: accepted for the loop).
 
 ## Traceability
-TK-7 · `37e0fd3` · `ca46aae` · `5f350ca`.
+TK-7 · TK-8 · `37e0fd3` · `ca46aae` · `5f350ca` · `e084ff1`.
