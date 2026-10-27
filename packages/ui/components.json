@@ -10,12 +10,12 @@
     "cssVariables": true,
     "prefix": ""
   },
-  "iconLibrary": "lucide",
+  "iconLibrary": "material-symbols",
   "aliases": {
-    "components": "@koklo/ui/components",
-    "utils": "@koklo/ui/lib/cn",
-    "ui": "@koklo/ui/components/ui",
-    "lib": "@koklo/ui/lib",
-    "hooks": "@koklo/ui/hooks"
+    "components": "@koklo/ui",
+    "utils": "@koklo/ui",
+    "ui": "@koklo/ui",
+    "lib": "@koklo/ui",
+    "hooks": "@koklo/ui"
   }
 }

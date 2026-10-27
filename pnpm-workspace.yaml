@@ -24,6 +24,7 @@ minimumReleaseAgeExclude:
   - "@better-auth/prisma-adapter@1.7.14"
   - "@better-auth/telemetry@1.7.14"
   - better-auth@1.7.14
+  - "@material-symbols/svg-400@0.48.2"
 
 overrides:
   multer: 2.5.0

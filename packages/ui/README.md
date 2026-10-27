@@ -1,6 +1,6 @@
 # @koklo/ui
 
-Fondations visuelles de Koklo : thème Indigo, couleurs de statut, typographie, Tailwind v4 et configuration shadcn/ui. Source de vérité des valeurs : `DESIGN.md` (§2 couleurs, §3 typographie) à la racine du dépôt. Aucun composant métier ni écran dans ce paquet pour l'instant.
+Fondations visuelles de Koklo : thème Indigo, couleurs de statut, typographie, Tailwind v4 et configuration shadcn/ui. Source de vérité des valeurs : `DESIGN.md` (§2 couleurs, §3 typographie) à la racine du dépôt. Icônes Material Symbols Rounded (SVG à la demande) et composants shadcn/ui sans Lucide, tous exportés par le seul point d'entrée `@koklo/ui`. Aucun composant métier ni écran.
 
 ## Contenu
 
@@ -24,8 +24,10 @@ Le thème sombre s'active avec la classe `.dark` sur `html`.
 ```
 
 ```ts
-import { cn } from "@koklo/ui";
+import { Button, Icon, StatusBadge } from "@koklo/ui";
 ```
+
+Ajouter une icône : l'inscrire dans `ICON_NAMES` (`scripts/generate-icons.ts`) puis `pnpm --filter @koklo/ui icons:generate`.
 
 Changer l'accent ou le rouge destructif : modifier uniquement `tentative.css` ; les tests de contraste valident la nouvelle valeur.
 
