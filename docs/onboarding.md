@@ -48,6 +48,13 @@ Local database (TK-7): `docker compose up -d postgres` at the root (set `KOKLO_D
 if 5432 is taken), then `cp packages/db/.env.example packages/db/.env`. The `@koklo/db`
 tests need Docker (or `TEST_DATABASE_URL`) and fail rather than skip without it.
 
+Running the worker (`apps/worker`, TK-12): it needs a PostgreSQL reachable through
+`DATABASE_URL` (the process exits at startup without it). `pnpm --filter @koklo/worker dev`
+runs `node --watch src/main.ts`; `pnpm --filter @koklo/worker build` then `start` runs
+`dist/main.js`. Its integration test starts its own PostgreSQL 17 through Testcontainers,
+so **Docker must be available** to run `pnpm test` for that package. See
+[architecture.md](architecture.md#worker-pg-boss-and-noop-job-tk-12).
+
 Layout and shared configuration (`packages/config`): see
 [architecture.md](architecture.md#monorepo-workspace-tk-1). Running a task for one
 package: `pnpm --filter @koklo/config test`. The smallest useful change at this stage
