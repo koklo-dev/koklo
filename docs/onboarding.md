@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: b242ff2
 ---
 # Onboarding — humans and AI agents
 
@@ -40,6 +40,13 @@ pnpm build       # turbo run build
 pnpm dev         # turbo run dev
 pnpm e2e         # turbo run e2e (no workspace defines this task yet)
 ```
+
+Running the worker (`apps/worker`, TK-12): it needs a PostgreSQL reachable through
+`DATABASE_URL` (the process exits at startup without it). `pnpm --filter @koklo/worker dev`
+runs `node --watch src/main.ts`; `pnpm --filter @koklo/worker build` then `start` runs
+`dist/main.js`. Its integration test starts its own PostgreSQL 17 through Testcontainers,
+so **Docker must be available** to run `pnpm test` for that package. See
+[architecture.md](architecture.md#worker-pg-boss-and-noop-job-tk-12).
 
 Layout and shared configuration (`packages/config`): see
 [architecture.md](architecture.md#monorepo-workspace-tk-1). Running a task for one

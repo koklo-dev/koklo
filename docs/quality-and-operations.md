@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: b242ff2
 ---
 # Quality and operations
 
@@ -38,8 +38,15 @@ covers_commit: c3841a8
   `info.version` = `package.json` version, sha256 = entry in `openapi/versions.json`);
   CT-9 checks the public exports and inferred types. Details:
   [api-contract.md](api-contract.md#compatibility-and-breaking-changes).
-- Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
-  no package defines it yet).
+- **Worker tests** (`apps/worker`, TK-12): `src/config.test.ts` covers `loadConfig`.
+  `test/noop.integration.test.ts` starts a real `postgres:17-alpine` with
+  `@testcontainers/postgresql`, calls `startWorker`, publishes a `noop` job with
+  `boss.send` and polls `getJobById` (timeout 30 s) until its state is `completed`
+  (acceptance criterion of TK-12). The package's Vitest config raises `testTimeout`
+  to 60 s and `hookTimeout` to 180 s (first image pull) and excludes `src/main.ts`
+  from coverage. Requires Docker.
+- Other levels (e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task, no package
+  defines it yet).
 
 ### Lint, types and build (workspace)
 - `pnpm lint`: `biome ci` per package, using the shared `packages/config/biome.json`

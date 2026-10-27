@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: b242ff2
 ---
 # Architecture
 
@@ -178,6 +178,33 @@ flowchart LR
   files -.-> test{{"test/contract.test.ts"}}
   openapi -.-> test
   contract --> index["src/index.ts (public exports)"]
+```
+
+### Worker: pg-boss and `noop` job (TK-12)
+`apps/worker` (`@koklo/worker`, tag `worker`, private) is a **separate Node process**
+that consumes jobs with pg-boss (`12.38.0`) on the same PostgreSQL database as the
+rest of the system. It depends only on `@koklo/config`. Nothing else is registered
+yet: `noop` is the only job.
+
+- `src/config.ts` — `loadConfig(env)` reads `DATABASE_URL` and throws
+  `DATABASE_URL is required` when it is missing or empty.
+- `src/worker.ts` — `startWorker(config)` creates `new PgBoss(databaseUrl)`, logs
+  `error` events, calls `boss.start()`, `createQueue("noop")`, then
+  `boss.work("noop", …)`. It returns `{ boss, stop() }`; `stop()` calls `boss.stop()`.
+- `src/jobs/noop.ts` — `NOOP_QUEUE = "noop"` and `handleNoop()`, which does nothing:
+  the job is completed as soon as the handler returns. It is a liveness proof of the
+  consumer, not business logic.
+- `src/main.ts` — entry point: `startWorker(loadConfig(process.env))`, logs
+  `worker started`, and calls `worker.stop()` then exits 0 on `SIGINT`/`SIGTERM`.
+
+```mermaid
+flowchart LR
+  main["src/main.ts"] --> config["loadConfig(env)"]
+  main --> worker["startWorker(config)"]
+  worker --> boss["PgBoss(DATABASE_URL)"]
+  worker --> noop["work('noop', handleNoop)"]
+  boss <-->|"pg-boss schema"| db[("PostgreSQL")]
+  producer["any producer: boss.send('noop')"] --> db
 ```
 
 ## 5. Runtime views
