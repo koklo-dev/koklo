@@ -11,7 +11,8 @@
     "generate": "prisma generate",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "rollback": "node scripts/rollback.ts"
+    "rollback": "node scripts/rollback.ts",
+    "seed": "node scripts/seed.ts"
   },
   "dependencies": {
     "@koklo/config": "workspace:*",

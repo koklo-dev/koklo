@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 5f350ca
+covers_commit: 37ccf40
 ---
 # Architecture
 
@@ -197,6 +197,15 @@ volume `koklo-postgres-data`, `pg_isready` healthcheck).
 Each migration folder carries a `migration.sql` and a `down.sql`. The rollback logic
 (`src/rollback.ts`) is pure and receives its side effects as ports, so it is unit-tested
 without a database; `scripts/rollback.ts` wires the real ports.
+
+Demo seed (TK-8): `src/seed.ts` exports `seed(databaseUrl)` and `SEED_IDS`;
+`scripts/seed.ts` loads `DATABASE_URL` (environment or `.env`) and calls it. It opens a
+`pg` connection and runs, in one transaction, `INSERT ... ON CONFLICT (id) DO UPDATE`
+statements with fixed UUIDs and a fixed timestamp (`2026-01-01T00:00:00.000Z`, never the
+clock), so two runs give the same database. Content: one organization (`demo`), two users
+and their members (`admin`, `client`) and one project. No `accounts` row is written, so
+no password is seeded. The rest of the vision §18.3 seed (fictional spec, sprint,
+6 tickets) waits for the R1 tables (TK-33).
 
 ```mermaid
 flowchart LR

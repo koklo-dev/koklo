@@ -13,6 +13,7 @@ KOKLO_DB_PORT=5433 docker compose up -d postgres   # depuis la racine ; 5432 par
 cp packages/db/.env.example packages/db/.env       # ajuster le port si besoin
 pnpm db:migrate                                    # prisma migrate deploy
 pnpm db:rollback                                   # annule la dernière migration
+pnpm db:seed                                       # jeu de démo déterministe (idempotent)
 pnpm --filter @koklo/db generate                   # client dans packages/db/generated (ignoré par git)
 ```
 
