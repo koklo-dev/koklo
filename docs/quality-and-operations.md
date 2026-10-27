@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 5d36e27
+covers_commit: 35d2b8b
 ---
 # Quality and operations
 
@@ -109,6 +109,12 @@ header of `agent-loop.sh`:
 | `purge-worktrees.sh` | reclaims disk from worktrees and stale local branches left by killed runs |
 | `notify.sh` | pluggable phone notifications; silent no-op when no backend is set |
 | `happy-pilot.sh` | tmux-wrapped Claude session to monitor and unblock the loop from mobile |
+
+- PR body refresh (`sync_pr_body` in `agent-loop.sh`, commit `aaf14e6`): the body is
+  now written through the REST API (`gh api -X PATCH` on the pull request), with
+  `gh pr edit --body-file` kept as fallback. Per the code comment, `gh pr edit` goes
+  through GraphQL and fails on repositories where gh still sees a classic project, so
+  the reviewer judged a stale body. A failure of both is logged and non-fatal.
 
 Machine-specific settings go in `.project/loop/env.local` (git-ignored).
 

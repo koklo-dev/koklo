@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: 5d36e27
+covers_commit: 35d2b8b
 ---
 # Architecture
 
@@ -208,6 +208,15 @@ The delivery loop runs agents in git worktrees. Project-level permissions in
 shipyard scripts under `~/.claude/shipyard/bin/` (three spellings: absolute path,
 `$HOME`, quoted `"$HOME"`), and read access to the vault `koklo-v2/**`. The `deny`
 list is unchanged. Source: commit `9be9b7e` (#7).
+
+Commit `5d36e27` (#9) extends that list: `node *`, `awk *`, `chmod +x *`,
+`make help|lint*|test*|build*`, `bash .github/scripts/*`, read-only `git check-ignore`
+and `git config --get`, the history-rewriting or branch-switching git commands
+`git restore|checkout|switch|cherry-pick|reset|rerere|stash`, and two more spellings of
+the shipyard scripts (`~/.claude/shipyard/bin/*`, `bash .../shipyard/bin/*`). The vault
+read rule now uses `~/perso/projets/MyVault/koklo-v2/**`, and the vault is added to
+`additionalDirectories`. `deny` gains `Edit(~/perso/projets/MyVault/koklo-v2/vision.md)`,
+which protects the vision file from agent edits.
 
 ## 7. Decisions
 Architecture decisions live in [decisions/](decisions/) as ADRs.
