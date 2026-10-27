@@ -3,7 +3,18 @@ import { designTokens, effectiveTheme, loadBlocks, norm } from "./helpers/css.ts
 import { cssPath } from "./helpers/paths.ts";
 
 /** Variables autorisées en plus de DESIGN.md §2.1 dans theme.css + tentative.css (Q2 de l'analyse). */
-const ALLOWED_EXTENSIONS = ["--destructive-foreground"];
+const ALLOWED_EXTENSIONS = [
+  "--destructive-foreground",
+  // TK-85 : alias de la barre latérale shadcn, chacun pointe vers un token existant (02-design.md §2).
+  "--sidebar",
+  "--sidebar-foreground",
+  "--sidebar-primary",
+  "--sidebar-primary-foreground",
+  "--sidebar-accent",
+  "--sidebar-accent-foreground",
+  "--sidebar-border",
+  "--sidebar-ring",
+];
 
 describe("CA1 - source de vérité DESIGN.md §2.1", () => {
   it("expose 19 variables en clair (dont --radius) et 18 en sombre", () => {

@@ -18,6 +18,14 @@
   --border: #e6e1f8;
   --input: #e6e1f8;
   --radius: 0.5rem;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--card-foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
 .dark {
