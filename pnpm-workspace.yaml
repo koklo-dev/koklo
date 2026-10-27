@@ -7,5 +7,18 @@ allowBuilds:
   "@prisma/engines": true
   prisma: true
 
+# Temporaire (TK-11) : better-auth 1.7.14 a ete publie le 2026-10-26 (moins que le delai minimum
+# de la politique supply-chain de pnpm). A RETIRER des que le delai est ecoule (des le 2026-10-28)
+# ou lors du prochain bump de better-auth ; verifier alors avec `pnpm install --frozen-lockfile`.
+minimumReleaseAgeExclude:
+  - "@better-auth/core@1.7.14"
+  - "@better-auth/drizzle-adapter@1.7.14"
+  - "@better-auth/kysely-adapter@1.7.14"
+  - "@better-auth/memory-adapter@1.7.14"
+  - "@better-auth/mongo-adapter@1.7.14"
+  - "@better-auth/prisma-adapter@1.7.14"
+  - "@better-auth/telemetry@1.7.14"
+  - better-auth@1.7.14
+
 overrides:
   multer: 2.5.0

@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: e084ff1
+covers_commit: 476c046
 ---
 # Onboarding — humans and AI agents
 
@@ -81,8 +81,8 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   **before** `migrate dev`; procedure in `packages/db/README.md` and
   [domain-model.md](domain-model.md#persistence-and-migrations). Never edit
   `packages/db/src/generated/` (git-ignored, produced by `pnpm --filter @koklo/db generate`).
-- `apps/api` is run with `cp apps/api/.env.example apps/api/.env` then `pnpm --filter @koklo/api dev`; its integration tests start a throwaway Postgres through Docker (or use `TEST_DATABASE_URL`).
-- Decisions: [ADR 0002](adr/0002-project-port-in-api.md); the layout decision is recorded in
+- `apps/api` is run with `cp apps/api/.env.example apps/api/.env` then `pnpm --filter @koklo/api dev`. Since TK-11 it refuses to start without `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`), `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: create a GitHub OAuth App per environment with the callback `<BETTER_AUTH_URL>/api/auth/callback/github`, and never commit the secrets. With `APP_ENV=test`, the header `x-test-session: <userId>:<organizationId>` replaces the cookie (see [api-contract.md](api-contract.md#authentication-and-authorization)). Its integration tests start a throwaway Postgres through Docker (or use `TEST_DATABASE_URL`).
+- Decisions: [ADR 0002](adr/0002-project-port-in-api.md), [ADR 0003](adr/0003-better-auth-session-guard.md); the layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.
 

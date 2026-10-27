@@ -1,22 +1,26 @@
 import { Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
+import type { Request } from "express";
+import { sessionOf } from "../auth/session.guard.ts";
 
 export const ORGANIZATION_CONTEXT = Symbol("ORGANIZATION_CONTEXT");
 
 /** Organisation pour laquelle la requête courante agit. */
 export interface OrganizationContext {
-  organizationId(): Promise<string>;
+  organizationId(request: Request): Promise<string>;
 }
 
 /**
- * Implémentation fermée par défaut : sans session, aucune organisation n'est connue, donc 401.
- * TODO(TK-11): remplacer par l'organisation active de la session Better Auth.
+ * Organisation de la session résolue par le garde. Elle ne vient jamais du client (corps, query,
+ * en-tête) : sans session posée par le garde, la requête est refusée (401).
  */
 @Injectable()
-export class DenyOrganizationContext implements OrganizationContext {
-  async organizationId(): Promise<string> {
-    throw new ORPCError("UNAUTHORIZED", {
-      message: "Session absente ou expirée",
-    });
+export class SessionOrganizationContext implements OrganizationContext {
+  async organizationId(request: Request): Promise<string> {
+    const session = sessionOf(request);
+    if (!session) {
+      throw new ORPCError("UNAUTHORIZED", { message: "Session absente ou expirée" });
+    }
+    return session.organizationId;
   }
 }

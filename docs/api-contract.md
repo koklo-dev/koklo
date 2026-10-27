@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: e084ff1
+covers_commit: 476c046
 ---
 # API contract
 
@@ -50,8 +50,29 @@ ones it lists:
 In the generated OpenAPI, the `INTERNAL` payload is the component schema `Internal`.
 
 ## Authentication and authorization
-The contract only declares the `UNAUTHORIZED` and `FORBIDDEN` errors on `project.list`.
-`apps/api` enforces access server-side through the `OrganizationContext` port: its default implementation is closed and raises `UNAUTHORIZED` (401), so `GET /projects` answers 401 until the session (Better Auth, TK-11) provides the organization. `FORBIDDEN` is declared but not yet emitted. The repository port has no "list everything" method: every read is filtered by `organizationId`. The Prisma tenant-filter extension of CDC §18.4 does not exist yet.
+`project.list` requires a session (TK-11, [ADR 0003](adr/0003-better-auth-session-guard.md)).
+`apps/api` mounts Better Auth on `/api/auth/*` (GitHub OAuth sign-in and callback, sign-out);
+these routes belong to Better Auth, not to the oRPC contract. The session is a signed Better
+Auth cookie.
+
+A per-procedure Nest guard (`SessionGuard`, `@UseGuards` on `ProjectController.list`; not
+global) resolves the session before the service runs. The request is refused with the typed
+`UNAUTHORIZED` error (401, body `{ code, status, message, ... }`) when:
+
+- there is no cookie, or it is unknown, forged or expired;
+- the session has no active organization;
+- the user is not a member of the active organization (checked in the `member` table).
+
+The organization used for the query comes only from the resolved session
+(`SessionOrganizationContext`); an organization sent by the client (header, query, body) is
+ignored. `FORBIDDEN` is declared but not emitted. The repository port has no "list
+everything" method: every read is filtered by `organizationId`. The Prisma tenant-filter
+extension of CDC §18.4 does not exist yet.
+
+Test session (e2e only): when `APP_ENV=test`, the header
+`x-test-session: <userId>:<organizationId>` is accepted (exactly two non-empty segments,
+otherwise 401). In any other `APP_ENV` the test resolver is not registered and the header
+is ignored.
 
 `GET /health` and `GET /openapi.json` are public. When the database does not answer within 2 s, `/health` returns `INTERNAL` (500) with `requestId` (`x-request-id` if given, otherwise a UUID); no connection detail is exposed.
 

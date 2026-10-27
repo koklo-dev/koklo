@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: e084ff1
+covers_commit: 476c046
 ---
 # Architecture
 
@@ -222,7 +222,9 @@ flowchart LR
 that implements `@koklo/contract` with `@orpc/nest` (`@Implement`). It is compiled with
 `tsc` (decorators need `experimentalDecorators`; Node cannot strip them) and started with
 `pnpm --filter @koklo/api start`. Configuration is read once at startup and validated
-with Zod (`DATABASE_URL`, `PORT`, `APP_ENV`, `APP_VERSION`; see `apps/api/.env.example`).
+with Zod (`DATABASE_URL`, `PORT`, `APP_ENV`, `APP_VERSION` and, since TK-11, `BETTER_AUTH_SECRET` (32 characters minimum),
+`BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`; see `apps/api/.env.example`).
+A configuration error names the variable and the rule, never the received value.
 The `project` module keeps its port in `apps/api` ([ADR 0002](adr/0002-project-port-in-api.md)).
 `@koklo/db` now exports `createDbClient` (Prisma 7 + `@prisma/adapter-pg`), `seed` and
 `SEED_IDS`, plus the `@koklo/db/testing` sub-path used by integration tests; the Prisma
@@ -236,7 +238,41 @@ flowchart LR
   svc --> port["ProjectRepository / DatabaseProbe (ports)"]
   port --> adapter["Prisma adapters"]
   adapter --> pg[("PostgreSQL")]
-  ctl -. "OrganizationContext (401 until TK-11)" .-> svc
+  ctl -. "SessionGuard + OrganizationContext (session)" .-> svc
+```
+
+### Authentication and session guard (TK-11)
+`apps/api/src/auth/` (global `AuthModule.forRoot(config)`):
+
+| File | Role |
+|------|------|
+| `auth.ts` | `createAuth`: Better Auth with GitHub OAuth, Prisma adapter on the shared client (UUID ids), `organization()` plugin (active organization carried by the session) |
+| `auth.controller.ts` | Mounts Better Auth on `/api/auth/*` |
+| `session.ts` | `AuthSession { userId, organizationId }` and the `SessionResolver` port (`null` = unauthenticated) |
+| `better-auth-session.resolver.ts` | Real resolver: Better Auth session, active organization, `member` row check |
+| `session.guard.ts` | `SessionGuard` (per procedure) stores the session on the request; `sessionOf(request)` reads it |
+| `test-session.ts` | `x-test-session` resolver, registered only when `APP_ENV=test` |
+| `orpc-error.filter.ts` | Renders a guard's `ORPCError` in the typed contract format; statuses from `ERROR_STATUS_MAP` (`src/error-status.ts`, shared with `ORPCModule`) |
+
+`SessionOrganizationContext` replaces the closed `DenyOrganizationContext` of TK-10 and
+returns the organization of the session set by the guard.
+
+```mermaid
+sequenceDiagram
+  actor C as Client
+  participant G as SessionGuard
+  participant R as SessionResolver
+  participant S as ProjectService
+  C->>G: GET /projects (cookie)
+  G->>R: resolve(headers)
+  alt session, active organization and membership
+    R-->>G: { userId, organizationId }
+    G->>S: list(organizationId)
+    S-->>C: 200 projects
+  else otherwise
+    R-->>G: null
+    G-->>C: 401 UNAUTHORIZED (OrpcErrorFilter)
+  end
 ```
 
 ## 5. Runtime views
@@ -299,4 +335,6 @@ read rule now uses `~/perso/projets/MyVault/koklo-v2/**`, and the vault is added
 which protects the vision file from agent edits.
 
 ## 7. Decisions
-Architecture decisions live in [decisions/](decisions/) as ADRs.
+Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones are in `adr/`:
+[0001](adr/0001-monorepo-pnpm-turborepo.md), [0002](adr/0002-project-port-in-api.md),
+[0003](adr/0003-better-auth-session-guard.md).
