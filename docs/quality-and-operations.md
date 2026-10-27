@@ -26,6 +26,9 @@ covers_commit: 5d36e27
   `deep-import` fixture (`web` importing `@fixture/ui/src/button`) must make
   `check-deep-imports` exit 1; `exports` patterns and the real repository (no deep
   import) are also covered. Do not "fix" the violating fixtures.
+- **Size gate under test** (`packages/config/test/check-size.test.ts`): covers the
+  acceptance criteria of TK-2 (301-line source file fails, waiver handling, migrations
+  and generated files not counted). Test names and fixtures: see the file.
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 
@@ -36,6 +39,14 @@ covers_commit: 5d36e27
   `turbo boundaries` and the deep-import check (TK-3, see
   [architecture.md](architecture.md#package-boundaries-tk-3)). Any of the three failing
   fails the lint.
+- `pnpm check:size` (also run by `pnpm lint`, after `biome ci`): fails when a source
+  file exceeds 300 lines or a test file 500 lines, unless covered by a non-expired
+  waiver in `.koklo/waivers.yaml`. Failure output is one line per file on stderr,
+  prefixed `check:size`, e.g. `path/file.ts : 301 lignes (limite 300)`; an expired
+  waiver adds `dérogation expirée le <date> (<auteur>)`. Details and the waiver
+  format: [architecture.md](architecture.md#file-size-gate-checksize-tk-2).
+  Adding a waiver: append an entry to `waivers:` in `.koklo/waivers.yaml` with a real
+  justification and an expiry date; remove it once the file is split.
 - `pnpm typecheck`: `tsc --noEmit` against `tsconfig.base.json` (TypeScript 7.0.2).
 - `pnpm build`: `packages/config` has nothing to build (`echo 'nothing to build'`).
 - Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,

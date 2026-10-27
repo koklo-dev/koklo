@@ -1,0 +1,9 @@
+# Dérogations à la limite de taille de fichier (CDC §17.2).
+# Chaque entrée lève le plafond pour UN fichier, jusqu'à la fin du jour `expires` (UTC).
+# Tous les champs sont obligatoires :
+#   - file: chemin relatif à la racine du dépôt, séparateur "/"
+#     rule: max-file-lines
+#     justification: "pourquoi le fichier ne peut pas être découpé maintenant"
+#     author: "prenom.nom"
+#     expires: 2026-12-31   # YYYY-MM-DD ; au-delà, check:size échoue
+waivers: []
