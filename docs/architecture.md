@@ -3,9 +3,10 @@ title: Architecture
 audience: technical
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-26
+last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
+covers_commit: 5d36e27
 ---
 # Architecture
 
@@ -76,6 +77,41 @@ flowchart TB
 - **Rule for new code**: every new workspace package exposes the `lint`, `typecheck`,
   `test` and `build` scripts so it enters the Turborepo graph, and extends the shared
   configs instead of redefining them.
+
+### Package boundaries (TK-3)
+Dependencies between workspace packages are constrained by tags (CDC §16.4). Each
+package declares one tag in its own `turbo.json` (`{ "extends": ["//"], "tags": ["domain"] }`);
+the rules live in `boundaries.tags` of the root `turbo.json` and are checked by
+`turbo boundaries`. Only `packages/config` (tag `config`) exists today.
+
+```mermaid
+flowchart LR
+  cli --> contract & schema & delivery & rules
+  delivery --> domain & contract & rules
+  github --> domain & contract
+  rules --> domain & contract
+  db --> domain
+  domain --> contract
+  web --> contract & schema & ui
+  api["api, worker"] -. "forbidden: cli, ui, web" .-> web
+```
+
+- `allow` lists (every tag also allows `config`): `domain` → `contract`; `db` →
+  `domain`; `contract`, `schema`, `ui` → nothing else; `github`, `rules` → `domain`,
+  `contract`; `delivery` → `domain`, `contract`, `rules`; `cli` → `contract`,
+  `schema`, `delivery`, `rules`; `web` → `contract`, `ui`, `schema`.
+- `api` and `worker` use `deny` (`cli`, `ui`, `web`) instead of an allow list, so they
+  may depend on any other tag.
+- A package without a tag is not subject to any rule.
+- **Deep imports** (`@scope/pkg/src/...`) are refused by a second check,
+  `packages/config/src/check-deep-imports.ts` (logic in `src/deep-imports.ts`), because
+  `turbo boundaries` does not detect them. It reads the workspaces from
+  `pnpm-workspace.yaml`, scans source files (`.js/.ts/.jsx/.tsx` and `m`/`c` variants,
+  skipping `node_modules`, `dist`, `.next`, `.turbo`, `coverage`, `fixtures`) and accepts
+  a subpath only if it matches a key of the target package's `exports` (`*` patterns
+  supported). Exit code 1 and a message on stderr otherwise.
+- Both checks run from the root `lint` script:
+  `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
 
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical

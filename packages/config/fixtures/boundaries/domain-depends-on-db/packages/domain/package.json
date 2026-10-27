@@ -1,0 +1,6 @@
+{
+  "name": "@fixture/domain",
+  "version": "0.0.0",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@fixture/db": "workspace:*" }
+}

@@ -3,9 +3,10 @@ title: Quality and operations
 audience: technical
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-26
+last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
+covers_commit: 5d36e27
 ---
 # Quality and operations
 
@@ -18,13 +19,23 @@ sources: []
 - **Lint rules under test** (`packages/config/test/biome-rules.test.ts`): runs
   `biome ci` on `packages/config/fixtures/`. A 51-line function must fail with
   `noExcessiveLinesPerFunction`; a 50-line function must pass.
+- **Boundary rules under test** (`packages/config/test/boundaries.test.ts`): copies the
+  workspaces of `packages/config/fixtures/boundaries/` to a temporary directory, applies
+  the root `turbo.json` `boundaries` block and runs `turbo boundaries`. `valid` must
+  pass (exit 0); `domain-depends-on-db` must fail and name `@fixture/db`. The
+  `deep-import` fixture (`web` importing `@fixture/ui/src/button`) must make
+  `check-deep-imports` exit 1; `exports` patterns and the real repository (no deep
+  import) are also covered. Do not "fix" the violating fixtures.
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 
 ### Lint, types and build (workspace)
 - `pnpm lint`: `biome ci` per package, using the shared `packages/config/biome.json`
   (formatter: spaces, line width 100; recommended rules plus the three error-level
-  rules listed in [architecture.md](architecture.md#monorepo-workspace-tk-1)).
+  rules listed in [architecture.md](architecture.md#monorepo-workspace-tk-1)), then
+  `turbo boundaries` and the deep-import check (TK-3, see
+  [architecture.md](architecture.md#package-boundaries-tk-3)). Any of the three failing
+  fails the lint.
 - `pnpm typecheck`: `tsc --noEmit` against `tsconfig.base.json` (TypeScript 7.0.2).
 - `pnpm build`: `packages/config` has nothing to build (`echo 'nothing to build'`).
 - Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,
