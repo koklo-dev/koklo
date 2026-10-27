@@ -47,5 +47,5 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 
 | Écran | Version | Dernier ticket |
 |---|---|---|
-| [S-login](screens/S-login.md) | 1 | TK-14 |
-| [S-projects](screens/S-projects.md) | 1 | TK-14 |
+| [S-login](screens/S-login.md) | 2 | TK-85 |
+| [S-projects](screens/S-projects.md) | 2 | TK-85 |

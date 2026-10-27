@@ -94,9 +94,16 @@ test("mobile 375 px : pas de défilement horizontal, cibles de 44 px", async ({ 
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(overflow).toBe(false);
-  const box = await page.getByRole("button", { name: "Passer au thème sombre" }).boundingBox();
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-  expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+  // TK-85 : la bascule de thème vit dans la sidebar, qui est une Sheet sous 768 px : on l'ouvre d'abord.
+  await page.getByRole("button", { name: "Ouvrir la barre latérale" }).click();
+  const toggle = page.getByRole("button", { name: "Passer au thème sombre" });
+  // La Sheet entre en 150 ms (échelle 0,97 → 1) : on mesure une fois la taille stabilisée.
+  await expect
+    .poll(async () => {
+      const box = await toggle.boundingBox();
+      return Math.min(box?.height ?? 0, box?.width ?? 0);
+    })
+    .toBeGreaterThanOrEqual(44);
 });
 
 test("mouvement réduit : le squelette ne pulse pas", async ({ page }) => {

@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: ade3f4d
+covers_commit: 558d95f
 ---
 # Quality and operations
 
@@ -256,3 +256,31 @@ fake e2e secret defined in the script (no real secret). It does not use the stub
 `apps/web/e2e`. The CI job `e2e` runs the same command (`pnpm --filter @koklo/e2e exec playwright
 install --with-deps chromium` first). `turbo run e2e` still only runs the stub-API suites of
 `apps/web` and `packages/ui`; the real-stack package exposes its Playwright call as `stack`.
+
+## App shell and login blocks (TK-85)
+
+`apps/web` uses the shadcn blocks `sidebar-07` (app shell) and `login-05` (login page), installed
+with the shadcn CLI; shared components live in `@koklo/ui`. Only tokens, icons (`Icon`, Material
+Symbols Rounded) and copy differ from the blocks. Screen contracts: `design/screens/S-login.md`
+and `design/screens/S-projects.md` (both version 2).
+
+Tests that guard it (viewport simulated by `test/viewport.ts` in `apps/web` and `packages/ui`;
+`setup.ts` of both packages updated accordingly):
+- `packages/ui/test/sidebar.test.tsx`: exports, `SidebarTrigger` (named button, `aria-expanded`,
+  Enter and Ctrl+B), no `complementary` landmark, mobile `Sheet` (Escape closes and returns focus
+  to the trigger), 768 px breakpoint (768 desktop, 767 mobile), tooltip on keyboard focus.
+- `packages/ui/test/sidebar-tokens.test.ts`: every `--sidebar-*` variable in `theme.css` is
+  colour-literal free in light and dark, exposed to Tailwind, width `15.5rem` (248 px).
+- `packages/ui/test/no-hardcoded-colors.test.ts`: no hard-coded colour and no inline SVG
+  (Lucide) in the added components.
+- `apps/web/test/app-shell-sidebar.test.tsx`: `data-testid="app-shell"` kept, one `main`,
+  `nav` "Navigation principale" with `aria-current="page"`, no demo data, focus order, light/dark
+  toggle, mobile `Sheet`.
+- `apps/web/test/login-05.test.tsx`: single GitHub provider, no input field, layout, states
+  (redirecting with `aria-busy`, then error alert).
+- Playwright (stub API, `apps/web/e2e/sidebar.spec.ts`): keyboard collapse/expand, Tab order with
+  visible focus, axe WCAG AA in light and dark, expanded and collapsed, mobile `Sheet`. In
+  `projects.spec.ts` the 375 px test now opens the sidebar ("Ouvrir la barre latérale") before
+  checking the 44 px theme toggle, which lives inside the `Sheet` on mobile.
+
+Selector changes for the real-stack e2e of TK-15: TO DOCUMENT (not part of this diff).

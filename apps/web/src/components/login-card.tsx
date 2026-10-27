@@ -12,7 +12,6 @@ import {
 } from "@koklo/ui";
 import { useState } from "react";
 import { authClient } from "../lib/auth-client.ts";
-import { BrandMark } from "./brand-mark.tsx";
 
 type Status = "idle" | "redirecting" | "failed";
 
@@ -34,9 +33,8 @@ export function LoginCard() {
 
   const busy = status === "redirecting";
   return (
-    <Card className="w-full max-w-[400px]">
+    <Card>
       <CardHeader>
-        <BrandMark />
         <h1 className="text-[24px] font-semibold tracking-[-0.015em]">Connexion à Koklo</h1>
         <CardDescription>
           Connectez-vous avec votre compte GitHub pour accéder à vos projets.

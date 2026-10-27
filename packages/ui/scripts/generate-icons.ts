@@ -45,6 +45,8 @@ export const ICON_NAMES = [
   "unfold_more",
   "light_mode",
   "dark_mode",
+  "left_panel_close",
+  "left_panel_open",
   // Glyphes internes des composants
   "check",
   "close",
