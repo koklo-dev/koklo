@@ -1,0 +1,39 @@
+/* Thème Indigo - DESIGN.md §2.1.
+   --primary, --ring, --destructive et --destructive-foreground (valeurs « à confirmer »)
+   vivent uniquement dans tentative.css. */
+:root {
+  --background: #ffffff;
+  --foreground: #14102b;
+  --card: #ffffff;
+  --card-foreground: #14102b;
+  --popover: #ffffff;
+  --popover-foreground: #14102b;
+  --primary-foreground: #ffffff;
+  --secondary: #eeeaff;
+  --secondary-foreground: #43299f;
+  --muted: #f7f5ff;
+  --muted-foreground: #55507a;
+  --accent: #eeeaff;
+  --accent-foreground: #43299f;
+  --border: #e6e1f8;
+  --input: #e6e1f8;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0d0b1c;
+  --foreground: #f1efff;
+  --card: #15122b;
+  --card-foreground: #f1efff;
+  --popover: #15122b;
+  --popover-foreground: #f1efff;
+  --primary-foreground: #0d0b1c;
+  --secondary: #231d4a;
+  --secondary-foreground: #cbc1ff;
+  --muted: #15122b;
+  --muted-foreground: #a9a3d4;
+  --accent: #231d4a;
+  --accent-foreground: #cbc1ff;
+  --border: #2a2550;
+  --input: #2a2550;
+}

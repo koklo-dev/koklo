@@ -41,7 +41,7 @@ flowchart TB
 ### Monorepo workspace (TK-1)
 The code is a pnpm workspace orchestrated by Turborepo
 ([ADR 0001](adr/0001-monorepo-pnpm-turborepo.md)). `pnpm-workspace.yaml` declares
-`apps/*`, `packages/*` and `e2e`; `apps/api`, `packages/config`, `packages/contract` and `packages/db` exist.
+`apps/*`, `packages/*` and `e2e`; `apps/api`, `packages/config`, `packages/contract`, `packages/db` and `packages/ui` exist.
 
 ```mermaid
 flowchart TB
@@ -275,6 +275,37 @@ sequenceDiagram
   end
 ```
 
+### UI foundations (TK-13)
+`packages/ui` (`@koklo/ui`) holds the visual foundations only: no business component and no
+screen yet. Values come from `DESIGN.md` (§2 colours, §3 typography); Tailwind v4 is
+configured CSS-first (no `tailwind.config`), and `components.json` points shadcn/ui at
+`src/styles/index.css`. Dark mode is the `.dark` class on `html`.
+
+| File (`src/styles/`) | Role |
+|------|------|
+| `theme.css` | `:root` and `.dark` blocks of DESIGN.md §2.1, except the "to confirm" values |
+| `tentative.css` | The only file declaring `--primary`, `--ring`, `--destructive`, `--destructive-foreground` (values "to confirm"): change the accent or destructive red here only |
+| `status.css` | `--status-{validated,pending,revise}-{bg,fg}`, light and dark; the brand violet is never a status |
+| `typography.css` | `--font-sans`, `--font-mono` and the scale `--text-<role>-{size,weight,tracking,font}` |
+| `fonts.css` | Self-hosted Fontsource fonts: Instrument Sans 400-700, JetBrains Mono 400-500 |
+| `index.css` | Entry point (`@import "@koklo/ui/styles.css"`): Tailwind, the files above, `@theme inline` mapping to shadcn names and `bg-status-*` utilities |
+
+`src/lib/cn.ts` (clsx + tailwind-merge) is the only code exported (`@koklo/ui`, built to
+`dist/`); the CSS files are exported raw (`./styles.css`, `./theme.css`, ...).
+
+```mermaid
+flowchart LR
+  idx[index.css] --> tw[tailwindcss]
+  idx --> fonts[fonts.css] --> fs[(@fontsource/*)]
+  idx --> theme[theme.css]
+  idx --> tent[tentative.css]
+  idx --> status[status.css]
+  idx --> typo[typography.css]
+  idx --> map["@theme inline: shadcn + status names"]
+```
+
+Decision: [ADR 0004](adr/0004-ui-foundations-tokens-and-fonts.md).
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).
@@ -337,4 +368,5 @@ which protects the vision file from agent edits.
 ## 7. Decisions
 Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones are in `adr/`:
 [0001](adr/0001-monorepo-pnpm-turborepo.md), [0002](adr/0002-project-port-in-api.md),
-[0003](adr/0003-better-auth-session-guard.md).
+[0003](adr/0003-better-auth-session-guard.md),
+[0004](adr/0004-ui-foundations-tokens-and-fonts.md).

@@ -1,0 +1,17 @@
+/* Valeurs « à confirmer » (DESIGN.md §2.1) : seul fichier à modifier pour changer l'accent
+   ou le rouge destructif. Les composants ne référencent que les noms de variables.
+   --destructive-foreground n'est pas dans DESIGN.md (shadcn le consomme) : défaut proposé
+   à valider par le designer ; contraste >= 4,5:1 vérifié par les tests. */
+:root {
+  --primary: #5b3fd9;
+  --ring: #5b3fd9;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+}
+
+.dark {
+  --primary: #9b87ff;
+  --ring: #9b87ff;
+  --destructive: #f87171;
+  --destructive-foreground: #0d0b1c;
+}

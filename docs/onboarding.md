@@ -54,6 +54,11 @@ package: `pnpm --filter @koklo/config test`. The smallest useful change at this 
 is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
 
 ## Conventions that are not obvious from the code
+- UI tokens (TK-13): never hard-code a colour or a font in an app. Use the variables of
+  `packages/ui` (read `DESIGN.md` first). The "to confirm" values (`--primary`, `--ring`,
+  `--destructive`, `--destructive-foreground`) live only in
+  `packages/ui/src/styles/tentative.css`. Fonts are self-hosted through Fontsource: never
+  add a Google Fonts link. See [architecture.md](architecture.md#ui-foundations-tk-13).
 - Quality limits are defined once, in `packages/config/biome.json`: functions of at
   most 50 lines, cognitive complexity at most 15, no explicit `any`. Do not override
   them per package; split the code instead.

@@ -1,0 +1,19 @@
+/* Couleurs de statut - DESIGN.md §2.2. Valeurs littérales : le violet de marque
+   n'est jamais un statut. */
+:root {
+  --status-validated-bg: #dcfce7;
+  --status-validated-fg: #166534;
+  --status-pending-bg: #fef3c7;
+  --status-pending-fg: #92400e;
+  --status-revise-bg: #fee2e2;
+  --status-revise-fg: #991b1b;
+}
+
+.dark {
+  --status-validated-bg: #14532d;
+  --status-validated-fg: #bbf7d0;
+  --status-pending-bg: #78350f;
+  --status-pending-fg: #fde68a;
+  --status-revise-bg: #7f1d1d;
+  --status-revise-fg: #fecaca;
+}

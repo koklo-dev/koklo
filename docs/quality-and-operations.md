@@ -60,6 +60,17 @@ covers_commit: 9830e2e
   `auth-oauth.test.ts` (`/api/auth/*` mounted and returns the GitHub authorization URL;
   callback with a simulated GitHub creates user, account and session; unknown `state`
   creates none).
+- **UI foundations tests** (`packages/ui/test/`, TK-13, `pnpm --filter @koklo/ui test`):
+  `theme-fidelity.test.ts` checks that every variable of DESIGN.md §2.1 exists with the same
+  value, light and dark; `theme-mapping.test.ts` the `@theme inline` mapping;
+  `contrast.test.ts` requires WCAG AA 4.5:1 for every text/background pair of §2.1 and for
+  the three statuses of §2.2, in `:root` and `.dark` (a pair below the threshold fails the
+  suite; the helper itself is tested on #787878 vs #767676 on white);
+  `fonts.test.ts` and `fonts-transitive.test.ts` forbid any `fonts.googleapis.com` /
+  `fonts.gstatic.com` reference and any remote source, and require the exact Fontsource
+  weights; `status-typography.test.ts` covers the status variables and the type scale;
+  `cn.test.ts` covers `cn`. Changing a "to confirm" value in `tentative.css` is validated by
+  these same tests.
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 
@@ -79,7 +90,8 @@ covers_commit: 9830e2e
   Adding a waiver: append an entry to `waivers:` in `.koklo/waivers.yaml` with a real
   justification and an expiry date; remove it once the file is split.
 - `pnpm typecheck`: `tsc --noEmit` against `tsconfig.base.json` (TypeScript 7.0.2).
-- `pnpm build`: `packages/config` has nothing to build (`echo 'nothing to build'`).
+- `pnpm build`: `packages/config` has nothing to build (`echo 'nothing to build'`);
+  `packages/ui` compiles `cn` to `dist/` with `tsc -p tsconfig.build.json`.
 - Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,
   Biome 2.6.3, Vitest 5.0.5, TypeScript 7.0.2.
 
