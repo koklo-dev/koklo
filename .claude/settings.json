@@ -51,8 +51,30 @@
       "Bash(/home/devops/.claude/shipyard/bin/*)",
       "Bash($HOME/.claude/shipyard/bin/*)",
       "Bash(\"$HOME/.claude/shipyard/bin/*)",
-      "Read(/home/devops/perso/projets/MyVault/koklo-v2/**)"
+      "Bash(node *)",
+      "Bash(awk *)",
+      "Bash(chmod +x *)",
+      "Bash(make help)",
+      "Bash(make lint*)",
+      "Bash(make test*)",
+      "Bash(make build*)",
+      "Bash(bash .github/scripts/*)",
+      "Bash(git check-ignore *)",
+      "Bash(git restore *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git cherry-pick *)",
+      "Bash(git reset *)",
+      "Bash(git rerere *)",
+      "Bash(git stash *)",
+      "Bash(git config --get *)",
+      "Bash(~/.claude/shipyard/bin/*)",
+      "Bash(bash ~/.claude/shipyard/bin/*)",
+      "Bash(bash /home/devops/.claude/shipyard/bin/*)",
+      "Bash(bash $HOME/.claude/shipyard/bin/*)",
+      "Read(~/perso/projets/MyVault/koklo-v2/**)"
     ],
+    "additionalDirectories": ["/home/devops/perso/projets/MyVault/koklo-v2"],
     "deny": [
       "Bash(curl:*)",
       "Bash(wget:*)",
@@ -77,7 +99,8 @@
       "Edit(.env)",
       "Edit(**/.env)",
       "Edit(**/.env.local)",
-      "Edit(~/.ssh/**)"
+      "Edit(~/.ssh/**)",
+      "Edit(~/perso/projets/MyVault/koklo-v2/vision.md)"
     ]
   },
   "sandbox": {
