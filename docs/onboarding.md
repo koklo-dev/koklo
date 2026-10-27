@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: 37e0fd3
 ---
 # Onboarding — humans and AI agents
 
@@ -39,7 +39,13 @@ pnpm test        # turbo run test  (vitest run --coverage)
 pnpm build       # turbo run build
 pnpm dev         # turbo run dev
 pnpm e2e         # turbo run e2e (no workspace defines this task yet)
+pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
+pnpm db:rollback # undo the latest migration through its down.sql
 ```
+
+Local database (TK-7): `docker compose up -d postgres` at the root (set `KOKLO_DB_PORT`
+if 5432 is taken), then `cp packages/db/.env.example packages/db/.env`. The `@koklo/db`
+tests need Docker (or `TEST_DATABASE_URL`) and fail rather than skip without it.
 
 Layout and shared configuration (`packages/config`): see
 [architecture.md](architecture.md#monorepo-workspace-tk-1). Running a task for one
@@ -70,6 +76,10 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   `openapi/openapi.json` and `openapi/versions.json`; otherwise the contract test fails
   (see [api-contract.md](api-contract.md#compatibility-and-breaking-changes)). Never edit
   those two files by hand. oRPC is pinned to a v2 beta on purpose.
+- Every Prisma migration in `packages/db/prisma/migrations/` ships a `down.sql`, generated
+  **before** `migrate dev`; procedure in `packages/db/README.md` and
+  [domain-model.md](domain-model.md#persistence-and-migrations). Never edit
+  `packages/db/generated/` (git-ignored).
 - The layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.

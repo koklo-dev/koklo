@@ -1,0 +1,29 @@
+{
+  "name": "@koklo/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "biome ci --config-path=../.. .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "build": "tsc -p tsconfig.build.json",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "rollback": "node scripts/rollback.ts"
+  },
+  "dependencies": {
+    "@koklo/config": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@vitest/coverage-v8": "5.0.5",
+    "prisma": "7.10.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

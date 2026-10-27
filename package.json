@@ -10,7 +10,9 @@
     "test": "turbo run test",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "e2e": "turbo run e2e"
+    "e2e": "turbo run e2e",
+    "db:migrate": "pnpm --filter @koklo/db migrate",
+    "db:rollback": "pnpm --filter @koklo/db rollback"
   },
   "devDependencies": {
     "turbo": "2.11.10"

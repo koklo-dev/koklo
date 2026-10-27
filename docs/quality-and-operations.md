@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-27
 covers_release: unreleased
 sources: []
-covers_commit: c3841a8
+covers_commit: 37e0fd3
 ---
 # Quality and operations
 
@@ -38,6 +38,14 @@ covers_commit: c3841a8
   `info.version` = `package.json` version, sha256 = entry in `openapi/versions.json`);
   CT-9 checks the public exports and inferred types. Details:
   [api-contract.md](api-contract.md#compatibility-and-breaking-changes).
+- **Database tests** (`packages/db/test/`, `packages/db/src/rollback.test.ts`, TK-7):
+  `migration-cycle.test.ts` (T1.x) applies `migrate deploy` on an empty ephemeral
+  Postgres 17, runs `down.sql`, applies again, and requires an empty
+  `migrate diff --exit-code` against `schema.prisma`; T2.1 requires a non-empty
+  `down.sql` in every migration. `schema.test.ts` (T3.x) checks table names,
+  snake_case, uuid keys and `created_at`/`updated_at`. `root-scripts.test.ts` (T4.1)
+  covers the root scripts; `rollback.test.ts` covers the rollback logic with fake ports.
+  The database comes from Docker (random host port, never 5432) or `TEST_DATABASE_URL`.
 - Other levels (integration, e2e): TO DOCUMENT (`pnpm e2e` exists as a Turborepo task,
   no package defines it yet).
 
@@ -157,8 +165,17 @@ Machine-specific settings go in `.project/loop/env.local` (git-ignored).
 Prefixes keep Dependabot PRs valid for the `commitlint` workflow.
 
 ## Environments and runtime
-TO DOCUMENT — environments, configuration and secrets handling, deployment
-topology and rollback path.
+Local database (TK-7): `docker-compose.yml` runs `postgres:17-alpine` on
+`127.0.0.1:${KOKLO_DB_PORT:-5432}` with development credentials `koklo`/`koklo`.
+`DATABASE_URL` comes from the environment or `packages/db/.env` (template:
+`.env.example`); `SHADOW_DATABASE_URL` is only needed for `migrate dev` and
+`migrate diff --to-migrations`. Other environments, secrets handling and deployment
+topology: TO DOCUMENT.
+
+Database rollback path: `pnpm db:rollback` undoes the latest migration (its `down.sql`,
+then removal of its `_prisma_migrations` row). It is not transactional, so take a backup
+first outside development. Whether CI runs the `@koklo/db` tests (they need Docker):
+TO DOCUMENT.
 
 ## Observability
 TO DOCUMENT — logs, metrics, traces, health checks, alerting.
