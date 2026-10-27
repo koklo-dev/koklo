@@ -25,7 +25,7 @@ L'étiquette est le nom court du paquet du §16.2 (`domain`, `db`, `contract`, `
 
 ## check:size (CDC §17.2)
 
-Plafonds de taille de fichier, vérifiés par `pnpm lint` (le `lint` du paquet enchaîne `biome ci` puis `check:size`) ou seuls par `pnpm check:size` à la racine.
+Plafonds de taille de fichier, vérifiés par `pnpm lint` (le `lint` racine enchaîne `turbo run lint`, qui lance `biome ci`, puis `pnpm check:size` hors cache turbo : le script lit tout le dépôt et la date du jour, ses entrées ne sont pas celles d'une tâche turbo) ou seuls par `pnpm check:size` à la racine.
 
 - fichier source (`.ts .tsx .js .jsx .mjs .cjs .mts .cts`) : 300 lignes max ;
 - fichier de test (`*.test.*`, `*.spec.*`, ou sous `test/ tests/ __tests__/ e2e/`) : 500 lignes max ;
