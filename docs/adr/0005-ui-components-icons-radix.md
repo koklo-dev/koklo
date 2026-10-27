@@ -2,7 +2,7 @@
 doc_version: 0.1.0
 status: draft
 last_reviewed: 2026-10-27
-covers_commit: f442681
+covers_commit: b106ecd
 ---
 # 0005 — Bâtir les composants de `@koklo/ui` sur Radix, avec des icônes Material Symbols en SVG à la demande
 
@@ -47,6 +47,18 @@ Le point d'entrée `@koklo/ui` est l'unique API (aucun sous-chemin). Ajouter une
 | class-variance-authority | 0.7.1 | 0.7.1 | `npm view` (2026-10-27) | API cva connue, inchangée |
 | react-resizable-panels | 4.15.0 | 4.15.0 | `npm view` (2026-10-27) | Context7 `/bvaughn/react-resizable-panels` (Group, Panel, Separator) |
 | @material-symbols/svg-400 | 0.48.2 | 0.48.2 | `npm view` (2026-10-27) | README du paquet |
+| @testing-library/dom | 10.4.2 | 10.4.2 | `npm view @testing-library/dom dist-tags.latest` (2026-10-27) | peer de `@testing-library/react`, API `screen`/`within` |
+| @testing-library/jest-dom | 7.0.1 | 7.0.1 | `npm view` (2026-10-27) | README du paquet (matchers `toBeInTheDocument`, `toHaveAttribute`) |
+| @testing-library/react | 16.3.3 | 16.3.3 | `npm view` (2026-10-27) | README du paquet (React 19, `render`) |
+| @testing-library/user-event | 14.6.8 | 14.6.8 | `npm view` (2026-10-27) | README du paquet (`userEvent.setup`) |
+| @types/react | 19.3.0 | 19.3.0 | `npm view` (2026-10-27) | aligné sur `react` 19.3 |
+| @types/react-dom | 19.3.0 | 19.3.0 | `npm view` (2026-10-27) | aligné sur `react-dom` 19.3 |
+| jsdom | 30.1.3 | 30.1.3 | `npm view` (2026-10-27) | environnement Vitest `jsdom` |
+| react | 19.3.1 | 19.3.1 | `npm view` (2026-10-27) | peer `^19.0.0` ; devDependency pour les tests |
+| react-dom | 19.3.1 | 19.3.1 | `npm view` (2026-10-27) | peer `^19.0.0` ; devDependency pour les tests |
+| esbuild | 0.28.2 | 0.28.2 | `npm view esbuild dist-tags.latest` (2026-10-27) | API `build` (`splitting`, `write: false`) ; déjà verrouillé via Vite, bundle de la fixture e2e |
+
+`@types/node` reste en 24.19.2 (dernière stable 26.6.5) : volontaire, les types suivent le runtime Node 24 LTS du projet.
 
 ## Preuves
-`pnpm --filter @koklo/ui lint|typecheck|test|build|e2e`, `pnpm lint`, `pnpm audit` : voir `.workflow/TK-84/04-green.md`.
+`pnpm --filter @koklo/ui lint|typecheck|test|build|e2e`, `pnpm lint`, `pnpm audit` : voir `.workflow/TK-84/04-green.md`. E2E navigateur : `e2e/components.spec.ts` (fixture `e2e/fixture/main.tsx`).
