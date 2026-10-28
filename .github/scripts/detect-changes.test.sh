@@ -46,4 +46,8 @@ check ".github/scripts seul -> skills=false" has '.github/scripts/x.sh\n' skills
 
 check "mélange docs+code -> code=true" has 'README.md\napps/api/a.ts\n' code=true
 check "exactement 3 sorties key=value" three_lines
+# TK-16 : Dockerfiles et .dockerignore déclenchent les jobs de code (build des images)
+for f in 'apps/web/Dockerfile\n' 'apps/api/Dockerfile\n' 'apps/worker/Dockerfile\n' '.dockerignore\n'; do
+    check "$f -> code=true" has "$f" code=true
+done
 finish
