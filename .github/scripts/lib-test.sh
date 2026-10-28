@@ -13,3 +13,8 @@ finish() {
     echo "$PASS passed, $FAIL failed"
     [ "$FAIL" -eq 0 ]
 }
+
+# Bloc d'un job de premier niveau d'un workflow ($WF), entre "  <job>:" et le job suivant.
+job_block() {
+    awk -v j="$1" '$0 ~ ("^  " j ":") {on=1; next} on && /^  [A-Za-z0-9_-]+:/ {on=0} on' "$WF"
+}

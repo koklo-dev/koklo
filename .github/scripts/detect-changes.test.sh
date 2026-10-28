@@ -7,7 +7,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUT="$HERE/detect-changes.sh"
 
 out() { printf '%b' "$1" | bash "$SUT" 2>&1; }
-has() { out "$1" | grep -qx "$2"; }
+# Capture avant de filtrer : `grep -q` quitte à la première ligne trouvée, le producteur reçoit
+# SIGPIPE et pipefail fait échouer le test au hasard (observé sous charge).
+has() { local lines; lines="$(out "$1")"; grep -qx "$2" <<<"$lines"; }
 four_lines() { [ "$(printf 'README.md\n' | bash "$SUT" | grep -Ec '^(code|skills|ci|deploy)=(true|false)$')" = 4 ]; }
 
 echo "detect-changes.sh"

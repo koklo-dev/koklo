@@ -9,10 +9,6 @@ echo "ci.yml"
 [ -f "$WF" ] || { ko "absent: .github/workflows/ci.yml"; finish; exit $?; }
 
 g() { grep -Eq -- "$1" "$WF"; }
-# Bloc d'un job de premier niveau (entre "  <job>:" et le job suivant).
-job_block() {
-    awk -v j="$1" '$0 ~ ("^  " j ":") {on=1; next} on && /^  [A-Za-z0-9_-]+:/ {on=0} on' "$WF"
-}
 in_ci() { job_block ci | grep -Eq -- "$1"; }
 job_if_always() { job_block ci | grep -Eq '^    if: always\(\)'; }
 guard_fails() { job_block ci | grep -Eq "needs\.changes\.result != 'success'"; }

@@ -108,6 +108,15 @@ check "C8 port 3000" m 'port: 3000'
 check "C8 healthcheck web /api/health" m 'healthcheck:.*/api/health'
 check "C8 healthcheck api /health" m 'healthcheck:.*[^i]/health'
 
+# TK-18 : l'API n'est pas exposée, BETTER_AUTH_URL = origine web de l'environnement
+check "TK-18 manifest: aucun 'domain: api' (API non exposée)" bash -c "! grep -Eq 'domain: *api' '$REAL_MANIFEST'"
+check "TK-18 manifest: aucun domaine 'api' dans les environnements" bash -c "! grep -Eq 'domains:.*\\bapi:' '$REAL_MANIFEST'"
+check "TK-18 manifest: aucun hôte api*.koklo.dev" bash -c "! grep -Eq 'api(-staging)?\\.koklo\\.dev' '$REAL_MANIFEST'"
+check "TK-18 manifest: le web garde son domaine app" bash -c "grep -Eq 'domain: *app' '$REAL_MANIFEST' && grep -Eq 'app-staging\\.koklo\\.dev' '$REAL_MANIFEST' && grep -Eq 'app\\.koklo\\.dev' '$REAL_MANIFEST'"
+check "TK-18 manifest: web uses [api] conservé (API_INTERNAL_URL)" bash -c "grep -Eq 'web:.*' '$REAL_MANIFEST' && grep -Eq 'uses: \\[api\\]' '$REAL_MANIFEST'"
+check "TK-18 manifest: BETTER_AUTH_URL définie via vars sur \${domains.app}" bash -c "grep -Eq 'BETTER_AUTH_URL: *.?https://\\\$\\{domains\\.app\\}' '$REAL_MANIFEST'"
+check "TK-18 manifest: BETTER_AUTH_URL n'est pas un secret" bash -c "! grep -E '^(secrets|optionalSecrets|generate|lockedSecrets):' '$REAL_MANIFEST' | grep -q BETTER_AUTH_URL"
+
 # --- C3 : infra introuvable -> échec explicite (aucune dépendance Python requise) ---
 write_base "$TMP/valid.yaml"
 check "C3 INFRA_DIR inexistant -> échec avec message INFRA_DIR" fails_with 'INFRA_DIR' INFRA_DIR="$TMP/absent" -- "$TMP/valid.yaml"
@@ -143,6 +152,8 @@ if have_validator; then
     variant extra 's/^name: fixture/name: fixture\nchampInconnu: 1/'
     check "C2 champ hors schéma -> échec lisible" fails_with "additional properties|champInconnu" -- "$TMP/extra.yaml"
     check "C2 fichier manifest inexistant -> échec" fails_with '.' -- "$TMP/nope.yaml"
+    # TK-18 : le vrai manifest résout BETTER_AUTH_URL sur le domaine web, pour chaque environnement
+    check "TK-18 deploy:check vert sur le manifest sans domaine api" bash -c "cd '$ROOT' && INFRA_DIR='$INFRA' bash scripts/deploy-check.sh >/dev/null 2>&1"
 else
     for c in "C1 manifest valide" "C1 manifest du dépôt" "C2 uses inconnu" "C2 domaine manquant" "C2 secret réservé" "C2 champ hors schéma" "C2 fichier inexistant"; do
         skip "$c" "INFRA_DIR ($INFRA) ou python3 jsonschema/PyYAML absent"
