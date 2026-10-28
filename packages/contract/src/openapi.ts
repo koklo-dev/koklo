@@ -15,10 +15,19 @@ const sortKeys = (value: unknown): unknown => {
   return value;
 };
 
+type ErrorMap = Record<string, { status: number }>;
+type ProcedureNode = { "~orpc": { errorMap: ErrorMap } };
+
+/** Procédures du routeur, quelle que soit la profondeur : une nouvelle route est prise en compte sans liste à la main. */
+const collectErrorMaps = (node: object): ErrorMap[] =>
+  "~orpc" in node
+    ? [(node as ProcedureNode)["~orpc"].errorMap]
+    : Object.values(node).flatMap(collectErrorMaps);
+
 /** Statut HTTP de chaque code d'erreur du contrat : le générateur OpenAPI et le serveur le lisent ici. */
 export const errorStatusMap: Record<string, number> = Object.fromEntries(
-  [contract.health, contract.project.list].flatMap((procedure) =>
-    Object.entries(procedure["~orpc"].errorMap).map(([code, item]) => [code, item.status]),
+  collectErrorMaps(contract).flatMap((errorMap) =>
+    Object.entries(errorMap).map(([code, item]) => [code, item.status]),
   ),
 );
 
