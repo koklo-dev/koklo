@@ -3,10 +3,10 @@ title: Quality and operations
 audience: technical
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-27
+last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: 558d95f
+covers_commit: 98c76a5
 ---
 # Quality and operations
 
@@ -84,6 +84,13 @@ covers_commit: 558d95f
   (acceptance criterion of TK-12). The package's Vitest config raises `testTimeout`
   to 60 s and `hookTimeout` to 180 s (first image pull) and excludes `src/main.ts`
   from coverage. Requires Docker.
+- **Observability tests** (TK-19): `packages/observability/test/` (logger JSON, redaction,
+  no-op without DSN, `captureError` never throws, `setupObservability`);
+  `apps/api/test/observability-config.test.ts` and `observability-app.test.ts` (config,
+  `requestId` on log lines, no secret header in logs); `guard-capture.test.ts` (capture with
+  `requestId`, then `INTERNAL`; it prints two JSON lines on stdout, cosmetic);
+  `apps/worker/src/observability*.test.ts` (`jobId`/`queue`, capture and rethrow). No
+  GlitchTip instance is needed: the SDK is mocked with `vi.mock("@sentry/node")`.
 - **UI browser e2e** (`packages/ui/e2e/`, Playwright `1.64.1`, `pnpm e2e` / `pnpm --filter
   @koklo/ui e2e`): `fonts.spec.ts` (no remote font request at load) and `components.spec.ts`
   (TK-84). The latter bundles `e2e/fixture/main.tsx` with esbuild (code splitting, so generated
@@ -107,6 +114,29 @@ covers_commit: 558d95f
   `packages/ui` compiles its entry point (components, `Icon`, `cn`) to `dist/` with `tsc -p tsconfig.build.json`.
 - Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,
   Biome 2.6.3, Vitest 5.0.5, TypeScript 7.0.2.
+
+## Observability (TK-19)
+| Variable | Applies to | Meaning |
+|----------|------------|---------|
+| `LOG_LEVEL` | api, worker | `fatal`, `error`, `warn`, `info` (default), `debug`, `trace`, `silent`; an unknown value stops the process at startup |
+| `SENTRY_DSN` | api, worker | optional DSN of GlitchTip (Sentry protocol); empty or absent disables error reporting |
+| `APP_ENV`, `APP_VERSION` | api, worker | `environment` and `release` sent with each reported error |
+
+- **Logs**: one JSON object per line on stdout (pino); the platform collects stdout. No
+  `console.*` in application code.
+- **Correlation**: every api line carries `requestId` (the incoming `x-request-id`, capped at
+  128 characters, else a UUID; it is also the id returned in the `INTERNAL` error body).
+  Worker lines carry `jobId` and `queue`. The same ids are attached as tags on the error sent
+  to GlitchTip.
+- **Redaction**: `authorization` and `cookie` (request headers and top-level fields) are
+  replaced by `[Redacted]`. Unexpected errors are logged by name only, since a driver message
+  may quote a host or credentials.
+- **Without a DSN**: nothing is sent and nothing fails; this is the default in local
+  development and in tests. To test the reporting path, mock the SDK as the tests do
+  (`vi.mock("@sentry/node", () => ({ init: vi.fn(), captureException: vi.fn() }))`) and
+  assert on `init` / `captureException`; to read logs in a test, pass
+  `AppModule.forRoot(config, { logStream })` and parse the lines.
+- **Failure isolation**: a failing SDK never changes a response or a job outcome.
 
 ## Quality gates
 Workflows in `.github/workflows/`: `ci.yml`, `commitlint.yml`, `security.yml`,
