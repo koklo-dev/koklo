@@ -3,7 +3,7 @@ import { loadConfig } from "./config.ts";
 
 describe("loadConfig", () => {
   it("reads DATABASE_URL", () => {
-    expect(loadConfig({ DATABASE_URL: "postgres://x" })).toEqual({ databaseUrl: "postgres://x" });
+    expect(loadConfig({ DATABASE_URL: "postgres://x" }).databaseUrl).toBe("postgres://x");
   });
 
   it("fails when DATABASE_URL is missing", () => {

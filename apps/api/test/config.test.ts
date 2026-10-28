@@ -52,7 +52,9 @@ describe("configuration (C3.3)", () => {
       "DATABASE_URL",
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
+      "LOG_LEVEL",
       "PORT",
+      "SENTRY_DSN",
     ]);
   });
 
@@ -77,8 +79,21 @@ describe("configuration (C3.3)", () => {
   });
 });
 
+const CONFIG_KEYS = [
+  "appEnv",
+  "appVersion",
+  "betterAuthSecret",
+  "betterAuthUrl",
+  "databaseUrl",
+  "githubClientId",
+  "githubClientSecret",
+  "logLevel",
+  "port",
+  "sentryDsn",
+];
+
 describe("configuration d'authentification (TK-11 C3, C2.d)", () => {
-  it("C3 expose les 4 variables d'auth et exactement 8 clés de configuration", () => {
+  it("C3 expose les 4 variables d'auth et exactement 10 clés de configuration", () => {
     const config = loadConfig(VALID_ENV);
     expect(config).toMatchObject({
       betterAuthSecret: SECRET,
@@ -87,17 +102,10 @@ describe("configuration d'authentification (TK-11 C3, C2.d)", () => {
       githubClientSecret: "client-secret-value",
     });
     // C2.d : aucun drapeau de session de test dans la configuration, quel que soit APP_ENV.
-    expect(Object.keys(config).sort()).toEqual([
-      "appEnv",
-      "appVersion",
-      "betterAuthSecret",
-      "betterAuthUrl",
-      "databaseUrl",
-      "githubClientId",
-      "githubClientSecret",
-      "port",
-    ]);
-    expect(Object.keys(loadConfig({ ...VALID_ENV, APP_ENV: "production" }))).toHaveLength(8);
+    expect(Object.keys(config).sort()).toEqual(CONFIG_KEYS);
+    expect(Object.keys(loadConfig({ ...VALID_ENV, APP_ENV: "production" }))).toHaveLength(
+      CONFIG_KEYS.length,
+    );
   });
 
   // Infra injecte APP_ENV = nom de l'environnement déployé : l'api doit démarrer en staging.

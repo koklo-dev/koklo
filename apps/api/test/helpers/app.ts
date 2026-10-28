@@ -40,6 +40,8 @@ export function configFor(
     betterAuthUrl: TEST_AUTH_URL,
     githubClientId: TEST_GITHUB_CLIENT_ID,
     githubClientSecret: TEST_GITHUB_CLIENT_SECRET,
+    logLevel: "silent",
+    sentryDsn: undefined,
   };
 }
 
