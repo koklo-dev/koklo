@@ -32,6 +32,10 @@ describe("configuration d'observabilité du worker (TK-19)", () => {
         LOG_LEVEL: "warn",
         APP_ENV: "staging",
         APP_VERSION: "1.2.3",
+        // staging exige la configuration d'envoi (TK-22) ; hors sujet ici.
+        RESEND_API_KEY: "re_test",
+        MAIL_DOMAIN: "koklo.dev",
+        EMAIL_FROM: "no-reply@koklo.dev",
       }),
     ).toMatchObject({
       sentryDsn: "https://clef@glitchtip.example.com/2",

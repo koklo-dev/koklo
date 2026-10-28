@@ -14,6 +14,7 @@ beforeAll(async () => {
     appVersion: "dev",
     logLevel: "silent",
     sentryDsn: undefined,
+    mail: { kind: "capture" },
   });
 });
 
