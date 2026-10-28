@@ -122,4 +122,41 @@ check "images: aucun --build-arg" images_lacks -- '--build-arg'
 check "images: ni push ni secret" images_lacks 'push|ghcr|secrets\.'
 check "job ci agrège images (needs)" in_ci 'needs:.*images'
 check "images: actions épinglées" bash -c "$(declare -f job_block images_present images_unpinned_action); WF='$WF'; images_present && ! images_unpinned_action"
+
+# TK-17 : job deploy-check (valide .deploy/manifest.yaml avec le validateur d'infra, épinglé)
+dc_block() { job_block deploy-check; }
+in_dc() { dc_block | grep -Eq -- "$1"; }
+dc_present() { [ -n "$(dc_block)" ]; }
+dc_lacks() { dc_present && ! dc_block | grep -Eq -- "$1"; }
+dc_unpinned_action() { dc_block | grep -E 'uses:' | grep -vE '@v[0-9]+\.[0-9]+\.[0-9]+' | grep -q .; }
+dc_actions_pinned() { dc_present && ! dc_unpinned_action; }
+infra_checkout_sha() { dc_block | grep -Eq 'repository: josias-koffi/infra' && dc_block | grep -Eq 'ref: [0-9a-f]{40}( |$)'; }
+dc_rank() { dc_block | grep -nE -- "$1" | head -1 | cut -d: -f1; }
+dc_before() {
+    local a b
+    a="$(dc_rank "$1")"
+    b="$(dc_rank "$2")"
+    [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]
+}
+changes_exposes_deploy() { job_block changes | grep -Eq 'deploy: \$\{\{ steps\.detect\.outputs\.deploy \}\}'; }
+push_sets_deploy() { job_block changes | grep -Eq "printf 'code=true.*deploy=true"; }
+ci_accepts_deploy_skipped() { ! job_block ci | grep -Eq "needs\\.deploy-check\\.result != 'success'"; }
+check "deploy-check: job présent" g '^  deploy-check:'
+check "changes expose la sortie deploy" changes_exposes_deploy
+check "changes: sur push, deploy=true (comme les autres sorties)" push_sets_deploy
+check "deploy-check: dépend de changes" in_dc 'needs:.*changes'
+check "deploy-check: déclenché seulement par outputs.deploy" in_dc "if: needs\.changes\.outputs\.deploy == 'true'"
+check "deploy-check: checkout du dépôt courant épinglé" in_dc 'actions/checkout@v7\.0\.1'
+check "deploy-check: checkout d'infra (josias-koffi/infra) épinglé sur un SHA de 40 caractères" infra_checkout_sha
+check "deploy-check: pas de ref flottante (main/master/develop)" dc_lacks 'ref: (main|master|develop|HEAD)'
+check "deploy-check: INFRA_DIR pointe sur le checkout d'infra" in_dc 'INFRA_DIR:'
+check "deploy-check: installe jsonschema" in_dc 'pip install.*jsonschema'
+check "deploy-check: lance deploy-check / pnpm deploy:check" in_dc 'deploy-check\.sh|pnpm deploy:check'
+check "deploy-check: ordre checkout d'infra < validation" dc_before 'josias-koffi/infra' 'deploy-check\.sh|pnpm deploy:check'
+check "deploy-check: ordre pip install < validation" dc_before 'pip install' 'deploy-check\.sh|pnpm deploy:check'
+check "deploy-check: aucun secret (dépôt infra public)" dc_lacks 'secrets\.'
+check "deploy-check: actions épinglées" dc_actions_pinned
+check "job ci agrège deploy-check (needs)" in_ci 'needs:.*deploy-check'
+check "job ci : échec si deploy-check est en failure ou cancelled" in_ci "needs\\.deploy-check\\.result == 'failure' \\|\\| needs\\.deploy-check\\.result == 'cancelled'"
+check "job ci : deploy-check skipped reste accepté (pas de garde != 'success')" ci_accepts_deploy_skipped
 finish
