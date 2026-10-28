@@ -25,6 +25,7 @@ jobs:
       code: ${{ steps.detect.outputs.code }}
       skills: ${{ steps.detect.outputs.skills }}
       ci: ${{ steps.detect.outputs.ci }}
+      deploy: ${{ steps.detect.outputs.deploy }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -39,12 +40,12 @@ jobs:
           if [ "$EVENT" = "pull_request" ]; then
             git diff --name-only "origin/${BASE_REF}...HEAD" | bash .github/scripts/detect-changes.sh >> "$GITHUB_OUTPUT"
           else
-            printf 'code=true\nskills=true\nci=true\n' >> "$GITHUB_OUTPUT"
+            printf 'code=true\nskills=true\nci=true\ndeploy=true\n' >> "$GITHUB_OUTPUT"
           fi
           cat "$GITHUB_OUTPUT"
 
   ci:
-    needs: [changes, e2e, images]
+    needs: [changes, e2e, images, deploy-check]
     # always() : si `changes` échoue, `ci` doit s'exécuter et échouer, pas être sauté —
     # un check requis sauté compte comme réussi.
     if: always()
@@ -71,6 +72,13 @@ jobs:
         if: needs.images.result == 'failure' || needs.images.result == 'cancelled'
         run: |
           echo "::error::job 'images' ended with '${{ needs.images.result }}'"
+          exit 1
+
+      # Même logique : un manifest invalide ne doit pas passer. `skipped` reste accepté (.deploy/ intact).
+      - name: Deploy check did not fail
+        if: needs.deploy-check.result == 'failure' || needs.deploy-check.result == 'cancelled'
+        run: |
+          echo "::error::job 'deploy-check' ended with '${{ needs.deploy-check.result }}'"
           exit 1
 
       - uses: actions/checkout@v7.0.1
@@ -201,6 +209,29 @@ jobs:
       # Démarre les images contre un Postgres jetable : migrations, /health, /api/health, non-root.
       - name: Image tests
         run: bash .github/scripts/docker-images.test.sh
+
+  # Valide .deploy/manifest.yaml avec le validateur du repo infra (TK-17, vision §20.4).
+  # Infra est public : checkout sans token ni secret, épinglé sur un SHA complet (mise à jour volontaire).
+  deploy-check:
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    env:
+      INFRA_DIR: ${{ github.workspace }}/infra
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: josias-koffi/infra
+          ref: 834d82912f5ee5d56a174163a01b0b140438d5f4
+          path: infra
+
+      - name: Install validator dependencies
+        run: pip install jsonschema==4.26.0 PyYAML==6.0.3
+
+      - name: Validate manifest
+        run: bash scripts/deploy-check.sh
 
   # Les runtimes d'agent chargent .claude/skills/ et .codex/skills/, jamais
   # shipyard/skills/ : une source modifiée sans republication laisse les sessions
