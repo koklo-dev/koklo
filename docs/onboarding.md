@@ -95,7 +95,7 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   **before** `migrate dev`; procedure in `packages/db/README.md` and
   [domain-model.md](domain-model.md#persistence-and-migrations). Never edit
   `packages/db/src/generated/` (git-ignored, produced by `pnpm --filter @koklo/db generate`).
-- `apps/api` is run with `cp apps/api/.env.example apps/api/.env` then `pnpm --filter @koklo/api dev`. Since TK-11 it refuses to start without `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`), `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: create a GitHub OAuth App per environment with the callback `<BETTER_AUTH_URL>/api/auth/callback/github`, and never commit the secrets. With `APP_ENV=test`, the header `x-test-session: <userId>:<organizationId>` replaces the cookie (see [api-contract.md](api-contract.md#authentication-and-authorization)). Its integration tests start a throwaway Postgres through Docker (or use `TEST_DATABASE_URL`).
+- `apps/api` is run with `cp apps/api/.env.example apps/api/.env` then `pnpm --filter @koklo/api dev`. Since TK-11 it refuses to start without `BETTER_AUTH_SECRET` (32+ characters, `openssl rand -base64 32`), `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: `BETTER_AUTH_URL` is the public URL of the web (the API is not exposed): create a GitHub OAuth App per environment with the callback `<BETTER_AUTH_URL>/api/auth/callback/github`, i.e. on the web origin, and never commit the secrets. With `APP_ENV=test`, the header `x-test-session: <userId>:<organizationId>` replaces the cookie (see [api-contract.md](api-contract.md#authentication-and-authorization)). Its integration tests start a throwaway Postgres through Docker (or use `TEST_DATABASE_URL`).
 - Decisions: [ADR 0002](adr/0002-project-port-in-api.md), [ADR 0003](adr/0003-better-auth-session-guard.md); the layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.
@@ -119,5 +119,5 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
 TO DOCUMENT — active sprint focus, known debt, deliberate shortcuts.
 
 `pnpm dev` needs `apps/api/.env` for `BETTER_AUTH_SECRET` and `GITHUB_CLIENT_*` (see its
-`.env.example`); `DATABASE_URL`, `PORT` (3001), `BETTER_AUTH_URL` and the web `API_URL` get
-defaults aligned on `KOKLO_DB_PORT` / `KOKLO_API_PORT`, and any variable already exported wins.
+`.env.example`); `DATABASE_URL`, `PORT` (3001), `BETTER_AUTH_URL` (the public URL of the web, `http://localhost:3000`) and the
+web `API_INTERNAL_URL` get defaults aligned on `KOKLO_DB_PORT` / `KOKLO_API_PORT`, and any variable already exported wins.

@@ -6,7 +6,7 @@ import { hasSession } from "./lib/session.ts";
 
 /**
  * Proxy exécuté à chaque requête (donc config lue à l'exécution) :
- * - `/api/auth/*` et `/api/orpc/*` sont relayés vers `API_URL` (même origine pour le navigateur) ;
+ * - `/api/auth/*` et `/api/orpc/*` sont relayés vers `API_INTERNAL_URL` (même origine pour le navigateur) ;
  * - `/login` et `/projects` sont gardés selon la session.
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {

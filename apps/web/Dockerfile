@@ -1,5 +1,5 @@
 # Image web (TK-16, vision §20.4). Contexte = racine du dépôt : docker build -f apps/web/Dockerfile .
-# Aucun NEXT_PUBLIC_* ni URL d'environnement au build : API_URL, APP_ENV… sont lus à l'exécution.
+# Aucun NEXT_PUBLIC_* ni URL d'environnement au build : API_INTERNAL_URL, APP_ENV… sont lus à l'exécution.
 
 FROM node:24.22.1-alpine AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH

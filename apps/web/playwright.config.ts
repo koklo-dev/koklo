@@ -20,9 +20,13 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      // L'API cible est lue à l'exécution (API_URL), jamais via NEXT_PUBLIC_*.
+      // L'API cible est lue à l'exécution (API_INTERNAL_URL), jamais via NEXT_PUBLIC_*.
       command: `pnpm exec next dev --port ${WEB_PORT}`,
-      env: { API_URL: `http://127.0.0.1:${API_PORT}`, APP_ENV: "test", APP_VERSION: "0.0.0-test" },
+      env: {
+        API_INTERNAL_URL: `http://127.0.0.1:${API_PORT}`,
+        APP_ENV: "test",
+        APP_VERSION: "0.0.0-test",
+      },
       url: `http://127.0.0.1:${WEB_PORT}/login`,
       reuseExistingServer: false,
       timeout: 120_000,

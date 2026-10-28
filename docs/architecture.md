@@ -176,7 +176,7 @@ that implements `@koklo/contract` with `@orpc/nest` (`@Implement`). It is compil
 `tsc` (decorators need `experimentalDecorators`; Node cannot strip them) and started with
 `pnpm --filter @koklo/api start`. Configuration is read once at startup and validated
 with Zod (`DATABASE_URL`, `PORT`, `APP_ENV`, `APP_VERSION` and, since TK-11, `BETTER_AUTH_SECRET` (32 characters minimum),
-`BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`; see `apps/api/.env.example`).
+`BETTER_AUTH_URL` (the public URL of the web, since the API is not exposed), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`; see `apps/api/.env.example`).
 A configuration error names the variable and the rule, never the received value.
 The `project` module keeps its port in `apps/api` ([ADR 0002](adr/0002-project-port-in-api.md)).
 `@koklo/db` now exports `createDbClient` (Prisma 7 + `@prisma/adapter-pg`), `seed` and
