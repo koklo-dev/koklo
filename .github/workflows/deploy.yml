@@ -1,0 +1,151 @@
+# Workflow de déploiement de Koklo, copié de infra/templates/app-deploy.yml (vision §20.4).
+# Aucune règle ici : quelle branche déploie quel environnement, et si un push déploie ou
+# seulement un lancement manuel, viennent de .deploy/manifest.yaml
+# (environments.<env>.branch / deploy: auto|manual). Guide : docs/guides/deploy-an-app.md (infra).
+#
+# Production (deploy: manual) : Actions > Deploy > Run workflow depuis `main`, avec `image_tag` =
+# tag déjà validé en staging. `resolve` met alors `build` à false : aucune reconstruction, et
+# `image-check` rejoue quand même le démarrage de l'image api avant le déploiement.
+#
+# Le déploiement lui-même tourne dans le repo infra : ce repo ne détient aucun identifiant de
+# plateforme, seulement le jeton qui le déclenche.
+#
+# Secret du repo : INFRA_DEPLOY_TOKEN (scripts/onboard-app.sh, dans infra)
+# Secrets d'app  : ceux du manifest, dans les environnements infra koklo-<env>
+name: Deploy
+
+on:
+  push: # chaque push interroge le manifest ; la plupart se terminent en ~10 s
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environnement (vide = celui de cette branche)
+        required: false
+      image_tag:
+        description: Tag d'image existant à déployer (promotion / retour arrière), vide = construit ce commit
+        required: false
+      plan_only:
+        description: Afficher le plan seulement
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  resolve:
+    uses: josias-koffi/infra/.github/workflows/resolve.yml@main
+    with:
+      environment: ${{ inputs.environment }}
+      image_tag: ${{ inputs.image_tag }}
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: docker/login-action@v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Une étape build-push par image du manifest. Aucune URL d'environnement au build.
+      - name: Build and push web
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/koklo-web:${{ needs.resolve.outputs.image_tag }}
+
+      - name: Build and push api
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/koklo-api:${{ needs.resolve.outputs.image_tag }}
+
+      - name: Build and push worker
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: apps/worker/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/koklo-worker:${{ needs.resolve.outputs.image_tag }}
+
+  # L'API n'étant pas exposée, le smoke test d'infra ne la joue plus : ce job démarre l'image api
+  # au tag à déployer contre un Postgres jetable (migrate deploy puis GET /health) avant tout
+  # environnement. `build` peut être ignoré (promotion) : l'image est alors tirée de GHCR.
+  image-check:
+    needs: [resolve, build]
+    if: ${{ !failure() && !cancelled() && needs.resolve.outputs.deploy == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: check
+          POSTGRES_PASSWORD: check
+          POSTGRES_DB: check
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U check"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      API_IMAGE: ghcr.io/${{ github.repository_owner }}/koklo-api:${{ needs.resolve.outputs.image_tag }}
+    steps:
+      - uses: docker/login-action@v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # Valeurs factices : seules les variables obligatoires de l'api, aucune n'est un secret réel.
+      - name: Start the api image
+        run: |
+          docker run -d --name api-check --network host \
+            -e PORT=3000 \
+            -e DATABASE_URL=postgresql://check:check@127.0.0.1:5432/check \
+            -e BETTER_AUTH_SECRET=check-only-not-a-real-secret-0123456789 \
+            -e BETTER_AUTH_URL=http://127.0.0.1:3000 \
+            -e GITHUB_CLIENT_ID=check -e GITHUB_CLIENT_SECRET=check \
+            "$API_IMAGE"
+
+      - name: Wait for /health
+        run: |
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3000/health; then
+              echo; echo "healthy after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::L'image api n'est jamais devenue saine."
+          exit 1
+
+      - name: Container logs
+        if: always()
+        run: docker logs api-check 2>&1 | tail -80
+
+      - name: Remove the container
+        if: always()
+        run: docker rm -f api-check
+
+  deploy:
+    needs: [resolve, build, image-check]
+    if: ${{ !failure() && !cancelled() && needs.resolve.outputs.deploy == 'true' }}
+    uses: josias-koffi/infra/.github/workflows/dispatch-deploy.yml@main
+    with:
+      environment: ${{ needs.resolve.outputs.environment }}
+      image_tag: ${{ needs.resolve.outputs.image_tag }}
+      plan_only: ${{ inputs.plan_only == true }}
+    secrets:
+      INFRA_DEPLOY_TOKEN: ${{ secrets.INFRA_DEPLOY_TOKEN }}

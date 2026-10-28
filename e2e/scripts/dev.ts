@@ -14,8 +14,8 @@ const apiPort = process.env.KOKLO_API_PORT ?? "3001";
 const env: NodeJS.ProcessEnv = {
   DATABASE_URL: `postgresql://koklo:koklo@127.0.0.1:${dbPort}/koklo`,
   PORT: apiPort,
-  BETTER_AUTH_URL: `http://localhost:${apiPort}`,
-  API_URL: `http://127.0.0.1:${apiPort}`,
+  BETTER_AUTH_URL: "http://localhost:3000", // origine publique du web (callback GitHub, trustedOrigins)
+  API_INTERNAL_URL: `http://127.0.0.1:${apiPort}`,
   ...process.env,
 };
 

@@ -12,7 +12,7 @@ const DB_PORT = process.env.E2E_DB_PORT ?? "54329";
 const WEB_PORT = process.env.E2E_WEB_PORT ?? "3200";
 const API_PORT = process.env.E2E_API_PORT ?? "3201";
 const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
-const API_URL = `http://127.0.0.1:${API_PORT}`;
+const API_INTERNAL_URL = `http://127.0.0.1:${API_PORT}`;
 const COMPOSE = ["compose", "-p", "koklo-e2e", "-f", resolve(ROOT, "docker-compose.yml")];
 
 const env: NodeJS.ProcessEnv = {
@@ -22,7 +22,7 @@ const env: NodeJS.ProcessEnv = {
   APP_ENV: "test",
   APP_VERSION: "0.0.0-e2e",
   BETTER_AUTH_SECRET: "e2e-only-fake-secret-not-for-production-0123456789",
-  BETTER_AUTH_URL: API_URL,
+  BETTER_AUTH_URL: WEB_URL,
   GITHUB_CLIENT_ID: "e2e-fake-github-client-id",
   GITHUB_CLIENT_SECRET: "e2e-fake-github-client-secret",
   E2E_WEB_URL: WEB_URL,
@@ -84,11 +84,11 @@ async function main(): Promise<number> {
     cpSync(resolve(web, "public"), resolve(standalone, "public"), { recursive: true });
   }
   start("node", [resolve(standalone, "server.js")], {
-    API_URL,
+    API_INTERNAL_URL,
     PORT: WEB_PORT,
     HOSTNAME: "127.0.0.1",
   });
-  await waitFor(`${API_URL}/health`);
+  await waitFor(`${API_INTERNAL_URL}/health`);
   await waitFor(`${WEB_URL}/login`);
 
   const playwright = spawnSync("pnpm", ["--filter", "@koklo/e2e", "exec", "playwright", "test"], {

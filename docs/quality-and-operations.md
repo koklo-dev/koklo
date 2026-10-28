@@ -214,6 +214,31 @@ topology: TO DOCUMENT.
 API secrets (TK-11): `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
 are set in each deployment's environment, never in `.env.example` or the repository. The
 GitHub OAuth App is one per environment, callback `<BETTER_AUTH_URL>/api/auth/callback/github`.
+GitHub refuses secret names starting with `GITHUB_`, so in the infra environment
+(`koklo-<env>`) the two values are entered as `OAUTH_GITHUB_CLIENT_ID` and
+`OAUTH_GITHUB_CLIENT_SECRET`; the manifest maps them to `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET` for the API with `vars` (`${secrets.…}`). The optional GitHub App
+secrets follow the same rule: `GH_APP_ID`, `GH_APP_PRIVATE_KEY` and `GH_WEBHOOK_SECRET` are mapped to
+`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` and `GITHUB_WEBHOOK_SECRET` for the API and the worker.
+`GH_APP_PRIVATE_KEY` holds the `.pem` as **one base64 line**, not the raw multi-line key:
+`init-app-env.sh` reads a single line, so it is skipped there (Enter) and set separately from the
+infra checkout with
+`base64 -w0 <key>.pem | gh secret set GH_APP_PRIVATE_KEY -R josias-koffi/infra -e koklo-<env>`.
+Whatever reads `GITHUB_APP_PRIVATE_KEY` (the GitHub App client, R2) must base64-decode it before
+signing the JWT.
+`BETTER_AUTH_URL` is the public URL of the web (`https://app-staging.koklo.dev`,
+`https://app.koklo.dev`), set by the manifest from `${domains.app}`: the API has no domain, so
+the callback lands on the web origin and the web proxies it to the API through `API_INTERNAL_URL`
+(injected by `uses: [api]`).
+
+Deployment (TK-18): `.github/workflows/deploy.yml` is the infra template (`resolve`, `build`,
+`image-check`, `deploy`). `build` pushes `ghcr.io/koklo-dev/koklo-{web,api,worker}` tagged with
+the commit. `image-check` starts the api image at the tag to deploy against a throwaway Postgres
+(`migrate deploy`, then `GET /health`) before any environment is touched; it replaces the
+post-deploy smoke test of the api, which infra only plays on components with a domain. It also
+runs on a promotion, where `build` is skipped. Production is a manual run (`deploy: manual`)
+with the `image_tag` already validated in staging: nothing is rebuilt. Existing `api*.koklo.dev`
+DNS records are not removed by infra: delete them by hand.
 The test session (`x-test-session`) exists only when `APP_ENV=test`: never run a deployed
 environment with that value. Secret storage and rotation: TO DOCUMENT.
 

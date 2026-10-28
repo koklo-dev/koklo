@@ -4,19 +4,22 @@
 apiVersion: deploy/v1
 name: koklo
 server: vps20
-secrets: [GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET]
-optionalSecrets: [GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET, SENTRY_DSN]  # GITHUB_APP_* passent en secrets à R2
+secrets: [OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET]  # GitHub refuse les secrets nommés GITHUB_* : l'api les reçoit sous leur nom d'origine par `vars`
+optionalSecrets: [GH_APP_ID, GH_APP_PRIVATE_KEY, GH_WEBHOOK_SECRET, SENTRY_DSN]  # GH_APP_* passent en secrets à R2 ; mappés en GITHUB_APP_* par `vars` (GitHub refuse GITHUB_*)
 generate: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]
 lockedSecrets: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]     # sessions signées, données chiffrées
-vars: { LOG_LEVEL: info, EMAIL_FROM: 'Koklo <no-reply@koklo.dev>' }
+vars: { LOG_LEVEL: info, EMAIL_FROM: 'Koklo <no-reply@koklo.dev>', BETTER_AUTH_URL: 'https://${domains.app}' }   # origine web : l'API n'est pas exposée
 
 apps:
   web: { image: ghcr.io/koklo-dev/koklo-web, registry: ghcr, port: 3000, domain: app, healthcheck: /api/health,
          uses: [api], resources: { cpus: 0.5, memory: 512m } }
-  api: { image: ghcr.io/koklo-dev/koklo-api, registry: ghcr, port: 3000, domain: api, healthcheck: /health,
-         uses: [db, files, mail], resources: { cpus: 1, memory: 1g } }
+  api: { image: ghcr.io/koklo-dev/koklo-api, registry: ghcr, port: 3000, healthcheck: /health,
+         uses: [db, files, mail], resources: { cpus: 1, memory: 1g },
+         vars: { GITHUB_CLIENT_ID: '${secrets.OAUTH_GITHUB_CLIENT_ID}', GITHUB_CLIENT_SECRET: '${secrets.OAUTH_GITHUB_CLIENT_SECRET}',
+                 GITHUB_APP_ID: '${secrets.GH_APP_ID}', GITHUB_APP_PRIVATE_KEY: '${secrets.GH_APP_PRIVATE_KEY}', GITHUB_WEBHOOK_SECRET: '${secrets.GH_WEBHOOK_SECRET}' } }
 workers:
-  worker: { image: ghcr.io/koklo-dev/koklo-worker, registry: ghcr, uses: [db, files, mail], resources: { cpus: 0.5, memory: 512m } }
+  worker: { image: ghcr.io/koklo-dev/koklo-worker, registry: ghcr, uses: [db, files, mail], resources: { cpus: 0.5, memory: 512m },
+           vars: { GITHUB_APP_ID: '${secrets.GH_APP_ID}', GITHUB_APP_PRIVATE_KEY: '${secrets.GH_APP_PRIVATE_KEY}', GITHUB_WEBHOOK_SECRET: '${secrets.GH_WEBHOOK_SECRET}' } }
 databases:
   db: { type: postgres, version: 17-alpine, database: koklo, user: koklo }   # sauvegardée chaque jour, DB_PASSWORD généré
 buckets:
@@ -24,5 +27,5 @@ buckets:
 mail: {}                          # domaine d'envoi koklo.dev (zones/zones.yaml d'infra)
 
 environments:
-  staging:    { branch: develop, domains: { app: app-staging.koklo.dev, api: api-staging.koklo.dev } }
-  production: { branch: main, deploy: manual, domains: { app: app.koklo.dev, api: api.koklo.dev } }
+  staging:    { branch: develop, domains: { app: app-staging.koklo.dev } }
+  production: { branch: main, deploy: manual, domains: { app: app.koklo.dev } }

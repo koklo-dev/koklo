@@ -40,7 +40,7 @@
       "passThroughEnv": [
         "DATABASE_URL",
         "PORT",
-        "API_URL",
+        "API_INTERNAL_URL",
         "BETTER_AUTH_URL",
         "BETTER_AUTH_SECRET",
         "GITHUB_CLIENT_ID",

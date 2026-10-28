@@ -20,16 +20,16 @@ doit aussi rester utilisable sans configuration CORS entre deux origines.
 |--------|-----------|---------------|
 | `NEXT_PUBLIC_API_URL` figée au build | Simple | Une image par environnement, contraire à §20.4 |
 | Le navigateur appelle l'API directement | Pas de relais | CORS et cookies inter-origines, URL de l'API exposée |
-| Proxy Next.js (`src/proxy.ts`) vers `API_URL` lue à l'exécution | Même origine, une image | Un saut réseau de plus, la garde de session fait un appel à l'API |
+| Proxy Next.js (`src/proxy.ts`) vers `API_INTERNAL_URL` lue à l'exécution | Même origine, une image | Un saut réseau de plus, la garde de session fait un appel à l'API |
 
 ## Décision
-- Aucune variable `NEXT_PUBLIC_*` (test `no-public-env`). `API_URL`, `APP_ENV` et `APP_VERSION` sont lues
+- Aucune variable `NEXT_PUBLIC_*` (test `no-public-env`). `API_INTERNAL_URL`, `APP_ENV` et `APP_VERSION` sont lues
   côté serveur par `readRuntimeConfig` ; `output: "standalone"`.
-- `src/proxy.ts` relaie `/api/auth/*` tel quel et `/api/orpc/*` (préfixe retiré) vers `API_URL`.
+- `src/proxy.ts` relaie `/api/auth/*` tel quel et `/api/orpc/*` (préfixe retiré) vers `API_INTERNAL_URL`.
 - La garde des pages `/login` et `/projects` interroge `/api/auth/get-session` avec les cookies de la requête ;
   toute erreur vaut « pas de session ».
 - Thème clair par défaut (H-24), sombre seulement sur choix enregistré.
 
 ## Conséquences
-`API_URL` doit être joignable depuis le conteneur web. Chaque navigation gardée coûte un appel à l'API.
+`API_INTERNAL_URL` doit être joignable depuis le conteneur web. Chaque navigation gardée coûte un appel à l'API.
 Les écrans futurs s'ajoutent à `config.matcher` et à `GuardedPath` pour être gardés.
