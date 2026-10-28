@@ -12,6 +12,7 @@ import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { ProjectModule } from "./project/project.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
+import { serializeRequest } from "./request-serializer.ts";
 
 export interface AppModuleOptions {
   /** Destination des lignes de journal (défaut : stdout) ; les tests y lisent le JSON émis. */
@@ -39,6 +40,7 @@ export class AppModule {
           pinoHttp: {
             logger,
             genReqId: requestIdOfMessage,
+            serializers: { req: serializeRequest },
             customLogLevel: (_request, response, error) =>
               error || response.statusCode >= 500 ? "error" : "info",
             customProps: (request) => ({ requestId: request.id }),

@@ -6,6 +6,7 @@ import { AuthController } from "./auth.controller.ts";
 import { AUTH } from "./auth.tokens.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { BetterAuthSessionResolver } from "./better-auth-session.resolver.ts";
+import { MagicLinkQueue } from "./magic-link-queue.ts";
 import { OrpcErrorFilter } from "./orpc-error.filter.ts";
 import { SESSION_RESOLVER } from "./session.ts";
 import {
@@ -47,9 +48,11 @@ export class AuthModule {
       providers: [
         {
           provide: AUTH,
-          inject: [DatabaseService],
-          useFactory: (database: DatabaseService) => createAuth(config, database.raw),
+          inject: [DatabaseService, MagicLinkQueue],
+          useFactory: (database: DatabaseService, queue: MagicLinkQueue) =>
+            createAuth(config, database.raw, queue.enqueue),
         },
+        MagicLinkQueue,
         { provide: APP_FILTER, useClass: OrpcErrorFilter },
         ...sessionProviders(config),
       ],
