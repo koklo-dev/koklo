@@ -14,7 +14,11 @@ export interface LoggerOptions {
   destination?: LogDestination;
 }
 
-/** En-têtes qui ne doivent jamais atteindre un journal, quel que soit l'endroit où ils apparaissent. */
+/**
+ * Secrets qui ne doivent jamais atteindre un journal, quel que soit l'endroit où ils apparaissent :
+ * en-têtes d'authentification (dont `set-cookie` des réponses : jeton de session), et `token` /
+ * `url` (jeton et lien magique d'un payload de job).
+ */
 const REDACTED_PATHS = [
   "req.headers.authorization",
   "req.headers.cookie",
@@ -22,6 +26,14 @@ const REDACTED_PATHS = [
   "headers.cookie",
   "authorization",
   "cookie",
+  'res.headers["set-cookie"]',
+  'headers["set-cookie"]',
+  "token",
+  "url",
+  "data.token",
+  "data.url",
+  "job.data.token",
+  "job.data.url",
 ];
 
 /** Logger pino : une ligne JSON par événement, secrets d'en-tête masqués. */

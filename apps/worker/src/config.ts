@@ -1,5 +1,15 @@
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 
+/** Envoi d'emails : capture en mémoire (développement, test) ou Resend (staging, production). */
+export type MailConfig =
+  | { readonly kind: "capture" }
+  | {
+      readonly kind: "resend";
+      readonly apiKey: string;
+      readonly domain: string;
+      readonly from: string;
+    };
+
 export type WorkerConfig = {
   readonly databaseUrl: string;
   readonly appEnv: string;
@@ -7,6 +17,7 @@ export type WorkerConfig = {
   readonly logLevel: LogLevel;
   /** DSN GlitchTip/Sentry ; absent : le SDK d'erreurs reste désactivé. */
   readonly sentryDsn: string | undefined;
+  readonly mail: MailConfig;
 };
 
 function fail(variable: string, rule: string): never {
@@ -29,17 +40,58 @@ function parseDsn(value: string | undefined): string | undefined {
   return URL.canParse(value) ? value : fail("SENTRY_DSN", "must be a valid URL");
 }
 
+const STRICT_ENVS = ["staging", "production"];
+
+/** Domaine de l'adresse d'expéditeur (`Nom <a@b>` ou `a@b`), en minuscules. */
+function domainOfSender(from: string): string {
+  return from
+    .slice(from.lastIndexOf("@") + 1)
+    .replace(">", "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Sans clé : capture en development/test, échec en staging/production. Avec clé : domaine et
+ * expéditeur requis, l'expéditeur appartenant au domaine. Les messages ne citent que le nom
+ * de la variable, jamais sa valeur.
+ */
+function parseMail(env: Readonly<Record<string, string | undefined>>, appEnv: string): MailConfig {
+  const apiKey = env.RESEND_API_KEY || undefined;
+  if (apiKey === undefined && !STRICT_ENVS.includes(appEnv)) {
+    return { kind: "capture" };
+  }
+  const domain = env.MAIL_DOMAIN || undefined;
+  const from = env.EMAIL_FROM || undefined;
+  if (apiKey === undefined) {
+    return fail("RESEND_API_KEY", `is required when APP_ENV is ${appEnv}`);
+  }
+  if (domain === undefined) {
+    return fail("MAIL_DOMAIN", "is required when RESEND_API_KEY is set");
+  }
+  if (from === undefined) {
+    return fail("EMAIL_FROM", "is required when RESEND_API_KEY is set");
+  }
+  const sender = domainOfSender(from);
+  if (sender !== domain.toLowerCase() && !sender.endsWith(`.${domain.toLowerCase()}`)) {
+    return fail("EMAIL_FROM", "must belong to MAIL_DOMAIN");
+  }
+  return { kind: "resend", apiKey, domain, from };
+}
+
 /** Lit la configuration du worker depuis l'environnement ; échoue si elle est incomplète. */
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): WorkerConfig {
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
   }
+  const appEnv = env.APP_ENV || "development";
   return {
     databaseUrl,
-    appEnv: env.APP_ENV || "development",
+    appEnv,
     appVersion: env.APP_VERSION || "dev",
     logLevel: parseLogLevel(env.LOG_LEVEL),
     sentryDsn: parseDsn(env.SENTRY_DSN),
+    mail: parseMail(env, appEnv),
   };
 }
