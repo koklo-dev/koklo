@@ -1,7 +1,7 @@
 ---
 id: S-login
 titre: Connexion
-version: 2
+version: 3
 ---
 ## 1. Utilisateurs et objectif
 Toute personne non connectée (vue équipe d'abord ; la vue client suivra avec ses propres entrées). Elle arrive par l'URL de l'application ou par la redirection depuis `/projects` sans session. Objectif : ouvrir une session via GitHub, le seul fournisseur du lot.
@@ -14,6 +14,7 @@ Toute personne non connectée (vue équipe d'abord ; la vue client suivra avec s
 
 ## 3. Contenu
 Ordre d'importance : logo « K » temporaire (repère, pas une marque) ; titre « Connexion à Koklo » (h1) ; phrase « Connectez-vous avec votre compte GitHub pour accéder à vos projets. » ; bouton principal ; bascule de thème en haut à droite. Aucune donnée oRPC. Aucun champ de saisie : les champs e-mail/mot de passe, « mot de passe oublié », Apple/Google, inscription et mentions légales de `login-05` sont retirés.
+Mention sous le bouton (correction TK-85) : « Vous serez redirigé vers GitHub pour vous authentifier. », sans lien (les conditions d'utilisation et la confidentialité de `login-05` n'existent pas).
 Mise en page (TK-85) : colonne centrée, `bg-muted`, logo « K » au-dessus de la `Card`, bascule de thème en haut à droite.
 
 ## 4. États
@@ -45,6 +46,8 @@ Sous 768 px : la carte occupe la largeur moins deux marges de 16 px, bouton plei
 5. **`login-05` (TK-85, retenu)** contre variantes à visuel scindé (`login-03`/`login-04`) : un visuel serait inventé ; seuls tokens, icônes et textes s'écartent du bloc.
 6. **Garder les champs e-mail et boutons sociaux du bloc** contre bouton GitHub seul : hors périmètre, aucune fonction derrière.
 
+7. **Mention de conditions sans lien** et **liens `#`** contre notice de redirection : l'une promet des conditions inexistantes, l'autre crée des liens morts. Boutons Google/Apple « bientôt » écartés : fonctions hors vision.
+
 ## 9. Questions ouvertes
 - Logo et marque définitifs (DESIGN.md §8.3) : « K » temporaire.
 - Pas d'icône GitHub dans la bibliothèque d'icônes ; `lock` est utilisée en attendant. Ajouter une icône de marque demanderait une décision (Q3 de TK-85 : `lock` conservée, icône décorative `aria-hidden`).
@@ -55,3 +58,4 @@ Sous 768 px : la carte occupe la largeur moins deux marges de 16 px, bouton plei
 |---|---|---|---|
 | 1 | 2026-10-27 | TK-14 | Création : connexion GitHub, carte centrée, thème clair par défaut (H-24) |
 | 2 | 2026-10-27 | TK-85 | Adoption de `login-05` (CLI shadcn) : même contenu, textes et états ; éléments hors périmètre retirés ; largeur 384 px ; tokens et icônes du projet, `lock` conservée. Détail : `.workflow/TK-85/02-design.md` |
+| 3 | 2026-10-28 | TK-85 (correction) | Bloc `login-05` installé fidèle par la CLI ; retraits purement soustractifs confirmés ; mentions légales remplacées par une notice de redirection sans lien. Détail : `.workflow/TK-85/02-design.md` |
