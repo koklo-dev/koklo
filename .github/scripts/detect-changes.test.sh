@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests de detect-changes.sh (TK-4, critère 3 : une PR ne lance que les jobs nécessaires).
-# Contrat : liste de fichiers (un par ligne) sur stdin -> code=, skills=, ci= (true|false) sur stdout.
+# Contrat : liste de fichiers (un par ligne) sur stdin -> code=, skills=, ci=, deploy= (true|false) sur stdout.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/lib-test.sh"
@@ -8,14 +8,14 @@ SUT="$HERE/detect-changes.sh"
 
 out() { printf '%b' "$1" | bash "$SUT" 2>&1; }
 has() { out "$1" | grep -qx "$2"; }
-three_lines() { [ "$(printf 'README.md\n' | bash "$SUT" | grep -Ec '^(code|skills|ci)=(true|false)$')" = 3 ]; }
+four_lines() { [ "$(printf 'README.md\n' | bash "$SUT" | grep -Ec '^(code|skills|ci|deploy)=(true|false)$')" = 4 ]; }
 
 echo "detect-changes.sh"
 [ -f "$SUT" ] || { ko "script absent: .github/scripts/detect-changes.sh"; finish; exit $?; }
 
 # T3.1 aucun paquet touché
 for f in 'README.md\n' 'docs/x.md\nREADME.md\n' 'design/screens/S-1.md\n' ''; do
-    for k in code=false skills=false ci=false; do
+    for k in code=false skills=false ci=false deploy=false; do
         check "sans code ($f) -> $k" has "$f" "$k"
     done
 done
@@ -45,9 +45,17 @@ check "ci.yml -> code=true" has '.github/workflows/ci.yml\n' code=true
 check ".github/scripts seul -> skills=false" has '.github/scripts/x.sh\n' skills=false
 
 check "mélange docs+code -> code=true" has 'README.md\napps/api/a.ts\n' code=true
-check "exactement 3 sorties key=value" three_lines
+check "exactement 4 sorties key=value" four_lines
 # TK-16 : Dockerfiles et .dockerignore déclenchent les jobs de code (build des images)
 for f in 'apps/web/Dockerfile\n' 'apps/api/Dockerfile\n' 'apps/worker/Dockerfile\n' '.dockerignore\n'; do
     check "$f -> code=true" has "$f" code=true
 done
+# TK-17 : sortie deploy (le job deploy-check ne tourne que si .deploy/ change)
+for f in '.deploy/manifest.yaml\n' '.deploy/x\n' 'README.md\n.deploy/manifest.yaml\n'; do
+    check "$f -> deploy=true" has "$f" deploy=true
+done
+for f in 'apps/x\n' 'apps/web/x.ts\n' 'packages/domain/src/a.ts\n' '.github/workflows/ci.yml\n' 'shipyard/skills/x.md\n' 'README.md\n' 'deploy/x\n' 'apps/web/.deploy/x\n' ''; do
+    check "$f -> deploy=false" has "$f" deploy=false
+done
+check ".deploy/x seul -> skills=false" has '.deploy/x\n' skills=false
 finish
