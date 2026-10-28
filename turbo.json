@@ -5,6 +5,7 @@
       "domain": { "dependencies": { "allow": ["contract", "config"] } },
       "db": { "dependencies": { "allow": ["domain", "config"] } },
       "contract": { "dependencies": { "allow": ["config"] } },
+      "observability": { "dependencies": { "allow": ["config"] } },
       "schema": { "dependencies": { "allow": ["config"] } },
       "github": { "dependencies": { "allow": ["domain", "contract", "config"] } },
       "rules": { "dependencies": { "allow": ["domain", "contract", "config"] } },
