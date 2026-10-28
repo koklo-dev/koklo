@@ -17,7 +17,11 @@ in_ci() { job_block ci | grep -Eq -- "$1"; }
 job_if_always() { job_block ci | grep -Eq '^    if: always\(\)'; }
 guard_fails() { job_block ci | grep -Eq "needs\.changes\.result != 'success'"; }
 # Le garde doit précéder toute autre étape (le premier "- " du bloc steps).
-guard_first() { job_block ci | awk '/^    steps:/ {on=1; next} on && /^      - / {print; exit}' | grep -q 'Change detection succeeded'; }
+guard_first() {
+    local first
+    first="$(job_block ci | awk '/^    steps:/ {on=1; next} on && /^      - / && !seen {print; seen=1}')"
+    case "$first" in *'Change detection succeeded'*) return 0 ;; *) return 1 ;; esac
+}
 # Rang de la première ligne du job ci qui correspond.
 rank() { job_block ci | grep -nE -- "$1" | head -1 | cut -d: -f1; }
 before() {
