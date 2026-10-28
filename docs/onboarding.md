@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: 98c76a5
+covers_commit: 9c821e2
 ---
 # Onboarding — humans and AI agents
 
@@ -107,6 +107,13 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
 - Decisions: [ADR 0002](adr/0002-project-port-in-api.md), [ADR 0003](adr/0003-better-auth-session-guard.md); the layout decision is recorded in
   [ADR 0001](adr/0001-monorepo-pnpm-turborepo.md).
 - Other conventions: TO DOCUMENT.
+
+- Multi-tenant data access (TK-20): in the api, business queries go through
+  `DatabaseService.client` inside `withOrganization(organizationId, ...)`; never use
+  `DatabaseService.raw` for a business model. In scripts, seed and tests use
+  `createRawDbClient`. A new model with `organizationId` must be classified in
+  `TENANT_MODELS` or `TENANT_EXCLUDED_MODELS`, or the guard test fails. See
+  [architecture.md](architecture.md#multi-tenant-isolation-tk-20).
 
 ## Commits, releases and dependency updates
 - Commits must follow Conventional Commits (enforced by the `commitlint` workflow);

@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: 98c76a5
+covers_commit: 9c821e2
 ---
 # Architecture
 
@@ -168,6 +168,46 @@ flowchart LR
   down["migrations/TS_NAME/down.sql"] --> rb["pnpm db:rollback = scripts/rollback.ts"]
   rb -->|"prisma db execute --file"| pg
   rb -->|"DELETE FROM _prisma_migrations"| pg
+```
+
+### Multi-tenant isolation (TK-20)
+`@koklo/db` filters every business model by organization with a Prisma `$extends`
+(`src/tenant-extension.ts`) and an `AsyncLocalStorage` (`src/tenant-context.ts`).
+
+- `withOrganization(organizationId, fn)` opens the context (the id must be a UUID, else
+  `MissingOrganizationContextError`). The organization always comes from the session guard
+  (`OrganizationContext`), never from the client input. `currentOrganizationId()` reads it.
+- On a business model (`TENANT_MODELS`, today `Project`), outside a context every operation
+  rejects with `MissingOrganizationContextError`. Inside, `where` is forced to the context
+  organization (reads, `update*`, `delete*`, `count`, `aggregate`, `groupBy`; it overrides any
+  caller-supplied `organizationId`). `create`, `createMany(AndReturn)` and `upsert.create` set
+  `organizationId` to the context, or reject with `OrganizationMismatchError` on another one
+  (a nested `organization` relation is rejected too). An unknown operation is rejected
+  (fail closed).
+- `upsert` first looks up its target on the raw client and rejects when the row belongs to
+  another organization (otherwise the filtered `where` would create a duplicate). The check
+  and the upsert are two queries: if a concurrent transaction inserts the foreign row between
+  them, the upsert fails on the unique constraint, so nothing crosses organizations.
+- Raw SQL (`$queryRaw`, `$executeRaw`, `...Unsafe`) is rejected on the extended client
+  (`RawQueryNotAllowedError`) because it cannot be filtered.
+- Excluded models (`TENANT_EXCLUDED_MODELS`: Better Auth tables, `Organization`, `Member`,
+  `Invitation`) pass through untouched, each with a written reason. PostgreSQL RLS is not used
+  in v1 (vision §18.4).
+
+Two clients, one pool: `createRawDbClient(url)` returns the plain Prisma client;
+`createDbClient(url)` returns it wrapped by `withTenantIsolation`. In the api,
+`DatabaseService.raw` is the unfiltered client (Better Auth, health probe) and
+`DatabaseService.client` the extended one built on the same pool. Business code uses `client`
+only; `raw` is infrastructure, never a business model. Seed and tests use the raw client.
+
+```mermaid
+flowchart LR
+  guard["Session guard\n(OrganizationContext)"] -->|organizationId| wo["withOrganization(orgId, fn)"]
+  wo --> repo["Repository"]
+  repo -->|DatabaseService.client| ext["Tenant extension\n$extends + AsyncLocalStorage"]
+  ext -->|"where organizationId = ctx"| pool[("Shared pg pool")]
+  auth["Better Auth, health probe"] -->|DatabaseService.raw| pool
+  ext -. "no context / other org / raw SQL" .-> err["Named error"]
 ```
 
 ### API application (TK-10)
@@ -440,3 +480,4 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md),
 [0006](adr/0006-web-same-origin-proxy-runtime-config.md),
 [0007](adr/0007-real-stack-e2e-orchestration.md).
+TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.
