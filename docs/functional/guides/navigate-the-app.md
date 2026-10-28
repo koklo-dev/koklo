@@ -3,7 +3,7 @@ title: Sign in and move around the application
 audience: functional
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-27
+last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
 covers_commit: 558d95f
@@ -22,7 +22,9 @@ covers_commit: 558d95f
 3. In the side menu, "Projets" is the current page. Use the button at the top of the page
    (**Réduire la barre latérale** / **Ouvrir la barre latérale**), or Ctrl+B (Cmd+B on Mac),
    to fold the menu to icons or open it again. Folded, hover or focus an icon to see its name.
-4. To change theme, use **Passer au thème sombre** / **Passer au thème clair** at the bottom of the menu.
+4. To change theme or sign out, open the user menu (**Menu utilisateur**) at the bottom of the side menu:
+   it offers **Passer au thème sombre** / **Passer au thème clair** and **Se déconnecter**.
+   The folded rail can also be clicked (**Réduire ou agrandir la barre latérale**).
 5. On a phone (narrow screen) the menu is hidden: press **Ouvrir la barre latérale** to open it
    as a drawer; Escape closes it.
 
