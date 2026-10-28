@@ -1,12 +1,12 @@
 ---
 title: Quality and operations
 audience: technical
-doc_version: 0.1.0
+doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-28
+last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 9c821e2
+covers_commit: 706ce94
 ---
 # Quality and operations
 
@@ -137,6 +137,29 @@ covers_commit: 9c821e2
   assert on `init` / `captureException`; to read logs in a test, pass
   `AppModule.forRoot(config, { logStream })` and parse the lines.
 - **Failure isolation**: a failing SDK never changes a response or a job outcome.
+
+### Emails and magic link (TK-22)
+- **Sending**: the api never sends mail. Better Auth's `sendMagicLink` enqueues
+  `{ email, url }` on the `send-magic-link` pg-boss queue; the worker sends it (3 attempts).
+  Link lifetime 600 s, token stored hashed, single use, no sign-up through a link.
+- **Capture vs Resend**: without `RESEND_API_KEY`, `APP_ENV` `development` or `test` uses the
+  in-memory `CaptureMailSender` (no network). In `staging` or `production` a missing key stops
+  the worker at startup (`RESEND_API_KEY is required when APP_ENV is staging`); with a key,
+  `MAIL_DOMAIN` and `EMAIL_FROM` are required and the sender must belong to the domain. Error
+  messages name the variable, never its value.
+- **Payload retention**: the job payload carries the link (hence the token), so the queue keeps
+  completed and archived jobs for 1 hour at most (`deleteAfterSeconds` / `retentionSeconds`
+  = 3600, re-applied with `updateQueue` at each start).
+- **Redaction**: `token`, `url`, `data.*`, `job.data.*` and the response `set-cookie` header
+  (session token) are replaced by `[Redacted]`; the request logger keeps the path only (query
+  string and fragment dropped, `request-serializer.ts`). A Resend failure is raised as
+  `Resend a refusé l'envoi (<name>)`, without the body.
+- **Image content**: `@koklo/worker` is a devDependency of the api (tests start the worker
+  and read the capture). `pnpm deploy --prod` in `apps/api/Dockerfile` leaves it, and
+  `resend`, out of the api image (checked: only config, contract, db, observability remain);
+  `turbo prune` and the builder stage do contain it, which only costs build time.
+- **Open**: remove `resend@6.35.0` from `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`)
+  once its release age passes.
 
 ## Multi-tenant isolation (TK-20)
 - Tests: `packages/db/test/tenant-extension.test.ts` (ephemeral PostgreSQL: no context on 16
