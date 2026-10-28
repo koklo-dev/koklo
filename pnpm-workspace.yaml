@@ -27,6 +27,12 @@ minimumReleaseAgeExclude:
   - "@better-auth/telemetry@1.7.14"
   - better-auth@1.7.14
   - "@material-symbols/svg-400@0.48.2"
+  - "@sentry/bundler-plugins@11.10.0"
+  - "@sentry/core@11.10.0"
+  - "@sentry/node@11.10.0"
+  - "@sentry/opentelemetry@11.10.0"
+  - "@sentry/server-runtime-injection@11.10.0"
+  - "@sentry/server-utils@11.10.0"
 
 overrides:
   multer: 2.5.0

@@ -1,3 +1,4 @@
+import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 import { z } from "zod";
 
 export interface AppConfig {
@@ -9,6 +10,9 @@ export interface AppConfig {
   betterAuthUrl: string;
   githubClientId: string;
   githubClientSecret: string;
+  logLevel: LogLevel;
+  /** DSN GlitchTip/Sentry ; absent : le SDK d'erreurs reste désactivé. */
+  sentryDsn: string | undefined;
 }
 
 const MIN_AUTH_SECRET_LENGTH = 32;
@@ -22,6 +26,8 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url(),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
+  LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
+  SENTRY_DSN: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
 });
 
 /**
@@ -39,6 +45,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     BETTER_AUTH_URL: env.BETTER_AUTH_URL,
     GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET,
+    LOG_LEVEL: env.LOG_LEVEL,
+    SENTRY_DSN: env.SENTRY_DSN,
   });
   if (!parsed.success) {
     const problems = parsed.error.issues
@@ -56,5 +64,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     betterAuthUrl: data.BETTER_AUTH_URL,
     githubClientId: data.GITHUB_CLIENT_ID,
     githubClientSecret: data.GITHUB_CLIENT_SECRET,
+    logLevel: data.LOG_LEVEL,
+    sentryDsn: data.SENTRY_DSN,
   };
 }
