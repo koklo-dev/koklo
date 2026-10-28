@@ -3,10 +3,10 @@ title: Onboarding — humans and AI agents
 audience: technical
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-27
+last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: ade3f4d
+covers_commit: 98c76a5
 ---
 # Onboarding — humans and AI agents
 
@@ -54,6 +54,14 @@ runs `node --watch src/main.ts`; `pnpm --filter @koklo/worker build` then `start
 `dist/main.js`. Its integration test starts its own PostgreSQL 17 through Testcontainers,
 so **Docker must be available** to run `pnpm test` for that package. See
 [architecture.md](architecture.md#worker-pg-boss-and-noop-job-tk-12).
+
+Observability variables (TK-19), read by both `apps/api` and `apps/worker` (each has its
+`.env.example`; copy to `.env`): `LOG_LEVEL` (`fatal|error|warn|info|debug|trace|silent`,
+default `info`; anything else fails at startup), `SENTRY_DSN` (optional GlitchTip/Sentry URL,
+empty means no error reporting), plus `APP_ENV` and `APP_VERSION` (environment and release
+reported to GlitchTip). Logs are JSON lines on stdout. See
+[quality-and-operations.md](quality-and-operations.md#observability-tk-19) and
+[architecture.md](architecture.md#observability-koklo-observability-tk-19).
 
 Layout and shared configuration (`packages/config`): see
 [architecture.md](architecture.md#monorepo-workspace-tk-1). Running a task for one

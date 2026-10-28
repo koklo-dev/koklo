@@ -3,10 +3,10 @@ title: Architecture
 audience: technical
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-10-27
+last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: ade3f4d
+covers_commit: 98c76a5
 ---
 # Architecture
 
@@ -344,6 +344,35 @@ already exported win over the defaults; `turbo.json` passes the ports and auth v
 (`globalPassThroughEnv`, `dev.passThroughEnv`). Run steps and gates:
 [quality-and-operations.md](quality-and-operations.md#real-stack-e2e-tk-15) ·
 decision: [ADR 0007](adr/0007-real-stack-e2e-orchestration.md).
+
+### Observability: `@koklo/observability` (TK-19)
+`packages/observability` is the single place that knows pino and the Sentry-compatible SDK
+(`@sentry/node`, speaking to GlitchTip). Public API (entry point only): `createLogger`,
+`LOG_LEVELS`, `initObservability`, `captureError`, and `setupObservability` (SDK init plus
+logger, shared by the api and the worker). The error SDK is **optional**: without a DSN
+`initObservability` does nothing and `captureError` never throws, so the service behaves the
+same with or without GlitchTip.
+
+- **api**: `AppModule.forRoot(config)` calls `setupObservability`, then mounts `nestjs-pino`
+  (`LoggerModule`) with that logger. The request id (`x-request-id` or a UUID) is generated
+  once per request and written on every log line as `requestId`; 5xx responses log at `error`.
+  `guard` (used by the oRPC handlers, outside dependency injection) logs the unexpected error
+  name, sends it to the SDK tagged with `requestId`, then raises the typed `INTERNAL` error.
+  Its logger lives in `apps/api/src/request-logger.ts` (one logger per process, an
+  info-level JSON logger until `forRoot` replaces it).
+- **worker**: `setupObservability(config)` builds the logger; `instrumentJob` wraps each
+  pg-boss handler with a child logger `{ jobId, queue }`, captures and logs a failure, and
+  rethrows so pg-boss marks the job failed while the consumer stays alive.
+
+```mermaid
+flowchart LR
+  req([HTTP request]) --> api[api: nestjs-pino + guard]
+  job([pg-boss job]) --> wrk[worker: instrumentJob]
+  api --> obs[[@koklo/observability]]
+  wrk --> obs
+  obs -->|JSON lines| stdout[(stdout)]
+  obs -.->|only if SENTRY_DSN| gt[GlitchTip]
+```
 
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
