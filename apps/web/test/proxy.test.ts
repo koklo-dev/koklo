@@ -6,7 +6,8 @@ const hasSession = vi.hoisted(() => vi.fn());
 vi.mock("../src/lib/session.ts", () => ({ hasSession }));
 
 beforeEach(() => {
-  vi.stubEnv("API_URL", "http://api.internal:3001");
+  vi.stubEnv("API_INTERNAL_URL", "http://api.internal:3001");
+  vi.stubEnv("API_URL", "http://ancienne.invalid:9");
   vi.stubEnv("APP_ENV", "test");
   vi.stubEnv("APP_VERSION", "0.0.0");
   hasSession.mockReset();

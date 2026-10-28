@@ -12,9 +12,9 @@ skip() { SKIPPED=$((SKIPPED + 1)); echo "  - SKIP $1 ($2)"; }
 TAG="koklo-tk16-test"
 RUN_ID="tk16-$$"
 NETWORK="net-$RUN_ID"
-CONTAINERS=()
+# `start` est appelée dans `$(…)` : une liste mise à jour là serait perdue. On nettoie donc par préfixe de nom.
 cleanup() {
-    for c in "${CONTAINERS[@]:-}"; do [ -n "$c" ] && docker rm -f "$c" >/dev/null 2>&1; done
+    docker ps -aq --filter "name=^$RUN_ID-" | xargs -r docker rm -f >/dev/null 2>&1
     docker network rm "$NETWORK" >/dev/null 2>&1
 }
 trap cleanup EXIT
@@ -33,7 +33,6 @@ have_img() { docker image inspect "$(img "$1")" >/dev/null 2>&1; }
 start() { # start <nom> <args docker...>
     local n="$RUN_ID-$1"
     shift
-    CONTAINERS+=("$n")
     docker run -d --name "$n" "$@" >/dev/null 2>&1 && echo "$n"
 }
 http_code() { # http_code <conteneur> <chemin> : requête depuis le réseau docker
@@ -127,8 +126,8 @@ fi
 
 # C4 + C5
 if have_img web; then
-    W1="$(start web1 --network "$NETWORK" -e API_URL="http://env-un.invalid" "$(img web)")"
-    W2="$(start web2 --network "$NETWORK" -e API_URL="http://env-deux.invalid" "$(img web)")"
+    W1="$(start web1 --network "$NETWORK" -e API_INTERNAL_URL="http://env-un.invalid" "$(img web)")"
+    W2="$(start web2 --network "$NETWORK" -e API_INTERNAL_URL="http://env-deux.invalid" "$(img web)")"
     check "C4 web GET /api/health = 200 sans api ni DB" wait_http "$W1" /api/health 200
     body_ok() { docker run --rm --network "$NETWORK" "$CURL_IMAGE" -s "http://$1:3000/api/health" | grep -Eq '"status" *: *"ok"'; }
     check "C4 corps { status: ok }" body_ok "$W1"
