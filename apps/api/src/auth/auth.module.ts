@@ -19,7 +19,7 @@ function sessionProviders(config: AppConfig): Provider[] {
     provide: BetterAuthSessionResolver,
     inject: [AUTH, DatabaseService],
     useFactory: (auth: Auth, database: DatabaseService) =>
-      new BetterAuthSessionResolver(auth, database.client),
+      new BetterAuthSessionResolver(auth, database.raw),
   };
   if (config.appEnv !== "test") {
     return [real, { provide: SESSION_RESOLVER, useExisting: BetterAuthSessionResolver }];
@@ -48,7 +48,7 @@ export class AuthModule {
         {
           provide: AUTH,
           inject: [DatabaseService],
-          useFactory: (database: DatabaseService) => createAuth(config, database.client),
+          useFactory: (database: DatabaseService) => createAuth(config, database.raw),
         },
         { provide: APP_FILTER, useClass: OrpcErrorFilter },
         ...sessionProviders(config),

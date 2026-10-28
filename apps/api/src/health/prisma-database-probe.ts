@@ -8,6 +8,6 @@ export class PrismaDatabaseProbe implements DatabaseProbe {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   async ping(): Promise<void> {
-    await this.database.client.$queryRaw`SELECT 1`;
+    await this.database.raw.$queryRaw`SELECT 1`;
   }
 }
