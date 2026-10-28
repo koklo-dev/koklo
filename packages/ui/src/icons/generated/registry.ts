@@ -34,6 +34,7 @@ export const iconLoaders = {
   dark_mode: () => import("./dark_mode.ts"),
   left_panel_close: () => import("./left_panel_close.ts"),
   left_panel_open: () => import("./left_panel_open.ts"),
+  logout: () => import("./logout.ts"),
   check: () => import("./check.ts"),
   close: () => import("./close.ts"),
   keyboard_arrow_down: () => import("./keyboard_arrow_down.ts"),

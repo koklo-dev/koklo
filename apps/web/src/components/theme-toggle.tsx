@@ -16,9 +16,18 @@ function currentTheme(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function useTheme() {
   const theme = useSyncExternalStore(subscribe, currentTheme, () => "light" as Theme);
   const next: Theme = theme === "dark" ? "light" : "dark";
+  const toggle = () => {
+    applyTheme(next);
+    for (const listener of listeners) listener();
+  };
+  return { theme, next, toggle };
+}
+
+export function ThemeToggle({ className }: { className?: string }) {
+  const { theme, next, toggle } = useTheme();
 
   return (
     <IconButton
@@ -26,10 +35,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       icon={theme === "dark" ? "light_mode" : "dark_mode"}
       aria-label={next === "dark" ? "Passer au thème sombre" : "Passer au thème clair"}
       className={`size-11 md:size-9 ${className ?? ""}`}
-      onClick={() => {
-        applyTheme(next);
-        for (const listener of listeners) listener();
-      }}
+      onClick={toggle}
     />
   );
 }

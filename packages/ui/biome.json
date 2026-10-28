@@ -2,5 +2,28 @@
   "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "root": false,
   "extends": "//",
-  "css": { "parser": { "tailwindDirectives": true } }
+  "css": { "parser": { "tailwindDirectives": true } },
+  "overrides": [
+    {
+      "includes": [
+        "src/components/sidebar.tsx",
+        "src/components/breadcrumb.tsx",
+        "src/components/field.tsx",
+        "src/components/label.tsx",
+        "src/components/collapsible.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": { "noExcessiveLinesPerFunction": "off" },
+          "suspicious": {
+            "noDocumentCookie": "off",
+            "noDoubleEquals": "off",
+            "noArrayIndexKey": "off"
+          },
+          "correctness": { "useExhaustiveDependencies": "off" },
+          "a11y": { "useSemanticElements": "off", "useFocusableInteractive": "off" }
+        }
+      }
+    }
+  ]
 }

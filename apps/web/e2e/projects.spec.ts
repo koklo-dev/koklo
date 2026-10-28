@@ -5,8 +5,10 @@ import {
   releaseHeld,
   setScenario,
   settle,
+  sidebarOf,
   switchToDark,
   type Theme,
+  triggerOf,
 } from "./support/helpers.ts";
 
 const STATES: Array<{
@@ -44,9 +46,15 @@ test("S-projects : le gabarit expose la navigation, le titre et aucun panneau de
 }) => {
   await setScenario({ session: true, projects: "data" });
   await page.goto("/projects");
-  const nav = page.getByRole("navigation", { name: "Navigation principale" });
-  await expect(nav.getByRole("link", { name: "Projets" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByTestId("app-shell")).toBeVisible();
+  await expect(sidebarOf(page).getByRole("link", { name: "Projets" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(sidebarOf(page).getByText("Test", { exact: true })).toBeVisible();
+  await expect(sidebarOf(page).getByText("test@example.com")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i })).toContainText(
+    "Projets",
+  );
   await expect(page.getByRole("complementary")).toHaveCount(0);
   await expect(page.getByRole("row")).toHaveCount(4);
 });
@@ -76,7 +84,8 @@ test("thème : le choix persiste après rechargement, sans flash (classe dark d�
   await switchToDark(page);
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await expect(page.getByRole("button", { name: "Passer au thème clair" })).toBeVisible();
+  await page.getByRole("button", { name: "Menu utilisateur" }).click();
+  await expect(page.getByRole("menuitem", { name: "Passer au thème clair" })).toBeVisible();
 });
 
 test("thème : clair par défaut même si le système préfère le sombre", async ({ page }) => {
@@ -94,9 +103,9 @@ test("mobile 375 px : pas de défilement horizontal, cibles de 44 px", async ({ 
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(overflow).toBe(false);
-  // TK-85 : la bascule de thème vit dans la sidebar, qui est une Sheet sous 768 px : on l'ouvre d'abord.
-  await page.getByRole("button", { name: "Ouvrir la barre latérale" }).click();
-  const toggle = page.getByRole("button", { name: "Passer au thème sombre" });
+  // TK-85 : la sidebar est une Sheet sous 768 px : on l'ouvre, puis on mesure le menu utilisateur.
+  await triggerOf(page).click();
+  const toggle = page.getByRole("dialog").getByRole("button", { name: "Menu utilisateur" });
   // La Sheet entre en 150 ms (échelle 0,97 → 1) : on mesure une fois la taille stabilisée.
   await expect
     .poll(async () => {

@@ -103,7 +103,7 @@ describe("sous-composants du bloc sidebar-07", () => {
 
   it("le rail bascule la barre", async () => {
     render(<Parts />);
-    const rail = screen.getByRole("button", { name: "Toggle Sidebar" });
+    const rail = screen.getByRole("button", { name: "Réduire ou agrandir la barre latérale" });
     await userEvent.click(rail);
     expect(document.cookie).toContain("sidebar_state=false");
   });
@@ -126,7 +126,9 @@ describe("sous-composants du bloc sidebar-07", () => {
         </Sidebar>
       </SidebarProvider>,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Toggle Sidebar" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Réduire ou agrandir la barre latérale" }),
+    );
     expect(calls).toEqual([false]);
   });
 });

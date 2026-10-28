@@ -8,6 +8,7 @@
     // Next résout ses sous-chemins (next/navigation…) sans « exports » : résolution bundler requise.
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "paths": { "@/*": ["./src/*"] },
     "plugins": [{ "name": "next" }]
   },
   "include": ["src", "test", "e2e", "*.ts", "next-env.d.ts", ".next/types/**/*.ts"]

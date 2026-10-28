@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("../src/components/projects-page.tsx", () => ({
   ProjectsPage: () => <p>liste</p>,
 }));
-vi.mock("../src/components/login-card.tsx", () => ({ LoginCard: () => <p>carte</p> }));
+vi.mock("../src/components/login-form.tsx", () => ({ LoginForm: () => <p>carte</p> }));
 
 describe("RootLayout", () => {
   it("déclare la langue fr et le script de thème avant le contenu", () => {
@@ -38,10 +38,9 @@ describe("page /login", () => {
 });
 
 describe("page /projects", () => {
-  it("rend le titre h1 dans la coque d'application avec la vue projets", () => {
+  it("rend le titre h1 et la vue projets (le gabarit sidebar vit dans le layout)", () => {
     render(<ProjectsRoute />);
     expect(screen.getByRole("heading", { level: 1, name: "Projets" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Navigation principale" })).toBeInTheDocument();
-    expect(screen.getByRole("main")).toHaveTextContent("liste");
+    expect(screen.getByText("liste")).toBeInTheDocument();
   });
 });
