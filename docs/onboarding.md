@@ -77,10 +77,6 @@ is a rule or threshold tweak in `packages/config`, proven by its Vitest tests.
   them per package; split the code instead.
 - `packages/config/fixtures/` holds deliberately 50- and 51-line functions that prove the
   line limit; the root Biome config ignores that folder. Do not "fix" the 51-line one.
-- File size is capped: 300 lines per source file, 500 per test file, enforced by
-  `check:size` inside `pnpm lint` (migrations and generated files excluded). Split the
-  file; if that is impossible now, add a dated waiver to `.koklo/waivers.yaml`
-  (see [architecture.md](architecture.md#file-size-gate-checksize-tk-2)).
 - TypeScript is `strict` with `noUncheckedIndexedAccess`; extend
   `@koklo/config/tsconfig.base.json`.
 - Every new package declares its boundary tag in its own `turbo.json`

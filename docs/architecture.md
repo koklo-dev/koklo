@@ -112,53 +112,6 @@ flowchart LR
   supported). Exit code 1 and a message on stderr otherwise.
 - Both checks run from the root `lint` script:
   `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
-
-### File size gate `check:size` (TK-2)
-`packages/config` also owns the file-size limits (CDC §17.2), implemented in two
-modules that the package README ([packages/config/README.md](../packages/config/README.md))
-documents for users:
-
-- `src/check-size.ts`: walks the repository from a root (default: two levels above
-  the package; `node src/check-size.ts <root>` overrides it), counts lines of
-  `.ts .tsx .js .jsx .mjs .cjs .mts .cts` files and reports violations. Exported API:
-  `checkSize({ root, today? })`, `SOURCE_LIMIT` (300), `TEST_LIMIT` (500), `Violation`.
-  A file is a test when it matches `*.test.*` / `*.spec.*` or sits under `test/`,
-  `tests/`, `__tests__/` or `e2e/`.
-- `src/waivers.ts`: `loadWaivers(root)` parses `.koklo/waivers.yaml` (`yaml` 2.9.1),
-  `isExpired(waiver, today)` compares UTC calendar days.
-
-Not counted: `node_modules`, `.git`, `.worktrees`, `.workflow`, `.turbo`, `dist`,
-`.next`, `coverage`, `migrations/` and `generated/` directories, `*.generated.*` and
-`*.gen.*` files, and files with `@generated` or `DO NOT EDIT` in their first 5 lines.
-
-```mermaid
-flowchart LR
-  lint["pnpm lint (root)"] --> turbo{{"turbo run lint"}}
-  turbo --> pkg["@koklo/config lint"]
-  pkg --> biome["biome ci"]
-  lint -->|"&&, outside the turbo cache"| size["pnpm check:size"]
-  size --> cs["src/check-size.ts"]
-  cs --> w["src/waivers.ts"]
-  w --> y[(".koklo/waivers.yaml")]
-  cs -->|"exit 1 + one stderr line per violation"| fail[lint fails]
-```
-
-A file over its limit is a violation unless a waiver with the same `file` (path
-relative to the root, `/` separators) and `rule: max-file-lines` has not expired.
-A waiver is valid through the end of its `expires` day (UTC). If only expired waivers
-match, the violation has reason `waiver-expired` and the message names the file, the
-expiry date and the author; otherwise the reason is `too-long`. A missing
-`waivers.yaml` means no waivers; an unreadable or incomplete one (all five fields
-`file`, `rule`, `justification`, `author`, `expires` are mandatory) makes the check
-fail with an explicit message.
-
-Wiring: root `package.json` adds `check:size` (`pnpm --filter @koklo/config check:size`);
-the root `lint` ends with `&& pnpm check:size` (after `turbo run lint`, `turbo boundaries` and the deep-import check). `packages/config` `lint` stays
-`biome ci --config-path=../.. .`: `check:size` must not live inside the cached turbo
-task, because it reads the whole repository and today's date (waiver expiry), which are
-not turbo inputs — a cache hit would replay a stale verdict. The check scans the whole
-repository, not only the package.
-
 ### API contract package (TK-9)
 `packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2
 contract that other packages consume (see the `contract` edges in the boundaries
