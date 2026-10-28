@@ -84,9 +84,18 @@ describe("CT-4 chemins explicites", () => {
     const pairs = Object.entries(doc.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${path}`),
     );
-    expect(pairs).toHaveLength(Object.keys(procedures()).length);
+    expect(pairs).toHaveLength(8);
     expect(new Set(pairs).size).toBe(pairs.length);
-    expect(pairs.sort()).toEqual(["GET /health", "GET /projects"]);
+    expect(pairs.sort()).toEqual([
+      "GET /health",
+      "GET /members",
+      "GET /organizations",
+      "GET /projects",
+      "PATCH /members/{memberId}/role",
+      "POST /members/invitations",
+      "POST /organizations",
+      "POST /projects",
+    ]);
   });
 });
 
@@ -125,7 +134,7 @@ describe("CT-5 erreurs typées", () => {
 });
 
 describe("CT-6 génération OpenAPI", () => {
-  it("produit un document OpenAPI 3.x avec /health et /projects", async () => {
+  it("produit un document OpenAPI 3.x avec les 6 chemins (8 routes)", async () => {
     const doc = (await generateOpenApi()) as {
       openapi: string;
       info: { title: string; version: string };
@@ -133,7 +142,14 @@ describe("CT-6 génération OpenAPI", () => {
     };
     expect(doc.openapi).toMatch(/^3\./);
     expect(doc.info.title).toBeTruthy();
-    expect(Object.keys(doc.paths).sort()).toEqual(["/health", "/projects"]);
+    expect(Object.keys(doc.paths).sort()).toEqual([
+      "/health",
+      "/members",
+      "/members/invitations",
+      "/members/{memberId}/role",
+      "/organizations",
+      "/projects",
+    ]);
     expect(JSON.stringify(doc)).toContain('"status"');
   });
 
@@ -202,11 +218,21 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (C3.2)", () => {
-  it("est en 0.2.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.2.0");
-    expect(CONTRACT_VERSION).toBe("0.2.0");
-    expect(Object.keys(readJson("openapi/versions.json"))).toEqual(["0.1.0", "0.2.0"]);
+describe("CT-10 version du contrat (TK-21)", () => {
+  it("est en 0.3.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.3.0");
+    expect(CONTRACT_VERSION).toBe("0.3.0");
+    expect(Object.keys(readJson("openapi/versions.json"))).toEqual(["0.1.0", "0.2.0", "0.3.0"]);
+  });
+
+  it("conserve les empreintes des versions précédentes (versions.json ne fait que croître)", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["0.1.0"]).toBe(
+      "0298d7165e28361bd41e002829956c2e1dcdea6e0f40a6cf539b78e9039b4738",
+    );
+    expect(versions["0.2.0"]).toBe(
+      "9187ec3eae09e5a6dd39091f417b5fe55b5f72ea22a71f29066455b5261ab779",
+    );
   });
 });
 
