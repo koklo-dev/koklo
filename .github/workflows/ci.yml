@@ -44,7 +44,7 @@ jobs:
           cat "$GITHUB_OUTPUT"
 
   ci:
-    needs: [changes, e2e]
+    needs: [changes, e2e, images]
     # always() : si `changes` échoue, `ci` doit s'exécuter et échouer, pas être sauté —
     # un check requis sauté compte comme réussi.
     if: always()
@@ -64,6 +64,13 @@ jobs:
         if: needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled'
         run: |
           echo "::error::job 'e2e' ended with '${{ needs.e2e.result }}'"
+          exit 1
+
+      # Même logique que e2e : `ci` est le seul check requis, il doit refuser une image qui ne se construit pas.
+      - name: Images did not fail
+        if: needs.images.result == 'failure' || needs.images.result == 'cancelled'
+        run: |
+          echo "::error::job 'images' ended with '${{ needs.images.result }}'"
           exit 1
 
       - uses: actions/checkout@v7.0.1
@@ -172,6 +179,28 @@ jobs:
             e2e/playwright-report/
             e2e/test-results/
           if-no-files-found: ignore
+
+  # Construction des 3 images (TK-16, vision §20.4) : contexte = racine, sans --build-arg,
+  # sans publication (le push GHCR relève de TK-18).
+  images:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Build web
+        run: docker build -f apps/web/Dockerfile -t koklo-web:ci .
+
+      - name: Build api
+        run: docker build -f apps/api/Dockerfile -t koklo-api:ci .
+
+      - name: Build worker
+        run: docker build -f apps/worker/Dockerfile -t koklo-worker:ci .
+
+      # Démarre les images contre un Postgres jetable : migrations, /health, /api/health, non-root.
+      - name: Image tests
+        run: bash .github/scripts/docker-images.test.sh
 
   # Les runtimes d'agent chargent .claude/skills/ et .codex/skills/, jamais
   # shipyard/skills/ : une source modifiée sans republication laisse les sessions
