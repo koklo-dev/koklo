@@ -108,4 +108,18 @@ check "job ci agrège e2e (needs)" in_ci 'needs:.*e2e'
 check "job ci : échec si e2e est en failure ou cancelled" in_ci "needs\\.e2e\\.result == 'failure' \\|\\| needs\\.e2e\\.result == 'cancelled'"
 check "job ci : e2e skipped reste accepté (pas de garde != 'success')" ci_accepts_e2e_skipped
 check "job ci conserve son nom stable" g '^  ci:'
+
+# TK-16 : build des 3 images Docker, sans publication
+in_images() { job_block images | grep -Eq -- "$1"; }
+images_present() { [ -n "$(job_block images)" ]; }
+images_lacks() { images_present && ! job_block images | grep -Eq -- "$1"; }
+images_unpinned_action() { job_block images | grep -E 'uses:' | grep -vE '@v[0-9]+\.[0-9]+\.[0-9]+' | grep -q .; }
+check "images: job présent" g '^  images:'
+for a in web api worker; do
+    check "images: docker build apps/$a/Dockerfile" in_images "docker build.*apps/$a/Dockerfile"
+done
+check "images: aucun --build-arg" images_lacks -- '--build-arg'
+check "images: ni push ni secret" images_lacks 'push|ghcr|secrets\.'
+check "job ci agrège images (needs)" in_ci 'needs:.*images'
+check "images: actions épinglées" bash -c "$(declare -f job_block images_present images_unpinned_action); WF='$WF'; images_present && ! images_unpinned_action"
 finish
