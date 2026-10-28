@@ -91,7 +91,8 @@ pg_ready() { for _ in $(seq 1 40); do docker exec "$PG" pg_isready -U postgres -
 check "base Postgres 17 jetable prête" pg_ready
 DBURL="postgresql://postgres:pw@pg:5432/koklo"
 # Variables obligatoires de l'api (loadConfig) : valeurs factices de test, aucune n'est dans l'image.
-API_ENV=(-e BETTER_AUTH_SECRET=0123456789abcdef0123456789abcdef -e BETTER_AUTH_URL=http://localhost:3000 -e GITHUB_CLIENT_ID=test -e GITHUB_CLIENT_SECRET=test)
+# APP_ENV=staging comme infra (APP_ENV = nom de l'environnement) : l'api doit démarrer ainsi.
+API_ENV=(-e APP_ENV=staging -e BETTER_AUTH_SECRET=0123456789abcdef0123456789abcdef -e BETTER_AUTH_URL=http://localhost:3000 -e GITHUB_CLIENT_ID=test -e GITHUB_CLIENT_SECRET=test)
 EXPECTED="$(find "$ROOT/packages/db/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
 
 # C2

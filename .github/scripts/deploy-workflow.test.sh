@@ -39,6 +39,7 @@ check "image-check ne tourne que si un déploiement est demandé" in_job image-c
 check "image-check lance un Postgres jetable" in_job image-check 'postgres'
 check "image-check tire l'image api au tag de resolve" in_job image-check "koklo-api:.*needs\\.resolve\\.outputs\\.image_tag|image_tag.*koklo-api"
 check "image-check vérifie GET /health" in_job image-check '/health'
+check "image-check démarre l'api avec APP_ENV=staging (comme infra)" in_job image-check 'APP_ENV=staging'
 image_check_no_secret() { [ -n "$(job_block image-check)" ] && ! job_block image-check | grep -Eq 'secrets\.(INFRA|[A-Z_]+_(TOKEN|SECRET|KEY))'; }
 check "image-check n'utilise aucun secret de plateforme" image_check_no_secret
 check "deploy dépend de image-check" bash -c "$(declare -f job_block needs_of); WF='$WF'; needs_of deploy | grep -Eq 'image-check'"

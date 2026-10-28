@@ -100,6 +100,15 @@ describe("configuration d'authentification (TK-11 C3, C2.d)", () => {
     expect(Object.keys(loadConfig({ ...VALID_ENV, APP_ENV: "production" }))).toHaveLength(8);
   });
 
+  // Infra injecte APP_ENV = nom de l'environnement déployé : l'api doit démarrer en staging.
+  it.each(["development", "staging", "production"])("APP_ENV=%s est accepté", (appEnv) => {
+    expect(loadConfig({ ...VALID_ENV, APP_ENV: appEnv }).appEnv).toBe(appEnv);
+  });
+
+  it("APP_ENV inconnu : échec nommant la variable", () => {
+    expect(() => loadConfig({ ...VALID_ENV, APP_ENV: "preprod" })).toThrow(/APP_ENV/);
+  });
+
   it.each(["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"])(
     "C3.a %s manquante : échec nommant la variable",
     (name) => {
