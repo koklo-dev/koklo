@@ -17,7 +17,7 @@ Open a pull request that is small, correct, and traceable to a task.
 
 ## Procedure (strict order)
 1. Verify the branch is pushed and tracks a remote.
-2. Draft the PR title as `<type>(<scope>): <summary>` (matches the lead commit).
+2. Draft the PR title as `<type>(<scope>): <summary>` (matches the lead commit), with a **lower-case** summary (commitlint rejects sentence-case). Check it before creating the PR: `.github/scripts/commitlint-local.sh --title "<title>"`, and the commits with `.github/scripts/commitlint-local.sh`.
 3. Draft the PR body with:
    - Link to the task (`.project/sprints/sprint-NNN.md#<task-id>`)
    - Acceptance criteria checklist (copied from the task)

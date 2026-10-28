@@ -18,6 +18,7 @@ It applies the node-specific quality gates for this repository.
 4. Run lint: `pnpm lint` (blocking).
 5. Run tests: `pnpm test` (blocking).
 6. Run build: `pnpm build` (blocking).
+6b. Run commitlint: `.github/scripts/commitlint-local.sh` (blocking) — same version and config as the CI `commitlint` job; it checks every commit of `origin/develop..HEAD`. Fix a bad message with a new commit only if the rules allow, otherwise ask; never push a branch that fails it.
 7. If a manifest or lockfile changed, run the dependency audit: `TO CLARIFY` (blocking).
 8. `git add <files>` + `git commit -m "type(scope): summary"`.
 9. Final gate rerun: lint + tests + build.
@@ -31,6 +32,7 @@ list — fix the list, not the CI.
 - Format: `TO CLARIFY`
 - Tests: `pnpm test`
 - Build: `pnpm build`
+- Commit messages: `.github/scripts/commitlint-local.sh` (the CI `commitlint` job; subject must be lower-case, no sentence-case).
 - Dependency vulnerabilities: `TO CLARIFY` — required whenever a manifest or a
   lockfile is touched. The scan covers the whole resolved tree, so a transitive
   dependency you never named can fail it. A repository often runs several
