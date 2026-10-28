@@ -15,10 +15,17 @@ afterAll(async () => {
 });
 
 describe("GET /openapi.json (C3.1)", () => {
-  it("sert le document de generateOpenApi(), avec /health et /projects", async () => {
+  it("sert le document de generateOpenApi(), avec toutes les routes du contrat", async () => {
     const response = await request(app.getHttpServer()).get("/openapi.json");
     expect(response.status).toBe(200);
     expect(response.body).toEqual(JSON.parse(JSON.stringify(await generateOpenApi())));
-    expect(Object.keys(response.body.paths).sort()).toEqual(["/health", "/projects"]);
+    expect(Object.keys(response.body.paths).sort()).toEqual([
+      "/health",
+      "/members",
+      "/members/invitations",
+      "/members/{memberId}/role",
+      "/organizations",
+      "/projects",
+    ]);
   });
 });
