@@ -11,6 +11,7 @@ const config: WorkerConfig = {
   appVersion: "1.2.3",
   logLevel: "info",
   sentryDsn: undefined,
+  mail: { kind: "capture" },
 };
 
 const lines: string[] = [];

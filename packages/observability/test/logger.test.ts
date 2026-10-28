@@ -61,3 +61,21 @@ describe("createLogger (TK-19)", () => {
     expect(lines).toEqual([]);
   });
 });
+
+describe("createLogger : jetons et liens (TK-22)", () => {
+  it.each([
+    ["token", (secret: string) => ({ token: secret })],
+    ["url", (secret: string) => ({ url: secret })],
+    ["data.token", (secret: string) => ({ data: { token: secret } })],
+    ["data.url", (secret: string) => ({ data: { url: secret } })],
+    ["job.data.url", (secret: string) => ({ job: { data: { url: secret } } })],
+    [
+      "res.headers.set-cookie",
+      (secret: string) => ({ res: { headers: { "set-cookie": [secret] } } }),
+    ],
+  ])("redaction (TK-22) : %s ne sort jamais", (_label, build) => {
+    const { lines, destination } = sink();
+    createLogger({ level: "info", destination }).info(build("valeur-secrete-xyz"), "lien");
+    expect(lines.join("")).not.toContain("valeur-secrete-xyz");
+  });
+});
