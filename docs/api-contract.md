@@ -1,12 +1,12 @@
 ---
 title: API contract
 audience: technical
-doc_version: 0.1.0
+doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-27
+last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: 9830e2e
+covers_commit: 427d077
 ---
 # API contract
 
@@ -16,14 +16,23 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-| Operation | Method | Path | Auth | Notes |
-|-----------|--------|------|------|-------|
-| `health` | GET | `/health` | none (public) | Database reachability and deployed version (`APP_VERSION`, `dev` by default) |
-| `project.list` | GET | `/projects` | session (declares `UNAUTHORIZED`, `FORBIDDEN`) | Lists the projects of the caller's organization |
+Contract version **0.3.0** (TK-21). The router shape is
+`{ health, organization: { create, list }, member: { invite, list, setRole }, project: { list, create } }`:
+8 routes on 6 paths. Method and path are explicit on every route, via
+`.meta(openapi({ method, path }))` (`src/contract.ts`).
 
-Method and path are explicit on every route, via `.meta(openapi({ method, path }))`
-(oRPC v2 syntax; `src/contract.ts`). The router shape is
-`{ health, project: { list } }`.
+| Operation | Method | Path | Auth | Typed errors (besides `INTERNAL`) |
+|-----------|--------|------|------|-----------------------------------|
+| `health` | GET | `/health` | none (public) | none |
+| `organization.create` | POST | `/organizations` | session | `UNAUTHORIZED`, `CONFLICT` |
+| `organization.list` | GET | `/organizations` | session | `UNAUTHORIZED` |
+| `member.invite` | POST | `/members/invitations` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
+| `member.list` | GET | `/members` | session + active organization | `UNAUTHORIZED` |
+| `member.setRole` | PATCH | `/members/{memberId}/role` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `project.list` | GET | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
+| `project.create` | POST | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
+
+Only the contract exists for the six TK-21 routes: they have no controller yet (TK-23).
 
 ## Inputs, outputs and error shapes
 
@@ -31,23 +40,52 @@ Schemas are in `packages/contract/src/schemas.ts`:
 
 | Operation | Input | Output |
 |-----------|-------|--------|
-| `health` | `{}` (empty object) | `{ status: "ok", version: string }` |
-| `project.list` | none | array of `{ id: uuid, name: string }` (no project key: the CDC defines none) |
+| `health` | `{}` | `{ status: "ok", version: string }` |
+| `organization.create` | `{ name: 1..100, slug?: 2..48, [a-z0-9-] }` | `{ id: uuid, name, slug }` |
+| `organization.list` | none | array of `{ id, name, slug, role }` (caller's own role) |
+| `member.invite` | `{ email, role: MemberRole }` | `{ id, email, role, status: "pending", expiresAt: ISO datetime }` |
+| `member.list` | none | array of `{ id, userId, name, email, role }` |
+| `member.setRole` | `{ memberId: uuid, role: MemberRole }` (`memberId` in the path) | `{ id, role: MemberRole }` |
+| `project.list` | none | array of `{ id, name }` |
+| `project.create` | `{ name: 1..100 }` | `{ id, name }` |
 
-TypeScript types are exported from the package index: `HealthInput`, `HealthOutput`,
-`ProjectListOutput`. Pagination and filtering: none defined (ASSUMPTION: to be added by
-a later ticket).
+Roles (CDC §14): `Role` = `owner | admin | dev | designer | client | business`;
+`MemberRole` = `Role` without `owner`. `owner` can never be granted by invitation or role
+change. TypeScript types are exported from the package index (`Role`, `MemberRole`,
+`OrganizationCreateInput`, `MemberInviteInput`, `ProjectCreateInput` and the outputs).
+Pagination and filtering: none defined (ASSUMPTION: to be added by a later ticket).
 
 Typed errors are declared in the contract (`src/errors.ts`); each route exposes only the
 ones it lists:
 
-| Code | HTTP status | Data | `health` | `project.list` |
-|------|-------------|------|----------|----------------|
-| `INTERNAL` | 500 | `{ requestId: string }` | yes | yes |
-| `UNAUTHORIZED` | 401 | none | no | yes |
-| `FORBIDDEN` | 403 | none | no | yes |
+| Code | HTTP status | Data | Meaning |
+|------|-------------|------|---------|
+| `INTERNAL` | 500 | `{ requestId: string }` | every route |
+| `UNAUTHORIZED` | 401 | none | no or expired session |
+| `FORBIDDEN` | 403 | none | role not allowed for the action (see below) |
+| `NOT_FOUND` | 404 | none | `member.setRole`: member absent from the active organization |
+| `CONFLICT` | 409 | `{ reason }` | state conflict |
 
-In the generated OpenAPI, the `INTERNAL` payload is the component schema `Internal`.
+`CONFLICT.data.reason` is one of: `slug_taken` (`organization.create`), `already_member`
+and `already_invited` (`member.invite`), `last_owner` (`member.setRole`: would leave the
+organization without owner). In the generated OpenAPI, the `INTERNAL` payload is the
+component schema `Internal`.
+
+Roles allowed per action (to enforce in TK-23): `member.invite` and `member.setRole` are
+reserved to `owner`/`admin` (otherwise `FORBIDDEN`); `project.create` to the roles the CDC
+allows to create projects (otherwise `FORBIDDEN`).
+
+## What TK-23 must implement
+- Controllers (`@Implement`) for the six new routes; the Nest router only exists through
+  `@Implement`, so an unimplemented route is not served.
+- The guard without active organization: `member.*` and `project.*` refuse a session that
+  has no active organization (`UNAUTHORIZED`, as `project.list` does today), whereas
+  `organization.create` and `organization.list` must work without one (that is how the
+  first organization is created).
+- Role checks (`FORBIDDEN`), the `NOT_FOUND` and `CONFLICT` reasons above, and the
+  `last_owner` invariant.
+- Keep `errorStatusMap` untouched: it is derived from the contract tree, a new route needs
+  no registration.
 
 ## Authentication and authorization
 `project.list` requires a session (TK-11, [ADR 0003](adr/0003-better-auth-session-guard.md)).
@@ -80,7 +118,8 @@ is ignored.
 `generateOpenApi()` (`src/openapi.ts`) is pure (no I/O) and returns an OpenAPI 3.1.0
 document titled `Koklo API`, whose `info.version` is `CONTRACT_VERSION`
 (`src/version.ts`). Object keys are sorted recursively so the output is deterministic.
-Error statuses are derived from the contract's own error maps, not written twice.
+Error statuses are derived from the contract's own error maps (the router tree is walked,
+no list of procedures to maintain), not written twice.
 
 | Artifact | Role |
 |----------|------|
