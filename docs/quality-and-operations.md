@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-10-28
 covers_release: unreleased
 sources: []
-covers_commit: 98c76a5
+covers_commit: 9c821e2
 ---
 # Quality and operations
 
@@ -137,6 +137,17 @@ covers_commit: 98c76a5
   assert on `init` / `captureException`; to read logs in a test, pass
   `AppModule.forRoot(config, { logStream })` and parse the lines.
 - **Failure isolation**: a failing SDK never changes a response or a job outcome.
+
+## Multi-tenant isolation (TK-20)
+- Tests: `packages/db/test/tenant-extension.test.ts` (ephemeral PostgreSQL: no context on 16
+  operations, two organizations, create/upsert rules, excluded models, raw SQL) and
+  `tenant-guard.test.ts` (no database).
+- **Rule for a new model with `organizationId`**: add it to `TENANT_MODELS` (with
+  `@@index([organizationId])`) or to `TENANT_EXCLUDED_MODELS` with a reason, in
+  `packages/db/src/tenant-extension.ts`. Otherwise `tenant-guard.test.ts` fails.
+- Raw SQL is refused on the extended client; use `DatabaseService.raw` only for infrastructure
+  (health probe, Better Auth), never for a business model.
+- Known limit: the `upsert` ownership check is not atomic (unique constraint is the safety net).
 
 ## Quality gates
 Workflows in `.github/workflows/`: `ci.yml`, `commitlint.yml`, `security.yml`,
