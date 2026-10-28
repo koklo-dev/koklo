@@ -8,7 +8,13 @@ let worker: Worker;
 
 beforeAll(async () => {
   database = await new PostgreSqlContainer("postgres:17-alpine").start();
-  worker = await startWorker({ databaseUrl: database.getConnectionUri() });
+  worker = await startWorker({
+    databaseUrl: database.getConnectionUri(),
+    appEnv: "test",
+    appVersion: "dev",
+    logLevel: "silent",
+    sentryDsn: undefined,
+  });
 });
 
 afterAll(async () => {
