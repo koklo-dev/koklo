@@ -14,7 +14,7 @@ while IFS= read -r f; do
     case "$f" in
     apps/* | packages/* | e2e/* | scripts/* | .deploy/* | \
         package.json | pnpm-lock.yaml | pnpm-workspace.yaml | turbo.json | biome.json | \
-        tsconfig.json | tsconfig.*.json | .nvmrc | docker-compose.yml)
+        tsconfig.json | tsconfig.*.json | .nvmrc | docker-compose.yml | .dockerignore)
         code=true ;;
     shipyard/skills/* | .claude/skills/* | .codex/skills/*)
         skills=true ;;
