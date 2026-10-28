@@ -4,13 +4,25 @@ import { describe, expect, it } from "vitest";
 import { repoRoot, uiRoot } from "./helpers/paths.ts";
 
 /** Fichiers ajoutés par TK-85 (blocs sidebar-07 / login-05) : tokens uniquement. */
-const REQUIRED = ["sidebar.tsx", "tooltip.tsx"].map((f) => join(uiRoot, "src/components", f));
-const OPTIONAL = ["separator", "input", "label", "skeleton", "field"].map((f) =>
+const REQUIRED = [
+  "sidebar.tsx",
+  "tooltip.tsx",
+  "breadcrumb.tsx",
+  "collapsible.tsx",
+  "field.tsx",
+  "label.tsx",
+].map((f) => join(uiRoot, "src/components", f));
+const OPTIONAL = ["separator", "input", "skeleton"].map((f) =>
   join(uiRoot, "src/components", `${f}.tsx`),
 );
-const WEB = ["app-shell", "login-card"].map((f) =>
-  join(repoRoot, "apps/web/src/components", `${f}.tsx`),
-);
+const WEB = [
+  "app-sidebar",
+  "nav-main",
+  "nav-projects",
+  "nav-user",
+  "team-switcher",
+  "login-form",
+].map((f) => join(repoRoot, "apps/web/src/components", `${f}.tsx`));
 
 const PALETTE =
   "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black";

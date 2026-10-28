@@ -42,7 +42,7 @@ function Layout() {
       </Sidebar>
       <SidebarInset>
         <SidebarTrigger />
-        <main>contenu</main>
+        <div>contenu</div>
       </SidebarInset>
     </SidebarProvider>
   );

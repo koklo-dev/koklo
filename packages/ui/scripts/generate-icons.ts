@@ -47,6 +47,7 @@ export const ICON_NAMES = [
   "dark_mode",
   "left_panel_close",
   "left_panel_open",
+  "logout",
   // Glyphes internes des composants
   "check",
   "close",

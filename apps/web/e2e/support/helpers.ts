@@ -20,17 +20,32 @@ export async function releaseHeld(): Promise<void> {
   await fetch(`${STUB}/__release`, { method: "POST" });
 }
 
-/** Le thème par défaut est clair ; le sombre s'obtient par la bascule, comme pour une vraie personne. */
+/**
+ * Le thème par défaut est clair ; le sombre s'obtient par la bascule, comme pour une vraie personne.
+ * Sur /login la bascule est un bouton ; dans le gabarit (TK-85) elle vit dans le menu « Menu utilisateur ».
+ */
 export async function switchToDark(page: Page): Promise<void> {
   // Avant l'hydratation le clic est sans effet : on le rejoue jusqu'à ce que la classe `dark` soit posée.
   await expect(async () => {
-    await page
-      .getByRole("button", { name: "Passer au thème sombre" })
-      .first()
-      .click({ timeout: 2_000 });
+    const userMenu = page.getByRole("button", { name: "Menu utilisateur" });
+    if (await userMenu.count()) {
+      await userMenu.first().click({ timeout: 2_000 });
+      await page
+        .getByRole("menuitem", { name: "Passer au thème sombre" })
+        .click({ timeout: 2_000 });
+    } else {
+      await page
+        .getByRole("button", { name: "Passer au thème sombre" })
+        .first()
+        .click({ timeout: 2_000 });
+    }
     await expect(page.locator("html")).toHaveClass(/dark/, { timeout: 1_000 });
   }).toPass({ timeout: 20_000 });
 }
+
+/** Barre latérale du gabarit (bloc sidebar-07) et son bouton de repli. */
+export const sidebarOf = (page: Page) => page.locator('[data-slot="sidebar"]');
+export const triggerOf = (page: Page) => page.locator('[data-sidebar="trigger"]');
 
 /** Attend la fin des transitions CSS (bascule de thème) pour que la capture montre l'état final. */
 export async function settle(page: Page): Promise<void> {

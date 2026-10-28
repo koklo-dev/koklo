@@ -19,6 +19,10 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/login");
     if (theme === "dark") await switchToDark(page);
     await expect(page.getByRole("heading", { level: 1, name: "Connexion à Koklo" })).toBeVisible();
+    await expect(
+      page.getByText("Vous serez redirigé vers GitHub pour vous authentifier."),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
     const button = page.getByRole("button", { name: /Continuer avec GitHub/ });
     await button.focus();
     await expect(button).toBeFocused();
