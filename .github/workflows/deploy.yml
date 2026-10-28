@@ -112,6 +112,7 @@ jobs:
       - name: Start the api image
         run: |
           docker run -d --name api-check --network host \
+            -e APP_ENV=staging \
             -e PORT=3000 \
             -e DATABASE_URL=postgresql://check:check@127.0.0.1:5432/check \
             -e BETTER_AUTH_SECRET=check-only-not-a-real-secret-0123456789 \

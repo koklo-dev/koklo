@@ -3,7 +3,7 @@ import { z } from "zod";
 export interface AppConfig {
   databaseUrl: string;
   port: number;
-  appEnv: "development" | "test" | "production";
+  appEnv: "development" | "test" | "staging" | "production";
   appVersion: string;
   betterAuthSecret: string;
   betterAuthUrl: string;
@@ -16,7 +16,7 @@ const MIN_AUTH_SECRET_LENGTH = 32;
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
-  APP_ENV: z.enum(["development", "test", "production"]).default("development"),
+  APP_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   APP_VERSION: z.string().min(1).default("dev"),
   BETTER_AUTH_SECRET: z.string().min(MIN_AUTH_SECRET_LENGTH),
   BETTER_AUTH_URL: z.url(),
