@@ -1,12 +1,12 @@
 ---
 title: Onboarding — humans and AI agents
 audience: technical
-doc_version: 0.1.0
+doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-28
+last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 9c821e2
+covers_commit: 706ce94
 ---
 # Onboarding — humans and AI agents
 
@@ -62,6 +62,14 @@ empty means no error reporting), plus `APP_ENV` and `APP_VERSION` (environment a
 reported to GlitchTip). Logs are JSON lines on stdout. See
 [quality-and-operations.md](quality-and-operations.md#observability-tk-19) and
 [architecture.md](architecture.md#observability-koklo-observability-tk-19).
+
+Email variables (TK-22), read by `apps/worker` (see its `.env.example`): `RESEND_API_KEY`,
+`MAIL_DOMAIN`, `EMAIL_FROM`. Left empty in development and test, the worker captures mails in
+memory (nothing leaves the machine). In staging and production they are **injected by infra**,
+never committed, and the worker refuses to start without them. The domain `koklo.dev` must be
+verified at Resend before any real send. The api needs no mail variable. Tests that touch the
+magic link import `startWorker` and `CaptureMailSender` from `@koklo/worker`. See
+[quality-and-operations.md](quality-and-operations.md#emails-and-magic-link-tk-22).
 
 Layout and shared configuration (`packages/config`): see
 [architecture.md](architecture.md#monorepo-workspace-tk-1). Running a task for one

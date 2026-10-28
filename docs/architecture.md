@@ -1,12 +1,12 @@
 ---
 title: Architecture
 audience: technical
-doc_version: 0.1.0
+doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-28
+last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 9c821e2
+covers_commit: 706ce94
 ---
 # Architecture
 
@@ -359,6 +359,29 @@ flowchart LR
   worker --> noop["work('noop', handleNoop)"]
   boss <-->|"pg-boss schema"| db[("PostgreSQL")]
   producer["any producer: boss.send('noop')"] --> db
+```
+
+### Magic-link emails: `send-magic-link` queue (TK-22)
+The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.
+
+- **Producer** (`apps/api/src/auth/magic-link-queue.ts`): `MagicLinkQueue` opens its pg-boss
+  connection on the first request (`migrate`, `supervise`, `schedule` off), forgets a failed
+  attempt, and stops on `app.close()`. The api therefore boots without the queue.
+- **Queue** (`apps/worker/src/worker.ts`): `send-magic-link`, 3 attempts, 1 h retention.
+- **Port** `MailSender` (`src/mail/mail-sender.ts`): `send(message)`, throws on failure so
+  pg-boss retries. Adapters: `ResendMailSender` (staging, production) and `CaptureMailSender`
+  (development, test), chosen by `createMailSender(config.mail)`.
+- The queue name is declared on both sides (the api cannot import the worker at runtime).
+
+```mermaid
+flowchart LR
+  user["user"] -->|"POST /api/auth/sign-in/magic-link"| auth["Better Auth magicLink"]
+  auth -->|"enqueue {email,url}"| producer["MagicLinkQueue (api)"]
+  producer -->|"boss.send"| q[("pg-boss: send-magic-link")]
+  q --> handler["createSendMagicLinkHandler (worker)"]
+  handler --> port{{"MailSender"}}
+  port --> resend["ResendMailSender"]
+  port --> capture["CaptureMailSender"]
 ```
 
 ### Real-stack e2e and one-command dev (TK-15)
