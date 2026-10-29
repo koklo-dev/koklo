@@ -48,4 +48,6 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | Écran | Version | Dernier ticket |
 |---|---|---|
 | [S-login](screens/S-login.md) | 3 | TK-85 (correction) |
-| [S-projects](screens/S-projects.md) | 3 | TK-85 (correction) |
+| [S-projects](screens/S-projects.md) | 4 | TK-24 |
+| [S-organizations](screens/S-organizations.md) | 1 | TK-24 |
+| [S-members](screens/S-members.md) | 1 | TK-24 |
