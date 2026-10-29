@@ -9,6 +9,7 @@ export * from "./components/collapsible.tsx";
 export * from "./components/dropdown-menu.tsx";
 export * from "./components/field.tsx";
 export * from "./components/icon-button.tsx";
+export * from "./components/input.tsx";
 export * from "./components/label.tsx";
 export * from "./components/popover.tsx";
 export * from "./components/resizable.tsx";

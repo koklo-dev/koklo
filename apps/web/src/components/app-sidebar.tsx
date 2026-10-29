@@ -1,25 +1,28 @@
 "use client";
 
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@koklo/ui";
+import { usePathname } from "next/navigation";
 import type * as React from "react";
 import { NavMain } from "./nav-main.tsx";
 import { NavProjects } from "./nav-projects.tsx";
 import { NavUser } from "./nav-user.tsx";
 import { TeamSwitcher } from "./team-switcher.tsx";
 
-// Données réelles : une seule entrée de navigation existe (la liste des projets).
-const navMain = [
-  { title: "Projets", url: "/projects", icon: "account_tree" as const, isActive: true },
-];
+const NAVIGATION = [
+  { title: "Projets", url: "/projects", icon: "account_tree" },
+  { title: "Membres", url: "/members", icon: "person" },
+] as const;
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname();
+  const items = NAVIGATION.map((item) => ({ ...item, isActive: pathname === item.url }));
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain items={items} />
         <NavProjects />
       </SidebarContent>
       <SidebarFooter>
