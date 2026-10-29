@@ -128,6 +128,33 @@ flowchart LR
   D --> E[Numéro de clé croissant]
 ```
 
+### Leases, locks and versioned project state (TK-27, `packages/domain`)
+Same purity rules as the ticket module: time is always injected as an ISO-8601 UTC string
+(`instant.ts` parses and formats it; the domain never reads a clock).
+- **Lease** (`lease.ts`): claims one ticket for a holder (`member` or `runner`) with its
+  branch and worktree. Default TTL 15 min (`DEFAULT_LEASE_TTL_MS = 900000`). `heartbeat`
+  pushes `expiresAt` to `now + ttl`; only the holder may heartbeat or `release`; an expired or
+  released lease cannot be renewed (`LeaseExpiredError`). At most one active lease per ticket
+  (`LeaseAlreadyHeldError`); `releaseExpired` splits active from expired leases.
+- **Lock** (`lock.ts`): short-lived exclusive lock of kind `merge` or `spec-write` on a scope.
+  A held target refuses other holders (`LockAlreadyHeldError`); a holder already owning an
+  active lock cannot take a second one (`NestedLockError`, refusal order: conflict, then
+  nesting). Only the holder releases (`LockNotHeldByError`).
+- **Project state** (`project-state.ts`): `{ version, content }`, created at version 1.
+  `writeProjectState` is an optimistic write: it succeeds only if `expectedVersion` equals the
+  current version, then increments it; otherwise `StaleProjectStateError` carries the current
+  state so the caller can re-read and retry.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Active: acquireLease
+  Active --> Active: heartbeat (holder)
+  Active --> Released: release (holder)
+  Active --> Expired: now >= expiresAt
+  Released --> [*]
+  Expired --> [*]: releaseExpired
+```
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.

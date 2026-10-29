@@ -99,3 +99,128 @@ export class InvalidDependencyTypeError extends Error {
     this.value = value;
   }
 }
+
+/** Titulaire d'un bail ou d'un verrou : membre ou runner. */
+export interface LeaseHolderRef {
+  readonly kind: "member" | "runner";
+  readonly id: string;
+}
+
+export interface LeaseRef {
+  readonly ticket: string;
+  readonly holder: LeaseHolderRef;
+  readonly expiresAt: string;
+}
+
+export interface LockRef {
+  readonly kind: "merge" | "spec-write";
+  readonly scope: string;
+  readonly holder: LeaseHolderRef;
+  readonly expiresAt: string;
+}
+
+export class InvalidInstantError extends Error {
+  readonly value: unknown;
+  constructor(value: unknown) {
+    super(`Instant invalide (ISO-8601 UTC attendu) : ${String(value)}`);
+    this.name = "InvalidInstantError";
+    this.value = value;
+  }
+}
+
+export class InvalidLeaseError extends Error {
+  readonly field: string;
+  constructor(field: string, message: string) {
+    super(`Bail invalide (${field}) : ${message}`);
+    this.name = "InvalidLeaseError";
+    this.field = field;
+  }
+}
+
+export class LeaseAlreadyHeldError<L extends LeaseRef = LeaseRef> extends Error {
+  readonly lease: L;
+  constructor(lease: L) {
+    super(`Ticket ${lease.ticket} déjà sous bail actif (jusqu'à ${lease.expiresAt})`);
+    this.name = "LeaseAlreadyHeldError";
+    this.lease = lease;
+  }
+}
+
+export class LeaseExpiredError<L extends LeaseRef = LeaseRef> extends Error {
+  readonly lease: L;
+  constructor(lease: L) {
+    super(`Bail expiré ou libéré pour ${lease.ticket} (expiration ${lease.expiresAt})`);
+    this.name = "LeaseExpiredError";
+    this.lease = lease;
+  }
+}
+
+export class LeaseNotHeldByError<L extends LeaseRef = LeaseRef> extends Error {
+  readonly lease: L;
+  readonly holder: LeaseHolderRef;
+  constructor(lease: L, holder: LeaseHolderRef) {
+    super(`Le bail de ${lease.ticket} n'appartient pas à ${holder.kind}:${holder.id}`);
+    this.name = "LeaseNotHeldByError";
+    this.lease = lease;
+    this.holder = holder;
+  }
+}
+
+export class LockAlreadyHeldError<L extends LockRef = LockRef> extends Error {
+  readonly lock: L;
+  constructor(lock: L) {
+    super(`Verrou ${lock.kind}/${lock.scope} déjà tenu (jusqu'à ${lock.expiresAt})`);
+    this.name = "LockAlreadyHeldError";
+    this.lock = lock;
+  }
+}
+
+export class NestedLockError<L extends LockRef = LockRef> extends Error {
+  readonly holder: LeaseHolderRef;
+  readonly held: L;
+  readonly requested: { readonly kind: string; readonly scope: string };
+  constructor(holder: LeaseHolderRef, held: L, requested: { kind: string; scope: string }) {
+    super(
+      `Verrou imbriqué refusé : ${held.kind}/${held.scope} tenu, ${requested.kind}/${requested.scope} demandé`,
+    );
+    this.name = "NestedLockError";
+    this.holder = holder;
+    this.held = held;
+    this.requested = requested;
+  }
+}
+
+export class LockNotHeldByError extends Error {
+  readonly kind: string;
+  readonly scope: string;
+  readonly holder: LeaseHolderRef;
+  constructor(kind: string, scope: string, holder: LeaseHolderRef) {
+    super(`Verrou ${kind}/${scope} non tenu par ${holder.kind}:${holder.id}`);
+    this.name = "LockNotHeldByError";
+    this.kind = kind;
+    this.scope = scope;
+    this.holder = holder;
+  }
+}
+
+export class StaleProjectStateError<
+  S extends { readonly version: number } = { readonly version: number; readonly content: unknown },
+> extends Error {
+  readonly current: S;
+  readonly expected: number;
+  constructor(current: S, expected: number) {
+    super(`État de projet périmé : version attendue ${expected}`);
+    this.name = "StaleProjectStateError";
+    this.current = current;
+    this.expected = expected;
+  }
+}
+
+export class InvalidProjectStateVersionError extends Error {
+  readonly value: unknown;
+  constructor(value: unknown) {
+    super(`Version d'état de projet invalide : ${String(value)}`);
+    this.name = "InvalidProjectStateVersionError";
+    this.value = value;
+  }
+}
