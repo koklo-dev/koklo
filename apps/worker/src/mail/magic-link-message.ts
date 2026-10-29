@@ -1,14 +1,7 @@
+import { escapeHtml } from "./html.ts";
 import type { MailMessage } from "./mail-sender.ts";
 
 const SUBJECT = "Votre lien de connexion à Koklo";
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
 /** Gabarit du message de connexion (fonction pure : texte et html portent le même lien). */
 export function buildMagicLinkMessage({ email, url }: { email: string; url: string }): MailMessage {

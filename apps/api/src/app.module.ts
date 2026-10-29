@@ -8,7 +8,9 @@ import type { AppConfig } from "./config.ts";
 import { DatabaseModule } from "./database/database.module.ts";
 import { ERROR_STATUS_MAP } from "./error-status.ts";
 import { HealthModule } from "./health/health.module.ts";
+import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
+import { OrganizationModule } from "./organization/organization.module.ts";
 import { ProjectModule } from "./project/project.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
@@ -50,6 +52,8 @@ export class AppModule {
         AuthModule.forRoot(config),
         ORPCModule.forRoot({ errorStatusMap: ERROR_STATUS_MAP }),
         HealthModule,
+        OrganizationModule,
+        MemberModule,
         ProjectModule,
       ],
       controllers: [OpenApiController],

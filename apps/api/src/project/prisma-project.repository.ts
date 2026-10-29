@@ -16,4 +16,14 @@ export class PrismaProjectRepository implements ProjectRepository {
       }),
     );
   }
+
+  create(organizationId: string, name: string): Promise<ProjectRecord> {
+    // `organizationId` est affecté (et vérifié) par l'extension multi-tenant.
+    return withOrganization(organizationId, () =>
+      this.database.client.project.create({
+        data: { name, organizationId },
+        select: { id: true, name: true, organizationId: true, createdAt: true },
+      }),
+    );
+  }
 }
