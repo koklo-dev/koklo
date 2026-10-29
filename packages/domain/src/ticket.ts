@@ -29,6 +29,7 @@ export type Ticket = {
   readonly pullRequest: string | null;
   readonly attempts: number;
   readonly reviewRounds: number;
+  readonly createdAt: string;
 };
 
 export type CreateTicketInput = {
@@ -38,6 +39,8 @@ export type CreateTicketInput = {
   readonly priority: TicketPriority;
   readonly pkg: TicketPackage;
   readonly sensitivity: Sensitivity;
+  /** Instant ISO-8601 UTC (`YYYY-MM-DDTHH:mm:ss[.sss]Z`), conservé tel quel. */
+  readonly createdAt: string;
   readonly description?: string;
   readonly status?: "backlog" | "todo";
   readonly sprint?: string | null;
@@ -98,6 +101,31 @@ const parseEstimate = (value: unknown): number | null => {
   return value;
 };
 
+const INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{3})?Z$/;
+
+/** Instant ISO-8601 UTC dont la date calendaire existe réellement. */
+const parseCreatedAt = (value: unknown): string => {
+  const match = typeof value === "string" ? INSTANT_PATTERN.exec(value) : null;
+  if (!match) return fail("createdAt", "instant ISO-8601 UTC requis");
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const real =
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    hour < 24 &&
+    minute < 60 &&
+    second < 60;
+  return real ? (value as string) : fail("createdAt", "date calendaire inexistante");
+};
+
 const parseTitle = (value: unknown): string =>
   typeof value === "string" && value.trim() !== "" ? value : fail("title", "titre non vide requis");
 
@@ -129,6 +157,7 @@ export const createTicket = (input: CreateTicketInput): Ticket => {
     pullRequest: nullableString("pullRequest", input.pullRequest),
     attempts: parseCounter("attempts", input.attempts),
     reviewRounds: parseCounter("reviewRounds", input.reviewRounds),
+    createdAt: parseCreatedAt(input.createdAt),
   });
 };
 

@@ -81,3 +81,21 @@ export class InvalidTicketError extends Error {
     this.field = field;
   }
 }
+
+export class DependencyCycleError extends Error {
+  readonly path: readonly string[];
+  constructor(path: readonly string[]) {
+    super(`Cycle de dépendances : ${path.join(" -> ")}`);
+    this.name = "DependencyCycleError";
+    this.path = path;
+  }
+}
+
+export class InvalidDependencyTypeError extends Error {
+  readonly value: unknown;
+  constructor(value: unknown) {
+    super(`Type de dépendance inconnu : ${String(value)}`);
+    this.name = "InvalidDependencyTypeError";
+    this.value = value;
+  }
+}
