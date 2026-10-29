@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as dbPackage from "../src/index.ts";
 import { schemaPath } from "../src/testing/prisma-cli.ts";
+import { TICKET_MODELS } from "./support/ticket-fixtures.ts";
 
 const { TENANT_MODELS, TENANT_EXCLUDED_MODELS } = dbPackage;
 
@@ -26,8 +27,8 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("Project est le seul modèle métier actuel", () => {
-    expect([...TENANT_MODELS]).toEqual(["Project"]);
+  it("les modèles métier sont Project et les 11 modèles du ticket (TK-28)", () => {
+    expect([...TENANT_MODELS].sort()).toEqual(["Project", ...TICKET_MODELS].sort());
   });
 
   it("chaque modèle avec organizationId est métier ou explicitement exclu", () => {

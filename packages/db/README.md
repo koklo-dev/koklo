@@ -2,7 +2,9 @@
 
 Schéma Prisma 7 (PostgreSQL 17) et migrations réversibles. Tables Better Auth
 (`users`, `sessions`, `accounts`, `verifications`, `organizations`, `members`,
-`invitations`) et table métier `projects`. Modèles PascalCase, tables et colonnes en
+`invitations`), table métier `projects` et les 11 tables du ticket (TK-28) : `tickets`,
+`ticket_labels`, `ticket_features`, `acceptance_criteria`, `ticket_dependencies`, `sprints`,
+`project_states`, `leases`, `ticket_comments`, `audit_log`, `project_counters`. Modèles PascalCase, tables et colonnes en
 snake_case (`@@map`/`@map`), identifiants UUID v7 générés par Prisma, `created_at` et
 `updated_at` partout.
 
@@ -38,6 +40,28 @@ Chaque dossier de `prisma/migrations/` doit contenir un `down.sql` non vide (vé
    Première migration (dossier vide) : `--from-schema prisma/schema.prisma --to-empty` donne le même résultat.
 3. `pnpm --filter @koklo/db migrate:dev --name <nom>`.
 4. Copier `down.sql` dans le dossier de migration créé, puis le relire (ordre inverse des dépendances, types/enums supprimés).
+5. Objet SQL hors Prisma (index partiel, CHECK, trigger) : l'ajouter à la main en fin de `migration.sql`
+   et son inverse (`DROP FUNCTION`, etc.) dans `down.sql` ; le test up -> down -> up contrôle qu'il ne reste rien.
+
+## Tickets, sprints, baux (TK-28)
+
+- Aucune colonne tableau (incident 6) : `labels` et `linkedFeatures` du domaine sont les tables de
+  liaison `ticket_labels` / `ticket_features` (clé primaire composite). Les listes fermées du domaine
+  sont des enums Postgres natifs (test de parité avec `@koklo/domain`).
+- Objets SQL écrits à la main dans `migration.sql` (Prisma ne les exprime pas et `migrate diff`
+  les ignore, le diff reste vide) : index uniques partiels (`leases(ticket_id) WHERE released_at IS NULL`,
+  `sprints(project_id) WHERE status = 'active'`), CHECK, triggers d'immutabilité d'`audit_log`
+  (UPDATE, DELETE, TRUNCATE refusés ; seule la cascade de suppression de l'organisation passe) et
+  trigger de non-régression de `project_counters`. Les `down.sql` suppriment aussi fonctions et triggers.
+- Clé lisible `TK-n` / `SP-n` : dans la transaction qui insère le ticket,
+  `UPDATE project_counters SET last_value = last_value + 1 WHERE project_id = $1 AND name = 'ticket' RETURNING last_value`
+  (verrou de ligne), puis `formatTicketKey` du domaine. Un rollback ne consomme pas de valeur.
+- Bail : l'unicité porte sur « non libéré » (un index partiel ne peut pas dépendre de `now()`).
+  L'acquisition exécute d'abord, dans la même transaction,
+  `UPDATE leases SET released_at = now() WHERE ticket_id = $1 AND released_at IS NULL AND expires_at <= now()`,
+  puis l'`INSERT` : un bail expiré libère ainsi le ticket (CDC §7.5).
+- État de projet (écriture optimiste) : `UPDATE project_states SET version = version + 1, content = $2 WHERE project_id = $1 AND version = $attendue` ; 0 ligne = conflit.
+- Titulaire d'un bail et assigné : `(kind, id)` sans clé étrangère (le runner n'a pas de table).
 
 ## Rollback
 

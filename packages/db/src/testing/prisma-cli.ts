@@ -16,7 +16,29 @@ export const expectedTables = [
   "members",
   "invitations",
   "projects",
+  "tickets",
+  "ticket_labels",
+  "ticket_features",
+  "acceptance_criteria",
+  "ticket_dependencies",
+  "sprints",
+  "project_states",
+  "leases",
+  "ticket_comments",
+  "audit_log",
+  "project_counters",
 ] as const;
+
+/** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
+export const compositeKeyTables: readonly string[] = [
+  "ticket_labels",
+  "ticket_features",
+  "ticket_dependencies",
+  "project_counters",
+];
+
+/** Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et `audit_log` (jamais modifiée). */
+export const stampExemptTables: readonly string[] = [...compositeKeyTables, "audit_log"];
 
 export interface CliResult {
   status: number | null;
