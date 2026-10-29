@@ -73,6 +73,40 @@ No entity or migration changed.
 No state machine is enforced in the database. `invitations.status` defaults to
 `pending`; its other values are TO DOCUMENT.
 
+### Ticket lifecycle (TK-25, `packages/domain`)
+Pure module (no I/O, no clock, no runtime dependency, relative imports only; enforced by
+`test/purity.test.ts`). Statuses: `backlog`, `todo`, `in_progress`, `in_review`, `blocked`,
+`done`, `cancelled`. `done` and `cancelled` are terminal; `blocked` never resumes straight
+into `in_progress`. `canTransition` / `transitionTicket` apply this table (rule H1, 17
+transitions); tickets are frozen values and every change returns a copy. A ticket carries
+exactly one package (`parseTicketPackage`), a `TK-<n>` key, a `safe | sensitive`
+sensitivity, and `attempts` / `reviewRounds` counters that only `escalate` resets.
+
+```mermaid
+stateDiagram-v2
+  [*] --> backlog
+  [*] --> todo
+  backlog --> todo
+  backlog --> cancelled
+  todo --> in_progress
+  todo --> backlog
+  todo --> blocked
+  todo --> cancelled
+  in_progress --> in_review
+  in_progress --> blocked
+  in_progress --> todo
+  in_progress --> cancelled
+  in_review --> done
+  in_review --> in_progress
+  in_review --> blocked
+  in_review --> cancelled
+  blocked --> todo
+  blocked --> backlog
+  blocked --> cancelled
+  done --> [*]
+  cancelled --> [*]
+```
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.
