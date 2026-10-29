@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Card,
   Icon,
@@ -13,6 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@koklo/ui";
+import type { Ref } from "react";
+import { GENERIC_ERROR } from "../lib/form-errors.ts";
+import { ErrorNotice } from "./error-notice.tsx";
+import { LoadingStatus } from "./loading-status.tsx";
 
 export interface ProjectRow {
   id: string;
@@ -27,57 +28,62 @@ export type ProjectsState =
 interface ProjectsViewProps {
   state: ProjectsState;
   onRetry: () => void;
+  /** Ouvre le panneau de création ; absent quand le rôle ne permet pas de créer un projet. */
+  onCreate?: () => void;
+  createButtonRef?: Ref<HTMLButtonElement>;
 }
 
-function Loading() {
+function CreateButton({
+  onCreate,
+  buttonRef,
+}: {
+  onCreate: () => void;
+  buttonRef?: Ref<HTMLButtonElement> | undefined;
+}) {
   return (
-    <div
-      role="status"
-      aria-busy="true"
-      data-testid="projects-loading"
-      className="flex flex-col gap-3"
+    <Button
+      ref={buttonRef}
+      data-testid="create-project-button"
+      className="h-11 md:h-9"
+      onClick={onCreate}
     >
-      <p className="text-[13px] text-muted-foreground">Chargement des projets…</p>
-      {[0, 1, 2].map((row) => (
-        <div key={row} className="h-10 rounded-md bg-muted motion-safe:animate-pulse" />
-      ))}
-    </div>
+      <Icon name="add" size={20} />
+      Créer un projet
+    </Button>
   );
 }
 
-function Empty() {
+function Empty({
+  onCreate,
+  createButtonRef,
+}: Pick<ProjectsViewProps, "onCreate" | "createButtonRef">) {
   return (
     <Card data-testid="projects-empty" className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="account_tree" size={28} className="text-muted-foreground" />
       <h2 className="text-base font-semibold tracking-[-0.015em]">Aucun projet pour le moment</h2>
       <p className="text-[13px] text-muted-foreground">
-        Les projets auxquels vous avez accès apparaîtront ici.
+        {onCreate
+          ? "Créez votre premier projet pour commencer."
+          : "Les projets auxquels vous avez accès apparaîtront ici."}
       </p>
+      {onCreate ? <CreateButton onCreate={onCreate} buttonRef={createButtonRef} /> : null}
     </Card>
   );
 }
 
-function Failure({ onRetry }: { onRetry: () => void }) {
-  return (
-    <Alert variant="destructive" data-testid="projects-error">
-      <Icon name="warning" size={20} />
-      <AlertTitle>Impossible de charger les projets</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3">
-        <p>Une erreur est survenue. Vérifiez votre connexion puis réessayez.</p>
-        <Button variant="outline" className="h-11 md:h-9" onClick={onRetry}>
-          Réessayer
-        </Button>
-      </AlertDescription>
-    </Alert>
-  );
-}
-
-function Projects({ projects }: { projects: ProjectRow[] }) {
+function Projects({
+  projects,
+  onCreate,
+  createButtonRef,
+}: { projects: ProjectRow[] } & Pick<ProjectsViewProps, "onCreate" | "createButtonRef">) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[13px] text-muted-foreground">
-        {projects.length === 1 ? "1 projet" : `${projects.length} projets`}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] text-muted-foreground">
+          {projects.length === 1 ? "1 projet" : `${projects.length} projets`}
+        </p>
+        {onCreate ? <CreateButton onCreate={onCreate} buttonRef={createButtonRef} /> : null}
+      </div>
       <Table data-testid="projects-table">
         <TableCaption className="sr-only">Liste des projets</TableCaption>
         <TableHeader>
@@ -98,8 +104,24 @@ function Projects({ projects }: { projects: ProjectRow[] }) {
 }
 
 /** Les quatre états de la liste des projets (chargement, vide, données, erreur). */
-export function ProjectsView({ state, onRetry }: ProjectsViewProps) {
-  if (state.status === "loading") return <Loading />;
-  if (state.status === "error") return <Failure onRetry={onRetry} />;
-  return state.projects.length === 0 ? <Empty /> : <Projects projects={state.projects} />;
+export function ProjectsView({ state, onRetry, onCreate, createButtonRef }: ProjectsViewProps) {
+  if (state.status === "loading") {
+    return <LoadingStatus label="Chargement des projets…" data-testid="projects-loading" />;
+  }
+  if (state.status === "error") {
+    return (
+      <ErrorNotice
+        data-testid="projects-error"
+        title="Impossible de charger les projets"
+        onRetry={onRetry}
+      >
+        {GENERIC_ERROR}
+      </ErrorNotice>
+    );
+  }
+  return state.projects.length === 0 ? (
+    <Empty onCreate={onCreate} createButtonRef={createButtonRef} />
+  ) : (
+    <Projects projects={state.projects} onCreate={onCreate} createButtonRef={createButtonRef} />
+  );
 }
