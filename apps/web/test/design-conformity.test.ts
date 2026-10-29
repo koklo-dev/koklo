@@ -1,0 +1,37 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/** TK-24 C5 : uniquement composants et tokens de @koklo/ui (DESIGN.md) dans les fichiers du ticket. */
+const src = join(import.meta.dirname, "../src");
+const FILES = [
+  "components/organizations-page.tsx",
+  "components/members-page.tsx",
+  "components/projects-page.tsx",
+  "components/projects-view.tsx",
+  "components/team-switcher.tsx",
+  "components/app-sidebar.tsx",
+  "app/organizations/page.tsx",
+  "app/members/page.tsx",
+  "app/members/layout.tsx",
+];
+
+const RAW_COLOR_CLASS =
+  /\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|decoration)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|white|black)(?:-\d{2,3})?\b/;
+
+describe.each(FILES)("%s", (file) => {
+  const path = join(src, file);
+
+  it("existe", () => {
+    expect(existsSync(path), `${file} absent`).toBe(true);
+  });
+
+  it("n'embarque ni couleur en dur ni classe de couleur Tailwind brute ni SVG inline", () => {
+    if (!existsSync(path)) throw new Error(`${file} absent`);
+    const code = readFileSync(path, "utf8");
+    expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(code).not.toMatch(/\brgba?\(|\bhsla?\(|\boklch\(/);
+    expect(code).not.toMatch(RAW_COLOR_CLASS);
+    expect(code).not.toMatch(/<svg\b/);
+  });
+});

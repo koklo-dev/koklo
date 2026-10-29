@@ -37,3 +37,31 @@ export async function createAdminSessionCookie(): Promise<string> {
   const signature = createHmac("sha256", secret).update(token).digest("base64");
   return encodeURIComponent(`${token}.${signature}`);
 }
+
+/**
+ * Crée un nouvel utilisateur sans aucune appartenance et une vraie session Better Auth **sans
+ * organisation active** (premier login, lacune G1 de TK-24). Même signature de cookie que ci-dessus.
+ */
+export async function createSessionCookieWithoutOrganization(): Promise<string> {
+  const secret = requiredEnv("BETTER_AUTH_SECRET");
+  const token = randomBytes(24).toString("base64url");
+  const userId = randomUUID();
+  const client = new pg.Client({ connectionString: requiredEnv("DATABASE_URL") });
+  await client.connect();
+  try {
+    await client.query(
+      `INSERT INTO users (id, name, email, email_verified, created_at, updated_at)
+       VALUES ($1, $2, $3, true, now(), now())`,
+      [userId, "Nouvelle Utilisatrice", `nouvelle-${userId}@example.com`],
+    );
+    await client.query(
+      `INSERT INTO sessions (id, token, user_id, active_organization_id, expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, NULL, now() + interval '1 hour', now(), now())`,
+      [randomUUID(), token, userId],
+    );
+  } finally {
+    await client.end();
+  }
+  const signature = createHmac("sha256", secret).update(token).digest("base64");
+  return encodeURIComponent(`${token}.${signature}`);
+}

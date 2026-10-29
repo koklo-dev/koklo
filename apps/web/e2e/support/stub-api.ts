@@ -8,6 +8,10 @@ import { createServer } from "node:http";
 type Scenario = {
   session: boolean;
   projects: "loading" | "empty" | "data" | "internal" | "unauthorized";
+  /** Organisations de la personne (défaut : une seule, propriétaire). */
+  organizations?: "none" | "one" | "many";
+  /** Organisation active sur la session (défaut : oui). */
+  activeOrganization?: boolean;
 };
 
 let scenario: Scenario = { session: true, projects: "data" };
@@ -19,10 +23,49 @@ const PROJECTS = [
   { id: "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b03", name: "Portail partenaires" },
 ];
 
-const SESSION = {
-  session: { id: "s1", userId: "u1", expiresAt: "2999-01-01T00:00:00.000Z", token: "t" },
+const ORG_ID = "01900000-0000-7000-8000-0000000000a1";
+const ORGANIZATIONS = [
+  { id: ORG_ID, name: "Atelier Lumière", slug: "atelier-lumiere", role: "owner" },
+  {
+    id: "01900000-0000-7000-8000-0000000000a2",
+    name: "Studio Nord",
+    slug: "studio-nord",
+    role: "dev",
+  },
+];
+const MEMBERS = [
+  {
+    id: "01900000-0000-7000-8000-0000000000b1",
+    userId: "01900000-0000-7000-8000-0000000000c1",
+    name: "Awa Koné",
+    email: "awa@example.com",
+    role: "owner",
+  },
+  {
+    id: "01900000-0000-7000-8000-0000000000b2",
+    userId: "01900000-0000-7000-8000-0000000000c2",
+    name: "Moussa Diallo",
+    email: "moussa@example.com",
+    role: "dev",
+  },
+];
+
+const session = () => ({
+  session: {
+    id: "s1",
+    userId: "u1",
+    expiresAt: "2999-01-01T00:00:00.000Z",
+    token: "t",
+    activeOrganizationId: scenario.activeOrganization === false ? null : ORG_ID,
+  },
   user: { id: "u1", name: "Test", email: "test@example.com", emailVerified: true },
-};
+});
+
+function organizations(): typeof ORGANIZATIONS {
+  const mode = scenario.organizations ?? "one";
+  if (mode === "none") return [];
+  return mode === "many" ? ORGANIZATIONS : ORGANIZATIONS.slice(0, 1);
+}
 
 const json = (status: number, body: unknown) => ({ status, body: JSON.stringify(body) });
 
@@ -39,6 +82,13 @@ function projectsResponse(): ReturnType<typeof json> {
     default:
       return json(200, PROJECTS);
   }
+}
+
+/** Lectures simples (organisations, membres) ; le reste est inconnu du faux API. */
+function readEndpoint(method: string | undefined, path: string): ReturnType<typeof json> {
+  if (method === "GET" && path.endsWith("/organizations")) return json(200, organizations());
+  if (method === "GET" && path.endsWith("/members")) return json(200, MEMBERS);
+  return json(404, { code: "NOT_FOUND" });
 }
 
 createServer((req, res) => {
@@ -62,10 +112,10 @@ createServer((req, res) => {
     for (const release of held.splice(0)) release();
     return send(json(200, { released: true }));
   }
-  if (path.endsWith("/get-session")) return send(json(200, scenario.session ? SESSION : null));
+  if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
   if (path.endsWith("/projects")) {
     if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
     return send(projectsResponse());
   }
-  send(json(404, { code: "NOT_FOUND" }));
+  send(readEndpoint(req.method, path));
 }).listen(Number(process.env.STUB_API_PORT ?? 3101), "127.0.0.1");
