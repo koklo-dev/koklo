@@ -11,4 +11,10 @@ export class ProjectService {
     const projects = await this.repository.listByOrganization(organizationId);
     return projects.map(({ id, name }) => ({ id, name }));
   }
+
+  /** Crée un projet dans l'organisation de la session. */
+  async create(organizationId: string, name: string): Promise<ProjectListOutput[number]> {
+    const { id } = await this.repository.create(organizationId, name);
+    return { id, name };
+  }
 }

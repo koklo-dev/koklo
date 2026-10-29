@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import { Injectable } from "@nestjs/common";
-import type { AuthSession, SessionResolver } from "./session.ts";
+import type { AuthSession, SessionResolver, UserSession } from "./session.ts";
 
 export const TEST_SESSION_RESOLVER = Symbol("TEST_SESSION_RESOLVER");
 
@@ -14,6 +14,11 @@ export const TEST_SESSION_HEADER = "x-test-session";
 export class TestSessionResolver implements SessionResolver {
   async resolve(headers: IncomingHttpHeaders): Promise<AuthSession | null> {
     return parseTestSession(headers[TEST_SESSION_HEADER]);
+  }
+
+  async resolveUser(headers: IncomingHttpHeaders): Promise<UserSession | null> {
+    const session = parseTestSession(headers[TEST_SESSION_HEADER]);
+    return session ? { userId: session.userId } : null;
   }
 }
 
@@ -42,5 +47,12 @@ export class TestFirstSessionResolver implements SessionResolver {
       return this.test.resolve(headers);
     }
     return this.real.resolve(headers);
+  }
+
+  async resolveUser(headers: IncomingHttpHeaders): Promise<UserSession | null> {
+    if (headers[TEST_SESSION_HEADER] !== undefined) {
+      return this.test.resolveUser(headers);
+    }
+    return this.real.resolveUser(headers);
   }
 }

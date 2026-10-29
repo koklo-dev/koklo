@@ -1,7 +1,13 @@
-import type { LogDestination } from "@koklo/observability";
+import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
 import type { WorkerConfig } from "./config.ts";
 import { handleNoop, NOOP_QUEUE } from "./jobs/noop.ts";
+import {
+  createSendInvitationHandler,
+  SEND_INVITATION_QUEUE,
+  SEND_INVITATION_RETENTION_SECONDS,
+  SEND_INVITATION_RETRY_LIMIT,
+} from "./jobs/send-invitation.ts";
 import {
   createSendMagicLinkHandler,
   SEND_MAGIC_LINK_QUEUE,
@@ -21,6 +27,30 @@ export interface StartWorkerOptions {
   logStream?: LogDestination;
 }
 
+interface MailQueue {
+  name: string;
+  options: { retryLimit: number; deleteAfterSeconds: number; retentionSeconds: number };
+  handler: (job: { id: string; data: unknown }) => Promise<void>;
+}
+
+const mailQueue = (
+  name: string,
+  retryLimit: number,
+  retentionSeconds: number,
+  handler: MailQueue["handler"],
+): MailQueue => ({
+  name,
+  options: { retryLimit, deleteAfterSeconds: retentionSeconds, retentionSeconds },
+  handler,
+});
+
+async function registerMailQueue(boss: PgBoss, logger: Logger, queue: MailQueue): Promise<void> {
+  await boss.createQueue(queue.name, queue.options);
+  // `createQueue` ne réécrit pas une file existante : les options restent celles du code.
+  await boss.updateQueue(queue.name, queue.options);
+  await boss.work(queue.name, instrumentJob(logger, queue.name, queue.handler));
+}
+
 /** Démarre pg-boss sur la base partagée, crée les files et enregistre un consommateur par job. */
 export async function startWorker(
   config: WorkerConfig,
@@ -36,17 +66,25 @@ export async function startWorker(
   await boss.start();
   await boss.createQueue(NOOP_QUEUE);
   await boss.work(NOOP_QUEUE, instrumentJob(logger, NOOP_QUEUE, handleNoop));
-  const magicLinkQueue = {
-    retryLimit: SEND_MAGIC_LINK_RETRY_LIMIT,
-    deleteAfterSeconds: SEND_MAGIC_LINK_RETENTION_SECONDS,
-    retentionSeconds: SEND_MAGIC_LINK_RETENTION_SECONDS,
-  };
-  await boss.createQueue(SEND_MAGIC_LINK_QUEUE, magicLinkQueue);
-  // `createQueue` ne réécrit pas une file existante : les options restent celles du code.
-  await boss.updateQueue(SEND_MAGIC_LINK_QUEUE, magicLinkQueue);
-  await boss.work(
-    SEND_MAGIC_LINK_QUEUE,
-    instrumentJob(logger, SEND_MAGIC_LINK_QUEUE, createSendMagicLinkHandler(mailSender)),
+  await registerMailQueue(
+    boss,
+    logger,
+    mailQueue(
+      SEND_MAGIC_LINK_QUEUE,
+      SEND_MAGIC_LINK_RETRY_LIMIT,
+      SEND_MAGIC_LINK_RETENTION_SECONDS,
+      createSendMagicLinkHandler(mailSender),
+    ),
+  );
+  await registerMailQueue(
+    boss,
+    logger,
+    mailQueue(
+      SEND_INVITATION_QUEUE,
+      SEND_INVITATION_RETRY_LIMIT,
+      SEND_INVITATION_RETENTION_SECONDS,
+      createSendInvitationHandler(mailSender),
+    ),
   );
   logger.info("worker started");
   return { boss, stop: () => boss.stop() };

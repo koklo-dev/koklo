@@ -2,6 +2,7 @@ import { type DynamicModule, Global, Module, type Provider } from "@nestjs/commo
 import { APP_FILTER } from "@nestjs/core";
 import type { AppConfig } from "../config.ts";
 import { DatabaseService } from "../database/database.module.ts";
+import { InvitationQueue } from "../organization/invitation-queue.ts";
 import { AuthController } from "./auth.controller.ts";
 import { AUTH } from "./auth.tokens.ts";
 import { type Auth, createAuth } from "./auth.ts";
@@ -48,15 +49,19 @@ export class AuthModule {
       providers: [
         {
           provide: AUTH,
-          inject: [DatabaseService, MagicLinkQueue],
-          useFactory: (database: DatabaseService, queue: MagicLinkQueue) =>
-            createAuth(config, database.raw, queue.enqueue),
+          inject: [DatabaseService, MagicLinkQueue, InvitationQueue],
+          useFactory: (
+            database: DatabaseService,
+            magicLinks: MagicLinkQueue,
+            invitations: InvitationQueue,
+          ) => createAuth(config, database.raw, magicLinks.enqueue, invitations.enqueue),
         },
         MagicLinkQueue,
+        InvitationQueue,
         { provide: APP_FILTER, useClass: OrpcErrorFilter },
         ...sessionProviders(config),
       ],
-      exports: [SESSION_RESOLVER],
+      exports: [SESSION_RESOLVER, AUTH],
     };
   }
 }
