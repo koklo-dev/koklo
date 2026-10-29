@@ -1,4 +1,7 @@
+export * from "./dependency-graph.ts";
+export * from "./eligibility.ts";
 export * from "./errors.ts";
+export * from "./selection-order.ts";
 export * from "./ticket.ts";
 export * from "./ticket-counters.ts";
 export * from "./ticket-key.ts";

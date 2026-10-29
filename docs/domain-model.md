@@ -107,6 +107,27 @@ stateDiagram-v2
   cancelled --> [*]
 ```
 
+### Dependencies, eligibility and selection order (TK-26, `packages/domain`)
+`DependencyGraph` is a frozen set of edges `{ ticket, dependsOn, type }` with `type` in
+`blocks | related`. `addDependency` is idempotent on a duplicate edge, validates both keys and
+the type, and rejects any edge that closes a cycle (`DependencyCycleError`, `path` = added edge
+plus the existing path back). The no-cycle rule covers `blocks` and `related` together. Edges are
+kept in a deterministic order (ticket number, target number, type). `createTicket` now requires
+`createdAt` (ISO-8601 UTC, real calendar date), kept as given.
+
+A ticket is eligible (`isEligible`) when it is `todo` and every `blocks` target is `done`
+(`related` never blocks; a missing target counts as unsatisfied). `rankTickets` sorts all
+tickets and `selectionOrder` keeps the eligible ones; `nextTicket` returns the first eligible
+ticket of the active sprint, or `null` without an active sprint (CDC §7.3).
+
+```mermaid
+flowchart LR
+  A[Sprint actif] --> B[Priorité décroissante]
+  B --> C[Dépendances satisfaites]
+  C --> D[createdAt croissant]
+  D --> E[Numéro de clé croissant]
+```
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.
