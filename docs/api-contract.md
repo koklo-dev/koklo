@@ -1,12 +1,12 @@
 ---
 title: API contract
 audience: technical
-doc_version: 0.3.0
+doc_version: 0.2.0
 status: draft
 last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 0c11f12
+covers_commit: 7f97066
 ---
 # API contract
 
@@ -107,6 +107,19 @@ drift apart.
 `organization.*` needs a session only (any user; no role). Others: 401 without session or
 active organization, 403 for a role marked "no".
 
+### Web consumer (TK-24)
+`apps/web` calls these procedures; the contract is unchanged. Roles are shown from `organization.list`
+(`role` of the active organization); the UI hides what the matrix forbids, the API stays the authority.
+
+| Screen | Procedure | Error handling in the UI |
+|--------|-----------|--------------------------|
+| `/organizations` | `organization.list`, `organization.create` | `CONFLICT slug_taken` shown under "Identifiant"; other errors in an alert; `UNAUTHORIZED` re-checks the session (no session: `/login`; session: `/organizations`) |
+| `/members` | `member.list`, `member.invite` | `CONFLICT already_member` / `already_invited` under "Adresse e-mail"; `FORBIDDEN` as a message; other errors in an alert |
+| `/projects` | `project.list`, `project.create` | `FORBIDDEN` as a message; other errors in an alert |
+
+Organization activation is not an oRPC procedure: the web calls the Better Auth client
+`organization.setActive` (`/api/auth/*`). `member.setRole` has no screen yet.
+
 ### Hypotheses to validate (product owner)
 - **H1 (to validate)**: `project.create` is owner and admin only. The CDC has no "create a
   project" row; the cautious option was kept (TK-21 had assumed dev as well). Opening it to
@@ -120,7 +133,13 @@ The invitation acceptance page and the `acceptInvitation` call (web, follow-up t
 creates the invitation and enqueues the email, whose link is `<BETTER_AUTH_URL>/accept-invitation/<id>`.
 Ownership transfer and member removal are not in the contract.
 
+As of TK-24 the page still does not exist in `apps/web` (no `accept-invitation` route): the link in the
+invitation email gives a 404 (checked: `apps/web/src/app` holds only `login`, `organizations`, `members`,
+`projects`). Follow-up ticket.
+
 ### Known limits
+- No pending-invitation list and no resend or cancel procedure: the web cannot show `already_invited`
+  before the error, nor resend an email (TK-24 observation; see also the limits below).
 - Better Auth swallows errors of `sendInvitationEmail`: if pg-boss fails, the invitation
   exists without an email and the response is still 200. The failure is logged
   (`enqueue failed`, queue and error name only) and sent to Sentry; there is no resend

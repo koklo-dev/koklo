@@ -1,12 +1,12 @@
 ---
 title: Architecture
 audience: technical
-doc_version: 0.3.0
+doc_version: 0.2.0
 status: draft
 last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 0c11f12
+covers_commit: 7f97066
 ---
 # Architecture
 
@@ -389,6 +389,87 @@ flowchart LR
   q --> w[worker send-invitation] --> m{{MailSender}}
 ```
 
+### Web: organizations, members and project creation (TK-24)
+`apps/web` consumes the TK-23 procedures; `apps/api`, `packages/contract` and the database are untouched.
+Decision record: [ADR 0008](adr/0008-web-entry-gate-organizations.md).
+
+| Route | Page | Frame | Guard (`resolveAccess`) |
+|-------|------|-------|-------------------------|
+| `/organizations` | `OrganizationsPage` (+ `OrganizationForm`, `OrganizationList`) | none (full-page, like `/login`) | session required; never redirected when a session exists |
+| `/projects` | `ProjectsPage` (+ `ProjectCreateSheet`) | `AppFrame` | session + active organization |
+| `/members` | `MembersPage` (+ `InviteForm`, `RoleField`) | `AppFrame` | session + active organization |
+
+- **Guard** (`lib/auth-guard.ts`, pure, `lib/session.ts`, `proxy.ts`): only a missing session leads to
+  `/login`; a session without active organization on `/projects` or `/members` leads to
+  `/organizations`; `/login` with a session leads to `/projects`. `readSession` reads
+  `session.activeOrganizationId` from `/api/auth/get-session`.
+- **Client state**: the active organization comes from `authClient.getSession()` crossed with
+  `organization.list` (`useActiveOrganization`: name and role). `useActivateOrganization` calls
+  `authClient.organization.setActive` then invalidates every query. `useOrganizationEntry` drives
+  `/organizations` (auto-open of a single organization, once the session is known).
+  `useUnauthorizedRedirect` re-checks the session on `UNAUTHORIZED`.
+- **Roles in the UI** (`lib/roles.ts`): `canManage` (owner, admin) shows "Créer un projet" and the invitation
+  form; `invitableRoles` hides `admin` from non-owners and never offers `owner`. The API stays the authority
+  (`FORBIDDEN` is rendered as a message).
+- **Forms** validate with the contract Zod schemas (`organizationCreateInputSchema`, `memberInviteInputSchema`,
+  `projectCreateInputSchema`); messages per field in `lib/form-errors.ts`; `CONFLICT` reasons
+  (`slug_taken`, `already_member`, `already_invited`) read by `lib/api-error.ts`.
+- **Shared blocks**: `AppFrame` (shell for projects and members), `ErrorNotice`, `LoadingStatus`, `FormField`.
+  `packages/ui` only gains the export of the existing `Input`.
+
+```mermaid
+flowchart TB
+  proxy["proxy.ts (matcher: /login /projects /members /organizations)"] --> guard["auth-guard.ts: resolveAccess"]
+  proxy --> sess["session.ts: readSession"]
+  subgraph apps/web
+    orgPage[OrganizationsPage] --> entry[use-organization-entry]
+    orgPage --> orgForm[OrganizationForm]
+    entry --> act[use-activate-organization]
+    projPage[ProjectsPage] --> sheet[ProjectCreateSheet]
+    memPage[MembersPage] --> inv[InviteForm]
+    projPage & memPage --> frame[AppFrame] --> ts[TeamSwitcher]
+    ts --> act
+    projPage & memPage & ts --> actOrg[use-active-organization]
+    projPage & memPage & entry --> unauth[use-unauthorized-redirect]
+  end
+  orgForm & sheet & inv & entry & actOrg -->|oRPC + Better Auth client| api[(apps/api via same-origin proxy)]
+```
+
+Guard flow (`resolveAccess`):
+
+```mermaid
+flowchart TD
+  r[Request on a guarded path] --> s{Session?}
+  s -- no --> l{path = /login?}
+  l -- yes --> ok[Allowed]
+  l -- no --> tl[Redirect /login]
+  s -- yes --> pl{path = /login?}
+  pl -- yes --> tp[Redirect /projects]
+  pl -- no --> n{/projects or /members?}
+  n -- no --> ok
+  n -- yes --> o{Active organization?}
+  o -- yes --> ok
+  o -- no --> to[Redirect /organizations]
+```
+
+```mermaid
+sequenceDiagram
+  actor U as User
+  participant W as apps/web
+  participant A as apps/api
+  U->>W: GET /projects (session, no active organization)
+  W-->>U: redirect /organizations
+  U->>W: "Créer l'organisation" (name, optional slug)
+  W->>A: organization.create
+  A-->>W: organization (caller owner, active on the session)
+  W-->>U: navigate /projects (empty list)
+  U->>W: "Créer un projet" (name)
+  W->>A: project.create
+  A-->>W: project
+  W->>A: project.list (invalidated)
+  W-->>U: list updated, status "Projet « name » créé."
+```
+
 ### Magic-link emails: `send-magic-link` queue (TK-22)
 The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.
 
@@ -530,5 +611,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0003](adr/0003-better-auth-session-guard.md),
 [0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md),
 [0006](adr/0006-web-same-origin-proxy-runtime-config.md),
-[0007](adr/0007-real-stack-e2e-orchestration.md).
+[0007](adr/0007-real-stack-e2e-orchestration.md),
+[0008](adr/0008-web-entry-gate-organizations.md).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

@@ -1,12 +1,12 @@
 ---
 title: Quality and operations
 audience: technical
-doc_version: 0.3.0
+doc_version: 0.2.0
 status: draft
 last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 0c11f12
+covers_commit: 7f97066
 ---
 # Quality and operations
 
@@ -340,6 +340,28 @@ TO DOCUMENT — logs, metrics, traces, health checks, alerting.
 
 ## Risks, mitigations and runbook
 TO DOCUMENT — known risks, their mitigations, and what to do at 3am.
+
+## Web: organizations, members, project creation (TK-24)
+- **Unit and component tests** (`apps/web/test`, Vitest, mocks in `test/support/web-mocks.ts`):
+  `auth-guard.test.ts`, `session.test.ts`, `proxy.test.ts` (access matrix and redirects),
+  `organizations-page.test.tsx`, `members-page.test.tsx`, `projects-page.test.tsx`,
+  `team-switcher.test.tsx`, `organizations-members-routes.test.tsx`, `projects-layout.test.tsx`,
+  `design-conformity.test.ts`. Web: 191 tests passing at the end of the refactor step
+  (`.workflow/TK-24/05-refactor.md`); line coverage 99.21 %, branches 94.80 %.
+- **Real-stack e2e** (`e2e/tests/organizations.spec.ts`, `pnpm e2e`): C1 (session without organization,
+  `/projects` goes to `/organizations`, create the organization, create a project), G1 (no `/login` <->
+  `/projects` loop), C1.d (without session, the three pages go to `/login`). The session cookie without active
+  organization is forged by `e2e/support/session.ts`. 5 e2e passing (2 in `projects.spec.ts`).
+- **Stub-API suite** (`apps/web/e2e`: `organizations.spec.ts`, `a11y.spec.ts` axe on `/members` and
+  `/organizations`, including the active-organization case) writes the captures in `design/screens/captures/`.
+  It was run after the Refactor step, once the `next dev` that blocked it was stopped: 54 tests passed
+  (axe WCAG AA in light and dark, captures, sidebar, theme, mobile 375 px on the projects page, reduced motion).
+- **Mail in development**: invitations are queued on `send-invitation`; with `APP_ENV` `development` or
+  `test` the worker uses the in-memory `CaptureMailSender` (see [Emails and magic link](#emails-and-magic-link-tk-22)):
+  nothing reaches a real mailbox. Resend is used only in `staging` and `production`.
+- **Known limits**: the email link `/accept-invitation/<id>` is a 404 (no page yet); no pending-invitation
+  list, no resend; `engineering-rules` was not available in the delivery session, so rule evidence ids are
+  UNVERIFIED for this ticket.
 
 ## Real-stack e2e (TK-15)
 
