@@ -1,12 +1,12 @@
 ---
 title: API contract
 audience: technical
-doc_version: 0.2.0
+doc_version: 0.3.0
 status: draft
-last_reviewed: 2026-10-28
+last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 427d077
+covers_commit: 0c11f12
 ---
 # API contract
 
@@ -32,7 +32,7 @@ Contract version **0.3.0** (TK-21). The router shape is
 | `project.list` | GET | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 | `project.create` | POST | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 
-Only the contract exists for the six TK-21 routes: they have no controller yet (TK-23).
+The six TK-21 routes are implemented in `apps/api` (TK-23); see the next section.
 
 ## Inputs, outputs and error shapes
 
@@ -75,17 +75,59 @@ Roles allowed per action (to enforce in TK-23): `member.invite` and `member.setR
 reserved to `owner`/`admin` (otherwise `FORBIDDEN`); `project.create` to the roles the CDC
 allows to create projects (otherwise `FORBIDDEN`).
 
-## What TK-23 must implement
-- Controllers (`@Implement`) for the six new routes; the Nest router only exists through
-  `@Implement`, so an unimplemented route is not served.
-- The guard without active organization: `member.*` and `project.*` refuse a session that
-  has no active organization (`UNAUTHORIZED`, as `project.list` does today), whereas
-  `organization.create` and `organization.list` must work without one (that is how the
-  first organization is created).
-- Role checks (`FORBIDDEN`), the `NOT_FOUND` and `CONFLICT` reasons above, and the
-  `last_owner` invariant.
-- Keep `errorStatusMap` untouched: it is derived from the contract tree, a new route needs
-  no registration.
+## Implementation of the six procedures (TK-23)
+| Procedure | Controller guards | Behaviour |
+|-----------|-------------------|-----------|
+| `organization.create` | `UserSessionGuard` | Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
+| `organization.list` | `UserSessionGuard` | Organizations the caller belongs to, with the caller's role |
+| `member.list` | `SessionGuard` | Members of the session organization |
+| `member.invite` | `SessionGuard`, `RoleGuard` | `already_member` / `already_invited` checks, then Better Auth `createInvitation`; its callback enqueues the email job |
+| `member.setRole` | `SessionGuard`, `RoleGuard` | Serializable transaction: `NOT_FOUND`, H3, `last_owner` |
+| `project.create` | `SessionGuard`, `RoleGuard` | Project created under the session organization |
+
+`NOT_FOUND` is identical for an unknown member and a member of another organization.
+Every organization value comes from the session, never from the input. The role check runs
+before input validation (403 before 400).
+
+### Permission matrix (CDC §14)
+`RoleGuard` reads the role from `members` on every request. Single source of the manager
+roles: `MANAGER_ROLES` in `apps/api/src/auth/roles.ts`, used by the `@Roles` decorators; the
+Better Auth access-control table in the same file is its echo, and
+`apps/api/test/roles-consistency.test.ts` fails if the two, or the contract's `roleSchema`,
+drift apart.
+
+| Procedure | owner | admin | dev | designer | client | business |
+|-----------|:-----:|:-----:|:---:|:--------:|:------:|:--------:|
+| `organization.create`, `organization.list` | yes | yes | yes | yes | yes | yes |
+| `member.list` | yes | yes | yes | yes | yes | yes |
+| `member.invite` | yes | yes | no | no | no | no |
+| `member.setRole` | yes | yes | no | no | no | no |
+| `project.create` | yes | yes | no | no | no | no |
+
+`organization.*` needs a session only (any user; no role). Others: 401 without session or
+active organization, 403 for a role marked "no".
+
+### Hypotheses to validate (product owner)
+- **H1 (to validate)**: `project.create` is owner and admin only. The CDC has no "create a
+  project" row; the cautious option was kept (TK-21 had assumed dev as well). Opening it to
+  `dev` later is backward compatible, the reverse is not.
+- **H2 (to validate)**: any member can list members.
+- **H3 (to validate)**: only an `owner` changes the role of an `owner` or grants `admin`
+  (invitation included); otherwise 403. `owner` is never assignable.
+
+### Out of scope
+The invitation acceptance page and the `acceptInvitation` call (web, follow-up ticket): TK-23
+creates the invitation and enqueues the email, whose link is `<BETTER_AUTH_URL>/accept-invitation/<id>`.
+Ownership transfer and member removal are not in the contract.
+
+### Known limits
+- Better Auth swallows errors of `sendInvitationEmail`: if pg-boss fails, the invitation
+  exists without an email and the response is still 200. The failure is logged
+  (`enqueue failed`, queue and error name only) and sent to Sentry; there is no resend
+  procedure yet.
+- A concurrent `setRole` race on the last owner can abort the Serializable transaction and
+  return `INTERNAL` (500) instead of `CONFLICT last_owner`. The organization is never left
+  without an owner.
 
 ## Authentication and authorization
 `project.list` requires a session (TK-11, [ADR 0003](adr/0003-better-auth-session-guard.md)).
@@ -93,7 +135,7 @@ allows to create projects (otherwise `FORBIDDEN`).
 these routes belong to Better Auth, not to the oRPC contract. The session is a signed Better
 Auth cookie.
 
-A per-procedure Nest guard (`SessionGuard`, `@UseGuards` on `ProjectController.list`; not
+Three guards (TK-23, [architecture.md](architecture.md#organizations-members-and-roles-tk-23)): `UserSessionGuard` (session only), `SessionGuard` (active organization) and `RoleGuard` (`@Roles`). A per-procedure Nest guard (`SessionGuard`, `@UseGuards` on `ProjectController.list`; not
 global) resolves the session before the service runs. The request is refused with the typed
 `UNAUTHORIZED` error (401, body `{ code, status, message, ... }`) when:
 
@@ -103,7 +145,7 @@ global) resolves the session before the service runs. The request is refused wit
 
 The organization used for the query comes only from the resolved session
 (`SessionOrganizationContext`); an organization sent by the client (header, query, body) is
-ignored. `FORBIDDEN` is declared but not emitted. The repository port has no "list
+ignored. `FORBIDDEN` is emitted by `RoleGuard` (TK-23). The repository port has no "list
 everything" method: every read is filtered by `organizationId`. The Prisma tenant-filter
 extension of CDC §18.4 does not exist yet.
 

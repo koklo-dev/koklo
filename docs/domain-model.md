@@ -1,12 +1,12 @@
 ---
 title: Domain model
 audience: technical
-doc_version: 0.1.0
+doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-28
+last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 9c821e2
+covers_commit: 0c11f12
 ---
 # Domain model
 
@@ -29,6 +29,11 @@ The first seven are the Better Auth tables (organization plugin), with fields al
 the Better Auth documentation (ASSUMPTION: not re-checked against the library in this
 pass). Business tables carry an indexed `organization_id` (schema comment citing
 vision §18.4).
+
+### Roles (TK-23)
+`members.role` holds one of `owner`, `admin`, `dev`, `designer`, `client`, `business` (CDC §14;
+`roleSchema` in the contract). The creator is the only `owner`; `owner` is never assignable by
+invitation or `setRole`, and an organization always keeps at least one owner.
 
 ## Relationships and cardinalities
 

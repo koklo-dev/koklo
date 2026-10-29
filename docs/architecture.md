@@ -1,12 +1,12 @@
 ---
 title: Architecture
 audience: technical
-doc_version: 0.2.0
+doc_version: 0.3.0
 status: draft
 last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 706ce94
+covers_commit: 0c11f12
 ---
 # Architecture
 
@@ -359,6 +359,34 @@ flowchart LR
   worker --> noop["work('noop', handleNoop)"]
   boss <-->|"pg-boss schema"| db[("PostgreSQL")]
   producer["any producer: boss.send('noop')"] --> db
+```
+
+### Organizations, members and roles (TK-23)
+Modules `organization/`, `member/` and `project/` in `apps/api`, on top of the Better Auth
+`organization()` plugin (six CDC §14 roles, 7-day invitations).
+
+- **Guards** (`auth/session.guard.ts`): `UserSessionGuard` (valid session, organization
+  optional: `organization.create/list`), `SessionGuard` (active organization and membership),
+  `RoleGuard` + `@Roles(...MANAGER_ROLES)` (role re-read from `members`, 403). The manager
+  roles live once in `auth/roles.ts`; the plugin access-control table is its echo, checked by
+  a test.
+- **Data access**: `members`, `invitations`, `organizations` are outside the tenant filter and
+  always bounded by the session `organizationId` or `userId`; `Project` goes through
+  `withOrganization`.
+- **Queue**: `PgBossProducer` (`queue/pg-boss-producer.ts`) is the lazy producer base of
+  `MagicLinkQueue` and `InvitationQueue`; it logs and reports to Sentry an enqueue failure
+  before rethrowing. The worker consumes `send-invitation` (`jobs/send-invitation.ts`,
+  `mail/invitation-message.ts`, shared `mail/html.ts`), 3 attempts, 1 h retention.
+
+```mermaid
+flowchart LR
+  c[Client] --> g1{{UserSessionGuard / SessionGuard}}
+  g1 --> g2{{RoleGuard}}
+  g2 --> svc[MemberService.invite]
+  svc -->|createInvitation| ba[Better Auth organization plugin]
+  ba -->|sendInvitationEmail| iq[InvitationQueue]
+  iq -->|boss.send| q[(pg-boss: send-invitation)]
+  q --> w[worker send-invitation] --> m{{MailSender}}
 ```
 
 ### Magic-link emails: `send-magic-link` queue (TK-22)

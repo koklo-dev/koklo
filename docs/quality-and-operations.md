@@ -1,12 +1,12 @@
 ---
 title: Quality and operations
 audience: technical
-doc_version: 0.2.0
+doc_version: 0.3.0
 status: draft
 last_reviewed: 2026-10-29
 covers_release: unreleased
 sources: []
-covers_commit: 706ce94
+covers_commit: 0c11f12
 ---
 # Quality and operations
 
@@ -160,6 +160,24 @@ covers_commit: 706ce94
   `turbo prune` and the builder stage do contain it, which only costs build time.
 - **Open**: remove `resend@6.35.0` from `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`)
   once its release age passes.
+
+## Invitations (TK-23)
+- **Flow**: `member.invite` creates the invitation (`pending`, 7 days) and the plugin callback
+  enqueues `{ email, url, inviterName, organizationName, role }` on `send-invitation`; the
+  worker sends it (3 attempts, payload kept 1 h at most, link and `data` redacted in logs).
+  The acceptance page is out of scope.
+- **Known limit 1, enqueue failure**: Better Auth awaits `sendInvitationEmail` as a background
+  task and swallows its errors (it logs "Failed to run background task"). If pg-boss is down,
+  the invitation exists without an email and the API answers 200. Mitigation added: the
+  producer logs `enqueue failed` (queue and error name, no payload) and reports to Sentry
+  (tag `queue`); covered by `apps/api/test/enqueue-failure.test.ts`. Lead for later: a resend
+  procedure, or a transactional outbox, so the invitation and its job commit together.
+- **Known limit 2, `last_owner` race**: two concurrent demotions of owners can abort the
+  Serializable transaction; the caller gets `INTERNAL` (500), not `CONFLICT`. The invariant
+  holds (no organization without an owner). Mapping Prisma `P2034` to a retry is a possible
+  follow-up.
+- **Tests**: build the worker before running api tests alone (`@koklo/worker` is read from
+  `dist`; `pnpm test` chains it through turbo).
 
 ## Multi-tenant isolation (TK-20)
 - Tests: `packages/db/test/tenant-extension.test.ts` (ephemeral PostgreSQL: no context on 16
