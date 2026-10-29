@@ -51,3 +51,4 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-projects](screens/S-projects.md) | 4 | TK-24 |
 | [S-organizations](screens/S-organizations.md) | 1 | TK-24 |
 | [S-members](screens/S-members.md) | 1 | TK-24 |
+| [S-accept-invitation](screens/S-accept-invitation.md) | 1 | TK-86 |

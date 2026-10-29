@@ -12,6 +12,8 @@ type Scenario = {
   organizations?: "none" | "one" | "many";
   /** Organisation active sur la session (défaut : oui). */
   activeOrganization?: boolean;
+  /** Aperçu d'invitation (`/accept-invitation/<id>`) ; absent = invitation inconnue. */
+  invitation?: "ready" | "member" | "wrong" | "invalid";
 };
 
 let scenario: Scenario = { session: true, projects: "data" };
@@ -84,6 +86,30 @@ function projectsResponse(): ReturnType<typeof json> {
   }
 }
 
+/** Better Auth : `get-invitation` et `organization/list` pour l'écran d'acceptation. */
+function invitationEndpoint(path: string): ReturnType<typeof json> | null {
+  const mode = scenario.invitation;
+  if (path.endsWith("/get-invitation")) {
+    if (mode === "ready" || mode === "member") {
+      return json(200, {
+        id: "01900000-0000-7000-8000-0000000000d1",
+        organizationId: ORG_ID,
+        organizationName: "Atelier Lumière",
+        role: "dev",
+        inviterEmail: "awa@example.com",
+      });
+    }
+    if (mode === "wrong") {
+      return json(403, { code: "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION" });
+    }
+    return json(400, { code: "INVITATION_NOT_FOUND" });
+  }
+  if (path.endsWith("/organization/list")) {
+    return json(200, mode === "member" ? [{ id: ORG_ID, name: "Atelier Lumière" }] : []);
+  }
+  return null;
+}
+
 /** Lectures simples (organisations, membres) ; le reste est inconnu du faux API. */
 function readEndpoint(method: string | undefined, path: string): ReturnType<typeof json> {
   if (method === "GET" && path.endsWith("/organizations")) return json(200, organizations());
@@ -117,5 +143,5 @@ createServer((req, res) => {
     if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
     return send(projectsResponse());
   }
-  send(readEndpoint(req.method, path));
+  send(invitationEndpoint(path) ?? readEndpoint(req.method, path));
 }).listen(Number(process.env.STUB_API_PORT ?? 3101), "127.0.0.1");
