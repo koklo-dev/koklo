@@ -13,12 +13,15 @@ export const pathname = { current: "/projects" };
 export const getSession = vi.fn();
 export const setActive = vi.fn();
 export const signOut = vi.fn();
+export const getInvitation = vi.fn();
+export const acceptInvitation = vi.fn();
+export const listOrganizations = vi.fn();
 
 export const authClient = {
   getSession,
   signOut,
   signIn: { social: vi.fn() },
-  organization: { setActive },
+  organization: { setActive, getInvitation, acceptInvitation, list: listOrganizations },
   useSession: () => ({
     data: { user: { id: "u1", name: "Awa Koné", email: "awa@example.com", image: null } },
     isPending: false,
@@ -89,6 +92,9 @@ export function resetWebMocks(): void {
     getSession,
     setActive,
     signOut,
+    getInvitation,
+    acceptInvitation,
+    listOrganizations,
     ...Object.values(procedures),
   ]) {
     fn.mockReset();

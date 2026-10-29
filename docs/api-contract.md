@@ -133,11 +133,18 @@ The invitation acceptance page and the `acceptInvitation` call (web, follow-up t
 creates the invitation and enqueues the email, whose link is `<BETTER_AUTH_URL>/accept-invitation/<id>`.
 Ownership transfer and member removal are not in the contract.
 
-As of TK-24 the page still does not exist in `apps/web` (no `accept-invitation` route): the link in the
-invitation email gives a 404 (checked: `apps/web/src/app` holds only `login`, `organizations`, `members`,
-`projects`). Follow-up ticket.
+As of TK-86 the page exists: `apps/web/src/app/accept-invitation/[id]` calls the Better Auth client
+`organization.getInvitation` (preview, recipient only) then `organization.acceptInvitation` (explicit click).
+No oRPC procedure was added; without a session the proxy redirects to `/login?next=/accept-invitation/<id>`.
 
 ### Known limits
+- Invitation acceptance (TK-86): Better Auth returns a single `INVITATION_NOT_FOUND` (400) for an
+  unknown, expired, canceled or already accepted invitation, so the web shows one message naming the
+  possible causes. For a user who is **already a member**, `acceptInvitation` answers **500** with no
+  body (API log: Prisma `P2002` on `members_organization_id_user_id_key`); the invitation stays
+  `pending` and the existing member is untouched (no duplicate). The web avoids the call by checking
+  `organization.list` first (and again after a 5xx) and shows "Vous faites déjà partie de cette
+  organisation". Another client calling the endpoint directly still gets the 500 (logged as ERROR).
 - No pending-invitation list and no resend or cancel procedure: the web cannot show `already_invited`
   before the error, nor resend an email (TK-24 observation; see also the limits below).
 - Better Auth swallows errors of `sendInvitationEmail`: if pg-boss fails, the invitation

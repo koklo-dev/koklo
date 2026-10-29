@@ -14,6 +14,7 @@ export async function setScenario(scenario: {
   projects: "loading" | "empty" | "data" | "internal" | "unauthorized";
   organizations?: "none" | "one" | "many";
   activeOrganization?: boolean;
+  invitation?: "ready" | "member" | "wrong" | "invalid";
 }): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }

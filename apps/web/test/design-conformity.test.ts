@@ -14,6 +14,8 @@ const FILES = [
   "app/organizations/page.tsx",
   "app/members/page.tsx",
   "app/members/layout.tsx",
+  "components/accept-invitation-page.tsx",
+  "app/accept-invitation/[id]/page.tsx",
 ];
 
 const RAW_COLOR_CLASS =

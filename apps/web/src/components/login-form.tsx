@@ -12,11 +12,17 @@ import {
 } from "@koklo/ui";
 import { useState } from "react";
 import { authClient } from "../lib/auth-client.ts";
+import { resolveNextPath } from "../lib/next-path.ts";
 import { BrandMark } from "./brand-mark.tsx";
 
 type Status = "idle" | "redirecting" | "failed";
 
-export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
+interface LoginFormProps extends React.ComponentProps<"div"> {
+  /** Destination de retour après connexion (liste blanche `/accept-invitation/<uuid>`). */
+  next?: string | undefined;
+}
+
+export function LoginForm({ className, next, ...props }: LoginFormProps) {
   const [status, setStatus] = useState<Status>("idle");
 
   async function signIn(event: React.FormEvent): Promise<void> {
@@ -25,7 +31,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     try {
       const result = await authClient.signIn.social({
         provider: "github",
-        callbackURL: "/projects",
+        callbackURL: resolveNextPath(next),
       });
       if (result?.error) setStatus("failed");
     } catch {
