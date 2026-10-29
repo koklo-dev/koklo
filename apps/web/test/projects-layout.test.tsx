@@ -10,12 +10,16 @@ import { DESKTOP, MOBILE, setViewport } from "./viewport.ts";
 // Frontières externes uniquement : navigation Next, client Better Auth, client oRPC.
 const signOut = vi.hoisted(() => vi.fn());
 const listFn = vi.hoisted(() => vi.fn());
+const organizationListFn = vi.hoisted(() => vi.fn());
+const getSession = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/projects",
 }));
 vi.mock("../src/lib/auth-client.ts", () => ({
   authClient: {
+    getSession,
+    organization: { setActive: vi.fn() },
     signOut,
     signIn: { social: vi.fn() },
     useSession: () => ({
@@ -27,6 +31,11 @@ vi.mock("../src/lib/auth-client.ts", () => ({
 vi.mock("../src/lib/orpc.ts", () => ({
   orpc: {
     project: { list: { queryOptions: () => ({ queryKey: ["project", "list"], queryFn: listFn }) } },
+    organization: {
+      list: {
+        queryOptions: () => ({ queryKey: ["organization", "list"], queryFn: organizationListFn }),
+      },
+    },
   },
 }));
 
@@ -47,6 +56,13 @@ const PROJECTS = [
   { id: "p1", name: "Atelier Lumière" },
   { id: "p2", name: "Portail partenaires" },
 ];
+
+const ORGANIZATION = {
+  id: "01900000-0000-7000-8000-0000000000a1",
+  name: "Atelier Lumière",
+  slug: "atelier-lumiere",
+  role: "owner",
+};
 
 function renderLayout() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -69,6 +85,10 @@ beforeEach(() => {
   signOut.mockReset();
   listFn.mockReset();
   listFn.mockResolvedValue(PROJECTS);
+  organizationListFn.mockReset();
+  organizationListFn.mockResolvedValue([ORGANIZATION]);
+  getSession.mockReset();
+  getSession.mockResolvedValue({ data: { session: { activeOrganizationId: ORGANIZATION.id } } });
   setViewport(DESKTOP);
 });
 

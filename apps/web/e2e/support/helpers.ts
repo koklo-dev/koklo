@@ -12,6 +12,8 @@ export const CAPTURES_DIR = resolve(import.meta.dirname, "../../../../design/scr
 export async function setScenario(scenario: {
   session: boolean;
   projects: "loading" | "empty" | "data" | "internal" | "unauthorized";
+  organizations?: "none" | "one" | "many";
+  activeOrganization?: boolean;
 }): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
