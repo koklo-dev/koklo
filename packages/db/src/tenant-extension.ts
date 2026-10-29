@@ -7,7 +7,20 @@ import {
 } from "./tenant-context.ts";
 
 /** Modèles métier : toute opération exige un contexte d'organisation et est filtrée par lui. */
-export const TENANT_MODELS: readonly string[] = ["Project"];
+export const TENANT_MODELS: readonly string[] = [
+  "Project",
+  "Ticket",
+  "TicketLabel",
+  "TicketFeature",
+  "AcceptanceCriterion",
+  "TicketDependency",
+  "Sprint",
+  "ProjectState",
+  "Lease",
+  "TicketComment",
+  "AuditLog",
+  "ProjectCounter",
+];
 
 /** Modèles portant (ou non) `organizationId` mais hors filtre, avec la raison de l'exclusion. */
 export const TENANT_EXCLUDED_MODELS: Record<string, string> = {

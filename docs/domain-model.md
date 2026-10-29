@@ -24,6 +24,16 @@ tables and columns are `snake_case` through `@@map` / `@map`.
 | `members` | `Member` | A user's membership and `role` (default `member`) in an organization |
 | `invitations` | `Invitation` | Invitation to an organization (`email`, `role`, `status` default `pending`, `expires_at`, `inviter_id`) |
 | `projects` | `Project` | Business table: a named project of an organization |
+| `tickets` | `Ticket` | Work item (`key` `TK-n`, `status`, `type`, `priority`, `pkg`, `sensitivity`, `attempts`, `review_rounds`, `estimate_hours`, optional `sprint_id`) |
+| `ticket_labels`, `ticket_features` | `TicketLabel`, `TicketFeature` | Labels and feature tags of a ticket (composite key) |
+| `acceptance_criteria` | `AcceptanceCriterion` | Ordered criteria of a ticket (`position` >= 1, `proof_status`) |
+| `ticket_dependencies` | `TicketDependency` | Edge `ticket_id` depends on `depends_on_id` (composite key, no self-edge) |
+| `sprints` | `Sprint` | Time box of a project (`number`, `key`, `starts_on`/`ends_on`, `status`) |
+| `project_states` | `ProjectState` | Versioned optimistic project state (`version` >= 1, JSON object `content`) |
+| `leases` | `Lease` | Ticket lease (`holder_kind`, `holder_id`, `branch`, `worktree`, `expires_at`, `ttl_ms`, `released_at`) |
+| `ticket_comments` | `TicketComment` | Comments on a target (`target_kind`, `target_id`) |
+| `audit_log` | `AuditLog` | Append-only audit trail (`actor_kind`, `action`, `target_kind`, `target_id`) |
+| `project_counters` | `ProjectCounter` | Per-project monotonic counter (`name`, `last_value`) feeding ticket keys |
 
 The first seven are the Better Auth tables (organization plugin), with fields aligned on
 the Better Auth documentation (ASSUMPTION: not re-checked against the library in this
@@ -46,9 +56,29 @@ erDiagram
   organizations ||--o{ members : has
   organizations ||--o{ invitations : has
   organizations ||--o{ projects : owns
+  projects ||--o{ tickets : has
+  projects ||--o{ sprints : plans
+  projects ||--o{ project_states : versions
+  projects ||--o{ project_counters : counts
+  sprints |o--o{ tickets : contains
+  tickets ||--o{ ticket_labels : tagged
+  tickets ||--o{ ticket_features : tagged
+  tickets ||--o{ acceptance_criteria : has
+  tickets ||--o{ ticket_dependencies : "depends on"
+  tickets ||--o{ leases : locked_by
+  organizations ||--o{ ticket_comments : has
+  organizations ||--o{ audit_log : records
 ```
 
 `sessions.active_organization_id` is a plain UUID column, not a foreign key.
+
+### Ticket, sprint, lease and audit tables (TK-28)
+All eleven are tenant models (`organization_id` FK `ON DELETE CASCADE`, indexed). Hand-written
+SQL in migration `*_tickets_sprints_leases` (Prisma cannot express it): partial unique indexes
+(one unreleased lease per ticket, one `active` sprint per project), `CHECK` constraints
+(counters and durations non-negative, `ends_on >= starts_on`), an `audit_log` trigger refusing
+UPDATE/DELETE/TRUNCATE (except the cascade of an organization deletion) and a trigger keeping
+`project_counters.last_value` from decreasing. Procedure in `packages/db/README.md`.
 
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:

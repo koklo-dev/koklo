@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { expectedTables, runPrismaOrThrow } from "../src/testing/prisma-cli.ts";
+import {
+  compositeKeyTables,
+  expectedTables,
+  runPrismaOrThrow,
+  stampExemptTables,
+} from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
@@ -16,7 +21,7 @@ describe("schéma après migration (§18.1)", () => {
     await db?.dispose();
   }, 60_000);
 
-  it("T3.3 les 7 tables Better Auth et projects existent avec les noms pluriels prévus", async () => {
+  it("T3.3 les tables Better Auth, projects et celles du ticket (TK-28) existent avec les noms pluriels prévus", async () => {
     const rows = await db.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name <> '_prisma_migrations'`,
@@ -50,7 +55,7 @@ describe("schéma après migration (§18.1)", () => {
        WHERE tc.table_schema = 'public' AND tc.constraint_type = 'PRIMARY KEY'`,
     );
     const pkByTable = new Map(pks.map((row) => [row.table_name, row.data_type]));
-    for (const table of expectedTables) {
+    for (const table of expectedTables.filter((t) => !compositeKeyTables.includes(t))) {
       expect(pkByTable.get(table), `PK de ${table}`).toBe("uuid");
     }
 
@@ -58,7 +63,7 @@ describe("schéma après migration (§18.1)", () => {
       `SELECT table_name, column_name, is_nullable FROM information_schema.columns
        WHERE table_schema = 'public' AND column_name IN ('created_at', 'updated_at')`,
     );
-    for (const table of expectedTables) {
+    for (const table of expectedTables.filter((t) => !stampExemptTables.includes(t))) {
       for (const column of ["created_at", "updated_at"]) {
         const found = stamps.find((s) => s.table_name === table && s.column_name === column);
         expect(found, `${table}.${column} existe`).toBeDefined();

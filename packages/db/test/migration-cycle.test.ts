@@ -32,7 +32,7 @@ describe("migration init : up -> down -> up (C1)", () => {
     await db?.dispose();
   }, 60_000);
 
-  it("T1.1 migrate deploy sur base vide crée les 8 tables et _prisma_migrations", async () => {
+  it("T1.1 migrate deploy sur base vide crée les 19 tables et _prisma_migrations", async () => {
     runPrismaOrThrow(["migrate", "deploy"], db.url);
 
     expect(await appTables(db)).toEqual(sortedTables);
@@ -42,13 +42,12 @@ describe("migration init : up -> down -> up (C1)", () => {
     expect(Number(ledger[0]?.n)).toBeGreaterThanOrEqual(1);
   }, 120_000);
 
-  it("T1.2 down.sql supprime toutes les tables et types applicatifs", async () => {
-    const latest = listMigrationDirs().at(-1);
-    expect(latest).toBeDefined();
-    const downFile = join(migrationsDir, latest as string, "down.sql");
-
-    runPrismaOrThrow(["db", "execute", "--file", downFile], db.url);
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [latest]);
+  it("T1.2 les down.sql (ordre inverse) suppriment toutes les tables et types applicatifs", async () => {
+    for (const dir of [...listMigrationDirs()].reverse()) {
+      const downFile = join(migrationsDir, dir, "down.sql");
+      runPrismaOrThrow(["db", "execute", "--file", downFile], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     expect(await appTables(db)).toEqual([]);
     const orphanTypes = await db.query<{ typname: string }>(

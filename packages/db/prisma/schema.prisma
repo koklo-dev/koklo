@@ -88,6 +88,18 @@ model Organization {
   invitations Invitation[]
   projects    Project[]
 
+  tickets            Ticket[]
+  ticketLabels       TicketLabel[]
+  ticketFeatures     TicketFeature[]
+  acceptanceCriteria AcceptanceCriterion[]
+  ticketDependencies TicketDependency[]
+  sprints            Sprint[]
+  projectStates      ProjectState[]
+  leases             Lease[]
+  ticketComments     TicketComment[]
+  auditLog           AuditLog[]
+  projectCounters    ProjectCounter[]
+
   @@map("organizations")
 }
 
@@ -135,7 +147,365 @@ model Project {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tickets      Ticket[]
+  sprints      Sprint[]
+  state        ProjectState?
+  counters     ProjectCounter[]
 
   @@index([organizationId])
   @@map("projects")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tickets, sprints, baux (CDC §4.2, §7). Listes fermées = enums natifs, alignés sur @koklo/domain
+// (test de parité). Aucune colonne tableau (incident 6) : les listes sont des tables de liaison.
+// Objets SQL non exprimables ici (index uniques partiels, CHECK, triggers) : voir la migration
+// `*_tickets_sprints_leases/migration.sql`.
+// ---------------------------------------------------------------------------------------------
+
+enum TicketStatus {
+  backlog
+  todo
+  in_progress
+  in_review
+  blocked
+  done
+  cancelled
+
+  @@map("ticket_status")
+}
+
+enum TicketType {
+  feature
+  bug
+  task
+  chore
+
+  @@map("ticket_type")
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+  critical
+
+  @@map("ticket_priority")
+}
+
+enum TicketPackage {
+  web
+  api
+  worker
+  contract
+  db
+  domain
+  schema
+  github
+  rules
+  delivery
+  cli
+  ui
+  config
+  e2e
+  infra
+
+  @@map("ticket_package")
+}
+
+enum Sensitivity {
+  safe
+  sensitive
+
+  @@map("sensitivity")
+}
+
+/// Titulaire d'un bail ou assigné d'un ticket (member ou runner).
+enum HolderKind {
+  member
+  runner
+
+  @@map("holder_kind")
+}
+
+enum DependencyType {
+  blocks
+  related
+
+  @@map("dependency_type")
+}
+
+enum SprintStatus {
+  planned
+  active
+  closed
+
+  @@map("sprint_status")
+}
+
+enum ProofStatus {
+  pending
+  proven
+  failed
+
+  @@map("proof_status")
+}
+
+enum CommentTargetKind {
+  ticket
+  feature
+  screen
+  change_request
+
+  @@map("comment_target_kind")
+}
+
+enum CommentAuthorKind {
+  human
+  agent
+  client
+  system
+
+  @@map("comment_author_kind")
+}
+
+enum AuditActorKind {
+  human
+  agent
+  runner
+  system
+
+  @@map("audit_actor_kind")
+}
+
+enum CounterName {
+  ticket
+  sprint
+
+  @@map("counter_name")
+}
+
+model Ticket {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  projectId      String         @map("project_id") @db.Uuid
+  key            String
+  title          String
+  description    String
+  type           TicketType
+  status         TicketStatus
+  priority       TicketPriority
+  sprintId       String?        @map("sprint_id") @db.Uuid
+  assigneeKind   HolderKind?    @map("assignee_kind")
+  assigneeId     String?        @map("assignee_id")
+  pkg            TicketPackage
+  sensitivity    Sensitivity
+  estimateHours  Decimal?       @map("estimate_hours") @db.Decimal(6, 2)
+  branch         String?
+  pullRequest    String?        @map("pull_request")
+  attempts       Int            @default(0)
+  reviewRounds   Int            @default(0) @map("review_rounds")
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint       Sprint?               @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  labels       TicketLabel[]
+  features     TicketFeature[]
+  criteria     AcceptanceCriterion[]
+  dependencies TicketDependency[]    @relation("TicketDependsOn")
+  dependents   TicketDependency[]    @relation("TicketDependedOnBy")
+  leases       Lease[]
+
+  @@unique([projectId, key])
+  @@index([organizationId])
+  @@index([projectId, status])
+  @@index([sprintId])
+  @@map("tickets")
+}
+
+model TicketLabel {
+  organizationId String @map("organization_id") @db.Uuid
+  ticketId       String @map("ticket_id") @db.Uuid
+  label          String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, label])
+  @@index([organizationId])
+  @@map("ticket_labels")
+}
+
+model TicketFeature {
+  organizationId String @map("organization_id") @db.Uuid
+  ticketId       String @map("ticket_id") @db.Uuid
+  featureRef     String @map("feature_ref")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, featureRef])
+  @@index([organizationId])
+  @@map("ticket_features")
+}
+
+model AcceptanceCriterion {
+  id             String      @id @default(uuid(7)) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  ticketId       String      @map("ticket_id") @db.Uuid
+  position       Int
+  statement      String
+  specRef        String?     @map("spec_ref")
+  proofStatus    ProofStatus @default(pending) @map("proof_status")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, position])
+  @@index([organizationId])
+  @@map("acceptance_criteria")
+}
+
+/// `ticketId` dépend de `dependsOnId`. Pas de cycle ni d'auto-dépendance (CHECK) : le domaine refuse les cycles.
+model TicketDependency {
+  organizationId String         @map("organization_id") @db.Uuid
+  ticketId       String         @map("ticket_id") @db.Uuid
+  dependsOnId    String         @map("depends_on_id") @db.Uuid
+  type           DependencyType
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket       @relation("TicketDependsOn", fields: [ticketId], references: [id], onDelete: Cascade)
+  dependsOn    Ticket       @relation("TicketDependedOnBy", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, dependsOnId, type])
+  @@index([organizationId])
+  @@index([dependsOnId])
+  @@map("ticket_dependencies")
+}
+
+model Sprint {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  projectId        String       @map("project_id") @db.Uuid
+  number           Int
+  key              String
+  goal             String
+  startsOn         DateTime     @map("starts_on") @db.Date
+  endsOn           DateTime     @map("ends_on") @db.Date
+  status           SprintStatus
+  definitionOfDone String       @map("definition_of_done")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tickets      Ticket[]
+
+  @@unique([projectId, number])
+  @@index([organizationId])
+  @@map("sprints")
+}
+
+/// Écriture optimiste : `UPDATE … WHERE project_id = $1 AND version = $attendue SET version = version + 1`.
+model ProjectState {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @unique @map("project_id") @db.Uuid
+  version        Int      @default(1)
+  content        Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("project_states")
+}
+
+/// Un seul bail non libéré par ticket (index unique partiel `WHERE released_at IS NULL`, migration).
+model Lease {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  organizationId String     @map("organization_id") @db.Uuid
+  ticketId       String     @map("ticket_id") @db.Uuid
+  holderKind     HolderKind @map("holder_kind")
+  holderId       String     @map("holder_id")
+  branch         String
+  worktree       String
+  acquiredAt     DateTime   @map("acquired_at") @db.Timestamptz(3)
+  heartbeatAt    DateTime   @map("heartbeat_at") @db.Timestamptz(3)
+  expiresAt      DateTime   @map("expires_at") @db.Timestamptz(3)
+  ttlMs          Int        @map("ttl_ms")
+  releasedAt     DateTime?  @map("released_at") @db.Timestamptz(3)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([ticketId])
+  @@map("leases")
+}
+
+model TicketComment {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  targetKind     CommentTargetKind @map("target_kind")
+  targetId       String            @map("target_id") @db.Uuid
+  authorKind     CommentAuthorKind @map("author_kind")
+  authorId       String?           @map("author_id")
+  body           String
+  deletedAt      DateTime?         @map("deleted_at") @db.Timestamptz(3)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([targetKind, targetId])
+  @@map("ticket_comments")
+}
+
+/// Journal immuable (triggers UPDATE/DELETE/TRUNCATE, migration). Pas de `updated_at` : une ligne
+/// n'est jamais modifiée (exception §18.1). Suppression permise uniquement avec l'organisation.
+model AuditLog {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  actorKind      AuditActorKind @map("actor_kind")
+  actorId        String?        @map("actor_id")
+  tokenId        String?        @map("token_id")
+  action         String
+  targetKind     String         @map("target_kind")
+  targetId       String         @map("target_id") @db.Uuid
+  ticketId       String?        @map("ticket_id") @db.Uuid
+  occurredAt     DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([ticketId])
+  @@map("audit_log")
+}
+
+/// Compteur transactionnel des clés lisibles (`TK-n`, `SP-n`) : ne recule jamais.
+model ProjectCounter {
+  organizationId String      @map("organization_id") @db.Uuid
+  projectId      String      @map("project_id") @db.Uuid
+  name           CounterName
+  lastValue      Int         @default(0) @map("last_value")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, name])
+  @@index([organizationId])
+  @@map("project_counters")
 }
