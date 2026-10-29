@@ -12,7 +12,7 @@ describe("ProjectService (C1.8)", () => {
         createdAt: new Date("2026-01-01T00:00:00Z"),
       },
     ]);
-    const service = new ProjectService({ listByOrganization });
+    const service = new ProjectService({ listByOrganization, create: vi.fn() });
 
     const result = await service.list("org-1");
 
@@ -24,6 +24,7 @@ describe("ProjectService (C1.8)", () => {
 
   it("laisse remonter l'erreur du port (aucune erreur avalée)", async () => {
     const service = new ProjectService({
+      create: vi.fn(),
       listByOrganization: async () => {
         throw new Error("boom");
       },
