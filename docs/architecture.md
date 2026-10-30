@@ -727,6 +727,45 @@ flowchart LR
 - Known limits: a duplicate key in a screen JSON file is not detected (`JSON.parse`); the
   Markdown body of a feature silently overrides `description` and `criteres` of its front matter.
 
+### Webhook delivery, deduplication and spec index (TK-41)
+The database side of the git provider flow (vision §8). A signed webhook is stored first, then
+processed asynchronously; the spec index is a projection of git, rebuilt per commit. Tables and
+constraints: `packages/db/README.md` and [domain model](domain-model.md).
+
+```mermaid
+sequenceDiagram
+  participant P as Git provider
+  participant A as API (webhook endpoint)
+  participant D as webhook_deliveries
+  participant W as Worker (pg-boss)
+  participant G as GitProvider
+  participant I as Spec index (tenant tables)
+  P->>A: POST event (delivery id, signature)
+  A->>A: verify signature (secret from env)
+  A->>D: INSERT ... ON CONFLICT (provider, delivery_id) DO NOTHING
+  alt redelivery (row exists)
+    D-->>A: 0 row inserted
+    A-->>P: 2xx, nothing enqueued
+  else first delivery
+    A->>W: enqueue processing
+    A-->>P: 2xx
+    W->>G: read spec files at the pushed commit
+    W->>I: upsert snapshot (UNIQUE repo_id, commit_sha), move spec_heads
+    W->>D: status processed
+  end
+```
+
+- `webhook_deliveries` has no `organization_id` and is outside the tenant filter: the
+  `installation` event arrives before `provider_installations` exists. It is read through the raw
+  client only, and stores neither signature nor headers.
+- Deduplication is a database guarantee (`UNIQUE(provider, delivery_id)`), so concurrent
+  redeliveries yield one row and one processing.
+- Re-indexing a commit is idempotent (`UNIQUE(repo_id, commit_sha)`); the UI reads the head of a
+  branch (`spec_heads`), never a SHA. Bot writes go through `spec_write_batches`, one batch per
+  commit, with the batch id as the `Koklo-Ops:` trailer.
+- Not implemented yet: the webhook endpoint, the worker job and the indexer (later tickets); this
+  ticket delivers the schema, constraints and tenant classification they rely on.
+
 ### Magic-link emails: `send-magic-link` queue (TK-22)
 The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.
 

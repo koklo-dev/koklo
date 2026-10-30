@@ -100,6 +100,19 @@ model Organization {
   auditLog           AuditLog[]
   projectCounters    ProjectCounter[]
 
+  providerInstallations ProviderInstallation[]
+  projectRepos          ProjectRepo[]
+  specSnapshots         SpecSnapshot[]
+  specHeads             SpecHead[]
+  specFeatures          SpecFeature[]
+  specCriteria          SpecCriterion[]
+  specTables            SpecTable[]
+  specEndpoints         SpecEndpoint[]
+  specFeatureTables     SpecFeatureTable[]
+  specFeatureEndpoints  SpecFeatureEndpoint[]
+  specWriteBatches      SpecWriteBatch[]
+  specWriteOperations   SpecWriteOperation[]
+
   @@map("organizations")
 }
 
@@ -146,12 +159,16 @@ model Project {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tickets      Ticket[]
   sprints      Sprint[]
   state        ProjectState?
   counters     ProjectCounter[]
+  repos        ProjectRepo[]
+  writeBatches SpecWriteBatch[]
 
+  // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
+  @@unique([organizationId, id])
   @@index([organizationId])
   @@map("projects")
 }
@@ -508,4 +525,408 @@ model ProjectCounter {
   @@id([projectId, name])
   @@index([organizationId])
   @@map("project_counters")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fournisseur git, repos du projet, index de la spec, lots d'écriture du bot, webhooks (TK-41,
+// CDC §4, §5, §8). Aucun secret en base : ni jeton d'installation, ni clé privée, ni user token.
+// Les enfants référencent leur parent par une clé étrangère COMPOSITE (organization_id, parent_id)
+// vers `UNIQUE(organization_id, id)` : une ligne ne peut pas pointer un parent d'une autre
+// organisation, même en contournant l'extension tenant (H2). Objets SQL non exprimables ici (index
+// partiels, CHECK) : voir la migration `*_provider_spec_index/migration.sql`.
+// ---------------------------------------------------------------------------------------------
+
+enum Provider {
+  github
+
+  @@map("provider")
+}
+
+enum InstallationStatus {
+  active
+  suspended
+  deleted
+
+  @@map("installation_status")
+}
+
+enum OwnerKind {
+  organization
+  user
+
+  @@map("owner_kind")
+}
+
+enum RepoRole {
+  spec
+  front
+  back
+  monorepo
+  mobile
+
+  @@map("repo_role")
+}
+
+enum RepoMode {
+  new
+  adopted
+
+  @@map("repo_mode")
+}
+
+enum WebhookEvent {
+  installation
+  push
+  pull_request
+  pull_request_review
+  check_suite
+  check_run
+  workflow_run
+  deployment_status
+
+  @@map("webhook_event")
+}
+
+enum WebhookDeliveryStatus {
+  received
+  processing
+  processed
+  ignored
+  failed
+
+  @@map("webhook_delivery_status")
+}
+
+enum SpecIndexStatus {
+  building
+  ready
+  failed
+
+  @@map("spec_index_status")
+}
+
+enum FeatureStatus {
+  brouillon
+  specifiee
+  implementee
+  adoptee
+
+  @@map("feature_status")
+}
+
+enum FeaturePriority {
+  must
+  should
+  could
+  wont
+
+  @@map("feature_priority")
+}
+
+enum EndpointMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+
+  @@map("endpoint_method")
+}
+
+enum WriteBatchStatus {
+  queued
+  committing
+  committed
+  failed
+  conflict
+
+  @@map("write_batch_status")
+}
+
+/// Identifiants publics côté fournisseur uniquement (CDC §20.3 : aucun jeton ni clé en base).
+model ProviderInstallation {
+  id             String             @id @default(uuid(7)) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  provider       Provider
+  externalId     String             @map("external_id")
+  ownerKind      OwnerKind          @map("owner_kind")
+  ownerLogin     String             @map("owner_login")
+  status         InstallationStatus
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repos        ProjectRepo[]
+
+  @@unique([provider, externalId])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@map("provider_installations")
+}
+
+/// Au plus un repo porteur de la spec par projet (index unique partiel, migration).
+model ProjectRepo {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  projectId        String    @map("project_id") @db.Uuid
+  installationId   String    @map("installation_id") @db.Uuid
+  role             RepoRole
+  mode             RepoMode
+  externalId       String    @map("external_id")
+  ownerLogin       String    @map("owner_login")
+  name             String
+  defaultBranch    String    @map("default_branch")
+  specPath         String?   @map("spec_path")
+  lastReconciledAt DateTime? @map("last_reconciled_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project              @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade)
+  installation ProviderInstallation @relation(fields: [organizationId, installationId], references: [organizationId, id], onDelete: Cascade)
+  snapshots    SpecSnapshot[]
+  heads        SpecHead[]
+  writeBatches SpecWriteBatch[]
+
+  @@unique([installationId, externalId])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("project_repos")
+}
+
+/// Projection d'un commit de la spec (snapshot complet, reconstruction idempotente par commit).
+model SpecSnapshot {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  repoId         String          @map("repo_id") @db.Uuid
+  commitSha      String          @map("commit_sha")
+  status         SpecIndexStatus
+  errorCode      String?         @map("error_code")
+  indexedAt      DateTime        @default(now()) @map("indexed_at") @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repo         ProjectRepo    @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade)
+  heads        SpecHead[]
+  features     SpecFeature[]
+  tables       SpecTable[]
+  endpoints    SpecEndpoint[]
+
+  @@unique([repoId, commitSha])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@map("spec_snapshots")
+}
+
+/// Pointeur de branche : l'interface lit la tête d'une branche, pas un SHA.
+model SpecHead {
+  organizationId String   @map("organization_id") @db.Uuid
+  repoId         String   @map("repo_id") @db.Uuid
+  branch         String
+  snapshotId     String   @map("snapshot_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repo         ProjectRepo  @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade)
+  snapshot     SpecSnapshot @relation(fields: [organizationId, snapshotId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([repoId, branch])
+  @@index([organizationId])
+  @@index([snapshotId])
+  @@map("spec_heads")
+}
+
+/// CHECK de format sur `spec_id` (`^F-\d{3,}$`) dans la migration.
+model SpecFeature {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  snapshotId     String          @map("snapshot_id") @db.Uuid
+  specId         String          @map("spec_id")
+  title          String
+  status         FeatureStatus
+  priority       FeaturePriority
+  filePath       String          @map("file_path")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  snapshot      SpecSnapshot          @relation(fields: [organizationId, snapshotId], references: [organizationId, id], onDelete: Cascade)
+  criteria      SpecCriterion[]
+  tableLinks    SpecFeatureTable[]
+  endpointLinks SpecFeatureEndpoint[]
+
+  @@unique([snapshotId, specId])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@map("spec_features")
+}
+
+/// CHECK de format sur `spec_id` (`^AC-\d+$`) dans la migration.
+model SpecCriterion {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  featureId      String   @map("feature_id") @db.Uuid
+  specId         String   @map("spec_id")
+  position       Int
+  title          String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  feature      SpecFeature  @relation(fields: [organizationId, featureId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([featureId, specId])
+  @@unique([featureId, position])
+  @@index([organizationId])
+  @@map("spec_criteria")
+}
+
+/// CHECK de format sur `spec_id` (`^T-[a-z0-9][a-z0-9-]*$`) dans la migration.
+model SpecTable {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  snapshotId     String   @map("snapshot_id") @db.Uuid
+  specId         String   @map("spec_id")
+  filePath       String   @map("file_path")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  snapshot     SpecSnapshot @relation(fields: [organizationId, snapshotId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([snapshotId, specId])
+  @@index([organizationId])
+  @@map("spec_tables")
+}
+
+/// CHECK de format sur `spec_id` (`^E-[a-z0-9][a-z0-9-]*$`) dans la migration.
+model SpecEndpoint {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  snapshotId     String         @map("snapshot_id") @db.Uuid
+  specId         String         @map("spec_id")
+  method         EndpointMethod
+  path           String
+  filePath       String         @map("file_path")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  snapshot     SpecSnapshot @relation(fields: [organizationId, snapshotId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([snapshotId, specId])
+  @@index([organizationId])
+  @@map("spec_endpoints")
+}
+
+/// Pas de clé étrangère vers la table cible : une référence pendante est une erreur du validateur
+/// (`@koklo/schema`, règle 4), pas un échec d'indexation. Liaison sans `created_at`/`updated_at`.
+model SpecFeatureTable {
+  organizationId String @map("organization_id") @db.Uuid
+  featureId      String @map("feature_id") @db.Uuid
+  targetSpecId   String @map("target_spec_id")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  feature      SpecFeature  @relation(fields: [organizationId, featureId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([featureId, targetSpecId])
+  @@index([organizationId])
+  @@map("spec_feature_tables")
+}
+
+/// Voir `SpecFeatureTable` : même forme, cible un endpoint.
+model SpecFeatureEndpoint {
+  organizationId String @map("organization_id") @db.Uuid
+  featureId      String @map("feature_id") @db.Uuid
+  targetSpecId   String @map("target_spec_id")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  feature      SpecFeature  @relation(fields: [organizationId, featureId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([featureId, targetSpecId])
+  @@index([organizationId])
+  @@map("spec_feature_endpoints")
+}
+
+/// Un lot = un commit du bot ; `id` = valeur du trailer `Koklo-Ops:`. `author_user_id` sans FK
+/// (utilisateur supprimé). CHECK `committed` => `commit_sha` et `committed_at`, index partiels :
+/// migration.
+model SpecWriteBatch {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  projectId      String           @map("project_id") @db.Uuid
+  repoId         String           @map("repo_id") @db.Uuid
+  branch         String
+  authorUserId   String?          @map("author_user_id") @db.Uuid
+  idempotencyKey String           @map("idempotency_key")
+  baseSha        String?          @map("base_sha")
+  commitSha      String?          @map("commit_sha")
+  status         WriteBatchStatus
+  errorCode      String?          @map("error_code")
+  enqueuedAt     DateTime         @default(now()) @map("enqueued_at") @db.Timestamptz(3)
+  committedAt    DateTime?        @map("committed_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project              @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade)
+  repo         ProjectRepo          @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade)
+  operations   SpecWriteOperation[]
+
+  @@unique([projectId, idempotencyKey])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([repoId])
+  @@map("spec_write_batches")
+}
+
+/// Une opération du lot (pas de colonne liste, incident 6). `kind` en texte : le vocabulaire
+/// n'existe pas encore (contrat TK-42). `payload` est toujours un objet (CHECK).
+model SpecWriteOperation {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  batchId        String   @map("batch_id") @db.Uuid
+  position       Int
+  kind           String
+  targetSpecId   String?  @map("target_spec_id")
+  payload        Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  batch        SpecWriteBatch @relation(fields: [organizationId, batchId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([batchId, position])
+  @@index([organizationId])
+  @@map("spec_write_operations")
+}
+
+/// Journal de réception, HORS multi-tenant : une livraison arrive avant qu'on connaisse
+/// l'organisation (l'événement `installation` précède même `provider_installations`). Aucune FK,
+/// aucune colonne `organization_id`, ni signature ni en-têtes stockés. Dédoublonnage par
+/// `UNIQUE(provider, delivery_id)` + `INSERT ... ON CONFLICT DO NOTHING`. Index partiel de
+/// rattrapage `(status, received_at)` : migration.
+model WebhookDelivery {
+  id                     String                @id @default(uuid(7)) @db.Uuid
+  provider               Provider
+  deliveryId             String                @map("delivery_id")
+  event                  WebhookEvent
+  action                 String?
+  installationExternalId String?               @map("installation_external_id")
+  repoExternalId         String?               @map("repo_external_id")
+  payload                Json
+  status                 WebhookDeliveryStatus
+  attempts               Int                   @default(0)
+  errorCode              String?               @map("error_code")
+  receivedAt             DateTime              @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt            DateTime?             @map("processed_at") @db.Timestamptz(3)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([provider, deliveryId])
+  @@index([receivedAt])
+  @@map("webhook_deliveries")
 }

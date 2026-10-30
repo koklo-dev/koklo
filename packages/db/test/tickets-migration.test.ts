@@ -10,11 +10,14 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { SPEC_TABLES } from "./support/spec-fixtures.ts";
 import { TICKET_TABLES } from "./support/ticket-fixtures.ts";
 
 const MIGRATION_SUFFIX = "_tickets_sprints_leases";
 const initialTables = expectedTables.filter(
-  (table) => !(TICKET_TABLES as readonly string[]).includes(table),
+  (table) =>
+    !(TICKET_TABLES as readonly string[]).includes(table) &&
+    !(SPEC_TABLES as readonly string[]).includes(table),
 );
 
 async function inventory(db: TestDatabase) {
@@ -45,7 +48,11 @@ async function inventory(db: TestDatabase) {
 
 describe("TK-28 C8 migration tickets_sprints_leases : up -> down -> up", () => {
   let db: TestDatabase;
-  const latest = () => listMigrationDirs().at(-1) as string;
+  // TK-41 : la migration TK-28 n'est plus la dernière ; on la retrouve par son suffixe et on
+  // défait d'abord les migrations postérieures (ordre inverse).
+  const ticketsMigration = () =>
+    listMigrationDirs().find((dir) => dir.endsWith(MIGRATION_SUFFIX)) as string;
+  const fromTicketsMigration = () => listMigrationDirs().filter((dir) => dir >= ticketsMigration());
 
   beforeAll(async () => {
     db = await createTestDatabase();
@@ -55,13 +62,13 @@ describe("TK-28 C8 migration tickets_sprints_leases : up -> down -> up", () => {
     await db?.dispose();
   }, 60_000);
 
-  it("la migration existe en dernière position avec un down.sql relu non vide", () => {
-    expect(latest()).toMatch(new RegExp(`^\\d{14}${MIGRATION_SUFFIX}$`));
-    const down = readFileSync(join(migrationsDir, latest(), "down.sql"), "utf8");
+  it("la migration existe avec un down.sql relu non vide", () => {
+    expect(ticketsMigration()).toMatch(new RegExp(`^\\d{14}${MIGRATION_SUFFIX}$`));
+    const down = readFileSync(join(migrationsDir, ticketsMigration(), "down.sql"), "utf8");
     expect(down.trim().length).toBeGreaterThan(0);
   });
 
-  it("deploy sur base vide crée les 11 nouvelles tables, triggers compris", async () => {
+  it("deploy sur base vide crée toutes les tables, triggers compris", async () => {
     runPrismaOrThrow(["migrate", "deploy"], db.url);
 
     const state = await inventory(db);
@@ -70,12 +77,11 @@ describe("TK-28 C8 migration tickets_sprints_leases : up -> down -> up", () => {
     expect(state.functions.length).toBeGreaterThanOrEqual(1);
   }, 120_000);
 
-  it("down de la dernière migration retire tables, types enum, fonctions et triggers", async () => {
-    runPrismaOrThrow(
-      ["db", "execute", "--file", join(migrationsDir, latest(), "down.sql")],
-      db.url,
-    );
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [latest()]);
+  it("down de TK-28 (après celles qui le suivent) retire tables, types enum, fonctions et triggers", async () => {
+    for (const dir of [...fromTicketsMigration()].reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     expect(await inventory(db)).toEqual({
       tables: [...initialTables].sort(),

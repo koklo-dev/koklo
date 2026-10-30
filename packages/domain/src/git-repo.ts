@@ -38,3 +38,11 @@ export type Commit = {
 
 export type Branch = { readonly name: string; readonly sha: Sha };
 export type Tag = { readonly name: string; readonly sha: Sha };
+
+/** Rôle d'un repo dans un projet (CDC §4) : détermine ce qu'on y lit et y écrit. */
+export const REPO_ROLES = Object.freeze(["spec", "front", "back", "monorepo", "mobile"] as const);
+export type RepoRole = (typeof REPO_ROLES)[number];
+
+/** Origine d'un repo : créé par koklo (`new`) ou rattaché à un repo existant (`adopted`). */
+export const REPO_MODES = Object.freeze(["new", "adopted"] as const);
+export type RepoMode = (typeof REPO_MODES)[number];
