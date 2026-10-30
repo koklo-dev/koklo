@@ -1,5 +1,10 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
+import type {
+  BoardMode as KanbanBoard,
+  KanbanRole,
+  TransitionMode as KanbanTransition,
+} from "./stub-kanban.ts";
 
 export type ProjectsState = "loading" | "empty" | "data" | "error";
 export type Theme = "light" | "dark";
@@ -9,7 +14,12 @@ const STUB = "http://127.0.0.1:3101";
 /** Captures jointes à la PR : design/screens/captures/<écran>/<état>-<thème>.png */
 export const CAPTURES_DIR = resolve(import.meta.dirname, "../../../../design/screens/captures");
 
+export type { KanbanBoard, KanbanRole, KanbanTransition };
+
 export async function setScenario(scenario: {
+  board?: KanbanBoard;
+  transition?: KanbanTransition;
+  role?: KanbanRole;
   session: boolean;
   projects: "loading" | "empty" | "data" | "internal" | "unauthorized";
   organizations?: "none" | "one" | "many";
@@ -17,6 +27,11 @@ export async function setScenario(scenario: {
   invitation?: "ready" | "member" | "wrong" | "invalid";
 }): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
+}
+
+/** Transitions reçues par le faux API (`POST /tickets/{key}/transition`), dans l'ordre. */
+export async function transitionsSeen(): Promise<Array<{ key: string; to: string }>> {
+  return (await fetch(`${STUB}/__transitions`)).json();
 }
 
 export async function releaseHeld(): Promise<void> {

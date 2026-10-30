@@ -1,4 +1,5 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
+import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 
 /**
  * Faux API pour les e2e : session Better Auth + project.list, sans Postgres.
@@ -14,7 +15,9 @@ type Scenario = {
   activeOrganization?: boolean;
   /** Aperçu d'invitation (`/accept-invitation/<id>`) ; absent = invitation inconnue. */
   invitation?: "ready" | "member" | "wrong" | "invalid";
-};
+  /** Rôle de la personne dans l'organisation active (défaut : owner). */
+  role?: KanbanRole;
+} & KanbanScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -66,7 +69,10 @@ const session = () => ({
 function organizations(): typeof ORGANIZATIONS {
   const mode = scenario.organizations ?? "one";
   if (mode === "none") return [];
-  return mode === "many" ? ORGANIZATIONS : ORGANIZATIONS.slice(0, 1);
+  const all = mode === "many" ? ORGANIZATIONS : ORGANIZATIONS.slice(0, 1);
+  return all.map((org, index) =>
+    index === 0 && scenario.role ? { ...org, role: scenario.role } : org,
+  );
 }
 
 const json = (status: number, body: unknown) => ({ status, body: JSON.stringify(body) });
@@ -117,31 +123,46 @@ function readEndpoint(method: string | undefined, path: string): ReturnType<type
   return json(404, { code: "NOT_FOUND" });
 }
 
+type Send = (reply: ReturnType<typeof json>) => void;
+
+/** Pilotage du faux API : POST /__scenario (état à servir) et POST /__release (réponses retenues). */
+function handleControl(req: IncomingMessage, path: string, send: Send): boolean {
+  if (req.method !== "POST") return false;
+  if (path === "/__release") {
+    for (const release of held.splice(0)) release();
+    send(json(200, { released: true }));
+    return true;
+  }
+  if (path !== "/__scenario") return false;
+  let raw = "";
+  req.on("data", (chunk) => {
+    raw += chunk;
+  });
+  req.on("end", () => {
+    scenario = JSON.parse(raw) as Scenario;
+    resetKanban();
+    send(json(200, scenario));
+  });
+  return true;
+}
+
+const hold = (release: () => void) => void held.push(release);
+const expireSession = () => {
+  scenario.session = false;
+};
+
 createServer((req, res) => {
   const path = new URL(req.url ?? "/", "http://stub").pathname;
   const send = ({ status, body }: ReturnType<typeof json>) => {
     res.writeHead(status, { "content-type": "application/json" }).end(body);
   };
   if (path === "/__health") return send(json(200, { ok: true }));
-  if (req.method === "POST" && path === "/__scenario") {
-    let raw = "";
-    req.on("data", (chunk) => {
-      raw += chunk;
-    });
-    req.on("end", () => {
-      scenario = JSON.parse(raw) as Scenario;
-      send(json(200, scenario));
-    });
-    return;
-  }
-  if (req.method === "POST" && path === "/__release") {
-    for (const release of held.splice(0)) release();
-    return send(json(200, { released: true }));
-  }
+  if (handleControl(req, path, send)) return;
   if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
   if (path.endsWith("/projects")) {
     if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
     return send(projectsResponse());
   }
+  if (handleKanban(req, path, scenario, send, hold, expireSession)) return;
   send(invitationEndpoint(path) ?? readEndpoint(req.method, path));
 }).listen(Number(process.env.STUB_API_PORT ?? 3101), "127.0.0.1");
