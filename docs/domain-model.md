@@ -78,6 +78,25 @@ erDiagram
   tickets ||--o{ leases : locked_by
   organizations ||--o{ ticket_comments : has
   organizations ||--o{ audit_log : records
+  organizations ||--o{ provider_installations : connects
+  projects ||--o{ project_repos : "has repos"
+  provider_installations ||--o{ project_repos : "gives access to"
+  project_repos ||--o{ spec_snapshots : indexed_as
+  project_repos ||--o{ spec_heads : "branch heads"
+  spec_snapshots ||--o{ spec_heads : "pointed by"
+  spec_snapshots ||--o{ spec_features : contains
+  spec_snapshots ||--o{ spec_tables : contains
+  spec_snapshots ||--o{ spec_endpoints : contains
+  spec_features ||--o{ spec_criteria : has
+  spec_features ||--o{ spec_feature_tables : "links (no FK to target)"
+  spec_features ||--o{ spec_feature_endpoints : "links (no FK to target)"
+  projects ||--o{ spec_write_batches : queues
+  project_repos ||--o{ spec_write_batches : "commits to"
+  spec_write_batches ||--o{ spec_write_operations : holds
+  webhook_deliveries {
+    text provider
+    text delivery_id "UNIQUE with provider"
+  }
 ```
 
 `sessions.active_organization_id` is a plain UUID column, not a foreign key.
@@ -89,6 +108,31 @@ SQL in migration `*_tickets_sprints_leases` (Prisma cannot express it): partial 
 (counters and durations non-negative, `ends_on >= starts_on`), an `audit_log` trigger refusing
 UPDATE/DELETE/TRUNCATE (except the cascade of an organization deletion) and a trigger keeping
 `project_counters.last_value` from decreasing. Procedure in `packages/db/README.md`.
+
+### Git provider and spec index tables (TK-41)
+Thirteen tables, migration `*_provider_spec_index` (additive, reversible):
+- **Installations and repos** (tenant): `provider_installations` holds only public provider
+  identifiers; `project_repos` (role `spec|front|back|monorepo|mobile`, mode `new|adopted`,
+  `spec_path` for a monorepo). A partial unique index allows at most one spec-carrying repo per
+  project.
+- **Spec index** (tenant, a projection of git rebuilt per commit): `spec_snapshots`
+  (`UNIQUE(repo_id, commit_sha)`, so reindexing a commit is idempotent), `spec_heads` (the UI reads a
+  branch head, not a SHA), features, criteria, tables, endpoints and two link tables without FK to
+  their target (a dangling reference is a validator error, not an indexing failure). Titles and
+  paths only: bodies stay in git.
+- **Bot write batches** (tenant): `spec_write_batches` (one batch = one bot commit; its `id` is the
+  `Koklo-Ops:` trailer) and `spec_write_operations`; no list column (incident 6).
+- **`webhook_deliveries`** is outside the tenant filter: a delivery arrives before the organization
+  is known, so it has no `organization_id` and no FK, and is read through the raw client.
+  Deduplication: `UNIQUE(provider, delivery_id)` with `INSERT ... ON CONFLICT DO NOTHING`; a
+  redelivery never creates a second row or a second processing.
+- **No secret in the database**: no installation token, private key, webhook secret or user access
+  token is stored (a test rejects secret-looking column names). Webhook payloads hold personal data
+  (commit authors) and are meant to be purged after a bounded retention.
+- **Composite foreign keys**: children reference `(organization_id, parent_id)` against
+  `UNIQUE(organization_id, id)` on `projects` and on the parent tables, so a row cannot point to a
+  parent of another organization even when bypassing the tenant extension.
+- Enums `repo_role` and `repo_mode` mirror `REPO_ROLES` and `REPO_MODES` in `@koklo/domain`.
 
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:

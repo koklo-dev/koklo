@@ -63,6 +63,49 @@ Chaque dossier de `prisma/migrations/` doit contenir un `down.sql` non vide (vé
 - État de projet (écriture optimiste) : `UPDATE project_states SET version = version + 1, content = $2 WHERE project_id = $1 AND version = $attendue` ; 0 ligne = conflit.
 - Titulaire d'un bail et assigné : `(kind, id)` sans clé étrangère (le runner n'a pas de table).
 
+## Fournisseur git, index de la spec, lots d'écriture, webhooks (TK-41)
+
+Migration `*_provider_spec_index` (additive ; `down.sql` ramène exactement à l'état TK-28, y compris
+le `UNIQUE(organization_id, id)` ajouté sur `projects`). 13 tables, 12 enums natifs.
+
+- **Aucun secret en base** (CDC §20.3) : `provider_installations` ne contient que des identifiants
+  publics (id d'installation, login, type de propriétaire, statut). Le jeton d'installation (1 h) est
+  obtenu à la demande et vit en mémoire ; la clé privée de l'App et le webhook secret sont des secrets
+  d'environnement ; le user access token n'est pas persisté. Un test refuse toute colonne dont le nom
+  contient `token`, `secret`, `private_key`, `password` ou `credential`.
+- **Installations et repos** (tenant) : `provider_installations` (`UNIQUE(provider, external_id)`),
+  `project_repos` (`UNIQUE(installation_id, external_id)`). Index unique partiel
+  `project_repos(project_id) WHERE role = 'spec' OR spec_path IS NOT NULL` : au plus un repo porteur de
+  la spec par projet. CHECK : un repo `spec` n'a pas de `spec_path` ; `spec_path` non vide, non absolu,
+  sans segment `..`.
+- **Index de la spec** (tenant, projection de git, un snapshot complet par commit) : `spec_snapshots`
+  (`UNIQUE(repo_id, commit_sha)`), `spec_heads` (PK `(repo_id, branch)`), `spec_features`,
+  `spec_criteria`, `spec_tables`, `spec_endpoints`, liaisons `spec_feature_tables` et
+  `spec_feature_endpoints` (PK `(feature_id, target_spec_id)`, sans FK vers la cible : une référence
+  pendante est une erreur du validateur `@koklo/schema`). CHECK de format des `spec_id`.
+- **Lots d'écriture du bot** (tenant) : `spec_write_batches` (`id` = trailer `Koklo-Ops:`,
+  `UNIQUE(project_id, idempotency_key)`, CHECK `committed` => `commit_sha` et `committed_at`, index
+  partiels `(repo_id, commit_sha) WHERE commit_sha IS NOT NULL` et
+  `(repo_id, branch, enqueued_at) WHERE status IN ('queued','committing')`) et `spec_write_operations`
+  (`UNIQUE(batch_id, position)`, `payload` jsonb objet par CHECK, `kind` texte avec CHECK de format).
+- **FK composites (H2)** : chaque enfant référence son parent par `(organization_id, parent_id)` vers
+  `UNIQUE(organization_id, id)` (`projects`, `provider_installations`, `project_repos`,
+  `spec_snapshots`, `spec_features`, `spec_write_batches`), toujours `ON DELETE CASCADE` : une ligne ne
+  peut pas pointer un parent d'une autre organisation (SQLSTATE `23503`), même en contournant
+  l'extension tenant. Prisma 7 les exprime nativement (`references: [organizationId, id]`).
+- **`webhook_deliveries` est hors multi-tenant** (`TENANT_EXCLUDED_MODELS`, raison consignée) : une
+  livraison arrive signée avant qu'on connaisse l'organisation, et l'événement `installation` précède
+  `provider_installations`. Pas de `organization_id`, aucune FK, ni signature ni en-têtes stockés ;
+  accès par le client brut (`createRawDbClient`) uniquement. **Dédoublonnage** :
+  `UNIQUE(provider, delivery_id)` et `INSERT ... ON CONFLICT (provider, delivery_id) DO NOTHING` : une
+  redélivrance ne crée jamais de seconde ligne. Index partiel de rattrapage
+  `(status, received_at) WHERE status IN ('received','processing','failed')` et index `(received_at)`
+  pour la purge (conservation bornée, job du worker). Le payload contient des données personnelles
+  (auteurs de commits).
+- Parité d'enums : `webhook_event` = `WEBHOOK_EVENTS`, `repo_role`/`repo_mode` = `REPO_ROLES`/`REPO_MODES`
+  (`@koklo/domain`) ; `feature_status`, `feature_priority`, `endpoint_method` = `z.enum` de
+  `@koklo/schema`, lus dans ses sources (db ne dépend pas de schema : `turbo boundaries`).
+
 ## Rollback
 
 `pnpm db:rollback` exécute le `down.sql` de la dernière migration (`prisma db execute --file`)

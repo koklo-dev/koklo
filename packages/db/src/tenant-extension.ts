@@ -20,6 +20,18 @@ export const TENANT_MODELS: readonly string[] = [
   "TicketComment",
   "AuditLog",
   "ProjectCounter",
+  "ProviderInstallation",
+  "ProjectRepo",
+  "SpecSnapshot",
+  "SpecHead",
+  "SpecFeature",
+  "SpecCriterion",
+  "SpecTable",
+  "SpecEndpoint",
+  "SpecFeatureTable",
+  "SpecFeatureEndpoint",
+  "SpecWriteBatch",
+  "SpecWriteOperation",
 ];
 
 /** Modèles portant (ou non) `organizationId` mais hors filtre, avec la raison de l'exclusion. */
@@ -31,6 +43,8 @@ export const TENANT_EXCLUDED_MODELS: Record<string, string> = {
   Organization: "Racine des organisations : lue avant d'ouvrir un contexte.",
   Member: "organizationId géré par le plugin organization de Better Auth.",
   Invitation: "organizationId géré par le plugin organization de Better Auth.",
+  WebhookDelivery:
+    "Journal de réception signé mais reçu avant de connaître l'organisation (l'événement installation précède provider_installations) : sans organization_id, lu par le worker via le client brut.",
 };
 
 type Args = Record<string, unknown> & {

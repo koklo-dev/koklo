@@ -27,6 +27,20 @@ export const expectedTables = [
   "ticket_comments",
   "audit_log",
   "project_counters",
+  // TK-41 : installations, repos, index de spec, lots d'écriture, journal de webhooks.
+  "provider_installations",
+  "project_repos",
+  "spec_snapshots",
+  "spec_heads",
+  "spec_features",
+  "spec_criteria",
+  "spec_tables",
+  "spec_endpoints",
+  "spec_feature_tables",
+  "spec_feature_endpoints",
+  "spec_write_batches",
+  "spec_write_operations",
+  "webhook_deliveries",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
@@ -35,6 +49,9 @@ export const compositeKeyTables: readonly string[] = [
   "ticket_features",
   "ticket_dependencies",
   "project_counters",
+  "spec_heads",
+  "spec_feature_tables",
+  "spec_feature_endpoints",
 ];
 
 /** Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et `audit_log` (jamais modifiée). */

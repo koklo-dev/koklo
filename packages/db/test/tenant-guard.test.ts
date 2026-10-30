@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as dbPackage from "../src/index.ts";
 import { schemaPath } from "../src/testing/prisma-cli.ts";
+import { SPEC_MODELS } from "./support/spec-fixtures.ts";
 import { TICKET_MODELS } from "./support/ticket-fixtures.ts";
 
 const { TENANT_MODELS, TENANT_EXCLUDED_MODELS } = dbPackage;
@@ -27,8 +28,8 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier sont Project et les 11 modèles du ticket (TK-28)", () => {
-    expect([...TENANT_MODELS].sort()).toEqual(["Project", ...TICKET_MODELS].sort());
+  it("les modèles métier sont Project, les 11 modèles du ticket (TK-28) et les 12 de la spec (TK-41)", () => {
+    expect([...TENANT_MODELS].sort()).toEqual(["Project", ...TICKET_MODELS, ...SPEC_MODELS].sort());
   });
 
   it("chaque modèle avec organizationId est métier ou explicitement exclu", () => {
@@ -44,7 +45,16 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
 
   it("Member et Invitation (organizationId géré par Better Auth) sont exclus", () => {
     expect(Object.keys(TENANT_EXCLUDED_MODELS).sort()).toEqual(
-      ["Account", "Invitation", "Member", "Organization", "Session", "User", "Verification"].sort(),
+      [
+        "Account",
+        "Invitation",
+        "Member",
+        "Organization",
+        "Session",
+        "User",
+        "Verification",
+        "WebhookDelivery",
+      ].sort(),
     );
   });
 
