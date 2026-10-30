@@ -602,6 +602,48 @@ sequenceDiagram
   end
 ```
 
+### Git provider port (TK-38)
+`packages/domain` defines the `GitProvider` port (vision §8) and its value types
+(`git-*.ts`). It is types and errors only: **no Octokit, no I/O in `domain`**. The
+Octokit adapter will live in `packages/github` (depends on `domain`, never the reverse),
+and tests use an in-memory fake.
+
+Thirteen async methods, each taking one request object with an explicit `auth`
+(the port is stateless). French names of vision §8 in parentheses:
+`authenticate` (authentifier), `createRepo` (creerRepo), `readFile` (lireFichier),
+`writeCommit` (ecrireCommit), `createBranch` (creerBranche), `createPullRequest` (creerPR),
+`getPullRequestState` (etatPR), `mergePullRequest` (fusionner), `createTag` (poserTag),
+`listDeployments` (lireDeploiements), `publishCheck` (publierCheck),
+`commentPullRequest` (commenterPR), `subscribeWebhooks` (abonnerWebhooks).
+
+- `GitOwner` is `{ kind: "organization" | "user"; login }`; `kind` is read from the
+  provider, never guessed.
+- `GitAuth` is `installation` (installation token) or `user` (user access token, optionally
+  refreshable). Only `createRepo` on a `user` owner requires `auth.kind === "user"`,
+  see [ADR 0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed, not yet validated on a real account).
+- Failures are typed subclasses of `GitProviderError` (`operation` field, never a token):
+  `UserTokenRequiredError`, `RepoCreationForbiddenError`, `GitAuthExpiredError`,
+  `GitNotFoundError`, `GitConflictError`, `GitRateLimitedError`, `GitProviderUnavailableError`.
+- `WEBHOOK_EVENTS` (frozen) lists the 8 subscribed events.
+
+```mermaid
+flowchart LR
+  subgraph domain["packages/domain (pure)"]
+    Port["GitProvider port<br/>13 methods"]
+    Types["GitOwner, GitAuth, Repo,<br/>PullRequest, CheckRun, Deployment"]
+    Errors["GitProviderError<br/>+ 7 typed subclasses"]
+    Port --> Types
+    Port -. throws .-> Errors
+  end
+  subgraph github["packages/github"]
+    Adapter["Octokit adapter (later ticket)"]
+  end
+  Fake["test fake (in memory)"]
+  Adapter -- implements --> Port
+  Fake -- implements --> Port
+  Adapter -- maps HTTP errors --> Errors
+```
+
 ### Magic-link emails: `send-magic-link` queue (TK-22)
 The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.
 
