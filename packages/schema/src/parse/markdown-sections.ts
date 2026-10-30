@@ -1,13 +1,13 @@
 import type { Criterion } from "../entities/index.ts";
+import { STEP_LABEL_BY_TYPE } from "../markdown-vocabulary.ts";
+
+type StepType = Criterion["etapes"][number]["type"];
 
 export type SectionResult<T> = { value: T; errors: { pointer: string; message: string }[] };
 
-const STEP_LABELS: Record<string, Criterion["etapes"][number]["type"]> = {
-  "Étant donné": "etant_donne",
-  Quand: "quand",
-  Alors: "alors",
-  Et: "et",
-};
+const STEP_TYPE_BY_LABEL = new Map(
+  Object.entries(STEP_LABEL_BY_TYPE).map(([type, label]) => [label, type as StepType]),
+);
 
 const HEADING = /^###\s+(.*?)\s*$/;
 const CRITERION_HEADING = /^(AC-\d+)\s+[—–-]\s+(.+)$/;
@@ -24,7 +24,7 @@ export function sectionLines(lines: readonly string[], title: RegExp): string[] 
 
 function parseStep(line: string, index: number, errors: SectionResult<unknown>["errors"]) {
   const match = STEP.exec(line);
-  const type = match?.[1] === undefined ? undefined : STEP_LABELS[match[1]];
+  const type = match?.[1] === undefined ? undefined : STEP_TYPE_BY_LABEL.get(match[1]);
   if (!match || type === undefined) {
     errors.push({
       pointer: `/criteres/${index}/etapes`,

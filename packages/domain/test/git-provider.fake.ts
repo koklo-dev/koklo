@@ -4,6 +4,7 @@ import type {
   Commit,
   Deployment,
   FileContent,
+  FileListing,
   GitAuth,
   GitOwner,
   GitProvider,
@@ -31,7 +32,7 @@ const repoOf = (owner: GitOwner, name: string): Repo => ({
 });
 
 /**
- * Faux minimal : sa compilation prouve la forme du port (14 méthodes, types de
+ * Faux minimal : sa compilation prouve la forme du port (16 méthodes, types de
  * requête et de retour). Seul `createRepo` applique la règle de l'ADR 0009.
  */
 export class FakeGitProvider implements GitProvider {
@@ -65,6 +66,16 @@ export class FakeGitProvider implements GitProvider {
 
   async writeCommit(request: Parameters<GitProvider["writeCommit"]>[0]): Promise<Commit> {
     return { sha: "sha-commit", message: request.message, author: request.author, parents: [] };
+  }
+
+  async listFiles(request: Parameters<GitProvider["listFiles"]>[0]): Promise<FileListing> {
+    return { ref: FAKE_HEAD_SHA, files: [{ path: "README.md", sha: `sha-${request.ref}` }] };
+  }
+
+  async listCommits(
+    _request: Parameters<GitProvider["listCommits"]>[0],
+  ): Promise<readonly Commit[]> {
+    return [];
   }
 
   async createBranch(request: Parameters<GitProvider["createBranch"]>[0]): Promise<Branch> {

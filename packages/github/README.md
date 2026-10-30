@@ -6,7 +6,7 @@ mémoire partagé par les tests des autres paquets. Privé au monorepo, aucune d
 
 ## Rôle
 
-- **Adaptateur** `createOctokitGitProvider(options)` : les 13 opérations du port sur l'API REST
+- **Adaptateur** `createOctokitGitProvider(options)` : les 16 opérations du port sur l'API REST
   de GitHub (GitHub App). Octokit est utilisé comme bibliothèque (`@octokit/core` + plugins
   `rest-endpoint-methods`, `paginate-rest`, `throttling`, `retry`, et `auth-app` pour le jeton
   d'installation), jamais le métapaquet `octokit`.
@@ -27,6 +27,7 @@ src/
   errors-map.ts             HTTP -> erreurs typées du port (fonction pure)
   mappers.ts, pagination.ts réponses d'API -> types du port, pagination bornée
   options.ts                OctokitGitProviderOptions
+  commit-rules.ts           règles communes adaptateur/faux : plafond de commits, tri, tête périmée
   ops/                      une famille d'opérations par fichier (repository, git-data,
                             pull-request, deployment, authentication) + shared.ts
   testing/                  InMemoryGitProvider (export ./testing) : fake-authority,
@@ -67,6 +68,22 @@ expirés (401). Ajouter `@koklo/github` en `devDependencies` (`workspace:*`) du 
 consommateur ; l'export `./testing` est le seul point d'entrée autorisé (pas d'import profond).
 Ne pas le confondre avec le faux minimal de `packages/domain/test`, qui prouve seulement que
 le port compile.
+
+## Suppression, tête attendue, listes (TK-44a)
+
+- `writeCommit` accepte `FileChange = FileWrite | FileDeletion`. Une suppression est une entrée
+  d'arbre `{ path, mode: "100644", type: "blob", sha: null }` sans `content` ; la référence est
+  déplacée sans `force`. `expectedHeadSha` (facultatif) est comparé à la tête lue : écart =
+  `GitConflictError` `stale-sha` avant toute écriture ; une tête qui avance entre la lecture et la
+  mise à jour de la référence (422 non fast-forward) donne le même `stale-sha`.
+- `listFiles({ auth, repo, ref })` : résolution du ref en commit, puis UN `GET git/trees` récursif.
+  Fichiers seulement, triés par `path`, `sha` = blob. Un arbre `truncated` est un `GitProviderError`
+  (`listFiles`), jamais une liste partielle.
+- `listCommits({ auth, repo, ref, limit? })` : UNE requête `GET commits?sha=&per_page=`, du plus
+  récent au plus ancien, message complet, plafonné à 50 (aucune page suivante).
+- Le faux `InMemoryGitProvider` se comporte pareil. NEEDS-HUMAN : ces trois comportements restent
+  à vérifier contre GitHub réel (`test/conformance/commit-ops-suite.ts`, même procédure que
+  ci-dessous ; non branché dans `test/real/github.real.ts`).
 
 ## Suite de conformité commune (incident 33)
 

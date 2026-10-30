@@ -4,6 +4,7 @@ import {
   type Commit,
   type Deployment,
   type FileContent,
+  type FileListing,
   type GitAuth,
   GitConflictError,
   GitNotFoundError,
@@ -20,9 +21,11 @@ import {
   UserTokenRequiredError,
   WEBHOOK_EVENTS,
 } from "@koklo/domain";
+import { commitLimit, staleHead } from "../commit-rules.ts";
 import { FakeAuthority } from "./fake-authority.ts";
-import { completeMerge, describePull, pullState, toStoredCheck, tryMerge } from "./pull-views.ts";
+import { describePull, mergeOutcome, pullState, toStoredCheck } from "./pull-views.ts";
 import {
+  fileEntries,
   RepositoryState,
   type StoredCommit,
   type StoredPull,
@@ -37,8 +40,6 @@ export type InMemoryGitProviderOptions = {
 };
 
 type Request<K extends keyof GitProvider> = Parameters<GitProvider[K]>[0];
-
-const BOT = { name: "GitHub", email: "noreply@github.com" } as const;
 
 const repoKey = (repo: RepoRef): string => `${repo.owner.login}/${repo.name}`;
 
@@ -62,13 +63,11 @@ export class InMemoryGitProvider implements GitProvider {
   /** Aide de test : crée un déploiement `success` sur la branche ou le SHA donné. */
   seedDeployment(repo: RepoRef, deployment: { environment: string; sha: string }): void {
     const state = this.#repo("seedDeployment", repo);
-    const ref =
-      [...state.branches].find(([, sha]) => sha === deployment.sha)?.[0] ?? deployment.sha;
     state.deployments.push({
       id: this.#options.nextId(),
       environment: deployment.environment,
       sha: deployment.sha,
-      ref,
+      ref: state.branchAt(deployment.sha) ?? deployment.sha,
       state: "success",
       createdAt: this.#options.now().toISOString(),
     });
@@ -101,17 +100,7 @@ export class InMemoryGitProvider implements GitProvider {
       defaultBranch: "main",
       htmlUrl: `https://github.com/${repoKey(ref)}`,
     };
-    const state = new RepositoryState(repo);
-    const initial = state.addCommit(
-      {
-        message: "Initial commit",
-        author: BOT,
-        parents: [],
-        files: files ?? withFiles(new Map(), [{ path: "README.md", content: `# ${name}\n` }]),
-      },
-      this.#options.nextId(),
-    );
-    state.branches.set("main", initial.sha);
+    const state = RepositoryState.initialized(repo, files, this.#options.nextId());
     this.#repos.set(repoKey(ref), state);
     return repo;
   }
@@ -138,12 +127,15 @@ export class InMemoryGitProvider implements GitProvider {
   }
 
   async writeCommit(request: Request<"writeCommit">): Promise<Commit> {
-    const { auth, repo, branch, files, author, message } = request;
+    const { auth, repo, branch, files, author, message, expectedHeadSha } = request;
     this.#authority.assertFresh("writeCommit", auth);
     const state = this.#repo("writeCommit", repo);
     const head = state.branches.get(branch);
     if (head === undefined) {
       throw this.#notFound("writeCommit", "branch", `${repoKey(repo)}@${branch}`);
+    }
+    if (expectedHeadSha !== undefined && expectedHeadSha !== head) {
+      throw staleHead(`${repoKey(repo)}@${branch}`);
     }
     const parent = state.commit(head);
     const commit = state.addCommit(
@@ -152,6 +144,21 @@ export class InMemoryGitProvider implements GitProvider {
     );
     state.branches.set(branch, commit.sha);
     return { sha: commit.sha, message, author, parents: [head] };
+  }
+
+  async listFiles(request: Request<"listFiles">): Promise<FileListing> {
+    const { auth, repo, ref } = request;
+    this.#authority.assertFresh("listFiles", auth);
+    const commit = this.#commitOf(this.#repo("listFiles", repo), "listFiles", ref);
+    return { ref: commit.sha, files: fileEntries(commit.files) };
+  }
+
+  async listCommits(request: Request<"listCommits">): Promise<readonly Commit[]> {
+    const { auth, repo, ref } = request;
+    this.#authority.assertFresh("listCommits", auth);
+    const state = this.#repo("listCommits", repo);
+    const head = this.#commitOf(state, "listCommits", ref);
+    return state.history(head.sha, commitLimit(request.limit));
   }
 
   async createBranch(request: Request<"createBranch">): Promise<Branch> {
@@ -215,23 +222,15 @@ export class InMemoryGitProvider implements GitProvider {
     const { auth, pullRequest, method, expectedHeadSha } = request;
     this.#authority.assertFresh("mergePullRequest", auth);
     const { state, pull } = this.#pull("mergePullRequest", pullRequest);
-    const conflict = (reason: "stale-sha" | "not-mergeable") =>
-      new GitConflictError({
+    const outcome = mergeOutcome(state, pull, { method, expectedHeadSha }, this.#options.nextId());
+    if ("reason" in outcome) {
+      throw new GitConflictError({
         operation: "mergePullRequest",
-        reason,
+        reason: outcome.reason,
         identifier: `${repoKey(pullRequest.repo)}#${pull.number}`,
       });
-    const headSha = state.sha(pull.head);
-    if (headSha !== expectedHeadSha) throw conflict("stale-sha");
-    const merge = tryMerge(state, pull);
-    if (merge === undefined || "conflicts" in merge) throw conflict("not-mergeable");
-    const commit = completeMerge(
-      state,
-      pull,
-      { files: merge.files, method, headSha },
-      this.#options.nextId(),
-    );
-    return { sha: commit.sha };
+    }
+    return { sha: outcome.sha };
   }
 
   async listDeployments(request: Request<"listDeployments">): Promise<readonly Deployment[]> {

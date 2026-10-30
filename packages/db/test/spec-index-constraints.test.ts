@@ -369,11 +369,15 @@ describe("TK-41 C7 lots de commits du bot", () => {
     await insertBatch(db, scope, r);
     await insertBatch(db, scope, r);
     const commit = sha("dup");
-    await insertBatch(db, scope, r, { commitSha: commit, status: "failed" });
+    // TK-44a : un SHA n'accompagne plus qu'un lot `committed` (CHECK), le lot est donc validé.
+    const committed = {
+      commitSha: commit,
+      status: "committed",
+      committedAt: new Date().toISOString(),
+    };
+    await insertBatch(db, scope, r, committed);
 
-    expect(
-      await sqlState(() => insertBatch(db, scope, r, { commitSha: commit, status: "failed" })),
-    ).toBe(UNIQUE);
+    expect(await sqlState(() => insertBatch(db, scope, r, committed))).toBe(UNIQUE);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { FileChange } from "@koklo/domain";
+import type { FileWrite } from "@koklo/domain";
 
 export interface SpecScaffoldInput {
   projectName: string;
@@ -57,7 +57,7 @@ const TECH = `# Cahier technique
  * `.gitkeep` par dossier vide. Aucune entité d'exemple (elle polluerait l'index et les règles de
  * cohérence). Pure et déterministe : mêmes entrées, mêmes fichiers dans le même ordre.
  */
-export function buildInitialSpecFiles(input: SpecScaffoldInput): FileChange[] {
+export function buildInitialSpecFiles(input: SpecScaffoldInput): FileWrite[] {
   const name = input.projectName.trim();
   return [
     {

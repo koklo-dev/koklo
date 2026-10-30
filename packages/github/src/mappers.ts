@@ -2,6 +2,7 @@ import type {
   CheckConclusion,
   CheckRun,
   CheckStatus,
+  Commit,
   Deployment,
   DeploymentState,
   GitOwner,
@@ -164,4 +165,21 @@ export const toDeployment = (
   state: deploymentState(status),
   ...(status?.environment_url ? { url: status.environment_url } : {}),
   createdAt: new Date(data.created_at).toISOString(),
+});
+
+/** Commit tel que renvoyé par `GET /repos/{o}/{r}/commits` (le reste est ignoré). */
+export type ApiListedCommit = {
+  readonly sha: string;
+  readonly commit: {
+    readonly message: string;
+    readonly author?: { readonly name?: string | null; readonly email?: string | null } | null;
+  };
+  readonly parents: ReadonlyArray<{ readonly sha: string }>;
+};
+
+export const toListedCommit = (commit: ApiListedCommit): Commit => ({
+  sha: commit.sha,
+  message: commit.commit.message,
+  author: { name: commit.commit.author?.name ?? "", email: commit.commit.author?.email ?? "" },
+  parents: commit.parents.map((parent) => parent.sha),
 });

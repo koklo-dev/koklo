@@ -45,9 +45,12 @@ async function inventory(db: TestDatabase) {
   };
 }
 
-/** Référence : les migrations antérieures seules, appliquées à la main sur une autre base. */
+/**
+ * Référence : les migrations antérieures à celle de TK-41 seules, appliquées à la main sur une
+ * autre base. TK-44a : la migration TK-41 n'est plus la dernière ; on la retrouve par son suffixe.
+ */
 async function applyEarlierMigrations(target: TestDatabase): Promise<TestDatabase> {
-  for (const dir of listMigrationDirs().slice(0, -1)) {
+  for (const dir of listMigrationDirs().filter((d) => d < specIndexMigration())) {
     runPrismaOrThrow(
       ["db", "execute", "--file", join(migrationsDir, dir, "migration.sql")],
       target.url,
@@ -64,7 +67,9 @@ async function expectSpecTablesEmpty(db: TestDatabase): Promise<void> {
 }
 
 const dirs = () => listMigrationDirs();
-const latest = () => dirs().at(-1) as string;
+const specIndexMigration = () =>
+  dirs().find((dir) => dir.endsWith("_provider_spec_index")) as string;
+const fromSpecIndexMigration = () => dirs().filter((dir) => dir >= specIndexMigration());
 const sqlOf = (dir: string, file: "migration.sql" | "down.sql") =>
   readFileSync(join(migrationsDir, dir, file), "utf8");
 
@@ -72,13 +77,13 @@ describe("TK-41 C1 migration : dossier et down.sql", () => {
   it("la migration TK-41 suit celle de TK-28 et son down.sql n'est pas vide", () => {
     const all = dirs();
     expect(all.length, "init + tickets + TK-41").toBeGreaterThanOrEqual(3);
-    expect(latest()).toMatch(/^\d{14}_[a-z0-9_]+$/);
-    expect(latest().endsWith("_tickets_sprints_leases")).toBe(false);
-    expect(sqlOf(latest(), "down.sql").trim().length).toBeGreaterThan(0);
+    expect(specIndexMigration()).toMatch(/^\d{14}_[a-z0-9_]+$/);
+    expect(specIndexMigration().endsWith("_tickets_sprints_leases")).toBe(false);
+    expect(sqlOf(specIndexMigration(), "down.sql").trim().length).toBeGreaterThan(0);
   });
 
   it("la migration TK-41 est additive : aucun DROP TABLE/COLUMN ni ALTER COLUMN TYPE dans migration.sql", () => {
-    const up = sqlOf(latest(), "migration.sql");
+    const up = sqlOf(specIndexMigration(), "migration.sql");
     expect(up).not.toMatch(
       /DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+COLUMN\s+\S+\s+(SET\s+DATA\s+)?TYPE/i,
     );
@@ -115,11 +120,11 @@ describe("TK-41 C1 migration : up -> (données) -> down -> up, sans résidu", ()
     await insertFullTree(db, scope);
     await insertDelivery(db);
 
-    runPrismaOrThrow(
-      ["db", "execute", "--file", join(migrationsDir, latest(), "down.sql")],
-      db.url,
-    );
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [latest()]);
+    // Les migrations postérieures sont défaites d'abord (ordre inverse), puis celle de TK-41.
+    for (const dir of [...fromSpecIndexMigration()].reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     const actual = await inventory(db);
     expect(actual.tables).toEqual(

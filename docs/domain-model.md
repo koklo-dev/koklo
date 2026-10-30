@@ -121,7 +121,11 @@ Thirteen tables, migration `*_provider_spec_index` (additive, reversible):
   their target (a dangling reference is a validator error, not an indexing failure). Titles and
   paths only: bodies stay in git.
 - **Bot write batches** (tenant): `spec_write_batches` (one batch = one bot commit; its `id` is the
-  `Koklo-Ops:` trailer) and `spec_write_operations`; no list column (incident 6).
+  `Koklo-Ops:` trailer) and `spec_write_operations`; no list column (incident 6). A batch also keeps
+  its outcome: `report` (JSON object), the requested commit `message` and the author's role
+  (`author_role`); `failed` and `conflict` require an `error_code`, and a `commit_sha` exists only
+  for a `committed` batch. `project_counters.name` gains `feature` (the `F-nnn` counter).
+  Operation `position` is 1-based in the database and 0-based in the contract.
 - **`webhook_deliveries`** is outside the tenant filter: a delivery arrives before the organization
   is known, so it has no `organization_id` and no FK, and is read through the raw client.
   Deduplication: `UNIQUE(provider, delivery_id)` with `INSERT ... ON CONFLICT DO NOTHING`; a

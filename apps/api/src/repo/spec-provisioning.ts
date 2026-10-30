@@ -1,4 +1,4 @@
-import type { FileChange, GitAuth, GitProvider, Repo, RepoRef } from "@koklo/domain";
+import type { FileWrite, GitAuth, GitProvider, Repo, RepoRef } from "@koklo/domain";
 import { requestLogger } from "../request-logger.ts";
 import type { CreationAuth } from "./git-access.ts";
 import { step } from "./git-access.ts";
@@ -37,7 +37,7 @@ async function afterCreation<T>(
 export async function provisionSpecRepo(
   provider: GitProvider,
   auth: CreationAuth,
-  request: { ref: RepoRef; files: readonly FileChange[] },
+  request: { ref: RepoRef; files: readonly FileWrite[] },
 ): Promise<Repo> {
   const { ref, files } = request;
   const created = await step("createRepo", () =>

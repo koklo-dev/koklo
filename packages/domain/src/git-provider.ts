@@ -16,6 +16,7 @@ import type {
   CommitAuthor,
   FileChange,
   FileContent,
+  FileListing,
   GitRef,
   Repo,
   RepoRef,
@@ -61,7 +62,12 @@ export interface GitProvider {
     ref: GitRef;
     path: string;
   }): Promise<FileContent>;
-  /** @throws GitConflictError @throws GitNotFoundError */
+  /**
+   * Un seul commit (parent = tête de la branche) ; une entrée `{ path, delete: true }` supprime
+   * le fichier. Si `expectedHeadSha` est fourni et diffère de la tête, rien n'est écrit.
+   * @throws GitConflictError `stale-sha` (tête périmée, y compris perdue en cours d'écriture)
+   * @throws GitNotFoundError
+   */
   writeCommit(request: {
     auth: GitAuth;
     repo: RepoRef;
@@ -69,7 +75,24 @@ export interface GitProvider {
     files: readonly FileChange[];
     author: CommitAuthor;
     message: string;
+    expectedHeadSha?: Sha;
   }): Promise<Commit>;
+  /**
+   * Fichiers (hors dossiers) d'un ref, récursifs, triés par `path` ; ref : branche, tag ou SHA.
+   * @throws GitNotFoundError
+   */
+  listFiles(request: { auth: GitAuth; repo: RepoRef; ref: GitRef }): Promise<FileListing>;
+  /**
+   * Commits atteignables depuis `ref`, du plus récent au plus ancien (premier parent), message
+   * complet. `limit` vaut 50 par défaut et est plafonné à 50 commits.
+   * @throws GitNotFoundError
+   */
+  listCommits(request: {
+    auth: GitAuth;
+    repo: RepoRef;
+    ref: GitRef;
+    limit?: number;
+  }): Promise<readonly Commit[]>;
   /** @throws GitConflictError @throws GitNotFoundError */
   createBranch(request: {
     auth: GitAuth;

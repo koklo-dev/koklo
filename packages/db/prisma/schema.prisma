@@ -298,6 +298,7 @@ enum AuditActorKind {
 enum CounterName {
   ticket
   sprint
+  feature
 
   @@map("counter_name")
 }
@@ -852,8 +853,10 @@ model SpecFeatureEndpoint {
 }
 
 /// Un lot = un commit du bot ; `id` = valeur du trailer `Koklo-Ops:`. `author_user_id` sans FK
-/// (utilisateur supprimé). CHECK `committed` => `commit_sha` et `committed_at`, index partiels :
-/// migration.
+/// (utilisateur supprimé). `report` : rapport de validation (objet JSON) ; `message` : message de
+/// commit demandé ; `author_role` : rôle de l'auteur à la soumission. CHECK `committed` =>
+/// `commit_sha` et `committed_at`, `failed|conflict` => `error_code`, `commit_sha` seulement si
+/// `committed`, `report` objet ; index partiels : migration.
 model SpecWriteBatch {
   id             String           @id @default(uuid(7)) @db.Uuid
   organizationId String           @map("organization_id") @db.Uuid
@@ -866,6 +869,9 @@ model SpecWriteBatch {
   commitSha      String?          @map("commit_sha")
   status         WriteBatchStatus
   errorCode      String?          @map("error_code")
+  report         Json?            @db.JsonB
+  message        String?
+  authorRole     String?          @map("author_role")
   enqueuedAt     DateTime         @default(now()) @map("enqueued_at") @db.Timestamptz(3)
   committedAt    DateTime?        @map("committed_at") @db.Timestamptz(3)
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
