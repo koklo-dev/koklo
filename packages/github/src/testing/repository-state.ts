@@ -1,12 +1,17 @@
 import { createHash } from "node:crypto";
 import type {
   CheckRun,
+  Commit,
   CommitAuthor,
   Deployment,
   FileChange,
+  FileEntry as ListedFile,
   PullRequestStatus,
   Repo,
 } from "@koklo/domain";
+import { byPath } from "../commit-rules.ts";
+
+export const BOT = { name: "GitHub", email: "noreply@github.com" } as const;
 
 export type FileEntry = { readonly content: string; readonly mode: string; readonly blob: string };
 /** Contenu complet d'un commit : chemin -> fichier. */
@@ -38,6 +43,10 @@ const blobSha = (content: string): string => sha1(`blob ${Buffer.byteLength(cont
 export function withFiles(base: Snapshot, files: readonly FileChange[]): Snapshot {
   const next = new Map(base);
   for (const file of files) {
+    if (file.delete === true) {
+      next.delete(file.path);
+      continue;
+    }
     next.set(file.path, {
       content: file.content,
       mode: file.mode ?? "100644",
@@ -47,9 +56,15 @@ export function withFiles(base: Snapshot, files: readonly FileChange[]): Snapsho
   return next;
 }
 
-/** Chemins modifiés ou ajoutés dans `after` par rapport à `before` (les suppressions n'existent pas dans le port). */
+/** Fichiers d'un instantané au format du port (`path`, SHA du blob), triés par chemin. */
+export const fileEntries = (snapshot: Snapshot): ListedFile[] =>
+  [...snapshot].map(([path, file]) => ({ path, sha: file.blob })).sort(byPath);
+
+/** Chemins ajoutés, modifiés ou supprimés dans `after` par rapport à `before`. */
 const changedPaths = (before: Snapshot, after: Snapshot): string[] =>
-  [...after].filter(([path, entry]) => before.get(path)?.blob !== entry.blob).map(([path]) => path);
+  [...new Set([...before.keys(), ...after.keys()])].filter(
+    (path) => before.get(path)?.blob !== after.get(path)?.blob,
+  );
 
 /** Dépôt en mémoire : graphe de commits (chacun avec son contenu complet), refs, PR, checks. */
 export class RepositoryState {
@@ -66,6 +81,23 @@ export class RepositoryState {
     this.repo = repo;
   }
 
+  /** Dépôt avec son commit initial sur `main` (README par défaut, ou le contenu du gabarit). */
+  static initialized(repo: Repo, files: Snapshot | undefined, id: string): RepositoryState {
+    const state = new RepositoryState(repo);
+    const initial = state.addCommit(
+      {
+        message: "Initial commit",
+        author: BOT,
+        parents: [],
+        files:
+          files ?? withFiles(new Map(), [{ path: "README.md", content: `# ${repo.ref.name}\n` }]),
+      },
+      id,
+    );
+    state.branches.set("main", initial.sha);
+    return state;
+  }
+
   /** Le SHA mêle l'identifiant injecté : deux commits identiques restent distincts, et déterministes. */
   addCommit(input: Omit<StoredCommit, "sha">, id: string): StoredCommit {
     const tree = [...input.files].map(([path, file]) => `${file.mode} ${file.blob} ${path}`).sort();
@@ -80,6 +112,11 @@ export class RepositoryState {
     const sha = this.branches.get(branch);
     if (sha === undefined) throw new Error(`branche inconnue : ${branch}`);
     return sha;
+  }
+
+  /** Première branche dont la tête est ce SHA. */
+  branchAt(sha: string): string | undefined {
+    return [...this.branches].find(([, head]) => head === sha)?.[0];
   }
 
   /** Branche, tag ou SHA complet -> SHA de commit. */
@@ -120,6 +157,17 @@ export class RepositoryState {
     return undefined;
   }
 
+  /** Commits du plus récent au plus ancien (premier parent), au plus `limit`. */
+  history(headSha: string, limit: number): Commit[] {
+    const commits: Commit[] = [];
+    for (let sha: string | undefined = headSha; sha !== undefined && commits.length < limit; ) {
+      const { message, author, parents } = this.commit(sha);
+      commits.push({ sha, message, author, parents });
+      sha = parents[0];
+    }
+    return commits;
+  }
+
   /**
    * Fusion à trois voies par fichier : un chemin modifié des deux côtés avec des contenus
    * différents est un conflit. Rend le contenu fusionné, ou la liste des chemins en conflit.
@@ -133,8 +181,8 @@ export class RepositoryState {
     const merged = new Map(base);
     for (const path of changedPaths(origin, head)) {
       const entry = head.get(path);
-      if (entry === undefined) continue;
-      if (onBase.has(path) && base.get(path)?.blob !== entry.blob) conflicts.push(path);
+      if (onBase.has(path) && base.get(path)?.blob !== entry?.blob) conflicts.push(path);
+      else if (entry === undefined) merged.delete(path);
       else merged.set(path, entry);
     }
     return conflicts.length > 0 ? { conflicts } : { files: merged };

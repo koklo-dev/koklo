@@ -10,7 +10,7 @@ import {
   mergePullRequest,
   publishCheck,
 } from "./ops/pull-request.ts";
-import { createRepo, getRepo, readFile } from "./ops/repository.ts";
+import { createRepo, getRepo, listCommits, listFiles, readFile } from "./ops/repository.ts";
 import type { OctokitGitProviderOptions } from "./options.ts";
 
 /**
@@ -36,6 +36,8 @@ export class OctokitGitProvider implements GitProvider {
   getRepo: GitProvider["getRepo"] = (request) => getRepo(this.#gateway, request);
   readFile: GitProvider["readFile"] = (request) => readFile(this.#gateway, request);
   writeCommit: GitProvider["writeCommit"] = (request) => writeCommit(this.#gateway, request);
+  listFiles: GitProvider["listFiles"] = (request) => listFiles(this.#gateway, request);
+  listCommits: GitProvider["listCommits"] = (request) => listCommits(this.#gateway, request);
   createBranch: GitProvider["createBranch"] = (request) => createBranch(this.#gateway, request);
   createPullRequest: GitProvider["createPullRequest"] = (request) =>
     createPullRequest(this.#gateway, request);

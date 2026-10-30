@@ -61,6 +61,16 @@ circulaire) lève une `CanonicalizeError` dont `path` est le pointeur JSON fauti
   section `## Critères d'acceptation` avec `### AC-n — titre` et puces `**Étant donné**`,
   `**Quand**`, `**Alors**`, `**Et**`. Le corps **remplace** les clés `description` et `criteres`
   d'un éventuel front matter, sans issue.
+- **Émetteur** `emitFeatureMarkdown(feature)` (TK-44a) : l'inverse du parseur, pure, qui ne lève que
+  `EmitFeatureError` (`path` = pointeur JSON de la valeur refusée). Front matter à ordre de clés
+  FIXE (`id, titre, statut, priorite, tables, endpoints, ecrans, roles, regles, nfr`, listes en
+  style flux), puis `## Description` et les critères ; ordre des listes et des critères conservé,
+  identifiants `AC-n` jamais renumérotés. `parseFeatureMarkdown(emit(f))` rend `f` et l'émission est
+  idempotente (la fixture F-001 est réémise à l'octet près). Refus : feature invalide au sens de
+  `FeatureSchema`, identifiants de critères dupliqués, titre, titre de critère ou texte d'étape sur
+  plusieurs lignes (ou avec NUL, ou espace de bord pour les deux derniers), description contenant
+  une ligne `## ...` ou `---` (injection de front matter ou de section). Le titre est cité en YAML
+  si nécessaire, jamais d'ancre ni d'étiquette.
 - Aucun parseur ne lève : toute erreur devient une `Issue` `STRUCT_*`.
 
 ## Règles et codes d'issue

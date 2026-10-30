@@ -1,5 +1,11 @@
 import type { CheckInput, CheckRun, PullRequest, PullRequestState } from "@koklo/domain";
-import type { FileEntry, RepositoryState, StoredCommit, StoredPull } from "./repository-state.ts";
+import {
+  BOT,
+  type FileEntry,
+  type RepositoryState,
+  type StoredCommit,
+  type StoredPull,
+} from "./repository-state.ts";
 
 /** Fusion à blanc d'une PR ouverte ; `undefined` si elle ne l'est plus. */
 export const tryMerge = (state: RepositoryState, pull: StoredPull) =>
@@ -27,8 +33,6 @@ export const describePull = (state: RepositoryState, pull: StoredPull): PullRequ
   body: pull.body,
   htmlUrl: `${state.repo.htmlUrl}/pull/${pull.number}`,
 });
-
-const BOT = { name: "GitHub", email: "noreply@github.com" } as const;
 
 /** Commit de fusion (squash ou merge commit), avance la base et marque la PR fusionnée. */
 export function completeMerge(
@@ -65,3 +69,21 @@ export const toStoredCheck = (sha: string, check: CheckInput): CheckRun => ({
   ...(check.detailsUrl === undefined ? {} : { detailsUrl: check.detailsUrl }),
   ...(check.summary === undefined ? {} : { summary: check.summary }),
 });
+
+/**
+ * Fusion demandée : tête périmée ou non fusionnable -> raison du refus ; sinon le commit de fusion.
+ * Le faux traduit la raison en `GitConflictError`.
+ */
+export function mergeOutcome(
+  state: RepositoryState,
+  pull: StoredPull,
+  request: { method: string; expectedHeadSha: string },
+  id: string,
+): { reason: "stale-sha" | "not-mergeable" } | { sha: string } {
+  const headSha = state.sha(pull.head);
+  if (headSha !== request.expectedHeadSha) return { reason: "stale-sha" };
+  const merge = tryMerge(state, pull);
+  if (merge === undefined || "conflicts" in merge) return { reason: "not-mergeable" };
+  const { files } = merge;
+  return { sha: completeMerge(state, pull, { files, method: request.method, headSha }, id).sha };
+}

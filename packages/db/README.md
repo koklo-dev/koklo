@@ -106,6 +106,22 @@ le `UNIQUE(organization_id, id)` ajouté sur `projects`). 13 tables, 12 enums na
   (`@koklo/domain`) ; `feature_status`, `feature_priority`, `endpoint_method` = `z.enum` de
   `@koklo/schema`, lus dans ses sources (db ne dépend pas de schema : `turbo boundaries`).
 
+## Résultat d'un lot d'écriture (TK-44a)
+
+Migration `*_spec_batch_outcome` (additive, aucune table : 32 tables). `migration.sql` ne contient
+aucun `DROP` ; `down.sql` ramène exactement à `*_provider_spec_index` (les compteurs `feature` sont
+supprimés car l'énumération `counter_name` est recréée ; les lots et les autres compteurs sont
+conservés).
+
+- `spec_write_batches.report` (`jsonb`, objet), `message` (message de commit demandé),
+  `author_role` (rôle de l'auteur à la soumission, texte). Colonnes nullables, sans défaut.
+- `counter_name` gagne `feature` (`ticket, sprint, feature`) : compteur des identifiants `F-nnn`.
+- Trois CHECK : `failed` et `conflict` exigent `error_code` ; `commit_sha` n'existe que pour un lot
+  `committed` (la CHECK `committed => commit_sha, committed_at` est conservée) ; `report` est un
+  objet JSON (le JSON `null` est refusé).
+- `spec_write_operations.position` est en base 1 en base et en base 0 au contrat : le dépôt traduit
+  (`position - 1`).
+
 ## Rollback
 
 `pnpm db:rollback` exécute le `down.sql` de la dernière migration (`prisma db execute --file`)
