@@ -1,6 +1,6 @@
 # @koklo/contract
 
-Contrat oRPC (Zod) de l'API Koklo : procédures `health` (`GET /health`) et `project.list` (`GET /projects`), erreurs typées (`INTERNAL` 500 avec `requestId`, `UNAUTHORIZED` 401, `FORBIDDEN` 403) et génération de l'OpenAPI.
+Contrat oRPC (Zod) de l'API Koklo : version 0.5.0 : 43 routes en 15 groupes (`health`, `organization`, `member`, `project`, `ticket`, `dependency`, `sprint`, `comment`, `projectState`, `lease`, `audit`, et depuis TK-42 `installation`, `repo`, `spec`, `specBatch`), erreurs typées (dont les erreurs du fournisseur git et des lots d'écriture, sans aucun secret) et génération de l'OpenAPI. Détail : `docs/api-contract.md`.
 
 - Chemin et méthode sont explicites par route : `.meta(openapi({ method, path }))`.
 - `generateOpenApi()` est pure et déterministe (clés triées). Les statuts d'erreur sont dérivés du contrat.

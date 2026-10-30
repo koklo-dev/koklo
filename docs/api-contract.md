@@ -16,9 +16,9 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.4.0** (TK-29). The router shape is
-`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit }`:
-33 routes on 21 paths (8 from TK-21, 25 from TK-29). Method and path are explicit on every
+Contract version **0.5.0** (TK-42). The router shape is
+`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, repo, spec, specBatch }`:
+43 routes on 30 paths (8 from TK-21, 25 from TK-29, 10 from TK-42; see "Provider, spec and feature batches (TK-42)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 `.meta(openapi({ method, path }))`) used by `src/contract.ts`, `src/contract-tickets.ts` and
 `src/contract-collaboration.ts`.
@@ -418,34 +418,34 @@ in the same transaction as the write. Roles live in `auth/roles.ts`: `COMMENT_WR
 | `comment.delete` | the author, or owner and admin for any comment. Soft delete (`deleted_at` set from `CLOCK`); the row stays. Membership of the project is checked before the right: unknown, already deleted or foreign comment is `NOT_FOUND`, another author's comment is `FORBIDDEN` |
 | `audit.list` | owner and admin only. Newest first, cursor on `(occurredAt, id)`. Filters combined with AND: `ticketKey` (unknown key: empty page), `actorKind`, `action` (exact), `from` (included), `to` (excluded). Null fields are omitted, `ticketKey` is resolved even for a soft-deleted ticket, the comment body is never exposed |
 
-Target validation (done by the API, the contract types `targetId` as a free string): only
+Target validation (done by the API; since 0.5.0 the contract types `targetId` as `z.uuid()`): only
 `targetKind: ticket` is accepted (`VALIDATION{targetKind}` otherwise: features, screens and change
 requests have no table); `targetId` must be a UUID (`VALIDATION{targetId}`); the ticket must exist,
 not be deleted and belong to the current project (`NOT_FOUND`). Pagination: `limit` default 50,
 maximum 100, a malformed cursor is `VALIDATION{cursor}`. These `VALIDATION`, `NOT_FOUND` and
-`FORBIDDEN` errors are raised with the right HTTP status but are not typed in the 0.4.0 OpenAPI
-(candidates for 0.5.0, with a nullable `authorId`, a `uuid` `targetId` and an enumerated audit
-`targetKind`).
+`FORBIDDEN` errors are raised with the right HTTP status and, since 0.5.0, are typed in the OpenAPI
+(with a nullable `authorId` and a `uuid` `targetId`; an enumerated audit `targetKind` stays open).
 
-**Schema refusals (temporary interceptor).** The contract types `comment.create` without
-`VALIDATION`, so the framework rejects an empty or over-long body as `BAD_REQUEST` (400). The
-tests require 422, so `input-validation.ts` (an oRPC client interceptor registered in
-`ORPCModule.forRoot`) converts it. Its scope is exactly the route `POST /comments`, read from the
+**Schema refusals (temporary interceptor).** The framework rejects an empty or over-long body, or a
+`targetId` that is not a UUID, as `BAD_REQUEST` (400) even though 0.5.0 types `VALIDATION` on
+`comment.create` and `comment.list`. The tests require 422, so `input-validation.ts` (an oRPC client interceptor registered in
+`ORPCModule.forRoot`) converts it. Its scope is exactly the routes `POST /comments` and `GET /comments`, read from the
 procedure's OpenAPI metadata; it converts only a `BAD_REQUEST` that carries schema `issues`
 (field = first path segment, message = first issue) and passes every other error through
-unchanged, so it hides nothing (organisation routes keep their 400). It is a stopgap: contract 0.5.0
-must type `VALIDATION` on `comment.create`, after which the interceptor is deleted.
+unchanged, so it hides nothing (organisation routes keep their 400). It is kept until a framework-level mapping of schema refusals to the typed `VALIDATION` exists.
 
 **Shared bricks added by TK-32** (`tracker/`): `cursor.ts` (opaque base64url cursor on
 `(sort key, id)`, `keysetAfter`, `pageOfItems`, default page size 50) now serves `ticket.list`,
 `comment.list` and `audit.list`; `uuid.ts` (`isUuid`). A malformed cursor is `VALIDATION{cursor}` on
 comments and audit, but still ignored on `ticket.list` (no typed error on that route).
 
-**Hypotheses for contract 0.5.0** (decisions to take, none applied in 0.4.0):
-- `VALIDATION` and `NOT_FOUND` typed on `comment.*`; `FORBIDDEN` typed on `comment.list` and
-  `audit.list`; `FORBIDDEN` on `projectState.get`.
-- `authorId` nullable (or the fixed value `"system"` documented) instead of `min(1)`; `targetId`
-  as `z.uuid()`; audit `targetKind` enumerated; explicit `projectId` instead of the oldest project.
+**Typing corrections applied in 0.5.0**:
+- `VALIDATION` and `NOT_FOUND` typed on `comment.create` and `comment.list`; `FORBIDDEN` typed on
+  `comment.list` and `projectState.get` (`audit.list` already had it).
+- `authorId` nullable (`null` for a system comment, empty string refused); `targetId` as
+  `z.uuid()` on comments and audit entries.
+- Still open: audit `targetKind` enumerated; explicit `projectId` instead of the oldest project
+  on the historical routes.
 - Open question: may the `client` role see comments written by agents? (Settled: `organization.create`,
   `member.invite`, `member.setRole` and `project.create` are journaled, see "Audit of organisation,
   member and project writes".)
@@ -497,7 +497,54 @@ absent from the OpenAPI document. It writes through the same ports, transactions
 `dependency.import`. Imported tickets keep their `TK-n` keys, so the next `ticket.create` continues
 after the highest imported number. The actor must be `owner` or `admin`, like the manager routes.
 
+## Provider, spec and feature batches (TK-42)
+Contract 0.5.0 adds four groups and 10 routes. No procedure is implemented yet (TK-43 to TK-45);
+the new routes take an explicit `projectId` (path), the historical ones keep the implicit project.
+
+| Operation | Method | Path | Notes |
+|-----------|--------|------|-------|
+| `installation.list` | GET | `/provider/installations` | owner/admin; no external id, `userAuthorization` is `absent`, `active` or `expired` |
+| `installation.start` | POST | `/provider/installations/start` | optional `installationId` (user re-authorization); returns `{ url, expiresAt }`, the signed one-shot `state` lives inside the URL |
+| `repo.list` | GET | `/projects/{projectId}/repos` | |
+| `repo.link` | POST | `/projects/{projectId}/repos` | links an existing repository (`mode: adopted`), also the manual fallback of ADR 0009 |
+| `repo.createSpec` | POST | `/projects/{projectId}/spec-repo` | always private, no visibility input |
+| `spec.head` | GET | `/projects/{projectId}/spec` | `branch` or `commitSha`, never both; `null` while the branch is not indexed |
+| `spec.listFeatures` | GET | `/projects/{projectId}/spec/features` | filters `status`, `priority`; paginated |
+| `spec.getFeature` | GET | `/projects/{projectId}/spec/features/{specId}` | description and steps are read from git at the indexed commit |
+| `specBatch.submit` | POST | `/projects/{projectId}/spec/batches` | idempotent, 1 to 50 operations, all or nothing |
+| `specBatch.get` | GET | `/projects/{projectId}/spec/batches/{batchId}` | status, `commitSha`, `report`, per-operation `results` |
+
+Operations are a union on `kind`: `feature.create` (the `F-nnn` is assigned by the server and
+returned in `results`), `feature.update` (partial patch, at least one field, `criteria` replaced
+as a whole) and `feature.delete`. Tables, endpoints and screens are out of 0.5.0. The author and
+the commit trailers come from the session, never from the input.
+
+The GitHub callback (`/api/github/callback`, `/api/github/installed`) is a browser redirect, not
+an oRPC procedure and absent from the OpenAPI document; the contract only exports
+`installationCallbackQuerySchema` and `installationCallbackOutcomeSchema` for the API and the web.
+
+New typed errors: `REPO_CREATION_FORBIDDEN` (403, `{ reason, ownerLogin, ownerKind }`) and
+`USER_TOKEN_REQUIRED` (403, `{ ownerLogin }`) on `repo.createSpec`; `PROVIDER_AUTH_EXPIRED` (403,
+`{ kind, refreshable }`), `PROVIDER_RATE_LIMITED` (429, `{ retryAfterMs? }`) and
+`PROVIDER_UNAVAILABLE` (503) on `repo.link`, `repo.createSpec`, `spec.getFeature` and
+`specBatch.submit`; `SPEC_BATCH_CONFLICT` (409, `{ reason, batchId? }`) and `SPEC_INVALID` (422,
+`{ report }`, at most 100 issues) on `specBatch.submit`. `CONFLICT.reason` gains `spec_repo_exists`,
+`repo_already_linked` and `repo_name_taken`. OpenAPI components: `RepoCreationForbidden`,
+`UserTokenRequired`, `ProviderAuthExpired`, `ProviderRateLimited`, `ProviderUnavailable`,
+`SpecBatchConflict`, `SpecInvalid`.
+
+**Secrets are never exposed.** No installation or user token, refresh token, app key, webhook
+secret or external installation id appears in any input, output, error or the OpenAPI document;
+tests scan the document for such property names. Enumerations (roles, modes, statuses, feature
+status and priority, id patterns) are hard-coded copies kept in step with the domain, the
+database and `@koklo/schema` by parity tests in `apps/api/test`, because the contract may not
+import those packages.
+
 ## Version history
+- **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,
+  contract only), seven typed errors, three `CONFLICT` reasons, and the grouped typing corrections
+  (`VALIDATION`/`NOT_FOUND` on `comment.create`/`list`, `FORBIDDEN` on `comment.list` and
+  `projectState.get`, nullable `authorId`, `uuid` `targetId`). Fingerprints of 0.1.0 to 0.4.0 unchanged.
 - **0.4.0** (TK-29, 15 routes implemented in TK-30, 6 more in TK-31: leases and project state): tickets, dependencies, sprints, comments, project state, leases and
   read-only audit (25 routes, all implemented since TK-32); typed errors `INVALID_TRANSITION`,
   `DEPENDENCY_CYCLE`, `VERSION_CONFLICT`, `LEASE_HELD`, `LEASE_EXPIRED`,

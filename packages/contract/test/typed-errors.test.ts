@@ -36,8 +36,6 @@ const READ_FOR_ALL = [
   "dependency.list",
   "sprint.get",
   "sprint.list",
-  "comment.list",
-  "projectState.get",
   "lease.get",
 ];
 /** Routes réservées à certains rôles du CDC §14 (ou à l'auteur/titulaire) : FORBIDDEN exposé. */
@@ -56,6 +54,8 @@ const ROLE_GATED = [
   "projectState.update",
   "lease.acquire",
   "audit.list",
+  "comment.list",
+  "projectState.get",
 ];
 const NOT_FOUND = [
   "ticket.get",
@@ -111,6 +111,9 @@ describe("E3 CONFLICT.reason étendu (rétrocompatible)", () => {
     "sprint_not_active",
     "ticket_has_active_lease",
     "counter_limit_reached",
+    "spec_repo_exists",
+    "repo_already_linked",
+    "repo_name_taken",
   ];
   it("accepte les anciennes et les nouvelles raisons, rejette le reste", async () => {
     const data = api.conflictError.CONFLICT.data;

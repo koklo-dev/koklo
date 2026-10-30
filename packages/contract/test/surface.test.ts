@@ -18,21 +18,29 @@ const GROUPS: Record<string, string[]> = {
   projectState: ["get", "update"],
   lease: ["acquire", "get", "heartbeat", "release"],
   audit: ["list"],
+  installation: ["list", "start"],
+  repo: ["createSpec", "link", "list"],
+  spec: ["getFeature", "head", "listFeatures"],
+  specBatch: ["get", "submit"],
 };
 
-describe("R1 routeur : 7 nouveaux groupes, 25 procédures", () => {
-  it("expose health, organization, member, project et les 7 groupes", () => {
+describe("R1 routeur : 15 groupes (TK-42 : +4), 35 procédures", () => {
+  it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
         "audit",
         "comment",
         "dependency",
         "health",
+        "installation",
         "lease",
         "member",
         "organization",
         "project",
         "projectState",
+        "repo",
+        "spec",
+        "specBatch",
         "sprint",
         "ticket",
       ].sort(),
@@ -75,13 +83,26 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /tickets/{key}/lease",
     "GET /audit",
   ];
-  it("les 25 paires de TK-29 sont présentes", async () => {
+  const NEW_PAIRS = [
+    "GET /provider/installations",
+    "POST /provider/installations/start",
+    "GET /projects/{projectId}/repos",
+    "POST /projects/{projectId}/repos",
+    "POST /projects/{projectId}/spec-repo",
+    "GET /projects/{projectId}/spec",
+    "GET /projects/{projectId}/spec/features",
+    "GET /projects/{projectId}/spec/features/{specId}",
+    "POST /projects/{projectId}/spec/batches",
+    "GET /projects/{projectId}/spec/batches/{batchId}",
+  ];
+  it("les 25 paires de TK-29 et les 10 de TK-42 sont présentes (43 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
     );
-    for (const pair of PAIRS) expect(pairs, pair).toContain(pair);
-    expect(pairs).toHaveLength(8 + PAIRS.length);
+    for (const pair of [...PAIRS, ...NEW_PAIRS]) expect(pairs, pair).toContain(pair);
+    expect(pairs).toHaveLength(8 + PAIRS.length + NEW_PAIRS.length);
+    expect(pairs).toHaveLength(43);
   });
 });
 
@@ -108,7 +129,7 @@ describe("R3 OpenAPI : réponses d'erreur par route", () => {
   it("les lectures ouvertes à tous n'ont pas de 403", async () => {
     const d = await doc();
     expect(statuses(d, "/tickets", "get")).not.toContain("403");
-    expect(statuses(d, "/project-state", "get")).not.toContain("403");
+    expect(statuses(d, "/sprints", "get")).not.toContain("403");
   });
 });
 

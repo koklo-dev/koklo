@@ -11,9 +11,10 @@ export const COMMENT_BODY_MAX = 8000;
 export const commentSchema = z.object({
   id: z.uuid(),
   targetKind: commentTargetKindSchema,
-  targetId: z.string().min(1),
+  targetId: z.uuid(),
   authorKind: commentAuthorKindSchema,
-  authorId: z.string().min(1),
+  /** Null pour un commentaire système (aucun auteur). */
+  authorId: z.string().min(1).nullable(),
   body: z.string(),
   createdAt: instantSchema,
 });
@@ -21,12 +22,12 @@ export const commentSchema = z.object({
 /** L'auteur est déduit du jeton : il n'est jamais lu dans l'entrée. */
 export const commentCreateInputSchema = z.object({
   targetKind: commentTargetKindSchema,
-  targetId: z.string().min(1),
+  targetId: z.uuid(),
   body: z.string().min(1).max(COMMENT_BODY_MAX),
 });
 export const commentListInputSchema = z.object({
   targetKind: commentTargetKindSchema,
-  targetId: z.string().min(1),
+  targetId: z.uuid(),
   ...pageInputSchema,
 });
 export const commentIdInputSchema = z.object({ id: z.uuid() });
@@ -55,7 +56,7 @@ export const auditEntrySchema = z.object({
   tokenId: z.string().optional(),
   action: z.string().min(1),
   targetKind: z.string().min(1),
-  targetId: z.string().min(1),
+  targetId: z.uuid(),
   ticketKey: ticketKeySchema.optional(),
   occurredAt: instantSchema,
 });

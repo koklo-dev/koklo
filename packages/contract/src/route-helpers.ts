@@ -9,5 +9,6 @@ export const readOneErrors = { ...readErrors, ...notFoundError } as const;
 export const writeErrors = { ...internalError, ...authErrors } as const;
 export const writeOneErrors = { ...writeErrors, ...notFoundError } as const;
 
+/** Point d'entrée de toute procédure : fixe la méthode et le chemin OpenAPI explicites (CT-4). */
 export const route = (method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: `/${string}`) =>
   oc.meta(openapi({ method, path }));
