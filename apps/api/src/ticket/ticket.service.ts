@@ -22,6 +22,7 @@ import {
   validation,
   viaDomain,
 } from "../tracker/api-errors.ts";
+import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import {
   TICKET_REPOSITORY,
@@ -42,8 +43,6 @@ import {
   toDomainTicket,
 } from "./ticket-domain.ts";
 import { toTicketDetail, toTicketOutput } from "./ticket-output.ts";
-
-export const DEFAULT_PAGE_SIZE = 50;
 
 /** Champs de `ticket.update` : `sprintId` est la clé `SP-n` du contrat. */
 type UpdateFields = Omit<TicketChanges, "sprintId"> & { sprintId?: string };

@@ -61,3 +61,12 @@ export const PROJECT_STATE_READ_ROLES = ["owner", "admin", "dev"] as const;
 
 /** Écriture de l'état de projet : la politique de merge relève du propriétaire et de l'admin (§14). */
 export const PROJECT_STATE_WRITE_ROLES = ["owner", "admin"] as const;
+
+/** Qui commente (CDC §14, « Commenter ») : le client commente, le business lit seulement. */
+export const COMMENT_WRITE_ROLES = ["owner", "admin", "dev", "designer", "client"] as const;
+
+/** Supprime le commentaire d'autrui (modération) ; tout autre rôle ne supprime que le sien. */
+export const COMMENT_DELETE_ANY_ROLES = MANAGER_ROLES;
+
+/** Lecture du journal d'audit : il expose acteurs et cibles de toute l'organisation. */
+export const AUDIT_READ_ROLES = MANAGER_ROLES;
