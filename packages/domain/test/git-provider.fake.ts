@@ -14,10 +14,13 @@ import type {
   Repo,
   Tag,
 } from "../src/index.ts";
-import { UserTokenRequiredError } from "../src/index.ts";
+import { GitConflictError, UserTokenRequiredError } from "../src/index.ts";
 
 /** Instant fixe : le domaine ne lit jamais l'horloge. */
 export const FAKE_EXPIRES_AT = "2026-10-30T12:00:00.000Z";
+
+/** Tête courante de toute PR du faux. */
+export const FAKE_HEAD_SHA = "sha-head";
 
 const repoOf = (owner: GitOwner, name: string): Repo => ({
   ref: { owner, name },
@@ -31,6 +34,12 @@ const repoOf = (owner: GitOwner, name: string): Repo => ({
  * requête et de retour). Seul `createRepo` applique la règle de l'ADR 0009.
  */
 export class FakeGitProvider implements GitProvider {
+  private readonly mergeable: boolean;
+
+  constructor(options: { readonly mergeable?: boolean } = {}) {
+    this.mergeable = options.mergeable ?? true;
+  }
+
   async authenticate(request: Parameters<GitProvider["authenticate"]>[0]): Promise<GitAuth> {
     if (request.user === undefined) {
       return { kind: "installation", token: "iat-fake", expiresAt: FAKE_EXPIRES_AT };
@@ -63,7 +72,7 @@ export class FakeGitProvider implements GitProvider {
     return {
       ref: { repo: request.repo, number: 1 },
       status: "open",
-      headSha: "sha-head",
+      headSha: FAKE_HEAD_SHA,
       baseBranch: request.base,
       headBranch: request.head,
       mergeable: null,
@@ -80,17 +89,32 @@ export class FakeGitProvider implements GitProvider {
     return {
       ref: request.pullRequest,
       status: "open",
-      headSha: "sha-head",
+      headSha: FAKE_HEAD_SHA,
       baseBranch: "main",
       headBranch: "feat/x",
-      mergeable: true,
+      mergeable: this.mergeable,
       checks: [],
     };
   }
 
   async mergePullRequest(
-    _request: Parameters<GitProvider["mergePullRequest"]>[0],
+    request: Parameters<GitProvider["mergePullRequest"]>[0],
   ): Promise<MergeResult> {
+    const identifier = `${request.pullRequest.repo.name}#${request.pullRequest.number}`;
+    if (request.expectedHeadSha !== FAKE_HEAD_SHA) {
+      throw new GitConflictError({
+        operation: "mergePullRequest",
+        reason: "stale-sha",
+        identifier,
+      });
+    }
+    if (!this.mergeable) {
+      throw new GitConflictError({
+        operation: "mergePullRequest",
+        reason: "not-mergeable",
+        identifier,
+      });
+    }
     return { sha: "sha-merge" };
   }
 

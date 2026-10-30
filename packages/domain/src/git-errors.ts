@@ -68,10 +68,16 @@ export class GitNotFoundError extends GitProviderError {
   }
 }
 
+/**
+ * Cause d'un conflit : `exists` (dépôt, branche ou tag déjà présent), `stale-sha`
+ * (la tête de la PR n'est plus `expectedHeadSha`), `not-mergeable` (fusion refusée).
+ */
+export type GitConflictReason = "exists" | "stale-sha" | "not-mergeable";
+
 export class GitConflictError extends GitProviderError {
-  readonly reason: string;
+  readonly reason: GitConflictReason;
   readonly identifier: string;
-  constructor(input: { operation: string; reason: string; identifier: string }) {
+  constructor(input: { operation: string; reason: GitConflictReason; identifier: string }) {
     super(input.operation, `Conflit Git (${input.reason}) : ${input.identifier}`);
     this.name = "GitConflictError";
     this.reason = input.reason;

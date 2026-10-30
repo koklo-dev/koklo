@@ -624,6 +624,12 @@ Thirteen async methods, each taking one request object with an explicit `auth`
 - Failures are typed subclasses of `GitProviderError` (`operation` field, never a token):
   `UserTokenRequiredError`, `RepoCreationForbiddenError`, `GitAuthExpiredError`,
   `GitNotFoundError`, `GitConflictError`, `GitRateLimitedError`, `GitProviderUnavailableError`.
+- `mergePullRequest` requires `expectedHeadSha`, the head whose policy was evaluated
+  (vision §10.5). The adapter compares it with the current head before merging and throws
+  `GitConflictError` with reason `stale-sha` if a push happened since, else `not-mergeable`.
+  `GitConflictError.reason` is the literal union `exists | stale-sha | not-mergeable`.
+- `GitAuth` and `GitUserCredentials` carry secrets: never log, serialize or put them in an
+  error (errors carry only `operation` and non-secret identifiers).
 - `WEBHOOK_EVENTS` (frozen) lists the 8 subscribed events.
 
 ```mermaid

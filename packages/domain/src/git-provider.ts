@@ -89,11 +89,16 @@ export interface GitProvider {
     auth: GitAuth;
     pullRequest: PullRequestRef;
   }): Promise<PullRequestState>;
-  /** @throws GitConflictError (not-mergeable, stale-sha) */
+  /**
+   * Fusionne uniquement si la tête courante de la PR vaut `expectedHeadSha`, la tête
+   * dont la politique a été évaluée (vision §10.5) : l'adaptateur compare avant de fusionner.
+   * @throws GitConflictError `stale-sha` (la tête a changé, testé en premier) ou `not-mergeable`
+   */
   mergePullRequest(request: {
     auth: GitAuth;
     pullRequest: PullRequestRef;
     method: MergeMethod;
+    expectedHeadSha: Sha;
   }): Promise<MergeResult>;
   /** @throws GitConflictError */
   createTag(request: { auth: GitAuth; repo: RepoRef; ref: GitRef; name: string }): Promise<Tag>;
