@@ -533,6 +533,41 @@ New typed errors: `REPO_CREATION_FORBIDDEN` (403, `{ reason, ownerLogin, ownerKi
 `UserTokenRequired`, `ProviderAuthExpired`, `ProviderRateLimited`, `ProviderUnavailable`,
 `SpecBatchConflict`, `SpecInvalid`.
 
+### Role matrix (vision section 14), to enforce in TK-43 to TK-45
+The contract cannot enforce roles; the API must, per procedure. "Own project" means the caller is a
+member of the project and of the organization of the session.
+
+| Procedure | Allowed roles |
+|-----------|---------------|
+| `installation.list`, `installation.start` | owner, admin |
+| `repo.link`, `repo.createSpec` | owner, admin |
+| `repo.list` | owner, admin, dev, designer |
+| `spec.head`, `spec.listFeatures`, `spec.getFeature` | every role, within their own project |
+| `specBatch.submit` | owner, admin, dev; designer only for design-related features, checked per operation by the API |
+| `specBatch.get` | same roles as `specBatch.submit` |
+
+`client` and `business` never write to the spec. A refused role returns `FORBIDDEN`.
+
+### Membership rule (anti-IDOR), to enforce before any access
+- Membership of the user in the project AND in the organization of the session is verified BEFORE
+  any read or write. A non-member gets `NOT_FOUND`, never `FORBIDDEN`, so the existence of a
+  project, repository, feature or batch is not disclosed.
+- `repo.link` and `repo.createSpec`: the `installationId` must belong to the organization of the
+  project. Otherwise `NOT_FOUND`.
+- `specBatch.get`: the `batchId` must belong to the `projectId` of the path. Otherwise `NOT_FOUND`.
+- Risk: identifiers are guessable or leaked, so skipping these checks is an IDOR (insecure direct
+  object reference) giving cross-tenant access to installations, specs and batches.
+
+### `installation.start` state requirement
+The `state` embedded in the returned URL is the only CSRF guard, and the contract cannot impose it.
+The API must make it signed (HMAC), bound to the user and to the organization of the session,
+single-use and expiring (`expiresAt`). The callback rejects any state failing one of these checks.
+
+### Open point: `criteria` on `feature.update`
+`criteria` is replaced as a whole and carries no acceptance-criterion identifier, so the `AC-n`
+numbering may shift when the list is rewritten. To be decided in TK-44 (stable identifiers or
+explicit renumbering rule). The contract is unchanged here.
+
 **Secrets are never exposed.** No installation or user token, refresh token, app key, webhook
 secret or external installation id appears in any input, output, error or the OpenAPI document;
 tests scan the document for such property names. Enumerations (roles, modes, statuses, feature
