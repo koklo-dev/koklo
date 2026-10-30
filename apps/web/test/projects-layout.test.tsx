@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsLayout from "../src/app/projects/layout.tsx";
 import { NavMain } from "../src/components/nav-main.tsx";
+import { findNamed } from "./support/wait.ts";
 import { DESKTOP, MOBILE, setViewport } from "./viewport.ts";
 
 // Frontières externes uniquement : navigation Next, client Better Auth, client oRPC.
@@ -208,8 +209,8 @@ describe("cas 4 : NavUser", () => {
   it("le menu propose le thème et « Se déconnecter », qui appelle signOut", async () => {
     renderLayout();
     await userEvent.click(screen.getByRole("button", { name: /Menu utilisateur/ }));
-    expect(await screen.findByRole("menuitem", { name: /thème/i })).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Se déconnecter" }));
+    expect(await findNamed("menuitem", /thème/i)).toBeInTheDocument();
+    await userEvent.click(await findNamed("menuitem", "Se déconnecter"));
     expect(signOut).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,7 @@ import AcceptInvitationRoute, {
 } from "../src/app/accept-invitation/[id]/page.tsx";
 import { AcceptInvitationPage } from "../src/components/accept-invitation-page.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import {
   acceptInvitation,
   getInvitation,
@@ -84,10 +85,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("C1.e : état prêt et acceptation", () => {
   it("affiche l'aperçu (organisation, inviteur, rôle) puis un seul bouton principal", async () => {
     mount();
-    const title = await screen.findByRole("heading", {
-      level: 1,
-      name: "Rejoindre Atelier Lumière",
-    });
+    const title = await findNamed("heading", "Rejoindre Atelier Lumière", { level: 1 });
     const page = screen.getByTestId("accept-invitation-page");
     expect(within(page).getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(page).toHaveTextContent("chef@example.com vous invite à rejoindre cette organisation");
@@ -107,7 +105,7 @@ describe("C1.e : état prêt et acceptation", () => {
   it("le clic appelle acceptInvitation avec l'id de la route, invalide les requêtes et mène à /projects", async () => {
     const invalidate = vi.spyOn(QueryClient.prototype, "invalidateQueries");
     mount();
-    await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
+    await userEvent.click(await findNamed("button", "Accepter l'invitation"));
     await waitFor(() => expect(navigations()).toContain("/projects"));
     expect(acceptInvitation).toHaveBeenCalledTimes(1);
     expect(acceptInvitation).toHaveBeenCalledWith({ invitationId: INVITATION_ID });
@@ -118,8 +116,8 @@ describe("C1.e : état prêt et acceptation", () => {
   it("pendant l'appel : bouton désactivé, aria-busy et libellé « Acceptation… »", async () => {
     acceptInvitation.mockReturnValue(new Promise(() => undefined));
     mount();
-    await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
-    const busy = await screen.findByRole("button", { name: "Acceptation…" });
+    await userEvent.click(await findNamed("button", "Accepter l'invitation"));
+    const busy = await findNamed("button", "Acceptation…");
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(acceptInvitation).toHaveBeenCalledTimes(1);
@@ -130,10 +128,10 @@ describe("C1.e : état prêt et acceptation", () => {
     router.replace.mockImplementation(() => undefined);
     acceptInvitation.mockReturnValue(new Promise((resolve) => (finish = resolve)));
     mount();
-    await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
+    await userEvent.click(await findNamed("button", "Accepter l'invitation"));
     finish({ data: { member: { id: "m1" } }, error: null });
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Bienvenue dans Atelier Lumière" }),
+      await findNamed("heading", "Bienvenue dans Atelier Lumière", { level: 1 }),
     ).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Ouverture de vos projets…");
   });
@@ -177,9 +175,9 @@ describe("C2 : cas d'erreur (jamais de page vide)", () => {
       else acceptInvitation.mockResolvedValue(NOT_FOUND);
       mount();
       if (when === "à l'acceptation") {
-        await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
+        await userEvent.click(await findNamed("button", "Accepter l'invitation"));
       }
-      expect(await screen.findByRole("heading", { level: 1, name: INVALID })).toBeInTheDocument();
+      expect(await findNamed("heading", INVALID, { level: 1 })).toBeInTheDocument();
       expect(screen.getByRole("alert")).toHaveTextContent(
         /expiré.*7 jours.*annulée.*déjà été acceptée.*nouveau lien/s,
       );
@@ -222,12 +220,9 @@ describe("C2 : cas d'erreur (jamais de page vide)", () => {
   it("C2.c même 403 à l'acceptation : même écran", async () => {
     acceptInvitation.mockResolvedValue(WRONG_RECIPIENT);
     mount();
-    await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
+    await userEvent.click(await findNamed("button", "Accepter l'invitation"));
     expect(
-      await screen.findByRole("heading", {
-        level: 1,
-        name: "Cette invitation est destinée à une autre adresse",
-      }),
+      await findNamed("heading", "Cette invitation est destinée à une autre adresse", { level: 1 }),
     ).toBeInTheDocument();
   });
 
@@ -257,14 +252,11 @@ describe("C2 : cas d'erreur (jamais de page vide)", () => {
     // (organisation, utilisateur) lève une 500 et l'invitation reste `pending` (voir 03-red.md).
     acceptInvitation.mockResolvedValue(SERVER_ERROR);
     mount();
-    const accept = await screen.findByRole("button", { name: "Accepter l'invitation" });
+    const accept = await findNamed("button", "Accepter l'invitation");
     listOrganizations.mockResolvedValue({ data: [organization()], error: null });
     await userEvent.click(accept);
     expect(
-      await screen.findByRole("heading", {
-        level: 1,
-        name: "Vous faites déjà partie de cette organisation",
-      }),
+      await findNamed("heading", "Vous faites déjà partie de cette organisation", { level: 1 }),
     ).toBeInTheDocument();
   });
 
@@ -281,7 +273,7 @@ describe("C2 : cas d'erreur (jamais de page vide)", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(GENERIC);
       await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
       expect(
-        await screen.findByRole("heading", { level: 1, name: "Rejoindre Atelier Lumière" }),
+        await findNamed("heading", "Rejoindre Atelier Lumière", { level: 1 }),
       ).toBeInTheDocument();
       expect(getInvitation).toHaveBeenCalledTimes(2);
     },
@@ -290,7 +282,7 @@ describe("C2 : cas d'erreur (jamais de page vide)", () => {
   it("C2.e erreur à l'acceptation : l'écran « prêt » reste sous l'alerte, « Réessayer » relance l'acceptation", async () => {
     acceptInvitation.mockResolvedValueOnce(SERVER_ERROR);
     mount();
-    await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
+    await userEvent.click(await findNamed("button", "Accepter l'invitation"));
     expect(await screen.findByRole("alert")).toHaveTextContent(GENERIC);
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
@@ -321,8 +313,8 @@ describe("C7 : focus, structure et accessibilité des états", () => {
   it("le focus revient sur le h1 à chaque changement d'état (prêt -> erreur)", async () => {
     acceptInvitation.mockResolvedValue(NOT_FOUND);
     mount();
-    await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
-    const h1 = await screen.findByRole("heading", { level: 1, name: /n'est plus valide/ });
+    await userEvent.click(await findNamed("button", "Accepter l'invitation"));
+    const h1 = await findNamed("heading", /n'est plus valide/, { level: 1 });
     await waitFor(() => expect(h1).toHaveFocus());
   });
 
@@ -343,7 +335,7 @@ describe("C4.d : aucune fuite de l'id dans les journaux, le titre ou le texte", 
       const spy = vi.spyOn(console, method).mockImplementation(() => undefined);
       acceptInvitation.mockResolvedValueOnce(SERVER_ERROR);
       mount();
-      await userEvent.click(await screen.findByRole("button", { name: "Accepter l'invitation" }));
+      await userEvent.click(await findNamed("button", "Accepter l'invitation"));
       await screen.findByRole("alert");
       expect(JSON.stringify(spy.mock.calls)).not.toContain(INVITATION_ID);
     },

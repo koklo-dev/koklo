@@ -5,6 +5,7 @@ import KanbanLayout from "../src/app/kanban/layout.tsx";
 import KanbanRoute, { metadata } from "../src/app/kanban/page.tsx";
 import { AppSidebar } from "../src/components/app-sidebar.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import { pathname, polyfillRadix, resetWebMocks } from "./support/web-mocks.ts";
 import { DESKTOP, setViewport } from "./viewport.ts";
 
@@ -40,21 +41,18 @@ describe("C8 — navigation vers /kanban", () => {
 
   it("la barre latérale propose « Kanban » vers /kanban", async () => {
     renderSidebar("/projects");
-    expect(await screen.findByRole("link", { name: "Kanban" })).toHaveAttribute("href", "/kanban");
+    expect(await findNamed("link", "Kanban")).toHaveAttribute("href", "/kanban");
   });
 
   it("« Kanban » est aria-current=page sur /kanban, pas « Projets »", async () => {
     renderSidebar("/kanban");
-    expect(await screen.findByRole("link", { name: "Kanban" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(await findNamed("link", "Kanban")).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Projets" })).not.toHaveAttribute("aria-current");
   });
 
   it("« Kanban » n'est pas courant sur /projects", async () => {
     renderSidebar("/projects");
-    expect(await screen.findByRole("link", { name: "Kanban" })).not.toHaveAttribute("aria-current");
+    expect(await findNamed("link", "Kanban")).not.toHaveAttribute("aria-current");
   });
 });
 
@@ -76,10 +74,11 @@ describe("C8 — route /kanban", () => {
         <h1>Kanban</h1>
       </KanbanLayout>,
     );
-    const crumbs = await screen.findByRole("navigation", { name: /breadcrumb|fil d'ariane/i });
+    await screen.findAllByText("Kanban");
+    const crumbs = screen.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i });
     expect(within(crumbs).getByText("Kanban")).toHaveAttribute("aria-current", "page");
     // Le fil d'Ariane (BreadcrumbPage) a lui aussi le rôle link : on cible le lien de la barre latérale.
-    const links = await screen.findAllByRole("link", { name: "Kanban" });
+    const links = screen.getAllByRole("link", { name: "Kanban" });
     const sidebarLink = links.find((link) => link.getAttribute("href") === "/kanban");
     expect(sidebarLink).toHaveAttribute("aria-current", "page");
   });
