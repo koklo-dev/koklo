@@ -70,7 +70,7 @@ const READ_ONLY_GROUPS = ["audit"];
  */
 const PENDING_GROUPS = ["installation", "repo", "spec", "specBatch"];
 
-/** Sources de l'API : une référence `contract.<groupe>.` y signifie qu'une procédure est implémentée. */
+/** Sources de l'API : une référence à `contract.<groupe>` y signifie qu'une procédure est implémentée. */
 function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = resolve(dir, entry.name);
@@ -78,6 +78,21 @@ function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] 
     return path.endsWith(".ts") ? [path] : [];
   });
 }
+/** Retire les commentaires (bloc et ligne) pour éviter les faux positifs ; approximation volontaire. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+}
+
+/** `contract.<g>` (frontière de mot), `contract["g"]`, `contract['g']` ou déstructuration de `contract`. */
+function referencesGroup(source: string, group: string): boolean {
+  const patterns = [
+    new RegExp(`contract\\.${group}\\b`),
+    new RegExp(`contract\\[\\s*["']${group}["']\\s*\\]`),
+    new RegExp(`\\b(?:const|let|var)\\s*\\{[^}]*\\b${group}\\b[^}]*\\}\\s*=\\s*contract\\b`),
+  ];
+  return patterns.some((pattern) => pattern.test(source));
+}
+
 /** `health` est une procédure isolée (GET), pas un groupe. */
 const STANDALONE_PROCEDURES = ["health"];
 
@@ -499,9 +514,9 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
   });
 
   it("un groupe en attente n'a aucune implémentation : sinon il doit rejoindre WRITE_GROUPS ou READ_ONLY_GROUPS", () => {
-    const sources = apiSourceFiles().map((file) => readFileSync(file, "utf8"));
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
     const implemented = PENDING_GROUPS.filter((group) =>
-      sources.some((source) => source.includes(`contract.${group}.`)),
+      sources.some((source) => referencesGroup(source, group)),
     );
     expect(
       implemented,
