@@ -4,7 +4,7 @@ import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
 import { MANAGER_ROLES } from "../auth/roles.ts";
-import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
+import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { guard, requestIdOf } from "../request-context.ts";
 import { ORGANIZATION_CONTEXT, type OrganizationContext } from "./organization-context.ts";
 import { ProjectService } from "./project.service.ts";
@@ -35,7 +35,7 @@ export class ProjectController {
     const requestId = requestIdOf(request);
     return implement(contract.project.create).handler(({ input, errors }) =>
       guard(requestId, errors, async () =>
-        this.service.create(await this.organization.organizationId(request), input.name),
+        this.service.create(requireSession(request), input.name),
       ),
     );
   }

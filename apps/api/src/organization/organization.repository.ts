@@ -1,6 +1,8 @@
 import type { OrganizationListOutput } from "@koklo/contract";
+import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
+import { recordAudit } from "../tracker/audit.ts";
 
 /**
  * Organisations et appartenances : modèles hors filtre multi-tenant (racine des organisations,
@@ -37,5 +39,31 @@ export class OrganizationRepository {
       ...organization,
       role: role as OrganizationListOutput[number]["role"],
     }));
+  }
+
+  /**
+   * Crée l'organisation, son membre `owner` et l'entrée d'audit `organization.create` dans UNE
+   * transaction : tout ou rien. L'audit est écrit dans la nouvelle organisation (c'est la seule
+   * qui existe à cet instant).
+   */
+  createWithOwner(
+    userId: string,
+    organization: { name: string; slug: string },
+  ): Promise<{ id: string; name: string; slug: string }> {
+    return this.database.client.$transaction(async (tx) => {
+      const created = await tx.organization.create({
+        data: organization,
+        select: { id: true, name: true, slug: true },
+      });
+      await tx.member.create({ data: { organizationId: created.id, userId, role: "owner" } });
+      await withOrganization(created.id, () =>
+        recordAudit(
+          tx,
+          { organizationId: created.id, userId },
+          { action: "organization.create", targetKind: "organization", targetId: created.id },
+        ),
+      );
+      return created;
+    });
   }
 }

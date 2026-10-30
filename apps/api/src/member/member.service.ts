@@ -57,6 +57,7 @@ export class MemberService {
       body: { email: input.email, role: input.role, organizationId },
       headers,
     });
+    await this.repository.recordInvitation(session, invitation.id);
     return {
       id: invitation.id,
       email: invitation.email,
@@ -71,20 +72,15 @@ export class MemberService {
     memberId: string,
     role: MemberRole,
   ): Promise<MemberSetRoleOutput> {
-    const updated = await this.repository.setRole(
-      session.organizationId,
-      memberId,
-      role,
-      (target, ownerCount) => {
-        if (!target) {
-          throw notFound();
-        }
-        assertMayGrant(session.role, role, target.role);
-        if (target.role === "owner" && ownerCount <= 1) {
-          throw conflict("last_owner");
-        }
-      },
-    );
+    const updated = await this.repository.setRole(session, memberId, role, (target, ownerCount) => {
+      if (!target) {
+        throw notFound();
+      }
+      assertMayGrant(session.role, role, target.role);
+      if (target.role === "owner" && ownerCount <= 1) {
+        throw conflict("last_owner");
+      }
+    });
     return { id: updated.id, role };
   }
 }

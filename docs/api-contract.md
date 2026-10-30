@@ -446,15 +446,48 @@ comments and audit, but still ignored on `ticket.list` (no typed error on that r
   `audit.list`; `FORBIDDEN` on `projectState.get`.
 - `authorId` nullable (or the fixed value `"system"` documented) instead of `min(1)`; `targetId`
   as `z.uuid()`; audit `targetKind` enumerated; explicit `projectId` instead of the oldest project.
-- Open questions: may the `client` role see comments written by agents? Should `organization.*`,
-  `member.*` and `project.create` be journaled (excluded from the audit-coverage test for now)?
+- Open question: may the `client` role see comments written by agents? (Settled: `organization.create`,
+  `member.invite`, `member.setRole` and `project.create` are journaled, see "Audit of organisation,
+  member and project writes".)
 - Only the `ticket` target is accepted for comments (no table for features, screens, change requests).
 
 **Immutable log.** The only writer is `recordAudit` (`tracker/audit.ts`); the `audit` module only
 calls `findMany`/`findFirst`, `/audit` has only `GET`, and the database triggers refuse `UPDATE`,
-`DELETE` and `TRUNCATE`. A test derives every non-GET procedure of the tracker groups from the
-contract and checks each one writes exactly one audit row (organisation, member and
-`project.create` writes are not journaled yet).
+`DELETE` and `TRUNCATE`. A test derives every non-GET procedure of every group from the contract
+(20 writes, no group excluded) and checks each one writes exactly one audit row.
+
+**Audit of organisation, member and project writes (decision Q2: journaled).** `recordAudit` takes
+an `AuditActor` (`{ organizationId, userId }`); a `ProjectScope` is one, and writes outside a
+project pass the session's organisation and user. Actor is always `human` (session user), `ticket_id`
+is NULL, `target_kind` is free text in the database (the TypeScript union gained `organization`,
+`invitation`, `member`, `project`). No entry on refusal (403, 409).
+
+| Procedure | action | targetKind / targetId | Entry's organisation | Atomicity |
+|---|---|---|---|---|
+| `project.create` | `project.create` | `project` / project id | session | same transaction as the insert |
+| `member.setRole` | `member.setRole` | `member` / member id | session | same (Serializable) transaction as the update |
+| `organization.create` | `organization.create` | `organization` / new organisation id | the NEW organisation | same transaction as the organisation and its `owner` member |
+| `member.invite` | `member.invite` | `invitation` / invitation id | session | NOT atomic, see below |
+
+`organization.create` no longer goes through Better Auth's `createOrganization`, which writes the
+organisation and the member in separate, non-transactional statements and cannot join a caller's
+transaction. The service inserts the organisation, the `owner` member (the plugin's `creatorRole`)
+and the audit row in one Prisma transaction, then calls `auth.api.setActiveOrganization` to put the
+organisation on the session. Slug conflicts still return `CONFLICT{slug_taken}` (pre-check, plus
+re-check after a unique violation). Residual risk: if `setActiveOrganization` fails after the commit,
+the organisation exists, is audited, and the call returns an error; the user is not locked out
+(`organization.list` shows it, the session can select it) and retrying with the same name yields a
+new suffixed slug. Better Auth hooks on the organisation model are bypassed (none configured).
+
+`member.invite` stays on Better Auth's `createInvitation` (it also cancels earlier pending invitations
+and hands the e-mail job to the worker through `sendInvitationEmail`; reimplementing that would
+duplicate the plugin). Better Auth writes with its own client, so the audit cannot share its
+transaction: `recordInvitation` writes the entry right after the invitation succeeds, before the
+response. Compromise: if that insert fails (database outage between the two statements), the
+invitation exists, its e-mail is queued, no audit row exists and the caller gets a 500. The window
+is one statement; the failure is visible (500 and the request log), not silent. Reaching strict
+atomicity would require owning the invitation write (a Prisma insert plus the queue) or a Better Auth
+adapter transaction hook; neither is available in better-auth 1.7.14 for this endpoint.
 
 ## Version history
 - **0.4.0** (TK-29, 15 routes implemented in TK-30, 6 more in TK-31: leases and project state): tickets, dependencies, sprints, comments, project state, leases and
