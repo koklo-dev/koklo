@@ -31,6 +31,8 @@ export type SprintChanges = Partial<
 export interface SprintStore {
   /** Numéro suivant du compteur de sprints du projet. */
   nextNumber(): Promise<number>;
+  /** Relève le compteur de sprints à au moins `atLeast` ; ne le fait jamais reculer. */
+  raiseCounter(atLeast: number): Promise<void>;
   find(key: string): Promise<SprintRecord | null>;
   findActive(): Promise<SprintRecord | null>;
   list(status?: SprintStatus): Promise<SprintRecord[]>;

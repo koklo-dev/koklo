@@ -190,6 +190,54 @@ covers_commit: 7f97066
   (health probe, Better Auth), never for a business model.
 - Known limit: the `upsert` ownership check is not atomic (unique constraint is the safety net).
 
+## Sprint import command `import:sprints` (TK-34)
+Administration command, never an HTTP route: it loads the Nest application context and calls
+`SprintImportService`. It imports Shipyard `sprint-NNN.md` files (CDC section 7.7) into sprints and
+tickets of one project.
+
+```bash
+pnpm --filter @koklo/api import:sprints <directory> \
+  --organization <uuid> --project <uuid> --actor <uuid> \
+  [--starts-on YYYY-MM-DD] [--ends-on YYYY-MM-DD] [--dry-run] [--json]
+```
+
+- **Environment**: same variables as the API (`DATABASE_URL`, ...); `.env` is read when present.
+- **Actor**: `--actor` must be an `owner` or `admin` member of the organization, otherwise exit 2.
+  A project outside the organization is refused the same way (exit 2).
+- **Dates**: sprint files carry no dates. `--starts-on` defaults to today, `--ends-on` to
+  `--starts-on`; both are applied to every created sprint. `--ends-on` cannot precede `--starts-on`.
+- **`--dry-run`**: same run and same report, then the transaction is rolled back (nothing written,
+  counters and audit untouched). **`--json`** prints the full report (every line) instead of the
+  readable summary.
+- **Exit codes**: `0` import without any `error` line; `1` report with at least one error or
+  conflict (or technical failure after configuration loaded); `2` refusal before any write (bad
+  usage, unreadable or non-conforming directory, actor not owner/admin, unknown project).
+- **Input safety**: one directory, no recursion, no symlink (`O_NOFOLLOW`), 1 MiB per file, strict
+  UTF-8. Any `sprint-*` entry that is not `sprint-NNN.md` is refused; other files (backlog,
+  retros) are listed as not read.
+- **Report**: counts for sprints, tickets and dependencies (created, matched, conflicts, rejected),
+  totals per reason code, then one line per warning or error with file, line, key and text.
+  Every line of a `## Tasks` zone is classified, none is dropped silently. Reason codes (closed
+  list): `blank`, `comment`, `dependency-cycle`, `dependency-target-missing`,
+  `deleted-ticket-conflict`, `field-not-imported`, `human-action`, `missing-package`,
+  `missing-sensitivity`, `section-not-imported`, `sprint-conflict`, `sprint-dod`,
+  `sprint-without-tasks`, `status-conflict`, `status-line-unparsable`, `title-conflict`,
+  `unknown-line`. Severities: `ignored`, `warning`, `error`.
+- **Idempotence by key**: sprints (`SP-n`) and tickets (`TK-n`) are matched by key only, never by
+  title. A matched object is left untouched; same key with another goal (sprint), another title or
+  a soft-deleted ticket is a conflict reported as an error. Re-running on the same project is a
+  no-op (all matched).
+- **Keys and counters**: imported tickets keep their `TK-n` keys. The ticket and sprint counters
+  are raised to the highest imported number (never lowered), so the next created ticket does not
+  collide. Import into an empty or dedicated project: the keys must be free.
+- **Atomicity**: the whole batch is one transaction (10 minute timeout, because 86 tickets exceed
+  Prisma's 5 s default); any technical failure leaves the project unchanged. Dependencies are
+  validated by `@koklo/domain` (cycle -> `dependency-cycle`). Audit actions: `sprint.import`,
+  `ticket.import`, `dependency.import`. A sprint whose tickets are all done is closed after
+  attachment, never made active.
+- **Tests**: `apps/api/test/sprint-import-*.test.ts` (fixture: frozen copy of the 17 vault sprint
+  files in `apps/api/test/fixtures/sprints`).
+
 ## Quality gates
 Workflows in `.github/workflows/`: `ci.yml`, `commitlint.yml`, `security.yml`,
 `release-please.yml`. Lint, types and coverage gates: TO DOCUMENT (`ci.yml` was not
