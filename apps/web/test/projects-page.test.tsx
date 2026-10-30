@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectsPage } from "../src/components/projects-page.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import {
   apiError,
   getSession,
@@ -108,14 +109,16 @@ describe("ProjectsPage — appel à l'action selon le rôle (C1.b, droits)", () 
   it("propriétaire avec projets : le bouton reste disponible au-dessus du tableau", async () => {
     procedures.projectList.mockResolvedValue([ALPHA]);
     renderWithQuery(<ProjectsPage />);
-    expect(await screen.findByRole("table", { name: "Liste des projets" })).toBeInTheDocument();
+    await screen.findByText("Alpha");
+    expect(screen.getByRole("table", { name: "Liste des projets" })).toBeInTheDocument();
     expect(await screen.findByTestId("create-project-button")).toBeInTheDocument();
   });
 });
 
 async function openSheet() {
   await userEvent.click(await screen.findByTestId("create-project-button"));
-  return screen.findByRole("dialog", { name: "Créer un projet" });
+  await screen.findByTestId("create-project-sheet");
+  return screen.getByRole("dialog", { name: "Créer un projet" });
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un écran, un test par comportement
@@ -149,7 +152,8 @@ describe("ProjectsPage — création de projet (C1.c)", () => {
     await waitFor(() => expect(procedures.projectCreate).toHaveBeenCalled());
     expect(procedures.projectCreate.mock.calls[0]?.[0]).toEqual({ name: "Alpha" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(await screen.findByRole("cell", { name: "Alpha" })).toBeInTheDocument();
+    await screen.findByText("Alpha");
+    expect(screen.getByRole("cell", { name: "Alpha" })).toBeInTheDocument();
     expect(screen.getByText("1 projet")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Projet « Alpha » créé.");
     expect(screen.getByTestId("create-project-button")).toHaveFocus();
@@ -161,7 +165,7 @@ describe("ProjectsPage — création de projet (C1.c)", () => {
     const sheet = await openSheet();
     await userEvent.type(within(sheet).getByLabelText("Nom du projet"), "Alpha");
     await userEvent.click(within(sheet).getByRole("button", { name: "Créer le projet" }));
-    const busy = await within(sheet).findByRole("button", { name: "Création…" });
+    const busy = await findNamed("button", "Création…", { scope: within(sheet) });
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(within(sheet).getByLabelText("Nom du projet")).toHaveAttribute("readonly");

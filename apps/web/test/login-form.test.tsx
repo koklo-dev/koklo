@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "../src/app/login/page.tsx";
 import { LoginForm } from "../src/components/login-form.tsx";
+import { findNamed } from "./support/wait.ts";
 
 // Frontière externe : le client Better Auth (réseau + redirection OAuth).
 const social = vi.hoisted(() => vi.fn());
@@ -52,7 +53,7 @@ describe("cas 6 : LoginForm (bloc login-05 installé)", () => {
     social.mockReturnValue(new Promise(() => undefined));
     render(<LoginForm />);
     await userEvent.click(screen.getByRole("button", { name: GITHUB }));
-    const busy = await screen.findByRole("button", { name: /Redirection vers GitHub…/ });
+    const busy = await findNamed("button", /Redirection vers GitHub…/);
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
   });
