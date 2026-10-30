@@ -16,10 +16,29 @@ export type Repo = {
 };
 
 /** Écriture d'un fichier texte UTF-8. */
-export type FileChange = {
+export type FileWrite = {
   readonly path: string;
   readonly content: string;
   readonly mode?: "100644" | "100755";
+  readonly delete?: undefined;
+};
+
+/** Suppression d'un fichier : une entrée d'arbre sans contenu. */
+export type FileDeletion = {
+  readonly path: string;
+  readonly delete: true;
+};
+
+/** Changement d'un commit : écriture ou suppression (discriminer sur `delete`). */
+export type FileChange = FileWrite | FileDeletion;
+
+/** Fichier d'un ref : `sha` est celui du blob (identique à `FileContent.sha`). */
+export type FileEntry = { readonly path: string; readonly sha: Sha };
+
+/** Liste récursive des fichiers d'un ref ; `ref` est le SHA du commit résolu. */
+export type FileListing = {
+  readonly ref: Sha;
+  readonly files: readonly FileEntry[];
 };
 
 export type FileContent = {

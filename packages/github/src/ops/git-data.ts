@@ -1,14 +1,26 @@
-import type { Branch, Commit, GitAuth, RepoRef, Tag } from "@koklo/domain";
+import type { Branch, Commit, FileChange, GitAuth, RepoRef, Tag } from "@koklo/domain";
 import { WRITE } from "../client.ts";
+import { staleHead } from "../commit-rules.ts";
 import type { Gateway } from "../gateway.ts";
 import { type Request, repoId, resolveCommitSha, target } from "./shared.ts";
+
+/** Suppression = entrée d'arbre sans contenu (`sha: null`) ; écriture = blob créé en ligne. */
+const treeEntry = (file: FileChange) =>
+  file.delete === true
+    ? { path: file.path, mode: "100644" as const, type: "blob" as const, sha: null }
+    : {
+        path: file.path,
+        mode: file.mode ?? ("100644" as const),
+        type: "blob" as const,
+        content: file.content,
+      };
 
 /**
  * Un seul commit atomique pour N fichiers (API Git Data) : tête de branche, arbre, commit, puis
  * mise à jour de la référence SANS `force` (une branche qui a bougé est un conflit, jamais écrasée).
  */
 export function writeCommit(gw: Gateway, request: Request<"writeCommit">): Promise<Commit> {
-  const { auth, repo, branch, files, author, message } = request;
+  const { auth, repo, branch, files, author, message, expectedHeadSha } = request;
   const operation = {
     operation: "writeCommit",
     resource: "branch",
@@ -21,16 +33,14 @@ export function writeCommit(gw: Gateway, request: Request<"writeCommit">): Promi
       ref,
     });
     const headSha = (head.data as { object: { sha: string } }).object.sha;
+    if (expectedHeadSha !== undefined && expectedHeadSha !== headSha) {
+      throw staleHead(operation.identifier);
+    }
     const parent = await octokit.rest.git.getCommit({ ...target(repo), commit_sha: headSha });
     const tree = await octokit.rest.git.createTree({
       ...target(repo),
       base_tree: parent.data.tree.sha,
-      tree: files.map((file) => ({
-        path: file.path,
-        mode: file.mode ?? "100644",
-        type: "blob" as const,
-        content: file.content,
-      })),
+      tree: files.map(treeEntry),
       ...WRITE,
     });
     const commit = await octokit.rest.git.createCommit({

@@ -15,6 +15,8 @@ const METHODS = [
   "getRepo",
   "readFile",
   "writeCommit",
+  "listFiles",
+  "listCommits",
   "createBranch",
   "createPullRequest",
   "getPullRequestState",
@@ -39,7 +41,7 @@ const userAuth: GitAuth = { kind: "user", token: "uat", expiresAt: FAKE_EXPIRES_
 const provider: GitProvider = new FakeGitProvider();
 
 describe("CA3 forme du port GitProvider", () => {
-  it("expose exactement les 14 opérations", () => {
+  it("expose exactement les 16 opérations (TK-44 : listFiles, listCommits)", () => {
     expectTypeOf<keyof GitProvider>().toEqualTypeOf<(typeof METHODS)[number]>();
     for (const method of METHODS) {
       expect(typeof provider[method], method).toBe("function");

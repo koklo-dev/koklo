@@ -608,7 +608,7 @@ sequenceDiagram
 Octokit adapter lives in `packages/github` (depends on `domain`, never the reverse, see
 "GitHub adapter and shared fake (TK-39)"), and tests use its in-memory fake.
 
-Fourteen async methods, each taking one request object with an explicit `auth`
+Sixteen async methods (TK-44a added `listFiles` and `listCommits`), each taking one request object with an explicit `auth`
 (the port is stateless). French names of vision §8 in parentheses:
 `authenticate` (authentifier), `createRepo` (creerRepo), `getRepo` (lireRepo, TK-43), `readFile` (lireFichier),
 `writeCommit` (ecrireCommit), `createBranch` (creerBranche), `createPullRequest` (creerPR),
@@ -635,7 +635,7 @@ Fourteen async methods, each taking one request object with an explicit `auth`
 ```mermaid
 flowchart LR
   subgraph domain["packages/domain (pure)"]
-    Port["GitProvider port<br/>14 methods"]
+    Port["GitProvider port<br/>16 methods"]
     Types["GitOwner, GitAuth, Repo,<br/>PullRequest, CheckRun, Deployment"]
     Errors["GitProviderError<br/>+ 7 typed subclasses"]
     Port --> Types
@@ -649,6 +649,11 @@ flowchart LR
   Fake -- implements --> Port
   Adapter -- maps HTTP errors --> Errors
 ```
+
+`writeCommit` takes a `FileChange`, either a write or a deletion (`{ path, delete: true }`), and an
+optional `expectedHeadSha`: a stale head throws `GitConflictError` `stale-sha` before anything is
+written. `listFiles` returns the recursive, path-sorted file list of a ref (blobs only) and
+`listCommits` the most recent commits first, capped at 50 (TK-44a).
 
 ### GitHub adapter and shared fake (TK-39)
 `packages/github` (`@koklo/github`) implements the `GitProvider` port twice, behind one
@@ -765,6 +770,25 @@ sequenceDiagram
   commit, with the batch id as the `Koklo-Ops:` trailer.
 - Not implemented yet: the webhook endpoint, the worker job and the indexer (later tickets); this
   ticket delivers the schema, constraints and tenant classification they rely on.
+
+### Spec write foundations (TK-44a)
+Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
+yet.
+
+```mermaid
+flowchart LR
+  Ops["feature operations"] --> Emit["emitFeatureMarkdown<br/>@koklo/schema (pure)"]
+  Emit --> Files["FileChange[]<br/>writes + deletions"]
+  Files --> Commit["GitProvider.writeCommit<br/>expectedHeadSha: stale-sha, nothing written"]
+  List["listFiles / listCommits"] --> State["current state of the branch<br/>and recovery of a Koklo-Ops commit"]
+  Commit --> Batch["spec_write_batches<br/>report, message, author_role"]
+```
+
+- The emitter is the inverse of `parseFeatureMarkdown` (fixed front matter key order, round trip
+  and idempotence tested); it rejects text that would inject front matter or a section.
+- `spec_write_batches` keeps the outcome of a batch (migration `*_spec_batch_outcome`); the
+  `feature` counter feeds the `F-nnn` identifiers.
+- Not delivered here: the `specBatch` procedures, the serialized write queue and the worker job.
 
 ### Spec repository in the API (TK-43)
 `apps/api/src/repo` is the application side of the git provider. It depends on the `GitProvider`
