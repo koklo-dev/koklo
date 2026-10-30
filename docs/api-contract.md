@@ -1,9 +1,9 @@
 ---
 title: API contract
 audience: technical
-doc_version: 0.2.0
+doc_version: 0.3.0
 status: draft
-last_reviewed: 2026-10-29
+last_reviewed: 2026-10-30
 covers_release: unreleased
 sources: []
 covers_commit: 7f97066
@@ -16,10 +16,12 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.3.0** (TK-21). The router shape is
-`{ health, organization: { create, list }, member: { invite, list, setRole }, project: { list, create } }`:
-8 routes on 6 paths. Method and path are explicit on every route, via
-`.meta(openapi({ method, path }))` (`src/contract.ts`).
+Contract version **0.4.0** (TK-29). The router shape is
+`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit }`:
+33 routes on 21 paths (8 from TK-21, 25 from TK-29). Method and path are explicit on every
+route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
+`.meta(openapi({ method, path }))`) used by `src/contract.ts`, `src/contract-tickets.ts` and
+`src/contract-collaboration.ts`.
 
 | Operation | Method | Path | Auth | Typed errors (besides `INTERNAL`) |
 |-----------|--------|------|------|-----------------------------------|
@@ -32,7 +34,44 @@ Contract version **0.3.0** (TK-21). The router shape is
 | `project.list` | GET | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 | `project.create` | POST | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 
-The six TK-21 routes are implemented in `apps/api` (TK-23); see the next section.
+The six TK-21 routes are implemented in `apps/api` (TK-23); see the next section. The 25
+TK-29 routes below are **contract only**: they have no implementation yet (tickets TK-30 to
+TK-32), and `apps/api` declares no controller for them. The organisation and the active
+project always come from the session or token, never from the input; a resource of another
+project is `NOT_FOUND` (no leak). The contract does not carry roles: the matrix is
+enforced and tested in `apps/api`. "Manage" below means owner, admin, dev, designer;
+"read" is open to every role (client for its own project, business).
+
+| Operation | Method | Path | Roles (to enforce) | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`) |
+|-----------|--------|------|--------------------|---------------------------------------------------|
+| `ticket.create` | POST | `/tickets` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
+| `ticket.get` | GET | `/tickets/{key}` | read | `NOT_FOUND` |
+| `ticket.list` | GET | `/tickets` | read | none |
+| `ticket.update` | PATCH | `/tickets/{key}` | manage | `FORBIDDEN`, `NOT_FOUND`, `VALIDATION` |
+| `ticket.delete` | DELETE | `/tickets/{key}` | owner, admin | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `ticket.transition` | POST | `/tickets/{key}/transition` | manage (agents and runners by token scope) | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `INVALID_TRANSITION` |
+| `dependency.add` | POST | `/tickets/{key}/dependencies` | manage | `FORBIDDEN`, `NOT_FOUND`, `DEPENDENCY_CYCLE` |
+| `dependency.remove` | DELETE | `/tickets/{key}/dependencies/{dependsOn}` | manage | `FORBIDDEN`, `NOT_FOUND` |
+| `dependency.list` | GET | `/tickets/{key}/dependencies` | read | `NOT_FOUND` |
+| `sprint.create` | POST | `/sprints` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
+| `sprint.get` | GET | `/sprints/{key}` | read | `NOT_FOUND` |
+| `sprint.list` | GET | `/sprints` | read | none |
+| `sprint.update` | PATCH | `/sprints/{key}` | manage | `FORBIDDEN`, `NOT_FOUND`, `VALIDATION` |
+| `sprint.activate` | POST | `/sprints/{key}/activate` | manage | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `sprint.close` | POST | `/sprints/{key}/close` | manage | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `comment.create` | POST | `/comments` | owner, admin, dev, designer, client; agents by token | `FORBIDDEN` |
+| `comment.list` | GET | `/comments` | read | none |
+| `comment.delete` | DELETE | `/comments/{id}` | author, owner, admin | `FORBIDDEN`, `NOT_FOUND` |
+| `projectState.get` | GET | `/project-state` | read | none |
+| `projectState.update` | PUT | `/project-state` | owner, admin (merge policy: owner only, decided in TK-32) | `FORBIDDEN`, `VERSION_CONFLICT` |
+| `lease.acquire` | POST | `/tickets/{key}/lease` | owner, admin, dev | `FORBIDDEN`, `NOT_FOUND`, `LEASE_HELD` |
+| `lease.heartbeat` | POST | `/tickets/{key}/lease/heartbeat` | holder only | `NOT_FOUND`, `LEASE_NOT_HOLDER`, `LEASE_EXPIRED` |
+| `lease.release` | DELETE | `/tickets/{key}/lease` | holder; owner and admin may force | `NOT_FOUND`, `LEASE_NOT_HOLDER` |
+| `lease.get` | GET | `/tickets/{key}/lease` | read | `NOT_FOUND` |
+| `audit.list` | GET | `/audit` | owner, admin | `FORBIDDEN` |
+
+`audit` is read-only: the log is immutable (CDC §4.2) and fed by the server. There is no
+`lock.*` group (the merge and spec-write locks have no table yet).
 
 ## Inputs, outputs and error shapes
 
@@ -49,6 +88,31 @@ Schemas are in `packages/contract/src/schemas.ts`:
 | `project.list` | none | array of `{ id, name }` |
 | `project.create` | `{ name: 1..100 }` | `{ id, name }` |
 
+TK-29 schemas live in `src/schemas-tickets.ts` (tickets, dependencies, sprints) and
+`src/schemas-collaboration.ts` (comments, project state, leases, audit), re-exported by
+`src/schemas.ts`. Enum values are the literals of `@koklo/domain`; the contract cannot
+depend on the domain (`turbo boundaries`), so the parity is tested in
+`apps/api/test/contract-domain-parity.test.ts`.
+
+| Schema | Shape |
+|--------|-------|
+| `ticketKeySchema`, `sprintKeySchema` | `TK-n`, `SP-n` (`n >= 1`, no leading zero): public identifiers in paths |
+| `instantSchema` | ISO-8601 UTC datetime; sprint dates are `YYYY-MM-DD` |
+| `ticketSchema` | domain `Ticket` + `id` (uuid): `key, title, description, type, status, priority, sprint (SP-n or null), assignee (string or null), pkg (one of 15), labels, sensitivity, estimateHours (>= 0 or null), linkedFeatures, branch, pullRequest, attempts, reviewRounds, createdAt` |
+| `ticketDetailSchema` | `ticketSchema` + `criteria [{ statement, specRef or null }]`, `dependencies`, `lease` (active or null) |
+| `ticket.create` input | `title 1..200, type, priority, pkg, sensitivity` required; `description, status (backlog or todo), sprintId, assignee {kind member or runner, id}, labels, estimateHours, linkedFeatures, criteria` optional |
+| `ticket.update` input | `key` + any editable field; **strict**: `status` is rejected (use `ticket.transition`) |
+| `dependency.add` input | `{ key, dependsOn, type: blocks or related }`; `dependsOn === key` rejected |
+| `sprintSchema` | `{ id, key, goal, status: planned, active or closed, startsOn, endsOn, definitionOfDone }`; `endsOn >= startsOn` (create, and update when both given); update is strict (no `status`) |
+| `commentSchema` | `{ id, targetKind: ticket, feature, screen or change_request, targetId, authorKind: human, agent, client or system, authorId, body, createdAt }`; body 1..8000 on create; the author is never read from the input |
+| `projectStateSchema` | `{ version >= 1, content: object }`; `projectState.update` takes `{ expectedVersion >= 1, content }` (full replacement) |
+| `leaseSchema` | domain `Lease`: `ticket, holder {kind member or runner, id}, branch, worktree, acquiredAt, heartbeatAt, expiresAt, ttlMs > 0, released`; `lease.acquire` takes `{ key, branch, worktree, ttlMs? }`, the holder comes from the token; `lease.get` returns a lease or `null` |
+| `auditEntrySchema` | `{ id, actorKind: human, agent, runner or system, actorId?, tokenId?, action, targetKind, targetId, ticketKey?, occurredAt }` |
+
+Pagination (`ticket.list`, `comment.list`, `audit.list`): cursor-based, input `limit`
+(1..100, coerced from the query string) and `cursor`, output `{ items, nextCursor: string or null }`.
+`sprint.list` and `dependency.list` are not paginated (bounded volume).
+
 Roles (CDC §14): `Role` = `owner | admin | dev | designer | client | business`;
 `MemberRole` = `Role` without `owner`. `owner` can never be granted by invitation or role
 change. TypeScript types are exported from the package index (`Role`, `MemberRole`,
@@ -63,13 +127,29 @@ ones it lists:
 | `INTERNAL` | 500 | `{ requestId: string }` | every route |
 | `UNAUTHORIZED` | 401 | none | no or expired session |
 | `FORBIDDEN` | 403 | none | role not allowed for the action (see below) |
-| `NOT_FOUND` | 404 | none | `member.setRole`: member absent from the active organization |
+| `NOT_FOUND` | 404 | none | `member.setRole`: member absent from the active organization; TK-29 routes: ticket, sprint, comment, dependency or lease unknown or in another project |
 | `CONFLICT` | 409 | `{ reason }` | state conflict |
+| `INVALID_TRANSITION` | 409 | `{ from, to }` | `ticket.transition`: refused by the lifecycle table (`InvalidTicketTransitionError`) |
+| `DEPENDENCY_CYCLE` | 409 | `{ path: TK-n[] }` | `dependency.add` (`DependencyCycleError`) |
+| `VERSION_CONFLICT` | 409 | `{ expected, current: { version, content } }` | `projectState.update`: refused with the current state (`StaleProjectStateError`) |
+| `LEASE_HELD` | 409 | `{ ticket, holder, expiresAt }` | `lease.acquire` (`LeaseAlreadyHeldError`) |
+| `LEASE_EXPIRED` | 409 | `{ ticket, expiresAt }` | `lease.heartbeat` (`LeaseExpiredError`) |
+| `LEASE_NOT_HOLDER` | 403 | `{ ticket, holder }` | `lease.heartbeat`, `lease.release`; `holder` is the actual holder (`LeaseNotHeldByError`) |
+| `VALIDATION` | 422 | `{ field, message }` | `ticket.create/update`, `sprint.create/update`: semantically invalid input (`InvalidTicketError`, `TicketPackageError`, `InvalidSensitivityError`) |
 
 `CONFLICT.data.reason` is one of: `slug_taken` (`organization.create`), `already_member`
 and `already_invited` (`member.invite`), `last_owner` (`member.setRole`: would leave the
-organization without owner). In the generated OpenAPI, the `INTERNAL` payload is the
-component schema `Internal`.
+organization without owner), and since 0.4.0 `sprint_already_active`, `sprint_not_planned`,
+`sprint_not_active` (`sprint.activate`/`close`, and `sprint.create`), `ticket_has_active_lease`
+(`ticket.delete`) and `counter_limit_reached` (`ticket.create`, `ticket.transition`); the
+extension is backward compatible (values added). In the generated OpenAPI, the `INTERNAL`
+payload is the component schema `Internal`; the new payloads are `InvalidTransition`,
+`DependencyCycle`, `VersionConflict`, `LeaseHeld`, `LeaseExpired`, `LeaseNotHolder` and
+`Validation`.
+
+Decisions taken in TK-29 (to confirm at implementation, TK-30 to TK-32): `ticket.transition`
+does not expose `LEASE_NOT_HOLDER` (the contract does not force a lease for a transition);
+the audit log is readable by owner and admin only (loosening it is not a breaking change).
 
 Roles allowed per action (to enforce in TK-23): `member.invite` and `member.setRole` are
 reserved to `owner`/`admin` (otherwise `FORBIDDEN`); `project.create` to the roles the CDC
@@ -226,3 +306,11 @@ To change the contract: bump the version in `package.json` **and** `src/version.
 
 oRPC packages are pinned to `2.0.0-beta.46`: it is the only published line offering
 `.meta(openapi(...))` (stable 1.16.1 uses `.route()`). Replace with 2.0 stable on release.
+
+## Version history
+- **0.4.0** (TK-29): tickets, dependencies, sprints, comments, project state, leases and
+  read-only audit (25 routes, contract only); typed errors `INVALID_TRANSITION`,
+  `DEPENDENCY_CYCLE`, `VERSION_CONFLICT`, `LEASE_HELD`, `LEASE_EXPIRED`,
+  `LEASE_NOT_HOLDER`, `VALIDATION`; `CONFLICT.reason` extended. Backward compatible
+  (pre-1.0 addition); the frozen fingerprint of 0.3.0 is unchanged.
+- 0.3.0 (TK-21): organisations, members, projects.

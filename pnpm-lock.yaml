@@ -233,6 +233,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.3
         version: 2.6.3
+      '@koklo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@koklo/worker':
         specifier: workspace:*
         version: link:../worker

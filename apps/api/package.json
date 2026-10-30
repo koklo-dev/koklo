@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
+    "@koklo/domain": "workspace:*",
     "@koklo/worker": "workspace:*",
     "@nestjs/testing": "12.2.0",
     "@sentry/node": "11.10.0",

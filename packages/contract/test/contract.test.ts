@@ -84,17 +84,42 @@ describe("CT-4 chemins explicites", () => {
     const pairs = Object.entries(doc.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${path}`),
     );
-    expect(pairs).toHaveLength(8);
+    expect(pairs).toHaveLength(33);
     expect(new Set(pairs).size).toBe(pairs.length);
     expect(pairs.sort()).toEqual([
+      "DELETE /comments/{id}",
+      "DELETE /tickets/{key}",
+      "DELETE /tickets/{key}/dependencies/{dependsOn}",
+      "DELETE /tickets/{key}/lease",
+      "GET /audit",
+      "GET /comments",
       "GET /health",
       "GET /members",
       "GET /organizations",
+      "GET /project-state",
       "GET /projects",
+      "GET /sprints",
+      "GET /sprints/{key}",
+      "GET /tickets",
+      "GET /tickets/{key}",
+      "GET /tickets/{key}/dependencies",
+      "GET /tickets/{key}/lease",
       "PATCH /members/{memberId}/role",
+      "PATCH /sprints/{key}",
+      "PATCH /tickets/{key}",
+      "POST /comments",
       "POST /members/invitations",
       "POST /organizations",
       "POST /projects",
+      "POST /sprints",
+      "POST /sprints/{key}/activate",
+      "POST /sprints/{key}/close",
+      "POST /tickets",
+      "POST /tickets/{key}/dependencies",
+      "POST /tickets/{key}/lease",
+      "POST /tickets/{key}/lease/heartbeat",
+      "POST /tickets/{key}/transition",
+      "PUT /project-state",
     ]);
   });
 });
@@ -134,7 +159,7 @@ describe("CT-5 erreurs typées", () => {
 });
 
 describe("CT-6 génération OpenAPI", () => {
-  it("produit un document OpenAPI 3.x avec les 6 chemins (8 routes)", async () => {
+  it("produit un document OpenAPI 3.x avec les 21 chemins (33 routes)", async () => {
     const doc = (await generateOpenApi()) as {
       openapi: string;
       info: { title: string; version: string };
@@ -143,12 +168,27 @@ describe("CT-6 génération OpenAPI", () => {
     expect(doc.openapi).toMatch(/^3\./);
     expect(doc.info.title).toBeTruthy();
     expect(Object.keys(doc.paths).sort()).toEqual([
+      "/audit",
+      "/comments",
+      "/comments/{id}",
       "/health",
       "/members",
       "/members/invitations",
       "/members/{memberId}/role",
       "/organizations",
+      "/project-state",
       "/projects",
+      "/sprints",
+      "/sprints/{key}",
+      "/sprints/{key}/activate",
+      "/sprints/{key}/close",
+      "/tickets",
+      "/tickets/{key}",
+      "/tickets/{key}/dependencies",
+      "/tickets/{key}/dependencies/{dependsOn}",
+      "/tickets/{key}/lease",
+      "/tickets/{key}/lease/heartbeat",
+      "/tickets/{key}/transition",
     ]);
     expect(JSON.stringify(doc)).toContain('"status"');
   });
@@ -218,11 +258,16 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-21)", () => {
-  it("est en 0.3.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.3.0");
-    expect(CONTRACT_VERSION).toBe("0.3.0");
-    expect(Object.keys(readJson("openapi/versions.json"))).toEqual(["0.1.0", "0.2.0", "0.3.0"]);
+describe("CT-10 version du contrat (TK-29)", () => {
+  it("est en 0.4.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.4.0");
+    expect(CONTRACT_VERSION).toBe("0.4.0");
+    expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
+      "0.1.0",
+      "0.2.0",
+      "0.3.0",
+      "0.4.0",
+    ]);
   });
 
   it("conserve les empreintes des versions précédentes (versions.json ne fait que croître)", () => {
@@ -232,6 +277,9 @@ describe("CT-10 version du contrat (TK-21)", () => {
     );
     expect(versions["0.2.0"]).toBe(
       "9187ec3eae09e5a6dd39091f417b5fe55b5f72ea22a71f29066455b5261ab779",
+    );
+    expect(versions["0.3.0"]).toBe(
+      "d16fb0eec65a6efef88a8d35c8ce69a7aa160efe7c606e1246b4b2ca79f3f869",
     );
   });
 });

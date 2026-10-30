@@ -20,12 +20,27 @@ describe("GET /openapi.json (C3.1)", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual(JSON.parse(JSON.stringify(await generateOpenApi())));
     expect(Object.keys(response.body.paths).sort()).toEqual([
+      "/audit",
+      "/comments",
+      "/comments/{id}",
       "/health",
       "/members",
       "/members/invitations",
       "/members/{memberId}/role",
       "/organizations",
+      "/project-state",
       "/projects",
+      "/sprints",
+      "/sprints/{key}",
+      "/sprints/{key}/activate",
+      "/sprints/{key}/close",
+      "/tickets",
+      "/tickets/{key}",
+      "/tickets/{key}/dependencies",
+      "/tickets/{key}/dependencies/{dependsOn}",
+      "/tickets/{key}/lease",
+      "/tickets/{key}/lease/heartbeat",
+      "/tickets/{key}/transition",
     ]);
   });
 });
