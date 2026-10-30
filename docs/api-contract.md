@@ -38,7 +38,7 @@ The six TK-21 routes are implemented in `apps/api` (TK-23). Of the 25 TK-29 rout
 ticket, dependency and sprint ones are implemented since TK-30 (see
 [Tickets, dependencies and sprints (TK-30)](#tickets-dependencies-and-sprints-tk-30)); the
 lease and project-state ones since TK-31 (see [Leases and project state (TK-31)](#leases-and-project-state-tk-31));
-the comment and audit routes are still **contract only** (TK-32). The
+the comment and audit ones since TK-32 (see [Comments and audit log (TK-32)](#comments-and-audit-log-tk-32)). The
 organisation and the project always come from the session or the server, never from the input;
 a resource of another project is `NOT_FOUND` (no leak). The contract does not carry roles:
 the matrix is enforced and tested in `apps/api`. "Manage" below means owner, admin, dev,
@@ -403,9 +403,62 @@ To change the contract: bump the version in `package.json` **and** `src/version.
 oRPC packages are pinned to `2.0.0-beta.46`: it is the only published line offering
 `.meta(openapi(...))` (stable 1.16.1 uses `.route()`). Replace with 2.0 stable on release.
 
+## Comments and audit log (TK-32)
+Modules `comment/` and `audit/` in `apps/api`, same hexagonal shape as TK-31. The contract is
+unchanged (0.4.0). `comment.create` and `comment.delete` write their `audit_log` row
+(`comment.create`, `comment.delete`, target kind `comment`, `ticket_id` = the commented ticket)
+in the same transaction as the write. Roles live in `auth/roles.ts`: `COMMENT_WRITE_ROLES`
+(owner, admin, dev, designer, client), `COMMENT_DELETE_ANY_ROLES` (owner, admin),
+`AUDIT_READ_ROLES` (owner, admin).
+
+| Route | Rule |
+|---|---|
+| `comment.create` | owner, admin, dev, designer, client (business is read-only: `FORBIDDEN`). The author comes from the session, never from the input: `client` writes as `authorKind: client`, the others as `human`, `authorId` is the user id. Body 1..8000 characters, stored as is (untrusted data). A body refused by the contract schema is returned as `VALIDATION` (422), see "Schema refusals" below |
+| `comment.list` | every role. Oldest first, cursor on `(createdAt, id)`; deleted comments are hidden. A row with a NULL `author_id` (system comment) is served with `authorId: "system"` |
+| `comment.delete` | the author, or owner and admin for any comment. Soft delete (`deleted_at` set from `CLOCK`); the row stays. Membership of the project is checked before the right: unknown, already deleted or foreign comment is `NOT_FOUND`, another author's comment is `FORBIDDEN` |
+| `audit.list` | owner and admin only. Newest first, cursor on `(occurredAt, id)`. Filters combined with AND: `ticketKey` (unknown key: empty page), `actorKind`, `action` (exact), `from` (included), `to` (excluded). Null fields are omitted, `ticketKey` is resolved even for a soft-deleted ticket, the comment body is never exposed |
+
+Target validation (done by the API, the contract types `targetId` as a free string): only
+`targetKind: ticket` is accepted (`VALIDATION{targetKind}` otherwise: features, screens and change
+requests have no table); `targetId` must be a UUID (`VALIDATION{targetId}`); the ticket must exist,
+not be deleted and belong to the current project (`NOT_FOUND`). Pagination: `limit` default 50,
+maximum 100, a malformed cursor is `VALIDATION{cursor}`. These `VALIDATION`, `NOT_FOUND` and
+`FORBIDDEN` errors are raised with the right HTTP status but are not typed in the 0.4.0 OpenAPI
+(candidates for 0.5.0, with a nullable `authorId`, a `uuid` `targetId` and an enumerated audit
+`targetKind`).
+
+**Schema refusals (temporary interceptor).** The contract types `comment.create` without
+`VALIDATION`, so the framework rejects an empty or over-long body as `BAD_REQUEST` (400). The
+tests require 422, so `input-validation.ts` (an oRPC client interceptor registered in
+`ORPCModule.forRoot`) converts it. Its scope is exactly the route `POST /comments`, read from the
+procedure's OpenAPI metadata; it converts only a `BAD_REQUEST` that carries schema `issues`
+(field = first path segment, message = first issue) and passes every other error through
+unchanged, so it hides nothing (organisation routes keep their 400). It is a stopgap: contract 0.5.0
+must type `VALIDATION` on `comment.create`, after which the interceptor is deleted.
+
+**Shared bricks added by TK-32** (`tracker/`): `cursor.ts` (opaque base64url cursor on
+`(sort key, id)`, `keysetAfter`, `pageOfItems`, default page size 50) now serves `ticket.list`,
+`comment.list` and `audit.list`; `uuid.ts` (`isUuid`). A malformed cursor is `VALIDATION{cursor}` on
+comments and audit, but still ignored on `ticket.list` (no typed error on that route).
+
+**Hypotheses for contract 0.5.0** (decisions to take, none applied in 0.4.0):
+- `VALIDATION` and `NOT_FOUND` typed on `comment.*`; `FORBIDDEN` typed on `comment.list` and
+  `audit.list`; `FORBIDDEN` on `projectState.get`.
+- `authorId` nullable (or the fixed value `"system"` documented) instead of `min(1)`; `targetId`
+  as `z.uuid()`; audit `targetKind` enumerated; explicit `projectId` instead of the oldest project.
+- Open questions: may the `client` role see comments written by agents? Should `organization.*`,
+  `member.*` and `project.create` be journaled (excluded from the audit-coverage test for now)?
+- Only the `ticket` target is accepted for comments (no table for features, screens, change requests).
+
+**Immutable log.** The only writer is `recordAudit` (`tracker/audit.ts`); the `audit` module only
+calls `findMany`/`findFirst`, `/audit` has only `GET`, and the database triggers refuse `UPDATE`,
+`DELETE` and `TRUNCATE`. A test derives every non-GET procedure of the tracker groups from the
+contract and checks each one writes exactly one audit row (organisation, member and
+`project.create` writes are not journaled yet).
+
 ## Version history
 - **0.4.0** (TK-29, 15 routes implemented in TK-30, 6 more in TK-31: leases and project state): tickets, dependencies, sprints, comments, project state, leases and
-  read-only audit (25 routes, contract only); typed errors `INVALID_TRANSITION`,
+  read-only audit (25 routes, all implemented since TK-32); typed errors `INVALID_TRANSITION`,
   `DEPENDENCY_CYCLE`, `VERSION_CONFLICT`, `LEASE_HELD`, `LEASE_EXPIRED`,
   `LEASE_NOT_HOLDER`, `VALIDATION`; `CONFLICT.reason` extended. Backward compatible
   (pre-1.0 addition); the frozen fingerprint of 0.3.0 is unchanged.

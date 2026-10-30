@@ -3,12 +3,15 @@ import { type LogDestination, setupObservability } from "@koklo/observability";
 import { type DynamicModule, Module } from "@nestjs/common";
 import { ORPCModule } from "@orpc/nest";
 import { LoggerModule } from "nestjs-pino";
+import { AuditModule } from "./audit/audit.module.ts";
 import { AuthModule } from "./auth/auth.module.ts";
 import { ClockModule } from "./clock.ts";
+import { CommentModule } from "./comment/comment.module.ts";
 import type { AppConfig } from "./config.ts";
 import { DatabaseModule } from "./database/database.module.ts";
 import { ERROR_STATUS_MAP } from "./error-status.ts";
 import { HealthModule } from "./health/health.module.ts";
+import { validationStatusInterceptor } from "./input-validation.ts";
 import { LeaseModule } from "./lease/lease.module.ts";
 import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
@@ -56,7 +59,10 @@ export class AppModule {
         ClockModule,
         DatabaseModule.forRoot(config),
         AuthModule.forRoot(config),
-        ORPCModule.forRoot({ errorStatusMap: ERROR_STATUS_MAP }),
+        ORPCModule.forRoot({
+          errorStatusMap: ERROR_STATUS_MAP,
+          clientInterceptors: [validationStatusInterceptor],
+        }),
         HealthModule,
         OrganizationModule,
         MemberModule,
@@ -65,6 +71,8 @@ export class AppModule {
         SprintModule,
         LeaseModule,
         ProjectStateModule,
+        CommentModule,
+        AuditModule,
       ],
       controllers: [OpenApiController],
     };

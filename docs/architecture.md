@@ -413,6 +413,12 @@ flowchart LR
   tx --> db[(PostgreSQL: rows + counter + audit_log)]
 ```
 
+### Comments and audit log in the API (TK-32)
+Modules `comment/` and `audit/` reuse the TK-30 shape. Keyset pagination (`tracker/cursor.ts`) and
+UUID checks (`tracker/uuid.ts`) are shared with `ticket.list`. The audit module is read-only; the
+single writer is `recordAudit`, called inside each write transaction. Details:
+[API contract](api-contract.md#comments-and-audit-log-tk-32).
+
 ### Leases and project state in the API (TK-31)
 Modules `lease/` and `project-state/` follow the TK-30 shape (service holds the use case, port
 hides Prisma, `@koklo/domain` decides, one transaction and one audit row per write). Time comes

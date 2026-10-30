@@ -1,3 +1,4 @@
+import { decodeCursor, keysetAfter, pageOfItems } from "../tracker/cursor.ts";
 import type {
   Holder,
   LeaseRecord,
@@ -83,29 +84,8 @@ export const toLeaseRecord = (row: {
   released: row.releasedAt !== null,
 });
 
-/** Curseur opaque `(createdAt, id)` : tri stable de `ticket.list` (H7). */
-export const encodeCursor = (row: { createdAt: Date; id: string }): string =>
-  Buffer.from(JSON.stringify([row.createdAt.toISOString(), row.id])).toString("base64url");
-
-/** `null` si le curseur n'est pas un curseur émis par `encodeCursor`. */
-export function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
-  try {
-    const [createdAt, id] = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-    const date = new Date(createdAt);
-    return typeof id === "string" && !Number.isNaN(date.getTime()) ? { createdAt: date, id } : null;
-  } catch {
-    return null;
-  }
-}
-
-export const pageOfRows = (rows: TicketRow[], limit: number): TicketPage => {
-  const items = rows.slice(0, limit).map(toTicketRecord);
-  const last = rows[limit - 1];
-  return {
-    items,
-    nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
-  };
-};
+export const pageOfRows = (rows: TicketRow[], limit: number): TicketPage =>
+  pageOfItems(rows, limit, (row) => row.createdAt, toTicketRecord);
 
 /** `kind:id` ou un identifiant seul, comme `ticket.list` le reçoit dans le filtre `assignee`. */
 function assigneeFilter(assignee: string) {
@@ -127,13 +107,6 @@ export function listWhere(projectId: string, filter: TicketFilter, cursor?: stri
     ...(filter.sprintKey ? { sprint: { key: filter.sprintKey } } : {}),
     ...(filter.pkg ? { pkg: filter.pkg } : {}),
     ...(filter.assignee ? assigneeFilter(filter.assignee) : {}),
-    ...(after
-      ? {
-          OR: [
-            { createdAt: { gt: after.createdAt } },
-            { createdAt: after.createdAt, id: { gt: after.id } },
-          ],
-        }
-      : {}),
+    ...(after ? keysetAfter("createdAt", after, "asc") : {}),
   };
 }
