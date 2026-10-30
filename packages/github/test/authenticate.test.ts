@@ -1,4 +1,9 @@
-import { GitAuthExpiredError, GitNotFoundError, type GitUserCredentials } from "@koklo/domain";
+import {
+  GitAuthExpiredError,
+  GitNotFoundError,
+  type GitUserCredentials,
+  UserTokenRequiredError,
+} from "@koklo/domain";
 import { describe, expect, it } from "vitest";
 import { caught, createMockGitHub, ORG, PERSON, providerOn } from "./support/mock-github.ts";
 
@@ -128,5 +133,35 @@ describe("authenticate : jeton utilisateur", () => {
     expect(error).toBeInstanceOf(GitAuthExpiredError);
     expect(error).toMatchObject({ kind: "user", refreshable: false });
     expect(mock.requests).toEqual([]);
+  });
+});
+
+describe("authenticate : jeton utilisateur sans identifiants client (optionnels)", () => {
+  const without = { clientId: undefined, clientSecret: undefined };
+
+  it("jeton valide : UserTokenRequiredError, aucune requête (impossible à valider)", async () => {
+    const mock = createMockGitHub();
+    const error = await caught(
+      providerOn(mock, without).authenticate({ installation: personal, user: valid }),
+    );
+    expect(error).toBeInstanceOf(UserTokenRequiredError);
+    expect(mock.requests).toHaveLength(0);
+  });
+
+  it("jeton expiré : UserTokenRequiredError, aucune requête, aucun secret dans le message", async () => {
+    const mock = createMockGitHub();
+    const expired = { ...valid, expiresAt: "2026-10-30T11:00:00.000Z", refreshToken: "ghr-secret" };
+    const error = await caught(
+      providerOn(mock, without).authenticate({ installation: personal, user: expired }),
+    );
+    expect(error).toBeInstanceOf(UserTokenRequiredError);
+    expect(error.message).not.toContain("ghr-secret");
+    expect(mock.requests).toHaveLength(0);
+  });
+
+  it("le jeton d'installation fonctionne sans identifiants client", async () => {
+    const mock = createMockGitHub({ [TOKEN]: issued("2026-10-30T13:00:00Z") });
+    const auth = await providerOn(mock, without).authenticate({ installation });
+    expect(auth.kind).toBe("installation");
   });
 });

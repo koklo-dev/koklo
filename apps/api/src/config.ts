@@ -1,12 +1,16 @@
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 import { z } from "zod";
 
-/** GitHub App de l'épique (fournisseur git) : distincte de l'OAuth App de Better Auth. */
+/**
+ * GitHub App de l'épique (fournisseur git) : distincte de l'OAuth App de Better Auth (autres
+ * identifiants, jamais lus ici). `clientId` et `clientSecret` vont ensemble et sont facultatifs :
+ * ils ne servent qu'aux jetons utilisateur, flux non implémenté aujourd'hui.
+ */
 export interface GithubAppConfig {
   appId: string;
   privateKey: string;
-  clientId: string;
-  clientSecret: string;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 export interface AppConfig {
@@ -27,13 +31,9 @@ export interface AppConfig {
 
 const MIN_AUTH_SECRET_LENGTH = 32;
 
-/** Variables de l'App GitHub, lues en tout-ou-rien (valeur vide = non fournie). */
-const GITHUB_APP_VARIABLES = [
-  "GITHUB_APP_ID",
-  "GITHUB_APP_PRIVATE_KEY",
-  "GITHUB_APP_CLIENT_ID",
-  "GITHUB_APP_CLIENT_SECRET",
-] as const;
+/** Paires de l'App GitHub, chacune tout-ou-rien (valeur vide = non fournie). */
+const APP_IDENTITY = ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY"] as const;
+const APP_CLIENT = ["GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET"] as const;
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -60,26 +60,49 @@ function pemOf(value: string): string {
   return decoded.includes("-----BEGIN") ? decoded : value;
 }
 
+type Env = Record<string, string | undefined>;
+
 /**
- * Tout ou rien : aucune variable renseignée = pas d'App ; toutes = App ; une partie = erreur qui
- * nomme les variables manquantes (jamais les valeurs reçues).
+ * Lit une paire tout-ou-rien : `undefined` si aucune variable n'est renseignée, les deux valeurs
+ * si elles le sont ; une seule renseignée = erreur qui nomme l'autre (jamais une valeur reçue).
  */
-function githubAppOf(env: Record<string, string | undefined>): GithubAppConfig | undefined {
-  const given = GITHUB_APP_VARIABLES.filter((name) => (env[name] ?? "") !== "");
+function pairOf(
+  env: Env,
+  names: readonly [string, string],
+  role: string,
+): [string, string] | undefined {
+  const given = names.filter((name) => (env[name] ?? "") !== "");
   if (given.length === 0) {
     return undefined;
   }
-  const missing = GITHUB_APP_VARIABLES.filter((name) => !given.includes(name));
+  const missing = names.filter((name) => !given.includes(name));
   if (missing.length > 0) {
     throw new Error(
-      `Configuration invalide (GitHub App : ${missing.join(", ")} manquante(s) ; fournir les quatre variables ou aucune)`,
+      `Configuration invalide (GitHub App : ${missing.join(", ")} manquante(s) ; ${role})`,
     );
   }
+  return [env[names[0]] as string, env[names[1]] as string];
+}
+
+/**
+ * ID + clé privée forment la paire obligatoire de l'App (aucune = pas d'App) ; les identifiants
+ * client forment une seconde paire facultative. Un client fourni sans App échoue en nommant l'ID.
+ */
+function githubAppOf(env: Env): GithubAppConfig | undefined {
+  const identity = pairOf(env, APP_IDENTITY, "fournir les deux variables ou aucune");
+  if (!identity) {
+    if (APP_CLIENT.some((name) => (env[name] ?? "") !== "")) {
+      throw new Error(
+        "Configuration invalide (GitHub App : GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY manquante(s) ; les identifiants client exigent l'App)",
+      );
+    }
+    return undefined;
+  }
+  const client = pairOf(env, APP_CLIENT, "fournir les deux variables ou aucune");
   return {
-    appId: env.GITHUB_APP_ID as string,
-    privateKey: pemOf(env.GITHUB_APP_PRIVATE_KEY as string),
-    clientId: env.GITHUB_APP_CLIENT_ID as string,
-    clientSecret: env.GITHUB_APP_CLIENT_SECRET as string,
+    appId: identity[0],
+    privateKey: pemOf(identity[1]),
+    ...(client ? { clientId: client[0], clientSecret: client[1] } : {}),
   };
 }
 

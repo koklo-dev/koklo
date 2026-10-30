@@ -110,6 +110,56 @@ describe("câblage du fournisseur selon la configuration", () => {
       await app.close();
     }
   });
+});
+
+describe("App sans identifiants client (optionnels) et sans App", () => {
+  it("ID + clé sans identifiants client : l'adaptateur Octokit est actif", async () => {
+    const { GIT_PROVIDER } = await import("../src/repo/tokens.ts");
+    const { OctokitGitProvider } = await import("@koklo/github");
+    const app = await createRepoApp(UNREACHABLE_DATABASE_URL, {
+      githubApp: { appId: "123456", privateKey: PEM },
+    });
+    try {
+      expect(app.get(GIT_PROVIDER)).toBeInstanceOf(OctokitGitProvider);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("repo.createSpec sur compte personnel, sans identifiants client : USER_TOKEN_REQUIRED", async () => {
+    const world = await createWorld(database);
+    const installation = await insertInstallation(database, world.organizationId, {
+      ownerKind: "user",
+      ownerLogin: "octo-personal",
+    });
+    // Adaptateur réel, construit comme le module (ID + clé seulement), sur un transport simulé
+    // qui n'émet que des jetons d'installation : aucun jeton utilisateur n'existe.
+    const { createOctokitGitProvider } = await import("@koklo/github");
+    const provider = createOctokitGitProvider({
+      appId: "123456",
+      privateKey: PEM,
+      now: () => new Date(),
+      retries: 0,
+      spaceWrites: false,
+      fetch: async () =>
+        Response.json(
+          { token: "iat-fake", expires_at: new Date(Date.now() + 3_600_000).toISOString() },
+          { status: 201 },
+        ),
+    });
+    const app = await createRepoApp(database.url, { clock: new ManualClock(), provider });
+    try {
+      const res = await repoApi(app, world.actors.owner).createSpec(
+        world.projectId,
+        installation.id,
+      );
+      expect(res.body.code, JSON.stringify(res.body)).toBe("USER_TOKEN_REQUIRED");
+      expect(res.body.data).toEqual({ ownerLogin: "octo-personal" });
+      expect(await projectRepoRows(database, world.organizationId)).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
 
   it("sans App : un seul avertissement au démarrage, sans aucune valeur", async () => {
     lines.length = 0;

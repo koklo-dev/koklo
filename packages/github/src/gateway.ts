@@ -22,8 +22,8 @@ const credentialOf = (auth: GitAuth): ErrorContext["credential"] => ({
 export class Gateway {
   readonly now: () => Date;
   readonly maxPages: number;
-  readonly clientId: string;
-  readonly clientSecret: string;
+  readonly clientId: string | undefined;
+  readonly clientSecret: string | undefined;
   readonly #options: OctokitGitProviderOptions;
   readonly #clients: ClientCache;
   #anonymous: GitHubOctokit | undefined;

@@ -5,7 +5,7 @@ apiVersion: deploy/v1
 name: koklo
 server: vps20
 secrets: [OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET]  # GitHub refuse les secrets nommés GITHUB_* : l'api les reçoit sous leur nom d'origine par `vars`
-optionalSecrets: [GH_APP_ID, GH_APP_PRIVATE_KEY, GH_WEBHOOK_SECRET, SENTRY_DSN]  # GH_APP_* passent en secrets à R2 ; mappés en GITHUB_APP_* par `vars` (GitHub refuse GITHUB_*)
+optionalSecrets: [GH_APP_ID, GH_APP_PRIVATE_KEY, GH_APP_CLIENT_ID, GH_APP_CLIENT_SECRET, GH_WEBHOOK_SECRET, SENTRY_DSN]  # GH_APP_ID/GH_APP_PRIVATE_KEY passent en secrets à R2 ; GH_APP_CLIENT_* restent facultatifs (jetons utilisateur, flux absent) ; mappés en GITHUB_APP_* par `vars` (GitHub refuse GITHUB_*)
 generate: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]
 lockedSecrets: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]     # sessions signées, données chiffrées
 vars: { LOG_LEVEL: info, EMAIL_FROM: 'Koklo <no-reply@koklo.dev>', BETTER_AUTH_URL: 'https://${domains.app}' }   # origine web : l'API n'est pas exposée
@@ -16,7 +16,8 @@ apps:
   api: { image: ghcr.io/koklo-dev/koklo-api, registry: ghcr, port: 3000, healthcheck: /health,
          uses: [db, files, mail], resources: { cpus: 1, memory: 1g },
          vars: { GITHUB_CLIENT_ID: '${secrets.OAUTH_GITHUB_CLIENT_ID}', GITHUB_CLIENT_SECRET: '${secrets.OAUTH_GITHUB_CLIENT_SECRET}',
-                 GITHUB_APP_ID: '${secrets.GH_APP_ID}', GITHUB_APP_PRIVATE_KEY: '${secrets.GH_APP_PRIVATE_KEY}', GITHUB_WEBHOOK_SECRET: '${secrets.GH_WEBHOOK_SECRET}' } }
+                 GITHUB_APP_ID: '${secrets.GH_APP_ID}', GITHUB_APP_PRIVATE_KEY: '${secrets.GH_APP_PRIVATE_KEY}', GITHUB_WEBHOOK_SECRET: '${secrets.GH_WEBHOOK_SECRET}',
+                 GITHUB_APP_CLIENT_ID: '${secrets.GH_APP_CLIENT_ID}', GITHUB_APP_CLIENT_SECRET: '${secrets.GH_APP_CLIENT_SECRET}' } }
 workers:
   worker: { image: ghcr.io/koklo-dev/koklo-worker, registry: ghcr, uses: [db, files, mail], resources: { cpus: 0.5, memory: 512m },
            vars: { GITHUB_APP_ID: '${secrets.GH_APP_ID}', GITHUB_APP_PRIVATE_KEY: '${secrets.GH_APP_PRIVATE_KEY}', GITHUB_WEBHOOK_SECRET: '${secrets.GH_WEBHOOK_SECRET}' } }

@@ -659,11 +659,15 @@ The log carries `owner/name` and the failed step, never a token. A new call with
 complete it by hand and attach it with `repo.link`.
 
 ### Provider not configured (staging without the App)
-`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` are
-read all or nothing (an empty value counts as missing). With none, the API starts, logs one warning
-and `repo.createSpec` and `repo.link` answer 503 `PROVIDER_UNAVAILABLE` after the access checks
-(`FORBIDDEN`, then `NOT_FOUND`); `repo.list` works. A partial set fails at startup, naming the missing
-variables and never a value. The private key is accepted as the one-line base64 the infra stores
+`GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` are read as an all-or-nothing pair (an empty value counts
+as missing). With neither, the API starts, logs one warning and `repo.createSpec` and `repo.link`
+answer 503 `PROVIDER_UNAVAILABLE` after the access checks (`FORBIDDEN`, then `NOT_FOUND`);
+`repo.list` works. With only those two (staging without client credentials) the provider is active:
+organisation accounts work, and a personal account answers 403 `USER_TOKEN_REQUIRED` (no user-token
+flow yet; fallback `repo.link`). `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` are optional,
+all or nothing, and distinct from the sign-in OAuth pair `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`,
+which the App configuration never reads. A single variable of a pair fails at startup, naming the
+missing variable and never a value. The private key is accepted as the one-line base64 the infra stores
 (`GH_APP_PRIVATE_KEY`) or as a PEM with literal `\n`. The fake provider is never selected by configuration, only injected by
 tests through the `GIT_PROVIDER` token.
 

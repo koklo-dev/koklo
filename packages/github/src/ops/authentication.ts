@@ -2,7 +2,9 @@ import {
   type GitAuth,
   GitAuthExpiredError,
   GitNotFoundError,
+  type GitOwner,
   type GitUserCredentials,
+  UserTokenRequiredError,
 } from "@koklo/domain";
 import { createAppAuth } from "@octokit/auth-app";
 import { type GitHubOctokit, WRITE } from "../client.ts";
@@ -22,7 +24,8 @@ type RefreshResponse = {
   refresh_token_expires_in?: number;
 };
 
-type InstallationRequest = { id: string };
+type InstallationRequest = { id: string; owner: GitOwner };
+type ClientCredentials = { clientId: string; clientSecret: string };
 
 /**
  * `authenticate` : jeton d'installation (JWT de l'App via `@octokit/auth-app`, avec son cache)
@@ -45,7 +48,7 @@ export class Authenticator {
   }): Promise<GitAuth> {
     return request.user === undefined
       ? this.#installation(request.installation)
-      : this.#user(request.user);
+      : this.#user(request.user, request.installation);
   }
 
   #installation(installation: InstallationRequest): Promise<GitAuth> {
@@ -81,18 +84,33 @@ export class Authenticator {
     return this.#appAuth;
   }
 
-  async #user(credentials: GitUserCredentials): Promise<GitAuth> {
+  async #user(
+    credentials: GitUserCredentials,
+    installation: InstallationRequest,
+  ): Promise<GitAuth> {
+    const client = this.#client();
+    if (client === undefined) {
+      // Sans identifiants client, un jeton utilisateur ne peut être ni validé ni rafraîchi.
+      throw new UserTokenRequiredError({ operation: OPERATION, owner: installation.owner });
+    }
     const expired = Date.parse(credentials.expiresAt) <= this.#gateway.now().getTime();
     if (!expired) {
-      await this.#validate(credentials);
+      await this.#validate(credentials, client);
       return { kind: "user", ...credentials };
     }
-    return this.#refresh(credentials);
+    return this.#refresh(credentials, client);
+  }
+
+  #client(): ClientCredentials | undefined {
+    const { clientId, clientSecret } = this.#gateway;
+    return clientId === undefined || clientSecret === undefined
+      ? undefined
+      : { clientId, clientSecret };
   }
 
   /** « Check a token » : exige le secret client, donc prouve que le jeton vient de notre App. */
-  #validate(credentials: GitUserCredentials): Promise<void> {
-    const { clientId, clientSecret } = this.#gateway;
+  #validate(credentials: GitUserCredentials, client: ClientCredentials): Promise<void> {
+    const { clientId, clientSecret } = client;
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
     return this.#gateway.anonymous(
       userOperation(),
@@ -113,14 +131,14 @@ export class Authenticator {
     );
   }
 
-  #refresh(credentials: GitUserCredentials): Promise<GitAuth> {
+  #refresh(credentials: GitUserCredentials, client: ClientCredentials): Promise<GitAuth> {
     const now = this.#gateway.now().getTime();
     const { refreshToken, refreshExpiresAt } = credentials;
     const refreshable =
       refreshToken !== undefined &&
       (refreshExpiresAt === undefined || Date.parse(refreshExpiresAt) > now);
     if (!refreshable) return Promise.reject(expiredUserToken(false));
-    const { clientId, clientSecret } = this.#gateway;
+    const { clientId, clientSecret } = client;
     return this.#gateway.anonymous(
       userOperation(),
       userCredential(credentials),
