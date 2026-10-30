@@ -497,3 +497,12 @@ Tests that guard it:
   `projects.spec.ts`.
 
 Selector changes for the real-stack e2e of TK-15: TO DOCUMENT (not part of this diff).
+
+## Real GitHub conformance (TK-39)
+`pnpm --filter @koklo/github test:real` runs the shared `GitProvider` conformance suite against
+real GitHub, by hand only. It refuses to start (exit 1, missing variables listed) unless the
+10 `KOKLO_GH_*` variables are set (template: `packages/github/.env.real.example`; the real
+`.env.real` is git-ignored). Repositories are named `koklo-sandbox-<timestamp>-...` in the test
+organisation; they are deleted at the end only if the test App has the Administration
+(write) permission, otherwise delete them by prefix. Full procedure and App permissions:
+`packages/github/README.md`.

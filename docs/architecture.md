@@ -605,8 +605,8 @@ sequenceDiagram
 ### Git provider port (TK-38)
 `packages/domain` defines the `GitProvider` port (vision §8) and its value types
 (`git-*.ts`). It is types and errors only: **no Octokit, no I/O in `domain`**. The
-Octokit adapter will live in `packages/github` (depends on `domain`, never the reverse),
-and tests use an in-memory fake.
+Octokit adapter lives in `packages/github` (depends on `domain`, never the reverse, see
+"GitHub adapter and shared fake (TK-39)"), and tests use its in-memory fake.
 
 Thirteen async methods, each taking one request object with an explicit `auth`
 (the port is stateless). French names of vision §8 in parentheses:
@@ -642,13 +642,58 @@ flowchart LR
     Port -. throws .-> Errors
   end
   subgraph github["packages/github"]
-    Adapter["Octokit adapter (later ticket)"]
+    Adapter["Octokit adapter (TK-39)"]
   end
   Fake["test fake (in memory)"]
   Adapter -- implements --> Port
   Fake -- implements --> Port
   Adapter -- maps HTTP errors --> Errors
 ```
+
+### GitHub adapter and shared fake (TK-39)
+`packages/github` (`@koklo/github`) implements the `GitProvider` port twice, behind one
+conformance suite (incident 33: a fake that drifts from the real service hides bugs).
+
+- **Adapter** `createOctokitGitProvider(options)`: GitHub App, REST via `@octokit/core` and
+  plugins (library, not the `octokit` umbrella; no ADR, it is not a framework and sits behind
+  the port). Nothing is read from the environment: App id, PEM key, client secret, clock and
+  `fetch` are injected. A `Gateway` is the single call path: it picks the cached client
+  (keyed by a SHA-256 of the token), logs `operation`, `status`, `durationMs` only, and maps
+  every failure to a typed port error with no `RequestError` as `cause`.
+- **Retries**: only reads (GET) on 5xx or network errors; writes never. On quota, one GET
+  retry if the wait is short, else `GitRateLimitedError` goes to the worker. `spaceWrites`
+  (default `true`) keeps the throttling plugin's 1 s spacing between writes; tests set it
+  to `false`.
+- **Shared fake** `InMemoryGitProvider`, exported as `@koklo/github/testing`: stateful (commit
+  graph with full content, three-way merge per file), deterministic (injected clock and
+  ids), per-instance state, expired tokens refused. Other packages' tests import it instead
+  of writing their own.
+- **Conformance suite** `test/conformance/suite.ts`: one body, two entry points. CI runs it
+  against the fake (`fake.test.ts`); `pnpm --filter @koklo/github test:real` runs it
+  against real GitHub on `koklo-sandbox-` repositories (manual, never in CI). A divergence
+  found on real GitHub becomes a suite case, and the fake is corrected.
+- Token safety: never in logs or errors; `.env.real` is git-ignored, `.env.real.example`
+  (empty values) is tracked.
+
+```mermaid
+flowchart LR
+  Port["GitProvider port<br/>packages/domain"]
+  subgraph github["packages/github"]
+    Adapter["OctokitGitProvider<br/>Gateway, errors-map, ops/"]
+    Fake["InMemoryGitProvider<br/>export ./testing"]
+    Suite["conformance suite<br/>(one body)"]
+  end
+  Others["tests of api, worker, delivery"]
+  GH[("GitHub API")]
+  Adapter -- implements --> Port
+  Fake -- implements --> Port
+  Adapter -- HTTP --> GH
+  Suite -- CI: fake.test.ts --> Fake
+  Suite -- manual: test:real --> Adapter
+  Others -- import --> Fake
+```
+
+Procedure, App permissions and sandbox clean-up: `packages/github/README.md`.
 
 ### Magic-link emails: `send-magic-link` queue (TK-22)
 The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.

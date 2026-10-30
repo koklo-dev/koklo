@@ -1,0 +1,24 @@
+{
+  "extends": ["//"],
+  "tags": ["github"],
+  "tasks": {
+    "test:real": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": [
+        "KOKLO_GH_APP_ID",
+        "KOKLO_GH_PRIVATE_KEY",
+        "KOKLO_GH_PRIVATE_KEY_PATH",
+        "KOKLO_GH_CLIENT_ID",
+        "KOKLO_GH_CLIENT_SECRET",
+        "KOKLO_GH_ORG_LOGIN",
+        "KOKLO_GH_ORG_INSTALLATION_ID",
+        "KOKLO_GH_USER_LOGIN",
+        "KOKLO_GH_USER_INSTALLATION_ID",
+        "KOKLO_GH_USER_TOKEN",
+        "KOKLO_GH_USER_TOKEN_EXPIRES_AT",
+        "KOKLO_GH_SANDBOX_PREFIX"
+      ]
+    }
+  }
+}
