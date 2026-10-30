@@ -11,7 +11,7 @@ import {
 } from "./tokens.ts";
 
 /**
- * Fournisseur git de l'API : l'adaptateur Octokit si l'App GitHub est configurée, sinon `null`
+ * Fournisseur git de l'API : l'adaptateur Octokit si l'App GitHub est configurée (ID + clé ; les identifiants client sont facultatifs), sinon `null`
  * (un seul avertissement au démarrage, sans valeur). Le faux n'est jamais choisi par la
  * configuration : les tests l'injectent par `overrideProvider(GIT_PROVIDER)`.
  */
@@ -19,7 +19,7 @@ function providerOf(config: AppConfig, clock: Clock): GitProviderBinding {
   const app = config.githubApp;
   if (!app) {
     requestLogger().warn(
-      "GITHUB_APP_* absentes : fournisseur git non configuré, repo.createSpec et repo.link répondront PROVIDER_UNAVAILABLE",
+      "GITHUB_APP_ID et GITHUB_APP_PRIVATE_KEY absentes : fournisseur git non configuré, repo.createSpec et repo.link répondront PROVIDER_UNAVAILABLE",
     );
     return null;
   }

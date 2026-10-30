@@ -12,8 +12,13 @@ export type GitProviderLogEntry = {
 export type OctokitGitProviderOptions = {
   readonly appId: string;
   readonly privateKey: string;
-  readonly clientId: string;
-  readonly clientSecret: string;
+  /**
+   * Identifiants client de l'App (distincts de l'OAuth App de connexion), facultatifs et fournis
+   * ensemble : ils ne servent qu'aux jetons utilisateur. Absents, ces jetons sont refusés par
+   * `UserTokenRequiredError` ; le jeton d'installation n'en a pas besoin.
+   */
+  readonly clientId?: string | undefined;
+  readonly clientSecret?: string | undefined;
   /** Horloge injectée : calcul des délais de quota, des expirations et des dates de commit. */
   readonly now: () => Date;
   /** Transport HTTP (tests) ; `fetch` global par défaut. */

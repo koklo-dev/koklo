@@ -2,7 +2,7 @@ import type { GitProvider, GitUserCredentials } from "@koklo/domain";
 
 /**
  * Fournisseur git injecté dans l'API (port `GitProvider` du domaine). `null` : l'App GitHub n'est
- * pas configurée (`GITHUB_APP_*` absentes) ; `repo.createSpec` et `repo.link` répondent alors
+ * pas configurée (`GITHUB_APP_ID` et `GITHUB_APP_PRIVATE_KEY` absentes) ; `repo.createSpec` et `repo.link` répondent alors
  * `PROVIDER_UNAVAILABLE`. Les tests le remplacent par le faux en mémoire (`overrideProvider`).
  */
 export const GIT_PROVIDER = Symbol("GIT_PROVIDER");

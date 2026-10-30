@@ -23,7 +23,7 @@ import { send } from "./tickets.ts";
  * Contrat attendu de la production (TK-43) :
  *  - `src/repo/tokens.ts` exporte les jetons Nest `GIT_PROVIDER` (valeur `GitProvider | null`,
  *    `null` = App non configurée) et `USER_CREDENTIALS` (port `UserCredentialsStore`) ;
- *  - `AppConfig.githubApp?: { appId, privateKey, clientId, clientSecret }` (tout ou rien).
+ *  - `AppConfig.githubApp?: { appId, privateKey, clientId?, clientSecret? }` (ID + clé tout ou rien ; client optionnel).
  * Les imports de production sont différés : un module absent fait échouer le test qui en a besoin,
  * pas tous les fichiers qui importent ce helper.
  */
@@ -180,7 +180,7 @@ export interface RepoAppOptions {
   /** Absent : le fournisseur résolu par la configuration (null sans `githubApp`). */
   provider?: GitProvider | null;
   credentials?: TestCredentialsStore;
-  githubApp?: { appId: string; privateKey: string; clientId: string; clientSecret: string };
+  githubApp?: { appId: string; privateKey: string; clientId?: string; clientSecret?: string };
   logStream?: { write: (line: string) => void };
   appEnv?: AppConfig["appEnv"];
 }

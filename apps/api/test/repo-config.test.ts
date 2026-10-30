@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.ts";
 
 /**
- * TK-43 CA11 : l'App GitHub est configurée en tout-ou-rien (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY,
- * GITHUB_APP_CLIENT_ID, GITHUB_APP_CLIENT_SECRET) : une configuration partielle fait échouer le démarrage.
+ * TK-43 CA11, révisé par le correctif HOTFIX-github-app-config : l'App GitHub se configure par la paire
+ * tout-ou-rien GITHUB_APP_ID + GITHUB_APP_PRIVATE_KEY ; GITHUB_APP_CLIENT_ID + GITHUB_APP_CLIENT_SECRET
+ * forment une seconde paire tout-ou-rien, optionnelle (futur flux de jeton utilisateur). Une paire
+ * partielle fait échouer le démarrage.
  */
 const APP_KEYS = [
   "GITHUB_APP_ID",
@@ -41,6 +43,40 @@ describe("configuration de l'App GitHub : tout ou rien", () => {
     expect(githubApp(Object.fromEntries(APP_KEYS.map((key) => [key, ""])))).toBeUndefined();
   });
 
+  it("ID + clé seulement : App configurée, sans identifiants client", () => {
+    expect(
+      githubApp({
+        GITHUB_APP_ID: APP_ENV.GITHUB_APP_ID,
+        GITHUB_APP_PRIVATE_KEY: APP_ENV.GITHUB_APP_PRIVATE_KEY,
+      }),
+    ).toEqual({
+      appId: "123456",
+      privateKey: "-----BEGIN PRIVATE KEY-----\nABCDEF\n-----END PRIVATE KEY-----",
+    });
+  });
+
+  it("ID + clé et identifiants client vides : équivaut à ID + clé seulement", () => {
+    const app = githubApp({
+      GITHUB_APP_ID: APP_ENV.GITHUB_APP_ID,
+      GITHUB_APP_PRIVATE_KEY: APP_ENV.GITHUB_APP_PRIVATE_KEY,
+      GITHUB_APP_CLIENT_ID: "",
+      GITHUB_APP_CLIENT_SECRET: "",
+    });
+    expect(app).toBeDefined();
+    expect(app).not.toHaveProperty("clientId");
+    expect(app).not.toHaveProperty("clientSecret");
+  });
+
+  it("GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (OAuth de connexion) ne sont jamais lus pour l'App", () => {
+    expect(githubApp({})).toBeUndefined();
+    const app = githubApp({
+      GITHUB_APP_ID: APP_ENV.GITHUB_APP_ID,
+      GITHUB_APP_PRIVATE_KEY: APP_ENV.GITHUB_APP_PRIVATE_KEY,
+    });
+    expect(JSON.stringify(app)).not.toContain("better-auth-client");
+    expect(app).not.toHaveProperty("clientId");
+  });
+
   it("les quatre variables : App configurée, clé PEM aux retours à la ligne normalisés", () => {
     expect(githubApp(APP_ENV)).toEqual({
       appId: "123456",
@@ -58,24 +94,49 @@ describe("configuration de l'App GitHub : tout ou rien", () => {
   });
 });
 
+const messageOf = (env: Record<string, string>): string => {
+  try {
+    loadConfig({ ...BASE_ENV, ...env });
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  return "";
+};
+
 describe("configuration partielle : échec au démarrage, noms seulement", () => {
-  it.each(APP_KEYS)("%s manquante : l'échec nomme cette variable", (missing) => {
-    const env = Object.fromEntries(
-      APP_KEYS.filter((key) => key !== missing).map((key) => [key, APP_ENV[key]]),
-    );
-    expect(() => loadConfig({ ...BASE_ENV, ...env })).toThrow(new RegExp(missing));
+  it.each(["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY"] as const)(
+    "%s manquante (l'autre fournie) : l'échec nomme cette variable seule",
+    (missing) => {
+      const other = missing === "GITHUB_APP_ID" ? "GITHUB_APP_PRIVATE_KEY" : "GITHUB_APP_ID";
+      const message = messageOf({ [other]: APP_ENV[other] });
+      expect(message).toContain(missing);
+      expect(message).not.toContain(other);
+      expect(message).not.toContain(APP_ENV[other]);
+    },
+  );
+
+  it.each([
+    ["GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET"],
+    ["GITHUB_APP_CLIENT_SECRET", "GITHUB_APP_CLIENT_ID"],
+  ] as const)("%s seule : l'échec nomme %s", (given, missing) => {
+    const message = messageOf({
+      GITHUB_APP_ID: APP_ENV.GITHUB_APP_ID,
+      GITHUB_APP_PRIVATE_KEY: APP_ENV.GITHUB_APP_PRIVATE_KEY,
+      [given]: APP_ENV[given],
+    });
+    expect(message).toContain(missing);
+    expect(message).not.toContain(APP_ENV[given]);
   });
 
-  it("une seule variable fournie : les trois autres sont nommées, la valeur ne l'est jamais", () => {
-    let message = "";
-    try {
-      loadConfig({ ...BASE_ENV, GITHUB_APP_CLIENT_SECRET: "app-client-secret-VALUE" });
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error);
-    }
-    for (const key of ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", "GITHUB_APP_CLIENT_ID"]) {
-      expect(message).toContain(key);
-    }
+  it("CLIENT_ID seul, sans ID ni clé : échec (nomme l'ID de l'App)", () => {
+    expect(() => loadConfig({ ...BASE_ENV, GITHUB_APP_CLIENT_ID: "Iv1.x" })).toThrow(
+      /GITHUB_APP_ID/,
+    );
+  });
+
+  it("une seule variable fournie : la valeur n'est jamais citée", () => {
+    const message = messageOf({ GITHUB_APP_CLIENT_SECRET: "app-client-secret-VALUE" });
+    expect(message).toContain("GITHUB_APP_ID");
     expect(message).not.toContain("app-client-secret-VALUE");
   });
 
