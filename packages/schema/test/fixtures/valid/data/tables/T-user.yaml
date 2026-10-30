@@ -1,0 +1,5 @@
+id: T-user
+champs:
+  - { nom: id, type: uuid, nullable: false, unique: true }
+  - { nom: email, type: text, nullable: false, unique: true }
+  - { nom: mot_de_passe_hash, type: text, nullable: false, unique: false }

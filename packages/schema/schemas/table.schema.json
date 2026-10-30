@@ -1,0 +1,56 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/table.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "champs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "nom": {
+            "pattern": "^[a-z_][a-z0-9_]*$",
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          },
+          "type": {
+            "enum": [
+              "uuid",
+              "text",
+              "integer",
+              "decimal",
+              "boolean",
+              "timestamp",
+              "json"
+            ],
+            "type": "string"
+          },
+          "unique": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "nom",
+          "type",
+          "nullable",
+          "unique"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "description": {
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "champs"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "__schema0": {
+      "additionalProperties": {},
+      "properties": {
+        "annotations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "comportement": {
+                "type": "string"
+              },
+              "critere": {
+                "pattern": "^AC-\\d+$",
+                "type": "string"
+              },
+              "donnee": {
+                "type": "string"
+              },
+              "endpoint": {
+                "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+                "type": "string"
+              },
+              "feature": {
+                "pattern": "^F-\\d{3,}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "feature"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "composant": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "enfants": {
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "composant"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://koklo.dev/schemas/spec/v1/screen.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "arbre": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "etats": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "features": {
+      "default": [],
+      "items": {
+        "pattern": "^F-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^S-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "viewport": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "arbre"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "S-register-success",
+  "features": ["F-001"],
+  "arbre": { "composant": "C-page" },
+  "etats": ["succes"]
+}
