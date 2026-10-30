@@ -324,11 +324,22 @@ DNS records are not removed by infra: delete them by hand.
 The test session (`x-test-session`) exists only when `APP_ENV=test`: never run a deployed
 environment with that value. Secret storage and rotation: TO DOCUMENT.
 
-Demo seed: `pnpm db:seed` (delegates to `@koklo/db` `seed`, `node scripts/seed.ts`)
-upserts fixed-id demo rows in a single transaction and rolls back on error. It is
-idempotent, but it overwrites any edit made to those rows (name, slug, email, role,
-dates). Test: `packages/db/test/seed.test.ts`; `root-scripts.test.ts` checks the root
-`db:seed` script. Demo emails use the reserved `.test` domain.
+Demo seed (vision §18.3): `pnpm db:seed` (delegates to `@koklo/db` `seed`, `node scripts/seed.ts`)
+loads one organization, an admin and a client, the demo project, an active sprint `SP-1` and
+six linked tickets `TK-1`..`TK-6` (all kanban columns, `blocks` and `related` edges, labels,
+feature refs, acceptance criteria), with the `ticket` and `sprint` counters set to 6 and 1 (the
+next ticket is `TK-7`). The fictional spec (`F-001`..`F-003`, `T-user`, `T-session`) is a typed
+constant in `src/seed-data.ts`, not a table, until TK-41. It runs in a single transaction and
+rolls back on error. It is idempotent and deterministic (fixed ids and `2026-01-01` timestamp,
+no clock): rows are upserted by natural key (`(project, key)`, `(project, number)`), the
+children of the six seeded tickets are deleted and re-inserted, counters use `GREATEST` (the
+database trigger forbids lowering them) and tickets created outside the seed are never touched.
+It overwrites any edit made to the seeded rows. **Never in production**: `seed()` throws before
+opening any connection when `NODE_ENV=production`, with no bypass (a production database
+reached with another `NODE_ENV` is not detected). Test: `packages/db/test/seed.test.ts`;
+`root-scripts.test.ts` checks the root `db:seed` script. Demo emails use the reserved `.test`
+domain. The same seed serves the e2e run; the active sprint means a sprint created by an e2e
+must be `planned`, and new tickets start at `TK-7`.
 
 Database rollback path: `pnpm db:rollback` undoes the latest migration (its `down.sql`,
 then removal of its `_prisma_migrations` row). It is not transactional, so take a backup

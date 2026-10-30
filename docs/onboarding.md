@@ -41,7 +41,7 @@ pnpm dev         # Postgres (Compose) + web :3000 + api :3001 + worker (e2e/scri
 pnpm e2e         # real-stack e2e (TK-15): Compose Postgres, migrate, seed, build, api+web, Playwright (needs Docker + Chromium)
 pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
 pnpm db:rollback # undo the latest migration through its down.sql
-pnpm db:seed     # deterministic demo data (needs DATABASE_URL), safe to re-run
+pnpm db:seed     # deterministic demo data: sprint + 6 tickets (needs DATABASE_URL), safe to re-run, refused when NODE_ENV=production
 ```
 
 Local database (TK-7): `docker compose up -d postgres` at the root (set `KOKLO_DB_PORT`

@@ -15,7 +15,7 @@ KOKLO_DB_PORT=5433 docker compose up -d postgres   # depuis la racine ; 5432 par
 cp packages/db/.env.example packages/db/.env       # ajuster le port si besoin
 pnpm db:migrate                                    # prisma migrate deploy
 pnpm db:rollback                                   # annule la dernière migration
-pnpm db:seed                                       # jeu de démo déterministe (idempotent)
+pnpm db:seed                                       # jeu de démo déterministe (idempotent), jamais en production
 pnpm --filter @koklo/db generate                   # client dans packages/db/src/generated (ignoré par git)
 ```
 
@@ -74,3 +74,13 @@ après incident, avec sauvegarde préalable ailleurs.
 
 `pnpm --filter @koklo/db test` démarre un Postgres 17 éphémère via Docker (port hôte aléatoire,
 jamais 5432) ou utilise `TEST_DATABASE_URL`. Sans l'un ni l'autre, le test échoue (pas de skip).
+
+## Seed de démo
+
+`pnpm db:seed` charge l'organisation, un admin, un client, le « Projet de démo », le sprint
+actif `SP-1` et six tickets `TK-1` à `TK-6` (dépendances, labels, features, critères),
+compteurs à 6 et 1. Il est déterministe (ids et date fixes), idempotent (upserts par clés
+naturelles, enfants des tickets seedés réinsérés, compteurs en `GREATEST`) et transactionnel.
+Les tickets créés hors seed ne sont jamais touchés. **Jamais en production** : `seed()` lève
+une erreur avant toute connexion quand `NODE_ENV=production`. Code : `src/seed-data.ts`,
+`src/seed-statements.ts`, `src/seed-guard.ts`, `src/seed.ts`.
