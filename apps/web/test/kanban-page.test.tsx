@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KanbanPage } from "../src/components/kanban-page.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import {
   apiError,
   getSession,
@@ -113,6 +114,11 @@ function asRole(role: string) {
 const column = (status: Status) => screen.getByTestId(`kanban-column-${status}`);
 const card = (key: string) => screen.getByTestId(`kanban-card-${key}`);
 const moveButton = (key: string) => screen.getByRole("button", { name: `Déplacer ${key}` });
+/** Le bouton n'existe qu'une fois le rôle chargé (session puis organisation) : on l'attend par son texte. */
+const findMoveButton = async (key: string) => {
+  await within(card(key)).findByText("Déplacer");
+  return moveButton(key);
+};
 const keysIn = (status: Status) =>
   within(column(status))
     .queryAllByTestId(/^kanban-card-/)
@@ -121,6 +127,15 @@ const keysIn = (status: Status) =>
 async function renderBoard() {
   renderWithQuery(<KanbanPage />);
   await screen.findByTestId("kanban-board");
+}
+
+/**
+ * Tableau affiché ET rôle chargé (par défaut propriétaire) : les contrôles de déplacement dépendent de la
+ * session puis de la liste d'organisations, qui arrivent indépendamment des tickets.
+ */
+async function renderEditableBoard() {
+  await renderBoard();
+  await findMoveButton("TK-102");
 }
 
 /** jsdom n'a pas de DataTransfer : un double minimal suffit aux événements de glisser HTML5. */
@@ -364,7 +379,7 @@ describe("KanbanPage — pagination (C4)", () => {
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un écran, un test par comportement
 describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
   it("la carte contient un vrai bouton nommé « Déplacer TK-102 » avec menu", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     const button = moveButton("TK-102");
     expect(button.tagName).toBe("BUTTON");
     expect(button).toHaveAttribute("aria-haspopup", "menu");
@@ -373,10 +388,10 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
   });
 
   it("Entrée ouvre le menu « Déplacer TK-102 vers » : les 6 autres statuts, dans l'ordre", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     moveButton("TK-102").focus();
     await userEvent.keyboard("{Enter}");
-    const menu = await screen.findByRole("menu", { name: "Déplacer TK-102 vers" });
+    const menu = await findNamed("menu", "Déplacer TK-102 vers");
     const items = within(menu).getAllByRole("menuitem");
     expect(items.map((i) => i.textContent)).toEqual([
       "Backlog",
@@ -390,10 +405,10 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
   });
 
   it("flèche bas navigue, Entrée choisit : ticket.transition reçoit { key, to }", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     moveButton("TK-102").focus();
     await userEvent.keyboard("{Enter}");
-    const menu = await screen.findByRole("menu");
+    const menu = await findNamed("menu", "Déplacer TK-102 vers");
     await waitFor(() =>
       expect(within(menu).getByRole("menuitem", { name: "Backlog" })).toHaveFocus(),
     );
@@ -408,10 +423,10 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
   });
 
   it("Espace choisit aussi un statut", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     moveButton("TK-104").focus();
     await userEvent.keyboard(" ");
-    const menu = await screen.findByRole("menu", { name: "Déplacer TK-104 vers" });
+    const menu = await findNamed("menu", "Déplacer TK-104 vers");
     await userEvent.click(within(menu).getByRole("menuitem", { name: "En revue" }));
     await waitFor(() =>
       expect(procedures.ticketTransition.mock.calls[0]?.[0]).toEqual({
@@ -422,10 +437,10 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
   });
 
   it("Échap ferme le menu sans appel et rend le focus au bouton", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     moveButton("TK-102").focus();
     await userEvent.keyboard("{Enter}");
-    await screen.findByRole("menu");
+    await findNamed("menu", "Déplacer TK-102 vers");
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
     expect(moveButton("TK-102")).toHaveFocus();
@@ -433,10 +448,10 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
   });
 
   it("le menu n'est pas proposé pour le statut courant", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     moveButton("TK-107").focus();
     await userEvent.keyboard("{Enter}");
-    const menu = await screen.findByRole("menu", { name: "Déplacer TK-107 vers" });
+    const menu = await findNamed("menu", "Déplacer TK-107 vers");
     expect(within(menu).queryByRole("menuitem", { name: "Terminé" })).not.toBeInTheDocument();
     expect(within(menu).getAllByRole("menuitem")).toHaveLength(6);
   });
@@ -445,7 +460,7 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
 async function moveWithMenu(key: string, to: string) {
   moveButton(key).focus();
   await userEvent.keyboard("{Enter}");
-  const menu = await screen.findByRole("menu");
+  const menu = await findNamed("menu", `Déplacer ${key} vers`);
   await userEvent.click(within(menu).getByRole("menuitem", { name: to }));
 }
 
@@ -453,7 +468,7 @@ async function moveWithMenu(key: string, to: string) {
 describe("KanbanPage — déplacement, succès et refus (C6)", () => {
   it("pendant l'appel : carte aria-busy, bouton désactivé « Déplacement… », non glissable", async () => {
     procedures.ticketTransition.mockReturnValue(new Promise(() => undefined));
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     await waitFor(() => expect(card("TK-102")).toHaveAttribute("aria-busy", "true"));
     expect(within(card("TK-102")).getByText("Déplacement…")).toBeInTheDocument();
@@ -463,7 +478,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
   });
 
   it("succès : la carte change de colonne, compteurs à jour, annonce role=status, focus sur « Déplacer »", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     await waitFor(() => expect(keysIn("in_progress")).toContain("TK-102"));
     expect(keysIn("todo")).not.toContain("TK-102");
@@ -478,7 +493,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
     procedures.ticketTransition.mockImplementation(() =>
       Promise.reject(apiError("INVALID_TRANSITION", { from: "todo", to: "done" })),
     );
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "Terminé");
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Déplacement impossible");
@@ -495,7 +510,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
     procedures.ticketTransition.mockImplementation(() =>
       Promise.reject(apiError("INVALID_TRANSITION", { from: "todo", to: "done" })),
     );
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "Terminé");
     const alert = await screen.findByRole("alert");
     await userEvent.click(within(alert).getByRole("button", { name: "Fermer le message" }));
@@ -508,7 +523,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
         Promise.reject(apiError("INVALID_TRANSITION", { from: "todo", to: "done" })),
       )
       .mockImplementationOnce(() => Promise.reject(apiError("FORBIDDEN")));
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "Terminé");
     await screen.findByText(/Transition interdite/);
     await moveWithMenu("TK-102", "En cours");
@@ -519,7 +534,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
 
   it("FORBIDDEN : message de droits", async () => {
     procedures.ticketTransition.mockImplementation(() => Promise.reject(apiError("FORBIDDEN")));
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Vous n'avez pas le droit de déplacer les tickets. Demandez à un propriétaire, un administrateur, un développeur ou un designer.",
@@ -528,7 +543,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
 
   it("CONFLICT : « Ce ticket a changé entre-temps » avec « Recharger »", async () => {
     procedures.ticketTransition.mockImplementation(() => Promise.reject(apiError("CONFLICT")));
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Ce ticket a changé entre-temps");
@@ -542,7 +557,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
     procedures.ticketTransition.mockImplementation(() =>
       Promise.reject(apiError("CONFLICT", { reason: "ticket_has_active_lease" })),
     );
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Ce ticket est en cours de traitement par un agent. Réessayez quand il aura terminé.",
@@ -551,7 +566,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
 
   it("NOT_FOUND sur le ticket : « Ce ticket n'existe plus. » et rechargement du tableau", async () => {
     procedures.ticketTransition.mockImplementation(() => Promise.reject(apiError("NOT_FOUND")));
-    await renderBoard();
+    await renderEditableBoard();
     const before = procedures.ticketList.mock.calls.length;
     await moveWithMenu("TK-102", "En cours");
     expect(await screen.findByRole("alert")).toHaveTextContent("Ce ticket n'existe plus.");
@@ -560,7 +575,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
 
   it("INTERNAL : « Le déplacement a échoué » et « Réessayer » relance la même transition", async () => {
     procedures.ticketTransition.mockImplementationOnce(() => Promise.reject(apiError("INTERNAL")));
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Le déplacement a échoué");
@@ -576,7 +591,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
 
   it("erreur réseau (sans code) : même message que INTERNAL", async () => {
     procedures.ticketTransition.mockImplementation(() => Promise.reject(new Error("réseau")));
-    await renderBoard();
+    await renderEditableBoard();
     await moveWithMenu("TK-102", "En cours");
     expect(await screen.findByRole("alert")).toHaveTextContent("Le déplacement a échoué");
   });
@@ -585,12 +600,12 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un écran, un test par comportement
 describe("KanbanPage — glisser-déposer natif (C6)", () => {
   it("les cartes de l'équipe sont draggable", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     expect(card("TK-102")).toHaveAttribute("draggable", "true");
   });
 
   it("déposer sur une autre colonne appelle ticket.transition avec la clé et la cible", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     const dt = dataTransfer();
     fireEvent.dragStart(card("TK-102"), { dataTransfer: dt });
     fireEvent.dragOver(column("in_review"), { dataTransfer: dt });
@@ -608,7 +623,7 @@ describe("KanbanPage — glisser-déposer natif (C6)", () => {
   });
 
   it("la colonne d'origine n'offre pas de retour de dépôt et déposer dessus ne fait rien", async () => {
-    await renderBoard();
+    await renderEditableBoard();
     const dt = dataTransfer();
     fireEvent.dragStart(card("TK-102"), { dataTransfer: dt });
     fireEvent.dragOver(column("todo"), { dataTransfer: dt });
@@ -619,7 +634,7 @@ describe("KanbanPage — glisser-déposer natif (C6)", () => {
 
   it("une colonne vide reste une cible de dépôt", async () => {
     board = board.filter((t) => t.status !== "blocked");
-    await renderBoard();
+    await renderEditableBoard();
     const dt = dataTransfer();
     fireEvent.dragStart(card("TK-102"), { dataTransfer: dt });
     fireEvent.dragOver(column("blocked"), { dataTransfer: dt });
@@ -636,7 +651,7 @@ describe("KanbanPage — glisser-déposer natif (C6)", () => {
     procedures.ticketTransition.mockImplementation(() =>
       Promise.reject(apiError("INVALID_TRANSITION", { from: "todo", to: "done" })),
     );
-    await renderBoard();
+    await renderEditableBoard();
     const dt = dataTransfer();
     fireEvent.dragStart(card("TK-102"), { dataTransfer: dt });
     fireEvent.dragOver(column("done"), { dataTransfer: dt });

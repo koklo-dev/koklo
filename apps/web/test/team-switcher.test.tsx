@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppSidebar } from "../src/components/app-sidebar.tsx";
 import { TeamSwitcher } from "../src/components/team-switcher.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import {
   getSession,
   navigations,
@@ -89,7 +90,7 @@ describe("TeamSwitcher réel (S-projects v4)", () => {
   it("choisir une autre organisation appelle setActive", async () => {
     renderSwitcher();
     await openSwitcher();
-    await userEvent.click(await screen.findByRole("menuitem", { name: /Studio Nord/ }));
+    await userEvent.click(await findNamed("menuitem", /Studio Nord/));
     await waitFor(() => expect(setActive).toHaveBeenCalledWith({ organizationId: OTHER_ORG_ID }));
   });
 });
@@ -106,22 +107,13 @@ describe("Navigation de la barre latérale", () => {
 
   it("propose « Projets » et « Membres » vers /projects et /members", async () => {
     renderSidebar("/projects");
-    expect(await screen.findByRole("link", { name: "Projets" })).toHaveAttribute(
-      "href",
-      "/projects",
-    );
-    expect(await screen.findByRole("link", { name: "Membres" })).toHaveAttribute(
-      "href",
-      "/members",
-    );
+    expect(await findNamed("link", "Projets")).toHaveAttribute("href", "/projects");
+    expect(await findNamed("link", "Membres")).toHaveAttribute("href", "/members");
   });
 
   it("marque « Membres » aria-current=page sur /members, pas « Projets »", async () => {
     renderSidebar("/members");
-    expect(await screen.findByRole("link", { name: "Membres" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(await findNamed("link", "Membres")).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Projets" })).not.toHaveAttribute("aria-current");
   });
 });

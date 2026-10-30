@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationsPage } from "../src/components/organizations-page.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import {
   apiError,
   getSession,
@@ -56,7 +57,7 @@ describe("S-organizations — 0 organisation (état vide, premier login)", () =>
   it("affiche le titre, la phrase d'accueil et le formulaire de création seul", async () => {
     renderWithQuery(<OrganizationsPage />);
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Créer votre organisation" }),
+      await findNamed("heading", "Créer votre organisation", { level: 1 }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -84,7 +85,7 @@ describe("S-organizations — 0 organisation (état vide, premier login)", () =>
   it("propose « Se déconnecter » et appelle signOut", async () => {
     signOut.mockResolvedValue({ data: {}, error: null });
     renderWithQuery(<OrganizationsPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Se déconnecter" }));
+    await userEvent.click(await findNamed("button", "Se déconnecter"));
     expect(signOut).toHaveBeenCalled();
   });
 });
@@ -136,7 +137,7 @@ describe("S-organizations — création", () => {
     renderWithQuery(<OrganizationsPage />);
     await userEvent.type(await screen.findByLabelText("Nom de l'organisation"), "Atelier");
     await userEvent.click(screen.getByRole("button", { name: "Créer l'organisation" }));
-    const busy = await screen.findByRole("button", { name: "Création…" });
+    const busy = await findNamed("button", "Création…");
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(screen.getByLabelText("Nom de l'organisation")).toHaveAttribute("readonly");
@@ -144,7 +145,7 @@ describe("S-organizations — création", () => {
 
   it("refuse un nom vide : erreur liée au champ, focus, aucun appel API", async () => {
     renderWithQuery(<OrganizationsPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Créer l'organisation" }));
+    await userEvent.click(await findNamed("button", "Créer l'organisation"));
     const field = screen.getByLabelText("Nom de l'organisation");
     expect(await screen.findByText("Saisissez le nom de l'organisation.")).toBeInTheDocument();
     expect(field).toHaveAttribute("aria-invalid", "true");
@@ -246,7 +247,7 @@ describe("S-organizations — 2 organisations ou plus (choix)", () => {
   it("liste les organisations avec leur rôle et un bouton « Ouvrir » nommé", async () => {
     renderWithQuery(<OrganizationsPage />);
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Choisir une organisation" }),
+      await findNamed("heading", "Choisir une organisation", { level: 1 }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Ouvrir l'organisation Atelier Lumière" }),
@@ -262,8 +263,9 @@ describe("S-organizations — 2 organisations ou plus (choix)", () => {
 
   it("« Ouvrir » active l'organisation choisie puis navigue vers /projects", async () => {
     renderWithQuery(<OrganizationsPage />);
+    await screen.findByText("Studio Nord");
     await userEvent.click(
-      await screen.findByRole("button", { name: "Ouvrir l'organisation Studio Nord" }),
+      screen.getByRole("button", { name: "Ouvrir l'organisation Studio Nord" }),
     );
     await waitFor(() => expect(setActive).toHaveBeenCalledWith({ organizationId: OTHER_ORG_ID }));
     await waitFor(() => expect(navigations()).toContain("/projects"));

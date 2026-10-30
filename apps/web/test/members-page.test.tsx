@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MembersPage } from "../src/components/members-page.tsx";
 import { renderWithQuery } from "./support/render.tsx";
+import { findNamed } from "./support/wait.ts";
 import {
   apiError,
   getSession,
@@ -57,7 +58,7 @@ function asRole(role: string) {
 
 async function chooseRole(label: string) {
   await userEvent.click(screen.getByRole("combobox", { name: "Rôle" }));
-  await userEvent.click(await screen.findByRole("option", { name: label }));
+  await userEvent.click(await findNamed("option", label));
 }
 
 async function fillInvite(email: string, role: string) {
@@ -84,7 +85,8 @@ describe("S-members — liste", () => {
 
   it("rend un tableau « Liste des membres » avec nom, e-mail et rôle en texte", async () => {
     renderWithQuery(<MembersPage />);
-    expect(await screen.findByRole("table", { name: "Liste des membres" })).toBeInTheDocument();
+    await screen.findByText("Moussa Diallo");
+    expect(screen.getByRole("table", { name: "Liste des membres" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Membre" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Rôle" })).toBeInTheDocument();
     const row = screen.getByText("Moussa Diallo").closest("tr") as HTMLElement;
@@ -129,7 +131,8 @@ describe("S-members — droits selon le rôle (C2.c, C2.d)", () => {
       ).toBeInTheDocument();
       expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Inviter" })).not.toBeInTheDocument();
-      expect(await screen.findByRole("table", { name: "Liste des membres" })).toBeInTheDocument();
+      await screen.findByText("Moussa Diallo");
+      expect(screen.getByRole("table", { name: "Liste des membres" })).toBeInTheDocument();
     },
   );
 
@@ -198,7 +201,7 @@ describe("S-members — invitation (C2.a)", () => {
     procedures.memberInvite.mockReturnValue(new Promise(() => undefined));
     renderWithQuery(<MembersPage />);
     await fillInvite("nina@example.com", "Designer");
-    const busy = await screen.findByRole("button", { name: "Invitation…" });
+    const busy = await findNamed("button", "Invitation…");
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(screen.getByLabelText("Adresse e-mail")).toHaveAttribute("readonly");
