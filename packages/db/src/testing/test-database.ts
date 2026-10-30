@@ -49,22 +49,60 @@ function withDatabaseName(url: string, name: string): string {
   return parsed.toString();
 }
 
-/** Démarre le conteneur éphémère sur un port hôte aléatoire (jamais 5432). */
-function startContainer(): { containerId: string; adminUrl: string } {
-  const containerId = docker([
+const DATA_DIR = "/var/lib/postgresql/data";
+
+/**
+ * Arguments de `docker run` du Postgres éphémère. L'image déclare `VOLUME ${DATA_DIR}` : sans
+ * tmpfs, chaque conteneur laisse un volume anonyme. Le datadir est donc monté en tmpfs.
+ */
+export function postgresRunArgs(): string[] {
+  return [
     "run",
     "-d",
     "--rm",
+    "--label",
+    "org.koklo.test=true",
+    "--tmpfs",
+    `${DATA_DIR}:rw`,
     "-p",
     "127.0.0.1::5432",
     "-e",
     `POSTGRES_PASSWORD=${PASSWORD}`,
     IMAGE,
-  ]);
+  ];
+}
+
+const liveContainers = new Set<string>();
+let exitHookInstalled = false;
+
+/** Filet si le process s'arrête sans passer par dispose() (échec de hook, Ctrl-C, exception). */
+function ensureExitHook(): void {
+  if (exitHookInstalled) return;
+  exitHookInstalled = true;
+  process.once("exit", () => {
+    for (const id of liveContainers) removeContainer(id);
+  });
+}
+
+/** Supprime le conteneur (et ses éventuels volumes anonymes) ; sans erreur s'il a déjà disparu. */
+function removeContainer(containerId: string): void {
+  liveContainers.delete(containerId);
+  try {
+    docker(["rm", "-f", "-v", containerId]);
+  } catch {
+    // déjà supprimé (--rm)
+  }
+}
+
+/** Démarre le conteneur éphémère sur un port hôte aléatoire (jamais 5432). */
+function startContainer(): { containerId: string; adminUrl: string } {
+  const containerId = docker(postgresRunArgs());
+  liveContainers.add(containerId);
+  ensureExitHook();
   const mapping = docker(["port", containerId, "5432/tcp"]).split("\n")[0] ?? "";
   const port = mapping.split(":").at(-1);
   if (!port || port === "5432") {
-    docker(["rm", "-f", containerId]);
+    removeContainer(containerId);
     throw new Error(`Port hôte inattendu pour le Postgres éphémère : "${mapping}"`);
   }
   return { containerId, adminUrl: `postgresql://postgres:${PASSWORD}@127.0.0.1:${port}/postgres` };
@@ -94,13 +132,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   }
 
   const stopContainer = () => {
-    if (containerId) {
-      try {
-        docker(["rm", "-f", containerId]);
-      } catch {
-        // déjà supprimé (--rm)
-      }
-    }
+    if (containerId) removeContainer(containerId);
   };
 
   try {

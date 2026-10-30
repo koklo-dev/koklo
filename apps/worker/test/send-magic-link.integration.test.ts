@@ -1,9 +1,10 @@
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { SEND_MAGIC_LINK_QUEUE } from "../src/jobs/send-magic-link.ts";
 import { CaptureMailSender } from "../src/mail/capture-mail-sender.ts";
 import type { MailSender } from "../src/mail/mail-sender.ts";
 import { startWorker, type Worker } from "../src/worker.ts";
+import { startTestPostgres } from "./support/postgres.ts";
 
 /**
  * TK-22 : le consommateur send-magic-link du worker (Postgres + pg-boss réels, envoi capturé),
@@ -35,7 +36,7 @@ async function start(mailSender: MailSender): Promise<Worker> {
 }
 
 beforeAll(async () => {
-  database = await new PostgreSqlContainer("postgres:17-alpine").start();
+  database = await startTestPostgres();
 });
 
 beforeEach(() => {

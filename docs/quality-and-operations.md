@@ -84,6 +84,19 @@ covers_commit: 7f97066
   (acceptance criterion of TK-12). The package's Vitest config raises `testTimeout`
   to 60 s and `hookTimeout` to 180 s (first image pull) and excludes `src/main.ts`
   from coverage. Requires Docker.
+- **Integration Postgres hygiene** (fix `testcontainers-anonymous-volumes`): the
+  `postgres:17-alpine` image declares `VOLUME /var/lib/postgresql/data`, so every test container
+  creates an anonymous Docker volume that `stop()` does not remove. Rules: (1) every test
+  Postgres mounts its datadir on **tmpfs** (`.withTmpFs({ "/var/lib/postgresql/data": "rw" })`
+  through `apps/worker/test/support/postgres.ts`; `--tmpfs` in `postgresRunArgs()` of
+  `packages/db/src/testing/test-database.ts`); no test calls `new PostgreSqlContainer` directly
+  (static guard `apps/worker/test/postgres-tmpfs.test.ts`, args guard
+  `packages/db/test/test-database-args.test.ts`). (2) Every container is stopped in `afterAll`
+  (`database?.stop()` / `db?.dispose()`, which runs `docker rm -f -v`); the `packages/db` helper also
+  removes live containers on process `exit`, and testcontainers' Ryuk reaper must stay enabled
+  (never set `TESTCONTAINERS_RYUK_DISABLED`). (3) After a batch of test runs, a human may clean
+  leftovers manually (never `docker system prune` nor `docker volume prune -a`):
+  `docker container prune -f --filter label=org.testcontainers=true && docker volume prune -f`.
 - **Observability tests** (TK-19): `packages/observability/test/` (logger JSON, redaction,
   no-op without DSN, `captureError` never throws, `setupObservability`);
   `apps/api/test/observability-config.test.ts` and `observability-app.test.ts` (config,
