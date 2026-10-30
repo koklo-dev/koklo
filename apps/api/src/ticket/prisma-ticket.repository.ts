@@ -2,16 +2,19 @@ import type { Dependency } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import { recordAudit } from "../tracker/audit.ts";
-import { nextCounterValue } from "../tracker/counters.ts";
+import { nextCounterValue, raiseCounterTo } from "../tracker/counters.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
   Criterion,
+  ImportedCriterion,
+  ImportedTicket,
   LeaseRecord,
   NewTicket,
   SprintRef,
   TicketChanges,
   TicketFilter,
+  TicketIdentity,
   TicketPage,
   TicketRecord,
   TicketRepository,
@@ -26,7 +29,7 @@ import {
   toTicketRecord,
 } from "./ticket-rows.ts";
 
-class PrismaTicketStore implements TicketStore {
+export class PrismaTicketStore implements TicketStore {
   constructor(
     private readonly tx: Tx,
     private readonly scope: ProjectScope,
@@ -62,30 +65,25 @@ class PrismaTicketStore implements TicketStore {
     return pageOfRows(rows, limit);
   }
 
-  async insert(ticket: NewTicket): Promise<TicketRecord> {
-    const { organizationId, projectId } = this.scope;
-    const { id } = await this.tx.ticket.create({
-      data: {
-        organizationId,
-        projectId,
-        key: ticket.key,
-        title: ticket.title,
-        description: ticket.description,
-        type: ticket.type,
-        status: ticket.status,
-        priority: ticket.priority,
-        sprintId: ticket.sprintId,
-        assigneeKind: ticket.assignee?.kind ?? null,
-        assigneeId: ticket.assignee?.id ?? null,
-        pkg: ticket.pkg,
-        sensitivity: ticket.sensitivity,
-        estimateHours: ticket.estimateHours,
-      },
-      select: { id: true },
+  insert(ticket: NewTicket): Promise<TicketRecord> {
+    const criteria = ticket.criteria.map((criterion) => ({ ...criterion, proven: false }));
+    return this.insertRow({ ...ticket, criteria });
+  }
+
+  insertImported(ticket: ImportedTicket): Promise<TicketRecord> {
+    return this.insertRow(ticket);
+  }
+
+  raiseCounter(atLeast: number): Promise<void> {
+    return raiseCounterTo(this.tx, this.scope, "ticket", atLeast);
+  }
+
+  async findIncludingDeleted(key: string): Promise<TicketIdentity | null> {
+    const row = await this.tx.ticket.findFirst({
+      where: { projectId: this.scope.projectId, key },
+      select: { id: true, key: true, title: true, deletedAt: true },
     });
-    await this.replaceChildren(id, ticket);
-    await this.insertCriteria(id, ticket.criteria);
-    return this.reload(id);
+    return row && { id: row.id, key: row.key, title: row.title, deleted: row.deletedAt !== null };
   }
 
   async update(id: string, changes: TicketChanges): Promise<TicketRecord> {
@@ -210,6 +208,32 @@ class PrismaTicketStore implements TicketStore {
     return { ticketId, releasedAt: null, expiresAt: { gt: new Date(this.clock.now()) } };
   }
 
+  private async insertRow(ticket: ImportedTicket): Promise<TicketRecord> {
+    const { organizationId, projectId } = this.scope;
+    const { id } = await this.tx.ticket.create({
+      data: {
+        organizationId,
+        projectId,
+        key: ticket.key,
+        title: ticket.title,
+        description: ticket.description,
+        type: ticket.type,
+        status: ticket.status,
+        priority: ticket.priority,
+        sprintId: ticket.sprintId,
+        assigneeKind: ticket.assignee?.kind ?? null,
+        assigneeId: ticket.assignee?.id ?? null,
+        pkg: ticket.pkg,
+        sensitivity: ticket.sensitivity,
+        estimateHours: ticket.estimateHours,
+      },
+      select: { id: true },
+    });
+    await this.replaceChildren(id, ticket);
+    await this.insertCriteria(id, ticket.criteria);
+    return this.reload(id);
+  }
+
   private reload(id: string): Promise<TicketRecord> {
     return this.tx.ticket
       .findFirstOrThrow({ where: { id, projectId: this.scope.projectId }, include: ticketInclude })
@@ -253,7 +277,7 @@ class PrismaTicketStore implements TicketStore {
     }
   }
 
-  private async insertCriteria(ticketId: string, criteria: Criterion[]): Promise<void> {
+  private async insertCriteria(ticketId: string, criteria: ImportedCriterion[]): Promise<void> {
     if (criteria.length === 0) return;
     await this.assertOwned(ticketId);
     await this.tx.acceptanceCriterion.createMany({
@@ -263,6 +287,7 @@ class PrismaTicketStore implements TicketStore {
         position: position + 1, // les positions commencent à 1 (CHECK en base)
         statement: criterion.statement,
         specRef: criterion.specRef,
+        proofStatus: criterion.proven ? ("proven" as const) : ("pending" as const),
       })),
     });
   }

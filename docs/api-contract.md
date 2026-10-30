@@ -489,6 +489,14 @@ is one statement; the failure is visible (500 and the request log), not silent. 
 atomicity would require owning the invitation write (a Prisma insert plus the queue) or a Better Auth
 adapter transaction hook; neither is available in better-auth 1.7.14 for this endpoint.
 
+## Sprint import (TK-34)
+No new route and no contract change: the import is an administration command (`import:sprints`,
+see [Quality and operations](quality-and-operations.md#sprint-import-command-importsprints-tk-34)),
+absent from the OpenAPI document. It writes through the same ports, transactions and audit rows as
+`ticket.*` and `sprint.*`, with three extra audit actions: `sprint.import`, `ticket.import` and
+`dependency.import`. Imported tickets keep their `TK-n` keys, so the next `ticket.create` continues
+after the highest imported number. The actor must be `owner` or `admin`, like the manager routes.
+
 ## Version history
 - **0.4.0** (TK-29, 15 routes implemented in TK-30, 6 more in TK-31: leases and project state): tickets, dependencies, sprints, comments, project state, leases and
   read-only audit (25 routes, all implemented since TK-32); typed errors `INVALID_TRANSITION`,

@@ -24,3 +24,24 @@ export async function nextCounterValue(
   });
   return counter.lastValue;
 }
+
+/**
+ * Relève le compteur à au moins `atLeast` (clés explicites d'un import) ; ne le fait jamais reculer
+ * (la comparaison est dans la requête, en plus du déclencheur de base qui interdit toute baisse).
+ */
+export async function raiseCounterTo(
+  tx: Tx,
+  scope: ProjectScope,
+  name: "ticket" | "sprint",
+  atLeast: number,
+): Promise<void> {
+  const { organizationId, projectId } = scope;
+  await tx.projectCounter.createMany({
+    data: [{ organizationId, projectId, name }],
+    skipDuplicates: true,
+  });
+  await tx.projectCounter.updateMany({
+    where: { projectId, name, lastValue: { lt: atLeast } },
+    data: { lastValue: atLeast },
+  });
+}

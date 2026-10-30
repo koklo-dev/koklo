@@ -22,6 +22,7 @@ import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest } from "./request-serializer.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
+import { SprintImportModule } from "./sprint-import/sprint-import.module.ts";
 import { TicketModule } from "./ticket/ticket.module.ts";
 
 export interface AppModuleOptions {
@@ -69,6 +70,7 @@ export class AppModule {
         ProjectModule,
         TicketModule,
         SprintModule,
+        SprintImportModule,
         LeaseModule,
         ProjectStateModule,
         CommentModule,

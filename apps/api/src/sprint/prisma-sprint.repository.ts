@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { recordAudit } from "../tracker/audit.ts";
-import { nextCounterValue } from "../tracker/counters.ts";
+import { nextCounterValue, raiseCounterTo } from "../tracker/counters.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
@@ -41,7 +41,7 @@ const toRecord = (row: SprintRow): SprintRecord => ({
   endsOn: toDay(row.endsOn),
 });
 
-class PrismaSprintStore implements SprintStore {
+export class PrismaSprintStore implements SprintStore {
   constructor(
     private readonly tx: Tx,
     private readonly scope: ProjectScope,
@@ -49,6 +49,10 @@ class PrismaSprintStore implements SprintStore {
 
   nextNumber(): Promise<number> {
     return nextCounterValue(this.tx, this.scope, "sprint");
+  }
+
+  raiseCounter(atLeast: number): Promise<void> {
+    return raiseCounterTo(this.tx, this.scope, "sprint", atLeast);
   }
 
   async find(key: string): Promise<SprintRecord | null> {

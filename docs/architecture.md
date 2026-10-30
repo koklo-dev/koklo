@@ -414,6 +414,33 @@ flowchart LR
   tx --> db[(PostgreSQL: rows + counter + audit_log)]
 ```
 
+### Sprint import command (TK-34)
+Module `sprint-import/` and entry point `cli/` in `apps/api`. Not a controller: the script
+`import:sprints` builds the Nest application context and calls `SprintImportService`.
+
+- **Pure parser**: `parseSprintFile` (no I/O) turns one file into a `ParsedSprint` and classifies
+  every line of the tasks zone (`task-zone-parser.ts`, `ticket-draft.ts`); `read-sprint-directory.ts`
+  is the only reader (no symlink, size and UTF-8 checks).
+- **Reuse, no duplication**: `ImportRun` writes through `TicketStore` and `SprintStore`
+  (`insertImported`, `raiseCounter`, `findIncludingDeleted`) and `recordAudit`; `insert` and
+  `insertImported` share one private `insertRow`. Dependencies go through `addDependency` of
+  `@koklo/domain`.
+- **One transaction** per run via `ProjectTransactions.run(scope, work, { timeoutMs })`; without
+  options the behavior is unchanged (Prisma default). `--dry-run` rolls back after the report.
+
+```mermaid
+flowchart LR
+  cli[cli/import-sprints] --> rd[read-sprint-directory]
+  cli --> svc[SprintImportService: owner/admin check]
+  rd --> ps[parseSprintFile: pure]
+  svc --> ps
+  svc --> run[ImportRun]
+  run --> ports[(TicketStore / SprintStore)]
+  run --> dom[@koklo/domain: dependency graph]
+  ports --> tx[ProjectTransactions: 1 transaction]
+  tx --> db[(PostgreSQL: rows + counters + audit_log)]
+```
+
 ### Comments and audit log in the API (TK-32)
 Modules `comment/` and `audit/` reuse the TK-30 shape. Keyset pagination (`tracker/cursor.ts`) and
 UUID checks (`tracker/uuid.ts`) are shared with `ticket.list`. The audit module is read-only; the

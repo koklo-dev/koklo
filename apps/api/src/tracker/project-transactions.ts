@@ -20,18 +20,26 @@ export type Tx = TenantTransactionClient;
 export class ProjectTransactions {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
-  run<T>(scope: ProjectScope, work: (tx: Tx) => Promise<T>): Promise<T> {
+  /** `timeoutMs` : borne de la transaction (défaut Prisma : 5 s), à relever pour un lot (import). */
+  run<T>(
+    scope: ProjectScope,
+    work: (tx: Tx) => Promise<T>,
+    options: { timeoutMs?: number } = {},
+  ): Promise<T> {
     return withOrganization(scope.organizationId, () =>
-      this.database.client.$transaction(async (tx) => {
-        const project = await tx.project.findFirst({
-          where: { id: scope.projectId },
-          select: { id: true },
-        });
-        if (!project) {
-          throw notFound();
-        }
-        return work(tx);
-      }),
+      this.database.client.$transaction(
+        async (tx) => {
+          const project = await tx.project.findFirst({
+            where: { id: scope.projectId },
+            select: { id: true },
+          });
+          if (!project) {
+            throw notFound();
+          }
+          return work(tx);
+        },
+        options.timeoutMs === undefined ? undefined : { timeout: options.timeoutMs },
+      ),
     );
   }
 }

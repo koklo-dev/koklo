@@ -9,7 +9,8 @@
     "test": "vitest run --coverage",
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/main.js",
-    "dev": "tsc -p tsconfig.build.json && pnpm start"
+    "dev": "tsc -p tsconfig.build.json && pnpm start",
+    "import:sprints": "tsc -p tsconfig.build.json && node --env-file-if-exists=.env dist/cli/import-sprints.main.js"
   },
   "dependencies": {
     "@koklo/config": "workspace:*",
