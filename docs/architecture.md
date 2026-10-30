@@ -744,5 +744,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0004](adr/0004-ui-foundations-tokens-and-fonts.md), [0005](adr/0005-ui-components-icons-radix.md),
 [0006](adr/0006-web-same-origin-proxy-runtime-config.md),
 [0007](adr/0007-real-stack-e2e-orchestration.md),
-[0008](adr/0008-web-entry-gate-organizations.md).
+[0008](adr/0008-web-entry-gate-organizations.md),
+[0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.
