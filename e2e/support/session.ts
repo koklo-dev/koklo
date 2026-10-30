@@ -1,5 +1,7 @@
-import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import pg from "pg";
+import { randomUUID } from "node:crypto";
+import { insertSession, insertUser, SESSION_COOKIE, withClient } from "./db.ts";
+
+export { SESSION_COOKIE };
 
 /** Identifiants du seed (packages/db/src/seed.ts, SEED_IDS) : le test lit la base seedée, il ne la crée pas. */
 export const SEED = {
@@ -8,60 +10,20 @@ export const SEED = {
   projectName: "Projet de démo",
 } as const;
 
-export const SESSION_COOKIE = "better-auth.session_token";
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
-  return value;
+/** Vraie session Better Auth de l'admin du seed, avec l'organisation active. */
+export function createAdminSessionCookie(): Promise<string> {
+  return withClient((client) => insertSession(client, SEED.adminUser, SEED.organization));
 }
 
-/**
- * Crée une vraie session Better Auth pour l'admin du seed (ligne `sessions` portant l'organisation
- * active) et renvoie la valeur du cookie signé avec BETTER_AUTH_SECRET (`<token>.<hmac base64>`).
- */
-export async function createAdminSessionCookie(): Promise<string> {
-  const secret = requiredEnv("BETTER_AUTH_SECRET");
-  const token = randomBytes(24).toString("base64url");
-  const client = new pg.Client({ connectionString: requiredEnv("DATABASE_URL") });
-  await client.connect();
-  try {
-    await client.query(
-      `INSERT INTO sessions (id, token, user_id, active_organization_id, expires_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, now() + interval '1 hour', now(), now())`,
-      [randomUUID(), token, SEED.adminUser, SEED.organization],
-    );
-  } finally {
-    await client.end();
-  }
-  const signature = createHmac("sha256", secret).update(token).digest("base64");
-  return encodeURIComponent(`${token}.${signature}`);
-}
-
-/**
- * Crée un nouvel utilisateur sans aucune appartenance et une vraie session Better Auth **sans
- * organisation active** (premier login, lacune G1 de TK-24). Même signature de cookie que ci-dessus.
- */
-export async function createSessionCookieWithoutOrganization(): Promise<string> {
-  const secret = requiredEnv("BETTER_AUTH_SECRET");
-  const token = randomBytes(24).toString("base64url");
-  const userId = randomUUID();
-  const client = new pg.Client({ connectionString: requiredEnv("DATABASE_URL") });
-  await client.connect();
-  try {
-    await client.query(
-      `INSERT INTO users (id, name, email, email_verified, created_at, updated_at)
-       VALUES ($1, $2, $3, true, now(), now())`,
-      [userId, "Nouvelle Utilisatrice", `nouvelle-${userId}@example.com`],
-    );
-    await client.query(
-      `INSERT INTO sessions (id, token, user_id, active_organization_id, expires_at, created_at, updated_at)
-       VALUES ($1, $2, $3, NULL, now() + interval '1 hour', now(), now())`,
-      [randomUUID(), token, userId],
-    );
-  } finally {
-    await client.end();
-  }
-  const signature = createHmac("sha256", secret).update(token).digest("base64");
-  return encodeURIComponent(`${token}.${signature}`);
+/** Nouvel utilisateur sans appartenance et session **sans organisation active** (premier login, lacune G1 de TK-24). */
+export function createSessionCookieWithoutOrganization(): Promise<string> {
+  return withClient(async (client) => {
+    const userId = randomUUID();
+    await insertUser(client, {
+      id: userId,
+      name: "Nouvelle Utilisatrice",
+      email: `nouvelle-${userId}@example.com`,
+    });
+    return insertSession(client, userId, null);
+  });
 }
