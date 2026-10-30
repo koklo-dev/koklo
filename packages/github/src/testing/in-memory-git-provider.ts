@@ -95,6 +95,7 @@ export class InMemoryGitProvider implements GitProvider {
     }
     const files = template === undefined ? undefined : this.#templateFiles(template);
     const repo: Repo = {
+      id: this.#options.nextId(),
       ref,
       visibility,
       defaultBranch: "main",
@@ -113,6 +114,11 @@ export class InMemoryGitProvider implements GitProvider {
     state.branches.set("main", initial.sha);
     this.#repos.set(repoKey(ref), state);
     return repo;
+  }
+
+  async getRepo(request: Request<"getRepo">): Promise<Repo> {
+    this.#authority.assertFresh("getRepo", request.auth);
+    return this.#repo("getRepo", request.repo).repo;
   }
 
   async readFile(request: Request<"readFile">): Promise<FileContent> {

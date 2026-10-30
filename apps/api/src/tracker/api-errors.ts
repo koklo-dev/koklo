@@ -19,7 +19,10 @@ type ConflictReason =
   | "sprint_not_planned"
   | "sprint_not_active"
   | "ticket_has_active_lease"
-  | "counter_limit_reached";
+  | "counter_limit_reached"
+  | "spec_repo_exists"
+  | "repo_already_linked"
+  | "repo_name_taken";
 
 export const notFound = () => new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });
 /** Une ressource absente ou hors du projet est `NOT_FOUND` (aucune fuite entre projets). */

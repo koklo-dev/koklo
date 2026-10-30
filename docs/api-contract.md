@@ -498,7 +498,7 @@ absent from the OpenAPI document. It writes through the same ports, transactions
 after the highest imported number. The actor must be `owner` or `admin`, like the manager routes.
 
 ## Provider, spec and feature batches (TK-42)
-Contract 0.5.0 adds four groups and 10 routes. No procedure is implemented yet (TK-43 to TK-45);
+Contract 0.5.0 adds four groups and 10 routes. `repo.*` is implemented since TK-43 (see "Repositories in the API (TK-43)"); the others follow in TK-44 and TK-45;
 the new routes take an explicit `projectId` (path), the historical ones keep the implicit project.
 
 | Operation | Method | Path | Notes |
@@ -533,7 +533,7 @@ New typed errors: `REPO_CREATION_FORBIDDEN` (403, `{ reason, ownerLogin, ownerKi
 `UserTokenRequired`, `ProviderAuthExpired`, `ProviderRateLimited`, `ProviderUnavailable`,
 `SpecBatchConflict`, `SpecInvalid`.
 
-### Role matrix (vision section 14), to enforce in TK-43 to TK-45
+### Role matrix (vision section 14), enforced per procedure (`repo.*` since TK-43)
 The contract cannot enforce roles; the API must, per procedure. "Own project" means the caller is a
 member of the project and of the organization of the session.
 
@@ -574,6 +574,102 @@ tests scan the document for such property names. Enumerations (roles, modes, sta
 status and priority, id patterns) are hard-coded copies kept in step with the domain, the
 database and `@koklo/schema` by parity tests in `apps/api/test`, because the contract may not
 import those packages.
+
+## Repositories in the API (TK-43)
+`repo.createSpec`, `repo.link` and `repo.list` are implemented in `apps/api/src/repo`. The contract
+is unchanged (0.5.0). `installation.*` and its callbacks are not part of TK-43: installations are
+inserted by seed or, later, by the installation webhook.
+
+Roles: `repo.createSpec` and `repo.link` are `MANAGER_ROLES` (owner, admin); `repo.list` is
+`REPO_READ_ROLES` (owner, admin, dev, designer). A refused role is `FORBIDDEN` for any project,
+and it is checked before membership. The project must belong to the organization of the session
+and the installation must be an `active` installation of that organization; otherwise `NOT_FOUND`,
+before any call to the provider. A `suspended` or `deleted` installation is `NOT_FOUND` too.
+
+Creating a project does not create its spec repository: the caller chains `project.create` then
+`repo.createSpec` (the web does it in TK-48). A project without a repository is a valid state.
+
+### `repo.createSpec` sequence
+No network call ever happens inside a database transaction.
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant S as RepoService
+  participant D as Database
+  participant G as GitProvider
+  C->>S: repo.createSpec(projectId, installationId, name?)
+  S->>D: Tx A (read): project, active installation, spec carrier, names
+  alt no spec carrier yet and name valid
+    S->>G: authenticate (+ user token for a personal account)
+    S->>G: createRepo (private, owner of the installation)
+    S->>G: writeCommit (whole structure, default branch, author Koklo)
+    S->>G: createBranch (cadrage, from the commit sha)
+    S->>D: Tx B: INSERT project_repos (role spec, mode new) + audit repo.createSpec
+    S-->>C: repo (no external id, no URL)
+  else conflict or invalid name
+    S-->>C: 409 CONFLICT or 422 VALIDATION, provider never called
+  end
+```
+
+- The default name is `<project slug>-spec` (accents removed); a given `name` must match
+  `^[A-Za-z0-9._-]{1,100}$`, not be `.` or `..` and not end with `.git`, else
+  `VALIDATION{field: "name"}`. Visibility (always private) and owner (the installation's) never
+  come from the client.
+- The structure is `buildInitialSpecFiles` (vision annex A, section 4.0): manifest
+  `koklo.project.yaml`, `README.md`, brief, architecture and technical skeletons, `domain/roles.yaml`,
+  `data/relations.yaml`, `.koklo/rules.yaml` (minimal, its format is not defined yet) and a
+  `.gitkeep` per empty directory. No example entity. It passes `checkSpec` without error.
+- `external_id` of the row is the provider's `Repo.id` (a string), stable across renames.
+- A personal account needs a user token (ADR 0009): `createRepo` alone uses it, commit and branch use
+  an installation token. The API keeps no user token yet (`NoUserCredentials`), so a personal account
+  gets `USER_TOKEN_REQUIRED` and falls back to `repo.link`.
+
+### `repo.link`
+Reads the repository with `getRepo` (installation token, no write), then inserts it in `mode: adopted`
+with the provider's values (owner, name, default branch, external id) and the audit `repo.link` in
+one transaction. `ownerLogin` must be the owner of the installation (else `NOT_FOUND`, compared
+case-insensitively); a repository unknown to the installation is `NOT_FOUND`. `specPath` is allowed for
+a non-`spec` role only, relative and without `..` (else `VALIDATION{field: "specPath"}`). No structure
+and no `cadrage` branch is created for an adopted repository.
+
+### Errors
+| Case | Response |
+|------|----------|
+| spec carrier already present (role `spec` or `spec_path`) | 409 `CONFLICT{spec_repo_exists}`, no provider call |
+| repository already linked (`UNIQUE(installation_id, external_id)`) | 409 `CONFLICT{repo_already_linked}` |
+| repository name taken at the provider (`createRepo`) | 409 `CONFLICT{repo_name_taken}` |
+| `UserTokenRequiredError` | 403 `USER_TOKEN_REQUIRED{ownerLogin}` |
+| `RepoCreationForbiddenError` | 403 `REPO_CREATION_FORBIDDEN{reason, ownerLogin, ownerKind}` |
+| `GitAuthExpiredError` | 403 `PROVIDER_AUTH_EXPIRED{kind, refreshable}` |
+| `GitRateLimitedError` | 429 `PROVIDER_RATE_LIMITED{retryAfterMs?}` |
+| `GitProviderUnavailableError` | 503 `PROVIDER_UNAVAILABLE` |
+| `GitNotFoundError` on `repo.link` | 404 `NOT_FOUND` |
+| any other error, or a conflict/not-found on a repository just created | 500 `INTERNAL{requestId}` |
+
+Provider errors are mapped by `instanceof`, never by `error.name` (enumerable, so forgeable). No
+message of the provider, token or key reaches a response, the OpenAPI document, the audit log or the
+logs.
+
+### Partial failure
+If `createRepo` succeeds and a later step fails (`writeCommit`, `createBranch`, or the database), the
+repository stays at the provider (the port has no deletion) and nothing is stored: no row, no audit.
+The log carries `owner/name` and the failed step, never a token. A new call with the default name gets
+`repo_name_taken`. Recovery: give another `name`, or delete the repository by hand and retry, or
+complete it by hand and attach it with `repo.link`.
+
+### Provider not configured (staging without the App)
+`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` are
+read all or nothing (an empty value counts as missing). With none, the API starts, logs one warning
+and `repo.createSpec` and `repo.link` answer 503 `PROVIDER_UNAVAILABLE` after the access checks
+(`FORBIDDEN`, then `NOT_FOUND`); `repo.list` works. A partial set fails at startup, naming the missing
+variables and never a value. The private key is accepted as the one-line base64 the infra stores
+(`GH_APP_PRIVATE_KEY`) or as a PEM with literal `\n`. The fake provider is never selected by configuration, only injected by
+tests through the `GIT_PROVIDER` token.
+
+### Audit
+`repo.createSpec` and `repo.link` write one entry (`targetKind: "repo"`, `targetId` the row id) in the
+same transaction as the insert, so a failing audit rolls the insert back. `repo.list` is not audited.
 
 ## Version history
 - **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,

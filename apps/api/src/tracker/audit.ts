@@ -12,7 +12,8 @@ export interface AuditEntry {
     | "organization"
     | "invitation"
     | "member"
-    | "project";
+    | "project"
+    | "repo";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;
