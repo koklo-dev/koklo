@@ -59,3 +59,6 @@ export const memberListOutputSchema = z.array(
 
 export const memberSetRoleInputSchema = z.object({ memberId: z.uuid(), role: memberRoleSchema });
 export const memberSetRoleOutputSchema = z.object({ id: z.uuid(), role: memberRoleSchema });
+
+export * from "./schemas-collaboration.ts";
+export * from "./schemas-tickets.ts";

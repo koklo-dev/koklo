@@ -1,6 +1,12 @@
 export type {
+  AuditEntry,
+  CommentCreateInput,
+  CommentOutput,
+  DependencyAddInput,
   HealthInput,
   HealthOutput,
+  LeaseAcquireInput,
+  LeaseOutput,
   MemberInviteInput,
   MemberInviteOutput,
   MemberListOutput,
@@ -12,17 +18,33 @@ export type {
   OrganizationListOutput,
   ProjectCreateInput,
   ProjectListOutput,
+  ProjectStateOutput,
+  ProjectStateUpdateInput,
   Role,
+  SprintCreateInput,
+  SprintOutput,
+  TicketCreateInput,
+  TicketDetail,
+  TicketOutput,
+  TicketStatus,
+  TicketTransitionInput,
 } from "./contract.ts";
 export { contract } from "./contract.ts";
 export {
   authErrors,
   conflictError,
   conflictReasonSchema,
+  dependencyCycleError,
   forbiddenError,
   internalError,
+  invalidTransitionError,
+  leaseExpiredError,
+  leaseHeldError,
+  leaseNotHolderError,
   notFoundError,
   unauthorizedError,
+  validationError,
+  versionConflictError,
 } from "./errors.ts";
 export { errorStatusMap, generateOpenApi } from "./openapi.ts";
 export {
@@ -42,4 +64,6 @@ export {
   projectSchema,
   roleSchema,
 } from "./schemas.ts";
+export * from "./schemas-collaboration.ts";
+export * from "./schemas-tickets.ts";
 export { CONTRACT_VERSION } from "./version.ts";
