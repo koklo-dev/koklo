@@ -23,6 +23,7 @@ export const FAKE_EXPIRES_AT = "2026-10-30T12:00:00.000Z";
 export const FAKE_HEAD_SHA = "sha-head";
 
 const repoOf = (owner: GitOwner, name: string): Repo => ({
+  id: `fake-repo-${owner.login}-${name}`,
   ref: { owner, name },
   visibility: "private",
   defaultBranch: "main",
@@ -30,7 +31,7 @@ const repoOf = (owner: GitOwner, name: string): Repo => ({
 });
 
 /**
- * Faux minimal : sa compilation prouve la forme du port (13 méthodes, types de
+ * Faux minimal : sa compilation prouve la forme du port (14 méthodes, types de
  * requête et de retour). Seul `createRepo` applique la règle de l'ADR 0009.
  */
 export class FakeGitProvider implements GitProvider {
@@ -52,6 +53,10 @@ export class FakeGitProvider implements GitProvider {
       throw new UserTokenRequiredError({ operation: "createRepo", owner: request.owner });
     }
     return repoOf(request.owner, request.name);
+  }
+
+  async getRepo(request: Parameters<GitProvider["getRepo"]>[0]): Promise<Repo> {
+    return repoOf(request.repo.owner, request.repo.name);
   }
 
   async readFile(request: Parameters<GitProvider["readFile"]>[0]): Promise<FileContent> {

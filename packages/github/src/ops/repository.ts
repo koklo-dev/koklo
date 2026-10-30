@@ -47,6 +47,16 @@ export async function createRepo(gw: Gateway, request: Request<"createRepo">): P
   });
 }
 
+/** Lit un dépôt avec le jeton fourni ; 404 (absent ou hors installation) : `GitNotFoundError`. */
+export function getRepo(gw: Gateway, request: Request<"getRepo">): Promise<Repo> {
+  const { auth, repo } = request;
+  const operation = { operation: "getRepo", resource: "repository", identifier: repoId(repo) };
+  return gw.withAuth(operation, auth, async (octokit) => {
+    const response = await octokit.rest.repos.get(target(repo));
+    return toRepo(response.data as ApiRepo);
+  });
+}
+
 type ContentFile = {
   type?: string;
   path: string;

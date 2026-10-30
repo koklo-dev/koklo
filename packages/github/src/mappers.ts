@@ -14,6 +14,7 @@ import type {
 
 /** Formes minimales lues dans les réponses GitHub (le reste est ignoré). */
 export type ApiRepo = {
+  readonly id: number | bigint | string;
   readonly name: string;
   readonly private: boolean;
   readonly default_branch: string;
@@ -65,6 +66,7 @@ export const ownerOf = (owner: ApiRepo["owner"]): GitOwner => ({
 export function toRepo(data: ApiRepo): Repo {
   const ref: RepoRef = { owner: ownerOf(data.owner), name: data.name };
   return {
+    id: String(data.id),
     ref,
     visibility: data.private ? "private" : "public",
     defaultBranch: data.default_branch,

@@ -18,6 +18,8 @@ import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { OrganizationModule } from "./organization/organization.module.ts";
 import { ProjectModule } from "./project/project.module.ts";
 import { ProjectStateModule } from "./project-state/project-state.module.ts";
+import { GitProviderModule } from "./repo/git-provider.module.ts";
+import { RepoModule } from "./repo/repo.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest } from "./request-serializer.ts";
@@ -75,6 +77,8 @@ export class AppModule {
         ProjectStateModule,
         CommentModule,
         AuditModule,
+        GitProviderModule.forRoot(config),
+        RepoModule,
       ],
       controllers: [OpenApiController],
     };

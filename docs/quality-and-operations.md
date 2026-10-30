@@ -369,6 +369,14 @@ infra checkout with
 `base64 -w0 <key>.pem | gh secret set GH_APP_PRIVATE_KEY -R josias-koffi/infra -e koklo-<env>`.
 Whatever reads `GITHUB_APP_PRIVATE_KEY` (the GitHub App client, R2) must base64-decode it before
 signing the JWT.
+In the API the four `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CLIENT_ID` and
+`GITHUB_APP_CLIENT_SECRET` are read all or nothing (TK-43): none set (staging without the App)
+means the API starts with one warning and `repo.createSpec` / `repo.link` answer
+`PROVIDER_UNAVAILABLE`; a partial set fails at startup, naming the missing variables and never a
+value. `loadConfig` decodes the base64 key itself (a PEM with literal `\n` is accepted too). The
+manifest does not map `GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET` yet (TK-47): until it does,
+an environment that sets the other App secrets must also set these two. See
+[API contract](api-contract.md), "Provider not configured".
 `BETTER_AUTH_URL` is the public URL of the web (`https://app-staging.koklo.dev`,
 `https://app.koklo.dev`), set by the manifest from `${domains.app}`: the API has no domain, so
 the callback lands on the web origin and the web proxies it to the API through `API_INTERNAL_URL`

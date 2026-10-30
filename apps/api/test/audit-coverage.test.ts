@@ -9,6 +9,7 @@ import { createSeededDatabase } from "./helpers/app.ts";
 import { auditRowsFull, commentsFor, UUID_RE } from "./helpers/comments.ts";
 import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./helpers/leases.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
+import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import {
   apiFor,
   createWorld,
@@ -33,7 +34,23 @@ beforeAll(async () => {
   app = await createAppWithClock(database.url, new ManualClock());
 });
 
+/**
+ * TK-43 : les scénarios `repo.*` ont besoin du fournisseur git (faux en mémoire injecté par
+ * GIT_PROVIDER). Application dédiée, créée à la demande : les autres scénarios n'en dépendent pas.
+ */
+let repoRuntime: Promise<{ app: INestApplication; harness: ProviderHarness }> | undefined;
+function repoRuntimeOf() {
+  repoRuntime ??= (async () => {
+    const clock = new ManualClock();
+    const harness = await ProviderHarness.create(clock);
+    const repoApp = await createRepoApp(database.url, { clock, provider: harness.provider });
+    return { app: repoApp, harness };
+  })();
+  return repoRuntime;
+}
+
 afterAll(async () => {
+  await (await repoRuntime?.catch(() => undefined))?.app.close();
   await app?.close();
   await boss?.stop();
   await database?.dispose();
@@ -61,14 +78,16 @@ const WRITE_GROUPS = [
   "comment",
   "projectState",
   "lease",
+  "repo",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit"];
 /**
- * Groupes du contrat 0.5.0 sans implémentation API (TK-43 à TK-45) : ils rejoindront WRITE_GROUPS
- * ou READ_ONLY_GROUPS avec leurs scénarios d'audit.
+ * Groupes du contrat 0.5.0 sans implémentation API (TK-44 et suivants ; `installation` n'a pas de
+ * ticket dans les sprints 8-9) : ils rejoindront WRITE_GROUPS ou READ_ONLY_GROUPS avec leurs
+ * scénarios d'audit. `repo` a rejoint WRITE_GROUPS avec TK-43.
  */
-const PENDING_GROUPS = ["installation", "repo", "spec", "specBatch"];
+const PENDING_GROUPS = ["installation", "spec", "specBatch"];
 
 /** Sources de l'API : une référence à `contract.<groupe>` y signifie qu'une procédure est implémentée. */
 function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] {
@@ -109,6 +128,8 @@ const EXPECTED_WRITE_PROCEDURES = [
   "organization.create",
   "project.create",
   "projectState.update",
+  "repo.createSpec",
+  "repo.link",
   "sprint.activate",
   "sprint.close",
   "sprint.create",
@@ -172,6 +193,28 @@ async function leaseExpected(action: string, ticket: { id: string; key: string }
     targetId: lease?.id ?? "",
     ticketId: ticket.id,
     ticketKey: ticket.key,
+  };
+}
+
+const ofRepo = (action: string, res: Response): Expected => ({
+  action,
+  targetKind: "repo",
+  targetId: res.body.id,
+  ticketId: null,
+});
+
+/** Installation active d'organisation insérée en base ; `seedRepo` crée le dépôt chez le faux fournisseur. */
+function repoPrepare(options: { seedRepo?: string } = {}) {
+  return async (ctx: Ctx) => {
+    const installation = await insertInstallation(database, ctx.world.organizationId);
+    if (options.seedRepo) {
+      const { harness } = await repoRuntimeOf();
+      await harness.seedRepo(
+        { kind: "organization", login: installation.ownerLogin },
+        options.seedRepo,
+      );
+    }
+    return { installation };
   };
 }
 
@@ -481,10 +524,46 @@ const SCENARIOS: Scenario[] = [
       send(app, ctx.world.actors.dev.cookie, "post", "/projects", { name: "Refusé" }),
     deniedStatuses: [403],
   },
+  {
+    procedure: "repo.createSpec",
+    role: "owner",
+    prepare: repoPrepare(),
+    call: async (ctx, s) =>
+      repoApi((await repoRuntimeOf()).app, ctx.world.actors.owner).createSpec(
+        ctx.world.projectId,
+        s.installation.id,
+      ),
+    expected: async (_ctx, _s, res) => ofRepo("repo.createSpec", res),
+    denied: async (ctx, s) =>
+      repoApi((await repoRuntimeOf()).app, ctx.world.actors.dev).createSpec(
+        ctx.world.projectId,
+        s.installation.id,
+      ),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "repo.link",
+    role: "owner",
+    prepare: repoPrepare({ seedRepo: "demo" }),
+    call: async (ctx, s) =>
+      repoApi((await repoRuntimeOf()).app, ctx.world.actors.owner).link(
+        ctx.world.projectId,
+        s.installation.id,
+        { ownerLogin: s.installation.ownerLogin, name: "demo" },
+      ),
+    expected: async (_ctx, _s, res) => ofRepo("repo.link", res),
+    denied: async (ctx, s) =>
+      repoApi((await repoRuntimeOf()).app, ctx.world.actors.dev).link(
+        ctx.world.projectId,
+        s.installation.id,
+        { ownerLogin: s.installation.ownerLogin, name: "demo" },
+      ),
+    deniedStatuses: [403],
+  },
 ];
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 20 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 22 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 

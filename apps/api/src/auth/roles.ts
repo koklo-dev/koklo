@@ -70,3 +70,10 @@ export const COMMENT_DELETE_ANY_ROLES = MANAGER_ROLES;
 
 /** Lecture du journal d'audit : il expose acteurs et cibles de toute l'organisation. */
 export const AUDIT_READ_ROLES = MANAGER_ROLES;
+
+/**
+ * Lecture des repos d'un projet (CDC §14, annexe A §4.0) : ils portent propriétaire, nom et
+ * branche du code ; le client et le business n'y accèdent pas. Création et rattachement :
+ * `MANAGER_ROLES`.
+ */
+export const REPO_READ_ROLES = ["owner", "admin", "dev", "designer"] as const;

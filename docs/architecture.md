@@ -608,9 +608,9 @@ sequenceDiagram
 Octokit adapter lives in `packages/github` (depends on `domain`, never the reverse, see
 "GitHub adapter and shared fake (TK-39)"), and tests use its in-memory fake.
 
-Thirteen async methods, each taking one request object with an explicit `auth`
+Fourteen async methods, each taking one request object with an explicit `auth`
 (the port is stateless). French names of vision §8 in parentheses:
-`authenticate` (authentifier), `createRepo` (creerRepo), `readFile` (lireFichier),
+`authenticate` (authentifier), `createRepo` (creerRepo), `getRepo` (lireRepo, TK-43), `readFile` (lireFichier),
 `writeCommit` (ecrireCommit), `createBranch` (creerBranche), `createPullRequest` (creerPR),
 `getPullRequestState` (etatPR), `mergePullRequest` (fusionner), `createTag` (poserTag),
 `listDeployments` (lireDeploiements), `publishCheck` (publierCheck),
@@ -635,7 +635,7 @@ Thirteen async methods, each taking one request object with an explicit `auth`
 ```mermaid
 flowchart LR
   subgraph domain["packages/domain (pure)"]
-    Port["GitProvider port<br/>13 methods"]
+    Port["GitProvider port<br/>14 methods"]
     Types["GitOwner, GitAuth, Repo,<br/>PullRequest, CheckRun, Deployment"]
     Errors["GitProviderError<br/>+ 7 typed subclasses"]
     Port --> Types
@@ -765,6 +765,34 @@ sequenceDiagram
   commit, with the batch id as the `Koklo-Ops:` trailer.
 - Not implemented yet: the webhook endpoint, the worker job and the indexer (later tickets); this
   ticket delivers the schema, constraints and tenant classification they rely on.
+
+### Spec repository in the API (TK-43)
+`apps/api/src/repo` is the application side of the git provider. It depends on the `GitProvider`
+port of `@koklo/domain`, never on Octokit; `@koklo/github` is only used to build the adapter, and
+`@koklo/schema` to check the generated structure (the `api` tag of `turbo boundaries` allows both).
+
+```mermaid
+flowchart LR
+  Ctl["RepoController<br/>repo.list / link / createSpec"] --> Svc["RepoService"]
+  Svc --> Repo["RepoRepository (Prisma)<br/>Tx A read, Tx B insert + audit"]
+  Svc --> Access["GitAccess<br/>installation / user tokens"]
+  Svc --> Prov["provisionSpecRepo<br/>createRepo, writeCommit, createBranch"]
+  Prov --> Port["GitProvider (GIT_PROVIDER)"]
+  Access --> Port
+  Access --> Creds["UserCredentialsStore<br/>(USER_CREDENTIALS)"]
+  Port -. App configured .-> Octo["OctokitGitProvider"]
+  Port -. no App: null .-> None["503 PROVIDER_UNAVAILABLE"]
+  Svc --> Scaffold["buildInitialSpecFiles"]
+```
+
+- Nest tokens: `GIT_PROVIDER` (`GitProvider | null`; `null` when `AppConfig.githubApp` is absent) and
+  `USER_CREDENTIALS` (default `NoUserCredentials`: no user token is stored yet). Both are global
+  and can be overridden by tests (`overrideProvider`).
+- The service never holds a token: installation tokens are requested per call and never cached or
+  stored; `GitAccess` renews a stored user token and saves it back through the port.
+- The network never runs inside a transaction (read, provider calls, then insert and audit); see
+  [API contract](api-contract.md), "Repositories in the API (TK-43)" for the sequence and errors.
+- `mapProviderError` is the single place where port errors become contract errors.
 
 ### Magic-link emails: `send-magic-link` queue (TK-22)
 The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.

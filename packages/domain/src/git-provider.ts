@@ -31,7 +31,7 @@ import type { WebhookSubscription } from "./git-webhook.ts";
  * `auth` est explicite : le port n'a pas d'état. Seul `createRepo` sur un
  * propriétaire `user` exige `auth.kind === "user"` (ADR 0009).
  *
- * Noms français du §8 : authentifier = authenticate, creerRepo = createRepo,
+ * Noms français du §8 : authentifier = authenticate, creerRepo = createRepo, lireRepo = getRepo,
  * lireFichier = readFile, ecrireCommit = writeCommit, creerBranche = createBranch,
  * creerPR = createPullRequest, etatPR = getPullRequestState, fusionner =
  * mergePullRequest, poserTag = createTag, lireDeploiements = listDeployments,
@@ -52,6 +52,8 @@ export interface GitProvider {
     visibility: Visibility;
     template?: RepoRef;
   }): Promise<Repo>;
+  /** Lit un dépôt existant (identifiant, propriétaire, branche par défaut). @throws GitNotFoundError */
+  getRepo(request: { auth: GitAuth; repo: RepoRef }): Promise<Repo>;
   /** @throws GitNotFoundError */
   readFile(request: {
     auth: GitAuth;

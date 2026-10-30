@@ -7,6 +7,8 @@ export type Visibility = "public" | "private";
 export type RepoRef = { readonly owner: GitOwner; readonly name: string };
 
 export type Repo = {
+  /** Identifiant du fournisseur, rendu en chaîne : stable au renommage, relie les webhooks. */
+  readonly id: string;
   readonly ref: RepoRef;
   readonly visibility: Visibility;
   readonly defaultBranch: string;
