@@ -1,13 +1,14 @@
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { NOOP_QUEUE } from "../src/jobs/noop.ts";
 import { startWorker, type Worker } from "../src/worker.ts";
+import { startTestPostgres } from "./support/postgres.ts";
 
 let database: StartedPostgreSqlContainer;
 let worker: Worker;
 
 beforeAll(async () => {
-  database = await new PostgreSqlContainer("postgres:17-alpine").start();
+  database = await startTestPostgres();
   worker = await startWorker({
     databaseUrl: database.getConnectionUri(),
     appEnv: "test",
