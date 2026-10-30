@@ -1,27 +1,8 @@
-import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import pg from "pg";
+import { randomUUID } from "node:crypto";
+import { insertMembership, insertSession, insertUser, withClient } from "./db.ts";
 import { SEED } from "./session.ts";
 
-/**
- * Support e2e (pas du code de production) : insère en base des invitations et des sessions réelles
- * pour une adresse donnée. OAuth GitHub est inutilisable en CI, donc le test pose le cookie signé.
- */
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
-  return value;
-}
-
-async function withClient<T>(run: (client: pg.Client) => Promise<T>): Promise<T> {
-  const client = new pg.Client({ connectionString: requiredEnv("DATABASE_URL") });
-  await client.connect();
-  try {
-    return await run(client);
-  } finally {
-    await client.end();
-  }
-}
+/** Support e2e (pas du code de production) : invitations et sessions réelles pour une adresse donnée. */
 
 export interface InvitationOptions {
   email: string;
@@ -60,30 +41,12 @@ export async function createUserSession(
   email: string,
   { memberRole }: { memberRole?: string } = {},
 ): Promise<InvitedUser> {
-  const secret = requiredEnv("BETTER_AUTH_SECRET");
-  const token = randomBytes(24).toString("base64url");
-  const userId = randomUUID();
-  await withClient(async (client) => {
-    await client.query(
-      `INSERT INTO users (id, name, email, email_verified, created_at, updated_at)
-       VALUES ($1, $2, $3, true, now(), now())`,
-      [userId, "Personne Invitée", email],
-    );
-    if (memberRole) {
-      await client.query(
-        `INSERT INTO members (id, organization_id, user_id, role, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, now(), now())`,
-        [randomUUID(), SEED.organization, userId, memberRole],
-      );
-    }
-    await client.query(
-      `INSERT INTO sessions (id, token, user_id, active_organization_id, expires_at, created_at, updated_at)
-       VALUES ($1, $2, $3, NULL, now() + interval '1 hour', now(), now())`,
-      [randomUUID(), token, userId],
-    );
+  return withClient(async (client) => {
+    const userId = await insertUser(client, { email, name: "Personne Invitée" });
+    if (memberRole) await insertMembership(client, SEED.organization, userId, memberRole);
+    const cookie = await insertSession(client, userId, null);
+    return { cookie, userId, email };
   });
-  const signature = createHmac("sha256", secret).update(token).digest("base64");
-  return { cookie: encodeURIComponent(`${token}.${signature}`), userId, email };
 }
 
 export const uniqueEmail = (prefix: string): string => `${prefix}-${randomUUID()}@example.com`;
