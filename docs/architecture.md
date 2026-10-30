@@ -3,10 +3,10 @@ title: Architecture
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-29
+last_reviewed: 2026-10-30
 covers_release: unreleased
 sources: []
-covers_commit: 7f97066
+covers_commit: 0139410
 ---
 # Architecture
 
@@ -537,6 +537,69 @@ sequenceDiagram
   A-->>W: project
   W->>A: project.list (invalidated)
   W-->>U: list updated, status "Projet « name » créé."
+```
+
+### Web: sprint kanban (TK-35)
+`apps/web` only; `apps/api`, `packages/contract` and the database are untouched. The screen consumes
+`sprint.list({ status: "active" })`, `ticket.list({ sprintId })` and `ticket.transition({ key, to })`
+([API contract](api-contract.md#tickets-dependencies-and-sprints-tk-30)). Screen specification:
+`design/screens/S-kanban.md`.
+
+| Route | Page | Frame | Guard (`resolveAccess`) |
+|-------|------|-------|-------------------------|
+| `/kanban` | `KanbanPage` -> `KanbanView` -> `KanbanColumn` -> `KanbanCard` | `AppFrame` | session + active organization |
+
+- **Data** (`lib/use-kanban-data.ts`): reads the active sprint, then every page of its tickets (follows
+  `nextCursor` until exhausted, 100 per page). `deriveKanbanData` reduces both queries to one state:
+  `loading`, `error`, `no-sprint`, `no-project` (`NOT_FOUND`) or `ready` (`lib/kanban-board.ts` groups by
+  status, sorted by priority then key).
+- **Moves** (`lib/use-ticket-move.ts`): not optimistic. The card keeps its column (`aria-busy`) until the
+  server answers and the board is reloaded; then a status message is announced and focus returns to the
+  card's "Déplacer" button. The server is the authority on transitions: a refusal (`INVALID_TRANSITION`,
+  `FORBIDDEN`, `CONFLICT`, `NOT_FOUND`) is turned into one dismissible message by `lib/kanban-failure.ts`.
+- **Two ways to move**: native HTML5 drag and drop on columns, and the "Déplacer" menu on each card
+  (keyboard and touch alternative, WCAG 2.5.7). The menu is non-modal so the button stays in the
+  accessibility tree.
+- **Roles** (`lib/roles.ts`): `canMoveTickets` (owner, admin, dev, designer); other roles, or a role not yet
+  known, get a read-only board (no button, cards not draggable).
+- **Shared vocabulary** (`lib/ticket-labels.ts`): status order, labels, one icon per status (status is never
+  carried by colour alone) and priority labels. Five icons were added to `packages/ui`
+  (`inbox`, `radio_button_unchecked`, `play_circle`, `block`, `cancel`; DESIGN.md section 4).
+- **Guard**: `/kanban` joins `GuardedPath` and the proxy matcher; it needs an active organization.
+  `RedirectPath` excludes `/kanban` so no redirect ever targets it.
+
+```mermaid
+flowchart TB
+  proxy["proxy.ts (+ /kanban)"] --> guard["auth-guard.ts: resolveAccess"]
+  subgraph apps/web
+    page[KanbanPage] --> data[use-kanban-data]
+    page --> move[use-ticket-move]
+    page --> fail[kanban-failure: describeFailure]
+    page --> view[KanbanView] --> col[KanbanColumn x7] --> card[KanbanCard]
+    view --> notice[KanbanNotice]
+    data --> board[kanban-board: groupByStatus]
+    col & card --> labels[ticket-labels]
+    page --> roles["roles.canMoveTickets"]
+  end
+  data -->|sprint.list, ticket.list| api[(apps/api)]
+  move -->|ticket.transition| api
+```
+
+```mermaid
+sequenceDiagram
+  actor U as Team member
+  participant W as KanbanPage
+  participant A as apps/api
+  U->>W: drop TK-6 on "À faire" (or menu "Déplacer")
+  W->>A: ticket.transition { key, to }
+  alt accepted
+    A-->>W: ticket
+    W->>A: ticket.list (invalidated)
+    W-->>U: card in new column, "TK-6 déplacé vers À faire."
+  else refused (INVALID_TRANSITION, FORBIDDEN, CONFLICT)
+    A-->>W: typed error
+    W-->>U: card unchanged, dismissible message
+  end
 ```
 
 ### Magic-link emails: `send-magic-link` queue (TK-22)

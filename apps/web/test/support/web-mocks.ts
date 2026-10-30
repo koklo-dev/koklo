@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 
 /**
  * Frontières externes simulées pour les tests des écrans TK-24 : navigation Next, client Better Auth,
@@ -35,10 +35,36 @@ export const procedures = {
   memberInvite: vi.fn(),
   projectList: vi.fn(),
   projectCreate: vi.fn(),
+  sprintList: vi.fn(),
+  ticketList: vi.fn(),
+  ticketTransition: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
   queryOptions: () => ({ queryKey: name, queryFn }),
+  key: () => name,
+});
+
+/**
+ * Requête oRPC dont l'entrée compte (TK-35) : `queryOptions({ input })`, `infiniteOptions({ input: (cursor) => ... })`
+ * et `call(input)` appellent tous la procédure simulée avec l'entrée, comme le client réel.
+ */
+const queryWithInput = (name: string[], fn: Mock<(input?: unknown) => unknown>) => ({
+  queryOptions: (options?: { input?: unknown }) => ({
+    queryKey: [...name, options?.input ?? null],
+    queryFn: () => fn(options?.input),
+  }),
+  infiniteOptions: (options: {
+    input: (pageParam: unknown) => unknown;
+    initialPageParam?: unknown;
+    getNextPageParam: (lastPage: unknown) => unknown;
+  }) => ({
+    queryKey: [...name, "infinite", options.input(options.initialPageParam)],
+    queryFn: (context: { pageParam: unknown }) => fn(options.input(context.pageParam)),
+    initialPageParam: options.initialPageParam,
+    getNextPageParam: options.getNextPageParam,
+  }),
+  call: (input?: unknown) => fn(input),
   key: () => name,
 });
 const mutation = (mutationFn: ReturnType<typeof vi.fn>) => ({
@@ -57,6 +83,15 @@ export const orpc = {
   project: {
     list: query(["project", "list"], procedures.projectList),
     create: mutation(procedures.projectCreate),
+  },
+  sprint: {
+    key: () => ["sprint"],
+    list: queryWithInput(["sprint", "list"], procedures.sprintList),
+  },
+  ticket: {
+    key: () => ["ticket"],
+    list: queryWithInput(["ticket", "list"], procedures.ticketList),
+    transition: mutation(procedures.ticketTransition),
   },
 };
 

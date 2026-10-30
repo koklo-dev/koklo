@@ -8,7 +8,7 @@ import { readSession } from "./lib/session.ts";
 /**
  * Proxy exécuté à chaque requête (donc config lue à l'exécution) :
  * - `/api/auth/*` et `/api/orpc/*` sont relayés vers `API_INTERNAL_URL` (même origine pour le navigateur) ;
- * - `/login`, `/projects`, `/members` et `/organizations` sont gardés selon la session et l'organisation active ;
+ * - `/login`, `/projects`, `/kanban`, `/members` et `/organizations` sont gardés selon la session et l'organisation active ;
  * - `/accept-invitation/<id>` exige une session (sinon `/login?next=…`) mais jamais d'organisation active,
  *   et n'est jamais mis en cache.
  */
@@ -54,6 +54,7 @@ export const config = {
   matcher: [
     "/login",
     "/projects",
+    "/kanban",
     "/members",
     "/organizations",
     "/accept-invitation/:id",

@@ -112,6 +112,7 @@ Règle : la marque (violet) n'est jamais utilisée pour un statut ni pour une al
 | Versions | `commit`, `call_split`, `merge`, `difference`, `history` |
 | Données et technique | `database`, `api`, `palette`, `smart_toy`, `terminal` |
 | Interface | `add`, `search`, `link`, `person`, `settings`, `lock`, `visibility`, `warning`, `unfold_more`, `light_mode`, `dark_mode` |
+| Statuts de ticket (kanban, TK-35) | `inbox` (backlog), `radio_button_unchecked` (à faire), `play_circle` (en cours), `fact_check` (en revue), `block` (bloqué), `check_circle` (terminé), `cancel` (annulé) ; `inbox`, `radio_button_unchecked`, `play_circle`, `block` et `cancel` ont été ajoutées au registre du générateur |
 
 Mise en œuvre :
 - shadcn/ui utilise **Lucide** dans ses composants (chevrons, coches, croix). Il faudra remplacer ces imports dans les composants copiés dans le projet.

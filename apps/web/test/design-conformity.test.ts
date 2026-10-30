@@ -16,6 +16,13 @@ const FILES = [
   "app/members/layout.tsx",
   "components/accept-invitation-page.tsx",
   "app/accept-invitation/[id]/page.tsx",
+  // TK-35 : kanban
+  "components/kanban-page.tsx",
+  "components/kanban-view.tsx",
+  "components/kanban-column.tsx",
+  "components/kanban-card.tsx",
+  "app/kanban/page.tsx",
+  "app/kanban/layout.tsx",
 ];
 
 const RAW_COLOR_CLASS =

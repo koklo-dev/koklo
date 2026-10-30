@@ -48,6 +48,11 @@ export const ICON_NAMES = [
   "left_panel_close",
   "left_panel_open",
   "logout",
+  "inbox",
+  "radio_button_unchecked",
+  "play_circle",
+  "block",
+  "cancel",
   // Glyphes internes des composants
   "check",
   "close",

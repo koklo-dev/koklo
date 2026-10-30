@@ -20,3 +20,8 @@ const INVITABLE: MemberRole[] = ["admin", "dev", "designer", "client", "business
 export function invitableRoles(role: Role | undefined): MemberRole[] {
   return role === "owner" ? INVITABLE : INVITABLE.filter((candidate) => candidate !== "admin");
 }
+
+/** L'équipe (propriétaire, administrateur, développeur, designer) déplace les tickets ; le reste est en lecture seule. */
+export function canMoveTickets(role: Role | undefined): boolean {
+  return role === "owner" || role === "admin" || role === "dev" || role === "designer";
+}

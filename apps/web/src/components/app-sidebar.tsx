@@ -10,6 +10,7 @@ import { TeamSwitcher } from "./team-switcher.tsx";
 
 const NAVIGATION = [
   { title: "Projets", url: "/projects", icon: "account_tree" },
+  { title: "Kanban", url: "/kanban", icon: "checklist" },
   { title: "Membres", url: "/members", icon: "person" },
 ] as const;
 

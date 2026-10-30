@@ -1,6 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { releaseHeld, setScenario, switchToDark } from "./support/helpers.ts";
+import {
+  type KanbanBoard,
+  type KanbanRole,
+  releaseHeld,
+  setScenario,
+  switchToDark,
+} from "./support/helpers.ts";
 
 type Page = {
   name: string;
@@ -9,6 +15,8 @@ type Page = {
   projects: "loading" | "empty" | "data" | "internal";
   organizations?: "none" | "one" | "many";
   activeOrganization?: boolean;
+  board?: KanbanBoard;
+  role?: KanbanRole;
 };
 
 const PAGES: readonly Page[] = [
@@ -17,6 +25,19 @@ const PAGES: readonly Page[] = [
   { name: "projects empty", path: "/projects", session: true, projects: "empty" },
   { name: "projects data", path: "/projects", session: true, projects: "data" },
   { name: "projects error", path: "/projects", session: true, projects: "internal" },
+  { name: "kanban loading", path: "/kanban", session: true, projects: "data", board: "loading" },
+  { name: "kanban no sprint", path: "/kanban", session: true, projects: "data", board: "noSprint" },
+  { name: "kanban empty", path: "/kanban", session: true, projects: "data", board: "empty" },
+  { name: "kanban data", path: "/kanban", session: true, projects: "data", board: "data" },
+  {
+    name: "kanban data read-only",
+    path: "/kanban",
+    session: true,
+    projects: "data",
+    board: "data",
+    role: "client",
+  },
+  { name: "kanban error", path: "/kanban", session: true, projects: "data", board: "internal" },
   { name: "members", path: "/members", session: true, projects: "data" },
   {
     name: "organizations create",
@@ -45,13 +66,24 @@ const PAGES: readonly Page[] = [
 ];
 
 for (const theme of ["light", "dark"] as const) {
-  for (const { name, path, session, projects, organizations, activeOrganization } of PAGES) {
+  for (const {
+    name,
+    path,
+    session,
+    projects,
+    organizations,
+    activeOrganization,
+    board,
+    role,
+  } of PAGES) {
     test(`axe WCAG AA sans violation : ${name} (${theme})`, async ({ page }) => {
       await setScenario({
         session,
         projects,
         ...(organizations ? { organizations } : {}),
         ...(activeOrganization === undefined ? {} : { activeOrganization }),
+        ...(board ? { board } : {}),
+        ...(role ? { role } : {}),
       });
       await page.goto(path);
       if (theme === "dark") await switchToDark(page);

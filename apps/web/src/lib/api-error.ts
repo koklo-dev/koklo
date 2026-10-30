@@ -13,3 +13,10 @@ export function conflictReason(error: unknown): string | undefined {
   const reason: unknown = Reflect.get(data, "reason");
   return typeof reason === "string" ? reason : undefined;
 }
+
+/** Charge `data` d'une erreur typée (`INVALID_TRANSITION` : `{ from, to }`), ou undefined. */
+export function errorData(error: unknown): Record<string, unknown> | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const data: unknown = Reflect.get(error, "data");
+  return typeof data === "object" && data !== null ? (data as Record<string, unknown>) : undefined;
+}
