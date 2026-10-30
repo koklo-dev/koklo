@@ -49,6 +49,18 @@ const renderSwitcher = () =>
     </SidebarProvider>,
   );
 
+/**
+ * Attend que la liste d'organisations ET la session soient chargées (le déclencheur passe de « Koklo » à
+ * l'organisation active), puis ouvre le menu. L'attente porte sur une requête de texte, peu coûteuse :
+ * un `findByRole(..., { name })` sondé en boucle recalcule les noms accessibles à chaque mutation du DOM
+ * et, sur un CPU saturé, monopolise le fil d'exécution au point d'empêcher les timers de React Query
+ * de livrer les données avant l'échéance.
+ */
+async function openSwitcher() {
+  await screen.findByText("Atelier Lumière");
+  await userEvent.click(screen.getByRole("button", { name: /Atelier Lumière/ }));
+}
+
 describe("TeamSwitcher réel (S-projects v4)", () => {
   it("affiche « Koklo » pendant le chargement puis le nom et le rôle de l'organisation active", async () => {
     renderSwitcher();
@@ -59,7 +71,7 @@ describe("TeamSwitcher réel (S-projects v4)", () => {
 
   it("ouvre un menu « Organisations » avec l'active cochée, les autres, et « Créer une organisation »", async () => {
     renderSwitcher();
-    await userEvent.click(await screen.findByRole("button", { name: /Atelier Lumière/ }));
+    await openSwitcher();
     const menu = await screen.findByRole("menu");
     expect(within(menu).getByText("Organisations")).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Atelier Lumière/ })).toBeInTheDocument();
@@ -76,7 +88,7 @@ describe("TeamSwitcher réel (S-projects v4)", () => {
 
   it("choisir une autre organisation appelle setActive", async () => {
     renderSwitcher();
-    await userEvent.click(await screen.findByRole("button", { name: /Atelier Lumière/ }));
+    await openSwitcher();
     await userEvent.click(await screen.findByRole("menuitem", { name: /Studio Nord/ }));
     await waitFor(() => expect(setActive).toHaveBeenCalledWith({ organizationId: OTHER_ORG_ID }));
   });
