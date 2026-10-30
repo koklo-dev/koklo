@@ -37,12 +37,13 @@ route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 The six TK-21 routes are implemented in `apps/api` (TK-23). Of the 25 TK-29 routes, the 15
 ticket, dependency and sprint ones are implemented since TK-30 (see
 [Tickets, dependencies and sprints (TK-30)](#tickets-dependencies-and-sprints-tk-30)); the
-comment, project-state, lease and audit routes are still **contract only** (TK-31, TK-32). The
+lease and project-state ones since TK-31 (see [Leases and project state (TK-31)](#leases-and-project-state-tk-31));
+the comment and audit routes are still **contract only** (TK-32). The
 organisation and the project always come from the session or the server, never from the input;
 a resource of another project is `NOT_FOUND` (no leak). The contract does not carry roles:
 the matrix is enforced and tested in `apps/api`. "Manage" below means owner, admin, dev,
 designer; "read" is open to every role (client for its own project, business). The column is
-the contract's intent; the matrix actually enforced for TK-30 is in the next section
+the contract's intent; the matrix actually enforced is in the TK-30 and TK-31 sections
 (`ticket.delete` is currently open to every manager role, not only owner and admin).
 
 | Operation | Method | Path | Roles (intent) | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`) |
@@ -65,16 +66,18 @@ the contract's intent; the matrix actually enforced for TK-30 is in the next sec
 | `comment.create` | POST | `/comments` | owner, admin, dev, designer, client; agents by token | `FORBIDDEN` |
 | `comment.list` | GET | `/comments` | read | none |
 | `comment.delete` | DELETE | `/comments/{id}` | author, owner, admin | `FORBIDDEN`, `NOT_FOUND` |
-| `projectState.get` | GET | `/project-state` | read | none |
-| `projectState.update` | PUT | `/project-state` | owner, admin (merge policy: owner only, decided in TK-32) | `FORBIDDEN`, `VERSION_CONFLICT` |
+| `projectState.get` | GET | `/project-state` | owner, admin, dev (enforced since TK-31) | none (the `FORBIDDEN` 403 is not typed in the contract) |
+| `projectState.update` | PUT | `/project-state` | owner, admin | `FORBIDDEN`, `VERSION_CONFLICT` |
 | `lease.acquire` | POST | `/tickets/{key}/lease` | owner, admin, dev | `FORBIDDEN`, `NOT_FOUND`, `LEASE_HELD` |
-| `lease.heartbeat` | POST | `/tickets/{key}/lease/heartbeat` | holder only | `NOT_FOUND`, `LEASE_NOT_HOLDER`, `LEASE_EXPIRED` |
-| `lease.release` | DELETE | `/tickets/{key}/lease` | holder; owner and admin may force | `NOT_FOUND`, `LEASE_NOT_HOLDER` |
+| `lease.heartbeat` | POST | `/tickets/{key}/lease/heartbeat` | manage, then holder only | `NOT_FOUND`, `LEASE_NOT_HOLDER`, `LEASE_EXPIRED` |
+| `lease.release` | DELETE | `/tickets/{key}/lease` | manage, then holder only (no force mechanism in the contract) | `NOT_FOUND`, `LEASE_NOT_HOLDER` |
 | `lease.get` | GET | `/tickets/{key}/lease` | read | `NOT_FOUND` |
 | `audit.list` | GET | `/audit` | owner, admin | `FORBIDDEN` |
 
 `audit` is read-only: the log is immutable (CDC §4.2) and fed by the server. There is no
-`lock.*` group (the merge and spec-write locks have no table yet).
+`lock.*` group: the **merge and spec-write locks are not delivered on the API side** (no `locks`
+table, no procedure in contract 0.4.0). Delivering them needs a database migration and a
+contract 0.5.0; a follow-up ticket is to be created.
 
 ## Tickets, dependencies and sprints (TK-30)
 Modules `ticket/`, `sprint/` and `tracker/` (shared bricks) in `apps/api`, a NestJS adapter on top
@@ -89,7 +92,7 @@ and `audit_log` row (`tracker/audit.ts`) commit or roll back together.
 | Procedure | Behaviour |
 |-----------|-----------|
 | `ticket.create` | Domain validation; `pkg:*` labels rejected (`VALIDATION`, field `labels`, rule `assertNoPackageLabel` of `@koklo/domain`); `sprintId` must be a planned or active sprint of the project; key from the counter; criteria stored with 1-based positions |
-| `ticket.get` | Detail with criteria, dependencies and active lease; `lease.worktree` is `""` unless the caller's role is a manager role (deny by default, also without role) |
+| `ticket.get` | Detail with criteria, dependencies and active lease; `lease.worktree` is `""` unless the caller's role is in `TICKET_WRITE_ROLES` (owner, admin, dev, designer; deny by default, also without role) |
 | `ticket.list` | Filters `status`, `sprintId`, `pkg`, `assignee` (`kind:id` or bare id); order `(createdAt, id)`; cursor pagination; **an invalid cursor is ignored** (first page) because the contract declares no `VALIDATION` error on this route |
 | `ticket.update` | Merged state validated by the domain, then only the provided fields are written; a provided `labels` or `linkedFeatures` list replaces the stored one |
 | `ticket.delete` | Soft delete; `CONFLICT ticket_has_active_lease` while a lease is held |
@@ -215,6 +218,38 @@ the audit log is readable by owner and admin only (loosening it is not a breakin
 Roles allowed per action (to enforce in TK-23): `member.invite` and `member.setRole` are
 reserved to `owner`/`admin` (otherwise `FORBIDDEN`); `project.create` to the roles the CDC
 allows to create projects (otherwise `FORBIDDEN`).
+
+## Leases and project state (TK-31)
+Modules `lease/` and `project-state/` in `apps/api`, same hexagonal shape as TK-30 (controller,
+service, repository port, Prisma adapter, one `ProjectTransactions` transaction and one
+`audit_log` row per write). The contract is unchanged (0.4.0). The domain decides (holder,
+expiry, version rule: `acquireLease`, `heartbeat`, `release`, `writeProjectState`); domain errors
+become typed errors through `tracker/api-errors.ts`.
+
+**Injected clock.** `CLOCK` (`clock.ts`, global `ClockModule`) is the only source of time for a
+decision: lease expiry, "active lease" filters of `ticket.get`/`ticket.delete`. Neither
+`Date.now()` nor SQL `now()` decides anywhere; tests replace it with `overrideProvider(CLOCK)`.
+
+| Constant (`auth/roles.ts`) | Roles | Used by |
+|----------------------------|-------|---------|
+| `LEASE_ACQUIRE_ROLES` | owner, admin, dev | `lease.acquire` |
+| `TICKET_WRITE_ROLES` | owner, admin, dev, designer | `lease.heartbeat`, `lease.release` (then the holder only, else `LEASE_NOT_HOLDER`) |
+| `PROJECT_STATE_READ_ROLES` | owner, admin, dev | `projectState.get` |
+| `PROJECT_STATE_WRITE_ROLES` | owner, admin | `projectState.update` |
+
+`lease.get` is open to every role; `canSeeWorktree(role)` (true for `TICKET_WRITE_ROLES`) masks
+`worktree` as `""` for the others, in `lease.get` and `ticket.get` alike. A role outside
+`PROJECT_STATE_READ_ROLES` gets a 403 on `projectState.get` that is **not typed** in the contract
+(the route declares no `FORBIDDEN`); the client sees a generic forbidden response.
+
+| Procedure | Behaviour |
+|-----------|-----------|
+| `lease.acquire` | Expired leases of the ticket are marked released in the same transaction, then the domain checks, then INSERT. A race lost on the partial unique index (`P2002`) rolls back and a second transaction reads the winner: `LEASE_HELD` |
+| `lease.heartbeat` | Domain extends the lease; persisted by a conditional UPDATE (not released, not expired). No active lease: `LEASE_EXPIRED` if the ticket ever had one, else `NOT_FOUND` |
+| `lease.release` | Holder only (`LEASE_NOT_HOLDER`); conditional UPDATE. **No one can force a release**: the contract has no such mechanism, so owner and admin are not exempt |
+| `lease.get` | Active lease or `null` |
+| `projectState.get` | Row created on demand (`{ version: 1, content: {} }`) with `createMany skipDuplicates` (no `P2002`) |
+| `projectState.update` | Domain version rule, then `UPDATE ... WHERE version = expected`; zero rows means a concurrent write won: re-read and `VERSION_CONFLICT` |
 
 ## Implementation of the six procedures (TK-23)
 | Procedure | Controller guards | Behaviour |
@@ -369,7 +404,7 @@ oRPC packages are pinned to `2.0.0-beta.46`: it is the only published line offer
 `.meta(openapi(...))` (stable 1.16.1 uses `.route()`). Replace with 2.0 stable on release.
 
 ## Version history
-- **0.4.0** (TK-29, 15 routes implemented in TK-30): tickets, dependencies, sprints, comments, project state, leases and
+- **0.4.0** (TK-29, 15 routes implemented in TK-30, 6 more in TK-31: leases and project state): tickets, dependencies, sprints, comments, project state, leases and
   read-only audit (25 routes, contract only); typed errors `INVALID_TRANSITION`,
   `DEPENDENCY_CYCLE`, `VERSION_CONFLICT`, `LEASE_HELD`, `LEASE_EXPIRED`,
   `LEASE_NOT_HOLDER`, `VALIDATION`; `CONFLICT.reason` extended. Backward compatible

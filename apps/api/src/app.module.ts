@@ -4,14 +4,17 @@ import { type DynamicModule, Module } from "@nestjs/common";
 import { ORPCModule } from "@orpc/nest";
 import { LoggerModule } from "nestjs-pino";
 import { AuthModule } from "./auth/auth.module.ts";
+import { ClockModule } from "./clock.ts";
 import type { AppConfig } from "./config.ts";
 import { DatabaseModule } from "./database/database.module.ts";
 import { ERROR_STATUS_MAP } from "./error-status.ts";
 import { HealthModule } from "./health/health.module.ts";
+import { LeaseModule } from "./lease/lease.module.ts";
 import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { OrganizationModule } from "./organization/organization.module.ts";
 import { ProjectModule } from "./project/project.module.ts";
+import { ProjectStateModule } from "./project-state/project-state.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest } from "./request-serializer.ts";
@@ -50,6 +53,7 @@ export class AppModule {
             customProps: (request) => ({ requestId: request.id }),
           },
         }),
+        ClockModule,
         DatabaseModule.forRoot(config),
         AuthModule.forRoot(config),
         ORPCModule.forRoot({ errorStatusMap: ERROR_STATUS_MAP }),
@@ -59,6 +63,8 @@ export class AppModule {
         ProjectModule,
         TicketModule,
         SprintModule,
+        LeaseModule,
+        ProjectStateModule,
       ],
       controllers: [OpenApiController],
     };

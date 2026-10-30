@@ -61,6 +61,7 @@ export const toTicketRecord = (row: TicketRow): TicketRecord => ({
 });
 
 export const toLeaseRecord = (row: {
+  id: string;
   holderKind: Holder["kind"];
   holderId: string;
   branch: string;
@@ -71,6 +72,7 @@ export const toLeaseRecord = (row: {
   ttlMs: number;
   releasedAt: Date | null;
 }): LeaseRecord => ({
+  id: row.id,
   holder: { kind: row.holderKind, id: row.holderId },
   branch: row.branch,
   worktree: row.worktree,

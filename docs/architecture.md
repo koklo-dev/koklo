@@ -413,6 +413,17 @@ flowchart LR
   tx --> db[(PostgreSQL: rows + counter + audit_log)]
 ```
 
+### Leases and project state in the API (TK-31)
+Modules `lease/` and `project-state/` follow the TK-30 shape (service holds the use case, port
+hides Prisma, `@koklo/domain` decides, one transaction and one audit row per write). Time comes
+from the injected `CLOCK` (`clock.ts`, global module), never from `Date.now()` or SQL `now()`.
+Concurrency is settled by the database: the partial unique index for one active lease per ticket
+and `UPDATE ... WHERE version = expected` for the project state. Roles and behaviour:
+[API contract](api-contract.md#leases-and-project-state-tk-31).
+
+- **Not delivered**: the merge and spec-write locks (no `locks` table, no contract procedure);
+  they need a migration and contract 0.5.0, tracked by a follow-up ticket.
+
 ### Web: organizations, members and project creation (TK-24)
 `apps/web` consumes the TK-23 procedures; `apps/api`, `packages/contract` and the database are untouched.
 Decision record: [ADR 0008](adr/0008-web-entry-gate-organizations.md).
