@@ -1,9 +1,15 @@
 import {
   CounterLimitReachedError,
   DependencyCycleError,
+  InvalidLeaseError,
+  InvalidProjectStateVersionError,
   InvalidSensitivityError,
   InvalidTicketError,
   InvalidTicketTransitionError,
+  LeaseAlreadyHeldError,
+  LeaseExpiredError,
+  LeaseNotHeldByError,
+  StaleProjectStateError,
   TicketPackageError,
 } from "@koklo/domain";
 import { ORPCError } from "@orpc/server";
@@ -45,6 +51,31 @@ export function toApiError(error: unknown): unknown {
   if (error instanceof DependencyCycleError) {
     return new ORPCError("DEPENDENCY_CYCLE", { data: { path: error.path } });
   }
+  return leaseOrStateError(error);
+}
+
+/** Erreurs nommées des baux et de l'état de projet (CDC §7.4, §7.5) vers leurs erreurs typées. */
+function leaseOrStateError(error: unknown): unknown {
+  if (error instanceof InvalidLeaseError) return validation(error.field, error.message);
+  if (error instanceof InvalidProjectStateVersionError) {
+    return validation("expectedVersion", error.message);
+  }
+  if (error instanceof LeaseAlreadyHeldError) {
+    const { ticket, holder, expiresAt } = error.lease;
+    return new ORPCError("LEASE_HELD", { data: { ticket, holder, expiresAt } });
+  }
+  if (error instanceof LeaseNotHeldByError) {
+    const { ticket, holder } = error.lease;
+    return new ORPCError("LEASE_NOT_HOLDER", { data: { ticket, holder } });
+  }
+  if (error instanceof LeaseExpiredError) {
+    const { ticket, expiresAt } = error.lease;
+    return new ORPCError("LEASE_EXPIRED", { data: { ticket, expiresAt } });
+  }
+  if (error instanceof StaleProjectStateError) {
+    const { expected, current } = error;
+    return new ORPCError("VERSION_CONFLICT", { data: { expected, current } });
+  }
   return error;
 }
 
@@ -57,6 +88,6 @@ export function viaDomain<T>(call: () => T): T {
   }
 }
 
-/** Violation d'unicité Prisma (P2002) : l'index partiel « un seul sprint actif » en est la source. */
+/** Violation d'unicité Prisma (P2002) : index partiels « un seul sprint actif » et « un seul bail actif ». */
 export const isUniqueViolation = (error: unknown): boolean =>
   typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";

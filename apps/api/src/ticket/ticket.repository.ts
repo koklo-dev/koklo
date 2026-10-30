@@ -42,6 +42,7 @@ export interface Criterion {
 }
 
 export interface LeaseRecord {
+  id: string;
   holder: Holder;
   branch: string;
   worktree: string;

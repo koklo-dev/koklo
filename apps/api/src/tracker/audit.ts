@@ -4,7 +4,7 @@ import type { ProjectScope } from "./scope.ts";
 /** Une écriture à journaliser : actions stables `ticket.create`, `sprint.activate`, etc. */
 export interface AuditEntry {
   action: string;
-  targetKind: "ticket" | "sprint";
+  targetKind: "ticket" | "sprint" | "lease" | "project_state";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;

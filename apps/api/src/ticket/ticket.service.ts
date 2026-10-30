@@ -13,7 +13,7 @@ import {
   transitionTicket,
 } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
-import { TICKET_WRITE_ROLES } from "../auth/roles.ts";
+import { canSeeWorktree } from "../auth/roles.ts";
 import {
   conflict,
   invalidTransition,
@@ -100,7 +100,7 @@ export class TicketService {
           dependencies: dependenciesOf(graphOf(edges), record.key),
           lease: await store.activeLease(record.id),
         },
-        TICKET_WRITE_ROLES.some((writer) => writer === role),
+        canSeeWorktree(role),
       );
     });
   }

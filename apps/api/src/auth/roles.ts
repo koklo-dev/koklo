@@ -45,3 +45,19 @@ export const MANAGER_ROLES = ["owner", "admin"] as const;
  * client ne fait que commenter, le business lit. Seule source pour `@Roles(...TICKET_WRITE_ROLES)`.
  */
 export const TICKET_WRITE_ROLES = ["owner", "admin", "dev", "designer"] as const;
+
+/**
+ * Le chemin du worktree d'un runner est interne à l'infrastructure : lisible des seuls rôles
+ * d'écriture (deny by default, aussi sans rôle). Source unique pour `ticket.get` et `lease.get`.
+ */
+export const canSeeWorktree = (role: string | undefined): boolean =>
+  TICKET_WRITE_ROLES.some((writer) => writer === role);
+
+/** Rôles qui prennent un bail de livraison (CDC §14, « Lancer un runner de livraison »). */
+export const LEASE_ACQUIRE_ROLES = ["owner", "admin", "dev"] as const;
+
+/** Lecture de l'état de projet : son contenu porte politique de merge et réglages de livraison. */
+export const PROJECT_STATE_READ_ROLES = ["owner", "admin", "dev"] as const;
+
+/** Écriture de l'état de projet : la politique de merge relève du propriétaire et de l'admin (§14). */
+export const PROJECT_STATE_WRITE_ROLES = ["owner", "admin"] as const;

@@ -29,7 +29,7 @@ export const toTicketOutput = (record: TicketRecord): TicketOutput => ({
  * Le chemin du worktree d'un runner est interne à l'infrastructure : seuls les rôles qui écrivent
  * le voient, les autres reçoivent une chaîne vide (le schéma l'impose obligatoire).
  */
-const leaseOutput = (key: string, lease: LeaseRecord, canSeeWorktree: boolean) => ({
+export const leaseOutput = (key: string, lease: LeaseRecord, canSeeWorktree: boolean) => ({
   ticket: key,
   holder: lease.holder,
   branch: lease.branch,

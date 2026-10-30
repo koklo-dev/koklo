@@ -1,5 +1,6 @@
 import type { Dependency } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
+import { CLOCK, type Clock } from "../clock.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { nextCounterValue } from "../tracker/counters.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
@@ -29,6 +30,7 @@ class PrismaTicketStore implements TicketStore {
   constructor(
     private readonly tx: Tx,
     private readonly scope: ProjectScope,
+    private readonly clock: Clock,
   ) {}
 
   nextNumber(): Promise<number> {
@@ -116,13 +118,13 @@ class PrismaTicketStore implements TicketStore {
 
   async hasActiveLease(id: string): Promise<boolean> {
     await this.assertOwned(id);
-    return (await this.tx.lease.count({ where: { ticketId: id, releasedAt: null } })) > 0;
+    return (await this.tx.lease.count({ where: this.activeWhere(id) })) > 0;
   }
 
   async activeLease(id: string): Promise<LeaseRecord | null> {
     await this.assertOwned(id);
     const row = await this.tx.lease.findFirst({
-      where: { ticketId: id, releasedAt: null },
+      where: this.activeWhere(id),
       orderBy: { acquiredAt: "desc" },
     });
     return row && toLeaseRecord(row);
@@ -203,6 +205,11 @@ class PrismaTicketStore implements TicketStore {
     });
   }
 
+  /** Bail actif = non libéré ET non expiré à l'instant de l'horloge injectée (jamais `now()` SQL). */
+  private activeWhere(ticketId: string) {
+    return { ticketId, releasedAt: null, expiresAt: { gt: new Date(this.clock.now()) } };
+  }
+
   private reload(id: string): Promise<TicketRecord> {
     return this.tx.ticket
       .findFirstOrThrow({ where: { id, projectId: this.scope.projectId }, include: ticketInclude })
@@ -263,9 +270,12 @@ class PrismaTicketStore implements TicketStore {
 
 @Injectable()
 export class PrismaTicketRepository implements TicketRepository {
-  constructor(@Inject(ProjectTransactions) private readonly transactions: ProjectTransactions) {}
+  constructor(
+    @Inject(ProjectTransactions) private readonly transactions: ProjectTransactions,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
 
   run<T>(scope: ProjectScope, work: (store: TicketStore) => Promise<T>): Promise<T> {
-    return this.transactions.run(scope, (tx) => work(new PrismaTicketStore(tx, scope)));
+    return this.transactions.run(scope, (tx) => work(new PrismaTicketStore(tx, scope, this.clock)));
   }
 }
