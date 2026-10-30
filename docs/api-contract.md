@@ -34,15 +34,18 @@ route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 | `project.list` | GET | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 | `project.create` | POST | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 
-The six TK-21 routes are implemented in `apps/api` (TK-23); see the next section. The 25
-TK-29 routes below are **contract only**: they have no implementation yet (tickets TK-30 to
-TK-32), and `apps/api` declares no controller for them. The organisation and the active
-project always come from the session or token, never from the input; a resource of another
-project is `NOT_FOUND` (no leak). The contract does not carry roles: the matrix is
-enforced and tested in `apps/api`. "Manage" below means owner, admin, dev, designer;
-"read" is open to every role (client for its own project, business).
+The six TK-21 routes are implemented in `apps/api` (TK-23). Of the 25 TK-29 routes, the 15
+ticket, dependency and sprint ones are implemented since TK-30 (see
+[Tickets, dependencies and sprints (TK-30)](#tickets-dependencies-and-sprints-tk-30)); the
+comment, project-state, lease and audit routes are still **contract only** (TK-31, TK-32). The
+organisation and the project always come from the session or the server, never from the input;
+a resource of another project is `NOT_FOUND` (no leak). The contract does not carry roles:
+the matrix is enforced and tested in `apps/api`. "Manage" below means owner, admin, dev,
+designer; "read" is open to every role (client for its own project, business). The column is
+the contract's intent; the matrix actually enforced for TK-30 is in the next section
+(`ticket.delete` is currently open to every manager role, not only owner and admin).
 
-| Operation | Method | Path | Roles (to enforce) | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`) |
+| Operation | Method | Path | Roles (intent) | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`) |
 |-----------|--------|------|--------------------|---------------------------------------------------|
 | `ticket.create` | POST | `/tickets` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
 | `ticket.get` | GET | `/tickets/{key}` | read | `NOT_FOUND` |
@@ -72,6 +75,64 @@ enforced and tested in `apps/api`. "Manage" below means owner, admin, dev, desig
 
 `audit` is read-only: the log is immutable (CDC §4.2) and fed by the server. There is no
 `lock.*` group (the merge and spec-write locks have no table yet).
+
+## Tickets, dependencies and sprints (TK-30)
+Modules `ticket/`, `sprint/` and `tracker/` (shared bricks) in `apps/api`, a NestJS adapter on top
+of `@koklo/domain` (a runtime dependency since TK-30): the domain decides (lifecycle table H1,
+dependency graph, validation), the API orchestrates and persists. The contract is unchanged (0.4.0).
+
+Each use case runs in **one Prisma transaction** under `withOrganization`
+(`tracker/project-transactions.ts`): the project is checked to belong to the organization
+(`NOT_FOUND` otherwise), then read, write, key counter (`TK-n`, `SP-n`, `tracker/counters.ts`)
+and `audit_log` row (`tracker/audit.ts`) commit or roll back together.
+
+| Procedure | Behaviour |
+|-----------|-----------|
+| `ticket.create` | Domain validation; `pkg:*` labels rejected (`VALIDATION`, field `labels`, rule `assertNoPackageLabel` of `@koklo/domain`); `sprintId` must be a planned or active sprint of the project; key from the counter; criteria stored with 1-based positions |
+| `ticket.get` | Detail with criteria, dependencies and active lease; `lease.worktree` is `""` unless the caller's role is a manager role (deny by default, also without role) |
+| `ticket.list` | Filters `status`, `sprintId`, `pkg`, `assignee` (`kind:id` or bare id); order `(createdAt, id)`; cursor pagination; **an invalid cursor is ignored** (first page) because the contract declares no `VALIDATION` error on this route |
+| `ticket.update` | Merged state validated by the domain, then only the provided fields are written; a provided `labels` or `linkedFeatures` list replaces the stored one |
+| `ticket.delete` | Soft delete; `CONFLICT ticket_has_active_lease` while a lease is held |
+| `ticket.transition` | Table H1, then CDC §7.2 for `todo -> in_progress`: every `blocks` dependency must be `done`, otherwise `INVALID_TRANSITION { from, to }` |
+| `dependency.add` / `remove` / `list` | Cycle detection on the project graph (`DEPENDENCY_CYCLE`); re-adding an identical edge is an idempotent no-op (no write, no audit); removing an absent edge is `NOT_FOUND` |
+| `sprint.create` / `update` | `endsOn >= startsOn` (`VALIDATION`, also when only one date changes); `SP-n` from the counter |
+| `sprint.activate` / `close` | `planned -> active -> closed`, no reopening. One active sprint per project: pre-check plus the partial unique index; a concurrent loser (`P2002`) becomes `CONFLICT sprint_already_active` |
+
+### Current project (v1)
+Neither the session nor the contract carries a project, so `PROJECT_CONTEXT`
+(`project/project-context.ts`) resolves it: `OldestProjectContext` returns the oldest project of
+the session organization (`createdAt`, then `id`); an organization without project gives
+`NOT_FOUND`. The value never comes from the client. An explicit project selection will replace
+this class without touching the services. Every read and write is filtered by this `projectId`.
+
+### Permission matrix (TK-30)
+Single source of the write roles: `TICKET_WRITE_ROLES` in `apps/api/src/auth/roles.ts` (owner,
+admin, dev, designer), checked by `apps/api/test/ticket-roles-consistency.test.ts`. The role is
+re-read from `members` on every request (`RoleGuard`).
+
+| Procedure | owner | admin | dev | designer | client | business |
+|-----------|:-----:|:-----:|:---:|:--------:|:------:|:--------:|
+| `ticket.get`, `ticket.list`, `dependency.list`, `sprint.get`, `sprint.list` | yes | yes | yes | yes | yes | yes |
+| `ticket.create`, `update`, `delete`, `transition` | yes | yes | yes | yes | no | no |
+| `dependency.add`, `dependency.remove` | yes | yes | yes | yes | no | no |
+| `sprint.create`, `update`, `activate`, `close` | yes | yes | yes | yes | no | no |
+
+401 without session or active organization, 403 for a role marked "no".
+
+### Known limits and debt (TK-30)
+- **No composite foreign key from child rows to the ticket (TK-28 debt).** `ticket_labels`,
+  `ticket_features`, `acceptance_criteria` and `ticket_dependencies` reference the ticket by id
+  only, so the database does not forbid a child row pointing to a ticket of another project or
+  organization. This is covered by the application safety net only: every child write goes
+  through `assertOwned` (ticket in the organization AND the current project), every read filters
+  by `projectId`, and child rows are written through model operations (not nested writes) so the
+  tenant extension applies. To harden later with composite keys `(id, project_id)`; a follow-up
+  ticket should track it.
+- The `pkg:*` label rule is domain logic (`assertNoPackageLabel` in
+  `packages/domain/src/ticket-package.ts`), raised as `InvalidTicketError` and mapped to
+  `VALIDATION`.
+- `ticket.delete` is allowed to every manager role, while the contract intent says owner and
+  admin only; to be arbitrated by the product owner.
 
 ## Inputs, outputs and error shapes
 
@@ -308,7 +369,7 @@ oRPC packages are pinned to `2.0.0-beta.46`: it is the only published line offer
 `.meta(openapi(...))` (stable 1.16.1 uses `.route()`). Replace with 2.0 stable on release.
 
 ## Version history
-- **0.4.0** (TK-29): tickets, dependencies, sprints, comments, project state, leases and
+- **0.4.0** (TK-29, 15 routes implemented in TK-30): tickets, dependencies, sprints, comments, project state, leases and
   read-only audit (25 routes, contract only); typed errors `INVALID_TRANSITION`,
   `DEPENDENCY_CYCLE`, `VERSION_CONFLICT`, `LEASE_HELD`, `LEASE_EXPIRED`,
   `LEASE_NOT_HOLDER`, `VALIDATION`; `CONFLICT.reason` extended. Backward compatible

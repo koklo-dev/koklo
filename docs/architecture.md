@@ -389,6 +389,30 @@ flowchart LR
   q --> w[worker send-invitation] --> m{{MailSender}}
 ```
 
+### Tickets and sprints in the API (TK-30)
+Modules `ticket/`, `sprint/` and `tracker/` in `apps/api`: hexagonal slices where the service
+holds the use cases, a port (`TicketRepository`, `SprintRepository`) hides Prisma, and
+`@koklo/domain` makes every business decision (lifecycle, dependency graph, validation,
+`pkg:*` label rule). Details and the permission matrix: [API contract](api-contract.md#tickets-dependencies-and-sprints-tk-30).
+
+- **One transaction per use case** (`ProjectTransactions`): project check, read/write, key counter
+  and audit row commit together under `withOrganization`.
+- **Current project**: `PROJECT_CONTEXT` (`OldestProjectContext` in v1), never from the client.
+- **Shared bricks** in `tracker/`: `scope.ts`, `counters.ts`, `audit.ts`, `api-errors.ts`
+  (domain errors translated to typed contract errors).
+- **Debt**: no composite FK child -> ticket (TK-28); covered by the application safety net
+  (`assertOwned`, `projectId` filters) only.
+
+```mermaid
+flowchart LR
+  c[Client] --> g{{SessionGuard / RoleGuard}}
+  g --> ctl[Controller] --> svc[TicketService / SprintService]
+  svc -->|decides| d[@koklo/domain]
+  svc --> port[(Repository port)]
+  port --> tx[ProjectTransactions: 1 transaction]
+  tx --> db[(PostgreSQL: rows + counter + audit_log)]
+```
+
 ### Web: organizations, members and project creation (TK-24)
 `apps/web` consumes the TK-23 procedures; `apps/api`, `packages/contract` and the database are untouched.
 Decision record: [ADR 0008](adr/0008-web-entry-gate-organizations.md).

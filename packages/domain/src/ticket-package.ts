@@ -1,4 +1,4 @@
-import { TicketPackageError } from "./errors.ts";
+import { InvalidTicketError, TicketPackageError } from "./errors.ts";
 import { isOneOf } from "./one-of.ts";
 
 export const TICKET_PACKAGES = [
@@ -46,4 +46,17 @@ export const pkgFromLabels = (labels: readonly string[]): TicketPackage => {
     .filter((label) => label.startsWith(LABEL_PREFIX))
     .map((label) => label.slice(LABEL_PREFIX.length));
   return parseTicketPackage(packages);
+};
+
+/**
+ * Le paquet d'un ticket est son champ `pkg`, jamais une étiquette : une étiquette `pkg:*`
+ * créerait une seconde source de vérité (`pkgFromLabels` ne sert qu'à lire l'existant).
+ */
+export const assertNoPackageLabel = (labels: readonly string[] | undefined): void => {
+  if (labels?.some((label) => label.startsWith(LABEL_PREFIX))) {
+    throw new InvalidTicketError(
+      "labels",
+      `une étiquette ne peut pas commencer par ${LABEL_PREFIX} (utiliser pkg)`,
+    );
+  }
 };
