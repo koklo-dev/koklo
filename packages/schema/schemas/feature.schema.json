@@ -1,0 +1,141 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/feature.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "criteres": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "etapes": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "texte": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "etant_donne",
+                    "quand",
+                    "alors",
+                    "et"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "texte"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^AC-\\d+$",
+            "type": "string"
+          },
+          "titre": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "titre",
+          "etapes"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "description": {
+      "type": "string"
+    },
+    "ecrans": {
+      "default": [],
+      "items": {
+        "pattern": "^S-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "endpoints": {
+      "default": [],
+      "items": {
+        "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^F-\\d{3,}$",
+      "type": "string"
+    },
+    "nfr": {
+      "default": [],
+      "items": {
+        "pattern": "^NFR-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "priorite": {
+      "enum": [
+        "must",
+        "should",
+        "could",
+        "wont"
+      ],
+      "type": "string"
+    },
+    "regles": {
+      "default": [],
+      "items": {
+        "pattern": "^R-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "roles": {
+      "default": [],
+      "items": {
+        "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "statut": {
+      "enum": [
+        "brouillon",
+        "specifiee",
+        "implementee",
+        "adoptee"
+      ],
+      "type": "string"
+    },
+    "tables": {
+      "default": [],
+      "items": {
+        "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "titre": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "titre",
+    "statut",
+    "priorite",
+    "description",
+    "criteres"
+  ],
+  "type": "object"
+}

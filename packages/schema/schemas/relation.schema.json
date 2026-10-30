@@ -1,0 +1,30 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/relation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cardinalite": {
+      "enum": [
+        "1-1",
+        "1-n",
+        "n-1",
+        "n-n"
+      ],
+      "type": "string"
+    },
+    "from": {
+      "pattern": "^T-[a-z0-9][a-z0-9-]*\\.[a-z_][a-z0-9_]*$",
+      "type": "string"
+    },
+    "to": {
+      "pattern": "^T-[a-z0-9][a-z0-9-]*\\.[a-z_][a-z0-9_]*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "cardinalite"
+  ],
+  "type": "object"
+}

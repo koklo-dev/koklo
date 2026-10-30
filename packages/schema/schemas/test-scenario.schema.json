@@ -1,0 +1,37 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/test-scenario.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "criteres": {
+      "items": {
+        "pattern": "^AC-\\d+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "feature": {
+      "pattern": "^F-\\d{3,}$",
+      "type": "string"
+    },
+    "fichier": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "e2e",
+        "contrat",
+        "visuel"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "feature",
+    "type",
+    "fichier",
+    "criteres"
+  ],
+  "type": "object"
+}

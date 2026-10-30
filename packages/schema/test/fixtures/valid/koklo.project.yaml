@@ -1,0 +1,8 @@
+projet: civinat
+organisation: acme
+spec_version: 1
+extends:
+  - org:design-library@^2
+repos:
+  - { role: front, fournisseur: github, url: acme/civinat-web }
+  - { role: back, fournisseur: github, url: acme/civinat-api }

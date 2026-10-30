@@ -1,0 +1,26 @@
+{
+  "id": "S-register",
+  "features": ["F-001"],
+  "viewport": ["mobile", "desktop"],
+  "arbre": {
+    "composant": "C-page",
+    "enfants": [
+      {
+        "id": "n-email",
+        "composant": "C-input",
+        "props": { "label": "Email", "type": "email" },
+        "annotations": [
+          { "feature": "F-001", "critere": "AC-1", "donnee": "T-user.email",
+            "comportement": "Erreur inline si email déjà utilisé" }
+        ]
+      },
+      {
+        "id": "n-submit",
+        "composant": "C-button",
+        "props": { "label": "Créer mon compte" },
+        "annotations": [ { "feature": "F-001", "endpoint": "E-auth-register" } ]
+      }
+    ]
+  },
+  "etats": ["vide", "chargement", "erreur-serveur", "succes"]
+}

@@ -695,6 +695,38 @@ flowchart LR
 
 Procedure, App permissions and sandbox clean-up: `packages/github/README.md`.
 
+### Spec model: `@koklo/schema` (TK-40)
+`packages/schema` (`@koklo/schema`, tag `schema`, private) turns the files of a spec
+repository into typed entities and a validation report. It is **pure**: no `node:*`, `fetch`,
+`process`, `Date` or `console` in `src/`; the caller passes `{ path, content }` files. Its only
+runtime dependencies are `zod` 4.6.7 (same pin as `@koklo/contract`) and `yaml` 2.9.1. Details,
+codes and usage: `packages/schema/README.md`.
+
+```mermaid
+flowchart LR
+  files[("SpecFile[]<br/>path + content")] --> kinds["kindOf(path)"]
+  kinds --> load["hardened loaders<br/>YAML / JSON / Markdown"]
+  load -->|"STRUCT_* issues"| report
+  load --> zod["Zod strictObject<br/>parseWithSchema"]
+  zod -->|"STRUCT_SCHEMA_VIOLATION"| report
+  zod --> spec["ParsedSpec<br/>(valid entities only)"]
+  spec --> index["buildIndex"]
+  index --> r4["rule 4: links resolve"]
+  index --> r5["rule 5: status vs coverage"]
+  index --> r7["rule 7: orphans (warning)"]
+  r4 & r5 & r7 --> report["ValidationReport<br/>sorted issues, ok, counts"]
+  zod -.-> gen["z.toJSONSchema"] -.-> json[("schemas/*.schema.json<br/>pnpm schemas:generate")]
+```
+
+- `checkSpec(files)` = `parseSpecFiles` then `validateSpec`; both halves are exported.
+- Files are processed in a stable order (path without extension, then full path); the report is
+  sorted by `path`, `pointer`, `code`, `message`, so the output does not depend on input order.
+- A failing entity is excluded from `ParsedSpec` and reported; rules 4, 5 and 7 run on the rest.
+- JSON Schemas (draft 2020-12) are generated from the Zod schemas and committed; a drift test
+  fails CI when they differ. `canonicalize` gives the deterministic serialisation they use.
+- Known limits: a duplicate key in a screen JSON file is not detected (`JSON.parse`); the
+  Markdown body of a feature silently overrides `description` and `criteres` of its front matter.
+
 ### Magic-link emails: `send-magic-link` queue (TK-22)
 The api is a pg-boss **producer only**; the worker owns migrations, queue options and sending.
 

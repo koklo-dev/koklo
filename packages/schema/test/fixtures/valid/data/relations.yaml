@@ -1,0 +1,2 @@
+relations:
+  - { from: T-session.user_id, to: T-user.id, cardinalite: n-1 }

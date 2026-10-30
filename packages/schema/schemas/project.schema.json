@@ -1,0 +1,59 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/project.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "extends": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "organisation": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "projet": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "repos": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "fournisseur": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "role": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "url": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "fournisseur",
+          "url"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "spec_version": {
+      "const": 1,
+      "type": "number"
+    }
+  },
+  "required": [
+    "projet",
+    "organisation",
+    "spec_version"
+  ],
+  "type": "object"
+}

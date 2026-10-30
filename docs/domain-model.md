@@ -45,6 +45,16 @@ vision §18.4).
 `roleSchema` in the contract). The creator is the only `owner`; `owner` is never assignable by
 invitation or `setRole`, and an organization always keeps at least one owner.
 
+### Spec entities (TK-40, `packages/schema`)
+Distinct from the database tables above: these are the files of a project's spec repository,
+validated by `@koklo/schema` (not persisted by `packages/db`). Feature `F-nnn` (status
+`brouillon` | `specifiee` | `implementee` | `adoptee`, acceptance criteria `AC-n`), table `T-*`
+(fields), relation (`T-a.champ` to `T-b.champ`, `1-1` | `1-n` | `n-1` | `n-n`), endpoint `E-*`,
+screen `S-*` (annotated node tree) and test scenario (feature + criteria covered). Invariants
+enforced as issues: rule 4 (every link resolves), rule 5 (`specifiee` has a screen or endpoint,
+`implementee` has a test per criterion), rule 7 (no orphan entity, warning). See
+`packages/schema/README.md` for the 26 issue codes.
+
 ## Relationships and cardinalities
 
 ```mermaid
