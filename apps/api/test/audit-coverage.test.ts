@@ -1,11 +1,20 @@
 import { contract, type Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
+import type { PgBoss } from "pg-boss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createSeededDatabase } from "./helpers/app.ts";
 import { auditRowsFull, commentsFor, UUID_RE } from "./helpers/comments.ts";
 import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./helpers/leases.ts";
-import { apiFor, createWorld, seedSprint, seedTicket, type World } from "./helpers/tickets.ts";
+import { startQueueBoss } from "./helpers/organizations.ts";
+import {
+  apiFor,
+  createWorld,
+  seedSprint,
+  seedTicket,
+  send,
+  type World,
+} from "./helpers/tickets.ts";
 
 /**
  * TK-32, critère 2 : TOUTE procédure d'écriture du contrat 0.4.0 des groupes tracker produit
@@ -14,14 +23,17 @@ import { apiFor, createWorld, seedSprint, seedTicket, type World } from "./helpe
  */
 let database: TestDatabase;
 let app: INestApplication;
+let boss: PgBoss;
 
 beforeAll(async () => {
   database = await createSeededDatabase();
+  boss = await startQueueBoss(database);
   app = await createAppWithClock(database.url, new ManualClock());
 });
 
 afterAll(async () => {
   await app?.close();
+  await boss?.stop();
   await database?.dispose();
 });
 
@@ -36,17 +48,22 @@ function nonGetProcedures(groupNames: readonly string[]): string[] {
   );
 }
 
-const TRACKER_GROUPS = ["ticket", "dependency", "sprint", "comment", "projectState", "lease"];
+/** Tous les groupes à écriture : organization, member et project se journalisent aussi (audit_log ne requiert que organization_id). */
+const WRITE_GROUPS = [
+  "organization",
+  "member",
+  "project",
+  "ticket",
+  "dependency",
+  "sprint",
+  "comment",
+  "projectState",
+  "lease",
+];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit"];
 /** `health` est une procédure isolée (GET), pas un groupe. */
 const STANDALONE_PROCEDURES = ["health"];
-/** Exclusions nommées et justifiées (H3, Q2 de l'analyse) : jamais un oubli silencieux. */
-const EXCLUDED_GROUPS: Record<string, string> = {
-  organization: "hors ProjectScope : journalisation à arbitrer (Q2), ticket de suivi",
-  member: "hors ProjectScope : journalisation à arbitrer (Q2), ticket de suivi",
-  project: "hors ProjectScope : journalisation à arbitrer (Q2), ticket de suivi",
-};
 
 const EXPECTED_WRITE_PROCEDURES = [
   "comment.create",
@@ -56,6 +73,10 @@ const EXPECTED_WRITE_PROCEDURES = [
   "lease.acquire",
   "lease.heartbeat",
   "lease.release",
+  "member.invite",
+  "member.setRole",
+  "organization.create",
+  "project.create",
   "projectState.update",
   "sprint.activate",
   "sprint.close",
@@ -89,6 +110,10 @@ interface Scenario {
   prepare: (ctx: Ctx) => Promise<State>;
   call: (ctx: Ctx, state: State) => Promise<Response>;
   expected: (ctx: Ctx, state: State, response: Response) => Promise<Expected>;
+  /** Organisation qui reçoit l'entrée si ce n'est pas celle du monde (organization.create : la nouvelle). */
+  auditOrganization?: (ctx: Ctx, response: Response) => string;
+  /** false : l'owner du monde ne peut pas relire cette entrée via audit.list (autre organisation). */
+  listable?: boolean;
   /** Appel refusé (403, 404, 409, 422) : aucune entrée ne doit apparaître. */
   denied: (ctx: Ctx, state: State) => Promise<Response>;
   deniedStatuses: number[];
@@ -331,39 +356,124 @@ const SCENARIOS: Scenario[] = [
     denied: (ctx, t) => collab(ctx, "client").release(t.key),
     deniedStatuses: [403],
   },
+  {
+    procedure: "organization.create",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      send(app, ctx.world.actors.owner.cookie, "post", "/organizations", { name: "Nouvelle org" }),
+    auditOrganization: (_ctx, res) => res.body.id,
+    listable: false,
+    expected: async (_ctx, _s, res) => ({
+      action: "organization.create",
+      targetKind: "organization",
+      targetId: res.body.id,
+      ticketId: null,
+    }),
+    denied: async (ctx) => {
+      const [org] = await database.query<{ slug: string }>(
+        "SELECT slug FROM organizations WHERE id = $1",
+        [ctx.world.organizationId],
+      );
+      return send(app, ctx.world.actors.owner.cookie, "post", "/organizations", {
+        name: "Doublon",
+        slug: org?.slug,
+      });
+    },
+    deniedStatuses: [409],
+  },
+  {
+    procedure: "member.invite",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      send(app, ctx.world.actors.owner.cookie, "post", "/members/invitations", {
+        email: `invite-${Date.now()}@example.test`,
+        role: "dev",
+      }),
+    expected: async (_ctx, _s, res) => ({
+      action: "member.invite",
+      targetKind: "invitation",
+      targetId: res.body.id,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      send(app, ctx.world.actors.dev.cookie, "post", "/members/invitations", {
+        email: "refus@example.test",
+        role: "dev",
+      }),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "member.setRole",
+    role: "owner",
+    prepare: async () => ({}),
+    call: async (ctx) => {
+      const memberId = ctx.world.actors.dev.memberId;
+      const res = await send(
+        app,
+        ctx.world.actors.owner.cookie,
+        "patch",
+        `/members/${memberId}/role`,
+        { memberId, role: "designer" },
+      );
+      return res;
+    },
+    expected: async (ctx) => ({
+      action: "member.setRole",
+      targetKind: "member",
+      targetId: ctx.world.actors.dev.memberId,
+      ticketId: null,
+    }),
+    denied: (ctx) => {
+      const memberId = ctx.world.actors.designer.memberId;
+      return send(app, ctx.world.actors.dev.cookie, "patch", `/members/${memberId}/role`, {
+        memberId,
+        role: "client",
+      });
+    },
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "project.create",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      send(app, ctx.world.actors.owner.cookie, "post", "/projects", { name: "Nouveau projet" }),
+    expected: async (_ctx, _s, res) => ({
+      action: "project.create",
+      targetKind: "project",
+      targetId: res.body.id,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      send(app, ctx.world.actors.dev.cookie, "post", "/projects", { name: "Refusé" }),
+    deniedStatuses: [403],
+  },
 ];
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes tracker sont exactement les 16 attendues", () => {
-    expect(nonGetProcedures(TRACKER_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
+  it("les procédures non-GET des groupes sont exactement les 20 attendues", () => {
+    expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
   it("chaque procédure d'écriture du contrat a un scénario", () => {
     const covered = new Set(SCENARIOS.map((s) => s.procedure));
-    const missing = nonGetProcedures(TRACKER_GROUPS).filter((name) => !covered.has(name));
+    const missing = nonGetProcedures(WRITE_GROUPS).filter((name) => !covered.has(name));
     expect(missing, `procédures d'écriture sans scénario d'audit : ${missing.join(", ")}`).toEqual(
       [],
     );
   });
 
   it("aucun scénario ne vise une procédure disparue ou non-écriture", () => {
-    const writes = new Set(nonGetProcedures(TRACKER_GROUPS));
+    const writes = new Set(nonGetProcedures(WRITE_GROUPS));
     const stale = SCENARIOS.map((s) => s.procedure).filter((name) => !writes.has(name));
     expect(stale).toEqual([]);
   });
 
-  it("chaque groupe du contrat est couvert, en lecture seule ou exclu avec justification", () => {
-    const known = new Set([
-      ...TRACKER_GROUPS,
-      ...READ_ONLY_GROUPS,
-      ...STANDALONE_PROCEDURES,
-      ...Object.keys(EXCLUDED_GROUPS),
-    ]);
+  it("chaque groupe du contrat est couvert ou en lecture seule : aucune exclusion", () => {
+    const known = new Set([...WRITE_GROUPS, ...READ_ONLY_GROUPS, ...STANDALONE_PROCEDURES]);
     expect(Object.keys(contract).filter((group) => !known.has(group))).toEqual([]);
-    for (const [group, why] of Object.entries(EXCLUDED_GROUPS)) {
-      expect(why.length).toBeGreaterThan(10);
-      expect(nonGetProcedures([group]).length, `${group} exclu sans écriture`).toBeGreaterThan(0);
-    }
     expect(nonGetProcedures(READ_ONLY_GROUPS)).toEqual([]);
   });
 });
@@ -371,12 +481,17 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
 async function checkSuccess(scenario: Scenario) {
   const ctx = { world: await createWorld(database) };
   const state = await scenario.prepare(ctx);
-  const before = await auditRowsFull(database, ctx.world.organizationId);
+  // L'organisation créée par organization.create n'existe pas avant l'appel : journal vide.
+  const before = scenario.auditOrganization
+    ? []
+    : await auditRowsFull(database, ctx.world.organizationId);
 
   const response = await scenario.call(ctx, state);
   expect(response.status, JSON.stringify(response.body)).toBe(200);
 
-  const after = await auditRowsFull(database, ctx.world.organizationId);
+  const auditOrganizationId =
+    scenario.auditOrganization?.(ctx, response) ?? ctx.world.organizationId;
+  const after = await auditRowsFull(database, auditOrganizationId);
   const created = after.slice(before.length);
   expect(created).toHaveLength(1);
   const expected = await scenario.expected(ctx, state, response);
@@ -439,8 +554,11 @@ async function checkDenied(scenario: Scenario) {
 describe.each(SCENARIOS)("$procedure", (scenario) => {
   it("réussit avec une seule nouvelle entrée exacte (action, cible, acteur, ticket)", () =>
     checkSuccess(scenario));
-  it("est restituée par audit.list (owner), avec ticketKey quand elle vise un ticket", () =>
-    checkListed(scenario));
+  // organization.create : l'entrée vit dans la nouvelle organisation, que la session de l'owner (organisation active du monde) ne peut pas relire ; le succès est vérifié en base.
+  it.skipIf(scenario.listable === false)(
+    "est restituée par audit.list (owner), avec ticketKey quand elle vise un ticket",
+    () => checkListed(scenario),
+  );
   it("refusée (403, 404, 409 ou 422) : aucune entrée n'est ajoutée", () => checkDenied(scenario));
 });
 

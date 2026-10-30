@@ -1,6 +1,8 @@
 import type { MemberListOutput, Role } from "@koklo/contract";
+import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
+import { type AuditActor, recordAudit } from "../tracker/audit.ts";
 
 export interface MemberRecord {
   id: string;
@@ -55,29 +57,56 @@ export class MemberRepository {
   /**
    * Change le rôle dans une transaction sérialisable : `authorize` (qui lève pour refuser) et
    * l'écriture voient le même état, une course ne peut pas laisser l'organisation sans owner.
-   * `target` est `null` si le membre n'appartient pas à l'organisation.
+   * `target` est `null` si le membre n'appartient pas à l'organisation. L'audit `member.setRole`
+   * s'écrit dans la même transaction : un refus ou un échec n'en laisse aucune trace.
    */
   setRole(
-    organizationId: string,
+    actor: AuditActor,
     memberId: string,
     newRole: string,
     authorize: (target: MemberRecord | null, ownerCount: number) => void,
   ): Promise<{ id: string; role: string }> {
-    return this.database.client.$transaction(
-      async (tx) => {
-        const target = await tx.member.findFirst({
-          where: { id: memberId, organizationId },
-          select: { id: true, role: true },
-        });
-        const ownerCount = await tx.member.count({ where: { organizationId, role: "owner" } });
-        authorize(target, ownerCount);
-        return tx.member.update({
-          where: { id: memberId },
-          data: { role: newRole },
-          select: { id: true, role: true },
-        });
-      },
-      { isolationLevel: "Serializable" },
+    const { organizationId } = actor;
+    return withOrganization(organizationId, () =>
+      this.database.client.$transaction(
+        async (tx) => {
+          const target = await tx.member.findFirst({
+            where: { id: memberId, organizationId },
+            select: { id: true, role: true },
+          });
+          const ownerCount = await tx.member.count({ where: { organizationId, role: "owner" } });
+          authorize(target, ownerCount);
+          const updated = await tx.member.update({
+            where: { id: memberId },
+            data: { role: newRole },
+            select: { id: true, role: true },
+          });
+          await recordAudit(tx, actor, {
+            action: "member.setRole",
+            targetKind: "member",
+            targetId: updated.id,
+          });
+          return updated;
+        },
+        { isolationLevel: "Serializable" },
+      ),
+    );
+  }
+
+  /**
+   * Journalise `member.invite` après la création de l'invitation par Better Auth. Better Auth
+   * écrit avec son propre client : l'audit ne peut pas partager sa transaction (voir
+   * docs/api-contract.md).
+   */
+  recordInvitation(actor: AuditActor, invitationId: string): Promise<void> {
+    return withOrganization(actor.organizationId, () =>
+      this.database.client.$transaction((tx) =>
+        recordAudit(tx, actor, {
+          action: "member.invite",
+          targetKind: "invitation",
+          targetId: invitationId,
+        }),
+      ),
     );
   }
 }

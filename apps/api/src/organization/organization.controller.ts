@@ -19,8 +19,11 @@ export class OrganizationController {
     const requestId = requestIdOf(request);
     return implement(contract.organization.create).handler(({ input, errors }) =>
       guard(requestId, errors, async () => {
-        requireUserSession(request);
-        return this.service.create(input, fromNodeHeaders(request.headers));
+        return this.service.create(
+          input,
+          requireUserSession(request),
+          fromNodeHeaders(request.headers),
+        );
       }),
     );
   }
