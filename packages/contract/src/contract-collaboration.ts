@@ -2,9 +2,10 @@ import {
   leaseExpiredError,
   leaseHeldError,
   leaseNotHolderError,
+  validationError,
   versionConflictError,
 } from "./errors.ts";
-import { readErrors, readOneErrors, route, writeErrors, writeOneErrors } from "./route-helpers.ts";
+import { readOneErrors, route, writeErrors, writeOneErrors } from "./route-helpers.ts";
 import {
   auditEntrySchema,
   auditListInputSchema,
@@ -20,13 +21,16 @@ import {
   ticketKeyInputSchema,
 } from "./schemas.ts";
 
+/** La cible (ticket, feature...) peut être inconnue ou hors projet : NOT_FOUND et VALIDATION typés. */
+const commentErrors = { ...writeOneErrors, ...validationError } as const;
+
 const comment = {
   create: route("POST", "/comments")
-    .errors(writeErrors)
+    .errors(commentErrors)
     .input(commentCreateInputSchema)
     .output(commentSchema),
   list: route("GET", "/comments")
-    .errors(readErrors)
+    .errors(commentErrors)
     .input(commentListInputSchema)
     .output(pageOf(commentSchema)),
   delete: route("DELETE", "/comments/{id}")
@@ -36,7 +40,7 @@ const comment = {
 };
 
 const projectState = {
-  get: route("GET", "/project-state").errors(readErrors).output(projectStateSchema),
+  get: route("GET", "/project-state").errors(writeErrors).output(projectStateSchema),
   update: route("PUT", "/project-state")
     .errors({ ...writeErrors, ...versionConflictError })
     .input(projectStateUpdateInputSchema)

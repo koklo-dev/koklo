@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
+import { installation, repo } from "./contract-provider.ts";
+import { spec, specBatch } from "./contract-spec.ts";
 import { dependency, sprint, ticket } from "./contract-tickets.ts";
 import {
   authErrors,
@@ -43,6 +45,16 @@ import {
   projectSchema,
   type roleSchema,
 } from "./schemas.ts";
+import type { installationSchema, repoSchema } from "./schemas-provider.ts";
+import type {
+  featureDetailSchema,
+  featureSummarySchema,
+  specBatchSchema,
+  specBatchSubmitInputSchema,
+  specHeadSchema,
+  specOperationSchema,
+  validationReportSchema,
+} from "./schemas-spec.ts";
 
 const health = route("GET", "/health")
   .errors(internalError)
@@ -93,6 +105,10 @@ export const contract = {
   projectState,
   lease,
   audit,
+  installation,
+  repo,
+  spec,
+  specBatch,
 };
 
 export type HealthInput = z.input<typeof healthInputSchema>;
@@ -124,3 +140,12 @@ export type ProjectStateOutput = z.output<typeof projectStateSchema>;
 export type LeaseAcquireInput = z.input<typeof leaseAcquireInputSchema>;
 export type LeaseOutput = z.output<typeof leaseSchema>;
 export type AuditEntry = z.output<typeof auditEntrySchema>;
+export type RepoOutput = z.output<typeof repoSchema>;
+export type InstallationOutput = z.output<typeof installationSchema>;
+export type SpecHeadOutput = z.output<typeof specHeadSchema>;
+export type FeatureSummary = z.output<typeof featureSummarySchema>;
+export type FeatureDetail = z.output<typeof featureDetailSchema>;
+export type SpecOperation = z.input<typeof specOperationSchema>;
+export type SpecBatchSubmitInput = z.input<typeof specBatchSubmitInputSchema>;
+export type SpecBatchOutput = z.output<typeof specBatchSchema>;
+export type ValidationReport = z.output<typeof validationReportSchema>;

@@ -38,6 +38,9 @@ export const conflictReasonSchema = z.enum([
   "sprint_not_active",
   "ticket_has_active_lease",
   "counter_limit_reached",
+  "spec_repo_exists",
+  "repo_already_linked",
+  "repo_name_taken",
 ]);
 
 export const conflictError = {
@@ -110,3 +113,5 @@ export const validationError = {
     data: z.object({ field: z.string(), message: z.string() }),
   },
 } as const;
+
+export * from "./errors-provider.ts";

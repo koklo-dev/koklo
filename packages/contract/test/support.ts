@@ -135,3 +135,122 @@ export const auditEntry = {
   targetId: UUID2,
   occurredAt: INSTANT,
 };
+
+// --- TK-42 : contrat 0.5.0 (fournisseur, spec, lots d'écriture) ---
+export const SHA = "0123456789abcdef0123456789abcdef01234567";
+export const SHA2 = "fedcba9876543210fedcba9876543210fedcba98";
+
+export const installation = {
+  id: UUID,
+  provider: "github",
+  ownerKind: "organization",
+  ownerLogin: "koklo-hq",
+  status: "active",
+  userAuthorization: "absent",
+  createdAt: INSTANT,
+};
+
+export const repo = {
+  id: UUID,
+  projectId: UUID2,
+  installationId: UUID,
+  role: "spec",
+  mode: "new",
+  ownerLogin: "koklo-hq",
+  name: "demo-spec",
+  defaultBranch: "main",
+  specPath: null,
+};
+
+export const specHead = {
+  branch: "cadrage",
+  commitSha: SHA,
+  status: "ready",
+  errorCode: null,
+  indexedAt: INSTANT,
+  counts: { features: 3, tables: 2, endpoints: 4 },
+};
+
+export const featureSummary = {
+  specId: "F-001",
+  title: "Connexion",
+  status: "brouillon",
+  priority: "must",
+  filePath: "features/F-001.md",
+  criteriaCount: 2,
+};
+
+export const featureDetail = {
+  specId: "F-001",
+  title: "Connexion",
+  status: "specifiee",
+  priority: "should",
+  description: "Se connecter par lien magique.",
+  criteria: [
+    {
+      specId: "AC-1",
+      position: 1,
+      title: "Lien envoyé",
+      steps: [
+        { type: "etant_donne", text: "un compte" },
+        { type: "quand", text: "je demande un lien" },
+        { type: "alors", text: "un courriel part" },
+        { type: "et", text: "le lien expire" },
+      ],
+    },
+  ],
+  tables: ["T-user"],
+  endpoints: ["E-login"],
+  screens: ["S-login"],
+  roles: ["RL-owner"],
+  rules: ["R-001"],
+  nfr: ["NFR-perf"],
+  filePath: "features/F-001.md",
+  commitSha: SHA,
+};
+
+export const report = {
+  ok: false,
+  counts: { error: 1, warning: 1 },
+  truncated: false,
+  issues: [
+    {
+      rule: 4,
+      code: "R4_UNKNOWN_TABLE",
+      severity: "error",
+      path: "features/F-001.md",
+      pointer: "/tables/0",
+      entityId: "F-001",
+      message: "table inconnue",
+    },
+    {
+      rule: "structure",
+      code: "STRUCT_SCHEMA_VIOLATION",
+      severity: "warning",
+      path: "features/F-002.md",
+      pointer: "",
+      message: "structure",
+    },
+  ],
+};
+
+export const batch = {
+  id: UUID,
+  branch: "cadrage",
+  status: "queued",
+  idempotencyKey: "submit-1",
+  baseSha: null,
+  commitSha: null,
+  errorCode: null,
+  report: null,
+  results: [{ position: 0, kind: "feature.create", specId: null }],
+  enqueuedAt: INSTANT,
+  committedAt: null,
+};
+
+export const createOp = { kind: "feature.create", title: "Nouvelle feature", priority: "must" };
+export const submitInput = {
+  projectId: UUID,
+  idempotencyKey: "submit-1",
+  operations: [createOp],
+};

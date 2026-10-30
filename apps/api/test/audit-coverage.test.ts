@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { contract, type Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
@@ -62,6 +64,20 @@ const WRITE_GROUPS = [
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit"];
+/**
+ * Groupes du contrat 0.5.0 sans implémentation API (TK-43 à TK-45) : ils rejoindront WRITE_GROUPS
+ * ou READ_ONLY_GROUPS avec leurs scénarios d'audit.
+ */
+const PENDING_GROUPS = ["installation", "repo", "spec", "specBatch"];
+
+/** Sources de l'API : une référence `contract.<groupe>.` y signifie qu'une procédure est implémentée. */
+function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(dir, entry.name);
+    if (entry.isDirectory()) return apiSourceFiles(path);
+    return path.endsWith(".ts") ? [path] : [];
+  });
+}
 /** `health` est une procédure isolée (GET), pas un groupe. */
 const STANDALONE_PROCEDURES = ["health"];
 
@@ -472,9 +488,25 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
   });
 
   it("chaque groupe du contrat est couvert ou en lecture seule : aucune exclusion", () => {
-    const known = new Set([...WRITE_GROUPS, ...READ_ONLY_GROUPS, ...STANDALONE_PROCEDURES]);
+    const known = new Set([
+      ...WRITE_GROUPS,
+      ...READ_ONLY_GROUPS,
+      ...PENDING_GROUPS,
+      ...STANDALONE_PROCEDURES,
+    ]);
     expect(Object.keys(contract).filter((group) => !known.has(group))).toEqual([]);
     expect(nonGetProcedures(READ_ONLY_GROUPS)).toEqual([]);
+  });
+
+  it("un groupe en attente n'a aucune implémentation : sinon il doit rejoindre WRITE_GROUPS ou READ_ONLY_GROUPS", () => {
+    const sources = apiSourceFiles().map((file) => readFileSync(file, "utf8"));
+    const implemented = PENDING_GROUPS.filter((group) =>
+      sources.some((source) => source.includes(`contract.${group}.`)),
+    );
+    expect(
+      implemented,
+      `groupes implémentés mais exclus de la garde d'audit : ${implemented.join(", ")}`,
+    ).toEqual([]);
   });
 });
 

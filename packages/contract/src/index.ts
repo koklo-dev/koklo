@@ -3,8 +3,11 @@ export type {
   CommentCreateInput,
   CommentOutput,
   DependencyAddInput,
+  FeatureDetail,
+  FeatureSummary,
   HealthInput,
   HealthOutput,
+  InstallationOutput,
   LeaseAcquireInput,
   LeaseOutput,
   MemberInviteInput,
@@ -20,7 +23,12 @@ export type {
   ProjectListOutput,
   ProjectStateOutput,
   ProjectStateUpdateInput,
+  RepoOutput,
   Role,
+  SpecBatchOutput,
+  SpecBatchSubmitInput,
+  SpecHeadOutput,
+  SpecOperation,
   SprintCreateInput,
   SprintOutput,
   TicketCreateInput,
@@ -28,6 +36,7 @@ export type {
   TicketOutput,
   TicketStatus,
   TicketTransitionInput,
+  ValidationReport,
 } from "./contract.ts";
 export { contract } from "./contract.ts";
 export {
@@ -42,7 +51,15 @@ export {
   leaseHeldError,
   leaseNotHolderError,
   notFoundError,
+  providerAuthExpiredError,
+  providerErrors,
+  providerRateLimitedError,
+  providerUnavailableError,
+  repoCreationForbiddenError,
+  specBatchConflictError,
+  specInvalidError,
   unauthorizedError,
+  userTokenRequiredError,
   validationError,
   versionConflictError,
 } from "./errors.ts";
@@ -65,5 +82,7 @@ export {
   roleSchema,
 } from "./schemas.ts";
 export * from "./schemas-collaboration.ts";
+export * from "./schemas-provider.ts";
+export * from "./schemas-spec.ts";
 export * from "./schemas-tickets.ts";
 export { CONTRACT_VERSION } from "./version.ts";
