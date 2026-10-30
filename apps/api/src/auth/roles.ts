@@ -39,3 +39,9 @@ export { ac as organizationAccessControl };
  * pour owner et admin ; `roles-consistency.test.ts` vérifie leur cohérence.
  */
 export const MANAGER_ROLES = ["owner", "admin"] as const;
+
+/**
+ * Rôles qui écrivent tickets, dépendances et sprints (CDC §14, « Gérer tickets / sprints ») : le
+ * client ne fait que commenter, le business lit. Seule source pour `@Roles(...TICKET_WRITE_ROLES)`.
+ */
+export const TICKET_WRITE_ROLES = ["owner", "admin", "dev", "designer"] as const;

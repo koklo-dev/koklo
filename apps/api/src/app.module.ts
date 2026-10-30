@@ -15,6 +15,8 @@ import { ProjectModule } from "./project/project.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest } from "./request-serializer.ts";
+import { SprintModule } from "./sprint/sprint.module.ts";
+import { TicketModule } from "./ticket/ticket.module.ts";
 
 export interface AppModuleOptions {
   /** Destination des lignes de journal (défaut : stdout) ; les tests y lisent le JSON émis. */
@@ -55,6 +57,8 @@ export class AppModule {
         OrganizationModule,
         MemberModule,
         ProjectModule,
+        TicketModule,
+        SprintModule,
       ],
       controllers: [OpenApiController],
     };
