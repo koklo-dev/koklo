@@ -69,6 +69,24 @@ consommateur ; l'export `./testing` est le seul point d'entrée autorisé (pas d
 Ne pas le confondre avec le faux minimal de `packages/domain/test`, qui prouve seulement que
 le port compile.
 
+## Webhooks : signature et normalisation (TK-45a)
+
+Deux fonctions pures, sans réseau ni lecture d'environnement, exportées par l'index :
+
+- `verifyWebhookSignature({ secret, rawBody, header })` : HMAC-SHA256 des octets bruts reçus,
+  comparé à `X-Hub-Signature-256` (`sha256=` + 64 hexadécimaux, casse indifférente) par
+  `timingSafeEqual` sur deux tampons de 32 octets. SHA-1 n'est jamais accepté. Un en-tête absent,
+  mal formé ou faux donne `false`. Un secret absent ou vide lève `WebhookSecretMissingError`
+  avant tout calcul (une « signature valide » d'une clé vide n'est jamais acceptée). Ni le secret,
+  ni la signature attendue, ni le corps ne figurent dans une erreur ou un journal.
+- `normalizeWebhook(event, deliveryId, payload)` : charge GitHub vers `NormalizedWebhook`
+  (`@koklo/domain`). `push` : identifiants (chaînes), `ref`, `branch`, `before`, `after`,
+  `created`, `deleted`, `forced`, jamais commits, auteurs, e-mails ni expéditeur.
+  `installation` : action, identifiant et compte (`externalId`, `login`, `kind`). Les six autres
+  événements : enveloppe minimale sans corps. Événement non géré ou forme invalide :
+  `InvalidWebhookPayloadError` (`code` `invalid_payload`, `reason` `unsupported_event` ou
+  `malformed_payload`), dont le message ne reprend aucune valeur de la charge.
+
 ## Suppression, tête attendue, listes (TK-44a)
 
 - `writeCommit` accepte `FileChange = FileWrite | FileDeletion`. Une suppression est une entrée

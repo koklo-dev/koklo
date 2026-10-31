@@ -934,5 +934,6 @@ model WebhookDelivery {
 
   @@unique([provider, deliveryId])
   @@index([receivedAt])
+  @@index([installationExternalId])
   @@map("webhook_deliveries")
 }

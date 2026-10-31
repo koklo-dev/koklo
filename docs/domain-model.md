@@ -130,6 +130,10 @@ Thirteen tables, migration `*_provider_spec_index` (additive, reversible):
   is known, so it has no `organization_id` and no FK, and is read through the raw client.
   Deduplication: `UNIQUE(provider, delivery_id)` with `INSERT ... ON CONFLICT DO NOTHING`; a
   redelivery never creates a second row or a second processing.
+  A migration adds a plain index on `webhook_deliveries(installation_external_id)` (TK-45a) to find
+  the deliveries of an installation. The normalized payloads (`PushWebhook`, `InstallationWebhook`,
+  `OtherWebhook` in `@koklo/domain`) keep identifiers, ref and SHAs only: no commit, author, email or
+  message.
 - **No secret in the database**: no installation token, private key, webhook secret or user access
   token is stored (a test rejects secret-looking column names). Webhook payloads hold personal data
   (commit authors) and are meant to be purged after a bounded retention.

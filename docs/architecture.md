@@ -772,6 +772,15 @@ sequenceDiagram
 - Not implemented yet: the webhook endpoint, the worker job and the indexer (later tickets); this
   ticket delivers the schema, constraints and tenant classification they rely on.
 
+#### Receiving a webhook: building blocks (TK-45a)
+`@koklo/github` provides `verifyWebhookSignature` (HMAC-SHA256 over the raw body, constant-time
+comparison, SHA-1 refused, an empty secret raises `WebhookSecretMissingError` before any
+computation) and `normalizeWebhook` (provider payload to the `NormalizedWebhook` types of
+`@koklo/domain`, personal data dropped). `@koklo/domain` also holds the queue names, the
+serialization key (`installation:<id>`, `push:<repo>:<ref>`), the delivery error codes and the
+retention bounds. `raiseCounterTo` now lives in `@koklo/db` so that any process can use it. These
+are building blocks only: they are not wired to an endpoint or a job yet.
+
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
 yet.
