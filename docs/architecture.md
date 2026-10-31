@@ -892,6 +892,39 @@ sequenceDiagram
   end
 ```
 
+#### Worker: reconciliation of stuck work (TK-46a)
+A `reconcile` job (pg-boss, ordinary queue, `retryLimit: 0`) runs on one schedule, `*/10 * * * *` in
+UTC (a restart does not duplicate it). A tick takes a transaction-scoped Postgres advisory lock
+(`RECONCILE_LOCK_KEY`, `pg_try_advisory_xact_lock`): a second tick, even from another worker, logs
+`skipped: already_running` and repairs nothing; the lock is released with the transaction, even if the
+process dies. The passes are isolated: a failing pass is named in `failedPasses` and the next one still
+runs, the job always completes (the next tick is the retry).
+
+```mermaid
+flowchart LR
+  S["schedule */10 UTC"] --> T["reconcile tick"] --> L{"advisory lock free?"}
+  L -->|"no"| K["log skipped: already_running"]
+  L -->|"yes"| P1["P1 webhook_deliveries<br/>received/processing older than grace"]
+  L -->|"yes"| P2["P2 spec_write_batches<br/>queued/committing older than grace"]
+  P1 --> R["no live job (created/retry/active)?<br/>delete failed jobs of the key,<br/>send a NEW job id, same singletonKey"]
+  P2 --> R
+  P2 -->|"per requeued batch"| A[("audit_log: system,<br/>spec_write_batch.requeued")]
+```
+
+- **Orphan test.** A row is an orphan when it is older than `RECONCILE_GRACE_MINUTES` and no job in
+  `created|retry|active` carries its id in the payload. Deliveries older than `retention - 1` day are
+  ignored (the purge removes them first). At most `RECONCILE_MAX_REQUEUES_DEFAULT` (200) rows per pass
+  and per tick, oldest first; the rest waits for the next tick.
+- **Requeue with a new id.** A `failed` job on a `key_strict_fifo` key blocks the key. The repair
+  deletes the `failed` jobs of the key and sends a fresh job (new id, same `singletonKey`, minimal
+  payload `{ deliveryId }` or `{ batchId }`). Handlers are idempotent (trailer recovery for batches),
+  so an occasional duplicate has no effect.
+- **Audit.** P2 writes one system entry per relaunched batch, in the batch's own organization
+  (`withOrganization`). P1 writes none (deliveries have no organization).
+- **Log.** One line per tick: counts and pass names only, never ids, payloads or error messages.
+- **Code.** `apps/worker/src/jobs/reconcile.ts` (handler, cron), `src/reconcile/{lock,passes,requeue,store,register,types}.ts`;
+  constants in `packages/domain/src/reconcile.ts`. P3/P4 come with TK-46b.
+
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
 yet.

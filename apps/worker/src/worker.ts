@@ -1,5 +1,9 @@
-import { createRawDbClient } from "@koklo/db";
-import { type GitProvider, WEBHOOK_RETENTION_DAYS_DEFAULT } from "@koklo/domain";
+import { createRawDbClient, type PrismaClient } from "@koklo/db";
+import {
+  type GitProvider,
+  RECONCILE_GRACE_MINUTES_DEFAULT,
+  WEBHOOK_RETENTION_DAYS_DEFAULT,
+} from "@koklo/domain";
 import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
 import type { WorkerConfig } from "./config.ts";
@@ -21,6 +25,7 @@ import type { WebhookDeliverySettings } from "./jobs/webhook-delivery.ts";
 import { createMailSender } from "./mail/create-mail-sender.ts";
 import type { MailSender } from "./mail/mail-sender.ts";
 import { instrumentJob, setupObservability } from "./observability.ts";
+import { registerReconcile } from "./reconcile/register.ts";
 import { providerOf, registerSpecWrite } from "./spec-write/register.ts";
 import { SpecWriteStore } from "./spec-write/store.ts";
 import { registerWebhookDelivery, registerWebhookPurge } from "./webhook/register.ts";
@@ -68,6 +73,31 @@ async function registerMailQueue(boss: PgBoss, logger: Logger, queue: MailQueue)
   await boss.work(queue.name, instrumentJob(logger, queue.name, queue.handler));
 }
 
+/** Files qui lisent la base : lots de spec, livraisons de webhook, purge et réconciliation. */
+async function registerDatabaseJobs(
+  boss: PgBoss,
+  logger: Logger,
+  database: PrismaClient,
+  config: WorkerConfig,
+  options: StartWorkerOptions,
+): Promise<void> {
+  const provider = providerOf(config, options.gitProvider);
+  const retentionDays = config.webhookRetentionDays ?? WEBHOOK_RETENTION_DAYS_DEFAULT;
+  await registerSpecWrite(
+    boss,
+    logger,
+    { store: new SpecWriteStore(database), provider },
+    options.specWrite,
+  );
+  await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
+  await registerWebhookPurge(boss, logger, { raw: database, retentionDays });
+  await registerReconcile(boss, logger, {
+    raw: database,
+    graceMinutes: config.reconcileGraceMinutes ?? RECONCILE_GRACE_MINUTES_DEFAULT,
+    retentionDays,
+  });
+}
+
 /** Démarre pg-boss sur la base partagée, crée les files et enregistre un consommateur par job. */
 export async function startWorker(
   config: WorkerConfig,
@@ -104,19 +134,7 @@ export async function startWorker(
     ),
   );
   const database = createRawDbClient(config.databaseUrl);
-  const provider = providerOf(config, options.gitProvider);
-  const retentionDays = config.webhookRetentionDays ?? WEBHOOK_RETENTION_DAYS_DEFAULT;
-  await registerSpecWrite(
-    boss,
-    logger,
-    { store: new SpecWriteStore(database), provider },
-    options.specWrite,
-  );
-  await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
-  await registerWebhookPurge(boss, logger, {
-    raw: database,
-    retentionDays,
-  });
+  await registerDatabaseJobs(boss, logger, database, config, options);
   logger.info("worker started");
   return {
     boss,

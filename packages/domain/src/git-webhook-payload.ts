@@ -74,9 +74,15 @@ export const WEBHOOK_PURGE_QUEUE = "webhook-purge";
  */
 export function webhookDeliverySingletonKey(webhook: PushWebhook | InstallationWebhook): string {
   return webhook.event === "installation"
-    ? `installation:${webhook.installationId}`
-    : `push:${webhook.repositoryId}:${webhook.ref}`;
+    ? installationDeliveryKey(webhook.installationId)
+    : pushDeliveryKey(webhook.repositoryId, webhook.ref);
 }
+
+/** Clés de sérialisation à partir des seuls champs qui les composent (réconciliation d'une livraison stockée). */
+export const installationDeliveryKey = (installationId: string): string =>
+  `installation:${installationId}`;
+export const pushDeliveryKey = (repositoryId: string, ref: string): string =>
+  `push:${repositoryId}:${ref}`;
 
 /** Codes d'erreur d'une livraison en échec (liste fermée). */
 export const WEBHOOK_DELIVERY_ERROR_CODES = Object.freeze([
