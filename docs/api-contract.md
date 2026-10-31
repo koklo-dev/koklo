@@ -832,6 +832,14 @@ reconciliation (TK-46).
 operations and the counter. A replay, a refusal (role, validation, project) and `specBatch.get` write
 none, nor do the worker transitions (the batch is its own journal).
 
+## Webhook endpoint outside the contract (TK-45c1)
+`POST /api/webhooks/github` is not an oRPC procedure and is absent from `openapi.json` (no contract
+change, version unchanged). It is authenticated by the GitHub HMAC signature only. Answers, in
+evaluation order: 503 `webhook_not_configured`, 413 `payload_too_large`, 415 `unsupported_media_type`,
+401 `invalid_signature`, 400 `invalid_headers` / `invalid_body`, 202 `{ "received": true }`. Details and
+the ingestion flow are in `architecture.md`; configuration and the manual check in
+`quality-and-operations.md`.
+
 ## Version history
 - **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,
   contract only), seven typed errors, three `CONFLICT` reasons, and the grouped typing corrections

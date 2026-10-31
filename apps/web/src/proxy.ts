@@ -5,9 +5,12 @@ import { ORPC_PREFIX } from "./lib/orpc-prefix.ts";
 import { readRuntimeConfig } from "./lib/runtime-config.ts";
 import { readSession } from "./lib/session.ts";
 
+const WEBHOOK_PATH = "/api/webhooks/github";
+
 /**
  * Proxy exécuté à chaque requête (donc config lue à l'exécution) :
  * - `/api/auth/*` et `/api/orpc/*` sont relayés vers `API_INTERNAL_URL` (même origine pour le navigateur) ;
+ * - `/api/webhooks/github` est relayé tel quel, sans session (livraisons signées de GitHub) ;
  * - `/login`, `/projects`, `/kanban`, `/members` et `/organizations` sont gardés selon la session et l'organisation active ;
  * - `/accept-invitation/<id>` exige une session (sinon `/login?next=…`) mais jamais d'organisation active,
  *   et n'est jamais mis en cache.
@@ -16,6 +19,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { apiUrl } = readRuntimeConfig(process.env);
   const { pathname, search } = request.nextUrl;
 
+  if (pathname === WEBHOOK_PATH) {
+    // GitHub poste sans cookie : la signature est l'authentification, vérifiée par l'API sur les octets bruts.
+    return NextResponse.rewrite(new URL(`${pathname}${search}`, apiUrl));
+  }
   if (pathname.startsWith("/api/auth/")) {
     return NextResponse.rewrite(new URL(`${pathname}${search}`, apiUrl));
   }
@@ -60,5 +67,6 @@ export const config = {
     "/accept-invitation/:id",
     "/api/auth/:path*",
     "/api/orpc/:path*",
+    "/api/webhooks/github",
   ],
 };

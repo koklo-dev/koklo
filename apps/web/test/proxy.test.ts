@@ -34,6 +34,46 @@ describe("proxy", () => {
     expect(response.headers.get("x-middleware-rewrite")).toBe("http://api.internal:3001/projects");
   });
 
+  describe("webhooks GitHub (TK-45c1)", () => {
+    const post = (path: string) =>
+      proxy(
+        new NextRequest(`http://web.test${path}`, {
+          method: "POST",
+          body: "{}",
+          headers: { "x-hub-signature-256": "sha256=00", "x-github-event": "push" },
+        }),
+      );
+
+    it("relaie /api/webhooks/github vers l'API au même chemin, sans lire la session", async () => {
+      const response = await post("/api/webhooks/github");
+      expect(response.headers.get("x-middleware-rewrite")).toBe(
+        "http://api.internal:3001/api/webhooks/github",
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+      expect(readSession).not.toHaveBeenCalled();
+    });
+
+    it("n'exige ni cookie ni session : aucune redirection même sans session", async () => {
+      withSession(false);
+      const response = await post("/api/webhooks/github");
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("x-middleware-rewrite")).toContain("/api/webhooks/github");
+      expect(readSession).not.toHaveBeenCalled();
+    });
+
+    it("ne relaie que ce chemin exact : un autre chemin /api/webhooks/* n'est pas réécrit", async () => {
+      withSession(true);
+      const response = await post("/api/webhooks/autre");
+      expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+    });
+
+    it("est dans le matcher du proxy", async () => {
+      const { config } = await import("../src/proxy.ts");
+      expect(config.matcher).toContain("/api/webhooks/github");
+    });
+  });
+
   it("redirige /projects vers /login sans session", async () => {
     withSession(false);
     const response = await call("/projects");

@@ -56,6 +56,7 @@ describe("configuration (C3.3)", () => {
       "GITHUB_APP_PRIVATE_KEY",
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
+      "GITHUB_WEBHOOK_SECRET",
       "LOG_LEVEL",
       "PORT",
       "SENTRY_DSN",
