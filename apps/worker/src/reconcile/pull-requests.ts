@@ -32,11 +32,14 @@ class PullRequestRun {
   readonly count: PullRequestCount = emptyPullRequestCount();
   private readonly auths = new Map<string, Promise<GitAuth>>();
 
-  constructor(
-    private readonly store: PullRequestStore,
-    private readonly provider: GitProvider,
-    private readonly logger?: Logger,
-  ) {}
+  private readonly store: PullRequestStore;
+  private readonly provider: GitProvider;
+  private readonly logger: Logger | undefined;
+  constructor(store: PullRequestStore, provider: GitProvider, logger?: Logger) {
+    this.store = store;
+    this.provider = provider;
+    this.logger = logger;
+  }
 
   async reconcile(ticket: PullRequestTicketRow): Promise<Outcome> {
     const ref = parsePullRequestRef(ticket.pullRequest);

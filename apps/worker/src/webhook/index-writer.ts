@@ -62,7 +62,10 @@ async function insertEntities(
  * tête de branche et relevé du compteur `feature`. Tout ou rien.
  */
 export class IndexWriter {
-  constructor(private readonly client: TenantClient) {}
+  private readonly client: TenantClient;
+  constructor(client: TenantClient) {
+    this.client = client;
+  }
 
   async write(
     target: Target,

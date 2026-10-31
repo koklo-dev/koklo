@@ -18,7 +18,10 @@ const OPEN: BatchStatus[] = ["queued", "committing"];
 export class SpecWriteStore {
   private readonly client: TenantClient;
 
-  constructor(private readonly raw: PrismaClient) {
+  private readonly raw: PrismaClient;
+
+  constructor(raw: PrismaClient) {
+    this.raw = raw;
     this.client = withTenantIsolation(raw);
   }
 

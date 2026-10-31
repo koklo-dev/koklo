@@ -9,7 +9,10 @@ export const PURGE_BATCH_SIZE = 1000;
  * multi-tenant : tout passe par le client brut, par identifiant de ligne ou par installation.
  */
 export class DeliveryStore {
-  constructor(private readonly raw: PrismaClient) {}
+  private readonly raw: PrismaClient;
+  constructor(raw: PrismaClient) {
+    this.raw = raw;
+  }
 
   async load(id: string): Promise<DeliveryRow | null> {
     return this.raw.webhookDelivery.findUnique({

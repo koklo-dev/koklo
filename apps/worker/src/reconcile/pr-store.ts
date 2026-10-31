@@ -43,7 +43,10 @@ export interface PullRequestStore {
 export class PrismaPullRequestStore implements PullRequestStore {
   private readonly client: TenantClient;
 
-  constructor(private readonly raw: PrismaClient) {
+  private readonly raw: PrismaClient;
+
+  constructor(raw: PrismaClient) {
+    this.raw = raw;
     this.client = withTenantIsolation(raw);
   }
 

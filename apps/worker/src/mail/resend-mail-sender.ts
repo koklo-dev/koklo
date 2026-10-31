@@ -15,10 +15,12 @@ export interface ResendClient {
 
 /** Envoi via Resend. L'erreur citée ne porte que son nom : jamais le corps (lien, jeton). */
 export class ResendMailSender implements MailSender {
-  constructor(
-    private readonly client: ResendClient,
-    private readonly from: string,
-  ) {}
+  private readonly client: ResendClient;
+  private readonly from: string;
+  constructor(client: ResendClient, from: string) {
+    this.client = client;
+    this.from = from;
+  }
 
   async send(message: MailMessage): Promise<void> {
     const { error } = await this.client.emails.send({ from: this.from, ...message });
