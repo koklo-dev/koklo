@@ -94,7 +94,15 @@ function Projects({
         <TableBody>
           {projects.map((project) => (
             <TableRow key={project.id}>
-              <TableCell>{project.name}</TableCell>
+              <TableCell>
+                <a
+                  href={`/projects/${project.id}/features`}
+                  className="font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {project.name}
+                  <span className="sr-only"> : fonctionnalités</span>
+                </a>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

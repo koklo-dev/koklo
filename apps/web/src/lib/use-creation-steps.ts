@@ -32,8 +32,13 @@ export function useCreateProjectStep({ fields, setPhase, setProject, setLastErro
       return created;
     } catch (error) {
       setLastError(error);
-      const stepOneFailure = errorCode(error) === "FORBIDDEN" ? "forbidden" : "generic";
-      setPhase({ name: "form", stepOneFailure });
+      // UNAUTHORIZED : la redirection est en cours, aucun texte d'erreur pendant ce temps (48c, non bloquant 4).
+      if (errorCode(error) === "UNAUTHORIZED") setPhase({ name: "form" });
+      else
+        setPhase({
+          name: "form",
+          stepOneFailure: errorCode(error) === "FORBIDDEN" ? "forbidden" : "generic",
+        });
       return null;
     }
   };
@@ -47,6 +52,10 @@ export function useCreateRepoStep(context: StepContext) {
 
   function fail(error: unknown, account: GithubAccount): void {
     setLastError(error);
+    if (errorCode(error) === "UNAUTHORIZED") {
+      setPhase({ name: "ready" });
+      return;
+    }
     const context = { ownerLogin: account.ownerLogin, repoName: fields.repoName };
     const view = describeSpecRepoError(error, context);
     if (view.alreadyExists) {

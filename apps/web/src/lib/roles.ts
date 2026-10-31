@@ -27,6 +27,6 @@ export function canMoveTickets(role: Role | undefined): boolean {
 }
 
 /** `repo.list` est réservé à l'équipe : client et business ne l'appellent jamais. */
-export function canReadRepos(_role: Role | undefined): boolean {
-  throw new Error("roles: canReadRepos non implémenté");
+export function canReadRepos(role: Role | undefined): boolean {
+  return canMoveTickets(role);
 }

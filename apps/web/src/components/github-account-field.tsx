@@ -29,17 +29,20 @@ interface AccountFieldProps {
   disabled: boolean;
   /** Identifiant du texte de chargement, relié au bouton de création. */
   loadingId: string;
+  /** Le projet existe déjà (reprise) : le texte ne promet plus de le créer. */
+  projectExists?: boolean;
   selectRef: Ref<HTMLButtonElement>;
 }
 
-function NoAccount() {
+function NoAccount({ projectExists }: { projectExists: boolean }) {
   return (
     <Alert>
       <Icon name="link" size={20} />
       <AlertDescription className="flex flex-col items-start gap-2">
         <p>
-          Aucun compte GitHub n'est relié. Le projet sera créé sans dépôt de spec. Vous pourrez
-          relier GitHub ensuite.
+          {projectExists
+            ? "Aucun compte GitHub n'est relié. Reliez GitHub pour que Koklo crée le dépôt de spec de ce projet."
+            : "Aucun compte GitHub n'est relié. Le projet sera créé sans dépôt de spec. Vous pourrez relier GitHub ensuite."}
         </p>
         <a href="/github" className="font-medium underline underline-offset-4">
           Relier GitHub
@@ -74,7 +77,7 @@ function AccountSelect({
   error,
   disabled,
   selectRef,
-}: Omit<AccountFieldProps, "status" | "onReload" | "loadingId">) {
+}: Omit<AccountFieldProps, "status" | "onReload" | "loadingId" | "projectExists">) {
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -105,7 +108,7 @@ function AccountSelect({
 
 /** Compte GitHub du dépôt : chargement, erreur, aucun, un seul (lecture seule) ou plusieurs (sans présélection). */
 export function GithubAccountField(props: AccountFieldProps) {
-  const { accounts, status, selected, onReload, loadingId } = props;
+  const { accounts, status, selected, onReload, loadingId, projectExists = false } = props;
   if (status === "loading") {
     return <LoadingStatus id={loadingId} label="Chargement des comptes GitHub…" rows={1} />;
   }
@@ -116,7 +119,7 @@ export function GithubAccountField(props: AccountFieldProps) {
       </ErrorNotice>
     );
   }
-  if (accounts.length === 0) return <NoAccount />;
+  if (accounts.length === 0) return <NoAccount projectExists={projectExists} />;
   if (accounts.length === 1 && selected) return <SingleAccount account={selected} />;
   return <AccountSelect {...props} />;
 }

@@ -109,6 +109,7 @@ function RepoSection({ panel, loadingId }: { panel: CreationPanel; loadingId: st
         error={errors.account}
         disabled={busy}
         loadingId={loadingId}
+        projectExists={creation.project !== null}
         selectRef={refs.account}
       />
       {accounts.status === "ready" && accounts.accounts.length > 0 ? (

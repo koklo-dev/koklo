@@ -41,7 +41,9 @@ function outcomeOnClose(
 ): CreationOutcome {
   if (!project) return { kind: "cancelled" };
   if (phase.name === "existing") return { kind: "existing-repo", name: project.name };
-  if (!marker || phase.name === "no-account") return { kind: "created", name: project.name };
+  if (phase.name === "no-account") return { kind: "created", name: project.name };
+  // Compte choisi disparu : le projet existe sans dépôt, jamais « Projet créé. » (48c, non bloquant 3).
+  if (!marker) return { kind: "repo-missing", name: project.name };
   const offerLink = phase.name === "failed" ? phase.view.offerLink : resume?.offerLink;
   return { kind: "unresolved", marker, offerLink: Boolean(offerLink) };
 }
