@@ -1,4 +1,7 @@
 import {
+  RECONCILE_GRACE_MINUTES_DEFAULT,
+  RECONCILE_GRACE_MINUTES_MAX,
+  RECONCILE_GRACE_MINUTES_MIN,
   WEBHOOK_RETENTION_DAYS_DEFAULT,
   WEBHOOK_RETENTION_DAYS_MAX,
   WEBHOOK_RETENTION_DAYS_MIN,
@@ -28,6 +31,8 @@ export type WorkerConfig = {
   readonly githubApp?: GithubAppSettings;
   /** Rétention des livraisons de webhook, en jours (`WEBHOOK_RETENTION_DAYS`, 1 à 365). `loadConfig` la renseigne toujours (défaut 30) ; absente, le défaut s'applique. */
   readonly webhookRetentionDays?: number;
+  /** Âge avant qu'une ligne non réglée soit jugée orpheline (`RECONCILE_GRACE_MINUTES`, 5 à 1440). `loadConfig` la renseigne toujours (défaut 15) ; absente, le défaut s'applique. */
+  readonly reconcileGraceMinutes?: number;
 };
 
 function fail(variable: string, rule: string): never {
@@ -61,6 +66,23 @@ function parseRetentionDays(value: string | undefined): number {
     : fail(
         "WEBHOOK_RETENTION_DAYS",
         `must be an integer between ${WEBHOOK_RETENTION_DAYS_MIN} and ${WEBHOOK_RETENTION_DAYS_MAX}`,
+      );
+}
+
+/**
+ * Entier de `MIN` à `MAX` minutes (bornes documentées dans `.env.example`) ; le message ne cite que
+ * la variable, ni la valeur lue ni aucun chiffre qui pourrait la recouper.
+ */
+function parseGraceMinutes(value: string | undefined): number {
+  if (value === undefined || value === "") {
+    return RECONCILE_GRACE_MINUTES_DEFAULT;
+  }
+  const minutes = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  return minutes >= RECONCILE_GRACE_MINUTES_MIN && minutes <= RECONCILE_GRACE_MINUTES_MAX
+    ? minutes
+    : fail(
+        "RECONCILE_GRACE_MINUTES",
+        "must be a whole number of minutes within the documented range",
       );
 }
 
@@ -120,5 +142,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     mail: parseMail(env, appEnv),
     ...(githubApp ? { githubApp } : {}),
     webhookRetentionDays: parseRetentionDays(env.WEBHOOK_RETENTION_DAYS),
+    reconcileGraceMinutes: parseGraceMinutes(env.RECONCILE_GRACE_MINUTES),
   };
 }

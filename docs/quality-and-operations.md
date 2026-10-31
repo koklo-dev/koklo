@@ -538,6 +538,24 @@ fake e2e secret defined in the script (no real secret). It does not use the stub
 install --with-deps chromium` first). `turbo run e2e` still only runs the stub-API suites of
 `apps/web` and `packages/ui`; the real-stack package exposes its Playwright call as `stack`.
 
+### Reconciliation job (TK-46a)
+| Variable | Read by | Meaning |
+|----------|---------|---------|
+| `RECONCILE_GRACE_MINUTES` | worker | optional integer from 5 to 1440 (default 15): minimum age of a delivery or batch before it is considered stuck. Anything else fails the start, naming the variable and never the value |
+
+- **Schedule.** `*/10 * * * *` in UTC on the `reconcile` queue, registered once. Only one tick runs at a
+  time (advisory lock); a skipped tick logs `skipped: already_running`.
+- **Repairs.** P1 requeues `received`/`processing` deliveries and P2 requeues `queued`/`committing`
+  spec-write batches that have no live job, with a new job id and the same singleton key, after
+  deleting the `failed` jobs of that key (which would block it). Each pass handles at most 200 rows per
+  tick. Each relaunched batch gets a system audit entry `spec_write_batch.requeued`.
+- **Monitoring.** The tick log carries `deliveries`, `batches` (`requeued`, `skipped`), `failedPasses`
+  and `durationMs`. A non-empty `failedPasses` on several consecutive ticks means a pass is broken
+  (the error class name is logged as `errorName`, never the message). Steady non-zero `requeued` means
+  jobs are being lost upstream. Check: `SELECT count(*) FROM pgboss.job WHERE name IN ('webhook-delivery','spec-write') AND state = 'failed'`
+  should return to 0 within one tick.
+- **Not covered here.** Provider-side drift (P3) and the other passes (P4) arrive with TK-46b.
+
 ### R1 journey (TK-36)
 
 `e2e/tests/r1.spec.ts` (serial, 5 tests, about 4 s) replays the R1 result of the vision against the
