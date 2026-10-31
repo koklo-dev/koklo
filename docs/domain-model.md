@@ -203,6 +203,14 @@ stateDiagram-v2
   cancelled --> [*]
 ```
 
+#### `Ticket.pullRequest` format (TK-46b)
+
+`Ticket.pullRequest` holds the pull request URL `https://github.com/<owner>/<repo>/pull/<n>`
+(`parsePullRequestRef` in `@koklo/domain`: https and `github.com` only, `n` an integer from 1 to
+2^31-1 without leading zero, never throws; any other text yields `undefined`). The reconciliation
+pass P3 uses it and records the system audit entries `ticket.reconcile.pr_merged` and
+`ticket.reconcile.pr_closed` (`actor_kind = system`, no actor, `target_kind = ticket`).
+
 ### Dependencies, eligibility and selection order (TK-26, `packages/domain`)
 `DependencyGraph` is a frozen set of edges `{ ticket, dependsOn, type }` with `type` in
 `blocks | related`. `addDependency` is idempotent on a duplicate edge, validates both keys and

@@ -14,6 +14,7 @@ export * from "./git-webhook-payload.ts";
 export * from "./lease.ts";
 export * from "./lock.ts";
 export * from "./project-state.ts";
+export * from "./pull-request-ref.ts";
 export * from "./reconcile.ts";
 export * from "./selection-order.ts";
 export * from "./spec-write.ts";

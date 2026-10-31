@@ -2,7 +2,12 @@ import type { PrismaClient } from "@koklo/db";
 import type { Logger } from "@koklo/observability";
 import { errorNameOf } from "../job-support.ts";
 import { withReconcileLock } from "../reconcile/lock.ts";
-import type { PassCount, PassName, ReconcilePass } from "../reconcile/types.ts";
+import {
+  emptyPullRequestCount,
+  type PassCount,
+  type PassName,
+  type ReconcilePasses,
+} from "../reconcile/types.ts";
 
 export { RECONCILE_QUEUE } from "@koklo/domain";
 
@@ -13,7 +18,7 @@ export const RECONCILE_TIMEZONE = "UTC";
 export interface ReconcileDeps {
   readonly raw: PrismaClient;
   readonly logger: Logger;
-  readonly passes: Readonly<Record<PassName, ReconcilePass>>;
+  readonly passes: ReconcilePasses;
 }
 
 const NONE: PassCount = { requeued: 0, skipped: 0 };
@@ -29,11 +34,11 @@ export function createReconcileHandler(deps: ReconcileDeps) {
   return async (): Promise<void> => {
     const startedAt = Date.now();
     const result = await withReconcileLock(deps.raw, async () => {
-      const counts = { deliveries: NONE, batches: NONE };
+      const counts = { deliveries: NONE, batches: NONE, prs: emptyPullRequestCount() };
       const failedPasses: PassName[] = [];
       for (const name of Object.keys(deps.passes) as PassName[]) {
         try {
-          counts[name] = await deps.passes[name]();
+          Object.assign(counts, { [name]: await deps.passes[name]() });
         } catch (error) {
           failedPasses.push(name);
           deps.logger.warn(

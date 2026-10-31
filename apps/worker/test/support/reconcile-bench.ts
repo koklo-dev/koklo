@@ -26,6 +26,7 @@ export const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * M
 export interface Summary {
   deliveries?: { requeued: number; skipped: number };
   batches?: { requeued: number; skipped: number };
+  prs?: { done: number; closed: number; skipped: number; reasons?: Record<string, number> };
   failedPasses?: string[];
   skipped?: string;
   durationMs?: number;

@@ -17,5 +17,8 @@ export const RECONCILE_GRACE_MINUTES_MAX = 1440;
 /** Plafond de lignes ré-enfilées par passe et par run ; le reste attend le tick suivant. */
 export const RECONCILE_MAX_REQUEUES_DEFAULT = 200;
 
+/** Plafond de PR lues chez le fournisseur par run (passe P3) ; le reste attend le tick suivant. */
+export const RECONCILE_MAX_PULL_REQUESTS_DEFAULT = 200;
+
 /** Clé du verrou consultatif Postgres qui empêche deux réconciliations simultanées. */
 export const RECONCILE_LOCK_KEY = 460_046;
