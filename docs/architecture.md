@@ -540,6 +540,30 @@ sequenceDiagram
   W-->>U: list updated, status "Projet « name » créé."
 ```
 
+### Web: project features list (TK-48d)
+Route `/projects/[projectId]/features` (`app/projects/[projectId]/features/{layout,page}.tsx`), `apps/web` only: it consumes `spec.head`, `spec.listFeatures`, `spec.getFeature`, `repo.list` and `project.list`; the contract (0.7.0) and the API are unchanged. Read-only; writing arrives in 48e. Screen sheet: `design/screens/S-features.md`.
+- **Frames**: `app/projects/layout.tsx` renders `ProjectsFrame`, which wraps `/projects` in `AppFrame current="Projets"` but lets any nested path (`/projects/<id>/...`) through, because the feature route has its own `AppFrame` without `current` (the page carries its breadcrumb `Koklo > Projets > name > Fonctionnalités`). One sidebar, one breadcrumb, whatever the depth. The guard is the existing one (`proxy.ts` matcher, `auth-guard.ts`: no session goes to `/login`, no active organization to `/organizations`). The project name links in `/projects` and the sidebar "Projets" group (`nav-projects.tsx`) are plain `<a href>`; a client-side `Link` would add nothing because the page is dynamic and refetches its data anyway.
+- **State machine**: `deriveFeaturesView` (`lib/features-view.ts`, pure) reduces the four queries (project, `spec.head`, `repo.list`, list) to one `FeaturesView` kind: `loading`, `not-found`, `error`, `index-failed`, `no-repo`, `neutral`, `preparing`, `empty`, `empty-filtered` or `list`. `repo.list` is read only when `spec.head` is `null` and `canReadRepos(role)` (client and business never call it and get the neutral state). A project in `building` is polled every 5 s for at most 2 minutes (`use-spec-head`), hidden tabs suspended.
+```mermaid
+stateDiagram-v2
+  [*] --> loading
+  loading --> not_found: NOT_FOUND or invalid id
+  loading --> error: network / INTERNAL
+  loading --> index_failed: head failed or 409
+  loading --> no_repo: head null, no spec repository (owner/admin/dev/designer)
+  loading --> neutral: head null, role without repo.list
+  loading --> preparing: head null with repository, or building without items
+  preparing --> list: indexed
+  loading --> empty: indexed, no feature
+  loading --> empty_filtered: filters without result
+  loading --> list
+  no_repo --> preparing: repository created in place (48c panel, step 2)
+```
+- **Hooks** (`apps/web/src/lib`, functions of 50 lines at most): `use-features-page` composes `use-features-data` (queries and view), `use-features-url` (filters and open sheet in the address, History API: filters replace, the sheet pushes so Back closes it), `use-features-list` ("Afficher plus", filters actions, focus), `use-feature-sheet` (shareable link of a row, focus return, background refetch) and `use-features-actions` (announcements, repository created). `features-region.ts` holds the pure text of the single status region and which views show filters or the version line.
+- **Sheet**: `FeatureSheet` (`Sheet` modal) opened by `?feature=F-nnn`; header from the list row, detail from `spec.getFeature`. Plain text description (no Markdown, no active content). Technical groups (tables, endpoints, non functional requirements) and the commit/file provenance are shown to `canReadRepos` roles only (no git vocabulary for client and business). The scrollable body is a focusable named region (axe `scrollable-region-focusable`).
+- **Accessibility**: one `role="status"` region (counter, loading, announcements), a real `table` with caption, 44 px targets under `md`, skeletons animate under `motion-safe:` only, statuses are icon + text.
+- **Tests**: unit `apps/web/test/features-*.test.tsx`, `project-create-48d-fixes.test.tsx`; e2e `apps/web/e2e/features.spec.ts` (46 tests against the fake API `e2e/support/stub-features.ts`, captures in `design/screens/captures/S-features/`).
+
 ### Web: sprint kanban (TK-35)
 `apps/web` only; `apps/api`, `packages/contract` and the database are untouched. The screen consumes
 `sprint.list({ status: "active" })`, `ticket.list({ sprintId })` and `ticket.transition({ key, to })`

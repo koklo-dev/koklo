@@ -104,9 +104,15 @@ export function FeatureSheet({
             </div>
           ) : null}
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto">
+        {/* Région défilante atteignable au clavier (axe `scrollable-region-focusable`) : Tab puis flèches. */}
+        <section
+          aria-label="Détail de la fonctionnalité"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante, doit pouvoir être lue au clavier
+          tabIndex={0}
+          className="flex-1 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Body query={query} role={role} />
-        </div>
+        </section>
         <SheetFooter>
           <Button variant="outline" className="h-11 md:h-9" onClick={onClose}>
             Fermer

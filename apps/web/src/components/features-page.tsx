@@ -137,7 +137,7 @@ function ListView({ page, building }: { page: FeaturesPageModel; building: boole
       <FeaturesList
         projectName={page.data.projectName}
         items={page.data.features.items}
-        hrefFor={page.hrefFor}
+        hrefFor={page.sheet.hrefFor}
         onOpen={page.url.openFeature}
         more={page.more}
       />
@@ -201,8 +201,8 @@ function Sheet({ page }: { page: FeaturesPageModel }) {
       summary={data.features.items.find((item) => item.specId === url.feature)}
       role={data.role}
       onClose={url.closeFeature}
-      onGone={page.refetchList}
-      onReturnFocus={page.returnFocus}
+      onGone={page.sheet.refetchList}
+      onReturnFocus={page.sheet.returnFocus}
     />
   );
 }

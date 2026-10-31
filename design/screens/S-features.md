@@ -1,7 +1,7 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1
+version: 1.1
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
@@ -189,6 +189,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-10-31 | TK-48 (48d) | Création : liste des fonctionnalités d'un projet en lecture seule (filtres, pagination par « afficher plus »), fiche en `Sheet`, états chargement, vide, vide filtré, en préparation, projet sans dépôt de spec avec reprise en place, index en échec, introuvable, erreurs de fiche, vocabulaire sans git côté client. Détail : `.workflow/TK-48/02-design-48d.md` |
+| 1.1 | 2026-10-31 | TK-48 (48d, refactor) | États réellement livrés conformes à la fiche (tous les états de §4, clair et sombre, 375 px). Une seule correction d'écran : la zone défilante de la fiche est une région nommée « Détail de la fonctionnalité », atteignable au clavier (Tab, focus visible `--ring`), exigence axe `scrollable-region-focusable`. Captures générées. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.
@@ -217,5 +218,7 @@ Tests attendus (Red), AC-48-23 et AC-48-28
 - e2e Playwright `apps/web/e2e/features.spec.ts` (faux API / pile locale avec faux fournisseur, jamais github.com) : liste, filtre, fiche, `?feature=`, chaque état de §4, clair/sombre, 375 px, axe sans violation par état ; rôle client en lecture sans terme git ; reprise de dépôt de spec sur un projet créé sans dépôt.
 - Preuve navigateur (Chrome, pile locale + faux fournisseur, base seedée) : liste, fiche, projet sans dépôt, index en échec, clair et sombre, mobile. Staging réel : lecture seule, NEEDS-HUMAN pour la création de dépôt réelle.
 
-## 12. Captures (48d, à générer par `apps/web/e2e/features.spec.ts`, clair et sombre)
-Dossier `design/screens/captures/S-features/` : `loading`, `data`, `empty`, `empty-filtered`, `preparing`, `no-repo-manager`, `no-repo-dev`, `unavailable-client`, `index-failed`, `list-error`, `not-found`, `feature-sheet`, `feature-sheet-client`, `feature-error-provider`, `feature-error-auth` (chacun `-light` / `-dark`), `data-mobile` et `feature-sheet-mobile` (375 px). À produire à l'étape Green/Refactor, pas à l'étape design.
+## 12. Captures (48d, générées par `apps/web/e2e/features.spec.ts`, clair et sombre)
+Dossier `design/screens/captures/S-features/` (32 images) : `loading`, `data`, `empty`, `empty-filtered`, `preparing`, `no-repo-manager`, `no-repo-dev`, `unavailable-client`, `index-failed`, `list-error`, `not-found`, `feature-sheet`, `feature-sheet-client`, `feature-error-provider`, `feature-error-auth`, chacun en `-light.png` et `-dark.png` ; `data-light-mobile.png` et `feature-sheet-light-mobile.png` (375 px). Les captures des autres écrans régénérées par la même passe e2e ne sont pas versionnées lorsqu'elles ne diffèrent que par du bruit de rendu.
+
+L'axe des e2e est exécuté avec les étiquettes WCAG (`wcag2a`, `wcag2aa`, `wcag21aa`), comme les autres écrans ; les règles « best-practice » (landmarks de la barre latérale, `label-content-name-mismatch` du menu utilisateur) relèvent du gabarit sidebar-07 et non de cet écran.
