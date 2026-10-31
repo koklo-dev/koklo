@@ -87,12 +87,13 @@ describe("N1b énumérations fermées des schémas de 0.5.0", () => {
 });
 
 describe("N2 callback GitHub : exports partagés, hors oRPC et hors OpenAPI", () => {
-  it("installationCallbackOutcomeSchema : enum fermé de 5 résultats", () => {
+  it("installationCallbackOutcomeSchema : enum fermé de 6 résultats (not_owner : B1, preuve de propriété)", () => {
     expect([...api.installationCallbackOutcomeSchema.options].sort()).toEqual([
       "already_linked",
       "denied",
       "installed",
       "invalid_state",
+      "not_owner",
       "provider_error",
     ]);
   });

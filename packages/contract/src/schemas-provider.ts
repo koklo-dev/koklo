@@ -72,5 +72,6 @@ export const installationCallbackOutcomeSchema = z.enum([
   "denied",
   "invalid_state",
   "already_linked",
+  "not_owner",
   "provider_error",
 ]);

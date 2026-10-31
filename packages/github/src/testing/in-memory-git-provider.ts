@@ -10,7 +10,6 @@ import {
   GitNotFoundError,
   type GitProvider,
   GitProviderError,
-  type GitUserCredentials,
   type GitUserInstallation,
   type MergeResult,
   type PullRequest,
@@ -25,7 +24,7 @@ import {
 } from "@koklo/domain";
 import { commitLimit } from "../commit-rules.ts";
 import { FakeAuthority } from "./fake-authority.ts";
-import { FakeUserOAuth } from "./fake-user-oauth.ts";
+import { FakeUserOAuth, type OrgMembership } from "./fake-user-oauth.ts";
 import {
   describePull,
   mergeOutcome,
@@ -91,19 +90,18 @@ export class InMemoryGitProvider implements GitProvider {
     this.#userOAuth.seed(login, installation);
   }
 
-  async exchangeUserCode(request: Request<"exchangeUserCode">): Promise<GitUserCredentials> {
-    return this.#userOAuth.exchange(request);
+  /** Aide de test : lien du compte `login` avec l'organisation `org` (admin, member ou pending). */
+  seedOrgMembership(login: string, org: string, role: OrgMembership): void {
+    this.#userOAuth.seedMembership(login, org, role);
   }
 
-  async listUserInstallations(
-    request: Request<"listUserInstallations">,
-  ): Promise<readonly GitUserInstallation[]> {
-    return this.#userOAuth.list(request.auth);
-  }
-
-  async appSlug(): Promise<string> {
-    return this.#options.appSlug ?? DEFAULT_APP_SLUG;
-  }
+  exchangeUserCode: GitProvider["exchangeUserCode"] = async (request) =>
+    this.#userOAuth.exchange(request);
+  listUserInstallations: GitProvider["listUserInstallations"] = async (request) =>
+    this.#userOAuth.list(request.auth);
+  getUserOwnerRole: GitProvider["getUserOwnerRole"] = async (request) =>
+    this.#userOAuth.role(request.auth, request.owner);
+  appSlug: GitProvider["appSlug"] = async () => this.#options.appSlug ?? DEFAULT_APP_SLUG;
 
   async createRepo(request: Request<"createRepo">): Promise<Repo> {
     const { auth, owner, name, visibility, template } = request;

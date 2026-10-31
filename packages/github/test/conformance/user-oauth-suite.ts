@@ -19,11 +19,26 @@ export type UserGrant = {
   readonly installations: readonly GitUserInstallation[];
 };
 
+/**
+ * Un consentement dont le compte a des relations connues : l'organisation `adminOrg` (admin actif),
+ * `memberOrg` (membre simple), `pendingOrg` (invitation en attente) et `strangerOrg` (aucun lien).
+ */
+export type RoleGrant = {
+  readonly code: string;
+  readonly login: string;
+  readonly adminOrg: string;
+  readonly memberOrg: string;
+  readonly pendingOrg: string;
+  readonly strangerOrg: string;
+};
+
 export type UserOAuthContext = {
   readonly provider: GitProvider;
   readonly redirectUri: string;
   /** Fabrique un consentement neuf (code jamais utilisé). */
   readonly newGrant: () => Promise<UserGrant>;
+  /** Fabrique un consentement neuf dont les rôles sont connus (preuve de propriété, B1). */
+  readonly newRoleGrant: () => Promise<RoleGrant>;
   /** Un code que le fournisseur ne connaît pas. */
   readonly unknownCode: string;
 };
@@ -120,6 +135,74 @@ export function runUserOAuthConformance(label: string, factory: UserOAuthFactory
       );
       expect(error).toBeInstanceOf(GitProviderError);
       expect(error).toMatchObject({ operation: "listUserInstallations" });
+    });
+
+    describe("getUserOwnerRole (preuve de propriété)", () => {
+      async function roles() {
+        const ctx = await factory();
+        const grant = await ctx.newRoleGrant();
+        const credentials = await ctx.provider.exchangeUserCode({
+          code: grant.code,
+          redirectUri: ctx.redirectUri,
+        });
+        const auth = { kind: "user", ...credentials } as const;
+        const role = (kind: "organization" | "user", login: string) =>
+          ctx.provider.getUserOwnerRole({ auth, owner: { kind, login } });
+        return { ctx, grant, auth, role };
+      }
+
+      it("compte personnel : son propre login -> self (casse ignorée)", async () => {
+        const { grant, role } = await roles();
+        expect(await role("user", grant.login)).toBe("self");
+        expect(await role("user", grant.login.toUpperCase())).toBe("self");
+      });
+
+      it("compte personnel d'un autre : none", async () => {
+        const { role } = await roles();
+        expect(await role("user", "quelqu-un-d-autre")).toBe("none");
+      });
+
+      it("organisation : admin actif -> admin, membre simple -> member", async () => {
+        const { grant, role } = await roles();
+        expect(await role("organization", grant.adminOrg)).toBe("admin");
+        expect(await role("organization", grant.memberOrg)).toBe("member");
+      });
+
+      it("organisation : invitation en attente ou aucun lien -> none", async () => {
+        const { grant, role } = await roles();
+        expect(await role("organization", grant.pendingOrg)).toBe("none");
+        expect(await role("organization", grant.strangerOrg)).toBe("none");
+      });
+
+      it("un login d'organisation n'est pas un compte personnel (et inversement)", async () => {
+        const { grant, role } = await roles();
+        expect(await role("organization", grant.login)).toBe("none");
+        expect(await role("user", grant.adminOrg)).toBe("none");
+      });
+
+      it("jeton expiré ou inconnu : GitAuthExpiredError (kind user)", async () => {
+        const ctx = await factory();
+        const error = await rejection(
+          ctx.provider.getUserOwnerRole({
+            auth: { kind: "user", token: "pas-un-jeton", expiresAt: "2020-01-01T00:00:00.000Z" },
+            owner: { kind: "user", login: "octo" },
+          }),
+        );
+        expect(error).toBeInstanceOf(GitAuthExpiredError);
+        expect(error).toMatchObject({ kind: "user" });
+      });
+
+      it("jeton d'installation : refusé (jeton utilisateur exigé)", async () => {
+        const ctx = await factory();
+        const error = await rejection(
+          ctx.provider.getUserOwnerRole({
+            auth: { kind: "installation", token: "iat", expiresAt: "2099-01-01T00:00:00.000Z" },
+            owner: { kind: "user", login: "octo" },
+          }),
+        );
+        expect(error).toBeInstanceOf(GitProviderError);
+        expect(error).toMatchObject({ operation: "getUserOwnerRole" });
+      });
     });
 
     it("appSlug rend un identifiant d'URL non vide et stable", async () => {

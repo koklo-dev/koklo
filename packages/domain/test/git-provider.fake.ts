@@ -16,6 +16,7 @@ import type {
   PullRequestState,
   Repo,
   Tag,
+  UserOwnerRole,
 } from "../src/index.ts";
 import { GitConflictError, UserTokenRequiredError } from "../src/index.ts";
 
@@ -57,6 +58,10 @@ export class FakeGitProvider implements GitProvider {
 
   async listUserInstallations(): Promise<readonly GitUserInstallation[]> {
     return [];
+  }
+
+  async getUserOwnerRole(): Promise<UserOwnerRole> {
+    return "none";
   }
 
   async appSlug(): Promise<string> {

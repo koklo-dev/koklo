@@ -950,7 +950,9 @@ flowchart LR
 Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installation.list`/`start`, the raw callback `GET /api/github/callback`, relayed by `apps/web/src/proxy.ts` with the session cookie). Flow, outcomes and audit: `api-contract.md`, "Installations in the API (TK-48a2)".
 - **Port** (`@koklo/domain`): `GitProvider.exchangeUserCode({ code, redirectUri })` returns
   `GitUserCredentials`; `listUserInstallations({ auth })` returns the installations visible to a user
-  token (`externalId`, `ownerKind`, `ownerLogin`); `appSlug()` gives the App URL slug. A refused code
+  token (`externalId`, `ownerKind`, `ownerLogin`); `getUserOwnerRole({ auth, owner })` returns the
+  user's link with an owner (`self`, `admin`, `member`, `none`; `ops/user-role.ts`: `GET /user` or
+  `GET /user/memberships/orgs/{org}`, no extra App permission); `appSlug()` gives the App URL slug. A refused code
   raises `InvalidUserCodeError`, which carries nothing received (no code, no client secret).
   `@koklo/github` implements them (`ops/user-oauth.ts`: POST `/login/oauth/access_token`, never
   replayed because the code is single-use; `ops/app-slug.ts`: `GET /app` with the App JWT, success
@@ -959,7 +961,9 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
 - **Flow** (ADR 0009, proposed; implemented in 48a2): `installation.start` returns the GitHub install URL with a
   signed single-use `state`; GitHub redirects the browser to the callback with `code` and `state`;
   the API consumes the state, exchanges the code, lists the user's installations and only links an
-  installation proven visible to that user token, under the organization of the state.
+  installation proven visible to that user token AND owned by that user (own personal account, or
+  active admin of the GitHub organization: visibility alone also covers mere members), under the
+  organization of the state.
   ```mermaid
   sequenceDiagram
     participant W as Web
@@ -973,6 +977,7 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
     A->>A: re-read owner/admin role of the state organization
     A->>G: exchangeUserCode (only after the state is consumed)
     A->>G: listUserInstallations (installation must be visible to the user token)
+    A->>G: getUserOwnerRole (self for a personal account, admin for an organization, else not_owner)
     A->>A: one transaction: installation, encrypted token, audit
   ```
   Hexagonal split: `InstallationService`/`InstallationCallbackService` depend on the

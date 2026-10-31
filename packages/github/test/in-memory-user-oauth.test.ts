@@ -109,3 +109,38 @@ describe("InMemoryGitProvider.appSlug", () => {
     expect(await make({ appSlug: "koklo-e2e" }).provider.appSlug()).toBe("koklo-e2e");
   });
 });
+
+describe("InMemoryGitProvider.getUserOwnerRole", () => {
+  type Owner = { kind: "organization" | "user"; login: string };
+  async function rolesOf(provider: InMemoryGitProvider, login: string) {
+    const creds = await exchange(provider, login);
+    return (owner: Owner) => provider.getUserOwnerRole({ auth: { kind: "user", ...creds }, owner });
+  }
+  const org = (login: string): Owner => ({ kind: "organization", login });
+
+  it("seedOrgMembership : admin, member, pending (= none), sans lien (= none)", async () => {
+    const { provider } = make();
+    provider.seedOrgMembership("ada", "acme", "admin");
+    provider.seedOrgMembership("ada", "beta", "member");
+    provider.seedOrgMembership("ada", "gamma", "pending");
+    const role = await rolesOf(provider, "ada");
+    expect(await role(org("acme"))).toBe("admin");
+    expect(await role(org("ACME"))).toBe("admin");
+    expect(await role(org("beta"))).toBe("member");
+    expect(await role(org("gamma"))).toBe("none");
+    expect(await role(org("delta"))).toBe("none");
+  });
+
+  it("le rôle d'un compte n'est pas celui d'un autre", async () => {
+    const { provider } = make();
+    provider.seedOrgMembership("grace", "acme", "admin");
+    expect(await (await rolesOf(provider, "ada"))(org("acme"))).toBe("none");
+  });
+
+  it("compte personnel : self pour son login seulement", async () => {
+    const { provider } = make();
+    const role = await rolesOf(provider, "ada");
+    expect(await role({ kind: "user", login: "ada" })).toBe("self");
+    expect(await role({ kind: "user", login: "grace" })).toBe("none");
+  });
+});

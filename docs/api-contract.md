@@ -899,7 +899,7 @@ transaction) or, for a re-authorization,
 New typed errors on `installation.start` (contract 0.7.0): `PROVIDER_UNAVAILABLE` (503) when the App has
 no client credentials, `KOKLO_ENCRYPTION_KEY` is missing, no provider is configured or the provider
 fails; `VALIDATION{field: "installationId", message: "too_many_pending"}` (422) at the 21st unconsumed,
-unexpired state of a user. Each `start` also purges the expired states of the organization and writes an
+unexpired state of a user. Each `start` also purges the expired states of the organization and of the user and writes an
 `installation.start` audit entry (target: the organization).
 
 The `state` is `base64url(payload).base64url(HMAC-SHA256)`; the key is derived from
@@ -915,18 +915,32 @@ Raw Nest route relayed by the web with the session cookie. It always answers `30
 Evaluation order: session; configuration; query shape; signed state bound to the session user; atomic
 consumption of the state (`UPDATE ... WHERE consumed_at IS NULL AND expires_at > now RETURNING`);
 the user is still owner/admin of the organization carried by the state (not the active organization of
-the session); and only then the exchange of `code` for a user token.
+the session); the exchange of `code` for a user token; the proof that the installation is visible to
+that token; and the proof of **ownership** of the installed account (see below).
 
 | Outcome | Cases |
 |---------|-------|
-| `installed` | the token's `GET /user/installations` lists the installation; the row (organization of the state, owner kind and login read from GitHub, never from the request), the encrypted token and the audit entry are written in one transaction |
+| `installed` | the token's `GET /user/installations` lists the installation AND the user owns the account (below); the row (organization of the state, owner kind and login read from GitHub, never from the request), the encrypted token and the audit entry are written in one transaction |
 | `invalid_state` | no session, absent, forged, truncated, duplicated, other-user, other-organization, expired or replayed state; a re-authorization whose `installation_id` contradicts the state |
 | `denied` | no `code`, code refused, installation absent from the token's list, installation `deleted` or no longer of the organization, user no longer owner/admin |
+| `not_owner` | the installation is visible to the token but the user is not its owner: personal account of another login, or organization where the user is only a member, has a pending invitation or no link; nothing is written, audit `installation.link_refused` |
 | `already_linked` | the installation belongs to another organization (which is never revealed) |
 | `provider_error` | provider failure or timeout, App without client credentials at return, failure of the transaction (audit included); never a `500` |
 
+Ownership proof (B1). `GET /user/installations` also lists the installations of organizations the user
+merely belongs to, so visibility proves nothing. The API then asks the port `getUserOwnerRole` with the
+same user token: personal account (`ownerKind` `user`) requires `GET /user` to return the same login
+(case ignored, role `self`); organization requires `GET /user/memberships/orgs/{org}` to answer
+`role: admin` and `state: active` (role `admin`). A plain member, a pending invitation (`state:
+pending`), a 404 (no link) or an unknown state is `not_owner`. This endpoint needs no additional App
+permission for a user access token (GitHub, "Permissions required for GitHub Apps": none). A failure
+of that call (including a `403` when the organization blocks the App) is `provider_error`, never a
+link. Consequence: an organization squatted by a mere member is impossible, and the real admin can
+still link it afterwards (no `already_linked`).
+
 Re-authorization (state carrying `installationId`): GitHub returns no `installation_id`, the identifier
-comes from the state; the token is still proven through `GET /user/installations`. The existing row and
+comes from the state; the token is still proven through `GET /user/installations` and the ownership
+proof above (a user who is no longer admin of the GitHub organization is `not_owner`). The existing row and
 its encrypted token are updated, no second row is created. Audit actions: `installation.link` (new row),
 `installation.reauthorize` (existing row), `installation.link_refused` (target: the organization, only
 when the organization comes from a valid signed state of the session user; no external id). Tokens are
@@ -948,14 +962,15 @@ sequenceDiagram
   W->>A: same path and query
   A->>A: verify state, consume it (atomic)
   A->>G: exchange code, list user installations
+  A->>G: getUserOwnerRole (GET /user or /user/memberships/orgs/{org})
   A->>A: one transaction: installation, encrypted token, audit
   A-->>B: 303 /github?result=installed
 ```
 
 ## Version history
 - **0.7.0** (TK-48a2): typed errors `PROVIDER_UNAVAILABLE` (503) and `VALIDATION` (422) on
-  `installation.start`; `installation_id` optional in `installationCallbackQuerySchema` (outside the
-  OpenAPI document). Same 43 routes. Fingerprints of 0.1.0 to 0.6.0 unchanged.
+  `installation.start`; `installation_id` optional in `installationCallbackQuerySchema` and the outcome `not_owner` in
+  `installationCallbackOutcomeSchema` (both outside the OpenAPI document). Same 43 routes. Fingerprints of 0.1.0 to 0.6.0 unchanged.
 - **0.6.0** (TK-45c2): typed error `SPEC_INDEX_FAILED` (409, `{ errorCode, commitSha }`) on
   `spec.listFeatures` and `spec.getFeature`; same 43 routes. Fingerprints of 0.1.0 to 0.5.0 unchanged.
 - **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { GitProviderUnavailableError } from "@koklo/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createSeededDatabase } from "./helpers/app.ts";
@@ -5,6 +6,7 @@ import {
   createInstallApp,
   ENCRYPTION_KEY,
   INSTALL_APP,
+  type InstallBench,
   insertStateRow,
   installationAudit,
   installationBench,
@@ -18,6 +20,7 @@ import {
 } from "./helpers/installations.ts";
 import { ManualClock } from "./helpers/leases.ts";
 import { insertInstallation, ProviderHarness } from "./helpers/repos.ts";
+import { insertSession } from "./helpers/session.ts";
 import { createWorld } from "./helpers/tickets.ts";
 
 /** TK-48a2, AC-48-06 : `installation.start` (URL GitHub, état signé lié à l'utilisateur et à l'organisation). */
@@ -278,5 +281,54 @@ describe("installation.start : purge opportuniste et plafond", () => {
       });
     }
     expect((await startInstall(b, s.owner)).status).toBe(200);
+  });
+});
+
+describe("installation.start : plafond et purge par utilisateur, toutes organisations confondues", () => {
+  const PAST = "2026-01-01T00:00:00.000Z";
+
+  /** L'utilisateur `owner` de la scène `s` devient aussi owner d'une autre organisation Koklo. */
+  async function joinSecondOrganization(b: InstallBench, userId: string) {
+    const other = await createWorld(b.database);
+    await b.database.query(
+      `INSERT INTO members (id, organization_id, user_id, role, created_at, updated_at)
+       VALUES ($1, $2, $3, 'owner', now(), now())`,
+      [randomUUID(), other.organizationId, userId],
+    );
+    const cookie = await insertSession(b.database, {
+      userId,
+      activeOrganizationId: other.organizationId,
+    });
+    return { organizationId: other.organizationId, cookie };
+  }
+
+  it("20 états en attente dans une organisation bloquent le 21e dans une autre (422 too_many_pending)", async () => {
+    const b = bench();
+    const s = await installScene(b);
+    const second = await joinSecondOrganization(b, s.owner.userId);
+    for (let i = 0; i < 20; i++) {
+      expect((await startInstall(b, s.owner)).status, `start ${i}`).toBe(200);
+    }
+    const res = await startInstall(b, { cookie: second.cookie });
+    expect(res.status).toBe(422);
+    expect(res.body.data).toMatchObject({ message: "too_many_pending" });
+    expect(await stateRows(b.database, second.organizationId)).toHaveLength(0);
+  });
+
+  it("les états expirés de l'utilisateur dans les autres organisations sont purgés à chaque start", async () => {
+    const b = bench();
+    const s = await installScene(b);
+    const second = await joinSecondOrganization(b, s.owner.userId);
+    const expired = await insertStateRow(b.database, second.organizationId, s.owner.userId, {
+      createdAtIso: PAST,
+    });
+    const foreign = await insertStateRow(b.database, second.organizationId, s.admin.userId, {
+      createdAtIso: PAST,
+    });
+    expect((await startInstall(b, s.owner)).status).toBe(200);
+    const ids = (await stateRows(b.database, second.organizationId)).map((r) => r.id);
+    expect(ids).not.toContain(expired);
+    // Seuls les états de l'utilisateur qui démarre sont purgés hors de son organisation.
+    expect(ids).toContain(foreign);
   });
 });

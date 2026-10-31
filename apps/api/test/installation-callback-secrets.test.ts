@@ -44,7 +44,7 @@ describe("redirection ouverte impossible", () => {
     for (const res of [ok, refused, anonymous]) {
       expect(res.status).toBe(303);
       expect(res.headers.location).toMatch(
-        /^\/github\?result=(installed|denied|invalid_state|already_linked|provider_error)$/,
+        /^\/github\?result=(installed|denied|invalid_state|already_linked|not_owner|provider_error)$/,
       );
       expect(res.text).not.toMatch(/evil|script|javascript/);
     }

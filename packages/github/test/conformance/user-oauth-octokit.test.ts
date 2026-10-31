@@ -1,7 +1,14 @@
 import { createMockGitHub, providerOn } from "../support/mock-github.ts";
 import { runUserOAuthConformance, type UserGrant } from "./user-oauth-suite.ts";
 
-type Issued = { readonly installations: UserGrant["installations"] };
+type Issued = {
+  readonly installations: UserGrant["installations"];
+  readonly login?: string;
+  /** Appartenances : organisation (minuscules) -> rôle et état chez GitHub. */
+  readonly memberships?: Readonly<Record<string, { role: string; state: string }>>;
+};
+const tokenOf = (request: { headers: Readonly<Record<string, string>> }) =>
+  (request.headers.authorization ?? "").replace(/^(token|bearer) /i, "");
 
 /**
  * Point d'entrée CI de l'adaptateur Octokit : transport simulé à état minimal. GitHub répond 200
@@ -49,11 +56,45 @@ runUserOAuthConformance("OctokitGitProvider (transport simulé)", async () => {
       },
     };
   });
+  mock.route("GET /user", (request) => {
+    const grant = tokens.get(tokenOf(request));
+    if (grant === undefined) return { status: 401, body: { message: "Bad credentials" } };
+    return { body: { login: grant.login ?? "octo", type: "User" } };
+  });
   mock.route("GET /app", { body: { slug: "koklo-test", name: "Koklo Test" } });
   return {
     provider: providerOn(mock),
     redirectUri: "https://app.koklo.test/api/github/callback",
     unknownCode: "code-inconnu-de-github",
+    newRoleGrant: async () => {
+      grants += 1;
+      const login = `Octo-Roles${grants}`;
+      const memberships = {
+        [`admin-org-${grants}`]: { role: "admin", state: "active" },
+        [`member-org-${grants}`]: { role: "member", state: "active" },
+        [`pending-org-${grants}`]: { role: "admin", state: "pending" },
+      };
+      for (const org of [...Object.keys(memberships), `stranger-org-${grants}`]) {
+        mock.route(`GET /user/memberships/orgs/${org}`, (request) => {
+          const grant = tokens.get(tokenOf(request));
+          if (grant === undefined) return { status: 401, body: { message: "Bad credentials" } };
+          const membership = grant.memberships?.[org];
+          return membership === undefined
+            ? { status: 404, body: { message: "Not Found" } }
+            : { body: { ...membership, organization: { login: org } } };
+        });
+      }
+      const code = `code-roles-${grants}`;
+      codes.set(code, { installations: [], login, memberships });
+      return {
+        code,
+        login,
+        adminOrg: `admin-org-${grants}`,
+        memberOrg: `member-org-${grants}`,
+        pendingOrg: `pending-org-${grants}`,
+        strangerOrg: `stranger-org-${grants}`,
+      };
+    },
     newGrant: async () => {
       grants += 1;
       const installations = [

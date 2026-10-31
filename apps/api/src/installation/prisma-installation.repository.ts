@@ -74,14 +74,16 @@ export class PrismaInstallationRepository implements InstallationRepository {
     );
   }
 
-  createState(actor: AuditActor, state: NewAuthState): Promise<"created" | "too_many_pending"> {
+  async createState(
+    actor: AuditActor,
+    state: NewAuthState,
+  ): Promise<"created" | "too_many_pending"> {
     const now = new Date(state.createdAt);
+    if ((await this.pendingStatesOf(actor.userId, now)) >= MAX_PENDING_STATES) {
+      return "too_many_pending";
+    }
     return this.transaction(actor.organizationId, async (tx) => {
       await tx.providerAuthState.deleteMany({ where: { expiresAt: { lt: now } } });
-      const pending = await tx.providerAuthState.count({
-        where: { userId: actor.userId, consumedAt: null, expiresAt: { gt: now } },
-      });
-      if (pending >= MAX_PENDING_STATES) return "too_many_pending" as const;
       await tx.providerAuthState.create({
         data: {
           organizationId: actor.organizationId,
@@ -99,6 +101,17 @@ export class PrismaInstallationRepository implements InstallationRepository {
       });
       return "created" as const;
     });
+  }
+
+  /**
+   * Purge les états expirés de l'utilisateur puis compte ceux en attente, toutes organisations
+   * confondues (un utilisateur peut gérer plusieurs organisations) : lecture hors filtre
+   * multi-tenant, filtrée à la main sur `userId`. Hors transaction, pour ne pas attendre ses verrous.
+   */
+  private async pendingStatesOf(userId: string, now: Date): Promise<number> {
+    const states = this.database.raw.providerAuthState;
+    await states.deleteMany({ where: { userId, expiresAt: { lt: now } } });
+    return states.count({ where: { userId, consumedAt: null, expiresAt: { gt: now } } });
   }
 
   consumeState(key: StateKey, now: string): Promise<ConsumedState | null> {

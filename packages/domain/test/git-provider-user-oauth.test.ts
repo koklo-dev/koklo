@@ -3,9 +3,11 @@ import { resolve } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
   GitAuth,
+  GitOwner,
   GitProvider,
   GitUserCredentials,
   GitUserInstallation,
+  UserOwnerRole,
 } from "../src/index.ts";
 import * as domain from "../src/index.ts";
 
@@ -38,6 +40,20 @@ describe("TK-48 port : exchangeUserCode, listUserInstallations, appSlug", () => 
     expectTypeOf<ReturnType<GitProvider["listUserInstallations"]>>().toEqualTypeOf<
       Promise<readonly GitUserInstallation[]>
     >();
+  });
+
+  it("getUserOwnerRole({ auth, owner }) -> self | admin | member | none (B1, preuve de propriété)", () => {
+    expectTypeOf<Parameters<GitProvider["getUserOwnerRole"]>[0]>().toEqualTypeOf<{
+      auth: GitAuth;
+      owner: GitOwner;
+    }>();
+    expectTypeOf<UserOwnerRole>().toEqualTypeOf<"self" | "admin" | "member" | "none">();
+    expectTypeOf<ReturnType<GitProvider["getUserOwnerRole"]>>().toEqualTypeOf<
+      Promise<UserOwnerRole>
+    >();
+    expect(src("git-provider.ts")).toMatch(
+      /@throws GitAuthExpiredError\s*\*\/\s*getUserOwnerRole\(/,
+    );
   });
 
   it("appSlug() -> Promise<string>", () => {

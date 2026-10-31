@@ -2,7 +2,12 @@ import {
   type installationCallbackOutcomeSchema,
   installationCallbackQuerySchema,
 } from "@koklo/contract";
-import { type GitUserCredentials, InvalidUserCodeError } from "@koklo/domain";
+import {
+  type GitProvider,
+  type GitUserCredentials,
+  type GitUserInstallation,
+  InvalidUserCodeError,
+} from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import { CLOCK, type Clock } from "../clock.ts";
@@ -16,8 +21,10 @@ type CallbackQuery = z.output<typeof installationCallbackQuerySchema>;
 
 /**
  * Retour de GitHub après l'installation ou la ré-autorisation. Une installation n'est liée que si le
- * jeton de l'utilisateur la voit : l'identifiant reçu dans la requête n'est jamais une preuve. Le
- * résultat est un énuméré, sans aucune valeur reçue ni message du fournisseur.
+ * jeton de l'utilisateur la voit ET que cet utilisateur en est le propriétaire (son compte personnel,
+ * ou administrateur actif de l'organisation GitHub) : `GET /user/installations` liste aussi les
+ * installations des organisations dont il est seulement membre. L'identifiant reçu dans la requête
+ * n'est jamais une preuve. Le résultat est un énuméré, sans valeur reçue ni message du fournisseur.
  *
  * Ordre : session, configuration, état signé, consommation atomique en base, et SEULEMENT ensuite
  * l'échange du code (le code d'un attaquant ne doit jamais servir avec la session d'une victime).
@@ -60,7 +67,7 @@ export class InstallationCallbackService {
     return this.prove(flow, actor, target, query.code);
   }
 
-  /** Échange du code puis preuve : l'installation doit être visible par le jeton de l'utilisateur. */
+  /** Échange du code puis preuve : installation visible du jeton de l'utilisateur, dont il est propriétaire. */
   private async prove(
     flow: InstallationFlow,
     actor: AuditActor,
@@ -80,6 +87,9 @@ export class InstallationCallbackService {
       });
       const proven = visible.find((candidate) => candidate.externalId === target);
       if (!proven) return this.refuse(actor, "denied");
+      if (!(await ownsAccount(flow.provider, credentials, proven))) {
+        return this.refuse(actor, "not_owner");
+      }
       const result = await this.repository.link(actor, proven, credentials);
       return result === "already_linked" ? this.refuse(actor, "already_linked") : "installed";
     } catch (error) {
@@ -107,7 +117,7 @@ export class InstallationCallbackService {
   }
 
   /** Le refus est journalisé (sans identifiant externe) ; une panne du journal ne change pas le résultat. */
-  private async refuse(actor: AuditActor, outcome: "denied" | "already_linked") {
+  private async refuse(actor: AuditActor, outcome: "denied" | "already_linked" | "not_owner") {
     try {
       await this.repository.recordRefusal(actor);
     } catch (error) {
@@ -124,4 +134,17 @@ export class InstallationCallbackService {
     );
     return "provider_error";
   }
+}
+
+/** Seuls le compte personnel lui-même et un administrateur actif de l'organisation prouvent la propriété. */
+async function ownsAccount(
+  provider: GitProvider,
+  credentials: GitUserCredentials,
+  installation: GitUserInstallation,
+): Promise<boolean> {
+  const role = await provider.getUserOwnerRole({
+    auth: { kind: "user", ...credentials },
+    owner: { kind: installation.ownerKind, login: installation.ownerLogin },
+  });
+  return installation.ownerKind === "user" ? role === "self" : role === "admin";
 }
