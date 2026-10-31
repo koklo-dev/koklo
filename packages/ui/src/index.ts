@@ -20,6 +20,7 @@ export * from "./components/sidebar.tsx";
 export * from "./components/status-badge.tsx";
 export * from "./components/table.tsx";
 export * from "./components/tabs.tsx";
+export * from "./components/textarea.tsx";
 export * from "./components/tooltip.tsx";
 export * from "./icons/icon.tsx";
 export { cn } from "./lib/cn.ts";

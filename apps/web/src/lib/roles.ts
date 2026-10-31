@@ -30,3 +30,8 @@ export function canMoveTickets(role: Role | undefined): boolean {
 export function canReadRepos(role: Role | undefined): boolean {
   return canMoveTickets(role);
 }
+
+/** `specBatch.submit` : propriétaire, administrateur, développeur et designer écrivent dans la spec (`SPEC_BATCH_ROLES`). */
+export function canWriteSpec(_role: Role | string | undefined): boolean {
+  throw new Error("canWriteSpec : non implémenté");
+}

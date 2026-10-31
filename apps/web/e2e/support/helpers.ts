@@ -100,3 +100,14 @@ export async function settle(page: Page): Promise<void> {
 /** Lectures reçues par le faux API de l'écran des fonctionnalités (`spec.*`, `repo.list`), dans l'ordre. */
 export const specReadsSeen = async (): Promise<string[]> =>
   (await fetch(`${STUB}/__spec-reads`)).json();
+
+/** Écritures reçues par le faux API (`specBatch.submit` : corps ; `specBatch.get` : lot lu), dans l'ordre. */
+export interface SpecWrite {
+  kind: "submit" | "get";
+  idempotencyKey?: string;
+  baseSha?: string;
+  operations?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+export const specWritesSeen = async (): Promise<SpecWrite[]> =>
+  (await fetch(`${STUB}/__spec-writes`)).json();
