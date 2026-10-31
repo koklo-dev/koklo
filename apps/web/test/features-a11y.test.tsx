@@ -11,6 +11,7 @@ import {
   renderFeatures,
   serve,
 } from "./support/features.tsx";
+import { findNamed, findRole } from "./support/wait.ts";
 import {
   pathname,
   polyfillRadix,
@@ -60,9 +61,7 @@ describe("Route /projects/[projectId]/features", () => {
     setUrl(`/projects/${PROJECT_ID}/features`);
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "Fonctionnalités" }),
-    ).toBeInTheDocument();
+    expect(await findNamed("heading", "Fonctionnalités", { level: 1 })).toBeInTheDocument();
     await findTable();
     expect(procedures.specHead.mock.calls[0]?.[0]).toMatchObject({ projectId: PROJECT_ID });
   });
@@ -71,7 +70,7 @@ describe("Route /projects/[projectId]/features", () => {
     setUrl("/projects/pas-un-uuid/features");
     const element = await route.default({ params: Promise.resolve({ projectId: "pas-un-uuid" }) });
     render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
-    expect(await screen.findByRole("heading", { name: "Projet introuvable" })).toBeInTheDocument();
+    expect(await findNamed("heading", "Projet introuvable")).toBeInTheDocument();
     expect(procedures.specHead).not.toHaveBeenCalled();
   });
 });
@@ -105,7 +104,7 @@ describe("Gabarit de la route", () => {
     await renderFramed();
     const sidebar = document.querySelector('[data-slot="sidebar"]') as HTMLElement;
     expect(sidebar).not.toBeNull();
-    const current = await within(sidebar).findByRole("link", { name: /Alpha/ });
+    const current = await findNamed("link", /Alpha/, { scope: within(sidebar) });
     expect(current).toHaveAttribute("href", `/projects/${PROJECT_ID}/features`);
     expect(current).toHaveAttribute("aria-current", "page");
   });
@@ -219,7 +218,7 @@ describe("Mouvement réduit et chargement (§7)", () => {
   it("squelette pulsant seulement sous motion-safe:", async () => {
     procedures.specHead.mockImplementation(() => new Promise(() => undefined));
     renderFeatures();
-    await screen.findByRole("status");
+    await findRole("status");
     const animated = Array.from(document.querySelectorAll<HTMLElement>("[class*='animate-']"));
     expect(animated.length).toBeGreaterThan(0);
     for (const element of animated) {

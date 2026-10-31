@@ -12,6 +12,7 @@ import {
   titleLink,
   visibleText,
 } from "./support/features.tsx";
+import { findNamed, findRole } from "./support/wait.ts";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
 vi.mock("next/navigation", async () => {
@@ -37,7 +38,7 @@ beforeEach(() => {
   serve();
 });
 
-const sheet = () => screen.findByRole("dialog");
+const sheet = () => findRole("dialog");
 const TITLE = "Connexion par e-mail";
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
@@ -74,7 +75,7 @@ describe("Ouverture et fermeture", () => {
     await findTable();
     const length = window.history.length;
     await userEvent.click(titleLink("Tableau kanban"));
-    expect(await screen.findByRole("dialog", { name: "Tableau kanban" })).toBeVisible();
+    expect(await findNamed("dialog", "Tableau kanban")).toBeVisible();
     expect(new URLSearchParams(window.location.search).get("feature")).toBe("F-002");
     expect(window.history.length).toBe(length + 1);
   });
@@ -153,7 +154,7 @@ describe("Ouverture et fermeture", () => {
   it("une fonctionnalité absente de la liste chargée mais bien formée ouvre quand même la fiche", async () => {
     procedures.specGetFeature.mockResolvedValue({ ...DETAIL, specId: "F-999", title: "Hors page" });
     renderFeatures({ search: "?feature=F-999" });
-    expect(await screen.findByRole("dialog", { name: "Hors page" })).toBeVisible();
+    expect(await findNamed("dialog", "Hors page")).toBeVisible();
     expect(inputsOf(procedures.specGetFeature)[0]).toMatchObject({ specId: "F-999" });
   });
 });

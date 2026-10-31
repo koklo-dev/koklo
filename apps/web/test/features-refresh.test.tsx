@@ -9,6 +9,7 @@ import {
   serve,
   statusRegion,
 } from "./support/features.tsx";
+import { findNamed } from "./support/wait.ts";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
 vi.mock("next/navigation", async () => {
@@ -66,7 +67,7 @@ afterEach(() => {
 
 async function renderPreparing() {
   renderFeatures();
-  await screen.findByRole("heading", { name: PREPARING });
+  await findNamed("heading", PREPARING);
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
@@ -154,7 +155,7 @@ describe("Actualisation automatique de la spec en préparation (§4.5)", () => {
     serve("client");
     procedures.specHead.mockResolvedValue(null);
     renderFeatures();
-    await screen.findByRole("heading", { name: "Aucune fonctionnalité à afficher pour le moment" });
+    await findNamed("heading", "Aucune fonctionnalité à afficher pour le moment");
     const initial = headCalls();
     await advance(5.5 * SECOND);
     expect(headCalls()).toBe(initial + 1);

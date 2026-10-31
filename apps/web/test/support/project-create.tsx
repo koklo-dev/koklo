@@ -4,7 +4,7 @@ import { expect } from "vitest";
 import { ProjectsPage } from "../../src/components/projects-page.tsx";
 import { asRole, INSTALL_ID_1, installation } from "./github-fixtures.ts";
 import { renderWithQuery } from "./render.tsx";
-import { findNamed } from "./wait.ts";
+import { findNamed, findRole } from "./wait.ts";
 import { apiError, procedures } from "./web-mocks.ts";
 
 /** Support des tests de création de projet (TK-48 / 48c). Les `vi.mock` restent dans chaque fichier de test. */
@@ -83,7 +83,7 @@ export async function createWithSpecFailure(
   procedures.repoCreateSpec.mockImplementation(error);
   const sheet = await openReadySheet();
   await createProject(sheet, "Alpha", repoName);
-  const alert = await within(sheet).findByRole("alert");
+  const alert = await findRole("alert", { from: sheet });
   expect(alert).toHaveTextContent("Projet créé, dépôt de spec non créé");
   return sheet;
 }

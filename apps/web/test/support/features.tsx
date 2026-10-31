@@ -1,13 +1,19 @@
-import { screen, within } from "@testing-library/react";
+import { configure, screen, within } from "@testing-library/react";
 import { FeaturesPage } from "../../src/components/features-page.tsx";
 import { asRole } from "./github-fixtures.ts";
 import { renderWithQuery } from "./render.tsx";
+import { findRole } from "./wait.ts";
 import { procedures, setUrl } from "./web-mocks.ts";
 
 /**
  * Support des tests de la liste des fonctionnalités (TK-48 / 48d). Les `vi.mock` restent dans chaque fichier :
  * `next/navigation` (avec `useSearchParams` de web-mocks), `auth-client` et `orpc`, voir .workflow/TK-48/03-red-48d.md.
  */
+// Les attentes asynchrones (`waitFor`, `findBy*`) de ces tests valent 1 s par défaut, ce qui est trop court
+// pour le premier rendu d'une page chargée par React Query sur un runner saturé (CI + couverture). Le délai
+// n'est relevé que pour les fichiers qui importent ce support ; une attente qui réussit n'en est pas ralentie.
+configure({ asyncUtilTimeout: 5_000 });
+
 export const PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
 export const OTHER_PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02";
 export const SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
@@ -126,7 +132,7 @@ export function renderFeatures({ projectId = PROJECT_ID, search = "" }: RenderOp
 
 /** Attend que la table des fonctionnalités soit affichée. */
 export const findTable = (): Promise<HTMLElement> =>
-  screen.findByRole("table", { name: /^Fonctionnalités du projet/ });
+  findRole("table", { name: /^Fonctionnalités du projet/ });
 
 export const titleLink = (title: string): HTMLElement => screen.getByRole("link", { name: title });
 
