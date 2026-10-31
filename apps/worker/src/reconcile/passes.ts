@@ -10,7 +10,7 @@ import type { PgBoss } from "pg-boss";
 import { parseDeliveryPayload } from "../webhook/payload.ts";
 import { type Orphan, requeueOrphan } from "./requeue.ts";
 import type { ReconcileStore } from "./store.ts";
-import type { PassCount, ReconcilePass } from "./types.ts";
+import type { PassCount } from "./types.ts";
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -43,7 +43,7 @@ async function requeueAll(
  * P1 : livraisons `received`/`processing` plus vieilles que la grâce sans job vivant. Celles de
  * plus de `rétention - 1` jour sont ignorées : la purge les supprimera avant qu'elles servent.
  */
-export function deliveriesPass(deps: PassDeps): ReconcilePass {
+export function deliveriesPass(deps: PassDeps): () => Promise<PassCount> {
   return async () => {
     const now = deps.now().getTime();
     const rows = await deps.store.unsettledDeliveries(
@@ -72,7 +72,7 @@ export function deliveriesPass(deps: PassDeps): ReconcilePass {
 }
 
 /** P2 : lots `queued`/`committing` plus vieux que la grâce sans job vivant ; un audit système par lot relancé. */
-export function batchesPass(deps: PassDeps): ReconcilePass {
+export function batchesPass(deps: PassDeps): () => Promise<PassCount> {
   return async () => {
     const rows = await deps.store.openBatches(
       new Date(deps.now().getTime() - deps.graceMinutes * MINUTE_MS),

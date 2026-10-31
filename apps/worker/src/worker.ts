@@ -95,6 +95,7 @@ async function registerDatabaseJobs(
     raw: database,
     graceMinutes: config.reconcileGraceMinutes ?? RECONCILE_GRACE_MINUTES_DEFAULT,
     retentionDays,
+    provider,
   });
 }
 

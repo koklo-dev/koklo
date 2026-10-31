@@ -549,12 +549,25 @@ install --with-deps chromium` first). `turbo run e2e` still only runs the stub-A
   spec-write batches that have no live job, with a new job id and the same singleton key, after
   deleting the `failed` jobs of that key (which would block it). Each pass handles at most 200 rows per
   tick. Each relaunched batch gets a system audit entry `spec_write_batch.requeued`.
-- **Monitoring.** The tick log carries `deliveries`, `batches` (`requeued`, `skipped`), `failedPasses`
-  and `durationMs`. A non-empty `failedPasses` on several consecutive ticks means a pass is broken
+- **P3 (TK-46b).** An `in_review` ticket whose pull request (URL in `Ticket.pullRequest`) was merged by
+  hand at the provider becomes `done`, its open leases are released and a system audit entry
+  `ticket.reconcile.pr_merged` is written. A pull request closed without merge changes nothing and
+  leaves one `ticket.reconcile.pr_closed` entry. At most 200 provider reads per run; without a
+  provider configured the pass does nothing.
+  Known limit (no migration, no per-ticket marker): tickets whose pull request is closed without
+  merge, or whose reference is unreadable, are read again at every tick (the `pr_closed` audit is
+  deduplicated, `closed` is recounted; unreadable references cost no provider call and no cap).
+  Closed ones must be re-read since the pull request can be reopened and merged later. A
+  `last_reconciled_at` marker belongs to TK-46c.
+- **Monitoring.** The tick log carries `deliveries`, `batches` (`requeued`, `skipped`), `prs` (`done`,
+  `closed`, `skipped`, `reasons`: counts per reason such as `pr_ref_unparsable`, `repo_not_linked`,
+  `provider_error`), `failedPasses` and `durationMs`. A non-empty `failedPasses` on several consecutive ticks means a pass is broken
   (the error class name is logged as `errorName`, never the message). Steady non-zero `requeued` means
-  jobs are being lost upstream. Check: `SELECT count(*) FROM pgboss.job WHERE name IN ('webhook-delivery','spec-write') AND state = 'failed'`
+  jobs are being lost upstream. Check the `failed` jobs whose row is still unsettled (a settled row is not repaired, so a
+  bare count of `failed` jobs would stay above 0 forever):
+  `SELECT count(*) FROM pgboss.job j LEFT JOIN webhook_deliveries d ON d.id::text = j.data->>'deliveryId' LEFT JOIN spec_write_batches b ON b.id::text = j.data->>'batchId' WHERE j.state = 'failed' AND ((j.name = 'webhook-delivery' AND d.status IN ('received','processing')) OR (j.name = 'spec-write' AND b.status IN ('queued','committing')))`
   should return to 0 within one tick.
-- **Not covered here.** Provider-side drift (P3) and the other passes (P4) arrive with TK-46b.
+- **Not covered here.** The other passes (P4) arrive with TK-46c.
 
 ### R1 journey (TK-36)
 

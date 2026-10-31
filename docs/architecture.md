@@ -906,9 +906,11 @@ flowchart LR
   L -->|"no"| K["log skipped: already_running"]
   L -->|"yes"| P1["P1 webhook_deliveries<br/>received/processing older than grace"]
   L -->|"yes"| P2["P2 spec_write_batches<br/>queued/committing older than grace"]
+  L -->|"yes"| P3["P3 tickets in_review<br/>PR merged by hand (TK-46b)"]
   P1 --> R["no live job (created/retry/active)?<br/>delete failed jobs of the key,<br/>send a NEW job id, same singletonKey"]
   P2 --> R
   P2 -->|"per requeued batch"| A[("audit_log: system,<br/>spec_write_batch.requeued")]
+  P3 -->|"PR merged: done + leases released"| A3[("audit_log: system,<br/>ticket.reconcile.pr_merged")]
 ```
 
 - **Orphan test.** A row is an orphan when it is older than `RECONCILE_GRACE_MINUTES` and no job in
@@ -921,9 +923,21 @@ flowchart LR
   so an occasional duplicate has no effect.
 - **Audit.** P2 writes one system entry per relaunched batch, in the batch's own organization
   (`withOrganization`). P1 writes none (deliveries have no organization).
+- **P3, pull requests merged by hand (TK-46b, incident 10).** A non-deleted `in_review` ticket whose
+  `Ticket.pullRequest` is exactly `https://github.com/<owner>/<repo>/pull/<n>` (`parsePullRequestRef`
+  in `@koklo/domain`; any other text is skipped as `pr_ref_unparsable`) is read at the provider. The
+  repository read is the one linked to the ticket's own project with an `active` installation, never
+  the one the reference names alone (otherwise `repo_not_linked`, no provider call). One
+  authentication per installation and per run, one `getPullRequestState` per ticket, sequential, at
+  most `RECONCILE_MAX_PULL_REQUESTS_DEFAULT` (200) provider reads per run. A provider error leaves the
+  ticket for the next tick (`provider_error`). Merged: in one transaction, `UPDATE ... WHERE
+  status = 'in_review'` (count must be 1, otherwise a runner or the API won the race and nothing is
+  written), open leases released, system audit `ticket.reconcile.pr_merged`. Closed without merge: no
+  change, one system audit `ticket.reconcile.pr_closed` per ticket (never repeated). `in_progress` and
+  `blocked` tickets are never forced.
 - **Log.** One line per tick: counts and pass names only, never ids, payloads or error messages.
-- **Code.** `apps/worker/src/jobs/reconcile.ts` (handler, cron), `src/reconcile/{lock,passes,requeue,store,register,types}.ts`;
-  constants in `packages/domain/src/reconcile.ts`. P3/P4 come with TK-46b.
+- **Code.** `apps/worker/src/jobs/reconcile.ts` (handler, cron), `src/reconcile/{lock,passes,requeue,store,pull-requests,pr-store,register,types}.ts`;
+  constants in `packages/domain/src/reconcile.ts`. P3 is TK-46b; P4 comes with TK-46c.
 
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
