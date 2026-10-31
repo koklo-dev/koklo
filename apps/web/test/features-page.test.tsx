@@ -19,7 +19,7 @@ import {
   TEAM,
   visibleText,
 } from "./support/features.tsx";
-import { findNamed } from "./support/wait.ts";
+import { findNamed, findRole } from "./support/wait.ts";
 import {
   apiError,
   getSession,
@@ -75,14 +75,14 @@ describe("Chargement (§4.1)", () => {
 
   it("zone role=status aria-busy avec le libellé visible", async () => {
     renderFeatures();
-    const status = await screen.findByRole("status");
+    const status = await findRole("status");
     expect(status).toHaveAttribute("aria-busy", "true");
     expect(status).toHaveTextContent("Chargement des fonctionnalités…");
   });
 
   it("ni table, ni filtres, ni alerte, ni liste appelée", async () => {
     renderFeatures();
-    await screen.findByRole("status");
+    await findRole("status");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -91,7 +91,7 @@ describe("Chargement (§4.1)", () => {
 
   it("le titre de page est déjà là", async () => {
     renderFeatures();
-    expect(await screen.findByRole("heading", { level: 1, name: "Fonctionnalités" })).toBeVisible();
+    expect(await findNamed("heading", "Fonctionnalités", { level: 1 })).toBeVisible();
   });
 });
 
@@ -172,7 +172,7 @@ describe("En-tête (§3.1)", () => {
   it("la ligne de version est absente tant que spec.head n'a pas répondu", async () => {
     procedures.specHead.mockImplementation(neverResolves);
     renderFeatures();
-    await screen.findByRole("status");
+    await findRole("status");
     expect(visibleText()).not.toMatch(/Version de la spec|Mise à jour le/);
   });
 });
@@ -313,9 +313,7 @@ describe("Vide (§4.3)", () => {
 
   it("carte « Aucune fonctionnalité pour le moment » avec son texte, sans table ni filtres", async () => {
     renderFeatures();
-    expect(
-      await screen.findByRole("heading", { name: "Aucune fonctionnalité pour le moment" }),
-    ).toBeVisible();
+    expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
     expect(visibleText()).toContain("La spec de ce projet ne décrit encore aucune fonctionnalité.");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
@@ -323,7 +321,7 @@ describe("Vide (§4.3)", () => {
 
   it("aucun bouton, aucun emplacement d'écriture vide", async () => {
     renderFeatures();
-    await screen.findByRole("heading", { name: "Aucune fonctionnalité pour le moment" });
+    await findNamed("heading", "Aucune fonctionnalité pour le moment");
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -333,9 +331,7 @@ describe("Vide (§4.3)", () => {
     procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
     procedures.specHead.mockResolvedValue(EMPTY_HEAD);
     renderFeatures();
-    expect(
-      await screen.findByRole("heading", { name: "Aucune fonctionnalité pour le moment" }),
-    ).toBeVisible();
+    expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
   });
 });
 
@@ -496,7 +492,7 @@ describe("Filtres (§3.2)", () => {
       expect(inputsOf(procedures.specListFeatures).at(-1)).toMatchObject({ priority: "could" }),
     );
     expect(inputsOf(procedures.specListFeatures).at(-1)).not.toHaveProperty("cursor");
-    expect(await screen.findByRole("link", { name: "Seule" })).toBeInTheDocument();
+    expect(await findNamed("link", "Seule")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Fonctionnalité numéro 1" })).not.toBeInTheDocument();
   });
 });
@@ -579,12 +575,12 @@ describe("Afficher plus (§3.3)", () => {
     renderFeatures();
     await findTable();
     await userEvent.click(more());
-    const busy = await screen.findByRole("button", { name: "Chargement…" });
+    const busy = await findNamed("button", "Chargement…");
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(busy).toHaveFocus();
     release(page(51, 1, null));
-    await screen.findByRole("link", { name: "Fonctionnalité numéro 51" });
+    await findNamed("link", "Fonctionnalité numéro 51");
   });
 
   it("échec de la suite : alerte sous la table, éléments déjà chargés conservés, « Réessayer » relance la même page", async () => {
@@ -595,7 +591,7 @@ describe("Afficher plus (§3.3)", () => {
     renderFeatures();
     const table = await findTable();
     await userEvent.click(more());
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(within(table).getAllByRole("row")).toHaveLength(51);
     await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
@@ -612,7 +608,7 @@ describe("Afficher plus (§3.3)", () => {
     renderFeatures({ search: "?status=specifiee" });
     const table = await findTable();
     await userEvent.click(more());
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert).toHaveTextContent("La liste n'a pas pu être poursuivie");
     expect(alert).toHaveTextContent("Revenez au début de la liste puis réessayez.");
     expect(within(table).getAllByRole("row")).toHaveLength(51);
@@ -635,7 +631,7 @@ describe("Erreur de chargement de la liste (§4.9)", () => {
     async (_label, failure) => {
       procedures.specListFeatures.mockImplementationOnce(failure);
       renderFeatures();
-      const alert = await screen.findByRole("alert");
+      const alert = await findRole("alert");
       expect(alert).toHaveTextContent("Impossible de charger les fonctionnalités");
       expect(alert).toHaveTextContent(
         "Une erreur est survenue. Vérifiez votre connexion puis réessayez.",
@@ -653,7 +649,7 @@ describe("Erreur de chargement de la liste (§4.9)", () => {
   it("l'erreur de head est traitée de même (alerte + Réessayer)", async () => {
     procedures.specHead.mockImplementationOnce(reject("INTERNAL"));
     renderFeatures();
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert).toHaveTextContent("Impossible de charger les fonctionnalités");
     await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
     await findTable();
@@ -662,7 +658,7 @@ describe("Erreur de chargement de la liste (§4.9)", () => {
 
 describe("Projet introuvable (§4.10)", () => {
   const expectNotFound = async () => {
-    expect(await screen.findByRole("heading", { name: "Projet introuvable" })).toBeVisible();
+    expect(await findNamed("heading", "Projet introuvable")).toBeVisible();
     expect(visibleText()).toContain("Ce projet n'existe pas ou vous n'y avez pas accès.");
     expect(screen.getByRole("link", { name: "Voir les projets" })).toHaveAttribute(
       "href",
@@ -701,7 +697,7 @@ describe("Projet introuvable (§4.10)", () => {
   it("l'icône lock est décorative et le texte porte le sens", async () => {
     procedures.specHead.mockImplementation(reject("NOT_FOUND"));
     renderFeatures();
-    const heading = await screen.findByRole("heading", { name: "Projet introuvable" });
+    const heading = await findNamed("heading", "Projet introuvable");
     expect(
       heading.closest("[data-slot='card'], div")?.querySelector('svg[aria-hidden="true"]'),
     ).not.toBeNull();

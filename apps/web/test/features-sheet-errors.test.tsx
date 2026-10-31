@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DETAIL, renderFeatures, serve, visibleText } from "./support/features.tsx";
+import { findRole } from "./support/wait.ts";
 import {
   apiError,
   polyfillRadix,
@@ -39,8 +40,8 @@ async function openWith(error: () => Promise<never>, role: Parameters<typeof ser
   serve(role);
   procedures.specGetFeature.mockImplementation(error);
   renderFeatures({ search: "?feature=F-001" });
-  const dialog = await screen.findByRole("dialog");
-  const alert = await within(dialog).findByRole("alert");
+  const dialog = await findRole("dialog");
+  const alert = await findRole("alert", { from: dialog });
   return { dialog, alert };
 }
 

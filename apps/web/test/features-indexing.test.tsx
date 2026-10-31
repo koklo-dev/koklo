@@ -14,6 +14,7 @@ import {
   statusRegion,
   visibleText,
 } from "./support/features.tsx";
+import { findNamed, findRole } from "./support/wait.ts";
 import {
   apiError,
   polyfillRadix,
@@ -75,7 +76,7 @@ beforeEach(() => {
 });
 
 const reject = (code: string, data?: unknown) => () => Promise.reject(apiError(code, data));
-const heading = (name: string) => screen.findByRole("heading", { name });
+const heading = (name: string) => findNamed("heading", name);
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Projet sans dépôt de spec (§4.6) — spec.head null et repo.list sans dépôt de spec", () => {
@@ -119,7 +120,7 @@ describe("Projet sans dépôt de spec (§4.6) — spec.head null et repo.list sa
   it("pendant la lecture de repo.list : état de chargement, jamais une affirmation prématurée", async () => {
     procedures.repoList.mockImplementation(() => new Promise(() => undefined));
     renderFeatures();
-    await screen.findByRole("status");
+    await findRole("status");
     expect(screen.getByRole("status")).toHaveTextContent("Chargement des fonctionnalités…");
     expect(screen.queryByRole("heading", { name: NO_REPO_TITLE })).not.toBeInTheDocument();
   });
@@ -127,7 +128,7 @@ describe("Projet sans dépôt de spec (§4.6) — spec.head null et repo.list sa
   it("le rôle inconnu (organisation pas encore chargée) n'affirme rien et n'appelle pas repo.list", async () => {
     procedures.organizationList.mockImplementation(() => new Promise(() => undefined));
     renderFeatures();
-    await screen.findByRole("status");
+    await findRole("status");
     await waitFor(() => expect(procedures.specHead).toHaveBeenCalled());
     expect(procedures.repoList).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: NO_REPO_TITLE })).not.toBeInTheDocument();
@@ -256,7 +257,7 @@ describe("Index en échec (§4.8)", () => {
   it("spec.head « failed » : alerte destructive, listFeatures JAMAIS appelé", async () => {
     procedures.specHead.mockResolvedValue(failed());
     renderFeatures();
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert).toHaveTextContent(FAILED_TITLE);
     expect(alert).toHaveTextContent(TOO_LARGE);
     expect(screen.getAllByRole("alert")).toHaveLength(1);
@@ -271,7 +272,7 @@ describe("Index en échec (§4.8)", () => {
       serve(role);
       procedures.specHead.mockResolvedValue(failed());
       renderFeatures();
-      const alert = await screen.findByRole("alert");
+      const alert = await findRole("alert");
       expect(alert).toHaveTextContent(
         "Corrigez la spec puis poussez la correction : la lecture reprendra seule.",
       );
@@ -286,7 +287,7 @@ describe("Index en échec (§4.8)", () => {
       serve(role);
       procedures.specHead.mockResolvedValue(failed());
       renderFeatures();
-      const alert = await screen.findByRole("alert");
+      const alert = await findRole("alert");
       expect(alert).toHaveTextContent("Prévenez l'équipe : la spec doit être corrigée.");
       expect(alert).toHaveTextContent(TOO_LARGE);
       expect(visibleText()).not.toMatch(GIT_VOCABULARY);
@@ -298,7 +299,7 @@ describe("Index en échec (§4.8)", () => {
     serve("client");
     procedures.specHead.mockResolvedValue(failed("yaml_boom_42"));
     renderFeatures();
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert).toHaveTextContent(CORRUPT);
     expect(visibleText()).not.toContain("yaml_boom_42");
   });
@@ -306,7 +307,7 @@ describe("Index en échec (§4.8)", () => {
   it("errorCode inconnu côté équipe : la phrase reste générique (la valeur n'est que dans la ligne technique)", async () => {
     procedures.specHead.mockResolvedValue(failed("yaml_boom_42"));
     renderFeatures();
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert).toHaveTextContent(CORRUPT);
     const sentences = alert.querySelectorAll("p");
     for (const p of sentences) {
@@ -321,7 +322,7 @@ describe("Index en échec (§4.8)", () => {
       reject("SPEC_INDEX_FAILED", { errorCode: "spec_too_large", commitSha: "b".repeat(40) }),
     );
     renderFeatures();
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     expect(alert).toHaveTextContent(FAILED_TITLE);
     expect(alert).toHaveTextContent(TOO_LARGE);
     expect(alert).toHaveTextContent("Code : spec_too_large · version bbbbbbb");
@@ -330,7 +331,7 @@ describe("Index en échec (§4.8)", () => {
   it("« Actualiser » relit spec.head (pas de repli sur une autre révision) et la liste revient une fois corrigée", async () => {
     procedures.specHead.mockResolvedValueOnce(failed()).mockResolvedValue(head());
     renderFeatures();
-    const alert = await screen.findByRole("alert");
+    const alert = await findRole("alert");
     await userEvent.click(within(alert).getByRole("button", { name: "Actualiser" }));
     await findTable();
     expect(procedures.specHead).toHaveBeenCalledTimes(2);

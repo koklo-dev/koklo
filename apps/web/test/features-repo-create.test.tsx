@@ -12,7 +12,7 @@ import {
   visibleText,
 } from "./support/features.tsx";
 import { ACME, REPO, rejectWith } from "./support/project-create.tsx";
-import { findNamed } from "./support/wait.ts";
+import { findNamed, findRole } from "./support/wait.ts";
 import {
   getSession,
   NO_SESSION,
@@ -59,9 +59,9 @@ beforeEach(() => {
 
 async function openPanel() {
   renderFeatures();
-  await screen.findByRole("heading", { name: NO_REPO });
+  await findNamed("heading", NO_REPO);
   await userEvent.click(screen.getByRole("button", { name: "Créer le dépôt de spec" }));
-  const dialog = await screen.findByRole("dialog");
+  const dialog = await findRole("dialog");
   await waitFor(() =>
     expect(within(dialog).getByRole("button", { name: "Créer le dépôt" })).toBeEnabled(),
   );
@@ -93,10 +93,10 @@ describe("Ouverture du panneau en mode reprise", () => {
 
   it("installation.list n'est demandée qu'à l'ouverture du panneau", async () => {
     renderFeatures();
-    await screen.findByRole("heading", { name: NO_REPO });
+    await findNamed("heading", NO_REPO);
     expect(procedures.installationList).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Créer le dépôt de spec" }));
-    await screen.findByRole("dialog");
+    await findRole("dialog");
     await waitFor(() => expect(procedures.installationList).toHaveBeenCalled());
   });
 });
@@ -133,7 +133,7 @@ describe("Création du dépôt", () => {
     procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    const title = await screen.findByRole("heading", { name: PREPARING });
+    const title = await findNamed("heading", PREPARING);
     const regions = await screen.findAllByRole("status");
     expect(regions.some((region) => /Dépôt de spec créé\./.test(region.textContent ?? ""))).toBe(
       true,
@@ -160,7 +160,7 @@ describe("Création du dépôt", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
     await within(dialog).findByText("Ce projet a déjà son dépôt de spec.");
     await userEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
-    await screen.findByRole("heading", { name: PREPARING });
+    await findNamed("heading", PREPARING);
   });
 });
 
@@ -172,7 +172,7 @@ describe("Erreurs de 48c rendues dans le panneau", () => {
       rejectWith("USER_TOKEN_REQUIRED", { ownerLogin: "acme-corp" }),
     );
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
-    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(await findRole("alert", { from: dialog })).toBeInTheDocument();
     expect(await findNamed("button", /Autoriser Koklo/, { scope: within(dialog) })).toBeEnabled();
     expect(procedures.projectCreate).not.toHaveBeenCalled();
   });
@@ -181,7 +181,7 @@ describe("Erreurs de 48c rendues dans le panneau", () => {
     const dialog = await openPanel();
     procedures.repoCreateSpec.mockImplementationOnce(rejectWith("PROVIDER_UNAVAILABLE"));
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
-    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(await findRole("alert", { from: dialog })).toBeInTheDocument();
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
     procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
     await userEvent.click(await findNamed("button", /^Réessayer/, { scope: within(dialog) }));
@@ -195,9 +195,9 @@ describe("Erreurs de 48c rendues dans le panneau", () => {
   it("sans compte GitHub relié : renvoi vers la page GitHub, aucun appel de création", async () => {
     procedures.installationList.mockResolvedValue([]);
     renderFeatures();
-    await screen.findByRole("heading", { name: NO_REPO });
+    await findNamed("heading", NO_REPO);
     await userEvent.click(screen.getByRole("button", { name: "Créer le dépôt de spec" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await findRole("dialog");
     expect(await within(dialog).findByText(/Aucun compte GitHub n'est relié/)).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Relier GitHub" })).toHaveAttribute(
       "href",
@@ -223,7 +223,7 @@ describe("Erreurs de 48c rendues dans le panneau", () => {
     const dialog = await openPanel();
     procedures.repoCreateSpec.mockImplementation(rejectWith("NOT_FOUND"));
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
-    await within(dialog).findByRole("alert");
+    await findRole("alert", { from: dialog });
     await userEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(visibleText()).not.toMatch(/Projet « Alpha » créé\.|Dépôt de spec créé\./);

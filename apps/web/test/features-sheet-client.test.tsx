@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -14,6 +14,7 @@ import {
   titleLink,
   visibleText,
 } from "./support/features.tsx";
+import { findRole } from "./support/wait.ts";
 import {
   apiError,
   polyfillRadix,
@@ -65,7 +66,7 @@ function everythingVisible(): string {
 async function openFiche(role: (typeof CLIENT_SIDE)[number] | (typeof TEAM)[number]) {
   serve(role);
   renderFeatures({ search: "?feature=F-001" });
-  const dialog = await screen.findByRole("dialog");
+  const dialog = await findRole("dialog");
   await within(dialog).findByText("Description");
   return dialog;
 }
@@ -190,8 +191,8 @@ describe("Vue client / business — erreurs sans terme technique", () => {
       serve("client");
       procedures.specGetFeature.mockRejectedValue(error);
       renderFeatures({ search: "?feature=F-001" });
-      const dialog = await screen.findByRole("dialog");
-      await within(dialog).findByRole("alert");
+      const dialog = await findRole("dialog");
+      await findRole("alert", { from: dialog });
       expect(everythingVisible()).not.toMatch(TECHNICAL_VALUE);
       expect(everythingVisible()).not.toMatch(/INTERNAL|NOT_FOUND|commit|SHA|branche/);
       expect(within(dialog).queryByRole("link", { name: /GitHub/ })).not.toBeInTheDocument();
@@ -203,7 +204,7 @@ describe("Vue client / business — erreurs sans terme technique", () => {
     serve("business");
     procedures.specHead.mockResolvedValue(head({ status: "failed", errorCode: "spec_too_large" }));
     renderFeatures();
-    await screen.findByRole("alert");
+    await findRole("alert");
     expect(visibleText()).toContain("Prévenez l'équipe : la spec doit être corrigée.");
     expect(everythingVisible()).not.toMatch(TECHNICAL_VALUE);
   });
@@ -213,7 +214,7 @@ describe("Vue client / business — erreurs sans terme technique", () => {
     renderFeatures();
     await findTable();
     await userEvent.click(titleLink("Connexion par e-mail"));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await findRole("dialog");
     await within(dialog).findByText("Description");
     expect(inputsOf(procedures.specGetFeature)[0]).toMatchObject({ specId: "F-001" });
     expect(everythingVisible()).not.toMatch(TECHNICAL_VALUE);
