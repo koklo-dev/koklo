@@ -151,7 +151,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetKanban();
     resetGithub();
     resetSpecRepo();
-    createdProjects.length = 0;
+    if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
   });
   return true;

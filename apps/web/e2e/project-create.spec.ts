@@ -338,6 +338,7 @@ test.describe("autorisation et reprise (AC-48-21)", () => {
       projects: "data",
       installations: "single",
       specRepo: "ok",
+      keepProjects: true,
     });
     await page.goto("/github?result=installed");
     const resume = page.getByRole("link", { name: `Reprendre la création du projet « ${NAME} »` });

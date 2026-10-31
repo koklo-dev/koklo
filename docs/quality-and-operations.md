@@ -600,6 +600,11 @@ TO DOCUMENT — known risks, their mitigations, and what to do at 3am.
   `/organizations`, including the active-organization case) writes the captures in `design/screens/captures/`.
   It was run after the Refactor step, once the `next dev` that blocked it was stopped: 54 tests passed
   (axe WCAG AA in light and dark, captures, sidebar, theme, mobile 375 px on the projects page, reduced motion).
+- **Project creation e2e (TK-48c)**: `apps/web/e2e/project-create.spec.ts` (fake API `e2e/support/stub-spec-repo.ts`,
+  never github.com) plus `a11y.spec.ts`: 189 tests passed on a temporary copy of the repository (ports 3100/3101,
+  `PLAYWRIGHT_CHANNEL=chrome pnpm --filter @koklo/web e2e -- e2e/project-create.spec.ts e2e/a11y.spec.ts`). The
+  captures land in `design/screens/captures/S-projects/` and are copied back from the copy. A scenario change in
+  the middle of a flow clears the fake API's created projects unless `keepProjects: true` is passed.
 - **Mail in development**: invitations are queued on `send-invitation`; with `APP_ENV` `development` or
   `test` the worker uses the in-memory `CaptureMailSender` (see [Emails and magic link](#emails-and-magic-link-tk-22)):
   nothing reaches a real mailbox. Resend is used only in `staging` and `production`.

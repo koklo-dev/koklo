@@ -999,6 +999,27 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
 - **Start**: one action in flight (a ref lock set before render, re-armed on `pageshow` from the back/forward cache). The URL comes from the API only and `isGithubUrl` (`lib/github-redirect.ts`) accepts nothing but `https://github.com` (no userinfo, no port, exact host); anything else shows an error and does not navigate. Typed errors (`PROVIDER_UNAVAILABLE`, `too_many_pending`, `NOT_FOUND`, `FORBIDDEN`) map to messages in `lib/github-start-error.ts`.
 - Statuses are always icon + text (`github-status.tsx`); no token, state, code or external id is displayed, stored or logged by the web. Screen sheet: `design/screens/S-github.md`.
 
+### Web: project creation with its spec repository (TK-48c)
+The "Créer un projet" panel (`ProjectCreateSheet`, a `Sheet`) creates the project, then its spec repository, in two visible steps. `apps/web` only: it consumes `project.create`, `installation.list`, `repo.createSpec`, `repo.link` and `installation.start`; the contract (`@koklo/contract` 0.7.0) and the API are unchanged. Screen sheet: `design/screens/S-projects.md` (v5, §3.1, §4.1, §5).
+```mermaid
+stateDiagram-v2
+  [*] --> form
+  form --> creating_project: submit (validated before any call)
+  creating_project --> form: project.create failed
+  creating_project --> creating_repo: project created
+  creating_project --> no_account: no GitHub account linked
+  creating_repo --> existing: success or spec_repo_exists
+  creating_repo --> failed: typed provider error
+  failed --> creating_repo: retry (repo.createSpec only)
+  failed --> existing: repo.link succeeded
+  ready --> creating_repo: resume
+```
+- **Hooks** (`apps/web/src/lib`, Biome caps functions at 50 lines): `use-creation-panel` composes the accounts query (`use-github-accounts`, enabled only once the panel is mounted), the state machine (`use-project-creation`, one in-flight lock, `project.create` called once), the two steps (`use-creation-steps`), the fields and their validation (`use-creation-fields`), the "authorize" redirect (`use-start-installation`, shared with `/github`) and the `repo.link` fallback (`use-spec-repo-link`). `use-creation-page` owns the page side: opening (the panel is remounted by `key`), the result announcement and the resume notice.
+- **Errors**: `describeSpecRepoError` maps each typed code to one text and one action (retry, authorize, reauthorize, close). `spec_repo_exists` is a success. `UNAUTHORIZED` goes through `useUnauthorizedRedirect` (G1: `/login` only when the session is really lost).
+- **Resume marker** (`creation-resume.ts`): `sessionStorage`, zod strict, 1 h TTL, every access in `try/catch`. It holds `projectId`, `projectName`, `installationId` and the typed repo name; never a token, a `state` or a URL. It is written when the panel closes with a project and no repository, and right before the redirect to GitHub; any success erases it. `/github?result=installed` shows a "Reprendre la création du projet" link when a valid marker exists.
+- **Accessibility**: one `role="status"` or `role="alert"` at a time in the panel, steps as an ordered list (icon + text, never colour alone), 44 px targets on mobile, animations only under `motion-safe:`.
+- **Tests**: unit (`apps/web/test/project-create-*.test.tsx`, `spec-repo-errors`, `creation-resume`, including `project-create-gaps` for the `/login` redirect, outside click and reduced motion); e2e `e2e/project-create.spec.ts` against the fake API (`e2e/support/stub-spec-repo.ts`, which journals the project taken from the URL path), never against github.com.
+
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
 yet.

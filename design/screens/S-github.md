@@ -121,6 +121,7 @@ Sous 768 px : le h1 et le bouton « Installer l'application GitHub » s'empilent
 | 1 | 2026-10-31 | TK-48 (48b) | Création : installation de l'application GitHub, autorisation utilisateur, retour de callback (6 résultats), droits, états. Détail : `.workflow/TK-48/02-design-48b.md` |
 | 2 | 2026-10-31 | TK-48 (48b) | Implémentation : à l'état vide le bouton d'installation reste dans l'en-tête (la carte ne porte que titre + texte) ; captures générées (§12). |
 | 3 | 2026-10-31 | TK-48 (48c) | Lien de reprise « Reprendre la création du projet » après `installed` quand un marqueur de création de projet existe (voir S-projects §5.1). |
+| 3.1 | 2026-10-31 | TK-48 (48c, refactor) | Lien de reprise vérifié en e2e (`project-create.spec.ts`, retour `?result=installed`, puis notice et reprise) ; aucun changement d'écran. |
 
 ## 11. Plan d'implémentation web (brief développeur)
 Routes et garde

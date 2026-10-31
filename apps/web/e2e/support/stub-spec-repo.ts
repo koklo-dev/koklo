@@ -20,6 +20,8 @@ export type SpecRepoScenario = {
   projectCreate?: "ok" | "loading";
   /** Réponse de `repo.link` (défaut : ok). */
   repoLink?: "ok" | "notFound";
+  /** Garde les projets créés pendant le scénario précédent (changement de scénario en cours de parcours). */
+  keepProjects?: boolean;
 };
 
 type Reply = { status: number; body: string };
@@ -79,6 +81,12 @@ function readBody(req: IncomingMessage, done: (body: Record<string, unknown>) =>
   req.on("end", () => done(JSON.parse(raw || "{}")));
 }
 
+/** Le projet visé est dans l'URL (`/projects/{projectId}/…`), pas dans le corps : on le journalise avec. */
+const withPathProject = (path: string, body: Record<string, unknown>): Record<string, unknown> => {
+  const projectId = /\/projects\/([^/]+)\//.exec(path)?.[1];
+  return projectId ? { projectId, ...body } : body;
+};
+
 interface Handlers {
   scenario: SpecRepoScenario;
   /** Ajoute le projet créé à la liste servie par `project.list` (jusqu'au prochain scénario). */
@@ -112,7 +120,7 @@ export function handleSpecRepo(req: IncomingMessage, path: string, h: Handlers):
   }
   if (path.endsWith("/spec-repo")) {
     readBody(req, (body) => {
-      specRepoCalls.push(body);
+      specRepoCalls.push(withPathProject(path, body));
       const answer = () => send(specRepoResponse(scenario.specRepo ?? "ok"));
       if (scenario.specRepo === "loading") hold(answer);
       else answer();
@@ -121,7 +129,7 @@ export function handleSpecRepo(req: IncomingMessage, path: string, h: Handlers):
   }
   if (path.endsWith("/repos")) {
     readBody(req, (body) => {
-      repoLinks.push(body);
+      repoLinks.push(withPathProject(path, body));
       send(scenario.repoLink === "notFound" ? typed(404, "NOT_FOUND") : reply(200, REPO));
     });
     return true;

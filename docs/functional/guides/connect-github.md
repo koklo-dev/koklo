@@ -32,6 +32,8 @@ covers_commit: dbab697
    ![Liste des installations, thème clair](../../../design/screens/captures/S-github/data-light.png)
    ![Liste des installations, thème sombre](../../../design/screens/captures/S-github/data-dark.png)
 
+Si vous veniez de la création d'un projet sans dépôt de spec, le message propose le lien **Reprendre la création du projet « … »** : il vous ramène sur la page Projets (voir [Créer un projet](create-a-project.md)).
+
 ## Vérifier que ça a marché
 La ligne du compte affiche **Active** et **Autorisée**, avec « Koklo peut créer des dépôts sur ce compte. »
 

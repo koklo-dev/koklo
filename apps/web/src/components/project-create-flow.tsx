@@ -16,6 +16,14 @@ const EXPLANATION =
 const REPO_HINT =
   "Laissez vide pour utiliser le nom du projet suivi de « -spec ». Lettres, chiffres, points, tirets et tirets bas, 100 caractères maximum.";
 
+function StatusLine({ children }: { children: string }) {
+  return (
+    <p role="status" className="text-[13px] text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
 function NoRepoNotice({ name }: { name: string }) {
   const title = useRef<HTMLParagraphElement>(null);
   useEffect(() => title.current?.focus(), []);
@@ -50,25 +58,13 @@ function Banner({ panel }: { panel: CreationPanel }) {
         <ErrorNotice title="Le projet n'a pas pu être créé">{RETRY_LATER}</ErrorNotice>
       );
     case "creating-project":
-      return (
-        <p role="status" className="text-[13px] text-muted-foreground">
-          Création du projet…
-        </p>
-      );
+      return <StatusLine>Création du projet…</StatusLine>;
     case "creating-repo":
-      return (
-        <p role="status" className="text-[13px] text-muted-foreground">
-          Projet créé. Création du dépôt de spec…
-        </p>
-      );
+      return <StatusLine>Projet créé. Création du dépôt de spec…</StatusLine>;
     case "failed":
       return <SpecRepoFailure view={phase.view} authFailure={panel.authFailure} />;
     case "existing":
-      return (
-        <p role="status" className="text-[13px] text-muted-foreground">
-          Ce projet a déjà son dépôt de spec.
-        </p>
-      );
+      return <StatusLine>Ce projet a déjà son dépôt de spec.</StatusLine>;
     case "no-account":
       return <NoRepoNotice name={project?.name ?? ""} />;
     case "ready":
