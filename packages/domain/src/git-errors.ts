@@ -105,3 +105,11 @@ export class GitProviderUnavailableError extends GitProviderError {
     this.name = "GitProviderUnavailableError";
   }
 }
+
+/** Le `code` d'autorisation est refusé, expiré ou déjà utilisé ; il n'est pas repris dans l'erreur. */
+export class InvalidUserCodeError extends GitProviderError {
+  constructor(input: { operation: string }) {
+    super(input.operation, "Le code d'autorisation GitHub est invalide ou expiré.");
+    this.name = "InvalidUserCodeError";
+  }
+}

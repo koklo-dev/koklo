@@ -946,6 +946,43 @@ flowchart LR
 - **Audits `repo.reconcile.*`.** `head_updated` and `head_removed` are written once per repo and run that changes state (none when nothing moved, so two runs leave the same rows); `unreachable` is written once per repo ever. Actor is the system, target is the repo, in the repo's own organization.
 - **Run summary.** `heads: { updated, removed, unreachable, skipped, stopped }`, `stopped` being `rate_limited`, `budget` or `null`.
 
+### User tokens and the prepared installation flow (TK-48a1)
+Foundations only: no route, no screen yet (48a2 adds `installation.*` and the callback).
+- **Port** (`@koklo/domain`): `GitProvider.exchangeUserCode({ code, redirectUri })` returns
+  `GitUserCredentials`; `listUserInstallations({ auth })` returns the installations visible to a user
+  token (`externalId`, `ownerKind`, `ownerLogin`); `appSlug()` gives the App URL slug. A refused code
+  raises `InvalidUserCodeError`, which carries nothing received (no code, no client secret).
+  `@koklo/github` implements them (`ops/user-oauth.ts`: POST `/login/oauth/access_token`, never
+  replayed because the code is single-use; `ops/app-slug.ts`: `GET /app` with the App JWT, success
+  cached); the shared fake (`testing/fake-user-oauth.ts`) accepts `fake-code-<login>` once and only
+  sees the installations seeded for that login. Both run the same conformance suite.
+- **Prepared flow** (ADR 0009, proposed): `installation.start` returns the GitHub install URL with a
+  signed single-use `state`; GitHub redirects the browser to the callback with `code` and `state`;
+  the API consumes the state, exchanges the code, lists the user's installations and only links an
+  installation proven visible to that user token, under the organization of the state.
+  ```mermaid
+  sequenceDiagram
+    participant W as Web
+    participant A as API
+    participant G as GitHub
+    W->>A: installation.start
+    A-->>W: install URL + state (provider_auth_states)
+    W->>G: install the App
+    G-->>A: callback (installation_id, code, state)
+    A->>A: consume state (single use, 10 min)
+    A->>G: exchangeUserCode, listUserInstallations
+    A->>A: save encrypted token (provider_user_credentials)
+  ```
+- **Token encryption** (`apps/api/src/crypto/token-cipher.ts`, pure module): AES-256-GCM, a random
+  12-byte nonce per message, associated data `userId:installationId` (a sealed token copied to
+  another user or installation does not decrypt), `ciphertext = encrypted bytes || 16-byte tag`.
+  Only the secret part (access and refresh tokens) is encrypted; expiries stay readable. Each
+  row carries `key_version` (1 today); a value that does not match raises `TokenDecryptionError`.
+  Every failure (tamper, wrong key, wrong data, malformed row, unexpected plaintext shape) is the
+  same `TokenDecryptionError`, without cause, key or content: it is never turned into "no token".
+  `PrismaUserCredentials` replaces `NoUserCredentials` only when the App client id and secret AND
+  `KOKLO_ENCRYPTION_KEY` are configured (see Quality and operations).
+
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
 yet.

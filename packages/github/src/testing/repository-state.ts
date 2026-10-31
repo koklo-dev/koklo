@@ -107,6 +107,22 @@ export class RepositoryState {
     return commit;
   }
 
+  /** Déploiement `success` sur la branche qui porte `sha` (sinon sur le SHA lui-même). */
+  addSuccessDeployment(
+    deployment: { environment: string; sha: string },
+    id: string,
+    now: Date,
+  ): void {
+    this.deployments.push({
+      id,
+      environment: deployment.environment,
+      sha: deployment.sha,
+      ref: this.branchAt(deployment.sha) ?? deployment.sha,
+      state: "success",
+      createdAt: now.toISOString(),
+    });
+  }
+
   /** SHA de la tête d'une branche qui existe (les branches ne sont jamais supprimées). */
   sha(branch: string): string {
     const sha = this.branches.get(branch);

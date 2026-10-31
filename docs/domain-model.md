@@ -146,6 +146,23 @@ Thirteen tables, migration `*_provider_spec_index` (additive, reversible):
   parent of another organization even when bypassing the tenant extension.
 - Enums `repo_role` and `repo_mode` mirror `REPO_ROLES` and `REPO_MODES` in `@koklo/domain`.
 
+### OAuth tables (TK-48a1)
+Two tenant tables (`TENANT_MODELS`), migrations `*_provider_auth_states` and
+`*_provider_user_credentials` (additive, each with a `down.sql`):
+- **`provider_auth_states`**: single-use authorization state. `nonce` is unique, `expires_at` is
+  indexed, `consumed_at` marks use (consumption is an atomic conditional update: 48a2). A CHECK
+  bounds the lifetime to 10 minutes; a partial index on `user_id WHERE consumed_at IS NULL` serves
+  the per-user cap. `installation_id` is null for a first installation. Expired rows are purged
+  opportunistically at each `installation.start` (48a2); no worker.
+- **`provider_user_credentials`**: one encrypted user token per `(user_id, installation_id)`
+  (unique). `ciphertext` (BYTEA, encrypted bytes then the 16-byte tag), `nonce` (12 bytes),
+  `key_version` (>= 1); `expires_at` and `refresh_expires_at` stay in clear. CHECKs enforce the
+  nonce length, the key version and a ciphertext longer than the tag.
+- Both carry `organization_id` and a composite FK `(organization_id, installation_id)` to
+  `provider_installations(organization_id, id)`, so a row cannot point at another organization's
+  installation. Deleting the installation, the organization or the user cascades. No clear token
+  is ever stored.
+
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:
 `Project` is a tenant model (filtered by organization, see

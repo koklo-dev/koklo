@@ -8,6 +8,8 @@ import type {
   GitAuth,
   GitOwner,
   GitProvider,
+  GitUserCredentials,
+  GitUserInstallation,
   MergeResult,
   PullRequest,
   PullRequestComment,
@@ -47,6 +49,18 @@ export class FakeGitProvider implements GitProvider {
       return { kind: "installation", token: "iat-fake", expiresAt: FAKE_EXPIRES_AT };
     }
     return { kind: "user", token: request.user.token, expiresAt: request.user.expiresAt };
+  }
+
+  async exchangeUserCode(): Promise<GitUserCredentials> {
+    return { token: "uat-fake", expiresAt: FAKE_EXPIRES_AT };
+  }
+
+  async listUserInstallations(): Promise<readonly GitUserInstallation[]> {
+    return [];
+  }
+
+  async appSlug(): Promise<string> {
+    return "koklo-fake";
   }
 
   async createRepo(request: Parameters<GitProvider["createRepo"]>[0]): Promise<Repo> {

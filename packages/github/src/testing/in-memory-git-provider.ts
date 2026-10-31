@@ -10,6 +10,8 @@ import {
   GitNotFoundError,
   type GitProvider,
   GitProviderError,
+  type GitUserCredentials,
+  type GitUserInstallation,
   type MergeResult,
   type PullRequest,
   type PullRequestComment,
@@ -21,15 +23,22 @@ import {
   UserTokenRequiredError,
   WEBHOOK_EVENTS,
 } from "@koklo/domain";
-import { commitLimit, staleHead } from "../commit-rules.ts";
+import { commitLimit } from "../commit-rules.ts";
 import { FakeAuthority } from "./fake-authority.ts";
-import { describePull, mergeOutcome, pullState, toStoredCheck } from "./pull-views.ts";
+import { FakeUserOAuth } from "./fake-user-oauth.ts";
+import {
+  describePull,
+  mergeOutcome,
+  openPull,
+  pullState,
+  recordCheck,
+  writeOnBranch,
+} from "./pull-views.ts";
 import {
   fileEntries,
   RepositoryState,
   type StoredCommit,
   type StoredPull,
-  withFiles,
 } from "./repository-state.ts";
 
 export type InMemoryGitProviderOptions = {
@@ -37,9 +46,13 @@ export type InMemoryGitProviderOptions = {
   readonly now: () => Date;
   /** Générateur d'identifiants (jetons, commentaires, déploiements, SHA) : rend le faux déterministe. */
   readonly nextId: () => string;
+  /** Identifiant d'URL de l'App rendu par `appSlug` (défaut : `koklo-fake`). */
+  readonly appSlug?: string;
 };
 
 type Request<K extends keyof GitProvider> = Parameters<GitProvider[K]>[0];
+
+const DEFAULT_APP_SLUG = "koklo-fake";
 
 const repoKey = (repo: RepoRef): string => `${repo.owner.login}/${repo.name}`;
 
@@ -54,28 +67,42 @@ export class InMemoryGitProvider implements GitProvider {
   readonly #repos = new Map<string, RepositoryState>();
   readonly #options: InMemoryGitProviderOptions;
   readonly #authority: FakeAuthority;
+  readonly #userOAuth: FakeUserOAuth;
 
   constructor(options: InMemoryGitProviderOptions) {
     this.#options = options;
     this.#authority = new FakeAuthority(options.now, options.nextId);
+    this.#userOAuth = new FakeUserOAuth(options.now, options.nextId);
   }
 
   /** Aide de test : crée un déploiement `success` sur la branche ou le SHA donné. */
   seedDeployment(repo: RepoRef, deployment: { environment: string; sha: string }): void {
     const state = this.#repo("seedDeployment", repo);
-    state.deployments.push({
-      id: this.#options.nextId(),
-      environment: deployment.environment,
-      sha: deployment.sha,
-      ref: state.branchAt(deployment.sha) ?? deployment.sha,
-      state: "success",
-      createdAt: this.#options.now().toISOString(),
-    });
+    state.addSuccessDeployment(deployment, this.#options.nextId(), this.#options.now());
   }
 
   async authenticate(request: Request<"authenticate">): Promise<GitAuth> {
     const { user } = request;
     return user === undefined ? this.#authority.installation() : this.#authority.user(user);
+  }
+
+  /** Aide de test : rend `installation` visible des jetons obtenus pour le compte `login`. */
+  seedUserInstallation(login: string, installation: GitUserInstallation): void {
+    this.#userOAuth.seed(login, installation);
+  }
+
+  async exchangeUserCode(request: Request<"exchangeUserCode">): Promise<GitUserCredentials> {
+    return this.#userOAuth.exchange(request);
+  }
+
+  async listUserInstallations(
+    request: Request<"listUserInstallations">,
+  ): Promise<readonly GitUserInstallation[]> {
+    return this.#userOAuth.list(request.auth);
+  }
+
+  async appSlug(): Promise<string> {
+    return this.#options.appSlug ?? DEFAULT_APP_SLUG;
   }
 
   async createRepo(request: Request<"createRepo">): Promise<Repo> {
@@ -127,23 +154,11 @@ export class InMemoryGitProvider implements GitProvider {
   }
 
   async writeCommit(request: Request<"writeCommit">): Promise<Commit> {
-    const { auth, repo, branch, files, author, message, expectedHeadSha } = request;
+    const { auth, repo, author, message } = request;
     this.#authority.assertFresh("writeCommit", auth);
     const state = this.#repo("writeCommit", repo);
-    const head = state.branches.get(branch);
-    if (head === undefined) {
-      throw this.#notFound("writeCommit", "branch", `${repoKey(repo)}@${branch}`);
-    }
-    if (expectedHeadSha !== undefined && expectedHeadSha !== head) {
-      throw staleHead(`${repoKey(repo)}@${branch}`);
-    }
-    const parent = state.commit(head);
-    const commit = state.addCommit(
-      { message, author, parents: [head], files: withFiles(parent.files, files) },
-      this.#options.nextId(),
-    );
-    state.branches.set(branch, commit.sha);
-    return { sha: commit.sha, message, author, parents: [head] };
+    const commit = writeOnBranch(state, request, this.#options.nextId());
+    return { sha: commit.sha, message, author, parents: commit.parents };
   }
 
   async listFiles(request: Request<"listFiles">): Promise<FileListing> {
@@ -164,25 +179,13 @@ export class InMemoryGitProvider implements GitProvider {
   async createBranch(request: Request<"createBranch">): Promise<Branch> {
     const { auth, repo, base, name } = request;
     this.#authority.assertFresh("createBranch", auth);
-    const state = this.#repo("createBranch", repo);
-    const sha = this.#commitOf(state, "createBranch", base).sha;
-    if (state.branches.has(name)) {
-      throw new GitConflictError({ operation: "createBranch", reason: "exists", identifier: name });
-    }
-    state.branches.set(name, sha);
-    return { name, sha };
+    return this.#addRef("createBranch", repo, base, name, (state) => state.branches);
   }
 
   async createTag(request: Request<"createTag">): Promise<Tag> {
     const { auth, repo, ref, name } = request;
     this.#authority.assertFresh("createTag", auth);
-    const state = this.#repo("createTag", repo);
-    const sha = this.#commitOf(state, "createTag", ref).sha;
-    if (state.tags.has(name)) {
-      throw new GitConflictError({ operation: "createTag", reason: "exists", identifier: name });
-    }
-    state.tags.set(name, sha);
-    return { name, sha };
+    return this.#addRef("createTag", repo, ref, name, (state) => state.tags);
   }
 
   async createPullRequest(request: Request<"createPullRequest">): Promise<PullRequest> {
@@ -192,23 +195,7 @@ export class InMemoryGitProvider implements GitProvider {
     if (!state.branches.has(base) || !state.branches.has(head)) {
       throw new GitProviderError("createPullRequest");
     }
-    const open = state.pulls.find((p) => p.status === "open" && p.base === base && p.head === head);
-    if (open !== undefined) {
-      throw new GitConflictError({
-        operation: "createPullRequest",
-        reason: "exists",
-        identifier: `${repoKey(repo)}: ${head} -> ${base}`,
-      });
-    }
-    const pull: StoredPull = {
-      number: state.pulls.length + 1,
-      title,
-      body,
-      base,
-      head,
-      status: "open",
-    };
-    state.pulls.push(pull);
+    const pull = openPull(state, { base, head, title, body });
     return describePull(state, pull);
   }
 
@@ -246,11 +233,7 @@ export class InMemoryGitProvider implements GitProvider {
     if (!state.commits.has(sha)) {
       throw this.#notFound("publishCheck", "commit", `${repoKey(repo)}@${sha}`);
     }
-    const run = toStoredCheck(sha, check);
-    const previous = state.checks.findIndex((c) => c.name === run.name && c.sha === sha);
-    if (previous >= 0) state.checks[previous] = run;
-    else state.checks.push(run);
-    return run;
+    return recordCheck(state, sha, check);
   }
 
   async commentPullRequest(request: Request<"commentPullRequest">): Promise<PullRequestComment> {
@@ -273,6 +256,24 @@ export class InMemoryGitProvider implements GitProvider {
 
   #notFound(operation: string, resource: string, identifier: string): GitNotFoundError {
     return new GitNotFoundError({ operation, resource, identifier });
+  }
+
+  /** Pose une branche ou une étiquette sur le commit de `from` ; le nom doit être libre. */
+  #addRef(
+    operation: string,
+    repo: RepoRef,
+    from: string,
+    name: string,
+    refs: (state: RepositoryState) => Map<string, string>,
+  ): { name: string; sha: string } {
+    const state = this.#repo(operation, repo);
+    const sha = this.#commitOf(state, operation, from).sha;
+    const target = refs(state);
+    if (target.has(name)) {
+      throw new GitConflictError({ operation, reason: "exists", identifier: name });
+    }
+    target.set(name, sha);
+    return { name, sha };
   }
 
   #repo(operation: string, repo: RepoRef): RepositoryState {

@@ -1,5 +1,6 @@
 import { type GitProvider, GitProviderError, WEBHOOK_EVENTS } from "@koklo/domain";
 import { Gateway } from "./gateway.ts";
+import { AppSlug } from "./ops/app-slug.ts";
 import { Authenticator } from "./ops/authentication.ts";
 import { listDeployments } from "./ops/deployment.ts";
 import { createBranch, createTag, writeCommit } from "./ops/git-data.ts";
@@ -11,6 +12,7 @@ import {
   publishCheck,
 } from "./ops/pull-request.ts";
 import { createRepo, getRepo, listCommits, listFiles, readFile } from "./ops/repository.ts";
+import { exchangeUserCode, listUserInstallations } from "./ops/user-oauth.ts";
 import type { OctokitGitProviderOptions } from "./options.ts";
 
 /**
@@ -21,6 +23,7 @@ import type { OctokitGitProviderOptions } from "./options.ts";
 export class OctokitGitProvider implements GitProvider {
   readonly #gateway: Gateway;
   readonly #authenticator: Authenticator;
+  readonly #appSlug: AppSlug;
 
   constructor(options: OctokitGitProviderOptions) {
     this.#gateway = new Gateway(options);
@@ -28,10 +31,16 @@ export class OctokitGitProvider implements GitProvider {
       appId: options.appId,
       privateKey: options.privateKey,
     });
+    this.#appSlug = new AppSlug(this.#gateway, this.#authenticator);
   }
 
   authenticate: GitProvider["authenticate"] = (request) =>
     this.#authenticator.authenticate(request);
+  exchangeUserCode: GitProvider["exchangeUserCode"] = (request) =>
+    exchangeUserCode(this.#gateway, request);
+  listUserInstallations: GitProvider["listUserInstallations"] = (request) =>
+    listUserInstallations(this.#gateway, request);
+  appSlug: GitProvider["appSlug"] = () => this.#appSlug.read();
   createRepo: GitProvider["createRepo"] = (request) => createRepo(this.#gateway, request);
   getRepo: GitProvider["getRepo"] = (request) => getRepo(this.#gateway, request);
   readFile: GitProvider["readFile"] = (request) => readFile(this.#gateway, request);

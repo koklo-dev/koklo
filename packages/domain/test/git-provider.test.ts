@@ -26,6 +26,9 @@ const METHODS = [
   "publishCheck",
   "commentPullRequest",
   "subscribeWebhooks",
+  "exchangeUserCode",
+  "listUserInstallations",
+  "appSlug",
 ] as const;
 
 const org: GitOwner = { kind: "organization", login: "acme" };
@@ -41,7 +44,7 @@ const userAuth: GitAuth = { kind: "user", token: "uat", expiresAt: FAKE_EXPIRES_
 const provider: GitProvider = new FakeGitProvider();
 
 describe("CA3 forme du port GitProvider", () => {
-  it("expose exactement les 16 opérations (TK-44 : listFiles, listCommits)", () => {
+  it("expose exactement les 19 opérations (TK-44 : listFiles, listCommits ; TK-48 : exchangeUserCode, listUserInstallations, appSlug)", () => {
     expectTypeOf<keyof GitProvider>().toEqualTypeOf<(typeof METHODS)[number]>();
     for (const method of METHODS) {
       expect(typeof provider[method], method).toBe("function");

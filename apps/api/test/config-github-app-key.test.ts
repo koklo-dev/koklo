@@ -15,6 +15,8 @@ const ENV = {
   GITHUB_APP_ID: "123456",
   GITHUB_APP_CLIENT_ID: "Iv1.x",
   GITHUB_APP_CLIENT_SECRET: "app-secret",
+  // Exigée dès que les identifiants client de l'App sont fournis (TK-48a1).
+  KOKLO_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
 };
 
 describe("GITHUB_APP_PRIVATE_KEY", () => {

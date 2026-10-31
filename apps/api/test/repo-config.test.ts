@@ -22,6 +22,8 @@ const BASE_ENV: Record<string, string> = {
   BETTER_AUTH_URL: "http://localhost:3000",
   GITHUB_CLIENT_ID: "better-auth-client-id",
   GITHUB_CLIENT_SECRET: "better-auth-client-secret",
+  // Exigée dès que les identifiants client de l'App sont fournis (TK-48a1).
+  KOKLO_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
 };
 const APP_ENV: Record<(typeof APP_KEYS)[number], string> = {
   GITHUB_APP_ID: "123456",
