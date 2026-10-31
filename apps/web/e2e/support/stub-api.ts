@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
+import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
 
 /**
  * Faux API pour les e2e : session Better Auth + project.list, sans Postgres.
@@ -19,7 +20,8 @@ type Scenario = {
   /** Rôle de la personne dans l'organisation active (défaut : owner). */
   role?: KanbanRole;
 } & KanbanScenario &
-  GithubScenario;
+  GithubScenario &
+  SpecRepoScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -29,6 +31,10 @@ const PROJECTS = [
   { id: "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02", name: "Plateforme de réservation" },
   { id: "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b03", name: "Portail partenaires" },
 ];
+
+/** Projets créés pendant le scénario (`project.create` du faux API), servis par `project.list`. */
+const createdProjects: Array<{ id: string; name: string }> = [];
+const addProject = (project: { id: string; name: string }) => void createdProjects.push(project);
 
 const ORG_ID = "01900000-0000-7000-8000-0000000000a1";
 const ORGANIZATIONS = [
@@ -82,7 +88,7 @@ const json = (status: number, body: unknown) => ({ status, body: JSON.stringify(
 function projectsResponse(): ReturnType<typeof json> {
   switch (scenario.projects) {
     case "empty":
-      return json(200, []);
+      return json(200, [...createdProjects]);
     case "internal":
       return json(500, { defined: false, code: "INTERNAL", message: "Internal error" });
     case "unauthorized":
@@ -90,7 +96,7 @@ function projectsResponse(): ReturnType<typeof json> {
       scenario.session = false;
       return json(401, { defined: false, code: "UNAUTHORIZED", message: "Unauthorized" });
     default:
-      return json(200, PROJECTS);
+      return json(200, [...PROJECTS, ...createdProjects]);
   }
 }
 
@@ -144,6 +150,8 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     scenario = JSON.parse(raw) as Scenario;
     resetKanban();
     resetGithub();
+    resetSpecRepo();
+    createdProjects.length = 0;
     send(json(200, scenario));
   });
   return true;
@@ -162,6 +170,7 @@ createServer((req, res) => {
   if (path === "/__health") return send(json(200, { ok: true }));
   if (handleControl(req, path, send)) return;
   if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
+  if (handleSpecRepo(req, path, { scenario, send, hold, addProject })) return;
   if (path.endsWith("/projects")) {
     if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
     return send(projectsResponse());
