@@ -868,6 +868,30 @@ flowchart LR
   `webhook-purge.ts`. The fake provider is injected by `startWorker({ gitProvider })` in tests and is
   never imported by production code.
 
+#### API: spec reads (TK-45c2)
+`apps/api/src/spec-read` (port `SpecReadRepository`, Prisma adapter, service, controller, `feature-page`,
+`feature-detail`). The **index is the source of truth**: `spec.head` and `spec.listFeatures` never call
+the provider; each repository method is one short tenant transaction, project checked first (foreign
+project = `NOT_FOUND`). `spec.getFeature` decides on the index (`failed` snapshot -> `SPEC_INDEX_FAILED`,
+unknown id -> `NOT_FOUND`, provider absent or installation not active -> `PROVIDER_UNAVAILABLE`), then
+reads the file **from git at the indexed SHA** (not the branch head) outside any transaction. No audit.
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as API spec-read
+  participant I as Index (spec_heads, snapshots)
+  participant G as Git provider
+  C->>A: spec.getFeature
+  A->>I: snapshot of the default head + feature row
+  alt snapshot failed
+    A-->>C: 409 SPEC_INDEX_FAILED
+  else found
+    A->>G: authenticate, readFile(ref = indexed SHA)
+    A-->>C: FeatureDetail (filePath, commitSha)
+  end
+```
+
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
 yet.

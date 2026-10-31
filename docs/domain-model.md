@@ -120,6 +120,10 @@ Thirteen tables, migration `*_provider_spec_index` (additive, reversible):
   branch head, not a SHA), features, criteria, tables, endpoints and two link tables without FK to
   their target (a dangling reference is a validator error, not an indexing failure). Titles and
   paths only: bodies stay in git.
+  **The index is the source of truth for reads** (`spec.head|listFeatures|getFeature`, TK-45c2); a
+  feature's body is read from git at the indexed `commit_sha`. A snapshot is `ready` or `failed`
+  (`error_code`); `building` is never written today and reads as `ready`. A SHA may be pointed by
+  several heads (first branch alphabetically is reported).
 - **Bot write batches** (tenant): `spec_write_batches` (one batch = one bot commit; its `id` is the
   `Koklo-Ops:` trailer) and `spec_write_operations`; no list column (incident 6). A batch also keeps
   its outcome: `report` (JSON object), the requested commit `message` and the author's role

@@ -271,6 +271,7 @@ describe("X9 exposition exclusive des nouvelles erreurs typées", () => {
     PROVIDER_UNAVAILABLE: PROVIDER_ROUTES,
     SPEC_BATCH_CONFLICT: ["specBatch.submit"],
     SPEC_INVALID: ["specBatch.submit"],
+    SPEC_INDEX_FAILED: ["spec.listFeatures", "spec.getFeature"],
   };
   it.each(Object.entries(exposers))("%s n'apparaît que sur ses routes", (code, routes) => {
     for (const name of EVERY) {
@@ -346,11 +347,11 @@ describe("X11 OpenAPI : réponses d'erreur des nouvelles routes", () => {
       ["401", "403", "404", "409", "422", "429", "503", "500"],
     ],
     ["/projects/{projectId}/spec", "get", ["401", "404", "422", "500"]],
-    ["/projects/{projectId}/spec/features", "get", ["401", "404", "422", "500"]],
+    ["/projects/{projectId}/spec/features", "get", ["401", "404", "409", "422", "500"]],
     [
       "/projects/{projectId}/spec/features/{specId}",
       "get",
-      ["401", "403", "404", "429", "503", "500"],
+      ["401", "403", "404", "409", "429", "503", "500"],
     ],
     [
       "/projects/{projectId}/spec/batches",
@@ -400,6 +401,7 @@ describe("X11b OpenAPI : absences et composants", () => {
       "ProviderUnavailable",
       "SpecBatchConflict",
       "SpecInvalid",
+      "SpecIndexFailed",
     ]) {
       expect(schemas, name).toContain(name);
     }

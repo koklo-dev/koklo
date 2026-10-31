@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.5.0** (TK-42). The router shape is
+Contract version **0.6.0** (TK-45c2; routes unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, repo, spec, specBatch }`:
 43 routes on 30 paths (8 from TK-21, 25 from TK-29, 10 from TK-42; see "Provider, spec and feature batches (TK-42)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -498,7 +498,7 @@ absent from the OpenAPI document. It writes through the same ports, transactions
 after the highest imported number. The actor must be `owner` or `admin`, like the manager routes.
 
 ## Provider, spec and feature batches (TK-42)
-Contract 0.5.0 adds four groups and 10 routes. `repo.*` is implemented since TK-43 (see "Repositories in the API (TK-43)") and `specBatch.*` since TK-44b (see "Spec batches in the API (TK-44b)"); `spec.*` follows in TK-45;
+Contract 0.5.0 adds four groups and 10 routes. `repo.*` is implemented since TK-43 (see "Repositories in the API (TK-43)") and `specBatch.*` since TK-44b (see "Spec batches in the API (TK-44b)"); `spec.*` since TK-45c2 (see "Spec reads in the API (TK-45c2)");
 the new routes take an explicit `projectId` (path), the historical ones keep the implicit project.
 
 | Operation | Method | Path | Notes |
@@ -677,8 +677,8 @@ same transaction as the insert, so a failing audit rolls the insert back. `repo.
 
 ## Spec batches in the API (TK-44b)
 `specBatch.submit` and `specBatch.get` are implemented in `apps/api/src/spec-batch`; the write itself
-is done by the `spec-write` job of `apps/worker`. The contract is unchanged (0.5.0). `spec.*` still
-reads the database index and is TK-45: after a commit, `spec.head` lags until the push webhook rebuilds
+is done by the `spec-write` job of `apps/worker`. The contract is unchanged (0.5.0). `spec.*` reads
+the database index (TK-45c2): after a commit, `spec.head` lags until the push webhook rebuilds
 the index, so a client compares `spec.head.commitSha` with the batch `commitSha`.
 
 Roles: `SPEC_BATCH_ROLES` (owner, admin, dev, designer) on both procedures, checked before membership
@@ -832,6 +832,39 @@ reconciliation (TK-46).
 operations and the counter. A replay, a refusal (role, validation, project) and `specBatch.get` write
 none, nor do the worker transitions (the batch is its own journal).
 
+## Spec reads in the API (TK-45c2)
+`spec.head`, `spec.listFeatures` and `spec.getFeature` are implemented in `apps/api/src/spec-read`.
+Contract 0.6.0 adds one typed error and no route (still 43 routes): `SPEC_INDEX_FAILED` (409,
+`{ errorCode, commitSha }`, `errorCode` is the stored code such as `spec_too_large`, no message) on
+`spec.listFeatures` and `spec.getFeature` only. OpenAPI component: `SpecIndexFailed`.
+
+- **Roles and scope**: every role reads its own project; no role guard, only the session. The project
+  must belong to the caller organisation, checked by the first read; a foreign or unknown project is
+  `NOT_FOUND`, never `FORBIDDEN`, with the same response. A `specId` unknown to the project (or of
+  another project) is `NOT_FOUND` before any call to the provider. No read writes an audit entry.
+- **Revision**: neither `branch` nor `commitSha` means the `cadrage` head if it has one, otherwise the
+  default branch of the spec repository. `branch` and `commitSha` together, an unknown `status` or
+  `priority`, a `limit` outside 1..100 or a malformed `cursor` are `VALIDATION` (422; the two list
+  routes are declared in `VALIDATION_ROUTES`). A project without a spec repository, a branch or a
+  commit that is not indexed give `spec.head` = `null` and an empty page (not 404). For a `commitSha`,
+  `spec.head.branch` is a branch whose head points at that snapshot, or `""` when none does.
+- **`spec.head`** reads the index only. It returns `status` and `errorCode` as stored, including for
+  a `failed` snapshot (200, not an error), so a client can show why a branch is not readable.
+- **`spec.listFeatures`** reads the index only (no provider call), sorted numerically on `F-nnn`
+  (`F-999` before `F-1000`), default page of 50, opaque cursor (the last returned id).
+- **`spec.getFeature`** decides on the index (snapshot of the default head, then the feature row),
+  then reads the file from git at the **indexed commit**, not the current branch head, outside any SQL
+  transaction: `authenticate` then one `readFile` of `<spec_path>/<file_path>`. The answer carries
+  the index `filePath` and `commitSha`. Provider errors: no App configured, or installation
+  `suspended`/`deleted`: 503 `PROVIDER_UNAVAILABLE` without a call (the index stays readable);
+  429 `PROVIDER_RATE_LIMITED`; 403 `PROVIDER_AUTH_EXPIRED`; file missing at the commit: 404
+  `NOT_FOUND`. Nothing of the provider message, token or path is returned.
+- **`failed` snapshot**: `spec.listFeatures` and `spec.getFeature` answer 409 `SPEC_INDEX_FAILED`
+  before any provider call and before looking for the `specId`. A snapshot in `building` is not
+  produced by the worker (it writes `ready` or `failed` in one transaction) and is read like a `ready` one;
+  if a future writer produces it, the expected behaviour (409, 503 or readable) must be decided then.
+  A `commitSha` pointed by several branches is reported with the first branch in alphabetical order.
+
 ## Webhook endpoint outside the contract (TK-45c1)
 `POST /api/webhooks/github` is not an oRPC procedure and is absent from `openapi.json` (no contract
 change, version unchanged). It is authenticated by the GitHub HMAC signature only. Answers, in
@@ -841,6 +874,8 @@ the ingestion flow are in `architecture.md`; configuration and the manual check 
 `quality-and-operations.md`.
 
 ## Version history
+- **0.6.0** (TK-45c2): typed error `SPEC_INDEX_FAILED` (409, `{ errorCode, commitSha }`) on
+  `spec.listFeatures` and `spec.getFeature`; same 43 routes. Fingerprints of 0.1.0 to 0.5.0 unchanged.
 - **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,
   contract only), seven typed errors, three `CONFLICT` reasons, and the grouped typing corrections
   (`VALIDATION`/`NOT_FOUND` on `comment.create`/`list`, `FORBIDDEN` on `comment.list` and

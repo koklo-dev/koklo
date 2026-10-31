@@ -462,6 +462,15 @@ state, as it would block its branch (`SELECT count(*) FROM pgboss.job WHERE name
 state = 'failed'` must be 0). Logs carry the batch id, the final status and the error code, never a
 token, a provider message or an e-mail address.
 
+### Spec reads: operation (TK-45c2)
+`spec.head`, `spec.listFeatures` and `spec.getFeature` have no configuration. `spec.head` and
+`spec.listFeatures` read only the index (no provider call, no audit entry); `spec.getFeature` makes one
+`readFile` at the indexed SHA. `SPEC_INDEX_FAILED` (409, `errorCode` + `commitSha`) means the indexer
+stored a `failed` snapshot (for example `spec_too_large`): fix the spec and push, the head then moves to
+a new snapshot. After a commit through `specBatch`, `spec.head` lags until the push webhook is indexed.
+The list is sorted in memory over the features of one snapshot (bounded by `spec_too_large`). Logs and
+errors carry no token, provider message or file path.
+
 ### Webhook deliveries: configuration, retention and operation (TK-45b)
 | Variable | Read by | Meaning |
 |----------|---------|---------|

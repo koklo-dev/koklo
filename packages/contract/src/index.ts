@@ -57,6 +57,7 @@ export {
   providerUnavailableError,
   repoCreationForbiddenError,
   specBatchConflictError,
+  specIndexFailedError,
   specInvalidError,
   unauthorizedError,
   userTokenRequiredError,

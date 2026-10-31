@@ -5,8 +5,15 @@ import { validation } from "./tracker/api-errors.ts";
  * Routes (`MÉTHODE chemin` du contrat) dont le refus du schéma ressort en `VALIDATION` (422) et
  * non en `BAD_REQUEST` (400) : un commentaire vide ou trop long est une saisie invalide au même
  * titre qu'une cible qui n'est pas un UUID (`targetId`, contrat 0.5.0), en création comme en liste.
+ * Les lectures de la spec en relèvent aussi : `branch` et `commitSha` exclusifs, filtre ou limite inconnus
+ * (contrat 0.6.0).
  */
-const VALIDATION_ROUTES = new Set(["POST /comments", "GET /comments"]);
+const VALIDATION_ROUTES = new Set([
+  "POST /comments",
+  "GET /comments",
+  "GET /projects/{projectId}/spec",
+  "GET /projects/{projectId}/spec/features",
+]);
 
 interface RouteMeta {
   "~openapi"?: { method?: string; path?: string };

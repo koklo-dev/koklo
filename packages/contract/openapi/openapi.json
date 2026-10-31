@@ -438,6 +438,37 @@
         "title": "SPEC_BATCH_CONFLICT",
         "type": "object"
       },
+      "SpecIndexFailed": {
+        "properties": {
+          "code": {
+            "const": "SPEC_INDEX_FAILED"
+          },
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "commitSha": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "errorCode": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": ["errorCode", "commitSha"],
+            "type": "object"
+          },
+          "defined": {
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["defined", "code", "message", "data"],
+        "title": "SPEC_INDEX_FAILED",
+        "type": "object"
+      },
       "SpecInvalid": {
         "properties": {
           "code": {
@@ -683,7 +714,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4283,6 +4314,23 @@
             },
             "description": "Ressource introuvable"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SpecIndexFailed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "L'index de la spec est en échec pour cette révision"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -4531,6 +4579,23 @@
               }
             },
             "description": "Ressource introuvable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SpecIndexFailed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "L'index de la spec est en échec pour cette révision"
           },
           "429": {
             "content": {
