@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.6.0** (TK-45c2; routes unchanged since 0.5.0, TK-42). The router shape is
+Contract version **0.7.0** (TK-48a2; routes unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, repo, spec, specBatch }`:
 43 routes on 30 paths (8 from TK-21, 25 from TK-29, 10 from TK-42; see "Provider, spec and feature batches (TK-42)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -519,9 +519,12 @@ returned in `results`), `feature.update` (partial patch, at least one field, `cr
 as a whole) and `feature.delete`. Tables, endpoints and screens are out of 0.5.0. The author and
 the commit trailers come from the session, never from the input.
 
-The GitHub callback (`/api/github/callback`, `/api/github/installed`) is a browser redirect, not
-an oRPC procedure and absent from the OpenAPI document; the contract only exports
-`installationCallbackQuerySchema` and `installationCallbackOutcomeSchema` for the API and the web.
+The GitHub callback (`/api/github/callback`) is a browser redirect, not an oRPC procedure and absent
+from the OpenAPI document; the contract only exports `installationCallbackQuerySchema` and
+`installationCallbackOutcomeSchema` for the API and the web. There is no `/api/github/installed`
+(Setup URL): linking an installation without proof from a user token would let an attacker with a
+valid `state` bind someone else's installation to their organization (see "Installations in the API
+(TK-48a2)").
 
 New typed errors: `REPO_CREATION_FORBIDDEN` (403, `{ reason, ownerLogin, ownerKind }`) and
 `USER_TOKEN_REQUIRED` (403, `{ ownerLogin }`) on `repo.createSpec`; `PROVIDER_AUTH_EXPIRED` (403,
@@ -560,8 +563,9 @@ member of the project and of the organization of the session.
 
 ### `installation.start` state requirement
 The `state` embedded in the returned URL is the only CSRF guard, and the contract cannot impose it.
-The API must make it signed (HMAC), bound to the user and to the organization of the session,
-single-use and expiring (`expiresAt`). The callback rejects any state failing one of these checks.
+The API makes it signed (HMAC), bound to the user and to the organization of the session,
+single-use and expiring (`expiresAt`). The callback rejects any state failing one of these checks
+(implemented in TK-48a2).
 
 ### `criteria` on `feature.update`: numbering rule (decided in TK-44b)
 `criteria` is replaced as a whole and carries no acceptance-criterion identifier. The worker renumbers
@@ -577,8 +581,8 @@ import those packages.
 
 ## Repositories in the API (TK-43)
 `repo.createSpec`, `repo.link` and `repo.list` are implemented in `apps/api/src/repo`. The contract
-is unchanged (0.5.0). `installation.*` and its callbacks are not part of TK-43: installations are
-inserted by seed or, later, by the installation webhook.
+is unchanged (0.5.0). `installation.*` and its callback were not part of TK-43 (they arrive with
+TK-48a2, below).
 
 Roles: `repo.createSpec` and `repo.link` are `MANAGER_ROLES` (owner, admin); `repo.list` is
 `REPO_READ_ROLES` (owner, admin, dev, designer). A refused role is `FORBIDDEN` for any project,
@@ -622,8 +626,9 @@ sequenceDiagram
   `.gitkeep` per empty directory. No example entity. It passes `checkSpec` without error.
 - `external_id` of the row is the provider's `Repo.id` (a string), stable across renames.
 - A personal account needs a user token (ADR 0009): `createRepo` alone uses it, commit and branch use
-  an installation token. The API keeps no user token yet (`NoUserCredentials`), so a personal account
-  gets `USER_TOKEN_REQUIRED` and falls back to `repo.link`.
+  an installation token. The user token is stored by the installation callback (TK-48a2, encrypted);
+  without one (or without `GITHUB_APP_CLIENT_ID`/`SECRET` and `KOKLO_ENCRYPTION_KEY`, which select
+  `NoUserCredentials`) a personal account gets `USER_TOKEN_REQUIRED` and falls back to `repo.link`.
 
 ### `repo.link`
 Reads the repository with `getRepo` (installation token, no write), then inserts it in `mode: adopted`
@@ -873,7 +878,84 @@ evaluation order: 503 `webhook_not_configured`, 413 `payload_too_large`, 415 `un
 the ingestion flow are in `architecture.md`; configuration and the manual check in
 `quality-and-operations.md`.
 
+## Installations in the API (TK-48a2)
+`installation.list`, `installation.start` and the browser callback are implemented in
+`apps/api/src/installation`. Roles: owner and admin only (`FORBIDDEN` otherwise, `401` without session).
+
+### `installation.list`
+Reads the database only (no provider call). Returns every installation of the session organization
+(including `suspended` and `deleted`, sorted by creation) with `userAuthorization` for the caller:
+`absent` (no stored token), `active` (token valid, or expired but renewable by a valid refresh token)
+or `expired` (expired and not renewable). Neither the external id nor any token is returned.
+
+### `installation.start`
+Optional `installationId` (re-authorization): it must be an installation of the session organization
+and not `deleted`, otherwise `404 NOT_FOUND` (no detail). The URL is
+`https://github.com/apps/<slug>/installations/new?state=<state>` (slug read from the provider, outside any
+transaction) or, for a re-authorization,
+`https://github.com/login/oauth/authorize?client_id&redirect_uri&state`, where `redirect_uri` is
+`<BETTER_AUTH_URL>/api/github/callback`. `expiresAt` is the application clock plus 10 minutes.
+
+New typed errors on `installation.start` (contract 0.7.0): `PROVIDER_UNAVAILABLE` (503) when the App has
+no client credentials, `KOKLO_ENCRYPTION_KEY` is missing, no provider is configured or the provider
+fails; `VALIDATION{field: "installationId", message: "too_many_pending"}` (422) at the 21st unconsumed,
+unexpired state of a user. Each `start` also purges the expired states of the organization and writes an
+`installation.start` audit entry (target: the organization).
+
+The `state` is `base64url(payload).base64url(HMAC-SHA256)`; the key is derived from
+`KOKLO_ENCRYPTION_KEY` by HKDF (label `installation-state`) and the signature is compared in constant
+time. The payload binds the nonce, the user, the organization and, for a re-authorization, the
+installation. A row of `provider_auth_states` (created and expiring from the application clock)
+arbitrates single use and expiry.
+
+### `GET /api/github/callback` (Callback URL of the App, outside the contract)
+Raw Nest route relayed by the web with the session cookie. It always answers `303` with
+`Location: /github?result=<outcome>` (fixed relative target, no received value ever echoed),
+`Cache-Control: no-store`, no cookie; the request log keeps the path only and masks `Location`.
+Evaluation order: session; configuration; query shape; signed state bound to the session user; atomic
+consumption of the state (`UPDATE ... WHERE consumed_at IS NULL AND expires_at > now RETURNING`);
+the user is still owner/admin of the organization carried by the state (not the active organization of
+the session); and only then the exchange of `code` for a user token.
+
+| Outcome | Cases |
+|---------|-------|
+| `installed` | the token's `GET /user/installations` lists the installation; the row (organization of the state, owner kind and login read from GitHub, never from the request), the encrypted token and the audit entry are written in one transaction |
+| `invalid_state` | no session, absent, forged, truncated, duplicated, other-user, other-organization, expired or replayed state; a re-authorization whose `installation_id` contradicts the state |
+| `denied` | no `code`, code refused, installation absent from the token's list, installation `deleted` or no longer of the organization, user no longer owner/admin |
+| `already_linked` | the installation belongs to another organization (which is never revealed) |
+| `provider_error` | provider failure or timeout, App without client credentials at return, failure of the transaction (audit included); never a `500` |
+
+Re-authorization (state carrying `installationId`): GitHub returns no `installation_id`, the identifier
+comes from the state; the token is still proven through `GET /user/installations`. The existing row and
+its encrypted token are updated, no second row is created. Audit actions: `installation.link` (new row),
+`installation.reauthorize` (existing row), `installation.link_refused` (target: the organization, only
+when the organization comes from a valid signed state of the session user; no external id). Tokens are
+AES-256-GCM encrypted (`provider_user_credentials`), never in a log, error, redirect, audit entry or
+state.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant W as Web (proxy)
+  participant A as API
+  participant G as GitHub
+  B->>A: installation.start (owner/admin)
+  A->>G: appSlug
+  A-->>B: url + signed state
+  B->>G: install the App / authorize
+  G-->>B: 302 /api/github/callback?installation_id&code&state
+  B->>W: GET /api/github/callback (session cookie)
+  W->>A: same path and query
+  A->>A: verify state, consume it (atomic)
+  A->>G: exchange code, list user installations
+  A->>A: one transaction: installation, encrypted token, audit
+  A-->>B: 303 /github?result=installed
+```
+
 ## Version history
+- **0.7.0** (TK-48a2): typed errors `PROVIDER_UNAVAILABLE` (503) and `VALIDATION` (422) on
+  `installation.start`; `installation_id` optional in `installationCallbackQuerySchema` (outside the
+  OpenAPI document). Same 43 routes. Fingerprints of 0.1.0 to 0.6.0 unchanged.
 - **0.6.0** (TK-45c2): typed error `SPEC_INDEX_FAILED` (409, `{ errorCode, commitSha }`) on
   `spec.listFeatures` and `spec.getFeature`; same 43 routes. Fingerprints of 0.1.0 to 0.5.0 unchanged.
 - **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,

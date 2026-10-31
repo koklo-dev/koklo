@@ -268,7 +268,7 @@ describe("X9 exposition exclusive des nouvelles erreurs typées", () => {
     USER_TOKEN_REQUIRED: ["repo.createSpec"],
     PROVIDER_AUTH_EXPIRED: PROVIDER_ROUTES,
     PROVIDER_RATE_LIMITED: PROVIDER_ROUTES,
-    PROVIDER_UNAVAILABLE: PROVIDER_ROUTES,
+    PROVIDER_UNAVAILABLE: [...PROVIDER_ROUTES, "installation.start"],
     SPEC_BATCH_CONFLICT: ["specBatch.submit"],
     SPEC_INVALID: ["specBatch.submit"],
     SPEC_INDEX_FAILED: ["spec.listFeatures", "spec.getFeature"],

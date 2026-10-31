@@ -8,6 +8,7 @@ import type { PgBoss } from "pg-boss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createSeededDatabase } from "./helpers/app.ts";
 import { auditRowsFull, commentsFor, UUID_RE } from "./helpers/comments.ts";
+import { ENCRYPTION_KEY, INSTALL_APP } from "./helpers/installations.ts";
 import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./helpers/leases.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
@@ -44,7 +45,13 @@ function repoRuntimeOf() {
   repoRuntime ??= (async () => {
     const clock = new ManualClock();
     const harness = await ProviderHarness.create(clock);
-    const repoApp = await createRepoApp(database.url, { clock, provider: harness.provider });
+    // TK-48a2 : identifiants client + clé de chiffrement pour que `installation.start` soit disponible.
+    const repoApp = await createRepoApp(database.url, {
+      clock,
+      provider: harness.provider,
+      githubApp: INSTALL_APP,
+      encryptionKey: ENCRYPTION_KEY,
+    });
     return { app: repoApp, harness };
   })();
   return repoRuntime;
@@ -105,16 +112,16 @@ const WRITE_GROUPS = [
   "lease",
   "repo",
   "specBatch",
+  "installation",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit", "spec"];
 /**
- * Groupes du contrat sans implémentation API (`installation` n'a pas de ticket dans les sprints
- * 8-9) : ils rejoindront WRITE_GROUPS ou READ_ONLY_GROUPS avec leurs scénarios d'audit. `repo` a
- * rejoint WRITE_GROUPS avec TK-43, `specBatch` avec TK-44b, `spec` (lectures de l'index) READ_ONLY_GROUPS
- * avec TK-45c2.
+ * Groupes du contrat sans implémentation API : plus aucun depuis TK-48a2 (`installation` a rejoint
+ * WRITE_GROUPS : `installation.start` est une écriture, `installation.list` une lecture du même groupe,
+ * comme `repo.list`). Un futur groupe non implémenté y reviendrait, et la garde ci-dessous le vérifie.
  */
-const PENDING_GROUPS = ["installation"];
+const PENDING_GROUPS: string[] = [];
 
 /** Sources de l'API : une référence à `contract.<groupe>` y signifie qu'une procédure est implémentée. */
 function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] {
@@ -147,6 +154,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "comment.delete",
   "dependency.add",
   "dependency.remove",
+  "installation.start",
   "lease.acquire",
   "lease.heartbeat",
   "lease.release",
@@ -633,10 +641,38 @@ const SCENARIOS: Scenario[] = [
       ),
     deniedStatuses: [403],
   },
+  {
+    procedure: "installation.start",
+    role: "owner",
+    prepare: async () => ({}),
+    call: async (ctx) =>
+      send(
+        (await repoRuntimeOf()).app,
+        ctx.world.actors.owner.cookie,
+        "post",
+        "/provider/installations/start",
+        {},
+      ),
+    expected: async (ctx) => ({
+      action: "installation.start",
+      targetKind: "organization",
+      targetId: ctx.world.organizationId,
+      ticketId: null,
+    }),
+    denied: async (ctx) =>
+      send(
+        (await repoRuntimeOf()).app,
+        ctx.world.actors.dev.cookie,
+        "post",
+        "/provider/installations/start",
+        {},
+      ),
+    deniedStatuses: [403],
+  },
 ];
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 23 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 24 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -673,6 +709,11 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
     expect(missing, `groupes en lecture seule sans implémentation : ${missing.join(", ")}`).toEqual(
       [],
     );
+  });
+
+  it("le groupe installation est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "installation"))).toBe(true);
   });
 
   it("un groupe en attente n'a aucune implémentation : sinon il doit rejoindre WRITE_GROUPS ou READ_ONLY_GROUPS", () => {

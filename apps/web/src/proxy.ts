@@ -6,11 +6,15 @@ import { readRuntimeConfig } from "./lib/runtime-config.ts";
 import { readSession } from "./lib/session.ts";
 
 const WEBHOOK_PATH = "/api/webhooks/github";
+/** Callback GitHub (Callback URL de l'App) : chemin exact, ni `/installed` ni sous-chemin. */
+const GITHUB_CALLBACK_PATH = "/api/github/callback";
 
 /**
  * Proxy exécuté à chaque requête (donc config lue à l'exécution) :
  * - `/api/auth/*` et `/api/orpc/*` sont relayés vers `API_INTERNAL_URL` (même origine pour le navigateur) ;
  * - `/api/webhooks/github` est relayé tel quel, sans session (livraisons signées de GitHub) ;
+ * - `/api/github/callback` est relayé tel quel avec le cookie de session, sans lecture de session ici :
+ *   l'API arbitre (session absente ou état invalide = `/github?result=invalid_state`, jamais `/login`) ;
  * - `/login`, `/projects`, `/kanban`, `/members` et `/organizations` sont gardés selon la session et l'organisation active ;
  * - `/accept-invitation/<id>` exige une session (sinon `/login?next=…`) mais jamais d'organisation active,
  *   et n'est jamais mis en cache.
@@ -21,6 +25,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   if (pathname === WEBHOOK_PATH) {
     // GitHub poste sans cookie : la signature est l'authentification, vérifiée par l'API sur les octets bruts.
+    return NextResponse.rewrite(new URL(`${pathname}${search}`, apiUrl));
+  }
+  if (pathname === GITHUB_CALLBACK_PATH) {
     return NextResponse.rewrite(new URL(`${pathname}${search}`, apiUrl));
   }
   if (pathname.startsWith("/api/auth/")) {
@@ -68,5 +75,6 @@ export const config = {
     "/api/auth/:path*",
     "/api/orpc/:path*",
     "/api/webhooks/github",
+    "/api/github/callback",
   ],
 };

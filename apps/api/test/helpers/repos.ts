@@ -181,6 +181,8 @@ export interface RepoAppOptions {
   provider?: GitProvider | null;
   credentials?: TestCredentialsStore;
   githubApp?: { appId: string; privateKey: string; clientId?: string; clientSecret?: string };
+  /** Clé AES-256 des jetons utilisateur (`KOKLO_ENCRYPTION_KEY`) : absente, aucun jeton n'est conservé. */
+  encryptionKey?: Buffer;
   logStream?: { write: (line: string) => void };
   appEnv?: AppConfig["appEnv"];
 }
@@ -197,6 +199,7 @@ export async function createRepoApp(
     // Les journaux ne sont émis (niveau info) que si le test les capture.
     logLevel: options.logStream ? "info" : "silent",
     githubApp: options.githubApp,
+    ...(options.encryptionKey ? { encryptionKey: options.encryptionKey } : {}),
   } as AppConfig;
   let builder = Test.createTestingModule({
     imports: [AppModule.forRoot(config, { logStream: options.logStream })],

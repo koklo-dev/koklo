@@ -14,6 +14,7 @@ export interface AuditEntry {
     | "member"
     | "project"
     | "repo"
+    | "installation"
     | "spec_batch";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;

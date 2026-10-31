@@ -947,7 +947,7 @@ flowchart LR
 - **Run summary.** `heads: { updated, removed, unreachable, skipped, stopped }`, `stopped` being `rate_limited`, `budget` or `null`.
 
 ### User tokens and the prepared installation flow (TK-48a1)
-Foundations only: no route, no screen yet (48a2 adds `installation.*` and the callback).
+Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installation.list`/`start`, the raw callback `GET /api/github/callback`, relayed by `apps/web/src/proxy.ts` with the session cookie). Flow, outcomes and audit: `api-contract.md`, "Installations in the API (TK-48a2)".
 - **Port** (`@koklo/domain`): `GitProvider.exchangeUserCode({ code, redirectUri })` returns
   `GitUserCredentials`; `listUserInstallations({ auth })` returns the installations visible to a user
   token (`externalId`, `ownerKind`, `ownerLogin`); `appSlug()` gives the App URL slug. A refused code
@@ -956,7 +956,7 @@ Foundations only: no route, no screen yet (48a2 adds `installation.*` and the ca
   replayed because the code is single-use; `ops/app-slug.ts`: `GET /app` with the App JWT, success
   cached); the shared fake (`testing/fake-user-oauth.ts`) accepts `fake-code-<login>` once and only
   sees the installations seeded for that login. Both run the same conformance suite.
-- **Prepared flow** (ADR 0009, proposed): `installation.start` returns the GitHub install URL with a
+- **Flow** (ADR 0009, proposed; implemented in 48a2): `installation.start` returns the GitHub install URL with a
   signed single-use `state`; GitHub redirects the browser to the callback with `code` and `state`;
   the API consumes the state, exchanges the code, lists the user's installations and only links an
   installation proven visible to that user token, under the organization of the state.
@@ -969,10 +969,15 @@ Foundations only: no route, no screen yet (48a2 adds `installation.*` and the ca
     A-->>W: install URL + state (provider_auth_states)
     W->>G: install the App
     G-->>A: callback (installation_id, code, state)
-    A->>A: consume state (single use, 10 min)
-    A->>G: exchangeUserCode, listUserInstallations
-    A->>A: save encrypted token (provider_user_credentials)
+    A->>A: session user = state user, verify HMAC, consume state (single use, 10 min)
+    A->>A: re-read owner/admin role of the state organization
+    A->>G: exchangeUserCode (only after the state is consumed)
+    A->>G: listUserInstallations (installation must be visible to the user token)
+    A->>A: one transaction: installation, encrypted token, audit
   ```
+  Hexagonal split: `InstallationService`/`InstallationCallbackService` depend on the
+  `InstallationRepository` port (Prisma adapter) and the `GitProvider` port; the provider is never
+  called inside a transaction. The state signer (`auth-state.ts`) is a pure module.
 - **Token encryption** (`apps/api/src/crypto/token-cipher.ts`, pure module): AES-256-GCM, a random
   12-byte nonce per message, associated data `userId:installationId` (a sealed token copied to
   another user or installation does not decrypt), `ciphertext = encrypted bytes || 16-byte tag`.

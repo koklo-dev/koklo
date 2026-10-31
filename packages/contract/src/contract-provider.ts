@@ -1,6 +1,7 @@
 import {
   conflictError,
   providerErrors,
+  providerUnavailableError,
   repoCreationForbiddenError,
   userTokenRequiredError,
   validationError,
@@ -17,13 +18,16 @@ import {
   repoSchema,
 } from "./schemas-provider.ts";
 
+/** `start` : 503 sans identifiants client/clé de chiffrement ; 422 au-delà de 20 états en attente. */
+const startErrors = { ...writeOneErrors, ...validationError, ...providerUnavailableError } as const;
+
 /** Le callback GitHub est une redirection navigateur : il n'est ni une procédure ni dans l'OpenAPI. */
 const installation = {
   list: route("GET", "/provider/installations")
     .errors(writeErrors)
     .output(installationListOutputSchema),
   start: route("POST", "/provider/installations/start")
-    .errors(writeOneErrors)
+    .errors(startErrors)
     .input(installationStartInputSchema)
     .output(installationStartOutputSchema),
 };

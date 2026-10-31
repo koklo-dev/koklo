@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2)", () => {
-  it("est en 0.6.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.6.0");
-    expect(CONTRACT_VERSION).toBe("0.6.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2)", () => {
+  it("est en 0.7.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.7.0");
+    expect(CONTRACT_VERSION).toBe("0.7.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -214,6 +214,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2)", () => {
       "0.4.0",
       "0.5.0",
       "0.6.0",
+      "0.7.0",
     ]);
   });
 
@@ -236,13 +237,20 @@ describe("CT-10 version du contrat (TK-42, TK-45c2)", () => {
     );
   });
 
-  it("l'empreinte 0.6.0 est celle du document généré et diffère de 0.5.0", async () => {
+  it("conserve l'empreinte figée de 0.6.0 (TK-45c2)", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["0.6.0"]).toBe(
+      "5dbb28ba6f41cfbb31409d8303ad2d12405ffcb0a79e4e166a99dee01e198569",
+    );
+  });
+
+  it("l'empreinte 0.7.0 est celle du document généré et diffère de 0.6.0 (erreurs typées de installation.start)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["0.6.0"]).toBe(hash);
-    expect(versions["0.6.0"]).not.toBe(versions["0.5.0"]);
+    expect(versions["0.7.0"]).toBe(hash);
+    expect(versions["0.7.0"]).not.toBe(versions["0.6.0"]);
   });
 });
 

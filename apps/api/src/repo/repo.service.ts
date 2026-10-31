@@ -74,7 +74,7 @@ export class RepoService {
       organizationSlug: plan.organizationSlug,
       projectSlug: projectSlugOf(plan.projectName),
     });
-    const auth = await this.access.creationAuth(provider, scope.userId, installation);
+    const auth = await this.access.creationAuth(provider, scope, installation);
     const created = await provisionSpecRepo(provider, auth, { ref, files });
 
     try {
