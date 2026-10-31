@@ -54,4 +54,5 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-accept-invitation](screens/S-accept-invitation.md) | 1 | TK-86 |
 | [S-kanban](screens/S-kanban.md) | 1 | TK-35 |
 | [S-github](screens/S-github.md) | 3 | TK-48 (48c) |
-| [S-features](screens/S-features.md) | 1.1 | TK-48 (48d) |
+| [S-features](screens/S-features.md) | 1.2 | TK-48 (48e) |
+| [S-feature-form](screens/S-feature-form.md) | 1 | TK-48 (48e) |
