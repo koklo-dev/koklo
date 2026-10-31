@@ -6,6 +6,7 @@ import {
   TokenDecryptionError,
 } from "../crypto/token-cipher.ts";
 import type { DatabaseService } from "../database/database.module.ts";
+import type { Tx } from "../tracker/project-transactions.ts";
 import type { UserCredentialsStore } from "./tokens.ts";
 
 /** Part secrète des identifiants : seule elle est chiffrée, les échéances restent lisibles en base. */
@@ -63,6 +64,7 @@ export class PrismaUserCredentials implements UserCredentialsStore {
     userId: string,
     installationId: string,
     credentials: GitUserCredentials,
+    tx?: Tx,
   ): Promise<void> {
     const organizationId = currentOrganizationId();
     if (!organizationId) {
@@ -81,7 +83,7 @@ export class PrismaUserCredentials implements UserCredentialsStore {
       refreshExpiresAt:
         credentials.refreshExpiresAt === undefined ? null : new Date(credentials.refreshExpiresAt),
     };
-    await this.database.client.providerUserCredential.upsert({
+    await (tx ?? this.database.client).providerUserCredential.upsert({
       where: { userId_installationId: { userId, installationId } },
       create: { organizationId, userId, installationId, ...data },
       update: data,

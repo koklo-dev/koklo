@@ -96,14 +96,17 @@ describe("N2 callback GitHub : exports partagés, hors oRPC et hors OpenAPI", ()
       "provider_error",
     ]);
   });
-  it("installationCallbackQuerySchema : installation_id et state obligatoires, code optionnel", async () => {
+  it("installationCallbackQuerySchema : state obligatoire, installation_id et code optionnels (TK-48a2)", async () => {
     const q = api.installationCallbackQuerySchema;
     const ok = { installation_id: "12345", code: "abc", state: "s.ig", setup_action: "install" };
     expect(await isValid(q, ok)).toBe(true);
     expect(
       await isValid(q, { installation_id: "12345", state: "s.ig", setup_action: "update" }),
     ).toBe(true);
-    expect(await isValid(q, { ...ok, installation_id: undefined })).toBe(false);
+    // Ré-autorisation : GitHub ne renvoie pas installation_id, l'identifiant vient de l'état signé.
+    expect(await isValid(q, { state: "s.ig", code: "abc" })).toBe(true);
+    expect(await isValid(q, { ...ok, installation_id: undefined })).toBe(true);
+    expect(await isValid(q, { ...ok, installation_id: "" })).toBe(false);
     expect(await isValid(q, { ...ok, state: undefined })).toBe(false);
     expect(await isValid(q, { ...ok, state: "" })).toBe(false);
   });

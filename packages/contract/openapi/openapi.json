@@ -714,7 +714,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4859,6 +4859,23 @@
             },
             "description": "Ressource introuvable"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Validation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Entrée invalide"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -4875,6 +4892,23 @@
               }
             },
             "description": "Erreur interne"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProviderUnavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Fournisseur indisponible"
           }
         }
       }

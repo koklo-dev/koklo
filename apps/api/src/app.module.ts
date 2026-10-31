@@ -12,6 +12,7 @@ import { DatabaseModule } from "./database/database.module.ts";
 import { ERROR_STATUS_MAP } from "./error-status.ts";
 import { HealthModule } from "./health/health.module.ts";
 import { validationStatusInterceptor } from "./input-validation.ts";
+import { InstallationModule } from "./installation/installation.module.ts";
 import { LeaseModule } from "./lease/lease.module.ts";
 import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
@@ -22,7 +23,7 @@ import { GitProviderModule } from "./repo/git-provider.module.ts";
 import { RepoModule } from "./repo/repo.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
-import { serializeRequest } from "./request-serializer.ts";
+import { serializeRequest, serializeResponse } from "./request-serializer.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SpecReadModule } from "./spec-read/spec-read.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
@@ -56,7 +57,7 @@ export class AppModule {
           pinoHttp: {
             logger,
             genReqId: requestIdOfMessage,
-            serializers: { req: serializeRequest },
+            serializers: { req: serializeRequest, res: serializeResponse },
             customLogLevel: (_request, response, error) =>
               error || response.statusCode >= 500 ? "error" : "info",
             customProps: (request) => ({ requestId: request.id }),
@@ -82,6 +83,7 @@ export class AppModule {
         AuditModule,
         GitProviderModule.forRoot(config),
         RepoModule,
+        InstallationModule,
         SpecBatchModule,
         SpecReadModule,
         WebhookModule,

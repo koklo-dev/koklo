@@ -61,7 +61,8 @@ export const repoCreateSpecInputSchema = z.object({
  * transmis au web dans la redirection.
  */
 export const installationCallbackQuerySchema = z.object({
-  installation_id: z.string().min(1),
+  // Absent à la ré-autorisation : GitHub ne le renvoie pas, l'identifiant vient de l'état signé.
+  installation_id: z.string().min(1).optional(),
   state: z.string().min(1),
   code: z.string().min(1).optional(),
   setup_action: z.string().min(1).optional(),

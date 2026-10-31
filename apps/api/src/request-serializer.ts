@@ -14,15 +14,16 @@ export function pathOnly(url: unknown): unknown {
 }
 
 const REDACTED = "[Redacted]";
+const RESPONSE_SECRET_HEADERS: ReadonlySet<string> = new Set(["location"]);
 /** En-têtes dont la valeur ne doit jamais atteindre un journal (signature de webhook, TK-45). */
 const SECRET_HEADERS = new Set(["x-hub-signature-256", "x-hub-signature"]);
 
-function redactHeaders(headers: unknown): unknown {
+function redactHeaders(headers: unknown, names: ReadonlySet<string> = SECRET_HEADERS): unknown {
   if (typeof headers !== "object" || headers === null) return headers;
   return Object.fromEntries(
     Object.entries(headers).map(([name, value]) => [
       name,
-      SECRET_HEADERS.has(name.toLowerCase()) ? REDACTED : value,
+      names.has(name.toLowerCase()) ? REDACTED : value,
     ]),
   );
 }
@@ -40,5 +41,18 @@ export function serializeRequest(request: SerializedRequest): Record<string, unk
     headers: redactHeaders(request.headers),
     remoteAddress: request.remoteAddress,
     remotePort: request.remotePort,
+  };
+}
+
+/** Réponse du journal : `Location` écarté (une redirection peut porter un état, un jeton ou un résultat). */
+interface SerializedResponse {
+  statusCode?: unknown;
+  headers?: unknown;
+}
+
+export function serializeResponse(response: SerializedResponse): Record<string, unknown> {
+  return {
+    statusCode: response.statusCode,
+    headers: redactHeaders(response.headers, RESPONSE_SECRET_HEADERS),
   };
 }

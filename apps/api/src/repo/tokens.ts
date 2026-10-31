@@ -1,4 +1,5 @@
 import type { GitProvider, GitUserCredentials } from "@koklo/domain";
+import type { Tx } from "../tracker/project-transactions.ts";
 
 /**
  * Fournisseur git injecté dans l'API (port `GitProvider` du domaine). `null` : l'App GitHub n'est
@@ -17,12 +18,18 @@ export const USER_CREDENTIALS = Symbol("USER_CREDENTIALS");
  */
 export interface UserCredentialsStore {
   find(userId: string, installationId: string): Promise<GitUserCredentials | undefined>;
-  save(userId: string, installationId: string, credentials: GitUserCredentials): Promise<void>;
+  /** `tx` : transaction de l'appelant (sous `withOrganization`), pour écrire le jeton avec le reste ou rien. */
+  save(
+    userId: string,
+    installationId: string,
+    credentials: GitUserCredentials,
+    tx?: Tx,
+  ): Promise<void>;
 }
 
 /**
- * Adaptateur par défaut : aucun jeton utilisateur n'est conservé tant que le flux d'autorisation
- * n'existe pas. Un compte personnel obtient donc `USER_TOKEN_REQUIRED` (repli : `repo.link`).
+ * Adaptateur par défaut, sans identifiants client ni clé de chiffrement : aucun jeton utilisateur
+ * n'est conservé. Un compte personnel obtient donc `USER_TOKEN_REQUIRED` (repli : `repo.link`).
  */
 export class NoUserCredentials implements UserCredentialsStore {
   async find(): Promise<undefined> {

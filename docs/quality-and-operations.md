@@ -475,6 +475,26 @@ token, a provider message or an e-mail address.
   Each row stores `key_version`; a future rotation will decrypt with the old key by version. The
   procedure is not written yet.
 - The key, tokens, OAuth codes and the client secret never appear in logs, errors or audit.
+- The same key (HKDF label `installation-state`) signs the installation `state`: rotating it also
+  invalidates the flows in progress (10 minutes at most). Without client credentials or key,
+  `installation.start` answers `503 PROVIDER_UNAVAILABLE` and the callback `provider_error`.
+- **Installation callback (TK-48a2)**: the App's Callback URL must be exactly
+  `https://<web domain>/api/github/callback`; `BETTER_AUTH_URL` must be the public origin of the web
+  (it builds the `redirect_uri` sent to GitHub). Each `start` purges the expired states of the
+  organization; unconsumed states are capped at 20 per user. The request log keeps the callback path
+  only (no query) and masks the `Location` header.
+- **GitHub App settings (NEEDS-HUMAN, per environment).** In the App settings, "Identifying and
+  authorizing users": **Callback URL** `https://app-staging.koklo.dev/api/github/callback` (staging) or
+  `https://app.koklo.dev/api/github/callback` (production), exactly, distinct from the Better Auth
+  callback; tick **Request user authorization (OAuth) during installation**. With that box ticked the
+  **Setup URL** becomes unavailable and is not used: the Callback URL finalizes the installation. The
+  App's client ID and a client secret are stored as the infra secrets `GH_APP_CLIENT_ID` and
+  `GH_APP_CLIENT_SECRET` (mapped to `GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET`, optional
+  pair); without them `installation.start` answers `503 PROVIDER_UNAVAILABLE`. Never reuse the
+  `OAUTH_GITHUB_CLIENT_*` pair, which belongs to the sign-in OAuth App.
+- **CSRF and session.** The callback is a browser GET: the `state` (HMAC, bound to user and
+  organization, single use, 10 minutes) is the CSRF guard, and the session cookie (SameSite=Lax, sent on
+  GitHub's top-level redirect) must belong to the same user, otherwise the outcome is `invalid_state`.
 
 ### Spec reads: operation (TK-45c2)
 `spec.head`, `spec.listFeatures` and `spec.getFeature` have no configuration. `spec.head` and

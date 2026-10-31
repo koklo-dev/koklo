@@ -1,3 +1,4 @@
+import { withOrganization } from "@koklo/db";
 import type { GitAuth, GitInstallation, GitProvider, GitUserCredentials } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { mapProviderError, type ProviderStep } from "./provider-errors.ts";
@@ -39,17 +40,21 @@ export class GitAccess {
   /**
    * Pour `createRepo` sur un compte personnel : le jeton utilisateur de l'appelant s'il en a un
    * (rafraîchi par le fournisseur, puis re-enregistré s'il a changé) ; sans lui, le port lève
-   * `UserTokenRequiredError`. Le jeton utilisateur ne sert qu'à cette opération : commit et
+   * `UserTokenRequiredError`. Le magasin est multi-tenant : ses accès s'exécutent sous
+   * l'organisation de l'appelant. Le jeton utilisateur ne sert qu'à cette opération : commit et
    * branche repartent d'un jeton d'installation.
    */
   async creationAuth(
     provider: GitProvider,
-    userId: string,
+    actor: { organizationId: string; userId: string },
     installation: InstallationRecord,
   ): Promise<CreationAuth> {
+    const { organizationId, userId } = actor;
     const stored =
       installation.ownerKind === "user"
-        ? await this.credentials.find(userId, installation.id)
+        ? await withOrganization(organizationId, () =>
+            this.credentials.find(userId, installation.id),
+          )
         : undefined;
     if (stored === undefined) {
       const auth = await this.installationAuth(provider, installation);
@@ -58,7 +63,9 @@ export class GitAccess {
     const create = await step("authenticate", () =>
       provider.authenticate({ installation: gitInstallationOf(installation), user: stored }),
     );
-    await this.saveIfRenewed(userId, installation, stored, create);
+    await withOrganization(organizationId, () =>
+      this.saveIfRenewed(userId, installation, stored, create),
+    );
     return { create, write: await this.installationAuth(provider, installation) };
   }
 
