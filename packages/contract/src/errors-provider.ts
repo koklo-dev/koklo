@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ownerKindSchema } from "./schemas-provider.ts";
-import { validationReportSchema } from "./schemas-spec.ts";
+import { commitShaSchema, validationReportSchema } from "./schemas-spec.ts";
 
 /**
  * Erreurs du fournisseur git et des lots d'écriture (0.5.0). Aucune ne porte de jeton, de message
@@ -76,5 +76,14 @@ export const specInvalidError = {
     status: 422,
     message: "La spec résultante est invalide",
     data: z.object({ report: validationReportSchema }),
+  },
+} as const;
+
+/** L'instantané d'index lu est en échec (ex. `spec_too_large`) : aucune entité n'est lisible. */
+export const specIndexFailedError = {
+  SPEC_INDEX_FAILED: {
+    status: 409,
+    message: "L'index de la spec est en échec pour cette révision",
+    data: z.object({ errorCode: z.string().min(1), commitSha: commitShaSchema }),
   },
 } as const;

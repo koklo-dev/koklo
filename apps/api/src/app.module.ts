@@ -24,6 +24,7 @@ import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest } from "./request-serializer.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
+import { SpecReadModule } from "./spec-read/spec-read.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
 import { SprintImportModule } from "./sprint-import/sprint-import.module.ts";
 import { TicketModule } from "./ticket/ticket.module.ts";
@@ -82,6 +83,7 @@ export class AppModule {
         GitProviderModule.forRoot(config),
         RepoModule,
         SpecBatchModule,
+        SpecReadModule,
         WebhookModule,
       ],
       controllers: [OpenApiController],

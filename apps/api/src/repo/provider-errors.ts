@@ -15,6 +15,7 @@ export type ProviderStep =
   | "authenticate"
   | "createRepo"
   | "getRepo"
+  | "readFile"
   | "writeCommit"
   | "createBranch";
 
@@ -50,7 +51,7 @@ export function mapProviderError(error: unknown, step: ProviderStep): unknown {
   if (error instanceof GitConflictError && error.reason === "exists" && step === "createRepo") {
     return conflict("repo_name_taken");
   }
-  if (error instanceof GitNotFoundError && step === "getRepo") {
+  if (error instanceof GitNotFoundError && (step === "getRepo" || step === "readFile")) {
     return notFound();
   }
   return error;

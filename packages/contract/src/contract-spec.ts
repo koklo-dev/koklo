@@ -1,6 +1,7 @@
 import {
   providerErrors,
   specBatchConflictError,
+  specIndexFailedError,
   specInvalidError,
   validationError,
 } from "./errors.ts";
@@ -27,11 +28,11 @@ const spec = {
     .input(specHeadInputSchema)
     .output(specHeadSchema),
   listFeatures: route("GET", "/projects/{projectId}/spec/features")
-    .errors(readIndexErrors)
+    .errors({ ...readIndexErrors, ...specIndexFailedError })
     .input(featureListInputSchema)
     .output(pageOf(featureSummarySchema)),
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
-    .errors({ ...readOneErrors, ...providerErrors })
+    .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })
     .input(featureGetInputSchema)
     .output(featureDetailSchema),
 };

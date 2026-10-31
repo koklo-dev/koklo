@@ -203,16 +203,17 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42)", () => {
-  it("est en 0.5.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.5.0");
-    expect(CONTRACT_VERSION).toBe("0.5.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2)", () => {
+  it("est en 0.6.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.6.0");
+    expect(CONTRACT_VERSION).toBe("0.6.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
       "0.3.0",
       "0.4.0",
       "0.5.0",
+      "0.6.0",
     ]);
   });
 
@@ -230,15 +231,18 @@ describe("CT-10 version du contrat (TK-42)", () => {
     expect(versions["0.4.0"]).toBe(
       "95f7d6490d2965f3d33c042624e2c6a9ed3d22fb55c9aeb17dbe68c76e2a2828",
     );
+    expect(versions["0.5.0"]).toBe(
+      "f08da34aca79dbf58d5b4833f19f8f9c6818bc59685692b558fda459f51817af",
+    );
   });
 
-  it("l'empreinte 0.5.0 est celle du document généré et diffère de 0.4.0", async () => {
+  it("l'empreinte 0.6.0 est celle du document généré et diffère de 0.5.0", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["0.5.0"]).toBe(hash);
-    expect(versions["0.5.0"]).not.toBe(versions["0.4.0"]);
+    expect(versions["0.6.0"]).toBe(hash);
+    expect(versions["0.6.0"]).not.toBe(versions["0.5.0"]);
   });
 });
 

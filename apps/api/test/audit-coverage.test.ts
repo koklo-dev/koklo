@@ -107,14 +107,14 @@ const WRITE_GROUPS = [
   "specBatch",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
-const READ_ONLY_GROUPS = ["audit"];
+const READ_ONLY_GROUPS = ["audit", "spec"];
 /**
- * Groupes du contrat 0.5.0 sans implémentation API (TK-44 et suivants ; `installation` n'a pas de
- * ticket dans les sprints 8-9) : ils rejoindront WRITE_GROUPS ou READ_ONLY_GROUPS avec leurs
- * scénarios d'audit. `repo` a rejoint WRITE_GROUPS avec TK-43, `specBatch` avec TK-44b (`spec`
- * reste en attente : TK-45 construit l'index qu'elle lit).
+ * Groupes du contrat sans implémentation API (`installation` n'a pas de ticket dans les sprints
+ * 8-9) : ils rejoindront WRITE_GROUPS ou READ_ONLY_GROUPS avec leurs scénarios d'audit. `repo` a
+ * rejoint WRITE_GROUPS avec TK-43, `specBatch` avec TK-44b, `spec` (lectures de l'index) READ_ONLY_GROUPS
+ * avec TK-45c2.
  */
-const PENDING_GROUPS = ["installation", "spec"];
+const PENDING_GROUPS = ["installation"];
 
 /** Sources de l'API : une référence à `contract.<groupe>` y signifie qu'une procédure est implémentée. */
 function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] {
@@ -663,6 +663,16 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
     ]);
     expect(Object.keys(contract).filter((group) => !known.has(group))).toEqual([]);
     expect(nonGetProcedures(READ_ONLY_GROUPS)).toEqual([]);
+  });
+
+  it("un groupe en lecture seule est bel et bien implémenté (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    const missing = READ_ONLY_GROUPS.filter(
+      (group) => !sources.some((source) => referencesGroup(source, group)),
+    );
+    expect(missing, `groupes en lecture seule sans implémentation : ${missing.join(", ")}`).toEqual(
+      [],
+    );
   });
 
   it("un groupe en attente n'a aucune implémentation : sinon il doit rejoindre WRITE_GROUPS ou READ_ONLY_GROUPS", () => {
