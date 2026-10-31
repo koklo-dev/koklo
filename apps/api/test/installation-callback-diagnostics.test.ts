@@ -98,6 +98,37 @@ describe("entrée de journal de l'échec du callback", () => {
     });
   });
 
+  it("403 de lecture du rôle : denial de la liste fermée journalisé, sans texte brut", async () => {
+    const { b, entries } = await run((bench_) =>
+      bench_.harness.failWith(
+        "getUserOwnerRole",
+        Object.assign(
+          new GitProviderError("getUserOwnerRole", `Resource not accessible ${CANARY}`, {
+            status: 403,
+            denial: "resource_not_accessible",
+          }),
+          { body: CANARY },
+        ),
+      ),
+    );
+    expect(entries[0]).toMatchObject({
+      step: "owner_role",
+      status: 403,
+      denial: "resource_not_accessible",
+    });
+    expect(b.lines.join("\n")).not.toContain(CANARY);
+  });
+
+  it("denial hors liste ou absent : champ absent de l'entrée", async () => {
+    const { entries } = await run((b) =>
+      b.harness.failWith(
+        "getUserOwnerRole",
+        Object.assign(new GitProviderError("getUserOwnerRole"), { status: 403, denial: CANARY }),
+      ),
+    );
+    expect(entries[0]).not.toHaveProperty("denial");
+  });
+
   it("liaison en échec (audit de la transaction) : étape link", async () => {
     const b = bench();
     const s = await installScene(b);
@@ -146,6 +177,7 @@ describe("entrée de journal de l'échec du callback", () => {
       "errorName",
       "status",
       "oauthError",
+      "denial",
     ];
     for (const key of Object.keys(entry)) expect(allowed, key).toContain(key);
   });

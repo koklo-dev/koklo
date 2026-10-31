@@ -3,6 +3,7 @@ import {
   GitAuthExpiredError,
   GitConflictError,
   type GitConflictReason,
+  type GitDenial,
   GitNotFoundError,
   type GitOwner,
   GitProviderError,
@@ -53,6 +54,20 @@ const messages = (error: RequestError): string => {
   );
   return [String(data?.message ?? ""), ...details].join(" | ").toLowerCase();
 };
+
+const DENIAL_RULES: ReadonlyArray<readonly [RegExp, GitDenial]> = [
+  [/resource not accessible by integration/, "resource_not_accessible"],
+  [/blocked/, "app_blocked"],
+  [/access policy|third-party/, "access_policy"],
+  [/saml/, "saml_enforcement"],
+  [/permission|must have/, "permission_missing"],
+];
+
+/** Motif d'un 403 : valeur de la liste fermée, jamais le texte de GitHub. */
+function denialOf(error: RequestError): GitDenial {
+  const text = messages(error);
+  return DENIAL_RULES.find(([pattern]) => pattern.test(text))?.[1] ?? "other";
+}
 
 function retryAfterMs(error: RequestError, now: () => Date): number | undefined {
   const retryAfter = Number(header(error, "retry-after"));
@@ -131,7 +146,7 @@ export const mapGitHubError = (
 ): GitProviderError => quiet(withDiagnostic(translate(error, context, now), error));
 
 /**
- * Pose le statut HTTP et le code OAuth public (liste blanche) de la réponse fautive sur l'erreur
+ * Pose le statut HTTP, le code OAuth public et le motif de refus 403 (listes fermées) de la réponse fautive sur l'erreur
  * typée, sans jamais en garder le corps ni la cause. Ne remplace pas un diagnostic déjà présent.
  */
 function withDiagnostic(mapped: GitProviderError, source: unknown): GitProviderError {
@@ -139,7 +154,11 @@ function withDiagnostic(mapped: GitProviderError, source: unknown): GitProviderE
   const oauthError = oauthErrorCodeOf(
     (source.response?.data as { error?: unknown } | undefined)?.error,
   );
-  const found = { status: source.status, ...(oauthError === undefined ? {} : { oauthError }) };
+  const found = {
+    status: source.status,
+    ...(oauthError === undefined ? {} : { oauthError }),
+    ...(source.status === 403 ? { denial: denialOf(source) } : {}),
+  };
   for (const [key, value] of Object.entries(found)) {
     if (!(key in mapped)) Object.defineProperty(mapped, key, { value, enumerable: false });
   }

@@ -29,10 +29,31 @@ export function oauthErrorCodeOf(value: unknown): OAuthErrorCode | undefined {
   return OAUTH_ERROR_CODES.find((code) => code === value);
 }
 
-/** Ce que l'on peut dire d'un échec fournisseur sans rien fuiter : statut HTTP et code OAuth public. */
+/**
+ * Motif d'un refus 403, énumération fermée calculée par l'adaptateur à partir du message de GitHub.
+ * Jamais le texte lui-même : seule une de ces valeurs peut sortir dans un journal.
+ */
+export const GIT_DENIALS = [
+  "resource_not_accessible",
+  "app_blocked",
+  "access_policy",
+  "saml_enforcement",
+  "permission_missing",
+  "other",
+] as const;
+
+export type GitDenial = (typeof GIT_DENIALS)[number];
+
+/** La valeur si elle est exactement l'un des motifs connus, sinon `undefined`. */
+export function gitDenialOf(value: unknown): GitDenial | undefined {
+  return GIT_DENIALS.find((denial) => denial === value);
+}
+
+/** Ce que l'on peut dire d'un échec fournisseur sans rien fuiter : statut, code OAuth public, motif de refus. */
 export type GitErrorDiagnostic = {
   readonly status?: number | undefined;
   readonly oauthError?: OAuthErrorCode | undefined;
+  readonly denial?: GitDenial | undefined;
 };
 
 const HTTP_MIN = 100;
