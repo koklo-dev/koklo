@@ -72,7 +72,11 @@ function parsedSnapshot(deps: PushDeps, files: readonly SpecFile[]): SnapshotWri
   return { status: "ready", spec };
 }
 
-async function indexHead(
+/**
+ * Indexe la tête d'une branche (lue à l'exécution) ; partagée par le webhook `push` et la passe P4
+ * de la réconciliation. Une exception signifie une panne à classer par l'appelant.
+ */
+export async function indexBranch(
   deps: PushDeps,
   provider: GitProvider,
   target: Target,
@@ -136,5 +140,5 @@ export async function handlePush(deps: PushDeps, push: PushJob): Promise<Deliver
   const { target } = resolution;
   if (target.installation.status !== "active" || !carriesSpec(target)) return ignored();
   if (deps.provider === null) return failedWith("provider_unavailable");
-  return indexHead(deps, deps.provider, target, branch);
+  return indexBranch(deps, deps.provider, target, branch);
 }

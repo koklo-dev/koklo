@@ -20,7 +20,24 @@ export const emptyPullRequestCount = (): PullRequestCount => ({
   reasons: {},
 });
 
-export const PASS_NAMES = ["deliveries", "batches", "prs"] as const;
+/** Bilan de P4 : têtes déplacées, têtes retirées, dépôts injoignables, dépôts sautés, raison d'arrêt. */
+export interface HeadCount {
+  updated: number;
+  removed: number;
+  unreachable: number;
+  skipped: number;
+  stopped: "rate_limited" | "budget" | null;
+}
+
+export const emptyHeadCount = (): HeadCount => ({
+  updated: 0,
+  removed: 0,
+  unreachable: 0,
+  skipped: 0,
+  stopped: null,
+});
+
+export const PASS_NAMES = ["deliveries", "batches", "prs", "heads"] as const;
 export type PassName = (typeof PASS_NAMES)[number];
 
 /** Les passes de réparation, indépendantes : la panne de l'une ne doit pas arrêter le tick. */
@@ -28,4 +45,5 @@ export interface ReconcilePasses {
   readonly deliveries: () => Promise<PassCount>;
   readonly batches: () => Promise<PassCount>;
   readonly prs: () => Promise<PullRequestCount>;
+  readonly heads: () => Promise<HeadCount>;
 }

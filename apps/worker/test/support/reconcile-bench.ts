@@ -27,6 +27,13 @@ export interface Summary {
   deliveries?: { requeued: number; skipped: number };
   batches?: { requeued: number; skipped: number };
   prs?: { done: number; closed: number; skipped: number; reasons?: Record<string, number> };
+  heads?: {
+    updated: number;
+    removed: number;
+    unreachable: number;
+    skipped: number;
+    stopped: "rate_limited" | "budget" | null;
+  };
   failedPasses?: string[];
   skipped?: string;
   durationMs?: number;

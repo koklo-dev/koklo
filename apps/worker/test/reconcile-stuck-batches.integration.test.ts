@@ -34,6 +34,7 @@ beforeEach(async () => {
 const jobs = (batchId: string) => jobsOf(bench, SPEC_WRITE_QUEUE, "batchId", batchId);
 const batch = (id: string) => bench.inner.batch(id);
 const settled = (id: string) => bench.inner.settled(id, 40_000);
+/** Audits de P2 : ceux de la passe des index de têtes (P4, `repo.reconcile.*`) sont exclus. */
 const audits = (organizationId: string) =>
   bench.query<{
     action: string;
@@ -42,7 +43,7 @@ const audits = (organizationId: string) =>
     target_kind: string;
     target_id: string;
   }>(
-    "SELECT action, actor_kind, actor_id, target_kind, target_id FROM audit_log WHERE organization_id = $1 ORDER BY occurred_at, id",
+    "SELECT action, actor_kind, actor_id, target_kind, target_id FROM audit_log WHERE organization_id = $1 AND action NOT LIKE 'repo.reconcile.%' ORDER BY occurred_at, id",
     [organizationId],
   );
 

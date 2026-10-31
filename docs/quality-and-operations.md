@@ -542,6 +542,7 @@ install --with-deps chromium` first). `turbo run e2e` still only runs the stub-A
 | Variable | Read by | Meaning |
 |----------|---------|---------|
 | `RECONCILE_GRACE_MINUTES` | worker | optional integer from 5 to 1440 (default 15): minimum age of a delivery or batch before it is considered stuck. Anything else fails the start, naming the variable and never the value |
+| `RECONCILE_MAX_PROVIDER_CALLS` | worker | optional integer from 10 to 5000 (default 300): maximum git provider calls (authentication included) of the spec-heads pass per run. Anything else fails the start, naming the variable and never the value |
 
 - **Schedule.** `*/10 * * * *` in UTC on the `reconcile` queue, registered once. Only one tick runs at a
   time (advisory lock); a skipped tick logs `skipped: already_running`.
@@ -562,7 +563,7 @@ install --with-deps chromium` first). `turbo run e2e` still only runs the stub-A
   Known limit: tickets whose pull request is closed without merge are read again at every pass
   over the list (the `pr_closed` audit is deduplicated, `closed` is recounted; unreadable
   references cost no provider call and no cap). Closed ones must be re-read since the pull request
-  can be reopened and merged later. A `last_reconciled_at` marker belongs to TK-46c.
+  can be reopened and merged later. `last_reconciled_at` (P4) is not used by P3: the marker is per repo, not per pull request.
   A provider rate limit (`rate_limited` reason) stops the pass; the ticket is read again on the
   next run. Provider errors are logged by class name (`errorName`) only, never the message.
 - **Monitoring.** The tick log carries `deliveries`, `batches` (`requeued`, `skipped`), `prs` (`done`,
@@ -573,7 +574,23 @@ install --with-deps chromium` first). `turbo run e2e` still only runs the stub-A
   bare count of `failed` jobs would stay above 0 forever):
   `SELECT count(*) FROM pgboss.job j LEFT JOIN webhook_deliveries d ON d.id::text = j.data->>'deliveryId' LEFT JOIN spec_write_batches b ON b.id::text = j.data->>'batchId' WHERE j.state = 'failed' AND ((j.name = 'webhook-delivery' AND d.status IN ('received','processing')) OR (j.name = 'spec-write' AND b.status IN ('queued','committing')))`
   should return to 0 within one tick.
-- **Not covered here.** The other passes (P4) arrive with TK-46c.
+- **P4 (TK-46c).** For each spec-bearing repo (role `spec` or a `spec_path`) of an `active` installation,
+  re-indexes the default branch and the known heads, so a lost `push` webhook or a deleted branch is
+  repaired within a few ticks. Audits `repo.reconcile.head_updated`, `head_removed` (repo checked by
+  `getRepo`) and `unreachable` (repo 404: heads kept, one entry ever); nothing is written when the state
+  is unchanged. The tick log carries `heads` (`updated`, `removed`, `unreachable`, `skipped`, `stopped`).
+  Rotation and budget: repos go by oldest `last_reconciled_at` first (never reconciled first), one at a
+  time, and at most `RECONCILE_MAX_PROVIDER_CALLS` provider calls per run (authentication included). The
+  repo is marked reconciled only when finished (an unreachable repo counts as finished), never when
+  interrupted by the budget or a rate limit, so it is resumed first on the next tick: with N repos and
+  a budget B every repo is served within a few ticks. A repo failing with a provider error is `skipped`
+  and goes behind the healthy repos on the following runs (process memory), so one broken repo does not
+  starve the others.
+  Known limits: a repo that alone needs more calls than the budget stays interrupted (keep the budget
+  at 300 or more); the failing-repo memory is lost at restart; P3 and P4 budgets are separate; a `stopped`
+  value of `budget` on many consecutive ticks means raising `RECONCILE_MAX_PROVIDER_CALLS` or fewer
+  repos per tick; `skipped` steadily above 0 means a repo that the provider refuses (permissions,
+  suspended app): see the worker logs (`errorName`).
 
 ### R1 journey (TK-36)
 
