@@ -18,6 +18,8 @@ interface Target {
   readonly auth: GitAuth;
   readonly repo: RepoRef;
   readonly batch: LoadedBatch;
+  /** Appelé juste avant `writeCommit` : à partir de là, une écriture a pu partir. */
+  readonly beforeWrite: () => Promise<void>;
 }
 
 /**
@@ -80,6 +82,7 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
   if (batch.baseSha !== null && batch.baseSha !== listing.ref) return conflicted("stale_base");
   const plan = planBatch(batch, await readSpec(target, listing));
   if ("outcome" in plan) return plan.outcome;
+  await target.beforeWrite();
   const commit = await provider.writeCommit({
     auth,
     repo,
@@ -103,6 +106,8 @@ const isStaleHead = (error: unknown): boolean =>
   error instanceof GitConflictError && error.reason === "stale-sha";
 
 /**
+ * `beforeWrite` pose le lot en `committing` juste avant `writeCommit` (jamais avant la lecture de
+ * l'état) : une panne transitoire en lecture laisse le lot `queued`, rejouable sans « sort inconnu ».
  * Exécute un lot hors de toute transaction : reprise, puis lecture-plan-commit, rejouée UNE fois
  * si la tête a bougé entre la lecture et l'écriture. Rend le résultat métier ; une panne du
  * fournisseur est levée telle quelle (le job la classe : transitoire ou métier).
@@ -111,13 +116,14 @@ export async function executeBatch(
   provider: GitProvider,
   batch: LoadedBatch,
   author: BatchAuthor | null,
+  beforeWrite: () => Promise<void>,
 ): Promise<Outcome> {
   const { externalId, ownerKind, ownerLogin } = batch.installation;
   const auth = await provider.authenticate({
     installation: { id: externalId, owner: { kind: ownerKind, login: ownerLogin } },
   });
   const repo = { owner: { kind: ownerKind, login: batch.repo.ownerLogin }, name: batch.repo.name };
-  const target: Target = { provider, auth, repo, batch };
+  const target: Target = { provider, auth, repo, batch, beforeWrite };
   const recovered = await recover(target);
   if (recovered) return recovered;
   try {
