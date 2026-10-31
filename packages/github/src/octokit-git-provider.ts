@@ -13,6 +13,7 @@ import {
 } from "./ops/pull-request.ts";
 import { createRepo, getRepo, listCommits, listFiles, readFile } from "./ops/repository.ts";
 import { exchangeUserCode, listUserInstallations } from "./ops/user-oauth.ts";
+import { getUserOwnerRole } from "./ops/user-role.ts";
 import type { OctokitGitProviderOptions } from "./options.ts";
 
 /**
@@ -40,6 +41,8 @@ export class OctokitGitProvider implements GitProvider {
     exchangeUserCode(this.#gateway, request);
   listUserInstallations: GitProvider["listUserInstallations"] = (request) =>
     listUserInstallations(this.#gateway, request);
+  getUserOwnerRole: GitProvider["getUserOwnerRole"] = (request) =>
+    getUserOwnerRole(this.#gateway, request);
   appSlug: GitProvider["appSlug"] = () => this.#appSlug.read();
   createRepo: GitProvider["createRepo"] = (request) => createRepo(this.#gateway, request);
   getRepo: GitProvider["getRepo"] = (request) => getRepo(this.#gateway, request);

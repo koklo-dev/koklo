@@ -28,6 +28,7 @@ const METHODS = [
   "subscribeWebhooks",
   "exchangeUserCode",
   "listUserInstallations",
+  "getUserOwnerRole",
   "appSlug",
 ] as const;
 
@@ -44,7 +45,7 @@ const userAuth: GitAuth = { kind: "user", token: "uat", expiresAt: FAKE_EXPIRES_
 const provider: GitProvider = new FakeGitProvider();
 
 describe("CA3 forme du port GitProvider", () => {
-  it("expose exactement les 19 opérations (TK-44 : listFiles, listCommits ; TK-48 : exchangeUserCode, listUserInstallations, appSlug)", () => {
+  it("expose exactement les 20 opérations (TK-44 : listFiles, listCommits ; TK-48 : exchangeUserCode, listUserInstallations, getUserOwnerRole, appSlug)", () => {
     expectTypeOf<keyof GitProvider>().toEqualTypeOf<(typeof METHODS)[number]>();
     for (const method of METHODS) {
       expect(typeof provider[method], method).toBe("function");

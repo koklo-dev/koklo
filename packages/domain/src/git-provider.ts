@@ -24,7 +24,7 @@ import type {
   Tag,
   Visibility,
 } from "./git-repo.ts";
-import type { GitUserInstallation } from "./git-user-installation.ts";
+import type { GitUserInstallation, UserOwnerRole } from "./git-user-installation.ts";
 import type { WebhookSubscription } from "./git-webhook.ts";
 
 /**
@@ -56,6 +56,14 @@ export interface GitProvider {
    * @throws GitAuthExpiredError
    */
   listUserInstallations(request: { auth: GitAuth }): Promise<readonly GitUserInstallation[]>;
+  /**
+   * Lien de l'utilisateur du jeton avec `owner` : `GET /user` pour un compte personnel,
+   * `GET /user/memberships/orgs/{org}` pour une organisation (aucune permission d'App
+   * supplémentaire, jeton utilisateur). Preuve de propriété d'une installation, que
+   * `listUserInstallations` seule ne donne pas.
+   * @throws GitAuthExpiredError
+   */
+  getUserOwnerRole(request: { auth: GitAuth; owner: GitOwner }): Promise<UserOwnerRole>;
   /** Identifiant d'URL de l'App (`https://github.com/apps/<slug>`). */
   appSlug(): Promise<string>;
   /** @throws UserTokenRequiredError @throws RepoCreationForbiddenError @throws GitConflictError */

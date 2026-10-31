@@ -61,6 +61,21 @@ permissions, `POST /user/repos` accepte-t-il un IAT, faut-il un user access toke
 - Device flow : seulement si un CLI doit créer sans navigateur.
 - **Client ID et client secret de l'App** en secrets d'environnement, avec App ID, clé privée et webhook secret ; distincts des secrets Better Auth GitHub.
 
+## Propriété de l'installation liée (TK-48a2, correction B1)
+`GET /user/installations` liste aussi les installations des organisations dont l'utilisateur est seulement membre ou
+collaborateur : la visibilité par le jeton utilisateur ne prouve PAS la propriété. Sans autre contrôle, un owner/admin Koklo
+membre simple d'une organisation GitHub X pourrait lier l'installation de X à son organisation Koklo (accès aux dépôts de X par
+le jeton d'installation) ou la squatter avant la vraie organisation (qui recevrait `already_linked`). Règle appliquée par l'API,
+avec le même jeton utilisateur, en plus de la visibilité :
+- compte personnel : `GET /user` doit rendre le même login que le propriétaire de l'installation (casse ignorée) ;
+- organisation : `GET /user/memberships/orgs/{org}` doit rendre `role: admin` et `state: active`.
+Tout autre cas (membre simple, invitation en attente, 404, état inconnu) est refusé (`not_owner`) sans rien écrire ; un échec de ce
+contrôle est une erreur fournisseur, jamais un lien. Cet endpoint est disponible pour les jetons utilisateur d'une GitHub App et
+n'exige aucune permission supplémentaire (doc « Permissions required for GitHub Apps », consultée le 2026-10-31) ; il répond 403 si
+l'organisation bloque l'App. À confirmer par le test sandbox : un membre non admin obtient `not_owner`, un admin `installed`, et
+le rôle d'un propriétaire d'organisation est bien `admin`. Une organisation GitHub qui restreint l'accès des Apps tierces peut
+cacher son installation à un simple membre : cela ne change pas la règle.
+
 ## Test sandbox pour passer en accepté
 NEEDS-HUMAN : créer une App de test (permission « Repository creation » en écriture, user authorization activée, tokens expirants), un compte personnel de test et une organisation de test, et fournir App ID, clé privée, client ID et secret. Puis, en notant pour chaque appel le statut HTTP, le corps d'erreur, l'en-tête `x-accepted-github-permissions` et la date :
 1. Installer l'App sur le compte personnel de test, **IAT** (`createAppAuth` `type: "installation"`) puis `POST /user/repos` : attendu 403 d'après la source tierce, à consigner.
@@ -68,6 +83,7 @@ NEEDS-HUMAN : créer une App de test (permission « Repository creation » en é
 3. Avec le repo créé en 2 : est-il accessible à l'IAT quand l'installation est en « Only select repositories » puis en « All repositories » (`GET /repos/{owner}/{repo}` en IAT) ?
 4. **IAT** de l'installation sur l'organisation de test, `POST /orgs/{org}/repos` : succès attendu, à confirmer.
 5. Optionnel : `POST /repos/{template}/generate` avec UAT puis IAT.
+6. Propriété (B1) : avec un compte simplement membre de l'organisation de test (installation visible dans `GET /user/installations`), `GET /user/memberships/orgs/{org}` doit rendre `role: member` ; avec un admin, `role: admin` et `state: active`.
 Si 2 et 4 réussissent, passer l'ADR en `accepté` avec les résultats ; si 2 échoue, la décision bascule sur l'option C.
 
 ## Correction proposée de la vision §8.1 (DÉCISION HUMAINE)

@@ -15,6 +15,21 @@ runUserOAuthConformance("InMemoryGitProvider", async () => {
     provider,
     redirectUri: "https://app.koklo.test/api/github/callback",
     unknownCode: "pas-un-code-du-faux",
+    newRoleGrant: async () => {
+      const login = `octo-roles${++grants}`;
+      const grant = {
+        code: `fake-code-${login}`,
+        login,
+        adminOrg: `admin-org-${grants}`,
+        memberOrg: `member-org-${grants}`,
+        pendingOrg: `pending-org-${grants}`,
+        strangerOrg: `stranger-org-${grants}`,
+      };
+      provider.seedOrgMembership(login, grant.adminOrg, "admin");
+      provider.seedOrgMembership(login, grant.memberOrg, "member");
+      provider.seedOrgMembership(login, grant.pendingOrg, "pending");
+      return grant;
+    },
     newGrant: async () => {
       const login = `octo${++grants}`;
       const installation = {

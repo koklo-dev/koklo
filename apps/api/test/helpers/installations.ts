@@ -42,6 +42,7 @@ export type Outcome =
   | "denied"
   | "invalid_state"
   | "already_linked"
+  | "not_owner"
   | "provider_error";
 
 export interface InstallBench {
@@ -116,10 +117,21 @@ export interface Scene {
   admin: Actor;
 }
 
-/** Monde Koklo + compte GitHub dont le jeton voit une installation. */
+export type GithubRole = "admin" | "member" | "pending" | "none";
+
+/**
+ * Monde Koklo + compte GitHub dont le jeton voit une installation. Pour une organisation GitHub,
+ * `githubRole` est le lien de ce compte avec elle (admin par défaut ; `member` : simple membre, qui voit
+ * pourtant l'installation dans `GET /user/installations`). Compte personnel : le propriétaire est le
+ * compte lui-même, sauf `ownerLogin` explicite (installation d'un tiers visible du jeton).
+ */
 export async function installScene(
   b: InstallBench,
-  over: { ownerKind?: "organization" | "user" } = {},
+  over: {
+    ownerKind?: "organization" | "user";
+    githubRole?: GithubRole;
+    ownerLogin?: string;
+  } = {},
 ): Promise<Scene> {
   const n = ++counter;
   const world = await createWorld(b.database);
@@ -127,9 +139,13 @@ export async function installScene(
   const github = {
     externalId: `${7_000_000 + n}`,
     ownerKind: over.ownerKind ?? ("organization" as const),
-    ownerLogin: over.ownerKind === "user" ? login : `acme-gh-${n}`,
+    ownerLogin: over.ownerLogin ?? (over.ownerKind === "user" ? login : `acme-gh-${n}`),
   };
   b.harness.inner.seedUserInstallation(login, github);
+  const role = over.githubRole ?? "admin";
+  if (github.ownerKind === "organization" && role !== "none") {
+    b.harness.inner.seedOrgMembership(login, github.ownerLogin, role);
+  }
   return { world, login, github, owner: world.actors.owner, admin: world.actors.admin };
 }
 
@@ -140,6 +156,9 @@ export async function installScene(
 export function reseed(b: InstallBench, s: Scene): Scene {
   const login = `${s.login}-r${++counter}`;
   b.harness.inner.seedUserInstallation(login, s.github);
+  if (s.github.ownerKind === "organization") {
+    b.harness.inner.seedOrgMembership(login, s.github.ownerLogin, "admin");
+  }
   return { ...s, login };
 }
 

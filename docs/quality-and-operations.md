@@ -481,7 +481,7 @@ token, a provider message or an e-mail address.
 - **Installation callback (TK-48a2)**: the App's Callback URL must be exactly
   `https://<web domain>/api/github/callback`; `BETTER_AUTH_URL` must be the public origin of the web
   (it builds the `redirect_uri` sent to GitHub). Each `start` purges the expired states of the
-  organization; unconsumed states are capped at 20 per user. The request log keeps the callback path
+  organization and of the user; unconsumed states are capped at 20 per user across all organizations. The request log keeps the callback path
   only (no query) and masks the `Location` header.
 - **GitHub App settings (NEEDS-HUMAN, per environment).** In the App settings, "Identifying and
   authorizing users": **Callback URL** `https://app-staging.koklo.dev/api/github/callback` (staging) or
@@ -492,6 +492,13 @@ token, a provider message or an e-mail address.
   `GH_APP_CLIENT_SECRET` (mapped to `GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET`, optional
   pair); without them `installation.start` answers `503 PROVIDER_UNAVAILABLE`. Never reuse the
   `OAUTH_GITHUB_CLIENT_*` pair, which belongs to the sign-in OAuth App.
+- **Ownership proof (B1).** Linking requires the user to own the installed account: own personal
+  account, or active admin of the GitHub organization (`GET /user/memberships/orgs/{org}`). No App
+  permission is added for it (the endpoint takes a GitHub App user access token with no extra
+  permission); an organization that blocks the App answers 403, reported as `provider_error`. A
+  refusal is the outcome `not_owner` (audit `installation.link_refused`). To check on a sandbox
+  (NEEDS-HUMAN, with the ADR 0009 test): a member who is not admin of a test organization gets
+  `not_owner`; an admin gets `installed`.
 - **CSRF and session.** The callback is a browser GET: the `state` (HMAC, bound to user and
   organization, single use, 10 minutes) is the CSRF guard, and the session cookie (SameSite=Lax, sent on
   GitHub's top-level redirect) must belong to the same user, otherwise the outcome is `invalid_state`.
