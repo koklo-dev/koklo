@@ -1,12 +1,12 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1.1
+version: 1.2
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
 - **Vue client / business** : lit les fonctionnalités en langage courant, sans jamais croiser de vocabulaire git (vision §1 principe 7, AC-48-28) : ni « commit », ni « branche », ni SHA, ni chemin de fichier, ni code d'erreur technique.
-- Écran **par projet**, en **lecture seule** (TK-48 / 48d). L'écriture (créer, modifier, supprimer) arrive en 48e sur ce même écran : aucun bouton d'écriture ici, aucun emplacement vide laissé à l'écran. Arrive depuis la liste des projets ou la barre latérale.
+- Écran **par projet**, en **lecture seule** (TK-48 / 48d). L'écriture (créer, modifier, supprimer) est décrite par la fiche [S-feature-form](S-feature-form.md) (48e) : pour la vue équipe qui écrit (propriétaire, administrateur, développeur, designer) et seulement quand la spec est lue (`ready`), s'ajoutent le bouton « Nouvelle fonctionnalité » (en-tête et état vide 4.3), le bouton « Modifier » dans le pied de la fiche, le bloc de confirmation ou de suivi au-dessus du tableau et les paramètres d'adresse `?new=1` / `?edit=F-001`. Client et business : aucun bouton d'écriture, aucun emplacement vide. Arrive depuis la liste des projets ou la barre latérale.
 
 ## 2. Tâches et parcours
 - Principale : parcourir la liste des fonctionnalités et ouvrir la fiche de l'une d'elles.
@@ -17,7 +17,7 @@ version: 1.1
   - **Fiche** : `?feature=F-001` ouvre la fiche au chargement (lien partageable). Les filtres vivent aussi dans l'adresse (`?status=…&priority=…`). Un identifiant `feature` qui ne respecte pas `F-nnn` est ignoré.
 - Sorties : `UNAUTHORIZED` sans session vers `/login` ; session sans organisation active vers `/organizations` (garde G1, jamais vers `/login` quand une session existe) ; fil d'Ariane vers « Projets ».
 - Pas de nouvelle entrée de premier niveau dans la navigation : l'écran est une dépendance d'un projet, pas une section de l'organisation (voir §8, alternative 1).
-- Hors lot (48e et suivants) : création, modification, suppression, attente de lot, tables/endpoints/écrans en lecture dédiée, recherche texte, tri, choix de la révision.
+- Hors lot : tables/endpoints/écrans en lecture dédiée, recherche texte, tri, choix de la révision. Écriture : voir S-feature-form.
 
 ## 3. Contenu
 Sources du contrat `@koklo/contract` 0.7.0 (aucun changement de contrat) :
@@ -85,7 +85,7 @@ Zone `role="status"` `aria-busy="true"`, libellé visible « Chargement des fonc
 Compteur, ligne de version, filtres, table, éventuel « Afficher plus » (§3).
 
 ### 4.3 Vide (spec lue, aucune fonctionnalité, aucun filtre)
-`Card` centrée : icône `checklist` (28), titre « Aucune fonctionnalité pour le moment », texte « La spec de ce projet ne décrit encore aucune fonctionnalité. » Aucun bouton en 48d (l'écriture arrive en 48e : le bouton « Nouvelle fonctionnalité » viendra y prendre place pour l'équipe).
+`Card` centrée : icône `checklist` (28), titre « Aucune fonctionnalité pour le moment », texte « La spec de ce projet ne décrit encore aucune fonctionnalité. » Client et business : aucun bouton. Équipe qui écrit (S-feature-form §4.1) : `Button` principal « Nouvelle fonctionnalité » (icône `add`).
 
 ### 4.4 Vide filtré
 Filtres conservés et rendus. À la place de la table : texte `role="status"` « Aucune fonctionnalité ne correspond à ces filtres. » et `Button variant="outline"` « Effacer les filtres » (le focus reste sur les `Select` au changement ; sur « Effacer » le focus passe au premier `Select`).
@@ -154,6 +154,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 ## 7. Accessibilité
 - Repères : `main` dans `SidebarInset`, h1 unique « Fonctionnalités », fil d'Ariane dans une `nav` nommée, fiche = dialogue modal nommé par son h2. `data-testid="app-shell"` conservé.
 - Ordre de focus : trigger de barre latérale, fil d'Ariane, filtres (« Statut », « Priorité »), « Effacer les filtres », liens de titre dans l'ordre de la table, « Afficher plus ». Focus visible (`--ring`). Aucun piège.
+- Écriture : le formulaire (S-feature-form) est un second `Sheet` modal qui remplace la fiche ; la région `role="status"` unique de l'écran porte aussi la confirmation et le suivi d'un enregistrement (S-feature-form §5.6, §5.7).
 - Fiche : `Sheet` modal avec focus piégé ; focus initial sur le titre de la fiche (`tabindex="-1"`), pas sur « Fermer » (on lit d'abord) ; Échap ferme et restitue le focus au lien d'origine ; croix `aria-label` « Fermer la fiche ».
 - Table : vrai `table` avec `TableCaption`, `th scope="col"`, identifiants et titres en cellules ; la colonne titre contient le seul élément interactif de la ligne.
 - Statuts doublés d'une icône **et** d'un libellé (statut de fonctionnalité, `schedule` de préparation, `warning` d'erreur, `lock` d'introuvable) ; priorité en mots. Jamais la couleur seule.
@@ -190,6 +191,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 |---|---|---|---|
 | 1 | 2026-10-31 | TK-48 (48d) | Création : liste des fonctionnalités d'un projet en lecture seule (filtres, pagination par « afficher plus »), fiche en `Sheet`, états chargement, vide, vide filtré, en préparation, projet sans dépôt de spec avec reprise en place, index en échec, introuvable, erreurs de fiche, vocabulaire sans git côté client. Détail : `.workflow/TK-48/02-design-48d.md` |
 | 1.1 | 2026-10-31 | TK-48 (48d, refactor) | États réellement livrés conformes à la fiche (tous les états de §4, clair et sombre, 375 px). Une seule correction d'écran : la zone défilante de la fiche est une région nommée « Détail de la fonctionnalité », atteignable au clavier (Tab, focus visible `--ring`), exigence axe `scrollable-region-focusable`. Captures générées. |
+| 1.2 | 2026-10-31 | TK-48 (48e) | Points d'entrée de l'écriture (bouton « Nouvelle fonctionnalité », « Modifier » dans la fiche, état vide pour l'équipe qui écrit, `?new`/`?edit`, bloc de confirmation et de suivi) ; le formulaire lui-même est dans la fiche S-feature-form v1. Aucun changement pour les rôles en lecture. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.
