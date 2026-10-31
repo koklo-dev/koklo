@@ -6,11 +6,22 @@ export type GuardedPath =
   | "/github"
   | "/organizations";
 
+/** Page d'un projet (TK-48d) : chemin dynamique, un seul segment `projectId`. */
+export type ProjectFeaturesPath = `/projects/${string}/features`;
+
+/**
+ * Résout un chemin de requête en page gardée : les chemins exacts de `GuardedPath` et
+ * `/projects/<un segment>/features`. Tout autre chemin (`/projects/<id>`, `/projects/<id>/features/x`) : null.
+ */
+export function guardedPathFor(_pathname: string): GuardedPath | ProjectFeaturesPath | null {
+  throw new Error("auth-guard: guardedPathFor non implémenté");
+}
+
 /** Destinations de redirection possibles (jamais /kanban ni /github : on y entre, on n'y renvoie pas). */
 export type RedirectPath = Exclude<GuardedPath, "/kanban" | "/github">;
 
 export interface AccessInput {
-  path: GuardedPath;
+  path: GuardedPath | ProjectFeaturesPath;
   hasSession: boolean;
   /** Ignoré sans session ; absent = on ne sait pas, donc on ne renvoie pas vers /organizations. */
   hasActiveOrganization?: boolean;

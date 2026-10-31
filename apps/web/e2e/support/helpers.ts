@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
+import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
 import type {
   BoardMode as KanbanBoard,
@@ -29,7 +30,8 @@ export async function setScenario(
     activeOrganization?: boolean;
     invitation?: "ready" | "member" | "wrong" | "invalid";
   } & GithubScenario &
-    SpecRepoScenario,
+    SpecRepoScenario &
+    FeaturesScenario,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
@@ -94,3 +96,7 @@ export async function settle(page: Page): Promise<void> {
     ),
   );
 }
+
+/** Lectures reçues par le faux API de l'écran des fonctionnalités (`spec.*`, `repo.list`), dans l'ordre. */
+export const specReadsSeen = async (): Promise<string[]> =>
+  (await fetch(`${STUB}/__spec-reads`)).json();

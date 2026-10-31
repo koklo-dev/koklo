@@ -117,10 +117,13 @@ describe("cas 2 : layout /projects (sidebar-07)", () => {
     expect(rail?.getAttribute("aria-label")).toBeTruthy();
   });
 
-  it("les projets de NavProjects ne sont pas des liens (pas de page de détail)", async () => {
+  it("les projets de NavProjects sont des liens vers /projects/<id>/features (TK-48d)", async () => {
     renderLayout();
     await within(sidebar()).findByText("Atelier Lumière");
-    expect(within(sidebar()).queryByRole("link", { name: /Atelier Lumière/ })).toBeNull();
+    for (const project of PROJECTS) {
+      const link = within(sidebar()).getByRole("link", { name: new RegExp(project.name) });
+      expect(link).toHaveAttribute("href", `/projects/${project.id}/features`);
+    }
   });
 
   it.each([

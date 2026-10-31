@@ -93,6 +93,8 @@ interface Handlers {
   addProject: (project: { id: string; name: string }) => void;
   send: Send;
   hold: (release: () => void) => void;
+  /** Le dépôt de spec vient d'être créé (réponse 200 de `repo.createSpec`). */
+  onSpecRepoCreated?: () => void;
 }
 
 export function handleSpecRepo(req: IncomingMessage, path: string, h: Handlers): boolean {
@@ -121,7 +123,11 @@ export function handleSpecRepo(req: IncomingMessage, path: string, h: Handlers):
   if (path.endsWith("/spec-repo")) {
     readBody(req, (body) => {
       specRepoCalls.push(withPathProject(path, body));
-      const answer = () => send(specRepoResponse(scenario.specRepo ?? "ok"));
+      const answer = () => {
+        const response = specRepoResponse(scenario.specRepo ?? "ok");
+        if (response.status === 200) h.onSpecRepoCreated?.();
+        send(response);
+      };
       if (scenario.specRepo === "loading") hold(answer);
       else answer();
     });
