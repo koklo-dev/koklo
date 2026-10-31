@@ -4,23 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clearCreationResume } from "./creation-resume.ts";
 import type { CreationOutcome } from "./creation-types.ts";
+import { plural } from "./features-region.ts";
 import type { FeaturesView } from "./features-view.ts";
 import { orpc } from "./orpc.ts";
-
-const plural = (count: number, word: string): string => `${count} ${word}${count > 1 ? "s" : ""}`;
-
-/** « N fonctionnalité(s) » sans filtre, « N fonctionnalité(s) affichée(s) [sur plus de N] » avec un filtre. */
-export function counterText(options: {
-  filtered: boolean;
-  total: number | undefined;
-  shown: number;
-  hasNext: boolean;
-}): string {
-  const { filtered, total, shown, hasNext } = options;
-  if (!filtered) return total === undefined ? "" : plural(total, "fonctionnalité");
-  const base = `${plural(shown, "fonctionnalité")} ${shown > 1 ? "affichées" : "affichée"}`;
-  return hasNext ? `${base} sur plus de ${shown}` : base;
-}
 
 /**
  * Annonces de la région d'état : « La spec est prête. » quand la liste remplace la carte de préparation,

@@ -25,6 +25,8 @@ import {
  * Pile locale : faux API (support/stub-features.ts) et navigateur réel ; jamais github.com ni Postgres.
  * Captures dans design/screens/captures/S-features/<état>-<thème>.png (+ -mobile à 375 px).
  */
+/** Même référentiel que les autres specs : WCAG A/AA (les règles « best-practice » visent un autre périmètre). */
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa"];
 const PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
 const FICHE_TITLE = "Connexion par e-mail";
 const ids = (role?: KanbanRole) => (role ? { role } : {});
@@ -152,10 +154,13 @@ for (const theme of ["light", "dark"] as Theme[]) {
       page,
     }) => {
       await arrive(page, state, theme);
-      await expect(page.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toBeVisible();
+      // `includeHidden` : sous une fiche modale, le reste de la page est volontairement masqué aux lecteurs d'écran.
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Fonctionnalités", includeHidden: true }),
+      ).toBeVisible();
       await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^((?!dark).)*$/);
       await capture(page, state.name, theme);
-      const results = await new AxeBuilder({ page }).analyze();
+      const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
       expect(results.violations, JSON.stringify(results.violations.map((v) => v.id))).toEqual([]);
       await releaseHeld();
     });
@@ -393,14 +398,15 @@ test.describe("375 px", () => {
     for (const name of ["Statut", "Priorité", "Critères"]) {
       await expect(page.getByRole("columnheader", { name })).toHaveCount(0);
     }
-    await expect(table.getByText("Indispensable")).toBeVisible();
+    // La ligne méta (statut · priorité · critères) remplace les colonnes masquées ; la cellule Priorité reste masquée.
+    await expect(table.getByText(/Brouillon · Indispensable · 3 critères/)).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
     await capture(page, "data", "light", "-mobile");
-    const results = await new AxeBuilder({ page }).analyze();
+    const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
     expect(results.violations).toEqual([]);
   });
 
@@ -408,6 +414,8 @@ test.describe("375 px", () => {
     await setScenario({ session: true, projects: "data" });
     await page.goto(PATH);
     await openFiche(page);
+    // La fiche glisse depuis la droite : on mesure une fois l'animation terminée.
+    await settle(page);
     const box = await page.getByRole("dialog").boundingBox();
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(370);
     expect(
@@ -416,7 +424,7 @@ test.describe("375 px", () => {
       ),
     ).toBe(true);
     await capture(page, "feature-sheet", "light", "-mobile");
-    const results = await new AxeBuilder({ page }).analyze();
+    const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
     expect(results.violations).toEqual([]);
   });
 });
