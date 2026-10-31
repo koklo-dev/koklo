@@ -515,7 +515,7 @@ token, a provider message or an e-mail address.
   | `consume_state` / `manager_check` / `target` | Database reads of the signed state, the role, the installation |
   | `exchange_code` | `POST github.com/login/oauth/access_token` (code to user token) |
   | `list_installations` | `GET /user/installations` with the new user token |
-  | `owner_role` | `GET /user` or `GET /user` + `GET /orgs/{org}/memberships/{username}` (ownership proof) |
+  | `owner_role` | `GET /user`, puis pour une organisation `GET /orgs/{org}/memberships/{username}` (ownership proof) |
   | `link` | Database transaction that links the installation (and its audit) |
   | `audit` | Writing the `link_refused` audit after a refusal (outcome is unchanged) |
 

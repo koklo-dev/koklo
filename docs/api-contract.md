@@ -932,9 +932,10 @@ merely belongs to, so visibility proves nothing. The API then asks the port `get
 same user token: personal account (`ownerKind` `user`) requires `GET /user` to return the same login
 (case ignored, role `self`); organization requires `GET /user` then `GET /orgs/{org}/memberships/{username}` to answer
 `role: admin` and `state: active` (role `admin`). A plain member, a pending invitation (`state:
-pending`), a 404 (no link) or an unknown state is `not_owner`. This endpoint needs no additional App
-permission for a user access token (GitHub, "Permissions required for GitHub Apps": none). A failure
-of that call (including a `403` when the organization blocks the App) is `provider_error`, never a
+pending`), a 404 (no link) or an unknown state is `not_owner`. The organization call needs the App
+permission "Organization permissions > Members: Read-only", accepted by an owner of the organization
+(without it GitHub answers `403 Resource not accessible by integration`). A failure
+of that call (including a `403` when the organization blocks the App or the permission is missing) is `provider_error`, never a
 link. Consequence: an organization squatted by a mere member is impossible, and the real admin can
 still link it afterwards (no `already_linked`).
 
