@@ -930,7 +930,7 @@ that token; and the proof of **ownership** of the installed account (see below).
 Ownership proof (B1). `GET /user/installations` also lists the installations of organizations the user
 merely belongs to, so visibility proves nothing. The API then asks the port `getUserOwnerRole` with the
 same user token: personal account (`ownerKind` `user`) requires `GET /user` to return the same login
-(case ignored, role `self`); organization requires `GET /user/memberships/orgs/{org}` to answer
+(case ignored, role `self`); organization requires `GET /user` then `GET /orgs/{org}/memberships/{username}` to answer
 `role: admin` and `state: active` (role `admin`). A plain member, a pending invitation (`state:
 pending`), a 404 (no link) or an unknown state is `not_owner`. This endpoint needs no additional App
 permission for a user access token (GitHub, "Permissions required for GitHub Apps": none). A failure
@@ -962,7 +962,7 @@ sequenceDiagram
   W->>A: same path and query
   A->>A: verify state, consume it (atomic)
   A->>G: exchange code, list user installations
-  A->>G: getUserOwnerRole (GET /user or /user/memberships/orgs/{org})
+  A->>G: getUserOwnerRole (GET /user, then GET /orgs/{org}/memberships/{username} for an organization)
   A->>A: one transaction: installation, encrypted token, audit
   A-->>B: 303 /github?result=installed
 ```

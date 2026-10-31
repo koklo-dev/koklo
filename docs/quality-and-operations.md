@@ -493,9 +493,11 @@ token, a provider message or an e-mail address.
   pair); without them `installation.start` answers `503 PROVIDER_UNAVAILABLE`. Never reuse the
   `OAUTH_GITHUB_CLIENT_*` pair, which belongs to the sign-in OAuth App.
 - **Ownership proof (B1).** Linking requires the user to own the installed account: own personal
-  account, or active admin of the GitHub organization (`GET /user/memberships/orgs/{org}`). No App
-  permission is added for it (the endpoint takes a GitHub App user access token with no extra
-  permission); an organization that blocks the App answers 403, reported as `provider_error`. A
+  account, or active admin of the GitHub organization (`GET /user`, then `GET /orgs/{org}/memberships/{username}`).
+  `GET /user/memberships/orgs/{org}` is not open to GitHub App user tokens (403 "Resource not
+  accessible by integration"). The App needs the organization permission **Members: Read-only**
+  (App settings > Permissions & events > Organization permissions); an organization owner must
+  accept the permission change on the existing installation. An organization that blocks the App answers 403, reported as `provider_error`. A
   refusal is the outcome `not_owner` (audit `installation.link_refused`). To check on a sandbox
   (NEEDS-HUMAN, with the ADR 0009 test): a member who is not admin of a test organization gets
   `not_owner`; an admin gets `installed`.
@@ -513,7 +515,7 @@ token, a provider message or an e-mail address.
   | `consume_state` / `manager_check` / `target` | Database reads of the signed state, the role, the installation |
   | `exchange_code` | `POST github.com/login/oauth/access_token` (code to user token) |
   | `list_installations` | `GET /user/installations` with the new user token |
-  | `owner_role` | `GET /user` or `GET /user/memberships/orgs/{org}` (ownership proof) |
+  | `owner_role` | `GET /user` or `GET /user` + `GET /orgs/{org}/memberships/{username}` (ownership proof) |
   | `link` | Database transaction that links the installation (and its audit) |
   | `audit` | Writing the `link_refused` audit after a refusal (outcome is unchanged) |
 

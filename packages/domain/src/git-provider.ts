@@ -58,8 +58,8 @@ export interface GitProvider {
   listUserInstallations(request: { auth: GitAuth }): Promise<readonly GitUserInstallation[]>;
   /**
    * Lien de l'utilisateur du jeton avec `owner` : `GET /user` pour un compte personnel,
-   * `GET /user/memberships/orgs/{org}` pour une organisation (aucune permission d'App
-   * supplémentaire, jeton utilisateur). Preuve de propriété d'une installation, que
+   * `GET /user` puis `GET /orgs/{org}/memberships/{username}` pour une organisation (permission
+   * d'organisation de l'App : Members, lecture ; jeton utilisateur). Preuve de propriété d'une installation, que
    * `listUserInstallations` seule ne donne pas.
    * @throws GitAuthExpiredError
    */

@@ -68,11 +68,12 @@ membre simple d'une organisation GitHub X pourrait lier l'installation de X à s
 le jeton d'installation) ou la squatter avant la vraie organisation (qui recevrait `already_linked`). Règle appliquée par l'API,
 avec le même jeton utilisateur, en plus de la visibilité :
 - compte personnel : `GET /user` doit rendre le même login que le propriétaire de l'installation (casse ignorée) ;
-- organisation : `GET /user/memberships/orgs/{org}` doit rendre `role: admin` et `state: active`.
+- organisation : `GET /user` (login) puis `GET /orgs/{org}/memberships/{username}` doit rendre `role: admin` et `state: active`.
 Tout autre cas (membre simple, invitation en attente, 404, état inconnu) est refusé (`not_owner`) sans rien écrire ; un échec de ce
-contrôle est une erreur fournisseur, jamais un lien. Cet endpoint est disponible pour les jetons utilisateur d'une GitHub App et
-n'exige aucune permission supplémentaire (doc « Permissions required for GitHub Apps », consultée le 2026-10-31) ; il répond 403 si
-l'organisation bloque l'App. À confirmer par le test sandbox : un membre non admin obtient `not_owner`, un admin `installed`, et
+contrôle est une erreur fournisseur, jamais un lien. Correction (preuve en staging) : `GET /user/memberships/orgs/{org}` n'est pas ouvert aux jetons utilisateur d'App
+(403 « Resource not accessible by integration »). `GET /orgs/{org}/memberships/{username}` l'est, avec la permission d'organisation
+**Members: Read-only**, à ajouter à l'App puis à ACCEPTER par un propriétaire de l'organisation sur l'installation existante ;
+il répond 403 si l'organisation bloque l'App. À confirmer par le test sandbox : un membre non admin obtient `not_owner`, un admin `installed`, et
 le rôle d'un propriétaire d'organisation est bien `admin`. Une organisation GitHub qui restreint l'accès des Apps tierces peut
 cacher son installation à un simple membre : cela ne change pas la règle.
 
@@ -83,7 +84,7 @@ NEEDS-HUMAN : créer une App de test (permission « Repository creation » en é
 3. Avec le repo créé en 2 : est-il accessible à l'IAT quand l'installation est en « Only select repositories » puis en « All repositories » (`GET /repos/{owner}/{repo}` en IAT) ?
 4. **IAT** de l'installation sur l'organisation de test, `POST /orgs/{org}/repos` : succès attendu, à confirmer.
 5. Optionnel : `POST /repos/{template}/generate` avec UAT puis IAT.
-6. Propriété (B1) : avec un compte simplement membre de l'organisation de test (installation visible dans `GET /user/installations`), `GET /user/memberships/orgs/{org}` doit rendre `role: member` ; avec un admin, `role: admin` et `state: active`.
+6. Propriété (B1) : avec un compte simplement membre de l'organisation de test (installation visible dans `GET /user/installations`), `GET /orgs/{org}/memberships/{username}` doit rendre `role: member` ; avec un admin, `role: admin` et `state: active`.
 Si 2 et 4 réussissent, passer l'ADR en `accepté` avec les résultats ; si 2 échoue, la décision bascule sur l'option C.
 
 ## Correction proposée de la vision §8.1 (DÉCISION HUMAINE)

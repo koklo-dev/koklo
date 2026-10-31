@@ -75,7 +75,7 @@ runUserOAuthConformance("OctokitGitProvider (transport simulé)", async () => {
         [`pending-org-${grants}`]: { role: "admin", state: "pending" },
       };
       for (const org of [...Object.keys(memberships), `stranger-org-${grants}`]) {
-        mock.route(`GET /user/memberships/orgs/${org}`, (request) => {
+        mock.route(`GET /orgs/${org}/memberships/${login}`, (request) => {
           const grant = tokens.get(tokenOf(request));
           if (grant === undefined) return { status: 401, body: { message: "Bad credentials" } };
           const membership = grant.memberships?.[org];
