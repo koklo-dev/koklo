@@ -48,9 +48,9 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | Écran | Version | Dernier ticket |
 |---|---|---|
 | [S-login](screens/S-login.md) | 3 | TK-85 (correction) |
-| [S-projects](screens/S-projects.md) | 4 | TK-24 |
+| [S-projects](screens/S-projects.md) | 5 | TK-48 (48c) |
 | [S-organizations](screens/S-organizations.md) | 1 | TK-24 |
 | [S-members](screens/S-members.md) | 1 | TK-24 |
 | [S-accept-invitation](screens/S-accept-invitation.md) | 1 | TK-86 |
 | [S-kanban](screens/S-kanban.md) | 1 | TK-35 |
-| [S-github](screens/S-github.md) | 1 | TK-48 (48b) |
+| [S-github](screens/S-github.md) | 3 | TK-48 (48c) |
