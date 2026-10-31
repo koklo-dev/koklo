@@ -812,8 +812,13 @@ flowchart LR
   completes. A row left `received` or `processing` (crash, enqueue lost) is not swept yet: TK-46.
 - **Push indexing.** The job indexes the head of the branch **read at execution time** through the
   port (`listFiles`), not the `after` of the payload, so out-of-order deliveries and force-pushes
-  cannot regress the index. A head whose snapshot is already `ready` only moves `spec_heads`; a branch
-  deleted at the provider removes its `spec_heads` row (snapshots stay). More than 2000 recognized
+  cannot regress the index. A head whose snapshot is already `ready` only moves `spec_heads`. The
+  `deleted` flag of the payload is never trusted: the branch is read again like for any push, so a
+  "deleted" delivery that arrives after a "recreated" one leaves the head in place. A branch found
+  missing at the provider removes its `spec_heads` row (snapshots stay), but only after `getRepo`
+  confirms the repository still exists: the real adapter answers a 404 "ref" for a deleted,
+  transferred or no longer accessible repository too, and that case is `failed` / `repo_not_found`
+  with the head untouched. More than 2000 recognized
   files make the snapshot `failed` / `spec_too_large` (the head still moves, so the failure is
   visible). Invalid spec entities are excluded and never fail the job. The `feature` counter is raised
   to the highest `F-nnn` found (at most 999999; larger ids are indexed but ignored by the counter), on

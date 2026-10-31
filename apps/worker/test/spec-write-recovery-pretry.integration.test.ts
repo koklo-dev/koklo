@@ -69,7 +69,7 @@ describe("panne transitoire AVANT writeCommit sur une branche d'au moins 50 comm
     expect(row.commit_sha).toBe(posted[0]?.sha);
     // Le listing est plafonné à 50 commits (contrat) : on vérifie la tête, pas un total.
     expect((await bench.commits(scene, "cadrage", 1))[0]?.sha).toBe(row.commit_sha);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("(a bis) readFile en 503 au 1er essai (lecture de la spec), succès au 2e : committed, un seul commit", async () => {
@@ -118,7 +118,7 @@ describe("panne transitoire AVANT writeCommit à chaque essai", () => {
     expect(bench.spy.callsOf("writeCommit")).toEqual([]);
     expect(await opsCommits(scene, id)).toEqual([]);
     expect((await bench.commits(scene, "cadrage", 500)).length).toBe(before);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 });
 
@@ -148,7 +148,7 @@ describe("le vrai cas « inconnu » reste inconnu", () => {
     expect(row).toMatchObject({ status: "failed", error_code: "INTERNAL", commit_sha: null });
     expect(bench.spy.callsOf("writeCommit")).toEqual([]);
     expect((await bench.commits(scene, "cadrage", 500)).length).toBe(before);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("(d) crash après writeCommit, trailer dans les 50 derniers commits : committed sans recommit", async () => {
@@ -208,7 +208,7 @@ describe("panne transitoire sur writeCommit lui-même (réponse perdue) : jamais
     expect(posted).toHaveLength(1);
     expect(row).toMatchObject({ status: "committed", commit_sha: posted[0]?.sha });
     expect(bench.spy.callsOf("writeCommit")).toHaveLength(1);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("(f) branche courte : committed avec le SHA déjà posé, un seul commit du lot", async () => {

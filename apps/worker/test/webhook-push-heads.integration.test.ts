@@ -85,6 +85,11 @@ describe("force-push et suppression", () => {
 describe("suppression de branche", () => {
   it("branche supprimée (deleted: true) : spec_heads retiré, snapshots conservés", async () => {
     await bench.push(scene, { after: await bench.commit(scene, feature(1)) });
+    // Le drapeau `deleted` ne suffit plus (la branche est relue) : le fournisseur la dit absente.
+    bench.spy.failWith(
+      "listFiles",
+      new GitNotFoundError({ operation: "listFiles", resource: "ref", identifier: "x" }),
+    );
 
     const row = await bench.push(scene, { deleted: true });
 

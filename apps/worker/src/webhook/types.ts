@@ -38,6 +38,7 @@ export interface PushJob {
   readonly repositoryId: string;
   readonly ref: string;
   readonly after: string;
+  /** Validé à la relecture, mais jamais lu pour décider : la branche est relue à l'exécution. */
   readonly deleted: boolean;
 }
 

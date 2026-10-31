@@ -153,8 +153,8 @@ describe("un échec métier ne bloque pas la clé", () => {
 
     expect(badRow).toMatchObject({ status: "failed", error_code: "SPEC_INVALID" });
     expect(goodRow.status).toBe("committed");
-    expect((await bench.job(bad))?.state).toBe("completed");
-    expect((await bench.job(good))?.state).toBe("completed");
+    expect((await bench.jobCompleted(bad)).state).toBe("completed");
+    expect((await bench.jobCompleted(good)).state).toBe("completed");
   });
 
   it("aucun job de la file ne reste en état failed après des échecs métier de toute nature", async () => {

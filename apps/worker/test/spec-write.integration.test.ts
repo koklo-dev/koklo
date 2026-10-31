@@ -104,7 +104,7 @@ describe("exécution d'un lot", () => {
       expect.arrayContaining(["features/F-001-premiere.md", "features/F-002-seconde.md"]),
     );
     expect(bench.spy.callsOf("writeCommit")).toHaveLength(1);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("le payload du job ne contient que batchId", async () => {
@@ -195,7 +195,7 @@ describe("un résultat métier est écrit sur le lot et le job termine normaleme
 
     expect(row).toMatchObject({ status: "conflict", error_code: "stale_base", commit_sha: null });
     expect(bench.spy.callsOf("writeCommit")).toEqual([]);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("baseSha égal à la tête : commit", async () => {
@@ -249,7 +249,7 @@ describe("un résultat métier est écrit sur le lot et le job termine normaleme
     expect(JSON.stringify(row.report)).not.toContain("T-ancienne");
     expect((await bench.read(scene, "koklo.project.yaml")).ref).toBe(head);
     expect(bench.spy.callsOf("writeCommit")).toEqual([]);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 });
 
@@ -302,7 +302,7 @@ describe("un résultat métier est écrit sur le lot et le job termine normaleme
       });
 
       expect(row).toMatchObject({ status: "failed", error_code: "PROVIDER_UNAVAILABLE" });
-      expect((await bench.job(id))?.state).toBe("completed");
+      expect((await bench.jobCompleted(id)).state).toBe("completed");
     } finally {
       await bench.start();
     }
