@@ -46,15 +46,19 @@ const isMissingRef = (error: unknown): boolean =>
   error instanceof GitNotFoundError && error.resource === "ref";
 
 /**
- * Tête de la branche lue à l'exécution, jamais le `after` de la charge : c'est ce qui rend l'ordre
- * des livraisons sans importance. Rend `undefined` si la branche n'existe plus.
+ * Tête de la branche lue à l'exécution, jamais le `after` de la charge ni le drapeau `deleted` :
+ * c'est ce qui rend l'ordre des livraisons sans importance. Rend `undefined` si la branche n'existe
+ * plus. Le 404 « ref » de l'adaptateur réel couvre aussi un dépôt supprimé, transféré ou dont
+ * l'accès est retiré : le dépôt est donc vérifié (`getRepo`) avant de conclure à une branche
+ * supprimée ; son 404 « repository » remonte et devient `failed / repo_not_found`, tête inchangée.
  */
 async function listHead(provider: GitProvider, auth: GitAuth, repo: RepoRef, branch: string) {
   try {
     return await provider.listFiles({ auth, repo, ref: branch });
   } catch (error) {
-    if (isMissingRef(error)) return undefined;
-    throw error;
+    if (!isMissingRef(error)) throw error;
+    await provider.getRepo({ auth, repo });
+    return undefined;
   }
 }
 
@@ -131,10 +135,6 @@ export async function handlePush(deps: PushDeps, push: PushJob): Promise<Deliver
   if (resolution.kind === "unknown-repo") return ignored("unknown_repo");
   const { target } = resolution;
   if (target.installation.status !== "active" || !carriesSpec(target)) return ignored();
-  if (push.deleted) {
-    await deps.targets.deleteHead(target, branch);
-    return processed();
-  }
   if (deps.provider === null) return failedWith("provider_unavailable");
   return indexHead(deps, deps.provider, target, branch);
 }

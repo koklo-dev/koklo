@@ -80,6 +80,13 @@ export class SpyProvider {
   }
 }
 
+/** Pool du banc : une erreur d'un client inactif (ex. arrêt du serveur) ne doit pas être non gérée. */
+function pooled(connectionString: string): pg.Pool {
+  const pool = new pg.Pool({ connectionString });
+  pool.on("error", () => undefined);
+  return pool;
+}
+
 export interface Scene {
   organizationId: string;
   projectId: string;
@@ -115,11 +122,7 @@ export class WorkerBench {
   static async create(): Promise<WorkerBench> {
     const container = await startTestPostgres();
     migrateDeploy(container.getConnectionUri());
-    return new WorkerBench(
-      container,
-      new pg.Pool({ connectionString: container.getConnectionUri() }),
-      new SpyProvider(),
-    );
+    return new WorkerBench(container, pooled(container.getConnectionUri()), new SpyProvider());
   }
 
   get url(): string {
@@ -339,6 +342,21 @@ export class WorkerBench {
 
   async job(batchId: string) {
     return this.worker?.boss.getJobById(SPEC_WRITE_QUEUE, batchId);
+  }
+
+  /**
+   * Attend que pg-boss ait finalisé le job (`completed`) : il le fait un peu après le règlement du
+   * lot en base. Ne relâche rien : un job qui n'arrive jamais à `completed` fait échouer l'attente.
+   */
+  async jobCompleted(batchId: string, timeout = 40_000) {
+    return vi.waitFor(
+      async () => {
+        const job = await this.job(batchId);
+        if (job?.state !== "completed") throw new Error(`job ${batchId} : ${job?.state}`);
+        return job;
+      },
+      { timeout, interval: 100 },
+    );
   }
 
   async commits(scene: Scene, branch = "cadrage", limit = 50) {

@@ -74,7 +74,7 @@ describe("reprise après crash par recherche du trailer", () => {
     expect(bench.spy.callsOf("writeCommit")).toEqual([]);
     expect(bench.spy.callsOf("listCommits").length).toBeGreaterThan(0);
     expect((await bench.commits(scene)).length).toBe(commits);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("le commit posé aussi pour un lot encore queued (job rejoué avant la première transition) est retrouvé", async () => {
@@ -161,7 +161,7 @@ describe("trailer non trouvé : inconnu, pas « non commité »", () => {
     const listing = bench.spy.callsOf("listCommits");
     expect(listing.length).toBeGreaterThan(0);
     expect(Number(listing[0]?.request.limit ?? 50)).toBeLessThanOrEqual(50);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("lot déjà pris mais historique entièrement lu (< 50 commits) sans trailer : exécution normale", async () => {

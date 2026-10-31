@@ -58,7 +58,7 @@ describe("panne transitoire du fournisseur", () => {
       "Initial commit",
     ]);
     expect(commits[0]?.message).toContain(`Koklo-Ops: ${id}`);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 });
 
@@ -83,7 +83,7 @@ describe("panne transitoire du fournisseur (suite 2)", () => {
       commit_sha: null,
     });
     expect(secondRow.status).toBe("committed");
-    expect((await bench.job(first))?.state).toBe("completed");
+    expect((await bench.jobCompleted(first)).state).toBe("completed");
     expect(bench.spy.callsOf("writeCommit").length).toBeGreaterThanOrEqual(3);
     const failedJobs = await bench.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM pgboss.job WHERE name = 'spec-write' AND state = 'failed'",
@@ -121,7 +121,7 @@ describe("panne transitoire du fournisseur (suite 3)", () => {
 
     expect(row).toMatchObject({ status: "failed", error_code: "PROVIDER_AUTH_EXPIRED" });
     expect(bench.spy.callsOf("authenticate")).toHaveLength(1);
-    expect((await bench.job(id))?.state).toBe("completed");
+    expect((await bench.jobCompleted(id)).state).toBe("completed");
   });
 
   it("aucun message brut du fournisseur ni jeton dans le lot après un échec", async () => {
@@ -164,7 +164,7 @@ describe("chemins validés à l'entrée du lot, avant tout appel fournisseur", (
 
       expect(row).toMatchObject({ status: "failed", error_code: "INTERNAL", commit_sha: null });
       expect(bench.spy.calls).toEqual([]);
-      expect((await bench.job(id))?.state).toBe("completed");
+      expect((await bench.jobCompleted(id)).state).toBe("completed");
     },
   );
 

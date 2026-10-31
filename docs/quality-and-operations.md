@@ -462,7 +462,10 @@ token, a provider message or an e-mail address.
   retention, at most `WEBHOOK_RETENTION_DAYS` days later.
 - **Signals.** Rows left `received` or `processing` (worker stopped, enqueue lost) are not swept yet:
   re-enqueueing them, with the same job id, is TK-46. A delivery `failed` carries a closed `error_code`
-  (`SELECT error_code, count(*) FROM webhook_deliveries WHERE status = 'failed' GROUP BY 1`). No job of
+  (`SELECT error_code, count(*) FROM webhook_deliveries WHERE status = 'failed' GROUP BY 1`).
+  `repo_not_found` means the repository itself is gone or no longer reachable by the installation
+  (a missing branch alone is not an error: its head is removed and the delivery is `processed`);
+  the heads are left as they were. No job of
   `webhook-delivery` should sit in the `failed` state (it would block its key):
   `SELECT count(*) FROM pgboss.job WHERE name = 'webhook-delivery' AND state = 'failed'` must be 0.
   Logs carry the delivery id, the event, the final status and the error code, never the payload, a

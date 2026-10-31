@@ -76,9 +76,7 @@ describe("pannes transitoires : relance puis failed au dernier essai", () => {
     bench.spy.failures.clear();
 
     expect(await bench.settled(second)).toMatchObject({ status: "processed" });
-    expect((await bench.worker.boss.getJobById("webhook-delivery", first))?.state).toBe(
-      "completed",
-    );
+    expect((await bench.jobCompleted(first)).state).toBe("completed");
   });
 });
 
