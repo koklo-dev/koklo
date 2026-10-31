@@ -5,7 +5,7 @@ import type { IncomingMessage } from "node:http";
  * C'est le faux fournisseur des e2e : l'URL « GitHub » renvoyée par `start` n'est jamais jointe, le test
  * intercepte la navigation côté navigateur (`page.route`). Aucune requête ne part vers github.com.
  */
-export type InstallationsMode = "loading" | "empty" | "data" | "internal";
+export type InstallationsMode = "loading" | "empty" | "data" | "internal" | "single";
 export type StartMode = "ok" | "unavailable" | "tooManyPending" | "badUrl";
 export type GithubScenario = { installations?: InstallationsMode; start?: StartMode };
 
@@ -46,6 +46,7 @@ function listResponse(mode: InstallationsMode): Reply {
   if (mode === "internal") {
     return reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
   }
+  if (mode === "single") return reply(200, [DATA[0], DATA[3], DATA[4]]);
   return reply(200, mode === "empty" ? [] : DATA);
 }
 

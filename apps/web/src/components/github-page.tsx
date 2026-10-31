@@ -1,9 +1,10 @@
 "use client";
 
 import { Alert, AlertDescription, Icon } from "@koklo/ui";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { readCreationResume } from "../lib/creation-resume.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import {
   type InstallationCallbackOutcome,
@@ -11,11 +12,11 @@ import {
   RESTRICTED_TEXT,
   RESULT_NOTICES,
 } from "../lib/github-labels.ts";
-import { assignLocation, isGithubUrl } from "../lib/github-redirect.ts";
-import { describeStartError, START_FAILED, type StartFailure } from "../lib/github-start-error.ts";
+import type { StartFailure } from "../lib/github-start-error.ts";
 import { orpc } from "../lib/orpc.ts";
 import { canManage } from "../lib/roles.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
+import { NEW_INSTALLATION, useStartInstallation } from "../lib/use-start-installation.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { GithubEmpty } from "./github-empty.tsx";
@@ -24,51 +25,11 @@ import { GithubInstallations } from "./github-installations.tsx";
 import { GithubResultNotice } from "./github-result-notice.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
 
-/** Clé de l'action en cours : « new » pour une nouvelle installation, sinon l'identifiant de la ligne. */
-const NEW_INSTALLATION = "new";
-
 const isKnownOutcome = (value: unknown): value is InstallationCallbackOutcome =>
   typeof value === "string" && Object.hasOwn(RESULT_NOTICES, value);
 
 function Title() {
   return <h1 className="text-[30px] font-semibold tracking-[-0.025em]">GitHub</h1>;
-}
-
-/** Une seule action en vol : le verrou (ref) est posé avant tout rendu, un double clic ne compte qu'une fois. */
-function useStartInstallation(onFailure: (failure: StartFailure) => void) {
-  const start = useMutation(orpc.installation.start.mutationOptions());
-  const lock = useRef(false);
-  const [active, setActive] = useState<string>();
-
-  useEffect(() => {
-    const rearm = (event: PageTransitionEvent) => {
-      if (!event.persisted) return;
-      lock.current = false;
-      setActive(undefined);
-    };
-    window.addEventListener("pageshow", rearm);
-    return () => window.removeEventListener("pageshow", rearm);
-  }, []);
-
-  const run = (installationId?: string) => {
-    if (lock.current) return;
-    lock.current = true;
-    setActive(installationId ?? NEW_INSTALLATION);
-    const fail = (failure: StartFailure) => {
-      lock.current = false;
-      setActive(undefined);
-      onFailure(failure);
-    };
-    start
-      .mutateAsync(installationId ? { installationId } : {})
-      .then(({ url }) => {
-        // L'URL vient de l'API, jamais construite ici : on ne quitte la page que vers GitHub (https).
-        if (isGithubUrl(url)) assignLocation(url);
-        else fail(START_FAILED);
-      })
-      .catch((error: unknown) => fail(describeStartError(error)));
-  };
-  return { active, run };
 }
 
 /** Liste, vide, chargement ou erreur selon la requête des installations. */
@@ -119,6 +80,12 @@ function GithubManager({ result }: { result: InstallationCallbackOutcome | undef
   const redirecting = useUnauthorizedRedirect(installations.error);
   const [outcome, setOutcome] = useState(() => (isKnownOutcome(result) ? result : undefined));
   const [failure, setFailure] = useState<StartFailure>();
+  const [resumeName, setResumeName] = useState<string>();
+
+  // Après l'installation, un marqueur de création de projet valide propose de reprendre (S-projects §5.1).
+  useEffect(() => {
+    setResumeName(outcome === "installed" ? readCreationResume()?.projectName : undefined);
+  }, [outcome]);
 
   // Le message du retour de GitHub est gardé dans l'état, puis le paramètre quitte l'URL (pas de rejeu).
   useEffect(() => {
@@ -159,7 +126,7 @@ function GithubManager({ result }: { result: InstallationCallbackOutcome | undef
           {REDIRECTING_LABEL}
         </p>
       )}
-      {outcome ? <GithubResultNotice outcome={outcome} /> : null}
+      {outcome ? <GithubResultNotice outcome={outcome} resumeProjectName={resumeName} /> : null}
       {failure ? (
         <ErrorNotice {...(failure.title ? { title: failure.title } : {})}>
           {failure.text}

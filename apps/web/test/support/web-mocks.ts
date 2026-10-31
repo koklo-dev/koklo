@@ -40,6 +40,8 @@ export const procedures = {
   ticketTransition: vi.fn(),
   installationList: vi.fn(),
   installationStart: vi.fn(),
+  repoCreateSpec: vi.fn(),
+  repoLink: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -99,6 +101,11 @@ export const orpc = {
     key: () => ["installation"],
     list: queryWithOptions(["installation", "list"], procedures.installationList),
     start: mutation(procedures.installationStart),
+  },
+  repo: {
+    key: () => ["repo"],
+    createSpec: mutation(procedures.repoCreateSpec),
+    link: mutation(procedures.repoLink),
   },
   ticket: {
     key: () => ["ticket"],

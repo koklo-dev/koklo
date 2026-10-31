@@ -1,7 +1,7 @@
 ---
 id: S-github
 titre: Application GitHub (installation et autorisation)
-version: 2
+version: 3
 ---
 ## 1. Utilisateurs et objectif
 Propriétaires et administrateurs de l'organisation active (vue équipe, vision §14). Les autres rôles (développeur, designer, client, business) n'ont pas cette page : l'entrée est absente de la navigation et un accès direct affiche un message sans action. Arrivée : entrée « GitHub » de la barre latérale, ou retour de GitHub après une installation (`/github?result=…`), ou lien depuis la création de projet (48c).
@@ -73,6 +73,8 @@ Sources : `installation.list` (`{ id, provider, ownerKind, ownerLogin, status, u
 | `not_owner` | « Seul le propriétaire du compte peut faire cette liaison » | « Vous n'êtes pas propriétaire de ce compte GitHub (pour une organisation GitHub, il faut en être administrateur). Demandez-le à un propriétaire, ou connectez-vous à GitHub avec le bon compte. » |
 | `provider_error` | « GitHub n'a pas répondu comme prévu » | « Un problème est survenu pendant l'échange avec GitHub. Rien n'a été enregistré. Réessayez dans quelques minutes. » |
 
+  Reprise de création de projet (48c) : si un marqueur de reprise valide existe dans `sessionStorage` (posé par « Autoriser Koklo » de S-projects) et que `result` vaut `installed`, le message ajoute un lien « Reprendre la création du projet « <nom> » » vers `/projects`. Aucun autre résultat n'affiche ce lien ; le marqueur n'est jamais lu pour autre chose.
+
   Comportement : à la lecture de `result`, le message est conservé dans l'état de la page puis le paramètre est retiré de l'URL (`/github`, sans nouvelle entrée d'historique) : un rechargement ne rejoue pas le message. Le message disparaît au prochain clic d'action (pas de minuterie). La liste est rechargée dans tous les cas (surtout `installed`).
 
 ## 5. Interactions et retours
@@ -118,6 +120,8 @@ Sous 768 px : le h1 et le bouton « Installer l'application GitHub » s'empilent
 |---|---|---|---|
 | 1 | 2026-10-31 | TK-48 (48b) | Création : installation de l'application GitHub, autorisation utilisateur, retour de callback (6 résultats), droits, états. Détail : `.workflow/TK-48/02-design-48b.md` |
 | 2 | 2026-10-31 | TK-48 (48b) | Implémentation : à l'état vide le bouton d'installation reste dans l'en-tête (la carte ne porte que titre + texte) ; captures générées (§12). |
+| 3 | 2026-10-31 | TK-48 (48c) | Lien de reprise « Reprendre la création du projet » après `installed` quand un marqueur de création de projet existe (voir S-projects §5.1). |
+| 3.1 | 2026-10-31 | TK-48 (48c, refactor) | Lien de reprise vérifié en e2e (`project-create.spec.ts`, retour `?result=installed`, puis notice et reprise) ; aucun changement d'écran. |
 
 ## 11. Plan d'implémentation web (brief développeur)
 Routes et garde

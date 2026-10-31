@@ -34,7 +34,13 @@ test("C1 : session sans organisation → créer une organisation → créer un p
   await page.getByTestId("create-project-button").click();
   const sheet = page.getByRole("dialog", { name: "Créer un projet" });
   await sheet.getByLabel("Nom du projet").fill(projectName);
+  // Cette pile e2e n'a aucune installation GitHub : le projet est créé sans dépôt de spec (design 48c §2),
+  // le panneau reste ouvert sur la notice « Relier GitHub » jusqu'à ce qu'on le ferme.
+  await expect(sheet.getByText("Aucun compte GitHub n'est relié", { exact: false })).toBeVisible();
   await sheet.getByRole("button", { name: "Créer le projet" }).click();
+  await expect(sheet.getByText(`Projet « ${projectName} » créé, sans dépôt de spec`)).toBeVisible();
+  await expect(sheet.getByRole("link", { name: "Relier GitHub" })).toBeVisible();
+  await sheet.getByRole("button", { name: "Fermer", exact: true }).click();
   await expect(sheet).toBeHidden();
   await expect(page.getByRole("cell", { name: projectName })).toBeVisible();
   await expect(page.getByText("1 projet", { exact: true })).toBeVisible();

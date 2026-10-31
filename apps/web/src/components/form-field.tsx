@@ -5,10 +5,19 @@ interface FormFieldProps extends Omit<ComponentProps<"input">, "id"> {
   label: string;
   error?: string | undefined;
   hint?: string;
+  /** Annonce l'erreur (`role="alert"`) ; à désactiver quand une autre alerte du même écran est déjà annoncée. */
+  announceError?: boolean;
 }
 
 /** Champ texte accessible : `Label` associé, aide et erreur liées par `aria-describedby` (erreur d'abord). */
-export function FormField({ label, error, hint, className, ...input }: FormFieldProps) {
+export function FormField({
+  label,
+  error,
+  hint,
+  announceError = true,
+  className,
+  ...input
+}: FormFieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -23,7 +32,11 @@ export function FormField({ label, error, hint, className, ...input }: FormField
         aria-describedby={describedBy || undefined}
         {...input}
       />
-      {error ? <FieldError id={errorId}>{error}</FieldError> : null}
+      {error ? (
+        <FieldError id={errorId} role={announceError ? "alert" : undefined}>
+          {error}
+        </FieldError>
+      ) : null}
       {hint ? <FieldDescription id={hintId}>{hint}</FieldDescription> : null}
     </Field>
   );

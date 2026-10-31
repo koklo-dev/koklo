@@ -33,6 +33,19 @@ const FILES = [
   "lib/github-redirect.ts",
   "app/github/page.tsx",
   "app/github/layout.tsx",
+  // TK-48c : création de projet avec dépôt de spec (design/screens/S-projects.md section 11)
+  "components/project-create-sheet.tsx",
+  "components/project-create-flow.tsx",
+  "components/project-create-steps.tsx",
+  "components/github-account-field.tsx",
+  "components/spec-repo-failure.tsx",
+  "components/spec-repo-resume-notice.tsx",
+  "lib/use-project-creation.ts",
+  "lib/spec-repo-errors.ts",
+  "lib/spec-repo-name.ts",
+  "lib/creation-resume.ts",
+  // TK-48c, repli repo.link (sous-lot détachable)
+  "components/spec-repo-link-form.tsx",
 ];
 
 const RAW_COLOR_CLASS =
