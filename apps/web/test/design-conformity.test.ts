@@ -46,6 +46,25 @@ const FILES = [
   "lib/creation-resume.ts",
   // TK-48c, repli repo.link (sous-lot détachable)
   "components/spec-repo-link-form.tsx",
+  // TK-48d : liste des fonctionnalités d'un projet (design/screens/S-features.md section 11)
+  "components/features-page.tsx",
+  "components/features-list.tsx",
+  "components/features-filters.tsx",
+  "components/feature-sheet.tsx",
+  "components/feature-detail.tsx",
+  "components/features-empty.tsx",
+  "components/spec-preparing.tsx",
+  "components/spec-repo-missing.tsx",
+  "components/spec-index-failed.tsx",
+  "components/feature-error.tsx",
+  "components/nav-projects.tsx",
+  "lib/feature-labels.ts",
+  "lib/features-url.ts",
+  "lib/spec-errors.ts",
+  "lib/use-features.ts",
+  "lib/use-spec-head.ts",
+  "app/projects/[projectId]/features/page.tsx",
+  "app/projects/[projectId]/features/layout.tsx",
 ];
 
 const RAW_COLOR_CLASS =

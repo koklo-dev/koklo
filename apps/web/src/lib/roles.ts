@@ -25,3 +25,8 @@ export function invitableRoles(role: Role | undefined): MemberRole[] {
 export function canMoveTickets(role: Role | undefined): boolean {
   return role === "owner" || role === "admin" || role === "dev" || role === "designer";
 }
+
+/** `repo.list` est réservé à l'équipe : client et business ne l'appellent jamais. */
+export function canReadRepos(_role: Role | undefined): boolean {
+  throw new Error("roles: canReadRepos non implémenté");
+}

@@ -163,7 +163,8 @@ describe("ProjectsPage — création de projet (C1.c)", () => {
     expect(procedures.projectCreate.mock.calls[0]?.[0]).toEqual({ name: "Alpha" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await screen.findByText("Alpha");
-    expect(screen.getByRole("cell", { name: "Alpha" })).toBeInTheDocument();
+    // TK-48d : le nom devient un lien vers la page du projet (suffixe lu seulement par les lecteurs d'écran)
+    expect(screen.getByRole("cell", { name: /^Alpha\s?:\s?fonctionnalités$/ })).toBeInTheDocument();
     expect(screen.getByText("1 projet")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(
       "Projet « Alpha » et dépôt de spec créés.",

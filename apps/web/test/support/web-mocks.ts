@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { type Mock, vi } from "vitest";
 
 /**
@@ -42,6 +43,11 @@ export const procedures = {
   installationStart: vi.fn(),
   repoCreateSpec: vi.fn(),
   repoLink: vi.fn(),
+  // TK-48d : lecture de la spec (contrat 0.7.0) et dépôts du projet
+  specHead: vi.fn(),
+  specListFeatures: vi.fn(),
+  specGetFeature: vi.fn(),
+  repoList: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -76,6 +82,30 @@ const queryWithOptions = (name: string[], queryFn: ReturnType<typeof vi.fn>) => 
   queryOptions: (options?: Record<string, unknown>) => ({ queryKey: name, queryFn, ...options }),
   key: () => name,
 });
+/**
+ * Procédure de lecture dont TOUTES les options TanStack (`enabled`, `refetchInterval`, `select`, ...) sont
+ * transmises telles quelles, comme le client oRPC réel (`queryOptions({ input, ...options })`).
+ */
+const queryFull = (name: string[], fn: Mock<(input?: unknown) => unknown>) => ({
+  queryOptions: ({ input, ...rest }: { input?: unknown } & Record<string, unknown> = {}) => ({
+    queryKey: [...name, input ?? null],
+    queryFn: () => fn(input),
+    ...rest,
+  }),
+  infiniteOptions: ({
+    input,
+    ...rest
+  }: {
+    input: (pageParam: unknown) => unknown;
+    initialPageParam?: unknown;
+    getNextPageParam: (lastPage: unknown) => unknown;
+  } & Record<string, unknown>) => ({
+    queryKey: [...name, "infinite", input(rest.initialPageParam)],
+    queryFn: (context: { pageParam: unknown }) => fn(input(context.pageParam)),
+    ...rest,
+  }),
+  key: () => name,
+});
 const mutation = (mutationFn: ReturnType<typeof vi.fn>) => ({
   mutationOptions: () => ({ mutationFn }),
 });
@@ -106,6 +136,13 @@ export const orpc = {
     key: () => ["repo"],
     createSpec: mutation(procedures.repoCreateSpec),
     link: mutation(procedures.repoLink),
+    list: queryFull(["repo", "list"], procedures.repoList),
+  },
+  spec: {
+    key: () => ["spec"],
+    head: queryFull(["spec", "head"], procedures.specHead),
+    listFeatures: queryFull(["spec", "listFeatures"], procedures.specListFeatures),
+    getFeature: queryFull(["spec", "getFeature"], procedures.specGetFeature),
   },
   ticket: {
     key: () => ["ticket"],
@@ -178,4 +215,47 @@ export function polyfillRadix(): void {
     unobserve() {}
     disconnect() {}
   };
+}
+
+// --- Adresse du navigateur (TK-48d) -----------------------------------------------------------------
+// Le Green lit les paramètres par `useSearchParams()` de next/navigation et les écrit par
+// `window.history.pushState` (fiche) / `replaceState` (filtres), comme le routeur de Next 16 les relit.
+
+const URL_EVENT = "koklo:test-url";
+type HistoryMethod = "pushState" | "replaceState";
+const originals: Partial<Record<HistoryMethod, History[HistoryMethod]>> = {};
+
+/** À appeler dans `beforeEach` : la navigation par l'API History notifie les composants abonnés. */
+export function watchUrl(): void {
+  for (const method of ["pushState", "replaceState"] as const) {
+    originals[method] ??= window.history[method].bind(window.history);
+    window.history[method] = ((data: unknown, unused: string, url?: string | URL | null) => {
+      originals[method]?.(data, unused, url);
+      window.dispatchEvent(new Event(URL_EVENT));
+    }) as History[HistoryMethod];
+  }
+}
+
+/** Place le navigateur sur une adresse sans notifier (avant le rendu). */
+export function setUrl(path: string): void {
+  (originals.replaceState ?? window.history.replaceState.bind(window.history))(null, "", path);
+}
+
+function subscribeToUrl(onChange: () => void): () => void {
+  window.addEventListener(URL_EVENT, onChange);
+  window.addEventListener("popstate", onChange);
+  return () => {
+    window.removeEventListener(URL_EVENT, onChange);
+    window.removeEventListener("popstate", onChange);
+  };
+}
+
+/** `useSearchParams` de next/navigation, relié à `window.location`. */
+export function useSearchParams(): URLSearchParams {
+  const search = useSyncExternalStore(
+    subscribeToUrl,
+    () => window.location.search,
+    () => "",
+  );
+  return new URLSearchParams(search);
 }

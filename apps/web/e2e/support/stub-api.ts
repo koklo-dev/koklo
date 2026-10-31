@@ -1,4 +1,10 @@
 import { createServer, type IncomingMessage } from "node:http";
+import {
+  type FeaturesScenario,
+  handleFeatures,
+  markSpecRepoCreated,
+  resetFeatures,
+} from "./stub-features.ts";
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
@@ -21,7 +27,8 @@ type Scenario = {
   role?: KanbanRole;
 } & KanbanScenario &
   GithubScenario &
-  SpecRepoScenario;
+  SpecRepoScenario &
+  FeaturesScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -151,6 +158,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetKanban();
     resetGithub();
     resetSpecRepo();
+    resetFeatures();
     if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
   });
@@ -163,14 +171,27 @@ const expireSession = () => {
 };
 
 createServer((req, res) => {
-  const path = new URL(req.url ?? "/", "http://stub").pathname;
+  const url = new URL(req.url ?? "/", "http://stub");
+  const path = url.pathname;
   const send = ({ status, body }: ReturnType<typeof json>) => {
     res.writeHead(status, { "content-type": "application/json" }).end(body);
   };
   if (path === "/__health") return send(json(200, { ok: true }));
   if (handleControl(req, path, send)) return;
   if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
-  if (handleSpecRepo(req, path, { scenario, send, hold, addProject })) return;
+  const knownProject = (id: string) =>
+    [...PROJECTS, ...createdProjects].some((project) => project.id === id);
+  if (handleFeatures(req, url, { scenario, knownProject, send, hold })) return;
+  if (
+    handleSpecRepo(req, path, {
+      scenario,
+      send,
+      hold,
+      addProject,
+      onSpecRepoCreated: markSpecRepoCreated,
+    })
+  )
+    return;
   if (path.endsWith("/projects")) {
     if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
     return send(projectsResponse());
