@@ -11,6 +11,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { insertDelivery } from "./support/spec-fixtures.ts";
 import { openPool } from "./support/ticket-fixtures.ts";
 
@@ -82,7 +83,14 @@ async function applyEarlierMigrations(target: TestDatabase): Promise<TestDatabas
   return target;
 }
 
+/** Défait d'abord les migrations postérieures (TK-48a1), de la plus récente à la plus ancienne. */
 async function rollBack(db: TestDatabase): Promise<void> {
+  for (const later of dirs()
+    .filter((d) => d > migration())
+    .reverse()) {
+    runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, later, "down.sql")], db.url);
+    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [later]);
+  }
   runPrismaOrThrow(
     ["db", "execute", "--file", join(migrationsDir, migration(), "down.sql")],
     db.url,
@@ -102,7 +110,6 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     expect(migration(), "dossier de migration *_webhook_installation_index").toBeDefined();
     expect(migration()).toMatch(/^\d{14}_webhook_installation_index$/);
     expect(migration() > previous).toBe(true);
-    expect(dirs().at(-1)).toBe(migration());
     expect(sqlOf(migration(), "down.sql").trim().length).toBeGreaterThan(0);
   });
 
@@ -124,8 +131,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("expectedTables est inchangé (aucune table ajoutée)", () => {
-    expect(expectedTables).toHaveLength(32);
+  it("cette migration n'ajoute aucune table (34 attendues au total avec TK-48a1)", () => {
+    expect(expectedTables).toHaveLength(34);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });
@@ -210,7 +217,10 @@ describe("TK-45a migration webhook_installation_index : retour arrière et sché
     const actual = await inventory(db);
     expect(actual).toEqual(expected);
     expect(actual.indexes.some((line) => line.startsWith(`${INDEX} `))).toBe(false);
-    expect(afterFirstUp.indexes.filter((line) => !actual.indexes.includes(line))).toHaveLength(1);
+    const removed = afterFirstUp.indexes.filter((line) => !actual.indexes.includes(line));
+    expect(
+      removed.filter((line) => !OAUTH_TABLES.some((table) => line.includes(table))),
+    ).toHaveLength(1);
     expect(await deliveriesOf(db)).toEqual(before);
   }, 180_000);
 

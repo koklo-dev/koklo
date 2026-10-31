@@ -79,6 +79,11 @@ export class Authenticator {
     );
   }
 
+  /** JWT de l'App (10 minutes) pour les routes réservées à l'App, comme `GET /app`. */
+  async appJwt(octokit: GitHubOctokit): Promise<string> {
+    return (await this.#appAuthFor(octokit)({ type: "app" })).token;
+  }
+
   #appAuthFor(octokit: GitHubOctokit): AppAuth {
     this.#appAuth ??= createAppAuth({ ...this.#app, request: octokit.request });
     return this.#appAuth;

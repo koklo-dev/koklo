@@ -10,6 +10,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { insertDelivery, insertFullTree, SPEC_TABLES } from "./support/spec-fixtures.ts";
 import { insertScope } from "./support/ticket-fixtures.ts";
 
@@ -66,6 +67,8 @@ async function expectSpecTablesEmpty(db: TestDatabase): Promise<void> {
   }
 }
 
+/** Tables créées par TK-41 puis TK-48a1 : absentes de l'état « TK-28 ». */
+const LATER_TABLES: readonly string[] = [...SPEC_TABLES, ...OAUTH_TABLES];
 const dirs = () => listMigrationDirs();
 const specIndexMigration = () =>
   dirs().find((dir) => dir.endsWith("_provider_spec_index")) as string;
@@ -127,9 +130,7 @@ describe("TK-41 C1 migration : up -> (données) -> down -> up, sans résidu", ()
     }
 
     const actual = await inventory(db);
-    expect(actual.tables).toEqual(
-      expectedTables.filter((t) => !(SPEC_TABLES as readonly string[]).includes(t)).sort(),
-    );
+    expect(actual.tables).toEqual(expectedTables.filter((t) => !LATER_TABLES.includes(t)).sort());
     expect(actual).toEqual(expected);
   }, 180_000);
 

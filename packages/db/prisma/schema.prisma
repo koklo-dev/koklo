@@ -17,10 +17,12 @@ model User {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  sessions    Session[]
-  accounts    Account[]
-  members     Member[]
-  invitations Invitation[]
+  sessions                Session[]
+  accounts                Account[]
+  members                 Member[]
+  invitations             Invitation[]
+  providerAuthStates      ProviderAuthState[]
+  providerUserCredentials ProviderUserCredential[]
 
   @@map("users")
 }
@@ -100,18 +102,20 @@ model Organization {
   auditLog           AuditLog[]
   projectCounters    ProjectCounter[]
 
-  providerInstallations ProviderInstallation[]
-  projectRepos          ProjectRepo[]
-  specSnapshots         SpecSnapshot[]
-  specHeads             SpecHead[]
-  specFeatures          SpecFeature[]
-  specCriteria          SpecCriterion[]
-  specTables            SpecTable[]
-  specEndpoints         SpecEndpoint[]
-  specFeatureTables     SpecFeatureTable[]
-  specFeatureEndpoints  SpecFeatureEndpoint[]
-  specWriteBatches      SpecWriteBatch[]
-  specWriteOperations   SpecWriteOperation[]
+  providerInstallations   ProviderInstallation[]
+  projectRepos            ProjectRepo[]
+  specSnapshots           SpecSnapshot[]
+  specHeads               SpecHead[]
+  specFeatures            SpecFeature[]
+  specCriteria            SpecCriterion[]
+  specTables              SpecTable[]
+  specEndpoints           SpecEndpoint[]
+  specFeatureTables       SpecFeatureTable[]
+  specFeatureEndpoints    SpecFeatureEndpoint[]
+  specWriteBatches        SpecWriteBatch[]
+  specWriteOperations     SpecWriteOperation[]
+  providerAuthStates      ProviderAuthState[]
+  providerUserCredentials ProviderUserCredential[]
 
   @@map("organizations")
 }
@@ -656,8 +660,10 @@ model ProviderInstallation {
   createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  repos        ProjectRepo[]
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repos           ProjectRepo[]
+  authStates      ProviderAuthState[]
+  userCredentials ProviderUserCredential[]
 
   @@unique([provider, externalId])
   @@unique([organizationId, id])
@@ -936,4 +942,48 @@ model WebhookDelivery {
   @@index([receivedAt])
   @@index([installationExternalId])
   @@map("webhook_deliveries")
+}
+
+/// État d'autorisation OAuth à usage unique (`consumed_at`), valable 10 minutes au plus (CHECK et index partiel : migration).
+model ProviderAuthState {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  installationId String?   @map("installation_id") @db.Uuid
+  nonce          String    @unique
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt     DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installation ProviderInstallation? @relation(fields: [organizationId, installationId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([expiresAt])
+  @@map("provider_auth_states")
+}
+
+/// Jeton utilisateur chiffré (AES-256-GCM) : `ciphertext` = chiffré suivi du tag de 16 octets, jamais en clair.
+model ProviderUserCredential {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  installationId   String    @map("installation_id") @db.Uuid
+  ciphertext       Bytes
+  nonce            Bytes
+  keyVersion       Int       @default(1) @map("key_version")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  refreshExpiresAt DateTime? @map("refresh_expires_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installation ProviderInstallation @relation(fields: [organizationId, installationId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([userId, installationId])
+  @@index([organizationId])
+  @@map("provider_user_credentials")
 }

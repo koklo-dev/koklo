@@ -168,10 +168,10 @@ describe("TK-44a migration spec_batch_outcome : dossier et contenu", () => {
     expect(up).toMatch(/'feature'/);
   });
 
-  it("ne crée aucune table (la liste des tables attendues reste celle de TK-41)", () => {
+  it("ne crée aucune table (les 32 tables de TK-41 + 2 de TK-48a1 = 34 attendues au total)", () => {
     expect(code(sqlOf(outcomeMigration(), "migration.sql"))).not.toMatch(/CREATE\s+TABLE/i);
     expect(expectedTables).toContain("spec_write_batches");
-    expect(expectedTables).toHaveLength(32);
+    expect(expectedTables).toHaveLength(34);
   });
 });
 

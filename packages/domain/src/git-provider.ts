@@ -24,6 +24,7 @@ import type {
   Tag,
   Visibility,
 } from "./git-repo.ts";
+import type { GitUserInstallation } from "./git-user-installation.ts";
 import type { WebhookSubscription } from "./git-webhook.ts";
 
 /**
@@ -45,6 +46,18 @@ export interface GitProvider {
     installation: GitInstallation;
     user?: GitUserCredentials;
   }): Promise<GitAuth>;
+  /**
+   * Échange le `code` du retour d'autorisation contre un jeton utilisateur (ADR 0009).
+   * @throws InvalidUserCodeError code refusé, expiré ou déjà utilisé (le code n'est jamais repris)
+   */
+  exchangeUserCode(request: { code: string; redirectUri: string }): Promise<GitUserCredentials>;
+  /**
+   * Installations de l'App visibles du jeton utilisateur.
+   * @throws GitAuthExpiredError
+   */
+  listUserInstallations(request: { auth: GitAuth }): Promise<readonly GitUserInstallation[]>;
+  /** Identifiant d'URL de l'App (`https://github.com/apps/<slug>`). */
+  appSlug(): Promise<string>;
   /** @throws UserTokenRequiredError @throws RepoCreationForbiddenError @throws GitConflictError */
   createRepo(request: {
     auth: GitAuth;

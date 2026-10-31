@@ -57,6 +57,7 @@ describe("configuration (C3.3)", () => {
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
       "GITHUB_WEBHOOK_SECRET",
+      "KOKLO_ENCRYPTION_KEY",
       "LOG_LEVEL",
       "PORT",
       "SENTRY_DSN",

@@ -111,6 +111,7 @@ describe("D2 erreurs du port Git <-> erreurs typées du contrat", () => {
       GitConflictError: "CONFLICT / SPEC_BATCH_CONFLICT",
       GitRateLimitedError: "PROVIDER_RATE_LIMITED",
       GitProviderUnavailableError: "PROVIDER_UNAVAILABLE",
+      InvalidUserCodeError: "INTERNAL (le flux d'autorisation de TK-48b la traduit)",
       GitProviderError: "INTERNAL (racine abstraite)",
     };
     expect(sorted(portErrors as string[])).toEqual(sorted(Object.keys(MAPPED)));
