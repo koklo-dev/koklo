@@ -27,6 +27,7 @@ import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
 import { SprintImportModule } from "./sprint-import/sprint-import.module.ts";
 import { TicketModule } from "./ticket/ticket.module.ts";
+import { WebhookModule } from "./webhook/webhook.module.ts";
 
 export interface AppModuleOptions {
   /** Destination des lignes de journal (défaut : stdout) ; les tests y lisent le JSON émis. */
@@ -81,6 +82,7 @@ export class AppModule {
         GitProviderModule.forRoot(config),
         RepoModule,
         SpecBatchModule,
+        WebhookModule,
       ],
       controllers: [OpenApiController],
     };

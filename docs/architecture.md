@@ -770,7 +770,7 @@ sequenceDiagram
   branch (`spec_heads`), never a SHA. Bot writes go through `spec_write_batches`, one batch per
   commit, with the batch id as the `Koklo-Ops:` trailer.
 - The worker job and the indexer are TK-45b (next sections); the HTTP endpoint that receives and
-  enqueues deliveries is TK-45c, so nothing enqueues a delivery in production yet.
+  enqueues deliveries is TK-45c1 (below).
 
 #### Receiving a webhook: building blocks (TK-45a)
 `@koklo/github` provides `verifyWebhookSignature` (HMAC-SHA256 over the raw body, constant-time
@@ -782,6 +782,38 @@ retention bounds. `raiseCounterTo` now lives in `@koklo/db` so that any process 
 `normalizeWebhook` also refuses a `ref` longer than 255 characters (`malformed_payload`), because the
 ref ends up in the queue key `push:<repo>:<ref>`.
 
+#### API: webhook ingestion endpoint (TK-45c1)
+`POST /api/webhooks/github` is a raw Nest route (module `apps/api/src/webhook`), outside oRPC and
+absent from `openapi.json`: GitHub sends no session and no contract JSON; the HMAC signature is the
+authentication (no session, no audit, no organization at this stage). The web app relays the path
+unchanged to `API_INTERNAL_URL` in `proxy.ts`, before any session read; the path is a literal in the
+proxy `matcher`, and any other `/api/webhooks/*` is not relayed.
+
+Checks run in this order, cheapest first, and the first failure answers (body `{ "error": code }`):
+
+| Order | Status | Code | Condition |
+|-------|--------|------|-----------|
+| 1 | 503 | `webhook_not_configured` | `GITHUB_WEBHOOK_SECRET` absent or empty (nothing is read) |
+| 2 | 413 | `payload_too_large` | `Content-Length` above 5 MiB (before reading), or a real body above 5 MiB |
+| 3 | 415 | `unsupported_media_type` | content type other than `application/json` (absent included) |
+| 4 | 401 | `invalid_signature` | `verifyWebhookSignature` over the exact raw bytes fails (same body for every cause) |
+| 5 | 400 | `invalid_headers` / `invalid_body` | `X-GitHub-Delivery` not a 36-character UUID, `X-GitHub-Event` not `[a-z_]{1,64}`, JSON invalid or not an object |
+| 6 | 202 | `{ "received": true }` | accepted, replayed or ignored |
+
+The raw 5 MiB parser (`webhook-body-parser.ts`) is mounted at the head of the Express stack in
+`onModuleInit`, because Nest registers its own 100 kB parsers before module code; every other route
+keeps its limit. `request.body` is the `Buffer` of exact bytes. After the signature: `ping` and unknown
+events answer 202 without writing; handled events but `push`/`installation` are stored `ignored`; a
+payload of the wrong shape is stored `failed` / `invalid_payload` with an empty payload and no job;
+`push` / `installation` are stored `received` (normalized payload, attempts 0) with
+`INSERT ... ON CONFLICT DO NOTHING` on `(provider, delivery_id)`, then a `webhook-delivery` job is
+enqueued. A replay answers the same 202 with no new row and no new job (the first payload wins). If
+the enqueue fails, the row is deleted and the answer is 503, so GitHub's redelivery starts afresh.
+
+Nothing sensitive reaches logs or errors: `serializeRequest` masks `x-hub-signature-256` and
+`x-hub-signature`, error bodies are fixed codes, and the enqueue error is logged without secret,
+signature or payload.
+
 #### Worker: delivery queue, handlers, spec index, purge (TK-45b)
 The `webhook-delivery` queue (pg-boss, `key_strict_fifo`) carries `{ deliveryId }` only, with the job
 `id` equal to the row id and the `singletonKey` of `webhookDeliverySingletonKey`. The handler reads the
@@ -790,7 +822,7 @@ row through the raw client and drives the state machine
 
 ```mermaid
 flowchart LR
-  P["Provider webhook"] --> E["API endpoint (TK-45c):<br/>signature, INSERT ON CONFLICT DO NOTHING"]
+  P["Provider webhook"] --> E["API endpoint (TK-45c1):<br/>signature, INSERT ON CONFLICT DO NOTHING"]
   E -->|"send {deliveryId}<br/>id=row id, key = push:repo:ref or installation:id"| Q["pg-boss webhook-delivery<br/>key_strict_fifo"]
   Q --> H["handler: state machine<br/>(jobs/webhook-delivery.ts)"]
   H -->|"installation"| IN["status + system audit<br/>(+ erase deliveries if deleted)"]

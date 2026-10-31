@@ -128,6 +128,23 @@ covers_commit: 7f97066
 - Pinned tool versions (2026-10-26, per ADR 0001): pnpm 12.15.0, turbo 2.11.10,
   Biome 2.6.3, Vitest 5.0.5, TypeScript 7.0.2.
 
+### Webhook ingestion: configuration and verification (TK-45c1)
+| Variable | Read by | Meaning |
+|----------|---------|---------|
+| `GITHUB_WEBHOOK_SECRET` | API | optional; deployed from the optional secret `GH_WEBHOOK_SECRET`. Absent or empty: the API starts, logs one warning naming the variable (never a value) and `POST /api/webhooks/github` answers 503 until it is set |
+
+- **Route.** Raw body capped at 5 MiB (`413` above, decided from `Content-Length` before reading). Order
+  of checks: 503, 413, 415, 401, 400, 202 (see `architecture.md`). The web app relays the path to the
+  API unchanged and without a session.
+- **GitHub App URLs.** Staging: `https://app-staging.koklo.dev/api/webhooks/github`. Production:
+  `https://app.koklo.dev/api/webhooks/github`. Content type `application/json`, secret equal to the one
+  stored as `GH_WEBHOOK_SECRET`.
+- **Human verification (NEEDS-HUMAN).** After configuring the App and the secret on an environment,
+  open the App settings, Advanced, **Recent Deliveries**: the `ping` delivery must show a 2xx status
+  (202). A 503 means the secret is missing on the server; a 401 means the secrets differ. Use
+  Redeliver to replay: the replay answers 202 and creates nothing.
+- **Logs.** Signature headers are masked; no secret, body or author appears in a log line or an error.
+
 ## Observability (TK-19)
 | Variable | Applies to | Meaning |
 |----------|------------|---------|
@@ -470,7 +487,7 @@ token, a provider message or an e-mail address.
   `SELECT count(*) FROM pgboss.job WHERE name = 'webhook-delivery' AND state = 'failed'` must be 0.
   Logs carry the delivery id, the event, the final status and the error code, never the payload, a
   token, a provider message or an account login. The worker reads no webhook secret: the signature is
-  verified by the API (TK-45c).
+  verified by the API (TK-45c1).
 
 ## Observability
 TO DOCUMENT — logs, metrics, traces, health checks, alerting.

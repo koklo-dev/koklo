@@ -16,6 +16,8 @@ export interface AppConfig {
   sentryDsn: string | undefined;
   /** Absent : fournisseur git non configuré (staging sans App) ; voir `GITHUB_APP_*`. */
   githubApp?: GithubAppSettings;
+  /** Secret de signature des webhooks GitHub (`GITHUB_WEBHOOK_SECRET`) ; absent : la route d'ingestion répond 503. */
+  githubWebhookSecret?: string;
   /** Attente maximale de `specBatch.submit` avant de rendre le lot en cours (ms) ; défaut : `SPEC_BATCH_WAIT_DEFAULT_MS`. */
   specBatchWaitMs?: number;
 }
@@ -35,6 +37,10 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().min(1),
   LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
   SENTRY_DSN: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
+  GITHUB_WEBHOOK_SECRET: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(1).optional(),
+  ),
   SPEC_BATCH_WAIT_MS: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.coerce.number().int().min(1).max(SPEC_BATCH_WAIT_MAX_MS).optional(),
@@ -58,6 +64,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET,
     LOG_LEVEL: env.LOG_LEVEL,
     SENTRY_DSN: env.SENTRY_DSN,
+    GITHUB_WEBHOOK_SECRET: env.GITHUB_WEBHOOK_SECRET,
     SPEC_BATCH_WAIT_MS: env.SPEC_BATCH_WAIT_MS,
   });
   if (!parsed.success) {
@@ -80,6 +87,9 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     logLevel: data.LOG_LEVEL,
     sentryDsn: data.SENTRY_DSN,
     ...(githubApp ? { githubApp } : {}),
+    ...(data.GITHUB_WEBHOOK_SECRET === undefined
+      ? {}
+      : { githubWebhookSecret: data.GITHUB_WEBHOOK_SECRET }),
     ...(data.SPEC_BATCH_WAIT_MS === undefined ? {} : { specBatchWaitMs: data.SPEC_BATCH_WAIT_MS }),
   };
 }
