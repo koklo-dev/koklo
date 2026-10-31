@@ -1,6 +1,6 @@
 import type { InstallationOutput } from "@koklo/contract";
 import { Button, cn } from "@koklo/ui";
-import { REDIRECTING_LABEL } from "../lib/github-labels.ts";
+import { ownerKindLabel, REDIRECTING_LABEL } from "../lib/github-labels.ts";
 import { AuthorizationBadge, InstallationStatusBadge } from "./github-status.tsx";
 
 const longDate = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
@@ -35,9 +35,7 @@ function InstallationRow({ installation, locked, redirecting, onAuthorize }: Row
     >
       <div className="flex flex-col gap-1">
         <h2 className="font-mono text-base font-normal">{ownerLogin}</h2>
-        <p className="text-[13px] text-muted-foreground">
-          {ownerKind === "user" ? "Compte personnel" : "Organisation GitHub"}
-        </p>
+        <p className="text-[13px] text-muted-foreground">{ownerKindLabel(ownerKind)}</p>
         <p className="text-[13px] text-muted-foreground">
           Installée le {longDate.format(new Date(createdAt))}
         </p>

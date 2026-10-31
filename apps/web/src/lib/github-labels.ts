@@ -17,6 +17,9 @@ export const AUTHORIZATION_LABELS: Record<UserAuthorization, string> = {
   expired: "Autorisation expirée",
 };
 
+export const ownerKindLabel = (ownerKind: "organization" | "user"): string =>
+  ownerKind === "user" ? "Compte personnel" : "Organisation GitHub";
+
 /** Message affiché au retour de GitHub : `status` pour le succès, `alert` pour tout le reste. */
 export const RESULT_NOTICES: Record<
   InstallationCallbackOutcome,

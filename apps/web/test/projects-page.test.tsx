@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectsPage } from "../src/components/projects-page.tsx";
+import { INSTALL_ID_1, installation } from "./support/github-fixtures.ts";
 import { renderWithQuery } from "./support/render.tsx";
 import { findNamed } from "./support/wait.ts";
 import {
@@ -115,15 +116,24 @@ describe("ProjectsPage — appel à l'action selon le rôle (C1.b, droits)", () 
   });
 });
 
+/** TK-48c : « Créer le projet » reste désactivé tant que la liste des comptes GitHub n'est pas connue. */
 async function openSheet() {
   await userEvent.click(await screen.findByTestId("create-project-button"));
   await screen.findByTestId("create-project-sheet");
-  return screen.getByRole("dialog", { name: "Créer un projet" });
+  const sheet = screen.getByRole("dialog", { name: "Créer un projet" });
+  await waitFor(() =>
+    expect(within(sheet).getByRole("button", { name: "Créer le projet" })).toBeEnabled(),
+  );
+  return sheet;
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un écran, un test par comportement
 describe("ProjectsPage — création de projet (C1.c)", () => {
-  beforeEach(() => asRole("owner"));
+  beforeEach(() => {
+    asRole("owner");
+    procedures.installationList.mockResolvedValue([installation()]);
+    procedures.repoCreateSpec.mockResolvedValue({ id: "r1", installationId: INSTALL_ID_1 });
+  });
 
   it("ouvre un panneau « Créer un projet » avec le champ, « Créer le projet » et « Annuler »", async () => {
     renderWithQuery(<ProjectsPage />);
@@ -155,17 +165,19 @@ describe("ProjectsPage — création de projet (C1.c)", () => {
     await screen.findByText("Alpha");
     expect(screen.getByRole("cell", { name: "Alpha" })).toBeInTheDocument();
     expect(screen.getByText("1 projet")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Projet « Alpha » créé.");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Projet « Alpha » et dépôt de spec créés.",
+    );
     expect(screen.getByTestId("create-project-button")).toHaveFocus();
   });
 
-  it("pendant la création : champ en lecture seule, bouton désactivé aria-busy « Création… »", async () => {
+  it("pendant la création : champ en lecture seule, bouton désactivé aria-busy « Création du projet… »", async () => {
     procedures.projectCreate.mockReturnValue(new Promise(() => undefined));
     renderWithQuery(<ProjectsPage />);
     const sheet = await openSheet();
     await userEvent.type(within(sheet).getByLabelText("Nom du projet"), "Alpha");
     await userEvent.click(within(sheet).getByRole("button", { name: "Créer le projet" }));
-    const busy = await findNamed("button", "Création…", { scope: within(sheet) });
+    const busy = await findNamed("button", "Création du projet…", { scope: within(sheet) });
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(within(sheet).getByLabelText("Nom du projet")).toHaveAttribute("readonly");
