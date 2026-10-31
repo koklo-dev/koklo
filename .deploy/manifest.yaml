@@ -4,8 +4,8 @@
 apiVersion: deploy/v1
 name: koklo
 server: vps20
-secrets: [OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET]  # GitHub refuse les secrets nommés GITHUB_* : l'api les reçoit sous leur nom d'origine par `vars`
-optionalSecrets: [GH_APP_ID, GH_APP_PRIVATE_KEY, GH_APP_CLIENT_ID, GH_APP_CLIENT_SECRET, GH_WEBHOOK_SECRET, SENTRY_DSN]  # GH_APP_ID/GH_APP_PRIVATE_KEY passent en secrets à R2 ; GH_APP_CLIENT_* restent facultatifs (jetons utilisateur, flux absent) ; mappés en GITHUB_APP_* par `vars` (GitHub refuse GITHUB_*)
+secrets: [OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET, GH_APP_ID, GH_APP_PRIVATE_KEY, GH_WEBHOOK_SECRET]  # obligatoires au déploiement (TK-47) ; GitHub refuse les secrets nommés GITHUB_* : l'api (et le worker pour l'App) les reçoit sous leur nom d'origine par `vars`
+optionalSecrets: [GH_APP_CLIENT_ID, GH_APP_CLIENT_SECRET, SENTRY_DSN]  # GH_APP_CLIENT_* restent facultatifs (jetons utilisateur, flux absent -> USER_TOKEN_REQUIRED) ; mappés en GITHUB_APP_CLIENT_* par `vars`
 generate: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]
 lockedSecrets: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]     # sessions signées, données chiffrées
 vars: { LOG_LEVEL: info, EMAIL_FROM: 'Koklo <no-reply@koklo.dev>', BETTER_AUTH_URL: 'https://${domains.app}' }   # origine web : l'API n'est pas exposée
