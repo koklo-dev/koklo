@@ -102,3 +102,21 @@ describe("redirectForError", () => {
     expect(redirectForError(new TypeError("fetch failed"))).toBeNull();
   });
 });
+
+describe("resolveAccess — /github (TK-48b)", () => {
+  it("redirige /github vers /login sans session", () => {
+    expect(resolveAccess({ path: "/github", hasSession: false })).toBe("/login");
+  });
+
+  it("redirige /github vers /organizations avec session sans organisation active", () => {
+    expect(resolveAccess({ path: "/github", hasSession: true, hasActiveOrganization: false })).toBe(
+      "/organizations",
+    );
+  });
+
+  it("laisse passer /github avec session et organisation active", () => {
+    expect(
+      resolveAccess({ path: "/github", hasSession: true, hasActiveOrganization: true }),
+    ).toBeNull();
+  });
+});

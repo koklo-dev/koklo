@@ -17,6 +17,7 @@ type Page = {
   activeOrganization?: boolean;
   board?: KanbanBoard;
   role?: KanbanRole;
+  installations?: "loading" | "empty" | "data" | "internal";
 };
 
 const PAGES: readonly Page[] = [
@@ -39,6 +40,43 @@ const PAGES: readonly Page[] = [
   },
   { name: "kanban error", path: "/kanban", session: true, projects: "data", board: "internal" },
   { name: "members", path: "/members", session: true, projects: "data" },
+  {
+    name: "github loading",
+    path: "/github",
+    session: true,
+    projects: "data",
+    installations: "loading",
+  },
+  {
+    name: "github empty",
+    path: "/github",
+    session: true,
+    projects: "data",
+    installations: "empty",
+  },
+  { name: "github data", path: "/github", session: true, projects: "data", installations: "data" },
+  {
+    name: "github error",
+    path: "/github",
+    session: true,
+    projects: "data",
+    installations: "internal",
+  },
+  {
+    name: "github result installed",
+    path: "/github?result=installed",
+    session: true,
+    projects: "data",
+    installations: "data",
+  },
+  {
+    name: "github result denied",
+    path: "/github?result=denied",
+    session: true,
+    projects: "data",
+    installations: "data",
+  },
+  { name: "github non-manager", path: "/github", session: true, projects: "data", role: "dev" },
   {
     name: "organizations create",
     path: "/organizations",
@@ -75,6 +113,7 @@ for (const theme of ["light", "dark"] as const) {
     activeOrganization,
     board,
     role,
+    installations,
   } of PAGES) {
     test(`axe WCAG AA sans violation : ${name} (${theme})`, async ({ page }) => {
       await setScenario({
@@ -84,6 +123,7 @@ for (const theme of ["light", "dark"] as const) {
         ...(activeOrganization === undefined ? {} : { activeOrganization }),
         ...(board ? { board } : {}),
         ...(role ? { role } : {}),
+        ...(installations ? { installations } : {}),
       });
       await page.goto(path);
       if (theme === "dark") await switchToDark(page);

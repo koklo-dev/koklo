@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage } from "node:http";
+import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 
 /**
@@ -17,7 +18,8 @@ type Scenario = {
   invitation?: "ready" | "member" | "wrong" | "invalid";
   /** Rôle de la personne dans l'organisation active (défaut : owner). */
   role?: KanbanRole;
-} & KanbanScenario;
+} & KanbanScenario &
+  GithubScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -141,6 +143,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
   req.on("end", () => {
     scenario = JSON.parse(raw) as Scenario;
     resetKanban();
+    resetGithub();
     send(json(200, scenario));
   });
   return true;
@@ -164,5 +167,6 @@ createServer((req, res) => {
     return send(projectsResponse());
   }
   if (handleKanban(req, path, scenario, send, hold, expireSession)) return;
+  if (handleGithub(req, path, scenario, send, hold)) return;
   send(invitationEndpoint(path) ?? readEndpoint(req.method, path));
 }).listen(Number(process.env.STUB_API_PORT ?? 3101), "127.0.0.1");

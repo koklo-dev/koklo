@@ -38,6 +38,8 @@ export const procedures = {
   sprintList: vi.fn(),
   ticketList: vi.fn(),
   ticketTransition: vi.fn(),
+  installationList: vi.fn(),
+  installationStart: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -67,6 +69,11 @@ const queryWithInput = (name: string[], fn: Mock<(input?: unknown) => unknown>) 
   call: (input?: unknown) => fn(input),
   key: () => name,
 });
+/** Requête dont les options (`enabled`…) sont transmises telles quelles, comme le client oRPC réel. */
+const queryWithOptions = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
+  queryOptions: (options?: Record<string, unknown>) => ({ queryKey: name, queryFn, ...options }),
+  key: () => name,
+});
 const mutation = (mutationFn: ReturnType<typeof vi.fn>) => ({
   mutationOptions: () => ({ mutationFn }),
 });
@@ -87,6 +94,11 @@ export const orpc = {
   sprint: {
     key: () => ["sprint"],
     list: queryWithInput(["sprint", "list"], procedures.sprintList),
+  },
+  installation: {
+    key: () => ["installation"],
+    list: queryWithOptions(["installation", "list"], procedures.installationList),
+    start: mutation(procedures.installationStart),
   },
   ticket: {
     key: () => ["ticket"],

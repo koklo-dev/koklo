@@ -135,4 +135,33 @@ describe("proxy", () => {
       );
     });
   });
+
+  describe("page /github (TK-48b)", () => {
+    const target = async (path: string) => {
+      const response = await call(path);
+      const location = response.headers.get("location");
+      return location ? new URL(location).pathname : null;
+    };
+
+    it("redirige /github vers /login sans session", async () => {
+      withSession(false);
+      expect(await target("/github")).toBe("/login");
+    });
+
+    it("redirige /github vers /organizations avec session sans organisation active", async () => {
+      withSession(true, false);
+      expect(await target("/github")).toBe("/organizations");
+    });
+
+    it("laisse passer /github?result=installed avec session et organisation active", async () => {
+      withSession(true, true);
+      const response = await call("/github?result=installed");
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    });
+
+    it("est dans le matcher, sans retirer le relais du callback GitHub", async () => {
+      const { config } = await import("../src/proxy.ts");
+      expect(config.matcher).toEqual(expect.arrayContaining(["/github", "/api/github/callback"]));
+    });
+  });
 });
