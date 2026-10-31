@@ -1,7 +1,13 @@
-export type GuardedPath = "/login" | "/projects" | "/kanban" | "/members" | "/organizations";
+export type GuardedPath =
+  | "/login"
+  | "/projects"
+  | "/kanban"
+  | "/members"
+  | "/github"
+  | "/organizations";
 
-/** Destinations de redirection possibles (jamais /kanban : on y entre, on n'y renvoie pas). */
-export type RedirectPath = Exclude<GuardedPath, "/kanban">;
+/** Destinations de redirection possibles (jamais /kanban ni /github : on y entre, on n'y renvoie pas). */
+export type RedirectPath = Exclude<GuardedPath, "/kanban" | "/github">;
 
 export interface AccessInput {
   path: GuardedPath;
@@ -22,7 +28,8 @@ export function resolveAccess({
 }: AccessInput): RedirectPath | null {
   if (!hasSession) return path === "/login" ? null : "/login";
   if (path === "/login") return "/projects";
-  const needsOrganization = path === "/projects" || path === "/kanban" || path === "/members";
+  const needsOrganization =
+    path === "/projects" || path === "/kanban" || path === "/members" || path === "/github";
   return needsOrganization && !hasActiveOrganization ? "/organizations" : null;
 }
 

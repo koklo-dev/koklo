@@ -23,6 +23,16 @@ const FILES = [
   "components/kanban-card.tsx",
   "app/kanban/page.tsx",
   "app/kanban/layout.tsx",
+  // TK-48b : écran /github
+  "components/github-page.tsx",
+  "components/github-installations.tsx",
+  "components/github-status.tsx",
+  "components/github-result-notice.tsx",
+  "components/github-empty.tsx",
+  "lib/github-labels.ts",
+  "lib/github-redirect.ts",
+  "app/github/page.tsx",
+  "app/github/layout.tsx",
 ];
 
 const RAW_COLOR_CLASS =

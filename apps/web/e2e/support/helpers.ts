@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
+import type { GithubScenario } from "./stub-github.ts";
 import type {
   BoardMode as KanbanBoard,
   KanbanRole,
@@ -16,22 +17,29 @@ export const CAPTURES_DIR = resolve(import.meta.dirname, "../../../../design/scr
 
 export type { KanbanBoard, KanbanRole, KanbanTransition };
 
-export async function setScenario(scenario: {
-  board?: KanbanBoard;
-  transition?: KanbanTransition;
-  role?: KanbanRole;
-  session: boolean;
-  projects: "loading" | "empty" | "data" | "internal" | "unauthorized";
-  organizations?: "none" | "one" | "many";
-  activeOrganization?: boolean;
-  invitation?: "ready" | "member" | "wrong" | "invalid";
-}): Promise<void> {
+export async function setScenario(
+  scenario: {
+    board?: KanbanBoard;
+    transition?: KanbanTransition;
+    role?: KanbanRole;
+    session: boolean;
+    projects: "loading" | "empty" | "data" | "internal" | "unauthorized";
+    organizations?: "none" | "one" | "many";
+    activeOrganization?: boolean;
+    invitation?: "ready" | "member" | "wrong" | "invalid";
+  } & GithubScenario,
+): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
 
 /** Transitions reçues par le faux API (`POST /tickets/{key}/transition`), dans l'ordre. */
 export async function transitionsSeen(): Promise<Array<{ key: string; to: string }>> {
   return (await fetch(`${STUB}/__transitions`)).json();
+}
+
+/** Corps reçus par `installation.start` sur le faux API, dans l'ordre. */
+export async function githubStartsSeen(): Promise<unknown[]> {
+  return (await fetch(`${STUB}/__github-starts`)).json();
 }
 
 export async function releaseHeld(): Promise<void> {
@@ -65,14 +73,14 @@ export async function switchToDark(page: Page): Promise<void> {
 export const sidebarOf = (page: Page) => page.locator('[data-slot="sidebar"]');
 export const triggerOf = (page: Page) => page.locator('[data-sidebar="trigger"]');
 
-/** Attend la fin des transitions CSS (bascule de thème) pour que la capture montre l'état final. */
+/** Attend la fin des transitions CSS (bascule de thème) ; une animation annulée en cours de route ne fait pas échouer. */
 export async function settle(page: Page): Promise<void> {
   await page.evaluate(() =>
     Promise.all(
       document
         .getAnimations()
         .filter((a) => a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
-        .map((a) => a.finished),
+        .map((a) => a.finished.catch(() => undefined)),
     ),
   );
 }

@@ -993,6 +993,12 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
   `PrismaUserCredentials` replaces `NoUserCredentials` only when the App client id and secret AND
   `KOKLO_ENCRYPTION_KEY` are configured (see Quality and operations).
 
+### Web: GitHub screen (TK-48b)
+`/github` (`GithubPage` in `AppFrame`, `app/github/page.tsx` server component) consumes `installation.list` and `installation.start`; nothing changes in the API. Guard: session + active organization (`auth-guard.ts`, `proxy.ts` matcher). The sidebar entry "GitHub" is shown to owners and admins only (`canManage`); other roles read a refusal without action or API call.
+- **Return from GitHub**: the API redirects (303) to `/github?result=<outcome>`. `page.tsx` keeps a value only if `installationCallbackOutcomeSchema` accepts it; the component stores the outcome in state, then `router.replace("/github")` removes the parameter (never replayed). The notice is `status` for `installed`, `alert` otherwise, icon + title + text from `lib/github-labels.ts`; the raw parameter is never rendered.
+- **Start**: one action in flight (a ref lock set before render, re-armed on `pageshow` from the back/forward cache). The URL comes from the API only and `isGithubUrl` (`lib/github-redirect.ts`) accepts nothing but `https://github.com` (no userinfo, no port, exact host); anything else shows an error and does not navigate. Typed errors (`PROVIDER_UNAVAILABLE`, `too_many_pending`, `NOT_FOUND`, `FORBIDDEN`) map to messages in `lib/github-start-error.ts`.
+- Statuses are always icon + text (`github-status.tsx`); no token, state, code or external id is displayed, stored or logged by the web. Screen sheet: `design/screens/S-github.md`.
+
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
 yet.
