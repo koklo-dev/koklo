@@ -1,7 +1,7 @@
 ---
 id: S-projects
 titre: Liste des projets
-version: 5
+version: 6
 ---
 ## 1. Utilisateurs et objectif
 Personne connectée (vue équipe d'abord). Elle arrive après la connexion (`/projects`). Objectif : voir les projets auxquels elle a accès. Cet écran décrit aussi le **gabarit d'application** réutilisé par les écrans suivants.
@@ -9,7 +9,7 @@ Personne connectée (vue équipe d'abord). Elle arrive après la connexion (`/pr
 ## 2. Tâches et parcours
 - Principale : repérer un projet par son nom.
 - Secondaire : relancer le chargement en cas d'erreur ; basculer clair/sombre.
-- Entrées : `/projects` (redirection depuis `/login` avec session). Sortie : sans session ou erreur `UNAUTHORIZED`, redirection vers `/login`. Le détail d'un projet est hors lot : les lignes ne sont pas des liens tant que la page détail n'existe pas.
+- Entrées : `/projects` (redirection depuis `/login` avec session). Sortie : sans session ou erreur `UNAUTHORIZED`, redirection vers `/login`. Depuis TK-48 (48d), le nom d'un projet est un lien vers `/projects/[projectId]/features` (fiche S-features) ; le groupe « Projets » de la barre latérale pointe vers la même page.
 - Création (TK-48 / 48c, remplace la création de TK-24) : le bouton « Créer un projet » (icône `add`, propriétaire et administrateur seulement) ouvre un panneau latéral (`Sheet`, 400 px) en **deux étapes visibles** : 1. Projet (`project.create`), 2. Dépôt de spec (`repo.createSpec`). Détail en §3, §4 et §5.2.
 - Création (TK-24, historique) : le bouton « Créer un projet » (icône `add`, propriétaire et administrateur seulement) ouvre un panneau latéral (`Sheet`, 400 px) avec le champ « Nom du projet ». Entrée : `/projects` exige une organisation active ; sans organisation active, redirection vers `/organizations` (jamais vers `/login` quand une session existe, lacune G1).
 
@@ -191,7 +191,7 @@ Panneau de création (48c) : sous 768 px le `Sheet` passe en pleine largeur, les
 - Cookie `sidebar_state` du bloc (état de repli, sans donnée personnelle) : à citer dans la future politique de confidentialité.
 - Icône `refresh` absente de la bibliothèque : « Réessayer » reste texte seul.
 
-- 48c : après rechargement ou nouvelle session, rien n'indique qu'un projet n'a pas de dépôt (`project.list` ne porte pas cette information, `repo.list` est par projet). La reprise ne vit que dans l'onglet. À traiter avec la page projet de 48d (état « sans dépôt de spec » + « Créer le dépôt » depuis la ligne), ou par un champ `hasSpecRepo` au contrat.
+- 48c, traité en 48d : après rechargement ou nouvelle session, l'état « projet sans dépôt de spec » et sa reprise (« Créer le dépôt de spec ») vivent dans la page du projet (S-features §4.6), sans champ `hasSpecRepo` au contrat. La liste `/projects` n'indique rien par ligne (N appels `repo.list`, interdits aux rôles client/business).
 - 48c : le nom exact du dépôt par défaut (`<slug>-spec`) est calculé par l'API ; le web ne l'affiche pas (texte d'aide seulement). À exposer si le message `repo_name_taken` doit citer le nom.
 - 48c : le retour d'autorisation passe par `/github` (cible fixe du callback) : la reprise vers `/projects` demande un clic de plus. Une cible de retour contrôlée par l'état signé est un changement d'API non prévu.
 - 48c : un dépôt orphelin laissé par un échec réel ne se supprime pas depuis Koklo (port sans suppression) : à supprimer à la main sur GitHub.
@@ -205,6 +205,7 @@ Panneau de création (48c) : sous 768 px le `Sheet` passe en pleine largeur, les
 | 3 | 2026-10-28 | TK-85 (correction) | Retour à `sidebar-07` fidèle (CLI) : TeamSwitcher, NavMain, NavProjects réels, NavUser avec déconnexion, fil d'Ariane ; largeur 248 px et marges 32/16 px alignées sur DESIGN §5, reste du bloc conservé ; 44 px mobile. Détail : `.workflow/TK-85/02-design.md` |
 | 4 | 2026-10-29 | TK-24 | Création de projet (`Sheet`, rôles owner/admin), état vide avec appel à l'action, TeamSwitcher réel (organisation active, changement, création), entrée « Membres », garde G1 vers `/organizations`. Détail : `.workflow/TK-24/02-design.md` |
 | 5 | 2026-10-31 | TK-48 (48c) | Création de projet en deux étapes visibles (projet puis dépôt de spec), choix du compte GitHub, échec partiel avec « Réessayer » sur `createSpec` seul, « Autoriser Koklo », erreurs typées du fournisseur, relier un dépôt existant, notice de reprise. Détail : `.workflow/TK-48/02-design-48c.md` |
+| 6 | 2026-10-31 | TK-48 (48d) | Lignes de la liste et groupe « Projets » de la barre latérale deviennent des liens vers les fonctionnalités du projet (S-features) ; le projet sans dépôt de spec se reprend depuis cette page (panneau de création réutilisé en place, étape 2). Détail : `.workflow/TK-48/02-design-48d.md` |
 | 5.1 | 2026-10-31 | TK-48 (48c, refactor) | Aucun changement d'écran : captures régénérées par les e2e, tests unitaires ajoutés (redirection `/login`, clic hors panneau, mouvement réduit). |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48c)
