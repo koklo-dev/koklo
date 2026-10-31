@@ -36,10 +36,12 @@ const branchesOf = (repo: HeadRepo): string[] => [
 class HeadsRun {
   readonly count: HeadCount = emptyHeadCount();
 
-  constructor(
-    private readonly deps: HeadsPassDeps,
-    private readonly provider: GitProvider,
-  ) {}
+  private readonly deps: HeadsPassDeps;
+  private readonly provider: GitProvider;
+  constructor(deps: HeadsPassDeps, provider: GitProvider) {
+    this.deps = deps;
+    this.provider = provider;
+  }
 
   async reconcile(repo: HeadRepo): Promise<RepoOutcome> {
     const { target } = repo;

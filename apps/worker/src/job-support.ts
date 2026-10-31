@@ -35,11 +35,10 @@ export const errorNameOf = (error: unknown): string =>
  * on ne lève jamais l'erreur du fournisseur (corps de réponse, jetons), seulement son code.
  */
 export class TransientJobError<Code extends string> extends Error {
-  constructor(
-    queue: string,
-    readonly code: Code,
-  ) {
+  readonly code: Code;
+  constructor(queue: string, code: Code) {
     super(`${queue}: panne transitoire (${code})`);
+    this.code = code;
     this.name = "TransientJobError";
   }
 }

@@ -15,10 +15,12 @@ export type Resolution =
  * Lectures par le client brut (l'organisation n'est connue qu'à l'issue de la lecture).
  */
 export class TargetStore {
-  constructor(
-    private readonly raw: PrismaClient,
-    private readonly client: TenantClient,
-  ) {}
+  private readonly raw: PrismaClient;
+  private readonly client: TenantClient;
+  constructor(raw: PrismaClient, client: TenantClient) {
+    this.raw = raw;
+    this.client = client;
+  }
 
   async installation(externalId: string): Promise<InstallationRow | null> {
     return this.raw.providerInstallation.findUnique({

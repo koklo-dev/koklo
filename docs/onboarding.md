@@ -51,7 +51,11 @@ tests need Docker (or `TEST_DATABASE_URL`) and fail rather than skip without it.
 Running the worker (`apps/worker`, TK-12): it needs a PostgreSQL reachable through
 `DATABASE_URL` (the process exits at startup without it). `pnpm --filter @koklo/worker dev`
 runs `node --watch src/main.ts`; `pnpm --filter @koklo/worker build` then `start` runs
-`dist/main.js`. Its integration test starts its own PostgreSQL 17 through Testcontainers,
+`dist/main.js`. `dev` runs the sources in Node's strip-only mode (types are erased, nothing is
+transformed): no constructor parameter properties, `enum`, `namespace` or `import =` in
+`apps/worker/src` (declare the field, assign it in the constructor); `test/strip-only-syntax.test.ts`
+enforces it. The `@koklo/*` packages are loaded from `dist/`, so run `pnpm build` once first.
+Its integration test starts its own PostgreSQL 17 through Testcontainers,
 so **Docker must be available** to run `pnpm test` for that package. See
 [architecture.md](architecture.md#worker-pg-boss-and-noop-job-tk-12).
 

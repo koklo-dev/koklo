@@ -29,8 +29,10 @@ export type Plan =
 
 /** Arrêt du calcul avec un résultat métier (conflit, interdit, spec invalide). */
 class PlanStop extends Error {
-  constructor(readonly outcome: Outcome) {
+  readonly outcome: Outcome;
+  constructor(outcome: Outcome) {
     super("plan stopped");
+    this.outcome = outcome;
   }
 }
 
