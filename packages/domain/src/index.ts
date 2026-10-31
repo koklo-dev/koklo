@@ -4,6 +4,7 @@ export * from "./errors.ts";
 export * from "./git-auth.ts";
 export * from "./git-check.ts";
 export * from "./git-deployment.ts";
+export * from "./git-diagnostic.ts";
 export * from "./git-errors.ts";
 export * from "./git-owner.ts";
 export * from "./git-provider.ts";

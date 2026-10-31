@@ -502,6 +502,36 @@ token, a provider message or an e-mail address.
 - **CSRF and session.** The callback is a browser GET: the `state` (HMAC, bound to user and
   organization, single use, 10 minutes) is the CSRF guard, and the session cookie (SameSite=Lax, sent on
   GitHub's top-level redirect) must belong to the same user, otherwise the outcome is `invalid_state`.
+- **Reading a `provider_error` (callback diagnostic).** A `provider_error` redirect always leaves one
+  log entry `installation callback failed` (level 40) with a closed set of fields and nothing else:
+  `step`, `errorName`, optional `status` and optional `oauthError`. Never the code, state, token,
+  client secret, URL, error message or response body.
+
+  | `step` | Meaning |
+  | --- | --- |
+  | `request` | Failure outside the named steps (session lookup, unexpected error) |
+  | `consume_state` / `manager_check` / `target` | Database reads of the signed state, the role, the installation |
+  | `exchange_code` | `POST github.com/login/oauth/access_token` (code to user token) |
+  | `list_installations` | `GET /user/installations` with the new user token |
+  | `owner_role` | `GET /user` or `GET /user/memberships/orgs/{org}` (ownership proof) |
+  | `link` | Database transaction that links the installation (and its audit) |
+  | `audit` | Writing the `link_refused` audit after a refusal (outcome is unchanged) |
+
+  `status` is the HTTP status of the failing GitHub call (GitHub answers **200** with an `error` field on
+  the token endpoint, so `status: 200` with an `oauthError` is a refused exchange). `oauthError` is kept
+  only if it is one of GitHub's public OAuth codes (allow list in `@koklo/domain`, `OAUTH_ERROR_CODES`);
+  any other value is dropped. Typical readings of `step: exchange_code`: `redirect_uri_mismatch` (the
+  App's Callback URL differs from `<BETTER_AUTH_URL>/api/github/callback`),
+  `incorrect_client_credentials` (wrong `GH_APP_CLIENT_ID` / `GH_APP_CLIENT_SECRET`),
+  `bad_verification_code` (reused or expired code: reported as `denied`, not `provider_error`),
+  `unauthorized_client`, `application_suspended`, `access_denied`. No `oauthError` with `status` 5xx:
+  GitHub outage; with `status` 401 or 403 on a later step: user token or organization App policy.
+  Example: `{"level":40,"step":"exchange_code","errorName":"GitProviderError","status":200,"oauthError":"redirect_uri_mismatch","msg":"installation callback failed"}`.
+- **User token expiry.** With "Expire user authorization tokens" on (GitHub's default), the exchange
+  response carries `expires_in` (8 h) and `refresh_token` (+ `refresh_token_expires_in`); the adapter
+  stores both. A response without them (option off) is treated as valid for 8 h without refresh. The
+  exchange sends `Accept: application/json`, `client_id`, `client_secret`, `code` and `redirect_uri`
+  (optional on GitHub's side, but if sent it must equal the Callback URL, which it does).
 
 ### Spec reads: operation (TK-45c2)
 `spec.head`, `spec.listFeatures` and `spec.getFeature` have no configuration. `spec.head` and

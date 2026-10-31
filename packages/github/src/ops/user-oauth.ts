@@ -3,6 +3,7 @@ import {
   type GitUserCredentials,
   type GitUserInstallation,
   InvalidUserCodeError,
+  oauthErrorCodeOf,
 } from "@koklo/domain";
 import { WRITE } from "../client.ts";
 import type { Gateway } from "../gateway.ts";
@@ -50,16 +51,16 @@ export function exchangeUserCode(
       headers: { accept: "application/json" },
       ...WRITE,
     });
-    return fromGrant(response.data as TokenResponse, gw.now().getTime());
+    return fromGrant(response.data as TokenResponse, response.status, gw.now().getTime());
   });
 }
 
-function fromGrant(data: TokenResponse, now: number): GitUserCredentials {
-  if (data.error === "bad_verification_code") {
-    throw new InvalidUserCodeError({ operation: EXCHANGE });
-  }
+function fromGrant(data: TokenResponse, status: number, now: number): GitUserCredentials {
+  // Seul le code public de la liste blanche est gardé : ni `error_description`, ni le corps.
+  const diagnostic = { operation: EXCHANGE, status, oauthError: oauthErrorCodeOf(data.error) };
+  if (data.error === "bad_verification_code") throw new InvalidUserCodeError(diagnostic);
   if (data.error !== undefined || typeof data.access_token !== "string") {
-    throw new GitProviderError(EXCHANGE);
+    throw new GitProviderError(EXCHANGE, undefined, diagnostic);
   }
   const at = (seconds: number) => new Date(now + seconds * 1000).toISOString();
   return {

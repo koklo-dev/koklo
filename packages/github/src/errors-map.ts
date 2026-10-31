@@ -8,6 +8,7 @@ import {
   GitProviderError,
   GitProviderUnavailableError,
   GitRateLimitedError,
+  oauthErrorCodeOf,
   RepoCreationForbiddenError,
 } from "@koklo/domain";
 import type { RequestError } from "@octokit/request-error";
@@ -127,7 +128,23 @@ export const mapGitHubError = (
   error: unknown,
   context: ErrorContext,
   now: () => Date,
-): GitProviderError => quiet(translate(error, context, now));
+): GitProviderError => quiet(withDiagnostic(translate(error, context, now), error));
+
+/**
+ * Pose le statut HTTP et le code OAuth public (liste blanche) de la réponse fautive sur l'erreur
+ * typée, sans jamais en garder le corps ni la cause. Ne remplace pas un diagnostic déjà présent.
+ */
+function withDiagnostic(mapped: GitProviderError, source: unknown): GitProviderError {
+  if (!isRequestError(source)) return mapped;
+  const oauthError = oauthErrorCodeOf(
+    (source.response?.data as { error?: unknown } | undefined)?.error,
+  );
+  const found = { status: source.status, ...(oauthError === undefined ? {} : { oauthError }) };
+  for (const [key, value] of Object.entries(found)) {
+    if (!(key in mapped)) Object.defineProperty(mapped, key, { value, enumerable: false });
+  }
+  return mapped;
+}
 
 function translate(error: unknown, context: ErrorContext, now: () => Date): GitProviderError {
   if (error instanceof GitProviderError) return error;
