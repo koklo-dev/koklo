@@ -65,6 +65,26 @@ const FILES = [
   "lib/use-spec-head.ts",
   "app/projects/[projectId]/features/page.tsx",
   "app/projects/[projectId]/features/layout.tsx",
+  // TK-48e : formulaire d'une fonctionnalité (design/screens/S-feature-form.md section 11)
+  "components/feature-form-sheet.tsx",
+  "components/feature-form-fields.tsx",
+  "components/feature-criteria-editor.tsx",
+  "components/criterion-item.tsx",
+  "components/feature-links-fields.tsx",
+  "components/feature-form-errors.tsx",
+  "components/save-progress.tsx",
+  "components/draft-banner.tsx",
+  "components/saved-notice.tsx",
+  "lib/feature-form.ts",
+  "lib/feature-operation.ts",
+  "lib/feature-draft.ts",
+  "lib/feature-rebase.ts",
+  "lib/feature-errors.ts",
+  "lib/feature-tracking.ts",
+  "lib/spec-issues.ts",
+  "lib/use-feature-submit.ts",
+  "lib/use-feature-draft.ts",
+  "lib/use-pending-save.ts",
 ];
 
 const RAW_COLOR_CLASS =

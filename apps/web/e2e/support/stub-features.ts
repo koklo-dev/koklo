@@ -1,4 +1,12 @@
 import type { IncomingMessage } from "node:http";
+import {
+  createdFeatures,
+  currentSha,
+  handleFeatureWrites,
+  renamed,
+  resetFeatureWrites,
+  type WriteMode,
+} from "./stub-feature-write.ts";
 
 /**
  * Faux API de l'écran /projects/[projectId]/features (TK-48 / 48d) : `spec.head`, `spec.listFeatures`,
@@ -25,8 +33,9 @@ export type FeatureMode =
   | "rateLimited"
   | "notFound"
   | "indexFailed"
-  | "internal";
-export type FeaturesScenario = { spec?: SpecMode; feature?: FeatureMode };
+  | "internal"
+  | "loading";
+export type FeaturesScenario = { spec?: SpecMode; feature?: FeatureMode; write?: WriteMode };
 
 type Reply = { status: number; body: string };
 type Send = (reply: Reply) => void;
@@ -120,6 +129,7 @@ const reads: string[] = [];
 let specRepoCreated = false;
 
 export function resetFeatures(): void {
+  resetFeatureWrites();
   reads.length = 0;
   specRepoCreated = false;
 }
@@ -153,13 +163,14 @@ const head = (mode: SpecMode) => {
       return baseHead();
   }
 };
+let writeMode: WriteMode | undefined;
 const baseHead = () => ({
   branch: "main",
-  commitSha: SHA,
+  commitSha: currentSha(writeMode === "indexLate"),
   status: "ready",
   errorCode: null as string | null,
   indexedAt: INDEXED_AT,
-  counts: { features: FEW.length, tables: 2, endpoints: 4 },
+  counts: { features: FEW.length + createdFeatures().length, tables: 2, endpoints: 4 },
 });
 
 function listFeatures(mode: SpecMode, query: URLSearchParams): Reply {
@@ -167,7 +178,20 @@ function listFeatures(mode: SpecMode, query: URLSearchParams): Reply {
   if (mode === "failed") {
     return typed(409, "SPEC_INDEX_FAILED", { errorCode: "spec_too_large", commitSha: SHA });
   }
-  const source = mode === "paginated" ? MANY : mode === "empty" || mode === "building" ? [] : FEW;
+  const base = mode === "paginated" ? MANY : mode === "empty" || mode === "building" ? [] : FEW;
+  const source = [
+    ...base.map((item) => ({ ...item, title: renamed(item.specId) ?? item.title })),
+    ...(mode === "ready" || mode === "paginated"
+      ? createdFeatures().map((c) =>
+          summary(Number(c.specId.slice(2)), {
+            title: c.title,
+            status: c.status,
+            priority: c.priority,
+            criteriaCount: c.criteriaCount,
+          }),
+        )
+      : []),
+  ];
   const status = query.get("status");
   const priority = query.get("priority");
   const filtered = source.filter(
@@ -195,7 +219,13 @@ function getFeature(mode: FeatureMode, specId: string): Reply {
       return reply(500, { defined: false, code: "INTERNAL", message: "x" });
     default: {
       const found = [...FEW, ...MANY].find((item) => item.specId === specId);
-      return reply(200, { ...DETAIL, specId, title: found?.title ?? DETAIL.title });
+      const title = renamed(specId) ?? found?.title ?? DETAIL.title;
+      return reply(200, {
+        ...DETAIL,
+        specId,
+        title,
+        commitSha: currentSha(writeMode === "indexLate"),
+      });
     }
   }
 }
@@ -211,6 +241,7 @@ interface Handlers {
 const ROUTE = /^\/projects\/([^/]+)\/(spec|repos)(?:\/features(?:\/(F-\d+))?)?$/;
 
 export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boolean {
+  if (handleFeatureWrites(req, url, { mode: h.scenario.write ?? "ok", ...h })) return true;
   if (url.pathname === "/__spec-reads") {
     h.send(reply(200, reads));
     return true;
@@ -226,15 +257,31 @@ export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boo
     h.send(typed(404, "NOT_FOUND"));
     return true;
   }
-  const mode = effectiveMode(h.scenario);
-  if (specId) h.send(getFeature(h.scenario.feature ?? "ok", specId));
-  else if (isFeatures) h.send(listFeatures(mode, url.searchParams));
-  else {
-    const answer = reply(200, head(mode));
-    if (mode === "loading") h.hold(() => h.send(answer));
-    else h.send(answer);
-  }
+  writeMode = h.scenario.write;
+  answerRead(h, effectiveMode(h.scenario), url, specId, isFeatures);
   return true;
+}
+
+function answerRead(
+  h: Handlers,
+  mode: SpecMode,
+  url: URL,
+  specId: string | undefined,
+  isFeatures: boolean,
+): void {
+  if (specId) {
+    const featureMode = h.scenario.feature ?? "ok";
+    if (featureMode === "loading") h.hold(() => h.send(getFeature("ok", specId)));
+    else h.send(getFeature(featureMode, specId));
+    return;
+  }
+  if (isFeatures) {
+    h.send(listFeatures(mode, url.searchParams));
+    return;
+  }
+  const answer = reply(200, head(mode));
+  if (mode === "loading") h.hold(() => h.send(answer));
+  else h.send(answer);
 }
 
 function repoList(projectId: string, h: Handlers): boolean {

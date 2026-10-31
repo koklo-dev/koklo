@@ -6,6 +6,10 @@ export interface FeaturesUrlState {
   priority?: FeaturePriority;
   /** Identifiant `F-nnn` de la fiche ouverte. */
   feature?: string;
+  /** `?new=1` : formulaire de création (TK-48 / 48e). Exclusif de `edit` et de `feature`. */
+  new?: true;
+  /** `?edit=F-nnn` : formulaire de modification (TK-48 / 48e). Exclusif de `feature`. */
+  edit?: string;
 }
 
 export type FeaturesUrlPatch = {

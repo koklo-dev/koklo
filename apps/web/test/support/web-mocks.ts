@@ -48,6 +48,9 @@ export const procedures = {
   specListFeatures: vi.fn(),
   specGetFeature: vi.fn(),
   repoList: vi.fn(),
+  // TK-48e : écriture de la spec par lots (contrat 0.7.0)
+  specBatchSubmit: vi.fn(),
+  specBatchGet: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -143,6 +146,20 @@ export const orpc = {
     head: queryFull(["spec", "head"], procedures.specHead),
     listFeatures: queryFull(["spec", "listFeatures"], procedures.specListFeatures),
     getFeature: queryFull(["spec", "getFeature"], procedures.specGetFeature),
+  },
+  specBatch: {
+    key: () => ["specBatch"],
+    // `submit` : useMutation(mutationOptions()) ; `get` : useQuery(queryOptions({ input, ...options })) ou `call`.
+    submit: {
+      mutationOptions: (options: Record<string, unknown> = {}) => ({
+        mutationFn: procedures.specBatchSubmit,
+        ...options,
+      }),
+    },
+    get: {
+      ...queryFull(["specBatch", "get"], procedures.specBatchGet),
+      call: (input?: unknown) => procedures.specBatchGet(input),
+    },
   },
   ticket: {
     key: () => ["ticket"],
