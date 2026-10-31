@@ -929,9 +929,11 @@ flowchart LR
   repository read is the one linked to the ticket's own project with an `active` installation, never
   the one the reference names alone (otherwise `repo_not_linked`, no provider call). One
   authentication per installation and per run, one `getPullRequestState` per ticket, sequential, at
-  most `RECONCILE_MAX_PULL_REQUESTS_DEFAULT` (200) provider reads per run. A provider error leaves the
-  ticket for the next tick (`provider_error`). Merged: in one transaction, `UPDATE ... WHERE
-  status = 'in_review'` (count must be 1, otherwise a runner or the API won the race and nothing is
+  most `RECONCILE_MAX_PULL_REQUESTS_DEFAULT` (200) provider reads per run. Beyond the cap the next
+  run resumes after the last ticket handled (in-memory cursor, wrapping at the end of the list), so
+  the rest really does wait for a following tick. A provider error leaves the ticket for its next
+  turn (`provider_error`, one `errorName` log); a rate limit stops the pass (`rate_limited`). Merged: in one transaction, `UPDATE ... WHERE
+  status = 'in_review' AND deleted_at IS NULL` (count must be 1, otherwise a runner or the API won the race and nothing is
   written), open leases released, system audit `ticket.reconcile.pr_merged`. Closed without merge: no
   change, one system audit `ticket.reconcile.pr_closed` per ticket (never repeated). `in_progress` and
   `blocked` tickets are never forced.
