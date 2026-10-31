@@ -498,7 +498,7 @@ absent from the OpenAPI document. It writes through the same ports, transactions
 after the highest imported number. The actor must be `owner` or `admin`, like the manager routes.
 
 ## Provider, spec and feature batches (TK-42)
-Contract 0.5.0 adds four groups and 10 routes. `repo.*` is implemented since TK-43 (see "Repositories in the API (TK-43)"); the others follow in TK-44 and TK-45;
+Contract 0.5.0 adds four groups and 10 routes. `repo.*` is implemented since TK-43 (see "Repositories in the API (TK-43)") and `specBatch.*` since TK-44b (see "Spec batches in the API (TK-44b)"); `spec.*` follows in TK-45;
 the new routes take an explicit `projectId` (path), the historical ones keep the implicit project.
 
 | Operation | Method | Path | Notes |
@@ -533,7 +533,7 @@ New typed errors: `REPO_CREATION_FORBIDDEN` (403, `{ reason, ownerLogin, ownerKi
 `UserTokenRequired`, `ProviderAuthExpired`, `ProviderRateLimited`, `ProviderUnavailable`,
 `SpecBatchConflict`, `SpecInvalid`.
 
-### Role matrix (vision section 14), enforced per procedure (`repo.*` since TK-43)
+### Role matrix (vision section 14), enforced per procedure (`repo.*` since TK-43, `specBatch.*` since TK-44b)
 The contract cannot enforce roles; the API must, per procedure. "Own project" means the caller is a
 member of the project and of the organization of the session.
 
@@ -563,10 +563,10 @@ The `state` embedded in the returned URL is the only CSRF guard, and the contrac
 The API must make it signed (HMAC), bound to the user and to the organization of the session,
 single-use and expiring (`expiresAt`). The callback rejects any state failing one of these checks.
 
-### Open point: `criteria` on `feature.update`
-`criteria` is replaced as a whole and carries no acceptance-criterion identifier, so the `AC-n`
-numbering may shift when the list is rewritten. To be decided in TK-44 (stable identifiers or
-explicit renumbering rule). The contract is unchanged here.
+### `criteria` on `feature.update`: numbering rule (decided in TK-44b)
+`criteria` is replaced as a whole and carries no acceptance-criterion identifier. The worker renumbers
+it with a fixed rule, see "Acceptance-criterion numbering" in "Spec batches in the API (TK-44b)". The
+contract is unchanged.
 
 **Secrets are never exposed.** No installation or user token, refresh token, app key, webhook
 secret or external installation id appears in any input, output, error or the OpenAPI document;
@@ -630,7 +630,7 @@ Reads the repository with `getRepo` (installation token, no write), then inserts
 with the provider's values (owner, name, default branch, external id) and the audit `repo.link` in
 one transaction. `ownerLogin` must be the owner of the installation (else `NOT_FOUND`, compared
 case-insensitively); a repository unknown to the installation is `NOT_FOUND`. `specPath` is allowed for
-a non-`spec` role only, relative and without `..` (else `VALIDATION{field: "specPath"}`). No structure
+a non-`spec` role only, relative, without `..`, `.git`, empty segment or control character, the same rule the worker applies (else `VALIDATION{field: "specPath"}`). No structure
 and no `cadrage` branch is created for an adopted repository.
 
 ### Errors
@@ -674,6 +674,153 @@ tests through the `GIT_PROVIDER` token.
 ### Audit
 `repo.createSpec` and `repo.link` write one entry (`targetKind: "repo"`, `targetId` the row id) in the
 same transaction as the insert, so a failing audit rolls the insert back. `repo.list` is not audited.
+
+## Spec batches in the API (TK-44b)
+`specBatch.submit` and `specBatch.get` are implemented in `apps/api/src/spec-batch`; the write itself
+is done by the `spec-write` job of `apps/worker`. The contract is unchanged (0.5.0). `spec.*` still
+reads the database index and is TK-45: after a commit, `spec.head` lags until the push webhook rebuilds
+the index, so a client compares `spec.head.commitSha` with the batch `commitSha`.
+
+Roles: `SPEC_BATCH_ROLES` (owner, admin, dev, designer) on both procedures, checked before membership
+(`client` and `business` get `FORBIDDEN`). The designer's limit is per operation and is applied by the
+worker on the real state of the branch: a feature is "design-related" when its `ecrans` list is not empty
+both before and after the operation (for a creation, in the operation itself); otherwise the batch ends
+`failed` with `FORBIDDEN`. Project and organization membership, then the spec carrier of the project,
+are verified before anything else (`NOT_FOUND`, never `FORBIDDEN`); `batchId` must belong to the
+`projectId` of the path.
+
+### `specBatch.submit` sequence
+Nothing here calls the provider from the API, and no transaction stays open while waiting.
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as API (SpecBatchService)
+  participant D as Database
+  participant Q as pg-boss (spec-write, key_strict_fifo)
+  participant W as Worker (spec-write job)
+  participant G as GitProvider
+  C->>A: specBatch.submit(projectId, idempotencyKey, operations)
+  A->>D: Tx: project, spec carrier (NOT_FOUND), then validate branch/message/operations
+  A->>D: Tx: batch queued + operations + F-nnn (project counter) + audit spec.batch.submit
+  A->>Q: send {batchId}, id = batchId, singletonKey = repoId:branch
+  loop every 150 ms, at most SPEC_BATCH_WAIT_MS
+    A->>D: read the batch (plain query)
+  end
+  Q->>W: next job of the key
+  W->>D: load batch, queued to committing
+  W->>G: authenticate, listCommits (trailer Koklo-Ops), listFiles, readFile
+  W->>G: writeCommit (one commit, expectedHeadSha)
+  W->>D: committed (commit_sha, committed_at) or failed/conflict (error_code, report)
+  A-->>C: 200 batch | typed error | 200 batch still queued/committing
+```
+
+Order of the checks in `submit`: role guard, project and organization (`NOT_FOUND`), spec carrier
+(`NOT_FOUND`), provider configured (`PROVIDER_UNAVAILABLE` 503, before any write), then validation
+(`VALIDATION`), then idempotency, then the single transaction.
+
+### Validation at the entry (`VALIDATION`, nothing stored)
+| Field | Rule |
+|-------|------|
+| `branch` | omitted means `cadrage`; a valid git branch name (no `..`, no leading or trailing `/`, no `//`, no segment starting with `.` or ending with `.lock`, no space or `~^:?*[\\`); the default branch of the repository is refused (the spec evolves on a working branch) |
+| `message` | one line (no CR, LF, NUL or Unicode line separator); it becomes the subject of the commit |
+| `operations` | at most one operation per `specId` in a batch (`field: "operations"`) |
+
+The batch, its operations (position starts at 1 in the database, `results[].position` starts at 0), the
+`F-nnn` of the creations and the audit entry are written in ONE transaction. `F-nnn` come from the
+`feature` counter of the project (never reused, a refused batch leaves a gap), so `results` carries them
+while the batch is still `queued`, and a replay returns the same identifiers.
+
+### Batch states
+| Status | When | Fields |
+|--------|------|--------|
+| `queued` | inserted by `submit` | no `commitSha` |
+| `committing` | the worker took the job | no `commitSha`, even if the commit already exists at the provider (crash window, see Recovery) |
+| `committed` | the commit is posted | `commitSha`, `committedAt` |
+| `failed` | `SPEC_INVALID`, `FORBIDDEN`, `PROVIDER_UNAVAILABLE`, `PROVIDER_AUTH_EXPIRED`, `PROVIDER_RATE_LIMITED`, `INTERNAL` | `errorCode`; `report` for `SPEC_INVALID` |
+| `conflict` | `stale_base`, `write_conflict` | `errorCode` is the reason |
+
+`errorCode` is a closed list; it never holds a provider message or a token. The result lives in the batch:
+`submit` waits at most `SPEC_BATCH_WAIT_MS` (default 8000, see `docs/quality-and-operations.md`) for a final
+status, then answers 200 with the current batch (`queued` or `committing`) and the client polls
+`specBatch.get`.
+
+### Errors
+| Final status of the batch | Response of `submit` (and of a replay) |
+|---------------------------|----------------------------------------|
+| `committed` | 200 batch |
+| `queued` / `committing` after the wait | 200 batch (poll `specBatch.get`) |
+| `failed` / `SPEC_INVALID` | 422 `SPEC_INVALID{report}` (new errors only, at most 100 issues, `truncated`) |
+| `failed` / `FORBIDDEN` | 403 `FORBIDDEN` (designer outside design-related features) |
+| `failed` / `PROVIDER_UNAVAILABLE`, `PROVIDER_RATE_LIMITED`, `PROVIDER_AUTH_EXPIRED` | 503, 429 `{}`, 403 `{kind: installation, refreshable: false}` |
+| `failed` / `INTERNAL` | 500 `INTERNAL{requestId}` (inconsistent data or unknown outcome, never a typed error) |
+| `conflict` / `stale_base` or `write_conflict` | 409 `SPEC_BATCH_CONFLICT{reason, batchId}` |
+| same key, other content | 409 `SPEC_BATCH_CONFLICT{reason: idempotency_key_reused, batchId}` |
+
+`stale_base`: `baseSha` differs from the head of the branch. `write_conflict`: an `update` or `delete` of a
+feature that has no file `features/F-nnn-*.md` on the head (absent path, or a directory: verified with
+`listFiles`), a `create` whose `F-nnn` already exists on the head (counter behind a hand-edited spec), a
+missing branch, or a head that moved twice during the write. `specBatch.get` returns the batch whatever
+its status; it never turns a failed batch into an error.
+
+### Idempotency
+`idempotencyKey` is scoped to the project (`UNIQUE(project_id, idempotency_key)`). A replay with the same
+branch, `baseSha`, `message` and operations (same order) returns the same batch: same `id`, same `F-nnn`,
+no new commit, no new audit entry, and a batch that ended in failure returns the same typed error (to
+retry, use a new key). A replay of a batch still open enqueues it again: the job id is the batch id, so a
+second `send` is a no-op, and it repairs an enqueue that failed after the insert. Two simultaneous
+submissions of the same key yield one batch (the unique index decides, the loser rereads the winner).
+
+### Commit written by the worker
+One batch is one commit authored by the bot (`Koklo <koklo-bot@users.noreply.invalid>`, the real
+no-reply address of the App is TK-47). The message is the subject (the `message` of the batch, else
+`spec: créé F-001, F-002 ; modifié F-003`), a blank line, then the trailers written by the server only:
+`Koklo-Ops: <batchId>`, then `Co-authored-by: <name> <email>` of the user of the session, read from the
+database by `author_user_id` (never from the input; the name keeps its first line only and loses `<` and
+`>`, so no trailer can be forged; a deleted user gives no `Co-authored-by` line). The e-mail of the author
+therefore enters the git history of a private repository, as the vision requires (section 5.1).
+Files are `features/F-nnn-<slug>.md` (slug: lowercase, no accents, `[a-z0-9-]`, at most 40 characters,
+fallback `feature`), prefixed by the `spec_path` of a monorepo, produced by `emitFeatureMarkdown`. An
+update keeps the file name. Defaults of a creation: `status` `brouillon`, empty links and criteria.
+
+The worker validates the whole spec with `checkSpec` before and after the operations; only NEW errors
+(key `rule|code|path|pointer|entityId`) block, so a draft with pre-existing errors is not stuck. New
+warnings are kept in `report` of a committed batch. Nothing is written when any operation fails.
+
+### Acceptance-criterion numbering
+`criteria` replaces the list as a whole. A criterion keeps its `AC-n` when the feature already has one with
+exactly the same title (after `trim`, case-sensitive, one match per existing criterion, in order); every
+other criterion gets `max(existing AC-n, AC-n already given) + 1`. Identifiers are never reassigned and
+gaps are allowed; the order of the file is the submitted order. Retitling a criterion makes it a new one.
+A vanished `AC-n` still cited by a test scenario is `R4_UNKNOWN_CRITERION`, so the change ends in
+`SPEC_INVALID`.
+
+### Serialization and failures (`spec-write` queue)
+The worker creates the queue with the `key_strict_fifo` policy: jobs with the same `singletonKey`
+(`repoId:branch`) run one at a time in the order of enqueuing, other keys run in parallel (several local
+consumers). A failed job would block its key, so the handler never lets a job fail: a business result is
+written on the batch and the job completes; a transient failure (`PROVIDER_UNAVAILABLE`,
+`PROVIDER_RATE_LIMITED`, database error) is rethrown for pg-boss to retry, and on the last attempt
+(`retryCount` equals the queue `retryLimit`) the batch is written `failed` with the code and the job still
+completes. The payload is `{ batchId }` only. Data read from the database (branch, `spec_path`, `F-nnn`) is
+re-validated before any provider call; an invalid value ends `failed/INTERNAL` with zero calls. Without an
+App and without an injected provider the job writes `failed/PROVIDER_UNAVAILABLE`.
+
+### Recovery after a crash
+If the process dies between `writeCommit` and the database update, the batch stays `committing` and
+pg-boss runs the job again. The worker looks for the trailer `Koklo-Ops: <batchId>` (last paragraph of the
+message only) in the last 50 commits of the branch: found, the batch becomes `committed` with that sha and
+no second commit is made. Not found is NOT "not committed": if the batch had already been taken and the
+window is full (50 commits without the trailer), the outcome is unknown and the batch ends `failed/INTERNAL`
+without any new commit (the sweep of TK-46 will reconcile); with fewer than 50 commits the whole history
+was read, or it is the first execution, and the batch is executed normally. A stale head between reading and
+writing (`expectedHeadSha`) is retried once, then `write_conflict`.
+
+### Audit
+`specBatch.submit` writes one entry (`action: "spec.batch.submit"`, `targetKind: "spec_batch"`,
+`targetId` the batch id, actor the user of the session) in the same transaction as the batch, its
+operations and the counter. A replay, a refusal (role, validation, project) and `specBatch.get` write
+none, nor do the worker transitions (the batch is its own journal).
 
 ## Version history
 - **0.5.0** (TK-42): provider and spec groups `installation`, `repo`, `spec`, `specBatch` (10 routes,

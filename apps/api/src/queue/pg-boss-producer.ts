@@ -1,6 +1,6 @@
 import { captureError } from "@koklo/observability";
 import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
-import { PgBoss } from "pg-boss";
+import { PgBoss, type SendOptions } from "pg-boss";
 import type { AppConfig } from "../config.ts";
 import { APP_CONFIG } from "../database/database.module.ts";
 import { requestLogger } from "../request-logger.ts";
@@ -21,10 +21,10 @@ export abstract class PgBossProducer implements OnModuleDestroy {
 
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
-  protected async send(queue: string, payload: object): Promise<void> {
+  protected async send(queue: string, payload: object, options?: SendOptions): Promise<void> {
     try {
       const boss = await this.connect();
-      await boss.send(queue, payload);
+      await (options ? boss.send(queue, payload, options) : boss.send(queue, payload));
     } catch (error) {
       requestLogger().error(
         { queue, errorName: error instanceof Error ? error.name : "erreur" },

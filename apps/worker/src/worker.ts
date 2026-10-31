@@ -1,3 +1,5 @@
+import { createRawDbClient } from "@koklo/db";
+import type { GitProvider } from "@koklo/domain";
 import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
 import type { WorkerConfig } from "./config.ts";
@@ -14,9 +16,12 @@ import {
   SEND_MAGIC_LINK_RETENTION_SECONDS,
   SEND_MAGIC_LINK_RETRY_LIMIT,
 } from "./jobs/send-magic-link.ts";
+import type { SpecWriteSettings } from "./jobs/spec-write.ts";
 import { createMailSender } from "./mail/create-mail-sender.ts";
 import type { MailSender } from "./mail/mail-sender.ts";
 import { instrumentJob, setupObservability } from "./observability.ts";
+import { providerOf, registerSpecWrite } from "./spec-write/register.ts";
+import { SpecWriteStore } from "./spec-write/store.ts";
 
 export type Worker = { readonly boss: PgBoss; stop(): Promise<void> };
 
@@ -25,6 +30,14 @@ export interface StartWorkerOptions {
   mailSender?: MailSender;
   /** Destination des journaux (défaut : stdout). */
   logStream?: LogDestination;
+  /**
+   * Fournisseur git des lots `spec-write`. Défaut : l'adaptateur GitHub de `config.githubApp`, ou
+   * aucun (les lots échouent en `PROVIDER_UNAVAILABLE`). Les tests y injectent le faux ; le code de
+   * production n'importe jamais le faux.
+   */
+  gitProvider?: GitProvider;
+  /** Essais et concurrence de la file `spec-write` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
+  specWrite?: Partial<SpecWriteSettings>;
 }
 
 interface MailQueue {
@@ -86,6 +99,19 @@ export async function startWorker(
       createSendInvitationHandler(mailSender),
     ),
   );
+  const database = createRawDbClient(config.databaseUrl);
+  await registerSpecWrite(
+    boss,
+    logger,
+    { store: new SpecWriteStore(database), provider: providerOf(config, options.gitProvider) },
+    options.specWrite,
+  );
   logger.info("worker started");
-  return { boss, stop: () => boss.stop() };
+  return {
+    boss,
+    stop: async () => {
+      await boss.stop();
+      await database.$disconnect();
+    },
+  };
 }

@@ -338,8 +338,9 @@ Decision: [ADR 0005](adr/0005-ui-components-icons-radix.md).
 ### Worker: pg-boss and `noop` job (TK-12)
 `apps/worker` (`@koklo/worker`, tag `worker`, private) is a **separate Node process**
 that consumes jobs with pg-boss (`12.38.0`) on the same PostgreSQL database as the
-rest of the system. It depends only on `@koklo/config`. Nothing else is registered
-yet: `noop` is the only job.
+rest of the system. It depends on `@koklo/config` and, since TK-44b, on `@koklo/db`,
+`@koklo/domain`, `@koklo/github` and `@koklo/schema` for the `spec-write` job (see "Spec batches:
+submit, queue, commit (TK-44b)"); the mail jobs and `noop` are the other registered jobs.
 
 - `src/config.ts` — `loadConfig(env)` reads `DATABASE_URL` and throws
   `DATABASE_URL is required` when it is missing or empty.
@@ -788,7 +789,43 @@ flowchart LR
   and idempotence tested); it rejects text that would inject front matter or a section.
 - `spec_write_batches` keeps the outcome of a batch (migration `*_spec_batch_outcome`); the
   `feature` counter feeds the `F-nnn` identifiers.
-- Not delivered here: the `specBatch` procedures, the serialized write queue and the worker job.
+- The `specBatch` procedures, the serialized write queue and the worker job use these blocks since
+  TK-44b (next section).
+
+### Spec batches: submit, queue, commit (TK-44b)
+`specBatch.submit` records a batch and a worker commits it; the API never writes to the provider.
+Both sides share the pure rules of `@koklo/domain` (`spec-write.ts`: queue name, singleton key, bot
+author, error codes, branch and path validation). The worker now depends on `@koklo/db`,
+`@koklo/domain`, `@koklo/github` and `@koklo/schema` (the `worker` tag still only denies `cli`, `ui`
+and `web`); the fake provider is injected by `startWorker({ gitProvider })` in tests and never imported
+by production code.
+
+```mermaid
+flowchart LR
+  C["Client"] -->|"specBatch.submit"| A["API SpecBatchService"]
+  A -->|"Tx: batch queued, operations,<br/>F-nnn counter, audit"| D[("PostgreSQL")]
+  A -->|"send {batchId}<br/>id=batchId, key=repoId:branch"| Q["pg-boss queue spec-write<br/>key_strict_fifo"]
+  A -. "poll every 150 ms<br/>up to SPEC_BATCH_WAIT_MS" .-> D
+  Q --> W["Worker job spec-write"]
+  W -->|"committing, then committed / failed / conflict"| D
+  W --> P["GitProvider: listCommits (Koklo-Ops),<br/>listFiles, readFile"]
+  W --> V["checkSpec before / after<br/>(new errors only)"]
+  W -->|"one commit by the bot<br/>trailers Koklo-Ops, Co-authored-by"| P
+  P --> G["Git (spec repository)"]
+  G -. "push webhook (TK-45)" .-> I["spec index in the database"]
+```
+
+- Worker modules (`apps/worker/src/spec-write`): `store` (batch, author, state changes; the only raw
+  Prisma reads are the organization of a batch and the name and e-mail of its author, a `user` row
+  without tenant; everything else runs under `withOrganization`),
+  `execute` (recovery, state read, one `writeCommit` guarded by `expectedHeadSha`, one retry on a stale
+  head), `plan` (pure: conflicts, designer limit, operations, validation), `message`, `criteria`,
+  `features`, `report`, `register` (queue creation and consumer). `src/jobs/spec-write.ts` is the
+  handler.
+- No provider call happens inside a transaction; the job holds none while it talks to the provider.
+- Not delivered: the index rebuild after the commit (TK-45) and the sweep of orphan batches (TK-46).
+  See [API contract](api-contract.md), "Spec batches in the API (TK-44b)" for states, errors,
+  idempotency and recovery.
 
 ### Spec repository in the API (TK-43)
 `apps/api/src/repo` is the application side of the git provider. It depends on the `GitProvider`

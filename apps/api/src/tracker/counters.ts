@@ -10,7 +10,7 @@ import type { ProjectScope } from "./scope.ts";
 export async function nextCounterValue(
   tx: Tx,
   scope: ProjectScope,
-  name: "ticket" | "sprint",
+  name: "ticket" | "sprint" | "feature",
 ): Promise<number> {
   const { organizationId, projectId } = scope;
   await tx.projectCounter.createMany({
@@ -32,7 +32,7 @@ export async function nextCounterValue(
 export async function raiseCounterTo(
   tx: Tx,
   scope: ProjectScope,
-  name: "ticket" | "sprint",
+  name: "ticket" | "sprint" | "feature",
   atLeast: number,
 ): Promise<void> {
   const { organizationId, projectId } = scope;

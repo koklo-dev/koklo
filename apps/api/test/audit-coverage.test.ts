@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { contract, type Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
+import { CaptureMailSender, startWorker, type Worker } from "@koklo/worker";
 import type { INestApplication } from "@nestjs/common";
 import type { PgBoss } from "pg-boss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -49,7 +50,31 @@ function repoRuntimeOf() {
   return repoRuntime;
 }
 
+/**
+ * TK-44b : `specBatch.submit` s'exécute de bout en bout (commit par le worker, qui partage la base
+ * et le faux fournisseur de l'application `repo`) ; le worker est démarré à la demande.
+ */
+let specWorker: Promise<Worker> | undefined;
+function specWorkerOf() {
+  specWorker ??= (async () => {
+    const { harness } = await repoRuntimeOf();
+    return startWorker(
+      {
+        databaseUrl: database.url,
+        appEnv: "test",
+        appVersion: "dev",
+        logLevel: "silent",
+        sentryDsn: undefined,
+        mail: { kind: "capture" },
+      },
+      { gitProvider: harness.provider, mailSender: new CaptureMailSender() },
+    );
+  })();
+  return specWorker;
+}
+
 afterAll(async () => {
+  await (await specWorker?.catch(() => undefined))?.stop();
   await (await repoRuntime?.catch(() => undefined))?.app.close();
   await app?.close();
   await boss?.stop();
@@ -79,15 +104,17 @@ const WRITE_GROUPS = [
   "projectState",
   "lease",
   "repo",
+  "specBatch",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit"];
 /**
  * Groupes du contrat 0.5.0 sans implémentation API (TK-44 et suivants ; `installation` n'a pas de
  * ticket dans les sprints 8-9) : ils rejoindront WRITE_GROUPS ou READ_ONLY_GROUPS avec leurs
- * scénarios d'audit. `repo` a rejoint WRITE_GROUPS avec TK-43.
+ * scénarios d'audit. `repo` a rejoint WRITE_GROUPS avec TK-43, `specBatch` avec TK-44b (`spec`
+ * reste en attente : TK-45 construit l'index qu'elle lit).
  */
-const PENDING_GROUPS = ["installation", "spec", "specBatch"];
+const PENDING_GROUPS = ["installation", "spec"];
 
 /** Sources de l'API : une référence à `contract.<groupe>` y signifie qu'une procédure est implémentée. */
 function apiSourceFiles(dir = resolve(import.meta.dirname, "../src")): string[] {
@@ -130,6 +157,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "projectState.update",
   "repo.createSpec",
   "repo.link",
+  "specBatch.submit",
   "sprint.activate",
   "sprint.close",
   "sprint.create",
@@ -560,10 +588,55 @@ const SCENARIOS: Scenario[] = [
       ),
     deniedStatuses: [403],
   },
+  {
+    procedure: "specBatch.submit",
+    role: "dev",
+    prepare: async (ctx) => {
+      const state = await repoPrepare()(ctx);
+      await specWorkerOf();
+      const created = await repoApi((await repoRuntimeOf()).app, ctx.world.actors.owner).createSpec(
+        ctx.world.projectId,
+        state.installation.id,
+      );
+      expect(created.status, JSON.stringify(created.body)).toBe(200);
+      return state;
+    },
+    call: async (ctx) =>
+      send(
+        (await repoRuntimeOf()).app,
+        ctx.world.actors.dev.cookie,
+        "post",
+        `/projects/${ctx.world.projectId}/spec/batches`,
+        {
+          projectId: ctx.world.projectId,
+          idempotencyKey: `audit-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          operations: [{ kind: "feature.create", title: "Auditée", priority: "must" }],
+        },
+      ),
+    expected: async (_ctx, _s, res) => ({
+      action: "spec.batch.submit",
+      targetKind: "spec_batch",
+      targetId: res.body.id,
+      ticketId: null,
+    }),
+    denied: async (ctx) =>
+      send(
+        (await repoRuntimeOf()).app,
+        ctx.world.actors.client.cookie,
+        "post",
+        `/projects/${ctx.world.projectId}/spec/batches`,
+        {
+          projectId: ctx.world.projectId,
+          idempotencyKey: "refuse",
+          operations: [{ kind: "feature.create", title: "Refusée", priority: "must" }],
+        },
+      ),
+    deniedStatuses: [403],
+  },
 ];
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 22 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 23 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
