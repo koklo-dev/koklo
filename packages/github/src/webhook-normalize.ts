@@ -11,6 +11,8 @@ import {
 } from "@koklo/domain";
 
 const EVENT_NAME_MAX = 64;
+/** Longueur maximale de `ref` : elle entre dans la clé de file `push:<dépôt>:<ref>` du worker. */
+const REF_MAX = 255;
 const BRANCH_PREFIX = "refs/heads/";
 const SHA_PATTERN = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/;
 
@@ -86,6 +88,7 @@ function normalizePush(deliveryId: string, body: Rec): PushWebhook | undefined {
   const installationId = idOf(field(child(body, "installation") ?? {}, "id"));
   if (
     !isPrintable(ref) ||
+    ref.length > REF_MAX ||
     before === undefined ||
     after === undefined ||
     created === undefined ||

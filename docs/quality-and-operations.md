@@ -445,6 +445,30 @@ state, as it would block its branch (`SELECT count(*) FROM pgboss.job WHERE name
 state = 'failed'` must be 0). Logs carry the batch id, the final status and the error code, never a
 token, a provider message or an e-mail address.
 
+### Webhook deliveries: configuration, retention and operation (TK-45b)
+| Variable | Read by | Meaning |
+|----------|---------|---------|
+| `WEBHOOK_RETENTION_DAYS` | worker | optional integer from 1 to 365 (default 30): age after which a delivery is deleted, whatever its status. Anything else fails the start, naming the variable and never the value |
+
+- **Purge.** The worker registers one pg-boss schedule, `17 3 * * *` in UTC, on the `webhook-purge`
+  queue (a restart does not duplicate it). The job deletes the rows received before `now - retention`
+  in batches of 1000 until none is left, and logs only counts. A delivery redelivered by the provider
+  after its row was purged is processed again, which is safe because indexing is idempotent per commit.
+- **Retention and personal data (GDPR).** Stored payloads are the **normalized** ones: no commit, author,
+  e-mail or message, only identifiers, the ref, the commit ids and, for `installation`, the public
+  account login. The row therefore holds no commit personal data and its life is bounded by the
+  retention. A `deleted` installation also erases the other deliveries of that installation at once. The
+  deliveries of a deleted organization have no `organization_id`: they disappear at the end of the
+  retention, at most `WEBHOOK_RETENTION_DAYS` days later.
+- **Signals.** Rows left `received` or `processing` (worker stopped, enqueue lost) are not swept yet:
+  re-enqueueing them, with the same job id, is TK-46. A delivery `failed` carries a closed `error_code`
+  (`SELECT error_code, count(*) FROM webhook_deliveries WHERE status = 'failed' GROUP BY 1`). No job of
+  `webhook-delivery` should sit in the `failed` state (it would block its key):
+  `SELECT count(*) FROM pgboss.job WHERE name = 'webhook-delivery' AND state = 'failed'` must be 0.
+  Logs carry the delivery id, the event, the final status and the error code, never the payload, a
+  token, a provider message or an account login. The worker reads no webhook secret: the signature is
+  verified by the API (TK-45c).
+
 ## Observability
 TO DOCUMENT — logs, metrics, traces, health checks, alerting.
 

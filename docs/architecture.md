@@ -769,8 +769,8 @@ sequenceDiagram
 - Re-indexing a commit is idempotent (`UNIQUE(repo_id, commit_sha)`); the UI reads the head of a
   branch (`spec_heads`), never a SHA. Bot writes go through `spec_write_batches`, one batch per
   commit, with the batch id as the `Koklo-Ops:` trailer.
-- Not implemented yet: the webhook endpoint, the worker job and the indexer (later tickets); this
-  ticket delivers the schema, constraints and tenant classification they rely on.
+- The worker job and the indexer are TK-45b (next sections); the HTTP endpoint that receives and
+  enqueues deliveries is TK-45c, so nothing enqueues a delivery in production yet.
 
 #### Receiving a webhook: building blocks (TK-45a)
 `@koklo/github` provides `verifyWebhookSignature` (HMAC-SHA256 over the raw body, constant-time
@@ -778,8 +778,58 @@ comparison, SHA-1 refused, an empty secret raises `WebhookSecretMissingError` be
 computation) and `normalizeWebhook` (provider payload to the `NormalizedWebhook` types of
 `@koklo/domain`, personal data dropped). `@koklo/domain` also holds the queue names, the
 serialization key (`installation:<id>`, `push:<repo>:<ref>`), the delivery error codes and the
-retention bounds. `raiseCounterTo` now lives in `@koklo/db` so that any process can use it. These
-are building blocks only: they are not wired to an endpoint or a job yet.
+retention bounds. `raiseCounterTo` now lives in `@koklo/db` so that any process can use it.
+`normalizeWebhook` also refuses a `ref` longer than 255 characters (`malformed_payload`), because the
+ref ends up in the queue key `push:<repo>:<ref>`.
+
+#### Worker: delivery queue, handlers, spec index, purge (TK-45b)
+The `webhook-delivery` queue (pg-boss, `key_strict_fifo`) carries `{ deliveryId }` only, with the job
+`id` equal to the row id and the `singletonKey` of `webhookDeliverySingletonKey`. The handler reads the
+row through the raw client and drives the state machine
+`received -> processing (attempts + 1) -> processed | ignored | failed`.
+
+```mermaid
+flowchart LR
+  P["Provider webhook"] --> E["API endpoint (TK-45c):<br/>signature, INSERT ON CONFLICT DO NOTHING"]
+  E -->|"send {deliveryId}<br/>id=row id, key = push:repo:ref or installation:id"| Q["pg-boss webhook-delivery<br/>key_strict_fifo"]
+  Q --> H["handler: state machine<br/>(jobs/webhook-delivery.ts)"]
+  H -->|"installation"| IN["status + system audit<br/>(+ erase deliveries if deleted)"]
+  H -->|"push"| PU["resolve installation, repo, organization"]
+  PU -->|"authenticate, listFiles(branch head)"| G["GitProvider"]
+  PU -->|"head already ready: move spec_heads"| X[("spec index")]
+  PU -->|"else readSpecFiles, parseSpecFiles"| W["one transaction, no network:<br/>snapshot, entities, joins,<br/>spec_heads, feature counter"]
+  W --> X
+  H -->|"processed / ignored / failed + error_code"| D[("webhook_deliveries")]
+  S["schedule 17 3 * * * UTC"] --> R["webhook-purge: batches of 1000"] --> D
+```
+
+- **Idempotence and failure.** A row already `processed` or `ignored`, or absent (purged), is left
+  untouched. A business outcome (invalid payload, unknown installation or repository, repository not
+  found, spec too large) is written on the row with a closed error code and the job **completes**: a
+  failed job would block its key. Only a transient failure (provider unavailable, rate limit, expired
+  authorization, database) throws before the last attempt, with a sanitized error that carries the
+  code and never the provider body; on the last attempt the row becomes `failed` and the job still
+  completes. A row left `received` or `processing` (crash, enqueue lost) is not swept yet: TK-46.
+- **Push indexing.** The job indexes the head of the branch **read at execution time** through the
+  port (`listFiles`), not the `after` of the payload, so out-of-order deliveries and force-pushes
+  cannot regress the index. A head whose snapshot is already `ready` only moves `spec_heads`; a branch
+  deleted at the provider removes its `spec_heads` row (snapshots stay). More than 2000 recognized
+  files make the snapshot `failed` / `spec_too_large` (the head still moves, so the failure is
+  visible). Invalid spec entities are excluded and never fail the job. The `feature` counter is raised
+  to the highest `F-nnn` found (at most 999999; larger ids are indexed but ignored by the counter), on
+  every branch, in the same transaction as the snapshot. Provider calls never happen inside a
+  transaction.
+- **Installation events.** `suspend`, `unsuspend` and `deleted` update `provider_installations.status`
+  and write a system audit entry (`provider.installation.suspended|reactivated|deleted`) in the same
+  transaction. `deleted` is terminal and also erases the other deliveries of that installation.
+  `created` never creates a row (the organization is only known by the authorization flow).
+- **Shared spec reading.** `apps/worker/src/spec-read/read-spec.ts` (`readSpecFiles`) is the only
+  place that reads files through the port; `spec-write` and the indexer both use it.
+- **Modules.** `apps/worker/src/webhook`: `payload` (stored payload), `target-store` (installation,
+  repository, heads), `index-rows` and `index-writer` (index transaction), `installation`, `push`,
+  `delivery-store`, `errors`, `register`; jobs in `src/jobs/webhook-delivery.ts` and
+  `webhook-purge.ts`. The fake provider is injected by `startWorker({ gitProvider })` in tests and is
+  never imported by production code.
 
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
