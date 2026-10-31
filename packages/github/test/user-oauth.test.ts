@@ -274,18 +274,28 @@ describe("appSlug", () => {
 });
 
 describe("getUserOwnerRole : requêtes (preuve de propriété, B1)", () => {
-  const MEMBERSHIP = "GET /user/memberships/orgs/acme";
+  const MEMBERSHIP = "GET /orgs/acme/memberships/octo";
+  const SELF = "GET /user";
+  const me = { body: { login: "octo", type: "User" } };
   const owner = (kind: "organization" | "user", login: string) => ({ kind, login });
   const role = (provider: ReturnType<typeof providerOn>, who: ReturnType<typeof owner>) =>
     provider.getUserOwnerRole({ auth: userAuth("uat-role"), owner: who });
 
-  it("organisation : GET /user/memberships/orgs/{org} avec le jeton utilisateur, sans appeler /user", async () => {
+  it("organisation : GET /user puis GET /orgs/{org}/memberships/{login}, jeton utilisateur", async () => {
     const mock = createMockGitHub({
+      [SELF]: me,
       [MEMBERSHIP]: { body: { role: "admin", state: "active" } },
     });
     expect(await role(providerOn(mock), owner("organization", "acme"))).toBe("admin");
-    expect(mock.requests.map((r) => `${r.method} ${r.path}`)).toEqual([MEMBERSHIP]);
-    expect(mock.requests[0]?.headers.authorization).toContain("uat-role");
+    expect(mock.requests.map((r) => `${r.method} ${r.path}`)).toEqual([SELF, MEMBERSHIP]);
+    expect(mock.requests.every((r) => r.headers.authorization?.includes("uat-role"))).toBe(true);
+  });
+
+  it("organisation : /user sans login lisible -> erreur typée, membership non appelé", async () => {
+    const mock = createMockGitHub({ [SELF]: { body: {} } });
+    const error = await caught(role(providerOn(mock), owner("organization", "acme")));
+    expect(error).toBeInstanceOf(GitProviderError);
+    expect(mock.requests.map((r) => r.path)).toEqual(["/user"]);
   });
 
   it.each([
@@ -296,12 +306,16 @@ describe("getUserOwnerRole : requêtes (preuve de propriété, B1)", () => {
     ["member", "pending", "none"],
     ["admin", "inconnu", "none"],
   ])("rôle %s, état %s -> %s", async (githubRole, state, expected) => {
-    const mock = createMockGitHub({ [MEMBERSHIP]: { body: { role: githubRole, state } } });
+    const mock = createMockGitHub({
+      [SELF]: me,
+      [MEMBERSHIP]: { body: { role: githubRole, state } },
+    });
     expect(await role(providerOn(mock), owner("organization", "acme"))).toBe(expected);
   });
 
   it("404 (aucun lien avec l'organisation) : none", async () => {
     const mock = createMockGitHub({
+      [SELF]: me,
       [MEMBERSHIP]: { status: 404, body: { message: "Not Found" } },
     });
     expect(await role(providerOn(mock), owner("organization", "acme"))).toBe("none");
@@ -312,7 +326,7 @@ describe("getUserOwnerRole : requêtes (preuve de propriété, B1)", () => {
     ["500", { status: 500, body: {} }],
     ["corps sans rôle", { body: {} }],
   ])("%s : erreur typée, jamais un rôle accordé", async (_label, reply) => {
-    const mock = createMockGitHub({ [MEMBERSHIP]: reply });
+    const mock = createMockGitHub({ [SELF]: me, [MEMBERSHIP]: reply });
     const error = await caught(role(providerOn(mock), owner("organization", "acme")));
     expect(error).toBeInstanceOf(GitProviderError);
     expect(error).toMatchObject({ operation: "getUserOwnerRole" });
@@ -332,7 +346,7 @@ describe("getUserOwnerRole : requêtes (preuve de propriété, B1)", () => {
   });
 
   it("le login est encodé dans le chemin (aucune injection de segment)", async () => {
-    const mock = createMockGitHub({});
+    const mock = createMockGitHub({ [SELF]: me });
     await role(providerOn(mock), owner("organization", "a/../b")).catch(() => undefined);
     expect(mock.requests.every((r) => !r.path.includes("/../"))).toBe(true);
   });

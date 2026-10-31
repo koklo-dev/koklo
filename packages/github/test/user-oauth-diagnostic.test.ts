@@ -95,7 +95,8 @@ describe("autres appels : statut HTTP porté par l'erreur typée", () => {
 
   it("getUserOwnerRole 403 : status 403", async () => {
     const mock = createMockGitHub({
-      "GET /user/memberships/orgs/acme": { status: 403, body: { message: "Forbidden" } },
+      "GET /user": { body: { login: "octo", type: "User" } },
+      "GET /orgs/acme/memberships/octo": { status: 403, body: { message: "Forbidden" } },
     });
     const error = await caught(
       providerOn(mock).getUserOwnerRole({

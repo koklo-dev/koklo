@@ -952,7 +952,7 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
   `GitUserCredentials`; `listUserInstallations({ auth })` returns the installations visible to a user
   token (`externalId`, `ownerKind`, `ownerLogin`); `getUserOwnerRole({ auth, owner })` returns the
   user's link with an owner (`self`, `admin`, `member`, `none`; `ops/user-role.ts`: `GET /user` or
-  `GET /user/memberships/orgs/{org}`, no extra App permission); `appSlug()` gives the App URL slug. A refused code
+  `GET /user` + `GET /orgs/{org}/memberships/{username}`, App permission Members: read); `appSlug()` gives the App URL slug. A refused code
   raises `InvalidUserCodeError`, which carries nothing received (no code, no client secret).
   `@koklo/github` implements them (`ops/user-oauth.ts`: POST `/login/oauth/access_token`, never
   replayed because the code is single-use; `ops/app-slug.ts`: `GET /app` with the App JWT, success
