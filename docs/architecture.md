@@ -807,7 +807,7 @@ flowchart LR
   A -->|"send {batchId}<br/>id=batchId, key=repoId:branch"| Q["pg-boss queue spec-write<br/>key_strict_fifo"]
   A -. "poll every 150 ms<br/>up to SPEC_BATCH_WAIT_MS" .-> D
   Q --> W["Worker job spec-write"]
-  W -->|"committing, then committed / failed / conflict"| D
+  W -->|"committing (just before the write), then committed / failed / conflict"| D
   W --> P["GitProvider: listCommits (Koklo-Ops),<br/>listFiles, readFile"]
   W --> V["checkSpec before / after<br/>(new errors only)"]
   W -->|"one commit by the bot<br/>trailers Koklo-Ops, Co-authored-by"| P
@@ -826,6 +826,11 @@ flowchart LR
 - Not delivered: the index rebuild after the commit (TK-45) and the sweep of orphan batches (TK-46).
   See [API contract](api-contract.md), "Spec batches in the API (TK-44b)" for states, errors,
   idempotency and recovery.
+- The batch is `queued` during the whole state read and becomes `committing` only just before
+  `writeCommit`: a transient failure before the write is retried as a normal first execution, while
+  `committing` always means "a write may have left" (recovery by trailer, `INTERNAL` if unknown). After the
+  expiry or the exhaustion of the job's attempts, the `repoId:branch` key stays blocked until the
+  reconciliation (TK-46).
 
 ### Spec repository in the API (TK-43)
 `apps/api/src/repo` is the application side of the git provider. It depends on the `GitProvider`

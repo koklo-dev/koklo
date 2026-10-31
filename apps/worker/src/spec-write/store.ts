@@ -78,7 +78,7 @@ export class SpecWriteStore {
     });
   }
 
-  /** `queued -> committing` ; sans effet si le lot est déjà pris (reprise d'un job). */
+  /** `queued -> committing`, posé juste avant `writeCommit` ; sans effet si le lot est déjà pris (reprise d'un job). */
   async markCommitting(batch: LoadedBatch): Promise<void> {
     await withOrganization(batch.organizationId, () =>
       this.client.specWriteBatch.updateMany({

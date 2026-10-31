@@ -73,8 +73,10 @@ async function attemptBatch(
   }
   if (deps.provider === null) return failed("PROVIDER_UNAVAILABLE");
   try {
-    await deps.store.markCommitting(batch);
-    return await executeBatch(deps.provider, batch, await deps.store.author(batch));
+    const { store } = deps;
+    return await executeBatch(deps.provider, batch, await store.author(batch), () =>
+      store.markCommitting(batch),
+    );
   } catch (error) {
     const failure = classify(error);
     if ("outcome" in failure) return failure.outcome;

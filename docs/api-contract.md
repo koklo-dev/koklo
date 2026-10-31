@@ -708,8 +708,9 @@ sequenceDiagram
     A->>D: read the batch (plain query)
   end
   Q->>W: next job of the key
-  W->>D: load batch, queued to committing
+  W->>D: load batch (stays queued)
   W->>G: authenticate, listCommits (trailer Koklo-Ops), listFiles, readFile
+  W->>D: queued to committing, just before the write
   W->>G: writeCommit (one commit, expectedHeadSha)
   W->>D: committed (commit_sha, committed_at) or failed/conflict (error_code, report)
   A-->>C: 200 batch | typed error | 200 batch still queued/committing
@@ -735,7 +736,7 @@ while the batch is still `queued`, and a replay returns the same identifiers.
 | Status | When | Fields |
 |--------|------|--------|
 | `queued` | inserted by `submit` | no `commitSha` |
-| `committing` | the worker took the job | no `commitSha`, even if the commit already exists at the provider (crash window, see Recovery) |
+| `committing` | the worker is about to call, or has called, `writeCommit` (the batch stays `queued` while the state is read) | no `commitSha`, even if the commit already exists at the provider (crash window, see Recovery) |
 | `committed` | the commit is posted | `commitSha`, `committedAt` |
 | `failed` | `SPEC_INVALID`, `FORBIDDEN`, `PROVIDER_UNAVAILABLE`, `PROVIDER_AUTH_EXPIRED`, `PROVIDER_RATE_LIMITED`, `INTERNAL` | `errorCode`; `report` for `SPEC_INVALID` |
 | `conflict` | `stale_base`, `write_conflict` | `errorCode` is the reason |
@@ -815,6 +816,15 @@ window is full (50 commits without the trailer), the outcome is unknown and the 
 without any new commit (the sweep of TK-46 will reconcile); with fewer than 50 commits the whole history
 was read, or it is the first execution, and the batch is executed normally. A stale head between reading and
 writing (`expectedHeadSha`) is retried once, then `write_conflict`.
+
+Transient failure before the write: the batch moves to `committing` only just before `writeCommit`, so
+it stays `queued` while the worker reads the state (`listFiles`, `readFile`, `listCommits`, validation).
+A transient provider failure in that phase therefore leaves it `queued`, and the retry runs normally
+(trailer search, then read-plan-commit) even on a branch of 50 commits or more; on the last attempt the
+batch ends `failed/PROVIDER_UNAVAILABLE`. A failure of `writeCommit` itself never puts the batch back to
+`queued` (the provider may have written): the retry searches the trailer, never commits twice. After the
+expiry or the exhaustion of the job's attempts, the `repoId:branch` key stays blocked until the
+reconciliation (TK-46).
 
 ### Audit
 `specBatch.submit` writes one entry (`action: "spec.batch.submit"`, `targetKind: "spec_batch"`,
