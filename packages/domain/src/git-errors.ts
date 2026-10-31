@@ -1,6 +1,8 @@
 import type { GitAuthKind } from "./git-auth.ts";
 import {
+  type GitDenial,
   type GitErrorDiagnostic,
+  gitDenialOf,
   httpStatusOf,
   type OAuthErrorCode,
   oauthErrorCodeOf,
@@ -16,13 +18,17 @@ export class GitProviderError extends Error {
   declare readonly status?: number;
   /** Code OAuth public de GitHub (liste blanche), jamais le corps de la réponse. */
   declare readonly oauthError?: OAuthErrorCode;
+  /** Motif d'un refus 403 (liste fermée), jamais le message de GitHub. */
+  declare readonly denial?: GitDenial;
   constructor(operation: string, message?: string, diagnostic?: GitErrorDiagnostic) {
     super(message ?? `Échec de l'opération Git ${operation}`);
     this.name = "GitProviderError";
     this.operation = operation;
     const status = httpStatusOf(diagnostic?.status);
     const oauthError = oauthErrorCodeOf(diagnostic?.oauthError);
+    const denial = gitDenialOf(diagnostic?.denial);
     if (status !== undefined) this.status = status;
+    if (denial !== undefined) this.denial = denial;
     if (oauthError !== undefined) this.oauthError = oauthError;
   }
 }

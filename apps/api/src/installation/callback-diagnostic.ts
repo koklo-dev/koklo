@@ -1,4 +1,4 @@
-import { httpStatusOf, oauthErrorCodeOf } from "@koklo/domain";
+import { gitDenialOf, httpStatusOf, oauthErrorCodeOf } from "@koklo/domain";
 import { requestLogger } from "../request-logger.ts";
 
 /** Étapes du callback, énumération fermée : la seule indication de lieu que le journal contient. */
@@ -40,19 +40,21 @@ const propertyOf = (error: unknown, key: string): unknown =>
   typeof error === "object" && error !== null ? (error as Record<string, unknown>)[key] : undefined;
 
 /**
- * Journalise l'échec : étape, nom de classe, statut HTTP et code OAuth public (liste blanche), et
+ * Journalise l'échec : étape, nom de classe, statut HTTP, code OAuth public et motif de refus 403 (listes fermées), et
  * RIEN d'autre. Ni message (il peut citer un code, un état ou un jeton), ni corps, ni cause, ni URL.
  */
 export function logCallbackFailure(step: CallbackStep, error: unknown): void {
   const source = error instanceof CallbackStepError ? error.source : error;
   const status = httpStatusOf(propertyOf(source, "status"));
   const oauthError = oauthErrorCodeOf(propertyOf(source, "oauthError"));
+  const denial = gitDenialOf(propertyOf(source, "denial"));
   requestLogger().warn(
     {
       step: error instanceof CallbackStepError ? error.step : step,
       errorName: source instanceof Error ? source.name : "erreur",
       ...(status === undefined ? {} : { status }),
       ...(oauthError === undefined ? {} : { oauthError }),
+      ...(denial === undefined ? {} : { denial }),
     },
     "installation callback failed",
   );

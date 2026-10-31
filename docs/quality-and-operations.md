@@ -504,7 +504,7 @@ token, a provider message or an e-mail address.
   GitHub's top-level redirect) must belong to the same user, otherwise the outcome is `invalid_state`.
 - **Reading a `provider_error` (callback diagnostic).** A `provider_error` redirect always leaves one
   log entry `installation callback failed` (level 40) with a closed set of fields and nothing else:
-  `step`, `errorName`, optional `status` and optional `oauthError`. Never the code, state, token,
+  `step`, `errorName`, optional `status`, optional `oauthError` and optional `denial`. Never the code, state, token,
   client secret, URL, error message or response body.
 
   | `step` | Meaning |
@@ -526,6 +526,14 @@ token, a provider message or an e-mail address.
   `bad_verification_code` (reused or expired code: reported as `denied`, not `provider_error`),
   `unauthorized_client`, `application_suspended`, `access_denied`. No `oauthError` with `status` 5xx:
   GitHub outage; with `status` 401 or 403 on a later step: user token or organization App policy.
+  `denial` appears only on a 403 and is one of a closed set computed by the adapter from GitHub's
+  message (never the text itself): `resource_not_accessible` ("resource not accessible by
+  integration": the App lacks the permission, or the token is not allowed for that resource),
+  `app_blocked` (message mentions "blocked"), `access_policy` ("access policy" / "third-party":
+  the organization restricts third-party App access), `saml_enforcement` (SAML SSO authorization
+  missing), `permission_missing` ("permission" / "must have"), `other`. Typical reading of
+  `step: owner_role` with `status: 403`: `access_policy` or `app_blocked` means an organization
+  owner must approve the App; `saml_enforcement` means the user must authorize the token for SSO.
   Example: `{"level":40,"step":"exchange_code","errorName":"GitProviderError","status":200,"oauthError":"redirect_uri_mismatch","msg":"installation callback failed"}`.
 - **User token expiry.** With "Expire user authorization tokens" on (GitHub's default), the exchange
   response carries `expires_in` (8 h) and `refresh_token` (+ `refresh_token_expires_in`); the adapter

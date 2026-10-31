@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  GIT_DENIALS,
   GitProviderError,
   GitProviderUnavailableError,
+  gitDenialOf,
   InvalidUserCodeError,
   OAUTH_ERROR_CODES,
   oauthErrorCodeOf,
@@ -67,5 +69,30 @@ describe("GitProviderError : diagnostic", () => {
   it("les sous-classes restent sans diagnostic par défaut", () => {
     expect(new GitProviderUnavailableError({ operation: "op" }).status).toBeUndefined();
     expect(new InvalidUserCodeError({ operation: "op" }).oauthError).toBeUndefined();
+  });
+});
+
+describe("denial : motif d'un refus 403, énumération fermée", () => {
+  it.each(GIT_DENIALS)("%s est reconnu", (denial) => {
+    expect(gitDenialOf(denial)).toBe(denial);
+  });
+
+  it.each([
+    ["texte libre", "Resource not accessible by integration"],
+    ["jeton", "ghu_canary-secret"],
+    ["nombre", 7],
+    ["null", null],
+    ["undefined", undefined],
+  ])("%s : absent", (_label, value) => {
+    expect(gitDenialOf(value)).toBeUndefined();
+  });
+
+  it("GitProviderError porte denial (non rendu dans le message) et filtre toute valeur hors liste", () => {
+    const error = new GitProviderError("op", undefined, { status: 403, denial: "app_blocked" });
+    expect(error.denial).toBe("app_blocked");
+    expect(error.message).not.toContain("app_blocked");
+    const bad = new GitProviderError("op", undefined, { denial: "ghu_canary" as never });
+    expect(bad.denial).toBeUndefined();
+    expect(Object.keys(new GitProviderError("op"))).not.toContain("denial");
   });
 });
