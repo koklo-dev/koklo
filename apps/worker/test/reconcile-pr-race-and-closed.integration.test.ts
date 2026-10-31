@@ -68,6 +68,24 @@ describe("reconcile-manual-merge-race-with-runner", () => {
   });
 });
 
+describe("reconcile-manual-merge-race-with-deletion", () => {
+  it("ticket supprimé entre la lecture et l'écriture : il reste in_review, aucun audit", async () => {
+    const scene = await bench.scene();
+    const pr = await openPullRequest(bench, scene);
+    const ticket = await insertTicket(bench, scene, { pullRequest: prUrl(scene, pr.number) });
+    await mergeByHand(bench, scene, pr);
+    bench.spy.hooks.set("getPullRequestState", async () => {
+      await bench.query("UPDATE tickets SET deleted_at = now() WHERE id = $1", [ticket.id]);
+    });
+
+    const summary = await runReconcile(bench);
+
+    expect(summary.prs?.done).toBe(0);
+    expect(await statusOf(bench, ticket.id)).toBe("in_review");
+    expect(await auditOf(bench, scene.organizationId)).toEqual([]);
+  });
+});
+
 describe("reconcile-pr-closed-unmerged-no-transition", () => {
   it("PR fermée sans fusion : statut et bail inchangés, un seul audit pr_closed sur deux runs", async () => {
     const scene = await bench.scene();

@@ -94,7 +94,7 @@ export class PrismaPullRequestStore implements PullRequestStore {
     return withOrganization(ticket.organizationId, () =>
       this.client.$transaction(async (tx) => {
         const { count } = await tx.ticket.updateMany({
-          where: { id: ticket.id, status: "in_review" },
+          where: { id: ticket.id, status: "in_review", deletedAt: null },
           data: { status: "done" },
         });
         if (count !== 1) return false;

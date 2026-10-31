@@ -554,11 +554,17 @@ install --with-deps chromium` first). `turbo run e2e` still only runs the stub-A
   `ticket.reconcile.pr_merged` is written. A pull request closed without merge changes nothing and
   leaves one `ticket.reconcile.pr_closed` entry. At most 200 provider reads per run; without a
   provider configured the pass does nothing.
-  Known limit (no migration, no per-ticket marker): tickets whose pull request is closed without
-  merge, or whose reference is unreadable, are read again at every tick (the `pr_closed` audit is
-  deduplicated, `closed` is recounted; unreadable references cost no provider call and no cap).
-  Closed ones must be re-read since the pull request can be reopened and merged later. A
-  `last_reconciled_at` marker belongs to TK-46c.
+  Rotation (no migration): tickets are scanned by increasing id; when the cap is reached, the next
+  run resumes after the last ticket handled and wraps to the start at the end of the list, so every
+  `in_review` ticket is read within ceil(N/200) ticks and none is starved. The cursor lives in the
+  worker process memory; losing it at restart only restarts the scan from the first ticket. Merged
+  tickets are not prioritised (that would need an extra read or a marker).
+  Known limit: tickets whose pull request is closed without merge are read again at every pass
+  over the list (the `pr_closed` audit is deduplicated, `closed` is recounted; unreadable
+  references cost no provider call and no cap). Closed ones must be re-read since the pull request
+  can be reopened and merged later. A `last_reconciled_at` marker belongs to TK-46c.
+  A provider rate limit (`rate_limited` reason) stops the pass; the ticket is read again on the
+  next run. Provider errors are logged by class name (`errorName`) only, never the message.
 - **Monitoring.** The tick log carries `deliveries`, `batches` (`requeued`, `skipped`), `prs` (`done`,
   `closed`, `skipped`, `reasons`: counts per reason such as `pr_ref_unparsable`, `repo_not_linked`,
   `provider_error`), `failedPasses` and `durationMs`. A non-empty `failedPasses` on several consecutive ticks means a pass is broken

@@ -48,6 +48,7 @@ export async function registerReconcile(
       prs: pullRequestsPass({
         store: new PrismaPullRequestStore(deps.raw),
         provider: deps.provider,
+        logger,
       }),
     },
   });
