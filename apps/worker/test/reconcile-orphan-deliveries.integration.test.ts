@@ -210,7 +210,9 @@ describe("multi-tenant", () => {
     const scene = await bench.scene();
     await orphanDelivery(bench, scene);
     await runReconcile(bench);
-    const audits = await bench.query("SELECT 1 FROM audit_log WHERE action LIKE '%reconcile%'");
+    const audits = await bench.query(
+      "SELECT 1 FROM audit_log WHERE action LIKE '%reconcile%' AND action NOT LIKE 'repo.reconcile.%'",
+    );
     expect(audits).toEqual([]);
   });
 });

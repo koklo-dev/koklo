@@ -22,3 +22,11 @@ export const RECONCILE_MAX_PULL_REQUESTS_DEFAULT = 200;
 
 /** Clé du verrou consultatif Postgres qui empêche deux réconciliations simultanées. */
 export const RECONCILE_LOCK_KEY = 460_046;
+
+/**
+ * Budget d'appels fournisseur de la passe P4 (index des têtes) par run : exécution séquentielle,
+ * au plus ce nombre d'appels (authenticate compris) ; le reste attend le tick suivant.
+ */
+export const RECONCILE_MAX_PROVIDER_CALLS_DEFAULT = 300;
+export const RECONCILE_MAX_PROVIDER_CALLS_MIN = 10;
+export const RECONCILE_MAX_PROVIDER_CALLS_MAX = 5000;

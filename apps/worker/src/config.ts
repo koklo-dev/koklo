@@ -2,6 +2,9 @@ import {
   RECONCILE_GRACE_MINUTES_DEFAULT,
   RECONCILE_GRACE_MINUTES_MAX,
   RECONCILE_GRACE_MINUTES_MIN,
+  RECONCILE_MAX_PROVIDER_CALLS_DEFAULT,
+  RECONCILE_MAX_PROVIDER_CALLS_MAX,
+  RECONCILE_MAX_PROVIDER_CALLS_MIN,
   WEBHOOK_RETENTION_DAYS_DEFAULT,
   WEBHOOK_RETENTION_DAYS_MAX,
   WEBHOOK_RETENTION_DAYS_MIN,
@@ -33,6 +36,8 @@ export type WorkerConfig = {
   readonly webhookRetentionDays?: number;
   /** Âge avant qu'une ligne non réglée soit jugée orpheline (`RECONCILE_GRACE_MINUTES`, 5 à 1440). `loadConfig` la renseigne toujours (défaut 15) ; absente, le défaut s'applique. */
   readonly reconcileGraceMinutes?: number;
+  /** Budget d'appels fournisseur de la passe P4 par run (`RECONCILE_MAX_PROVIDER_CALLS`, 10 à 5000). `loadConfig` le renseigne toujours (défaut 300) ; absent, le défaut s'applique. */
+  readonly reconcileMaxProviderCalls?: number;
 };
 
 function fail(variable: string, rule: string): never {
@@ -83,6 +88,20 @@ function parseGraceMinutes(value: string | undefined): number {
     : fail(
         "RECONCILE_GRACE_MINUTES",
         "must be a whole number of minutes within the documented range",
+      );
+}
+
+/** Entier de `MIN` à `MAX` appels ; le message ne cite que la variable, jamais la valeur lue. */
+function parseMaxProviderCalls(value: string | undefined): number {
+  if (value === undefined || value === "") {
+    return RECONCILE_MAX_PROVIDER_CALLS_DEFAULT;
+  }
+  const calls = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  return calls >= RECONCILE_MAX_PROVIDER_CALLS_MIN && calls <= RECONCILE_MAX_PROVIDER_CALLS_MAX
+    ? calls
+    : fail(
+        "RECONCILE_MAX_PROVIDER_CALLS",
+        "must be a whole number of calls within the documented range",
       );
 }
 
@@ -143,5 +162,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     ...(githubApp ? { githubApp } : {}),
     webhookRetentionDays: parseRetentionDays(env.WEBHOOK_RETENTION_DAYS),
     reconcileGraceMinutes: parseGraceMinutes(env.RECONCILE_GRACE_MINUTES),
+    reconcileMaxProviderCalls: parseMaxProviderCalls(env.RECONCILE_MAX_PROVIDER_CALLS),
   };
 }

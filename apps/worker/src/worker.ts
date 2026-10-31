@@ -96,6 +96,9 @@ async function registerDatabaseJobs(
     graceMinutes: config.reconcileGraceMinutes ?? RECONCILE_GRACE_MINUTES_DEFAULT,
     retentionDays,
     provider,
+    ...(config.reconcileMaxProviderCalls === undefined
+      ? {}
+      : { maxProviderCalls: config.reconcileMaxProviderCalls }),
   });
 }
 

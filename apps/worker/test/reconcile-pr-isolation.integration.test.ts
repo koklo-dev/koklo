@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { resetBench, runReconcile } from "./support/reconcile-bench.ts";
+import { detachFromHeads } from "./support/reconcile-heads-bench.ts";
 import {
   auditOf,
   insertTicket,
@@ -187,6 +188,7 @@ describe("reconcile-pr-provider-budget", () => {
     const scene = await bench.scene();
     const one = await openPullRequest(bench, scene);
     const two = await openPullRequest(bench, scene);
+    await detachFromHeads(bench, scene);
     await insertTicket(bench, scene, { pullRequest: prUrl(scene, one.number) });
     await insertTicket(bench, scene, { pullRequest: prUrl(scene, two.number) });
     bench.spy.calls = [];
@@ -202,6 +204,7 @@ describe("reconcile-pr-provider-budget", () => {
 
   it("aucune authentification quand aucun ticket ne peut être réconcilié", async () => {
     const scene = await bench.scene();
+    await detachFromHeads(bench, scene);
     await insertTicket(bench, scene, { status: "todo" });
     await insertTicket(bench, scene, { pullRequest: "n'importe quoi" });
     bench.spy.calls = [];

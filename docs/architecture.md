@@ -907,6 +907,7 @@ flowchart LR
   L -->|"yes"| P1["P1 webhook_deliveries<br/>received/processing older than grace"]
   L -->|"yes"| P2["P2 spec_write_batches<br/>queued/committing older than grace"]
   L -->|"yes"| P3["P3 tickets in_review<br/>PR merged by hand (TK-46b)"]
+  L -->|"yes"| P4["P4 spec-bearing repos<br/>spec heads vs provider (TK-46c)"]
   P1 --> R["no live job (created/retry/active)?<br/>delete failed jobs of the key,<br/>send a NEW job id, same singletonKey"]
   P2 --> R
   P2 -->|"per requeued batch"| A[("audit_log: system,<br/>spec_write_batch.requeued")]
@@ -938,8 +939,12 @@ flowchart LR
   change, one system audit `ticket.reconcile.pr_closed` per ticket (never repeated). `in_progress` and
   `blocked` tickets are never forced.
 - **Log.** One line per tick: counts and pass names only, never ids, payloads or error messages.
-- **Code.** `apps/worker/src/jobs/reconcile.ts` (handler, cron), `src/reconcile/{lock,passes,requeue,store,pull-requests,pr-store,register,types}.ts`;
-  constants in `packages/domain/src/reconcile.ts`. P3 is TK-46b; P4 comes with TK-46c.
+- **Code.** `apps/worker/src/jobs/reconcile.ts` (handler, cron), `src/reconcile/{lock,passes,requeue,store,pull-requests,pr-store,heads,head-store,budget,register,types}.ts`;
+  constants in `packages/domain/src/reconcile.ts`. P3 is TK-46b; P4 is TK-46c.
+- **P4, spec heads (TK-46c).** For each spec-bearing repo of an `active` installation (oldest `last_reconciled_at` first, never-reconciled first), the default branch and the known `spec_heads` are re-indexed by `indexBranch` (shared with the webhook `push` handler). A moved head audits `repo.reconcile.head_updated`, a vanished branch (repo verified by `getRepo`) removes its head and audits `head_removed`, a 404 repo keeps its heads and audits `unreachable` once. Provider calls are capped per run by `RECONCILE_MAX_PROVIDER_CALLS` (authentication included); a rate limit or the budget stops the pass cleanly (`heads.stopped`) and the interrupted repo is retried first next tick. A repo failing on a provider error is skipped and tried after the healthy ones on the next tick (in-memory, no migration), so a broken repo cannot starve the budget of the others.
+- **P3 / P4 budgets differ on purpose.** P3 caps *ticket reads* (200) and rotates by a ticket-id cursor; P4 caps *every provider call* (`budgetedProvider` in `budget.ts`) and rotates through `last_reconciled_at` in the database. Both keep one `authenticate` per installation and run; P3 keeps a failed authentication cached for the run, P4 forgets it so the next repo retries. The budgets are not shared.
+- **Audits `repo.reconcile.*`.** `head_updated` and `head_removed` are written once per repo and run that changes state (none when nothing moved, so two runs leave the same rows); `unreachable` is written once per repo ever. Actor is the system, target is the repo, in the repo's own organization.
+- **Run summary.** `heads: { updated, removed, unreachable, skipped, stopped }`, `stopped` being `rate_limited`, `budget` or `null`.
 
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them

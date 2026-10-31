@@ -3,6 +3,7 @@ import type { Logger } from "@koklo/observability";
 import { errorNameOf } from "../job-support.ts";
 import { withReconcileLock } from "../reconcile/lock.ts";
 import {
+  emptyHeadCount,
   emptyPullRequestCount,
   type PassCount,
   type PassName,
@@ -34,7 +35,12 @@ export function createReconcileHandler(deps: ReconcileDeps) {
   return async (): Promise<void> => {
     const startedAt = Date.now();
     const result = await withReconcileLock(deps.raw, async () => {
-      const counts = { deliveries: NONE, batches: NONE, prs: emptyPullRequestCount() };
+      const counts = {
+        deliveries: NONE,
+        batches: NONE,
+        prs: emptyPullRequestCount(),
+        heads: emptyHeadCount(),
+      };
       const failedPasses: PassName[] = [];
       for (const name of Object.keys(deps.passes) as PassName[]) {
         try {
