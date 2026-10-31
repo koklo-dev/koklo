@@ -131,7 +131,7 @@ covers_commit: 7f97066
 ### Webhook ingestion: configuration and verification (TK-45c1)
 | Variable | Read by | Meaning |
 |----------|---------|---------|
-| `GITHUB_WEBHOOK_SECRET` | API | optional; deployed from the optional secret `GH_WEBHOOK_SECRET`. Absent or empty: the API starts, logs one warning naming the variable (never a value) and `POST /api/webhooks/github` answers 503 until it is set |
+| `GITHUB_WEBHOOK_SECRET` | API | deployed from the **required** secret `GH_WEBHOOK_SECRET` (TK-47: a deployment without it fails). In local dev it stays optional; absent or empty: the API starts, logs one warning naming the variable (never a value) and `POST /api/webhooks/github` answers 503 until it is set |
 
 - **Route.** Raw body capped at 5 MiB (`413` above, decided from `Content-Length` before reading). Order
   of checks: 503, 413, 415, 401, 400, 202 (see `architecture.md`). The web app relays the path to the
@@ -377,8 +377,9 @@ GitHub OAuth App is one per environment, callback `<BETTER_AUTH_URL>/api/auth/ca
 GitHub refuses secret names starting with `GITHUB_`, so in the infra environment
 (`koklo-<env>`) the two values are entered as `OAUTH_GITHUB_CLIENT_ID` and
 `OAUTH_GITHUB_CLIENT_SECRET`; the manifest maps them to `GITHUB_CLIENT_ID` and
-`GITHUB_CLIENT_SECRET` for the API with `vars` (`${secrets.…}`). The optional GitHub App
-secrets follow the same rule: `GH_APP_ID`, `GH_APP_PRIVATE_KEY` and `GH_WEBHOOK_SECRET` are mapped to
+`GITHUB_CLIENT_SECRET` for the API with `vars` (`${secrets.…}`). The GitHub App
+secrets follow the same rule and are **required at deployment** (TK-47: listed in the manifest `secrets`,
+so a deployment missing any of them fails; local dev and tests stay tolerant): `GH_APP_ID`, `GH_APP_PRIVATE_KEY` and `GH_WEBHOOK_SECRET` are mapped to
 `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` and `GITHUB_WEBHOOK_SECRET` for the API and the worker.
 `GH_APP_PRIVATE_KEY` holds the `.pem` as **one base64 line**, not the raw multi-line key:
 `init-app-env.sh` reads a single line, so it is skipped there (Enter) and set separately from the
@@ -387,7 +388,7 @@ infra checkout with
 Whatever reads `GITHUB_APP_PRIVATE_KEY` (the GitHub App client, R2) must base64-decode it before
 signing the JWT.
 In the API, `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` are read as an all-or-nothing pair
-(TK-43): neither set (staging without the App) means the API starts with one warning and
+(TK-43): neither set (local dev without the App; no longer possible when deployed since TK-47) means the API starts with one warning and
 `repo.createSpec` / `repo.link` answer `PROVIDER_UNAVAILABLE`; only one of them fails at startup,
 naming the missing variable and never a value. `GITHUB_APP_CLIENT_ID` and
 `GITHUB_APP_CLIENT_SECRET` are **optional** and also an all-or-nothing pair (one alone fails at
@@ -396,7 +397,7 @@ implemented yet. Without them the provider is active and any path that needs a u
 personal account in `repo.createSpec`) answers `USER_TOKEN_REQUIRED`. `loadConfig` decodes the
 base64 key itself (a PEM with literal `\n` is accepted too). The manifest maps
 `GH_APP_CLIENT_ID` / `GH_APP_CLIENT_SECRET` to `GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET`
-for the API only, as **optional** secrets: nothing to add in TK-47, which keeps them optional.
+for the API only, as **optional** secrets (`optionalSecrets`): TK-47 made only `GH_APP_ID`, `GH_APP_PRIVATE_KEY` and `GH_WEBHOOK_SECRET` required and kept these two optional.
 Two distinct pairs, never interchangeable: `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` (from
 `OAUTH_GITHUB_CLIENT_*`) belong to the sign-in OAuth App (Better Auth), while
 `GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET` belong to the GitHub App; an authorisation code
