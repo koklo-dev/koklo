@@ -1,7 +1,7 @@
 import { Controller, Get, Inject, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { SESSION_RESOLVER, type SessionResolver } from "../auth/session.ts";
-import { requestLogger } from "../request-logger.ts";
+import { logCallbackFailure } from "./callback-diagnostic.ts";
 import {
   type CallbackOutcome,
   InstallationCallbackService,
@@ -36,10 +36,7 @@ export class InstallationCallbackController {
       const session = await this.sessions.resolveUser(request.headers);
       return await this.service.complete(session?.userId ?? null, request.query);
     } catch (error) {
-      requestLogger().warn(
-        { errorName: error instanceof Error ? error.name : "erreur" },
-        "installation callback failed",
-      );
+      logCallbackFailure("request", error);
       return "provider_error";
     }
   }

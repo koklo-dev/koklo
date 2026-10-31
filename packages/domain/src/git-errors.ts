@@ -1,4 +1,10 @@
 import type { GitAuthKind } from "./git-auth.ts";
+import {
+  type GitErrorDiagnostic,
+  httpStatusOf,
+  type OAuthErrorCode,
+  oauthErrorCodeOf,
+} from "./git-diagnostic.ts";
 import type { GitOwner } from "./git-owner.ts";
 
 export type RepoCreationForbiddenReason = "missing-user-token" | "resource-not-accessible";
@@ -6,10 +12,18 @@ export type RepoCreationForbiddenReason = "missing-user-token" | "resource-not-a
 /** Racine des erreurs du port Git ; aucune ne porte de jeton ni de secret. */
 export class GitProviderError extends Error {
   readonly operation: string;
-  constructor(operation: string, message?: string) {
+  /** Statut HTTP de l'appel fautif, quand il existe. Absent (pas `undefined`) sinon. */
+  declare readonly status?: number;
+  /** Code OAuth public de GitHub (liste blanche), jamais le corps de la réponse. */
+  declare readonly oauthError?: OAuthErrorCode;
+  constructor(operation: string, message?: string, diagnostic?: GitErrorDiagnostic) {
     super(message ?? `Échec de l'opération Git ${operation}`);
     this.name = "GitProviderError";
     this.operation = operation;
+    const status = httpStatusOf(diagnostic?.status);
+    const oauthError = oauthErrorCodeOf(diagnostic?.oauthError);
+    if (status !== undefined) this.status = status;
+    if (oauthError !== undefined) this.oauthError = oauthError;
   }
 }
 
@@ -108,8 +122,8 @@ export class GitProviderUnavailableError extends GitProviderError {
 
 /** Le `code` d'autorisation est refusé, expiré ou déjà utilisé ; il n'est pas repris dans l'erreur. */
 export class InvalidUserCodeError extends GitProviderError {
-  constructor(input: { operation: string }) {
-    super(input.operation, "Le code d'autorisation GitHub est invalide ou expiré.");
+  constructor(input: { operation: string } & GitErrorDiagnostic) {
+    super(input.operation, "Le code d'autorisation GitHub est invalide ou expiré.", input);
     this.name = "InvalidUserCodeError";
   }
 }

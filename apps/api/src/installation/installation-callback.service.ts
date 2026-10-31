@@ -11,8 +11,8 @@ import {
 import { Inject, Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import { CLOCK, type Clock } from "../clock.ts";
-import { requestLogger } from "../request-logger.ts";
 import type { AuditActor } from "../tracker/audit.ts";
+import { atStep, type CallbackStep, logCallbackFailure } from "./callback-diagnostic.ts";
 import { INSTALLATION_REPOSITORY, type InstallationRepository } from "./installation.repository.ts";
 import { INSTALLATION_FLOW, type InstallationFlow } from "./installation-flow.ts";
 
@@ -45,13 +45,12 @@ export class InstallationCallbackService {
     const claim = query.success ? flow.signer.verify(query.data.state) : null;
     if (!query.success || !claim || claim.userId !== userId) return "invalid_state";
     const actor = { organizationId: claim.organizationId, userId };
-    const consumed = await this.repository.consumeState(
-      { ...actor, nonce: claim.nonce },
-      this.clock.now(),
+    const consumed = await atStep("consume_state", () =>
+      this.repository.consumeState({ ...actor, nonce: claim.nonce }, this.clock.now()),
     );
     if (!consumed) return "invalid_state";
     // Organisation de l'état, jamais celle de la session au retour : on revérifie le rôle.
-    if (!(await this.repository.isManager(actor))) return "denied";
+    if (!(await atStep("manager_check", () => this.repository.isManager(actor)))) return "denied";
     return this.finish(flow, actor, consumed.installationId, query.data);
   }
 
@@ -61,7 +60,7 @@ export class InstallationCallbackService {
     installationId: string | null,
     query: CallbackQuery,
   ): Promise<CallbackOutcome> {
-    const target = await this.targetOf(actor, installationId, query);
+    const target = await atStep("target", () => this.targetOf(actor, installationId, query));
     if (target === "invalid_state") return target;
     if (target === null || query.code === undefined) return this.refuse(actor, "denied");
     return this.prove(flow, actor, target, query.code);
@@ -79,21 +78,39 @@ export class InstallationCallbackService {
       credentials = await flow.provider.exchangeUserCode({ code, redirectUri: flow.redirectUri });
     } catch (error) {
       if (error instanceof InvalidUserCodeError) return this.refuse(actor, "denied");
-      return this.failed(error);
+      return this.failed("exchange_code", error);
     }
+    return this.verify(flow, actor, target, credentials);
+  }
+
+  /** Preuve de visibilité et de propriété, puis liaison ; chaque appel porte sa propre étape. */
+  private async verify(
+    flow: InstallationFlow,
+    actor: AuditActor,
+    target: string,
+    credentials: GitUserCredentials,
+  ): Promise<CallbackOutcome> {
+    const auth = { kind: "user", ...credentials } as const;
+    let visible: readonly GitUserInstallation[];
     try {
-      const visible = await flow.provider.listUserInstallations({
-        auth: { kind: "user", ...credentials },
-      });
-      const proven = visible.find((candidate) => candidate.externalId === target);
-      if (!proven) return this.refuse(actor, "denied");
-      if (!(await ownsAccount(flow.provider, credentials, proven))) {
-        return this.refuse(actor, "not_owner");
-      }
+      visible = await flow.provider.listUserInstallations({ auth });
+    } catch (error) {
+      return this.failed("list_installations", error);
+    }
+    const proven = visible.find((candidate) => candidate.externalId === target);
+    if (!proven) return this.refuse(actor, "denied");
+    let owns: boolean;
+    try {
+      owns = await ownsAccount(flow.provider, credentials, proven);
+    } catch (error) {
+      return this.failed("owner_role", error);
+    }
+    if (!owns) return this.refuse(actor, "not_owner");
+    try {
       const result = await this.repository.link(actor, proven, credentials);
       return result === "already_linked" ? this.refuse(actor, "already_linked") : "installed";
     } catch (error) {
-      return this.failed(error);
+      return this.failed("link", error);
     }
   }
 
@@ -121,17 +138,14 @@ export class InstallationCallbackService {
     try {
       await this.repository.recordRefusal(actor);
     } catch (error) {
-      this.failed(error);
+      this.failed("audit", error);
     }
     return outcome;
   }
 
-  /** Seul le nom de l'erreur est journalisé : son message peut citer un code, un état ou un jeton. */
-  private failed(error: unknown): CallbackOutcome {
-    requestLogger().warn(
-      { errorName: error instanceof Error ? error.name : "erreur" },
-      "installation callback failed",
-    );
+  /** Journal diagnostique sans secret (voir `logCallbackFailure`) ; le résultat reste générique. */
+  private failed(step: CallbackStep, error: unknown): CallbackOutcome {
+    logCallbackFailure(step, error);
     return "provider_error";
   }
 }
