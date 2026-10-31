@@ -1,8 +1,9 @@
+import { raiseCounterTo } from "@koklo/db";
 import type { Dependency } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import { recordAudit } from "../tracker/audit.ts";
-import { nextCounterValue, raiseCounterTo } from "../tracker/counters.ts";
+import { nextCounterValue } from "../tracker/counters.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {

@@ -4,6 +4,12 @@ export {
   type PrismaClient,
   type TenantClient,
 } from "./client.ts";
+export {
+  type CounterName,
+  type CounterScope,
+  raiseCounterTo,
+  type TenantTx,
+} from "./counters.ts";
 export { latestMigration, type RollbackPorts, rollbackLatest } from "./rollback.ts";
 export { SEED_IDS, seed } from "./seed.ts";
 export {

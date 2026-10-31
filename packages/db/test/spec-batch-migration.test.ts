@@ -106,12 +106,14 @@ async function seedExistingData(db: TestDatabase, batchId: string) {
   return scope;
 }
 
+/** TK-45a : les migrations postérieures sont défaites d'abord (ordre inverse), puis celle de TK-44a. */
 async function rollBackOutcome(db: TestDatabase): Promise<void> {
-  runPrismaOrThrow(
-    ["db", "execute", "--file", join(migrationsDir, outcomeMigration(), "down.sql")],
-    db.url,
-  );
-  await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [outcomeMigration()]);
+  for (const dir of dirs()
+    .filter((d) => d >= outcomeMigration())
+    .reverse()) {
+    runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+  }
 }
 
 /** Le lot tel que la base le rend : colonnes de statut et, si elles existent, celles de TK-44a. */

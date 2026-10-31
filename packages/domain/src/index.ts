@@ -10,6 +10,7 @@ export * from "./git-provider.ts";
 export * from "./git-pull-request.ts";
 export * from "./git-repo.ts";
 export * from "./git-webhook.ts";
+export * from "./git-webhook-payload.ts";
 export * from "./lease.ts";
 export * from "./lock.ts";
 export * from "./project-state.ts";

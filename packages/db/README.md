@@ -122,6 +122,18 @@ conservés).
 - `spec_write_operations.position` est en base 1 en base et en base 0 au contrat : le dépôt traduit
   (`position - 1`).
 
+## Index des livraisons par installation (TK-45a)
+
+Migration `*_webhook_installation_index` (additive, aucune table : 32 tables) : un seul
+`CREATE INDEX "webhook_deliveries_installation_external_id_idx"` sur
+`webhook_deliveries(installation_external_id)` (B-tree simple), déclaré `@@index([installationExternalId])`
+dans `schema.prisma` (`migrate diff` vide). `down.sql` est un seul `DROP INDEX` et ramène exactement
+à `*_spec_batch_outcome`, livraisons conservées.
+
+`raiseCounterTo(tx, scope, name, atLeast)` est exporté par `@koklo/db` (déplacé de l'API, le worker
+relève le compteur `feature`) : crée la ligne si absente, relève à `atLeast`, ne recule jamais.
+`atLeast` hors entiers de 0 à 2 147 483 647 : `RangeError` avant toute écriture.
+
 ## Rollback
 
 `pnpm db:rollback` exécute le `down.sql` de la dernière migration (`prisma db execute --file`)
