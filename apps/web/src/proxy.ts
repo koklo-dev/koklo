@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { type GuardedPath, resolveAccess } from "./lib/auth-guard.ts";
+import { guardedPathFor, resolveAccess } from "./lib/auth-guard.ts";
 import { loginPathFor } from "./lib/next-path.ts";
 import { ORPC_PREFIX } from "./lib/orpc-prefix.ts";
 import { readRuntimeConfig } from "./lib/runtime-config.ts";
@@ -15,7 +15,8 @@ const GITHUB_CALLBACK_PATH = "/api/github/callback";
  * - `/api/webhooks/github` est relayé tel quel, sans session (livraisons signées de GitHub) ;
  * - `/api/github/callback` est relayé tel quel avec le cookie de session, sans lecture de session ici :
  *   l'API arbitre (session absente ou état invalide = `/github?result=invalid_state`, jamais `/login`) ;
- * - `/login`, `/projects`, `/kanban`, `/members`, `/github` et `/organizations` sont gardés selon la session et l'organisation active ;
+ * - `/login`, `/projects`, `/projects/<id>/features`, `/kanban`, `/members`, `/github` et `/organizations` sont gardés
+ *   selon la session et l'organisation active ;
  * - `/accept-invitation/<id>` exige une session (sinon `/login?next=…`) mais jamais d'organisation active,
  *   et n'est jamais mis en cache.
  */
@@ -42,7 +43,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return noStore(hasSession ? NextResponse.next() : redirectTo(request, loginPathFor(pathname)));
   }
 
-  const path = pathname as GuardedPath;
+  const path = guardedPathFor(pathname);
+  if (!path) return NextResponse.next();
   const target = resolveAccess({
     path,
     ...(await readSession(apiUrl, request.headers.get("cookie"))),
@@ -68,6 +70,7 @@ export const config = {
   matcher: [
     "/login",
     "/projects",
+    "/projects/:projectId/features",
     "/kanban",
     "/members",
     "/github",

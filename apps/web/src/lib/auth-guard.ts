@@ -9,12 +9,25 @@ export type GuardedPath =
 /** Page d'un projet (TK-48d) : chemin dynamique, un seul segment `projectId`. */
 export type ProjectFeaturesPath = `/projects/${string}/features`;
 
+const EXACT_PATHS: readonly GuardedPath[] = [
+  "/login",
+  "/projects",
+  "/kanban",
+  "/members",
+  "/github",
+  "/organizations",
+];
+/** `/projects/<un segment>/features` : jamais de sous-chemin ni de barre oblique finale. */
+const PROJECT_FEATURES = /^\/projects\/[^/]+\/features$/;
+
 /**
  * Résout un chemin de requête en page gardée : les chemins exacts de `GuardedPath` et
  * `/projects/<un segment>/features`. Tout autre chemin (`/projects/<id>`, `/projects/<id>/features/x`) : null.
  */
-export function guardedPathFor(_pathname: string): GuardedPath | ProjectFeaturesPath | null {
-  throw new Error("auth-guard: guardedPathFor non implémenté");
+export function guardedPathFor(pathname: string): GuardedPath | ProjectFeaturesPath | null {
+  const exact = EXACT_PATHS.find((path) => path === pathname);
+  if (exact) return exact;
+  return PROJECT_FEATURES.test(pathname) ? (pathname as ProjectFeaturesPath) : null;
 }
 
 /** Destinations de redirection possibles (jamais /kanban ni /github : on y entre, on n'y renvoie pas). */
@@ -39,9 +52,7 @@ export function resolveAccess({
 }: AccessInput): RedirectPath | null {
   if (!hasSession) return path === "/login" ? null : "/login";
   if (path === "/login") return "/projects";
-  const needsOrganization =
-    path === "/projects" || path === "/kanban" || path === "/members" || path === "/github";
-  return needsOrganization && !hasActiveOrganization ? "/organizations" : null;
+  return path !== "/organizations" && !hasActiveOrganization ? "/organizations" : null;
 }
 
 /**

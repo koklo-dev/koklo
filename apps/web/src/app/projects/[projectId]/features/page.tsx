@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { FeaturesPage } from "../../../../components/features-page.tsx";
 
-/** Squelette Red (TK-48 / 48d). */
-export default async function Page(_props: {
+export const metadata: Metadata = { title: "Fonctionnalités · Koklo" };
+
+export default async function Page({
+  params,
+}: {
   params: Promise<{ projectId: string }>;
 }): Promise<ReactNode> {
-  return null;
+  const { projectId } = await params;
+  return <FeaturesPage projectId={projectId} />;
 }

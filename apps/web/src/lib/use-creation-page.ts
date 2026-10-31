@@ -16,6 +16,8 @@ const ANNOUNCEMENTS: Record<string, (name: string) => string> = {
   linked: (name) => `Projet « ${name} » et dépôt de spec reliés.`,
   "existing-repo": () => "Ce projet a déjà son dépôt de spec.",
   created: (name) => `Projet « ${name} » créé.`,
+  "repo-missing": (name) =>
+    `Projet « ${name} » créé, sans dépôt de spec. Ouvrez-le pour créer le dépôt.`,
 };
 
 /**

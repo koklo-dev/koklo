@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { AppFrame } from "../../../../components/app-frame.tsx";
 
-/** Squelette Red (TK-48 / 48d). */
-export default function FeaturesLayout(_props: { children: ReactNode }): ReactNode {
-  return null;
+/** Gabarit sans fil d'Ariane propre : « Koklo > Projets > nom > Fonctionnalités » est porté par la page. */
+export default function FeaturesLayout({ children }: { children: ReactNode }): ReactNode {
+  return <AppFrame>{children}</AppFrame>;
 }

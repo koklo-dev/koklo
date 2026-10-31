@@ -315,6 +315,8 @@ describe("Index en échec (§4.8)", () => {
   });
 
   it("listFeatures répond 409 SPEC_INDEX_FAILED : même rendu, code et version lus dans l'erreur", async () => {
+    // le `beforeEach` du fichier pose `spec.head` à null : ici l'index est lisible, c'est la liste qui répond 409
+    procedures.specHead.mockResolvedValue(head());
     procedures.specListFeatures.mockImplementation(
       reject("SPEC_INDEX_FAILED", { errorCode: "spec_too_large", commitSha: "b".repeat(40) }),
     );

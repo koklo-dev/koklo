@@ -18,13 +18,23 @@ export type Phase =
   | { name: "no-account" };
 
 export type CreationOutcome =
-  | { kind: "created-with-repo" | "linked" | "existing-repo" | "created"; name: string }
+  | {
+      kind: "created-with-repo" | "linked" | "existing-repo" | "created" | "repo-missing";
+      name: string;
+    }
   | { kind: "unresolved"; marker: CreationResume; offerLink: boolean }
   | { kind: "cancelled" };
 
-/** Projet à reprendre : issu du marqueur de session (`offerLink` : proposer le repli « relier »). */
+/**
+ * Projet dont il reste à créer le dépôt : le marqueur de session (compte et nom de dépôt connus) ou, depuis la
+ * page du projet, le seul projet (le compte se choisit dans le panneau).
+ */
+export type ResumeTarget = Pick<CreationResume, "projectId" | "projectName"> &
+  Partial<Pick<CreationResume, "installationId" | "repoName">>;
+
+/** Projet à reprendre (`offerLink` : proposer le repli « relier »). */
 export interface PendingResume {
-  marker: CreationResume;
+  marker: ResumeTarget;
   offerLink: boolean;
   /** Ouvrir directement le repli « Relier un dépôt existant ». */
   openLink?: boolean;

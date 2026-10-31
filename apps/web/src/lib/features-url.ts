@@ -1,3 +1,4 @@
+import { featurePrioritySchema, featureStatusSchema } from "@koklo/contract";
 import type { FeaturePriority, FeatureStatus } from "./feature-labels.ts";
 
 export interface FeaturesUrlState {
@@ -11,14 +12,30 @@ export type FeaturesUrlPatch = {
   [K in keyof FeaturesUrlState]?: FeaturesUrlState[K] | null;
 };
 
-const TODO = "features-url: non implémenté";
+const FEATURE_ID = /^F-\d{3,}$/;
+const KEYS = ["status", "priority", "feature"] as const;
 
 /** Lit `status`, `priority` et `feature` dans une query string ; les valeurs inconnues sont ignorées. */
-export function readFeaturesUrl(_search: string): FeaturesUrlState {
-  throw new Error(TODO);
+export function readFeaturesUrl(search: string): FeaturesUrlState {
+  const params = new URLSearchParams(search);
+  const status = featureStatusSchema.safeParse(params.get("status"));
+  const priority = featurePrioritySchema.safeParse(params.get("priority"));
+  const feature = params.get("feature");
+  return {
+    ...(status.success ? { status: status.data } : {}),
+    ...(priority.success ? { priority: priority.data } : {}),
+    ...(feature !== null && FEATURE_ID.test(feature) ? { feature } : {}),
+  };
 }
 
 /** Applique `patch` (null efface) à `search` et rend la nouvelle query string : "" ou "?a=b". */
-export function withFeaturesUrl(_search: string, _patch: FeaturesUrlPatch): string {
-  throw new Error(TODO);
+export function withFeaturesUrl(search: string, patch: FeaturesUrlPatch): string {
+  const params = new URLSearchParams(search);
+  for (const key of KEYS) {
+    const value = patch[key];
+    if (value === null) params.delete(key);
+    else if (value !== undefined) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }

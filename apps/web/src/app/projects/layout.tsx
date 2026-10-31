@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { AppFrame } from "../../components/app-frame.tsx";
+import { ProjectsFrame } from "../../components/projects-frame.tsx";
 
 export default function ProjectsLayout({ children }: { children: ReactNode }) {
-  return <AppFrame current="Projets">{children}</AppFrame>;
+  return <ProjectsFrame>{children}</ProjectsFrame>;
 }

@@ -68,7 +68,10 @@ const rowOf = (title: string): HTMLElement => {
 };
 
 describe("Chargement (§4.1)", () => {
-  beforeEach(() => procedures.specHead.mockImplementation(neverResolves));
+  // Corps entre accolades : rendre le mock lui-même ferait de lui un « nettoyage » appelé et attendu (délai dépassé).
+  beforeEach(() => {
+    procedures.specHead.mockImplementation(neverResolves);
+  });
 
   it("zone role=status aria-busy avec le libellé visible", async () => {
     renderFeatures();
@@ -99,7 +102,8 @@ describe("En-tête (§3.1)", () => {
     await findTable();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Fonctionnalités");
-    expect(await screen.findByText("Alpha")).toBeInTheDocument();
+    // le nom du projet figure aussi dans le fil d'Ariane : on vise le sous-titre
+    expect(await screen.findByText("Alpha", { selector: "p" })).toBeInTheDocument();
   });
 
   it("pendant le chargement du nom, le sous-titre est « Projet »", async () => {
@@ -349,8 +353,9 @@ describe("Filtres (§3.2)", () => {
     await findTable();
     expect(statusSelect()).toHaveTextContent("Tous");
     expect(prioritySelect()).toHaveTextContent("Toutes");
-    expect(screen.getByText("Statut")).toBeVisible();
-    expect(screen.getByText("Priorité")).toBeVisible();
+    // « Statut » et « Priorité » sont aussi des en-têtes de colonne : on vise les libellés des filtres
+    expect(screen.getByText("Statut", { selector: "label" })).toBeVisible();
+    expect(screen.getByText("Priorité", { selector: "label" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /appliquer/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Effacer les filtres" })).not.toBeInTheDocument();
   });
