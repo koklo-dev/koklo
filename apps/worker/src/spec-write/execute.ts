@@ -6,10 +6,10 @@ import {
   KOKLO_BOT_AUTHOR,
   type RepoRef,
 } from "@koklo/domain";
-import { kindOf, type SpecFile } from "@koklo/schema";
-import { READ_CONCURRENCY, RECOVERY_WINDOW } from "./constants.ts";
+import { readSpecFiles } from "../spec-read/read-spec.ts";
+import { RECOVERY_WINDOW } from "./constants.ts";
 import { buildCommitMessage, hasOpsTrailer } from "./message.ts";
-import { relativeToSpec, withSpecPath } from "./paths.ts";
+import { withSpecPath } from "./paths.ts";
 import { planBatch } from "./plan.ts";
 import { type BatchAuthor, conflicted, failed, type LoadedBatch, type Outcome } from "./types.ts";
 
@@ -41,35 +41,6 @@ async function recover({ provider, auth, repo, batch }: Target): Promise<Outcome
   return unknown ? failed("INTERNAL") : undefined;
 }
 
-/** Lit les fichiers reconnus de la spec à la tête listée (lectures bornées, chemins relatifs). */
-async function readSpec(
-  { provider, auth, repo, batch }: Target,
-  listing: { ref: string; files: readonly { path: string }[] },
-): Promise<SpecFile[]> {
-  const paths = listing.files.flatMap((file) => {
-    const path = relativeToSpec(batch.repo.specPath, file.path);
-    return path !== undefined && kindOf(path) !== undefined ? [path] : [];
-  });
-  const files: SpecFile[] = [];
-  for (let start = 0; start < paths.length; start += READ_CONCURRENCY) {
-    const chunk = paths.slice(start, start + READ_CONCURRENCY);
-    const read = await Promise.all(
-      chunk.map((path) =>
-        provider.readFile({
-          auth,
-          repo,
-          ref: listing.ref,
-          path: withSpecPath(batch.repo.specPath, path),
-        }),
-      ),
-    );
-    for (const [index, path] of chunk.entries()) {
-      files.push({ path, content: read[index]?.content ?? "" });
-    }
-  }
-  return files;
-}
-
 const prefixed = (specPath: string | null, change: FileChange): FileChange =>
   change.delete === true
     ? { path: withSpecPath(specPath, change.path), delete: true }
@@ -80,7 +51,14 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
   const { provider, auth, repo, batch } = target;
   const listing = await provider.listFiles({ auth, repo, ref: batch.branch });
   if (batch.baseSha !== null && batch.baseSha !== listing.ref) return conflicted("stale_base");
-  const plan = planBatch(batch, await readSpec(target, listing));
+  const files = await readSpecFiles({
+    provider,
+    auth,
+    repo,
+    listing,
+    specPath: batch.repo.specPath,
+  });
+  const plan = planBatch(batch, files);
   if ("outcome" in plan) return plan.outcome;
   await target.beforeWrite();
   const commit = await provider.writeCommit({

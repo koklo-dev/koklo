@@ -1,5 +1,5 @@
 import { createRawDbClient } from "@koklo/db";
-import type { GitProvider } from "@koklo/domain";
+import { type GitProvider, WEBHOOK_RETENTION_DAYS_DEFAULT } from "@koklo/domain";
 import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
 import type { WorkerConfig } from "./config.ts";
@@ -17,11 +17,13 @@ import {
   SEND_MAGIC_LINK_RETRY_LIMIT,
 } from "./jobs/send-magic-link.ts";
 import type { SpecWriteSettings } from "./jobs/spec-write.ts";
+import type { WebhookDeliverySettings } from "./jobs/webhook-delivery.ts";
 import { createMailSender } from "./mail/create-mail-sender.ts";
 import type { MailSender } from "./mail/mail-sender.ts";
 import { instrumentJob, setupObservability } from "./observability.ts";
 import { providerOf, registerSpecWrite } from "./spec-write/register.ts";
 import { SpecWriteStore } from "./spec-write/store.ts";
+import { registerWebhookDelivery, registerWebhookPurge } from "./webhook/register.ts";
 
 export type Worker = { readonly boss: PgBoss; stop(): Promise<void> };
 
@@ -38,6 +40,8 @@ export interface StartWorkerOptions {
   gitProvider?: GitProvider;
   /** Essais et concurrence de la file `spec-write` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
   specWrite?: Partial<SpecWriteSettings>;
+  /** Essais et concurrence de la file `webhook-delivery` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
+  webhookDelivery?: Partial<WebhookDeliverySettings>;
 }
 
 interface MailQueue {
@@ -100,12 +104,19 @@ export async function startWorker(
     ),
   );
   const database = createRawDbClient(config.databaseUrl);
+  const provider = providerOf(config, options.gitProvider);
+  const retentionDays = config.webhookRetentionDays ?? WEBHOOK_RETENTION_DAYS_DEFAULT;
   await registerSpecWrite(
     boss,
     logger,
-    { store: new SpecWriteStore(database), provider: providerOf(config, options.gitProvider) },
+    { store: new SpecWriteStore(database), provider },
     options.specWrite,
   );
+  await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
+  await registerWebhookPurge(boss, logger, {
+    raw: database,
+    retentionDays,
+  });
   logger.info("worker started");
   return {
     boss,

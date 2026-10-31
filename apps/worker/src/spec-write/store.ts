@@ -4,12 +4,10 @@ import {
   withOrganization,
   withTenantIsolation,
 } from "@koklo/db";
+import { isRecord } from "../job-support.ts";
 import type { BatchAuthor, BatchStatus, LoadedBatch, Outcome } from "./types.ts";
 
 const OPEN: BatchStatus[] = ["queued", "committing"];
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * Accès base du job. Le lot n'est connu que par son identifiant : l'organisation se lit d'abord

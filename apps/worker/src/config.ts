@@ -1,3 +1,8 @@
+import {
+  WEBHOOK_RETENTION_DAYS_DEFAULT,
+  WEBHOOK_RETENTION_DAYS_MAX,
+  WEBHOOK_RETENTION_DAYS_MIN,
+} from "@koklo/domain";
 import { type GithubAppSettings, githubAppFromEnv } from "@koklo/github";
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 
@@ -21,6 +26,8 @@ export type WorkerConfig = {
   readonly mail: MailConfig;
   /** Absent : fournisseur git non configuré (staging sans App) ; les lots `spec-write` échouent en `PROVIDER_UNAVAILABLE`. */
   readonly githubApp?: GithubAppSettings;
+  /** Rétention des livraisons de webhook, en jours (`WEBHOOK_RETENTION_DAYS`, 1 à 365). `loadConfig` la renseigne toujours (défaut 30) ; absente, le défaut s'applique. */
+  readonly webhookRetentionDays?: number;
 };
 
 function fail(variable: string, rule: string): never {
@@ -41,6 +48,20 @@ function parseDsn(value: string | undefined): string | undefined {
     return undefined;
   }
   return URL.canParse(value) ? value : fail("SENTRY_DSN", "must be a valid URL");
+}
+
+/** Entier de `MIN` à `MAX` jours ; le message ne cite que la variable, jamais la valeur lue. */
+function parseRetentionDays(value: string | undefined): number {
+  if (value === undefined || value === "") {
+    return WEBHOOK_RETENTION_DAYS_DEFAULT;
+  }
+  const days = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  return days >= WEBHOOK_RETENTION_DAYS_MIN && days <= WEBHOOK_RETENTION_DAYS_MAX
+    ? days
+    : fail(
+        "WEBHOOK_RETENTION_DAYS",
+        `must be an integer between ${WEBHOOK_RETENTION_DAYS_MIN} and ${WEBHOOK_RETENTION_DAYS_MAX}`,
+      );
 }
 
 const STRICT_ENVS = ["staging", "production"];
@@ -98,5 +119,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     sentryDsn: parseDsn(env.SENTRY_DSN),
     mail: parseMail(env, appEnv),
     ...(githubApp ? { githubApp } : {}),
+    webhookRetentionDays: parseRetentionDays(env.WEBHOOK_RETENTION_DAYS),
   };
 }
