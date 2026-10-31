@@ -369,9 +369,21 @@ importers:
       '@koklo/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@koklo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@koklo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@koklo/github':
+        specifier: workspace:*
+        version: link:../../packages/github
       '@koklo/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@koklo/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       pg-boss:
         specifier: 12.38.0
         version: 12.38.0(@opentelemetry/api@1.10.0)
@@ -391,9 +403,15 @@ importers:
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
       '@vitest/coverage-v8':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2

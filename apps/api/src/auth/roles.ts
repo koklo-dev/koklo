@@ -77,3 +77,10 @@ export const AUDIT_READ_ROLES = MANAGER_ROLES;
  * `MANAGER_ROLES`.
  */
 export const REPO_READ_ROLES = ["owner", "admin", "dev", "designer"] as const;
+
+/**
+ * Soumettre et lire un lot d'écriture de la spec (CDC §14, annexe A §4.0). Le designer y a accès
+ * mais n'écrit que les features liées à un écran : cette limite se vérifie par opération, dans le
+ * worker, sur l'état réel de la branche. Client et business n'y accèdent jamais.
+ */
+export const SPEC_BATCH_ROLES = ["owner", "admin", "dev", "designer"] as const;

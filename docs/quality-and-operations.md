@@ -423,6 +423,28 @@ then removal of its `_prisma_migrations` row). It is not transactional, so take 
 first outside development. Whether CI runs the `@koklo/db` tests (they need Docker):
 TO DOCUMENT.
 
+### Spec batches: configuration and operation (TK-44b)
+| Variable | Read by | Meaning |
+|----------|---------|---------|
+| `SPEC_BATCH_WAIT_MS` | api | optional integer from 1 to 60000 (default 8000): how long `specBatch.submit` waits for the worker to settle the batch before answering 200 with the batch still `queued` or `committing`; the client then polls `specBatch.get`. A non-integer, zero, negative or larger value fails the start, naming the variable and never the value. The database is read every 150 ms and no transaction is held during the wait |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` | api, worker | same all-or-nothing pair and same decoding as in the API (one shared function in `@koklo/github`); neither set means the worker starts without a provider and every `spec-write` batch ends `failed` with `PROVIDER_UNAVAILABLE` |
+| `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET` | api, worker | optional pair, only valid with the App (a client without `GITHUB_APP_ID` fails the start); not used by the commit path |
+
+The worker needs the database and the GitHub App secrets of the API (the manifest wiring for the worker
+is TK-47). The `spec-write` queue is created and tuned by the worker at startup (`key_strict_fifo`, 5
+attempts in all with exponential back-off from 5 s, a job expires after 300 s); the API only sends to it,
+so the worker must have started once before the first `submit` (otherwise `submit` answers `INTERNAL`
+and a replay of the same key enqueues again). Workers can be scaled out: the policy serializes each
+`repoId:branch` key across processes.
+
+Operating signals: a batch stuck `committing` means the job died; pg-boss retries it, and the next
+attempt finds the commit by its `Koklo-Ops` trailer instead of writing twice. A batch `failed` with
+`INTERNAL` after a crash means the outcome is unknown (more than 50 commits since): check the branch for
+the trailer by hand; the periodic sweep is TK-46. No job of the queue should ever sit in the `failed`
+state, as it would block its branch (`SELECT count(*) FROM pgboss.job WHERE name = 'spec-write' AND
+state = 'failed'` must be 0). Logs carry the batch id, the final status and the error code, never a
+token, a provider message or an e-mail address.
+
 ## Observability
 TO DOCUMENT — logs, metrics, traces, health checks, alerting.
 

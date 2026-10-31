@@ -18,7 +18,7 @@ const isSpecCarrier = (repo: Pick<NewRepo, "role" | "specPath">) =>
   repo.role === "spec" || repo.specPath !== null;
 
 /** Le repo porte la spec : rôle `spec`, ou dossier `spec_path` d'un monorepo (index unique partiel). */
-const carrierFilter = { OR: [{ role: "spec" as const }, { specPath: { not: null } }] };
+export const carrierFilter = { OR: [{ role: "spec" as const }, { specPath: { not: null } }] };
 
 async function conflictOf(
   tx: Tx,

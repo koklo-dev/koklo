@@ -59,6 +59,7 @@ describe("configuration (C3.3)", () => {
       "LOG_LEVEL",
       "PORT",
       "SENTRY_DSN",
+      "SPEC_BATCH_WAIT_MS",
     ]);
   });
 

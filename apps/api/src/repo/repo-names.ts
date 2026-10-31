@@ -1,3 +1,4 @@
+import { isSafeSpecPath } from "@koklo/domain";
 import { slugify } from "../organization/slug.ts";
 import { validation } from "../tracker/api-errors.ts";
 
@@ -25,18 +26,20 @@ export function specRepoName(projectName: string, requested: string | undefined)
   return requested;
 }
 
-/** Dossier de la spec dans un monorepo : relatif, sans remontée (`..`). */
+/** Dossier de la spec dans un monorepo : relatif, sans remontée, sans `.git` (règle du domaine, aussi appliquée par le worker). */
 export function checkSpecPath(role: string, specPath: string | undefined): string | null {
   if (specPath === undefined) return null;
-  const segments = specPath.split("/");
   if (role === "spec") {
     throw validation(
       "specPath",
       "Un dépôt de rôle spec porte la spec à sa racine : pas de specPath.",
     );
   }
-  if (specPath.startsWith("/") || specPath.includes("\\") || segments.includes("..")) {
-    throw validation("specPath", "specPath doit être un chemin relatif, sans '..'.");
+  if (!isSafeSpecPath(specPath)) {
+    throw validation(
+      "specPath",
+      "specPath doit être un chemin relatif, sans '..', '.git', segment vide ni caractère de contrôle.",
+    );
   }
   return specPath;
 }

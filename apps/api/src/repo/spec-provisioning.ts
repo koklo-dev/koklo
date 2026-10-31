@@ -1,13 +1,18 @@
-import type { FileWrite, GitAuth, GitProvider, Repo, RepoRef } from "@koklo/domain";
+import {
+  type FileWrite,
+  type GitAuth,
+  type GitProvider,
+  KOKLO_BOT_AUTHOR,
+  type Repo,
+  type RepoRef,
+  SCOPING_BRANCH,
+} from "@koklo/domain";
 import { requestLogger } from "../request-logger.ts";
 import type { CreationAuth } from "./git-access.ts";
 import { step } from "./git-access.ts";
 import type { ProviderStep } from "./provider-errors.ts";
 
 const COMMIT_MESSAGE = "chore: initialise la spec Koklo";
-/** Identité fixe du commit initial ; l'adresse réelle de l'App et le trailer des lots relèvent de TK-44. */
-const BOT = { name: "Koklo", email: "koklo-bot@users.noreply.invalid" } as const;
-export const SCOPING_BRANCH = "cadrage";
 
 /** Le dépôt existe chez le fournisseur mais n'est pas enregistré : journal de réparation, sans jeton ni message brut. */
 export function logOrphan(repo: RepoRef, failedStep: ProviderStep | "insert"): void {
@@ -55,7 +60,7 @@ export async function provisionSpecRepo(
       repo: ref,
       branch: created.defaultBranch,
       files,
-      author: BOT,
+      author: KOKLO_BOT_AUTHOR,
       message: COMMIT_MESSAGE,
     }),
   );

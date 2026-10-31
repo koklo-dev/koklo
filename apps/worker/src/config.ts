@@ -1,3 +1,4 @@
+import { type GithubAppSettings, githubAppFromEnv } from "@koklo/github";
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 
 /** Envoi d'emails : capture en mémoire (développement, test) ou Resend (staging, production). */
@@ -18,6 +19,8 @@ export type WorkerConfig = {
   /** DSN GlitchTip/Sentry ; absent : le SDK d'erreurs reste désactivé. */
   readonly sentryDsn: string | undefined;
   readonly mail: MailConfig;
+  /** Absent : fournisseur git non configuré (staging sans App) ; les lots `spec-write` échouent en `PROVIDER_UNAVAILABLE`. */
+  readonly githubApp?: GithubAppSettings;
 };
 
 function fail(variable: string, rule: string): never {
@@ -86,6 +89,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     throw new Error("DATABASE_URL is required");
   }
   const appEnv = env.APP_ENV || "development";
+  const githubApp = githubAppFromEnv(env);
   return {
     databaseUrl,
     appEnv,
@@ -93,5 +97,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     logLevel: parseLogLevel(env.LOG_LEVEL),
     sentryDsn: parseDsn(env.SENTRY_DSN),
     mail: parseMail(env, appEnv),
+    ...(githubApp ? { githubApp } : {}),
   };
 }

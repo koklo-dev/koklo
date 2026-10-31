@@ -13,7 +13,8 @@ export interface AuditEntry {
     | "invitation"
     | "member"
     | "project"
-    | "repo";
+    | "repo"
+    | "spec_batch";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;

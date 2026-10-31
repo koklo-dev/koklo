@@ -14,6 +14,7 @@ export * from "./lease.ts";
 export * from "./lock.ts";
 export * from "./project-state.ts";
 export * from "./selection-order.ts";
+export * from "./spec-write.ts";
 export * from "./ticket.ts";
 export * from "./ticket-counters.ts";
 export * from "./ticket-key.ts";
