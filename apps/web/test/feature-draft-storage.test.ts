@@ -65,7 +65,6 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: un cas par comportement du stockage
 describe("cloisonnement par compte et par organisation", () => {
   it("le même compte et la même organisation relisent leur brouillon et leur marqueur", () => {
     saveDraft(SCOPE, PROJECT_ID, "new", draft());
@@ -146,7 +145,7 @@ describe("fin de session", () => {
   });
 });
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: un cas par comportement du stockage
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: un cas par champ du schéma de validation
 describe("validation stricte du brouillon relu", () => {
   const goodCriterion = {
     id: "AC-1",
