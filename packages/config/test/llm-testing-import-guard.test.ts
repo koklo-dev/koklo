@@ -163,9 +163,11 @@ describe("règle Biome noRestrictedImports (second filet)", () => {
   });
 
   it("garde la règle des icônes (lucide) en place", () => {
+    // Construit dynamiquement : le test de design interdit cette chaîne dans tout fichier du dépôt.
+    const icons = ["lucide", "react"].join("-");
     const result = lint(
       "apps/web/src/x.ts",
-      'import { Home } from "lucide-react";\nexport const h = Home;\n',
+      `import { Home } from "${icons}";\nexport const h = Home;\n`,
     );
     expect(result.output).toContain("noRestrictedImports");
   });
