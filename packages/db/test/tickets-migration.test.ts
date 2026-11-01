@@ -11,6 +11,7 @@ import {
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
+import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { REVIEW_TABLES } from "./support/reviews-fixtures.ts";
 import { SPEC_TABLES } from "./support/spec-fixtures.ts";
@@ -25,7 +26,8 @@ const initialTables = expectedTables.filter(
     !(OAUTH_TABLES as readonly string[]).includes(table) &&
     !(LLM_TABLES as readonly string[]).includes(table) &&
     !(SUGGESTION_TABLES as readonly string[]).includes(table) &&
-    !(REVIEW_TABLES as readonly string[]).includes(table),
+    !(REVIEW_TABLES as readonly string[]).includes(table) &&
+    !(NOTIFICATION_TABLES as readonly string[]).includes(table),
 );
 
 async function inventory(db: TestDatabase) {

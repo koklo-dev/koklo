@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import * as dbPackage from "../src/index.ts";
 import { schemaPath } from "../src/testing/prisma-cli.ts";
 import { LLM_MODELS } from "./support/llm-credentials-fixtures.ts";
+import { NOTIFICATION_MODELS } from "./support/notifications-fixtures.ts";
 import { OAUTH_MODELS } from "./support/oauth-fixtures.ts";
 import { REVIEW_MODELS } from "./support/reviews-fixtures.ts";
 import { SPEC_MODELS } from "./support/spec-fixtures.ts";
@@ -32,6 +33,7 @@ const EXPECTED_TENANT_MODELS = [
   ...LLM_MODELS,
   ...SUGGESTION_MODELS,
   ...REVIEW_MODELS,
+  ...NOTIFICATION_MODELS,
 ];
 
 const carriesOrganizationId = (model: SchemaModel) => /^\s*organizationId\s/m.test(model.body);
@@ -42,7 +44,7 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c)", () => {
+  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d)", () => {
     expect([...TENANT_MODELS].sort()).toEqual([...EXPECTED_TENANT_MODELS].sort());
   });
 
