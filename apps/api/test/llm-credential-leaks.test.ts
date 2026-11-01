@@ -133,7 +133,7 @@ describe("erreur Prisma du dépôt : réécrite sans cause ni meta", () => {
       () => offline.markUsed(a.organizationId, "anthropic", at),
     ];
     for (const operation of operations) {
-      expectClean(await failure(operation), ["127.0.0.1", "secret-pw", "koklo"]);
+      expectClean(await failure(operation), ["127.0.0.1", "secret-pw", "postgresql", "koklo:"]);
     }
   });
 

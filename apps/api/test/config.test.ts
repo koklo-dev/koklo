@@ -58,6 +58,8 @@ describe("configuration (C3.3)", () => {
       "GITHUB_CLIENT_SECRET",
       "GITHUB_WEBHOOK_SECRET",
       "KOKLO_ENCRYPTION_KEY",
+      "KOKLO_ENCRYPTION_KEYS_PREVIOUS",
+      "KOKLO_ENCRYPTION_KEY_VERSION",
       "LOG_LEVEL",
       "PORT",
       "SENTRY_DSN",

@@ -350,8 +350,8 @@ describe("AAD : une ligne copiée ailleurs est illisible", () => {
     await clearAll();
     await service.set(a.organizationId, "anthropic", { apiKey: makeSentinel() });
     await database.query(
-      `INSERT INTO llm_provider_credentials (id, organization_id, provider, ciphertext, nonce, key_version)
-       SELECT gen_random_uuid(), $2, provider, ciphertext, nonce, key_version
+      `INSERT INTO llm_provider_credentials (id, organization_id, provider, ciphertext, nonce, key_version, updated_at)
+       SELECT gen_random_uuid(), $2, provider, ciphertext, nonce, key_version, now()
        FROM llm_provider_credentials WHERE organization_id = $1`,
       [a.organizationId, b.organizationId],
     );
@@ -365,8 +365,8 @@ describe("AAD : une ligne copiée ailleurs est illisible", () => {
     await clearAll();
     await service.set(a.organizationId, "anthropic", { apiKey: makeSentinel() });
     await database.query(
-      `INSERT INTO llm_provider_credentials (id, organization_id, provider, ciphertext, nonce, key_version)
-       SELECT gen_random_uuid(), organization_id, 'openai'::llm_provider, ciphertext, nonce, key_version
+      `INSERT INTO llm_provider_credentials (id, organization_id, provider, ciphertext, nonce, key_version, updated_at)
+       SELECT gen_random_uuid(), organization_id, 'openai'::llm_provider, ciphertext, nonce, key_version, now()
        FROM llm_provider_credentials WHERE organization_id = $1`,
       [a.organizationId],
     );
