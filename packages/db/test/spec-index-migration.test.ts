@@ -11,6 +11,7 @@ import {
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
+import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { REVIEW_TABLES } from "./support/reviews-fixtures.ts";
 import { insertDelivery, insertFullTree, SPEC_TABLES } from "./support/spec-fixtures.ts";
@@ -77,6 +78,7 @@ const LATER_TABLES: readonly string[] = [
   ...LLM_TABLES,
   ...SUGGESTION_TABLES,
   ...REVIEW_TABLES,
+  ...NOTIFICATION_TABLES,
 ];
 const dirs = () => listMigrationDirs();
 const specIndexMigration = () =>

@@ -12,6 +12,7 @@ import {
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
+import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { REVIEW_TABLES } from "./support/reviews-fixtures.ts";
 import { insertDelivery } from "./support/spec-fixtures.ts";
@@ -134,8 +135,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (38 attendues au total avec TK-51c)", () => {
-    expect(expectedTables).toHaveLength(38);
+  it("cette migration n'ajoute aucune table (39 attendues au total avec TK-51d)", () => {
+    expect(expectedTables).toHaveLength(39);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });
@@ -224,9 +225,13 @@ describe("TK-45a migration webhook_installation_index : retour arrière et sché
     expect(
       removed.filter(
         (line) =>
-          ![...OAUTH_TABLES, ...LLM_TABLES, ...SUGGESTION_TABLES, ...REVIEW_TABLES].some((table) =>
-            line.includes(table),
-          ),
+          ![
+            ...OAUTH_TABLES,
+            ...LLM_TABLES,
+            ...SUGGESTION_TABLES,
+            ...REVIEW_TABLES,
+            ...NOTIFICATION_TABLES,
+          ].some((table) => line.includes(table)),
       ),
     ).toHaveLength(1);
     expect(await deliveriesOf(db)).toEqual(before);
