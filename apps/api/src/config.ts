@@ -1,6 +1,7 @@
 import { type GithubAppSettings, githubAppFromEnv } from "@koklo/github";
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 import { z } from "zod";
+import type { KeyRingSettings } from "./crypto/key-ring.ts";
 import { InvalidEncryptionKeyError, parseEncryptionKey } from "./crypto/token-cipher.ts";
 
 export interface AppConfig {
@@ -19,6 +20,8 @@ export interface AppConfig {
   githubApp?: GithubAppSettings;
   /** Clé AES-256 (32 octets) des jetons utilisateur (`KOKLO_ENCRYPTION_KEY`) ; absente : aucun jeton conservé. */
   encryptionKey?: Buffer;
+  /** Porte-clés versionné (`KOKLO_ENCRYPTION_KEY[_VERSION]`, `KOKLO_ENCRYPTION_KEYS_PREVIOUS`) ; absent avec la clé. */
+  encryptionKeyring?: KeyRingSettings;
   /** Secret de signature des webhooks GitHub (`GITHUB_WEBHOOK_SECRET`) ; absent : la route d'ingestion répond 503. */
   githubWebhookSecret?: string;
   /** Attente maximale de `specBatch.submit` avant de rendre le lot en cours (ms) ; défaut : `SPEC_BATCH_WAIT_DEFAULT_MS`. */
