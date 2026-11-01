@@ -14,6 +14,7 @@ import { createTestDatabase, type TestDatabase } from "../src/testing/test-datab
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { insertDelivery } from "./support/spec-fixtures.ts";
+import { SUGGESTION_TABLES } from "./support/suggestions-fixtures.ts";
 import { openPool } from "./support/ticket-fixtures.ts";
 
 /**
@@ -132,8 +133,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (35 attendues au total avec TK-51a)", () => {
-    expect(expectedTables).toHaveLength(35);
+  it("cette migration n'ajoute aucune table (36 attendues au total avec TK-51b)", () => {
+    expect(expectedTables).toHaveLength(36);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });
@@ -221,7 +222,10 @@ describe("TK-45a migration webhook_installation_index : retour arrière et sché
     const removed = afterFirstUp.indexes.filter((line) => !actual.indexes.includes(line));
     expect(
       removed.filter(
-        (line) => ![...OAUTH_TABLES, ...LLM_TABLES].some((table) => line.includes(table)),
+        (line) =>
+          ![...OAUTH_TABLES, ...LLM_TABLES, ...SUGGESTION_TABLES].some((table) =>
+            line.includes(table),
+          ),
       ),
     ).toHaveLength(1);
     expect(await deliveriesOf(db)).toEqual(before);

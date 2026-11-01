@@ -123,11 +123,13 @@ describe("TK-48a1 migrations : dossiers et contenu", () => {
     );
   });
 
-  it("expectedTables contient les deux tables (35 au total avec TK-51a)", () => {
+  it("expectedTables contient les deux tables (36 au total avec TK-51b)", () => {
     for (const table of OAUTH_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(35);
+    expect(expectedTables).toHaveLength(36);
   });
 });
+
+const LATER_ENUMS = ["llm_provider", "suggestion_status", "suggestion_target_kind"];
 
 let db: TestDatabase;
 let baseline: TestDatabase;
@@ -149,8 +151,8 @@ describe("TK-48a1 migrations : up -> (données) -> down -> up", () => {
     afterFirstUp = await inventory(db);
     for (const table of OAUTH_TABLES) expect(afterFirstUp.tables).toContain(table);
     expect(afterFirstUp.tables).toEqual([...expectedTables].sort());
-    // TK-51a ajoute le type `llm_provider` : seul écart d'enums attendu avec la base de référence.
-    expect(afterFirstUp.enums.filter((name) => name !== "llm_provider")).toEqual(
+    // TK-51a/b ajoutent des types : seuls écarts d'enums attendus avec la base de référence.
+    expect(afterFirstUp.enums.filter((name) => !LATER_ENUMS.includes(name))).toEqual(
       (await inventory(await applyEarlierMigrations(baseline))).enums,
     );
   }, 180_000);
@@ -161,7 +163,7 @@ describe("TK-48a1 migrations : up -> (données) -> down -> up", () => {
     await insertState(db, scene);
     await insertCredential(db, scene);
 
-    // Les migrations postérieures (TK-51a) sont défaites d'abord, de la plus récente à la plus ancienne.
+    // Les migrations postérieures sont défaites d'abord (de la plus récente à la plus ancienne).
     for (const later of dirs()
       .filter((d) => d > dirOf(CREDENTIALS_SUFFIX))
       .reverse()) {

@@ -110,9 +110,9 @@ describe("TK-51a migration llm_provider_credentials : dossier et contenu", () =>
     expect(down[1]).toMatch(/^DROP TYPE (?:IF EXISTS )?(?:"public"\.)?"llm_provider"$/i);
   });
 
-  it("expectedTables contient la table (35 au total)", () => {
+  it("expectedTables contient la table (36 au total avec TK-51b)", () => {
     expect(expectedTables).toContain(LLM_TABLE);
-    expect(expectedTables).toHaveLength(35);
+    expect(expectedTables).toHaveLength(36);
   });
 });
 
@@ -144,11 +144,13 @@ describe("TK-51a migration llm_provider_credentials : up -> (données) -> down -
     const scope = await llmScope(db, "cycle");
     await insertLlmCredential(db, { organizationId: scope.organizationId });
 
-    runPrismaOrThrow(
-      ["db", "execute", "--file", join(migrationsDir, migration(), "down.sql")],
-      db.url,
-    );
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [migration()]);
+    // Les migrations postérieures (TK-51b) sont défaites d'abord, de la plus récente à la plus ancienne.
+    for (const dir of dirs()
+      .filter((d) => d >= migration())
+      .reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     expect(await inventory(db)).toEqual(expected);
     const kept = await db.query("SELECT 1 FROM projects WHERE id = $1", [scope.projectId]);
