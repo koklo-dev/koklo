@@ -25,6 +25,9 @@ export interface LlmErrorDiagnostic {
 export const LLM_BUDGET_LIMITS = ["output-tokens", "timeout", "cost", "prompt-chars"] as const;
 export type LlmBudgetLimit = (typeof LLM_BUDGET_LIMITS)[number];
 
+/** Plafond de `retryAfterMs` (TK-50c) : une heure. */
+export const LLM_MAX_RETRY_AFTER_MS = 3_600_000;
+
 const OPERATION_PATTERN = /^[a-z][a-z0-9-]{0,39}$/;
 const MIN_STATUS = 100;
 const MAX_STATUS = 599;

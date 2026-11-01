@@ -88,7 +88,7 @@ const SHAPE_CHECKS: readonly (readonly [
 ];
 
 /** Garde unique d'un adaptateur avant tout appel réseau (forme, trace, budget, annulation). */
-export const assertLlmRequest = (request: LlmRequest): void => {
+export const assertLlmRequest = (request: LlmRequest): LlmRequest => {
   for (const [reason, isValid] of SHAPE_CHECKS) {
     if (!isValid(request ?? ({} as LlmRequest))) {
       throw new InvalidLlmRequestError(reason);
@@ -98,4 +98,5 @@ export const assertLlmRequest = (request: LlmRequest): void => {
   if (request.signal?.aborted) {
     throw new LlmAbortedError({ operation: "complete" });
   }
+  return request;
 };

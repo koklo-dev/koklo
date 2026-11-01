@@ -38,6 +38,10 @@ export class UntrustedDelimiterCollisionError extends Error {
   }
 }
 
+/** Raisons fermées d'une sortie invalide (TK-50c) ; la raison ne reprend jamais de texte libre. */
+export const LLM_INVALID_OUTPUT_REASONS = ["shape", "not-synchronous"] as const;
+export type LlmInvalidOutputReason = (typeof LLM_INVALID_OUTPUT_REASONS)[number];
+
 /** La sortie du modèle n'a pas passé la validation de l'appelant ; `reason` ne reprend pas la sortie. */
 export class LlmInvalidOutputError extends LlmProviderError {
   readonly reason: string;
