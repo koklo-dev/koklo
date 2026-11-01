@@ -172,6 +172,8 @@ model Project {
   repos        ProjectRepo[]
   writeBatches SpecWriteBatch[]
   suggestions  Suggestion[]
+  reviews      Review[]
+  baselines    Baseline[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -697,6 +699,8 @@ model ProjectRepo {
   snapshots    SpecSnapshot[]
   heads        SpecHead[]
   writeBatches SpecWriteBatch[]
+  reviews      Review[]
+  baselines    Baseline[]
 
   @@unique([installationId, externalId])
   @@unique([organizationId, id])
@@ -1072,4 +1076,88 @@ model Suggestion {
   @@index([organizationId])
   @@index([projectId, status, createdAt])
   @@map("suggestions")
+}
+
+/// Cible d'une review client (TK-51c).
+enum ReviewTargetKind {
+  feature
+  screen
+  baseline
+
+  @@map("review_target_kind")
+}
+
+/// Verdict d'une review client (TK-51c).
+enum ReviewStatus {
+  approved
+  changes_requested
+
+  @@map("review_status")
+}
+
+/// Cycle d'une baseline (TK-51c) : proposed -> validated -> tagged.
+enum BaselineStatus {
+  proposed
+  validated
+  tagged
+
+  @@map("baseline_status")
+}
+
+/// Journal append-only des reviews client (TK-51c) : la dernière review d'une cible fait foi, aucune unicité cible/SHA/auteur.
+/// Immuable (trigger `reviews_immutable`, voir la migration) sauf suppression en cascade du projet ou du repo.
+/// `authorUserId` sans clé étrangère (RGPD). Humain uniquement : les invariants (cible, SHA, repo du projet) sont vérifiés côté API.
+model Review {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  projectId      String           @map("project_id") @db.Uuid
+  repoId         String           @map("repo_id") @db.Uuid
+  targetKind     ReviewTargetKind @map("target_kind")
+  targetRef      String           @map("target_ref")
+  sha            String
+  status         ReviewStatus
+  authorUserId   String           @map("author_user_id") @db.Uuid
+  authorRole     String?          @map("author_role")
+  comment        String?
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project   Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  repo      ProjectRepo @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  baselines Baseline[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, projectId, id])
+  @@index([organizationId])
+  @@index([projectId, targetKind, targetRef, createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+/// Baselines d'un projet (TK-51c) : la baseline 0 est le point de départ ; au plus une baseline non taguée par projet
+/// (index unique partiel, migration). Validation et tag : humain uniquement.
+model Baseline {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  organizationId   String         @map("organization_id") @db.Uuid
+  projectId        String         @map("project_id") @db.Uuid
+  repoId           String         @map("repo_id") @db.Uuid
+  number           Int
+  status           BaselineStatus @default(proposed)
+  proposedSha      String         @map("proposed_sha")
+  proposedByUserId String?        @map("proposed_by_user_id") @db.Uuid
+  reviewId         String?        @map("review_id") @db.Uuid
+  validatedAt      DateTime?      @map("validated_at") @db.Timestamptz(3)
+  tagSha           String?        @map("tag_sha")
+  taggedAt         DateTime?      @map("tagged_at") @db.Timestamptz(3)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  repo    ProjectRepo @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  review  Review?     @relation(fields: [organizationId, projectId, reviewId], references: [organizationId, projectId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([projectId, number])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([organizationId, projectId, reviewId])
+  @@map("baselines")
 }
