@@ -40,7 +40,7 @@ describe("PC1 surface : exactement list, add, remove", () => {
     expect(d.paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("la version du contrat est 0.10.0 (0.9.0 est réservée à TK-54)", async () => {
+  it("la version du contrat est 0.10.0 (empilée sur 0.9.0 de TK-54)", async () => {
     expect(api.CONTRACT_VERSION).toBe("0.10.0");
     expect((await doc()).info.version).toBe("0.10.0");
   });
