@@ -232,6 +232,15 @@ describe("TK-51c migration reviews_baselines : up -> (données) -> down -> up", 
   }, 180_000);
 });
 
+describe("TK-51c migration reviews_baselines : fonction d'immutabilité et repo sans FK", () => {
+  it("le SQL fige search_path, qualifie les noms et ne référence jamais project_repos", () => {
+    const up = sqlOf(migration(), "migration.sql");
+    expect(up).toMatch(/SET search_path = public/i);
+    expect(up).not.toMatch(/FROM "project_repos"/);
+    expect(up).not.toMatch(/REFERENCES "project_repos"/);
+  });
+});
+
 describe("TK-51c migration reviews_baselines : second up", () => {
   it("second deploy : même inventaire qu'au premier up, tables vides, trigger actif", async () => {
     runPrismaOrThrow(["migrate", "deploy"], db.url);
@@ -254,6 +263,13 @@ describe("TK-51c migration reviews_baselines : schéma Prisma", () => {
     const { status, output } = runPrisma([...diff, "--exit-code"], db.url);
     expect(status, output).toBe(0);
   }, 120_000);
+
+  it("la fonction installée porte search_path=public", async () => {
+    const [fn] = await db.query<{ config: string[] | null }>(
+      "SELECT proconfig AS config FROM pg_proc WHERE proname = 'reviews_immutable'",
+    );
+    expect(fn?.config).toContain("search_path=public");
+  });
 
   it("schema.prisma déclare Review, Baseline et leurs trois enums mappés", () => {
     const schema = readFileSync(schemaPath, "utf8");

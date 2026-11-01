@@ -245,6 +245,15 @@ describe("suggestions : longueurs de texte bornées", () => {
   });
 });
 
+describe("suggestions : author_role", () => {
+  it("longueur 1 à 64 ou NULL ; vide ou trop long refusé (23514)", async () => {
+    expect(await attempt("role-null", { authorRole: null })).toBeUndefined();
+    expect(await attempt("role-64", { authorRole: "r".repeat(64) })).toBeUndefined();
+    expect(await attempt("role-65", { authorRole: "r".repeat(65) })).toBe(CHECK);
+    expect(await attempt("role-empty", { authorRole: "" })).toBe(CHECK);
+  });
+});
+
 describe("suggestions : note de décision, empreinte de spec et NOT NULL", () => {
   it("decision_note : au plus 2000 caractères", async () => {
     const decided = { status: "rejected", decidedAt: DECIDED };
