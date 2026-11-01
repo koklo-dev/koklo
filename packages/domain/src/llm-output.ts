@@ -49,10 +49,10 @@ export const validateLlmOutput = <T>(
   try {
     value = parse(output as unknown);
   } catch {
-    throw new LlmInvalidOutputError("La sortie du modèle ne respecte pas la forme attendue");
+    throw new LlmInvalidOutputError("shape");
   }
   if (isThenable(value)) {
-    throw new LlmInvalidOutputError("Le validateur doit être synchrone");
+    throw new LlmInvalidOutputError("not-synchronous");
   }
   const proposal = Object.freeze({ status: "proposal", value }) as unknown as Validated<T>;
   proposals.add(proposal);

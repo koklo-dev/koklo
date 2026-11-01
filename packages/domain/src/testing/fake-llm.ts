@@ -1,17 +1,21 @@
 import type { LlmBudget } from "../llm-budget.ts";
+import { revealLlmCredential } from "../llm-credential.ts";
+import { unvalidated } from "../llm-output.ts";
 import type { FramedPrompt } from "../llm-prompt.ts";
 import type { LlmProvider } from "../llm-provider.ts";
-import type { LlmProviderError } from "../llm-provider-errors.ts";
-import type {
-  LlmOutputSpec,
-  LlmRequest,
-  LlmResponse,
-  LlmStopReason,
-  LlmTrace,
+import { LlmAuthError, type LlmProviderError } from "../llm-provider-errors.ts";
+import {
+  assertLlmRequest,
+  type LlmOutputSpec,
+  type LlmRequest,
+  type LlmResponse,
+  type LlmStopReason,
+  type LlmTrace,
 } from "../llm-request.ts";
 
-/** Squelette TK-50c (étape RED) : la forme compile, le comportement reste à écrire. */
-const NOT_IMPLEMENTED = "TK-50c : FakeLlm non implémenté";
+/** Approximation fixe : un token pour quatre caractères (déterministe, sans tokenizer). */
+const CHARS_PER_TOKEN = 4;
+const tokensOf = (chars: number): number => Math.ceil(chars / CHARS_PER_TOKEN);
 
 /** Un appel enregistré : jamais la clé (`credential` est absent par construction). */
 export interface FakeLlmCall {
@@ -48,36 +52,101 @@ export class FakeLlmScriptExhaustedError extends Error {
   }
 }
 
+type FakeLlmOutcome = FakeLlmReply | FakeLlmFailure;
+
+/** Texte tronqué au budget de sortie : `[sortie, tronquée]` ; un JSON n'est jamais tronqué. */
+const truncated = (reply: unknown, maxOutputTokens: number): [unknown, boolean] => {
+  const limit = maxOutputTokens * CHARS_PER_TOKEN;
+  return typeof reply === "string" && reply.length > limit
+    ? [reply.slice(0, limit), true]
+    : [reply, false];
+};
+
+const charsOf = (reply: unknown): number =>
+  typeof reply === "string" ? reply.length : (JSON.stringify(reply) ?? "").length;
+
 /** Faux LLM scripté et déterministe : ni horloge, ni aléa, ni timer ; n'obéit jamais aux données. */
 export class FakeLlm implements LlmProvider {
   readonly id = "fake" as const;
 
   readonly options: FakeLlmOptions;
+  readonly #steps: FakeLlmStep[] = [];
+  readonly #calls: FakeLlmCall[] = [];
+  #always: FakeLlmOutcome | undefined;
 
   constructor(options: FakeLlmOptions = {}) {
     this.options = options;
   }
 
   /** Répond toujours la même sortie (texte ou JSON), sans épuisement. */
-  static replying(_output: unknown, _options: FakeLlmOptions = {}): FakeLlm {
-    throw new Error(NOT_IMPLEMENTED);
+  static replying(output: unknown, options: FakeLlmOptions = {}): FakeLlm {
+    const fake = new FakeLlm(options);
+    fake.#always = { reply: structuredClone(output) };
+    return fake;
   }
 
   /** Échoue toujours avec cette erreur typée (`timingOut` = `failing(new LlmTimeoutError(...))`). */
-  static failing(_error: LlmProviderError, _options: FakeLlmOptions = {}): FakeLlm {
-    throw new Error(NOT_IMPLEMENTED);
+  static failing(error: LlmProviderError, options: FakeLlmOptions = {}): FakeLlm {
+    const fake = new FakeLlm(options);
+    fake.#always = { fail: error };
+    return fake;
   }
 
   /** Étapes consommées une fois ; épuisé -> `FakeLlmScriptExhaustedError`. */
-  script(_steps: readonly FakeLlmStep[]): this {
-    throw new Error(NOT_IMPLEMENTED);
+  script(steps: readonly FakeLlmStep[]): this {
+    this.#steps.push(...steps);
+    return this;
   }
 
   get calls(): readonly FakeLlmCall[] {
-    throw new Error(NOT_IMPLEMENTED);
+    return [...this.#calls];
   }
 
-  complete(_request: LlmRequest): Promise<LlmResponse> {
-    return Promise.reject(new Error(NOT_IMPLEMENTED));
+  async complete(request: LlmRequest): Promise<LlmResponse> {
+    const snapshot = assertLlmRequest(request);
+    if (this.options.rejectedKeys?.includes(revealLlmCredential(snapshot.credential))) {
+      throw new LlmAuthError({ operation: "complete", provider: this.id });
+    }
+    const call: FakeLlmCall = Object.freeze({
+      model: snapshot.model,
+      prompt: snapshot.prompt,
+      output: snapshot.output,
+      budget: snapshot.budget,
+      trace: snapshot.trace,
+      ...(snapshot.temperature === undefined ? {} : { temperature: snapshot.temperature }),
+    });
+    this.#calls.push(call);
+    const outcome = this.#next(call);
+    if ("fail" in outcome) {
+      throw outcome.fail;
+    }
+    return this.#respond(snapshot, outcome);
+  }
+
+  /** Première étape non consommée dont `when` accepte l'appel, sinon la sortie permanente. */
+  #next(call: FakeLlmCall): FakeLlmOutcome {
+    const index = this.#steps.findIndex((step) => step.when?.(call) ?? true);
+    if (index >= 0) {
+      return this.#steps.splice(index, 1)[0] as FakeLlmStep;
+    }
+    if (this.#always === undefined) {
+      throw new FakeLlmScriptExhaustedError();
+    }
+    return this.#always;
+  }
+
+  #respond(request: LlmRequest, outcome: FakeLlmReply): LlmResponse {
+    const { prompt, budget } = request;
+    const [output, cut] = truncated(structuredClone(outcome.reply), budget.maxOutputTokens);
+    return {
+      output: unvalidated(output),
+      stop: cut ? "max-tokens" : (outcome.stop ?? "end"),
+      usage: {
+        inputTokens: tokensOf(prompt.system.length + prompt.user.length),
+        outputTokens: Math.min(tokensOf(charsOf(output)), budget.maxOutputTokens),
+      },
+      provider: this.id,
+      model: this.options.servedModel ?? request.model,
+    };
   }
 }

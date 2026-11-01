@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
-covers_commit: 0139410
+covers_commit: bb9f740
 ---
 # Architecture
 
@@ -1266,7 +1266,7 @@ interpolation). `framePrompt` is the only producer of `FramedPrompt`: the fixed 
 instructions go in `system`, each datum in a delimited block of `user` carrying a caller-supplied
 nonce. A model reply is `Unvalidated` until `validateLlmOutput` turns it into a `Validated`
 proposal. Framing reduces prompt-injection risk, it does not remove it, and a validated output is
-still a proposal that a human validates (vision §6.3). The provider port (50b) is described below; adapters follow in 50c.
+still a proposal that a human validates (vision §6.3). The provider port (50b) and the test fake (50c) are described below; real adapters follow with TK-54.
 
 ```mermaid
 flowchart LR
@@ -1284,7 +1284,7 @@ flowchart LR
 
 ### LLM provider port (TK-50b, `packages/domain`)
 The `LlmProvider` interface (`complete(request) -> response`, no streaming, no tools) is the only
-seam between Koklo and a model vendor; the domain names no SDK. An adapter (50c, one per provider
+seam between Koklo and a model vendor; the domain names no SDK. An adapter (TK-54, one per provider
 `anthropic | openai | google`, plus a deterministic `fake` for tests) first calls `assertLlmRequest`
 (request shape, mandatory budget capped by the domain at 5 USD per call, already aborted signal),
 reads the key with `revealLlmCredential` only when building the HTTP call, and maps every vendor
@@ -1302,6 +1302,28 @@ flowchart LR
   vendor -->|reply| un[Unvalidated output]
   err --> caller
   un --> caller
+```
+
+### Fake LLM and conformance suite (TK-50c, `@koklo/domain/testing`)
+`packages/domain/src/testing/` holds the deterministic `FakeLlm` and the shared conformance suite,
+exported as the sub-path `@koklo/domain/testing` (`exports["./testing"]`, built to `dist/testing`,
+same pattern as `@koklo/github/testing`) and never re-exported by the public index. `FakeLlm` is an
+`LlmProvider` with id `fake`: a script of replies and typed failures (`FakeLlm.replying`,
+`FakeLlm.failing`, `.script([...])`), usage computed as one token per four characters, output cut at
+`maxOutputTokens` with stop `max-tokens`, and a record of every call that never contains the key. It
+runs `assertLlmRequest` first and consumes only the frozen snapshot it returns. `runLlmConformance`
+runs 11 cases on any `LlmProvider` built by a factory (text and usage, unvalidated JSON, determinism,
+refused key, every typed failure, capped `retryAfterMs`, budget, `max-tokens`, aborted signal, forged
+request, no leak); the fake is its first client and TK-54 runs it on the Anthropic adapter.
+
+```mermaid
+flowchart LR
+  suite[runLlmConformance + describe/it] --> sub[Subject factory]
+  sub --> fake[FakeLlm]
+  sub -.-> adapter[Adapter, TK-54]
+  fake --> guard[assertLlmRequest: frozen snapshot]
+  adapter --> guard
+  uc[Use case tests] --> fake
 ```
 
 ## 5. Runtime views
@@ -1373,5 +1395,5 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0008](adr/0008-web-entry-gate-organizations.md),
 [0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
 [0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
-[0011](adr/0011-llm-port-and-untrusted-data.md) (proposed: LLM port and untrusted data).
+[0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

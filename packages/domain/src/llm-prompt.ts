@@ -73,9 +73,11 @@ const NEUTRALIZED_RANGES: readonly (readonly [number, number])[] = [
 const isNeutralized = (code: number): boolean =>
   NEUTRALIZED_RANGES.some(([low, high]) => code >= low && code <= high);
 
-/** Remplace les caractères de contrôle et marques bidirectionnelles/invisibles par U+FFFD. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/** Remplace surrogates isolés, contrôles et marques bidirectionnelles/invisibles par U+FFFD. */
 const neutralize = (text: string): string =>
-  Array.from(text, (char) =>
+  Array.from(text.replace(LONE_SURROGATE, REPLACEMENT), (char) =>
     isNeutralized(char.codePointAt(0) as number) ? REPLACEMENT : char,
   ).join("");
 
