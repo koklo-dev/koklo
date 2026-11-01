@@ -53,6 +53,11 @@ export function buildUpdateOperation(
   return operation as SpecOperation;
 }
 
+/** Suppression : `{ kind: "feature.delete", specId }` seule (S-feature-form §4.8). Squelette du Red 48e-2. */
+export function buildDeleteOperation(_specId: string): SpecOperation {
+  throw new Error("non implémenté");
+}
+
 export interface SubmitContext {
   projectId: string;
   idempotencyKey: string;

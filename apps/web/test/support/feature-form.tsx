@@ -16,7 +16,7 @@ import { findNamed, findRole } from "./wait.ts";
 import { procedures } from "./web-mocks.ts";
 
 /**
- * Support des tests du formulaire d'une fonctionnalité (TK-48 / 48e, sous-lot 48e-1 : création et modification).
+ * Support des tests du formulaire d'une fonctionnalité (TK-48 / 48e : création et modification en 48e-1, suppression en 48e-2).
  * Les `vi.mock` restent dans chaque fichier (voir features.tsx). Contrat des libellés et des sélecteurs :
  * .workflow/TK-48/03-red-48e.md.
  */
@@ -69,6 +69,24 @@ export function indexCatchesUp(title = NEW_TITLE): void {
   procedures.specListFeatures.mockResolvedValue(listWithCreated(title));
 }
 
+/** Lot de suppression : `feature.delete` de F-001, `baseSha` = version lue à l'ouverture (48e-2). */
+export const deletedBatch = (specId = "F-001", over: Record<string, unknown> = {}) =>
+  batch({
+    baseSha: head().commitSha,
+    results: [{ position: 0, kind: "feature.delete", specId }],
+    ...over,
+  });
+/** La liste d'après la suppression de F-001 (les deux autres restent). */
+export const listWithoutF001 = () => ({ items: FEATURES.slice(1), nextCursor: null });
+
+/** Après la suppression, l'index a rattrapé le commit et la liste ne contient plus F-001. */
+export function indexCatchesUpAfterDelete(): void {
+  procedures.specHead.mockResolvedValue(
+    head({ commitSha: NEW_SHA, counts: { features: 2, tables: 2, endpoints: 4 } }),
+  );
+  procedures.specListFeatures.mockResolvedValue(listWithoutF001());
+}
+
 export function serveWrite(role: Role = "owner"): void {
   serve(role);
   procedures.specBatchSubmit.mockResolvedValue(batch());
@@ -108,6 +126,36 @@ export async function openEdit(search = "?edit=F-001") {
   renderFeatures({ search });
   const panel = await form();
   await panel.findByDisplayValue("Connexion par e-mail", undefined, { timeout: 8_000 });
+  return panel;
+}
+
+export const DELETE_BUTTON = "Supprimer cette fonctionnalité";
+export const CONFIRM_GROUP = "Confirmer la suppression";
+export const CONFIRM_TITLE = "Supprimer F-001 « Connexion par e-mail » ?";
+export const CONFIRM_TEXT =
+  "Ses critères d'acceptation seront supprimés avec elle. Si d'autres éléments de la spec y renvoient (par exemple un scénario de test), la suppression sera refusée et vous verrez pourquoi.";
+
+/** Demande la suppression : le pied est remplacé par la confirmation en ligne (S-feature-form §4.8). */
+export async function askDelete(
+  panel: Panel,
+  user: { click: (e: Element) => Promise<void> } = userEvent,
+) {
+  await user.click(panel.getByRole("button", { name: DELETE_BUTTON }));
+  return within(await panel.findByRole("group", { name: CONFIRM_GROUP }));
+}
+/** Demande puis confirme la suppression (bouton « Supprimer » de la confirmation). */
+export async function confirmDelete(
+  panel: Panel,
+  user: { click: (e: Element) => Promise<void> } = userEvent,
+) {
+  const confirmation = await askDelete(panel, user);
+  await user.click(confirmation.getByRole("button", { name: "Supprimer" }));
+  return confirmation;
+}
+/** Ouvre la modification de F-001 (par l'adresse) et confirme la suppression. */
+export async function deleteF001(user: { click: (e: Element) => Promise<void> } = userEvent) {
+  const panel = await openEdit();
+  await confirmDelete(panel, user);
   return panel;
 }
 

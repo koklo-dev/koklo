@@ -56,7 +56,7 @@ export interface SaveErrorView {
 
 export interface SaveErrorContext {
   role: Role | undefined;
-  mode: "create" | "update";
+  mode: "create" | "update" | "delete";
 }
 
 /** Libellé du lien `/github` glissé dans le texte de l'indisponibilité (le composant le rend en lien). */

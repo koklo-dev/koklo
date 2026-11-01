@@ -2,6 +2,7 @@ import type { IncomingMessage } from "node:http";
 import {
   createdFeatures,
   currentSha,
+  deletedFeatures,
   handleFeatureWrites,
   renamed,
   resetFeatureWrites,
@@ -170,7 +171,11 @@ const baseHead = () => ({
   status: "ready",
   errorCode: null as string | null,
   indexedAt: INDEXED_AT,
-  counts: { features: FEW.length + createdFeatures().length, tables: 2, endpoints: 4 },
+  counts: {
+    features: FEW.length + createdFeatures().length - deletedFeatures().length,
+    tables: 2,
+    endpoints: 4,
+  },
 });
 
 function listFeatures(mode: SpecMode, query: URLSearchParams): Reply {
@@ -195,7 +200,10 @@ function listFeatures(mode: SpecMode, query: URLSearchParams): Reply {
   const status = query.get("status");
   const priority = query.get("priority");
   const filtered = source.filter(
-    (item) => (!status || item.status === status) && (!priority || item.priority === priority),
+    (item) =>
+      !deletedFeatures().includes(item.specId) &&
+      (!status || item.status === status) &&
+      (!priority || item.priority === priority),
   );
   const start = Number(query.get("cursor") ?? 0) || 0;
   const items = filtered.slice(start, start + PAGE);
@@ -218,6 +226,7 @@ function getFeature(mode: FeatureMode, specId: string): Reply {
     case "internal":
       return reply(500, { defined: false, code: "INTERNAL", message: "x" });
     default: {
+      if (deletedFeatures().includes(specId)) return typed(404, "NOT_FOUND");
       const found = [...FEW, ...MANY].find((item) => item.specId === specId);
       const title = renamed(specId) ?? found?.title ?? DETAIL.title;
       return reply(200, {

@@ -14,6 +14,8 @@ import type { IncomingMessage } from "node:http";
  * - `indexLate` : committed mais l'index ne rattrape jamais la version (« Pas encore à jour ») ;
  * - `hold` : `submit` est retenu jusqu'à POST /__release (état « envoi ») ;
  * - `invalid` : 422 SPEC_INVALID avec rapport ; `provider` : 503 ; `forbidden` : 403 ;
+ * - `invalid` sur une suppression (48e-2) : 422 SPEC_INVALID dont le diagnostic est une référence (« Le scénario
+ *   TS-001 renvoie à F-001 ») qui ne se rattache à aucun champ du formulaire ;
  * - `conflictOnce` : le premier envoi avec `baseSha` répond 409 stale_base et la spec change (nouvelle
  *   version, titre de F-001 modifié), le suivant réussit.
  */
@@ -65,6 +67,7 @@ let created: CreatedFeature[] = [];
 let titles: Record<string, string> = {};
 let batches: Batch[] = [];
 let conflicted = false;
+let deleted: string[] = [];
 const journal: unknown[] = [];
 
 export function resetFeatureWrites(): void {
@@ -73,14 +76,18 @@ export function resetFeatureWrites(): void {
   titles = {};
   batches = [];
   conflicted = false;
+  deleted = [];
   journal.length = 0;
 }
 /** Version de la spec lue par `spec.head` et `spec.getFeature` (l'index suit les commits). */
 export const currentSha = (lateIndex = false): string =>
   commits === 0 || lateIndex ? BASE_SHA : (SHAS[commits - 1] ?? BASE_SHA);
+/** Fonctionnalités supprimées par un lot committed ou en cours (la liste relue et la fiche ne les montrent plus). */
+export const deletedFeatures = (): string[] => deleted;
 export const createdFeatures = (): CreatedFeature[] => created;
 export const renamed = (specId: string): string | undefined => titles[specId];
-export const writeCount = (): number => created.length + Object.keys(titles).length;
+export const writeCount = (): number =>
+  created.length + Object.keys(titles).length + deleted.length;
 
 const nextId = (): string => `F-${String(4 + created.length).padStart(3, "0")}`;
 
@@ -98,6 +105,7 @@ function apply(body: Record<string, unknown>): Batch["results"] {
     return [{ position: 0, kind: "feature.create", specId }];
   }
   const specId = String(op.specId);
+  if (op.kind === "feature.delete") deleted.push(specId);
   if (typeof op.title === "string") titles[specId] = op.title;
   return [{ position: 0, kind: String(op.kind), specId }];
 }
@@ -142,6 +150,24 @@ const REPORT = {
   ],
 };
 
+/** Refus d'une suppression : une référence (scénario de test) empêche d'effacer la fonctionnalité. */
+const REFERENCE_REPORT = {
+  ok: false,
+  counts: { error: 1, warning: 0 },
+  truncated: false,
+  issues: [
+    {
+      rule: 7,
+      code: "dangling_reference",
+      severity: "error",
+      path: "scenarios/TS-001.md",
+      pointer: "/features/0",
+      entityId: "TS-001",
+      message: "Le scénario TS-001 renvoie à F-001, qui n'existerait plus.",
+    },
+  ],
+};
+
 function commit(batch: Batch): void {
   commits += 1;
   batch.status = "committed";
@@ -149,7 +175,11 @@ function commit(batch: Batch): void {
 }
 
 function refusal(mode: WriteMode, body: Record<string, unknown>): Reply | null {
-  if (mode === "invalid") return typed(422, "SPEC_INVALID", { report: REPORT });
+  const op = (body.operations as Array<Record<string, unknown>> | undefined)?.[0];
+  if (mode === "invalid") {
+    const report = op?.kind === "feature.delete" ? REFERENCE_REPORT : REPORT;
+    return typed(422, "SPEC_INVALID", { report });
+  }
   if (mode === "provider") return typed(503, "PROVIDER_UNAVAILABLE");
   if (mode === "forbidden") return typed(403, "FORBIDDEN");
   if (mode === "conflictOnce" && !conflicted && body.baseSha) {
