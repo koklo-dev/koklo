@@ -65,6 +65,7 @@ export {
   validationError,
   versionConflictError,
 } from "./errors.ts";
+export * from "./errors-ai.ts";
 export { errorStatusMap, generateOpenApi } from "./openapi.ts";
 export {
   healthInputSchema,
@@ -83,6 +84,7 @@ export {
   projectSchema,
   roleSchema,
 } from "./schemas.ts";
+export * from "./schemas-ai.ts";
 export * from "./schemas-collaboration.ts";
 export * from "./schemas-llm-credential.ts";
 export * from "./schemas-provider.ts";

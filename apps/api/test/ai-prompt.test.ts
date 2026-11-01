@@ -196,7 +196,8 @@ describe("injection de prompt : encapsulée, jamais dans la consigne", () => {
     const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
     const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId, { brief });
-    return { res, call: fake.calls[0], nonce: b.nonces.issued[0] };
+    // Le banc est partagé par les deux appels du test : le nonce de CET appel est le dernier émis.
+    return { res, call: fake.calls[0], nonce: b.nonces.issued.at(-1) };
   }
 
   it.each(INJECTIONS)(

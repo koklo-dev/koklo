@@ -8,7 +8,7 @@ import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { detailOf } from "./feature-detail.ts";
-import { pageFeatures } from "./feature-page.ts";
+import { compareFeatures, pageFeatures } from "./feature-page.ts";
 import {
   type FeatureFilter,
   type Revision,
@@ -50,6 +50,16 @@ export class SpecReadService {
     );
     if (indexed?.kind === "failed") throw indexFailed(indexed);
     return pageFeatures(indexed?.rows ?? [], limit ?? DEFAULT_PAGE_SIZE, cursor);
+  }
+
+  /**
+   * Features de la tête indexée, en ordre numérique, pour nourrir un prompt ou chercher un doublon.
+   * Vide quand rien n'est indexé ou que l'index est en échec ; `NOT_FOUND` si le projet n'est pas
+   * de l'organisation.
+   */
+  async indexedFeatures(scope: ProjectScope): Promise<FeatureSummary[]> {
+    const indexed = await this.repository.features(scope, {}, {});
+    return indexed?.kind === "rows" ? [...indexed.rows].sort(compareFeatures) : [];
   }
 
   async getFeature(scope: ProjectScope, specId: string): Promise<FeatureDetail> {

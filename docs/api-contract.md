@@ -3,7 +3,7 @@ title: API contract
 audience: technical
 doc_version: 0.4.0
 status: draft
-last_reviewed: 2026-10-30
+last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
 covers_commit: 7f97066
@@ -16,9 +16,9 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.8.0** (TK-52b: group `llmCredential`; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
-`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, repo, spec, specBatch }`:
-47 routes on 33 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b; see "Provider, spec and feature batches (TK-42)" and "BYOK LLM credentials (TK-52b)"). Method and path are explicit on every
+Contract version **0.9.0** (TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
+51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 `.meta(openapi({ method, path }))`) used by `src/contract.ts`, `src/contract-tickets.ts` and
 `src/contract-collaboration.ts`.
@@ -918,6 +918,94 @@ the session user, no ticket. `list` and every refusal (403, 404, 422, 503) write
 **Limit**: `audit_log` has no detail column, so nothing else is recorded (no provider, model or value);
 the provider of a deleted row can no longer be found from the audit.
 
+## AI proposals and key verification (TK-54b)
+Contract 0.9.0, group `ai` plus `llmCredential.verify` (`apps/api/src/ai`, `apps/api/src/llm`,
+[ADR 0015](adr/0015-anthropic-llm-adapter.md), [ADR 0011](adr/0011-llm-port-and-untrusted-data.md)). The model is the
+organization's own: the BYOK key of `anthropic` (see above). **A proposal is never written**: nothing is
+stored (no brief, no feature, no batch, no ticket, no commit); the human reads it, then submits it
+through `specBatch.submit`.
+
+| Operation | Method | Path | Roles | Input | Output |
+|-----------|--------|------|-------|-------|--------|
+| `ai.draftBrief` | POST | `/projects/{projectId}/ai/brief` | `SPEC_BATCH_ROLES` (owner, admin, dev, designer) | `{ projectId, idea (1..8000, not blank), answers? (0..10 of 1..1000) }` | `{ brief, meta }` |
+| `ai.proposeFeatures` | POST | `/projects/{projectId}/ai/features` | `SPEC_BATCH_ROLES` | `{ projectId, brief (1..20000, not blank), maxFeatures? (integer 1..20, default 8) }` | `{ features, duplicates, meta }` |
+| `ai.proposeCriteria` | POST | `/projects/{projectId}/ai/criteria` | `SPEC_BATCH_ROLES` | `{ projectId, specId (F-nnn) }` | `{ operation, meta }` |
+| `llmCredential.verify` | POST | `/llm-credentials/{provider}/verify` | `MANAGER_ROLES` (owner, admin) | `{ provider }` (`fake` refused) | `{ ok: true, model, checkedAt }` |
+
+The client and the business role get `403 FORBIDDEN`, no session `401`; a refusal spends nothing (no call,
+no audit line, no quota). The organization and the actor come from the session. **No input chooses the
+model, the budget, the provider, the key or the nonce** (unknown fields are dropped): the model is the
+key's `defaultModel`, otherwise `ANTHROPIC_DEFAULT_MODEL` of `@koklo/llm`.
+
+- `brief` = `{ title 1..200, problem 1..2000, users 1..2000, expectedOutcome 1..2000, constraints 0..2000, openQuestions: string[0..10] (1..500) }`.
+- `features[i]` = `{ kind: "feature.create", title 1..200, priority, description 0..4000, criteria: [{ title 1..200, steps: [{ type, text 1..500 }] (3..12) }] (1..12) }`, 1 to 20 items.
+  **No status** (implicit `brouillon`) **and no link** (`tables`, `endpoints`, `screens`, `roles`, `rules`, `nfr`):
+  a human links them. Every item is accepted as is by `specBatch.submit` (parity test).
+- `duplicates` = `[{ index, specId }]`: a proposal whose title equals (`trim().toLowerCase()`) the title of a
+  feature of the index is **kept** and reported here; the human decides.
+- `operation` (`proposeCriteria`) = `{ kind: "feature.update", specId, criteria }`, carrying criteria only: it replaces them.
+- `meta` = `{ provider, model, usage: { inputTokens, outputTokens } }`: the model actually **served**; no cost.
+- `verify` sends one constant prompt (16 output tokens, 15 s) and returns `{ ok: true, model (served), checkedAt }`;
+  it keeps nothing of the answer. A provider of the domain with no adapter (`openai`, `google` in 0.9.0) is
+  `LLM_PROVIDER_ERROR{unavailable}` before any call.
+
+### Order of a call
+1. Session and role guard (401/403). 2. Project in the session organization (and, for `proposeCriteria`, the
+feature in the index: `404 NOT_FOUND`). 3. Key resolved (`LLM_NOT_CONFIGURED`, `ENCRYPTION_UNAVAILABLE`).
+4. Prompt framed with a **fresh nonce** (a collision is `PROMPT_REJECTED`). 5. Concurrency gate then quota.
+6. **Audit line written before the call**, in its own short transaction (if it fails, the call is not made:
+`500 INTERNAL`). 7. Model call (never inside a transaction). 8. `markUsed` on success (best effort), then the
+output is validated. A refusal before step 6 writes no line and consumes no quota.
+
+### Errors (typed, `data` closed)
+| Code | Status | `data` | When |
+|------|--------|--------|------|
+| `LLM_NOT_CONFIGURED` | 409 | `{ reason: missing \| invalidated \| undecryptable }` | no usable key |
+| `ENCRYPTION_UNAVAILABLE` | 503 | none | no key ring configured |
+| `LLM_RATE_LIMITED` | 429 | `{ retryAfterSeconds >= 1 }` | quota, concurrency gate, or the provider's own 429 (capped at 3600) |
+| `LLM_PROVIDER_ERROR` | 502 | `{ reason: auth \| quota \| timeout \| aborted \| budget \| context_too_long \| refused \| model_not_found \| unavailable }` | the provider failed; **any unexpected exception** of the adapter is `unavailable`, never a 500 and never sent to Sentry |
+| `LLM_OUTPUT_INVALID` | 502 | none | output refused (shape, content policy, step order, truncated by the budget) |
+| `PROMPT_REJECTED` | 422 | `{ rank >= 1 }` | the data block of that rank contains the nonce or a delimiter |
+| `VALIDATION` | 422 | `{ field, message }` | input refused (the four routes are in `VALIDATION_ROUTES`) |
+| `NOT_FOUND` | 404 | none | project, or feature, not in the organization / the index (`ai.*` only) |
+
+`verify` declares the first four plus `LLM_PROVIDER_ERROR`, but neither `LLM_OUTPUT_INVALID`, `PROMPT_REJECTED` nor
+`NOT_FOUND`. `ai.proposeCriteria` also declares the errors of `spec.getFeature` (`PROVIDER_*`, `SPEC_INDEX_FAILED`),
+since it reads the feature in git at the indexed commit. No message repeats a key, a prompt, an output, an
+organization id or a provider text. A provider `401` **invalidates the key** (audit `llm_credential.invalidate`)
+with a compare-and-swap on the key's revision (the hex of its AES-GCM nonce): a key replaced during the call is not
+invalidated. A `403`, or a failure without status, does not touch the key.
+
+### Quotas (to validate by the product owner, D8)
+Computed from the audit lines of a sliding hour (no in-memory state; valid across instances): **30** `ai.*` calls
+per organization, **10** per user, **5** `verify` per organization, **2** simultaneous calls per organization and per
+process. Tuned by `AI_MAX_CALLS_PER_HOUR_ORG`, `AI_MAX_CALLS_PER_HOUR_USER`, `AI_MAX_VERIFY_PER_HOUR_ORG`,
+`AI_MAX_CONCURRENT_PER_ORG` (see `quality-and-operations.md`). Budgets per call, set by the server: `features-propose`
+4000 output tokens, `brief-draft` 1500, `criteria-propose` 1500, `credential-verify` 16; 60 s (15 s for `verify`);
+60,000 prompt characters; 0.50 USD.
+
+### Audit
+One line per call that reaches the model, **written before** it (a spend attempted is a spend traced, even if the
+provider fails): `ai.brief.draft`, `ai.features.propose`, `ai.criteria.propose` on `targetKind: project` /
+`targetId` the project, and `llm_credential.verify` on the key row. The actor is the session user. **No content**
+(no idea, brief, title, output, model or nonce). Refusals before the audit write nothing.
+
+### What enters a prompt, and what never does (vision section 15)
+Always as untrusted data blocks, never in the instruction: `draftBrief` the idea and the answers; `proposeFeatures`
+the brief (block 1) then, if any, one block listing at most 100 lines `F-nnn | title | status | priority` of the
+index (no description, no criterion); `proposeCriteria` the feature (title, status, priority, description, criteria
+read in git at the indexed commit). **Never**: the key, a token, an id, name or email of a user or member, the id,
+name or slug of the organization, the id or name of the project, the repository (owner, name, external id), the
+installation, the audit log, comments, data of another project. The output is hostile by default: strict Zod, no
+URL, HTML tag, markdown image or link, no control or bidirectional character, one-line steps, order Given, When,
+Then (rule 5 of `@koklo/schema`).
+
+### To validate (NEEDS-HUMAN)
+- **GDPR**: free text typed by users (idea, brief, titles) is sent to a US sub-processor (Anthropic) with the
+  organization's own key; the sending policy to display belongs to TK-59.
+- Quotas, budgets and model prices (D8); no persisted brief or proposal table (D3, D4); content policy (D6); `verify`
+  audited and marking the key used (D9).
+
 ## Installations in the API (TK-48a2)
 `installation.list`, `installation.start` and the browser callback are implemented in
 `apps/api/src/installation`. Roles: owner and admin only (`FORBIDDEN` otherwise, `401` without session).
@@ -1009,6 +1097,10 @@ sequenceDiagram
 ```
 
 ## Version history
+- **0.9.0** (TK-54b): group `ai` (`draftBrief`, `proposeFeatures`, `proposeCriteria`) and `llmCredential.verify`
+  (4 routes, 51 on 37 paths), five typed errors (`LLM_NOT_CONFIGURED`, `LLM_RATE_LIMITED`, `LLM_PROVIDER_ERROR`,
+  `LLM_OUTPUT_INVALID`, `PROMPT_REJECTED`); `featureCreateSchema` exported. Additive. Fingerprints of 0.1.0 to 0.8.0
+  unchanged. 0.10.0 is reserved for TK-55.
 - **0.7.0** (TK-48a2): typed errors `PROVIDER_UNAVAILABLE` (503) and `VALIDATION` (422) on
   `installation.start`; `installation_id` optional in `installationCallbackQuerySchema` and the outcome `not_owner` in
   `installationCallbackOutcomeSchema` (both outside the OpenAPI document). Same 43 routes. Fingerprints of 0.1.0 to 0.6.0 unchanged.

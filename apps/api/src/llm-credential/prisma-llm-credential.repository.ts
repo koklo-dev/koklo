@@ -40,6 +40,18 @@ function statusOf(row: Row): LlmCredentialStatus {
   };
 }
 
+/** Hex (24 caractères) du nonce AES-GCM de 12 octets : identifie une version de la clé stockée. */
+const revisionOf = (nonce: Uint8Array): string => Buffer.from(nonce).toString("hex");
+
+const REVISION_PATTERN = /^[0-9a-f]{24}$/;
+
+/** Sans révision attendue, aucun filtre ; une révision mal formée ne correspond à aucune ligne. */
+function revisionFilter(expected: string | undefined): { nonce?: Uint8Array<ArrayBuffer> } {
+  if (expected === undefined) return {};
+  const valid = REVISION_PATTERN.test(expected);
+  return { nonce: new Uint8Array(valid ? Buffer.from(expected, "hex") : []) };
+}
+
 type AuditAction = "create" | "replace" | "invalidate" | "delete";
 
 /** `audit_log` n'a pas de colonne de détail : ni fournisseur, ni modèle, ni valeur ne sont écrits. */
@@ -140,6 +152,7 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
         },
         defaultModel: row.defaultModel,
         invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
+        revision: revisionOf(row.nonce),
       };
     });
   }
@@ -160,11 +173,13 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
     provider: LlmProviderId,
     at: string,
     actor?: AuditActor,
+    expectedRevision?: string,
   ): Promise<LlmCredentialStatus | null> {
     return this.transaction(organizationId, async (tx) => {
       // Idempotent : une clé déjà invalidée garde son premier `invalidated_at`, sans audit.
+      // Avec une révision attendue, une clé remplacée entre-temps (autre nonce) n'est pas touchée.
       const { count } = await tx.llmProviderCredential.updateMany({
-        where: { provider, invalidatedAt: null },
+        where: { provider, invalidatedAt: null, ...revisionFilter(expectedRevision) },
         data: { invalidatedAt: new Date(at) },
       });
       const row = await tx.llmProviderCredential.findFirst({ where: { provider } });
@@ -178,9 +193,16 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
     const instant = new Date(at);
     const threshold = new Date(instant.getTime() - MARK_USED_INTERVAL_MS);
     return this.run(organizationId, async () => {
-      await this.table.updateMany({
+      const row = await this.table.findFirst({
         where: { provider, OR: [{ lastUsedAt: null }, { lastUsedAt: { lte: threshold } }] },
-        data: { lastUsedAt: instant },
+        select: { id: true, updatedAt: true },
+      });
+      if (row === null) return;
+      // Utiliser une clé ne la modifie pas : `updated_at` est reposé tel quel (sinon Prisma le
+      // ferait avancer) et `revision` (le nonce) ne bouge pas non plus.
+      await this.table.updateMany({
+        where: { id: row.id },
+        data: { lastUsedAt: instant, updatedAt: row.updatedAt },
       });
     });
   }

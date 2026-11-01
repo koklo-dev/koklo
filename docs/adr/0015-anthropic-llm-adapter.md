@@ -2,7 +2,7 @@
 doc_version: 0.1.0
 status: proposed
 last_reviewed: 2026-11-01
-covers_commit: 1b4f1ef
+covers_commit: 97b505c
 ---
 # 0015 — Adaptateur Anthropic : `fetch` direct dans `@koklo/llm`, sans SDK
 
@@ -100,7 +100,22 @@ fonction qui lève : aucun appel réseau n'est possible en test.
   de 12e erreur).
 - La garde d'import ne voit pas un import relatif `./testing` interne à `domain` ou `llm` (couvert par les
   tests de pureté de ces paquets).
-- Le non-embarquement du faux dans `dist/` d'api et worker est vérifié en 54b, quand ils dépendent de `@koklo/llm`.
+- Le non-embarquement du faux dans `dist/` d'api et worker est vérifié par `apps/api/test/ai-dist-isolation.test.ts` (54b, voir ci-dessous).
+
+## Utilisation par l'API (sous-lot 54b)
+- `apps/api/src/llm/llm.module.ts` place `AnthropicProvider` seul sous le jeton `LLM_PROVIDERS` ; aucun réglage
+  ne désigne un fournisseur, le faux n'est mis là que par les tests (`overrideProvider`).
+- Le module `ai` appelle le port dans un ordre figé par les tests : rôle, projet, clé, prompt (nonce neuf),
+  sémaphore et quota, **ligne d'audit avant l'appel**, appel, `markUsed`, validation stricte de la sortie.
+  Les propositions ne sont jamais persistées. Le contrat 0.9.0 expose `ai.*` et `llmCredential.verify`
+  ([contrat d'API](../api-contract.md#ai-proposals-and-key-verification-tk-54b)).
+- Un `401` du fournisseur invalide la clé par compare-and-swap sur sa révision (hex du nonce AES-GCM) : une clé
+  remplacée pendant l'appel n'est pas invalidée. Toute exception inattendue de l'adaptateur devient
+  `LLM_PROVIDER_ERROR{unavailable}`, journalisée par son seul nom, jamais envoyée à Sentry.
+- La sortie du modèle est hostile par défaut : Zod strict, ni URL, ni balise HTML, ni image ou lien markdown,
+  ni caractère de contrôle ou de direction, étapes sur une ligne, ordre Étant donné -> Quand -> Alors.
+- À valider par l'humain : quotas, budgets et prix (D8), politique de contenu (D6), absence de persistance (D3, D4),
+  RGPD (texte libre envoyé à un sous-traitant américain). L'ADR reste **proposé** jusqu'à la fusion de la PR TK-54.
 
 ## Preuves
 `pnpm --filter @koklo/llm test` (188 tests, dont `runLlmConformance` sur l'adaptateur et les tests de
