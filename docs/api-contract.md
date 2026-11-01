@@ -1,7 +1,7 @@
 ---
 title: API contract
 audience: technical
-doc_version: 0.3.0
+doc_version: 0.4.0
 status: draft
 last_reviewed: 2026-10-30
 covers_release: unreleased
@@ -16,9 +16,9 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.7.0** (TK-48a2; routes unchanged since 0.5.0, TK-42). The router shape is
-`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, repo, spec, specBatch }`:
-43 routes on 30 paths (8 from TK-21, 25 from TK-29, 10 from TK-42; see "Provider, spec and feature batches (TK-42)"). Method and path are explicit on every
+Contract version **0.8.0** (TK-52b: group `llmCredential`; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+`{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, repo, spec, specBatch }`:
+47 routes on 33 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b; see "Provider, spec and feature batches (TK-42)" and "BYOK LLM credentials (TK-52b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 `.meta(openapi({ method, path }))`) used by `src/contract.ts`, `src/contract-tickets.ts` and
 `src/contract-collaboration.ts`.
@@ -877,6 +877,46 @@ evaluation order: 503 `webhook_not_configured`, 413 `payload_too_large`, 415 `un
 401 `invalid_signature`, 400 `invalid_headers` / `invalid_body`, 202 `{ "received": true }`. Details and
 the ingestion flow are in `architecture.md`; configuration and the manual check in
 `quality-and-operations.md`.
+
+## BYOK LLM credentials (TK-52b)
+Contract 0.8.0, group `llmCredential` (`apps/api/src/llm-credential`, [ADR 0013](adr/0013-byok-credentials-storage.md)).
+Roles: **owner and admin only**, `list` included (`MANAGER_ROLES`, vision section 14, "clés BYOK"); any other
+role gets `403 FORBIDDEN`, no session `401`. Session only: an `Authorization: Bearer` header without a
+session cookie is `401` (no automation token exists). The organization and the audit actor always come
+from the session, never from the input.
+
+| Operation | Method | Path | Input | Output | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`, `FORBIDDEN`) |
+|-----------|--------|------|-------|--------|---------------------------------------------------------------|
+| `llmCredential.list` | GET | `/llm-credentials` | none | `{ items: Status[] }` (at most 3) | none |
+| `llmCredential.set` | PUT | `/llm-credentials/{provider}` | `{ provider, apiKey, defaultModel? }` | `Status` | `VALIDATION` 422, `ENCRYPTION_UNAVAILABLE` 503 |
+| `llmCredential.remove` | DELETE | `/llm-credentials/{provider}` | `{ provider }` | `{ removed: true }` | `NOT_FOUND` 404, `VALIDATION` 422 |
+| `llmCredential.invalidate` | POST | `/llm-credentials/{provider}/invalidate` | `{ provider }` | `Status` | `NOT_FOUND` 404, `VALIDATION` 422 |
+
+- `provider`: `anthropic`, `openai` or `google` (same literals as the domain and the database enum).
+- `apiKey`: 1 to 512 characters, not blank, no control character. `defaultModel`: 1 to 100 code points,
+  no `/`, no `..`. These are the CHECK rules of the table, applied before the database; no message ever
+  repeats the refused value. A schema refusal is `422 VALIDATION{field, message}` (`field: "provider"`
+  for an unknown provider), also when no key ring is configured.
+- `Status` = `{ provider, defaultModel?, configured: true, invalid, invalidatedAt?, lastUsedAt?, createdAt, updatedAt }`.
+  **No key hint**: no `id`, no `keyVersion`, no suffix, length or fingerprint; absent values are absent
+  keys, not `null`. The key is never returned, logged or exposed in the OpenAPI document (examples,
+  if any, are `<api-key>`).
+- `set` is a PUT: it creates the key or replaces it in place (same row, same `createdAt`, new nonce,
+  key re-armed, absent `defaultModel` erased). The answer is `200` in both cases.
+- `invalidate` on an already invalidated key is a no-op `200` (`invalidatedAt` unchanged, no audit
+  line). A key that does not exist, or belongs to another organization, is `404 NOT_FOUND` for
+  `remove` and `invalidate` (no distinction).
+- `ENCRYPTION_UNAVAILABLE` (503, no `data`): `set` only, when no key ring is configured
+  (`KOKLO_ENCRYPTION_KEY` absent). `list`, `remove` and `invalidate` still work without it.
+
+### Audit
+One line per successful write, in the same transaction as the write (if the audit insert fails, the
+answer is `500 INTERNAL` and the key row is unchanged): `llm_credential.create` (first `set`),
+`llm_credential.replace` (`set` on an existing row), `llm_credential.invalidate`,
+`llm_credential.delete`. `targetKind` is `llm_credential`, `targetId` the id of the key row, the actor
+the session user, no ticket. `list` and every refusal (403, 404, 422, 503) write nothing.
+**Limit**: `audit_log` has no detail column, so nothing else is recorded (no provider, model or value);
+the provider of a deleted row can no longer be found from the audit.
 
 ## Installations in the API (TK-48a2)
 `installation.list`, `installation.start` and the browser callback are implemented in
