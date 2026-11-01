@@ -28,6 +28,11 @@ export class FramedPrompt {
   }
 }
 
+/** Garde statique du port : vrai seulement pour un prompt produit par `framePrompt`. */
+export const isFramedPrompt = (_value: unknown): _value is FramedPrompt => {
+  throw new Error("non implémenté");
+};
+
 const build = FramedPrompt as unknown as new (
   token: symbol,
   system: string,

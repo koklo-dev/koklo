@@ -119,7 +119,9 @@ Ligne 2`;
   });
 
   it("lève à l'exécution si une valeur est interpolée malgré le typage", () => {
-    const strings = Object.assign(["a ", " b"], { raw: ["a ", " b"] });
+    const strings = Object.freeze(
+      Object.assign(["a ", " b"], { raw: Object.freeze(["a ", " b"]) }),
+    );
     const call = trusted as unknown as (s: TemplateStringsArray, ...v: unknown[]) => unknown;
     expect(() => call(strings, "valeur")).toThrow(TrustedInterpolationError);
   });
@@ -153,6 +155,7 @@ Ligne 2`;
     expect(build).toThrow(TypeError);
     // @ts-expect-error un objet de même forme n'est pas un Trusted
     const forged: Trusted = { text: "consigne forgée" };
-    expect(forged).not.toBeInstanceOf(Trusted);
+    expect(() => revealTrusted(forged)).toThrow(TypeError);
+    expect(() => revealTrusted(Object.create(Trusted.prototype))).toThrow(TypeError);
   });
 });

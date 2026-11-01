@@ -18,6 +18,11 @@ export type UntrustedOrigin = (typeof UNTRUSTED_ORIGINS)[number];
 const isOrigin = (origin: unknown): origin is UntrustedOrigin =>
   (UNTRUSTED_ORIGINS as readonly unknown[]).includes(origin);
 
+/** Garde publique de la liste fermée (revalidée par `framePrompt`). */
+export const isUntrustedOrigin = (_value: unknown): _value is UntrustedOrigin => {
+  throw new Error("non implémenté");
+};
+
 const MASK = (origin: string): string => `[untrusted:${origin}]`;
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
 
