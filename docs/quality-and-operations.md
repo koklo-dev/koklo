@@ -285,6 +285,26 @@ the suite (`packages/domain/test/llm-conformance.test.ts`), which also checks th
 detected. Use `FakeLlm` in tests of services that call a model; it records calls without the key.
 `pnpm --filter @koklo/domain build` must keep resolving `@koklo/domain/testing` (`dist/testing`).
 
+### Anthropic adapter: import guard and real conformance (TK-54a)
+- **No network in CI.** `packages/llm/vitest.setup.ts` replaces `globalThis.fetch` with a function that
+  throws; `AnthropicProvider` receives a `SimulatedAnthropicTransport` by injection. A call that bypasses
+  the injection fails loudly. No test reads `ANTHROPIC_*` from the real environment.
+- **Import guard.** Production code (`apps/*/src`, `packages/*/src` outside `**/testing/**`) never imports
+  `@koklo/domain/testing` or `@koklo/llm/testing`: source test
+  `packages/config/test/llm-testing-import-guard.test.ts` and the Biome rule `noRestrictedImports` in the
+  root `biome.json` (off for `**/test/**`, `**/src/testing/**`, `*.test.ts` and `e2e/**`; the icon rule
+  stays on). A violation fails `pnpm lint`.
+- **Logs.** The adapter writes nothing (no `console`, no stdout); the key never appears in an error, a
+  stack, a JSON rendering or an `inspect`. Error bodies, headers and the upstream message are dropped.
+- **Cost guard.** `costUpperBoundMicroUsd` uses the price table of `anthropic-pricing.ts`; review it when
+  the vendor price list changes. An unknown model is charged at the highest price.
+- **NEEDS-HUMAN: real conformance, once, outside CI.** The request format (`output_config.format`,
+  `anthropic-version`, `x-api-key`) and the wording of the two 400 errors (credit balance, prompt too
+  long) are UNVERIFIED against the real API. With a test key of a dedicated, capped Anthropic account, run
+  `runLlmConformance` against `AnthropicProvider` with the real `fetch` (a temporary local script, not in
+  CI), then confirm the price table against the vendor price page. Record the outcome in ADR 0015 and move
+  it to `accepted`.
+
 ### Emails and magic link (TK-22)
 - **Sending**: the api never sends mail. Better Auth's `sendMagicLink` enqueues
   `{ email, url }` on the `send-magic-link` pg-boss queue; the worker sends it (3 attempts).
