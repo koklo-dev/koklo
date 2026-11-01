@@ -1,12 +1,12 @@
 ---
 doc_version: 0.1.0
-status: draft
+status: accepted
 last_reviewed: 2026-11-01
 covers_commit: a202ce1
 ---
 # 0010 — Pile e2e à processus unique (API + worker) avec le faux fournisseur Git injecté
 
-- **Statut** : proposé
+- **Statut** : accepté (TK-49b : les parcours R2 `e2e/tests/r2-journeys.spec.ts` passent 3 fois de suite sur la pile ; la CI doit encore les exécuter)
 - **Date** : 2026-11-01
 - **Décideurs** : tech-lead, developer (ticket TK-49, lot 49a). Étend l'[ADR 0007](0007-real-stack-e2e-orchestration.md).
 
@@ -44,4 +44,4 @@ Aucune variable d'environnement, aucun `if (APP_ENV === "test")`, aucune branche
 - Écarts avec la production : API et worker partagent un processus (la communication reste pg-boss sur Postgres, sans appel direct) ; le journal Nest par défaut remplace le logger pino de `main.ts` ; le faux diverge peut-être de GitHub (conformité réelle : preuve humaine, hors e2e).
 - Le lanceur dépend des `dist` (`pnpm build` est déjà dans `run.ts`) ; il les charge par chemin, avec des interfaces locales minimales, pour que `tsc` d'`e2e` n'exige pas le build.
 - Les tests partagent le faux et pg-boss (workers: 1) : noms uniques, installations à `external_id` uniques.
-- Statut « proposé » : à accepter après les lots 49b et 49c (parcours complets verts en CI).
+- Accepté au lot 49b (parcours R2 complets verts en local, 3 passages consécutifs) ; les lots 49b et 49c ont été fusionnés.

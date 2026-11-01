@@ -641,6 +641,26 @@ refuses `staging`/`production`). `e2e/` stays out of the Docker images (`.docker
 `e2e/tests/r2-stack.spec.ts` (health, webhook bad signature 401, `installation.start` URL of the fake).
 The real GitHub App proof stays manual.
 
+**R2 journeys (TK-49b)**: `e2e/tests/r2-journeys.spec.ts` (8 tests, about 12 s of the 46 tests of `pnpm e2e`,
+about 30 s of Playwright and about 1 min in all with a warm build cache) replays the R2 result of the vision
+against the real API + worker + web + Postgres with the injected fake. Each test builds its own workspace
+(`createR2Workspace()` in `e2e/support/r2-workspace.ts`: organization, seeded installation, owner, dev and
+client sessions), so no test depends on another; waits are bounded `expect.poll` (15 s), never fixed sleeps.
+Covered: T1 create a project from the UI (success status "Projet « X » et dépôt de spec créés.", `repo.list`
+spec/new repo, `project_repos` row, second `createSpec` = 409); T2 before the signed push the page says "La
+spec est en cours de préparation", after it (delivery `processed`, `spec.head` set, page reloaded) "Aucune
+fonctionnalité pour le moment"; T3 bad signature 401 and one `webhook_deliveries` row for a replayed delivery
+id; T4 a feature written from the UI gives a `committed` batch with a 40-hex `commitSha` and `F-001`; T5 the
+next push indexes it (`spec.head.commitSha` = batch commit, the page lists the title: the index is rebuilt from
+the repository files, indirect proof of the commit); T6 two writes give two distinct ordered commits
+(`F-001`, `F-002`); T7 a read-only role (`client`) has no "Nouvelle fonctionnalité" button and gets 403 on
+`specBatch.submit`, a `dev` writes; T8 install through the fake OAuth (`installation.start` state, callback
+`code=fake-code-e2e-link-1` from the launcher pool, 303 to `/github?result=installed`, account listed, replay =
+`invalid_state`). The pool `e2e-link-1..3` is single use per run: the database is new at every `pnpm e2e`.
+The "Terminé" step badges of the creation panel are not asserted: the panel closes on full success (the stub
+suite `apps/web/e2e/project-create.spec.ts` covers them). Run three times in a row on ports 54339/3290/3291:
+46 passed each time.
+
 ### Reconciliation job (TK-46a)
 | Variable | Read by | Meaning |
 |----------|---------|---------|
