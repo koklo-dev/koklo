@@ -58,3 +58,17 @@ export function createKeyRing(settings: KeyRingSettings): TokenCipher {
     },
   };
 }
+
+/**
+ * Porte-clés de la configuration, ou `null` sans clé de chiffrement. Une configuration bâtie à la
+ * main (tests) peut ne porter que `encryptionKey` : version 1, sans clé précédente.
+ */
+export function keyRingOf(config: {
+  readonly encryptionKey?: Buffer;
+  readonly encryptionKeyring?: KeyRingSettings;
+}): TokenCipher | null {
+  const { encryptionKey, encryptionKeyring } = config;
+  if (encryptionKeyring !== undefined) return createKeyRing(encryptionKeyring);
+  if (encryptionKey === undefined) return null;
+  return createKeyRing({ current: { version: 1, key: encryptionKey }, previous: [] });
+}

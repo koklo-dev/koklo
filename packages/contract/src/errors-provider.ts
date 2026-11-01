@@ -87,3 +87,8 @@ export const specIndexFailedError = {
     data: z.object({ errorCode: z.string().min(1), commitSha: commitShaSchema }),
   },
 } as const;
+
+/** Aucun porte-clés de chiffrement configuré : une clé BYOK ne peut pas être enregistrée (0.8.0). */
+export const encryptionUnavailableError = {
+  ENCRYPTION_UNAVAILABLE: { status: 503, message: "Chiffrement indisponible" },
+} as const;

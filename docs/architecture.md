@@ -1069,9 +1069,13 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
   `KOKLO_ENCRYPTION_KEY[_VERSION]` and `KOKLO_ENCRYPTION_KEYS_PREVIOUS`; `git-provider.module.ts`
   gives it to `PrismaUserCredentials`, so tokens written in v1 stay readable after a move to v2.
 
-### API: BYOK LLM credentials, module `llm-credential` (TK-52a)
-Domain-facing store for the per-organization LLM keys (table `llm_provider_credentials`, ADR 0013).
-No procedure, controller or audit yet: the contract and the HTTP layer are TK-52b.
+### API: BYOK LLM credentials, module `llm-credential` (TK-52a, TK-52b)
+Store and HTTP layer for the per-organization LLM keys (table `llm_provider_credentials`, ADR 0013).
+TK-52b adds `LlmCredentialController` (group `llmCredential`, contract 0.8.0, `@Roles(...MANAGER_ROLES)`
+on each of the four procedures) and `LlmCredentialModule`, which gives the service the key ring of
+`keyRingOf(config)` (`null` without `KOKLO_ENCRYPTION_KEY`: `set` answers 503). The repository writes the
+`llm_credential.*` audit line in the transaction of the write; routes, roles and errors are in
+[API contract](api-contract.md#byok-llm-credentials-tk-52b).
 ```mermaid
 flowchart LR
   S[LlmCredentialService<br/>validate, encrypt, set/list/remove/invalidate/markUsed] --> P((LlmCredentialRepository port))
@@ -1086,7 +1090,7 @@ flowchart LR
   control character; model 1..100 code points, no `/`, no `..`), then encrypts with the AAD derived
   from the row and calls `upsert` (replace in place: same id and `createdAt`, new nonce, key re-armed,
   absent model = NULL). Without a key ring `set` throws `EncryptionUnavailableError` before any access
-  (mapped to 503 `ENCRYPTION_UNAVAILABLE` in TK-52b).
+  (mapped to 503 `ENCRYPTION_UNAVAILABLE` by the controller).
 - `LlmCredentialResolver.resolve` returns `{ credential, defaultModel }` where `credential` is the
   opaque domain `LlmCredential`; refusals, in this order: `missing`, `invalidated`,
   `no-encryption-key`, `undecryptable` (unknown version, other key or AAD, tampered ciphertext).
