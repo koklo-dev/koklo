@@ -97,8 +97,6 @@ describe("FakeAgentRuntime : erreurs et determinisme", () => {
   });
 });
 
-describe("FakeAgentRuntime : budget et annulation", () => {});
-
 describe("FakeAgentRuntime : budget", () => {
   it("tronque la sortie a maxOutputChars", async () => {
     const budget = { ...BUDGET, maxOutputChars: 5 };

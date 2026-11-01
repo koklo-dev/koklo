@@ -591,8 +591,48 @@ emits `notify{cause}`, with `version + 1`.
     `merge_requested`), repeated conflicts are unbounded, and a late `merge_done` on
     `deployed_staging` is refused (TK-76/78).
   - Raw git output must be redacted upstream (TK-76) before entering `Run.blocked` or `notify`.
-- **Dependency**: `@koklo/domain` stays in `packages/delivery/package.json` (the purity test pins
-  it); it is reserved for TK-73+ and imported nowhere in `src` yet.
+- **Dependencies**: `@koklo/domain` (prompts, untrusted data) and `@koklo/rules` (`AgentRole`) are
+  the only runtime dependencies, both used by the AgentRuntime port below.
+
+### AgentRuntime port (TK-73 lot 73a, `packages/delivery`)
+Pure types and guards, no persistence. One session = one promise = one typed result.
+- **AgentSessionRequest**: `role` (`AgentRole`), `prompt` (`FramedPrompt`), `worktree` (absolute
+  POSIX path supplied by the runner: not `/`, no `..` segment, no NUL), `tools`, `budget`, `signal`
+  (a real `AbortSignal`, mandatory), `trace` (`purpose`, `correlationId`, pattern
+  `[A-Za-z0-9._:-]{1,64}`, never content) and an optional opaque `credential` (absent for a
+  subscription). `assertSessionRequest` checks in this order: request, role, prompt, worktree,
+  tools, signal, trace, credential, then budget; it returns a deep-frozen snapshot, each field read
+  once (hostile getters cannot answer differently twice). An already aborted signal is not an error:
+  the runtime answers `aborted` without launching.
+- **AgentBudget**: `timeoutMs`, `maxCostMicroUsd`, `maxOutputChars`, `maxPromptChars`, positive
+  integers, all mandatory. Ceilings: 3 600 000 ms, 20 000 000 micro-USD, 1 000 000 characters of
+  output, 1 000 000 characters of prompt (`system` + `user` must fit `maxPromptChars`).
+  `InvalidAgentBudgetError(field)` for a missing or invalid field, `AgentBudgetExceededError(limit)`
+  (`timeout | cost | output-chars | prompt-chars`) above a ceiling.
+- **AgentToolPolicy**: `read`, `search` (always true), `write`, `edit`, `shell`
+  (`none | project-checks`), `writablePaths` (relative to the worktree), `network` (always `none`),
+  `mcp` (always false). No dangerous option is representable and unknown keys are refused.
+  `toolsForRole` (frozen): developer and test-writer write everywhere with the bounded shell,
+  doc-writer writes in `docs/` and `README.md`, designer in `design/` (no shell for both),
+  product-owner, analyst, qa-reviewer and tech-lead are read-only. A request may restrict a role's
+  policy but never exceed it (`isWithinRolePolicy`).
+- **AgentSessionResult** (union on `status`): `completed { output, usage { costMicroUsd,
+  durationMs } }`, `failed { reason, output }` (`agent_error | tool_denied | invalid_output |
+  process_error | budget_exceeded`), `timeout { output }`, `aborted { output }`,
+  `quota { output, retryAfterMs? }`. The output is always `Untrusted("model-output")` (possibly
+  partial). Only `failed` counts as a failure (`countsAsAgentFailure`): timeout, abort and quota are
+  never failures.
+- **AgentCredential**: opaque (private field, frozen), 1 to 512 characters without control
+  character; every rendering gives `[redacted]`; `revealAgentCredential` is for the adapter only.
+- **Errors**: root `AgentRuntimeError { operation, runtime? }` (known fields only, no `cause`);
+  `InvalidAgentRequestError(reason)`, `InvalidAgentBudgetError(field)`, `AgentBudgetExceededError(limit)`,
+  `AgentRuntimeUnavailableError`, `AgentAuthError`; `InvalidAgentCredentialError(reason)` extends
+  `Error`. Messages are fixed and never carry a key, a prompt or an output.
+- **Fake and conformance** (`@koklo/delivery/testing`): `FakeAgentRuntime` plays a script
+  (`completed`, `failed`, `timeout`, `quota`, `aborted`, `hang`, `{ fail }`), truncates the output to
+  `maxOutputChars`, turns a too long `elapsedMs` into `timeout` and a too high cost into
+  `failed/budget_exceeded`, and records calls without the key. `runAgentRuntimeConformance` runs the
+  14 shared cases against any `AgentConformanceSubject` with the engine injected by the caller.
 
 ## Rules catalog (TK-71 lot A, `packages/rules`)
 A **catalog** is a versioned set of engineering rules and the profiles that group them. The

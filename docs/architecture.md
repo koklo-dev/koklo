@@ -114,9 +114,9 @@ flowchart LR
   `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
 ### Delivery package: run state machine (TK-72 lots 1 and 2)
 `packages/delivery` (`@koklo/delivery`, tag `delivery`, private) holds the pure core of the
-delivery loop. Its only runtime dependency is `@koklo/domain` (workspace); it adds no
+delivery loop. Its only runtime dependencies are `@koklo/domain` and `@koklo/rules` (workspace); it adds no
 third-party dependency and no I/O, clock, randomness or environment access, which a
-purity test enforces (relative imports or `@koklo/domain` only, files at most 300 lines,
+purity test enforces (relative imports, `@koklo/domain` or `@koklo/rules` only, files at most 300 lines,
 functions at most 50). The tag `delivery` is already declared in the root `turbo.json`
 (allow: `domain`, `contract`, `rules`, `config`); `turbo boundaries` stays green. The
 package decides, the runner (TK-75/76) executes and persists.
@@ -145,6 +145,40 @@ flowchart LR
 The state diagram, transitions, block causes and effects are in
 [domain-model.md](domain-model.md#run-lifecycle-tk-72-lots-1-and-2-packagesdelivery).
 Counters, ceilings, idempotent replays and resume are described there too (lot 2).
+
+### Delivery package: AgentRuntime port (TK-73 lot 73a)
+The port that runs one agent session is pure and lives next to the run state machine
+([ADR 0011](adr/0011-llm-port-and-untrusted-data.md) pattern, as for the LLM port of TK-50). One
+session is one promise and one typed result; there is no public streaming. The runner (TK-75/76)
+only talks to the port; the Claude Code adapter (`src/claude-code/`, exported later as
+`./claude-code`, lot 73c) is the only place allowed to spawn a process and is excluded from the
+purity scan. The fake and the conformance suite are exported by `./testing` only, never by the
+public index.
+
+| File | Responsibility |
+|---|---|
+| `agent-runtime.ts` | `AgentRuntime { id, launchSession }`, request/result types, closed lists, `countsAsAgentFailure` |
+| `agent-request.ts` | `assertSessionRequest`: the single guard, frozen deep snapshot, one read per field |
+| `agent-budget.ts` | `AgentBudget`, domain ceilings, `assertAgentBudget` / `snapshotAgentBudget` |
+| `agent-tools.ts` | `AgentToolPolicy`, `toolsForRole`, `isWithinRolePolicy` (never network, never MCP) |
+| `agent-credential.ts` | opaque optional key, `[redacted]` everywhere, `revealAgentCredential` |
+| `agent-output.ts` | `agentOutput`: always `Untrusted("model-output")` |
+| `agent-errors.ts` | typed errors, no key, prompt, output or `cause` |
+| `testing/` | `FakeAgentRuntime`, `runAgentRuntimeConformance` (14 cases), `AgentConformanceSubject` |
+
+```mermaid
+flowchart LR
+  runner["runner (TK-75/76)"] -- "AgentSessionRequest" --> port["AgentRuntime.launchSession"]
+  port --> guard["assertSessionRequest (frozen snapshot)"]
+  guard --> fake["FakeAgentRuntime (./testing)"]
+  guard --> cc["claude-code adapter (src/claude-code, lot 73c)"]
+  fake & cc -- "AgentSessionResult (output Untrusted)" --> runner
+  suite["runAgentRuntimeConformance"] -. "same cases" .-> fake
+  suite -. "same cases" .-> cc
+```
+
+Request, budget, tool policy, result union and errors are described in
+[domain-model.md](domain-model.md#agentruntime-port-tk-73-lot-73a-packagesdelivery).
 
 ### Rules package: catalog and parser (TK-71 lot A)
 `packages/rules` (`@koklo/rules`, tag `rules`, private) is the pure engineering-rules library.
