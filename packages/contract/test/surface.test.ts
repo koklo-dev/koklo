@@ -25,7 +25,7 @@ const GROUPS: Record<string, string[]> = {
   specBatch: ["get", "submit"],
 };
 
-describe("R1 routeur : 16 groupes (TK-42 : +4, TK-52b : +1), 39 procédures", () => {
+describe("R1 routeur : 17 groupes (TK-42 : +4, TK-52b : +1, TK-55a : +1), 39 procédures", () => {
   it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
@@ -39,6 +39,7 @@ describe("R1 routeur : 16 groupes (TK-42 : +4, TK-52b : +1), 39 procédures", ()
         "member",
         "organization",
         "project",
+        "projectClient",
         "projectState",
         "repo",
         "spec",

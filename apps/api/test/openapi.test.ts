@@ -33,6 +33,8 @@ describe("GET /openapi.json (C3.1)", () => {
       "/organizations",
       "/project-state",
       "/projects",
+      "/projects/{projectId}/clients",
+      "/projects/{projectId}/clients/{memberId}",
       "/projects/{projectId}/repos",
       "/projects/{projectId}/spec",
       "/projects/{projectId}/spec-repo",

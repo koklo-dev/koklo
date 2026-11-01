@@ -545,11 +545,12 @@ member of the project and of the organization of the session.
 | `installation.list`, `installation.start` | owner, admin |
 | `repo.link`, `repo.createSpec` | owner, admin |
 | `repo.list` | owner, admin, dev, designer |
-| `spec.head`, `spec.listFeatures`, `spec.getFeature` | every role, within their own project |
+| `spec.head`, `spec.listFeatures`, `spec.getFeature` | owner, admin, dev, designer, business (never `client`, TK-55a) |
+| `projectClient.list`, `projectClient.add`, `projectClient.remove` | owner, admin |
 | `specBatch.submit` | owner, admin, dev; designer only for design-related features, checked per operation by the API |
 | `specBatch.get` | same roles as `specBatch.submit` |
 
-`client` and `business` never write to the spec. A refused role returns `FORBIDDEN`.
+`client` and `business` never write to the spec; `client` does not read the raw spec either (`FORBIDDEN`, TK-55a). A refused role returns `FORBIDDEN`.
 
 ### Membership rule (anti-IDOR), to enforce before any access
 - Membership of the user in the project AND in the organization of the session is verified BEFORE
@@ -843,8 +844,9 @@ Contract 0.6.0 adds one typed error and no route (still 43 routes): `SPEC_INDEX_
 `{ errorCode, commitSha }`, `errorCode` is the stored code such as `spec_too_large`, no message) on
 `spec.listFeatures` and `spec.getFeature` only. OpenAPI component: `SpecIndexFailed`.
 
-- **Roles and scope**: every role reads its own project; no role guard, only the session. The project
-  must belong to the caller organisation, checked by the first read; a foreign or unknown project is
+- **Roles and scope**: the five team roles read (owner, admin, dev, designer, business); `client` gets
+  `403 FORBIDDEN` before any project check (TK-55a, D7), linked or not, so the answer is no oracle. The
+  project must belong to the caller organisation, checked before the work; a foreign or unknown project is
   `NOT_FOUND`, never `FORBIDDEN`, with the same response. A `specId` unknown to the project (or of
   another project) is `NOT_FOUND` before any call to the provider. No read writes an audit entry.
 - **Revision**: neither `branch` nor `commitSha` means the `cadrage` head if it has one, otherwise the
@@ -917,6 +919,42 @@ answer is `500 INTERNAL` and the key row is unchanged): `llm_credential.create` 
 the session user, no ticket. `list` and every refusal (403, 404, 422, 503) write nothing.
 **Limit**: `audit_log` has no detail column, so nothing else is recorded (no provider, model or value);
 the provider of a deleted row can no longer be found from the audit.
+
+## Client access by project (TK-55a)
+Contract 0.10.0 (0.9.0 is reserved to TK-54), group `projectClient` (`apps/api/src/project-client`,
+[ADR 0016](adr/0016-client-access-by-project.md)), 50 routes, 35 paths. Roles: **owner and admin only**;
+every other role, the linked `client` included, gets `403`, no session `401`. Order of checks: role (403),
+project of the organization (404), then the member (422).
+
+| Operation | Method | Path | Input | Output | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`) |
+|-----------|--------|------|-------|--------|---------------------------------------------------------------|
+| `projectClient.list` | GET | `/projects/{projectId}/clients` | `{ projectId }` | `ProjectClient[]` | none |
+| `projectClient.add` | POST | `/projects/{projectId}/clients` | `{ projectId, memberId }` | `ProjectClient` | `VALIDATION` 422 |
+| `projectClient.remove` | DELETE | `/projects/{projectId}/clients/{memberId}` | `{ projectId, memberId }` | `{ removed: boolean }` | none |
+
+- `ProjectClient` = `{ memberId, userId, name, email, createdAt }`: no row id, no role. `memberId` is the id of
+  the `members` row. Organization, author and row id are set by the server, never read from the input.
+- `add` is idempotent: an existing link answers `200` with the same item (same `createdAt`), no extra row and
+  no audit line. A member who is not a `client`, belongs to another organization or does not exist is the same
+  `422 VALIDATION{field: "memberId", message}` (no oracle).
+- `remove` is idempotent: an absent link, or an unknown, foreign or non-client member, answers
+  `200 { removed: false }` without audit; otherwise only the link of this project is deleted.
+- `list` returns the clients linked to this project, ordered by link date then id.
+- **Audit** (same transaction as the write; an audit failure leaves no link): `project_client.add` and
+  `project_client.remove`, `targetKind` `project_client`, `targetId` the link row, no ticket, no free text.
+
+### Client scoping and uniform 404 (TK-55a)
+`isProjectScoped(role)` is true for every role outside `STAFF_ROLES` (fail-closed: absent, empty or unknown
+roles are scoped like `client`). All project procedures go through `scopeOf` / `inScope` / `inProject`
+(`apps/api/src/tracker/scope.ts`), which call `ProjectAccess.assertAccessible` **before** the work:
+- team roles and business: any project of their organization (no link needed);
+- `client`: only a linked project. The implicit project (`OldestProjectContext`) is the oldest **linked** one;
+  none means `NOT_FOUND`. `project.list` returns the linked projects (`[]` if none, never an error);
+- a role guard (403) always precedes the scoping (404): a client writing a ticket gets `403`, not `404`.
+
+The `NOT_FOUND` is **uniform**: unlinked client, project of another organization, unknown project and missing
+resource in an accessible project all return the same status and body, never `403`. The response time is not
+an oracle: the refusal costs one query round-trip in every case (tolerance-based test, no constant-time claim).
 
 ## Installations in the API (TK-48a2)
 `installation.list`, `installation.start` and the browser callback are implemented in
@@ -1009,6 +1047,8 @@ sequenceDiagram
 ```
 
 ## Version history
+- **0.10.0** (TK-55a): group `projectClient` (`list`, `add`, `remove`; 3 routes, 50 routes and 35 paths in all),
+  schemas `projectClientSchema` and its inputs. 0.9.0 is reserved to TK-54. Fingerprints of 0.1.0 to 0.8.0 unchanged.
 - **0.7.0** (TK-48a2): typed errors `PROVIDER_UNAVAILABLE` (503) and `VALIDATION` (422) on
   `installation.start`; `installation_id` optional in `installationCallbackQuerySchema` and the outcome `not_owner` in
   `installationCallbackOutcomeSchema` (both outside the OpenAPI document). Same 43 routes. Fingerprints of 0.1.0 to 0.6.0 unchanged.

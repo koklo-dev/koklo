@@ -1,3 +1,5 @@
+import { ORPCError } from "@orpc/server";
+import { STAFF_ROLES } from "../auth/roles.ts";
 import type { AuthSession } from "../auth/session.ts";
 
 export const PROJECT_ACCESS = Symbol("PROJECT_ACCESS");
@@ -19,8 +21,12 @@ export interface ProjectAccess {
 
 /**
  * Vrai si le rôle est cloisonné par projet : `client`, rôle absent ou hors des cinq rôles d'équipe.
- * Squelette de l'étape Red (volontairement fail-open) : le Green l'implémente sur `STAFF_ROLES`.
+ * Fail-closed : seule la liste fermée `STAFF_ROLES` voit toute l'organisation.
  */
-export function isProjectScoped(_role: string | undefined): boolean {
-  return false;
+export function isProjectScoped(role: string | undefined): boolean {
+  return !STAFF_ROLES.some((staff) => staff === role);
 }
+
+/** 404 uniforme : même corps pour client non lié, projet étranger, projet inconnu (aucun oracle). */
+export const notFoundError = (): ORPCError<"NOT_FOUND", undefined> =>
+  new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });

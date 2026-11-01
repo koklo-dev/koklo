@@ -178,7 +178,8 @@ describe("rôle relu en base à chaque requête", () => {
     const denied = await api.createTicket();
     expect(denied.status).toBe(403);
     expect(denied.body.code).toBe("FORBIDDEN");
-    expect((await api.listTickets()).status).toBe(200);
+    // Un dev devenu client n'a aucun lien de projet (TK-55a) : il ne voit plus rien (404 uniforme).
+    expect((await api.listTickets()).status).toBe(404);
   });
 });
 

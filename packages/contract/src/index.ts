@@ -19,6 +19,7 @@ export type {
   OrganizationCreateInput,
   OrganizationCreateOutput,
   OrganizationListOutput,
+  ProjectClient,
   ProjectCreateInput,
   ProjectListOutput,
   ProjectStateOutput,
@@ -85,6 +86,7 @@ export {
 } from "./schemas.ts";
 export * from "./schemas-collaboration.ts";
 export * from "./schemas-llm-credential.ts";
+export * from "./schemas-project-client.ts";
 export * from "./schemas-provider.ts";
 export * from "./schemas-spec.ts";
 export * from "./schemas-tickets.ts";

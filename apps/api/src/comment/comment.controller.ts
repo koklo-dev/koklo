@@ -5,6 +5,7 @@ import { implement } from "@orpc/server";
 import type { Request } from "express";
 import { COMMENT_WRITE_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
+import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { PROJECT_CONTEXT, type ProjectContext } from "../project/project-context.ts";
 import { inScope } from "../tracker/scope.ts";
 import { CommentService } from "./comment.service.ts";
@@ -15,6 +16,7 @@ export class CommentController {
   constructor(
     @Inject(CommentService) private readonly service: CommentService,
     @Inject(PROJECT_CONTEXT) private readonly project: ProjectContext,
+    @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
   @UseGuards(SessionGuard, RoleGuard)
@@ -22,8 +24,12 @@ export class CommentController {
   @Implement(contract.comment.create)
   create(@Req() request: Request) {
     return implement(contract.comment.create).handler(({ input, errors }) =>
-      inScope(request, this.project, errors, (scope) =>
-        this.service.create(scope, requireSession(request).role, input),
+      inScope(
+        request,
+        this.project,
+        errors,
+        (scope) => this.service.create(scope, requireSession(request).role, input),
+        this.access,
       ),
     );
   }
@@ -32,7 +38,13 @@ export class CommentController {
   @Implement(contract.comment.list)
   list(@Req() request: Request) {
     return implement(contract.comment.list).handler(({ input, errors }) =>
-      inScope(request, this.project, errors, (scope) => this.service.list(scope, input)),
+      inScope(
+        request,
+        this.project,
+        errors,
+        (scope) => this.service.list(scope, input),
+        this.access,
+      ),
     );
   }
 
@@ -41,8 +53,12 @@ export class CommentController {
   @Implement(contract.comment.delete)
   delete(@Req() request: Request) {
     return implement(contract.comment.delete).handler(({ input, errors }) =>
-      inScope(request, this.project, errors, (scope) =>
-        this.service.delete(scope, requireSession(request).role, input.id),
+      inScope(
+        request,
+        this.project,
+        errors,
+        (scope) => this.service.delete(scope, requireSession(request).role, input.id),
+        this.access,
       ),
     );
   }
