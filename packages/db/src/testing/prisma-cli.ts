@@ -44,6 +44,8 @@ export const expectedTables = [
   // TK-48a1 : états d'installation à usage unique, jetons utilisateur chiffrés.
   "provider_auth_states",
   "provider_user_credentials",
+  // TK-51a : identifiants BYOK chiffrés (un par organisation et fournisseur).
+  "llm_provider_credentials",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */

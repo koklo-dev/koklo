@@ -131,8 +131,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (34 attendues au total avec TK-48a1)", () => {
-    expect(expectedTables).toHaveLength(34);
+  it("cette migration n'ajoute aucune table (35 attendues au total avec TK-51a)", () => {
+    expect(expectedTables).toHaveLength(35);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });

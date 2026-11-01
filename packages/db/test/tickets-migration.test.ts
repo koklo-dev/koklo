@@ -10,6 +10,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { SPEC_TABLES } from "./support/spec-fixtures.ts";
 import { TICKET_TABLES } from "./support/ticket-fixtures.ts";
@@ -19,7 +20,8 @@ const initialTables = expectedTables.filter(
   (table) =>
     !(TICKET_TABLES as readonly string[]).includes(table) &&
     !(SPEC_TABLES as readonly string[]).includes(table) &&
-    !(OAUTH_TABLES as readonly string[]).includes(table),
+    !(OAUTH_TABLES as readonly string[]).includes(table) &&
+    !(LLM_TABLES as readonly string[]).includes(table),
 );
 
 async function inventory(db: TestDatabase) {

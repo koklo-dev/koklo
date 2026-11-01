@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as dbPackage from "../src/index.ts";
 import { schemaPath } from "../src/testing/prisma-cli.ts";
+import { LLM_MODELS } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_MODELS } from "./support/oauth-fixtures.ts";
 import { SPEC_MODELS } from "./support/spec-fixtures.ts";
 import { TICKET_MODELS } from "./support/ticket-fixtures.ts";
@@ -29,8 +30,8 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1)", () => {
-    const expected = ["Project", ...TICKET_MODELS, ...SPEC_MODELS, ...OAUTH_MODELS];
+  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a)", () => {
+    const expected = ["Project", ...TICKET_MODELS, ...SPEC_MODELS, ...OAUTH_MODELS, ...LLM_MODELS];
     expect([...TENANT_MODELS].sort()).toEqual(expected.sort());
   });
 
