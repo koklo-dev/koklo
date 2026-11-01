@@ -1198,6 +1198,37 @@ Foundations (48a1), then the module `apps/api/src/installation` (48a2: `installa
   same `TokenDecryptionError`, without cause, key or content: it is never turned into "no token".
   `PrismaUserCredentials` replaces `NoUserCredentials` only when the App client id and secret AND
   `KOKLO_ENCRYPTION_KEY` are configured (see Quality and operations).
+- **Key ring** (`apps/api/src/crypto/key-ring.ts`, TK-52a): `createKeyRing({ current, previous })`
+  implements the same `TokenCipher` interface over several versioned master keys. `encrypt` uses the
+  current key; `decrypt` picks the key by `secret.keyVersion` (unknown version: `TokenDecryptionError`,
+  no fallback). `config.encryptionKeyring` is built by `crypto/key-ring-config.ts` from
+  `KOKLO_ENCRYPTION_KEY[_VERSION]` and `KOKLO_ENCRYPTION_KEYS_PREVIOUS`; `git-provider.module.ts`
+  gives it to `PrismaUserCredentials`, so tokens written in v1 stay readable after a move to v2.
+
+### API: BYOK LLM credentials, module `llm-credential` (TK-52a)
+Domain-facing store for the per-organization LLM keys (table `llm_provider_credentials`, ADR 0013).
+No procedure, controller or audit yet: the contract and the HTTP layer are TK-52b.
+```mermaid
+flowchart LR
+  S[LlmCredentialService<br/>validate, encrypt, set/list/remove/invalidate/markUsed] --> P((LlmCredentialRepository port))
+  R[LlmCredentialResolver<br/>find, decrypt, LlmCredential] --> P
+  P --> A[PrismaLlmCredentialRepository<br/>withOrganization, errors rewritten]
+  S --> K[TokenCipher = key ring]
+  R --> K
+  S -. AAD .-> D[llmCredentialAad<br/>llm:v1:org:provider]
+  R -. AAD .-> D
+```
+- `LlmCredentialService.set` validates with the CHECK rules (key 1..512 UTF-16 units, non blank, no
+  control character; model 1..100 code points, no `/`, no `..`), then encrypts with the AAD derived
+  from the row and calls `upsert` (replace in place: same id and `createdAt`, new nonce, key re-armed,
+  absent model = NULL). Without a key ring `set` throws `EncryptionUnavailableError` before any access
+  (mapped to 503 `ENCRYPTION_UNAVAILABLE` in TK-52b).
+- `LlmCredentialResolver.resolve` returns `{ credential, defaultModel }` where `credential` is the
+  opaque domain `LlmCredential`; refusals, in this order: `missing`, `invalidated`,
+  `no-encryption-key`, `undecryptable` (unknown version, other key or AAD, tampered ciphertext).
+  It never writes `last_used_at`; the caller calls `markUsed` (at most one write per 60 s).
+- Statuses (`LlmCredentialStatus`) carry no value derived from the key, no `key_version`.
+- Every database error becomes `LlmCredentialStoreError` without cause (see Quality and operations).
 
 ### Web: GitHub screen (TK-48b)
 `/github` (`GithubPage` in `AppFrame`, `app/github/page.tsx` server component) consumes `installation.list` and `installation.start`; nothing changes in the API. Guard: session + active organization (`auth-guard.ts`, `proxy.ts` matcher). The sidebar entry "GitHub" is shown to owners and admins only (`canManage`); other roles read a refusal without action or API call.

@@ -1,6 +1,10 @@
 import type { LlmProviderId } from "@koklo/domain";
 
-/** Squelette du Red (TK-52a) : `llm:v1:<organization_id>:<provider>`. */
-export function llmCredentialAad(_organizationId: string, _provider: LlmProviderId): string {
-  throw new Error("not implemented");
+/**
+ * Données associées du chiffrement d'une clé BYOK : `llm:v1:<organization_id>:<provider>`. Dérivées à
+ * chaque appel, jamais stockées : une ligne copiée vers une autre organisation ou un autre
+ * fournisseur devient illisible.
+ */
+export function llmCredentialAad(organizationId: string, provider: LlmProviderId): string {
+  return `llm:v1:${organizationId}:${provider}`;
 }

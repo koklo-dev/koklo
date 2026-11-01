@@ -1,4 +1,4 @@
-import type { TokenCipher } from "./token-cipher.ts";
+import { createTokenCipher, type TokenCipher, TokenDecryptionError } from "./token-cipher.ts";
 
 /** Une clé maître et sa version (stockée dans `key_version`). */
 export interface VersionedKey {
@@ -19,7 +19,42 @@ export class KeyRingConfigError extends Error {
   }
 }
 
-/** Squelette du Red (TK-52a) : le Green l'implémente. */
-export function createKeyRing(_settings: KeyRingSettings): TokenCipher {
-  throw new Error("not implemented");
+function assertVersions(settings: KeyRingSettings): void {
+  const { current, previous } = settings;
+  const seen = new Set<number>();
+  for (const { version } of [current, ...previous]) {
+    if (!Number.isInteger(version) || version < 1) {
+      throw new KeyRingConfigError("Version de clé invalide : entier >= 1 attendu");
+    }
+    if (seen.has(version))
+      throw new KeyRingConfigError("Version de clé dupliquée dans le porte-clés");
+    seen.add(version);
+  }
+  if (previous.some((entry) => entry.version > current.version)) {
+    throw new KeyRingConfigError("La version courante doit dépasser toute version précédente");
+  }
+}
+
+/**
+ * Porte-clés versionné : chiffre toujours avec la clé courante, déchiffre avec la clé de la version
+ * portée par le chiffré. Version inconnue : `TokenDecryptionError`, jamais de repli sur une autre
+ * clé. Aucune erreur ne cite une clé.
+ */
+export function createKeyRing(settings: KeyRingSettings): TokenCipher {
+  assertVersions(settings);
+  const { current, previous } = settings;
+  const ciphers = new Map<number, TokenCipher>();
+  for (const { version, key } of [current, ...previous]) {
+    ciphers.set(version, createTokenCipher(key, { keyVersion: version }));
+  }
+  const currentCipher = ciphers.get(current.version) as TokenCipher;
+  return {
+    keyVersion: current.version,
+    encrypt: (plaintext, aad) => currentCipher.encrypt(plaintext, aad),
+    decrypt(secret, aad) {
+      const cipher = ciphers.get(secret.keyVersion);
+      if (cipher === undefined) throw new TokenDecryptionError();
+      return cipher.decrypt(secret, aad);
+    },
+  };
 }
