@@ -1,4 +1,4 @@
-import { InvalidRunStateError } from "./errors.ts";
+import { InvalidRunStateError, ResumeRequiredError } from "./errors.ts";
 import type { Run } from "./run.ts";
 import {
   AWAIT_DEPLOY,
@@ -29,13 +29,20 @@ const RESUME: Readonly<Record<RunState, RunEffect | null>> = {
   escalated: null,
 };
 
+/** Incident 17 : faux quand la branche est poussée avec une PR ouverte (la reprise est obligatoire). */
+export const canRestartDevelopment = (run: Run): boolean =>
+  run.branch === null || run.pullRequest === null;
+
+/** Refuse de repartir de zéro un run `leased` dont la branche est poussée avec une PR ouverte. */
+export const assertRestartable = (run: Run): void => {
+  if (run.state === "leased" && !canRestartDevelopment(run)) {
+    throw new ResumeRequiredError(run.ticket, String(run.branch), String(run.pullRequest));
+  }
+};
+
 /** Un runner tué repart de l'état persisté (§10.3) : la fonction décide, rien n'est exécuté. */
 export const resumePoint = (run: Run): RunEffect | null => {
   if (!isRunState(run.state)) throw new InvalidRunStateError(run.state);
+  assertRestartable(run);
   return RESUME[run.state];
-};
-
-/** Incident 17 : faux quand la branche est poussée avec une PR ouverte (lot 2 : à implémenter). */
-export const canRestartDevelopment = (_run: Run): boolean => {
-  throw new Error("not implemented");
 };
