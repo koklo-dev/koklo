@@ -13,6 +13,7 @@ import { createTestDatabase, type TestDatabase } from "../src/testing/test-datab
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { SPEC_TABLES } from "./support/spec-fixtures.ts";
+import { SUGGESTION_TABLES } from "./support/suggestions-fixtures.ts";
 import { TICKET_TABLES } from "./support/ticket-fixtures.ts";
 
 const MIGRATION_SUFFIX = "_tickets_sprints_leases";
@@ -21,7 +22,8 @@ const initialTables = expectedTables.filter(
     !(TICKET_TABLES as readonly string[]).includes(table) &&
     !(SPEC_TABLES as readonly string[]).includes(table) &&
     !(OAUTH_TABLES as readonly string[]).includes(table) &&
-    !(LLM_TABLES as readonly string[]).includes(table),
+    !(LLM_TABLES as readonly string[]).includes(table) &&
+    !(SUGGESTION_TABLES as readonly string[]).includes(table),
 );
 
 async function inventory(db: TestDatabase) {

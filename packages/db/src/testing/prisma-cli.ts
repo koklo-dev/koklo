@@ -46,6 +46,8 @@ export const expectedTables = [
   "provider_user_credentials",
   // TK-51a : identifiants BYOK chiffrés (un par organisation et fournisseur).
   "llm_provider_credentials",
+  // TK-51b : propositions client `SG-n`.
+  "suggestions",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
