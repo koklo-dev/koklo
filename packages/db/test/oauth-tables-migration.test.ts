@@ -123,9 +123,9 @@ describe("TK-48a1 migrations : dossiers et contenu", () => {
     );
   });
 
-  it("expectedTables contient les deux tables (34 au total)", () => {
+  it("expectedTables contient les deux tables (35 au total avec TK-51a)", () => {
     for (const table of OAUTH_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(34);
+    expect(expectedTables).toHaveLength(35);
   });
 });
 
@@ -149,7 +149,8 @@ describe("TK-48a1 migrations : up -> (données) -> down -> up", () => {
     afterFirstUp = await inventory(db);
     for (const table of OAUTH_TABLES) expect(afterFirstUp.tables).toContain(table);
     expect(afterFirstUp.tables).toEqual([...expectedTables].sort());
-    expect(afterFirstUp.enums).toEqual(
+    // TK-51a ajoute le type `llm_provider` : seul écart d'enums attendu avec la base de référence.
+    expect(afterFirstUp.enums.filter((name) => name !== "llm_provider")).toEqual(
       (await inventory(await applyEarlierMigrations(baseline))).enums,
     );
   }, 180_000);
@@ -160,6 +161,12 @@ describe("TK-48a1 migrations : up -> (données) -> down -> up", () => {
     await insertState(db, scene);
     await insertCredential(db, scene);
 
+    // Les migrations postérieures (TK-51a) sont défaites d'abord, de la plus récente à la plus ancienne.
+    for (const later of dirs()
+      .filter((d) => d > dirOf(CREDENTIALS_SUFFIX))
+      .reverse()) {
+      await rollBack(db, later);
+    }
     await rollBack(db, dirOf(CREDENTIALS_SUFFIX));
     expect((await inventory(db)).tables).not.toContain("provider_user_credentials");
     expect((await inventory(db)).tables).toContain("provider_auth_states");
