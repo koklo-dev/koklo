@@ -23,7 +23,7 @@ const selectionFor = (input: ResolveInput, path: string): readonly string[] => {
 };
 
 const unknownProfile = (catalog: Catalog, profiles: readonly string[], where: string) => {
-  const index = profiles.findIndex((profile) => !(profile in catalog.profiles));
+  const index = profiles.findIndex((profile) => !Object.hasOwn(catalog.profiles, profile));
   return index < 0
     ? undefined
     : rulesError(
@@ -46,7 +46,7 @@ export const checkSelections = (input: ResolveInput): RulesError | undefined => 
 
 const declaredBy = (catalog: Catalog, layer: RuleLayer): Conflict[] =>
   (layer.profiles ?? [])
-    .filter((profile) => !(profile in catalog.profiles))
+    .filter((profile) => !Object.hasOwn(catalog.profiles, profile))
     .map((profile) => ({
       ruleId: profile,
       level: layer.level,
@@ -61,7 +61,7 @@ export const effectiveProfiles = (
   path: string,
 ): ProfileSelection => {
   const declared = layers.flatMap((layer) =>
-    (layer.profiles ?? []).filter((profile) => profile in input.catalog.profiles),
+    (layer.profiles ?? []).filter((profile) => Object.hasOwn(input.catalog.profiles, profile)),
   );
   return {
     profiles: sortedUnique([CORE_PROFILE, ...selectionFor(input, path), ...declared]),

@@ -1,4 +1,4 @@
-import type { Rule } from "./catalog-types.ts";
+import type { Enforcement, EnforcementParams, Rule } from "./catalog-types.ts";
 
 export type Strength = Pick<Rule, "severity" | "enforcement">;
 
@@ -26,3 +26,35 @@ export const isWeaker = (from: Strength, to: Strength): boolean =>
   SEVERITY_RANK[to.severity] < SEVERITY_RANK[from.severity] ||
   ENFORCEMENT_RANK[to.enforcement.kind] < ENFORCEMENT_RANK[from.enforcement.kind] ||
   (to.enforcement.kind === from.enforcement.kind && limitRaised(from.enforcement, to.enforcement));
+
+const sameParamsExceptMax = (from: EnforcementParams, to: EnforcementParams): boolean => {
+  const keys = (params: EnforcementParams) => Object.keys(params).filter((k) => k !== "max");
+  const fromKeys = keys(from);
+  return (
+    fromKeys.length === keys(to).length &&
+    fromKeys.every((key) => Object.hasOwn(to, key) && Object.is(from[key], to[key]))
+  );
+};
+
+/** Nouvelle limite valide : entier ≥ 0, au plus égal à l'actuelle ; sans limite actuelle, aucune. */
+const limitKept = (from: EnforcementParams, to: EnforcementParams): boolean => {
+  const before = from.max;
+  const after = to.max;
+  if (typeof before !== "number") return after === undefined;
+  return typeof after === "number" && Number.isInteger(after) && after >= 0 && after <= before;
+};
+
+const sameTarget = (from: Enforcement, to: Enforcement): boolean => {
+  if (from.kind === "gate" && to.kind === "gate") {
+    return from.adapter === to.adapter && from.command === to.command;
+  }
+  if (from.kind === "evidence" && to.kind === "evidence") return from.evidence === to.evidence;
+  return from.kind === to.kind;
+};
+
+/** Sur une règle verrouillée, `to` n'est acceptable que s'il garde le même kind, adapter,
+ *  command et preuve, les mêmes params hors `max`, et une limite `max` identique ou abaissée. */
+export const isLockedSafe = (from: Enforcement, to: Enforcement): boolean =>
+  sameTarget(from, to) &&
+  sameParamsExceptMax(from.params ?? {}, to.params ?? {}) &&
+  limitKept(from.params ?? {}, to.params ?? {});

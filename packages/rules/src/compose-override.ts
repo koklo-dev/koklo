@@ -7,7 +7,7 @@ import type {
   RuleLayer,
   Trace,
 } from "./layer-types.ts";
-import { isWeaker } from "./strength.ts";
+import { isLockedSafe, isWeaker } from "./strength.ts";
 
 type Effect = readonly [Attempt, (rule: EffectiveRule, override: Override) => boolean];
 
@@ -24,7 +24,8 @@ const WEAKENING: readonly Effect[] = [
     "enforcement",
     (rule, o) =>
       o.enforcement !== undefined &&
-      isWeaker(rule, { severity: rule.severity, enforcement: o.enforcement }),
+      (isWeaker(rule, { severity: rule.severity, enforcement: o.enforcement }) ||
+        (rule.locked && !isLockedSafe(rule.enforcement, o.enforcement))),
   ],
   ["agents", (rule, o) => rule.agents.some((agent) => o.agents?.includes(agent) === false)],
   ["exclude-paths", (_rule, o) => (o.excludePaths?.length ?? 0) > 0],
