@@ -1,28 +1,41 @@
-/**
- * SQUELETTE (TK-53b, étape Red) : types seuls. Le Green ajoute RoleSchema, PermissionSchema,
- * RolesFileSchema et BusinessRuleSchema (voir .workflow/TK-53/03-decisions-53b.md).
- */
-export type PermissionAction = "lire" | "creer" | "modifier" | "supprimer" | "executer";
+import { z } from "zod";
+import { endpointId, permissionId, roleId, ruleId, tableId } from "./ids.ts";
 
-export type Role = { id: string; nom: string; description?: string; permissions: string[] };
+export const PERMISSION_ACTIONS = ["lire", "creer", "modifier", "supprimer", "executer"] as const;
 
-export type Permission = {
-  id: string;
-  action: PermissionAction;
-  ressource: string;
-  conditions: string[];
-  endpoints: string[];
-};
+export const RoleSchema = z.strictObject({
+  id: roleId,
+  nom: z.string().min(1),
+  description: z.string().optional(),
+  permissions: z.array(permissionId).default([]),
+});
 
-/** Forme de `domain/roles.yaml`. */
-export type RolesFile = { roles: Role[]; permissions: Permission[] };
+export const PermissionSchema = z.strictObject({
+  id: permissionId,
+  action: z.enum(PERMISSION_ACTIONS),
+  ressource: z.union([tableId, endpointId]),
+  conditions: z.array(z.string()).default([]),
+  endpoints: z.array(endpointId).default([]),
+});
 
-/** Règle métier `domain/rules/R-nnn-slug.md`. */
-export type BusinessRule = {
-  id: string;
-  type: "contrainte" | "calcul" | "workflow";
-  tables: string[];
-  endpoints: string[];
-  enonce: string;
-  exemples: string[];
-};
+/** Forme de `domain/roles.yaml` : les deux listes sont facultatives (scaffold `roles: []`). */
+export const RolesFileSchema = z.strictObject({
+  roles: z.array(RoleSchema).default([]),
+  permissions: z.array(PermissionSchema).default([]),
+});
+
+/** Front matter d'une règle `domain/rules/R-nnn-slug.md` plus énoncé et exemples du corps. */
+export const BusinessRuleSchema = z.strictObject({
+  id: ruleId,
+  type: z.enum(["contrainte", "calcul", "workflow"]),
+  tables: z.array(tableId).default([]),
+  endpoints: z.array(endpointId).default([]),
+  enonce: z.string().min(1),
+  exemples: z.array(z.string()).default([]),
+});
+
+export type Role = z.output<typeof RoleSchema>;
+export type Permission = z.output<typeof PermissionSchema>;
+export type PermissionAction = Permission["action"];
+export type RolesFile = z.output<typeof RolesFileSchema>;
+export type BusinessRule = z.output<typeof BusinessRuleSchema>;

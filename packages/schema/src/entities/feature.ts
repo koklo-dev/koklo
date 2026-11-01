@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { criterionId, endpointId, featureId, PATTERNS, screenId, tableId } from "./ids.ts";
+import {
+  criterionId,
+  endpointId,
+  featureId,
+  PATTERNS,
+  roleId,
+  ruleId,
+  screenId,
+  tableId,
+} from "./ids.ts";
 
 export const STEP_TYPES = ["etant_donne", "quand", "alors", "et"] as const;
 
@@ -21,8 +30,8 @@ export const FeatureSchema = z.strictObject({
   tables: links(tableId),
   endpoints: links(endpointId),
   ecrans: links(screenId),
-  roles: links(z.string().regex(PATTERNS.role)),
-  regles: links(z.string().regex(PATTERNS.rule)),
+  roles: links(roleId),
+  regles: links(ruleId),
   nfr: links(z.string().regex(PATTERNS.nfr)),
   description: z.string(),
   criteres: z.array(CriterionSchema),

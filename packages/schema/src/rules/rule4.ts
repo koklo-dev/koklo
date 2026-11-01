@@ -1,16 +1,8 @@
-import type { IssueCode } from "../codes.ts";
 import type { Annotation, SpecNode } from "../entities/index.ts";
-import { ruleIssue } from "../issue.ts";
 import type { Issue, ParsedSpec } from "../types.ts";
 import { parseDataRef, type SpecIndex } from "./index.ts";
-
-type Emit = (code: IssueCode, pointer: string, message: string) => void;
-
-function emitterFor(out: Issue[], path: string, entityId: string | undefined): Emit {
-  return (code, pointer, message) => {
-    out.push(ruleIssue(4, code, path, pointer, entityId, message));
-  };
-}
+import { checkDomainLinks } from "./rule4-domain.ts";
+import { type Collect, checkLinks, type Emit, emitterFor } from "./rule4-links.ts";
 
 /** `T-x` ou `T-x.champ` : la table puis le champ doivent exister. */
 function checkDataRef(value: string, pointer: string, index: SpecIndex, emit: Emit): void {
@@ -33,19 +25,6 @@ function checkDataRef(value: string, pointer: string, index: SpecIndex, emit: Em
       `Le champ « ${value} » n'existe pas dans la table ${ref.table}.`,
     );
   }
-}
-
-function checkList(
-  items: readonly string[] | undefined,
-  base: string,
-  known: (id: string) => boolean,
-  code: IssueCode,
-  label: string,
-  emit: Emit,
-): void {
-  (items ?? []).forEach((id, i) => {
-    if (!known(id)) emit(code, `${base}/${i}`, `${label} ${id} n'existe pas.`);
-  });
 }
 
 function checkAnnotation(a: Annotation, base: string, index: SpecIndex, emit: Emit): void {
@@ -72,23 +51,6 @@ function walkNode(node: SpecNode, base: string, index: SpecIndex, emit: Emit): v
   (node.enfants ?? []).forEach((child, i) => {
     walkNode(child, `${base}/enfants/${i}`, index, emit);
   });
-}
-
-type Collect = (path: string, entityId: string) => Emit;
-
-/** Liens de listes (`tables`, `endpoints`, ...) : un contrôle par couple (liste, règle). */
-function checkLinks(
-  checks: readonly {
-    items: readonly string[] | undefined;
-    base: string;
-    known: { has(id: string): boolean };
-    code: IssueCode;
-    label: string;
-  }[],
-  emit: Emit,
-): void {
-  for (const c of checks)
-    checkList(c.items, c.base, (id) => c.known.has(id), c.code, c.label, emit);
 }
 
 function featureLinks(spec: ParsedSpec, index: SpecIndex, at: Collect): void {
@@ -184,7 +146,7 @@ function testLinks(spec: ParsedSpec, index: SpecIndex, at: Collect): void {
   }
 }
 
-/** Règle 4 : tout lien pointe vers une feature, table/champ, endpoint, écran ou critère existant. */
+/** Règle 4 : tout lien pointe vers une feature, table/champ, endpoint, écran, critère, rôle, permission ou règle existant. */
 export function checkRule4(spec: ParsedSpec, index: SpecIndex): Issue[] {
   const out: Issue[] = [];
   const at: Collect = (path, entityId) => emitterFor(out, path, entityId);
@@ -192,5 +154,6 @@ export function checkRule4(spec: ParsedSpec, index: SpecIndex): Issue[] {
   screenLinks(spec, index, at);
   dataLinks(spec, index, at);
   testLinks(spec, index, at);
+  checkDomainLinks(spec, index, at);
   return out;
 }

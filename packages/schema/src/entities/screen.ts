@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { criterionId, endpointId, featureId, PATTERNS, screenId } from "./ids.ts";
+import { criterionId, endpointId, featureId, roleId, screenId } from "./ids.ts";
 
 export const AnnotationSchema = z.strictObject({
   feature: featureId,
@@ -22,7 +22,7 @@ export const NodeSchema = z.looseObject({
 export const ScreenSchema = z.strictObject({
   id: screenId,
   features: z.array(featureId).default([]),
-  roles: z.array(z.string().regex(PATTERNS.role)).default([]),
+  roles: z.array(roleId).default([]),
   viewport: z.array(z.string()).optional(),
   arbre: NodeSchema,
   etats: z.array(z.string()).default([]),

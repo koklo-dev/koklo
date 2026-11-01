@@ -1,0 +1,97 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/roles.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "permissions": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "lire",
+              "creer",
+              "modifier",
+              "supprimer",
+              "executer"
+            ],
+            "type": "string"
+          },
+          "conditions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "endpoints": {
+            "default": [],
+            "items": {
+              "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^PM-[a-z0-9][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*$",
+            "type": "string"
+          },
+          "ressource": {
+            "anyOf": [
+              {
+                "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                "type": "string"
+              },
+              {
+                "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "ressource"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "roles": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "nom": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "permissions": {
+            "default": [],
+            "items": {
+              "pattern": "^PM-[a-z0-9][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nom"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

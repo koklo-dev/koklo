@@ -1,9 +1,11 @@
 import { z } from "zod";
 import {
+  BusinessRuleSchema,
   EndpointSchema,
   FeatureSchema,
   ProjectManifestSchema,
   RelationSchema,
+  RolesFileSchema,
   ScreenSchema,
   TableSchema,
   TestScenarioSchema,
@@ -16,6 +18,8 @@ const entities = {
   feature: FeatureSchema,
   project: ProjectManifestSchema,
   relation: RelationSchema,
+  roles: RolesFileSchema,
+  rule: BusinessRuleSchema,
   screen: ScreenSchema,
   table: TableSchema,
   "test-scenario": TestScenarioSchema,

@@ -1,0 +1,52 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/rule.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "endpoints": {
+      "default": [],
+      "items": {
+        "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "enonce": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "exemples": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^R-\\d{3,}$",
+      "type": "string"
+    },
+    "tables": {
+      "default": [],
+      "items": {
+        "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "type": {
+      "enum": [
+        "contrainte",
+        "calcul",
+        "workflow"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "type",
+    "enonce"
+  ],
+  "type": "object"
+}

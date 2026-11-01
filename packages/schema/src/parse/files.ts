@@ -1,8 +1,10 @@
-import type { Feature } from "../entities/index.ts";
+import type { BusinessRule, Feature, RolesFile } from "../entities/index.ts";
 import { compare, sortIssues, structIssue } from "../issue.ts";
 import type { Issue, Parsed, ParsedSpec, SpecFile } from "../types.ts";
 import { parseFeatureMarkdown } from "./feature-markdown.ts";
 import { idKey, idMatchesFile, type Kind, kindOf, SCHEMAS } from "./kinds.ts";
+import { duplicateIdIssues } from "./roles-file.ts";
+import { parseRuleMarkdown } from "./rule-markdown.ts";
 import { loadJson, loadYaml } from "./yaml.ts";
 import { parseWithSchema, rawId } from "./zod-issues.ts";
 
@@ -20,6 +22,10 @@ function parseOne(file: SpecFile, kind: Kind): FileResult {
     const result = parseFeatureMarkdown(file.path, file.content);
     return result.ok ? { ok: true, value: result.value, id: result.value.id } : result;
   }
+  if (kind === "rule") {
+    const result = parseRuleMarkdown(file.path, file.content);
+    return result.ok ? { ok: true, value: result.value, id: result.value.id } : result;
+  }
   const loaded =
     kind === "screen" ? loadJson(file.path, file.content) : loadYaml(file.path, file.content);
   if (!loaded.ok) return loaded;
@@ -27,7 +33,12 @@ function parseOne(file: SpecFile, kind: Kind): FileResult {
   if (versionIssue) return { ok: false, issues: [versionIssue] };
   const id = rawId(loaded.data, idKey(kind));
   const result = parseWithSchema(SCHEMAS[kind], file.path, loaded.data, id);
-  return result.ok ? { ok: true, value: result.value, id } : result;
+  if (!result.ok) return result;
+  const duplicates =
+    kind === "roles" ? duplicateIdIssues(file.path, result.value as RolesFile) : [];
+  return duplicates.length > 0
+    ? { ok: false, issues: duplicates }
+    : { ok: true, value: result.value, id };
 }
 
 const stem = (path: string) => path.replace(/\.[^./]*$/, "");
@@ -35,7 +46,7 @@ const stem = (path: string) => path.replace(/\.[^./]*$/, "");
 const byPath = (a: SpecFile, b: SpecFile) =>
   compare(stem(a.path), stem(b.path)) || compare(a.path, b.path);
 
-const IDENTIFIED = new Set<Kind>(["feature", "table", "endpoint", "screen"]);
+const IDENTIFIED = new Set<Kind>(["feature", "table", "endpoint", "screen", "rule"]);
 
 const empty = (): ParsedSpec => ({
   features: [],
@@ -57,6 +68,8 @@ function place(spec: ParsedSpec, kind: Kind, path: string, value: unknown): void
   else if (kind === "relations") spec.relations.push(entry);
   else if (kind === "endpoint") spec.endpoints.push(entry);
   else if (kind === "screen") spec.screens.push(entry);
+  else if (kind === "roles") spec.roles.push(entry as Parsed<RolesFile>);
+  else if (kind === "rule") spec.rules.push(entry as Parsed<BusinessRule>);
   else spec.tests.push(entry);
 }
 

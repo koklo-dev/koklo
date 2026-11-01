@@ -3,6 +3,7 @@ import type { SpecNode } from "../entities/index.ts";
 import { ruleIssue } from "../issue.ts";
 import type { Issue, ParsedSpec } from "../types.ts";
 import { parseDataRef, type SpecIndex } from "./index.ts";
+import { checkDomainOrphans } from "./rule7-domain.ts";
 
 type Referenced = { tables: Set<string>; endpoints: Set<string> };
 
@@ -86,5 +87,6 @@ export function checkRule7(spec: ParsedSpec, index: SpecIndex): Issue[] {
           `Le scénario de test vise la feature ${t.feature}, qui n'existe pas.`,
         ),
       ),
+    ...checkDomainOrphans(spec),
   ];
 }

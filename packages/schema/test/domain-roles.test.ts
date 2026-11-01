@@ -123,7 +123,9 @@ const BAD: Bad[] = [
   schemaBad("clé inconnue à la racine", "roles: []\ngroupes: []\n", ""),
   schemaBad(
     "permissions d'un rôle mal formées",
-    role().replace("[]", "[compte.creer]"),
+    // Correction d'une erreur manifeste du Red : `role()` place `permissions: []` à la racine
+    // (colonne 0), donc le remplacement visait la liste de permissions, pas celle du rôle.
+    "roles:\n  - { id: RL-visiteur, nom: Visiteur, permissions: [compte.creer] }\n",
     "/roles/0/permissions/0",
   ),
   schemaBad(
