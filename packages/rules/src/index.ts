@@ -30,7 +30,7 @@ export type {
   TraceKind,
   Waiver,
 } from "./layer-types.ts";
-export { CONFLICT_REASONS, LEVELS } from "./layer-types.ts";
+export { CONFLICT_REASONS, LAYER_LEVELS, LEVELS } from "./layer-types.ts";
 export { MAX_CATALOG_BYTES, parseCatalog } from "./parse-catalog.ts";
 export { parseLayer, parseWaivers } from "./parse-layer.ts";
 export { resolveEffectiveRules } from "./resolve.ts";
