@@ -627,6 +627,20 @@ fake e2e secret defined in the script (no real secret). It does not use the stub
 install --with-deps chromium` first). `turbo run e2e` still only runs the stub-API suites of
 `apps/web` and `packages/ui`; the real-stack package exposes its Playwright call as `stack`.
 
+**R2 stack (TK-49a, [ADR 0010](adr/0010-e2e-single-process-stack-fake-git-provider.md))**: `run.ts` starts
+`e2e/scripts/stack.ts` instead of `apps/api/dist/main.js`. It runs the API and the worker in ONE process
+sharing ONE `InMemoryGitProvider` (`nextId` is a numeric counter), injected with
+`overrideProvider(GIT_PROVIDER)` and `startWorker(config, { gitProvider })`; no production file changes and
+no variable can select the fake. It refuses to start when `APP_ENV` is `staging` or `production` (stderr
+message, before any import, connection or port). `run.ts` adds fake `GITHUB_WEBHOOK_SECRET`,
+`GITHUB_APP_ID/PRIVATE_KEY/CLIENT_ID/CLIENT_SECRET`, `KOKLO_ENCRYPTION_KEY` and `SPEC_BATCH_WAIT_MS=15000`.
+The fake emits no webhook: tests post HMAC-signed `push` events through the web (`e2e/support/webhook.ts`);
+the seeded installation (`e2e/support/installation.ts`) needs no prior declaration. Guard:
+`packages/config/test/e2e-stack-guard.test.ts` (no production import of `@koklo/github/testing`; launcher
+refuses `staging`/`production`). `e2e/` stays out of the Docker images (`.dockerignore`). Smoke tests:
+`e2e/tests/r2-stack.spec.ts` (health, webhook bad signature 401, `installation.start` URL of the fake).
+The real GitHub App proof stays manual.
+
 ### Reconciliation job (TK-46a)
 | Variable | Read by | Meaning |
 |----------|---------|---------|
