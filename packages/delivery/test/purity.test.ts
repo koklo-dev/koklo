@@ -35,6 +35,14 @@ const sources = () =>
         return { file, text: readFileSync(resolve(srcDir, file), "utf8") };
       }),
   );
+/** Adaptateur d'E/S (lot 73c) : seul sous-dossier autorise a importer node:child_process/fs/path. */
+const adapterSources = () =>
+  readdirSync(resolve(srcDir, "claude-code"), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+    .map((entry) => ({
+      file: `claude-code/${entry.name}`,
+      text: readFileSync(resolve(srcDir, "claude-code", entry.name), "utf8"),
+    }));
 const importsOf = (source: string) =>
   [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1] as string);
 
@@ -116,6 +124,87 @@ describe("pureté de packages/delivery : frontières", () => {
   });
 });
 
+describe("adaptateur src/claude-code/ (lot 73c)", () => {
+  const ALLOWED_NODE = ["node:child_process", "node:fs", "node:fs/promises", "node:path"];
+
+  it("contient les fichiers attendus", () => {
+    expect(readdirSync(resolve(srcDir, "claude-code")).sort()).toEqual(
+      expect.arrayContaining([
+        "classify.ts",
+        "command.ts",
+        "environment.ts",
+        "index.ts",
+        "redact.ts",
+        "runtime.ts",
+        "worktree.ts",
+      ]),
+    );
+  });
+
+  it("n'importe que du relatif, @koklo/domain, @koklo/rules ou node:child_process/fs/path", () => {
+    for (const { file, text } of adapterSources()) {
+      for (const spec of importsOf(text)) {
+        const ok =
+          spec.startsWith("./") ||
+          spec.startsWith("../") ||
+          spec === "@koklo/domain" ||
+          spec === "@koklo/rules" ||
+          ALLOWED_NODE.includes(spec);
+        expect(ok, `${file} importe « ${spec} »`).toBe(true);
+      }
+    }
+  });
+
+  it("est le SEUL a importer node:child_process, et l'importe bien", () => {
+    const withChildProcess = adapterSources().filter(({ text }) =>
+      importsOf(text).includes("node:child_process"),
+    );
+    expect(withChildProcess.length).toBeGreaterThan(0);
+    for (const { file, text } of sources()) {
+      expect(/child_process|node:fs|node:path/.test(importsOf(text).join("\n")), file).toBe(false);
+    }
+  });
+
+  it("n'emploie jamais de shell ni l'option dangereuse", () => {
+    for (const { file, text } of adapterSources()) {
+      const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      expect(
+        /shell:\s*true|\bexec\(|execSync|--dangerously-skip-permissions/.test(code),
+        file,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("adaptateur src/claude-code/ : taille et API", () => {
+  it("garde chaque fichier a 300 lignes au plus et chaque fonction a 50 lignes au plus", () => {
+    for (const { file, text } of adapterSources()) {
+      expect(text.split("\n").length, `${file} depasse 300 lignes`).toBeLessThanOrEqual(300);
+      for (const length of functionLengths(text)) {
+        expect(length, `${file} : fonction de ${length} lignes`).toBeLessThanOrEqual(50);
+      }
+    }
+  });
+
+  it("exporte l'API de l'adaptateur par le sous-chemin, hors de l'index public", async () => {
+    const adapter = await import("../src/claude-code/index.ts");
+    for (const name of [
+      "ClaudeCodeRuntime",
+      "buildClaudeArgv",
+      "claudeToolRules",
+      "buildChildEnv",
+      "CLAUDE_ENV_ALLOWLIST",
+      "redactSecrets",
+      "classifyClaudeFailure",
+      "resolveWorktree",
+      "HARD_OUTPUT_FACTOR",
+    ]) {
+      expect(adapter, name).toHaveProperty(name);
+    }
+    expect(delivery).not.toHaveProperty("ClaudeCodeRuntime");
+  });
+});
+
 describe("pureté de packages/delivery : API", () => {
   it("exporte l'API publique figée", () => {
     for (const name of [
@@ -179,9 +268,13 @@ describe("package.json, étiquette et seuils", () => {
     });
   });
 
-  it("exporte « . » et « ./testing » (« ./claude-code » seulement au lot 73c)", () => {
+  it("exporte « . », « ./testing » et « ./claude-code »", () => {
     const keys = Object.keys(pkg.exports);
-    expect(keys).toEqual(expect.arrayContaining([".", "./testing"]));
+    expect(keys).toEqual(expect.arrayContaining([".", "./testing", "./claude-code"]));
+    expect(pkg.exports["./claude-code"]).toEqual({
+      types: "./dist/claude-code/index.d.ts",
+      default: "./dist/claude-code/index.js",
+    });
     for (const key of keys) {
       expect([".", "./testing", "./claude-code"]).toContain(key);
     }
