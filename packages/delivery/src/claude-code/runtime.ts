@@ -9,6 +9,7 @@ import type {
   AgentSessionResult,
 } from "../agent-runtime.ts";
 import { buildClaudeArgv } from "./command.ts";
+import { assertRuntimeConfig, DEFAULT_CLAUDE_EXECUTABLE } from "./config.ts";
 import { buildChildEnv } from "./environment.ts";
 import { toSessionResult } from "./outcome.ts";
 import { runProcess, type SpawnSpec } from "./process.ts";
@@ -16,13 +17,13 @@ import { resolveWorktree } from "./worktree.ts";
 
 export type { SpawnSpec } from "./process.ts";
 
-export const DEFAULT_CLAUDE_EXECUTABLE = "claude";
+export { DEFAULT_CLAUDE_EXECUTABLE };
 /** Plafond dur de lecture brute = `maxOutputChars` x ce facteur ; au-delà, le groupe est tué. */
 export const HARD_OUTPUT_FACTOR = 20;
 export const DEFAULT_KILL_GRACE_MS = 5_000;
 
 export interface ClaudeCodeRuntimeOptions {
-  /** Binaire résolu SANS shell (défaut `claude`). */
+  /** Chemin absolu du binaire, ou `claude` nu résolu par un PATH absolu, SANS shell (défaut `claude`). */
   readonly executable?: string;
   /** Racines autorisées pour les worktrees (comparées après `realpath`). */
   readonly allowedRoots: readonly string[];
@@ -41,6 +42,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   readonly #options: ClaudeCodeRuntimeOptions;
 
   constructor(options: ClaudeCodeRuntimeOptions) {
+    assertRuntimeConfig(options);
     this.#options = options;
   }
 

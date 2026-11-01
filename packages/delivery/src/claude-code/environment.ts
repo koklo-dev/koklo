@@ -15,6 +15,16 @@ export const CLAUDE_ENV_ALLOWLIST: readonly string[] = [
   "LOGNAME",
 ];
 
+const FORBIDDEN_EXTRA_ENV = /^(?:LD_.*|DYLD_.*|NODE_OPTIONS|PATH|HOME|ANTHROPIC_.*)$/;
+
+/**
+ * Noms que l'appelant ne peut pas imposer au fils : chargement de code (`LD_*`, `DYLD_*`,
+ * `NODE_OPTIONS`), résolution (`PATH`, `HOME`) et `ANTHROPIC_*` (la clé n'est injectée que par le
+ * runtime, via le credential opaque).
+ */
+export const isForbiddenExtraEnv = (name: string): boolean =>
+  FORBIDDEN_EXTRA_ENV.test(name.toUpperCase());
+
 export interface ChildEnvOptions {
   readonly credential?: AgentCredential;
   /** Variables explicites de l'appelant (jamais héritées), fusionnées en dernier. */
@@ -35,5 +45,10 @@ export const buildChildEnv = (
   if (options.credential !== undefined) {
     env.ANTHROPIC_API_KEY = revealAgentCredential(options.credential);
   }
-  return { ...env, ...options.extraEnv };
+  for (const [name, value] of Object.entries(options.extraEnv ?? {})) {
+    if (!isForbiddenExtraEnv(name)) {
+      env[name] = value;
+    }
+  }
+  return env;
 };

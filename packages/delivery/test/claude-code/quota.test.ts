@@ -34,6 +34,22 @@ describe("classifyClaudeFailure : formulations de quota", () => {
     }
   });
 
+  it.each([
+    "error at src/app.ts:429",
+    "GET /login returned 500",
+    "processed 4290 items",
+    "see /login page source",
+  ])("n'est ni un quota ni une authentification sans contexte : %s", (text) => {
+    expect(classifyClaudeFailure(text, { exitCode: 1, resultIsError: true })).toBe("agent_error");
+  });
+
+  it.each(["HTTP 429", "status: 429", "status code 429", "error code 429", "API Error: 429"])(
+    "reconnait le quota avec contexte : %s",
+    (text) => {
+      expect(classifyClaudeFailure(text, { exitCode: 1, resultIsError: true })).toBe("quota");
+    },
+  );
+
   it("distingue l'authentification du quota", () => {
     expect(
       classifyClaudeFailure("Invalid API key · Please run /login", {

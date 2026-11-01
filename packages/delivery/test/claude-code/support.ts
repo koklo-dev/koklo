@@ -1,5 +1,13 @@
 /** Aides des tests de l'adaptateur : faux executable `claude`, repertoires jetables, sondes de processus. */
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach } from "vitest";
@@ -104,4 +112,26 @@ export const waitDead = async (pid: number): Promise<boolean> => {
     await new Promise((done) => setTimeout(done, 50));
   }
   return !isAlive(pid);
+};
+
+/** Attend activement (au plus 5 s) qu'un fichier de trace existe et soit non vide ; rend son pid. */
+export const waitForPidFile = async (sandbox: Sandbox, name: string): Promise<number> => {
+  for (let i = 0; i < 250; i++) {
+    const file = join(sandbox.traces, name);
+    if (existsSync(file) && readFileSync(file, "utf8") !== "") {
+      return Number(readFileSync(file, "utf8"));
+    }
+    await new Promise((done) => setTimeout(done, 20));
+  }
+  throw new Error(`${name} n'est jamais apparu`);
+};
+
+/** Tue un survivant lance par un test (jamais autre chose) et attend sa mort. */
+export const killSurvivor = async (pid: number): Promise<void> => {
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // deja mort
+  }
+  await waitDead(pid);
 };

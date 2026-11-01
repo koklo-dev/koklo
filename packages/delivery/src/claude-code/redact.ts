@@ -1,12 +1,17 @@
 /** Redaction des secrets de tout ce qui sort de l'adaptateur (sortie, erreurs, partiel). */
 export const REDACTED = "[redacted]";
 
-/** Motifs de secrets connus : clés Anthropic, jetons GitHub, en-têtes `Bearer`. */
+/** Motifs de secrets connus : clés Anthropic/OpenAI/AWS, jetons GitHub/GitLab/Slack, blocs PEM, en-têtes `Bearer`. */
 const SECRET_PATTERNS: readonly RegExp[] = [
   /sk-ant-[A-Za-z0-9_-]+/g,
   /github_pat_[A-Za-z0-9_]+/g,
   /gh[pousr]_[A-Za-z0-9]+/g,
   /Bearer\s+[A-Za-z0-9._~+/=-]+/g,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  /sk-proj-[A-Za-z0-9_-]+/g,
+  /xox[baprs]-[A-Za-z0-9-]+/g,
+  /glpat-[A-Za-z0-9_-]+/g,
 ];
 
 /**

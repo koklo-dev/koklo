@@ -87,8 +87,26 @@ interface Stopper {
   readonly dispose: () => void;
 }
 
-/** Première raison gagnante : SIGTERM au groupe, puis SIGKILL après le délai de grâce. */
-const createStopper = (child: ChildProcess, options: ProcessOptions): Stopper => {
+/** Marge après le délai de grâce avant de résoudre de force, même si le fils ne se ferme pas. */
+export const FORCE_RESOLVE_MARGIN_MS = 500;
+/** Délai de vidange des pipes après la sortie du fils, avant de les détruire (petit-fils porteur). */
+export const DRAIN_MS = 50;
+
+interface Stopper {
+  readonly reason: () => StopReason | undefined;
+  readonly stop: (reason: StopReason) => void;
+  readonly dispose: () => void;
+}
+
+/**
+ * Première raison gagnante : SIGTERM au groupe, SIGKILL après le délai de grâce, puis résolution
+ * forcée (`onForce`) après une marge si le fils ne se ferme toujours pas.
+ */
+const createStopper = (
+  child: ChildProcess,
+  options: ProcessOptions,
+  onForce: () => void,
+): Stopper => {
   let reason: StopReason | undefined;
   const timers: NodeJS.Timeout[] = [];
   const stop = (why: StopReason): void => {
@@ -98,6 +116,7 @@ const createStopper = (child: ChildProcess, options: ProcessOptions): Stopper =>
     reason = why;
     signalGroup(child.pid, "SIGTERM");
     timers.push(setTimeout(() => signalGroup(child.pid, "SIGKILL"), options.killGraceMs));
+    timers.push(setTimeout(onForce, options.killGraceMs + FORCE_RESOLVE_MARGIN_MS));
   };
   const onAbort = (): void => stop("aborted");
   timers.push(setTimeout(() => stop("timeout"), options.timeoutMs));
@@ -117,21 +136,26 @@ const createStopper = (child: ChildProcess, options: ProcessOptions): Stopper =>
   };
 };
 
-/** Lance le CLI et attend sa fin (ou sa mise à mort) ; erreur typée si le binaire est inutilisable. */
+/**
+ * Lance le CLI et attend sa fin (ou sa mise à mort) ; erreur typée si le binaire est inutilisable.
+ * Résout sur `close` OU, au plus tard `DRAIN_MS` après `exit`, quand un petit-fils garde les pipes
+ * ouverts : le groupe est alors tué (SIGKILL) et les flux détruits. Un petit-fils qui a quitté le
+ * groupe (`setsid`) n'est pas tué : limite assumée, ADR 0014.
+ */
 export const runProcess = (spec: SpawnSpec, options: ProcessOptions): Promise<ProcessOutcome> =>
   new Promise((resolve, reject) => {
     const child = launch(spec, options);
-    const stopper = createStopper(child, options);
-    const collector = collect(child, options.hardOutputBytes, () => stopper.stop("exceeded"));
-    child.stdin?.on("error", () => undefined);
-    child.stdin?.end(options.stdin);
-    child.once("error", () => {
-      stopper.dispose();
-      reject(unavailable());
-    });
-    child.once("close", (exitCode) => {
+    let exitCode: number | null = null;
+    let settled = false;
+    const settle = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       signalGroup(child.pid, "SIGKILL"); // survivants éventuels du groupe
       stopper.dispose();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       collector.reader.end();
       const stopped = stopper.reason();
       resolve({
@@ -140,5 +164,23 @@ export const runProcess = (spec: SpawnSpec, options: ProcessOptions): Promise<Pr
         stream: collector.reader.state,
         stderr: collector.stderr(),
       });
+    };
+    const stopper = createStopper(child, options, settle);
+    const collector = collect(child, options.hardOutputBytes, () => stopper.stop("exceeded"));
+    child.stdin?.on("error", () => undefined);
+    child.stdin?.end(options.stdin);
+    child.once("error", () => {
+      settled = true;
+      stopper.dispose();
+      reject(unavailable());
+    });
+    child.once("exit", (code) => {
+      exitCode = code;
+      signalGroup(child.pid, "SIGKILL");
+      setTimeout(settle, DRAIN_MS).unref();
+    });
+    child.once("close", (code) => {
+      exitCode = code;
+      settle();
     });
   });

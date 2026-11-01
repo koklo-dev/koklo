@@ -13,6 +13,7 @@ import {
   recordedPid,
   script,
   waitDead,
+  waitForPidFile,
 } from "./support.ts";
 
 const withTimeout = (worktree: string, timeoutMs: number, signal?: AbortSignal) =>
@@ -54,10 +55,7 @@ describe("annulation", () => {
     const pending = makeRuntime(sandbox).launchSession(
       withTimeout(sandbox.worktree, 30_000, controller.signal),
     );
-    for (let i = 0; i < 100 && launches(sandbox) === 0; i++) {
-      await new Promise((done) => setTimeout(done, 20));
-    }
-    await new Promise((done) => setTimeout(done, 300)); // laisse le petit-fils naitre
+    await waitForPidFile(sandbox, "grandchild.pid"); // le petit-fils est ne
     controller.abort();
     const result = await pending.catch((error: unknown) => error);
     expect(result).toMatchObject({ status: "aborted" });
