@@ -2,6 +2,7 @@ import type { DatabaseService } from "../database/database.module.ts";
 import { createKeyRing, type KeyRingSettings } from "./key-ring.ts";
 import {
   llmTable,
+  type RotationRow,
   type RotationTable,
   type RotationTableKey,
   userTokensTable,
@@ -14,9 +15,9 @@ export interface TableRotationReport {
   readonly scanned: number;
   /** Lignes réécrites en version courante (avec `dryRun` : lignes qui le SERAIENT). */
   readonly rotated: number;
-  /** Lignes déjà en version courante, non touchées. */
+  /** Lignes déjà en version courante, non touchées et vérifiées (déchiffrement de contrôle). */
   readonly alreadyCurrent: number;
-  /** Lignes illisibles ou dont l'écriture a échoué : laissées intactes. */
+  /** Lignes illisibles (y compris à la version courante : clé changée sans nouvelle version) ou dont l'écriture a échoué : laissées intactes. */
   readonly failed: number;
   /** Lignes réécrites entre-temps par une écriture normale : laissées telles quelles, pas d'échec. */
   readonly conflicts: number;
@@ -62,6 +63,31 @@ const empty = (): TableRotationReport => ({
 
 type Counts = { -readonly [K in keyof TableRotationReport]: TableRotationReport[K] };
 
+/**
+ * Contrôle des lignes déjà à la version courante : sans lecture, une clé changée sous la même version
+ * (tout est illisible) passerait pour « tout à jour ». Déchiffrement seul, rien n'est écrit.
+ */
+function verifyCurrent(
+  table: RotationTable,
+  cipher: TokenCipher,
+  rows: readonly RotationRow[],
+  counts: Counts,
+  options: RotationOptions,
+): void {
+  for (const row of rows) {
+    try {
+      cipher.decrypt(row.secret, row.aad);
+      counts.alreadyCurrent += 1;
+    } catch (error) {
+      counts.failed += 1;
+      options.onFailure?.(
+        table.key,
+        error instanceof TokenDecryptionError ? error : table.storeError(),
+      );
+    }
+  }
+}
+
 async function rotateRows(
   table: RotationTable,
   cipher: TokenCipher,
@@ -69,8 +95,9 @@ async function rotateRows(
 ): Promise<Counts> {
   const counts: Counts = empty();
   const rows = await table.listOutdated(cipher.keyVersion);
-  counts.alreadyCurrent = await table.countCurrent(cipher.keyVersion);
-  counts.scanned = rows.length + counts.alreadyCurrent;
+  const current = await table.listCurrent(cipher.keyVersion);
+  counts.scanned = rows.length + current.length;
+  verifyCurrent(table, cipher, current, counts, options);
   for (const row of rows) {
     try {
       // Un chiffré illisible lève ici `TokenDecryptionError` : la ligne reste intacte.

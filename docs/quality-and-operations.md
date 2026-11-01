@@ -219,7 +219,11 @@ covers_commit: bb9f740
 ### BYOK credential routes (TK-52b)
 - The key travels in the body of `PUT /llm-credentials/{provider}` only. Request logs keep the path
   and never the body; `guard` logs the error name only; validation messages never repeat the value.
-  Do not add a body logger or a debug dump on these routes.
+  Do not add a body logger or a debug dump on these routes. A body the parser refuses (malformed or
+  truncated JSON, too large, wrong encoding) is answered by `BodyParserErrorFilter` with a generic typed
+  error (`BAD_REQUEST` 400, `PAYLOAD_TOO_LARGE` 413, `UNSUPPORTED_MEDIA_TYPE` 415) and no excerpt: the
+  parser's own message ("Unexpected token ... is not valid JSON") quotes a piece of the body, so a
+  piece of the key, and must never reach a response, a log or Sentry.
 - The status returned by every route carries no hint of the key (no suffix, length, fingerprint,
   `id` or `keyVersion`); keep it that way when adding fields.
 - Without `KOKLO_ENCRYPTION_KEY`, `PUT` answers `503 ENCRYPTION_UNAVAILABLE`; reading, invalidating and
@@ -699,6 +703,13 @@ Exit codes: `0` everything is current (no failed row); `1` at least one row `fai
 failure (database unreachable); `2` refusal, nothing written, reason on stderr: unknown option or
 positional argument, `DATABASE_URL` or `KOKLO_ENCRYPTION_KEY` missing or invalid, inconsistent versions
 (`KeyRingConfigError`), or outdated rows with no `KOKLO_ENCRYPTION_KEYS_PREVIOUS` (`RotationConfigError`).
+
+Rows already at the current version are **verified by a control decryption** (nothing written). A
+row at the current version that does not decrypt counts `failed` (exit `1`), so a new key deployed
+under the **same** `KOKLO_ENCRYPTION_KEY_VERSION` (everything unreadable) is never reported as
+"up to date". `alreadyCurrent` counts only rows that decrypted. The fix is not in the command:
+**always increment the version** with a new key, keep the old one in `KOKLO_ENCRYPTION_KEYS_PREVIOUS`,
+and run `--dry-run` first.
 
 **Procedure** (n = current version, 1 by default):
 1. Generate the new key: `openssl rand -base64 32`. Store it in the secret manager before anything else.

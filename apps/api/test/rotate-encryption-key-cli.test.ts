@@ -109,6 +109,26 @@ describe("rotate-encryption-key (CLI)", () => {
   });
 });
 
+describe("clé changée sans incrémenter la version", () => {
+  it("code 1 (jamais « tout à jour »), comptes en échec, rien d'écrit, aucune valeur citée", async () => {
+    const before = await snapshot(h.database);
+    const env = envFor({
+      KOKLO_ENCRYPTION_KEY_VERSION: "1",
+      KOKLO_ENCRYPTION_KEYS_PREVIOUS: undefined,
+    });
+    for (const argv of [[], ["--dry-run"]]) {
+      const { code, out, err } = await cli([...argv, "--json"], env);
+      expect(code).toBe(ROTATE_EXIT.failed);
+      expect(JSON.parse(out)).toMatchObject({
+        llm: { failed: 3, alreadyCurrent: 0, rotated: 0 },
+        userTokens: { failed: 2, alreadyCurrent: 0, rotated: 0 },
+      });
+      noValues(out + err);
+    }
+    expect(await snapshot(h.database)).toEqual(before);
+  });
+});
+
 describe("refus (code 2, rien d'écrit, aucune valeur citée)", () => {
   const refused = async (argv: string[], env: Record<string, string | undefined>) => {
     const before = await snapshot(h.database);
