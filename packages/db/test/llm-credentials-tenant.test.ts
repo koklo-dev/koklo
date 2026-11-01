@@ -80,7 +80,7 @@ describe("TK-51a : modèle multi-tenant", () => {
     );
     expect(foreign).toBeNull();
     const counted = await withOrganization(a.organizationId, () =>
-      tenant.llmProviderCredential.count({ where: { organizationId: b.organizationId } }),
+      tenant.llmProviderCredential.count({ where: { id: ids.b } }),
     );
     expect(counted).toBe(0);
   });
