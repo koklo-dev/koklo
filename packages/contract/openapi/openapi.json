@@ -2124,6 +2124,23 @@
             },
             "description": "Session absente ou expirée"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Forbidden"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Accès refusé"
+          },
           "500": {
             "content": {
               "application/json": {

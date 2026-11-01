@@ -69,7 +69,7 @@ const procedures: Procedure[] = [
   },
   {
     name: "member.list",
-    allowed: everyRole,
+    allowed: ["owner", "admin", "dev", "designer", "business"],
     run: (a) => call(app, a.cookie, "get", "/members"),
   },
   {

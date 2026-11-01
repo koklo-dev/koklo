@@ -46,10 +46,20 @@ export class PrismaProjectClientRepository implements ProjectClientRepository {
 
   add(scope: ProjectScope, memberId: string): Promise<ProjectClientRecord | null> {
     return this.transactions.run(scope, async (tx) => {
-      const member = await tx.member.findFirst({
+      // Verrou de ligne (le client tenant refuse le SQL brut) : un UPDATE sans effet pose le verrou
+      // et, en READ COMMITTED, réévalue `role = 'client'` après l'attente d'un `member.setRole`
+      // concurrent. Le rôle lu ici est donc encore vrai à l'INSERT (TK-55 N1, pas de lien orphelin).
+      const locked = await tx.member.updateMany({
         where: { id: memberId, organizationId: scope.organizationId, role: "client" },
-        select: { userId: true },
+        data: { role: "client" },
       });
+      const member =
+        locked.count === 0
+          ? null
+          : await tx.member.findFirst({
+              where: { id: memberId, organizationId: scope.organizationId, role: "client" },
+              select: { userId: true },
+            });
       if (!member) {
         return null;
       }

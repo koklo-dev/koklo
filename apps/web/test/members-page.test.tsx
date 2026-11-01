@@ -119,7 +119,18 @@ describe("S-members — liste", () => {
 });
 
 describe("S-members — droits selon le rôle (C2.c, C2.d)", () => {
-  it.each(["dev", "designer", "client", "business"])(
+  it("rôle client : member.list n'est pas appelé, message d'accès réservé, ni liste ni formulaire", async () => {
+    asRole("client");
+    renderWithQuery(<MembersPage />);
+    expect(
+      await screen.findByText("La liste des membres est réservée à l'équipe."),
+    ).toBeInTheDocument();
+    expect(procedures.memberList).not.toHaveBeenCalled();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
+  });
+
+  it.each(["dev", "designer", "business"])(
     "rôle %s : pas de formulaire, message « droits insuffisants », liste visible",
     async (role) => {
       asRole(role);

@@ -17,7 +17,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { orpc } from "../lib/orpc.ts";
-import { canManage, ROLE_LABELS } from "../lib/roles.ts";
+import { canListMembers, canManage, ROLE_LABELS } from "../lib/roles.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { ErrorNotice } from "./error-notice.tsx";
@@ -69,14 +69,29 @@ function ReadOnlyNotice() {
   );
 }
 
+function TeamOnlyNotice() {
+  return (
+    <Alert className="max-w-xl">
+      <Icon name="lock" size={20} />
+      <AlertDescription>La liste des membres est réservée à l'équipe.</AlertDescription>
+    </Alert>
+  );
+}
+
 /** Membres de l'organisation active : invitation (managers) et liste. */
 export function MembersPage() {
-  const members = useQuery(orpc.member.list.queryOptions());
-  const { role } = useActiveOrganization();
+  const { role, organizations } = useActiveOrganization();
+  const allowed = canListMembers(role);
+  // Pas d'appel tant que `organization.list` n'a pas dit le rôle : un client ne déclenche jamais de 403.
+  const members = useQuery({
+    ...orpc.member.list.queryOptions(),
+    enabled: allowed && !organizations.isPending,
+  });
   const redirecting = useUnauthorizedRedirect(members.error);
 
   let list = <LoadingStatus label="Chargement des membres…" />;
-  if (members.data) list = <MembersTable members={members.data} />;
+  if (!allowed) list = <TeamOnlyNotice />;
+  else if (members.data) list = <MembersTable members={members.data} />;
   else if (members.isError && !members.isFetching && !redirecting) {
     list = (
       <ErrorNotice title="Impossible de charger les membres" onRetry={() => void members.refetch()}>
@@ -87,7 +102,8 @@ export function MembersPage() {
 
   // Tant que le rôle est inconnu, ni formulaire ni message : on évite un faux « droits insuffisants ».
   let invitation = null;
-  if (role) invitation = canManage(role) ? <InviteForm role={role} /> : <ReadOnlyNotice />;
+  if (role && allowed)
+    invitation = canManage(role) ? <InviteForm role={role} /> : <ReadOnlyNotice />;
 
   return (
     <div data-testid="members-page" className="flex flex-col gap-6">

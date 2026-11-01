@@ -83,7 +83,7 @@ const memberInvite = route("POST", "/members/invitations")
   .output(memberInviteOutputSchema);
 
 const memberList = route("GET", "/members")
-  .errors({ ...internalError, ...unauthorizedError })
+  .errors({ ...internalError, ...authErrors })
   .output(memberListOutputSchema);
 
 const memberSetRole = route("PATCH", "/members/{memberId}/role")

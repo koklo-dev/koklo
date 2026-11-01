@@ -35,3 +35,8 @@ export function canReadRepos(role: Role | undefined): boolean {
 export function canWriteSpec(role: Role | string | undefined): boolean {
   return role === "owner" || role === "admin" || role === "dev" || role === "designer";
 }
+
+/** `member.list` expose noms, e-mails et rôles de toute l'organisation : fermé au client (403). */
+export function canListMembers(role: Role | undefined): boolean {
+  return role !== "client";
+}
