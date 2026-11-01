@@ -1,4 +1,10 @@
-import type { Run, RunEvent, RunLimits, RunState } from "../src/index.ts";
+import {
+  applyEvent,
+  type Run,
+  type RunEvent,
+  type RunLimits,
+  type RunState,
+} from "../src/index.ts";
 
 /** Références écrites dans le test, indépendantes de l'implémentation (vision §10.3, annexe C §C.6). */
 export const STATES: readonly RunState[] = [
@@ -65,10 +71,16 @@ export const REFERENCE: Readonly<Record<RunState, Readonly<Partial<Record<EventT
       quota_hit: "reviewing",
     },
     merge_requested: { merge_done: "merged", block: "blocked", quota_hit: "merge_requested" },
-    merged: { deploy_green: "deployed_staging", block: "blocked", quota_hit: "merged" },
-    deployed_staging: {},
+    // Lot 2 : rejeux idempotents (merge_done sur merged, deploy_green sur deployed_staging, escalate sur escalated).
+    merged: {
+      merge_done: "merged",
+      deploy_green: "deployed_staging",
+      block: "blocked",
+      quota_hit: "merged",
+    },
+    deployed_staging: { deploy_green: "deployed_staging" },
     blocked: { escalate: "escalated" },
-    escalated: {},
+    escalated: { escalate: "escalated" },
   };
 
 export const NOMINAL_PATH: readonly RunState[] = [
@@ -129,3 +141,17 @@ export const deepFreeze = <T>(value: T): T => {
   }
   return value;
 };
+
+/** Joue des événements par défaut à la suite, en renvoyant le dernier run. */
+export const play = (start: Run, types: readonly EventType[], limits: RunLimits = LIMITS): Run =>
+  types.reduce((run, type) => applyEvent(run, event(type), limits).run, start);
+
+/** De developing à reviewing : dev_done, gates_green, pr_opened, ci_green. */
+export const TO_REVIEWING: readonly EventType[] = [
+  "dev_done",
+  "gates_green",
+  "pr_opened",
+  "ci_green",
+];
+/** De developing à ci_wait. */
+export const TO_CI_WAIT: readonly EventType[] = ["dev_done", "gates_green", "pr_opened"];

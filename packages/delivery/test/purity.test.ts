@@ -94,6 +94,8 @@ describe("pureté de packages/delivery", () => {
       "InvalidRunEventError",
       "InvalidRunTransitionError",
       "StaleRunError",
+      "ResumeRequiredError",
+      "canRestartDevelopment",
     ]) {
       expect(delivery, name).toHaveProperty(name);
     }

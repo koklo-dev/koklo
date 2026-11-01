@@ -19,6 +19,9 @@ export interface StartRunInput {
   readonly ticket: string;
   readonly attempts?: number;
   readonly reviewRounds?: number;
+  /** Branche déjà poussée et PR ouverte (portées par le ticket) : le run reprend, il ne repart pas. */
+  readonly branch?: string | null;
+  readonly pullRequest?: string | null;
 }
 
 export interface RunLimits {
