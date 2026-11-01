@@ -289,7 +289,8 @@ describe("Liste (§3.3, §4.2)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("aucun bouton d'écriture en 48d (créer, modifier, supprimer)", async () => {
+  it("le client ne voit aucun bouton d'écriture (créer, modifier, supprimer) ; l'équipe, 48e-1", async () => {
+    serve("client");
     renderFeatures();
     await findTable();
     expect(
@@ -319,7 +320,10 @@ describe("Vide (§4.3)", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
-  it("aucun bouton, aucun emplacement d'écriture vide", async () => {
+  it("le client ne voit aucun bouton, aucun emplacement d'écriture vide", async () => {
+    serve("client");
+    procedures.specHead.mockResolvedValue(EMPTY_HEAD);
+    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
     renderFeatures();
     await findNamed("heading", "Aucune fonctionnalité pour le moment");
     expect(screen.queryAllByRole("button")).toHaveLength(0);

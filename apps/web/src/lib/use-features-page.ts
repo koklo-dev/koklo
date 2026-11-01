@@ -1,13 +1,16 @@
 "use client";
 
-import { useRef } from "react";
-import { regionText, showsFilters, showsVersion } from "./features-region.ts";
+import { type RefObject, useEffect, useRef } from "react";
+import { regionText, showsFilters, showsVersion, writeRegionText } from "./features-region.ts";
 import { canReadRepos } from "./roles.ts";
+import { useFeatureFormPanel } from "./use-feature-form-panel.ts";
 import { useFeatureSheet } from "./use-feature-sheet.ts";
+import { useFeatureWrite } from "./use-feature-submit.ts";
 import { useAnnouncements, useRepoCreated } from "./use-features-actions.ts";
 import { useFeaturesData } from "./use-features-data.ts";
 import { useFilterActions, useMore } from "./use-features-list.ts";
 import { useFeaturesUrl } from "./use-features-url.ts";
+import { usePendingResume } from "./use-pending-save.ts";
 
 /** Tout ce que l'écran des fonctionnalités pilote : données, adresse, annonces, liste, fiche et visibilités. */
 export function useFeaturesPage(projectId: string) {
@@ -16,6 +19,15 @@ export function useFeaturesPage(projectId: string) {
   const { announcement, announce, moreShown } = useAnnouncements(data.view);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const more = useMore(data, moreShown);
+  const write = useFeatureWrite({
+    projectId,
+    filters: () => ({ status: url.status, priority: url.priority }),
+  });
+  usePendingResume(projectId, data.role, write);
+  const form = useFeatureFormPanel(url, data, write);
+  const keepFocus = useRef(false);
+  keepFocus.current = write.phase === "saved";
+  useSavedFocus(write, form.open, data.features.items, titleRef);
   const { view, head } = data;
   const headReady = head !== null && head.status !== "failed";
   const text = regionText({
@@ -37,14 +49,48 @@ export function useFeaturesPage(projectId: string) {
     team: canReadRepos(data.role),
     repoCreated: useRepoCreated(announce),
     sheet: useFeatureSheet(projectId, url, titleRef),
+    write,
+    form,
+    /** « Rouvrir le brouillon » après un échec arrivé formulaire fermé. */
+    reopenDraft: () => {
+      const meta = write.meta;
+      if (meta?.kind === "update" && meta.specId) form.openEdit(meta.specId);
+      else form.openCreate();
+    },
+    keepFocus,
+    announce,
     region: {
-      text: [text, announcement].filter(Boolean).join(" "),
+      text: [text, announcement, writeRegionText(write, form.open)].filter(Boolean).join(" "),
       busy: view.kind === "loading",
     },
     showFilters: headReady && showsFilters(view),
     showVersion: headReady && showsVersion(view),
     sheetOpen: Boolean(url.feature) && view.kind === "list",
   };
+}
+
+/** Après un enregistrement : focus sur le lien de la ligne enregistrée, ou sur le titre de la page (§5.6). */
+function useSavedFocus(
+  write: ReturnType<typeof useFeatureWrite>,
+  formOpen: boolean,
+  items: { specId: string }[],
+  titleRef: RefObject<HTMLHeadingElement | null>,
+): void {
+  const done = useRef<string | null>(null);
+  const { saved } = write;
+  const specId = saved?.meta.specId;
+  const rowShown = items.some((item) => item.specId === specId);
+  useEffect(() => {
+    if (!saved?.placement || formOpen) return;
+    const key = `${saved.meta.target}:${saved.commitSha}`;
+    const toRow = saved.placement === "row";
+    if (done.current === key || (toRow && !rowShown)) return;
+    const link = toRow
+      ? document.querySelector<HTMLElement>(`[data-feature-link="${specId}"]`)
+      : null;
+    (link ?? titleRef.current)?.focus();
+    done.current = key;
+  }, [saved, formOpen, rowShown, specId, titleRef]);
 }
 
 export type FeaturesPageModel = ReturnType<typeof useFeaturesPage>;

@@ -456,11 +456,13 @@ describe("Index en retard (§4.6)", () => {
     submitReplies(batch());
     const panel = await fillAndSave();
     await advance(31 * SECOND);
-    const before = headTimes.length;
+    // Erreur de test corrigée (Green 48e-1) : `indexCatchesUp()` remplace l'implémentation qui alimente
+    // `headTimes`, qui ne peut donc plus grandir ; on compte les appels du mock lui-même.
+    const before = procedures.specHead.mock.calls.length;
     indexCatchesUp();
     await user().click(await panel.findByRole("button", { name: "Actualiser la liste" }));
     await advance(3 * SECOND);
-    expect(headTimes.length).toBeGreaterThan(before);
+    expect(procedures.specHead.mock.calls.length).toBeGreaterThan(before);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain(`${CREATED_ID} « ${NEW_TITLE} » créée.`);
   });

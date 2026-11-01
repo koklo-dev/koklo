@@ -32,6 +32,6 @@ export function canReadRepos(role: Role | undefined): boolean {
 }
 
 /** `specBatch.submit` : propriétaire, administrateur, développeur et designer écrivent dans la spec (`SPEC_BATCH_ROLES`). */
-export function canWriteSpec(_role: Role | string | undefined): boolean {
-  throw new Error("canWriteSpec : non implémenté");
+export function canWriteSpec(role: Role | string | undefined): boolean {
+  return role === "owner" || role === "admin" || role === "dev" || role === "designer";
 }

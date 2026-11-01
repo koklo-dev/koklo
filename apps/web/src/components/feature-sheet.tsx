@@ -1,7 +1,7 @@
 "use client";
 
 import type { FeatureSummary, Role } from "@koklo/contract";
-import { Button, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@koklo/ui";
+import { Button, Icon, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@koklo/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { orpc } from "../lib/orpc.ts";
@@ -24,6 +24,8 @@ interface SheetProps {
   onGone: () => void;
   /** Rend le focus au lien de la ligne d'origine (ou au titre de la page). */
   onReturnFocus: (specId: string) => void;
+  /** « Modifier » : présent seulement pour l'équipe qui écrit, quand la spec est lue. */
+  onEdit: (() => void) | undefined;
 }
 
 function Body({
@@ -62,6 +64,7 @@ export function FeatureSheet({
   onClose,
   onGone,
   onReturnFocus,
+  onEdit,
 }: SheetProps) {
   const query = useFeatureQuery(projectId, specId);
   const title = useRef<HTMLHeadingElement>(null);
@@ -117,6 +120,12 @@ export function FeatureSheet({
           <Button variant="outline" className="h-11 md:h-9" onClick={onClose}>
             Fermer
           </Button>
+          {onEdit ? (
+            <Button className="h-11 md:h-9" onClick={onEdit}>
+              <Icon name="edit_note" size={20} />
+              Modifier
+            </Button>
+          ) : null}
         </SheetFooter>
       </SheetContent>
     </Sheet>
