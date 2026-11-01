@@ -21,17 +21,44 @@
           "options": {
             "patterns": [
               {
+                "group": ["lucide", "lucide-*", "lucide/*"],
+                "message": "Icônes : utiliser le composant Icon de @koklo/ui (Material Symbols Rounded)."
+              },
+              {
                 "group": [
-                  "lucide",
-                  "lucide-*",
-                  "lucide/*"
+                  "@koklo/domain/testing",
+                  "@koklo/domain/testing/*",
+                  "@koklo/llm/testing",
+                  "@koklo/llm/testing/*"
                 ],
-                "message": "Ic\u00f4nes : utiliser le composant Icon de @koklo/ui (Material Symbols Rounded)."
+                "message": "Les faux (FakeLlm, transport simulé) sont réservés aux tests et au lanceur e2e : jamais dans le code livré (TK-54, ADR 0015)."
               }
             ]
           }
         }
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/test/**", "**/src/testing/**", "**/*.test.ts", "e2e/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["lucide", "lucide-*", "lucide/*"],
+                    "message": "Icônes : utiliser le composant Icon de @koklo/ui (Material Symbols Rounded)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

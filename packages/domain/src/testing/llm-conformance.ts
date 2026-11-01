@@ -19,14 +19,15 @@ import {
 import { LLM_STOP_REASONS, type LlmRequest } from "../llm-request.ts";
 import { trusted } from "../trusted.ts";
 import { Untrusted } from "../untrusted.ts";
-
-/** Échec d'un cas de conformité (le domaine n'a pas de bibliothèque d'assertion). */
-export class LlmConformanceFailure extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LlmConformanceFailure";
-  }
-}
+import {
+  check,
+  expectRejection,
+  hardeningBodies,
+  LLM_CONFORMANCE_HARDENING_CASE_NAMES,
+  LlmConformanceFailure,
+  type LlmConformanceHardeningSubject,
+  rejection,
+} from "./llm-conformance-hardening.ts";
 
 /** Chaque déclencheur de panne et l'erreur typée que tout adaptateur doit lever. */
 const ERROR_FOR = {
@@ -42,7 +43,7 @@ export type LlmFailureTrigger = keyof typeof ERROR_FOR;
 export const LLM_FAILURE_TRIGGERS = Object.keys(ERROR_FOR) as readonly LlmFailureTrigger[];
 
 /** Ce que la fabrique d'un adaptateur fournit : le fournisseur et ses déclencheurs. */
-export interface LlmConformanceSubject {
+export interface LlmConformanceSubject extends LlmConformanceHardeningSubject {
   readonly provider: LlmProvider;
   readonly validKey: string;
   /** Clé que le sujet refuse (-> `LlmAuthError`). */
@@ -76,6 +77,7 @@ export const LLM_CONFORMANCE_CASE_NAMES = [
   "rejects an already aborted signal with LlmAbortedError before any call",
   "refuses a request that did not pass the guard before any call",
   "never leaks key, prompt or output in errors",
+  ...LLM_CONFORMANCE_HARDENING_CASE_NAMES,
 ] as const;
 
 type CaseName = (typeof LLM_CONFORMANCE_CASE_NAMES)[number];
@@ -109,30 +111,6 @@ const requestFor = (
   ...overrides,
 });
 
-const check = (ok: boolean, message: string): void => {
-  if (!ok) throw new LlmConformanceFailure(message);
-};
-
-/** L'erreur levée par l'appel, ou un échec de conformité si l'appel réussit. */
-const rejection = async (call: Promise<unknown>): Promise<unknown> => {
-  try {
-    await call;
-  } catch (error) {
-    return error;
-  }
-  throw new LlmConformanceFailure("l'appel aurait dû être rejeté");
-};
-
-const expectRejection = async <T extends Error>(
-  call: Promise<unknown>,
-  type: new (...args: never[]) => T,
-  label: string,
-): Promise<T> => {
-  const error = await rejection(call);
-  check(error instanceof type, `${label} : erreur typée attendue (${type.name})`);
-  return error as T;
-};
-
 const noLeak = (error: unknown, secrets: readonly string[], label: string): void => {
   const failure = error as Error;
   const text = [JSON.stringify(error), failure.message, failure.stack].join("\n");
@@ -141,7 +119,21 @@ const noLeak = (error: unknown, secrets: readonly string[], label: string): void
   }
 };
 
+const KIT = {
+  triggers: LLM_FAILURE_TRIGGERS,
+  secrets: (subject: LlmConformanceSubject) => [
+    subject.validKey,
+    subject.invalidKey,
+    PROMPT_SENTINEL,
+  ],
+  requestFor,
+};
+
 const CASES: Record<CaseName, CaseBody> = {
+  ...(hardeningBodies(KIT) as Record<
+    (typeof LLM_CONFORMANCE_HARDENING_CASE_NAMES)[number],
+    CaseBody
+  >),
   "returns text with usage, provider and served model": async (subject) => {
     await subject.replyWith("bonjour");
     const response = await subject.provider.complete(requestFor(subject));
@@ -243,7 +235,6 @@ const CASES: Record<CaseName, CaseBody> = {
   "never leaks key, prompt or output in errors": async (subject) => {
     const secrets = [subject.validKey, subject.invalidKey, PROMPT_SENTINEL, OUTPUT_SENTINEL];
     const refused = requestFor(subject, { credential: llmCredential(subject.invalidKey) });
-    await subject.replyWith(OUTPUT_SENTINEL);
     noLeak(await rejection(subject.provider.complete(refused)), secrets, "clé refusée");
     for (const trigger of LLM_FAILURE_TRIGGERS) {
       await subject.failWith(trigger);

@@ -22,7 +22,10 @@ const FORBIDDEN_BODY_KEYS = [
 
 const sendOnce = async (overrides = {}) => {
   const { transport, provider, sentKeys } = bench();
-  transport.enqueue({ kind: "message", text: "bonjour" });
+  // Une sortie JSON reçoit un JSON : un texte libre y est une erreur (anthropic-response.test.ts).
+  const text =
+    (overrides as { output?: { kind: string } }).output?.kind === "json" ? "{}" : "bonjour";
+  transport.enqueue({ kind: "message", text });
   await provider.complete(makeRequest(overrides));
   const sent = transport.requests[0];
   if (sent === undefined) throw new Error("aucune requête envoyée");
