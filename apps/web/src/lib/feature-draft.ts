@@ -24,7 +24,7 @@ export interface FeatureDraft {
 }
 export interface PendingSave {
   batchId: string;
-  kind: "create" | "update";
+  kind: "create" | "update" | "delete";
   specId?: string;
   title: string;
   savedAt: string;

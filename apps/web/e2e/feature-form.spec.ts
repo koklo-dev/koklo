@@ -13,10 +13,10 @@ import { BASE_SHA, type WriteMode } from "./support/stub-feature-write.ts";
 import { FEATURE_PROJECT_ID } from "./support/stub-features.ts";
 
 /**
- * TK-48 / 48e-1, formulaire de fonctionnalité : création et modification (design/screens/S-feature-form.md
- * §11, §12). Pile locale : faux API (support/stub-feature-write.ts), navigateur réel ; jamais github.com ni
- * Postgres. La suppression est reportée au lot 48e-2 : ni bouton, ni capture `delete-confirm` ici.
- * Captures dans design/screens/captures/S-feature-form/<état>-<thème>.png (+ -mobile à 375 px) ; le Red n'en
+ * TK-48 / 48e, formulaire de fonctionnalité : création et modification (48e-1), suppression (48e-2)
+ * (design/screens/S-feature-form.md §4.8, §11, §12). Pile locale : faux API (support/stub-feature-write.ts),
+ * navigateur réel ; jamais github.com ni Postgres. La suppression ajoute l'état `delete-confirm` (clair, sombre,
+ * 375 px) et les parcours du bloc « Suppression (48e-2) » en fin de fichier. Captures dans design/screens/captures/S-feature-form/<état>-<thème>.png (+ -mobile à 375 px) ; le Red n'en
  * écrit aucune, le Green/Refactor les génère.
  */
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa"];
@@ -63,6 +63,20 @@ async function linkScreen(page: Page, id = "S-login"): Promise<void> {
   if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
   await dialog.getByRole("textbox", { name: "Écrans" }).fill(id);
 }
+const DELETE = "Supprimer cette fonctionnalité";
+const askDelete = (page: Page) => dialogOf(page).getByRole("button", { name: DELETE }).click();
+const confirmGroup = (page: Page) =>
+  dialogOf(page).getByRole("group", { name: "Confirmer la suppression" });
+const confirmDeletion = (page: Page) =>
+  confirmGroup(page).getByRole("button", { name: "Supprimer", exact: true }).click();
+const titleBox = (page: Page) =>
+  dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" });
+/** Ouvre la modification de F-001 et attend le préremplissage. */
+async function openF001(page: Page): Promise<void> {
+  await page.goto(`${PATH}?edit=F-001`);
+  await expect(titleBox(page)).toHaveValue("Connexion par e-mail");
+}
+const submitsSeen = async () => (await specWritesSeen()).filter((entry) => entry.kind === "submit");
 const save = (page: Page) => dialogOf(page).getByRole("button", { name: "Enregistrer" }).click();
 const region = (page: Page) => page.locator('[role="status"], output');
 
@@ -250,6 +264,17 @@ const STATES: State[] = [
       await page.reload();
     },
     visible: see((p) => dialogOf(p).getByText(/^Brouillon repris, enregistré le/)),
+  },
+  {
+    name: "delete-confirm",
+    path: `${PATH}?edit=F-001`,
+    act: async (page) => {
+      await expect(
+        dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" }),
+      ).toHaveValue("Connexion par e-mail");
+      await askDelete(page);
+    },
+    visible: see((p) => dialogOf(p).getByRole("group", { name: "Confirmer la suppression" })),
   },
   {
     name: "list-after-save",
@@ -615,5 +640,232 @@ test.describe("375 px", () => {
     expect(await noHorizontalScroll(page)).toBe(true);
     await capture(page, "error-spec-invalid", "light", "-mobile");
     await noAxeViolation(page);
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+test.describe("Suppression (48e-2)", () => {
+  test("confirmation en ligne : texte, deux boutons, focus sur « Garder », aucun dialogue empilé, aucun appel", async ({
+    page,
+  }) => {
+    await scenario({ write: "ok" });
+    await openF001(page);
+    await askDelete(page);
+    const group = confirmGroup(page);
+    await expect(group.getByText("Supprimer F-001 « Connexion par e-mail » ?")).toBeVisible();
+    await expect(group).toContainText("Ses critères d'acceptation seront supprimés avec elle.");
+    await expect(group.getByRole("button", { name: "Garder", exact: true })).toBeFocused();
+    await expect(group.getByRole("button", { name: "Supprimer", exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await expect(dialogOf(page).getByRole("button", { name: "Enregistrer" })).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveCount(1);
+    expect(await specWritesSeen()).toEqual([]);
+  });
+
+  test("« Garder » : retour au pied, focus sur « Supprimer cette fonctionnalité », aucun envoi, saisie gardée", async ({
+    page,
+  }) => {
+    await scenario({ write: "ok" });
+    await openF001(page);
+    await titleBox(page).fill("Titre en cours");
+    await askDelete(page);
+    await confirmGroup(page).getByRole("button", { name: "Garder", exact: true }).click();
+    await expect(confirmGroup(page)).toHaveCount(0);
+    await expect(dialogOf(page).getByRole("button", { name: DELETE })).toBeFocused();
+    await expect(titleBox(page)).toHaveValue("Titre en cours");
+    expect(await specWritesSeen()).toEqual([]);
+  });
+
+  test("suppression nominale : une opération feature.delete, F-001 disparaît de la liste relue, annonce, focus sur le h1 (AC-48-24)", async ({
+    page,
+  }) => {
+    await scenario({ write: "ok" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmDeletion(page);
+    await expect(region(page).filter({ hasText: "F-001 supprimée." })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(dialogOf(page)).toBeHidden();
+    await expect(page).not.toHaveURL(/edit=/);
+    await expect(page.getByRole("link", { name: "Connexion par e-mail" })).toHaveCount(0);
+    await expect(page.getByRole("row")).toHaveCount(3);
+    await expect(page.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toBeFocused();
+    await expect(page.getByRole("status")).toHaveCount(1);
+    const submits = await submitsSeen();
+    expect(submits).toHaveLength(1);
+    const [body] = submits;
+    expect(body?.idempotencyKey).toMatch(KEY_PATTERN);
+    expect(body?.baseSha).toBe(BASE_SHA);
+    expect(body).not.toHaveProperty("message");
+    expect(body?.operations).toEqual([{ kind: "feature.delete", specId: "F-001" }]);
+  });
+
+  test("l'adresse d'une fonctionnalité supprimée dit qu'elle n'existe plus et n'offre pas de suppression", async ({
+    page,
+  }) => {
+    await scenario({ write: "ok" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmDeletion(page);
+    await expect(region(page).filter({ hasText: "F-001 supprimée." })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.goto(`${PATH}?edit=F-001`);
+    await expect(
+      dialogOf(page).getByText("Cette fonctionnalité n'existe plus dans la spec."),
+    ).toBeVisible();
+    await expect(dialogOf(page).getByRole("button", { name: DELETE })).toHaveCount(0);
+  });
+
+  test("suppression refusée (SPEC_INVALID, une référence) : diagnostic lisible, F-001 reste dans la liste", async ({
+    page,
+  }) => {
+    await scenario({ write: "invalid" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmDeletion(page);
+    const alert = dialogOf(page).getByRole("alert");
+    await expect(alert).toContainText("La spec obtenue ne serait pas valide");
+    await expect(alert).toContainText("Le scénario TS-001 renvoie à F-001, qui n'existerait plus.");
+    await expect(dialogOf(page).getByRole("button", { name: DELETE })).toBeVisible();
+    await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
+    await expect(page.getByRole("link", { name: "Connexion par e-mail" })).toBeVisible();
+  });
+
+  test("GitHub indisponible (503) : « Réessayer » renvoie la suppression avec une nouvelle clé", async ({
+    page,
+  }) => {
+    await scenario({ write: "provider" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmDeletion(page);
+    await expect(dialogOf(page).getByRole("alert")).toContainText(
+      "GitHub est momentanément indisponible",
+    );
+    await dialogOf(page).getByRole("button", { name: "Réessayer" }).click();
+    await expect.poll(async () => (await submitsSeen()).length).toBe(2);
+    const [first, second] = await submitsSeen();
+    expect(second?.idempotencyKey).not.toBe(first?.idempotencyKey);
+    expect(second?.operations).toEqual([{ kind: "feature.delete", specId: "F-001" }]);
+  });
+
+  test("lot en attente, fermer, rechargement : suivi par la page, sans second envoi, puis « F-001 supprimée. »", async ({
+    page,
+  }) => {
+    await scenario({ write: "queued" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmDeletion(page);
+    await expect(dialogOf(page).getByText("En attente de son tour").first()).toBeVisible();
+    await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
+    await expect(
+      region(page).filter({ hasText: "Suppression de « Connexion par e-mail » en cours…" }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(region(page).filter({ hasText: "F-001 supprimée." })).toBeVisible({
+      timeout: 30_000,
+    });
+    const writes = await specWritesSeen();
+    expect(writes.filter((entry) => entry.kind === "submit")).toHaveLength(1);
+    expect(writes.some((entry) => entry.kind === "get")).toBe(true);
+    await expect(page.getByRole("link", { name: "Connexion par e-mail" })).toHaveCount(0);
+  });
+
+  test("double clic sur « Supprimer » : un seul envoi", async ({ page }) => {
+    await scenario({ write: "hold" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmGroup(page).getByRole("button", { name: "Supprimer", exact: true }).dblclick();
+    await expect(dialogOf(page).getByRole("button", { name: "Suppression…" })).toBeVisible();
+    await releaseHeld();
+    await expect(region(page).filter({ hasText: "supprimée." })).toBeVisible({ timeout: 20_000 });
+    expect(await submitsSeen()).toHaveLength(1);
+  });
+
+  test("clavier : Entrée ouvre la confirmation, focus sur « Garder », Tab reste dans le panneau, Entrée sur « Garder » annule", async ({
+    page,
+  }) => {
+    await scenario({ write: "ok" });
+    await openF001(page);
+    await dialogOf(page).getByRole("button", { name: DELETE }).focus();
+    await page.keyboard.press("Enter");
+    const keep = confirmGroup(page).getByRole("button", { name: "Garder", exact: true });
+    await expect(keep).toBeFocused();
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(
+        true,
+      );
+    }
+    await keep.focus();
+    await page.keyboard.press("Enter");
+    await expect(confirmGroup(page)).toHaveCount(0);
+    expect(await specWritesSeen()).toEqual([]);
+  });
+
+  for (const role of ["dev", "designer"] as KanbanRole[]) {
+    test(`${role} : peut supprimer une fonctionnalité liée à un écran`, async ({ page }) => {
+      await scenario({ write: "ok", role });
+      await openF001(page);
+      await askDelete(page);
+      await confirmDeletion(page);
+      await expect(region(page).filter({ hasText: "F-001 supprimée." })).toBeVisible({
+        timeout: 20_000,
+      });
+    });
+  }
+
+  test("designer, serveur qui refuse (FORBIDDEN) : règle de l'écran affichée, F-001 reste", async ({
+    page,
+  }) => {
+    await scenario({ write: "forbidden", role: "designer" });
+    await openF001(page);
+    await askDelete(page);
+    await confirmDeletion(page);
+    await expect(dialogOf(page).getByRole("alert")).toContainText(
+      "Vous ne pouvez enregistrer que les fonctionnalités liées à un écran",
+    );
+  });
+
+  for (const role of ["client", "business"] as KanbanRole[]) {
+    test(`${role} : aucune suppression, ni bouton ni confirmation, aucun appel d'écriture (AC-48-27, AC-48-28)`, async ({
+      page,
+    }) => {
+      await scenario({ write: "ok", role });
+      await page.goto(`${PATH}?edit=F-001`);
+      await expect(page.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Supprimer|Modifier/ })).toHaveCount(0);
+      await expect(page.getByRole("group", { name: "Confirmer la suppression" })).toHaveCount(0);
+      expect(await specWritesSeen()).toEqual([]);
+      const html = await page.content();
+      expect(html).not.toMatch(/Supprimer cette fonctionnalité|feature-draft|feature-pending/i);
+    });
+  }
+
+  test.describe("375 px", () => {
+    test.use({ viewport: { width: 375, height: 800 } });
+
+    test("delete-confirm-mobile : boutons pleine largeur de 44 px, aucun défilement horizontal, capture", async ({
+      page,
+    }) => {
+      await scenario({ write: "ok" });
+      await openF001(page);
+      await askDelete(page);
+      await settle(page);
+      const confirm = await confirmGroup(page)
+        .getByRole("button", { name: "Supprimer", exact: true })
+        .boundingBox();
+      const keep = await confirmGroup(page)
+        .getByRole("button", { name: "Garder", exact: true })
+        .boundingBox();
+      expect(confirm?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(keep?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(confirm?.width ?? 0).toBeGreaterThanOrEqual(300);
+      expect(await noHorizontalScroll(page)).toBe(true);
+      await capture(page, "delete-confirm", "light", "-mobile");
+      await noAxeViolation(page);
+    });
   });
 });

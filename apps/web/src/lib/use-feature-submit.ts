@@ -32,7 +32,7 @@ import { useStorageScope } from "./use-storage-scope.ts";
 export interface WriteMeta {
   /** Numéro du formulaire qui a lancé l'écriture (un formulaire rouvert ne reprend pas l'indicateur d'un autre). */
   owner: number;
-  kind: "create" | "update";
+  kind: "create" | "update" | "delete";
   specId?: string | undefined;
   title: string;
   status: string;

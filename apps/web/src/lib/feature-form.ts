@@ -209,7 +209,7 @@ const DESIGNER_MESSAGE = "Liez au moins un écran pour enregistrer cette fonctio
 
 /** Contrôle préalable du designer (S-feature-form §5.4) : `null` si la règle est respectée. */
 export function checkDesignerScreens(
-  mode: "create" | "update",
+  mode: "create" | "update" | "delete",
   baseline: FeatureFormValues | null,
   values: FeatureFormValues,
 ): FormIssue | null {

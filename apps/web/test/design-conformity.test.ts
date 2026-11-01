@@ -75,6 +75,8 @@ const FILES = [
   "components/save-progress.tsx",
   "components/draft-banner.tsx",
   "components/saved-notice.tsx",
+  // TK-48e-2 : suppression d'une fonctionnalité (S-feature-form §4.8)
+  "components/feature-delete-confirm.tsx",
   "lib/feature-form.ts",
   "lib/feature-operation.ts",
   "lib/feature-draft.ts",
