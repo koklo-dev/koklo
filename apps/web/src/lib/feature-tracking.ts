@@ -5,6 +5,9 @@ export const POLL_MAX_MS = 5000;
 export const TRACKING_LIMIT_MS = 60_000;
 export const INDEX_POLL_MS = 2000;
 export const INDEX_LIMIT_MS = 30_000;
+/** Liste « pas encore à jour » : la page relit encore `spec.head` toutes les 5 s, 2 minutes au plus (S-features 4.5). */
+export const LATE_POLL_MS = 5000;
+export const LATE_LIMIT_MS = 120_000;
 
 /** Délai avant la relecture n° `attempt` (0 = la première) : 1,5 s, ×1,5, plafonné à 5 s. */
 export function pollDelay(attempt: number): number {

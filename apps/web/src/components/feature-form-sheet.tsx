@@ -3,7 +3,7 @@
 import type { FeatureDetail, Role } from "@koklo/contract";
 import { Button, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@koklo/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type MutableRefObject, useEffect, useRef, useState } from "react";
+import { type MutableRefObject, type ReactNode, useEffect, useRef, useState } from "react";
 import { fieldId } from "../lib/feature-form-ids.ts";
 import { orpc } from "../lib/orpc.ts";
 import { describeFeatureError } from "../lib/spec-errors.ts";
@@ -27,11 +27,27 @@ export interface FormSheetProps {
   role: Role | undefined;
   head: { branch: string; commitSha: string };
   write: FeatureWrite;
+  /** Texte de la région d'état unique pendant que le panneau est ouvert (la page est alors masquée). */
+  statusText: string;
   announce: (text: string) => void;
   /** Ferme le formulaire (adresse) ; la saisie est déjà gardée. */
   onClose: () => void;
   /** Vrai quand le focus ne doit pas revenir au bouton d'origine (retour à la liste, focus géré par la page). */
   keepFocus: MutableRefObject<boolean>;
+}
+
+/** Zone défilante du panneau : atteignable au clavier (axe `scrollable-region-focusable`), anneau `--ring`. */
+function ScrollRegion({ className = "", children }: { className?: string; children: ReactNode }) {
+  return (
+    <section
+      aria-label="Saisie de la fonctionnalité"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante, doit pouvoir être lue au clavier
+      tabIndex={0}
+      className={`flex min-h-0 flex-1 flex-col overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
+    >
+      {children}
+    </section>
+  );
 }
 
 function Loading() {
@@ -69,7 +85,7 @@ function FormFooter(props: {
   onClose: () => void;
 }) {
   return (
-    <SheetFooter className="flex-col sm:flex-col sm:justify-start md:flex-row-reverse md:justify-start">
+    <SheetFooter className="flex-col sm:flex-col sm:justify-start md:flex-row md:justify-start">
       <Button
         type="submit"
         className="h-11 w-full md:h-9 md:w-auto"
@@ -91,13 +107,14 @@ function FormFooter(props: {
   );
 }
 
-/** Fermeture : brouillon écrit puis annoncé, échec ou liste en retard effacés, « Vérifier la liste ». */
+/** Fermeture : brouillon écrit puis annoncé, échec effacé, liste en retard gardée, « Vérifier la liste ». */
 function useFormClose(props: BodyProps, model: FeatureFormModel) {
   const { write, announce, onClose, closeRef } = props;
   const queryClient = useQueryClient();
   const close = (): void => {
     const kept = write.busy ? false : model.flushDraft();
-    if (model.mine && (write.phase === "failed" || write.phase === "late")) write.dismiss();
+    // « Liste pas encore à jour » reste suivie par la page (relectures bornées) : seul l'échec est effacé.
+    if (model.mine && write.phase === "failed") write.dismiss();
     if (kept) announce("Brouillon gardé sur cet appareil.");
     onClose();
   };
@@ -138,18 +155,13 @@ function FormBody(props: BodyProps) {
         model.save();
       }}
     >
-      <section
-        aria-label="Saisie de la fonctionnalité"
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante, doit pouvoir être lue au clavier
-        tabIndex={0}
-        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
+      <ScrollRegion className="gap-6">
         <FormMessages model={model} write={write} onClose={close} onCheckList={checkList} />
         <GeneralFields {...field} />
         <DescriptionField {...field} />
         <CriteriaEditor {...field} announce={announce} original={model.state.baseline} />
         <LinksFields {...field} designer={role === "designer"} />
-      </section>
+      </ScrollRegion>
       {model.mine && write.phase !== "idle" ? (
         <SaveProgress write={write} version={write.batch?.commitSha?.slice(0, 7) ?? null} />
       ) : null}
@@ -192,7 +204,7 @@ function restoreFocus(opener: Element | null, specId: string | undefined): void 
 
 /** Formulaire de création ou de modification d'une fonctionnalité, dans un `Sheet` de 440 px. */
 export function FeatureFormSheet(props: FormSheetProps) {
-  const { projectId, mode, specId, role, onClose, keepFocus } = props;
+  const { projectId, mode, specId, role, onClose, keepFocus, statusText } = props;
   const [opener] = useState(() => document.activeElement);
   const owner = useRef(0);
   if (owner.current === 0) owner.current = ++lastOwner;
@@ -220,6 +232,10 @@ export function FeatureFormSheet(props: FormSheetProps) {
             <Title mode={mode} specId={specId} />
           </SheetTitle>
         </SheetHeader>
+        {/* Région d'état unique de l'écran tant que le panneau est ouvert (le reste de la page est masqué). */}
+        <div role="status" className="sr-only">
+          {statusText}
+        </div>
         {ready ? (
           <FormBody
             {...props}
@@ -229,12 +245,7 @@ export function FeatureFormSheet(props: FormSheetProps) {
           />
         ) : (
           <>
-            <section
-              aria-label="Saisie de la fonctionnalité"
-              // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante, doit pouvoir être lue au clavier
-              tabIndex={0}
-              className="flex-1 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
+            <ScrollRegion>
               {query.isError ? (
                 <FeatureError
                   view={describeFeatureError(query.error, role)}
@@ -244,7 +255,7 @@ export function FeatureFormSheet(props: FormSheetProps) {
               ) : (
                 <Loading />
               )}
-            </section>
+            </ScrollRegion>
             <SheetFooter>
               <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onClose}>
                 Fermer

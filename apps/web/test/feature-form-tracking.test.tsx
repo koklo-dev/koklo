@@ -425,6 +425,7 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Index en retard (§4.6)", () => {
   it("après 30 s sans rattrapage : étape 3 « Pas encore à jour », phrase rassurante, aucune alerte", async () => {
     submitReplies(batch());
@@ -465,6 +466,40 @@ describe("Index en retard (§4.6)", () => {
     expect(procedures.specHead.mock.calls.length).toBeGreaterThan(before);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain(`${CREATED_ID} « ${NEW_TITLE} » créée.`);
+  });
+
+  it("« Fermer » à ce stade : la page garde l'avis et relit encore spec.head (5 s, 2 min), puis confirme (refactor 48e)", async () => {
+    submitReplies(batch());
+    const panel = await fillAndSave();
+    await advance(31 * SECOND);
+    await user().click(await panel.findByRole("button", { name: "Fermer" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(await screen.findByRole("group", { name: "Enregistrement en cours" })).toBeVisible();
+    expect(liveText()).toContain("La liste se mettra à jour dans un instant.");
+    // L'index rattrape pendant la fenêtre de 2 minutes : confirmation, sans action de l'utilisateur.
+    await advance(40 * SECOND);
+    indexCatchesUp();
+    await advance(6 * SECOND);
+    await waitFor(() => expect(liveText()).toContain(`${CREATED_ID} « ${NEW_TITLE} » créée.`));
+  });
+
+  it("la relecture de la liste en retard s'arrête à 2 minutes, sans erreur, et reprend avec « Actualiser la liste »", async () => {
+    submitReplies(batch());
+    const panel = await fillAndSave();
+    await advance(31 * SECOND);
+    await user().click(await panel.findByRole("button", { name: "Fermer" }));
+    await advance(2 * SECOND);
+    const during = procedures.specHead.mock.calls.length;
+    await advance(60 * SECOND);
+    const afterMinute = procedures.specHead.mock.calls.length;
+    expect(afterMinute - during).toBeGreaterThanOrEqual(10);
+    expect(afterMinute - during).toBeLessThanOrEqual(13);
+    await advance(70 * SECOND);
+    const stopped = procedures.specHead.mock.calls.length;
+    await advance(30 * SECOND);
+    expect(procedures.specHead.mock.calls.length).toBe(stopped);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Actualiser la liste" })).toBeVisible();
   });
 
   it("« Fermer » à ce stade ferme sans perdre l'information : le brouillon a déjà été supprimé", async () => {

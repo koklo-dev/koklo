@@ -7,7 +7,6 @@ import {
   setScenario,
   settle,
   specWritesSeen,
-  switchToDark,
   type Theme,
 } from "./support/helpers.ts";
 import { BASE_SHA, type WriteMode } from "./support/stub-feature-write.ts";
@@ -272,10 +271,17 @@ async function arrive(page: Page, state: State, theme: Theme): Promise<void> {
     ...(state.role ? { role: state.role } : {}),
     ...(state.feature ? { feature: state.feature } : {}),
   });
-  await page.addInitScript(() => localStorage.clear());
+  // Stockage vidé une seule fois par test (pas à chaque rechargement : « draft-resumed » recharge la page avec son
+  // brouillon) ; le thème sombre est posé avant le rendu, car sous un panneau modal (`?new=1`, `?edit=`) le menu
+  // utilisateur est masqué et inatteignable.
+  await page.addInitScript((dark) => {
+    if (sessionStorage.getItem("e2e-storage-cleared")) return;
+    sessionStorage.setItem("e2e-storage-cleared", "1");
+    localStorage.clear();
+    if (dark) localStorage.setItem("koklo-theme", "dark");
+  }, theme === "dark");
   if (state.clock) await page.clock.install();
   await page.goto(state.path ?? PATH);
-  if (theme === "dark") await switchToDark(page);
   if (state.act) await state.act(page);
   await state.visible(page);
 }
@@ -544,6 +550,20 @@ test("S-feature-form : clavier, Tab dans l'ordre, Échap ferme et rend le focus 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test("S-feature-form : la région d'état unique reste dans l'arbre d'accessibilité sous le panneau modal", async ({
+  page,
+}) => {
+  await scenario();
+  await page.goto(`${PATH}?new=1`);
+  await dialogOf(page).waitFor();
+  // `getByRole` ignore les éléments masqués aux technologies d'assistance (aria-hidden posé par le dialogue).
+  await expect(page.getByRole("status")).toHaveCount(1);
+  await expect(dialogOf(page).getByRole("status")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialogOf(page)).toBeHidden();
+  await expect(page.getByRole("status")).toHaveCount(1);
 });
 
 test("S-feature-form : mouvement réduit, aucune animation infinie dans le formulaire", async ({

@@ -240,6 +240,7 @@ function FormSheet({ page }: { page: FeaturesPageModel }) {
       role={data.role}
       head={data.head}
       write={write}
+      statusText={page.region.panelText}
       announce={page.announce}
       onClose={form.close}
       keepFocus={page.keepFocus}
@@ -260,18 +261,21 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
       />
       {page.showVersion && head ? <VersionLine head={head} team={page.team} /> : null}
       <div
-        role="status"
+        // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau.
+        role={page.form.open ? undefined : "status"}
         aria-busy={page.region.busy || undefined}
         className="text-[13px] text-muted-foreground empty:hidden"
       >
-        {page.region.text}
         {page.form.open ? null : (
-          <WriteNotice
-            write={page.write}
-            role={page.data.role}
-            hrefFor={page.sheet.hrefFor}
-            onOpen={page.url.openFeature}
-          />
+          <>
+            {page.region.text}
+            <WriteNotice
+              write={page.write}
+              role={page.data.role}
+              hrefFor={page.sheet.hrefFor}
+              onOpen={page.url.openFeature}
+            />
+          </>
         )}
       </div>
       {page.form.open ? null : (

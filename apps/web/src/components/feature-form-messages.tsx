@@ -1,16 +1,13 @@
 "use client";
 
-import { Alert, Button, Icon } from "@koklo/ui";
+import { Alert, Icon } from "@koklo/ui";
 import type { ReactNode } from "react";
 import { FIELD_LABELS } from "../lib/feature-form-ids.ts";
 import type { FeatureFormModel } from "../lib/use-feature-form.ts";
 import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import { DraftBanner } from "./draft-banner.tsx";
 import { FormSummary, SaveErrorAlert } from "./feature-form-errors.tsx";
-
-const SLOW =
-  "L'enregistrement prend plus de temps que prévu. Il continue sans vous : votre saisie est gardée.";
-const LATE = "Votre modification est enregistrée. La liste se mettra à jour dans un instant.";
+import { WaitNotice } from "./write-wait-notice.tsx";
 
 function Notice({ children }: { children: ReactNode }) {
   return (
@@ -18,25 +15,6 @@ function Notice({ children }: { children: ReactNode }) {
       <Icon name="schedule" size={20} />
       <div className="flex flex-col items-start gap-3">{children}</div>
     </Alert>
-  );
-}
-
-function ActionNotice({
-  text,
-  label,
-  onClick,
-}: {
-  text: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Notice>
-      <p>{text}</p>
-      <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onClick}>
-        {label}
-      </Button>
-    </Notice>
   );
 }
 
@@ -102,10 +80,10 @@ export function FormMessages(props: MessagesProps) {
       ) : null}
       <Problem model={model} onClose={props.onClose} onCheckList={props.onCheckList} />
       {model.mine && write.slow && write.phase === "tracking" ? (
-        <ActionNotice text={SLOW} label="Vérifier maintenant" onClick={write.restart} />
+        <WaitNotice write={write} slow label="Information" />
       ) : null}
       {model.mine && write.phase === "late" ? (
-        <ActionNotice text={LATE} label="Actualiser la liste" onClick={write.refreshIndex} />
+        <WaitNotice write={write} slow={false} label="Information" />
       ) : null}
     </>
   );

@@ -62,5 +62,3 @@ export function useFeatureFormPanel(url: Url, data: Data, write: FeatureWrite) {
     },
   };
 }
-
-export type FeatureFormPanel = ReturnType<typeof useFeatureFormPanel>;

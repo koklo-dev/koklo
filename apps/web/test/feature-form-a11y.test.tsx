@@ -126,10 +126,28 @@ describe("Dialogue, focus, étiquettes", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Une seule région d'état, une seule alerte (§7)", () => {
   it("formulaire au repos : une région role=status sur tout l'écran", async () => {
     await openCreate();
     expect(statusRegions()).toHaveLength(1);
+  });
+
+  it("la région d'état est dans le panneau tant qu'il est ouvert (le reste de la page est masqué), hors du panneau ensuite (refactor 48e)", async () => {
+    procedures.specBatchSubmit.mockReturnValue(new Promise(() => undefined));
+    const panel = await openCreate();
+    expect(statusRegions()[0]?.closest('[role="dialog"]')).not.toBeNull();
+    await fillMinimum(panel);
+    await clickSave(panel);
+    await panel.findByRole("button", { name: "Enregistrement…" });
+    expect(statusRegions()).toHaveLength(1);
+    expect(within(await dialog()).getByRole("status")).toHaveTextContent(
+      "Envoi de votre modification…",
+    );
+    await userEvent.click(panel.getByRole("button", { name: "Fermer" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(statusRegions()).toHaveLength(1);
+    expect(statusRegions()[0]?.closest('[role="dialog"]')).toBeNull();
   });
 
   it("pendant l'envoi : toujours une seule région d'état", async () => {

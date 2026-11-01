@@ -1,4 +1,5 @@
 import type { FeatureDetail, Role } from "@koklo/contract";
+import type { Dispatch, SetStateAction } from "react";
 import { readDraft } from "./feature-draft.ts";
 import type { SaveErrorView } from "./feature-errors.ts";
 import {
@@ -20,6 +21,9 @@ export interface ResumeKey {
   key: string;
   snapshot: string;
 }
+
+/** Mise à jour de l'état du formulaire, partagée par les hooks qui le pilotent. */
+export type SetFormState = Dispatch<SetStateAction<FormState>>;
 
 export type Banner = { kind: "resumed"; savedAt: string } | { kind: "changed"; savedAt: string };
 
