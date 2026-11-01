@@ -1258,6 +1258,29 @@ flowchart LR
   obs -.->|only if SENTRY_DSN| gt[GlitchTip]
 ```
 
+### Untrusted data marking and prompt framing (TK-50a, `packages/domain`)
+First lot of the LLM port ([ADR 0011](adr/0011-llm-port-and-untrusted-data.md)); pure domain code, no
+dependency, no I/O, no clock, no randomness. Content that does not come from Koklo is typed
+`Untrusted` (closed origin list); Koklo's own instructions are `Trusted` (template tag without
+interpolation). `framePrompt` is the only producer of `FramedPrompt`: the fixed policy and the
+instructions go in `system`, each datum in a delimited block of `user` carrying a caller-supplied
+nonce. A model reply is `Unvalidated` until `validateLlmOutput` turns it into a `Validated`
+proposal. Framing reduces prompt-injection risk, it does not remove it, and a validated output is
+still a proposal that a human validates (vision §6.3). The provider port and adapters follow in 50b/50c.
+
+```mermaid
+flowchart LR
+  src([spec, comments, issues, git, briefs]) --> u[Untrusted]
+  k([Koklo instructions]) --> t[Trusted]
+  u --> f[framePrompt + nonce]
+  t --> f
+  f --> p[FramedPrompt: system / user]
+  p -.->|50b port| m[(model)]
+  m -.-> r[Unvalidated]
+  r --> v[validateLlmOutput]
+  v --> o[Validated: proposal]
+```
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).
@@ -1326,5 +1349,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0007](adr/0007-real-stack-e2e-orchestration.md),
 [0008](adr/0008-web-entry-gate-organizations.md),
 [0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
-[0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider).
+[0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
+[0011](adr/0011-llm-port-and-untrusted-data.md) (proposed: LLM port and untrusted data).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

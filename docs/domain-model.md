@@ -276,6 +276,24 @@ stateDiagram-v2
   Expired --> [*]: releaseExpired
 ```
 
+### Untrusted data, framed prompts and validated outputs (TK-50a, `packages/domain`)
+Pure value types (no persistence), see [ADR 0011](adr/0011-llm-port-and-untrusted-data.md).
+- **Untrusted** (`untrusted.ts`): content from outside Koklo plus its `origin`, one of `spec-file`,
+  `client-suggestion`, `ticket-comment`, `issue`, `pull-request`, `git-content`, `user-input`, `brief`,
+  `model-output` (`InvalidUntrustedOriginError` otherwise). Frozen, content private; interpolation,
+  JSON and `util.inspect` give `[untrusted:<origin>]`. Read only through `revealUntrusted`.
+- **Trusted** (`trusted.ts`): an instruction written by Koklo, built only by the `trusted` template
+  tag; any interpolation is a type error and raises `TrustedInterpolationError`.
+- **FramedPrompt** (`llm-prompt.ts`): `{ system, user }`, produced only by `framePrompt`. `system` is
+  the fixed `UNTRUSTED_DATA_POLICY` then the instruction; `user` holds one block per datum,
+  `<<<DATA n origin=… nonce=…>>>` / `<<<END n nonce=…>>>`, n from 1. The nonce is 16 to 64
+  alphanumeric characters (`InvalidPromptNonceError`), supplied by the caller. Control characters
+  (except newline and tab) and bidi/invisible marks become U+FFFD; content containing the nonce,
+  `<<<DATA` or `<<<END` raises `UntrustedDelimiterCollisionError` (rank only).
+- **Unvalidated / Validated** (`llm-output.ts`): a raw model output is `Unvalidated`;
+  `validateLlmOutput(output, parse)` returns `{ status: "proposal", value }` or throws
+  `LlmInvalidOutputError` (which never quotes the output). A proposal is never a decision.
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.
