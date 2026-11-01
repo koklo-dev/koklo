@@ -129,8 +129,9 @@ model Member {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications Notification[]
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -164,16 +165,17 @@ model Project {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tickets      Ticket[]
-  sprints      Sprint[]
-  state        ProjectState?
-  counters     ProjectCounter[]
-  repos        ProjectRepo[]
-  writeBatches SpecWriteBatch[]
-  suggestions  Suggestion[]
-  reviews      Review[]
-  baselines    Baseline[]
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tickets       Ticket[]
+  sprints       Sprint[]
+  state         ProjectState?
+  counters      ProjectCounter[]
+  repos         ProjectRepo[]
+  writeBatches  SpecWriteBatch[]
+  suggestions   Suggestion[]
+  reviews       Review[]
+  baselines     Baseline[]
+  notifications Notification[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -1160,4 +1162,28 @@ model Baseline {
   @@index([organizationId])
   @@index([organizationId, projectId, reviewId])
   @@map("baselines")
+}
+
+/// Notifications in-app (TK-51d) : une ligne par destinataire et par événement, sans charge utile (l'API relit l'objet
+/// via `subjectKind`/`subjectRef` avec les droits du destinataire). `type` et `subjectKind` : texte contraint par CHECK
+/// (liste fermée, migration). Idempotence : unique (recipientUserId, dedupeKey). Index partiel des non lues : migration.
+model Notification {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  recipientUserId String    @map("recipient_user_id") @db.Uuid
+  type            String
+  projectId       String?   @map("project_id") @db.Uuid
+  subjectKind     String    @map("subject_kind")
+  subjectRef      String    @map("subject_ref")
+  dedupeKey       String    @map("dedupe_key")
+  readAt          DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  recipient Member   @relation(fields: [organizationId, recipientUserId], references: [organizationId, userId], onDelete: Cascade, onUpdate: NoAction)
+  project   Project? @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([recipientUserId, dedupeKey])
+  @@index([organizationId])
+  @@map("notifications")
 }

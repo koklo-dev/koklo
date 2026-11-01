@@ -38,6 +38,7 @@ export const TENANT_MODELS: readonly string[] = [
   "LlmProviderCredential",
   "Review",
   "Baseline",
+  "Notification",
 ];
 
 /** Modèles portant (ou non) `organizationId` mais hors filtre, avec la raison de l'exclusion. */
