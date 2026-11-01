@@ -61,6 +61,8 @@ export function useFeaturesPage(projectId: string) {
     announce,
     region: {
       text: [text, announcement, writeRegionText(write, form.open)].filter(Boolean).join(" "),
+      /** Formulaire ouvert : la page est masquée aux lecteurs d'écran, la région d'état passe dans le panneau. */
+      panelText: [announcement, writeRegionText(write, true)].filter(Boolean).join(" "),
       busy: view.kind === "loading",
     },
     showFilters: headReady && showsFilters(view),

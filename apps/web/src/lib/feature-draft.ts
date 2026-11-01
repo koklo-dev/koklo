@@ -6,8 +6,8 @@ import type { FeatureFormValues } from "./feature-form.ts";
  */
 export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
-export const DRAFT_PREFIX = "koklo:feature-draft:";
-export const PENDING_PREFIX = "koklo:feature-pending:";
+const DRAFT_PREFIX = "koklo:feature-draft:";
+const PENDING_PREFIX = "koklo:feature-pending:";
 
 export interface FeatureDraft {
   values: FeatureFormValues;

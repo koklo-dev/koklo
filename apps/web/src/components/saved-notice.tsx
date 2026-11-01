@@ -7,10 +7,8 @@ import { canReadRepos } from "../lib/roles.ts";
 import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import type { Placement } from "../lib/use-index-wait.ts";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
+import { WaitNotice } from "./write-wait-notice.tsx";
 
-const SLOW =
-  "L'enregistrement prend plus de temps que prévu. Il continue sans vous : votre saisie est gardée.";
-const LATE = "Votre modification est enregistrée. La liste se mettra à jour dans un instant.";
 const PLACEMENT_TEXT: Partial<Record<Placement, string>> = {
   filtered: "Elle n'apparaît pas avec les filtres actuels.",
   more: "Utilisez « Afficher plus de fonctionnalités » pour la voir.",
@@ -78,27 +76,13 @@ export function WriteNotice(props: NoticeProps) {
   const slow = write.phase === "tracking" && write.slow;
   if (!slow && write.phase !== "late") return null;
   return (
-    <Alert role="group" aria-label="Enregistrement en cours" className="mt-2">
-      <Icon name="schedule" size={20} />
-      <div className="flex flex-col items-start gap-3">
-        <p>{slow ? SLOW : LATE}</p>
-        <div className="flex flex-col gap-2 md:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 md:h-9"
-            onClick={slow ? write.restart : write.refreshIndex}
-          >
-            {slow ? "Vérifier maintenant" : "Actualiser la liste"}
-          </Button>
-          {slow ? null : (
-            <Button type="button" variant="outline" className="h-11 md:h-9" onClick={write.dismiss}>
-              Fermer
-            </Button>
-          )}
-        </div>
-      </div>
-    </Alert>
+    <WaitNotice
+      write={write}
+      slow={slow}
+      label="Enregistrement en cours"
+      dismissible
+      className="mt-2"
+    />
   );
 }
 

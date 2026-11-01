@@ -14,17 +14,17 @@ import {
   type FormArgs,
   type FormState,
   initialState,
+  type SetFormState,
   serverFields,
 } from "./feature-form-state.ts";
 import { useFeatureDraft } from "./use-feature-draft.ts";
 import { useDraftChoices, useFormSave, useReload } from "./use-feature-form-actions.ts";
+import { WRITTEN_PHASES } from "./use-feature-submit.ts";
 
 export type { Banner, FormArgs } from "./feature-form-state.ts";
 
 /** Demande de focus sur un élément du formulaire, appliquée après le rendu qui l'a (ré)ouvert. */
-type SetState = React.Dispatch<React.SetStateAction<FormState>>;
-
-function useFocusRequests(criteriaCount: number, setState: SetState) {
+function useFocusRequests(criteriaCount: number, setState: SetFormState) {
   const [request, setRequest] = useState<{ id: string; nonce: number } | null>(null);
   useEffect(() => {
     if (request) document.getElementById(request.id)?.focus();
@@ -44,7 +44,7 @@ function useFocusRequests(criteriaCount: number, setState: SetState) {
 }
 
 /** Un échec marque les champs que le serveur désigne et garde la saisie (et sa clé) dans le brouillon. */
-function useFailure(args: FormArgs, mine: boolean, setState: SetState, flush: () => boolean) {
+function useFailure(args: FormArgs, mine: boolean, setState: SetFormState, flush: () => boolean) {
   const { write, role, mode } = args;
   const failure = mine ? write.failure : null;
   const view = useMemo(
@@ -68,7 +68,7 @@ function useFailure(args: FormArgs, mine: boolean, setState: SetState, flush: ()
 }
 
 /** Saisie : valeurs, champs touchés, section « Éléments liés », confirmation d'abandon. */
-function useFieldActions(setState: SetState) {
+function useFieldActions(setState: SetFormState) {
   const patch = (next: Partial<FormState>) => setState((s) => ({ ...s, ...next }));
   return {
     setValues: useCallback(
@@ -101,7 +101,7 @@ export function useFeatureForm(args: FormArgs) {
     baseline: state.baseline,
     baseCommitSha: state.baseCommitSha,
     getKey: () => write.currentKey() ?? resumeKey.current?.key ?? null,
-    enabled: !(mine && ["indexing", "late", "saved"].includes(write.phase)),
+    enabled: !(mine && WRITTEN_PHASES.includes(write.phase)),
   });
   const context = { args, state, setState, resumeKey, flushDraft: draft.flush };
   const issues = collectIssues(state, args);

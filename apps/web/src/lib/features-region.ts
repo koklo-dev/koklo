@@ -49,6 +49,13 @@ const VERSIONED_VIEWS = ["loading", "list", "empty", "empty-filtered"];
 export const showsFilters = (view: FeaturesView): boolean => FILTERED_VIEWS.includes(view.kind);
 export const showsVersion = (view: FeaturesView): boolean => VERSIONED_VIEWS.includes(view.kind);
 
+/** Suivi du lot au-delà de 60 s : ce n'est pas une erreur, l'écriture continue sans la page. */
+export const SLOW_TEXT =
+  "L'enregistrement prend plus de temps que prévu. Il continue sans vous : votre saisie est gardée.";
+/** Lot écrit mais index pas encore à jour au bout de 30 s. */
+export const LATE_TEXT =
+  "Votre modification est enregistrée. La liste se mettra à jour dans un instant.";
+
 /** Texte de la région d'état pour l'écriture en cours (formulaire ouvert : étapes ; fermé : suivi de la page). */
 export function writeRegionText(write: FeatureWrite, formOpen: boolean): string {
   const { phase, meta, batch, slow } = write;

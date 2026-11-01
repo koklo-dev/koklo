@@ -3,7 +3,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { INDEX_LIMIT_MS, INDEX_POLL_MS } from "./feature-tracking.ts";
 import { orpc } from "./orpc.ts";
 
 interface Head {
@@ -15,50 +14,70 @@ interface IndexWaitOptions {
   active: boolean;
   /** Version écrite : l'index la rattrape quand `spec.head.commitSha` lui devient égal. */
   commitSha: string | null;
+  /** Délai entre deux relectures, et durée au bout de laquelle on s'arrête. */
+  pollMs: number;
+  limitMs: number;
+  /** Suspend les relectures tant que l'onglet est masqué. */
+  pauseHidden?: boolean;
   onCaughtUp: (head: Head) => void;
-  /** 30 s sans rattrapage : pas une erreur, la liste se mettra à jour. */
-  onLate: () => void;
+  /** Borne atteinte sans rattrapage : pas une erreur, la liste se mettra à jour. */
+  onLate?: () => void;
 }
 
-/** Relit `spec.head` toutes les 2 s, 30 s au plus, jusqu'à ce que l'index ait rattrapé la version écrite. */
-export function useIndexWait(options: IndexWaitOptions): void {
-  const { projectId, active, commitSha } = options;
-  const queryClient = useQueryClient();
-  const latest = useRef(options);
-  latest.current = options;
+/** Une fenêtre d'attente : relectures à intervalle fixe jusqu'au rattrapage ou à la borne. */
+function createIndexPoller(
+  read: () => Promise<Head | null>,
+  commitSha: string,
+  options: () => IndexWaitOptions,
+) {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => {
+    stopped = true;
+    clearTimeout(timer);
+    clearTimeout(deadline);
+  };
+  const deadline = setTimeout(() => {
+    stop();
+    options().onLate?.();
+  }, options().limitMs);
 
-  useEffect(() => {
-    if (!active || !commitSha) return;
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const stop = () => {
-      stopped = true;
-      clearTimeout(timer);
-      clearTimeout(deadline);
-    };
-    const deadline = setTimeout(() => {
-      stop();
-      latest.current.onLate();
-    }, INDEX_LIMIT_MS);
-
-    async function check(): Promise<void> {
-      if (stopped) return;
+  async function check(): Promise<void> {
+    if (stopped) return;
+    const { pauseHidden, pollMs, onCaughtUp } = options();
+    if (!(pauseHidden && document.visibilityState === "hidden")) {
       try {
-        const head = await queryClient.fetchQuery(
-          orpc.spec.head.queryOptions({ input: { projectId } }),
-        );
+        const head = await read();
         if (!stopped && head && head.commitSha === commitSha) {
           stop();
-          return latest.current.onCaughtUp(head);
+          return onCaughtUp(head);
         }
       } catch {
         // lecture manquée : on réessaie jusqu'à la borne
       }
-      if (!stopped) timer = setTimeout(() => void check(), INDEX_POLL_MS);
     }
-    void check();
-    return stop;
-  }, [active, commitSha, projectId, queryClient]);
+    if (!stopped) timer = setTimeout(() => void check(), pollMs);
+  }
+  void check();
+  return stop;
+}
+
+/** Relit `spec.head` à intervalle borné jusqu'à ce que l'index ait rattrapé la version écrite. */
+export function useIndexWait(options: IndexWaitOptions): void {
+  const { projectId, active, commitSha, pollMs, limitMs } = options;
+  const queryClient = useQueryClient();
+  const latest = useRef(options);
+  latest.current = options;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: la fenêtre dépend des bornes, pas des rappels
+  useEffect(() => {
+    if (!active || !commitSha) return;
+    return createIndexPoller(
+      () => queryClient.fetchQuery(orpc.spec.head.queryOptions({ input: { projectId } })),
+      commitSha,
+      () => latest.current,
+    );
+  }, [active, commitSha, projectId, pollMs, limitMs, queryClient]);
 }
 
 /** Où la ligne enregistrée apparaît après la relecture de la liste. */

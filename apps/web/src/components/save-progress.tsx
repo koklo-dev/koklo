@@ -1,5 +1,5 @@
 import { Icon, type IconName } from "@koklo/ui";
-import type { FeatureWrite } from "../lib/use-feature-submit.ts";
+import { type FeatureWrite, WRITTEN_PHASES } from "../lib/use-feature-submit.ts";
 
 type StepStatus = "todo" | "doing" | "done" | "failed" | "late";
 interface Step {
@@ -38,9 +38,7 @@ function writeStep(write: FeatureWrite): Step {
       ? step(label, "doing", "Écriture en cours…")
       : step(label, "doing", "En attente de son tour");
   }
-  return ["indexing", "late", "saved"].includes(write.phase)
-    ? step(label, "done")
-    : step(label, "todo");
+  return WRITTEN_PHASES.includes(write.phase) ? step(label, "done") : step(label, "todo");
 }
 
 /** Les trois étapes d'un enregistrement d'après l'état de l'écriture (S-feature-form §4.4). */

@@ -564,6 +564,32 @@ stateDiagram-v2
 - **Accessibility**: one `role="status"` region (counter, loading, announcements), a real `table` with caption, 44 px targets under `md`, skeletons animate under `motion-safe:` only, statuses are icon + text.
 - **Tests**: unit `apps/web/test/features-*.test.tsx`, `project-create-48d-fixes.test.tsx`; e2e `apps/web/e2e/features.spec.ts` (46 tests against the fake API `e2e/support/stub-features.ts`, captures in `design/screens/captures/S-features/`).
 
+### Web: feature form, create and edit (TK-48e-1)
+`apps/web` only, on top of the features list; contract (0.7.0) and API unchanged. A `Sheet` over `/projects/[projectId]/features` (`?new=1`, `?edit=F-nnn`); `@koklo/ui` gains `Textarea`. Deletion (`feature.delete`) is sub-lot 48e-2. Screen sheet: `design/screens/S-feature-form.md` (v1.1).
+- **One write, owned by the page**: `useFeatureWrite` (`lib/use-feature-submit.ts`) sends one `specBatch.submit` with one operation (pure builders in `feature-operation.ts`: minimal patch on update, `baseSha` from `spec.head`) and survives the form closing. A form number (`owner`) tells the form that started a write from a reopened one. The idempotency key (`feature-<uuid>`) is reused only after a network failure with an identical input; any coded failure or edited input gets a new key.
+```mermaid
+stateDiagram-v2
+  [*] --> idle
+  idle --> sending: Save (valid input)
+  sending --> tracking: batch queued / committing
+  sending --> failed: submit error (error table)
+  sending --> indexing: batch committed in the reply
+  tracking --> indexing: committed (specBatch.get, backoff 1.5 s x1.5, max 5 s, 60 s)
+  tracking --> failed: failed / conflict batch, NOT_FOUND
+  tracking --> tracking: slow after 60 s (checks go on without the page)
+  indexing --> saved: spec.head.commitSha = batch commit (every 2 s, 30 s)
+  indexing --> late: 30 s without catching up
+  late --> saved: spec.head polled every 5 s, 2 min, hidden tab suspended
+  late --> indexing: refresh the list
+  saved --> idle: dismiss / next write
+  failed --> idle: dismiss / next write
+```
+- **Batch tracking**: `use-batch-tracking` (one poller per window, hidden tab suspended, `restart()` opens a new window), `use-index-wait` (`createIndexPoller`, two windows: 2 s/30 s then 5 s/2 min), `use-pending-save` + `feature-draft` (a local pending marker lets a reloaded page resume with `specBatch.get`, never a second `submit`; it is read for write roles only and cleared by `clearAllFeatureStorage()` at sign-out). After the index catches up, `reloadList` resets the list query (cursor forgotten, filters kept) and reports where the row is (`row`, `filtered`, `more`).
+- **Form model**: `use-feature-form` composes `feature-form-state` (initial state, resumed draft, validation, server-designated fields), `use-feature-form-actions` (`useFormSave`, `useReload` = three-way rebase after `stale_base`, `useDraftChoices`), `use-feature-draft` (500 ms debounce, local only) and `use-feature-form-panel` (opening from the address, rights). Pure rules live in `feature-form.ts`, `feature-errors.ts` (single error table), `feature-rebase.ts`, `spec-issues.ts`.
+- **Access**: `canWriteSpec(role)` (owner, admin, dev, designer) and `spec.head.status = ready` gate every entry point; for client, business or an unknown role there is no button, no empty slot, and `?new`/`?edit` are stripped. `deriveFeaturesView` no longer waits for the role to show a spec that was read; only the absence of an index still waits for it. This leaks nothing: the list was always readable by every role, `repo.list` stays enabled only when `spec.head` is `null` and `canReadRepos(role)` (undefined role included), write buttons need a known writing role, and the git-flavoured version line and technical groups are shown to `canReadRepos` roles only (an unknown role gets the client wording).
+- **Accessibility**: exactly one `role="status"` per document. The page region is used while the form is closed; while the modal is open (the rest of the page is `aria-hidden`) it loses its role and content and a visually hidden region of the panel carries the announcements (sending, queue, criteria, draft). Neutral notices are `role="group"`, one `role="alert"` at a time. Footer DOM order is Save then Close, same as the visual order and the tab order. The scrollable area is a named, focusable region.
+- **Tests**: unit and integration `apps/web/test/feature-*.test.ts(x)`; e2e `apps/web/e2e/feature-form.spec.ts` (48 tests against the fake provider `e2e/support/stub-feature-write.ts`, fake clock for `slow` and `saved-index-pending`; captures in `design/screens/captures/S-feature-form/`).
+
 ### Web: sprint kanban (TK-35)
 `apps/web` only; `apps/api`, `packages/contract` and the database are untouched. The screen consumes
 `sprint.list({ status: "active" })`, `ticket.list({ sprintId })` and `ticket.transition({ key, to })`

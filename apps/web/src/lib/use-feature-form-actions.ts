@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import { clearDraft } from "./feature-draft.ts";
 import {
   EMPTY_VALUES,
@@ -14,6 +14,7 @@ import {
   type FormArgs,
   type FormState,
   type ResumeKey,
+  type SetFormState,
 } from "./feature-form-state.ts";
 import {
   buildCreateOperation,
@@ -23,12 +24,10 @@ import {
 import { rebase } from "./feature-rebase.ts";
 import { orpc } from "./orpc.ts";
 
-type SetState = Dispatch<SetStateAction<FormState>>;
-
 interface ActionContext {
   args: FormArgs;
   state: FormState;
-  setState: SetState;
+  setState: SetFormState;
   resumeKey: MutableRefObject<ResumeKey | undefined>;
   flushDraft: () => boolean;
 }

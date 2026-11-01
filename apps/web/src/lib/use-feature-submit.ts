@@ -15,6 +15,7 @@ import { errorCode } from "./api-error.ts";
 import { authClient } from "./auth-client.ts";
 import { clearDraft, clearPending, type PendingSave, savePending } from "./feature-draft.ts";
 import { describeSaveError, type SaveFailure } from "./feature-errors.ts";
+import { INDEX_LIMIT_MS, INDEX_POLL_MS, LATE_LIMIT_MS, LATE_POLL_MS } from "./feature-tracking.ts";
 import { orpc } from "./orpc.ts";
 import { useBatchTracking } from "./use-batch-tracking.ts";
 import { type Placement, reloadList, useIndexWait } from "./use-index-wait.ts";
@@ -63,6 +64,8 @@ const IDLE: WriteState = {
   saved: null,
 };
 const ACTIVE: WritePhase[] = ["sending", "tracking", "indexing"];
+/** Le lot est écrit dans la spec : le brouillon n'a plus de raison d'être et la liste rattrape. */
+export const WRITTEN_PHASES: WritePhase[] = ["indexing", "late", "saved"];
 
 export interface SubmitRequest {
   build: (idempotencyKey: string) => SpecBatchSubmitInput;
@@ -201,17 +204,14 @@ function useSubmit(
   );
 }
 
-/** Suivi du lot (60 s) puis attente de l'index (30 s) : chaque fin rend la main à l'état de l'écriture. */
-function useFollowUp(
-  core: Core,
-  setState: Dispatch<SetStateAction<WriteState>>,
+/** Suivi du lot : relectures de `specBatch.get` pendant 60 s, puis « prend plus de temps » (l'écriture continue). */
+function useBatchFollowUp(
+  { projectId, update }: Core,
   state: WriteState,
   outcomes: ReturnType<typeof useBatchOutcomes>,
-  options: { exit: () => Promise<void>; filters: WriteOptions["filters"] },
+  exit: () => Promise<void>,
 ) {
-  const { projectId, update, metaRef } = core;
-  const queryClient = useQueryClient();
-  const tracking = useBatchTracking({
+  return useBatchTracking({
     projectId,
     active: state.phase === "tracking",
     batchId: state.batchId,
@@ -219,29 +219,53 @@ function useFollowUp(
     onBatch: outcomes.onBatch,
     onSlow: () => update({ slow: true }),
     onError: (error) => {
-      if (errorCode(error) === "UNAUTHORIZED") void options.exit();
+      if (errorCode(error) === "UNAUTHORIZED") void exit();
       else if (errorCode(error) === "NOT_FOUND") outcomes.fail({ source: "submit", error });
     },
   });
+}
+
+/**
+ * Attente de l'index : `spec.head` toutes les 2 s pendant 30 s (« indexing »), puis, si la liste n'est pas à jour
+ * (« late »), toutes les 5 s pendant 2 minutes (S-feature-form §4.6). Chaque rattrapage relit la liste.
+ */
+function useIndexFollowUp(
+  { projectId, update, metaRef }: Core,
+  setState: Dispatch<SetStateAction<WriteState>>,
+  state: WriteState,
+  filters: WriteOptions["filters"],
+) {
+  const queryClient = useQueryClient();
+  const commitSha = state.batch?.commitSha ?? null;
+  const onCaughtUp = (head: { status: string }) => {
+    const meta = metaRef.current;
+    if (!meta) return;
+    const indexFailed = head.status === "failed";
+    update({ phase: "saved", saved: { meta, commitSha, indexFailed, placement: null } });
+    void reloadList(queryClient, meta, filters(), indexFailed).then((placement) =>
+      setState((current) =>
+        current.saved ? { ...current, saved: { ...current.saved, placement } } : current,
+      ),
+    );
+  };
   useIndexWait({
     projectId,
     active: state.phase === "indexing",
-    commitSha: state.batch?.commitSha ?? null,
-    onCaughtUp: (head) => {
-      const meta = metaRef.current;
-      if (!meta) return;
-      const indexFailed = head.status === "failed";
-      const commitSha = state.batch?.commitSha ?? null;
-      update({ phase: "saved", saved: { meta, commitSha, indexFailed, placement: null } });
-      void reloadList(queryClient, meta, options.filters(), indexFailed).then((placement) =>
-        setState((current) =>
-          current.saved ? { ...current, saved: { ...current.saved, placement } } : current,
-        ),
-      );
-    },
+    commitSha,
+    pollMs: INDEX_POLL_MS,
+    limitMs: INDEX_LIMIT_MS,
+    onCaughtUp,
     onLate: () => update({ phase: "late" }),
   });
-  return tracking;
+  useIndexWait({
+    projectId,
+    active: state.phase === "late",
+    commitSha,
+    pollMs: LATE_POLL_MS,
+    limitMs: LATE_LIMIT_MS,
+    pauseHidden: true,
+    onCaughtUp,
+  });
 }
 
 /** Reprise au rechargement : l'écriture repart du marqueur local, sans nouvel envoi. */
@@ -274,7 +298,8 @@ export function useFeatureWrite({ projectId, filters }: WriteOptions) {
   const { update, busy, keyRecord } = core;
   const outcomes = useBatchOutcomes(core);
   const exit = useUnauthorizedExit();
-  const tracking = useFollowUp(core, setState, state, outcomes, { exit, filters });
+  const tracking = useBatchFollowUp(core, state, outcomes, exit);
+  useIndexFollowUp(core, setState, state, filters);
   return {
     ...state,
     busy: ACTIVE.includes(state.phase),
