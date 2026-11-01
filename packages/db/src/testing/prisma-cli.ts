@@ -51,6 +51,8 @@ export const expectedTables = [
   // TK-51c : validations client liées au SHA (journal append-only) et baselines.
   "reviews",
   "baselines",
+  // TK-51d : notifications in-app (destinataire membre, sans charge utile libre).
+  "notifications",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
