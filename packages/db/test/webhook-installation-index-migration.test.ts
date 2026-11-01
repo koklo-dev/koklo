@@ -13,6 +13,7 @@ import {
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
+import { REVIEW_TABLES } from "./support/reviews-fixtures.ts";
 import { insertDelivery } from "./support/spec-fixtures.ts";
 import { SUGGESTION_TABLES } from "./support/suggestions-fixtures.ts";
 import { openPool } from "./support/ticket-fixtures.ts";
@@ -133,8 +134,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (36 attendues au total avec TK-51b)", () => {
-    expect(expectedTables).toHaveLength(36);
+  it("cette migration n'ajoute aucune table (38 attendues au total avec TK-51c)", () => {
+    expect(expectedTables).toHaveLength(38);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });
@@ -223,7 +224,7 @@ describe("TK-45a migration webhook_installation_index : retour arrière et sché
     expect(
       removed.filter(
         (line) =>
-          ![...OAUTH_TABLES, ...LLM_TABLES, ...SUGGESTION_TABLES].some((table) =>
+          ![...OAUTH_TABLES, ...LLM_TABLES, ...SUGGESTION_TABLES, ...REVIEW_TABLES].some((table) =>
             line.includes(table),
           ),
       ),
