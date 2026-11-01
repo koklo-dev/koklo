@@ -5,6 +5,7 @@ import { schemaPath } from "../src/testing/prisma-cli.ts";
 import { LLM_MODELS } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_MODELS } from "./support/oauth-fixtures.ts";
 import { SPEC_MODELS } from "./support/spec-fixtures.ts";
+import { SUGGESTION_MODELS } from "./support/suggestions-fixtures.ts";
 import { TICKET_MODELS } from "./support/ticket-fixtures.ts";
 
 const { TENANT_MODELS, TENANT_EXCLUDED_MODELS } = dbPackage;
@@ -22,6 +23,15 @@ function schemaModels(): SchemaModel[] {
   }));
 }
 
+const EXPECTED_TENANT_MODELS = [
+  "Project",
+  ...TICKET_MODELS,
+  ...SPEC_MODELS,
+  ...OAUTH_MODELS,
+  ...LLM_MODELS,
+  ...SUGGESTION_MODELS,
+];
+
 const carriesOrganizationId = (model: SchemaModel) => /^\s*organizationId\s/m.test(model.body);
 
 describe("garde multi-tenant : tout modèle portant organizationId est classé (TK-20 C5)", () => {
@@ -30,9 +40,8 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a)", () => {
-    const expected = ["Project", ...TICKET_MODELS, ...SPEC_MODELS, ...OAUTH_MODELS, ...LLM_MODELS];
-    expect([...TENANT_MODELS].sort()).toEqual(expected.sort());
+  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b)", () => {
+    expect([...TENANT_MODELS].sort()).toEqual([...EXPECTED_TENANT_MODELS].sort());
   });
 
   it("chaque modèle avec organizationId est métier ou explicitement exclu", () => {

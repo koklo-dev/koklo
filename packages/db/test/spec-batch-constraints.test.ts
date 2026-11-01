@@ -195,13 +195,13 @@ describe("TK-44a statut, SHA et code d'erreur", () => {
 });
 
 describe("TK-44a compteur de features", () => {
-  it("counter_name accepte feature après ticket et sprint, dans cet ordre", async () => {
+  it("counter_name accepte feature puis suggestion (TK-51b) après ticket et sprint, dans cet ordre", async () => {
     const labels = await db.query<{ enumlabel: string }>(
       `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
        WHERE t.typname = 'counter_name' ORDER BY e.enumsortorder`,
     );
 
-    expect(labels.map((l) => l.enumlabel)).toEqual(["ticket", "sprint", "feature"]);
+    expect(labels.map((l) => l.enumlabel)).toEqual(["ticket", "sprint", "feature", "suggestion"]);
   });
 
   it("un compteur `feature` par projet s'incrémente comme ticket et sprint", async () => {
