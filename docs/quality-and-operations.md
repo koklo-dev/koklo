@@ -200,6 +200,9 @@ covers_commit: bb9f740
   (`ciphertext`, `nonce`). Map the error to its SQLSTATE or Prisma `code` (`23514`, `23505`,
   `23503`, `P2002`) and the constraint name, and log only those, with the `organization_id` and
   `provider`.
+- The same holds for PostgreSQL itself: a violated CHECK writes `Failing row contains (...)`, ciphertext and
+  nonce included, to the **server** log. Never expose or export that log (support tickets, log shipping,
+  dashboards), and restrict its level and access (`log_min_error_statement`, `log_error_verbosity`).
 - The key is encrypted with AES-256-GCM and the AAD `llm:v1:<organization_id>:<provider>`; the AAD is
   not stored (see [domain-model.md](domain-model.md#byok-credentials-table-tk-51a)).
 
@@ -217,8 +220,14 @@ covers_commit: bb9f740
   triggers, `reviews`, `reviews_immutable()` and the three enums). Rolling back deletes all reviews and
   baselines (data loss by design).
 - `reviews` accepts no `UPDATE`, `TRUNCATE` or direct `DELETE` (SQLSTATE 23001); only a cascade from a
-  deleted project, organization or repo removes rows. Never disable the triggers to "fix" a review: add
+  deleted project or organization removes rows. Unlinking a repo or uninstalling the GitHub App removes
+  nothing (`repo_id` has no foreign key). Never disable the triggers to "fix" a review: add
   a new one (the latest wins). A retention or erasure need goes through an explicit migration.
+- The triggers do not protect against the table owner, a superuser or `SET session_replication_role`. The
+  application runtime role must therefore **not own** the tables, must not hold `TRIGGER`, and must not be able
+  to `SET session_replication_role` (superuser or granted); migrations run under a separate owner role.
+- `baselines` in `tagged` state are not immutable in the database: the API (TK-55) controls the transitions
+  and checks that `repo_id` belongs to the project.
 - Baselines and client validations are human-only; the API (TK-55) must check that a review targets the
   right object and SHA and that `repo_id` belongs to the project.
 
@@ -226,7 +235,7 @@ covers_commit: bb9f740
 - Migration `20261101120000_notifications` is reversible (`down.sql`: one `DROP TABLE`). Rolling back deletes
   all notifications (data loss by design; they are derived from events).
 - Producers must derive `dedupe_key` deterministically from the event (for example type plus subject plus
-  decision); a replay then hits `UNIQUE (recipient_user_id, dedupe_key)` and is a no-op.
+  decision) **and the project** (`SG-1` repeats across projects); a replay then hits `UNIQUE (recipient_user_id, dedupe_key)` and is a no-op.
 - A notification carries no text: never add a payload column to "help the UI"; read the subject again with
   the recipient's rights.
 - No retention yet (D8): the table only grows until the purge job exists.

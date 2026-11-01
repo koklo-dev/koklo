@@ -196,29 +196,35 @@ describe("reviews : journal sans unicité", () => {
   });
 });
 
+describe("reviews : author_role", () => {
+  it("longueur 1 à 64 ou NULL ; vide ou trop long refusé (23514)", async () => {
+    expect(await attemptReview("role-null", { authorRole: null })).toBeUndefined();
+    expect(await attemptReview("role-64", { authorRole: "r".repeat(64) })).toBeUndefined();
+    expect(await attemptReview("role-65", { authorRole: "r".repeat(65) })).toBe(CHECK);
+    expect(await attemptReview("role-empty", { authorRole: "" })).toBe(CHECK);
+  });
+});
+
 describe("reviews : clés étrangères composites et sans FK", () => {
-  it("exactement deux FK : (organization_id, project_id) et (organization_id, repo_id), en cascade", async () => {
-    expect(await defs("reviews", "f")).toEqual(
-      [
-        "FOREIGN KEY (organization_id, project_id) REFERENCES projects(organization_id, id) ON DELETE CASCADE",
-        "FOREIGN KEY (organization_id, repo_id) REFERENCES project_repos(organization_id, id) ON DELETE CASCADE",
-      ].sort(),
-    );
+  it("une seule FK : (organization_id, project_id) vers projects, en cascade ; repo_id sans FK", async () => {
+    expect(await defs("reviews", "f")).toEqual([
+      "FOREIGN KEY (organization_id, project_id) REFERENCES projects(organization_id, id) ON DELETE CASCADE",
+    ]);
   });
 
-  it("un projet ou un repo d'une autre organisation est refusé (23503)", async () => {
+  it("un projet d'une autre organisation est refusé (23503) ; repo_id n'est pas contrôlé en base", async () => {
     const a = await reviewScope(db, "fk-a");
     const b = await reviewScope(db, "fk-b");
     expect(await sqlState(() => insertReview(db, a, { projectId: b.projectId }))).toBe(FOREIGN_KEY);
-    expect(await sqlState(() => insertReview(db, a, { repoId: b.repoId }))).toBe(FOREIGN_KEY);
+    // La cohérence repo/projet est vérifiée par l'API (TK-55), pas par une clé étrangère.
+    expect(await sqlState(() => insertReview(db, a, { repoId: randomUUID() }))).toBeUndefined();
   });
 
-  it("projet, repo ou organisation inexistants : refusé (23503)", async () => {
+  it("projet ou organisation inexistants : refusé (23503)", async () => {
     const a = await reviewScope(db, "fk-missing");
     expect(await sqlState(() => insertReview(db, a, { projectId: randomUUID() }))).toBe(
       FOREIGN_KEY,
     );
-    expect(await sqlState(() => insertReview(db, a, { repoId: randomUUID() }))).toBe(FOREIGN_KEY);
     expect(await sqlState(() => insertReview(db, a, { organizationId: randomUUID() }))).toBe(
       FOREIGN_KEY,
     );
@@ -344,7 +350,7 @@ describe("reviews : immutabilité (trigger, calqué sur audit_log)", () => {
     expect(row).toEqual({ status: "approved", comment: null });
   });
 
-  it("un DELETE direct est refusé (23001) tant que le projet et le repo existent", async () => {
+  it("un DELETE direct est refusé (23001) tant que le projet existe", async () => {
     const scope = await reviewScope(db, "immutable-delete");
     const id = await insertReview(db, scope);
     expect(await sqlState(() => db.query("DELETE FROM reviews WHERE id = $1", [id]))).toBe(
@@ -406,11 +412,10 @@ describe("baselines : structure", () => {
     ).toBe(true);
   });
 
-  it("FK : projet et repo en cascade, review par trois colonnes en NO ACTION (aucune règle ON DELETE)", async () => {
+  it("FK : projet en cascade, review par trois colonnes en NO ACTION ; repo_id sans FK", async () => {
     expect(await defs("baselines", "f")).toEqual(
       [
         "FOREIGN KEY (organization_id, project_id) REFERENCES projects(organization_id, id) ON DELETE CASCADE",
-        "FOREIGN KEY (organization_id, repo_id) REFERENCES project_repos(organization_id, id) ON DELETE CASCADE",
         "FOREIGN KEY (organization_id, project_id, review_id) REFERENCES reviews(organization_id, project_id, id)",
       ].sort(),
     );
@@ -646,13 +651,12 @@ describe("baselines : FK à trois colonnes vers la review", () => {
     expect(await sqlState(() => insertBaseline(db, a, validated(randomUUID())))).toBe(FOREIGN_KEY);
   });
 
-  it("un projet ou un repo d'une autre organisation est refusé (23503)", async () => {
+  it("un projet d'une autre organisation est refusé (23503)", async () => {
     const a = await reviewScope(db, "fk-base-a");
     const b = await reviewScope(db, "fk-base-b");
     expect(await sqlState(() => insertBaseline(db, a, { projectId: b.projectId }))).toBe(
       FOREIGN_KEY,
     );
-    expect(await sqlState(() => insertBaseline(db, a, { repoId: b.repoId }))).toBe(FOREIGN_KEY);
   });
 
   it("supprimer directement la review qui valide est impossible (immutabilité, puis NO ACTION)", async () => {
@@ -718,12 +722,26 @@ describe("cascade à la suppression : reviews immuables, baselines NO ACTION", (
 });
 
 describe("cascade à la suppression : repo, voisins et auteur", () => {
-  it("supprimer le repo supprime les reviews et baselines qui s'y rattachent (le trigger l'autorise)", async () => {
+  it("supprimer le repo ne supprime ni les reviews ni les baselines (preuves liées au SHA)", async () => {
     const scope = await seedValidated("cascade-repo");
     await db.query("DELETE FROM project_repos WHERE id = $1", [scope.repoId]);
-    expect(await count("reviews", "repo_id", scope.repoId)).toBe(0);
-    expect(await count("baselines", "repo_id", scope.repoId)).toBe(0);
+    expect(await count("reviews", "repo_id", scope.repoId)).toBe(2);
+    expect(await count("baselines", "repo_id", scope.repoId)).toBe(1);
     expect(await count("projects", "id", scope.projectId)).toBe(1);
+    // Le journal reste protégé : le repo disparu n'ouvre aucune exception de suppression.
+    expect(
+      await sqlState(() =>
+        db.query("DELETE FROM reviews WHERE project_id = $1", [scope.projectId]),
+      ),
+    ).toBe(RESTRICT);
+  });
+
+  it("supprimer l'installation (cascade vers les repos) conserve reviews et baselines", async () => {
+    const scope = await seedValidated("cascade-installation");
+    await db.query("DELETE FROM provider_installations WHERE id = $1", [scope.installationId]);
+    expect(await count("project_repos", "id", scope.repoId)).toBe(0);
+    expect(await count("reviews", "project_id", scope.projectId)).toBe(2);
+    expect(await count("baselines", "project_id", scope.projectId)).toBe(1);
   });
 
   it("supprimer le projet d'un repo secondaire ne touche pas les autres projets de l'organisation", async () => {

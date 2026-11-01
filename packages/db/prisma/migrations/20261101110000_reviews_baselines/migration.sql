@@ -77,14 +77,11 @@ CREATE UNIQUE INDEX "baselines_one_untagged_per_project_key" ON "baselines"("pro
 -- AddForeignKey
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_organization_id_project_id_fkey" FOREIGN KEY ("organization_id", "project_id") REFERENCES "projects"("organization_id", "id") ON DELETE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "reviews" ADD CONSTRAINT "reviews_organization_id_repo_id_fkey" FOREIGN KEY ("organization_id", "repo_id") REFERENCES "project_repos"("organization_id", "id") ON DELETE CASCADE;
+-- repo_id : aucune FK (comme la cible d'une suggestion). Le journal ne doit pas disparaître quand le dépôt est délié
+-- ou que l'installation de l'App est supprimée (cascade project_repos) ; la cohérence repo/projet est vérifiée par l'API.
 
 -- AddForeignKey
 ALTER TABLE "baselines" ADD CONSTRAINT "baselines_organization_id_project_id_fkey" FOREIGN KEY ("organization_id", "project_id") REFERENCES "projects"("organization_id", "id") ON DELETE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "baselines" ADD CONSTRAINT "baselines_organization_id_repo_id_fkey" FOREIGN KEY ("organization_id", "repo_id") REFERENCES "project_repos"("organization_id", "id") ON DELETE CASCADE;
 
 -- AddForeignKey (NO ACTION : une review référencée par une baseline ne peut pas disparaître seule)
 ALTER TABLE "baselines" ADD CONSTRAINT "baselines_organization_id_project_id_review_id_fkey" FOREIGN KEY ("organization_id", "project_id", "review_id") REFERENCES "reviews"("organization_id", "project_id", "id");
@@ -94,6 +91,7 @@ ALTER TABLE "reviews" ADD CONSTRAINT "reviews_sha_check" CHECK ("sha" ~ '^([0-9a
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_target_ref_length_check" CHECK (char_length("target_ref") BETWEEN 1 AND 64);
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_feature_ref_check" CHECK ("target_kind" <> 'feature' OR "target_ref" ~ '^F-[0-9]{3,}$');
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_baseline_ref_check" CHECK ("target_kind" <> 'baseline' OR "target_ref" ~ '^baseline-(0|[1-9][0-9]*)$');
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_author_role_check" CHECK ("author_role" IS NULL OR char_length("author_role") BETWEEN 1 AND 64);
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_comment_check" CHECK ("comment" IS NULL OR char_length("comment") <= 2000);
 ALTER TABLE "baselines" ADD CONSTRAINT "baselines_number_check" CHECK ("number" >= 0);
 ALTER TABLE "baselines" ADD CONSTRAINT "baselines_proposed_sha_check" CHECK ("proposed_sha" ~ '^([0-9a-f]{40}|[0-9a-f]{64})$');
@@ -105,12 +103,12 @@ ALTER TABLE "baselines" ADD CONSTRAINT "baselines_status_fields_check" CHECK (
 );
 
 -- reviews immuable : aucun UPDATE, aucun TRUNCATE, aucun DELETE direct.
--- Seule exception : la suppression en cascade (le projet ou le repo de la ligne a déjà disparu).
-CREATE FUNCTION "reviews_immutable"() RETURNS trigger LANGUAGE plpgsql AS $$
+-- Seule exception : la suppression en cascade d'un projet disparu (jamais celle d'un dépôt ou d'une installation).
+-- Le trigger ne protège pas contre le propriétaire de la table, un superuser ni session_replication_role.
+CREATE FUNCTION "public"."reviews_immutable"() RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
   IF TG_OP = 'DELETE'
-     AND (NOT EXISTS (SELECT 1 FROM "projects" WHERE "id" = OLD."project_id")
-          OR NOT EXISTS (SELECT 1 FROM "project_repos" WHERE "id" = OLD."repo_id")) THEN
+     AND NOT EXISTS (SELECT 1 FROM "public"."projects" WHERE "id" = OLD."project_id") THEN
     RETURN OLD;
   END IF;
   RAISE EXCEPTION 'reviews is append-only (% refused)', TG_OP USING ERRCODE = 'restrict_violation';

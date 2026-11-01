@@ -701,8 +701,6 @@ model ProjectRepo {
   snapshots    SpecSnapshot[]
   heads        SpecHead[]
   writeBatches SpecWriteBatch[]
-  reviews      Review[]
-  baselines    Baseline[]
 
   @@unique([installationId, externalId])
   @@unique([organizationId, id])
@@ -1107,7 +1105,7 @@ enum BaselineStatus {
 }
 
 /// Journal append-only des reviews client (TK-51c) : la dernière review d'une cible fait foi, aucune unicité cible/SHA/auteur.
-/// Immuable (trigger `reviews_immutable`, voir la migration) sauf suppression en cascade du projet ou du repo.
+/// Immuable (trigger `reviews_immutable`, voir la migration) sauf suppression en cascade du projet. `repoId` sans clé étrangère : le journal survit au dépôt délié.
 /// `authorUserId` sans clé étrangère (RGPD). Humain uniquement : les invariants (cible, SHA, repo du projet) sont vérifiés côté API.
 model Review {
   id             String           @id @default(uuid(7)) @db.Uuid
@@ -1125,7 +1123,6 @@ model Review {
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   project   Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
-  repo      ProjectRepo @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
   baselines Baseline[]
 
   @@unique([organizationId, id])
@@ -1154,7 +1151,6 @@ model Baseline {
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   project Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
-  repo    ProjectRepo @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
   review  Review?     @relation(fields: [organizationId, projectId, reviewId], references: [organizationId, projectId, id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([projectId, number])

@@ -50,6 +50,7 @@ ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_key_check" CHECK ("key" ~ 
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_target_ref_presence_check" CHECK (("target_kind" = 'project') = ("target_ref" IS NULL));
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_target_ref_length_check" CHECK ("target_ref" IS NULL OR char_length("target_ref") BETWEEN 1 AND 64);
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_feature_ref_check" CHECK ("target_kind" <> 'feature' OR "target_ref" ~ '^F-[0-9]{3,}$');
+ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_author_role_check" CHECK ("author_role" IS NULL OR char_length("author_role") BETWEEN 1 AND 64);
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_body_check" CHECK (char_length("body") BETWEEN 1 AND 5000);
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_decision_note_check" CHECK ("decision_note" IS NULL OR char_length("decision_note") <= 2000);
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_base_sha_check" CHECK ("base_sha" IS NULL OR "base_sha" ~ '^([0-9a-f]{40}|[0-9a-f]{64})$');
