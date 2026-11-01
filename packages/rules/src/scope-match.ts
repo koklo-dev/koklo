@@ -39,23 +39,23 @@ const matchSegment = (pattern: string, text: string): boolean => {
   return p === pattern.length;
 };
 
-/** Correspondance segment par segment ; `**` absorbe 0..n segments (programmation dynamique). */
+/** Correspondance segment par segment ; `**` absorbe 0..n segments. Programmation dynamique
+ *  itérative (aucune récursion : un chemin très profond ne peut pas faire déborder la pile). */
 const matchSegments = (pattern: readonly string[], path: readonly string[]): boolean => {
-  const memo = new Map<number, boolean>();
-  const walk = (i: number, j: number): boolean => {
-    if (i === pattern.length) return j === path.length;
-    const key = i * (path.length + 1) + j;
-    const known = memo.get(key);
-    if (known !== undefined) return known;
+  const n = path.length;
+  let next = Array.from({ length: n + 1 }, (_, j) => j === n);
+  for (let i = pattern.length - 1; i >= 0; i--) {
     const segment = pattern[i] as string;
-    const result =
-      segment === ANY_DEPTH
-        ? walk(i + 1, j) || (j < path.length && walk(i, j + 1))
-        : j < path.length && matchSegment(segment, path[j] as string) && walk(i + 1, j + 1);
-    memo.set(key, result);
-    return result;
-  };
-  return walk(0, 0);
+    const current: boolean[] = new Array(n + 1).fill(false);
+    for (let j = n; j >= 0; j--) {
+      current[j] =
+        segment === ANY_DEPTH
+          ? (next[j] as boolean) || (j < n && (current[j + 1] as boolean))
+          : j < n && (next[j + 1] as boolean) && matchSegment(segment, path[j] as string);
+    }
+    next = current;
+  }
+  return next[0] as boolean;
 };
 
 /** Motif minimal (D6) : `*` dans un segment, segment `**` = 0..n segments, reste littéral,

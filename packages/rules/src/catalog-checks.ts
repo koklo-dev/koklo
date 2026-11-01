@@ -65,7 +65,7 @@ const checkDuplicateIds = (catalog: Catalog): Check => {
 const checkProfiles = (catalog: Catalog): Check => {
   for (const [index, rule] of catalog.rules.entries()) {
     for (const [at, profile] of rule.profiles.entries()) {
-      if (!(profile in catalog.profiles)) {
+      if (!Object.hasOwn(catalog.profiles, profile)) {
         return fail(
           "catalog.unknown-profile",
           `rule ${rule.id}: unknown profile ${profile}`,

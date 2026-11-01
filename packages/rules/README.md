@@ -52,7 +52,20 @@ else console.error(result.error.code); // ne lève jamais
 - **Verrou monotone** : une règle protégée (ou listée dans `lock` d'un niveau supérieur, ou
   ajoutée avec `protected: true`) ne peut plus être affaiblie par un niveau inférieur. Toute
   surcharge qui l'affaiblit est rejetée en bloc (`Conflict` `locked`), la règle reste
-  strictement identique, trace comprise ; durcir reste permis.
+  strictement identique, trace comprise ; durcir reste permis. Sur une règle verrouillée, une
+  surcharge d'`enforcement` n'est acceptée que si elle garde le même kind, adapter, command et
+  preuve, les mêmes params hors `max`, et un `max` entier, ≥ 0 et au plus égal à l'actuel
+  (`isLockedSafe`) ; échanger l'adapter, changer `level`/`rule`/`scope` ou ajouter une
+  `command` est un conflit `locked`.
+- **Catalogue de base** : il DOIT provenir de `parseCatalog`, `loadBuiltInCatalog` ou
+  `withKokloStrict` ; `resolveEffectiveRules` ne le re-valide pas (cohérence `protectedRuleIds`
+  et `protected` comprise). `withKokloStrict` remplace une règle `strict.*` préexistante par la
+  définition koklo-strict (protégée) ; il est idempotent.
+- **`canPass`** est relatif à la résolution donnée : les règles `instruction` bloquantes ne sont
+  pas jugées (rien à prouver). `packages[].profiles` remplace la sélection racine : un paquet
+  avec `profiles: []` retire `koklo-strict` pour ce chemin, par conception.
+- **Limites connues** : une dérogation `file: "."` ou `**` couvre tout le dépôt et `expires`
+  n'a pas d'horizon maximal ; §17.2 demande « par fichier », à resserrer dans un ticket de suite.
 - **Surcharges et dérogations tracées** : auteur, justification, `expires` (`YYYY-MM-DD`,
   borne incluse). Expirées, elles sont ignorées et signalées (`expired`). Une dérogation exige
   `expires` et ne vaut que pour son fichier.

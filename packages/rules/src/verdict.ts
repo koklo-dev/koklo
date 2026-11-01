@@ -1,6 +1,9 @@
 import type { EvidenceArtifact, RuleVerdict, Verdict, VerdictReason } from "./evidence-types.ts";
 import type { EffectiveRule } from "./layer-types.ts";
 
+/** Espaces, contrôles, caractères de format (largeur nulle) et remplisseurs : aucune preuve visible. */
+const INVISIBLE_ONLY = /^[\p{White_Space}\p{Cc}\p{Cf}\p{Zs}\u115f\u1160\u2800\u3164\uffa0]*$/u;
+
 type Outcome = readonly [verdict: Verdict, reason: VerdictReason];
 
 const gateOutcome = (id: string, artifact: EvidenceArtifact): Outcome => {
@@ -12,7 +15,7 @@ const gateOutcome = (id: string, artifact: EvidenceArtifact): Outcome => {
 const evidenceOutcome = (id: string, artifact: EvidenceArtifact): Outcome => {
   const items = (artifact.evidence ?? []).filter((item) => item.ruleId === id);
   if (items.length === 0) return ["UNVERIFIED", "evidence-missing"];
-  const complete = items.some((item) => item.references.some((ref) => ref.trim() !== ""));
+  const complete = items.some((item) => item.references.some((ref) => !INVISIBLE_ONLY.test(ref)));
   return complete ? ["PASS", "evidence-provided"] : ["UNVERIFIED", "evidence-incomplete"];
 };
 
