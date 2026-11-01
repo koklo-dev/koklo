@@ -14,5 +14,6 @@ import { SpecReadService } from "./spec-read.service.ts";
     GitAccess,
     { provide: SPEC_READ_REPOSITORY, useClass: PrismaSpecReadRepository },
   ],
+  exports: [SpecReadService],
 })
 export class SpecReadModule {}

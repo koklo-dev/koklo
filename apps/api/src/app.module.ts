@@ -3,6 +3,7 @@ import { type LogDestination, setupObservability } from "@koklo/observability";
 import { type DynamicModule, Module } from "@nestjs/common";
 import { ORPCModule } from "@orpc/nest";
 import { LoggerModule } from "nestjs-pino";
+import { AiModule } from "./ai/ai.module.ts";
 import { AuditModule } from "./audit/audit.module.ts";
 import { AuthModule } from "./auth/auth.module.ts";
 import { ClockModule } from "./clock.ts";
@@ -14,7 +15,7 @@ import { HealthModule } from "./health/health.module.ts";
 import { validationStatusInterceptor } from "./input-validation.ts";
 import { InstallationModule } from "./installation/installation.module.ts";
 import { LeaseModule } from "./lease/lease.module.ts";
-import { LlmCredentialModule } from "./llm-credential/llm-credential.module.ts";
+import { LlmCredentialRoutesModule } from "./llm-credential/llm-credential-routes.module.ts";
 import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { OrganizationModule } from "./organization/organization.module.ts";
@@ -85,7 +86,8 @@ export class AppModule {
         GitProviderModule.forRoot(config),
         RepoModule,
         InstallationModule,
-        LlmCredentialModule,
+        LlmCredentialRoutesModule,
+        AiModule,
         SpecBatchModule,
         SpecReadModule,
         WebhookModule,

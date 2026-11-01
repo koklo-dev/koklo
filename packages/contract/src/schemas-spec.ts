@@ -33,7 +33,7 @@ export const commitShaSchema = z.string().regex(/^[0-9a-f]{40}$/);
 const branchSchema = z.string().min(1);
 const titleSchema = z.string().min(1).max(200);
 
-const stepSchema = z.object({ type: stepTypeSchema, text: z.string().min(1) });
+export const stepSchema = z.object({ type: stepTypeSchema, text: z.string().min(1) });
 
 // --- Rapport de validation (miroir Zod du ValidationReport de @koklo/schema) ---
 export const specIssueSchema = z.object({
@@ -139,7 +139,7 @@ const featureFields = {
 };
 const optionalFeatureFields = z.object(featureFields).partial();
 
-const featureCreateSchema = optionalFeatureFields
+export const featureCreateSchema = optionalFeatureFields
   .required({ title: true, priority: true })
   .extend({ kind: z.literal("feature.create") });
 

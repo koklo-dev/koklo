@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { ai } from "./contract-ai.ts";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
 import { installation, repo } from "./contract-provider.ts";
@@ -108,6 +109,7 @@ export const contract = {
   audit,
   installation,
   llmCredential,
+  ai,
   repo,
   spec,
   specBatch,

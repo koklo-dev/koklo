@@ -1,5 +1,7 @@
+import { llmCallErrors } from "./contract-ai.ts";
 import { encryptionUnavailableError, notFoundError, validationError } from "./errors.ts";
 import { route, writeErrors } from "./route-helpers.ts";
+import { llmCredentialVerifyOutputSchema } from "./schemas-ai.ts";
 import {
   llmCredentialListOutputSchema,
   llmCredentialProviderInputSchema,
@@ -29,4 +31,9 @@ export const llmCredential = {
     .errors(providerErrors)
     .input(llmCredentialProviderInputSchema)
     .output(llmCredentialStatusSchema),
+  /** Appel minimal au fournisseur (16 tokens) : la clé fonctionne-t-elle ? Audité, comptée au quota. */
+  verify: route("POST", `${PATH}/verify`)
+    .errors(llmCallErrors)
+    .input(llmCredentialProviderInputSchema)
+    .output(llmCredentialVerifyOutputSchema),
 };

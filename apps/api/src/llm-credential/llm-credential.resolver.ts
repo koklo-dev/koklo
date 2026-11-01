@@ -5,11 +5,13 @@ import { llmCredentialAad } from "./llm-credential-aad.ts";
 import { LlmCredentialUnavailableError } from "./llm-credential-errors.ts";
 
 export interface ResolvedLlmCredential {
+  /** Identifiant de la ligne de la clé : cible de l'audit de `llmCredential.verify`. */
+  readonly credentialId: string;
   readonly credential: LlmCredential;
   readonly defaultModel: string | undefined;
   /**
    * Révision de la clé stockée (hex du nonce AES-GCM, neuf à chaque `set`) : sert de compare-and-swap
-   * à `invalidate` (D7, TK-54b). Squelette RED : vide tant que le Green ne la renseigne pas.
+   * à `invalidate` (D7, TK-54b). Sans lien avec la valeur de la clé.
    */
   readonly revision: string;
 }
@@ -33,9 +35,10 @@ export class LlmCredentialResolver {
     try {
       const secret = this.cipher.decrypt(stored.secret, llmCredentialAad(organizationId, provider));
       return {
+        credentialId: stored.id,
         credential: llmCredential(secret),
         defaultModel: stored.defaultModel ?? undefined,
-        revision: "",
+        revision: stored.revision,
       };
     } catch {
       // Version inconnue, autre clé ou AAD, chiffré altéré, ou clair que le domaine refuse : toute
