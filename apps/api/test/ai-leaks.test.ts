@@ -107,7 +107,9 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
     }
     if (res.status === 502) {
       expect(res.body.message).not.toContain(PROVIDER_SENTINEL);
-      expect(Object.keys(res.body.data ?? {})).toEqual(["reason"]);
+      // `LLM_OUTPUT_INVALID` n'a pas de `data` (contrat 0.9.0) ; `LLM_PROVIDER_ERROR` n'a que `reason`.
+      const expectedKeys = res.body.code === "LLM_PROVIDER_ERROR" ? ["reason"] : [];
+      expect(Object.keys(res.body.data ?? {})).toEqual(expectedKeys);
     }
     // Les contenus du modèle n'apparaissent que dans une réponse réussie.
     if (res.status !== 200) {

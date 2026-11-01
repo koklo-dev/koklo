@@ -38,3 +38,6 @@ export const AI_BUDGETS: Readonly<Record<AiPurpose, LlmBudget>> = {
   "criteria-propose": { maxOutputTokens: 1500, timeoutMs: 60_000, ...COMMON },
   "credential-verify": { maxOutputTokens: 16, timeoutMs: 15_000, ...COMMON },
 };
+
+/** Nombre maximal de features existantes (lignes) transmises au modèle comme contexte. */
+export const AI_FEATURES_MAX_LISTED = 100;

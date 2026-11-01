@@ -36,6 +36,13 @@ const MIN_AUTH_SECRET_LENGTH = 32;
 /** Borne haute de `SPEC_BATCH_WAIT_MS` : au-delà, une requête HTTP reste ouverte trop longtemps. */
 const SPEC_BATCH_WAIT_MAX_MS = 60_000;
 
+/** Plafond d'un réglage `AI_MAX_*` : au-delà, le plafond ne protège plus de rien. */
+const AI_LIMIT_MAX = 100_000;
+const aiLimit = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number().int().min(1).max(AI_LIMIT_MAX).optional(),
+);
+
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
@@ -67,7 +74,32 @@ const envSchema = z.object({
     (value) => (value === "" ? undefined : value),
     z.coerce.number().int().min(1).max(SPEC_BATCH_WAIT_MAX_MS).optional(),
   ),
+  AI_MAX_CALLS_PER_HOUR_ORG: aiLimit,
+  AI_MAX_CALLS_PER_HOUR_USER: aiLimit,
+  AI_MAX_VERIFY_PER_HOUR_ORG: aiLimit,
+  AI_MAX_CONCURRENT_PER_ORG: aiLimit,
 });
+
+type EnvData = z.infer<typeof envSchema>;
+
+/** Plafonds des appels IA réglés par l'environnement ; `undefined` si aucun n'est posé. */
+function aiLimitsOf(data: EnvData): Partial<AiLimits> | undefined {
+  const limits: Partial<AiLimits> = {
+    ...(data.AI_MAX_CALLS_PER_HOUR_ORG === undefined
+      ? {}
+      : { maxCallsPerHourOrg: data.AI_MAX_CALLS_PER_HOUR_ORG }),
+    ...(data.AI_MAX_CALLS_PER_HOUR_USER === undefined
+      ? {}
+      : { maxCallsPerHourUser: data.AI_MAX_CALLS_PER_HOUR_USER }),
+    ...(data.AI_MAX_VERIFY_PER_HOUR_ORG === undefined
+      ? {}
+      : { maxVerifyPerHourOrg: data.AI_MAX_VERIFY_PER_HOUR_ORG }),
+    ...(data.AI_MAX_CONCURRENT_PER_ORG === undefined
+      ? {}
+      : { maxConcurrentPerOrg: data.AI_MAX_CONCURRENT_PER_ORG }),
+  };
+  return Object.keys(limits).length === 0 ? undefined : limits;
+}
 
 /**
  * Clé de chiffrement des jetons utilisateur. Absente, elle n'est exigée que si l'App a ses
@@ -99,23 +131,9 @@ function encryptionKeyOf(value: string | undefined, githubApp: GithubAppSettings
  * Le message ne cite que le nom de la variable et la règle violée, jamais la valeur reçue.
  */
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
-  const parsed = envSchema.safeParse({
-    DATABASE_URL: env.DATABASE_URL,
-    PORT: env.PORT,
-    APP_ENV: env.APP_ENV,
-    APP_VERSION: env.APP_VERSION,
-    BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
-    BETTER_AUTH_URL: env.BETTER_AUTH_URL,
-    GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET,
-    LOG_LEVEL: env.LOG_LEVEL,
-    SENTRY_DSN: env.SENTRY_DSN,
-    KOKLO_ENCRYPTION_KEY: env.KOKLO_ENCRYPTION_KEY,
-    KOKLO_ENCRYPTION_KEY_VERSION: env.KOKLO_ENCRYPTION_KEY_VERSION,
-    KOKLO_ENCRYPTION_KEYS_PREVIOUS: env.KOKLO_ENCRYPTION_KEYS_PREVIOUS,
-    GITHUB_WEBHOOK_SECRET: env.GITHUB_WEBHOOK_SECRET,
-    SPEC_BATCH_WAIT_MS: env.SPEC_BATCH_WAIT_MS,
-  });
+  // Exactement les variables du schéma : aucune autre variable de l'environnement n'est lue.
+  const picked = Object.fromEntries(Object.keys(envSchema.shape).map((name) => [name, env[name]]));
+  const parsed = envSchema.safeParse(picked);
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
@@ -130,6 +148,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     data.KOKLO_ENCRYPTION_KEY_VERSION,
     data.KOKLO_ENCRYPTION_KEYS_PREVIOUS,
   );
+  const ai = aiLimitsOf(data);
   return {
     databaseUrl: data.DATABASE_URL,
     port: data.PORT,
@@ -148,5 +167,6 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
       ? {}
       : { githubWebhookSecret: data.GITHUB_WEBHOOK_SECRET }),
     ...(data.SPEC_BATCH_WAIT_MS === undefined ? {} : { specBatchWaitMs: data.SPEC_BATCH_WAIT_MS }),
+    ...(ai === undefined ? {} : { ai }),
   };
 }

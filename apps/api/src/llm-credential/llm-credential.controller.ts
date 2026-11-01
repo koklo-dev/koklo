@@ -3,6 +3,7 @@ import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
+import { AiService } from "../ai/ai.service.ts";
 import { MANAGER_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { guard, requestIdOf } from "../request-context.ts";
@@ -15,7 +16,10 @@ import { orKeyNotFound, toStatusOutput, viaCredential } from "./llm-credential-a
  */
 @Controller()
 export class LlmCredentialController {
-  constructor(@Inject(LlmCredentialService) private readonly service: LlmCredentialService) {}
+  constructor(
+    @Inject(LlmCredentialService) private readonly service: LlmCredentialService,
+    @Inject(AiService) private readonly ai: AiService,
+  ) {}
 
   @UseGuards(SessionGuard, RoleGuard)
   @Roles(...MANAGER_ROLES)
@@ -77,6 +81,19 @@ export class LlmCredentialController {
           userId,
         });
         return toStatusOutput(orKeyNotFound(status));
+      }),
+    );
+  }
+
+  /** Appel minimal au fournisseur : la clé fonctionne-t-elle ? Audité et soumis au quota `verify`. */
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...MANAGER_ROLES)
+  @Implement(contract.llmCredential.verify)
+  verify(@Req() request: Request) {
+    return implement(contract.llmCredential.verify).handler(({ input, errors }) =>
+      guard(requestIdOf(request), errors, () => {
+        const { organizationId, userId } = requireSession(request);
+        return this.ai.verify({ organizationId, userId }, input.provider, requestIdOf(request));
       }),
     );
   }

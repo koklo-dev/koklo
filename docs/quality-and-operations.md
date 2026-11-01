@@ -600,6 +600,36 @@ state, as it would block its branch (`SELECT count(*) FROM pgboss.job WHERE name
 state = 'failed'` must be 0). Logs carry the batch id, the final status and the error code, never a
 token, a provider message or an e-mail address.
 
+### AI proposals: quotas and operation (TK-54b)
+`ai.draftBrief`, `ai.proposeFeatures`, `ai.proposeCriteria` and `llmCredential.verify` call the model with the
+organization's own key (BYOK). Four optional variables of `api` set the ceilings; empty or absent means the
+default of the code, a non-integer or a value outside 1..100000 fails the start naming the variable (never the
+value).
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `AI_MAX_CALLS_PER_HOUR_ORG` | 30 | `ai.*` calls per organization over a sliding hour |
+| `AI_MAX_CALLS_PER_HOUR_USER` | 10 | `ai.*` calls per user over a sliding hour |
+| `AI_MAX_VERIFY_PER_HOUR_ORG` | 5 | `llmCredential.verify` calls per organization over a sliding hour |
+| `AI_MAX_CONCURRENT_PER_ORG` | 2 | simultaneous model calls per organization and per process |
+
+- The counters are audit lines (`ai.%`, `llm_credential.verify`): a restart does not reset them. A refused call
+  answers `429 LLM_RATE_LIMITED{retryAfterSeconds}`, calls nothing and writes nothing.
+- Budgets per call are fixed in `apps/api/src/ai/ai-budget.ts` and never read from an input: 4000 output tokens
+  for `features-propose`, 1500 for `brief-draft` and `criteria-propose`, 16 for `credential-verify`; 60 s (15 s for
+  `verify`); 60,000 prompt characters; 0.50 USD. The server prices a call with the table of `@koklo/llm`.
+- No network call exists in CI: the model is a `FakeLlm` or the `SimulatedAnthropicTransport`; the fake is never
+  chosen by configuration and is not shipped in the `dist/` of `api` or `worker` (test `ai-dist-isolation`, which
+  needs the packages built: `pnpm build` first).
+- A provider `401` invalidates the key (audit `llm_credential.invalidate`) unless the key was replaced during the
+  call; the owner then sets a new key. Calls log `llm.complete` / `llm.failed` (purpose, correlation id, provider,
+  model, duration, token counts, error name): never a prompt, an output or a key.
+- **NEEDS-HUMAN**: (1) validate the quotas, the budgets and the model prices (D8); the prices come from the skill
+  catalogue dated 2026-10-06, not from the official pricing page. (2) Run the real conformance **once, outside CI**,
+  with a test key of Anthropic (`runLlmConformance` on `AnthropicProvider`, then `llmCredential.verify` and one
+  proposal): it lifts the UNVERIFIED points of ADR 0015 (request format, 400 wordings). (3) GDPR: free text goes
+  to a US sub-processor, the sending policy to display belongs to TK-59.
+
 ### User token encryption key: `KOKLO_ENCRYPTION_KEY` (TK-48a1)
 | Variable | Read by | Meaning |
 |----------|---------|---------|

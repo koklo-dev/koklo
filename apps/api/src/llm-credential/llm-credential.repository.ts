@@ -24,6 +24,8 @@ export interface StoredLlmCredential {
   readonly secret: EncryptedSecret;
   readonly defaultModel: string | null;
   readonly invalidatedAt: string | null;
+  /** Hex du nonce AES-GCM : neuf à chaque `upsert`, inchangé par `markUsed` (compare-and-swap, D7). */
+  readonly revision: string;
 }
 
 export interface UpsertLlmCredential {
@@ -60,13 +62,16 @@ export interface LlmCredentialRepository {
   remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean>;
   /**
    * `null` si absente. Idempotent : une clé déjà invalidée garde son `invalidated_at` et ne
-   * journalise rien.
+   * journalise rien. Avec `expectedRevision` (compare-and-swap, D7), l'invalidation ne s'applique
+   * que si la clé n'a pas été remplacée depuis : sinon aucun effet, aucun audit, et le statut
+   * rendu est celui de la clé courante.
    */
   invalidate(
     organizationId: string,
     provider: LlmProviderId,
     at: string,
     actor?: AuditActor,
+    expectedRevision?: string,
   ): Promise<LlmCredentialStatus | null>;
   /** Au plus une écriture par minute : sans effet si `last_used_at` a moins de 60 s avant `at`. */
   markUsed(organizationId: string, provider: LlmProviderId, at: string): Promise<void>;

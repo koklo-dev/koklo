@@ -1527,6 +1527,58 @@ flowchart LR
   prod[Production code] -. forbidden .-> sim
 ```
 
+### API: AI proposals, module `ai` (TK-54b)
+`apps/api/src/ai` turns the key of the organization and the `@koklo/llm` adapter into three proposals
+(`ai.draftBrief`, `ai.proposeFeatures`, `ai.proposeCriteria`, contract 0.9.0) and into `llmCredential.verify`.
+Nothing a model returns is persisted ([ADR 0015](adr/0015-anthropic-llm-adapter.md), [API contract](api-contract.md#ai-proposals-and-key-verification-tk-54b)).
+- `LlmModule` provides `LLM_PROVIDERS`, a `Map` holding `AnthropicProvider` only (chosen by code, never by
+  configuration; global `fetch` read at each call). Tests replace the token with a `FakeLlm` (the same rule as
+  the fake git provider) and `NONCE_SOURCE` with a deterministic source. A test builds `api` and `worker`
+  with `tsc` and checks that no emitted file mentions a fake or a `testing` sub-path.
+- `LlmCredentialModule` gives `LlmCredentialService` and `LlmCredentialResolver` (which now also returns the key
+  `revision`, the hex of its AES-GCM nonce); `LlmCredentialRoutesModule` holds the controller, because
+  `verify` goes through `AiService`.
+- `AiService` gathers the data of a call (project check, index, feature in git through `SpecReadService`) and
+  hands a description of the call to `AiCallRunner`, the single pipeline. `AiLedger` counts the audit lines of
+  the last hour and writes the new one in the same transaction; `ConcurrencyGate` is a per-organization
+  in-process semaphore. `ai-prompts.ts` holds the constant instructions and the data blocks, `ai-schemas.ts`
+  the strict Zod schemas of the model output, `ai-text-policy.ts` the content policy.
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant G as SessionGuard, RoleGuard
+  participant S as AiService
+  participant R as AiCallRunner
+  participant K as LlmCredentialResolver
+  participant L as AiLedger
+  participant P as LlmProvider (Anthropic)
+  C->>G: POST /projects/{id}/ai/features
+  G->>S: role in SPEC_BATCH_ROLES
+  S->>S: project in the organization, index read (404 otherwise)
+  S->>R: run(call)
+  R->>K: resolve(organization, anthropic)
+  K-->>R: opaque key, defaultModel, revision (409 / 503 otherwise)
+  R->>R: framePrompt with a fresh nonce (422 PROMPT_REJECTED on collision)
+  R->>R: concurrency gate (429 if full)
+  R->>L: admit: count audit lines, then write the audit line
+  L-->>R: 429 if a quota is reached, nothing written
+  R->>P: complete(prompt, budget fixed by the server)
+  P-->>R: Unvalidated output, or a typed error (401 invalidates the key by revision)
+  R->>K: markUsed (best effort)
+  R->>R: validateLlmOutput, strict Zod, content policy, step order
+  R-->>C: proposal + meta, or LLM_OUTPUT_INVALID
+```
+- **Order is frozen by tests**: role, project, key, prompt, quota and gate, audit **before** the call, call.
+  A refusal before the audit writes nothing and uses no quota; the gate slot is returned in every case.
+- **Quotas have no state in memory**: they count audit lines (`ai.%` per organization and per user,
+  `llm_credential.verify` per organization), so several instances share them. The admission is serialized per
+  organization inside the process; across instances an overshoot is bounded by the number of instances (raw
+  queries are forbidden on the tenant client, so no advisory lock).
+- **Errors**: the port errors map to the 11 typed errors of the contract; an unexpected exception of the
+  adapter is `LLM_PROVIDER_ERROR{unavailable}` (logged by name only, not sent to Sentry). The log of a call
+  (`llm.complete` / `llm.failed`) carries counters and names, never a prompt, an output, a key or a nonce.
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).
@@ -1597,5 +1649,5 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
 [0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
 [0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data),
-[0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK).
+[0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK; its use in the API, TK-54b).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

@@ -86,11 +86,16 @@ export class LlmCredentialService {
     organizationId: string,
     provider: LlmProviderId,
     actor?: AuditActor,
-    // Squelette RED (TK-54b, D7) : `expectedRevision` (valeur de `ResolvedLlmCredential.revision`)
-    // rendra l'invalidation conditionnelle ; ignorée tant que le Green ne la transmet pas.
-    _expectedRevision?: string,
+    // Compare-and-swap (D7) : valeur de `ResolvedLlmCredential.revision` lue avant l'appel au modèle.
+    expectedRevision?: string,
   ): Promise<LlmCredentialStatus | null> {
-    return this.repository.invalidate(organizationId, provider, this.clock.now(), actor);
+    return this.repository.invalidate(
+      organizationId,
+      provider,
+      this.clock.now(),
+      actor,
+      expectedRevision,
+    );
   }
 
   markUsed(organizationId: string, provider: LlmProviderId): Promise<void> {

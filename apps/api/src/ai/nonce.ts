@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 /**
  * Source du nonce de `framePrompt` (le domaine n'a ni aléa ni horloge). Production : 48 caractères
  * hexadécimaux issus de `randomBytes(24)`, un nonce NEUF à chaque appel de `next()`, jamais
@@ -9,9 +11,10 @@ export interface NonceSource {
   next(): string;
 }
 
-/** Squelette TK-54b (étape RED) : l'implémentation arrive au Green. */
+const NONCE_BYTES = 24;
+
 export const randomNonceSource: NonceSource = {
   next(): string {
-    throw new Error("TK-54b : randomNonceSource n'est pas implémenté");
+    return randomBytes(NONCE_BYTES).toString("hex");
   },
 };

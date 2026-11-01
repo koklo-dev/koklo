@@ -10,7 +10,9 @@ import {
   insertAuditAt,
   installAiBench,
   keyedWorld,
+  setKey,
 } from "./helpers/ai-bench.ts";
+import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import { createWorld } from "./helpers/tickets.ts";
 
 /**
@@ -72,7 +74,11 @@ describe("quota par utilisateur et par organisation", () => {
   it("les trois procédures ai.* partagent le même quota ; un autre utilisateur de l'organisation reste servi", async () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 2, maxCallsPerHourOrg: 100 } });
-    const { world } = await keyedWorld(b);
+    // La feature F-001 doit exister dans l'index : sans elle, proposeCriteria répond 404 avant le quota.
+    const scene = await readScene(b);
+    await seedIndex(b, scene, [{ id: "F-001", titre: "Connexion" }], { commit: true });
+    const { world } = scene;
+    await setKey(app, world, "FAKE-KEY-NOT-REAL-QUOTA-0101");
     b.use(FakeLlm.replying(BRIEF_REPLY));
     const dev = aiApi(app, world.actors.dev);
     const admin = aiApi(app, world.actors.admin);
@@ -82,7 +88,7 @@ describe("quota par utilisateur et par organisation", () => {
     const refused = await dev.proposeCriteria(world.projectId);
     const other = await admin.draftBrief(world.projectId);
 
-    expect(refused.status).toBe(429);
+    expect(refused.status, JSON.stringify(refused.body)).toBe(429);
     expect(other.status, JSON.stringify(other.body)).toBe(200);
   });
 
