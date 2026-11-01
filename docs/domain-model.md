@@ -37,6 +37,7 @@ tables and columns are `snake_case` through `@@map` / `@map`.
 | `suggestions` | `Suggestion` | Client suggestion on a project, keyed `SG-n` (see [Suggestions table](#suggestions-table-tk-51b)) |
 | `reviews` | `Review` | Immutable journal of client reviews of a feature, screen or baseline at a SHA (see [Reviews and baselines](#reviews-and-baselines-tables-tk-51c)) |
 | `baselines` | `Baseline` | Project baselines (`number`, `status`: `proposed`, `validated`, `tagged`) |
+| `notifications` | `Notification` | In-app notification per recipient, without payload (see [Notifications table](#notifications-table-tk-51d)) |
 
 The first seven are the Better Auth tables (organization plugin), with fields aligned on
 the Better Auth documentation (ASSUMPTION: not re-checked against the library in this
@@ -241,6 +242,45 @@ drops `baselines`, then the triggers, `reviews`, the function and the enums, in 
 - **Human only, and API invariants**: baselines and client validations are human-only actions (vision).
   The database does not check that the review validates the right target and SHA, nor that `repo_id`
   belongs to the same project: the API (TK-55) must verify these invariants.
+
+### Notifications table (TK-51d)
+One tenant table (`TENANT_MODELS`: `Notification`), migration `20261101120000_notifications` (additive:
+a single `CREATE TABLE`, no enum, no function, no trigger; `down.sql` is one `DROP TABLE`).
+- **`notifications`**: `id`, `organization_id`, `recipient_user_id`, `type`, `project_id` (nullable),
+  `subject_kind`, `subject_ref`, `dedupe_key`, `read_at` (nullable), `created_at`, `updated_at`.
+  No JSON, bytea or array column.
+- **Closed lists** (text constrained by `CHECK`, D7): `type` in `suggestion.created`, `suggestion.decided`,
+  `review.submitted`, `baseline.proposed`, `baseline.validated`, `baseline.tagged`, `ticket.blocked`;
+  `subject_kind` in `suggestion`, `review`, `baseline`, `ticket`. Adding a value is an additive migration
+  that replaces the `CHECK`. `subject_ref` is 1 to 64 characters, `dedupe_key` 1 to 120.
+- **Idempotence**: `UNIQUE (recipient_user_id, dedupe_key)`. A producer replaying an event derives the same key
+  and the insert is a no-op (`ON CONFLICT DO NOTHING` or `createMany skipDuplicates`).
+- **No sensitive content**: a notification holds only a type and a reference. The API reads the object again
+  through `(subject_kind, subject_ref)` with the recipient's rights, so a notification never leaks text,
+  and a recipient who lost access sees nothing.
+- **Keys**: `(organization_id, recipient_user_id)` references `members(organization_id, user_id)` and
+  `(organization_id, project_id)` references `projects`, both `ON DELETE CASCADE` (no `ON UPDATE CASCADE`):
+  the recipient must be a member of the same organization, and removing the member, user, project or
+  organization removes the notifications.
+- **Indexes**: `(organization_id)`; partial `(recipient_user_id, created_at DESC) WHERE read_at IS NULL`
+  (unread list, written in SQL like the other partial indexes, `migrate diff` stays empty).
+- **Read**: marking as read is an `UPDATE` of `read_at`, no trigger.
+- **Retention deferred (D8)**: nothing purges notifications in this ticket; a `created_at` index will be
+  added with the retention job.
+
+### TK-51 summary: BYOK, suggestions, reviews, notifications
+Five tables over four additive and reversible migrations, each with a `down.sql` that returns to the
+previous state (data of the dropped tables is lost by design):
+
+| Migration | Tables | Model(s) |
+| --- | --- | --- |
+| `20261101090000_llm_provider_credentials` | `llm_provider_credentials` | `LlmProviderCredential` |
+| `20261101100000_suggestions` | `suggestions` + `SG-n` counter | `Suggestion` |
+| `20261101110000_reviews_baselines` | `reviews` (immutable), `baselines` | `Review`, `Baseline` |
+| `20261101120000_notifications` | `notifications` | `Notification` |
+
+All five are tenant models (`TENANT_MODELS`). The API layers (TK-54, TK-55) enforce the rules the database
+cannot express.
 
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:

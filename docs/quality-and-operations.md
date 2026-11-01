@@ -222,6 +222,15 @@ covers_commit: bb9f740
 - Baselines and client validations are human-only; the API (TK-55) must check that a review targets the
   right object and SHA and that `repo_id` belongs to the project.
 
+### Notifications: idempotence and rollback (TK-51d)
+- Migration `20261101120000_notifications` is reversible (`down.sql`: one `DROP TABLE`). Rolling back deletes
+  all notifications (data loss by design; they are derived from events).
+- Producers must derive `dedupe_key` deterministically from the event (for example type plus subject plus
+  decision); a replay then hits `UNIQUE (recipient_user_id, dedupe_key)` and is a no-op.
+- A notification carries no text: never add a payload column to "help the UI"; read the subject again with
+  the recipient's rights.
+- No retention yet (D8): the table only grows until the purge job exists.
+
 ### Running the LLM conformance suite (TK-50c)
 Every `LlmProvider` adapter (TK-54 and the later ones) must pass the shared suite from
 `@koklo/domain/testing`; the domain imports no test engine, so the test file passes its own:
