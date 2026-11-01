@@ -2,18 +2,10 @@ import type { Feature } from "../entities/index.ts";
 import { FeatureSchema } from "../entities/index.ts";
 import { structIssue } from "../issue.ts";
 import type { Issue } from "../types.ts";
+import { splitFrontMatter } from "./frontmatter.ts";
 import { parseCriteria, sectionLines } from "./markdown-sections.ts";
 import { loadYaml, tooLarge } from "./yaml.ts";
 import { type EntityParse, parseWithSchema, rawId } from "./zod-issues.ts";
-
-/** Sépare le front matter (entre deux lignes `---`) du corps. */
-function splitFrontMatter(content: string): { front: string; body: string[] } | undefined {
-  const lines = content.replace(/^﻿/, "").split(/\r?\n/);
-  if (lines[0]?.trimEnd() !== "---") return undefined;
-  const end = lines.findIndex((line, i) => i > 0 && line.trimEnd() === "---");
-  if (end < 0) return undefined;
-  return { front: lines.slice(1, end).join("\n"), body: lines.slice(end + 1) };
-}
 
 function bodyIssues(path: string, id: string | undefined, body: readonly string[]) {
   const description = sectionLines(body, /^Description$/);
