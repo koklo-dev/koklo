@@ -37,9 +37,7 @@ const BUILDERS: Record<LlmProviderErrorName, () => LlmProviderError> = {
   LlmRefusedError: () => new LlmRefusedError(D),
   LlmModelNotFoundError: () => new LlmModelNotFoundError(D),
   LlmProviderUnavailableError: () => new LlmProviderUnavailableError({ ...D, status: 503 }),
-  // Le skeleton 50b n'a pas encore rerooté LlmInvalidOutputError : le cast disparaît au Green.
-  LlmInvalidOutputError: () =>
-    new LlmInvalidOutputError("forme inattendue") as unknown as LlmProviderError,
+  LlmInvalidOutputError: () => new LlmInvalidOutputError("forme inattendue"),
 };
 
 /** Exhaustivité : ajouter un nom à la liste fermée casse la compilation ici. */
@@ -115,8 +113,7 @@ describe("erreurs du port LLM : forme", () => {
   });
 
   it("LlmInvalidOutputError est rerootée sous la racine et garde son contrat de 50a", () => {
-    const e = new LlmInvalidOutputError("forme inattendue") as unknown as LlmProviderError &
-      LlmInvalidOutputError;
+    const e = new LlmInvalidOutputError("forme inattendue");
     expect(e).toBeInstanceOf(LlmProviderError);
     expect(e.reason).toBe("forme inattendue");
     expect(e.operation).toBe("validate");
@@ -172,7 +169,7 @@ describe("erreurs du port LLM : non-fuite", () => {
     (name) => {
       const build: () => LlmProviderError =
         name === "LlmInvalidOutputError"
-          ? () => new LlmInvalidOutputError("forme inattendue") as unknown as LlmProviderError
+          ? () => new LlmInvalidOutputError("forme inattendue")
           : () => {
               const ctor = (
                 domain as unknown as Record<string, new (i: object) => LlmProviderError>

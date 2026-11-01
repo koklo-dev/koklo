@@ -1,12 +1,13 @@
-/** Erreurs du marquage des données non fiables (TK-50a). Aucune ne porte le contenu d'une donnée. */
+import { LlmProviderError } from "./llm-provider-errors.ts";
+
+/** Erreurs du marquage des données non fiables (TK-50a) et du port LLM (TK-50b). Aucune ne porte contenu ni clé. */
 
 /** Origine hors de la liste fermée `UNTRUSTED_ORIGINS`. */
 export class InvalidUntrustedOriginError extends Error {
-  readonly origin: unknown;
-  constructor(origin: unknown) {
+  /** L'argument éventuel est ignoré : la valeur fautive n'est jamais reprise. */
+  constructor(_ignored?: unknown) {
     super("Origine de donnée non fiable inconnue");
     this.name = "InvalidUntrustedOriginError";
-    this.origin = origin;
   }
 }
 
@@ -38,10 +39,10 @@ export class UntrustedDelimiterCollisionError extends Error {
 }
 
 /** La sortie du modèle n'a pas passé la validation de l'appelant ; `reason` ne reprend pas la sortie. */
-export class LlmInvalidOutputError extends Error {
+export class LlmInvalidOutputError extends LlmProviderError {
   readonly reason: string;
   constructor(reason: string) {
-    super("Sortie du modèle invalide");
+    super({ operation: "validate" }, "Sortie du modèle invalide");
     this.name = "LlmInvalidOutputError";
     this.reason = reason;
   }

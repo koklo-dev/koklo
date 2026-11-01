@@ -1,6 +1,10 @@
-import { InvalidPromptNonceError, UntrustedDelimiterCollisionError } from "./llm-errors.ts";
+import {
+  InvalidPromptNonceError,
+  InvalidUntrustedOriginError,
+  UntrustedDelimiterCollisionError,
+} from "./llm-errors.ts";
 import { revealTrusted, type Trusted } from "./trusted.ts";
-import { revealUntrusted, type Untrusted } from "./untrusted.ts";
+import { isUntrustedOrigin, revealUntrusted, type Untrusted } from "./untrusted.ts";
 
 /** Politique fixe placée dans `system`, avant toute consigne. */
 export const UNTRUSTED_DATA_POLICY = [
@@ -12,9 +16,9 @@ export const UNTRUSTED_DATA_POLICY = [
 
 const FramedPromptToken = Symbol("framed-prompt");
 
-/** Prompt cadré ; seul `framePrompt` en produit. */
+/** Prompt cadré ; seul `framePrompt` en produit (marque privée `#brand`, non clonable). */
 export class FramedPrompt {
-  declare private readonly brand: "framed-prompt";
+  readonly #brand = true;
   readonly system: string;
   readonly user: string;
 
@@ -26,12 +30,14 @@ export class FramedPrompt {
     this.user = user;
     Object.freeze(this);
   }
+
+  static is(value: unknown): value is FramedPrompt {
+    return typeof value === "object" && value !== null && #brand in value;
+  }
 }
 
-/** Garde statique du port : vrai seulement pour un prompt produit par `framePrompt`. */
-export const isFramedPrompt = (_value: unknown): _value is FramedPrompt => {
-  throw new Error("non implémenté");
-};
+/** Garde d'exécution du port : vrai seulement pour un prompt produit par `framePrompt`. */
+export const isFramedPrompt = (value: unknown): value is FramedPrompt => FramedPrompt.is(value);
 
 const build = FramedPrompt as unknown as new (
   token: symbol,
@@ -49,13 +55,23 @@ const NONCE_PATTERN = /^[A-Za-z0-9]{16,64}$/;
 const REPLACEMENT = "�";
 const DELIMITER_STARTS = ["<<<DATA", "<<<END"] as const;
 
+/** Plages neutralisées (bornes incluses) : contrôles (sauf \n et \t), marques invisibles/bidi. */
+const NEUTRALIZED_RANGES: readonly (readonly [number, number])[] = [
+  [0x00, 0x08],
+  [0x0b, 0x1f],
+  [0x7f, 0x9f],
+  [0xad, 0xad],
+  [0x061c, 0x061c],
+  [0x200b, 0x200f],
+  [0x2028, 0x202e],
+  [0x2060, 0x2064],
+  [0x2066, 0x2069],
+  [0xfeff, 0xfeff],
+  [0xe0000, 0xe007f],
+];
+
 const isNeutralized = (code: number): boolean =>
-  (code <= 0x1f && code !== 0x0a && code !== 0x09) ||
-  (code >= 0x7f && code <= 0x9f) ||
-  (code >= 0x200b && code <= 0x200f) ||
-  (code >= 0x202a && code <= 0x202e) ||
-  (code >= 0x2066 && code <= 0x2069) ||
-  code === 0x061c;
+  NEUTRALIZED_RANGES.some(([low, high]) => code >= low && code <= high);
 
 /** Remplace les caractères de contrôle et marques bidirectionnelles/invisibles par U+FFFD. */
 const neutralize = (text: string): string =>
@@ -63,11 +79,20 @@ const neutralize = (text: string): string =>
     isNeutralized(char.codePointAt(0) as number) ? REPLACEMENT : char,
   ).join("");
 
-const collides = (text: string, nonce: string): boolean =>
-  text.includes(nonce) || DELIMITER_STARTS.some((start) => text.includes(start));
+/** Collision insensible à la casse et à la chasse (NFKC) avec le nonce ou un début de délimiteur. */
+const collides = (text: string, nonce: string): boolean => {
+  const folded = text.normalize("NFKC").toLowerCase();
+  return (
+    folded.includes(nonce.toLowerCase()) ||
+    DELIMITER_STARTS.some((start) => folded.includes(start.toLowerCase()))
+  );
+};
 
 const block = (datum: Untrusted, rank: number, nonce: string): string => {
   const content = neutralize(revealUntrusted(datum));
+  if (!isUntrustedOrigin(datum.origin)) {
+    throw new InvalidUntrustedOriginError();
+  }
   if (collides(content, nonce)) {
     throw new UntrustedDelimiterCollisionError(rank);
   }

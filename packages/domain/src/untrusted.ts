@@ -15,13 +15,9 @@ export const UNTRUSTED_ORIGINS = [
 
 export type UntrustedOrigin = (typeof UNTRUSTED_ORIGINS)[number];
 
-const isOrigin = (origin: unknown): origin is UntrustedOrigin =>
-  (UNTRUSTED_ORIGINS as readonly unknown[]).includes(origin);
-
-/** Garde publique de la liste fermée (revalidée par `framePrompt`). */
-export const isUntrustedOrigin = (_value: unknown): _value is UntrustedOrigin => {
-  throw new Error("non implémenté");
-};
+/** Garde publique de la liste fermée, casse exacte (revalidée par `framePrompt`). */
+export const isUntrustedOrigin = (value: unknown): value is UntrustedOrigin =>
+  (UNTRUSTED_ORIGINS as readonly unknown[]).includes(value);
 
 const MASK = (origin: string): string => `[untrusted:${origin}]`;
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
@@ -35,8 +31,8 @@ export class Untrusted {
   readonly #value: string;
 
   constructor(origin: UntrustedOrigin, value: string) {
-    if (!isOrigin(origin)) {
-      throw new InvalidUntrustedOriginError(origin);
+    if (!isUntrustedOrigin(origin)) {
+      throw new InvalidUntrustedOriginError();
     }
     this.origin = origin;
     this.#value = value;

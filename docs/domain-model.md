@@ -3,7 +3,7 @@ title: Domain model
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-29
+last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
 covers_commit: 0c11f12
@@ -293,6 +293,36 @@ Pure value types (no persistence), see [ADR 0011](adr/0011-llm-port-and-untruste
 - **Unvalidated / Validated** (`llm-output.ts`): a raw model output is `Unvalidated`;
   `validateLlmOutput(output, parse)` returns `{ status: "proposal", value }` or throws
   `LlmInvalidOutputError` (which never quotes the output). A proposal is never a decision.
+  `isValidated` is true only for a proposal produced by `validateLlmOutput`; a thenable or async
+  `parse` is refused.
+
+### LLM port, budget and credential (TK-50b, `packages/domain`)
+Pure types and guards, no persistence ([ADR 0011](adr/0011-llm-port-and-untrusted-data.md)).
+- **LlmProvider** (`llm-provider.ts`): `{ id, complete(request) }`, one operation, no streaming, no
+  tools. `id` is an `LlmServingProviderId`: `anthropic | openai | google` (`LLM_PROVIDER_IDS`,
+  BYOK, the future `provider` column of TK-51) or `fake` (tests only, never stored).
+- **LlmRequest / LlmResponse** (`llm-request.ts`): the request carries the model, an `LlmCredential`,
+  a `FramedPrompt`, the wanted output (`text` or `json` + schema), a mandatory `LlmBudget`, an
+  optional temperature (0 to 2) and `AbortSignal`, and a `trace` (`purpose`, `correlationId`,
+  pattern `[A-Za-z0-9._:-]{1,64}`, never content). The response holds an `Unvalidated` output, the
+  stop reason (`end | max-tokens | stop-sequence | refusal`), the usage and the provider and model
+  actually served.
+- **LlmBudget** (`llm-budget.ts`): `maxOutputTokens`, `timeoutMs`, `maxPromptChars`,
+  `maxCostMicroUsd`, all positive integers and mandatory. Domain ceilings: 32 000 tokens, 120 000 ms,
+  400 000 characters (`system` + `user`), 5 000 000 micro-USD (5 USD per call).
+  `InvalidLlmBudgetError(field)` for a missing or invalid field, `LlmBudgetExceededError { limit }`
+  (`output-tokens | timeout | cost | prompt-chars`) above a ceiling.
+- **LlmCredential** (`llm-credential.ts`): opaque BYOK key (private field, frozen, no own property);
+  every rendering gives `[redacted]`; `revealLlmCredential` is the only reader, for the adapter's last
+  step. 1 to 512 characters, no control character, otherwise `InvalidLlmCredentialError(reason)`.
+- **Errors** (`llm-provider-errors.ts`): root `LlmProviderError { operation, provider?, status? }`
+  (operation `[a-z][a-z0-9-]{0,39}` else `unknown`, known provider, HTTP status 100 to 599, absent
+  fields omitted, never a `cause`) and `LlmAuthError`, `LlmRateLimitedError { retryAfterMs }`,
+  `LlmQuotaExceededError`, `LlmTimeoutError`, `LlmAbortedError`, `LlmBudgetExceededError`,
+  `LlmContextTooLongError`, `LlmRefusedError`, `LlmModelNotFoundError`,
+  `LlmProviderUnavailableError`, plus `LlmInvalidOutputError` (`operation = "validate"`).
+- **Adapter guard**: `assertLlmRequest` checks the request shape (`InvalidLlmRequestError(reason)`),
+  then the budget, then an already aborted signal (`LlmAbortedError`), before any network call.
 
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.

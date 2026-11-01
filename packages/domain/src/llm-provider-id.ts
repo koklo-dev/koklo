@@ -9,10 +9,9 @@ export const LLM_TEST_PROVIDER_ID = "fake" as const;
 /** Fournisseur effectivement servi : un fournisseur BYOK ou le faux de test. */
 export type LlmServingProviderId = LlmProviderId | typeof LLM_TEST_PROVIDER_ID;
 
-export const isLlmProviderId = (_value: unknown): _value is LlmProviderId => {
-  throw new Error("non implémenté");
-};
+/** Casse exacte, sans passer par le prototype (`"constructor"` et `"__proto__"` sont refusés). */
+export const isLlmProviderId = (value: unknown): value is LlmProviderId =>
+  (LLM_PROVIDER_IDS as readonly unknown[]).includes(value);
 
-export const isLlmServingProviderId = (_value: unknown): _value is LlmServingProviderId => {
-  throw new Error("non implémenté");
-};
+export const isLlmServingProviderId = (value: unknown): value is LlmServingProviderId =>
+  value === LLM_TEST_PROVIDER_ID || isLlmProviderId(value);

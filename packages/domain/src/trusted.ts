@@ -22,9 +22,24 @@ export class Trusted {
 
 const build = Trusted as unknown as new (token: symbol, text: string) => Trusted;
 
+/** Forme exacte d'un appel d'étiquette : `strings` et `strings.raw` gelés, de même longueur. */
+const isTemplateObject = (strings: unknown): boolean => {
+  if (!Array.isArray(strings) || !Object.isFrozen(strings)) {
+    return false;
+  }
+  const raw: unknown = (strings as { raw?: unknown }).raw;
+  return (
+    Array.isArray(raw) &&
+    Object.isFrozen(raw) &&
+    raw.length === strings.length &&
+    strings.every((part) => typeof part === "string") &&
+    raw.every((part) => typeof part === "string")
+  );
+};
+
 /** Étiquette de gabarit sans interpolation : les valeurs sont typées `never`. */
 export const trusted = (strings: TemplateStringsArray, ...values: never[]): Trusted => {
-  if (!Array.isArray(strings)) {
+  if (!isTemplateObject(strings)) {
     throw new TypeError("trusted s'utilise comme étiquette de gabarit");
   }
   if (values.length > 0) {

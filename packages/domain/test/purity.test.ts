@@ -57,6 +57,13 @@ describe("API publique du marquage des données non fiables (TK-50a)", () => {
       expect(domain, name).toHaveProperty(name);
     }
   });
+
+  it("n'exporte rien d'inattendu parmi les noms du port LLM (liste fermée des valeurs)", () => {
+    const llmValues = Object.keys(domain)
+      .filter((name) => /llm|Llm|LLM|Untrusted|Trusted|trusted|FramedPrompt|framePrompt/.test(name))
+      .sort();
+    expect(llmValues).toMatchSnapshot();
+  });
 });
 
 describe("F2 package.json et étiquette", () => {
