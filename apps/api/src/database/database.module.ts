@@ -30,7 +30,7 @@ export class DatabaseService implements OnModuleDestroy {
   /** Filtré par organisation : défaut pour tout accès aux données métier. */
   readonly client: TenantClient;
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+  constructor(@Inject(APP_CONFIG) config: Pick<AppConfig, "databaseUrl">) {
     this.raw = createRawDbClient(config.databaseUrl);
     this.client = withTenantIsolation(this.raw);
   }
