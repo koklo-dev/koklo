@@ -10,6 +10,8 @@ import { createSeededDatabase } from "./helpers/app.ts";
 import { auditRowsFull, commentsFor, UUID_RE } from "./helpers/comments.ts";
 import { ENCRYPTION_KEY, INSTALL_APP } from "./helpers/installations.ts";
 import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./helpers/leases.ts";
+import { credentialRows } from "./helpers/llm-credential-routes.ts";
+import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import {
@@ -113,6 +115,7 @@ const WRITE_GROUPS = [
   "repo",
   "specBatch",
   "installation",
+  "llmCredential",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit", "spec"];
@@ -158,6 +161,9 @@ const EXPECTED_WRITE_PROCEDURES = [
   "lease.acquire",
   "lease.heartbeat",
   "lease.release",
+  "llmCredential.invalidate",
+  "llmCredential.remove",
+  "llmCredential.set",
   "member.invite",
   "member.setRole",
   "organization.create",
@@ -669,10 +675,77 @@ const SCENARIOS: Scenario[] = [
       ),
     deniedStatuses: [403],
   },
+  ...llmCredentialScenarios(),
 ];
 
+/**
+ * TK-52b : clés BYOK. Application avec porte-clés (celle du banc `repo`) ; la clé est une sentinelle
+ * factice construite à l'exécution. La cible de l'audit est l'id de la ligne.
+ */
+const LLM_KEY = makeSentinel();
+const llmPath = (suffix = "") => `/llm-credentials/anthropic${suffix}`;
+
+function llmCredentialScenarios(): Scenario[] {
+  const appOf = async () => (await repoRuntimeOf()).app;
+  const putKey = async (ctx: Ctx, role: Role = "owner") =>
+    send(await appOf(), ctx.world.actors[role].cookie, "put", llmPath(), {
+      provider: "anthropic",
+      apiKey: LLM_KEY,
+    });
+  const rowId = async (ctx: Ctx) =>
+    (await credentialRows(database, ctx.world.organizationId))[0]?.id ?? "";
+  const expected = (action: string) => async (ctx: Ctx, state: State) => ({
+    action,
+    targetKind: "llm_credential",
+    targetId: state?.id ?? (await rowId(ctx)),
+    ticketId: null,
+  });
+  const prepared = async (ctx: Ctx) => {
+    await putKey(ctx);
+    return { id: await rowId(ctx) };
+  };
+  const as = async (
+    ctx: Ctx,
+    method: "put" | "post" | "delete",
+    suffix: string,
+    body?: Record<string, unknown>,
+  ) => send(await appOf(), ctx.world.actors.dev.cookie, method, llmPath(suffix), body);
+  return [
+    {
+      procedure: "llmCredential.set",
+      role: "owner",
+      prepare: async () => ({}),
+      call: (ctx) => putKey(ctx),
+      expected: expected("llm_credential.create"),
+      denied: (ctx) => putKey(ctx, "dev"),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "llmCredential.invalidate",
+      role: "owner",
+      prepare: prepared,
+      call: async (ctx) =>
+        send(await appOf(), ctx.world.actors.owner.cookie, "post", llmPath("/invalidate"), {
+          provider: "anthropic",
+        }),
+      expected: expected("llm_credential.invalidate"),
+      denied: (ctx) => as(ctx, "post", "/invalidate", { provider: "anthropic" }),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "llmCredential.remove",
+      role: "owner",
+      prepare: prepared,
+      call: async (ctx) => send(await appOf(), ctx.world.actors.owner.cookie, "delete", llmPath()),
+      expected: expected("llm_credential.delete"),
+      denied: (ctx) => as(ctx, "delete", ""),
+      deniedStatuses: [403],
+    },
+  ];
+}
+
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 24 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 27 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -725,6 +798,13 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
       implemented,
       `groupes implémentés mais exclus de la garde d'audit : ${implemented.join(", ")}`,
     ).toEqual([]);
+  });
+});
+
+describe("garde TK-52b : le groupe llmCredential", () => {
+  it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "llmCredential"))).toBe(true);
   });
 });
 

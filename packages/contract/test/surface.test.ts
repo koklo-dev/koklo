@@ -19,12 +19,13 @@ const GROUPS: Record<string, string[]> = {
   lease: ["acquire", "get", "heartbeat", "release"],
   audit: ["list"],
   installation: ["list", "start"],
+  llmCredential: ["invalidate", "list", "remove", "set"],
   repo: ["createSpec", "link", "list"],
   spec: ["getFeature", "head", "listFeatures"],
   specBatch: ["get", "submit"],
 };
 
-describe("R1 routeur : 15 groupes (TK-42 : +4), 35 procédures", () => {
+describe("R1 routeur : 16 groupes (TK-42 : +4, TK-52b : +1), 39 procédures", () => {
   it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
@@ -34,6 +35,7 @@ describe("R1 routeur : 15 groupes (TK-42 : +4), 35 procédures", () => {
         "health",
         "installation",
         "lease",
+        "llmCredential",
         "member",
         "organization",
         "project",
