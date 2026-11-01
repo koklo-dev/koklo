@@ -22,7 +22,7 @@ describe("parité des fournisseurs avec LLM_PROVIDER_IDS", () => {
     expect(group()).toBeDefined();
   });
 
-  it.each(["set", "remove", "invalidate"])(
+  it.each(["set", "remove", "invalidate", "verify"])(
     "%s : accepte chaque identifiant du domaine, refuse le reste",
     (name) => {
       const schema = group()?.[name]?.["~orpc"].inputSchemas?.[0];
@@ -55,6 +55,7 @@ describe("parité des fournisseurs avec LLM_PROVIDER_IDS", () => {
       ["/llm-credentials/{provider}", "put"],
       ["/llm-credentials/{provider}", "delete"],
       ["/llm-credentials/{provider}/invalidate", "post"],
+      ["/llm-credentials/{provider}/verify", "post"],
     ] as const) {
       const parameter = doc.paths[path]?.[method]?.parameters?.find((p) => p.name === "provider");
       expect([...(parameter?.schema?.enum ?? [])].sort(), `${method} ${path}`).toEqual(

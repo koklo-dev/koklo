@@ -45,6 +45,10 @@ describe("configuration (C3.3)", () => {
   it(".env.example contient exactement les variables lues par le code", () => {
     expect(readKeys()).toEqual([...exampleKeys].sort());
     expect([...exampleKeys].sort()).toEqual([
+      "AI_MAX_CALLS_PER_HOUR_ORG",
+      "AI_MAX_CALLS_PER_HOUR_USER",
+      "AI_MAX_CONCURRENT_PER_ORG",
+      "AI_MAX_VERIFY_PER_HOUR_ORG",
       "APP_ENV",
       "APP_VERSION",
       "BETTER_AUTH_SECRET",
