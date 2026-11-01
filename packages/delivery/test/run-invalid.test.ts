@@ -36,9 +36,9 @@ describe("transitions invalides", () => {
     expect(JSON.stringify({ ...error, message: error.message })).not.toContain("ghp_SECRET");
   });
 
-  it("les états terminaux refusent même block et escalate", () => {
+  it("les états terminaux refusent block et worktree_ready (seuls les rejeux idempotents passent, lot 2)", () => {
     for (const state of ["deployed_staging", "escalated"] as const) {
-      for (const type of ["block", "escalate", "worktree_ready"] as const) {
+      for (const type of ["block", "worktree_ready", "merge_done"] as const) {
         expect(() => applyEvent(runAt(state), event(type), LIMITS), `${state}/${type}`).toThrow(
           InvalidRunTransitionError,
         );
@@ -46,7 +46,16 @@ describe("transitions invalides", () => {
     }
   });
 
-  it("escalate n'est possible que depuis blocked", () => {
+  it("deployed_staging refuse escalate, escalated refuse deploy_green", () => {
+    expect(() => applyEvent(runAt("deployed_staging"), event("escalate"), LIMITS)).toThrow(
+      InvalidRunTransitionError,
+    );
+    expect(() => applyEvent(runAt("escalated"), event("deploy_green"), LIMITS)).toThrow(
+      InvalidRunTransitionError,
+    );
+  });
+
+  it("escalate n'est possible que depuis blocked (hors rejeu sur escalated)", () => {
     expect(() => applyEvent(runAt("reviewing"), event("escalate"), LIMITS)).toThrow(
       InvalidRunTransitionError,
     );

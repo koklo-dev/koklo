@@ -40,3 +40,17 @@ export class StaleRunError extends Error {
     this.actualVersion = actualVersion;
   }
 }
+
+/** Incident 17 : une branche poussée avec PR ouverte se reprend, elle ne repart jamais de zéro. */
+export class ResumeRequiredError extends Error {
+  readonly ticket: string;
+  readonly branch: string;
+  readonly pullRequest: string;
+  constructor(ticket: string, branch: string, pullRequest: string) {
+    super(`Reprise obligatoire : ${ticket} a la branche ${branch} et la PR ${pullRequest}`);
+    this.name = "ResumeRequiredError";
+    this.ticket = ticket;
+    this.branch = branch;
+    this.pullRequest = pullRequest;
+  }
+}

@@ -34,3 +34,8 @@ export const resumePoint = (run: Run): RunEffect | null => {
   if (!isRunState(run.state)) throw new InvalidRunStateError(run.state);
   return RESUME[run.state];
 };
+
+/** Incident 17 : faux quand la branche est poussée avec une PR ouverte (lot 2 : à implémenter). */
+export const canRestartDevelopment = (_run: Run): boolean => {
+  throw new Error("not implemented");
+};
