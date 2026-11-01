@@ -212,6 +212,16 @@ covers_commit: bb9f740
   keeps the other counters. `ALTER TYPE ... ADD VALUE` runs in the migration transaction, so no counter
   row is created in the same migration.
 
+### Reviews and baselines: immutable journal (TK-51c)
+- Migration `20261101110000_reviews_baselines` is reversible (`down.sql`: `baselines`, then the
+  triggers, `reviews`, `reviews_immutable()` and the three enums). Rolling back deletes all reviews and
+  baselines (data loss by design).
+- `reviews` accepts no `UPDATE`, `TRUNCATE` or direct `DELETE` (SQLSTATE 23001); only a cascade from a
+  deleted project, organization or repo removes rows. Never disable the triggers to "fix" a review: add
+  a new one (the latest wins). A retention or erasure need goes through an explicit migration.
+- Baselines and client validations are human-only; the API (TK-55) must check that a review targets the
+  right object and SHA and that `repo_id` belongs to the project.
+
 ### Running the LLM conformance suite (TK-50c)
 Every `LlmProvider` adapter (TK-54 and the later ones) must pass the shared suite from
 `@koklo/domain/testing`; the domain imports no test engine, so the test file passes its own:

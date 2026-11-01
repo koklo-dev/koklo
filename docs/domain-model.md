@@ -35,6 +35,8 @@ tables and columns are `snake_case` through `@@map` / `@map`.
 | `audit_log` | `AuditLog` | Append-only audit trail (`actor_kind`, `action`, `target_kind`, `target_id`) |
 | `project_counters` | `ProjectCounter` | Per-project monotonic counter (`name`: `ticket`, `sprint`, `feature`, `suggestion`; `last_value`) feeding ticket, sprint, `F-nnn` and `SG-n` keys |
 | `suggestions` | `Suggestion` | Client suggestion on a project, keyed `SG-n` (see [Suggestions table](#suggestions-table-tk-51b)) |
+| `reviews` | `Review` | Immutable journal of client reviews of a feature, screen or baseline at a SHA (see [Reviews and baselines](#reviews-and-baselines-tables-tk-51c)) |
+| `baselines` | `Baseline` | Project baselines (`number`, `status`: `proposed`, `validated`, `tagged`) |
 
 The first seven are the Better Auth tables (organization plugin), with fields aligned on
 the Better Auth documentation (ASSUMPTION: not re-checked against the library in this
@@ -209,6 +211,36 @@ enums, one new `counter_name` value, one table; `down.sql` drops the table then 
   round trip is exact). They enter an LLM prompt only through `Untrusted("client-suggestion")`.
 - **Author without GDPR foreign key**: `author_user_id` and `decided_by_user_id` reference no table, so
   erasing a user leaves the suggestion (and its `author_role`) in place.
+
+### Reviews and baselines tables (TK-51c)
+Two tenant tables (`TENANT_MODELS`: `Review`, `Baseline`), migration `20261101110000_reviews_baselines`
+(additive: three enums, two tables, the function `reviews_immutable()` and two triggers; `down.sql`
+drops `baselines`, then the triggers, `reviews`, the function and the enums, in that order).
+- **`reviews`**: `id`, `organization_id`, `project_id`, `repo_id`, `target_kind` (enum
+  `review_target_kind`: `feature`, `screen`, `baseline`), `target_ref`, `sha`, `status` (enum
+  `review_status`: `approved`, `changes_requested`), `author_user_id` (no foreign key, GDPR),
+  `author_role`, `comment`, `created_at`, `updated_at`. CHECKs: `sha` is 40/64 lowercase hex;
+  `target_ref` 1 to 64 characters, `F-nnn` for a `feature`, `baseline-<n>` (`baseline-0` allowed) for a
+  `baseline`, free for a `screen`; `comment` at most 2000.
+- **Append-only journal**: there is no uniqueness on target, SHA or author; every review is a new row
+  and the latest one for a target (index `(project_id, target_kind, target_ref, created_at DESC)`)
+  is authoritative. `UPDATE` and `TRUNCATE` are always refused (`restrict_violation`, 23001) by the
+  triggers `reviews_no_update_delete` and `reviews_no_truncate`. A direct `DELETE` is refused too, except
+  when the row's project or repo no longer exists, i.e. the cascade of a project, an organization (through
+  the project) or a repo. Same pattern as `audit_log`.
+- **`baselines`**: `id`, `organization_id`, `project_id`, `repo_id`, `number` (>= 0, unique per
+  project; baseline 0 is the starting point), `status` (`proposed` default, `validated`, `tagged`),
+  `proposed_sha`, `proposed_by_user_id` (no foreign key), `review_id`, `validated_at`, `tag_sha`,
+  `tagged_at`. State CHECK: `proposed` has no review, validation date, tag SHA nor tag date;
+  `validated` has a review and `validated_at`; `tagged` has all four. A partial unique index allows at most
+  one non-`tagged` baseline per project.
+- **Keys**: projects and repos by composite `(organization_id, ...)` foreign keys `ON DELETE CASCADE`
+  (no `ON UPDATE CASCADE`); `baselines` reference `reviews` by `(organization_id, project_id, review_id)`
+  in NO ACTION, so a review cannot be deleted alone while a baseline points to it (the cascade
+  removes both).
+- **Human only, and API invariants**: baselines and client validations are human-only actions (vision).
+  The database does not check that the review validates the right target and SHA, nor that `repo_id`
+  belongs to the same project: the API (TK-55) must verify these invariants.
 
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:
