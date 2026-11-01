@@ -193,7 +193,8 @@ describe("Table des échecs de submit, appliquée à la suppression", () => {
     };
     const { panel, alert } = await failWith(apiError("SPEC_INVALID", { report }));
     expect(alert).toHaveTextContent("La spec obtenue ne serait pas valide");
-    expect(alert).toHaveTextContent("Rien n'a été écrit.");
+    expect(alert).toHaveTextContent("Rien n'a été écrit. La fonctionnalité reste dans la spec");
+    expect(alert.textContent).not.toMatch(/Corrigez/);
     expect(
       within(alert).getByText("Le scénario TS-001 renvoie à F-001, qui n'existerait plus."),
     ).toBeVisible();

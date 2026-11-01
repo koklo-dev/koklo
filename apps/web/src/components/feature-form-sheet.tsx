@@ -5,23 +5,21 @@ import { Button, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } fro
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type MutableRefObject, type ReactNode, useEffect, useRef, useState } from "react";
 import { errorCode } from "../lib/api-error.ts";
-import { fieldId } from "../lib/feature-form-ids.ts";
+import { fieldId, REASON_ID } from "../lib/feature-form-ids.ts";
 import { orpc } from "../lib/orpc.ts";
 import { describeFeatureError } from "../lib/spec-errors.ts";
-import type { FeatureDelete } from "../lib/use-feature-delete.ts";
 import { type FeatureFormModel, useFeatureForm } from "../lib/use-feature-form.ts";
 import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { CriteriaEditor } from "./feature-criteria-editor.tsx";
-import { FeatureDeleteConfirm, FeatureDeleteTrigger } from "./feature-delete-confirm.tsx";
 import { FeatureError } from "./feature-error.tsx";
 import { DescriptionField, GeneralFields } from "./feature-form-fields.tsx";
+import { deleteEntry, FormFooter } from "./feature-form-footer.tsx";
 import { FormMessages } from "./feature-form-messages.tsx";
 import { LinksFields } from "./feature-links-fields.tsx";
 import { SaveProgress } from "./save-progress.tsx";
 
 let lastOwner = 0;
-const REASON = "feature-form-save-reason";
 
 export interface FormSheetProps {
   projectId: string;
@@ -81,67 +79,6 @@ function disabledReason(model: FeatureFormModel, write: FeatureWrite): string | 
   return model.noChange ? "Aucune modification à enregistrer." : null;
 }
 
-interface FooterProps {
-  busy: boolean;
-  disabled: boolean;
-  reason: string | null;
-  onClose: () => void;
-  /** Suppression : seulement en modification, une fois la fonctionnalité lue. */
-  remove: {
-    del: FeatureDelete;
-    specId: string;
-    title: string;
-    disabled: boolean;
-    explained: boolean;
-  } | null;
-}
-
-function FormFooter(props: FooterProps) {
-  const { remove } = props;
-  if (remove?.del.confirming) {
-    const { del } = remove;
-    return (
-      <SheetFooter className="flex-col sm:flex-col sm:justify-start">
-        <FeatureDeleteConfirm
-          specId={remove.specId}
-          title={remove.title}
-          busy={del.deleting}
-          onConfirm={del.confirm}
-          onKeep={del.keep}
-        />
-      </SheetFooter>
-    );
-  }
-  return (
-    <SheetFooter className="flex-col sm:flex-col sm:justify-start md:flex-row md:justify-start">
-      <Button
-        type="submit"
-        className="h-11 w-full md:h-9 md:w-auto"
-        disabled={props.disabled}
-        aria-busy={props.busy || undefined}
-        aria-describedby={props.reason ? REASON : undefined}
-      >
-        {props.busy ? "Enregistrement…" : "Enregistrer"}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full md:h-9 md:w-auto"
-        onClick={props.onClose}
-      >
-        Fermer
-      </Button>
-      {remove ? (
-        <FeatureDeleteTrigger
-          disabled={remove.disabled}
-          describedBy={remove.explained ? REASON : undefined}
-          onAsk={remove.del.ask}
-        />
-      ) : null}
-    </SheetFooter>
-  );
-}
-
 /** Fermeture : brouillon écrit puis annoncé, échec effacé, liste en retard gardée, « Vérifier la liste ». */
 function useFormClose(props: BodyProps, model: FeatureFormModel) {
   const { write, announce, onClose, closeRef } = props;
@@ -159,21 +96,6 @@ function useFormClose(props: BodyProps, model: FeatureFormModel) {
     close();
   };
   return { close, checkList };
-}
-
-/** Entrée de la suppression : en modification seulement, désactivée tant qu'une écriture suit son cours. */
-function removal(props: BodyProps, model: FeatureFormModel): FooterProps["remove"] {
-  const { specId, write } = props;
-  const baseline = model.state.baseline;
-  if (props.mode !== "edit" || !specId || !baseline) return null;
-  const disabled = write.busy || (model.mine && write.phase === "late");
-  return {
-    del: model.del,
-    specId,
-    title: baseline.title.trim(),
-    disabled,
-    explained: write.busy && !model.mine,
-  };
 }
 
 /** Formulaire prêt : champs, messages, indicateur d'avancement et pied (S-feature-form §3.2). */
@@ -216,7 +138,7 @@ function FormBody(props: BodyProps) {
         <SaveProgress write={write} version={write.batch?.commitSha?.slice(0, 7) ?? null} />
       ) : null}
       {reason ? (
-        <p id={REASON} className="text-[13px] text-muted-foreground">
+        <p id={REASON_ID} className="text-[13px] text-muted-foreground">
           {reason}
         </p>
       ) : null}
@@ -225,7 +147,7 @@ function FormBody(props: BodyProps) {
         disabled={Boolean(reason) || (model.mine && write.phase === "late")}
         reason={reason}
         onClose={close}
-        remove={removal(props, model)}
+        remove={deleteEntry(mode, specId, model, write)}
       />
     </form>
   );

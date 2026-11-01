@@ -652,7 +652,11 @@ test.describe("Suppression (48e-2)", () => {
     await openF001(page);
     await askDelete(page);
     const group = confirmGroup(page);
-    await expect(group.getByText("Supprimer F-001 « Connexion par e-mail » ?")).toBeVisible();
+    // Deux copies du titre : l'une masquée (lue en entier), l'autre visible avec l'identifiant en mono.
+    await expect(group.locator("p[aria-hidden='true']")).toHaveText(
+      "Supprimer F-001 « Connexion par e-mail » ?",
+    );
+    await expect(group.locator("p[aria-hidden='true'] .font-mono")).toHaveText("F-001");
     await expect(group).toContainText("Ses critères d'acceptation seront supprimés avec elle.");
     await expect(group.getByRole("button", { name: "Garder", exact: true })).toBeFocused();
     await expect(group.getByRole("button", { name: "Supprimer", exact: true })).toBeVisible();
@@ -728,6 +732,8 @@ test.describe("Suppression (48e-2)", () => {
     await confirmDeletion(page);
     const alert = dialogOf(page).getByRole("alert");
     await expect(alert).toContainText("La spec obtenue ne serait pas valide");
+    await expect(alert).toContainText("La fonctionnalité reste dans la spec");
+    await expect(alert).not.toContainText("Corrigez");
     await expect(alert).toContainText("Le scénario TS-001 renvoie à F-001, qui n'existerait plus.");
     await expect(dialogOf(page).getByRole("button", { name: DELETE })).toBeVisible();
     await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
@@ -862,7 +868,12 @@ test.describe("Suppression (48e-2)", () => {
         .boundingBox();
       expect(confirm?.height ?? 0).toBeGreaterThanOrEqual(44);
       expect(keep?.height ?? 0).toBeGreaterThanOrEqual(44);
-      expect(confirm?.width ?? 0).toBeGreaterThanOrEqual(300);
+      // Pleine largeur de la colonne de la confirmation (l'icône en prend une part à gauche : ~264 px à 375 px).
+      const column = await confirmGroup(page)
+        .getByRole("button", { name: "Garder", exact: true })
+        .evaluate((el) => el.parentElement?.getBoundingClientRect().width ?? 0);
+      expect(confirm?.width ?? 0).toBeGreaterThanOrEqual(column - 1);
+      expect(confirm?.width ?? 0).toBeGreaterThanOrEqual(240);
       expect(await noHorizontalScroll(page)).toBe(true);
       await capture(page, "delete-confirm", "light", "-mobile");
       await noAxeViolation(page);

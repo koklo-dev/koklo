@@ -143,6 +143,20 @@ describe("describeSaveError en mode « delete » : la table unique de §4.7", ()
     const view = describeSaveError(apiFailure("SPEC_INVALID", { report }), owner);
     expect(view).toMatchObject({ kind: "spec-invalid", freshKey: true });
     expect(view.report?.issues[0]?.entityId).toBe("TS-001");
+    // Texte propre à la suppression : ce n'est pas une saisie à corriger, une référence la bloque.
+    expect(view.text).toContain("La fonctionnalité reste dans la spec");
+    expect(view.text).not.toMatch(/Corrigez/);
+  });
+
+  it("SPEC_INVALID d'un lot terminal relu : même texte propre à la suppression ; l'enregistrement garde « Corrigez »", () => {
+    const batch = { status: "failed", errorCode: "SPEC_INVALID" };
+    const deleted = describeSaveError({ source: "batch", batch }, owner);
+    expect(deleted.text).toContain("La fonctionnalité reste dans la spec");
+    const updated = describeSaveError(
+      { source: "batch", batch },
+      { role: "owner", mode: "update" },
+    );
+    expect(updated.text).toContain("Corrigez les points ci-dessous");
   });
 
   it("INTERNAL de submit : pas de réessai aveugle (vérifier la liste d'abord), même clé pour un réessai identique", () => {

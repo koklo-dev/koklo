@@ -565,7 +565,7 @@ stateDiagram-v2
 - **Tests**: unit `apps/web/test/features-*.test.tsx`, `project-create-48d-fixes.test.tsx`; e2e `apps/web/e2e/features.spec.ts` (46 tests against the fake API `e2e/support/stub-features.ts`, captures in `design/screens/captures/S-features/`).
 
 ### Web: feature form, create and edit (TK-48e-1)
-`apps/web` only, on top of the features list; contract (0.7.0) and API unchanged. A `Sheet` over `/projects/[projectId]/features` (`?new=1`, `?edit=F-nnn`); `@koklo/ui` gains `Textarea`. Deletion (`feature.delete`) is sub-lot 48e-2. Screen sheet: `design/screens/S-feature-form.md` (v1.1).
+`apps/web` only, on top of the features list; contract (0.7.0) and API unchanged. A `Sheet` over `/projects/[projectId]/features` (`?new=1`, `?edit=F-nnn`); `@koklo/ui` gains `Textarea`. Deletion (`feature.delete`) is sub-lot 48e-2, described below. Screen sheet: `design/screens/S-feature-form.md` (v1.3).
 - **One write, owned by the page**: `useFeatureWrite` (`lib/use-feature-submit.ts`) sends one `specBatch.submit` with one operation (pure builders in `feature-operation.ts`: minimal patch on update, `baseSha` from `spec.head`) and survives the form closing. A form number (`owner`) tells the form that started a write from a reopened one. The idempotency key (`feature-<uuid>`) is reused only after a network failure or an `INTERNAL` reply of `submit` (the server may have written; the same key replays instead of duplicating) with an identical input; any other coded failure, a terminal `failed`/`INTERNAL` batch read by `specBatch.get`, or an edited input gets a new key.
 - **Local storage is scoped**: drafts (`koklo:feature-draft:<projectId>:<target>`) and the tracking marker (`koklo:feature-pending:<projectId>`) store the owner (`ownerId`, `organizationId` of the session; `lib/feature-draft.ts`). A read from another account or organisation, or whose JSON does not match the strict validators of `lib/feature-draft-schema.ts` (types, contract status/priority, criteria and steps, `F-\d{3,}`, `kind`, SHA, key), deletes the key and is ignored. `endFeatureSession()` (sign-out buttons and the `UNAUTHORIZED` exit to `/login`) clears everything and blocks later writes, so the unmount flush of a form cannot rewrite; `beginFeatureSession(scope)` (page mount) re-enables writes and purges what belongs to another owner.
 ```mermaid
@@ -589,7 +589,26 @@ stateDiagram-v2
 - **Form model**: `use-feature-form` composes `feature-form-state` (initial state, resumed draft, validation, server-designated fields), `use-feature-form-actions` (`useFormSave`, `useReload` = three-way rebase after `stale_base`, `useDraftChoices`), `use-feature-draft` (500 ms debounce, local only) and `use-feature-form-panel` (opening from the address, rights). Pure rules live in `feature-form.ts`, `feature-errors.ts` (single error table), `feature-rebase.ts`, `spec-issues.ts`.
 - **Access**: `canWriteSpec(role)` (owner, admin, dev, designer) and `spec.head.status = ready` gate every entry point; for client, business or an unknown role there is no button, no empty slot, and `?new`/`?edit` are stripped. `deriveFeaturesView` no longer waits for the role to show a spec that was read; only the absence of an index still waits for it. This leaks nothing: the list was always readable by every role, `repo.list` stays enabled only when `spec.head` is `null` and `canReadRepos(role)` (undefined role included), write buttons need a known writing role, and the git-flavoured version line and technical groups are shown to `canReadRepos` roles only (an unknown role gets the client wording).
 - **Accessibility**: exactly one `role="status"` per document. The page region is used while the form is closed; while the modal is open (the rest of the page is `aria-hidden`) it loses its role and content and a visually hidden region of the panel carries the announcements (sending, queue, criteria, draft). Neutral notices are `role="group"`, one `role="alert"` at a time. Footer DOM order is Save then Close, same as the visual order and the tab order. The scrollable area is a named, focusable region.
-- **Tests**: unit and integration `apps/web/test/feature-*.test.ts(x)`; e2e `apps/web/e2e/feature-form.spec.ts` (48 tests against the fake provider `e2e/support/stub-feature-write.ts`, fake clock for `slow` and `saved-index-pending`; captures in `design/screens/captures/S-feature-form/`).
+- **Tests**: unit and integration `apps/web/test/feature-*.test.ts(x)`; e2e `apps/web/e2e/feature-form.spec.ts` (48 tests in 48e-1, 65 with the deletion block, against the fake provider `e2e/support/stub-feature-write.ts`, fake clock for `slow` and `saved-index-pending`; captures in `design/screens/captures/S-feature-form/`).
+
+#### Feature deletion (TK-48e-2)
+Same write machinery, no contract or API change. `useFeatureDelete` (`lib/use-feature-delete.ts`, composed with `useFormSave` by `useWriteActions` in `use-feature-form-actions`) asks, cancels (focus back on the entry button), pre-checks the designer rule (`checkDesignerScreens("delete")`: the value read counts, the input being typed does not; a refusal is a local `FORBIDDEN`, same view as the server's) and sends the single operation `{ kind: "feature.delete", specId }` (`buildDeleteOperation`) with the `baseSha` read at opening and a fresh idempotency key. The input being typed is never sent.
+```mermaid
+stateDiagram-v2
+  [*] --> editing
+  editing --> confirming: "Supprimer cette fonctionnalité" (nothing sent)
+  confirming --> editing: "Garder" (focus on the entry button)
+  confirming --> refused: designer without a screen on the value read (no call)
+  confirming --> sending: "Supprimer" (one feature.delete, not while a write is busy)
+  sending --> tracking: same states as a save (queued, committing, indexing)
+  tracking --> deleted: batch committed and index caught up
+  tracking --> failed: error table (SPEC_INVALID = something still points at it)
+  failed --> sending: "Réessayer" (no new confirmation; same key after network/INTERNAL of submit only)
+  deleted --> [*]: list re-read without the feature, "F-001 supprimée.", focus on the h1
+```
+- **Safety**: no deletion without the confirmation step (`confirm` is only reachable from `FeatureDeleteConfirm`, and returns when a write is busy), one operation per batch, `baseSha` guards against a stale base, entry limited to `canWriteSpec` roles once the feature is read. The tracking marker has `kind: "delete"` and the same owner scoping (account and organisation) and 24 h limit as drafts; at `committed` the feature's draft and the marker are cleared, other drafts (including the new-feature draft) are kept. The server stays the authority for the designer rule.
+- **Errors**: the single table of 48e-1 applies with `mode: "delete"` (`write_conflict` = "changed or no longer exists", then reloading shows "no longer exists"). Only `SPEC_INVALID` has deletion wording: "Rien n'a été écrit. La fonctionnalité reste dans la spec : voyez ci-dessous ce qui bloque sa suppression." (`feature-errors.ts`).
+- **Components**: `feature-form-footer.tsx` (`FormFooter`, `deleteEntry`) swaps the footer for `FeatureDeleteConfirm` while asking and sending; `feature-form-sheet.tsx` stays under 250 lines.
 
 ### Web: sprint kanban (TK-35)
 `apps/web` only; `apps/api`, `packages/contract` and the database are untouched. The screen consumes
