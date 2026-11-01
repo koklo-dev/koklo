@@ -146,6 +146,38 @@ The state diagram, transitions, block causes and effects are in
 [domain-model.md](domain-model.md#run-lifecycle-tk-72-lots-1-and-2-packagesdelivery).
 Counters, ceilings, idempotent replays and resume are described there too (lot 2).
 
+### Rules package: catalog and parser (TK-71 lot A)
+`packages/rules` (`@koklo/rules`, tag `rules`, private) is the pure engineering-rules library.
+Lot A ships the catalog model and its parser; composition, locks, waivers and resolution come
+with lots B and C. Its only third-party dependency is `zod` 4.6.7 and it imports no other
+workspace package; a purity test enforces relative or `zod` imports only, no clock, randomness,
+environment or I/O in `src`, files at most 300 lines and functions at most 50. The tag `rules`
+is already declared in the root `turbo.json` (allow: `domain`, `contract`, `config`).
+
+| File | Responsibility |
+|---|---|
+| `catalog-types.ts` | `AGENT_ROLES` (8), `PROFILE_KINDS` (6), `Catalog`, `Rule`, `Profile`, `Enforcement` |
+| `catalog-schema.ts` | strict zod schemas (snake_case in, camelCase out), `RULE_ID_PATTERN` |
+| `catalog-checks.ts` | raw-document checks (version, protected, enforcement) and semantic checks |
+| `catalog-error.ts` | `CATALOG_ERROR_CODES` (10), `CatalogError`, `CatalogResult` |
+| `parse-catalog.ts` | `parseCatalog(json)`, never throws, `MAX_CATALOG_BYTES` (1 MiB of UTF-8) |
+| `builtin-catalog.ts`, `catalog.json` | `loadBuiltInCatalog()`: the shipped catalog, imported with `with { type: "json" }` |
+
+```mermaid
+flowchart LR
+  json["catalog JSON (string)"] --> size{"size <= 1 MiB"}
+  size --> parse["JSON.parse"]
+  parse --> raw["raw checks: version, protected, enforcement"]
+  raw --> schema["zod catalogSchema (strict)"]
+  schema --> sem["semantic checks: ids, profiles, protected set"]
+  sem --> result["CatalogResult ok | error {code, message, path}"]
+  builtin["src/catalog.json"] --> load["loadBuiltInCatalog()"] --> parse
+```
+
+`tsc` copies `catalog.json` into `dist/`, so the import works unchanged from the build. The
+catalog is a copy of the Shipyard catalog 2026.08.3 (34 rules, 13 profiles, 4 protected rules).
+Model and error codes: [domain-model.md](domain-model.md#rules-catalog-tk-71-lot-a-packagesrules).
+
 ### API contract package (TK-9)
 `packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2
 contract that other packages consume (see the `contract` edges in the boundaries

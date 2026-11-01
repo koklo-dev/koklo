@@ -469,6 +469,49 @@ emits `notify{cause}`, with `version + 1`.
 - **Dependency**: `@koklo/domain` stays in `packages/delivery/package.json` (the purity test pins
   it); it is reserved for TK-73+ and imported nowhere in `src` yet.
 
+## Rules catalog (TK-71 lot A, `packages/rules`)
+A **catalog** is a versioned set of engineering rules and the profiles that group them. The
+input is JSON in snake_case (`schema_version`, `catalog_version`, `protected_rule_ids`); the
+parsed value is camelCase (`schemaVersion`, `catalogVersion`, `protectedRuleIds`). Every object
+is strict: an unknown key is refused.
+
+- **Profile** (`profiles{id}`): `kind` in `global | language | domain | infrastructure |
+  business | standard`, and a `description`.
+- **Rule**: `id` (`^[a-z0-9]+(\.[a-z0-9-]+)+$`), `title`, `description`, `profiles` (at least
+  one, each an existing profile), `agents` (at least one, no duplicate, among the 8 roles
+  `product-owner`, `analyst`, `designer`, `developer`, `test-writer`, `qa-reviewer`,
+  `tech-lead`, `doc-writer`), `severity` (`blocking | advisory`), `protected` (default
+  `false`), `enforcement`.
+- **Enforcement** (how a rule is checked): `gate` (`adapter`, optional `command`: a tool
+  decides), `evidence` (`evidence`: the stage artifact must cite proof) or `instruction`
+  (guidance only).
+- **Protected rules**: `protected_rule_ids` must equal exactly the set of rules with
+  `protected: true`, each id must exist, and a protected rule is always `blocking`.
+  The shipped catalog protects `global.secrets`, `global.dependency-integrity`,
+  `security.authorization` and `privacy.sensitive-logging`.
+- A catalog has at least one rule and one profile, unique rule ids and `schema_version` 1.
+
+`parseCatalog(json)` never throws and returns `{ ok: true, value }` or
+`{ ok: false, error: { code, message, path? } }`. Checks run in this order: size, JSON,
+version, protected flag and enforcement per rule (raw document), zod shape, then ids,
+profiles and the protected set. The first failure wins; `path` is dotted (`rules.3.id`).
+
+| Code | Cause | Typical `path` |
+|---|---|---|
+| `catalog.too-large` | more than 1 MiB (1 048 576 UTF-8 bytes) | none |
+| `catalog.invalid-json` | not parseable JSON | none |
+| `catalog.invalid-shape` | schema violation (type, empty list, unknown key, unknown severity or role, protected rule not blocking) | `rules.1.agents` |
+| `catalog.unknown-version` | `schema_version` is not 1 | `schema_version` |
+| `catalog.duplicate-id` | second occurrence of a rule id | `rules.3.id` |
+| `catalog.missing-enforcement` | rule without `enforcement` | `rules.1.enforcement` |
+| `catalog.unknown-enforcement` | `enforcement.kind` outside `gate | evidence | instruction` | `rules.1.enforcement.kind` |
+| `catalog.unknown-profile` | rule references an undefined profile | `rules.1.profiles.1` |
+| `catalog.unknown-protected-id` | `protected_rule_ids` entry matches no rule | `protected_rule_ids.1` |
+| `catalog.protected-mismatch` | a rule's `protected` flag and `protected_rule_ids` disagree | `rules.1.protected` |
+
+A protected rule that is not listed is reported as `protected-mismatch` (raw check) before the
+shape check can call it `invalid-shape`.
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.
