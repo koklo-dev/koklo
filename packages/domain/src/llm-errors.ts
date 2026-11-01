@@ -46,3 +46,61 @@ export class LlmInvalidOutputError extends Error {
     this.reason = reason;
   }
 }
+
+export const INVALID_LLM_CREDENTIAL_REASONS = [
+  "not-a-string",
+  "empty",
+  "too-long",
+  "control-characters",
+] as const;
+export type InvalidLlmCredentialReason = (typeof INVALID_LLM_CREDENTIAL_REASONS)[number];
+
+/** Clé inutilisable ; ne reprend jamais la valeur fournie. */
+export class InvalidLlmCredentialError extends Error {
+  readonly reason: InvalidLlmCredentialReason;
+  constructor(reason: InvalidLlmCredentialReason) {
+    super("Clé de fournisseur LLM invalide");
+    this.name = "InvalidLlmCredentialError";
+    this.reason = reason;
+  }
+}
+
+export const INVALID_LLM_REQUEST_REASONS = [
+  "model",
+  "credential",
+  "prompt",
+  "output",
+  "temperature",
+  "signal",
+  "trace",
+] as const;
+export type InvalidLlmRequestReason = (typeof INVALID_LLM_REQUEST_REASONS)[number];
+
+/** Requête mal formée (erreur de programmation de l'appelant) ; ne reprend aucun contenu. */
+export class InvalidLlmRequestError extends Error {
+  readonly reason: InvalidLlmRequestReason;
+  constructor(reason: InvalidLlmRequestReason) {
+    super(`Requête LLM invalide : ${reason}`);
+    this.name = "InvalidLlmRequestError";
+    this.reason = reason;
+  }
+}
+
+export const INVALID_LLM_BUDGET_FIELDS = [
+  "budget",
+  "maxOutputTokens",
+  "timeoutMs",
+  "maxPromptChars",
+  "maxCostMicroUsd",
+] as const;
+export type InvalidLlmBudgetField = (typeof INVALID_LLM_BUDGET_FIELDS)[number];
+
+/** Budget absent ou champ qui n'est pas un entier strictement positif. */
+export class InvalidLlmBudgetError extends Error {
+  readonly field: InvalidLlmBudgetField;
+  constructor(field: InvalidLlmBudgetField) {
+    super(`Budget LLM invalide : ${field}`);
+    this.name = "InvalidLlmBudgetError";
+    this.field = field;
+  }
+}

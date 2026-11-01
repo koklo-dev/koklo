@@ -29,3 +29,8 @@ export const validateLlmOutput = <T>(
   }
   return Object.freeze({ status: "proposal", value }) as unknown as Validated<T>;
 };
+
+/** Garde statique : vrai seulement pour une proposition produite par `validateLlmOutput`. */
+export const isValidated = (_value: unknown): _value is Validated<unknown> => {
+  throw new Error("non implémenté");
+};
