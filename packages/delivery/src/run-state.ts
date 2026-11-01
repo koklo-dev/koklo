@@ -1,19 +1,25 @@
-/** SQUELETTE (TK-72 lot 1, étape RED) : le Green remplit la liste, la garde et les terminaux. */
-export type RunState =
-  | "leased"
-  | "developing"
-  | "local_gates"
-  | "pr_open"
-  | "ci_wait"
-  | "reviewing"
-  | "merge_requested"
-  | "merged"
-  | "deployed_staging"
-  | "blocked"
-  | "escalated";
+import { isOneOf } from "./one-of.ts";
 
-export const RUN_STATES: readonly RunState[] = [];
+/** États du run (vision §10.3, annexe C §C.6), dans l'ordre de la vision. */
+export const RUN_STATES = [
+  "leased",
+  "developing",
+  "local_gates",
+  "pr_open",
+  "ci_wait",
+  "reviewing",
+  "merge_requested",
+  "merged",
+  "deployed_staging",
+  "blocked",
+  "escalated",
+] as const;
 
-export const isRunState = (_value: unknown): _value is RunState => false;
+export type RunState = (typeof RUN_STATES)[number];
 
-export const isTerminal = (_state: RunState): boolean => false;
+/** Seuls ces états n'acceptent plus aucun événement (`merged` et `blocked` ne le sont pas). */
+const TERMINAL_STATES: readonly RunState[] = ["deployed_staging", "escalated"];
+
+export const isRunState = (value: unknown): value is RunState => isOneOf(RUN_STATES, value);
+
+export const isTerminal = (state: RunState): boolean => TERMINAL_STATES.includes(state);

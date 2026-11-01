@@ -344,6 +344,66 @@ Test-support types, outside the public index ([ADR 0011](adr/0011-llm-port-and-u
   `invalidKey`, `servedModel`, `replyWith`, `failWith(trigger)`, `callsMade`), triggers
   `LLM_FAILURE_TRIGGERS`, cases `LLM_CONFORMANCE_CASE_NAMES`, failure `LlmConformanceFailure`.
 
+### Run lifecycle (TK-72 lot 1, `packages/delivery`)
+A `Run` is an immutable, JSON-serialisable value (`ticket`, `state`, `attempts`, `reviewRounds`,
+`ciWaits`, `blocked`, `branch`, `pullRequest`, `lastReviewedAfterFix`, `version`). `startRun`
+creates it `leased`, version 0. `applyEvent(run, event, limits)` is pure and returns
+`{ run, effects }`: a new deeply frozen run (`version + 1`) and the commands the runner must
+execute; the machine executes nothing. Checks run in this order: unknown run state
+(`InvalidRunStateError`), unknown or malformed event (`InvalidRunEventError`), `expectedVersion`
+different from `run.version` (`StaleRunError`), pair absent from the table
+(`InvalidRunTransitionError(from, event)`, never carrying event data).
+
+```mermaid
+stateDiagram-v2
+  [*] --> leased
+  leased --> developing: worktree_ready
+  developing --> local_gates: dev_done
+  developing --> blocked: dev_done (empty diff, no_output)
+  local_gates --> pr_open: gates_green
+  local_gates --> developing: gates_red
+  pr_open --> ci_wait: pr_opened
+  ci_wait --> reviewing: ci_green
+  ci_wait --> developing: ci_red, conflict_detected
+  ci_wait --> ci_wait: ci_timeout
+  reviewing --> merge_requested: verdict_approve
+  reviewing --> developing: verdict_request_changes
+  merge_requested --> merged: merge_done
+  merged --> deployed_staging: deploy_green
+  blocked --> escalated: escalate
+  deployed_staging --> [*]
+  escalated --> [*]
+```
+
+Every non-terminal state except `blocked` also accepts `block` (-> `blocked`) and `quota_hit`
+(neutral: same run, same version, no effect). `blocked` accepts only `escalate`; the terminals
+`deployed_staging` and `escalated` accept nothing; `merged` and `blocked` are not terminal.
+`conflict_detected` is accepted only in `ci_wait`. `ci_timeout` is an event that stays in
+`ci_wait`, never a failure.
+
+| Transition | Effect described |
+|---|---|
+| leased -> developing | `start_dev` |
+| developing -> local_gates | `run_gates` |
+| local_gates -> pr_open | `open_pr` |
+| pr_open -> ci_wait, ci_wait -> ci_wait | `wait_ci` (`bounded: true`) |
+| ci_wait -> reviewing | `start_review` |
+| any return to developing | `start_dev` |
+| reviewing -> merge_requested | `request_merge` |
+| merge_requested -> merged | `await_deploy` |
+| merged -> deployed_staging | none |
+| any -> blocked | `notify` (cause) |
+| blocked -> escalated | `escalate` |
+
+**Block causes** (`BLOCK_CAUSES`, closed list, no catch-all): `dependency`, `ambiguous_spec`,
+`ci_failed`, `conflict`, `quota`, `review_exhausted`, `no_output`, `git_error`, `ci_timeout`
+(distinct from `ci_failed`). A block carries `{ cause, detail: { output, remoteBranchExists? } }`;
+the raw output is mandatory, `no_output` also requires `remoteBranchExists`. A `dev_done` with an
+empty diff becomes `blocked(no_output)`, never "PR impossible". `resumePoint(run)` maps a
+persisted state to the step to resume (`blocked` -> `escalate`, terminals -> `null`).
+Not in lot 1: counters and ceilings, `RunLimitReachedError`, idempotent replays,
+`ResumeRequiredError`.
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.

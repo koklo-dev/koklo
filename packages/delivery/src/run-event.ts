@@ -1,4 +1,3 @@
-/** SQUELETTE (TK-72 lot 1, étape RED). */
 import type { BlockCause } from "./block-cause.ts";
 
 interface EventBase {
@@ -37,4 +36,21 @@ export type RunEvent = EventBase &
 
 export type RunEventType = RunEvent["type"];
 
-export const RUN_EVENT_TYPES: readonly RunEventType[] = [];
+export const RUN_EVENT_TYPES = [
+  "worktree_ready",
+  "dev_done",
+  "gates_green",
+  "gates_red",
+  "pr_opened",
+  "ci_green",
+  "ci_red",
+  "ci_timeout",
+  "conflict_detected",
+  "verdict_approve",
+  "verdict_request_changes",
+  "merge_done",
+  "deploy_green",
+  "block",
+  "escalate",
+  "quota_hit",
+] as const satisfies readonly RunEventType[];

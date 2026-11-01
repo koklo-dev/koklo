@@ -1,4 +1,4 @@
-/** SQUELETTE (TK-72 lot 1, étape RED). */
+/** Valeur immuable et sérialisable en JSON : l'état d'un run de livraison. */
 import type { BlockInfo } from "./block-cause.ts";
 import type { RunState } from "./run-state.ts";
 
@@ -27,6 +27,17 @@ export interface RunLimits {
   readonly maxCiWaits: number;
 }
 
-export const startRun = (_input: StartRunInput): Run => {
-  throw new Error("not implemented");
-};
+/** Crée un run `leased`, version 0 ; les compteurs viennent du ticket, qui reste la source (D7). */
+export const startRun = (input: StartRunInput): Run =>
+  Object.freeze({
+    ticket: input.ticket,
+    state: "leased",
+    attempts: input.attempts ?? 0,
+    reviewRounds: input.reviewRounds ?? 0,
+    ciWaits: 0,
+    blocked: null,
+    branch: null,
+    pullRequest: null,
+    lastReviewedAfterFix: false,
+    version: 0,
+  });

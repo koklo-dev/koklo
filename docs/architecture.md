@@ -112,6 +112,38 @@ flowchart LR
   supported). Exit code 1 and a message on stderr otherwise.
 - Both checks run from the root `lint` script:
   `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
+### Delivery package: run state machine (TK-72 lot 1)
+`packages/delivery` (`@koklo/delivery`, tag `delivery`, private) holds the pure core of the
+delivery loop. Its only runtime dependency is `@koklo/domain` (workspace); it adds no
+third-party dependency and no I/O, clock, randomness or environment access, which a
+purity test enforces (relative imports or `@koklo/domain` only, files at most 300 lines,
+functions at most 50). The tag `delivery` is already declared in the root `turbo.json`
+(allow: `domain`, `contract`, `rules`, `config`); `turbo boundaries` stays green. The
+package decides, the runner (TK-75/76) executes and persists.
+
+| File | Responsibility |
+|---|---|
+| `run-state.ts` | `RUN_STATES` (11, vision order), `isRunState`, `isTerminal` |
+| `block-cause.ts` | `BLOCK_CAUSES` (9), `createBlock` (frozen, raw output required) |
+| `run.ts` | immutable, JSON-serialisable `Run`, `startRun`, `RunLimits` |
+| `run-event.ts`, `run-event-check.ts` | 16 event types; validation and block extraction |
+| `run-effects.ts` | `RunEffect` commands (frozen constants) |
+| `run-transitions.ts` | transition table (data), `applyEvent`, `canApply`, `allowedEvents` |
+| `run-resume.ts` | `resumePoint` (step to resume from a persisted run) |
+| `errors.ts` | `InvalidRunStateError`, `InvalidRunEventError`, `InvalidRunTransitionError`, `StaleRunError` |
+
+```mermaid
+flowchart LR
+  runner["runner (TK-75/76, later)"] -- "event" --> apply["applyEvent(run, event, limits)"]
+  apply --> table["transition table (data)"]
+  apply -- "{ run (frozen), effects }" --> runner
+  delivery["@koklo/delivery"] --> domain["@koklo/domain"]
+```
+
+The state diagram, transitions, block causes and effects are in
+[domain-model.md](domain-model.md#run-lifecycle-tk-72-lot-1-packagesdelivery).
+Counters, ceilings, idempotent replays and `ResumeRequiredError` are lot 2.
+
 ### API contract package (TK-9)
 `packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2
 contract that other packages consume (see the `contract` edges in the boundaries
