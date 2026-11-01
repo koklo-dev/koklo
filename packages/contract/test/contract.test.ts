@@ -85,7 +85,7 @@ describe("CT-4 chemins explicites", () => {
     const pairs = Object.entries(doc.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${path}`),
     );
-    expect(pairs).toHaveLength(47);
+    expect(pairs).toHaveLength(50);
     expect(new Set(pairs).size).toBe(pairs.length);
     expect(pairs.sort()).toEqual(ALL_PAIRS);
   });
@@ -126,7 +126,7 @@ describe("CT-5 erreurs typées", () => {
 });
 
 describe("CT-6 génération OpenAPI", () => {
-  it("produit un document OpenAPI 3.x avec les 33 chemins (47 routes)", async () => {
+  it("produit un document OpenAPI 3.x avec les 35 chemins (50 routes)", async () => {
     const doc = (await generateOpenApi()) as {
       openapi: string;
       info: { title: string; version: string };
@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b)", () => {
-  it("est en 0.8.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.8.0");
-    expect(CONTRACT_VERSION).toBe("0.8.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-55a)", () => {
+  it("est en 0.10.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.10.0");
+    expect(CONTRACT_VERSION).toBe("0.10.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -216,6 +216,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b)", () => {
       "0.6.0",
       "0.7.0",
       "0.8.0",
+      "0.10.0",
     ]);
   });
 });
@@ -254,13 +255,21 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     );
   });
 
-  it("l'empreinte 0.8.0 est celle du document généré et diffère de 0.7.0 (groupe llmCredential)", async () => {
+  it("conserve l'empreinte figée de 0.8.0 (TK-52b) : 0.9.0 est réservée à TK-54, jamais utilisée ici", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["0.8.0"]).toBe(
+      "9ba431bca4400ca0e188f420012e381976982d24861843d71a56155af326ed9b",
+    );
+    expect(versions["0.9.0"]).toBeUndefined();
+  });
+
+  it("l'empreinte 0.10.0 est celle du document généré et diffère de 0.8.0 (groupe projectClient)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["0.8.0"]).toBe(hash);
-    expect(versions["0.8.0"]).not.toBe(versions["0.7.0"]);
+    expect(versions["0.10.0"]).toBe(hash);
+    expect(versions["0.10.0"]).not.toBe(versions["0.8.0"]);
   });
 });
 

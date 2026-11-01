@@ -1,7 +1,8 @@
-/** Surface exacte du contrat 0.8.0 (47 routes, 33 chemins), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 0.10.0 (50 routes, 35 chemins), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /comments/{id}",
   "DELETE /llm-credentials/{provider}",
+  "DELETE /projects/{projectId}/clients/{memberId}",
   "DELETE /tickets/{key}",
   "DELETE /tickets/{key}/dependencies/{dependsOn}",
   "DELETE /tickets/{key}/lease",
@@ -13,6 +14,7 @@ export const ALL_PAIRS: string[] = [
   "GET /organizations",
   "GET /project-state",
   "GET /projects",
+  "GET /projects/{projectId}/clients",
   "GET /projects/{projectId}/repos",
   "GET /projects/{projectId}/spec",
   "GET /projects/{projectId}/spec/batches/{batchId}",
@@ -33,6 +35,7 @@ export const ALL_PAIRS: string[] = [
   "POST /members/invitations",
   "POST /organizations",
   "POST /projects",
+  "POST /projects/{projectId}/clients",
   "POST /projects/{projectId}/repos",
   "POST /projects/{projectId}/spec-repo",
   "POST /projects/{projectId}/spec/batches",
@@ -63,6 +66,8 @@ export const ALL_PATHS: string[] = [
   "/organizations",
   "/project-state",
   "/projects",
+  "/projects/{projectId}/clients",
+  "/projects/{projectId}/clients/{memberId}",
   "/projects/{projectId}/repos",
   "/projects/{projectId}/spec",
   "/projects/{projectId}/spec-repo",

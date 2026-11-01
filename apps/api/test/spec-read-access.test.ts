@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { linkClient } from "./helpers/client-scene.ts";
 import { ROLES } from "./helpers/organizations.ts";
 import { installBench } from "./helpers/repo-scene.ts";
 import {
@@ -11,7 +12,12 @@ import {
 } from "./helpers/spec-read.ts";
 import { createWorld, insertProject } from "./helpers/tickets.ts";
 
-/** TK-45c2 : lectures spec.* ouvertes aux six rôles de leur projet, NOT_FOUND hors périmètre, aucune écriture. */
+/**
+ * TK-45c2 : lectures spec.* ouvertes aux rôles d'équipe et au business, NOT_FOUND hors périmètre,
+ * aucune écriture. TK-55a (D7) : fermées au CLIENT (403), qui passe par l'espace client : branche,
+ * SHA et chemins de fichier sont du vocabulaire technique, et la spec brute n'est pas cloisonnée
+ * par projet pour lui.
+ */
 const bench = installBench({ beforeAll, afterAll, beforeEach });
 
 const FEATURE = {
@@ -28,8 +34,11 @@ async function indexed(): Promise<{ s: SpecReadScene; sha: string }> {
   return { s, sha };
 }
 
-describe("spec.* : les six rôles lisent leur projet", () => {
-  it.each(ROLES)("%s lit head, listFeatures et getFeature (200)", async (role) => {
+const READERS = ROLES.filter((role) => role !== "client");
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("spec.* : les cinq rôles d'équipe et le business lisent leur projet", () => {
+  it.each(READERS)("%s lit head, listFeatures et getFeature (200)", async (role) => {
     const { s, sha } = await indexed();
     const api = specReadApi(bench().app, s.world.actors[role]);
 
@@ -43,6 +52,35 @@ describe("spec.* : les six rôles lisent leur projet", () => {
     expect(list.body.items.map((i: { specId: string }) => i.specId)).toEqual(["F-001"]);
     expect(one.status, JSON.stringify(one.body)).toBe(200);
     expect(one.body.specId).toBe("F-001");
+  });
+
+  it("client : 403 FORBIDDEN sur les trois procédures, sur un projet lié comme sur un autre", async () => {
+    const { s, sha } = await indexed();
+    const b = bench();
+    await linkClient(b.database, s.organizationId, s.projectId, s.world.actors.client.userId);
+    const otherProject = await insertProject(b.database, s.organizationId, "Autre projet");
+    const api = specReadApi(b.app, s.world.actors.client);
+
+    for (const projectId of [s.projectId, otherProject, randomUUID()]) {
+      for (const res of [
+        await api.head(projectId),
+        await api.list(projectId),
+        await api.get(projectId, "F-001"),
+      ]) {
+        expect(res.status, JSON.stringify(res.body)).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
+        const text = JSON.stringify(res.body);
+        expect(text).not.toContain(sha);
+        expect(text).not.toContain("Connexion");
+      }
+    }
+  });
+
+  it("client d'une autre organisation : 403 aussi (le rôle est refusé avant tout contrôle de projet)", async () => {
+    const { s } = await indexed();
+    const foreign = await createWorld(bench().database);
+    const res = await specReadApi(bench().app, foreign.actors.client).head(s.projectId);
+    expect(res.status).toBe(403);
   });
 
   it("sans session : 401 sur les trois procédures", async () => {
@@ -145,7 +183,7 @@ describe("spec.* : lectures pures", () => {
     const { s } = await indexed();
     const b = bench();
     b.harness.calls = [];
-    const api = specReadApi(b.app, s.world.actors.client);
+    const api = specReadApi(b.app, s.world.actors.business);
 
     const responses = [await api.head(s.projectId), await api.list(s.projectId)];
 

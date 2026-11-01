@@ -44,8 +44,8 @@ describe("LC1 surface : exactement list, set, remove, invalidate", () => {
     expect(d.paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("l'OpenAPI est en 0.8.0", async () => {
-    expect((await doc()).info.version).toBe("0.8.0");
+  it("l'OpenAPI est en 0.10.0 (le groupe est apparu en 0.8.0)", async () => {
+    expect((await doc()).info.version).toBe("0.10.0");
   });
 });
 

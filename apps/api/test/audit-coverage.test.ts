@@ -13,6 +13,7 @@ import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./
 import { credentialRows } from "./helpers/llm-credential-routes.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
+import { linkRows, projectClientApi } from "./helpers/project-client.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import {
   apiFor,
@@ -106,6 +107,7 @@ const WRITE_GROUPS = [
   "organization",
   "member",
   "project",
+  "projectClient",
   "ticket",
   "dependency",
   "sprint",
@@ -168,6 +170,8 @@ const EXPECTED_WRITE_PROCEDURES = [
   "member.setRole",
   "organization.create",
   "project.create",
+  "projectClient.add",
+  "projectClient.remove",
   "projectState.update",
   "repo.createSpec",
   "repo.link",
@@ -551,6 +555,56 @@ const SCENARIOS: Scenario[] = [
     deniedStatuses: [403],
   },
   {
+    procedure: "projectClient.add",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      projectClientApi(app, ctx.world.actors.owner).add(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    expected: async (ctx) => ({
+      action: "project_client.add",
+      targetKind: "project_client",
+      targetId: (await linkRows(database, ctx.world.projectId))[0]?.id ?? "",
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      projectClientApi(app, ctx.world.actors.dev).add(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "projectClient.remove",
+    role: "owner",
+    prepare: async (ctx) => {
+      await projectClientApi(app, ctx.world.actors.owner).add(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      );
+      return { linkId: (await linkRows(database, ctx.world.projectId))[0]?.id ?? "" };
+    },
+    call: (ctx) =>
+      projectClientApi(app, ctx.world.actors.owner).remove(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    expected: async (_ctx, state) => ({
+      action: "project_client.remove",
+      targetKind: "project_client",
+      targetId: state.linkId,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      projectClientApi(app, ctx.world.actors.business).remove(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    deniedStatuses: [403],
+  },
+  {
     procedure: "project.create",
     role: "owner",
     prepare: async () => ({}),
@@ -745,7 +799,7 @@ function llmCredentialScenarios(): Scenario[] {
 }
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 27 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 29 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -798,6 +852,20 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
       implemented,
       `groupes implémentés mais exclus de la garde d'audit : ${implemented.join(", ")}`,
     ).toEqual([]);
+  });
+});
+
+describe("garde TK-55a : le groupe projectClient", () => {
+  it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "projectClient"))).toBe(true);
+  });
+
+  it("projectClient.list est une lecture : hors des écritures à journaliser", () => {
+    expect(nonGetProcedures(["projectClient"]).sort()).toEqual([
+      "projectClient.add",
+      "projectClient.remove",
+    ]);
   });
 });
 
