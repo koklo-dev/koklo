@@ -2,7 +2,7 @@ import { createOctokitGitProvider } from "@koklo/github";
 import { type DynamicModule, Global, Module } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import type { AppConfig } from "../config.ts";
-import { createTokenCipher } from "../crypto/token-cipher.ts";
+import { createKeyRing } from "../crypto/key-ring.ts";
 import { DatabaseService } from "../database/database.module.ts";
 import { requestLogger } from "../request-logger.ts";
 import { PrismaUserCredentials } from "./prisma-user-credentials.ts";
@@ -36,9 +36,15 @@ function providerOf(config: AppConfig, clock: Clock): GitProviderBinding {
  */
 function credentialsOf(config: AppConfig, database: DatabaseService): UserCredentialsStore {
   const { githubApp, encryptionKey } = config;
+  // Une configuration bâtie à la main (tests) peut ne porter que la clé : version 1, sans précédente.
+  const encryptionKeyring =
+    config.encryptionKeyring ??
+    (encryptionKey === undefined
+      ? undefined
+      : { current: { version: 1, key: encryptionKey }, previous: [] });
   const hasClient = githubApp?.clientId !== undefined && githubApp.clientSecret !== undefined;
-  return hasClient && encryptionKey !== undefined
-    ? new PrismaUserCredentials(database, createTokenCipher(encryptionKey))
+  return hasClient && encryptionKeyring !== undefined
+    ? new PrismaUserCredentials(database, createKeyRing(encryptionKeyring))
     : new NoUserCredentials();
 }
 
