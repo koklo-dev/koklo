@@ -123,13 +123,20 @@ describe("TK-48a1 migrations : dossiers et contenu", () => {
     );
   });
 
-  it("expectedTables contient les deux tables (36 au total avec TK-51b)", () => {
+  it("expectedTables contient les deux tables (38 au total avec TK-51c)", () => {
     for (const table of OAUTH_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(36);
+    expect(expectedTables).toHaveLength(38);
   });
 });
 
-const LATER_ENUMS = ["llm_provider", "suggestion_status", "suggestion_target_kind"];
+const LATER_ENUMS = [
+  "llm_provider",
+  "suggestion_status",
+  "suggestion_target_kind",
+  "review_target_kind",
+  "review_status",
+  "baseline_status",
+];
 
 let db: TestDatabase;
 let baseline: TestDatabase;
@@ -151,7 +158,7 @@ describe("TK-48a1 migrations : up -> (données) -> down -> up", () => {
     afterFirstUp = await inventory(db);
     for (const table of OAUTH_TABLES) expect(afterFirstUp.tables).toContain(table);
     expect(afterFirstUp.tables).toEqual([...expectedTables].sort());
-    // TK-51a/b ajoutent des types : seuls écarts d'enums attendus avec la base de référence.
+    // TK-51a/b/c ajoutent des types : seuls écarts d'enums attendus avec la base de référence.
     expect(afterFirstUp.enums.filter((name) => !LATER_ENUMS.includes(name))).toEqual(
       (await inventory(await applyEarlierMigrations(baseline))).enums,
     );
