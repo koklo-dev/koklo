@@ -1,0 +1,19 @@
+roles:
+  - id: RL-visiteur
+    nom: Visiteur
+    description: Personne non connectée qui crée un compte.
+    permissions: [PM-compte.creer]
+  - id: RL-admin
+    nom: Administrateur
+    description: Gère les comptes de l'application livrée.
+    permissions: [PM-compte.supprimer]
+permissions:
+  - id: PM-compte.creer
+    action: creer
+    ressource: T-user
+    conditions:
+      - L'email n'est pas déjà utilisé
+    endpoints: [E-auth-register]
+  - id: PM-compte.supprimer
+    action: supprimer
+    ressource: T-user

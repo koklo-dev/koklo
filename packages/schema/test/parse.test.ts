@@ -21,6 +21,8 @@ describe("CA8 parseSpecFiles : fixture valide", () => {
     expect(spec.endpoints.map((e) => e.value.id)).toEqual(["E-auth-register"]);
     expect(spec.screens.map((s) => s.value.id)).toEqual(["S-register", "S-register-success"]);
     expect(spec.tests[0]?.value.criteres).toEqual(["AC-1", "AC-2", "AC-3"]);
+    expect(spec.roles.map((r) => r.path)).toEqual(["domain/roles.yaml"]);
+    expect(spec.rules.map((r) => r.value.id)).toEqual(["R-003"]);
   });
 
   it("ignore les fichiers hors modèle (brief, architecture) sans issue", () => {
@@ -212,6 +214,9 @@ describe("ISSUE_CODES", () => {
       "R4_UNKNOWN_FIELD",
       "R4_UNKNOWN_ENDPOINT",
       "R4_UNKNOWN_SCREEN",
+      "R4_UNKNOWN_ROLE",
+      "R4_UNKNOWN_PERMISSION",
+      "R4_UNKNOWN_RULE",
       "R4_MALFORMED_DATA_REF",
       "R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT",
       "R5_IMPLEMENTED_CRITERION_WITHOUT_TEST",
@@ -221,6 +226,9 @@ describe("ISSUE_CODES", () => {
       "R7_ORPHAN_ENDPOINT",
       "R7_ORPHAN_SCREEN",
       "R7_ORPHAN_TEST",
+      "R7_ORPHAN_ROLE",
+      "R7_ORPHAN_PERMISSION",
+      "R7_ORPHAN_RULE",
       "STRUCT_YAML_SYNTAX",
       "STRUCT_DUPLICATE_KEY",
       "STRUCT_YAML_FORBIDDEN_FEATURE",

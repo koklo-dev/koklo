@@ -44,6 +44,8 @@ const empty = (): ParsedSpec => ({
   endpoints: [],
   screens: [],
   tests: [],
+  roles: [],
+  rules: [],
 });
 
 /** Range une entité valide dans la bonne liste du snapshot. */
