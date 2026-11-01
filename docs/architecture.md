@@ -89,6 +89,7 @@ flowchart LR
   cli --> contract & schema & delivery & rules
   delivery --> domain & contract & rules
   github --> domain & contract
+  llm --> domain
   rules --> domain & contract
   db --> domain
   domain --> contract
@@ -98,7 +99,7 @@ flowchart LR
 
 - `allow` lists (every tag also allows `config`): `domain` → `contract`; `db` →
   `domain`; `contract`, `schema`, `ui` → nothing else; `github`, `rules` → `domain`,
-  `contract`; `delivery` → `domain`, `contract`, `rules`; `cli` → `contract`,
+  `contract`; `llm` → `domain`; `delivery` → `domain`, `contract`, `rules`; `cli` → `contract`,
   `schema`, `delivery`, `rules`; `web` → `contract`, `ui`, `schema`.
 - `api` and `worker` use `deny` (`cli`, `ui`, `web`) instead of an allow list, so they
   may depend on any other tag.
@@ -1545,18 +1546,47 @@ same pattern as `@koklo/github/testing`) and never re-exported by the public ind
 `FakeLlm.failing`, `.script([...])`), usage computed as one token per four characters, output cut at
 `maxOutputTokens` with stop `max-tokens`, and a record of every call that never contains the key. It
 runs `assertLlmRequest` first and consumes only the frozen snapshot it returns. `runLlmConformance`
-runs 11 cases on any `LlmProvider` built by a factory (text and usage, unvalidated JSON, determinism,
+runs 16 cases on any `LlmProvider` built by a factory (text and usage, unvalidated JSON, determinism,
 refused key, every typed failure, capped `retryAfterMs`, budget, `max-tokens`, aborted signal, forged
-request, no leak); the fake is its first client and TK-54 runs it on the Anthropic adapter.
+request, no leak, plus the five hardening cases of TK-54a: abort during a call, one provider call per
+`complete`, no `cause` or secret in any error property, no secret in logs, text never validated); the
+fake is its first client and `AnthropicProvider` the second.
 
 ```mermaid
 flowchart LR
   suite[runLlmConformance + describe/it] --> sub[Subject factory]
   sub --> fake[FakeLlm]
-  sub -.-> adapter[Adapter, TK-54]
+  sub --> adapter[AnthropicProvider, TK-54a]
   fake --> guard[assertLlmRequest: frozen snapshot]
   adapter --> guard
   uc[Use case tests] --> fake
+```
+
+### Anthropic adapter: `@koklo/llm` (TK-54a)
+`packages/llm` (tag `llm`, allowed to depend on `domain` and `config` only, privately published) holds
+`AnthropicProvider`, an `LlmProvider` (id `anthropic`) that talks to `POST /v1/messages` with the native
+`fetch` and no third-party dependency (ADR [0015](adr/0015-anthropic-llm-adapter.md)). The URL is a
+constant, redirects are refused, the key is read with `revealLlmCredential` only just before the call, and
+`ANTHROPIC_*` variables are never read. Files: `anthropic-request.ts` (body and headers),
+`anthropic-response.ts` (blocks, stop reasons, usage, JSON output), `anthropic-errors.ts` (status mapping),
+`bounded-body.ts` (1 MiB cap), `anthropic-pricing.ts` (price table and cost upper bound),
+`anthropic-provider.ts` (orchestration, cancellation and deadline). The sub-path `@koklo/llm/testing`
+exports `SimulatedAnthropicTransport`, a scripted `fetch` that records requests with the key masked.
+An import guard keeps both fakes (`@koklo/domain/testing`, `@koklo/llm/testing`) out of production code.
+
+```mermaid
+flowchart LR
+  caller[Use case] --> port[LlmProvider port]
+  port --> adapter[AnthropicProvider]
+  adapter --> guard[assertLlmRequest]
+  guard --> cost[costUpperBoundMicroUsd]
+  cost --> fetch[fetch: fixed URL, redirect error]
+  fetch --> body[bounded-body 1 MiB]
+  body --> parse[parseMessage / errorForStatus]
+  parse --> out[Unvalidated output or typed error]
+  tests[Tests] --> sim[SimulatedAnthropicTransport]
+  sim -.-> fetch
+  prod[Production code] -. forbidden .-> sim
 ```
 
 ## 5. Runtime views
@@ -1629,5 +1659,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
 [0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
 [0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data),
-[0014](adr/0014-agent-runtime.md) (proposed: AgentRuntime port, Claude Code subprocess adapter and the incident 25 boundary).
+[0014](adr/0014-agent-runtime.md) (proposed: AgentRuntime port, Claude Code subprocess adapter and the incident 25 boundary),
+[0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

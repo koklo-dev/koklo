@@ -187,10 +187,13 @@ export class SimulatedAnthropicTransport {
       stop_reason:
         step.stopReason === undefined ? (cut ? "max_tokens" : "end_turn") : step.stopReason,
       stop_sequence: null,
-      usage: step.usage ?? {
-        input_tokens: Math.ceil(inputChars / CHARS_PER_TOKEN),
-        output_tokens: Math.min(Math.ceil(text.length / CHARS_PER_TOKEN), maxTokens),
-      },
+      usage:
+        step.usage !== undefined
+          ? step.usage
+          : {
+              input_tokens: Math.ceil(inputChars / CHARS_PER_TOKEN),
+              output_tokens: Math.min(Math.ceil(text.length / CHARS_PER_TOKEN), maxTokens),
+            },
     });
     const padded = step.padToBytes === undefined ? body : body.padEnd(step.padToBytes, " ");
     return new Response(padded, { status: 200, headers: { "content-type": "application/json" } });

@@ -52,7 +52,14 @@ export class FakeLlmScriptExhaustedError extends Error {
   }
 }
 
-type FakeLlmOutcome = FakeLlmReply | FakeLlmFailure;
+type FakeLlmOutcome = FakeLlmReply | (FakeLlmFailure & { readonly fresh?: true });
+
+/** Copie de l'erreur (même classe, mêmes propriétés propres) : une instance neuve par appel. */
+const freshCopy = (error: LlmProviderError): LlmProviderError =>
+  Object.defineProperties(
+    Object.create(Object.getPrototypeOf(error)),
+    Object.getOwnPropertyDescriptors(error),
+  );
 
 /** Texte tronqué au budget de sortie : `[sortie, tronquée]` ; un JSON n'est jamais tronqué. */
 const truncated = (reply: unknown, maxOutputTokens: number): [unknown, boolean] => {
@@ -74,8 +81,14 @@ export class FakeLlm implements LlmProvider {
   readonly #calls: FakeLlmCall[] = [];
   #always: FakeLlmOutcome | undefined;
 
+  /** `options` est copié et gelé, `rejectedKeys` aussi : une mutation ultérieure est sans effet. */
   constructor(options: FakeLlmOptions = {}) {
-    this.options = options;
+    this.options = Object.freeze({
+      ...options,
+      ...(options.rejectedKeys === undefined
+        ? {}
+        : { rejectedKeys: Object.freeze([...options.rejectedKeys]) }),
+    });
   }
 
   /** Répond toujours la même sortie (texte ou JSON), sans épuisement. */
@@ -88,7 +101,7 @@ export class FakeLlm implements LlmProvider {
   /** Échoue toujours avec cette erreur typée (`timingOut` = `failing(new LlmTimeoutError(...))`). */
   static failing(error: LlmProviderError, options: FakeLlmOptions = {}): FakeLlm {
     const fake = new FakeLlm(options);
-    fake.#always = { fail: error };
+    fake.#always = { fail: error, fresh: true };
     return fake;
   }
 
@@ -118,7 +131,7 @@ export class FakeLlm implements LlmProvider {
     this.#calls.push(call);
     const outcome = this.#next(call);
     if ("fail" in outcome) {
-      throw outcome.fail;
+      throw "fresh" in outcome ? freshCopy(outcome.fail) : outcome.fail;
     }
     return this.#respond(snapshot, outcome);
   }

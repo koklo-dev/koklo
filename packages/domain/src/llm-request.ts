@@ -2,6 +2,7 @@ import { assertWithinBudget, type LlmBudget } from "./llm-budget.ts";
 import { isLlmCredential, type LlmCredential } from "./llm-credential.ts";
 import { InvalidLlmRequestError, type InvalidLlmRequestReason } from "./llm-errors.ts";
 import type { Unvalidated } from "./llm-output.ts";
+import { isPlainJson } from "./llm-plain-json.ts";
 import { type FramedPrompt, isFramedPrompt } from "./llm-prompt.ts";
 import { LlmAbortedError } from "./llm-provider-errors.ts";
 import type { LlmServingProviderId } from "./llm-provider-id.ts";
@@ -127,10 +128,13 @@ const freezeOutput = (output: LlmOutputSpec): LlmOutputSpec => {
     return Object.freeze({ kind: "text" });
   }
   try {
-    return deepFreeze({ kind: "json", schema: structuredClone(output.schema) });
+    if (isPlainJson(output.schema)) {
+      return deepFreeze({ kind: "json", schema: structuredClone(output.schema) });
+    }
   } catch {
-    throw new InvalidLlmRequestError("output");
+    // une valeur non clonable est refusée comme une valeur qui n'est pas du JSON
   }
+  throw new InvalidLlmRequestError("output");
 };
 
 const snapshotOf = (read: LlmRequest): LlmRequest => {
