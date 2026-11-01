@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
-covers_commit: 0c11f12
+covers_commit: bb9f740
 ---
 # Domain model
 
@@ -320,9 +320,25 @@ Pure types and guards, no persistence ([ADR 0011](adr/0011-llm-port-and-untruste
   fields omitted, never a `cause`) and `LlmAuthError`, `LlmRateLimitedError { retryAfterMs }`,
   `LlmQuotaExceededError`, `LlmTimeoutError`, `LlmAbortedError`, `LlmBudgetExceededError`,
   `LlmContextTooLongError`, `LlmRefusedError`, `LlmModelNotFoundError`,
-  `LlmProviderUnavailableError`, plus `LlmInvalidOutputError` (`operation = "validate"`).
-- **Adapter guard**: `assertLlmRequest` checks the request shape (`InvalidLlmRequestError(reason)`),
-  then the budget, then an already aborted signal (`LlmAbortedError`), before any network call.
+  `LlmProviderUnavailableError`, plus `LlmInvalidOutputError` (`operation = "validate"`, `reason` in
+  the closed list `LLM_INVALID_OUTPUT_REASONS` = `shape | not-synchronous`). `retryAfterMs` is
+  truncated and capped at `LLM_MAX_RETRY_AFTER_MS` (1 hour); a `null` diagnostic gives
+  `operation = "unknown"`.
+- **Adapter guard**: `assertLlmRequest` reads each field once, checks the request shape
+  (`InvalidLlmRequestError(reason)`: the signal must be a real `AbortSignal`, the model has no `/`
+  or `..`), then the budget, then an already aborted signal (`LlmAbortedError`), before any network
+  call. It returns a deeply frozen snapshot (budget and trace copied, JSON schema cloned) that the
+  adapter must use instead of the original request.
+
+### Fake LLM and conformance (TK-50c, `@koklo/domain/testing`)
+Test-support types, outside the public index ([ADR 0011](adr/0011-llm-port-and-untrusted-data.md)).
+- **FakeLlm** (`testing/fake-llm.ts`): `LlmProvider` with id `fake`; `FakeLlmStep` is
+  `{ reply, stop? } | { fail }` with an optional `when(call)`; `FakeLlmCall` records model, framed
+  prompt, output spec, frozen budget and trace, never the credential.
+  `FakeLlmScriptExhaustedError` when a script has no step left.
+- **Conformance** (`testing/llm-conformance.ts`): `LlmConformanceSubject` (`provider`, `validKey`,
+  `invalidKey`, `servedModel`, `replyWith`, `failWith(trigger)`, `callsMade`), triggers
+  `LLM_FAILURE_TRIGGERS`, cases `LLM_CONFORMANCE_CASE_NAMES`, failure `LlmConformanceFailure`.
 
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.

@@ -6,7 +6,7 @@ status: draft
 last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
-covers_commit: 7f97066
+covers_commit: bb9f740
 ---
 # Quality and operations
 
@@ -193,6 +193,27 @@ covers_commit: 7f97066
   identifiers allowed in logs next to an LLM call.
 - Every call has a mandatory budget (tokens, duration, prompt size, cost) capped by the domain at
   5 USD per call; run `assertLlmRequest` before any network call and refuse, never clamp silently.
+
+### Running the LLM conformance suite (TK-50c)
+Every `LlmProvider` adapter (TK-54 and the later ones) must pass the shared suite from
+`@koklo/domain/testing`; the domain imports no test engine, so the test file passes its own:
+
+```ts
+import { describe, it } from "vitest";
+import { runLlmConformance } from "@koklo/domain/testing";
+
+runLlmConformance("AnthropicAdapter", () => makeSubject(), { describe, it });
+```
+
+`makeSubject()` returns a `LlmConformanceSubject`: the `provider` under test wired to a simulated
+transport (never the network, never a real key), a `validKey`, an `invalidKey` that the transport
+refuses, the `servedModel` it answers with, `replyWith(output)` and `failWith(trigger)` to program the
+next transport reply or failure, and `callsMade()` (transport calls; must stay unchanged when the
+guard refuses a request). Run it with `pnpm --filter <package> test`. `FakeLlm` is the first client of
+the suite (`packages/domain/test/llm-conformance.test.ts`), which also checks that broken adapters
+(key leak, ignored budget, wrong served model, unmapped auth error, uncapped `retryAfterMs`) are
+detected. Use `FakeLlm` in tests of services that call a model; it records calls without the key.
+`pnpm --filter @koklo/domain build` must keep resolving `@koklo/domain/testing` (`dist/testing`).
 
 ### Emails and magic link (TK-22)
 - **Sending**: the api never sends mail. Better Auth's `sendMagicLink` enqueues

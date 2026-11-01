@@ -113,9 +113,9 @@ describe("erreurs du port LLM : forme", () => {
   });
 
   it("LlmInvalidOutputError est rerootée sous la racine et garde son contrat de 50a", () => {
-    const e = new LlmInvalidOutputError("forme inattendue");
+    const e = new LlmInvalidOutputError("not-synchronous");
     expect(e).toBeInstanceOf(LlmProviderError);
-    expect(e.reason).toBe("forme inattendue");
+    expect(e.reason).toBe("not-synchronous");
     expect(e.operation).toBe("validate");
     expect(e.provider).toBeUndefined();
   });

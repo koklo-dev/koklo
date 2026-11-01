@@ -42,7 +42,7 @@ export class LlmProviderError extends Error {
   constructor(diagnostic: LlmErrorDiagnostic, message = "Erreur du fournisseur LLM") {
     super(message);
     this.name = "LlmProviderError";
-    const { operation, provider, status } = diagnostic;
+    const { operation, provider, status } = diagnostic ?? ({} as Partial<LlmErrorDiagnostic>);
     this.operation =
       typeof operation === "string" && OPERATION_PATTERN.test(operation) ? operation : "unknown";
     if (isLlmServingProviderId(provider)) {
@@ -66,10 +66,10 @@ export class LlmRateLimitedError extends LlmProviderError {
   constructor(input: LlmErrorDiagnostic & { retryAfterMs: number }) {
     super(input, "Limite de débit du fournisseur LLM atteinte");
     this.name = "LlmRateLimitedError";
-    const { retryAfterMs } = input;
+    const retryAfterMs = input?.retryAfterMs;
     this.retryAfterMs =
       typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs >= 0
-        ? Math.trunc(retryAfterMs)
+        ? Math.min(Math.trunc(retryAfterMs), LLM_MAX_RETRY_AFTER_MS)
         : 0;
   }
 }
@@ -100,7 +100,7 @@ export class LlmBudgetExceededError extends LlmProviderError {
   constructor(input: LlmErrorDiagnostic & { limit: LlmBudgetLimit }) {
     super(input, "Budget de l'appel LLM dépassé");
     this.name = "LlmBudgetExceededError";
-    this.limit = (LLM_BUDGET_LIMITS as readonly unknown[]).includes(input.limit)
+    this.limit = (LLM_BUDGET_LIMITS as readonly unknown[]).includes(input?.limit)
       ? input.limit
       : "cost";
   }

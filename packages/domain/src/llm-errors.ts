@@ -44,11 +44,14 @@ export type LlmInvalidOutputReason = (typeof LLM_INVALID_OUTPUT_REASONS)[number]
 
 /** La sortie du modèle n'a pas passé la validation de l'appelant ; `reason` ne reprend pas la sortie. */
 export class LlmInvalidOutputError extends LlmProviderError {
-  readonly reason: string;
+  readonly reason: LlmInvalidOutputReason;
+  /** Toute raison hors liste fermée est ramenée à `shape` (jamais de texte libre). */
   constructor(reason: string) {
     super({ operation: "validate" }, "Sortie du modèle invalide");
     this.name = "LlmInvalidOutputError";
-    this.reason = reason;
+    this.reason = (LLM_INVALID_OUTPUT_REASONS as readonly string[]).includes(reason)
+      ? (reason as LlmInvalidOutputReason)
+      : "shape";
   }
 }
 
