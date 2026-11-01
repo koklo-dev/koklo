@@ -116,6 +116,7 @@ model Organization {
   specWriteOperations     SpecWriteOperation[]
   providerAuthStates      ProviderAuthState[]
   providerUserCredentials ProviderUserCredential[]
+  llmProviderCredentials  LlmProviderCredential[]
 
   @@map("organizations")
 }
@@ -986,4 +987,37 @@ model ProviderUserCredential {
   @@unique([userId, installationId])
   @@index([organizationId])
   @@map("provider_user_credentials")
+}
+
+/// Fournisseurs LLM stockables (BYOK) ; `fake` n'existe qu'en test, jamais en base.
+enum LlmProvider {
+  anthropic
+  openai
+  google
+
+  @@map("llm_provider")
+}
+
+/// Identifiant BYOK chiffré (AES-256-GCM), un par organisation et fournisseur. `ciphertext` = chiffré suivi du
+/// tag de 16 octets, jamais en clair. L'AAD n'est pas stockée : `llm:v1:<organization_id>:<provider>`.
+/// `createdByUserId` sans clé étrangère : l'utilisateur peut disparaître sans effacer la clé.
+model LlmProviderCredential {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  organizationId  String      @map("organization_id") @db.Uuid
+  provider        LlmProvider
+  ciphertext      Bytes
+  nonce           Bytes
+  keyVersion      Int         @default(1) @map("key_version")
+  defaultModel    String?     @map("default_model")
+  createdByUserId String?     @map("created_by_user_id") @db.Uuid
+  lastUsedAt      DateTime?   @map("last_used_at") @db.Timestamptz(3)
+  invalidatedAt   DateTime?   @map("invalidated_at") @db.Timestamptz(3)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@index([organizationId])
+  @@map("llm_provider_credentials")
 }

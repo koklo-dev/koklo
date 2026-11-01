@@ -167,6 +167,24 @@ Two tenant tables (`TENANT_MODELS`), migrations `*_provider_auth_states` and
   installation. Deleting the installation, the organization or the user cascades. No clear token
   is ever stored.
 
+### BYOK credentials table (TK-51a)
+One tenant table (`TENANT_MODELS`: `LlmProviderCredential`), migration
+`20261101090000_llm_provider_credentials` (additive: one enum, one table; `down.sql` drops the table
+then the enum). Prisma cannot express the CHECKs: they are written by hand in `migration.sql`.
+- **`llm_provider_credentials`**: one encrypted key per `(organization_id, provider)` (`UNIQUE`);
+  replacing a key is an in-place `UPDATE`. Exactly 12 columns: `id`, `organization_id`, `provider`
+  (enum `llm_provider`: `anthropic`, `openai`, `google`, the values of `LLM_PROVIDER_IDS`; `fake` is
+  never stored), `ciphertext` (BYTEA, encrypted bytes then the 16-byte GCM tag), `nonce` (BYTEA, 12
+  bytes), `key_version` (default 1), `default_model` (nullable text), `created_by_user_id`
+  (nullable, no foreign key: the user may disappear), `last_used_at`, `invalidated_at`,
+  `created_at`, `updated_at`.
+- CHECKs: `octet_length(nonce) = 12`; `key_version >= 1`; `octet_length(ciphertext)` between 17 and
+  2064; `default_model` null or 1 to 100 characters without `/` nor `..`.
+- Foreign key to `organizations` with `ON DELETE CASCADE`; `organization_id` is indexed.
+- **AAD convention** (derived from the row, never stored, so no AAD column):
+  `llm:v1:<organization_id>:<provider>`. A ciphertext copied to another organization or provider
+  fails to decrypt. No clear key, hint or last-4 column exists.
+
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:
 `Project` is a tenant model (filtered by organization, see
