@@ -220,6 +220,34 @@ flowchart TD
 Model, conflicts and errors:
 [domain-model.md](domain-model.md#rules-composition-tk-71-lot-b-packagesrules).
 
+### Rules package: koklo-strict profile and evidence verdicts (TK-71 lot C)
+Lot C adds the `koklo-strict` profile (kind `standard`, 16 `strict.*` rules from vision §17.1 to
+17.3), `withKokloStrict(catalog)`, `checkBiomeLimits(config)` and `validateEvidence`. The built-in
+catalog stays the Shipyard one (34 rules); the koklo catalog is
+`withKokloStrict(loadBuiltInCatalog())`, a pure idempotent function that adds the profile, the
+rules and the 8 locked ids to `protectedRuleIds`. The profile is never deduced: a layer, the root
+selection or a package selection must name it. `Enforcement` gains typed scalar `params`
+(`{ max: 50 }`), and `isWeaker` treats raising or removing a `max` as weakening.
+
+| File | Responsibility |
+|---|---|
+| `koklo-strict-rules.ts`, `koklo-strict.ts` | the 16 rules, `kokloStrictProfile`, `lockedRuleIds` |
+| `with-koklo-strict.ts` | catalog + profile (pure, idempotent, deep-frozen) |
+| `biome-drift.ts` | `checkBiomeLimits`: 50, 15 and `"error"` against a Biome config already read |
+| `evidence-types.ts`, `verdict.ts`, `validate-evidence.ts` | verdicts PASS / FAIL / UNVERIFIED, `canPass` |
+
+```mermaid
+flowchart LR
+  base["loadBuiltInCatalog()"] --> with["withKokloStrict"] --> res["resolveEffectiveRules (layer: profiles koklo-strict)"]
+  res --> val["validateEvidence(resolution, artifact)"]
+  art["artifact: gates + evidence (from CI)"] --> val
+  val --> rep["report: verdicts, unknownRuleIds, overall, canPass"]
+  cfg["packages/config/biome.json (read by the caller)"] --> drift["checkBiomeLimits"]
+```
+
+Model, verdict table and open point on waivers:
+[domain-model.md](domain-model.md#profile-koklo-strict-and-evidence-verdicts-tk-71-lot-c-packagesrules).
+
 ### API contract package (TK-9)
 `packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2
 contract that other packages consume (see the `contract` edges in the boundaries
