@@ -11,6 +11,10 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
+    },
+    "./claude-code": {
+      "types": "./dist/claude-code/index.d.ts",
+      "default": "./dist/claude-code/index.js"
     }
   },
   "scripts": {

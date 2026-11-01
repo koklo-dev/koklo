@@ -285,6 +285,27 @@ the suite (`packages/domain/test/llm-conformance.test.ts`), which also checks th
 detected. Use `FakeLlm` in tests of services that call a model; it records calls without the key.
 `pnpm --filter @koklo/domain build` must keep resolving `@koklo/domain/testing` (`dist/testing`).
 
+### Claude Code adapter: tests and manual trial (TK-73 lot 73c)
+CI never launches the real CLI: `test/claude-code/*` run the adapter against the scripted fake
+`packages/delivery/test/fixtures/fake-claude.mjs`, and `incident-25-agent-runtime-boundary` fails if any
+file under `packages/*/src` or `apps/*/src` outside `packages/delivery/src/claude-code/` invokes an agent
+tool. After the suite, no `fake-claude` process may remain (`ps -eo pid,cmd | grep fake-claude`).
+
+Manual trial of the real CLI, outside CI, on a **throwaway** repository (never a real project):
+
+1. `git init /tmp/koklo-trial && cd /tmp/koklo-trial && git commit --allow-empty -m init`.
+2. Build once: `pnpm --filter @koklo/delivery build`.
+3. From a scratch script, import `ClaudeCodeRuntime` from `@koklo/delivery/claude-code`, create it with
+   `allowedRoots: ["/tmp"]`, and launch one `qa-reviewer` session (read-only) with a small budget
+   (for example 0.50 USD, 120 s) on that worktree. Check the status, that nothing was written, and that the
+   output is non-empty.
+4. A rejected worktree (outside `allowedRoots`) must fail before any process starts.
+
+NEEDS-HUMAN: install the CLI, pin and record the tested version (2.1.316 was inspected locally), and
+authenticate it (subscription login in `HOME`, or a BYOK key passed as an opaque credential). NEEDS-HUMAN
+for TK-74: capture a real usage-limit message from the CLI (stderr and `result` event) to complete the
+quota table; today only the minimal phrases of `classifyClaudeFailure` are covered.
+
 ### Emails and magic link (TK-22)
 - **Sending**: the api never sends mail. Better Auth's `sendMagicLink` enqueues
   `{ email, url }` on the `send-magic-link` pg-boss queue; the worker sends it (3 attempts).

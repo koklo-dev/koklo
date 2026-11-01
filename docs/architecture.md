@@ -180,6 +180,34 @@ flowchart LR
 Request, budget, tool policy, result union and errors are described in
 [domain-model.md](domain-model.md#agentruntime-port-tk-73-lot-73a-packagesdelivery).
 
+### Delivery package: Claude Code adapter and agent boundary (TK-73 lot 73c)
+`packages/delivery/src/claude-code/` implements `AgentRuntime` by running the `claude -p` CLI as a
+child process ([ADR 0014](adr/0014-agent-runtime.md)). It is exported as `@koklo/delivery/claude-code`
+(never from the public index) and is the **only** code allowed to import `node:child_process`,
+`node:fs` and `node:path` in the package, and the only place where an agent tool is invoked
+(incident 25). The pure core never references it; a CI test scans `packages/*/src` and `apps/*/src`.
+
+| File | Responsibility |
+|---|---|
+| `runtime.ts` | `ClaudeCodeRuntime(options)`: guard, worktree, spawn, result |
+| `command.ts` | frozen argv and tool rules derived from the role policy (user prompt goes to stdin) |
+| `environment.ts` | allow-listed child environment; the opaque key becomes the child's only API key |
+| `worktree.ts` | `resolveWorktree`: `realpath` strictly under an allowed root, else refusal before any spawn |
+| `process.ts` | spawn without shell in its own process group; SIGTERM then SIGKILL; hard output cap |
+| `stream.ts` / `outcome.ts` | line-by-line event reading; outcome to typed result (redacted, capped output) |
+| `classify.ts` / `redact.ts` | quota and authentication detection; secret redaction |
+
+```mermaid
+flowchart LR
+  runner["runner (TK-75/76)"] --> port["AgentRuntime (pure core)"]
+  port --> adapter["src/claude-code: ClaudeCodeRuntime"]
+  adapter -- "spawn, no shell, stdin = user prompt" --> cli["claude -p (own process group)"]
+  adapter -. "wrapCommand hook (future sandbox)" .-> cli
+  cli -- "stream-json lines" --> adapter
+  adapter -- "AgentSessionResult (redacted, Untrusted)" --> runner
+  ci["incident-25 boundary test"] -. "no agent invocation outside src/claude-code" .-> port
+```
+
 ### Rules package: catalog and parser (TK-71 lot A)
 `packages/rules` (`@koklo/rules`, tag `rules`, private) is the pure engineering-rules library.
 Lot A ships the catalog model and its parser; composition, locks, waivers and resolution come
@@ -1600,5 +1628,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0008](adr/0008-web-entry-gate-organizations.md),
 [0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
 [0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
-[0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data).
+[0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data),
+[0014](adr/0014-agent-runtime.md) (proposed: AgentRuntime port, Claude Code subprocess adapter and the incident 25 boundary).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

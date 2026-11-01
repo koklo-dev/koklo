@@ -7,9 +7,32 @@ export interface ClaudeFailureContext {
   readonly resultIsError: boolean;
 }
 
+/** Jamais un simple « limit » : seules des formulations de quota sans ambiguïté. */
+const QUOTA_PATTERNS: readonly RegExp[] = [
+  /usage limit/i,
+  /5-hour limit/i,
+  /weekly limit/i,
+  /hit your limit/i,
+  /rate_limit_error/i,
+  /too many requests/i,
+  /\b429\b/,
+];
+
+const AUTH_PATTERNS: readonly RegExp[] = [/invalid api key/i, /\/login\b/];
+
+const matchesAny = (patterns: readonly RegExp[], raw: string): boolean =>
+  patterns.some((pattern) => pattern.test(raw));
+
+/** L'authentification d'abord (le quota n'est jamais un échec d'identité), puis le quota. */
 export const classifyClaudeFailure = (
-  _raw: string,
-  _context: ClaudeFailureContext,
+  raw: string,
+  context: ClaudeFailureContext,
 ): ClaudeFailureKind => {
-  throw new Error("not implemented: lot 73c Green");
+  if (matchesAny(AUTH_PATTERNS, raw)) {
+    return "auth";
+  }
+  if (matchesAny(QUOTA_PATTERNS, raw)) {
+    return "quota";
+  }
+  return context.resultIsError ? "agent_error" : "process_error";
 };
