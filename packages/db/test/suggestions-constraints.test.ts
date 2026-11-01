@@ -285,7 +285,8 @@ describe("suggestions : colonnes obligatoires", () => {
       "organization_id",
       "project_id",
     ]) {
-      const values = {
+      const params = [scope.organizationId, scope.projectId];
+      const values: Record<string, string> = {
         id: "gen_random_uuid()",
         organization_id: "$1::uuid",
         project_id: "$2::uuid",
@@ -296,12 +297,21 @@ describe("suggestions : colonnes obligatoires", () => {
         created_at: "now()",
         updated_at: "now()",
       };
-      (values as Record<string, string>)[column] = "NULL";
+      // Un paramètre non référencé fait échouer PostgreSQL (42P18) avant la contrainte : on ne lie que les utilisés.
+      values[column] = "NULL";
+      const bound = params.filter((_, i) =>
+        Object.values(values).some((v) => v.startsWith(`$${i + 1}::`)),
+      );
+      const renumber = (v: string) =>
+        v.replace(
+          /^\$(\d)::/,
+          (_, n) => `$${bound.indexOf(params[Number(n) - 1] as string) + 1}::`,
+        );
       const state = await sqlState(() =>
         db.query(
           `INSERT INTO suggestions (${Object.keys(values).join(", ")})
-           VALUES (${Object.values(values).join(", ")})`,
-          [scope.organizationId, scope.projectId],
+           VALUES (${Object.values(values).map(renumber).join(", ")})`,
+          bound,
         ),
       );
       expect(state, column).toBe(NOT_NULL);

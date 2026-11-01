@@ -33,7 +33,8 @@ tables and columns are `snake_case` through `@@map` / `@map`.
 | `leases` | `Lease` | Ticket lease (`holder_kind`, `holder_id`, `branch`, `worktree`, `expires_at`, `ttl_ms`, `released_at`) |
 | `ticket_comments` | `TicketComment` | Comments on a target (`target_kind`, `target_id`) |
 | `audit_log` | `AuditLog` | Append-only audit trail (`actor_kind`, `action`, `target_kind`, `target_id`) |
-| `project_counters` | `ProjectCounter` | Per-project monotonic counter (`name`, `last_value`) feeding ticket keys |
+| `project_counters` | `ProjectCounter` | Per-project monotonic counter (`name`: `ticket`, `sprint`, `feature`, `suggestion`; `last_value`) feeding ticket, sprint, `F-nnn` and `SG-n` keys |
+| `suggestions` | `Suggestion` | Client suggestion on a project, keyed `SG-n` (see [Suggestions table](#suggestions-table-tk-51b)) |
 
 The first seven are the Better Auth tables (organization plugin), with fields aligned on
 the Better Auth documentation (ASSUMPTION: not re-checked against the library in this
@@ -184,6 +185,30 @@ then the enum). Prisma cannot express the CHECKs: they are written by hand in `m
 - **AAD convention** (derived from the row, never stored, so no AAD column):
   `llm:v1:<organization_id>:<provider>`. A ciphertext copied to another organization or provider
   fails to decrypt. No clear key, hint or last-4 column exists.
+
+### Suggestions table (TK-51b)
+One tenant table (`TENANT_MODELS`: `Suggestion`), migration `20261101100000_suggestions` (additive: two
+enums, one new `counter_name` value, one table; `down.sql` drops the table then the enums, deletes the
+`suggestion` counters and recreates `counter_name` as in `20261030150000_spec_batch_outcome`).
+- **`suggestions`**: `id`, `organization_id`, `project_id`, `key` (`SG-n`, unique per project),
+  `target_kind` (enum `suggestion_target_kind`: `feature`, `screen`, `project`), `target_ref`
+  (nullable), `body`, `author_user_id`, `author_role`, `base_sha` (nullable), `status` (enum
+  `suggestion_status`: `open` default, `accepted`, `rejected`, `withdrawn`), `decided_by_user_id`,
+  `decided_at`, `decision_note`, `created_at`, `updated_at`.
+- **Key and counter**: `SG-n` is allocated from the per-project `project_counters` row named
+  `suggestion` (monotonic, gap-free on rollback, concurrency-safe like `ticket` and `feature`).
+- CHECKs: `key ~ '^SG-[1-9][0-9]*$'`; `target_ref IS NULL` exactly when `target_kind = 'project'`,
+  otherwise 1 to 64 characters, and `F-nnn` for a `feature`; `body` 1 to 5000 characters;
+  `decision_note` at most 2000; `base_sha` null or 40/64 lowercase hex characters; `decided_at` is set
+  exactly when `status <> 'open'`; an `open` suggestion has no `decided_by_user_id` nor `decision_note`.
+- Keys: a single foreign key, composite `(organization_id, project_id)` to
+  `projects(organization_id, id)` `ON DELETE CASCADE` (an organization deletion cascades through the
+  project). Indexes: `(organization_id)`, `(project_id, status, created_at)`, unique `(project_id, key)`
+  and `(organization_id, id)`.
+- **Untrusted text**: `body` and `decision_note` are client text, stored raw (never sanitised, so a
+  round trip is exact). They enter an LLM prompt only through `Untrusted("client-suggestion")`.
+- **Author without GDPR foreign key**: `author_user_id` and `decided_by_user_id` reference no table, so
+  erasing a user leaves the suggestion (and its `author_role`) in place.
 
 ### Tenant classification (TK-20)
 Every model carrying `organization_id` is classified in `packages/db/src/tenant-extension.ts`:

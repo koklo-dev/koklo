@@ -178,7 +178,7 @@ describe("TK-51b : raiseCounterTo accepte le compteur suggestion", () => {
     const raise = (atLeast: number) =>
       withOrganization(scope.organizationId, () =>
         // `CounterName` n'inclut pas encore "suggestion" (Green) : cast volontaire.
-        tenant.$transaction((tx) => raiseCounterTo(tx, scope, "suggestion" as never, atLeast)),
+        tenant.$transaction((tx) => raiseCounterTo(tx, scope, "suggestion", atLeast)),
       );
     const value = async () =>
       (
