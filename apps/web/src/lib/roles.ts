@@ -36,7 +36,16 @@ export function canWriteSpec(role: Role | string | undefined): boolean {
   return role === "owner" || role === "admin" || role === "dev" || role === "designer";
 }
 
-/** `member.list` expose noms, e-mails et rôles de toute l'organisation : fermé au client (403). */
-export function canListMembers(role: Role | undefined): boolean {
-  return role !== "client";
+/**
+ * `member.list` expose noms, e-mails et rôles de toute l'organisation : réservé à l'équipe et au
+ * business (liste fermée, comme `STAFF_ROLES` côté api). Rôle inconnu ou absent : non autorisé.
+ */
+export function canListMembers(role: Role | string | undefined): boolean {
+  return (
+    role === "owner" ||
+    role === "admin" ||
+    role === "dev" ||
+    role === "designer" ||
+    role === "business"
+  );
 }

@@ -868,6 +868,19 @@ and business keep seeing the whole organization.
 **Start-up guard (TK-55 N6).** The API refuses to start when `APP_ENV=test` and `NODE_ENV=production`
 (`assertSafeEnvironment`, called first in `main.ts`): `APP_ENV=test` enables the `x-test-session` header, which
 takes the role from the request. The error names the two variables, never a value.
+Both values are compared after `trim` and lower-casing (`Production`, `"production "` do not bypass it). An
+absent `NODE_ENV` is deliberately **not** refused: the e2e stack and local development run `APP_ENV=test` without
+`NODE_ENV`, so a deployment must set `NODE_ENV=production` (the container image does) and never `APP_ENV=test`.
+
+**Better Auth organization channel (TK-55 B1-bis).** `/api/auth/organization/*` is mounted by the Better Auth
+plugin and bypasses the API role guards. `AuthController` runs `OrganizationChannelPolicy` first
+(`src/auth/organization-channel.ts`): self reads and the invitation journey are served to any session, reads of
+other people (`list-members`, `get-full-organization`, `list-invitations`, `get-organization`) only to
+`STAFF_ROLES` (role re-read from `members`, an explicit `organizationId` must be the active one, `organizationSlug`
+is refused), every organization write is refused to every role (they go through `member.invite` / `member.setRole`,
+which audit and purge client links), and any route missing from the table is refused with a uniform 403
+`{"code":"FORBIDDEN","message":"Accès refusé"}`. After a Better Auth upgrade,
+`test/auth-organization-routes.test.ts` fails until each new route is classified. See ADR 0016.
 
 ### Webhook deliveries: configuration, retention and operation (TK-45b)
 | Variable | Read by | Meaning |

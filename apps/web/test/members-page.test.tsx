@@ -118,6 +118,7 @@ describe("S-members — liste", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même écran, un test par comportement
 describe("S-members — droits selon le rôle (C2.c, C2.d)", () => {
   it("rôle client : member.list n'est pas appelé, message d'accès réservé, ni liste ni formulaire", async () => {
     asRole("client");
@@ -128,6 +129,36 @@ describe("S-members — droits selon le rôle (C2.c, C2.d)", () => {
     expect(procedures.memberList).not.toHaveBeenCalled();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
+  });
+
+  it("organization.list en échec : rôle inconnu = non autorisé, aucun appel, notice équipe", async () => {
+    getSession.mockResolvedValue(sessionWith(ORG_ID));
+    procedures.organizationList.mockImplementation(() => Promise.reject(apiError("INTERNAL")));
+    renderWithQuery(<MembersPage />);
+    expect(
+      await screen.findByText("La liste des membres est réservée à l'équipe."),
+    ).toBeInTheDocument();
+    expect(procedures.memberList).not.toHaveBeenCalled();
+    expect(screen.queryByText("Impossible de charger les membres")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
+  });
+
+  it("organisation active absente de la liste (rôle inconnu) : aucun appel, notice équipe", async () => {
+    getSession.mockResolvedValue(sessionWith("01900000-0000-7000-8000-00000000ffff"));
+    renderWithQuery(<MembersPage />);
+    expect(
+      await screen.findByText("La liste des membres est réservée à l'équipe."),
+    ).toBeInTheDocument();
+    expect(procedures.memberList).not.toHaveBeenCalled();
+  });
+
+  it("rôle inconnu de l'API (hors liste fermée) : aucun appel", async () => {
+    asRole("inconnu");
+    renderWithQuery(<MembersPage />);
+    expect(
+      await screen.findByText("La liste des membres est réservée à l'équipe."),
+    ).toBeInTheDocument();
+    expect(procedures.memberList).not.toHaveBeenCalled();
   });
 
   it.each(["dev", "designer", "business"])(

@@ -18,6 +18,21 @@ describe("garde-fou de démarrage", () => {
     expect(attempt).not.toThrow(/s3cr3t-valeur/);
   });
 
+  it.each(["Production", "PRODUCTION", "production ", " production", "\tProduction\n"])(
+    "NODE_ENV=%j avec APP_ENV=test : refus (valeur normalisée)",
+    (nodeEnv) => {
+      expect(() => assertSafeEnvironment({ NODE_ENV: nodeEnv, APP_ENV: "test" })).toThrow(
+        /NODE_ENV/,
+      );
+    },
+  );
+
+  it("APP_ENV=test normalisé aussi : refus avec NODE_ENV=production", () => {
+    expect(() => assertSafeEnvironment({ NODE_ENV: "production", APP_ENV: " Test " })).toThrow(
+      /APP_ENV/,
+    );
+  });
+
   it.each([
     ["production", "production"],
     ["production", "staging"],

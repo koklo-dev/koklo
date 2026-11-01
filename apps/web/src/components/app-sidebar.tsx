@@ -12,7 +12,7 @@ import { TeamSwitcher } from "./team-switcher.tsx";
 
 const PROJECTS_ENTRY = { title: "Projets", url: "/projects", icon: "account_tree" } as const;
 const KANBAN_ENTRY = { title: "Kanban", url: "/kanban", icon: "checklist" } as const;
-/** Fermée au client (`member.list` lui répond 403) ; tant que le rôle est inconnu, elle reste visible. */
+/** Réservée à l'équipe (`member.list` répond 403 au client) ; absente tant que le rôle est inconnu (fail-closed). */
 const MEMBERS_ENTRY = { title: "Membres", url: "/members", icon: "person" } as const;
 
 /** Réservée aux propriétaires et administrateurs ; tant que le rôle est inconnu, elle n'est pas rendue. */

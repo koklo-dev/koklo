@@ -80,17 +80,21 @@ function TeamOnlyNotice() {
 
 /** Membres de l'organisation active : invitation (managers) et liste. */
 export function MembersPage() {
-  const { role, organizations } = useActiveOrganization();
+  const { role, organizations, session, activeId } = useActiveOrganization();
+  const roleKnown = !organizations.isPending && !session.isPending;
   const allowed = canListMembers(role);
-  // Pas d'appel tant que `organization.list` n'a pas dit le rôle : un client ne déclenche jamais de 403.
+  // Pas d'appel tant que le rôle n'est pas établi, ni s'il reste inconnu (`organization.list` en
+  // échec, organisation active absente) : un rôle inconnu vaut non autorisé, jamais un 403 déclenché.
+  // Sans organisation active, l'api répond 401 (jamais de donnée) : l'appel déclenche la redirection
+  // vers /organizations.
   const members = useQuery({
     ...orpc.member.list.queryOptions(),
-    enabled: allowed && !organizations.isPending,
+    enabled: roleKnown && (allowed || !activeId),
   });
   const redirecting = useUnauthorizedRedirect(members.error);
 
   let list = <LoadingStatus label="Chargement des membres…" />;
-  if (!allowed) list = <TeamOnlyNotice />;
+  if (roleKnown && !allowed && activeId) list = <TeamOnlyNotice />;
   else if (members.data) list = <MembersTable members={members.data} />;
   else if (members.isError && !members.isFetching && !redirecting) {
     list = (

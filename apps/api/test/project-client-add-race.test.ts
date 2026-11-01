@@ -48,7 +48,9 @@ describe("projectClient.add face à un changement de rôle concurrent", () => {
     );
     await waitUntil(async () => {
       const rows = await database.query(
-        "SELECT 1 FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND query NOT LIKE '%pg_stat_activity%' AND state = 'active'",
+        `SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database() AND pid <> pg_backend_pid()
+            AND query LIKE '%${client.memberId}%pg_sleep%' AND state = 'active'`,
       );
       return rows.length > 0;
     });
