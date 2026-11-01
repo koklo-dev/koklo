@@ -11,6 +11,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { insertDelivery } from "./support/spec-fixtures.ts";
 import { openPool } from "./support/ticket-fixtures.ts";
@@ -219,7 +220,9 @@ describe("TK-45a migration webhook_installation_index : retour arrière et sché
     expect(actual.indexes.some((line) => line.startsWith(`${INDEX} `))).toBe(false);
     const removed = afterFirstUp.indexes.filter((line) => !actual.indexes.includes(line));
     expect(
-      removed.filter((line) => !OAUTH_TABLES.some((table) => line.includes(table))),
+      removed.filter(
+        (line) => ![...OAUTH_TABLES, ...LLM_TABLES].some((table) => line.includes(table)),
+      ),
     ).toHaveLength(1);
     expect(await deliveriesOf(db)).toEqual(before);
   }, 180_000);

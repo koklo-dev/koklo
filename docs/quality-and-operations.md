@@ -194,6 +194,15 @@ covers_commit: bb9f740
 - Every call has a mandatory budget (tokens, duration, prompt size, cost) capped by the domain at
   5 USD per call; run `assertLlmRequest` before any network call and refuse, never clamp silently.
 
+### BYOK credentials table: database errors (TK-51a)
+- **Never log the raw `meta` or `message` of a database error raised on `llm_provider_credentials`.**
+  A violated CHECK or unique constraint can carry the offending row, which holds the encrypted key
+  (`ciphertext`, `nonce`). Map the error to its SQLSTATE or Prisma `code` (`23514`, `23505`,
+  `23503`, `P2002`) and the constraint name, and log only those, with the `organization_id` and
+  `provider`.
+- The key is encrypted with AES-256-GCM and the AAD `llm:v1:<organization_id>:<provider>`; the AAD is
+  not stored (see [domain-model.md](domain-model.md#byok-credentials-table-tk-51a)).
+
 ### Running the LLM conformance suite (TK-50c)
 Every `LlmProvider` adapter (TK-54 and the later ones) must pass the shared suite from
 `@koklo/domain/testing`; the domain imports no test engine, so the test file passes its own:

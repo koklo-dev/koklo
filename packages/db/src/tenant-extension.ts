@@ -34,6 +34,7 @@ export const TENANT_MODELS: readonly string[] = [
   "SpecWriteOperation",
   "ProviderAuthState",
   "ProviderUserCredential",
+  "LlmProviderCredential",
 ];
 
 /** Modèles portant (ou non) `organizationId` mais hors filtre, avec la raison de l'exclusion. */
