@@ -56,6 +56,8 @@ const launch = (spec: SpawnSpec, options: ProcessOptions): ChildProcess =>
 interface Collector {
   readonly reader: ReturnType<typeof createStreamReader>;
   stderr(): string;
+  /** Octets reçus jusqu'ici (stdout + stderr). */
+  received(): number;
 }
 
 /** Branche la lecture de stdout/stderr ; `onOverflow` est appelé au dépassement du plafond dur. */
@@ -78,19 +80,34 @@ const collect = (child: ChildProcess, hardBytes: number, onOverflow: () => void)
   child.stderr?.on("data", (chunk: string) => {
     stderr = accept(chunk) ? stderr + chunk : stderr;
   });
-  return { reader, stderr: () => stderr };
+  return { reader, stderr: () => stderr, received: () => bytes };
 };
-
-interface Stopper {
-  readonly reason: () => StopReason | undefined;
-  readonly stop: (reason: StopReason) => void;
-  readonly dispose: () => void;
-}
 
 /** Marge après le délai de grâce avant de résoudre de force, même si le fils ne se ferme pas. */
 export const FORCE_RESOLVE_MARGIN_MS = 500;
 /** Délai de vidange des pipes après la sortie du fils, avant de les détruire (petit-fils porteur). */
 export const DRAIN_MS = 50;
+/** Passes de la boucle d'événements accordées à la lecture de ce qui est déjà dans les pipes. */
+export const MAX_DRAIN_PASSES = 20;
+
+/**
+ * Appelle `done` quand une passe de la boucle d'événements (phase de lecture comprise) n'a plus rien
+ * apporté : ce que le fils a écrit avant de sortir est lu avant la destruction des flux, même si la
+ * boucle a été retardée. Borné par `MAX_DRAIN_PASSES` (un petit-fils bavard ne retient pas la session).
+ */
+const drainThen = (received: () => number, done: () => void): void => {
+  let last = -1;
+  let passes = 0;
+  const pass = (): void => {
+    if (received() === last || passes++ >= MAX_DRAIN_PASSES) {
+      done();
+      return;
+    }
+    last = received();
+    setImmediate(pass);
+  };
+  pass();
+};
 
 interface Stopper {
   readonly reason: () => StopReason | undefined;
@@ -177,7 +194,7 @@ export const runProcess = (spec: SpawnSpec, options: ProcessOptions): Promise<Pr
     child.once("exit", (code) => {
       exitCode = code;
       signalGroup(child.pid, "SIGKILL");
-      setTimeout(settle, DRAIN_MS).unref();
+      setTimeout(() => drainThen(collector.received, settle), DRAIN_MS).unref();
     });
     child.once("close", (code) => {
       exitCode = code;
