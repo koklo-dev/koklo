@@ -207,11 +207,12 @@ describe("règle 4 : liens rôles, permissions et règles", () => {
 
   it("D4 : sans domain/roles.yaml, chaque rôle cité est une erreur R4_UNKNOWN_ROLE", () => {
     const issues = only(withFiles({ [ROLES]: null }), "R4_UNKNOWN_ROLE");
+    // Correction d'une erreur manifeste du Red : `.sort()` range `design/` avant `features/`.
     expect(issues.map((i) => `${i.path}${i.pointer}`).sort()).toEqual([
-      `${FEATURE}/roles/0`,
       "design/screens/S-register-success.json/roles/0",
       "design/screens/S-register-success.json/roles/1",
       `${SCREEN}/roles/0`,
+      `${FEATURE}/roles/0`,
     ]);
     expect(issues.every((i) => i.severity === "error")).toBe(true);
   });

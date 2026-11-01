@@ -50,11 +50,14 @@ Distinct from the database tables above: these are the files of a project's spec
 validated by `@koklo/schema` (not persisted by `packages/db`). Feature `F-nnn` (status
 `brouillon` | `specifiee` | `implementee` | `adoptee`, acceptance criteria `AC-n`), table `T-*`
 (fields), relation (`T-a.champ` to `T-b.champ`, `1-1` | `1-n` | `n-1` | `n-n`), endpoint `E-*`,
-screen `S-*` (annotated node tree) and test scenario (feature + criteria covered). Invariants
-enforced as issues: rule 4 (every link resolves), rule 5 (`specifiee` has a screen or endpoint,
+screen `S-*` (annotated node tree), test scenario (feature + criteria covered), product roles
+`RL-*` with permissions `PM-*` (`domain/roles.yaml`; action `lire` | `creer` | `modifier` |
+`supprimer` | `executer` on a table or endpoint) and business rules `R-nnn`
+(`domain/rules/R-nnn-slug.md`; `contrainte` | `calcul` | `workflow`, statement and examples). Invariants
+enforced as issues: rule 4 (every link resolves, roles, permissions and rules included, even when `roles: []`), rule 5 (`specifiee` has a screen or endpoint,
 `implementee` has a test per criterion; from `specifiee`, each criterion has Given, When, Then
-steps in that order, `R5_CRITERION_INCOMPLETE`), rule 7 (no orphan entity, warning). See
-`packages/schema/README.md` for the 27 issue codes.
+steps in that order, `R5_CRITERION_INCOMPLETE`), rule 7 (no orphan entity, role, permission or rule, warning). See
+`packages/schema/README.md` for the 33 issue codes.
 
 ## Relationships and cardinalities
 

@@ -23,6 +23,9 @@ export type SpecIndex = {
   tables: Map<string, ReadonlySet<string>>;
   endpoints: Set<string>;
   screens: Set<string>;
+  roles: Set<string>;
+  permissions: Set<string>;
+  rules: Set<string>;
 };
 
 export function buildIndex(spec: ParsedSpec): SpecIndex {
@@ -42,5 +45,8 @@ export function buildIndex(spec: ParsedSpec): SpecIndex {
     ),
     endpoints: new Set(spec.endpoints.map((e) => e.value.id)),
     screens: new Set(spec.screens.map((s) => s.value.id)),
+    roles: new Set(spec.roles.flatMap((f) => f.value.roles.map((r) => r.id))),
+    permissions: new Set(spec.roles.flatMap((f) => f.value.permissions.map((p) => p.id))),
+    rules: new Set(spec.rules.map((r) => r.value.id)),
   };
 }
