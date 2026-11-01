@@ -171,6 +171,7 @@ model Project {
   counters     ProjectCounter[]
   repos        ProjectRepo[]
   writeBatches SpecWriteBatch[]
+  suggestions  Suggestion[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -304,6 +305,7 @@ enum CounterName {
   ticket
   sprint
   feature
+  suggestion
 
   @@map("counter_name")
 }
@@ -1020,4 +1022,54 @@ model LlmProviderCredential {
   @@unique([organizationId, provider])
   @@index([organizationId])
   @@map("llm_provider_credentials")
+}
+
+/// Statut d'une suggestion client (TK-51b).
+enum SuggestionStatus {
+  open
+  accepted
+  rejected
+  withdrawn
+
+  @@map("suggestion_status")
+}
+
+/// Objet visé par une suggestion : une fonctionnalité (`F-nnn`), un écran, ou le projet entier (sans `target_ref`).
+enum SuggestionTargetKind {
+  feature
+  screen
+  project
+
+  @@map("suggestion_target_kind")
+}
+
+/// Suggestion d'un client sur un projet, numérotée `SG-n` par projet (compteur `suggestion`). `body` et
+/// `decisionNote` sont du texte non fiable, stocké brut : il n'entre dans un prompt que via `Untrusted("client-suggestion")`.
+/// `authorUserId` et `decidedByUserId` sans clé étrangère (RGPD : l'utilisateur peut disparaître). Une seule clé étrangère,
+/// composite vers `projects` (la cascade de l'organisation passe par le projet). CHECK : voir la migration.
+model Suggestion {
+  id              String               @id @default(uuid(7)) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  projectId       String               @map("project_id") @db.Uuid
+  key             String
+  targetKind      SuggestionTargetKind @map("target_kind")
+  targetRef       String?              @map("target_ref")
+  body            String
+  authorUserId    String?              @map("author_user_id") @db.Uuid
+  authorRole      String?              @map("author_role")
+  baseSha         String?              @map("base_sha")
+  status          SuggestionStatus     @default(open)
+  decidedByUserId String?              @map("decided_by_user_id") @db.Uuid
+  decidedAt       DateTime?            @map("decided_at") @db.Timestamptz(3)
+  decisionNote    String?              @map("decision_note")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([projectId, key])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([projectId, status, createdAt])
+  @@map("suggestions")
 }
