@@ -5,6 +5,7 @@ import { implement } from "@orpc/server";
 import type { Request } from "express";
 import { SPEC_BATCH_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
+import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { requestIdOf } from "../request-context.ts";
 import { inProject } from "../tracker/scope.ts";
 import { AiService } from "./ai.service.ts";
@@ -15,15 +16,22 @@ import { AiService } from "./ai.service.ts";
  */
 @Controller()
 export class AiController {
-  constructor(@Inject(AiService) private readonly service: AiService) {}
+  constructor(
+    @Inject(AiService) private readonly service: AiService,
+    @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
+  ) {}
 
   @UseGuards(SessionGuard, RoleGuard)
   @Roles(...SPEC_BATCH_ROLES)
   @Implement(contract.ai.draftBrief)
   draftBrief(@Req() request: Request) {
     return implement(contract.ai.draftBrief).handler(({ input, errors }) =>
-      inProject(request, errors, input.projectId, (scope) =>
-        this.service.draftBrief(scope, input, requestIdOf(request)),
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.draftBrief(scope, input, requestIdOf(request)),
+        this.access,
       ),
     );
   }
@@ -33,8 +41,12 @@ export class AiController {
   @Implement(contract.ai.proposeFeatures)
   proposeFeatures(@Req() request: Request) {
     return implement(contract.ai.proposeFeatures).handler(({ input, errors }) =>
-      inProject(request, errors, input.projectId, (scope) =>
-        this.service.proposeFeatures(scope, input, requestIdOf(request)),
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.proposeFeatures(scope, input, requestIdOf(request)),
+        this.access,
       ),
     );
   }
@@ -44,8 +56,12 @@ export class AiController {
   @Implement(contract.ai.proposeCriteria)
   proposeCriteria(@Req() request: Request) {
     return implement(contract.ai.proposeCriteria).handler(({ input, errors }) =>
-      inProject(request, errors, input.projectId, (scope) =>
-        this.service.proposeCriteria(scope, input, requestIdOf(request)),
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.proposeCriteria(scope, input, requestIdOf(request)),
+        this.access,
       ),
     );
   }

@@ -125,16 +125,9 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
     );
-    for (const pair of [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS, ...AI_PAIRS, ...PROJECT_CLIENT_PAIRS])
-      expect(pairs, pair).toContain(pair);
-    expect(pairs).toHaveLength(
-      8 +
-        PAIRS.length +
-        NEW_PAIRS.length +
-        LLM_PAIRS.length +
-        AI_PAIRS.length +
-        PROJECT_CLIENT_PAIRS.length,
-    );
+    const expected = [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS, ...AI_PAIRS, ...PROJECT_CLIENT_PAIRS];
+    for (const pair of expected) expect(pairs, pair).toContain(pair);
+    expect(pairs).toHaveLength(8 + expected.length);
     expect(pairs).toHaveLength(54);
   });
 });

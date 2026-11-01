@@ -16,8 +16,8 @@ import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./
 import { credentialRows } from "./helpers/llm-credential-routes.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
-import type { RepoBench } from "./helpers/repo-scene.ts";
 import { linkRows, projectClientApi } from "./helpers/project-client.ts";
+import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import {
