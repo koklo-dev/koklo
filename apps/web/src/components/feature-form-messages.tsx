@@ -36,7 +36,7 @@ function Problem({ model, onClose, onCheckList }: Omit<MessagesProps, "write">) 
         unchangedReloads={state.unchangedReloads}
         criteriaCount={criteriaCount}
         handlers={{
-          onRetry: model.save,
+          onRetry: model.retry,
           onCheckList,
           onReload: () => void model.reload(),
           onGotoLinks: () => model.focusField("screens"),

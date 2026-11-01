@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { describeSaveError } from "./feature-errors.ts";
+import { describeSaveError, type SaveFailure } from "./feature-errors.ts";
 import {
   diffValues,
   type FeatureFormValues,
@@ -17,6 +17,7 @@ import {
   type SetFormState,
   serverFields,
 } from "./feature-form-state.ts";
+import { useFeatureDelete } from "./use-feature-delete.ts";
 import { useFeatureDraft } from "./use-feature-draft.ts";
 import { useDraftChoices, useFormSave, useReload } from "./use-feature-form-actions.ts";
 import { WRITTEN_PHASES } from "./use-feature-submit.ts";
@@ -45,15 +46,25 @@ function useFocusRequests(criteriaCount: number, setState: SetFormState) {
 }
 
 /** Un échec marque les champs que le serveur désigne et garde la saisie (et sa clé) dans le brouillon. */
-function useFailure(args: FormArgs, mine: boolean, setState: SetFormState, flush: () => boolean) {
+function useFailure(
+  args: FormArgs,
+  mine: boolean,
+  refusal: SaveFailure | null,
+  setState: SetFormState,
+  flush: () => boolean,
+) {
   const { write, role, mode } = args;
-  const failure = mine ? write.failure : null;
+  const failure = refusal ?? (mine ? write.failure : null);
+  const deleting = refusal !== null || write.meta?.kind === "delete";
   const view = useMemo(
     () =>
       failure
-        ? describeSaveError(failure, { role, mode: mode === "create" ? "create" : "update" })
+        ? describeSaveError(failure, {
+            role,
+            mode: deleting ? "delete" : mode === "create" ? "create" : "update",
+          })
         : null,
-    [failure, role, mode],
+    [failure, role, mode, deleting],
   );
   useEffect(() => {
     if (!view) return;
@@ -109,12 +120,14 @@ export function useFeatureForm(args: FormArgs) {
     enabled: !(mine && WRITTEN_PHASES.includes(write.phase)),
   });
   const context = { args, state, setState, resumeKey, flushDraft: draft.flush };
+  const del = useFeatureDelete(args, state, mine);
+  const save = useFormSave(context);
   const issues = collectIssues(state, args);
   const touched = (issue: { field: string }) => state.touched.includes(topField(issue.field));
   return {
     state,
     mine,
-    failureView: useFailure(args, mine, setState, draft.flush),
+    failureView: useFailure(args, mine, del.refusal, setState, draft.flush),
     issues: state.submitted > 0 ? issues : issues.filter(touched),
     noChange:
       mode === "edit" &&
@@ -122,7 +135,13 @@ export function useFeatureForm(args: FormArgs) {
       diffValues(state.baseline, state.values).length === 0,
     awaitingChoice: state.banner?.kind === "changed",
     ...useFieldActions(setState),
-    save: useFormSave(context),
+    save: () => {
+      del.clearRefusal();
+      save();
+    },
+    /** « Réessayer » : renvoie la suppression ou l'enregistrement qui a échoué, sans redemander confirmation. */
+    retry: () => (mine && write.meta?.kind === "delete" ? del.confirm() : save()),
+    del,
     reload: useReload(context),
     ...useDraftChoices(context),
     ...useFocusRequests(state.values.criteria.length, setState),

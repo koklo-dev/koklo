@@ -35,7 +35,11 @@ function writeStep(write: FeatureWrite): Step {
   if (failedInBatch) return step(label, "failed");
   if (write.phase === "tracking") {
     return write.batch?.status === "committing"
-      ? step(label, "doing", "Écriture en cours…")
+      ? step(
+          label,
+          "doing",
+          write.meta?.kind === "delete" ? "Suppression en cours…" : "Écriture en cours…",
+        )
       : step(label, "doing", "En attente de son tour");
   }
   return WRITTEN_PHASES.includes(write.phase) ? step(label, "done") : step(label, "todo");

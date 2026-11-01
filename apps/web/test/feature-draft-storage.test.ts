@@ -255,7 +255,7 @@ describe("validation stricte du marqueur relu", () => {
     ["lot absent", (o: Record<string, unknown>) => delete o.batchId],
     ["lot vide", (o: Record<string, unknown>) => (o.batchId = "")],
     ["lot numérique", (o: Record<string, unknown>) => (o.batchId = 7)],
-    ["genre inconnu", (o: Record<string, unknown>) => (o.kind = "delete")],
+    ["genre inconnu", (o: Record<string, unknown>) => (o.kind = "archive")],
     ["genre absent", (o: Record<string, unknown>) => delete o.kind],
     ["specId invalide", (o: Record<string, unknown>) => (o.specId = "F-1")],
     ["specId numérique", (o: Record<string, unknown>) => (o.specId = 4)],

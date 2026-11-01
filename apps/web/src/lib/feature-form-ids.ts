@@ -1,6 +1,7 @@
 import type { FieldKey } from "./feature-form.ts";
 
 /** Libellés des champs, pour les avis de conflit et les liens de diagnostic. */
+export const DELETE_TRIGGER_ID = "feature-delete-trigger";
 export const FIELD_LABELS: Record<FieldKey, string> = {
   title: "Titre",
   priority: "Priorité",

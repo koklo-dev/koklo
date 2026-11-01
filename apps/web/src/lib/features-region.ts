@@ -56,15 +56,30 @@ export const SLOW_TEXT =
 export const LATE_TEXT =
   "Votre modification est enregistrée. La liste se mettra à jour dans un instant.";
 
+function progressSuffix(meta: FeatureWrite["meta"]): string {
+  if (!meta?.specId) return "";
+  if (meta.kind === "create") return ` ${meta.specId} en cours de création.`;
+  return meta.kind === "delete" ? ` ${meta.specId} en cours de suppression.` : "";
+}
+
+/** Textes de la région d'état selon la nature de l'écriture (enregistrement ou suppression). */
+function progressTexts(meta: FeatureWrite["meta"]) {
+  const deleting = meta?.kind === "delete";
+  return {
+    closed: `${deleting ? "Suppression" : "Enregistrement"} de « ${meta?.title ?? ""} » en cours…`,
+    sending: deleting ? "Envoi de la suppression…" : "Envoi de votre modification…",
+    committing: deleting ? "Suppression en cours…" : "Écriture en cours…",
+  };
+}
+
 /** Texte de la région d'état pour l'écriture en cours (formulaire ouvert : étapes ; fermé : suivi de la page). */
 export function writeRegionText(write: FeatureWrite, formOpen: boolean): string {
   const { phase, meta, batch, slow } = write;
-  if (phase === "idle" || phase === "failed" || phase === "saved" || phase === "late") return "";
-  if (!formOpen) return slow ? "" : `Enregistrement de « ${meta?.title ?? ""} » en cours…`;
-  if (phase === "sending") return "Envoi de votre modification…";
+  if (!["sending", "tracking", "indexing"].includes(phase)) return "";
+  const texts = progressTexts(meta);
+  if (!formOpen) return slow ? "" : texts.closed;
+  if (phase === "sending") return texts.sending;
   if (phase !== "tracking" || slow) return "";
-  if (batch?.status === "committing") return "Écriture en cours…";
-  const creating =
-    meta?.kind === "create" && meta.specId ? ` ${meta.specId} en cours de création.` : "";
-  return `En attente de son tour.${creating}`;
+  if (batch?.status === "committing") return texts.committing;
+  return `En attente de son tour.${progressSuffix(meta)}`;
 }

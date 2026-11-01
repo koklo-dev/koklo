@@ -56,7 +56,7 @@ export function useFeaturesPage(projectId: string) {
     /** « Rouvrir le brouillon » après un échec arrivé formulaire fermé. */
     reopenDraft: () => {
       const meta = write.meta;
-      if (meta?.kind === "update" && meta.specId) form.openEdit(meta.specId);
+      if (meta && meta.kind !== "create" && meta.specId) form.openEdit(meta.specId);
       else form.openCreate();
     },
     keepFocus,

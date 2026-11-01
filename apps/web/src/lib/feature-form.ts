@@ -214,6 +214,13 @@ export function checkDesignerScreens(
   values: FeatureFormValues,
 ): FormIssue | null {
   const linked = (candidate: FeatureFormValues) => parseLinks(candidate.screens).length > 0;
-  const before = mode === "create" || (baseline !== null && linked(baseline));
-  return before && linked(values) ? null : { field: "screens", message: DESIGNER_MESSAGE };
+  const readLinked = baseline !== null && linked(baseline);
+  // Suppression : seule la valeur lue compte, la saisie en cours est ignorée.
+  const allowed =
+    mode === "create"
+      ? linked(values)
+      : mode === "delete"
+        ? readLinked
+        : readLinked && linked(values);
+  return allowed ? null : { field: "screens", message: DESIGNER_MESSAGE };
 }
