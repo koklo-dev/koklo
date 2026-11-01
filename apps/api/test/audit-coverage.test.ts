@@ -1027,7 +1027,7 @@ describe("garde TK-52b : le groupe llmCredential", () => {
 });
 
 async function checkSuccess(scenario: Scenario) {
-  const ctx = { world: await createWorld(database) };
+  const ctx = { world: await createWorld(database, { linkedClient: false }) };
   const state = await scenario.prepare(ctx);
   // L'organisation créée par organization.create n'existe pas avant l'appel : journal vide.
   const before = scenario.auditOrganization
@@ -1060,7 +1060,7 @@ async function checkSuccess(scenario: Scenario) {
 }
 
 async function checkListed(scenario: Scenario) {
-  const ctx = { world: await createWorld(database) };
+  const ctx = { world: await createWorld(database, { linkedClient: false }) };
   const state = await scenario.prepare(ctx);
   const response = await scenario.call(ctx, state);
   expect(response.status).toBe(200);
@@ -1087,7 +1087,7 @@ async function checkListed(scenario: Scenario) {
 }
 
 async function checkDenied(scenario: Scenario) {
-  const ctx = { world: await createWorld(database) };
+  const ctx = { world: await createWorld(database, { linkedClient: false }) };
   const state = await scenario.prepare(ctx);
   const before = await auditRowsFull(database, ctx.world.organizationId);
 
@@ -1112,7 +1112,7 @@ describe.each(SCENARIOS)("$procedure", (scenario) => {
 
 describe("exception documentée : dependency.add d'une arête déjà posée", () => {
   it("la première pose produit une entrée, la seconde (no-op idempotent) n'en produit aucune", async () => {
-    const ctx = { world: await createWorld(database) };
+    const ctx = { world: await createWorld(database, { linkedClient: false }) };
     const a = await seed(ctx);
     const b = await seed(ctx);
     const dev = tickets(ctx);

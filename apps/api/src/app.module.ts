@@ -20,6 +20,8 @@ import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { OrganizationModule } from "./organization/organization.module.ts";
 import { ProjectModule } from "./project/project.module.ts";
+import { ProjectAccessModule } from "./project/project-access.module.ts";
+import { ProjectClientModule } from "./project-client/project-client.module.ts";
 import { ProjectStateModule } from "./project-state/project-state.module.ts";
 import { GitProviderModule } from "./repo/git-provider.module.ts";
 import { RepoModule } from "./repo/repo.module.ts";
@@ -75,7 +77,9 @@ export class AppModule {
         HealthModule,
         OrganizationModule,
         MemberModule,
+        ProjectAccessModule,
         ProjectModule,
+        ProjectClientModule,
         TicketModule,
         SprintModule,
         SprintImportModule,

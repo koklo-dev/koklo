@@ -38,6 +38,7 @@ export const TENANT_MODELS: readonly string[] = [
   "LlmProviderCredential",
   "Review",
   "Baseline",
+  "ProjectClientAccess",
   "Notification",
 ];
 

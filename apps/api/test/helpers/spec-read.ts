@@ -68,7 +68,7 @@ export async function readScene(
   bench: RepoBench,
   over: { world?: World; projectId?: string } = {},
 ): Promise<SpecReadScene> {
-  const world = over.world ?? (await createWorld(bench.database));
+  const world = over.world ?? (await createWorld(bench.database, { linkedClient: false }));
   const projectId = over.projectId ?? world.projectId;
   const installation = await insertInstallation(bench.database, world.organizationId);
   const created = await repoApi(bench.app, world.actors.owner).createSpec(

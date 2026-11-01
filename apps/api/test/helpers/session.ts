@@ -43,10 +43,16 @@ export async function insertUser(database: TestDatabase, id: string, email: stri
   );
 }
 
-export async function insertMember(database: TestDatabase, organizationId: string, userId: string) {
+/** `role` : `member` par défaut (rôle inconnu = cloisonné, fail-closed depuis TK-55a). */
+export async function insertMember(
+  database: TestDatabase,
+  organizationId: string,
+  userId: string,
+  role = "member",
+) {
   await database.query(
     `INSERT INTO members (id, organization_id, user_id, role, created_at, updated_at)
-     VALUES ($1, $2, $3, 'member', now(), now())`,
-    [randomUUID(), organizationId, userId],
+     VALUES ($1, $2, $3, $4, now(), now())`,
+    [randomUUID(), organizationId, userId, role],
   );
 }

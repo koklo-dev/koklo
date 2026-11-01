@@ -6,7 +6,8 @@ import { validation } from "./tracker/api-errors.ts";
  * non en `BAD_REQUEST` (400) : un commentaire vide ou trop long est une saisie invalide au même
  * titre qu'une cible qui n'est pas un UUID (`targetId`, contrat 0.5.0), en création comme en liste.
  * Les lectures de la spec en relèvent aussi : `branch` et `commitSha` exclusifs, filtre ou limite inconnus
- * (contrat 0.6.0). Les clés BYOK aussi : fournisseur inconnu, clé ou modèle refusés (contrat 0.8.0), comme les propositions de l'IA et la vérification d'une clé (0.9.0).
+ * (contrat 0.6.0). Les clés BYOK aussi : fournisseur inconnu, clé ou modèle refusés (contrat 0.8.0), comme les propositions de l'IA et la vérification d'une clé (0.9.0). Les liens client <-> projet aussi :
+ * identifiant de projet ou de membre mal formé (contrat 0.10.0).
  */
 const VALIDATION_ROUTES = new Set([
   "POST /comments",
@@ -20,6 +21,9 @@ const VALIDATION_ROUTES = new Set([
   "POST /projects/{projectId}/ai/brief",
   "POST /projects/{projectId}/ai/features",
   "POST /projects/{projectId}/ai/criteria",
+  "GET /projects/{projectId}/clients",
+  "POST /projects/{projectId}/clients",
+  "DELETE /projects/{projectId}/clients/{memberId}",
 ]);
 
 interface RouteMeta {

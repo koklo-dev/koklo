@@ -34,12 +34,37 @@ export async function insertProject(
 
 let worlds = 0;
 
-export async function createWorld(database: TestDatabase): Promise<World> {
+/** Lie un client à un projet (SQL direct : ces suites ne dépendent pas de `projectClient.add`). */
+export async function linkClient(
+  database: TestDatabase,
+  organizationId: string,
+  projectId: string,
+  userId: string,
+): Promise<void> {
+  await database.query(
+    `INSERT INTO project_client_access (id, organization_id, project_id, user_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, now(), now())`,
+    [randomUUID(), organizationId, projectId, userId],
+  );
+}
+
+/**
+ * `linkedClient: false` laisse le client sans lien de projet (suites qui posent elles-mêmes les liens
+ * ou qui testent `projectClient.*`).
+ */
+export async function createWorld(
+  database: TestDatabase,
+  options: { linkedClient?: boolean } = {},
+): Promise<World> {
   const organizationId = await insertOrganization(database, `tk30-${Date.now()}-${++worlds}`);
   const projectId = await insertProject(database, organizationId);
   const actors = {} as Record<Role, Actor>;
   for (const role of ROLES) {
     actors[role] = await insertActor(database, organizationId, role);
+  }
+  // TK-55a : le client ne voit que les projets liés ; le monde lie le sien à son projet.
+  if (options.linkedClient !== false) {
+    await linkClient(database, organizationId, projectId, actors.client.userId);
   }
   return { organizationId, projectId, actors };
 }

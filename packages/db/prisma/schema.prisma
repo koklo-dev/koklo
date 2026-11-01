@@ -132,6 +132,7 @@ model Member {
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications Notification[]
+  projectAccess ProjectClientAccess[]
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -176,6 +177,7 @@ model Project {
   reviews       Review[]
   baselines     Baseline[]
   notifications Notification[]
+  clientAccess  ProjectClientAccess[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -1182,4 +1184,25 @@ model Notification {
   @@unique([recipientUserId, dedupeKey])
   @@index([organizationId])
   @@map("notifications")
+}
+
+/// Liaison client <-> projet (TK-55a) : un membre `client` ne voit que les projets liés (cloisonnement central de l'API).
+/// Que le membre ait le rôle `client` est un invariant d'API, pas de la base. `createdByUserId` : trace sans FK.
+model ProjectClientAccess {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  member  Member  @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([projectId, userId])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([organizationId, userId])
+  @@map("project_client_access")
 }

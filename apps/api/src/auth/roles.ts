@@ -100,3 +100,6 @@ export const PROJECT_CLIENT_ROLES = MANAGER_ROLES;
  * passe par l'espace client (TK-55b). Le vocabulaire git (branche, SHA, chemins) n'est pas le sien.
  */
 export const SPEC_READ_ROLES = STAFF_ROLES;
+
+/** Le seul rôle cloisonné par projet ; son rôle est vérifié à la liaison et purgé à la sortie. */
+export const CLIENT_ROLE = "client";

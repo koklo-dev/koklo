@@ -351,6 +351,7 @@ describe("erreurs inattendues et contexte de projet", () => {
     const unreachable = await createApp({
       databaseUrl: UNREACHABLE_DATABASE_URL,
       organizationId: SEED_IDS.organization,
+      role: "owner",
     });
     extraApps.push(unreachable);
     const response = await send(unreachable, undefined, "get", "/tickets");

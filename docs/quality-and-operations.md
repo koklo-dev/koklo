@@ -848,6 +848,17 @@ a new snapshot. After a commit through `specBatch`, `spec.head` lags until the p
 The list is sorted in memory over the features of one snapshot (bounded by `spec_too_large`). Logs and
 errors carry no token, provider message or file path.
 
+### Client scoping: operation and tests (TK-55a)
+No configuration. A `client` sees only the projects linked through `projectClient.add` (owner or admin); until
+a link exists its `project.list` is empty and every project procedure answers `404`. There is no screen to link a
+client yet (ticket web to plan): use the API. Removing a link, or moving the member out of the `client` role
+(`member.setRole`, links purged in the same transaction), closes the access on the next request (the role and
+links are re-read at every request). Isolation tests are guard rails and must not be loosened: between
+organizations, between clients of the same organization, role-less sessions (fail-closed), uniform `404`,
+`spec.*` closed to the client. The `x-test-session` header re-reads the role in `members`; a non-member has no
+role and is scoped. Migration `20261102090000_project_client_access` has a `down.sql` (one `DROP TABLE`; the
+links are lost, clients lose access, which fails closed).
+
 ### Webhook deliveries: configuration, retention and operation (TK-45b)
 | Variable | Read by | Meaning |
 |----------|---------|---------|
