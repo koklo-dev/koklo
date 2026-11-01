@@ -1,8 +1,10 @@
 import type {
+  BusinessRule,
   Endpoint,
   Feature,
   ProjectManifest,
   RelationsFile,
+  RolesFile,
   Screen,
   Table,
   TestScenario,
@@ -37,4 +39,6 @@ export type ParsedSpec = {
   endpoints: Parsed<Endpoint>[];
   screens: Parsed<Screen>[];
   tests: Parsed<TestScenario>[];
+  roles: Parsed<RolesFile>[];
+  rules: Parsed<BusinessRule>[];
 };

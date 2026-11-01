@@ -1,6 +1,7 @@
 {
   "id": "S-register",
   "features": ["F-001"],
+  "roles": ["RL-visiteur"],
   "viewport": ["mobile", "desktop"],
   "arbre": {
     "composant": "C-page",

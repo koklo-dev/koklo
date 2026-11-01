@@ -1,6 +1,7 @@
 {
   "id": "S-register-success",
   "features": ["F-001"],
+  "roles": ["RL-visiteur", "RL-admin"],
   "arbre": { "composant": "C-page" },
   "etats": ["succes"]
 }

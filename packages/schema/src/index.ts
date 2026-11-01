@@ -6,5 +6,6 @@ export { jsonSchemas, type SchemaName } from "./json-schemas.ts";
 export { parseFeatureMarkdown } from "./parse/feature-markdown.ts";
 export { parseSpecFiles } from "./parse/files.ts";
 export { type Kind, kindOf } from "./parse/kinds.ts";
+export { parseRuleMarkdown } from "./parse/rule-markdown.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";
 export { checkSpec, validateSpec } from "./validate.ts";

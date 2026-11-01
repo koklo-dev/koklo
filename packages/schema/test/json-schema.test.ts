@@ -4,7 +4,17 @@ import { describe, expect, it } from "vitest";
 import { canonicalize, jsonSchemas } from "../src/index.ts";
 
 const schemasDir = resolve(import.meta.dirname, "../schemas");
-const NAMES = ["endpoint", "feature", "project", "relation", "screen", "table", "test-scenario"];
+const NAMES = [
+  "endpoint",
+  "feature",
+  "project",
+  "relation",
+  "roles",
+  "rule",
+  "screen",
+  "table",
+  "test-scenario",
+];
 
 type JsonSchema = {
   $schema?: string;
@@ -45,6 +55,34 @@ describe("CA2 JSON Schema généré", () => {
     expect(pattern.test("F-001")).toBe(true);
     expect(pattern.test("F-1")).toBe(false);
     expect(pattern.test("f-001")).toBe(false);
+  });
+
+  it("roles : fichier fermé, listes facultatives, enum d'actions", () => {
+    const roles = schemas.roles as JsonSchema;
+    expect(Object.keys(roles.properties ?? {}).sort()).toEqual(["permissions", "roles"]);
+    expect(roles.required ?? []).toEqual([]);
+    const text = JSON.stringify(roles);
+    for (const action of ["lire", "creer", "modifier", "supprimer", "executer"])
+      expect(text).toContain(`"${action}"`);
+    expect(text).toContain("^PM-");
+    expect(text).toContain("^RL-");
+  });
+
+  it("rule : id R-nnn (3 chiffres au moins), type, énoncé requis", () => {
+    const rule = schemas.rule as JsonSchema;
+    expect(rule.required).toEqual(expect.arrayContaining(["id", "type", "enonce"]));
+    expect(rule.required).not.toContain("exemples");
+    expect(rule.properties?.type?.enum).toEqual(["contrainte", "calcul", "workflow"]);
+    const pattern = new RegExp(rule.properties?.id?.pattern ?? "$^");
+    expect(pattern.test("R-003")).toBe(true);
+    expect(pattern.test("R-1000")).toBe(true);
+    expect(pattern.test("R-03")).toBe(false);
+  });
+
+  it("screen : roles facultatif, motif RL-…", () => {
+    const screen = schemas.screen as JsonSchema;
+    expect(screen.properties).toHaveProperty("roles");
+    expect(screen.required).not.toContain("roles");
   });
 
   it("project : spec_version est la constante 1", () => {

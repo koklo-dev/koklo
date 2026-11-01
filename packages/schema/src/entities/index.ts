@@ -1,4 +1,5 @@
 export * from "./data.ts";
+export * from "./domain.ts";
 export * from "./feature.ts";
 export * from "./ids.ts";
 export * from "./project.ts";
