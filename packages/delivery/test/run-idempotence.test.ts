@@ -12,7 +12,7 @@ describe("rejeu idempotent de merge_done, deploy_green et escalate", () => {
   it.each(REPLAYS)("%s rejoué sur %s : même run, version inchangée, aucun effet", (type, state) => {
     const run = deepFreeze(runAt(state, { version: 6, attempts: 0 }));
     const step = applyEvent(run, event(type), LIMITS);
-    expect(step.run).toBe(run);
+    expect(step.run).toEqual(run);
     expect(step.effects).toEqual([]);
   });
 
@@ -22,7 +22,7 @@ describe("rejeu idempotent de merge_done, deploy_green et escalate", () => {
       const run = runAt(state, { version: 6 });
       for (const expectedVersion of [5, 6]) {
         const step = applyEvent(run, { ...event(type), expectedVersion }, LIMITS);
-        expect(step.run, `${type}/${expectedVersion}`).toBe(run);
+        expect(step.run, `${type}/${expectedVersion}`).toEqual(run);
         expect(step.effects).toEqual([]);
       }
     },
@@ -34,7 +34,7 @@ describe("rejeu idempotent de merge_done, deploy_green et escalate", () => {
     expect([first.run.state, first.run.version]).toEqual(["merged", 4]);
     expect(first.effects.map((e) => e.type)).toEqual(["await_deploy"]);
     const replay = applyEvent(first.run, { ...event("merge_done"), expectedVersion: 3 }, LIMITS);
-    expect(replay.run).toBe(first.run);
+    expect(replay.run).toEqual(first.run);
     expect(replay.effects).toEqual([]);
   });
 

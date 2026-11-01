@@ -370,6 +370,8 @@ stateDiagram-v2
   ci_wait --> blocked: ci_timeout at ceiling (ci_timeout)
   local_gates --> blocked: gates_red at ceiling (ci_failed)
   ci_wait --> blocked: ci_red at ceiling (ci_failed)
+  leased --> blocked: block (any active state)
+  ci_wait --> ci_wait: quota_hit (neutral, any active state)
   reviewing --> blocked: request_changes at ceiling (review_exhausted)
   merged --> merged: merge_done (replay)
   deployed_staging --> deployed_staging: deploy_green (replay)
@@ -432,8 +434,9 @@ emits `notify{cause}`, with `version + 1`.
 - **Escalation**: `escalate` (`blocked -> escalated`) resets the three counters to 0 and keeps the
   block cause.
 - **Idempotence**: `merge_done` on `merged`, `deploy_green` on `deployed_staging` and `escalate` on
-  `escalated` return the same run object, no effect, version unchanged, without an
-  `expectedVersion` check. Any other replay raises `StaleRunError` (stale version) or
+  `escalated` return an equal, deeply frozen copy of the run, no effect, version unchanged,
+  without an `expectedVersion` check. Neutral steps (`quota_hit`) do the same; every `effects`
+  array is frozen at construction, so a caller cannot corrupt later calls. Any other replay raises `StaleRunError` (stale version) or
   `InvalidRunTransitionError`, so counters are never counted twice.
 - **Resume**: `startRun` with both `branch` and `pullRequest` creates a `ci_wait` run (version 0).
   `canRestartDevelopment(run)` is false when both are set. A persisted `leased` run with a branch
@@ -447,6 +450,24 @@ emits `notify{cause}`, with `version + 1`.
 | 13 last fix reviewed before exhaustion | `incident-13-last-fix-reviewed-before-exhaustion` |
 | 17 pushed branch never restarts development | `incident-17-pushed-branch-never-restarts-development` |
 | 18 empty diff is `no_output` with git output | `incident-18-empty-diff-is-no_output-with-git-output` |
+
+- **Input validation**: `startRun` requires a non-empty `ticket`, `attempts` and `reviewRounds`
+  as integers >= 0, and non-empty `branch`/`pullRequest` when present (`InvalidRunEventError`).
+  Events must carry their payload: `worktree_ready.branch` and `pr_opened.pullRequest` non-empty
+  strings, `dev_done.diffEmpty` and `remoteBranchExists` booleans, `expectedVersion` an integer
+  >= 0. Errors never echo the faulty value; `InvalidRunStateError.value` is bounded to 32 characters.
+  `worktree_ready` cannot replace an already set branch with another one (incident 17).
+- **Known gaps (documented, owners TK-75/76/78)**:
+  - The runner MUST always pass `expectedVersion` for events that count (`ci_timeout`, `ci_red`,
+    `gates_red`, `verdict_request_changes`): without it a replay doubles the counter. To be made
+    mandatory in TK-75.
+  - `lastReviewedAfterFix` is informative: the machine does not refuse `verdict_approve` on it.
+  - Conflicts are accepted only in `ci_wait` (no `conflict_detected` in `reviewing` or
+    `merge_requested`), repeated conflicts are unbounded, and a late `merge_done` on
+    `deployed_staging` is refused (TK-76/78).
+  - Raw git output must be redacted upstream (TK-76) before entering `Run.blocked` or `notify`.
+- **Dependency**: `@koklo/domain` stays in `packages/delivery/package.json` (the purity test pins
+  it); it is reserved for TK-73+ and imported nowhere in `src` yet.
 
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.

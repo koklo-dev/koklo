@@ -1,5 +1,10 @@
 import { type BlockInfo, cloneBlock } from "./block-cause.ts";
-import { InvalidRunStateError, InvalidRunTransitionError, StaleRunError } from "./errors.ts";
+import {
+  InvalidRunEventError,
+  InvalidRunStateError,
+  InvalidRunTransitionError,
+  StaleRunError,
+} from "./errors.ts";
 import type { Run, RunLimits } from "./run.ts";
 import { applyCounters, checkLimits } from "./run-counters.ts";
 import {
@@ -33,15 +38,26 @@ interface Transition {
   readonly replay?: true;
 }
 
-const replay = (to: RunState): Transition => ({ to, effects: [], neutral: true, replay: true });
+/** Effets gelés à la construction : aucun appelant ne peut corrompre la table partagée du module. */
+const frozen = (effects: readonly RunEffect[]): readonly RunEffect[] => Object.freeze([...effects]);
 
-const go = (to: RunState, ...effects: RunEffect[]): Transition => ({ to, effects });
+const replay = (to: RunState): Transition => ({
+  to,
+  effects: frozen([]),
+  neutral: true,
+  replay: true,
+});
+
+const go = (to: RunState, ...effects: RunEffect[]): Transition => ({
+  to,
+  effects: frozen(effects),
+});
 
 /** Tout état actif accepte `block` (-> blocked) et `quota_hit` (neutre, D2). */
 const active = (state: RunState, moves: Partial<Record<RunEventType, Transition>>) => ({
   ...moves,
   block: go("blocked"),
-  quota_hit: { to: state, effects: [], neutral: true } as const,
+  quota_hit: { to: state, effects: frozen([]), neutral: true } as const,
 });
 
 /** Table de transitions (vision §C.6) : des données, pas de logique. Absent = interdit. */
@@ -86,6 +102,17 @@ const patchOf = (event: RunEvent): Partial<Run> => {
 const withNotify = (transition: Transition, block: BlockInfo | null): readonly RunEffect[] =>
   block === null ? transition.effects : [notify(block.cause)];
 
+/** Copie gelée en profondeur : un run issu de `JSON.parse` n'est ni partagé ni modifiable. */
+const freezeRun = (run: Run): Run =>
+  Object.freeze({ ...run, blocked: run.blocked && cloneBlock(run.blocked) });
+
+/** Incident 17 : la branche déjà posée ne peut pas être remplacée par une autre. */
+const assertSameBranch = (run: Run, branch: string): void => {
+  if (run.branch !== null && run.branch !== branch) {
+    throw new InvalidRunEventError("changement de branche refusé");
+  }
+};
+
 /**
  * Applique un événement : pure, déterministe, renvoie un nouveau run gelé et les effets décrits.
  * Ordre des contrôles : état inconnu, événement mal formé, limites invalides, rejeu idempotent,
@@ -96,13 +123,18 @@ export const applyEvent = (run: Run, input: RunEvent, limits: RunLimits): RunSte
   const event = checkEvent(input);
   const checked = checkLimits(limits);
   const transition = TABLE[run.state][event.type];
-  if (transition?.replay) return Object.freeze({ run, effects: transition.effects });
+  if (transition?.replay)
+    return Object.freeze({ run: freezeRun(run), effects: transition.effects });
   if (event.expectedVersion !== undefined && event.expectedVersion !== run.version) {
     throw new StaleRunError(event.expectedVersion, run.version);
   }
   if (transition === undefined) throw new InvalidRunTransitionError(run.state, event.type);
-  if (event.type === "worktree_ready") assertRestartable(run);
-  if (transition.neutral) return Object.freeze({ run, effects: transition.effects });
+  if (event.type === "worktree_ready") {
+    assertRestartable(run);
+    assertSameBranch(run, event.branch);
+  }
+  if (transition.neutral)
+    return Object.freeze({ run: freezeRun(run), effects: transition.effects });
   const counted = applyCounters(run, event, checked);
   const block = blockOf(event) ?? counted.block;
   const next: Run = Object.freeze({

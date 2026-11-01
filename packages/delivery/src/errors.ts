@@ -1,12 +1,16 @@
 /** Erreurs typées nommées de la machine du run : aucune donnée d'événement dans les messages. */
 import type { RunState } from "./run-state.ts";
 
+const MAX_SHOWN = 32;
+
 export class InvalidRunStateError extends Error {
-  readonly value: unknown;
+  /** Chaîne bornée : jamais l'objet persisté brut ni une longue chaîne arbitraire. */
+  readonly value: string;
   constructor(value: unknown) {
-    super(`État de run inconnu : ${String(value)}`);
+    const shown = typeof value === "string" ? value.slice(0, MAX_SHOWN) : typeof value;
+    super(`État de run inconnu : ${shown}`);
     this.name = "InvalidRunStateError";
-    this.value = value;
+    this.value = shown;
   }
 }
 

@@ -3,6 +3,7 @@ import { type BlockInfo, createBlock } from "./block-cause.ts";
 import { InvalidRunEventError } from "./errors.ts";
 import type { Run, RunLimits } from "./run.ts";
 import type { RunEvent } from "./run-event.ts";
+import { isCount } from "./value-check.ts";
 
 /** Effet d'un événement sur les compteurs : champs modifiés, ou blocage quand un plafond est atteint. */
 export interface CounterOutcome {
@@ -11,8 +12,6 @@ export interface CounterOutcome {
 }
 
 const LIMIT_KEYS = ["maxAttempts", "maxReviewRounds", "maxCiWaits"] as const;
-
-const isCount = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 0;
 
 /** Plafonds : trois entiers >= 0, contrôlés pour tout événement. */
 export const checkLimits = (limits: unknown): RunLimits => {
