@@ -2,6 +2,7 @@ import { type GithubAppSettings, githubAppFromEnv } from "@koklo/github";
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 import { z } from "zod";
 import type { KeyRingSettings } from "./crypto/key-ring.ts";
+import { keyRingFromEnv } from "./crypto/key-ring-config.ts";
 import { InvalidEncryptionKeyError, parseEncryptionKey } from "./crypto/token-cipher.ts";
 
 export interface AppConfig {
@@ -44,6 +45,14 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
   SENTRY_DSN: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
   KOKLO_ENCRYPTION_KEY: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().optional(),
+  ),
+  KOKLO_ENCRYPTION_KEY_VERSION: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().optional(),
+  ),
+  KOKLO_ENCRYPTION_KEYS_PREVIOUS: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().optional(),
   ),
@@ -99,6 +108,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     LOG_LEVEL: env.LOG_LEVEL,
     SENTRY_DSN: env.SENTRY_DSN,
     KOKLO_ENCRYPTION_KEY: env.KOKLO_ENCRYPTION_KEY,
+    KOKLO_ENCRYPTION_KEY_VERSION: env.KOKLO_ENCRYPTION_KEY_VERSION,
+    KOKLO_ENCRYPTION_KEYS_PREVIOUS: env.KOKLO_ENCRYPTION_KEYS_PREVIOUS,
     GITHUB_WEBHOOK_SECRET: env.GITHUB_WEBHOOK_SECRET,
     SPEC_BATCH_WAIT_MS: env.SPEC_BATCH_WAIT_MS,
   });
@@ -111,6 +122,11 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   const data = parsed.data;
   const githubApp = githubAppFromEnv(env);
   const encryptionKey = encryptionKeyOf(data.KOKLO_ENCRYPTION_KEY, githubApp);
+  const encryptionKeyring = keyRingFromEnv(
+    encryptionKey,
+    data.KOKLO_ENCRYPTION_KEY_VERSION,
+    data.KOKLO_ENCRYPTION_KEYS_PREVIOUS,
+  );
   return {
     databaseUrl: data.DATABASE_URL,
     port: data.PORT,
@@ -124,6 +140,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     sentryDsn: data.SENTRY_DSN,
     ...(githubApp ? { githubApp } : {}),
     ...(encryptionKey ? { encryptionKey } : {}),
+    ...(encryptionKeyring ? { encryptionKeyring } : {}),
     ...(data.GITHUB_WEBHOOK_SECRET === undefined
       ? {}
       : { githubWebhookSecret: data.GITHUB_WEBHOOK_SECRET }),
