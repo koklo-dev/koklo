@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2)", () => {
-  it("est en 0.7.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.7.0");
-    expect(CONTRACT_VERSION).toBe("0.7.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b)", () => {
+  it("est en 0.8.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.8.0");
+    expect(CONTRACT_VERSION).toBe("0.8.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -215,9 +215,12 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2)", () => {
       "0.5.0",
       "0.6.0",
       "0.7.0",
+      "0.8.0",
     ]);
   });
+});
 
+describe("CT-10b empreintes figées des versions publiées", () => {
   it("conserve les empreintes des versions précédentes (versions.json ne fait que croître)", () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     expect(versions["0.1.0"]).toBe(
@@ -244,13 +247,20 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2)", () => {
     );
   });
 
-  it("l'empreinte 0.7.0 est celle du document généré et diffère de 0.6.0 (erreurs typées de installation.start)", async () => {
+  it("conserve l'empreinte figée de 0.7.0 (TK-48a2)", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["0.7.0"]).toBe(
+      "380f11e2d65db495f12459c1fefbd5612240689a1705cf36f06f681902d2d3a8",
+    );
+  });
+
+  it("l'empreinte 0.8.0 est celle du document généré et diffère de 0.7.0 (groupe llmCredential)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["0.7.0"]).toBe(hash);
-    expect(versions["0.7.0"]).not.toBe(versions["0.6.0"]);
+    expect(versions["0.8.0"]).toBe(hash);
+    expect(versions["0.8.0"]).not.toBe(versions["0.7.0"]);
   });
 });
 

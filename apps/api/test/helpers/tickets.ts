@@ -44,7 +44,7 @@ export async function createWorld(database: TestDatabase): Promise<World> {
   return { organizationId, projectId, actors };
 }
 
-export type HttpMethod = "get" | "post" | "patch" | "delete";
+export type HttpMethod = "get" | "post" | "patch" | "put" | "delete";
 
 export function send(
   app: INestApplication,
