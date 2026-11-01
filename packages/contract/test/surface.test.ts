@@ -57,6 +57,13 @@ describe("R1 routeur : 16 groupes (TK-42 : +4, TK-52b : +1), 39 procédures", ()
   });
 });
 
+const LLM_PAIRS = [
+  "GET /llm-credentials",
+  "PUT /llm-credentials/{provider}",
+  "DELETE /llm-credentials/{provider}",
+  "POST /llm-credentials/{provider}/invalidate",
+];
+
 describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => {
   const PAIRS = [
     "POST /tickets",
@@ -97,14 +104,14 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/spec/batches",
     "GET /projects/{projectId}/spec/batches/{batchId}",
   ];
-  it("les 25 paires de TK-29 et les 10 de TK-42 sont présentes (43 routes)", async () => {
+  it("les 25 paires de TK-29 les 10 de TK-42 et les 4 de TK-52b sont présentes (47 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
     );
-    for (const pair of [...PAIRS, ...NEW_PAIRS]) expect(pairs, pair).toContain(pair);
-    expect(pairs).toHaveLength(8 + PAIRS.length + NEW_PAIRS.length);
-    expect(pairs).toHaveLength(43);
+    for (const pair of [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS]) expect(pairs, pair).toContain(pair);
+    expect(pairs).toHaveLength(8 + PAIRS.length + NEW_PAIRS.length + LLM_PAIRS.length);
+    expect(pairs).toHaveLength(47);
   });
 });
 

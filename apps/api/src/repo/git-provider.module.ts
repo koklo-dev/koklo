@@ -2,7 +2,7 @@ import { createOctokitGitProvider } from "@koklo/github";
 import { type DynamicModule, Global, Module } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import type { AppConfig } from "../config.ts";
-import { createKeyRing } from "../crypto/key-ring.ts";
+import { keyRingOf } from "../crypto/key-ring.ts";
 import { DatabaseService } from "../database/database.module.ts";
 import { requestLogger } from "../request-logger.ts";
 import { PrismaUserCredentials } from "./prisma-user-credentials.ts";
@@ -35,16 +35,11 @@ function providerOf(config: AppConfig, clock: Clock): GitProviderBinding {
  * jeton ne peut être obtenu) ET que la clé de chiffrement est fournie ; sinon `NoUserCredentials`.
  */
 function credentialsOf(config: AppConfig, database: DatabaseService): UserCredentialsStore {
-  const { githubApp, encryptionKey } = config;
-  // Une configuration bâtie à la main (tests) peut ne porter que la clé : version 1, sans précédente.
-  const encryptionKeyring =
-    config.encryptionKeyring ??
-    (encryptionKey === undefined
-      ? undefined
-      : { current: { version: 1, key: encryptionKey }, previous: [] });
+  const { githubApp } = config;
+  const cipher = keyRingOf(config);
   const hasClient = githubApp?.clientId !== undefined && githubApp.clientSecret !== undefined;
-  return hasClient && encryptionKeyring !== undefined
-    ? new PrismaUserCredentials(database, createKeyRing(encryptionKeyring))
+  return hasClient && cipher !== null
+    ? new PrismaUserCredentials(database, cipher)
     : new NoUserCredentials();
 }
 

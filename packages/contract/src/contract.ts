@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
+import { llmCredential } from "./contract-llm-credential.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { spec, specBatch } from "./contract-spec.ts";
 import { dependency, sprint, ticket } from "./contract-tickets.ts";
@@ -106,6 +107,7 @@ export const contract = {
   lease,
   audit,
   installation,
+  llmCredential,
   repo,
   spec,
   specBatch,

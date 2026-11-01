@@ -1,12 +1,14 @@
-/** Surface exacte du contrat 0.5.0 (43 routes, 30 chemins), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 0.8.0 (47 routes, 33 chemins), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /comments/{id}",
+  "DELETE /llm-credentials/{provider}",
   "DELETE /tickets/{key}",
   "DELETE /tickets/{key}/dependencies/{dependsOn}",
   "DELETE /tickets/{key}/lease",
   "GET /audit",
   "GET /comments",
   "GET /health",
+  "GET /llm-credentials",
   "GET /members",
   "GET /organizations",
   "GET /project-state",
@@ -27,6 +29,7 @@ export const ALL_PAIRS: string[] = [
   "PATCH /sprints/{key}",
   "PATCH /tickets/{key}",
   "POST /comments",
+  "POST /llm-credentials/{provider}/invalidate",
   "POST /members/invitations",
   "POST /organizations",
   "POST /projects",
@@ -42,6 +45,7 @@ export const ALL_PAIRS: string[] = [
   "POST /tickets/{key}/lease",
   "POST /tickets/{key}/lease/heartbeat",
   "POST /tickets/{key}/transition",
+  "PUT /llm-credentials/{provider}",
   "PUT /project-state",
 ];
 
@@ -50,6 +54,9 @@ export const ALL_PATHS: string[] = [
   "/comments",
   "/comments/{id}",
   "/health",
+  "/llm-credentials",
+  "/llm-credentials/{provider}",
+  "/llm-credentials/{provider}/invalidate",
   "/members",
   "/members/invitations",
   "/members/{memberId}/role",

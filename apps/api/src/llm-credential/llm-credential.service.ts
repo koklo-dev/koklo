@@ -2,6 +2,7 @@ import type { LlmProviderId } from "@koklo/domain";
 import { LLM_CREDENTIAL_MAX_LENGTH, llmCredential } from "@koklo/domain";
 import { type Clock, systemClock } from "../clock.ts";
 import type { TokenCipher } from "../crypto/token-cipher.ts";
+import type { AuditActor } from "../tracker/audit.ts";
 import type { LlmCredentialRepository, LlmCredentialStatus } from "./llm-credential.repository.ts";
 import { llmCredentialAad } from "./llm-credential-aad.ts";
 import { EncryptionUnavailableError, LlmCredentialInputError } from "./llm-credential-errors.ts";
@@ -49,33 +50,44 @@ export class LlmCredentialService {
     private readonly clock: Clock = systemClock,
   ) {}
 
+  /** `actor` : l'utilisateur de la session, journalisé dans la transaction de l'écriture. */
   async set(
     organizationId: string,
     provider: LlmProviderId,
     input: SetLlmCredentialInput,
+    actor?: AuditActor,
   ): Promise<LlmCredentialStatus> {
     if (this.cipher === null) throw new EncryptionUnavailableError();
     assertApiKey(input.apiKey);
     if (input.defaultModel !== undefined) assertModel(input.defaultModel);
-    return this.repository.upsert(organizationId, {
-      provider,
-      secret: this.cipher.encrypt(input.apiKey, llmCredentialAad(organizationId, provider)),
-      defaultModel: input.defaultModel ?? null,
-      createdByUserId: input.createdByUserId ?? null,
-      at: this.clock.now(),
-    });
+    const { status } = await this.repository.upsert(
+      organizationId,
+      {
+        provider,
+        secret: this.cipher.encrypt(input.apiKey, llmCredentialAad(organizationId, provider)),
+        defaultModel: input.defaultModel ?? null,
+        createdByUserId: input.createdByUserId ?? actor?.userId ?? null,
+        at: this.clock.now(),
+      },
+      actor,
+    );
+    return status;
   }
 
   list(organizationId: string): Promise<LlmCredentialStatus[]> {
     return this.repository.list(organizationId);
   }
 
-  remove(organizationId: string, provider: LlmProviderId): Promise<boolean> {
-    return this.repository.remove(organizationId, provider);
+  remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean> {
+    return this.repository.remove(organizationId, provider, actor);
   }
 
-  invalidate(organizationId: string, provider: LlmProviderId): Promise<LlmCredentialStatus | null> {
-    return this.repository.invalidate(organizationId, provider, this.clock.now());
+  invalidate(
+    organizationId: string,
+    provider: LlmProviderId,
+    actor?: AuditActor,
+  ): Promise<LlmCredentialStatus | null> {
+    return this.repository.invalidate(organizationId, provider, this.clock.now(), actor);
   }
 
   markUsed(organizationId: string, provider: LlmProviderId): Promise<void> {

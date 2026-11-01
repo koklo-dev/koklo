@@ -216,6 +216,16 @@ covers_commit: bb9f740
   contains (...)` line is written by the server before Prisma sees the error. Keep that log out of
   support tickets, shipping and dashboards, as above.
 
+### BYOK credential routes (TK-52b)
+- The key travels in the body of `PUT /llm-credentials/{provider}` only. Request logs keep the path
+  and never the body; `guard` logs the error name only; validation messages never repeat the value.
+  Do not add a body logger or a debug dump on these routes.
+- The status returned by every route carries no hint of the key (no suffix, length, fingerprint,
+  `id` or `keyVersion`); keep it that way when adding fields.
+- Without `KOKLO_ENCRYPTION_KEY`, `PUT` answers `503 ENCRYPTION_UNAVAILABLE`; reading, invalidating and
+  deleting keys still work. Audit lines (`llm_credential.*`) carry no detail: see
+  [API contract](api-contract.md#byok-llm-credentials-tk-52b).
+
 ### Suggestions: untrusted text (TK-51b)
 - `suggestions.body` and `suggestions.decision_note` are client-supplied and stored raw: never build a
   prompt by concatenation; wrap them with `Untrusted("client-suggestion")`. Do not log them in full

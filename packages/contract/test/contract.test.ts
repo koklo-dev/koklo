@@ -85,7 +85,7 @@ describe("CT-4 chemins explicites", () => {
     const pairs = Object.entries(doc.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${path}`),
     );
-    expect(pairs).toHaveLength(43);
+    expect(pairs).toHaveLength(47);
     expect(new Set(pairs).size).toBe(pairs.length);
     expect(pairs.sort()).toEqual(ALL_PAIRS);
   });
@@ -126,7 +126,7 @@ describe("CT-5 erreurs typées", () => {
 });
 
 describe("CT-6 génération OpenAPI", () => {
-  it("produit un document OpenAPI 3.x avec les 30 chemins (43 routes)", async () => {
+  it("produit un document OpenAPI 3.x avec les 33 chemins (47 routes)", async () => {
     const doc = (await generateOpenApi()) as {
       openapi: string;
       info: { title: string; version: string };

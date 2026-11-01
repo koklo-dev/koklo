@@ -14,6 +14,7 @@ import { HealthModule } from "./health/health.module.ts";
 import { validationStatusInterceptor } from "./input-validation.ts";
 import { InstallationModule } from "./installation/installation.module.ts";
 import { LeaseModule } from "./lease/lease.module.ts";
+import { LlmCredentialModule } from "./llm-credential/llm-credential.module.ts";
 import { MemberModule } from "./member/member.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { OrganizationModule } from "./organization/organization.module.ts";
@@ -84,6 +85,7 @@ export class AppModule {
         GitProviderModule.forRoot(config),
         RepoModule,
         InstallationModule,
+        LlmCredentialModule,
         SpecBatchModule,
         SpecReadModule,
         WebhookModule,
