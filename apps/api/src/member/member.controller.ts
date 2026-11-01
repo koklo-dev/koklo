@@ -4,17 +4,19 @@ import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import { fromNodeHeaders } from "better-auth/node";
 import type { Request } from "express";
-import { MANAGER_ROLES } from "../auth/roles.ts";
+import { MANAGER_ROLES, MEMBER_LIST_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { guard, requestIdOf } from "../request-context.ts";
 import { MemberService } from "./member.service.ts";
 
-/** Lecture ouverte à tout membre (H2) ; invitation et changement de rôle : owner et admin. */
+/** Lecture : équipe et business, jamais le client (B1) ; invitation et changement de rôle : owner et admin. */
 @Controller()
 @UseGuards(SessionGuard)
 export class MemberController {
   constructor(@Inject(MemberService) private readonly service: MemberService) {}
 
+  @UseGuards(RoleGuard)
+  @Roles(...MEMBER_LIST_ROLES)
   @Implement(contract.member.list)
   list(@Req() request: Request) {
     const requestId = requestIdOf(request);

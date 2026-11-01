@@ -103,3 +103,9 @@ export const SPEC_READ_ROLES = STAFF_ROLES;
 
 /** Le seul rôle cloisonné par projet ; son rôle est vérifié à la liaison et purgé à la sortie. */
 export const CLIENT_ROLE = "client";
+
+/**
+ * Lire la liste des membres (`member.list`) : nom, e-mail et rôle de toute l'organisation. Fermé au
+ * client, lié ou non (TK-55, revue d'attaque B1) ; un rôle absent ou inconnu est refusé (403).
+ */
+export const MEMBER_LIST_ROLES = STAFF_ROLES;

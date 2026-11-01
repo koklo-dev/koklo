@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MANAGER_ROLES, PROJECT_CLIENT_ROLES, SPEC_READ_ROLES } from "../src/auth/roles.ts";
+import {
+  MANAGER_ROLES,
+  MEMBER_LIST_ROLES,
+  PROJECT_CLIENT_ROLES,
+  SPEC_READ_ROLES,
+  STAFF_ROLES,
+} from "../src/auth/roles.ts";
 
 /**
  * TK-55a : cohérence entre les constantes de rôles et les contrôleurs. `projectClient.*` relève
@@ -57,4 +63,20 @@ describe("rôles des procédures spec.* de lecture (D7)", () => {
       expect(decorators).toContain("@Roles(...SPEC_READ_ROLES)");
     },
   );
+});
+
+describe("rôles de member.list (TK-55 B1)", () => {
+  it("MEMBER_LIST_ROLES : les rôles d'équipe et business, jamais le client", () => {
+    expect([...MEMBER_LIST_ROLES]).toEqual([...STAFF_ROLES]);
+    expect(MEMBER_LIST_ROLES as readonly string[]).not.toContain("client");
+  });
+
+  it("member.list : session, garde de rôle et MEMBER_LIST_ROLES, fail-closed", () => {
+    const source = read("member/member.controller.ts");
+    const at = source.indexOf("@Implement(contract.member.list)");
+    expect(at, "@Implement(contract.member.list) absent du contrôleur").toBeGreaterThan(-1);
+    const decorators = source.slice(Math.max(0, at - 200), at);
+    expect(decorators).toContain("@UseGuards(RoleGuard)");
+    expect(decorators).toContain("@Roles(...MEMBER_LIST_ROLES)");
+  });
 });

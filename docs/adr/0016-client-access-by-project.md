@@ -2,7 +2,7 @@
 doc_version: 0.1.0
 status: proposed
 last_reviewed: 2026-11-02
-covers_commit: b69cf16
+covers_commit: c97bc20
 ---
 # 0016 — Accès client par projet : table de liaison `project_client_access` et cloisonnement central
 
@@ -21,7 +21,7 @@ incomplet) ne doit jamais ouvrir l'accès.
 ## Options envisagées
 | Option | Avantages | Inconvénients |
 |--------|-----------|---------------|
-| A. Table de liaison `project_client_access (organization_id, project_id, user_id)` + cloisonnement central côté API | Explicite, auditable, réversible ; les FK composites interdisent un lien inter-organisations ; un seul point d'étranglement dans l'API | Une table, une requête de plus par appel |
+| A. Table de liaison `project_client_access (organization_id, project_id, user_id)` + cloisonnement central côté API | Explicite, auditable, réversible ; les FK composites interdisent un lien inter-organisations ; cloisonnement central dans l'API pour les procédures de projet (voir Limites : `member.list` et la course N1) | Une table, une requête de plus par appel |
 | B. Colonne `project_id` sur `members` | Aucune table | Un client n'a qu'un projet ; mélange identité d'organisation et accès |
 | C. Un client = une organisation dédiée | Aucun changement de code | Casse la vision (un client est membre de l'organisation de l'équipe) ; invitations et facturation à dupliquer |
 | D. Filtre dans chaque service | Aucune table centrale | Oubli certain, non testable globalement |
@@ -44,7 +44,9 @@ Option A.
 - Les tests d'isolation entre organisations et entre clients d'une même organisation sont des garde-fous : ne pas les assouplir.
 
 ## Limites
-- **N2** : les rôles d'équipe et business gardent toute l'organisation ; seul le client est cloisonné.
+- **N2** : les rôles d'équipe et business gardent toute l'organisation (tous les projets, tous les membres) ; seul le client est cloisonné.
+- **`member.list` (B1, revue d'attaque)** : cette procédure ne passe pas par `ProjectAccess` et renvoyait nom, e-mail et rôle de tous les membres à n'importe quel client, lié ou non. Elle est désormais fermée au client par un garde de rôle (`@Roles(...MEMBER_LIST_ROLES)`, 403 `FORBIDDEN`, fail-closed pour un rôle absent ou inconnu) ; le web masque l'entrée « Membres » du client. Le cloisonnement n'a donc PAS un point d'étranglement unique : toute nouvelle procédure sans `projectId` qui expose des données d'organisation doit recevoir son propre garde de rôle (`roles-consistency`).
+- **Course `projectClient.add` / `member.setRole` (N1)** : `add` lisait le rôle `client` sans verrou (READ COMMITTED) ; un `setRole` client vers dev commité avant l'INSERT laissait un lien orphelin, ressuscité si le membre redevenait client. `add` pose maintenant un verrou de ligne sur le membre (UPDATE sans effet, réévalué après attente) avant de lire et d'insérer ; un test de concurrence déterministe (transaction externe qui tient le verrou) le garde.
 - **N3** : aucun écran ne permet encore de lier un client (ni `member.invite` avec un projet) ; ticket web à prévoir. Aujourd'hui le lien se pose par l'API `projectClient.add`.
 - Si le rôle d'un membre change hors de l'API (SQL), ses liens subsistent mais sont ignorés tant qu'il n'est pas client.
 - La **durée de réponse n'est pas un oracle** : le refus coûte un aller-retour de requête dans tous les cas (test à tolérance large), mais aucune garantie de temps constant n'est donnée.

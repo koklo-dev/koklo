@@ -859,6 +859,16 @@ organizations, between clients of the same organization, role-less sessions (fai
 role and is scoped. Migration `20261102090000_project_client_access` has a `down.sql` (one `DROP TABLE`; the
 links are lost, clients lose access, which fails closed).
 
+**Migration / release note (TK-55a, to repeat in the release notes).** Every existing `client` member LOSES
+access to all projects at deployment, until an owner or admin links them with `projectClient.add` (one call per
+client and project). There is no screen yet (web ticket to plan): do it through the API before or right after
+the release. `member.list` is closed to the client (403) and the "Membres" entry is hidden for them. Team roles
+and business keep seeing the whole organization.
+
+**Start-up guard (TK-55 N6).** The API refuses to start when `APP_ENV=test` and `NODE_ENV=production`
+(`assertSafeEnvironment`, called first in `main.ts`): `APP_ENV=test` enables the `x-test-session` header, which
+takes the role from the request. The error names the two variables, never a value.
+
 ### Webhook deliveries: configuration, retention and operation (TK-45b)
 | Variable | Read by | Meaning |
 |----------|---------|---------|

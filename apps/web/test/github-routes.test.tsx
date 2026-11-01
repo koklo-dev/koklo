@@ -108,11 +108,19 @@ describe("/github — gabarit et navigation (AC-48-17)", () => {
     async (role) => {
       asRole(role);
       renderLayout();
-      await within(sidebar()).findByRole("link", { name: "Membres" });
+      await within(sidebar()).findByRole("link", { name: "Projets" });
       await within(sidebar()).findAllByText("Atelier Lumière");
       expect(within(sidebar()).queryByRole("link", { name: "GitHub" })).toBeNull();
     },
   );
+
+  it("rôle client : pas d'entrée « Membres » (member.list lui est fermé, TK-55 B1)", async () => {
+    asRole("client");
+    renderLayout();
+    await within(sidebar()).findByRole("link", { name: "Projets" });
+    await within(sidebar()).findAllByText("Atelier Lumière");
+    expect(within(sidebar()).queryByRole("link", { name: "Membres" })).toBeNull();
+  });
 
   it("rôle inconnu : entrée absente tant que organization.list n'a pas répondu", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));

@@ -3,18 +3,17 @@
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@koklo/ui";
 import { usePathname } from "next/navigation";
 import type * as React from "react";
-import { canManage } from "../lib/roles.ts";
+import { canListMembers, canManage } from "../lib/roles.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { NavMain } from "./nav-main.tsx";
 import { NavProjects } from "./nav-projects.tsx";
 import { NavUser } from "./nav-user.tsx";
 import { TeamSwitcher } from "./team-switcher.tsx";
 
-const NAVIGATION = [
-  { title: "Projets", url: "/projects", icon: "account_tree" },
-  { title: "Kanban", url: "/kanban", icon: "checklist" },
-  { title: "Membres", url: "/members", icon: "person" },
-] as const;
+const PROJECTS_ENTRY = { title: "Projets", url: "/projects", icon: "account_tree" } as const;
+const KANBAN_ENTRY = { title: "Kanban", url: "/kanban", icon: "checklist" } as const;
+/** Fermée au client (`member.list` lui répond 403) ; tant que le rôle est inconnu, elle reste visible. */
+const MEMBERS_ENTRY = { title: "Membres", url: "/members", icon: "person" } as const;
 
 /** Réservée aux propriétaires et administrateurs ; tant que le rôle est inconnu, elle n'est pas rendue. */
 const GITHUB_ENTRY = { title: "GitHub", url: "/github", icon: "link" } as const;
@@ -22,7 +21,12 @@ const GITHUB_ENTRY = { title: "GitHub", url: "/github", icon: "link" } as const;
 function Navigation() {
   const pathname = usePathname();
   const { role } = useActiveOrganization();
-  const entries = canManage(role) ? [...NAVIGATION, GITHUB_ENTRY] : NAVIGATION;
+  const entries = [
+    PROJECTS_ENTRY,
+    KANBAN_ENTRY,
+    ...(canListMembers(role) ? [MEMBERS_ENTRY] : []),
+    ...(canManage(role) ? [GITHUB_ENTRY] : []),
+  ];
   return <NavMain items={entries.map((item) => ({ ...item, isActive: pathname === item.url }))} />;
 }
 

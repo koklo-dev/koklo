@@ -29,7 +29,7 @@ route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 | `organization.create` | POST | `/organizations` | session | `UNAUTHORIZED`, `CONFLICT` |
 | `organization.list` | GET | `/organizations` | session | `UNAUTHORIZED` |
 | `member.invite` | POST | `/members/invitations` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
-| `member.list` | GET | `/members` | session + active organization | `UNAUTHORIZED` |
+| `member.list` | GET | `/members` | session + active organization + team or business role | `UNAUTHORIZED`, `FORBIDDEN` |
 | `member.setRole` | PATCH | `/members/{memberId}/role` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
 | `project.list` | GET | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 | `project.create` | POST | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
@@ -256,7 +256,7 @@ decision: lease expiry, "active lease" filters of `ticket.get`/`ticket.delete`. 
 |-----------|-------------------|-----------|
 | `organization.create` | `UserSessionGuard` | Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
 | `organization.list` | `UserSessionGuard` | Organizations the caller belongs to, with the caller's role |
-| `member.list` | `SessionGuard` | Members of the session organization |
+| `member.list` | `SessionGuard`, `RoleGuard` (`MEMBER_LIST_ROLES`) | Members of the session organization; closed to `client` (403, exposes names, emails and roles of the whole organization) and to any absent or unknown role |
 | `member.invite` | `SessionGuard`, `RoleGuard` | `already_member` / `already_invited` checks, then Better Auth `createInvitation`; its callback enqueues the email job |
 | `member.setRole` | `SessionGuard`, `RoleGuard` | Serializable transaction: `NOT_FOUND`, H3, `last_owner` |
 | `project.create` | `SessionGuard`, `RoleGuard` | Project created under the session organization |
@@ -275,7 +275,7 @@ drift apart.
 | Procedure | owner | admin | dev | designer | client | business |
 |-----------|:-----:|:-----:|:---:|:--------:|:------:|:--------:|
 | `organization.create`, `organization.list` | yes | yes | yes | yes | yes | yes |
-| `member.list` | yes | yes | yes | yes | yes | yes |
+| `member.list` | yes | yes | yes | yes | no | yes |
 | `member.invite` | yes | yes | no | no | no | no |
 | `member.setRole` | yes | yes | no | no | no | no |
 | `project.create` | yes | yes | no | no | no | no |
@@ -290,7 +290,7 @@ active organization, 403 for a role marked "no".
 | Screen | Procedure | Error handling in the UI |
 |--------|-----------|--------------------------|
 | `/organizations` | `organization.list`, `organization.create` | `CONFLICT slug_taken` shown under "Identifiant"; other errors in an alert; `UNAUTHORIZED` re-checks the session (no session: `/login`; session: `/organizations`) |
-| `/members` | `member.list`, `member.invite` | `CONFLICT already_member` / `already_invited` under "Adresse e-mail"; `FORBIDDEN` as a message; other errors in an alert |
+| `/members` | `member.list`, `member.invite` | `CONFLICT already_member` / `already_invited` under "Adresse e-mail"; `FORBIDDEN` as a message; other errors in an alert. A `client` never calls `member.list` (no "Membres" entry; the page shows a team-only notice) |
 | `/projects` | `project.list`, `project.create` | `FORBIDDEN` as a message; other errors in an alert |
 
 Organization activation is not an oRPC procedure: the web calls the Better Auth client
