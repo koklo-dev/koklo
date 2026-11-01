@@ -821,3 +821,20 @@ real GitHub, by hand only. It refuses to start (exit 1, missing variables listed
 organisation; they are deleted at the end only if the test App has the Administration
 (write) permission, otherwise delete them by prefix. Full procedure and App permissions:
 `packages/github/README.md`.
+
+## Rules gates in CI: `checkBiomeLimits` and `validateEvidence` (TK-71 lot C)
+`@koklo/rules` executes nothing and reads no file: the caller reads, then passes JSON.
+- **Biome drift**: read `packages/config/biome.json`, `JSON.parse` it and call
+  `checkBiomeLimits(config)`; a non-empty result must fail the job (limits 50, 15, `error`). The
+  package test `koklo-strict-biome.test.ts` already runs it against the real file in
+  `pnpm --filter @koklo/rules test`.
+- **Evidence**: resolve the rules (`withKokloStrict(loadBuiltInCatalog())`, a layer with
+  `profiles: ["koklo-strict"]`, the role, the path), build an artifact from the CI results
+  (`gates` pass/fail per rule id, `evidence` references), call `validateEvidence`, and fail the
+  job unless `value.canPass` is true. `UNVERIFIED` is never `PASS`: a gate that was not run
+  blocks like a failed one.
+- **Later**: the adapter `koklo/policy` will wrap both calls. The adapters `check-size` (file
+  sizes 300 and 500) and `check-todo` (`TODO(TK-n)`) do not exist yet; until they do,
+  `strict.file-size-*` and `strict.no-dead-code-or-orphan-todo` stay UNVERIFIED.
+- **Open point**: waivers on locked limits (vision §17.2) are rejected by this package; a
+  tech-lead decision or another ticket must settle it.

@@ -575,6 +575,47 @@ covers the path and its descendants. An invalid pattern or path (`..`, absolute,
 never matches. The catalog of koklo is the source of truth (D5): no automatic synchronisation
 with Shipyard. `koklo-strict` and `validateEvidence` belong to lot C.
 
+## Profile koklo-strict and evidence verdicts (TK-71 lot C, `packages/rules`)
+**Profile.** `koklo-strict` (kind `standard`) groups 16 rules `strict.*` (vision §17.1 to 17.3), all
+for `developer`, `qa-reviewer` and `tech-lead`; 15 are `blocking`, `strict.english-code-french-ui`
+is `advisory`. It is activated explicitly (layer `profiles`, root or package selection), never
+deduced from other profiles or from a role; on a catalog without `withKokloStrict` the root
+selection gives `resolve.unknown-profile` and a layer declaration gives `Conflict(unknown-profile)`.
+
+| Group | Rules |
+|---|---|
+| Locked (`protected`, D3) | `strict.fn-lines` (50), `strict.cognitive-complexity` (15), `strict.no-explicit-any` (`error`), `strict.file-size-source` (300), `strict.file-size-test` (500), `strict.max-params` (4, instruction), `strict.domain-purity`, `strict.conventional-commits` |
+| Free (traced override or waiver) | `strict.adr-per-decision`, `strict.waiver-traced` (evidence); `strict.naming-kebab-case`, `strict.thin-controllers`, `strict.typed-errors`, `strict.structured-logs`, `strict.english-code-french-ui` (instructions); `strict.no-dead-code-or-orphan-todo` (gate `check-todo`) |
+
+`Enforcement.params` is an object of finite scalars (number, string, boolean); nesting, `NaN`
+and `Infinity` are `catalog.invalid-shape`. For `isWeaker`, on an identical adapter, a higher or
+removed `params.max` is weaker; a lower or added one is a hardening. Raising a locked limit is
+therefore `Conflict(locked, "enforcement")`; lowering it stays allowed (trace `hardened`).
+
+**Verdicts.** `validateEvidence(resolution, artifact)` returns `{ ok: true, value: EvidenceReport }`
+or `{ ok: false, error: { code: "evidence.invalid-shape", path? } }` (no proof text in errors).
+The artifact is `{ evidence?: { ruleId, references[] }[], gates?: { ruleId, status: "pass" | "fail" }[] }`.
+
+| Rule kind | Input | Verdict | Reason |
+|---|---|---|---|
+| `gate` | status `pass` | PASS | `gate-passed` |
+| `gate` | status `fail` (worst wins) | FAIL | `gate-failed` |
+| `gate` | no result | UNVERIFIED | `gate-not-run` |
+| `evidence` | at least one non-blank reference | PASS | `evidence-provided` |
+| `evidence` | only empty or blank references | UNVERIFIED | `evidence-incomplete` |
+| `evidence` | nothing | UNVERIFIED | `evidence-missing` |
+
+`instruction` rules have no verdict. `overall` is FAIL if a blocking rule is FAIL, else UNVERIFIED
+if a blocking rule is UNVERIFIED, else PASS; `canPass = overall === "PASS"`; advisory rules never
+block. `unknownRuleIds` lists proven ids absent from the resolution (unknown, out of role,
+disabled, instruction), sorted and unique, without effect on verdicts.
+
+**Biome drift.** `checkBiomeLimits(config)` returns `BiomeDrift { ruleId, setting, expected, actual? }`
+sorted by `ruleId` for `maxLines` (50), `maxAllowedComplexity` (15) and `noExplicitAny` (`"error"`).
+
+**Open point (tech-lead).** Vision §17.2 allows a `waivers.yaml` waiver on the limits; this package
+treats them as locked (`locked` conflict). A waivable limit would be another ticket.
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.

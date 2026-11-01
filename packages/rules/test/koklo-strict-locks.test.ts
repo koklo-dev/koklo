@@ -158,7 +158,7 @@ describe("règles strict non verrouillées : dérogations et surcharges tracées
     if (!result.ok) return;
     expect(result.value.conflicts).toEqual([]);
     const rule = ruleOf(result.value, id);
-    if (rule?.severity !== "advisory") return; // déjà advisory : rien de plus faible
+    if (rule === undefined || rule.severity === "advisory") return; // déjà advisory : rien de plus faible
     expect(rule.trace.at(-1)).toMatchObject({
       kind: "overridden",
       level: "project",

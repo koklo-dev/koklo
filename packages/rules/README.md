@@ -104,6 +104,16 @@ const report = validateEvidence(resolution.value, {
   bloquent pas `canPass`. Rien n'est exécuté ici : les résultats de gates viennent de la CI, et
   aucune erreur ne reprend le texte d'une preuve.
 
+- **Point ouvert (tech-lead)** : la vision §17.2 autorise une dérogation `waivers.yaml` sur les
+  limites ; ce paquet les traite comme verrouillées (une dérogation sur une règle verrouillée
+  donne un conflit `locked`). Décision tech-lead ou autre ticket.
+- **Adapters** : `check-size` et `check-todo` (gates `strict.file-size-*` et
+  `strict.no-dead-code-or-orphan-todo`) n'existent pas encore dans le dépôt ; tant qu'ils
+  manquent, ces gates restent UNVERIFIED.
+- **Fichiers** : `koklo-strict-rules.ts` (les 16 règles), `koklo-strict.ts` (profil, verrous),
+  `with-koklo-strict.ts`, `biome-drift.ts`, `verdict.ts` (verdict d'une règle),
+  `validate-evidence.ts`, `evidence-types.ts`.
+
 ## Codes d'erreur
 
 `catalog.too-large`, `catalog.invalid-json`, `catalog.invalid-shape`, `catalog.unknown-version`,
@@ -112,7 +122,8 @@ const report = validateEvidence(resolution.value, {
 (liste `CATALOG_ERROR_CODES`). Composition : `layer.invalid-shape`, `layer.invalid-level`,
 `layer.duplicate-level`, `layer.collision`, `layer.invalid-pattern`, `waiver.missing-expires`,
 `waiver.invalid-expires`, `resolve.invalid-role`, `resolve.invalid-path`, `resolve.invalid-now`,
-`resolve.unknown-profile` (`RULES_ERROR_CODES`). Détail : `docs/domain-model.md`, sections
+`resolve.unknown-profile` (`RULES_ERROR_CODES`). Preuves : `evidence.invalid-shape`
+(`EVIDENCE_ERROR_CODES`). Détail : `docs/domain-model.md`, sections
 « Rules catalog » et « Rules composition ».
 
 ## Catalogue livré

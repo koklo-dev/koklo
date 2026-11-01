@@ -1,4 +1,6 @@
 import type { Profile, Rule } from "./catalog-types.ts";
+import { frozenCopy } from "./freeze.ts";
+import { STRICT_RULES } from "./koklo-strict-rules.ts";
 
 export const KOKLO_STRICT_PROFILE_ID = "koklo-strict";
 
@@ -12,10 +14,13 @@ export interface KokloStrictProfile {
   readonly lockedRuleIds: readonly string[];
 }
 
-/** SQUELETTE (TK-71 lot C, Red) : le Green remplit les règles et les verrous. */
-export const kokloStrictProfile: KokloStrictProfile = {
+export const kokloStrictProfile: KokloStrictProfile = frozenCopy({
   id: KOKLO_STRICT_PROFILE_ID,
-  profile: { kind: "standard", description: "" },
-  rules: [],
-  lockedRuleIds: [],
-};
+  profile: {
+    kind: "standard",
+    description:
+      "Standard d'ingénierie koklo (vision §17.1 à 17.3) : limites chiffrées verrouillées, domaine pur, commits conventionnels.",
+  },
+  rules: STRICT_RULES,
+  lockedRuleIds: STRICT_RULES.filter((rule) => rule.protected).map((rule) => rule.id),
+});

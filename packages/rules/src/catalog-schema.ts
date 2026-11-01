@@ -10,14 +10,22 @@ export const nonEmptyText = z.string().min(1);
 /** Types d'enforcement acceptés (miroir de la union discriminée ci-dessous). */
 export const ENFORCEMENT_KINDS = ["gate", "evidence", "instruction"] as const;
 
+/** Limites typées : scalaires seulement (z.number() refuse déjà NaN et Infinity). */
+const paramsSchema = z.record(nonEmptyText, z.union([z.number(), z.string(), z.boolean()]));
+
 export const enforcementSchema: z.ZodType<Enforcement> = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("gate"),
     adapter: nonEmptyText,
     command: nonEmptyText.optional(),
+    params: paramsSchema.optional(),
   }),
-  z.strictObject({ kind: z.literal("evidence"), evidence: nonEmptyText }),
-  z.strictObject({ kind: z.literal("instruction") }),
+  z.strictObject({
+    kind: z.literal("evidence"),
+    evidence: nonEmptyText,
+    params: paramsSchema.optional(),
+  }),
+  z.strictObject({ kind: z.literal("instruction"), params: paramsSchema.optional() }),
 ]);
 
 export const profileSchema: z.ZodType<Profile> = z.strictObject({
