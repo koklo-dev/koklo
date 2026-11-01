@@ -3,7 +3,7 @@ title: Architecture
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-30
+last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
 covers_commit: 0139410
@@ -1266,7 +1266,7 @@ interpolation). `framePrompt` is the only producer of `FramedPrompt`: the fixed 
 instructions go in `system`, each datum in a delimited block of `user` carrying a caller-supplied
 nonce. A model reply is `Unvalidated` until `validateLlmOutput` turns it into a `Validated`
 proposal. Framing reduces prompt-injection risk, it does not remove it, and a validated output is
-still a proposal that a human validates (vision §6.3). The provider port and adapters follow in 50b/50c.
+still a proposal that a human validates (vision §6.3). The provider port (50b) is described below; adapters follow in 50c.
 
 ```mermaid
 flowchart LR
@@ -1275,10 +1275,33 @@ flowchart LR
   u --> f[framePrompt + nonce]
   t --> f
   f --> p[FramedPrompt: system / user]
-  p -.->|50b port| m[(model)]
-  m -.-> r[Unvalidated]
+  p --> g[assertLlmRequest]
+  g --> m[(LlmProvider.complete)]
+  m --> r[Unvalidated]
   r --> v[validateLlmOutput]
   v --> o[Validated: proposal]
+```
+
+### LLM provider port (TK-50b, `packages/domain`)
+The `LlmProvider` interface (`complete(request) -> response`, no streaming, no tools) is the only
+seam between Koklo and a model vendor; the domain names no SDK. An adapter (50c, one per provider
+`anthropic | openai | google`, plus a deterministic `fake` for tests) first calls `assertLlmRequest`
+(request shape, mandatory budget capped by the domain at 5 USD per call, already aborted signal),
+reads the key with `revealLlmCredential` only when building the HTTP call, and maps every vendor
+failure to a typed `LlmProviderError` subclass carrying only `operation`, `provider` and `status`
+(no key, prompt, output, header or `cause`). The output stays `Unvalidated`.
+
+```mermaid
+flowchart LR
+  caller[Use case] -->|LlmRequest + LlmBudget| port[LlmProvider]
+  port --> guard[assertLlmRequest]
+  guard -->|InvalidLlmRequestError / LlmBudgetExceededError / LlmAbortedError| caller
+  guard --> ad[Adapter: reveals LlmCredential]
+  ad -->|HTTP| vendor[(Vendor API)]
+  vendor -->|failure| err[Typed LlmProviderError]
+  vendor -->|reply| un[Unvalidated output]
+  err --> caller
+  un --> caller
 ```
 
 ## 5. Runtime views

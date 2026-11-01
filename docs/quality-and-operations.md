@@ -3,7 +3,7 @@ title: Quality and operations
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-29
+last_reviewed: 2026-11-01
 covers_release: unreleased
 sources: []
 covers_commit: 7f97066
@@ -177,6 +177,22 @@ covers_commit: 7f97066
   one per call in the adapter, 16 to 64 alphanumeric characters, and do not reuse it across calls.
 - Treat a `UntrustedDelimiterCollisionError` as a refusal of that datum, not as something to escape.
 - A `Validated` output is a proposal: no effect without human validation (vision §6.3).
+
+### LLM provider keys, budget and errors (TK-50b)
+- **Never log a key.** A BYOK key is an `LlmCredential`: every rendering (template, `String`, JSON,
+  `util.inspect`, `console`) gives `[redacted]`. Call `revealLlmCredential` only in the adapter, at
+  the moment of building the request, and never keep the revealed string in a log line, an error
+  or a GlitchTip event.
+- The typed errors (`LlmProviderError` and subclasses, `InvalidLlmCredentialError`,
+  `InvalidLlmRequestError`, `InvalidLlmBudgetError`) carry only `operation`, `provider`, `status`, a
+  fixed `reason`, `field` or `limit`: no key, no prompt, no model output, no response body, no header
+  and no `cause`. When mapping a vendor failure, build the error from those fields only; do not pass
+  the vendor error along. Logging the `provider`, the `status`, the `operation`, a size or a duration
+  is fine.
+- `trace.purpose` and `trace.correlationId` match `[A-Za-z0-9._:-]{1,64}`: they are the only free
+  identifiers allowed in logs next to an LLM call.
+- Every call has a mandatory budget (tokens, duration, prompt size, cost) capped by the domain at
+  5 USD per call; run `assertLlmRequest` before any network call and refuse, never clamp silently.
 
 ### Emails and magic link (TK-22)
 - **Sending**: the api never sends mail. Better Auth's `sendMagicLink` enqueues
