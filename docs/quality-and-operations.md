@@ -168,6 +168,16 @@ covers_commit: 7f97066
   `AppModule.forRoot(config, { logStream })` and parse the lines.
 - **Failure isolation**: a failing SDK never changes a response or a job outcome.
 
+### LLM prompts and outputs: what is never logged (TK-50a)
+- Never log, report to GlitchTip or put in an error message the content of an `Untrusted`, a
+  `FramedPrompt` (`system` or `user`), or a model output. The domain errors (`InvalidUntrustedOriginError`,
+  `UntrustedDelimiterCollisionError`, `LlmInvalidOutputError`) carry only an origin, a rank or a fixed
+  reason; keep it that way in callers and adapters. Logging the origin, the rank, a size or a duration is fine.
+- The nonce is injected by the caller (the domain has no randomness): generate a fresh unpredictable
+  one per call in the adapter, 16 to 64 alphanumeric characters, and do not reuse it across calls.
+- Treat a `UntrustedDelimiterCollisionError` as a refusal of that datum, not as something to escape.
+- A `Validated` output is a proposal: no effect without human validation (vision §6.3).
+
 ### Emails and magic link (TK-22)
 - **Sending**: the api never sends mail. Better Auth's `sendMagicLink` enqueues
   `{ email, url }` on the `send-magic-link` pg-boss queue; the worker sends it (3 attempts).

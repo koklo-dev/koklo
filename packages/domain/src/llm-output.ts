@@ -1,3 +1,5 @@
+import { LlmInvalidOutputError } from "./llm-errors.ts";
+
 declare const unvalidatedBrand: unique symbol;
 declare const validatedBrand: unique symbol;
 
@@ -12,14 +14,18 @@ export type Validated<T> = {
 };
 
 /** Marque une valeur brute comme non validée (produit par les adaptateurs). */
-export const unvalidated = <T>(_raw: T): Unvalidated<T> => {
-  throw new Error("non implémenté");
-};
+export const unvalidated = <T>(raw: T): Unvalidated<T> => raw as unknown as Unvalidated<T>;
 
-/** Seul chemin de `Unvalidated` à `Validated`. */
+/** Seul chemin de `Unvalidated` à `Validated` ; l'échec ne reprend ni la sortie ni le message de `parse`. */
 export const validateLlmOutput = <T>(
-  _output: Unvalidated<unknown>,
-  _parse: (raw: unknown) => T,
+  output: Unvalidated<unknown>,
+  parse: (raw: unknown) => T,
 ): Validated<T> => {
-  throw new Error("non implémenté");
+  let value: T;
+  try {
+    value = parse(output as unknown);
+  } catch {
+    throw new LlmInvalidOutputError("La sortie du modèle ne respecte pas la forme attendue");
+  }
+  return Object.freeze({ status: "proposal", value }) as unknown as Validated<T>;
 };

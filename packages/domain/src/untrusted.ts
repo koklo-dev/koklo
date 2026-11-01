@@ -15,20 +15,44 @@ export const UNTRUSTED_ORIGINS = [
 
 export type UntrustedOrigin = (typeof UNTRUSTED_ORIGINS)[number];
 
-/** Donnée non fiable immuable ; ne se laisse pas interpoler (squelette Red). */
+const isOrigin = (origin: unknown): origin is UntrustedOrigin =>
+  (UNTRUSTED_ORIGINS as readonly unknown[]).includes(origin);
+
+const MASK = (origin: string): string => `[untrusted:${origin}]`;
+const INSPECT = Symbol.for("nodejs.util.inspect.custom");
+
+/**
+ * Donnée non fiable immuable : le contenu est privé et ne se laisse pas interpoler
+ * (gabarit, `String`, JSON, `util.inspect` rendent `[untrusted:<origine>]`).
+ */
 export class Untrusted {
   readonly origin: UntrustedOrigin;
   readonly #value: string;
+
   constructor(origin: UntrustedOrigin, value: string) {
-    void InvalidUntrustedOriginError;
-    void origin;
-    void value;
-    throw new Error("non implémenté");
+    if (!isOrigin(origin)) {
+      throw new InvalidUntrustedOriginError(origin);
+    }
+    this.origin = origin;
+    this.#value = value;
+    Object.freeze(this);
   }
-  /** Réservé au cadrage de prompt. */
+
+  toString(): string {
+    return MASK(this.origin);
+  }
+
+  toJSON(): string {
+    return MASK(this.origin);
+  }
+
+  [INSPECT](): string {
+    return MASK(this.origin);
+  }
+
+  /** Réservé au cadrage de prompt : passer par `revealUntrusted`. */
   static reveal(untrusted: Untrusted): string {
-    void untrusted.#value;
-    throw new Error("non implémenté");
+    return untrusted.#value;
   }
 }
 

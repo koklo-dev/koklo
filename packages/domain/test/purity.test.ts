@@ -38,6 +38,27 @@ describe("F1 pureté des imports de src", () => {
   });
 });
 
+describe("API publique du marquage des données non fiables (TK-50a)", () => {
+  it("exporte les noms du marquage, du cadrage et de la validation", () => {
+    for (const name of [
+      "UNTRUSTED_ORIGINS",
+      "Untrusted",
+      "revealUntrusted",
+      "Trusted",
+      "trusted",
+      "revealTrusted",
+      "UNTRUSTED_DATA_POLICY",
+      "FramedPrompt",
+      "framePrompt",
+      "unvalidated",
+      "validateLlmOutput",
+      "LlmInvalidOutputError",
+    ]) {
+      expect(domain, name).toHaveProperty(name);
+    }
+  });
+});
+
 describe("F2 package.json et étiquette", () => {
   const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
   it("n'a aucune dépendance d'exécution tierce", () => {
