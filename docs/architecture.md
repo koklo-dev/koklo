@@ -1210,7 +1210,7 @@ root scripts that orchestrate processes: `pnpm e2e` → `e2e/scripts/run.ts`, `p
 flowchart LR
   run[pnpm e2e: run.ts] --> pg[(Postgres, Compose project koklo-e2e)]
   run --> mig[db:migrate + db:seed + build]
-  run --> api[API :3201]
+  run --> api[stack.ts: API :3201 + worker + fake Git provider, one process]
   run --> web[Web standalone :3200]
   run --> pw[playwright test]
   pw -->|signed session cookie| web
@@ -1223,7 +1223,11 @@ worker). Web and API ports are now distinct (`apps/web` dev is `next dev --port 
 already exported win over the defaults; `turbo.json` passes the ports and auth variables through
 (`globalPassThroughEnv`, `dev.passThroughEnv`). Run steps and gates:
 [quality-and-operations.md](quality-and-operations.md#real-stack-e2e-tk-15) ·
-decision: [ADR 0007](adr/0007-real-stack-e2e-orchestration.md).
+decision: [ADR 0007](adr/0007-real-stack-e2e-orchestration.md), extended by
+[ADR 0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (TK-49a): `run.ts` starts
+`e2e/scripts/stack.ts`, which hosts the API and the worker in one process around a single in-memory fake Git
+provider (injected, never selectable by configuration; refused under `APP_ENV` staging/production), so
+`repo.createSpec`, `specBatch` and webhook ingestion run for real against Postgres and pg-boss.
 
 ### Observability: `@koklo/observability` (TK-19)
 `packages/observability` is the single place that knows pino and the Sentry-compatible SDK
@@ -1321,5 +1325,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0006](adr/0006-web-same-origin-proxy-runtime-config.md),
 [0007](adr/0007-real-stack-e2e-orchestration.md),
 [0008](adr/0008-web-entry-gate-organizations.md),
-[0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token).
+[0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
+[0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

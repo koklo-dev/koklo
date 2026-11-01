@@ -430,6 +430,15 @@ importers:
       '@koklo/config':
         specifier: workspace:*
         version: link:../packages/config
+      '@koklo/github':
+        specifier: workspace:*
+        version: link:../packages/github
+      '@koklo/worker':
+        specifier: workspace:*
+        version: link:../apps/worker
+      '@nestjs/testing':
+        specifier: 12.2.0
+        version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.2.0)(@nestjs/platform-express@12.2.0)
       '@playwright/test':
         specifier: 1.64.1
         version: 1.64.1

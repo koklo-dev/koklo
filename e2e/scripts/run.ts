@@ -26,6 +26,14 @@ const env: NodeJS.ProcessEnv = {
   GITHUB_CLIENT_ID: "e2e-fake-github-client-id",
   GITHUB_CLIENT_SECRET: "e2e-fake-github-client-secret",
   E2E_WEB_URL: WEB_URL,
+  // Pile R2 (ADR 0010) : valeurs factices, le fournisseur Git est le faux injecté par `stack.ts`.
+  GITHUB_WEBHOOK_SECRET: "e2e-fake-webhook-secret-not-for-production",
+  GITHUB_APP_ID: "1",
+  GITHUB_APP_PRIVATE_KEY: "e2e-fake-private-key-never-parsed",
+  GITHUB_APP_CLIENT_ID: "e2e-fake-app-client-id",
+  GITHUB_APP_CLIENT_SECRET: "e2e-fake-app-client-secret",
+  KOKLO_ENCRYPTION_KEY: "e2eFakeEncryptionKey0123456789ab",
+  SPEC_BATCH_WAIT_MS: "15000",
 };
 
 const servers: ChildProcess[] = [];
@@ -75,7 +83,8 @@ async function main(): Promise<number> {
   run("pnpm", ["db:seed"]);
   run("pnpm", ["build"]);
 
-  start("node", ["apps/api/dist/main.js"], { PORT: API_PORT });
+  // API et worker dans un seul processus, avec le faux fournisseur Git (ADR 0010).
+  start("node", ["e2e/scripts/stack.ts"], { PORT: API_PORT });
   // Sortie `standalone` : on copie les assets statiques à côté du serveur, comme l'image promouvable.
   const web = resolve(ROOT, "apps/web");
   const standalone = resolve(web, ".next/standalone/apps/web");
