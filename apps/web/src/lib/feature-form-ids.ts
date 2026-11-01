@@ -1,7 +1,12 @@
 import type { FieldKey } from "./feature-form.ts";
 
-/** Libellés des champs, pour les avis de conflit et les liens de diagnostic. */
+/** Bouton d'entrée de la suppression : reçoit le focus quand on garde la fonctionnalité. */
 export const DELETE_TRIGGER_ID = "feature-delete-trigger";
+
+/** Texte qui explique pourquoi « Enregistrer » ou la suppression est désactivé. */
+export const REASON_ID = "feature-form-save-reason";
+
+/** Libellés des champs, pour les avis de conflit et les liens de diagnostic. */
 export const FIELD_LABELS: Record<FieldKey, string> = {
   title: "Titre",
   priority: "Priorité",

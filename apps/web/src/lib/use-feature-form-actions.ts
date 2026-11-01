@@ -23,6 +23,7 @@ import {
 } from "./feature-operation.ts";
 import { rebase } from "./feature-rebase.ts";
 import { orpc } from "./orpc.ts";
+import { useFeatureDelete } from "./use-feature-delete.ts";
 
 interface ActionContext {
   args: FormArgs;
@@ -74,6 +75,24 @@ export function useFormSave({ args, state, setState, resumeKey, flushDraft }: Ac
     setState((s) => ({ ...s, submitted: attempt }));
     write.dismiss();
     if (collectIssues({ ...state, submitted: attempt }, args).length === 0) send();
+  };
+}
+
+/**
+ * Actions d'écriture du formulaire : enregistrer, supprimer et « Réessayer » (qui renvoie la suppression ou
+ * l'enregistrement qui a échoué, sans redemander confirmation).
+ */
+export function useWriteActions(context: ActionContext, mine: boolean) {
+  const { args, state } = context;
+  const del = useFeatureDelete(args, state, mine);
+  const send = useFormSave(context);
+  return {
+    del,
+    save: (): void => {
+      del.clearRefusal();
+      send();
+    },
+    retry: (): void => (mine && args.write.meta?.kind === "delete" ? del.confirm() : send()),
   };
 }
 

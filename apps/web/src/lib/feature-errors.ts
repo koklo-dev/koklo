@@ -214,7 +214,18 @@ function classify(failure: SaveFailure): { code: string; reason?: string } {
   return { code: "unknown" };
 }
 
+/** Une suppression refusée l'est parce qu'autre chose de la spec y renvoie : ce n'est pas une saisie à corriger. */
+const DELETE_SPEC_INVALID_TEXT =
+  "Rien n'a été écrit. La fonctionnalité reste dans la spec : voyez ci-dessous ce qui bloque sa suppression.";
+
 function entryFor(failure: SaveFailure, context: SaveErrorContext): Entry {
+  const found = baseEntryFor(failure, context);
+  return found.kind === "spec-invalid" && context.mode === "delete"
+    ? { ...found, text: DELETE_SPEC_INVALID_TEXT }
+    : found;
+}
+
+function baseEntryFor(failure: SaveFailure, context: SaveErrorContext): Entry {
   const { code, reason } = classify(failure);
   const manager = canManage(context.role);
   const data = failure.source === "submit" ? errorData(failure.error) : undefined;

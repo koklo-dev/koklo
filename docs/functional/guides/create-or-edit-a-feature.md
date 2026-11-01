@@ -42,11 +42,20 @@ La fonctionnalité apparaît dans la liste (la ligne reçoit le focus) avec « c
 |----------|-------|-----------|
 | « L'enregistrement prend plus de temps que prévu » | La file d'écriture est chargée | Rien n'est perdu et l'enregistrement continue sans vous ; **Vérifier maintenant** relit tout de suite |
 | « Votre modification est enregistrée. La liste se mettra à jour dans un instant. » | La lecture de la spec n'a pas encore rattrapé l'écriture | **Actualiser la liste**, ou fermez : la page continue de vérifier pendant 2 minutes |
-| « La spec obtenue ne serait pas valide » | Une règle de la spec n'est pas respectée | Les points sont listés avec un lien vers le champ ; corrigez puis **Enregistrer** |
+| « La spec obtenue ne serait pas valide » | Une règle de la spec n'est pas respectée | Les points sont listés avec un lien vers le champ ; corrigez puis **Enregistrer**. Pour une suppression, la liste dit ce qui renvoie encore à la fonctionnalité (par exemple un scénario de test) : retirez ce renvoi d'abord |
 | « Cette fonctionnalité a changé depuis… » ou conflit de version | Quelqu'un a modifié la fonctionnalité entre-temps | **Recharger la version actuelle** : vos modifications sont gardées, les champs changés des deux côtés sont signalés avec **Reprendre la valeur actuelle** |
 | « Liez au moins un écran pour enregistrer cette fonctionnalité. » | Un Designer enregistre une fonctionnalité sans écran | Ouvrez **Éléments liés** et indiquez un écran |
 | « Koklo n'a plus accès au dépôt de spec » | L'autorisation GitHub a expiré | Un Propriétaire ou un Administrateur autorise de nouveau Koklo (voir [Relier GitHub](connect-github.md)) |
 | « Un enregistrement est déjà en cours. » | Un autre enregistrement de la page n'est pas terminé | Patientez, le bouton redevient actif |
 | Erreur avec « Référence : … » | Erreur interne | **Réessayer** ; sinon transmettez la référence à l'équipe |
 
-La suppression d'une fonctionnalité n'est pas encore disponible.
+## Supprimer une fonctionnalité
+Seuls les Propriétaires, Administrateurs, Développeurs et Designers peuvent supprimer (un Designer seulement une fonctionnalité liée à un écran).
+
+1. Ouvrez la fonctionnalité avec **Modifier**.
+2. En bas du panneau, après **Enregistrer** et **Fermer**, choisissez **Supprimer cette fonctionnalité**. Rien n'est supprimé à ce stade.
+3. Une confirmation remplace le bas du panneau : « Supprimer F-001 « … » ? ». Ses critères d'acceptation seront supprimés avec elle. **Garder** (sélectionné d'office) annule et vous ramène au bouton ; **Supprimer** lance la suppression.
+4. L'avancement s'affiche comme pour un enregistrement (« Suppression en cours… »). Vous pouvez fermer le panneau : la page continue le suivi, même après un rechargement.
+5. Quand la liste est à jour, le panneau se ferme et « F-001 supprimée. » est annoncé. La fonctionnalité a disparu de la liste ; votre saisie en cours dans ce formulaire, elle, est abandonnée avec la fonctionnalité.
+
+Si d'autres éléments de la spec renvoient à la fonctionnalité (par exemple un scénario de test), la suppression est refusée, rien n'est écrit et la liste de ce qui bloque s'affiche. En cas de coupure de connexion, **Réessayer** renvoie la même suppression sans doublon et sans nouvelle confirmation. Si quelqu'un l'a déjà supprimée, le panneau indique qu'elle n'existe plus.

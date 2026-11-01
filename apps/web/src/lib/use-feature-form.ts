@@ -17,9 +17,8 @@ import {
   type SetFormState,
   serverFields,
 } from "./feature-form-state.ts";
-import { useFeatureDelete } from "./use-feature-delete.ts";
 import { useFeatureDraft } from "./use-feature-draft.ts";
-import { useDraftChoices, useFormSave, useReload } from "./use-feature-form-actions.ts";
+import { useDraftChoices, useReload, useWriteActions } from "./use-feature-form-actions.ts";
 import { WRITTEN_PHASES } from "./use-feature-submit.ts";
 import { useStorageScope } from "./use-storage-scope.ts";
 
@@ -120,8 +119,7 @@ export function useFeatureForm(args: FormArgs) {
     enabled: !(mine && WRITTEN_PHASES.includes(write.phase)),
   });
   const context = { args, state, setState, resumeKey, flushDraft: draft.flush };
-  const del = useFeatureDelete(args, state, mine);
-  const save = useFormSave(context);
+  const { del, save, retry } = useWriteActions(context, mine);
   const issues = collectIssues(state, args);
   const touched = (issue: { field: string }) => state.touched.includes(topField(issue.field));
   return {
@@ -135,12 +133,8 @@ export function useFeatureForm(args: FormArgs) {
       diffValues(state.baseline, state.values).length === 0,
     awaitingChoice: state.banner?.kind === "changed",
     ...useFieldActions(setState),
-    save: () => {
-      del.clearRefusal();
-      save();
-    },
-    /** « Réessayer » : renvoie la suppression ou l'enregistrement qui a échoué, sans redemander confirmation. */
-    retry: () => (mine && write.meta?.kind === "delete" ? del.confirm() : save()),
+    save,
+    retry,
     del,
     reload: useReload(context),
     ...useDraftChoices(context),

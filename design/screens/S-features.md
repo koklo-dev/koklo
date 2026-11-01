@@ -1,7 +1,7 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1.3
+version: 1.4
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
@@ -193,6 +193,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 | 1.1 | 2026-10-31 | TK-48 (48d, refactor) | États réellement livrés conformes à la fiche (tous les états de §4, clair et sombre, 375 px). Une seule correction d'écran : la zone défilante de la fiche est une région nommée « Détail de la fonctionnalité », atteignable au clavier (Tab, focus visible `--ring`), exigence axe `scrollable-region-focusable`. Captures générées. |
 | 1.2 | 2026-10-31 | TK-48 (48e) | Points d'entrée de l'écriture (bouton « Nouvelle fonctionnalité », « Modifier » dans la fiche, état vide pour l'équipe qui écrit, `?new`/`?edit`, bloc de confirmation et de suivi) ; le formulaire lui-même est dans la fiche S-feature-form v1. Aucun changement pour les rôles en lecture. |
 | 1.3 | 2026-11-01 | TK-48 (48e-1, refactor) | Boutons d'entrée livrés tels que décrits ; la région d'état unique de cet écran perd son rôle et son contenu tant que le formulaire est ouvert (elle revient à la fermeture), le panneau portant alors la région (voir S-feature-form v1.1). La ligne de version et la fiche s'affichent sans attendre le rôle (client par défaut) ; rien d'autre ne change pour la lecture. |
+| 1.4 | 2026-11-01 | TK-48 (48e-2, refactor) | Après une suppression, la liste est relue sans la fonctionnalité (filtres gardés, curseur oublié) et la région d'état dit « F-001 supprimée. » (pas de « Voir la fiche »), focus sur le h1 ; un suivi de suppression page fermée dit « Suppression de « Titre » en cours… ». Détail : S-feature-form §4.8. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.
