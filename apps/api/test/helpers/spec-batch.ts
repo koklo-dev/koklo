@@ -141,6 +141,9 @@ function workerHandle(
           specWrite: { retryLimit: 1, retryDelaySeconds: 1 },
         },
       );
+      // Le worker planifie `reconcile` (cron */10, heure réelle) : un tick en plein test ferait lister
+      // les dépôts de la base au faux fournisseur et polluerait `harness.calls`. Aucun tick au banc.
+      await database.query("TRUNCATE pgboss.schedule");
     },
     async stop() {
       await worker?.stop();
