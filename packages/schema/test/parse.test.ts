@@ -11,7 +11,10 @@ describe("CA8 parseSpecFiles : fixture valide", () => {
     expect(issues).toEqual([]);
     expect(spec.project?.path).toBe("koklo.project.yaml");
     expect(spec.project?.value.projet).toBe("civinat");
-    expect(spec.features.map((f) => f.path)).toEqual(["features/F-001-inscription.md"]);
+    expect(spec.features.map((f) => f.path)).toEqual([
+      "features/F-001-inscription.md",
+      "features/F-004-criteres-structures.md",
+    ]);
     expect(spec.features[0]?.value.criteres.map((c) => c.id)).toEqual(["AC-1", "AC-2", "AC-3"]);
     expect(spec.tables.map((t) => t.value.id)).toEqual(["T-session", "T-user"]);
     expect(spec.relations[0]?.value.relations[0]?.from).toBe("T-session.user_id");
@@ -213,6 +216,7 @@ describe("ISSUE_CODES", () => {
       "R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT",
       "R5_IMPLEMENTED_CRITERION_WITHOUT_TEST",
       "R5_IMPLEMENTED_WITHOUT_CRITERIA",
+      "R5_CRITERION_INCOMPLETE",
       "R7_ORPHAN_TABLE",
       "R7_ORPHAN_ENDPOINT",
       "R7_ORPHAN_SCREEN",
