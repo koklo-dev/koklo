@@ -189,7 +189,10 @@ describe("TK-50c : revealUntrusted reste interne au cadrage", () => {
     readdirSyncSafe(dir)
       .filter((e) => e.isFile() && /\.tsx?$/.test(e.name))
       .map((e) => resolve(e.parentPath, e.name))
-      .filter((file) => file.includes("/src/") && !/\/(node_modules|dist|coverage)\//.test(file));
+      .filter((file) => file.includes("/src/") && !/\/(node_modules|dist|coverage)\//.test(file))
+      // Les dossiers `src/testing/` (faux et suites de conformité) lisent le contenu non fiable pour
+      // y chercher des fuites ; ils ne sont exportés que par `./testing`, jamais par la production.
+      .filter((file) => !file.includes("/src/testing/"));
 
   it("n'est référencé en source de production que par untrusted.ts et llm-prompt.ts", () => {
     const offenders = roots
