@@ -344,15 +344,16 @@ Test-support types, outside the public index ([ADR 0011](adr/0011-llm-port-and-u
   `invalidKey`, `servedModel`, `replyWith`, `failWith(trigger)`, `callsMade`), triggers
   `LLM_FAILURE_TRIGGERS`, cases `LLM_CONFORMANCE_CASE_NAMES`, failure `LlmConformanceFailure`.
 
-### Run lifecycle (TK-72 lot 1, `packages/delivery`)
+### Run lifecycle (TK-72 lots 1 and 2, `packages/delivery`)
 A `Run` is an immutable, JSON-serialisable value (`ticket`, `state`, `attempts`, `reviewRounds`,
 `ciWaits`, `blocked`, `branch`, `pullRequest`, `lastReviewedAfterFix`, `version`). `startRun`
 creates it `leased`, version 0. `applyEvent(run, event, limits)` is pure and returns
 `{ run, effects }`: a new deeply frozen run (`version + 1`) and the commands the runner must
 execute; the machine executes nothing. Checks run in this order: unknown run state
-(`InvalidRunStateError`), unknown or malformed event (`InvalidRunEventError`), `expectedVersion`
+(`InvalidRunStateError`), unknown or malformed event (`InvalidRunEventError`), invalid
+`RunLimits` (`InvalidRunEventError`, for every event), idempotent replay (no-op), `expectedVersion`
 different from `run.version` (`StaleRunError`), pair absent from the table
-(`InvalidRunTransitionError(from, event)`, never carrying event data).
+(`InvalidRunTransitionError(from, event)`, never carrying event data), then the ceilings.
 
 ```mermaid
 stateDiagram-v2
@@ -365,7 +366,15 @@ stateDiagram-v2
   pr_open --> ci_wait: pr_opened
   ci_wait --> reviewing: ci_green
   ci_wait --> developing: ci_red, conflict_detected
-  ci_wait --> ci_wait: ci_timeout
+  ci_wait --> ci_wait: ci_timeout (ciWaits + 1)
+  ci_wait --> blocked: ci_timeout at ceiling (ci_timeout)
+  local_gates --> blocked: gates_red at ceiling (ci_failed)
+  ci_wait --> blocked: ci_red at ceiling (ci_failed)
+  reviewing --> blocked: request_changes at ceiling (review_exhausted)
+  merged --> merged: merge_done (replay)
+  deployed_staging --> deployed_staging: deploy_green (replay)
+  escalated --> escalated: escalate (replay)
+  [*] --> ci_wait: startRun with branch and PR (resume)
   reviewing --> merge_requested: verdict_approve
   reviewing --> developing: verdict_request_changes
   merge_requested --> merged: merge_done
@@ -401,8 +410,43 @@ Every non-terminal state except `blocked` also accepts `block` (-> `blocked`) an
 the raw output is mandatory, `no_output` also requires `remoteBranchExists`. A `dev_done` with an
 empty diff becomes `blocked(no_output)`, never "PR impossible". `resumePoint(run)` maps a
 persisted state to the step to resume (`blocked` -> `escalate`, terminals -> `null`).
-Not in lot 1: counters and ceilings, `RunLimitReachedError`, idempotent replays,
-`ResumeRequiredError`.
+
+#### Counters, ceilings and `RunLimits` (lot 2)
+`RunLimits { maxAttempts, maxReviewRounds, maxCiWaits }` (integers >= 0) is an argument of
+`applyEvent`; the package hardcodes no value. Project defaults are 3 / 4 / 3 and live in the
+project state, outside the machine. Counters are monotonic, capped, and never exceed their
+ceiling; a ceiling hit blocks with a non-empty raw output, leaves the counter unchanged and
+emits `notify{cause}`, with `version + 1`.
+
+| Counter | Incremented by | At the ceiling |
+|---|---|---|
+| `attempts` | `gates_red`, `ci_red` (shared); ticket attempts passed to `startRun` count (D7) | `blocked(ci_failed)` |
+| `reviewRounds` | `verdict_request_changes` (the round reaching the ceiling is accepted) | `blocked(review_exhausted)` |
+| `ciWaits` | `ci_timeout` (no attempt cost) | `blocked(ci_timeout)`, never `ci_failed` |
+
+- **Final review**: `ci_green` enters `reviewing` with `lastReviewedAfterFix = (reviewRounds >=
+  maxReviewRounds)`; `verdict_request_changes` resets it to false. `review_exhausted` can thus only
+  follow a review of the last fix, and `verdict_approve` then leads to `merge_requested`.
+- **Conflict**: `conflict_detected` (`ci_wait -> developing`) touches no counter and never blocks.
+  Repeated conflicts are not bounded here (TK-76/78).
+- **Escalation**: `escalate` (`blocked -> escalated`) resets the three counters to 0 and keeps the
+  block cause.
+- **Idempotence**: `merge_done` on `merged`, `deploy_green` on `deployed_staging` and `escalate` on
+  `escalated` return the same run object, no effect, version unchanged, without an
+  `expectedVersion` check. Any other replay raises `StaleRunError` (stale version) or
+  `InvalidRunTransitionError`, so counters are never counted twice.
+- **Resume**: `startRun` with both `branch` and `pullRequest` creates a `ci_wait` run (version 0).
+  `canRestartDevelopment(run)` is false when both are set. A persisted `leased` run with a branch
+  and a PR refuses `worktree_ready` and `resumePoint` with `ResumeRequiredError(ticket, branch,
+  pullRequest)`; a fix loop (`developing` with a PR) stays normal.
+
+| Incident (annexe C §C.5) | Named test (`test/run-incidents.test.ts`) |
+|---|---|
+| 11 CI timeout is not a failure | `incident-11-ci-timeout-is-not-a-failure` |
+| 12 conflict costs no review round | `incident-12-conflict-costs-no-review-round` |
+| 13 last fix reviewed before exhaustion | `incident-13-last-fix-reviewed-before-exhaustion` |
+| 17 pushed branch never restarts development | `incident-17-pushed-branch-never-restarts-development` |
+| 18 empty diff is `no_output` with git output | `incident-18-empty-diff-is-no_output-with-git-output` |
 
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.

@@ -112,7 +112,7 @@ flowchart LR
   supported). Exit code 1 and a message on stderr otherwise.
 - Both checks run from the root `lint` script:
   `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
-### Delivery package: run state machine (TK-72 lot 1)
+### Delivery package: run state machine (TK-72 lots 1 and 2)
 `packages/delivery` (`@koklo/delivery`, tag `delivery`, private) holds the pure core of the
 delivery loop. Its only runtime dependency is `@koklo/domain` (workspace); it adds no
 third-party dependency and no I/O, clock, randomness or environment access, which a
@@ -128,21 +128,23 @@ package decides, the runner (TK-75/76) executes and persists.
 | `run.ts` | immutable, JSON-serialisable `Run`, `startRun`, `RunLimits` |
 | `run-event.ts`, `run-event-check.ts` | 16 event types; validation and block extraction |
 | `run-effects.ts` | `RunEffect` commands (frozen constants) |
-| `run-transitions.ts` | transition table (data), `applyEvent`, `canApply`, `allowedEvents` |
-| `run-resume.ts` | `resumePoint` (step to resume from a persisted run) |
-| `errors.ts` | `InvalidRunStateError`, `InvalidRunEventError`, `InvalidRunTransitionError`, `StaleRunError` |
+| `run-transitions.ts` | transition table (data, replays included), `applyEvent`, `canApply`, `allowedEvents` |
+| `run-counters.ts` | `checkLimits`, `applyCounters` (attempts, review rounds, CI waits, ceilings from `RunLimits`) |
+| `run-resume.ts` | `resumePoint`, `canRestartDevelopment`, resume guard (`ResumeRequiredError`) |
+| `errors.ts` | `InvalidRunStateError`, `InvalidRunEventError`, `InvalidRunTransitionError`, `StaleRunError`, `ResumeRequiredError` |
 
 ```mermaid
 flowchart LR
   runner["runner (TK-75/76, later)"] -- "event" --> apply["applyEvent(run, event, limits)"]
   apply --> table["transition table (data)"]
+  apply --> counters["counters and ceilings (RunLimits)"]
   apply -- "{ run (frozen), effects }" --> runner
   delivery["@koklo/delivery"] --> domain["@koklo/domain"]
 ```
 
 The state diagram, transitions, block causes and effects are in
-[domain-model.md](domain-model.md#run-lifecycle-tk-72-lot-1-packagesdelivery).
-Counters, ceilings, idempotent replays and `ResumeRequiredError` are lot 2.
+[domain-model.md](domain-model.md#run-lifecycle-tk-72-lots-1-and-2-packagesdelivery).
+Counters, ceilings, idempotent replays and resume are described there too (lot 2).
 
 ### API contract package (TK-9)
 `packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2

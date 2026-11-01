@@ -30,17 +30,21 @@ export interface RunLimits {
   readonly maxCiWaits: number;
 }
 
-/** Crée un run `leased`, version 0 ; les compteurs viennent du ticket, qui reste la source (D7). */
+/** Branche poussée et PR ouverte : le run se reprend à l'attente de CI, il ne repart pas (incident 17). */
+const hasPushedPullRequest = (input: StartRunInput): boolean =>
+  (input.branch ?? null) !== null && (input.pullRequest ?? null) !== null;
+
+/** Crée un run `leased`, version 0 (ou `ci_wait` si la PR existe) ; les compteurs viennent du ticket (D7). */
 export const startRun = (input: StartRunInput): Run =>
   Object.freeze({
     ticket: input.ticket,
-    state: "leased",
+    state: hasPushedPullRequest(input) ? "ci_wait" : "leased",
     attempts: input.attempts ?? 0,
     reviewRounds: input.reviewRounds ?? 0,
     ciWaits: 0,
     blocked: null,
-    branch: null,
-    pullRequest: null,
+    branch: input.branch ?? null,
+    pullRequest: input.pullRequest ?? null,
     lastReviewedAfterFix: false,
     version: 0,
   });

@@ -1,6 +1,7 @@
 import { type BlockInfo, cloneBlock } from "./block-cause.ts";
 import { InvalidRunStateError, InvalidRunTransitionError, StaleRunError } from "./errors.ts";
 import type { Run, RunLimits } from "./run.ts";
+import { applyCounters, checkLimits } from "./run-counters.ts";
 import {
   AWAIT_DEPLOY,
   ESCALATE,
@@ -15,6 +16,7 @@ import {
 } from "./run-effects.ts";
 import type { RunEvent, RunEventType } from "./run-event.ts";
 import { blockOf, checkEvent } from "./run-event-check.ts";
+import { assertRestartable } from "./run-resume.ts";
 import { isRunState, type RunState } from "./run-state.ts";
 
 export interface RunStep {
@@ -27,7 +29,11 @@ interface Transition {
   readonly to: RunState;
   readonly effects: readonly RunEffect[];
   readonly neutral?: true;
+  /** Rejeu idempotent : le run est déjà dans l'état d'arrivée ; no-op, sans contrôle de version. */
+  readonly replay?: true;
 }
+
+const replay = (to: RunState): Transition => ({ to, effects: [], neutral: true, replay: true });
 
 const go = (to: RunState, ...effects: RunEffect[]): Transition => ({ to, effects });
 
@@ -58,10 +64,10 @@ const TABLE: Readonly<Record<RunState, Partial<Record<RunEventType, Transition>>
     verdict_request_changes: go("developing", START_DEV),
   }),
   merge_requested: active("merge_requested", { merge_done: go("merged", AWAIT_DEPLOY) }),
-  merged: active("merged", { deploy_green: go("deployed_staging") }),
-  deployed_staging: {},
+  merged: active("merged", { deploy_green: go("deployed_staging"), merge_done: replay("merged") }),
+  deployed_staging: { deploy_green: replay("deployed_staging") },
   blocked: { escalate: go("escalated", ESCALATE) },
-  escalated: {},
+  escalated: { escalate: replay("escalated") },
 };
 
 export const canApply = (state: unknown, event: unknown): boolean =>
@@ -82,22 +88,27 @@ const withNotify = (transition: Transition, block: BlockInfo | null): readonly R
 
 /**
  * Applique un événement : pure, déterministe, renvoie un nouveau run gelé et les effets décrits.
- * Ordre des contrôles : état inconnu, événement mal formé, version périmée, transition absente.
- * `limits` est attendu par la signature (plafonds : lot 2) ; le lot 1 ne l'exerce pas.
+ * Ordre des contrôles : état inconnu, événement mal formé, limites invalides, rejeu idempotent,
+ * version périmée, transition absente, plafonds.
  */
-export const applyEvent = (run: Run, input: RunEvent, _limits: RunLimits): RunStep => {
+export const applyEvent = (run: Run, input: RunEvent, limits: RunLimits): RunStep => {
   if (!isRunState(run.state)) throw new InvalidRunStateError(run.state);
   const event = checkEvent(input);
-  const block = blockOf(event);
+  const checked = checkLimits(limits);
+  const transition = TABLE[run.state][event.type];
+  if (transition?.replay) return Object.freeze({ run, effects: transition.effects });
   if (event.expectedVersion !== undefined && event.expectedVersion !== run.version) {
     throw new StaleRunError(event.expectedVersion, run.version);
   }
-  const transition = TABLE[run.state][event.type];
   if (transition === undefined) throw new InvalidRunTransitionError(run.state, event.type);
+  if (event.type === "worktree_ready") assertRestartable(run);
   if (transition.neutral) return Object.freeze({ run, effects: transition.effects });
+  const counted = applyCounters(run, event, checked);
+  const block = blockOf(event) ?? counted.block;
   const next: Run = Object.freeze({
     ...run,
     ...patchOf(event),
+    ...counted.patch,
     blocked: block ?? (run.blocked && cloneBlock(run.blocked)),
     state: block === null ? transition.to : "blocked",
     version: run.version + 1,
