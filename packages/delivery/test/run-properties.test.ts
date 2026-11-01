@@ -87,7 +87,7 @@ describe.each([
   it("la version avance de 1, ou ne bouge pas pour un no-op (quota_hit, rejeu)", () => {
     for (const { before, after, type } of observations) {
       expect([before.version, before.version + 1], type).toContain(after.version);
-      if (after.version === before.version) expect(after).toBe(before);
+      if (after.version === before.version) expect(after).toEqual(before);
     }
   });
 
