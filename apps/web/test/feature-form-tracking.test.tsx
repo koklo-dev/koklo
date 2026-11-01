@@ -37,6 +37,7 @@ import {
   inputsOf,
   PROJECT_ID,
   renderFeatures,
+  SCOPE,
   summary,
 } from "./support/features.tsx";
 import { findNamed } from "./support/wait.ts";
@@ -590,6 +591,16 @@ describe("Lot terminal en échec relu par specBatch.get (§4.7) : même rendu qu
     expect(steps(panel)[1]).toHaveTextContent(/Non enregistré/);
   });
 
+  it("lot terminal failed/INTERNAL relu par specBatch.get : « Réessayer » prend une NOUVELLE clé", async () => {
+    submitReplies(queuedBatch());
+    getReply = () => failedBatch("INTERNAL");
+    const panel = await fillAndSave();
+    await advance(2 * SECOND);
+    await user().click(await panel.findByRole("button", { name: "Réessayer" }));
+    await waitFor(() => expect(submitInputs()).toHaveLength(2));
+    expect(submitInputs()[1]?.idempotencyKey).not.toBe(submitInputs()[0]?.idempotencyKey);
+  });
+
   it("après l'échec d'un lot, « Réessayer » prépare un nouvel envoi avec une NOUVELLE clé", async () => {
     submitReplies(queuedBatch());
     getReply = () => failedBatch("PROVIDER_UNAVAILABLE");
@@ -611,7 +622,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain(`Enregistrement de « ${NEW_TITLE} » en cours…`);
     expect(statusRegions()).toHaveLength(1);
-    const marker = readPending(PROJECT_ID);
+    const marker = readPending(SCOPE, PROJECT_ID);
     expect(marker).toMatchObject({
       batchId: BATCH_ID,
       kind: "create",
@@ -631,7 +642,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     await advance(8 * SECOND);
     expect(getTimes.length).toBeGreaterThan(before);
     await waitFor(() => expect(liveText()).toContain(`${CREATED_ID} « ${NEW_TITLE} » créée.`));
-    expect(readPending(PROJECT_ID)).toBeNull();
+    expect(readPending(SCOPE, PROJECT_ID)).toBeNull();
     expect(submitInputs()).toHaveLength(1);
   });
 
@@ -671,12 +682,12 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     await user().click(within(alert).getByRole("button", { name: "Rouvrir le brouillon" }));
     const reopened = await form();
     expect(titleField(reopened)).toHaveValue(NEW_TITLE);
-    expect(readPending(PROJECT_ID)).toBeNull();
+    expect(readPending(SCOPE, PROJECT_ID)).toBeNull();
   });
 
   it("rechargement avec un marqueur : reprise par specBatch.get, jamais par un nouvel submit", async () => {
     expect(
-      savePending(PROJECT_ID, {
+      savePending(SCOPE, PROJECT_ID, {
         batchId: BATCH_ID,
         kind: "create",
         specId: CREATED_ID,
@@ -700,11 +711,11 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     await advance(6 * SECOND);
     await waitFor(() => expect(liveText()).toContain(`${CREATED_ID} « ${NEW_TITLE} » créée.`));
     expect(procedures.specBatchSubmit).not.toHaveBeenCalled();
-    expect(readPending(PROJECT_ID)).toBeNull();
+    expect(readPending(SCOPE, PROJECT_ID)).toBeNull();
   });
 
   it("marqueur périmé (plus de 24 h) : ignoré, supprimé, aucune relecture", async () => {
-    savePending(PROJECT_ID, {
+    savePending(SCOPE, PROJECT_ID, {
       batchId: BATCH_ID,
       kind: "create",
       title: NEW_TITLE,
@@ -718,7 +729,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
   });
 
   it("un marqueur d'un autre projet n'est jamais relu", async () => {
-    savePending("7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02", {
+    savePending(SCOPE, "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02", {
       batchId: BATCH_ID,
       kind: "create",
       title: NEW_TITLE,
@@ -731,7 +742,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
 
   it("client : un marqueur laissé sur l'appareil n'affiche rien et ne relit rien", async () => {
     serveWrite("client");
-    savePending(PROJECT_ID, {
+    savePending(SCOPE, PROJECT_ID, {
       batchId: BATCH_ID,
       kind: "create",
       title: NEW_TITLE,

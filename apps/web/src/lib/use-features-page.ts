@@ -1,6 +1,7 @@
 "use client";
 
 import { type RefObject, useEffect, useRef } from "react";
+import { beginFeatureSession } from "./feature-draft.ts";
 import { regionText, showsFilters, showsVersion, writeRegionText } from "./features-region.ts";
 import { canReadRepos } from "./roles.ts";
 import { useFeatureFormPanel } from "./use-feature-form-panel.ts";
@@ -11,6 +12,7 @@ import { useFeaturesData } from "./use-features-data.ts";
 import { useFilterActions, useMore } from "./use-features-list.ts";
 import { useFeaturesUrl } from "./use-features-url.ts";
 import { usePendingResume } from "./use-pending-save.ts";
+import { useStorageScope } from "./use-storage-scope.ts";
 
 /** Tout ce que l'écran des fonctionnalités pilote : données, adresse, annonces, liste, fiche et visibilités. */
 export function useFeaturesPage(projectId: string) {

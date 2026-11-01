@@ -22,7 +22,7 @@ import {
   submitInputs,
   titleField,
 } from "./support/feature-form.tsx";
-import { head, PROJECT_ID, renderFeatures, SHA } from "./support/features.tsx";
+import { head, PROJECT_ID, renderFeatures, SCOPE, SHA } from "./support/features.tsx";
 import { renderWithQuery } from "./support/render.tsx";
 import { findNamed } from "./support/wait.ts";
 import {
@@ -290,6 +290,7 @@ describe("Brouillon expiré, corrompu ou stockage indisponible", () => {
 
   it("brouillon vieux de plus de 7 jours : ignoré et supprimé", async () => {
     saveDraft(
+      SCOPE,
       PROJECT_ID,
       "new",
       draft({ savedAt: new Date(Date.now() - 8 * 86_400_000).toISOString() }),
@@ -303,6 +304,7 @@ describe("Brouillon expiré, corrompu ou stockage indisponible", () => {
 
   it("brouillon de 6 jours : repris", async () => {
     saveDraft(
+      SCOPE,
       PROJECT_ID,
       "new",
       draft({ savedAt: new Date(Date.now() - 6 * 86_400_000).toISOString() }),
@@ -342,7 +344,7 @@ describe("Brouillon expiré, corrompu ou stockage indisponible", () => {
 describe("La fonctionnalité a changé depuis le brouillon (§5.5)", () => {
   const before = valuesFromDetail(DETAIL);
   const withDraft = () =>
-    saveDraft(PROJECT_ID, "F-001", {
+    saveDraft(SCOPE, PROJECT_ID, "F-001", {
       values: { ...before, title: "Titre du brouillon" },
       baseline: before,
       baseCommitSha: OLD_SHA,
@@ -428,14 +430,14 @@ describe("La fonctionnalité a changé depuis le brouillon (§5.5)", () => {
 
 describe("Effacé à la déconnexion", () => {
   beforeEach(() => {
-    saveDraft(PROJECT_ID, "new", {
+    saveDraft(SCOPE, PROJECT_ID, "new", {
       values: { ...EMPTY_VALUES, title: "À effacer" },
       baseline: null,
       baseCommitSha: null,
       idempotencyKey: "feature-1",
       savedAt: new Date().toISOString(),
     });
-    savePending(PROJECT_ID, {
+    savePending(SCOPE, PROJECT_ID, {
       batchId: "01900000-0000-7000-8000-0000000000d1",
       kind: "create",
       title: "En vol",

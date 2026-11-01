@@ -13,12 +13,20 @@ import {
 } from "react";
 import { errorCode } from "./api-error.ts";
 import { authClient } from "./auth-client.ts";
-import { clearDraft, clearPending, type PendingSave, savePending } from "./feature-draft.ts";
+import {
+  clearDraft,
+  clearPending,
+  endFeatureSession,
+  type PendingSave,
+  type StorageScope,
+  savePending,
+} from "./feature-draft.ts";
 import { describeSaveError, type SaveFailure } from "./feature-errors.ts";
 import { INDEX_LIMIT_MS, INDEX_POLL_MS, LATE_LIMIT_MS, LATE_POLL_MS } from "./feature-tracking.ts";
 import { orpc } from "./orpc.ts";
 import { useBatchTracking } from "./use-batch-tracking.ts";
 import { type Placement, reloadList, useIndexWait } from "./use-index-wait.ts";
+import { useStorageScope } from "./use-storage-scope.ts";
 
 /** Ce qu'une écriture sait d'elle-même : sert à l'étape d'envoi, au bloc de la page et au retour à la liste. */
 export interface WriteMeta {
@@ -90,6 +98,7 @@ const newKey = (): string => `feature-${crypto.randomUUID()}`;
 
 interface Core {
   projectId: string;
+  scope: StorageScope | null;
   update: (next: Partial<WriteState>) => void;
   busy: MutableRefObject<boolean>;
   keyRecord: MutableRefObject<KeyRecord | null>;
@@ -98,6 +107,7 @@ interface Core {
 
 /** État de l'écriture, drapeau « occupé » lisible tout de suite (double clic) et mémoire de la clé d'idempotence. */
 function useWriteCore(projectId: string) {
+  const scope = useStorageScope();
   const [state, setState] = useState<WriteState>(IDLE);
   const busy = useRef(false);
   const keyRecord = useRef<KeyRecord | null>(null);
@@ -106,11 +116,11 @@ function useWriteCore(projectId: string) {
     if (next.phase) busy.current = ACTIVE.includes(next.phase);
     setState((current) => ({ ...current, ...next }));
   }, []);
-  return { state, setState, core: { projectId, update, busy, keyRecord, metaRef } as Core };
+  return { state, setState, core: { projectId, scope, update, busy, keyRecord, metaRef } as Core };
 }
 
 /** Issues d'un lot : échec (la clé est reprise seulement après une absence de réponse), écrit, en cours. */
-function useBatchOutcomes({ projectId, update, keyRecord, metaRef }: Core) {
+function useBatchOutcomes({ projectId, scope, update, keyRecord, metaRef }: Core) {
   const fail = useCallback(
     (failure: SaveFailure) => {
       clearPending(projectId);
@@ -155,10 +165,10 @@ function useBatchOutcomes({ projectId, update, keyRecord, metaRef }: Core) {
         savedAt: new Date().toISOString(),
         ...(specId ? { specId } : {}),
       };
-      savePending(projectId, pending);
+      savePending(scope, projectId, pending);
       update({ phase: "tracking", meta: metaRef.current, batch, batchId: batch.id, slow: false });
     },
-    [metaRef, onBatch, projectId, update],
+    [metaRef, onBatch, projectId, scope, update],
   );
   return { fail, onBatch, onReply };
 }
@@ -168,7 +178,10 @@ function useUnauthorizedExit() {
   const router = useRouter();
   return useCallback(async () => {
     const { data } = await authClient.getSession();
-    router.replace(data && !data.session.activeOrganizationId ? "/organizations" : "/login");
+    const toOrganizations = data !== null && !data.session.activeOrganizationId;
+    // Sortie vers /login : plus aucun brouillon ni marqueur sur l'appareil, et le démontage de la page ne les réécrit pas.
+    if (!toOrganizations) endFeatureSession();
+    router.replace(toOrganizations ? "/organizations" : "/login");
   }, [router]);
 }
 

@@ -341,7 +341,6 @@ describe("Clé d'idempotence (AC-48-24)", () => {
   });
 
   it.each([
-    ["INTERNAL", apiError("INTERNAL", { requestId: "req-1" })],
     ["PROVIDER_UNAVAILABLE", apiError("PROVIDER_UNAVAILABLE")],
     ["PROVIDER_RATE_LIMITED", apiError("PROVIDER_RATE_LIMITED", { retryAfterMs: 1000 })],
     [
@@ -365,6 +364,25 @@ describe("Clé d'idempotence (AC-48-24)", () => {
       expect(submitInputs()[1]?.idempotencyKey).not.toBe(submitInputs()[0]?.idempotencyKey);
     },
   );
+
+  it("INTERNAL sur submit (réponse inconnue, le serveur a peut-être écrit) puis « Réessayer » : MÊME clé", async () => {
+    failFirstWith(apiError("INTERNAL", { requestId: "req-1" }));
+    const panel = await openCreate();
+    await submitUntilError(panel);
+    await retry(panel);
+    await waitFor(() => expect(submitInputs()).toHaveLength(2));
+    expect(submitInputs()[1]?.idempotencyKey).toBe(submitInputs()[0]?.idempotencyKey);
+  });
+
+  it("INTERNAL sur submit puis saisie modifiée : NOUVELLE clé", async () => {
+    failFirstWith(apiError("INTERNAL", { requestId: "req-1" }));
+    const panel = await openCreate();
+    await submitUntilError(panel);
+    await setText(titleField(panel), "Un autre titre");
+    await clickSave(panel);
+    await waitFor(() => expect(submitInputs()).toHaveLength(2));
+    expect(submitInputs()[1]?.idempotencyKey).not.toBe(submitInputs()[0]?.idempotencyKey);
+  });
 
   it("SPEC_INVALID puis nouvel envoi : NOUVELLE clé", async () => {
     const report = { ok: false, counts: { error: 1, warning: 0 }, truncated: false, issues: [] };

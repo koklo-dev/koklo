@@ -1,6 +1,6 @@
 import type { FeatureDetail, Role } from "@koklo/contract";
 import type { Dispatch, SetStateAction } from "react";
-import { readDraft } from "./feature-draft.ts";
+import { readDraft, type StorageScope } from "./feature-draft.ts";
 import type { SaveErrorView } from "./feature-errors.ts";
 import {
   checkDesignerScreens,
@@ -66,9 +66,10 @@ const hasLinks = (values: FeatureFormValues): boolean =>
 export function initialState(
   args: FormArgs,
   current: FeatureFormValues | null,
+  scope: StorageScope | null,
 ): { state: FormState; resume: ResumeKey | undefined } {
   const { projectId, mode, specId, detail, head, role } = args;
-  const draft = readDraft(projectId, specId ?? "new");
+  const draft = readDraft(scope, projectId, specId ?? "new");
   const opensLinks = (values: FeatureFormValues) => role === "designer" || hasLinks(values);
   const base: FormState = {
     values: current ?? EMPTY_VALUES,

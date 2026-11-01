@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { clearDraft, saveDraft } from "./feature-draft.ts";
+import { clearDraft, type StorageScope, saveDraft } from "./feature-draft.ts";
 import { diffValues, EMPTY_VALUES, type FeatureFormValues } from "./feature-form.ts";
 
 /** Écriture du brouillon 500 ms après la dernière frappe (S-feature-form §5.5). */
 export const DRAFT_DELAY_MS = 500;
 
 interface DraftOptions {
+  /** Propriétaire du brouillon (`null` tant que la session est inconnue : rien n'est écrit). */
+  scope: StorageScope | null;
   projectId: string;
   /** `new` ou `F-nnn`. */
   target: string;
@@ -30,13 +32,14 @@ export function useFeatureDraft(options: DraftOptions): { flush: () => boolean }
   latest.current = options;
 
   const flush = useCallback((): boolean => {
-    const { projectId, target, values, baseline, baseCommitSha, getKey, enabled } = latest.current;
+    const { scope, projectId, target, values, baseline, baseCommitSha, getKey, enabled } =
+      latest.current;
     if (!enabled) return false;
     if (diffValues(baseline ?? EMPTY_VALUES, values).length === 0) {
       clearDraft(projectId, target);
       return false;
     }
-    return saveDraft(projectId, target, {
+    return saveDraft(scope, projectId, target, {
       values,
       baseline,
       baseCommitSha,

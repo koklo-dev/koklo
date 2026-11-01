@@ -355,4 +355,20 @@ describe("Session", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"));
     expect(screen.queryByText(/n'a pas abouti|Impossible de confirmer/)).toBeNull();
   });
+
+  const featureKeys = () => Object.keys(localStorage).filter((k) => k.startsWith("koklo:feature-"));
+
+  it("UNAUTHORIZED (session expirée) : brouillon et marqueur effacés, et le démontage ne les réécrit pas", async () => {
+    const { apiError } = await import("./support/web-mocks.ts");
+    const { fillMinimum, clickSave } = await import("./support/feature-form.tsx");
+    procedures.specBatchSubmit.mockRejectedValue(apiError("UNAUTHORIZED"));
+    const view = renderFeatures({ search: "?new=1" });
+    const panel = await form();
+    await fillMinimum(panel);
+    await clickSave(panel);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"));
+    expect(featureKeys()).toEqual([]);
+    view.unmount();
+    expect(featureKeys()).toEqual([]);
+  });
 });
