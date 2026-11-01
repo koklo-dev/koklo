@@ -57,9 +57,9 @@ describe("SF3 OpenAPI et empreinte", () => {
     expect(codes("/projects/{projectId}/spec/features/{specId}")).toContain("409");
     expect(codes("/projects/{projectId}/spec")).not.toContain("409");
   });
-  it("le contrat compte 47 routes (les 4 de llmCredential ajoutées en 0.8.0, aucune autre)", async () => {
+  it("le contrat compte 51 routes (les 4 de llmCredential en 0.8.0, les 4 de TK-54b en 0.9.0, aucune autre)", async () => {
     const d = (await generateOpenApi()) as Doc;
     const operations = Object.values(d.paths).flatMap((methods) => Object.keys(methods));
-    expect(operations).toHaveLength(47);
+    expect(operations).toHaveLength(51);
   });
 });

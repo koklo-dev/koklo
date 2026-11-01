@@ -1,6 +1,7 @@
 import { type GithubAppSettings, githubAppFromEnv } from "@koklo/github";
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 import { z } from "zod";
+import type { AiLimits } from "./ai/ai-budget.ts";
 import type { KeyRingSettings } from "./crypto/key-ring.ts";
 import { keyRingFromEnv } from "./crypto/key-ring-config.ts";
 import { InvalidEncryptionKeyError, parseEncryptionKey } from "./crypto/token-cipher.ts";
@@ -27,6 +28,8 @@ export interface AppConfig {
   githubWebhookSecret?: string;
   /** Attente maximale de `specBatch.submit` avant de rendre le lot en cours (ms) ; défaut : `SPEC_BATCH_WAIT_DEFAULT_MS`. */
   specBatchWaitMs?: number;
+  /** Plafonds des appels IA (`AI_MAX_*`, TK-54b) ; absents : `AI_LIMIT_DEFAULTS`. */
+  ai?: Partial<AiLimits>;
 }
 
 const MIN_AUTH_SECRET_LENGTH = 32;

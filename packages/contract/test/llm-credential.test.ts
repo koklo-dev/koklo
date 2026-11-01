@@ -9,7 +9,7 @@ import { errors, input, isValid, output, parsed, proc } from "./support.ts";
  * reproduisent exactement les CHECK SQL de `llm_provider_credentials` (la base n'est jamais le
  * premier validateur).
  */
-const NAMES = ["invalidate", "list", "remove", "set"];
+const NAMES = ["invalidate", "list", "remove", "set", "verify"];
 const INSTANT = "2026-11-02T10:00:00.000Z";
 const KEY = `FAKE-KEY-NOT-REAL-${"a1".repeat(12)}`;
 const STATUS = {
@@ -26,7 +26,7 @@ type Doc = {
 };
 const doc = async () => (await generateOpenApi()) as unknown as Doc;
 
-describe("LC1 surface : exactement list, set, remove, invalidate", () => {
+describe("LC1 surface : exactement list, set, remove, invalidate, verify (0.9.0)", () => {
   it("le routeur expose le groupe llmCredential et rien d'autre dans ce groupe", () => {
     const group = (api.contract as unknown as Record<string, object>).llmCredential;
     expect(group).toBeDefined();
@@ -38,14 +38,15 @@ describe("LC1 surface : exactement list, set, remove, invalidate", () => {
     ["llmCredential.set", "put", "/llm-credentials/{provider}"],
     ["llmCredential.remove", "delete", "/llm-credentials/{provider}"],
     ["llmCredential.invalidate", "post", "/llm-credentials/{provider}/invalidate"],
+    ["llmCredential.verify", "post", "/llm-credentials/{provider}/verify"],
   ])("%s : %s %s dans l'OpenAPI", async (name, method, path) => {
     expect(proc(name)).toBeDefined();
     const d = await doc();
     expect(d.paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("l'OpenAPI est en 0.8.0", async () => {
-    expect((await doc()).info.version).toBe("0.8.0");
+  it("l'OpenAPI est en 0.9.0", async () => {
+    expect((await doc()).info.version).toBe("0.9.0");
   });
 });
 
