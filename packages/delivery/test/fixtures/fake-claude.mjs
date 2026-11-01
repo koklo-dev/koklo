@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Faux executable `claude` pour les tests (le vrai CLI n'est JAMAIS lance en CI).
 // Configuration : variable FAKE_CLAUDE_DIR (non secrete) -> <dir>/scenario.json
-//   { scenario, text, channel: "stderr" | "result", size }
+//   { scenario, text, channel: "stderr" | "result", size, startDelayMs }
 // Traces ecrites dans <dir> : argv.json, env.json, cwd.txt, stdin.txt, pid.txt,
 // grandchild.pid, launches.log (une ligne par lancement).
 import { spawn } from "node:child_process";
@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 const dir = process.env.FAKE_CLAUDE_DIR;
 const config = JSON.parse(readFileSync(join(dir, "scenario.json"), "utf8"));
-const { scenario, text = "ok", channel = "result", size = 0 } = config;
+const { scenario, text = "ok", channel = "result", size = 0, startDelayMs = 0 } = config;
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
 const result = (isError, body) =>
   emit({
@@ -45,6 +45,8 @@ const hang = (stubborn) => {
   if (stubborn) process.on("SIGTERM", () => {});
   withGrandchild(stubborn);
   emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
+  // `ready.txt` : le texte est ecrit ET vide dans le pipe (jamais devine par un delai).
+  process.stdout.write("", () => writeFileSync(join(dir, "ready.txt"), "ready"));
   setInterval(() => {}, 1000);
 };
 
@@ -113,6 +115,6 @@ if (run === undefined) {
 }
 process.stdin.on("end", () => {
   writeFileSync(join(dir, "stdin.txt"), stdin);
-  run();
+  setTimeout(run, startDelayMs);
 });
 process.stdin.resume();

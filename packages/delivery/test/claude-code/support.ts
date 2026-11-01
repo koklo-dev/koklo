@@ -10,8 +10,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach } from "vitest";
+import { setTimeout as sleep } from "node:timers/promises";
+import { afterEach, vi } from "vitest";
 import { ClaudeCodeRuntime, type ClaudeCodeRuntimeOptions } from "../../src/claude-code/index.ts";
+import type { AgentSessionRequest, AgentSessionResult } from "../../src/index.ts";
 
 export const FAKE_CLAUDE = resolve(import.meta.dirname, "../fixtures/fake-claude.mjs");
 
@@ -20,6 +22,8 @@ export interface Scenario {
   readonly text?: string;
   readonly channel?: "stderr" | "result";
   readonly size?: number;
+  /** Demarrage lent simule (runner charge) avant le scenario. */
+  readonly startDelayMs?: number;
 }
 
 export interface Sandbox {
@@ -109,7 +113,7 @@ export const isAlive = (pid: number): boolean => {
 /** Attend (au plus 3 s) que `pid` soit mort ; rend l'etat final. */
 export const waitDead = async (pid: number): Promise<boolean> => {
   for (let i = 0; i < 60 && isAlive(pid); i++) {
-    await new Promise((done) => setTimeout(done, 50));
+    await sleep(50);
   }
   return !isAlive(pid);
 };
@@ -121,7 +125,7 @@ export const waitForPidFile = async (sandbox: Sandbox, name: string): Promise<nu
     if (existsSync(file) && readFileSync(file, "utf8") !== "") {
       return Number(readFileSync(file, "utf8"));
     }
-    await new Promise((done) => setTimeout(done, 20));
+    await sleep(20);
   }
   throw new Error(`${name} n'est jamais apparu`);
 };
@@ -134,4 +138,32 @@ export const killSurvivor = async (pid: number): Promise<void> => {
     // deja mort
   }
   await waitDead(pid);
+};
+
+/**
+ * Lance une session dont le timeout part SEULEMENT une fois le fils pret (`ready.txt` : sa sortie
+ * est ecrite). Les minuteurs de l'adaptateur sont simules ; l'attente, elle, est reelle : aucune
+ * duree devinee, donc insensible a la charge du runner.
+ */
+export const launchTimedOut = async (
+  runtime: ClaudeCodeRuntime,
+  sandbox: Sandbox,
+  request: AgentSessionRequest,
+): Promise<AgentSessionResult> => {
+  vi.useFakeTimers({ toFake: ["setTimeout"] });
+  try {
+    let result: AgentSessionResult | undefined;
+    const pending = runtime.launchSession(request).then((value) => {
+      result = value;
+    });
+    await waitForPidFile(sandbox, "ready.txt");
+    while (result === undefined) {
+      vi.advanceTimersByTime(60_000);
+      await sleep(20);
+    }
+    await pending;
+    return result;
+  } finally {
+    vi.useRealTimers();
+  }
 };
