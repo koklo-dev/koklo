@@ -279,9 +279,12 @@ describe("Ouverture de la modification", () => {
     window.history.back();
     // Le texte « Connexion par e-mail » est déjà dans la ligne du tableau : attendre la disparition du
     // formulaire, puis la fiche, plutôt que de lire le rôle tout de suite (jsdom traite back() en différé).
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Modifier F-001" })).toBeNull(), {
-      timeout: 8000,
-    });
+    await waitFor(
+      () => expect(screen.queryByRole("dialog", { name: "Modifier F-001" })).toBeNull(),
+      {
+        timeout: 8000,
+      },
+    );
     await waitFor(
       () => expect(screen.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible(),
       { timeout: 8000 },
