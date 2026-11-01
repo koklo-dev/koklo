@@ -1,7 +1,19 @@
-/** Environnement du processus fils : liste blanche (squelette du lot 73c). */
-import type { AgentCredential } from "../agent-credential.ts";
+/** Environnement du processus fils : liste blanche, aucun secret hérité du parent. */
+import { type AgentCredential, revealAgentCredential } from "../agent-credential.ts";
 
-export const CLAUDE_ENV_ALLOWLIST: readonly string[] = [];
+/** HOME est hérité volontairement : il porte le login d'abonnement du CLI. */
+export const CLAUDE_ENV_ALLOWLIST: readonly string[] = [
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TERM",
+  "TMPDIR",
+  "TZ",
+  "USER",
+  "LOGNAME",
+];
 
 export interface ChildEnvOptions {
   readonly credential?: AgentCredential;
@@ -10,8 +22,18 @@ export interface ChildEnvOptions {
 }
 
 export const buildChildEnv = (
-  _parent: Readonly<Record<string, string | undefined>>,
-  _options: ChildEnvOptions,
+  parent: Readonly<Record<string, string | undefined>>,
+  options: ChildEnvOptions,
 ): Record<string, string> => {
-  throw new Error("not implemented: lot 73c Green");
+  const env: Record<string, string> = {};
+  for (const name of CLAUDE_ENV_ALLOWLIST) {
+    const value = parent[name];
+    if (value !== undefined) {
+      env[name] = value;
+    }
+  }
+  if (options.credential !== undefined) {
+    env.ANTHROPIC_API_KEY = revealAgentCredential(options.credential);
+  }
+  return { ...env, ...options.extraEnv };
 };
