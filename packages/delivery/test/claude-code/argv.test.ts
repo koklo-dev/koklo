@@ -1,9 +1,13 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildClaudeArgv, claudeToolRules } from "../../src/claude-code/index.ts";
-import { toolsForRole } from "../../src/index.ts";
-import { makeRequest, PROMPT_TEXT, SECRET_KEY } from "../agent-helpers.ts";
+import {
+  buildClaudeArgv,
+  claudeToolRules,
+  MAX_SYSTEM_PROMPT_BYTES,
+} from "../../src/claude-code/index.ts";
+import { InvalidAgentRequestError, toolsForRole } from "../../src/index.ts";
+import { makeRequest, PROMPT_TEXT, SECRET_KEY, thrownBy } from "../agent-helpers.ts";
 import {
   launches,
   makeRuntime,
@@ -30,10 +34,10 @@ const COMMON = [
   "none",
   "--max-budget-usd",
   "2",
-  "--append-system-prompt",
 ];
 const READ = "Read,Grep,Glob";
-const DENY_WEB = "WebFetch,WebSearch,Read(./.env*)";
+const DENY_WEB =
+  "WebFetch,WebSearch,Read(./.env*),Read(~/.ssh/**),Read(~/.aws/**),Read(~/.config/**),Read(~/.claude/.credentials*)";
 
 const GOLDEN: [string, string, string][] = [
   [
@@ -55,7 +59,7 @@ describe("argv de claude -p : golden par role", () => {
     const req = request(role as Parameters<typeof toolsForRole>[0]);
     expect(buildClaudeArgv(req)).toEqual([
       ...COMMON,
-      req.prompt.system,
+      `--append-system-prompt=${req.prompt.system}`,
       "--allowedTools",
       allowed,
       "--disallowedTools",
@@ -145,4 +149,64 @@ describe("argv et stdin reellement recus par le faux executable", () => {
     expect(existsSync(join(worktree, "PWNED"))).toBe(false);
     expect(recordedCwd(sandbox)).toBe(worktree);
   });
+});
+
+describe("argv : le prompt systeme", () => {
+  it("passe le prompt systeme en un seul element `--append-system-prompt=<v>`", () => {
+    const argv = buildClaudeArgv(makeRequest());
+    expect(argv.filter((a) => a.startsWith("--append-system-prompt"))).toHaveLength(1);
+    expect(argv).not.toContain("--append-system-prompt");
+  });
+
+  it("refuse un prompt systeme au-dela du plafond (typé, bien en dessous de MAX_ARG_STRLEN)", () => {
+    expect(MAX_SYSTEM_PROMPT_BYTES).toBeLessThanOrEqual(64 * 1024);
+    const base = makeRequest();
+    const big = {
+      ...base,
+      prompt: { ...base.prompt, system: "a".repeat(MAX_SYSTEM_PROMPT_BYTES + 1) },
+    };
+    const error = thrownBy(() => buildClaudeArgv(big as typeof base));
+    expect(error).toBeInstanceOf(InvalidAgentRequestError);
+    expect((error as InvalidAgentRequestError).reason).toBe("prompt");
+  });
+
+  it("compte des octets, pas des caracteres", () => {
+    const base = makeRequest();
+    const system = "é".repeat(MAX_SYSTEM_PROMPT_BYTES / 2 + 1);
+    const big = { ...base, prompt: { ...base.prompt, system } };
+    expect(thrownBy(() => buildClaudeArgv(big as typeof base))).toBeInstanceOf(
+      InvalidAgentRequestError,
+    );
+  });
+});
+
+describe("regles d'outils generees : aucun chemin n'elargit les droits (B1)", () => {
+  const TOOL_NAMES =
+    /^(Read|Grep|Glob|Write|Edit|Bash|MultiEdit|NotebookEdit|WebFetch|WebSearch)(\(|$)/;
+
+  it("refuse de generer des regles pour un chemin hostile, meme hors garde de requete", () => {
+    const base = makeRequest({ role: "doc-writer", tools: toolsForRole("doc-writer") });
+    for (const path of ["docs/x),Bash(*", "docs/**", "docs/x,Bash", "../etc", "/etc"]) {
+      const hostile = { ...base, tools: { ...base.tools, writablePaths: [path] } };
+      expect(
+        thrownBy(() => claudeToolRules(hostile as typeof base)),
+        path,
+      ).toBeInstanceOf(InvalidAgentRequestError);
+    }
+  });
+
+  it.each(["doc-writer", "designer", "qa-reviewer", "developer"] as const)(
+    "%s : seules des regles prevues apparaissent, Bash seulement avec un shell",
+    (role) => {
+      const req = request(role);
+      const rules = claudeToolRules(req);
+      const all = [...rules.allowed, ...rules.disallowed];
+      expect(all.every((rule) => TOOL_NAMES.test(rule))).toBe(true);
+      const bashAllowed = rules.allowed.filter((rule) => rule.startsWith("Bash"));
+      expect(bashAllowed.length > 0).toBe(req.tools.shell !== "none");
+      for (const rule of rules.allowed.filter((r) => /^(Write|Edit)\(/.test(r))) {
+        expect(rule).toMatch(/^(Write|Edit)\([A-Za-z0-9._/-]+(\/\*\*)?\)$/);
+      }
+    },
+  );
 });

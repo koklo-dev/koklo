@@ -301,6 +301,15 @@ Manual trial of the real CLI, outside CI, on a **throwaway** repository (never a
    output is non-empty.
 4. A rejected worktree (outside `allowedRoots`) must fail before any process starts.
 
+The manual trial of the real CLI (NEEDS-HUMAN) must be run, and its outcome recorded, **before the
+ticket is declared effective**: CI only proves the adapter against a fake. The option syntax was checked
+against `claude --help` of CLI 2.1.316 (`--permission-prompts <target>` with `none` exists).
+
+The boundary scan of incident 25 is a safety net, not a proof (patterns miss indirect launches); the
+extra rule "`node:child_process` is imported only under `src/claude-code/`" shrinks the surface (only the
+two `packages/db/src/testing` helpers are allow-listed). Process tests wait for `grandchild.pid`, never
+for a fixed delay.
+
 NEEDS-HUMAN: install the CLI, pin and record the tested version (2.1.316 was inspected locally), and
 authenticate it (subscription login in `HOME`, or a BYOK key passed as an opaque credential). NEEDS-HUMAN
 for TK-74: capture a real usage-limit message from the CLI (stderr and `result` event) to complete the

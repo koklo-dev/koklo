@@ -1,6 +1,15 @@
 /** Argv de `claude -p` : figé, dérivé de la requête ; le prompt utilisateur passe par stdin. */
+import { InvalidAgentRequestError } from "../agent-errors.ts";
 import type { AgentSessionRequest } from "../agent-runtime.ts";
-import type { AgentToolPolicy } from "../agent-tools.ts";
+import { type AgentToolPolicy, isSafeRelativePath } from "../agent-tools.ts";
+
+/**
+ * Syntaxe des options et de `--permission-prompts none` vérifiée sur le CLI 2.1.316
+ * (`claude --help`). Un essai manuel du CLI réel reste requis (docs/quality-and-operations.md).
+ */
+
+/** Plafond du prompt système en argv (octets) : très en dessous de MAX_ARG_STRLEN (128 Ko). */
+export const MAX_SYSTEM_PROMPT_BYTES = 32 * 1024;
 
 export interface ClaudeToolRules {
   readonly allowed: readonly string[];
@@ -25,6 +34,9 @@ const isFilePath = (path: string): boolean => {
 
 /** `.` = tout le worktree ; un chemin avec extension est un fichier, sinon un dossier. */
 const scopedRules = (tool: string, paths: readonly string[]): string[] => {
+  if (!paths.every(isSafeRelativePath)) {
+    throw new InvalidAgentRequestError("tools"); // défense en profondeur : jamais d'injection de règle
+  }
   if (paths.includes(".")) {
     return [tool];
   }
@@ -49,6 +61,11 @@ const disallowedRules = (tools: AgentToolPolicy): string[] => [
   "WebFetch",
   "WebSearch",
   "Read(./.env*)",
+  // HOME est hérité (login d'abonnement) : refus de lecture des secrets usuels, sans isolation réelle.
+  "Read(~/.ssh/**)",
+  "Read(~/.aws/**)",
+  "Read(~/.config/**)",
+  "Read(~/.claude/.credentials*)",
 ];
 
 /** Règles d'outils dérivées de la politique d'outils, sans rien d'autre. */
@@ -62,6 +79,9 @@ export const claudeToolRules = (request: AgentSessionRequest): ClaudeToolRules =
  * supplémentaires, limite de tours ni configuration MCP ; le prompt utilisateur n'y figure pas.
  */
 export const buildClaudeArgv = (request: AgentSessionRequest): string[] => {
+  if (Buffer.byteLength(request.prompt.system) > MAX_SYSTEM_PROMPT_BYTES) {
+    throw new InvalidAgentRequestError("prompt");
+  }
   const rules = claudeToolRules(request);
   return [
     "-p",
@@ -76,8 +96,7 @@ export const buildClaudeArgv = (request: AgentSessionRequest): string[] => {
     "none",
     "--max-budget-usd",
     String(request.budget.maxCostMicroUsd / 1_000_000),
-    "--append-system-prompt",
-    request.prompt.system,
+    `--append-system-prompt=${request.prompt.system}`,
     "--allowedTools",
     rules.allowed.join(","),
     "--disallowedTools",

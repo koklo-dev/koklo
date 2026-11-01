@@ -5,7 +5,12 @@ export {
   type ClaudeFailureKind,
   classifyClaudeFailure,
 } from "./classify.ts";
-export { buildClaudeArgv, type ClaudeToolRules, claudeToolRules } from "./command.ts";
+export {
+  buildClaudeArgv,
+  type ClaudeToolRules,
+  claudeToolRules,
+  MAX_SYSTEM_PROMPT_BYTES,
+} from "./command.ts";
 export { buildChildEnv, type ChildEnvOptions, CLAUDE_ENV_ALLOWLIST } from "./environment.ts";
 export { REDACTED, redactSecrets } from "./redact.ts";
 export {

@@ -2,7 +2,13 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADAPTER_PREFIX, type SourceFile, scanAgentBoundary } from "./agent-boundary-scan.ts";
+import {
+  ADAPTER_PREFIX,
+  CHILD_PROCESS_ALLOWLIST,
+  type SourceFile,
+  scanAgentBoundary,
+  scanChildProcessImports,
+} from "./agent-boundary-scan.ts";
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const SKIPPED = new Set(["node_modules", "dist", "coverage", ".next", "test", "tests"]);
@@ -69,6 +75,47 @@ describe("scan de frontiere : la fonction pure mord", () => {
     ]) {
       expect(violating("packages/delivery/src/agent-runtime.ts", text), text).toEqual([]);
     }
+  });
+});
+
+/** Le scan par motifs est un FILET (il attrape les oublis courants), pas une preuve : un binaire
+ * lance via une variable, un chemin construit ou un autre paquet l'echappe. La regle `child_process`
+ * ci-dessous reduit la surface : hors de l'adaptateur, plus aucun lancement de processus possible. */
+describe("regle : node:child_process n'est importe que sous src/claude-code/", () => {
+  const bad = (path: string, text: string) => scanChildProcessImports([{ path, text }]);
+
+  it.each([
+    `import { spawn } from "node:child_process";`,
+    `import cp from 'child_process'`,
+    `const { exec } = require("node:child_process");`,
+    `const cp = await import("node:child_process");`,
+    `export * from "node:child_process"`,
+  ])("rejette hors de l'adaptateur : %s", (text) => {
+    expect(bad("apps/api/src/x.ts", text)).toEqual([{ path: "apps/api/src/x.ts", line: 1 }]);
+    expect(bad("packages/delivery/src/run.ts", `\n${text}`)[0]?.line).toBe(2);
+  });
+
+  it("autorise l'adaptateur et ignore les autres imports", () => {
+    const text = `import { spawn } from "node:child_process";`;
+    expect(bad(`${ADAPTER_PREFIX}process.ts`, text)).toEqual([]);
+    expect(bad("apps/api/src/x.ts", `import { join } from "node:path";`)).toEqual([]);
+  });
+
+  it("aucun packages/*/src ni apps/*/src hors de l'adaptateur, sauf deux aides de test de db", () => {
+    expect(scanChildProcessImports(productionSources())).toEqual([]);
+    expect(CHILD_PROCESS_ALLOWLIST).toEqual([
+      "packages/db/src/testing/prisma-cli.ts",
+      "packages/db/src/testing/test-database.ts",
+    ]);
+    for (const file of CHILD_PROCESS_ALLOWLIST) {
+      const text = readFileSync(join(repoRoot, file), "utf8");
+      expect(text, file).not.toMatch(/claude|--allowedTools|stream-json/);
+    }
+    expect(
+      scanChildProcessImports([
+        { path: "packages/db/src/testing/autre.ts", text: `import "node:child_process"` },
+      ]),
+    ).toHaveLength(1);
   });
 });
 

@@ -11,6 +11,14 @@ const LEAKS = [
   "ghp_LEAKEDGITHUBTOKEN0123456789abcd",
   "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz",
   "Bearer abc.def-LEAKED",
+  "AKIAIOSFODNN7EXAMPLE",
+  "ASIAIOSFODNN7EXAMPLE",
+  "sk-proj-abcDEF0123456789_-abcdef",
+  "xoxb-1234567890-abcdefABCDEF",
+  "xoxp-1234567890-abcdefABCDEF",
+  "glpat-abcdefghij0123456789",
+  "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\nabcdef\n-----END RSA PRIVATE KEY-----",
+  "-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----",
 ];
 
 describe("redactSecrets", () => {
@@ -33,6 +41,13 @@ describe("redactSecrets", () => {
       expect(redactSecrets(once, [SECRET_KEY])).toBe(once);
     }
     expect(redactSecrets("rien a signaler")).toBe("rien a signaler");
+  });
+
+  it("masque un bloc PEM entier, y compris les sauts de ligne", () => {
+    const pem =
+      "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\nBBBB\n-----END OPENSSH PRIVATE KEY-----";
+    const out = redactSecrets(`a ${pem} b`);
+    expect(out).toBe(`a ${REDACTED} b`);
   });
 
   it("ignore les secrets connus vides (ne masque pas tout)", () => {

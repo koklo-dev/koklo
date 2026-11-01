@@ -42,3 +42,32 @@ export const scanAgentBoundary = (files: readonly SourceFile[]): BoundaryViolati
         })),
       ),
     );
+
+export interface ImportViolation {
+  readonly path: string;
+  readonly line: number;
+}
+
+/**
+ * Seuls utilisateurs existants hors de l'adaptateur : les aides de test de `packages/db`
+ * (docker de test, CLI prisma), sans lien avec un outil d'agent. Toute autre entree est refusee.
+ */
+export const CHILD_PROCESS_ALLOWLIST: readonly string[] = [
+  "packages/db/src/testing/prisma-cli.ts",
+  "packages/db/src/testing/test-database.ts",
+];
+
+const CHILD_PROCESS = /["'`](?:node:)?child_process["'`]/;
+
+/** `node:child_process` n'est importe nulle part hors de l'adaptateur (liste blanche vide ailleurs). */
+export const scanChildProcessImports = (files: readonly SourceFile[]): ImportViolation[] =>
+  files
+    .filter((file) => !file.path.startsWith(ADAPTER_PREFIX))
+    .filter((file) => !CHILD_PROCESS_ALLOWLIST.includes(file.path))
+    .flatMap((file) =>
+      file.text
+        .split("\n")
+        .flatMap((text, index) =>
+          CHILD_PROCESS.test(text) ? [{ path: file.path, line: index + 1 }] : [],
+        ),
+    );

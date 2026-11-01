@@ -48,6 +48,13 @@ const hang = (stubborn) => {
   setInterval(() => {}, 1000);
 };
 
+// Petit-fils qui garde stdout ouvert : dans le groupe (`lingering`) ou hors du groupe via setsid (`escape`).
+const holdStdout = (command, args) => {
+  const child = spawn(command, args, { stdio: ["ignore", "inherit", "inherit"] });
+  writeFileSync(join(dir, "grandchild.pid"), String(child.pid));
+  child.unref();
+};
+
 const flood = () => {
   const line = `${"x".repeat(65_535)}\n`;
   const pump = () => {
@@ -83,6 +90,16 @@ const SCENARIOS = {
     const leaked = `${text} sk-ant-api03-LEAKEDSECRET0123456789 ghp_LEAKEDGITHUBTOKEN0123456789abcd Bearer abc.def-LEAKED`;
     process.stderr.write(`${leaked}\n`);
     result(false, leaked);
+  },
+  lingering: () => {
+    holdStdout("sleep", ["5"]);
+    emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
+    result(false, text);
+  },
+  escape: () => {
+    holdStdout("setsid", ["sleep", "7"]);
+    emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
+    setInterval(() => {}, 1000);
   },
   hang: () => hang(false),
   "hang-stubborn": () => hang(true),

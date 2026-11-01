@@ -131,3 +131,46 @@ describe("isWithinRolePolicy", () => {
     expect(isWithinRolePolicy("developer", value)).toBe(false);
   });
 });
+
+describe("isWithinRolePolicy : chemins hostiles (injection de regle)", () => {
+  const HOSTILE = [
+    "docs/x),Bash(*",
+    "docs/x,Bash",
+    "docs/**",
+    "docs/*",
+    "docs/{a,b}",
+    "docs/x y",
+    "docs/x)",
+    "docs/(x",
+    "docs/~/x",
+    "docs/-rf",
+    "docs/\nBash",
+    "docs/x\u0000",
+    "docs/a:b",
+    "docs/[a]",
+    "docs/?x",
+    "docs/x!",
+    "docs/x#y",
+    "docs/x$y",
+    "docs/x\\y",
+    "docs/é",
+    "docs/",
+  ];
+
+  it.each(HOSTILE)("refuse %j pour doc-writer", (path) => {
+    const policy = { ...toolsForRole("doc-writer"), writablePaths: [path] };
+    expect(isWithinRolePolicy("doc-writer", policy)).toBe(false);
+  });
+
+  it.each(["~/docs", "-docs", "docs/~x", "docs/-x"])("refuse un segment en ~ ou - : %s", (path) => {
+    const policy = { ...toolsForRole("developer"), writablePaths: [path] };
+    expect(isWithinRolePolicy("developer", policy)).toBe(false);
+  });
+
+  it("accepte les chemins ordinaires", () => {
+    for (const path of ["docs", "docs/guide", "docs/a.b_c-d/e.md", "README.md"]) {
+      const policy = { ...toolsForRole("doc-writer"), writablePaths: [path] };
+      expect(isWithinRolePolicy("doc-writer", policy), path).toBe(true);
+    }
+  });
+});

@@ -79,13 +79,25 @@ const hasOnlyPolicyKeys = (value: Record<string, unknown>): boolean => {
   );
 };
 
-/** Chemin relatif sûr : ni absolu, ni `..`, ni segment vide ou `.` (sauf `.` seul), ni NUL. */
-const isSafeRelativePath = (path: unknown): path is string => {
-  if (typeof path !== "string" || path === "" || path.includes("\0") || path.startsWith("/")) {
-    return false;
-  }
-  return path === "." || path.split("/").every((s) => s !== "" && s !== "." && s !== "..");
-};
+const SAFE_PATH_CHARS = /^[A-Za-z0-9._/-]+$/;
+
+const isSafeSegment = (segment: string): boolean =>
+  segment !== "" &&
+  segment !== "." &&
+  segment !== ".." &&
+  !segment.startsWith("-") &&
+  !segment.startsWith("~");
+
+/**
+ * Chemin relatif sûr pour une règle d'outil : uniquement `[A-Za-z0-9._/-]` (ni glob, ni
+ * parenthèse, ni virgule, ni espace), sans segment vide, `.`, `..`, ni commençant par `-` ou `~`.
+ * `.` seul désigne le worktree. Limite : un lien symbolique commité (`docs -> /etc`) n'est pas
+ * détectable ici ; le CLI suit le lien (voir ADR 0014).
+ */
+export const isSafeRelativePath = (path: unknown): path is string =>
+  typeof path === "string" &&
+  SAFE_PATH_CHARS.test(path) &&
+  (path === "." || path.split("/").every(isSafeSegment));
 
 const isUnder = (path: string, root: string): boolean =>
   root === "." || path === root || path.startsWith(`${root}/`);

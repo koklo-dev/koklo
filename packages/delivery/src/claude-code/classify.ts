@@ -15,10 +15,10 @@ const QUOTA_PATTERNS: readonly RegExp[] = [
   /hit your limit/i,
   /rate_limit_error/i,
   /too many requests/i,
-  /\b429\b/,
+  /\b(?:http|status(?: code)?|error(?: code)?)\W{0,3}429\b/i,
 ];
 
-const AUTH_PATTERNS: readonly RegExp[] = [/invalid api key/i, /\/login\b/];
+const AUTH_PATTERNS: readonly RegExp[] = [/invalid api key/i, /please run \/login\b/i];
 
 const matchesAny = (patterns: readonly RegExp[], raw: string): boolean =>
   patterns.some((pattern) => pattern.test(raw));
