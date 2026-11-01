@@ -2,7 +2,7 @@
 doc_version: 0.1.0
 status: proposed
 last_reviewed: 2026-11-01
-covers_commit: bc6b7e3
+covers_commit: 90f49d4
 ---
 # 0013 — Stockage des clés BYOK : chiffrement direct par la clé maître, AAD dérivée de la ligne
 
@@ -16,7 +16,7 @@ La vision (§15) et TK-52 parlent de chiffrement « par enveloppe » des clés L
 ## Options envisagées
 | Option | Avantages | Inconvénients |
 |--------|-----------|---------------|
-| A. Chiffrement direct par la clé maître (AES-256-GCM), AAD `llm:v1:<organization_id>:<provider>`, `key_version` | Même modèle que ADR 0009 ; aucune colonne de plus ; au plus 3 lignes par organisation, rechiffrement trivial | Une rotation de la clé maître rechiffre toutes les lignes |
+| A. Chiffrement direct par la clé maître (AES-256-GCM), AAD `llm:v1:<organization_id>:<provider>`, `key_version` | Même modèle que `provider_user_credentials` (migration 20261031130000, jetons utilisateur chiffrés avec la clé maître) ; aucune colonne de plus ; au plus 3 lignes par organisation, rechiffrement trivial | Une rotation de la clé maître rechiffre toutes les lignes |
 | B. Vraie enveloppe (DEK par ligne chiffrée par une KEK) | Rotation de la KEK sans toucher aux données ; alignée sur le vocabulaire de la vision | Deux colonnes (`wrapped_key`, `wrap_nonce`), plus de code et de cas d'erreur, sans gain tant que la clé maître est locale |
 | C. KMS externe | Clé hors de l'application | Nouvelle dépendance et nouveau coût, hors périmètre (ADR requis) |
 | D. Indice de clé affiché (derniers caractères) | Aide l'utilisateur à reconnaître la clé | Fuite partielle d'un secret ; refusé |
