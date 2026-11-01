@@ -213,7 +213,19 @@ describe("TK-44a aller-retour parse -> emit -> parse", () => {
     const extended: Feature = {
       ...feature,
       statut: "specifiee",
-      criteres: [...feature.criteres, criterion("AC-4", "Nouveau critère")],
+      // TK-53a : dès `specifiee`, un critère doit avoir Étant donné, Quand, Alors (R5_CRITERION_INCOMPLETE).
+      criteres: [
+        ...feature.criteres,
+        {
+          id: "AC-4",
+          titre: "Nouveau critère",
+          etapes: [
+            { type: "etant_donne" as const, texte: "x" },
+            { type: "quand" as const, texte: "x" },
+            { type: "alors" as const, texte: "x" },
+          ],
+        },
+      ],
     };
     const report = checkSpec(withFiles({ [PATH]: emitFeatureMarkdown(extended) }));
     expect(report.counts.error).toBe(0);

@@ -77,13 +77,13 @@ circulaire) lève une `CanonicalizeError` dont `path` est le pointeur JSON fauti
 
 Le rapport est une liste d'`Issue` `{ rule, code, severity, path, pointer, entityId?, message }`,
 triée par `path`, `pointer`, `code`, `message`. `ok` vaut `true` s'il n'y a aucune erreur ; les
-avertissements (règle 7) ne le font pas échouer. Les 26 codes de `ISSUE_CODES` font partie du
+avertissements (règle 7) ne le font pas échouer. Les 27 codes de `ISSUE_CODES` font partie du
 contrat public.
 
 | Règle                                                                        | Gravité       | Codes                                                                                                                                                                                                                                                                                                                         |
 | ---------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4 : tout lien pointe vers une entité existante                               | erreur        | `R4_UNKNOWN_FEATURE`, `R4_UNKNOWN_CRITERION`, `R4_UNKNOWN_TABLE`, `R4_UNKNOWN_FIELD`, `R4_UNKNOWN_ENDPOINT`, `R4_UNKNOWN_SCREEN`, `R4_MALFORMED_DATA_REF`                                                                                                                                                                     |
-| 5 : `specifiee` a un écran ou un endpoint, `implementee` un test par critère | erreur        | `R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT`, `R5_IMPLEMENTED_CRITERION_WITHOUT_TEST`, `R5_IMPLEMENTED_WITHOUT_CRITERIA`                                                                                                                                                                                                         |
+| 5 : `specifiee` a un écran ou un endpoint, `implementee` un test par critère ; dès `specifiee`, chaque critère a ses étapes dans l'ordre Étant donné, Quand, Alors | erreur        | `R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT`, `R5_IMPLEMENTED_CRITERION_WITHOUT_TEST`, `R5_IMPLEMENTED_WITHOUT_CRITERIA`, `R5_CRITERION_INCOMPLETE`                                                                                                                                                                                                         |
 | 7 : aucune entité orpheline                                                  | avertissement | `R7_ORPHAN_TABLE`, `R7_ORPHAN_ENDPOINT`, `R7_ORPHAN_SCREEN`, `R7_ORPHAN_TEST`                                                                                                                                                                                                                                                 |
 | structure                                                                    | erreur        | `STRUCT_YAML_SYNTAX`, `STRUCT_DUPLICATE_KEY`, `STRUCT_YAML_FORBIDDEN_FEATURE`, `STRUCT_MULTIPLE_DOCUMENTS`, `STRUCT_FILE_TOO_LARGE`, `STRUCT_JSON_SYNTAX`, `STRUCT_FRONT_MATTER_MISSING`, `STRUCT_MARKDOWN_SYNTAX`, `STRUCT_SCHEMA_VIOLATION`, `STRUCT_UNSUPPORTED_SPEC_VERSION`, `STRUCT_ID_MISMATCH`, `STRUCT_DUPLICATE_ID` |
 
@@ -137,3 +137,13 @@ src/
   rules/      index (index de résolution), rule4, rule5, rule7
 scripts/generate-schemas.ts   schemas/  test/
 ```
+
+### Critères structurés (`R5_CRITERION_INCOMPLETE`)
+
+Dès `specifiee` (donc aussi `implementee` et `adoptee`), chaque critère doit contenir au moins une
+étape `etant_donne`, une `quand` et une `alors`, dans cet ordre (répétitions permises). Une étape
+`et` prend le rôle de l'étape précédente ; en tête, elle est une faute. Une seule issue par
+critère (la première faute) : pointeur `/criteres/<i>/etapes/<j>` pour une étape mal placée,
+`/criteres/<i>/etapes` pour un rôle manquant ou une liste vide. Les `brouillon` restent tolérés ;
+le parseur Markdown et le schéma Zod n'ajoutent aucune contrainte. `splitFrontMatter`
+(`src/parse/frontmatter.ts`) est partagé par les parseurs de feature (usage interne).

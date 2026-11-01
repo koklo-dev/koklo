@@ -3,6 +3,7 @@ import type { Feature } from "../entities/index.ts";
 import { ruleIssue } from "../issue.ts";
 import type { Issue, ParsedSpec } from "../types.ts";
 import type { SpecIndex } from "./index.ts";
+import { checkCriteriaSteps } from "./rule5-criteria.ts";
 
 function specifiedIsCovered(spec: ParsedSpec, index: SpecIndex, id: string): boolean {
   const feature = spec.features.find((f) => f.value.id === id)?.value;
@@ -53,13 +54,25 @@ function checkImplemented(
   return out;
 }
 
-/** Règle 5 : `specifiee` a un écran ou un endpoint ; `implementee` a un test par critère. */
+function checkStatus(
+  spec: ParsedSpec,
+  index: SpecIndex,
+  tested: ReadonlyMap<string, ReadonlySet<string>>,
+  path: string,
+  f: Feature,
+): Issue[] {
+  if (f.statut === "implementee") return checkImplemented(path, f, tested);
+  if (f.statut !== "specifiee" || specifiedIsCovered(spec, index, f.id)) return [];
+  const message = `La feature ${f.id} est spécifiée mais n'a aucun écran ni endpoint existant.`;
+  return [issue5("R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT", path, "", f.id, message)];
+}
+
+/** Règle 5 : `specifiee` a un écran ou un endpoint ; `implementee` a un test par critère ;
+ * dès `specifiee`, les étapes de chaque critère sont complètes et ordonnées. */
 export function checkRule5(spec: ParsedSpec, index: SpecIndex): Issue[] {
   const tested = testedCriteria(spec);
-  return spec.features.flatMap(({ path, value: f }) => {
-    if (f.statut === "implementee") return checkImplemented(path, f, tested);
-    if (f.statut !== "specifiee" || specifiedIsCovered(spec, index, f.id)) return [];
-    const message = `La feature ${f.id} est spécifiée mais n'a aucun écran ni endpoint existant.`;
-    return [issue5("R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT", path, "", f.id, message)];
-  });
+  return spec.features.flatMap(({ path, value: f }) => [
+    ...checkCriteriaSteps(path, f),
+    ...checkStatus(spec, index, tested, path, f),
+  ]);
 }
