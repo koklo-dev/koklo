@@ -185,6 +185,7 @@ then the enum). Prisma cannot express the CHECKs: they are written by hand in `m
 - CHECKs: `octet_length(nonce) = 12`; `key_version >= 1`; `octet_length(ciphertext)` between 17 and
   2064; `default_model` null or 1 to 100 characters without `/` nor `..`.
 - Foreign key to `organizations` with `ON DELETE CASCADE`; `organization_id` is indexed.
+- **Design**: direct encryption with the master key, see [ADR 0013](adr/0013-byok-credentials-storage.md).
 - **AAD convention** (derived from the row, never stored, so no AAD column):
   `llm:v1:<organization_id>:<provider>`. A ciphertext copied to another organization or provider
   fails to decrypt. No clear key, hint or last-4 column exists.
@@ -197,7 +198,7 @@ enums, one new `counter_name` value, one table; `down.sql` drops the table then 
   `target_kind` (enum `suggestion_target_kind`: `feature`, `screen`, `project`), `target_ref`
   (nullable), `body`, `author_user_id`, `author_role`, `base_sha` (nullable), `status` (enum
   `suggestion_status`: `open` default, `accepted`, `rejected`, `withdrawn`), `decided_by_user_id`,
-  `decided_at`, `decision_note`, `created_at`, `updated_at`.
+  `decided_at`, `decision_note`, `created_at`, `updated_at`. `author_role` is null or 1 to 64 characters.
 - **Key and counter**: `SG-n` is allocated from the per-project `project_counters` row named
   `suggestion` (monotonic, gap-free on rollback, concurrency-safe like `ticket` and `feature`).
 - CHECKs: `key ~ '^SG-[1-9][0-9]*$'`; `target_ref IS NULL` exactly when `target_kind = 'project'`,
@@ -222,26 +223,32 @@ drops `baselines`, then the triggers, `reviews`, the function and the enums, in 
   `review_status`: `approved`, `changes_requested`), `author_user_id` (no foreign key, GDPR),
   `author_role`, `comment`, `created_at`, `updated_at`. CHECKs: `sha` is 40/64 lowercase hex;
   `target_ref` 1 to 64 characters, `F-nnn` for a `feature`, `baseline-<n>` (`baseline-0` allowed) for a
-  `baseline`, free for a `screen`; `comment` at most 2000.
+  `baseline`, free for a `screen`; `comment` at most 2000; `author_role` null or 1 to 64 characters.
 - **Append-only journal**: there is no uniqueness on target, SHA or author; every review is a new row
   and the latest one for a target (index `(project_id, target_kind, target_ref, created_at DESC)`)
   is authoritative. `UPDATE` and `TRUNCATE` are always refused (`restrict_violation`, 23001) by the
   triggers `reviews_no_update_delete` and `reviews_no_truncate`. A direct `DELETE` is refused too, except
-  when the row's project or repo no longer exists, i.e. the cascade of a project, an organization (through
-  the project) or a repo. Same pattern as `audit_log`.
+  when the row's project no longer exists, i.e. the cascade of a project or of an organization (through
+  the project). There is no exception for the repo: `repo_id` has no foreign key, so unlinking a repo or
+  uninstalling the GitHub App (which cascades `provider_installations` to `project_repos`) never removes a
+  review or a baseline, which are customer validation evidence tied to a SHA. The function is
+  `SET search_path = public` with qualified names. The trigger does not protect against the table owner,
+  a superuser or `SET session_replication_role`: see the operations note.
 - **`baselines`**: `id`, `organization_id`, `project_id`, `repo_id`, `number` (>= 0, unique per
   project; baseline 0 is the starting point), `status` (`proposed` default, `validated`, `tagged`),
   `proposed_sha`, `proposed_by_user_id` (no foreign key), `review_id`, `validated_at`, `tag_sha`,
   `tagged_at`. State CHECK: `proposed` has no review, validation date, tag SHA nor tag date;
   `validated` has a review and `validated_at`; `tagged` has all four. A partial unique index allows at most
   one non-`tagged` baseline per project.
-- **Keys**: projects and repos by composite `(organization_id, ...)` foreign keys `ON DELETE CASCADE`
-  (no `ON UPDATE CASCADE`); `baselines` reference `reviews` by `(organization_id, project_id, review_id)`
+- **Keys**: only the project has a composite `(organization_id, project_id)` foreign key `ON DELETE CASCADE`
+  (no `ON UPDATE CASCADE`) on both tables; `repo_id` is a plain column with no foreign key (like the target
+  of a suggestion); `baselines` reference `reviews` by `(organization_id, project_id, review_id)`
   in NO ACTION, so a review cannot be deleted alone while a baseline points to it (the cascade
   removes both).
 - **Human only, and API invariants**: baselines and client validations are human-only actions (vision).
   The database does not check that the review validates the right target and SHA, nor that `repo_id`
-  belongs to the same project: the API (TK-55) must verify these invariants.
+  belongs to the same project: the API (TK-55) must verify these invariants. `tagged` baselines are not
+  immutable in the database: the transitions are controlled by the API (TK-55).
 
 ### Notifications table (TK-51d)
 One tenant table (`TENANT_MODELS`: `Notification`), migration `20261101120000_notifications` (additive:
@@ -254,7 +261,10 @@ a single `CREATE TABLE`, no enum, no function, no trigger; `down.sql` is one `DR
   `subject_kind` in `suggestion`, `review`, `baseline`, `ticket`. Adding a value is an additive migration
   that replaces the `CHECK`. `subject_ref` is 1 to 64 characters, `dedupe_key` 1 to 120.
 - **Idempotence**: `UNIQUE (recipient_user_id, dedupe_key)`. A producer replaying an event derives the same key
-  and the insert is a no-op (`ON CONFLICT DO NOTHING` or `createMany skipDuplicates`).
+  and the insert is a no-op (`ON CONFLICT DO NOTHING` or `createMany skipDuplicates`). References such as
+  `SG-1` repeat across projects, so the key must include the project (for example
+  `suggestion.created:<project_id>:SG-1`). When `project_id` is NULL, `(subject_kind, subject_ref)` alone is
+  ambiguous: only subjects whose reference is unique in the organization may be notified without a project.
 - **No sensitive content**: a notification holds only a type and a reference. The API reads the object again
   through `(subject_kind, subject_ref)` with the recipient's rights, so a notification never leaks text,
   and a recipient who lost access sees nothing.
