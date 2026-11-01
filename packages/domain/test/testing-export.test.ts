@@ -74,7 +74,12 @@ describe("export ./testing", () => {
 
 describe("pureté de src/testing", () => {
   it("contient les fichiers attendus", () => {
-    expect(files.sort()).toEqual(["fake-llm.ts", "index.ts", "llm-conformance.ts"]);
+    expect(files.sort()).toEqual([
+      "fake-llm.ts",
+      "index.ts",
+      "llm-conformance-hardening.ts",
+      "llm-conformance.ts",
+    ]);
     expect(existsSync(resolve(testingDir, "fake-llm.ts"))).toBe(true);
   });
 
