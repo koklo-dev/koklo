@@ -7,6 +7,13 @@ import deliveryVitestConfig, { deliveryCoverageThresholds } from "../vitest.conf
 const root = resolve(import.meta.dirname, "..");
 const srcDir = resolve(root, "src");
 const FILES = [
+  "agent-budget.ts",
+  "agent-credential.ts",
+  "agent-errors.ts",
+  "agent-output.ts",
+  "agent-request.ts",
+  "agent-runtime.ts",
+  "agent-tools.ts",
   "block-cause.ts",
   "errors.ts",
   "index.ts",
@@ -17,10 +24,17 @@ const FILES = [
   "run-transitions.ts",
   "run.ts",
 ];
+/** Cœur pur : `src/*.ts` et `src/testing/*.ts` ; `src/claude-code/` (lot 73c, I/O) en est exclu. */
+const CORE_DIRS = ["", "testing"] as const;
 const sources = () =>
-  readdirSync(srcDir)
-    .filter((f) => f.endsWith(".ts"))
-    .map((file) => ({ file, text: readFileSync(resolve(srcDir, file), "utf8") }));
+  CORE_DIRS.flatMap((dir) =>
+    readdirSync(resolve(srcDir, dir), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+      .map((entry) => {
+        const file = dir === "" ? entry.name : `${dir}/${entry.name}`;
+        return { file, text: readFileSync(resolve(srcDir, file), "utf8") };
+      }),
+  );
 const importsOf = (source: string) =>
   [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1] as string);
 
@@ -49,10 +63,20 @@ describe("pureté de packages/delivery", () => {
     expect(readdirSync(srcDir).sort()).toEqual(expect.arrayContaining(FILES));
   });
 
-  it("n'importe que du relatif ou @koklo/domain (ni node:*, fs, Prisma, Nest, Octokit)", () => {
+  it("contient les fichiers du faux et de la conformité sous src/testing", () => {
+    expect(readdirSync(resolve(srcDir, "testing")).sort()).toEqual(
+      expect.arrayContaining(["agent-conformance.ts", "fake-agent-runtime.ts", "index.ts"]),
+    );
+  });
+
+  it("n'importe que du relatif, @koklo/domain ou @koklo/rules (ni node:*, fs, Prisma, Nest, Octokit)", () => {
     for (const { file, text } of sources()) {
       for (const spec of importsOf(text)) {
-        const ok = spec.startsWith("./") || spec === "@koklo/domain";
+        const ok =
+          spec.startsWith("./") ||
+          (file.startsWith("testing/") && spec.startsWith("../")) ||
+          spec === "@koklo/domain" ||
+          spec === "@koklo/rules";
         expect(ok, `${file} importe « ${spec} »`).toBe(true);
       }
     }
@@ -66,6 +90,21 @@ describe("pureté de packages/delivery", () => {
       expect(forbidden.test(code), `${file} utilise une API impure`).toBe(false);
     }
   });
+});
+
+describe("pureté de packages/delivery : frontières", () => {
+  it("le cœur ne dépend jamais de l'adaptateur src/claude-code/ ni de node:*", () => {
+    for (const { file, text } of sources()) {
+      expect(/claude-code|node:|child_process/.test(importsOf(text).join("\n")), file).toBe(false);
+    }
+  });
+
+  it("l'index public n'exporte ni le faux ni la suite de conformité", () => {
+    const index = readFileSync(resolve(srcDir, "index.ts"), "utf8");
+    expect(/testing|FakeAgent|Conformance/.test(index)).toBe(false);
+    expect(delivery).not.toHaveProperty("FakeAgentRuntime");
+    expect(delivery).not.toHaveProperty("runAgentRuntimeConformance");
+  });
 
   it("garde chaque fichier à 300 lignes au plus et chaque fonction à 50 lignes au plus", () => {
     for (const { file, text } of sources()) {
@@ -75,7 +114,9 @@ describe("pureté de packages/delivery", () => {
       }
     }
   });
+});
 
+describe("pureté de packages/delivery : API", () => {
   it("exporte l'API publique figée", () => {
     for (const name of [
       "RUN_STATES",
@@ -96,6 +137,32 @@ describe("pureté de packages/delivery", () => {
       "StaleRunError",
       "ResumeRequiredError",
       "canRestartDevelopment",
+      "AGENT_RUNTIME_IDS",
+      "AGENT_RESULT_STATUSES",
+      "AGENT_FAILURE_REASONS",
+      "AGENT_TRACE_PATTERN",
+      "AGENT_MAX_TIMEOUT_MS",
+      "AGENT_MAX_COST_MICRO_USD",
+      "AGENT_MAX_OUTPUT_CHARS",
+      "AGENT_MAX_PROMPT_CHARS",
+      "AGENT_TOOL_POLICY_KEYS",
+      "assertSessionRequest",
+      "assertAgentBudget",
+      "toolsForRole",
+      "isWithinRolePolicy",
+      "countsAsAgentFailure",
+      "agentCredential",
+      "isAgentCredential",
+      "revealAgentCredential",
+      "agentOutput",
+      "isAgentOutput",
+      "AgentRuntimeError",
+      "InvalidAgentRequestError",
+      "InvalidAgentBudgetError",
+      "AgentBudgetExceededError",
+      "AgentRuntimeUnavailableError",
+      "AgentAuthError",
+      "InvalidAgentCredentialError",
     ]) {
       expect(delivery, name).toHaveProperty(name);
     }
@@ -105,8 +172,23 @@ describe("pureté de packages/delivery", () => {
 describe("package.json, étiquette et seuils", () => {
   const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 
-  it("ne dépend à l'exécution que de @koklo/domain, en workspace", () => {
-    expect(pkg.dependencies).toEqual({ "@koklo/domain": "workspace:*" });
+  it("ne dépend à l'exécution que de @koklo/domain et @koklo/rules, en workspace", () => {
+    expect(pkg.dependencies).toEqual({
+      "@koklo/domain": "workspace:*",
+      "@koklo/rules": "workspace:*",
+    });
+  });
+
+  it("exporte « . » et « ./testing » (« ./claude-code » seulement au lot 73c)", () => {
+    const keys = Object.keys(pkg.exports);
+    expect(keys).toEqual(expect.arrayContaining([".", "./testing"]));
+    for (const key of keys) {
+      expect([".", "./testing", "./claude-code"]).toContain(key);
+    }
+    expect(pkg.exports["./testing"]).toEqual({
+      types: "./dist/testing/index.d.ts",
+      default: "./dist/testing/index.js",
+    });
   });
 
   it("porte l'étiquette delivery", () => {
