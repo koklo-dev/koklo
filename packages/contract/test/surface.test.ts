@@ -19,16 +19,18 @@ const GROUPS: Record<string, string[]> = {
   lease: ["acquire", "get", "heartbeat", "release"],
   audit: ["list"],
   installation: ["list", "start"],
-  llmCredential: ["invalidate", "list", "remove", "set"],
+  llmCredential: ["invalidate", "list", "remove", "set", "verify"],
+  ai: ["draftBrief", "proposeCriteria", "proposeFeatures"],
   repo: ["createSpec", "link", "list"],
   spec: ["getFeature", "head", "listFeatures"],
   specBatch: ["get", "submit"],
 };
 
-describe("R1 routeur : 16 groupes (TK-42 : +4, TK-52b : +1), 39 procédures", () => {
+describe("R1 routeur : 17 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1), 43 procédures", () => {
   it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
+        "ai",
         "audit",
         "comment",
         "dependency",
@@ -56,6 +58,13 @@ describe("R1 routeur : 16 groupes (TK-42 : +4, TK-52b : +1), 39 procédures", ()
     expect("lock" in contract).toBe(false);
   });
 });
+
+const AI_PAIRS = [
+  "POST /projects/{projectId}/ai/brief",
+  "POST /projects/{projectId}/ai/features",
+  "POST /projects/{projectId}/ai/criteria",
+  "POST /llm-credentials/{provider}/verify",
+];
 
 const LLM_PAIRS = [
   "GET /llm-credentials",
@@ -104,14 +113,17 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/spec/batches",
     "GET /projects/{projectId}/spec/batches/{batchId}",
   ];
-  it("les 25 paires de TK-29 les 10 de TK-42 et les 4 de TK-52b sont présentes (47 routes)", async () => {
+  it("les 25 paires de TK-29 les 10 de TK-42 et les 4 de TK-52b et les 4 de TK-54b sont présentes (51 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
     );
-    for (const pair of [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS]) expect(pairs, pair).toContain(pair);
-    expect(pairs).toHaveLength(8 + PAIRS.length + NEW_PAIRS.length + LLM_PAIRS.length);
-    expect(pairs).toHaveLength(47);
+    for (const pair of [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS, ...AI_PAIRS])
+      expect(pairs, pair).toContain(pair);
+    expect(pairs).toHaveLength(
+      8 + PAIRS.length + NEW_PAIRS.length + LLM_PAIRS.length + AI_PAIRS.length,
+    );
+    expect(pairs).toHaveLength(51);
   });
 });
 

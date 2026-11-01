@@ -7,6 +7,11 @@ import { LlmCredentialUnavailableError } from "./llm-credential-errors.ts";
 export interface ResolvedLlmCredential {
   readonly credential: LlmCredential;
   readonly defaultModel: string | undefined;
+  /**
+   * Révision de la clé stockée (hex du nonce AES-GCM, neuf à chaque `set`) : sert de compare-and-swap
+   * à `invalidate` (D7, TK-54b). Squelette RED : vide tant que le Green ne la renseigne pas.
+   */
+  readonly revision: string;
 }
 
 /**
@@ -27,7 +32,11 @@ export class LlmCredentialResolver {
     if (this.cipher === null) throw new LlmCredentialUnavailableError("no-encryption-key");
     try {
       const secret = this.cipher.decrypt(stored.secret, llmCredentialAad(organizationId, provider));
-      return { credential: llmCredential(secret), defaultModel: stored.defaultModel ?? undefined };
+      return {
+        credential: llmCredential(secret),
+        defaultModel: stored.defaultModel ?? undefined,
+        revision: "",
+      };
     } catch {
       // Version inconnue, autre clé ou AAD, chiffré altéré, ou clair que le domaine refuse : toute
       // cause est écartée, elle pourrait citer des octets du message.

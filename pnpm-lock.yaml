@@ -190,6 +190,9 @@ importers:
       '@koklo/github':
         specifier: workspace:*
         version: link:../../packages/github
+      '@koklo/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@koklo/observability':
         specifier: workspace:*
         version: link:../../packages/observability

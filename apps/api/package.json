@@ -19,6 +19,7 @@
     "@koklo/db": "workspace:*",
     "@koklo/domain": "workspace:*",
     "@koklo/github": "workspace:*",
+    "@koklo/llm": "workspace:*",
     "@koklo/observability": "workspace:*",
     "@koklo/schema": "workspace:*",
     "@nestjs/common": "12.2.0",

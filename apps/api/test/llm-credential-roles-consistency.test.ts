@@ -6,13 +6,13 @@ import { MANAGER_ROLES } from "../src/auth/roles.ts";
 
 /**
  * TK-52b : cohérence entre la matrice de docs/api-contract.md (CDC §14) et le contrôleur. Les
- * quatre procédures relèvent des gestionnaires (owner, admin), jamais d'un rôle ouvert.
+ * cinq procédures (verify : 0.9.0) relèvent des gestionnaires (owner, admin), jamais d'un rôle ouvert.
  */
 const CONTROLLER = resolve(
   import.meta.dirname,
   "../src/llm-credential/llm-credential.controller.ts",
 );
-const PROCEDURES = ["list", "set", "remove", "invalidate"];
+const PROCEDURES = ["list", "set", "remove", "invalidate", "verify"];
 
 describe("rôles des procédures llmCredential.*", () => {
   it("MANAGER_ROLES : owner et admin, rôles du contrat", () => {

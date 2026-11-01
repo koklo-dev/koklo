@@ -6,6 +6,9 @@ import { CaptureMailSender, startWorker, type Worker } from "@koklo/worker";
 import type { INestApplication } from "@nestjs/common";
 import type { PgBoss } from "pg-boss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { NONCE_SOURCE } from "../src/ai/nonce.ts";
+import { LLM_PROVIDERS } from "../src/llm/tokens.ts";
+import { AI_ROUTES, PurposeLlm } from "./helpers/ai-bench.ts";
 import { createSeededDatabase } from "./helpers/app.ts";
 import { auditRowsFull, commentsFor, UUID_RE } from "./helpers/comments.ts";
 import { ENCRYPTION_KEY, INSTALL_APP } from "./helpers/installations.ts";
@@ -13,7 +16,9 @@ import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./
 import { credentialRows } from "./helpers/llm-credential-routes.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
+import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
+import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import {
   apiFor,
   createWorld,
@@ -53,6 +58,8 @@ function repoRuntimeOf() {
       provider: harness.provider,
       githubApp: INSTALL_APP,
       encryptionKey: ENCRYPTION_KEY,
+      // TK-54b : les procédures ai.* et llmCredential.verify tournent sur un faux modèle (jamais le réseau).
+      configure: aiOverrides(),
     });
     return { app: repoApp, harness };
   })();
@@ -60,7 +67,21 @@ function repoRuntimeOf() {
 }
 
 /**
- * TK-44b : `specBatch.submit` s'exécute de bout en bout (commit par le worker, qui partage la base
+ * TK-54b : modèle simulé des scénarios ai.* (réponse valide par finalité), sous le jeton `LLM_PROVIDERS`
+ * et un nonce déterministe ; le faux n'est jamais choisi par la configuration.
+ */
+function aiOverrides() {
+  return (builder: import("@nestjs/testing").TestingModuleBuilder) => {
+    return builder
+      .overrideProvider(LLM_PROVIDERS)
+      .useValue(new Map([["anthropic", new PurposeLlm()]]))
+      .overrideProvider(NONCE_SOURCE)
+      .useValue({ next: () => "c".repeat(48) });
+  };
+}
+
+/**
+ * TK-44b : `specBatch.submit s'exécute de bout en bout (commit par le worker, qui partage la base
  * et le faux fournisseur de l'application `repo`) ; le worker est démarré à la demande.
  */
 let specWorker: Promise<Worker> | undefined;
@@ -116,6 +137,7 @@ const WRITE_GROUPS = [
   "specBatch",
   "installation",
   "llmCredential",
+  "ai",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit", "spec"];
@@ -153,6 +175,9 @@ function referencesGroup(source: string, group: string): boolean {
 const STANDALONE_PROCEDURES = ["health"];
 
 const EXPECTED_WRITE_PROCEDURES = [
+  "ai.draftBrief",
+  "ai.proposeCriteria",
+  "ai.proposeFeatures",
   "comment.create",
   "comment.delete",
   "dependency.add",
@@ -164,6 +189,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "llmCredential.invalidate",
   "llmCredential.remove",
   "llmCredential.set",
+  "llmCredential.verify",
   "member.invite",
   "member.setRole",
   "organization.create",
@@ -676,7 +702,124 @@ const SCENARIOS: Scenario[] = [
     deniedStatuses: [403],
   },
   ...llmCredentialScenarios(),
+  ...aiScenarios(),
 ];
+
+/**
+ * TK-54b : propositions IA et vérification de clé. Chaque appel (modèle simulé) produit exactement une
+ * ligne d'audit, écrite avant l'appel, sans contenu : `ai.*` vise le projet, `verify` la ligne de la clé.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+function aiScenarios(): Scenario[] {
+  const key = makeSentinel();
+  const appOf = async () => (await repoRuntimeOf()).app;
+  const putKey = async (ctx: Ctx) =>
+    send(await appOf(), ctx.world.actors.owner.cookie, "put", "/llm-credentials/anthropic", {
+      provider: "anthropic",
+      apiKey: key,
+    });
+  const call = async (ctx: Ctx, role: Role, path: string, body: Record<string, unknown>) =>
+    send(await appOf(), ctx.world.actors[role].cookie, "post", path, body);
+  const onProject = (action: string) => async (ctx: Ctx) => ({
+    action,
+    targetKind: "project",
+    targetId: ctx.world.projectId,
+    ticketId: null,
+  });
+  const keyed = async (ctx: Ctx) => {
+    await putKey(ctx);
+    return {};
+  };
+  return [
+    {
+      procedure: "ai.draftBrief",
+      role: "dev",
+      prepare: keyed,
+      call: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "dev", AI_ROUTES.draftBrief(projectId), { projectId, idea: "Une idée" });
+      },
+      expected: onProject("ai.brief.draft"),
+      denied: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "client", AI_ROUTES.draftBrief(projectId), {
+          projectId,
+          idea: "Une idée",
+        });
+      },
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "ai.proposeFeatures",
+      role: "dev",
+      prepare: keyed,
+      call: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "dev", AI_ROUTES.proposeFeatures(projectId), {
+          projectId,
+          brief: "Un brief",
+        });
+      },
+      expected: onProject("ai.features.propose"),
+      denied: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "business", AI_ROUTES.proposeFeatures(projectId), {
+          projectId,
+          brief: "Un brief",
+        });
+      },
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "ai.proposeCriteria",
+      role: "dev",
+      prepare: async (ctx) => {
+        const runtime = await repoRuntimeOf();
+        const bench = {
+          database,
+          app: runtime.app,
+          harness: runtime.harness,
+        } as unknown as RepoBench;
+        const scene = await readScene(bench, { world: ctx.world });
+        await seedIndex(bench, scene, [{ id: "F-001", titre: "Connexion" }], { commit: true });
+        return keyed(ctx);
+      },
+      call: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "dev", AI_ROUTES.proposeCriteria(projectId), {
+          projectId,
+          specId: "F-001",
+        });
+      },
+      expected: onProject("ai.criteria.propose"),
+      denied: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "client", AI_ROUTES.proposeCriteria(projectId), {
+          projectId,
+          specId: "F-001",
+        });
+      },
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "llmCredential.verify",
+      role: "owner",
+      prepare: async (ctx) => {
+        await putKey(ctx);
+        return { id: (await credentialRows(database, ctx.world.organizationId))[0]?.id ?? "" };
+      },
+      call: (ctx) => call(ctx, "owner", AI_ROUTES.verify(), { provider: "anthropic" }),
+      expected: async (_ctx, state) => ({
+        action: "llm_credential.verify",
+        targetKind: "llm_credential",
+        targetId: state.id,
+        ticketId: null,
+      }),
+      denied: (ctx) => call(ctx, "dev", AI_ROUTES.verify(), { provider: "anthropic" }),
+      deniedStatuses: [403],
+    },
+  ];
+}
 
 /**
  * TK-52b : clés BYOK. Application avec porte-clés (celle du banc `repo`) ; la clé est une sentinelle
@@ -745,7 +888,7 @@ function llmCredentialScenarios(): Scenario[] {
 }
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 27 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 31 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -798,6 +941,13 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
       implemented,
       `groupes implémentés mais exclus de la garde d'audit : ${implemented.join(", ")}`,
     ).toEqual([]);
+  });
+});
+
+describe("garde TK-54b : le groupe ai", () => {
+  it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "ai"))).toBe(true);
   });
 });
 

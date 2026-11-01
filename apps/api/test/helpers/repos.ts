@@ -11,7 +11,7 @@ import type {
 } from "@koklo/domain";
 import type { InMemoryGitProvider } from "@koklo/github/testing";
 import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
+import { Test, type TestingModuleBuilder } from "@nestjs/testing";
 import { AppModule } from "../../src/app.module.ts";
 import type { AppConfig } from "../../src/config.ts";
 import { configFor } from "./app.ts";
@@ -185,6 +185,10 @@ export interface RepoAppOptions {
   encryptionKey?: Buffer;
   logStream?: { write: (line: string) => void };
   appEnv?: AppConfig["appEnv"];
+  /** Réglages de configuration en plus (TK-54b : `ai`), appliqués après les valeurs de test. */
+  config?: Partial<AppConfig>;
+  /** Surcharges Nest supplémentaires (TK-54b : `LLM_PROVIDERS`, `NONCE_SOURCE`). */
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder;
 }
 
 /** Application réelle (base réelle) dont seuls l'horloge, le fournisseur git et le magasin de jetons sont remplacés. */
@@ -200,6 +204,7 @@ export async function createRepoApp(
     logLevel: options.logStream ? "info" : "silent",
     githubApp: options.githubApp,
     ...(options.encryptionKey ? { encryptionKey: options.encryptionKey } : {}),
+    ...(options.config ?? {}),
   } as AppConfig;
   let builder = Test.createTestingModule({
     imports: [AppModule.forRoot(config, { logStream: options.logStream })],
@@ -212,6 +217,7 @@ export async function createRepoApp(
   if (options.credentials) {
     builder = builder.overrideProvider(USER_CREDENTIALS).useValue(options.credentials);
   }
+  if (options.configure) builder = options.configure(builder);
   const app = (await builder.compile()).createNestApplication();
   await app.init();
   return app;
