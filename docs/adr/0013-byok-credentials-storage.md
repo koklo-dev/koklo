@@ -39,4 +39,11 @@ Le porte-clés est livré derrière l'interface `TokenCipher` existante (`apps/a
 - Variables : `KOKLO_ENCRYPTION_KEY` (clé courante, inchangée), `KOKLO_ENCRYPTION_KEY_VERSION` (entier >= 1, défaut 1), `KOKLO_ENCRYPTION_KEYS_PREVIOUS` (`version:clé`, séparées par des virgules). Sans variable supplémentaire : version 1, aucune précédente, comportement identique à avant.
 - Le même porte-clés sert les jetons utilisateur (`PrismaUserCredentials`) : les jetons en v1 restent lisibles après le passage en v2.
 - Toute erreur de la base sur cette table est réécrite en `LlmCredentialStoreError` sans cause (voir `docs/quality-and-operations.md`).
-- Le rechiffrement des lignes et la procédure de rotation restent à livrer (TK-52c). Statut inchangé : **proposé**.
+- Le rechiffrement des lignes et la procédure de rotation sont livrés en TK-52c (amendement suivant). Statut inchangé : **proposé**.
+
+## Amendement (TK-52c, 2026-11-01) : rotation de la clé maître
+- Commande : `pnpm --filter @koklo/api rotate:encryption-key [--dry-run] [--json]` (`apps/api/src/cli/rotate-encryption-key.ts`, fonction `rotateEncryptionKey`). Elle rechiffre avec la clé courante les DEUX tables chiffrées, toutes organisations (client brut, usage d'administration borné à ces deux tables), avec les mêmes AAD que l'application (`llm:v1:<organisation>:<fournisseur>` ; `<utilisateur>:<installation>`).
+- Idempotente (les lignes déjà en version courante ne sont pas touchées), atomique par ligne (une instruction avec compare-and-swap sur id, version, chiffré et nonce ; une écriture normale concurrente gagne et est comptée en conflit), sans audit, sans toucher `provider_auth_states`. Une ligne illisible est comptée en échec et laissée intacte.
+- Sortie : comptes uniquement ; codes 0 (à jour), 1 (ligne en échec ou panne), 2 (refus : usage, configuration, lignes anciennes sans clé précédente). Aucune valeur, clé, AAD ou identifiant dans la sortie, les journaux ou les erreurs.
+- Procédure (`docs/quality-and-operations.md`) : nouvelle clé, déploiement `KOKLO_ENCRYPTION_KEY`/`_VERSION` n+1/`_KEYS_PREVIOUS` `n:ancienne`, essai puis rotation réelle, vérification `key_version <> n+1` = 0 sur les deux tables, retrait de la clé précédente, sauvegarde de la clé maître hors base. Point ouvert (infra, hors dépôt) : `KOKLO_ENCRYPTION_KEY` est dans `lockedSecrets` du manifeste de déploiement, la rotation réelle exige un moyen d'écraser une valeur verrouillée.
+- Statut inchangé : **proposé**.
