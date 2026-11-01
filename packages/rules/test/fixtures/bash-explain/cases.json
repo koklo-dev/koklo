@@ -1,0 +1,9 @@
+{
+  "profiles": ["ci", "core", "docker", "node", "privacy-rgpd", "security", "typescript"],
+  "packages": [{ "path": "packages/rules", "profiles": ["core", "node", "typescript"] }],
+  "cases": [
+    { "role": "developer", "path": ".", "expected": "developer-root.txt" },
+    { "role": "qa-reviewer", "path": "packages/rules", "expected": "qa-reviewer-packages-rules.txt" },
+    { "role": "tech-lead", "path": "apps/web", "expected": "tech-lead-apps-web.txt" }
+  ]
+}

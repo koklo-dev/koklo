@@ -1,0 +1,34 @@
+Agent: qa-reviewer
+Scope: packages/rules
+Profiles: core, node, typescript
+
+[BLOCKING] global.dependency-currency — Dépendances ajoutées en dernière version stable (framework)
+  Toute dépendance, tout framework et tout générateur de squelette est ajouté dans sa dernière version stable amont, vérifiée à la source au moment de l’ajout et jamais reprise de la mémoire du modèle; un écart volontaire est justifié par écrit.
+  enforcement: evidence
+[ADVISORY] global.dependency-freshness — Fraîcheur des dépendances directes (framework)
+  Aucune dépendance directe déclarée n’a une majeure de retard sur la dernière version stable publiée; la vérification est UNVERIFIED si le registre est indisponible.
+  enforcement: gate/dependency-freshness
+[BLOCKING] global.dependency-integrity — Dépendances reproductibles (framework)
+  Tout gestionnaire de dépendances détecté utilise son fichier de verrouillage.
+  enforcement: gate/dependency-lock
+[BLOCKING] global.scope — Respect du périmètre (framework)
+  Les changements restent dans le package et les chemins partagés autorisés.
+  enforcement: evidence
+[BLOCKING] global.secrets — Aucun secret versionné (framework)
+  Les sources et configurations versionnées ne contiennent aucun secret ou jeton détectable.
+  enforcement: gate/secret-scan
+[BLOCKING] global.verification — Preuve avant PASS (framework)
+  Un agent ne déclare jamais PASS sans preuve fraîche et reproductible.
+  enforcement: evidence
+[BLOCKING] node.lint — Lint Node.js (framework)
+  Exécuter le linter configuré par le projet.
+  enforcement: gate/state-command
+[BLOCKING] node.test — Tests Node.js (framework)
+  Utiliser le runner déclaré par le package, sans supposer Jest ou Vitest.
+  enforcement: gate/state-command
+[BLOCKING] role.qa.independence — Revue indépendante (framework)
+  QA ne valide pas son propre travail et distingue échec, conseil et absence de preuve.
+  enforcement: instruction
+[BLOCKING] typescript.types — Vérification TypeScript (framework)
+  Vérifier les types sans émission lorsque TypeScript est configuré.
+  enforcement: gate/typescript-check

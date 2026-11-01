@@ -1,0 +1,49 @@
+Agent: tech-lead
+Scope: apps/web
+Profiles: ci, core, docker, node, privacy-rgpd, security, typescript
+
+[BLOCKING] ci.permissions — Permissions CI minimales (framework)
+  Les workflows déclarent des permissions minimales et épinglent les actions selon la politique du projet.
+  enforcement: gate/ci-permissions
+[BLOCKING] docker.non-root — Conteneur non-root (framework)
+  Les images applicatives finales déclarent un utilisateur non-root.
+  enforcement: gate/docker-non-root
+[ADVISORY] docs.continuous — Documentation produite avec le code (framework)
+  Toute livraison est accompagnée de la passe de documentation correspondant à son tier calculé; la documentation n’est jamais reconstituée après coup.
+  enforcement: evidence
+[BLOCKING] docs.diagrams-mermaid — Diagrammes en Mermaid (framework)
+  Tout diagramme ajouté ou réécrit est écrit en Mermaid dans un bloc de code versionné, au sein du document qu’il explique, et aucune image binaire ne remplace une source diffable. Les sources dessinées préexistantes — PlantUML, Structurizr, Graphviz — sont conformes en l’état: elles ne sont ni converties ni signalées, une migration de format ne se fait jamais au détour d’un ticket.
+  enforcement: instruction
+[ADVISORY] docs.versioning — Documentation versionnée (framework)
+  La documentation porte sa propre version sémantique et l’évolution de l’applicatif reste suivable document par document.
+  enforcement: evidence
+[BLOCKING] global.dependency-currency — Dépendances ajoutées en dernière version stable (framework)
+  Toute dépendance, tout framework et tout générateur de squelette est ajouté dans sa dernière version stable amont, vérifiée à la source au moment de l’ajout et jamais reprise de la mémoire du modèle; un écart volontaire est justifié par écrit.
+  enforcement: evidence
+[ADVISORY] global.dependency-freshness — Fraîcheur des dépendances directes (framework)
+  Aucune dépendance directe déclarée n’a une majeure de retard sur la dernière version stable publiée; la vérification est UNVERIFIED si le registre est indisponible.
+  enforcement: gate/dependency-freshness
+[BLOCKING] global.dependency-integrity — Dépendances reproductibles (framework)
+  Tout gestionnaire de dépendances détecté utilise son fichier de verrouillage.
+  enforcement: gate/dependency-lock
+[BLOCKING] global.secrets — Aucun secret versionné (framework)
+  Les sources et configurations versionnées ne contiennent aucun secret ou jeton détectable.
+  enforcement: gate/secret-scan
+[BLOCKING] global.verification — Preuve avant PASS (framework)
+  Un agent ne déclare jamais PASS sans preuve fraîche et reproductible.
+  enforcement: evidence
+[BLOCKING] privacy.minimization — Minimisation des données (framework)
+  Ne collecter et conserver que les données nécessaires à une finalité explicite.
+  enforcement: evidence
+[BLOCKING] privacy.rights — Droits et cycle de vie documentés (framework)
+  Le projet documente les droits applicables sans prétendre à une conformité juridique non vérifiée.
+  enforcement: evidence
+[BLOCKING] privacy.sensitive-logging — Aucune donnée sensible dans les logs (framework)
+  Secrets, identifiants directs et données sensibles sont supprimés ou masqués dans logs et télémétrie.
+  enforcement: evidence
+[BLOCKING] role.tech-lead.architecture — Architecture propre au projet (framework)
+  Les contraintes architecturales proviennent du projet; Clean Architecture n’est pas imposée universellement.
+  enforcement: evidence
+[BLOCKING] security.authorization — Autorisation côté serveur (framework)
+  Toute opération protégée vérifie l’autorisation côté serveur, y compris l’isolation entre tenants.
+  enforcement: evidence
