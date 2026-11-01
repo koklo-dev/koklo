@@ -12,8 +12,8 @@ function write(patch: FeaturesUrlPatch, mode: "push" | "replace"): void {
 }
 
 /**
- * Filtres et fiche ouverte, lus dans l'adresse (`useSearchParams`) et écrits par l'API History : la fiche
- * s'empile (Retour la ferme), les filtres remplacent l'entrée courante.
+ * Filtres, fiche et formulaire ouverts, lus dans l'adresse (`useSearchParams`) et écrits par l'API History :
+ * la fiche et le formulaire s'empilent (Retour les ferme), les filtres remplacent l'entrée courante.
  */
 export function useFeaturesUrl() {
   const search = useSearchParams().toString();
@@ -24,5 +24,20 @@ export function useFeaturesUrl() {
     setFilters: useCallback((patch: FeaturesUrlPatch) => write(patch, "replace"), []),
     openFeature: useCallback((feature: string) => write({ feature }, "push"), []),
     closeFeature: useCallback(() => write({ feature: null }, "replace"), []),
+    openCreate: useCallback(() => write({ new: true, edit: null, feature: null }, "push"), []),
+    openEdit: useCallback(
+      (specId: string) => write({ edit: specId, new: null, feature: null }, "push"),
+      [],
+    ),
+    /** Ferme le formulaire ; `feature` rend la fiche d'où venait la modification. */
+    closeForm: useCallback(
+      (feature?: string) => write({ new: null, edit: null, feature: feature ?? null }, "replace"),
+      [],
+    ),
+    /** Sans droit d'écriture : `?edit=F-001` devient la fiche en lecture. */
+    showFeature: useCallback(
+      (feature: string) => write({ edit: null, new: null, feature }, "replace"),
+      [],
+    ),
   };
 }

@@ -19,6 +19,7 @@ import {
 } from "@koklo/ui";
 import { useRouter } from "next/navigation";
 import { authClient } from "../lib/auth-client.ts";
+import { clearAllFeatureStorage } from "../lib/feature-draft.ts";
 import { useTheme } from "./theme-toggle.tsx";
 
 function initials(name: string): string {
@@ -52,6 +53,7 @@ export function NavUser() {
   );
 
   async function signOut(): Promise<void> {
+    clearAllFeatureStorage();
     await authClient.signOut();
     router.replace("/login");
   }

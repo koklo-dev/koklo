@@ -9,6 +9,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
+  Button,
   Icon,
 } from "@koklo/ui";
 import type { Ref } from "react";
@@ -16,10 +17,12 @@ import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { canManage } from "../lib/roles.ts";
 import { type FeaturesPageModel, useFeaturesPage } from "../lib/use-features-page.ts";
 import { ErrorNotice } from "./error-notice.tsx";
+import { FeatureFormSheet } from "./feature-form-sheet.tsx";
 import { FeatureSheet } from "./feature-sheet.tsx";
 import { FeaturesEmpty, FeaturesEmptyFiltered, ProjectNotFound } from "./features-empty.tsx";
 import { FeaturesFilters } from "./features-filters.tsx";
 import { FeaturesList } from "./features-list.tsx";
+import { WriteFailure, WriteNotice } from "./saved-notice.tsx";
 import { SpecIndexFailed } from "./spec-index-failed.tsx";
 import { SpecPreparing } from "./spec-preparing.tsx";
 import { SpecRepoMissing } from "./spec-repo-missing.tsx";
@@ -41,39 +44,55 @@ function Skeleton() {
 function Header({
   name,
   titleRef,
+  onCreate,
 }: {
   name: string | undefined;
   titleRef: Ref<HTMLHeadingElement>;
+  /** Présent seulement pour l'équipe qui écrit, quand la spec est lue. */
+  onCreate: (() => void) | undefined;
 }) {
   return (
-    <div>
-      <Breadcrumb className="mb-3">
-        <BreadcrumbList>
-          <BreadcrumbItem>Koklo</BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/projects">Projets</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          {name ? (
-            <>
-              <BreadcrumbItem>{name}</BreadcrumbItem>
-              <BreadcrumbSeparator />
-            </>
-          ) : null}
-          <BreadcrumbItem>
-            <BreadcrumbPage>Fonctionnalités</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <h1
-        ref={titleRef}
-        tabIndex={-1}
-        className="text-[30px] font-semibold tracking-[-0.025em] outline-none"
-      >
-        Fonctionnalités
-      </h1>
-      <p className="mt-1 text-[13px] text-muted-foreground">{name ?? "Projet"}</p>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <Breadcrumb className="mb-3">
+          <BreadcrumbList>
+            <BreadcrumbItem>Koklo</BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/projects">Projets</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            {name ? (
+              <>
+                <BreadcrumbItem>{name}</BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            ) : null}
+            <BreadcrumbItem>
+              <BreadcrumbPage>Fonctionnalités</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <h1
+          ref={titleRef}
+          tabIndex={-1}
+          className="text-[30px] font-semibold tracking-[-0.025em] outline-none"
+        >
+          Fonctionnalités
+        </h1>
+        <p className="mt-1 text-[13px] text-muted-foreground">{name ?? "Projet"}</p>
+      </div>
+      {onCreate ? (
+        <Button
+          type="button"
+          data-new-feature
+          className="h-11 w-full md:h-9 md:w-auto"
+          onClick={onCreate}
+        >
+          <Icon name="add" size={20} />
+          Nouvelle fonctionnalité
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -182,7 +201,7 @@ function Body({ page }: { page: FeaturesPageModel }) {
     case "preparing":
       return <Preparing page={page} />;
     case "empty":
-      return <FeaturesEmpty />;
+      return <FeaturesEmpty onCreate={page.form.canWrite ? page.form.openCreate : undefined} />;
     case "empty-filtered":
       return <FeaturesEmptyFiltered onClear={page.filters.onClear} />;
     case "list":
@@ -203,6 +222,27 @@ function Sheet({ page }: { page: FeaturesPageModel }) {
       onClose={url.closeFeature}
       onGone={page.sheet.refetchList}
       onReturnFocus={page.sheet.returnFocus}
+      onEdit={
+        page.form.canWrite ? () => page.form.openEdit(url.feature as string, true) : undefined
+      }
+    />
+  );
+}
+
+function FormSheet({ page }: { page: FeaturesPageModel }) {
+  const { form, data, write } = page;
+  if (!form.open || !data.head) return null;
+  return (
+    <FeatureFormSheet
+      projectId={data.projectId}
+      mode={form.mode}
+      specId={form.specId}
+      role={data.role}
+      head={data.head}
+      write={write}
+      announce={page.announce}
+      onClose={form.close}
+      keepFocus={page.keepFocus}
     />
   );
 }
@@ -213,7 +253,11 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
   const { head, projectName } = page.data;
   return (
     <div className="flex flex-col gap-4">
-      <Header name={projectName} titleRef={page.titleRef} />
+      <Header
+        name={projectName}
+        titleRef={page.titleRef}
+        onCreate={page.form.canWrite ? page.form.openCreate : undefined}
+      />
       {page.showVersion && head ? <VersionLine head={head} team={page.team} /> : null}
       <div
         role="status"
@@ -221,7 +265,18 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
         className="text-[13px] text-muted-foreground empty:hidden"
       >
         {page.region.text}
+        {page.form.open ? null : (
+          <WriteNotice
+            write={page.write}
+            role={page.data.role}
+            hrefFor={page.sheet.hrefFor}
+            onOpen={page.url.openFeature}
+          />
+        )}
       </div>
+      {page.form.open ? null : (
+        <WriteFailure write={page.write} role={page.data.role} onReopen={page.reopenDraft} />
+      )}
       {page.showFilters ? (
         <FeaturesFilters
           status={page.url.status}
@@ -233,6 +288,7 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
       ) : null}
       <Body page={page} />
       <Sheet page={page} />
+      <FormSheet page={page} />
     </div>
   );
 }

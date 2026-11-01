@@ -210,7 +210,9 @@ describe("Fermer et reprendre", () => {
     await setText(titleField(panel), "Titre en cours");
     await advance(700);
     cleanup();
-    const again = await openEdit();
+    // Erreur de test corrigée (Green 48e-1) : `openEdit()` attend le titre lu, or le brouillon repris le remplace.
+    renderFeatures({ search: "?edit=F-001" });
+    const again = await form();
     await again.findByText(/Brouillon repris/);
     expect(titleField(again)).toHaveValue("Titre en cours");
     expect(again.queryByText("Cette fonctionnalité a changé depuis votre brouillon.")).toBeNull();
@@ -264,7 +266,9 @@ describe("Abandon avec confirmation en ligne", () => {
     await setText(titleField(panel), "Titre en cours");
     await advance(700);
     cleanup();
-    const again = await openEdit();
+    // Erreur de test corrigée (Green 48e-1) : `openEdit()` attend le titre lu, or le brouillon repris le remplace.
+    renderFeatures({ search: "?edit=F-001" });
+    const again = await form();
     const u = userEvent.setup({ delay: null });
     await u.click(await again.findByRole("button", { name: "Abandonner le brouillon" }));
     await u.click(await again.findByRole("button", { name: "Abandonner" }));

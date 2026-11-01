@@ -84,8 +84,9 @@ export function deriveFeaturesView(sources: ViewSources): FeaturesView {
     if (!head.isError) return { kind: "loading" };
     return sources.redirecting ? { kind: "loading" } : failure(head.error);
   }
-  if (!sources.roleKnown || sources.redirecting) return { kind: "loading" };
-  if (head.data === null) return withoutIndex(sources);
+  if (sources.redirecting) return { kind: "loading" };
+  // Le rôle ne conditionne que l'absence d'index (créer le dépôt ou non) : une spec lue s'affiche sans l'attendre.
+  if (head.data === null) return sources.roleKnown ? withoutIndex(sources) : { kind: "loading" };
   if (head.data.status === "failed") {
     return { kind: "index-failed", errorCode: head.data.errorCode, commitSha: head.data.commitSha };
   }

@@ -1,7 +1,7 @@
 import { Button, Card, Icon } from "@koklo/ui";
 
-/** Spec lue, aucune fonctionnalité, aucun filtre (aucun bouton en 48d : l'écriture arrive en 48e). */
-export function FeaturesEmpty() {
+/** Spec lue, aucune fonctionnalité, aucun filtre ; l'équipe qui écrit peut créer la première. */
+export function FeaturesEmpty({ onCreate }: { onCreate: (() => void) | undefined }) {
   return (
     <Card className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="checklist" size={28} className="text-muted-foreground" />
@@ -11,6 +11,12 @@ export function FeaturesEmpty() {
       <p className="text-[13px] text-muted-foreground">
         La spec de ce projet ne décrit encore aucune fonctionnalité.
       </p>
+      {onCreate ? (
+        <Button type="button" className="h-11 md:h-9" onClick={onCreate}>
+          <Icon name="add" size={20} />
+          Nouvelle fonctionnalité
+        </Button>
+      ) : null}
     </Card>
   );
 }

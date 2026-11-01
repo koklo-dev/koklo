@@ -4,6 +4,7 @@ import { Button, Card } from "@koklo/ui";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { authClient } from "../lib/auth-client.ts";
+import { clearAllFeatureStorage } from "../lib/feature-draft.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { useOrganizationEntry } from "../lib/use-organization-entry.ts";
 import { ErrorNotice } from "./error-notice.tsx";
@@ -23,6 +24,7 @@ function SignOut() {
       variant="ghost"
       className="h-11 md:h-9"
       onClick={async () => {
+        clearAllFeatureStorage();
         await authClient.signOut();
         router.replace("/login");
       }}

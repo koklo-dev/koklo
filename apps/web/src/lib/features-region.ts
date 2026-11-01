@@ -1,4 +1,5 @@
 import type { FeaturesView } from "./features-view.ts";
+import type { FeatureWrite } from "./use-feature-submit.ts";
 
 export const plural = (count: number, word: string): string =>
   `${count} ${word}${count > 1 ? "s" : ""}`;
@@ -47,3 +48,16 @@ const VERSIONED_VIEWS = ["loading", "list", "empty", "empty-filtered"];
 
 export const showsFilters = (view: FeaturesView): boolean => FILTERED_VIEWS.includes(view.kind);
 export const showsVersion = (view: FeaturesView): boolean => VERSIONED_VIEWS.includes(view.kind);
+
+/** Texte de la région d'état pour l'écriture en cours (formulaire ouvert : étapes ; fermé : suivi de la page). */
+export function writeRegionText(write: FeatureWrite, formOpen: boolean): string {
+  const { phase, meta, batch, slow } = write;
+  if (phase === "idle" || phase === "failed" || phase === "saved" || phase === "late") return "";
+  if (!formOpen) return slow ? "" : `Enregistrement de « ${meta?.title ?? ""} » en cours…`;
+  if (phase === "sending") return "Envoi de votre modification…";
+  if (phase !== "tracking" || slow) return "";
+  if (batch?.status === "committing") return "Écriture en cours…";
+  const creating =
+    meta?.kind === "create" && meta.specId ? ` ${meta.specId} en cours de création.` : "";
+  return `En attente de son tour.${creating}`;
+}

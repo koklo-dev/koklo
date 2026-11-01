@@ -17,18 +17,29 @@ export type FeaturesUrlPatch = {
 };
 
 const FEATURE_ID = /^F-\d{3,}$/;
-const KEYS = ["status", "priority", "feature"] as const;
+const KEYS = ["status", "priority", "feature", "edit"] as const;
 
-/** Lit `status`, `priority` et `feature` dans une query string ; les valeurs inconnues sont ignorées. */
+const isFeatureId = (value: string | null): value is string =>
+  value !== null && FEATURE_ID.test(value);
+
+/** Le formulaire (`edit` l'emporte sur `new`) ou, à défaut, la fiche : jamais deux panneaux. */
+function readPanel(params: URLSearchParams): Pick<FeaturesUrlState, "new" | "edit" | "feature"> {
+  const edit = params.get("edit");
+  if (isFeatureId(edit)) return { edit };
+  if (params.get("new") === "1") return { new: true };
+  const feature = params.get("feature");
+  return isFeatureId(feature) ? { feature } : {};
+}
+
+/** Lit les paramètres de l'écran dans une query string ; les valeurs inconnues sont ignorées. */
 export function readFeaturesUrl(search: string): FeaturesUrlState {
   const params = new URLSearchParams(search);
   const status = featureStatusSchema.safeParse(params.get("status"));
   const priority = featurePrioritySchema.safeParse(params.get("priority"));
-  const feature = params.get("feature");
   return {
     ...(status.success ? { status: status.data } : {}),
     ...(priority.success ? { priority: priority.data } : {}),
-    ...(feature !== null && FEATURE_ID.test(feature) ? { feature } : {}),
+    ...readPanel(params),
   };
 }
 
@@ -40,6 +51,8 @@ export function withFeaturesUrl(search: string, patch: FeaturesUrlPatch): string
     if (value === null) params.delete(key);
     else if (value !== undefined) params.set(key, value);
   }
+  if (patch.new === null) params.delete("new");
+  else if (patch.new) params.set("new", "1");
   const query = params.toString();
   return query ? `?${query}` : "";
 }
