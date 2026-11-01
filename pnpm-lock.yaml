@@ -552,6 +552,9 @@ importers:
       '@koklo/domain':
         specifier: workspace:*
         version: link:../domain
+      '@koklo/rules':
+        specifier: workspace:*
+        version: link:../rules
     devDependencies:
       '@biomejs/biome':
         specifier: 2.6.3
