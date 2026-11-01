@@ -145,9 +145,9 @@ describe("TK-51b migration suggestions : dossier et contenu", () => {
     expect(down.search(/DROP TABLE/i)).toBeLessThan(down.search(/DROP TYPE/i));
   });
 
-  it("expectedTables contient la table (39 au total avec TK-51d)", () => {
+  it("expectedTables contient la table (40 au total avec TK-55a)", () => {
     expect(expectedTables).toContain(SUGGESTION_TABLE);
-    expect(expectedTables).toHaveLength(39);
+    expect(expectedTables).toHaveLength(40);
   });
 });
 

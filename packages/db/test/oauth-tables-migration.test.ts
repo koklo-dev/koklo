@@ -123,9 +123,9 @@ describe("TK-48a1 migrations : dossiers et contenu", () => {
     );
   });
 
-  it("expectedTables contient les deux tables (39 au total avec TK-51d)", () => {
+  it("expectedTables contient les deux tables (40 au total avec TK-55a)", () => {
     for (const table of OAUTH_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(39);
+    expect(expectedTables).toHaveLength(40);
   });
 });
 

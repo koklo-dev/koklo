@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { requireSession } from "../auth/session.guard.ts";
+import type { ProjectAccess } from "../project/project-access.ts";
 import type { ProjectContext } from "../project/project-context.ts";
 import { guard, type InternalErrors, requestIdOf } from "../request-context.ts";
 
@@ -13,7 +14,11 @@ export interface ProjectScope {
   userId: string;
 }
 
-export async function scopeOf(request: Request, project: ProjectContext): Promise<ProjectScope> {
+export async function scopeOf(
+  request: Request,
+  project: ProjectContext,
+  _access?: ProjectAccess,
+): Promise<ProjectScope> {
   const { organizationId, userId } = requireSession(request);
   return { organizationId, userId, projectId: await project.projectId(request) };
 }
@@ -24,8 +29,11 @@ export function inScope<T>(
   project: ProjectContext,
   errors: InternalErrors,
   work: (scope: ProjectScope) => Promise<T>,
+  access?: ProjectAccess,
 ): Promise<T> {
-  return guard(requestIdOf(request), errors, async () => work(await scopeOf(request, project)));
+  return guard(requestIdOf(request), errors, async () =>
+    work(await scopeOf(request, project, access)),
+  );
 }
 
 /**
@@ -38,6 +46,7 @@ export function inProject<T>(
   errors: InternalErrors,
   projectId: string,
   work: (scope: ProjectScope) => Promise<T>,
+  _access?: ProjectAccess,
 ): Promise<T> {
   const { organizationId, userId } = requireSession(request);
   return guard(requestIdOf(request), errors, () => work({ organizationId, userId, projectId }));
