@@ -8,6 +8,7 @@
       "observability": { "dependencies": { "allow": ["config"] } },
       "schema": { "dependencies": { "allow": ["config"] } },
       "github": { "dependencies": { "allow": ["domain", "contract", "config"] } },
+      "llm": { "dependencies": { "allow": ["domain", "config"] } },
       "rules": { "dependencies": { "allow": ["domain", "contract", "config"] } },
       "delivery": { "dependencies": { "allow": ["domain", "contract", "rules", "config"] } },
       "cli": {
