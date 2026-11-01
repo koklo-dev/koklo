@@ -1,5 +1,6 @@
 /** Politique d'outils abstraite par rôle, indépendante de tout runtime (mapping dans l'adaptateur). */
-import type { AgentRole } from "@koklo/rules";
+import { AGENT_ROLES, type AgentRole } from "@koklo/rules";
+import { InvalidAgentRequestError } from "./agent-errors.ts";
 
 export type AgentShellProfile = "none" | "project-checks";
 
@@ -15,14 +16,135 @@ export interface AgentToolPolicy {
   readonly mcp: false;
 }
 
-export const AGENT_TOOL_POLICY_KEYS: readonly (keyof AgentToolPolicy)[] = [];
+export const AGENT_TOOL_POLICY_KEYS = [
+  "read",
+  "search",
+  "write",
+  "edit",
+  "shell",
+  "writablePaths",
+  "network",
+  "mcp",
+] as const satisfies readonly (keyof AgentToolPolicy)[];
+
+const policy = (
+  shell: AgentShellProfile,
+  writablePaths: readonly string[],
+  writes = true,
+): AgentToolPolicy =>
+  Object.freeze({
+    read: true,
+    search: true,
+    write: writes,
+    edit: writes,
+    shell,
+    writablePaths: Object.freeze([...writablePaths]),
+    network: "none",
+    mcp: false,
+  });
+
+const READ_ONLY = policy("none", [], false);
+
+/** Politiques de référence : jamais de réseau ni de MCP, écriture bornée au strict nécessaire. */
+const ROLE_POLICIES: Readonly<Record<AgentRole, AgentToolPolicy>> = Object.freeze({
+  "product-owner": READ_ONLY,
+  analyst: READ_ONLY,
+  "qa-reviewer": READ_ONLY,
+  "tech-lead": READ_ONLY,
+  developer: policy("project-checks", ["."]),
+  "test-writer": policy("project-checks", ["."]),
+  "doc-writer": policy("none", ["docs", "README.md"]),
+  designer: policy("none", ["design"]),
+});
+
+export const isAgentRole = (value: unknown): value is AgentRole =>
+  (AGENT_ROLES as readonly unknown[]).includes(value);
 
 /** Politique de référence d'un rôle (gelée en profondeur) ; rôle inconnu : InvalidAgentRequestError. */
-export const toolsForRole = (_role: AgentRole): AgentToolPolicy => {
-  throw new Error("not implemented");
+export const toolsForRole = (role: AgentRole): AgentToolPolicy => {
+  if (!isAgentRole(role)) {
+    throw new InvalidAgentRequestError("role");
+  }
+  return ROLE_POLICIES[role];
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const hasOnlyPolicyKeys = (value: Record<string, unknown>): boolean => {
+  const keys = Object.keys(value);
+  return (
+    keys.length === AGENT_TOOL_POLICY_KEYS.length &&
+    keys.every((key) => (AGENT_TOOL_POLICY_KEYS as readonly string[]).includes(key))
+  );
+};
+
+/** Chemin relatif sûr : ni absolu, ni `..`, ni segment vide ou `.` (sauf `.` seul), ni NUL. */
+const isSafeRelativePath = (path: unknown): path is string => {
+  if (typeof path !== "string" || path === "" || path.includes("\0") || path.startsWith("/")) {
+    return false;
+  }
+  return path === "." || path.split("/").every((s) => s !== "" && s !== "." && s !== "..");
+};
+
+const isUnder = (path: string, root: string): boolean =>
+  root === "." || path === root || path.startsWith(`${root}/`);
+
+const SHELL_RANK: Readonly<Record<AgentShellProfile, number>> = { none: 0, "project-checks": 1 };
+
+const isShell = (value: unknown): value is AgentShellProfile =>
+  value === "none" || value === "project-checks";
+
+/** `value` n'accorde pas plus que `limit` (un booléen vrai exige un plafond vrai). */
+const withinFlag = (value: unknown, limit: boolean): value is boolean =>
+  typeof value === "boolean" && (!value || limit);
+
+const withinPaths = (paths: unknown, reference: AgentToolPolicy, canWrite: boolean) =>
+  Array.isArray(paths) &&
+  (canWrite || paths.length === 0) &&
+  paths.every(
+    (path) => isSafeRelativePath(path) && reference.writablePaths.some((r) => isUnder(path, r)),
+  );
+
+/**
+ * Copie gelée de `candidate`, lue une seule fois par champ, si elle n'accorde rien de plus que
+ * la politique du rôle et n'a aucune clé inconnue ou manquante ; sinon `undefined`.
+ */
+export const snapshotToolPolicy = (
+  role: AgentRole,
+  candidate: unknown,
+): AgentToolPolicy | undefined => {
+  if (!isAgentRole(role) || !isRecord(candidate) || !hasOnlyPolicyKeys(candidate)) {
+    return undefined;
+  }
+  const reference = ROLE_POLICIES[role];
+  const { read, search, write, edit, shell, writablePaths, network, mcp } = candidate;
+  const paths = Array.isArray(writablePaths) ? [...writablePaths] : writablePaths;
+  const ok =
+    read === true &&
+    search === true &&
+    network === "none" &&
+    mcp === false &&
+    withinFlag(write, reference.write) &&
+    withinFlag(edit, reference.edit) &&
+    isShell(shell) &&
+    SHELL_RANK[shell] <= SHELL_RANK[reference.shell] &&
+    withinPaths(paths, reference, write === true || edit === true);
+  if (!ok) {
+    return undefined;
+  }
+  return Object.freeze({
+    read,
+    search,
+    write,
+    edit,
+    shell,
+    writablePaths: Object.freeze(paths as string[]),
+    network,
+    mcp,
+  }) as AgentToolPolicy;
 };
 
 /** Vrai si `policy` n'accorde rien de plus que `toolsForRole(role)` et n'a aucune clé inconnue. */
-export const isWithinRolePolicy = (_role: AgentRole, _policy: unknown): boolean => {
-  throw new Error("not implemented");
-};
+export const isWithinRolePolicy = (role: AgentRole, policy: unknown): boolean =>
+  snapshotToolPolicy(role, policy) !== undefined;
