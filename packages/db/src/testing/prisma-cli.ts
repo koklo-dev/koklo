@@ -48,6 +48,9 @@ export const expectedTables = [
   "llm_provider_credentials",
   // TK-51b : propositions client `SG-n`.
   "suggestions",
+  // TK-51c : validations client liées au SHA (journal append-only) et baselines.
+  "reviews",
+  "baselines",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
