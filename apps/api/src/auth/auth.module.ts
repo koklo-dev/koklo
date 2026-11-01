@@ -1,5 +1,6 @@
 import { type DynamicModule, Global, Module, type Provider } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
+import { BodyParserErrorFilter } from "../body-parser-error.filter.ts";
 import type { AppConfig } from "../config.ts";
 import { DatabaseService } from "../database/database.module.ts";
 import { InvitationQueue } from "../organization/invitation-queue.ts";
@@ -59,6 +60,7 @@ export class AuthModule {
         MagicLinkQueue,
         InvitationQueue,
         { provide: APP_FILTER, useClass: OrpcErrorFilter },
+        { provide: APP_FILTER, useClass: BodyParserErrorFilter },
         ...sessionProviders(config),
       ],
       exports: [SESSION_RESOLVER, AUTH],

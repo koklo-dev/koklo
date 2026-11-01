@@ -296,6 +296,52 @@ describe("refus de démarrer", () => {
   });
 });
 
+describe("lignes déjà en version courante : déchiffrement de contrôle", () => {
+  // L'opérateur garde KOKLO_ENCRYPTION_KEY_VERSION=1 avec une NOUVELLE clé : tout est illisible.
+  const wrongKeySameVersion = { current: { version: 1, key: K2 }, previous: [] };
+
+  it.each([
+    ["réel", false],
+    ["--dry-run", true],
+  ])(
+    "clé changée sans changer la version (%s) : toutes les lignes comptées en échec, rien d'écrit",
+    async (_label, dryRun) => {
+      const before = await snapshot(h.database);
+      const errors: Error[] = [];
+      const report = await rotateEncryptionKey(h.service, wrongKeySameVersion, {
+        dryRun,
+        log: (line) => lines.push(line),
+        onFailure: (_table, error) => errors.push(error),
+      });
+      expect(report.llm).toMatchObject({ scanned: 3, rotated: 0, alreadyCurrent: 0, failed: 3 });
+      expect(report.userTokens).toMatchObject({
+        scanned: 2,
+        rotated: 0,
+        alreadyCurrent: 0,
+        failed: 2,
+      });
+      expect(errors).toHaveLength(5);
+      for (const error of errors) expect(error).toBeInstanceOf(TokenDecryptionError);
+      expect(await snapshot(h.database)).toEqual(before);
+      const haystack = `${JSON.stringify(report)}\n${lines.join("\n")}`;
+      for (const row of seeded.llm) expect(haystack).not.toContain(row.plaintext);
+    },
+  );
+
+  it("une seule ligne courante illisible : comptée en échec, les autres restent à jour", async () => {
+    await run();
+    await h.database.query(
+      "UPDATE llm_provider_credentials SET ciphertext = $1 WHERE id = (SELECT id FROM llm_provider_credentials ORDER BY id LIMIT 1)",
+      [randomBytes(60)],
+    );
+    const before = await snapshot(h.database);
+    const report = await run();
+    expect(report.llm).toMatchObject({ rotated: 0, failed: 1, alreadyCurrent: 2 });
+    expect(report.userTokens).toMatchObject({ failed: 0, alreadyCurrent: 2 });
+    expect(await snapshot(h.database)).toEqual(before);
+  });
+});
+
 describe("sortie sans valeur", () => {
   it("le rapport et les journaux ne portent ni clé, ni chiffré, ni nonce, ni AAD, ni identifiant", async () => {
     const before = await snapshot(h.database);

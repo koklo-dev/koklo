@@ -26,6 +26,8 @@ export interface RotationTable {
   /** Erreur assainie à lever pour toute erreur de base sur cette table. */
   readonly storeError: () => Error;
   countCurrent(version: number): Promise<number>;
+  /** Lignes déjà à `version`, de toutes les organisations (déchiffrement de contrôle, sans écriture). */
+  listCurrent(version: number): Promise<RotationRow[]>;
   /** Lignes dont `key_version` diffère de `version`, de toutes les organisations. */
   listOutdated(version: number): Promise<RotationRow[]>;
   /** Vrai si la ligne a été réécrite ; faux si elle avait changé entre-temps (rien d'écrit). */
@@ -56,22 +58,42 @@ const casData = (next: EncryptedSecret, at: Date) => ({
  * Passe par le client brut : la commande d'administration parcourt toutes les organisations, hors
  * de toute requête HTTP (dérogation à la règle de `DatabaseService`, bornée à ces deux tables).
  */
+const llmRow = (
+  row: Parameters<typeof secretOf>[0] & {
+    id: string;
+    organizationId: string;
+    provider: Parameters<typeof llmCredentialAad>[1];
+  },
+): RotationRow => ({
+  id: row.id,
+  aad: llmCredentialAad(row.organizationId, row.provider),
+  secret: secretOf(row),
+});
+const tokenRow = (
+  row: Parameters<typeof secretOf>[0] & { id: string; userId: string; installationId: string },
+): RotationRow => ({
+  id: row.id,
+  // Mêmes données associées que `PrismaUserCredentials` (ADR 0009).
+  aad: `${row.userId}:${row.installationId}`,
+  secret: secretOf(row),
+});
+
 export function llmTable(database: DatabaseService): RotationTable {
   const table = database.raw.llmProviderCredential;
   return {
     key: "llm",
     storeError: () => new LlmCredentialStoreError(),
     countCurrent: (version) => table.count({ where: { keyVersion: version } }),
+    async listCurrent(version) {
+      const rows = await table.findMany({ where: { keyVersion: version }, orderBy: { id: "asc" } });
+      return rows.map(llmRow);
+    },
     async listOutdated(version) {
       const rows = await table.findMany({
         where: { keyVersion: { not: version } },
         orderBy: { id: "asc" },
       });
-      return rows.map((row) => ({
-        id: row.id,
-        aad: llmCredentialAad(row.organizationId, row.provider),
-        secret: secretOf(row),
-      }));
+      return rows.map(llmRow);
     },
     async swap(row, next, at) {
       const { count } = await table.updateMany({ where: casWhere(row), data: casData(next, at) });
@@ -86,17 +108,16 @@ export function userTokensTable(database: DatabaseService): RotationTable {
     key: "userTokens",
     storeError: () => new RotationStoreError(),
     countCurrent: (version) => table.count({ where: { keyVersion: version } }),
+    async listCurrent(version) {
+      const rows = await table.findMany({ where: { keyVersion: version }, orderBy: { id: "asc" } });
+      return rows.map(tokenRow);
+    },
     async listOutdated(version) {
       const rows = await table.findMany({
         where: { keyVersion: { not: version } },
         orderBy: { id: "asc" },
       });
-      // Mêmes données associées que `PrismaUserCredentials` (ADR 0009).
-      return rows.map((row) => ({
-        id: row.id,
-        aad: `${row.userId}:${row.installationId}`,
-        secret: secretOf(row),
-      }));
+      return rows.map(tokenRow);
     },
     async swap(row, next, at) {
       const { count } = await table.updateMany({ where: casWhere(row), data: casData(next, at) });
