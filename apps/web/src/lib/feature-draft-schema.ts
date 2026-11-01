@@ -69,7 +69,7 @@ export function isPending(data: Record<string, unknown>): boolean {
     typeof data.batchId === "string" &&
     data.batchId.length > 0 &&
     data.batchId.length <= 100 &&
-    (data.kind === "create" || data.kind === "update") &&
+    (data.kind === "create" || data.kind === "update" || data.kind === "delete") &&
     isOptional(data.specId, (v) => typeof v === "string" && SPEC_ID.test(v)) &&
     isText(data.title)
   );

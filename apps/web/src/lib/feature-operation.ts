@@ -53,9 +53,9 @@ export function buildUpdateOperation(
   return operation as SpecOperation;
 }
 
-/** Suppression : `{ kind: "feature.delete", specId }` seule (S-feature-form §4.8). Squelette du Red 48e-2. */
-export function buildDeleteOperation(_specId: string): SpecOperation {
-  throw new Error("non implémenté");
+/** Suppression : `{ kind: "feature.delete", specId }` seule, la saisie en cours n'est jamais envoyée (§4.8). */
+export function buildDeleteOperation(specId: string): SpecOperation {
+  return { kind: "feature.delete", specId };
 }
 
 export interface SubmitContext {

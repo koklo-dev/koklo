@@ -4,7 +4,7 @@ import type { Role } from "@koklo/contract";
 import { Alert, Button, Icon } from "@koklo/ui";
 import { describeSaveError } from "../lib/feature-errors.ts";
 import { canReadRepos } from "../lib/roles.ts";
-import type { FeatureWrite } from "../lib/use-feature-submit.ts";
+import type { FeatureWrite, WriteMeta } from "../lib/use-feature-submit.ts";
 import type { Placement } from "../lib/use-index-wait.ts";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
 import { WaitNotice } from "./write-wait-notice.tsx";
@@ -21,14 +21,20 @@ interface NoticeProps {
   onOpen: (specId: string) => void;
 }
 
+/** « F-001 supprimée. » (sans titre) ou « F-004 « Titre » créée. » / « … enregistrée. » ; phrase propre si l'index a échoué. */
+function confirmationText(meta: WriteMeta, indexFailed: boolean): string {
+  if (indexFailed)
+    return "Votre modification a été enregistrée, mais la spec n'a pas pu être relue.";
+  if (meta.kind === "delete") return `${meta.specId} supprimée.`;
+  return `${meta.specId} « ${meta.title} » ${meta.kind === "create" ? "créée" : "enregistrée"}.`;
+}
+
 function Confirmation({ write, role, hrefFor, onOpen }: NoticeProps) {
   const saved = write.saved;
   if (!saved) return null;
   const { meta, indexFailed, placement } = saved;
   const short = saved.commitSha?.slice(0, 7);
-  const text = indexFailed
-    ? "Votre modification a été enregistrée, mais la spec n'a pas pu être relue."
-    : `${meta.specId} « ${meta.title} » ${meta.kind === "create" ? "créée" : "enregistrée"}.`;
+  const text = confirmationText(meta, indexFailed);
   return (
     <Alert role="group" aria-label="Enregistrement terminé" className="mt-2">
       <Icon name="check_circle" size={20} />
@@ -45,7 +51,7 @@ function Confirmation({ write, role, hrefFor, onOpen }: NoticeProps) {
           </p>
         ) : null}
         <div className="flex flex-col gap-2 md:flex-row">
-          {indexFailed || !meta.specId ? null : (
+          {indexFailed || !meta.specId || meta.kind === "delete" ? null : (
             <Button asChild variant="outline" className="h-11 md:h-9">
               <a
                 href={hrefFor(meta.specId)}
@@ -99,7 +105,7 @@ export function WriteFailure({
   if (write.phase !== "failed" || !write.failure) return null;
   const view = describeSaveError(write.failure, {
     role,
-    mode: write.meta?.kind === "create" ? "create" : "update",
+    mode: write.meta?.kind ?? "update",
   });
   return (
     <SaveErrorAlert view={view} handlers={{}} criteriaCount={0}>

@@ -255,11 +255,13 @@ function useIndexFollowUp(
     if (!meta) return;
     const indexFailed = head.status === "failed";
     update({ phase: "saved", saved: { meta, commitSha, indexFailed, placement: null } });
-    void reloadList(queryClient, meta, filters(), indexFailed).then((placement) =>
+    void reloadList(queryClient, meta, filters(), indexFailed).then((found) => {
+      // Une fonctionnalité supprimée n'a plus de ligne : le focus va au titre de la page.
+      const placement = meta.kind === "delete" ? "none" : found;
       setState((current) =>
         current.saved ? { ...current, saved: { ...current.saved, placement } } : current,
-      ),
-    );
+      );
+    });
   };
   useIndexWait({
     projectId,

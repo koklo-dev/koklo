@@ -83,10 +83,13 @@ export function useReload({ args, state, setState }: ActionContext) {
   const { projectId, specId, write } = args;
   return async (): Promise<void> => {
     if (!specId || !state.baseline) return;
-    const [latestHead, latest] = await Promise.all([
+    const reads = await Promise.all([
       queryClient.fetchQuery(orpc.spec.head.queryOptions({ input: { projectId } })),
       queryClient.fetchQuery(orpc.spec.getFeature.queryOptions({ input: { projectId, specId } })),
-    ]);
+    ]).catch(() => null);
+    // Lecture refusée (par exemple fonctionnalité déjà supprimée) : le panneau affiche l'erreur de la lecture.
+    if (!reads) return;
+    const [latestHead, latest] = reads;
     const current = valuesFromDetail(latest);
     const merged = rebase(state.baseline, state.values, current);
     const baseSha = latestHead?.commitSha ?? latest.commitSha;

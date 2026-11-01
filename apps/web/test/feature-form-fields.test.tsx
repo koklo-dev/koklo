@@ -231,9 +231,9 @@ describe("Modification : préremplissage depuis spec.getFeature (§4.2)", () => 
     await waitFor(() => expect(saveButton(panel)).toBeDisabled());
   });
 
-  it("aucun bouton de suppression dans ce sous-lot (lot 48e-2)", async () => {
+  it("le bouton de suppression existe en modification (lot 48e-2), les tests de la suppression sont dans feature-delete-*", async () => {
     const panel = await openEdit();
-    expect(panel.queryByRole("button", { name: /Supprimer/ })).toBeNull();
+    expect(panel.getByRole("button", { name: "Supprimer cette fonctionnalité" })).toBeVisible();
   });
 });
 
