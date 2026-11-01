@@ -24,3 +24,7 @@ export interface RulesError {
 export type RulesResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: RulesError };
+
+/** Erreur de la composition ; `path` est omis (jamais `undefined`) pour rester sérialisable. */
+export const rulesError = (code: RulesErrorCode, message: string, path?: string): RulesError =>
+  path === undefined || path === "" ? { code, message } : { code, message, path };

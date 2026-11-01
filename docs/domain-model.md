@@ -512,6 +512,69 @@ profiles and the protected set. The first failure wins; `path` is dotted (`rules
 A protected rule that is not listed is reported as `protected-mismatch` (raw check) before the
 shape check can call it `invalid-shape`.
 
+## Rules composition (TK-71 lot B, `packages/rules`)
+`resolveEffectiveRules({ catalog, layers, role, path, now, profiles?, packages? })` returns
+`{ ok: true, value: Resolution }` or `{ ok: false, error: RulesError }`; it never throws.
+
+- **Layer** (`RuleLayer`, camelCase, strict): `level` (`organization | group | project`),
+  optional `author`, `profiles` (declared, never deduced), `add` (rules, with optional `paths`,
+  `excludePaths`, `replaces`), `override`, `waivers`, `lock` (ids). Levels rank
+  organization < group < project; the array order has no effect and a level appears once
+  (`layer.duplicate-level`). A layer at level `catalog` or unknown has no right to override:
+  `layer.invalid-level` (an error, not a conflict).
+- **Override**: `ruleId`, `author`, `justification` (all required), optional `expires`, and at
+  least one effect among `severity`, `enforcement`, `disabled`, `agents` (non-empty),
+  `excludePaths`, `protected`. Weakening a rule that is not locked is allowed and traced
+  (`overridden`; `hardened` when it only strengthens). `isWeaker` ranks `gate > evidence >
+  instruction` and `blocking > advisory`; one weaker axis is enough. `protected: true` has no
+  effect: locking goes through `lock`.
+- **Waiver** (derogation, section 17.2): `ruleId`, `file` (path or pattern), `author`,
+  `justification`, `expires` (mandatory). It removes the rule for matching paths only and is
+  listed in `Resolution.waivers` with its `level`; it is never applied to a locked rule.
+- **Expiry**: `YYYY-MM-DD`, valid up to and including `now`'s day (`now` is a date or an ISO
+  date-time). An expired override or waiver is ignored and reported as `expired`.
+- **Locked rule**: protected in the catalog (flag or `protectedRuleIds`), added with
+  `protected: true`, or listed in the `lock` of a higher level. The lock binds strictly lower
+  levels, only ever tightens, and is traced (`locked`). A lower level that tries to disable,
+  weaken severity or enforcement, drop an agent, add `excludePaths`, unlock
+  (`protected: false`), waive, re-add the id or `replaces` it gets a `Conflict` with reason
+  `locked`. The whole override is rejected, the rule stays strictly unchanged (trace included)
+  and the other changes of the layer still apply. Strengthening stays allowed.
+- **Collision**: adding an existing, unlocked id without `replaces` fails with `layer.collision`.
+- **Profiles**: `core` + the root selection, or that of the package with the longest path
+  prefix + profiles declared by layers; unique and sorted. An unknown profile in a selection is
+  `resolve.unknown-profile`; an unknown profile declared by a layer is a `unknown-profile`
+  conflict (`attempted: "profile"`).
+
+**Conflict** `{ ruleId, level, attempted, reason }`: `reason` in `locked`, `unknown-rule`,
+`unknown-profile`, `expired`; `attempted` in `disable`, `severity`, `enforcement`, `agents`,
+`exclude-paths`, `unlock`, `waiver`, `re-add`, `replace`, `override`, `lock`, `profile`.
+Sorted by level rank, then `ruleId`, then `attempted`.
+
+**Resolution** (JSON-serialisable, deep-frozen, never aliasing the input): `catalogVersion`,
+`role`, `path` (normalised), `profiles`, `rules` (`EffectiveRule` = rule + `origin`, `locked`,
+`paths`, `excludePaths`, `trace`; sorted by id), `conflicts`, `disabled` (overrides that
+disabled a rule, sorted by `ruleId`), `waivers`. Only rules matching the active profiles, the
+role and the path scope appear.
+
+| Code | Cause | Typical `path` |
+|---|---|---|
+| `layer.invalid-shape` | schema violation, unknown key, override without effect | `override.0.author` |
+| `layer.invalid-level` | level `catalog` or unknown | `level` |
+| `layer.duplicate-level` | two layers at the same level | `1.level` |
+| `layer.collision` | added id already taken, no `replaces` | `add.node.esm` |
+| `layer.invalid-pattern` | pattern with `..`, absolute, `\` or empty | `add.0.paths.0` |
+| `waiver.missing-expires` | waiver without `expires` | `waivers.0.expires` |
+| `waiver.invalid-expires` | `expires` is not a real `YYYY-MM-DD` day (also for overrides) | `override.0.expires` |
+| `resolve.invalid-role` / `invalid-path` / `invalid-now` | invalid input | `role`, `path`, `now` |
+| `resolve.unknown-profile` | unknown profile in the root or a package selection | `profiles.0` |
+
+**Matcher (D6)**: `*` inside one segment, a `**` segment matches 0..n segments, anything else is
+literal and case-sensitive; dotfiles are matched; no `?`, no `[]`. A pattern without wildcard
+covers the path and its descendants. An invalid pattern or path (`..`, absolute, `\`, NUL)
+never matches. The catalog of koklo is the source of truth (D5): no automatic synchronisation
+with Shipyard. `koklo-strict` and `validateEvidence` belong to lot C.
+
 ## Persistence and migrations
 - Engine: PostgreSQL 17 (Docker Compose locally); Prisma 7 with `prisma.config.ts`.
 - The generated client is written to `packages/db/src/generated` (TK-10, previously `packages/db/generated`) and consumed through `@koklo/db` (`createDbClient`); no entity changed in TK-10.

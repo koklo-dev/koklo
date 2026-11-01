@@ -3,8 +3,9 @@ import type { AgentRole, Enforcement, Rule, Severity } from "./catalog-types.ts"
 /** Niveaux par précédence croissante : le catalogue d'abord, le projet en dernier. */
 export const LEVELS = ["catalog", "organization", "group", "project"] as const;
 export type Level = (typeof LEVELS)[number];
-/** Niveaux qui peuvent fournir une couche (le catalogue n'est jamais une couche). */
-export type LayerLevel = Exclude<Level, "catalog">;
+/** Niveaux qui peuvent fournir une couche (le catalogue n'est jamais une couche), du plus faible au plus fort. */
+export const LAYER_LEVELS = ["organization", "group", "project"] as const;
+export type LayerLevel = (typeof LAYER_LEVELS)[number];
 
 /** Règle ajoutée par une couche : `paths` = portée (vide = partout), `replaces` = id supplanté. */
 export interface LayerRule extends Rule {

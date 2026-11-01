@@ -178,6 +178,48 @@ flowchart LR
 catalog is a copy of the Shipyard catalog 2026.08.3 (34 rules, 13 profiles, 4 protected rules).
 Model and error codes: [domain-model.md](domain-model.md#rules-catalog-tk-71-lot-a-packagesrules).
 
+### Rules package: layered composition and locks (TK-71 lot B)
+Lot B adds `resolveEffectiveRules(input)` to `packages/rules`: the catalog plus up to three
+layers (`organization` < `group` < `project`) resolved for one role and one path. It stays pure:
+`now` is an input, nothing is mutated, the output is a deep-frozen copy sorted by id. The
+catalog of koklo is the source of truth; there is no automatic synchronisation with Shipyard
+(D5). Path scopes use a home-made matcher (D6): `*` inside a segment, `**` for 0..n segments,
+dotfiles included, no `?` nor `[]`.
+
+| File | Responsibility |
+|---|---|
+| `layer-types.ts`, `resolve-types.ts`, `rules-error.ts` | `RuleLayer`, `Override`, `Waiver`, `EffectiveRule`, `Conflict`, `Resolution`, `RulesError` (11 codes) |
+| `layer-schema.ts`, `layer-checks.ts`, `parse-layer.ts` | strict zod shape, then dates and patterns; `parseLayer`, `parseWaivers` |
+| `resolve.ts` | input checks, layer revalidation and ordering, orchestration |
+| `profiles.ts` | `core` + selection (longest package prefix) + profiles declared by layers |
+| `compose.ts`, `compose-add.ts`, `compose-override.ts`, `compose-waiver.ts`, `compose-lock.ts`, `compose-context.ts` | one layer at a time: adds, overrides, waivers, then locks |
+| `resolution.ts` | filter by profile, role and path scope; sort rules, conflicts, disabled, waivers |
+| `strength.ts`, `scope-match.ts`, `iso-date.ts` | `isWeaker` (gate > evidence > instruction; blocking > advisory), matcher, dates |
+| `explain.ts` | `renderExplanation`: same text as `engineering-rules.sh explain` plus conflicts |
+
+The lock is monotone. A layer is applied against the locks set by the layers above it; its own
+`lock` list (and its `protected: true` additions) only takes effect once the layer is done, so
+it binds strictly lower levels and is never lifted.
+
+```mermaid
+flowchart TD
+  cat["catalog rules (protected = locked)"] --> org
+  subgraph compose ["composition, one layer at a time"]
+    org["organization"] --> grp["group"] --> prj["project"]
+  end
+  org -. "lock, protected add" .-> grp
+  grp -. "lock" .-> prj
+  prj --> filter["filter: profiles, role, path scope"]
+  filter --> out["Resolution: rules, conflicts, disabled, waivers"]
+  subgraph step ["inside a layer"]
+    a["add"] --> o["override"] --> w["waivers"] --> l["lock"]
+  end
+  o -->|"weakens a locked rule"| c["Conflict locked, rule unchanged"]
+```
+
+Model, conflicts and errors:
+[domain-model.md](domain-model.md#rules-composition-tk-71-lot-b-packagesrules).
+
 ### API contract package (TK-9)
 `packages/contract` (`@koklo/contract`, tag `contract`, private) holds the oRPC v2
 contract that other packages consume (see the `contract` edges in the boundaries
