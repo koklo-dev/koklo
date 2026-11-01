@@ -33,6 +33,7 @@ export const TENANT_MODELS: readonly string[] = [
   "SpecWriteBatch",
   "SpecWriteOperation",
   "ProviderAuthState",
+  "Suggestion",
   "ProviderUserCredential",
   "LlmProviderCredential",
 ];

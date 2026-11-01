@@ -203,6 +203,15 @@ covers_commit: bb9f740
 - The key is encrypted with AES-256-GCM and the AAD `llm:v1:<organization_id>:<provider>`; the AAD is
   not stored (see [domain-model.md](domain-model.md#byok-credentials-table-tk-51a)).
 
+### Suggestions: untrusted text (TK-51b)
+- `suggestions.body` and `suggestions.decision_note` are client-supplied and stored raw: never build a
+  prompt by concatenation; wrap them with `Untrusted("client-suggestion")`. Do not log them in full
+  (log the `key`, the `project_id` and a length).
+- Migration `20261101100000_suggestions` is reversible: its `down.sql` deletes every `suggestion`
+  counter and every suggestion (data loss by design), recreates `counter_name` without that value, and
+  keeps the other counters. `ALTER TYPE ... ADD VALUE` runs in the migration transaction, so no counter
+  row is created in the same migration.
+
 ### Running the LLM conformance suite (TK-50c)
 Every `LlmProvider` adapter (TK-54 and the later ones) must pass the shared suite from
 `@koklo/domain/testing`; the domain imports no test engine, so the test file passes its own:
