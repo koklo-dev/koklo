@@ -1,3 +1,5 @@
+export type { BiomeDrift } from "./biome-drift.ts";
+export { checkBiomeLimits } from "./biome-drift.ts";
 export { loadBuiltInCatalog } from "./builtin-catalog.ts";
 export type { CatalogError, CatalogErrorCode, CatalogResult } from "./catalog-error.ts";
 export { CATALOG_ERROR_CODES } from "./catalog-error.ts";
@@ -6,13 +8,29 @@ export type {
   AgentRole,
   Catalog,
   Enforcement,
+  EnforcementParams,
   Profile,
   ProfileKind,
   Rule,
   Severity,
 } from "./catalog-types.ts";
 export { AGENT_ROLES, PROFILE_KINDS } from "./catalog-types.ts";
+export type {
+  EvidenceArtifact,
+  EvidenceError,
+  EvidenceErrorCode,
+  EvidenceItem,
+  EvidenceReport,
+  EvidenceResult,
+  GateResult,
+  RuleVerdict,
+  Verdict,
+  VerdictReason,
+} from "./evidence-types.ts";
+export { EVIDENCE_ERROR_CODES, VERDICT_REASONS, VERDICTS } from "./evidence-types.ts";
 export { renderExplanation } from "./explain.ts";
+export type { KokloStrictProfile } from "./koklo-strict.ts";
+export { KOKLO_STRICT_PROFILE_ID, kokloStrictProfile } from "./koklo-strict.ts";
 export type {
   AppliedWaiver,
   Attempt,
@@ -40,3 +58,5 @@ export { RULES_ERROR_CODES } from "./rules-error.ts";
 export { isValidPattern, matchesAny, matchesPath, normalizePath } from "./scope-match.ts";
 export type { Strength } from "./strength.ts";
 export { isWeaker } from "./strength.ts";
+export { validateEvidence } from "./validate-evidence.ts";
+export { withKokloStrict } from "./with-koklo-strict.ts";

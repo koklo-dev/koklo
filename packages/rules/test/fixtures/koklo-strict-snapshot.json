@@ -1,0 +1,246 @@
+[
+  {
+    "id": "strict.adr-per-decision",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "evidence",
+      "evidence": "Lien vers l'ADR docs/adr/NNNN-titre.md de la décision"
+    }
+  },
+  {
+    "id": "strict.cognitive-complexity",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "biome",
+      "params": {
+        "rule": "complexity/noExcessiveCognitiveComplexity",
+        "max": 15
+      }
+    }
+  },
+  {
+    "id": "strict.conventional-commits",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "commitlint"
+    }
+  },
+  {
+    "id": "strict.domain-purity",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "turbo-boundaries"
+    }
+  },
+  {
+    "id": "strict.english-code-french-ui",
+    "severity": "advisory",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction"
+    }
+  },
+  {
+    "id": "strict.file-size-source",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "check-size",
+      "params": {
+        "max": 300,
+        "scope": "source"
+      }
+    }
+  },
+  {
+    "id": "strict.file-size-test",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "check-size",
+      "params": {
+        "max": 500,
+        "scope": "test"
+      }
+    }
+  },
+  {
+    "id": "strict.fn-lines",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "biome",
+      "params": {
+        "rule": "complexity/noExcessiveLinesPerFunction",
+        "max": 50
+      }
+    }
+  },
+  {
+    "id": "strict.max-params",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction",
+      "params": {
+        "max": 4
+      }
+    }
+  },
+  {
+    "id": "strict.naming-kebab-case",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction"
+    }
+  },
+  {
+    "id": "strict.no-dead-code-or-orphan-todo",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "check-todo",
+      "params": {
+        "pattern": "TODO\\(TK-[0-9]+\\)"
+      }
+    }
+  },
+  {
+    "id": "strict.no-explicit-any",
+    "severity": "blocking",
+    "protected": true,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "gate",
+      "adapter": "biome",
+      "params": {
+        "rule": "suspicious/noExplicitAny",
+        "level": "error"
+      }
+    }
+  },
+  {
+    "id": "strict.structured-logs",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction"
+    }
+  },
+  {
+    "id": "strict.thin-controllers",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction"
+    }
+  },
+  {
+    "id": "strict.typed-errors",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction"
+    }
+  },
+  {
+    "id": "strict.waiver-traced",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "evidence",
+      "evidence": "Entrée .koklo/waivers.yaml : fichier, règle, justification, auteur, expiration"
+    }
+  }
+]

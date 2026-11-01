@@ -23,10 +23,18 @@ export type ProfileKind = (typeof PROFILE_KINDS)[number];
 
 export type Severity = "blocking" | "advisory";
 
+/** Paramètres typés d'un enforcement (limites chiffrées : `{ max: 50 }`), jamais du texte libre. */
+export type EnforcementParams = Readonly<Record<string, number | string | boolean>>;
+
 export type Enforcement =
-  | { readonly kind: "gate"; readonly adapter: string; readonly command?: string }
-  | { readonly kind: "evidence"; readonly evidence: string }
-  | { readonly kind: "instruction" };
+  | {
+      readonly kind: "gate";
+      readonly adapter: string;
+      readonly command?: string;
+      readonly params?: EnforcementParams;
+    }
+  | { readonly kind: "evidence"; readonly evidence: string; readonly params?: EnforcementParams }
+  | { readonly kind: "instruction"; readonly params?: EnforcementParams };
 
 export interface Profile {
   readonly kind: ProfileKind;
