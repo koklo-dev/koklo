@@ -42,7 +42,7 @@ export interface SaveErrorView {
   title: string;
   text: string;
   actions: SaveErrorAction[];
-  /** Le prochain envoi prépare une nouvelle clé d'idempotence (faux seulement pour une absence de réponse). */
+  /** Le prochain envoi prépare une nouvelle clé d'idempotence (faux pour une absence de réponse ou un `INTERNAL` de `submit`). */
   freshKey: boolean;
   /** Lien `/github` proposé (propriétaire et administrateur seulement). */
   githubLink: boolean;
@@ -123,13 +123,19 @@ const TEXTS: Record<string, Entry> = {
   ),
 };
 
-function internal(requestId: unknown): Entry {
+/**
+ * `INTERNAL` : le serveur a peut-être écrit. Après la réponse de `submit` (inconnue), le réessai reprend la même clé
+ * pour une saisie identique : le serveur rejoue le résultat au lieu de créer un doublon. Un lot terminal
+ * `failed`/`INTERNAL` relu par `specBatch.get` est un échec connu : nouvelle clé.
+ */
+function internal(requestId: unknown, knownFailure: boolean): Entry {
   return {
     ...entry(
       "internal",
       "Nous ne savons pas si l'enregistrement a abouti",
       "Vérifiez la liste avant de réessayer, pour ne pas créer deux fois la même fonctionnalité.",
       ["check-list", "retry"],
+      knownFailure,
     ),
     ...(typeof requestId === "string" ? { requestId } : {}),
   };
@@ -214,7 +220,7 @@ function entryFor(failure: SaveFailure, context: SaveErrorContext): Entry {
   const data = failure.source === "submit" ? errorData(failure.error) : undefined;
   switch (code) {
     case "INTERNAL":
-      return internal(data?.requestId);
+      return internal(data?.requestId, failure.source === "batch");
     case "PROVIDER_UNAVAILABLE":
       return unavailable(manager);
     case "PROVIDER_AUTH_EXPIRED":

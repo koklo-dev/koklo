@@ -3,7 +3,7 @@ import { FeaturesPage } from "../../src/components/features-page.tsx";
 import { asRole } from "./github-fixtures.ts";
 import { renderWithQuery } from "./render.tsx";
 import { findRole } from "./wait.ts";
-import { procedures, setUrl } from "./web-mocks.ts";
+import { ORG_ID, procedures, setUrl } from "./web-mocks.ts";
 
 /**
  * Support des tests de la liste des fonctionnalités (TK-48 / 48d). Les `vi.mock` restent dans chaque fichier :
@@ -14,6 +14,8 @@ import { procedures, setUrl } from "./web-mocks.ts";
 // n'est relevé que pour les fichiers qui importent ce support ; une attente qui réussit n'en est pas ralentie.
 configure({ asyncUtilTimeout: 5_000 });
 
+/** Propriétaire des brouillons locaux : le compte `u1` des simulations et son organisation active. */
+export const SCOPE = { userId: "u1", organizationId: ORG_ID };
 export const PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
 export const OTHER_PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02";
 export const SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";

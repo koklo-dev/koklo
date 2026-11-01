@@ -54,12 +54,12 @@ describe("describeSaveError, erreur de submit", () => {
     }
   });
 
-  it("INTERNAL : « Nous ne savons pas si l'enregistrement a abouti », vérifier la liste, nouvelle clé", () => {
+  it("INTERNAL : « Nous ne savons pas si l'enregistrement a abouti », vérifier la liste, même clé au réessai", () => {
     const v = view(submit(apiError("INTERNAL", { requestId: "req-42" })));
     expect(v).toMatchObject({
       kind: "internal",
       actions: ["check-list", "retry"],
-      freshKey: true,
+      freshKey: false,
       requestId: "req-42",
     });
     expect(v.title).toBe("Nous ne savons pas si l'enregistrement a abouti");

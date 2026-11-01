@@ -14,7 +14,7 @@ import {
   savePending,
 } from "../src/lib/feature-draft.ts";
 import { EMPTY_VALUES } from "../src/lib/feature-form.ts";
-import { OTHER_PROJECT_ID, PROJECT_ID, SHA } from "./support/features.tsx";
+import { OTHER_PROJECT_ID, PROJECT_ID, SCOPE, SHA } from "./support/features.tsx";
 
 /**
  * TK-48 / 48e : brouillon (clé `koklo:feature-draft:<projectId>:<F-nnn|new>`, 7 jours) et marqueur de suivi
@@ -64,21 +64,21 @@ describe("brouillon", () => {
       baseCommitSha: SHA,
       idempotencyKey: "feature-abc",
     });
-    expect(saveDraft(PROJECT_ID, "F-001", value)).toBe(true);
-    expect(readDraft(PROJECT_ID, "F-001", NOW + 1000)).toEqual(value);
+    expect(saveDraft(SCOPE, PROJECT_ID, "F-001", value)).toBe(true);
+    expect(readDraft(SCOPE, PROJECT_ID, "F-001", NOW + 1000)).toEqual(value);
   });
 
   it("un brouillon par projet et par cible", () => {
-    saveDraft(PROJECT_ID, "new", draft());
-    expect(readDraft(PROJECT_ID, "F-001", NOW)).toBeNull();
-    expect(readDraft(OTHER_PROJECT_ID, "new", NOW)).toBeNull();
-    expect(readDraft(PROJECT_ID, "new", NOW)).not.toBeNull();
+    saveDraft(SCOPE, PROJECT_ID, "new", draft());
+    expect(readDraft(SCOPE, PROJECT_ID, "F-001", NOW)).toBeNull();
+    expect(readDraft(SCOPE, OTHER_PROJECT_ID, "new", NOW)).toBeNull();
+    expect(readDraft(SCOPE, PROJECT_ID, "new", NOW)).not.toBeNull();
   });
 
   it("expire après 7 jours : absent et supprimé du stockage ; juste avant : conservé", () => {
-    saveDraft(PROJECT_ID, "new", draft());
-    expect(readDraft(PROJECT_ID, "new", NOW + DRAFT_TTL_MS - 1000)).not.toBeNull();
-    expect(readDraft(PROJECT_ID, "new", NOW + DRAFT_TTL_MS + 1000)).toBeNull();
+    saveDraft(SCOPE, PROJECT_ID, "new", draft());
+    expect(readDraft(SCOPE, PROJECT_ID, "new", NOW + DRAFT_TTL_MS - 1000)).not.toBeNull();
+    expect(readDraft(SCOPE, PROJECT_ID, "new", NOW + DRAFT_TTL_MS + 1000)).toBeNull();
     expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).toBeNull();
   });
 
@@ -91,12 +91,12 @@ describe("brouillon", () => {
     ["valeurs de mauvais type", JSON.stringify({ ...draft(), values: "x" })],
   ])("contenu corrompu (%s) : ignoré sans lever, et supprimé", (_name, raw) => {
     localStorage.setItem(draftKey(PROJECT_ID, "new"), raw);
-    expect(readDraft(PROJECT_ID, "new", NOW)).toBeNull();
+    expect(readDraft(SCOPE, PROJECT_ID, "new", NOW)).toBeNull();
     expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).toBeNull();
   });
 
   it("clearDraft supprime la clé et ignore une clé absente", () => {
-    saveDraft(PROJECT_ID, "new", draft());
+    saveDraft(SCOPE, PROJECT_ID, "new", draft());
     clearDraft(PROJECT_ID, "new");
     expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).toBeNull();
     expect(() => clearDraft(PROJECT_ID, "new")).not.toThrow();
@@ -109,11 +109,11 @@ describe("brouillon", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(boom);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(boom);
     vi.spyOn(Storage.prototype, "removeItem").mockImplementation(boom);
-    expect(saveDraft(PROJECT_ID, "new", draft())).toBe(false);
-    expect(readDraft(PROJECT_ID, "new", NOW)).toBeNull();
+    expect(saveDraft(SCOPE, PROJECT_ID, "new", draft())).toBe(false);
+    expect(readDraft(SCOPE, PROJECT_ID, "new", NOW)).toBeNull();
     expect(() => clearDraft(PROJECT_ID, "new")).not.toThrow();
-    expect(savePending(PROJECT_ID, pending())).toBe(false);
-    expect(readPending(PROJECT_ID, NOW)).toBeNull();
+    expect(savePending(SCOPE, PROJECT_ID, pending())).toBe(false);
+    expect(readPending(SCOPE, PROJECT_ID, NOW)).toBeNull();
     expect(() => clearPending(PROJECT_ID)).not.toThrow();
     expect(() => clearAllFeatureStorage()).not.toThrow();
   });
@@ -122,20 +122,20 @@ describe("brouillon", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("full", "QuotaExceededError");
     });
-    expect(saveDraft(PROJECT_ID, "new", draft())).toBe(false);
+    expect(saveDraft(SCOPE, PROJECT_ID, "new", draft())).toBe(false);
   });
 });
 
 describe("marqueur de suivi", () => {
   it("écrit puis relit { batchId, kind, specId, title, savedAt }", () => {
-    expect(savePending(PROJECT_ID, pending())).toBe(true);
-    expect(readPending(PROJECT_ID, NOW + 1000)).toEqual(pending());
+    expect(savePending(SCOPE, PROJECT_ID, pending())).toBe(true);
+    expect(readPending(SCOPE, PROJECT_ID, NOW + 1000)).toEqual(pending());
   });
 
   it("périmé après 24 h : absent et supprimé", () => {
-    savePending(PROJECT_ID, pending());
-    expect(readPending(PROJECT_ID, NOW + PENDING_TTL_MS - 1000)).not.toBeNull();
-    expect(readPending(PROJECT_ID, NOW + PENDING_TTL_MS + 1000)).toBeNull();
+    savePending(SCOPE, PROJECT_ID, pending());
+    expect(readPending(SCOPE, PROJECT_ID, NOW + PENDING_TTL_MS - 1000)).not.toBeNull();
+    expect(readPending(SCOPE, PROJECT_ID, NOW + PENDING_TTL_MS + 1000)).toBeNull();
     expect(localStorage.getItem(pendingKey(PROJECT_ID))).toBeNull();
   });
 
@@ -143,26 +143,26 @@ describe("marqueur de suivi", () => {
     "contenu corrompu %j : ignoré et supprimé",
     (raw) => {
       localStorage.setItem(pendingKey(PROJECT_ID), raw);
-      expect(readPending(PROJECT_ID, NOW)).toBeNull();
+      expect(readPending(SCOPE, PROJECT_ID, NOW)).toBeNull();
       expect(localStorage.getItem(pendingKey(PROJECT_ID))).toBeNull();
     },
   );
 
   it("clearPending supprime le marqueur du projet seulement", () => {
-    savePending(PROJECT_ID, pending());
-    savePending(OTHER_PROJECT_ID, pending());
+    savePending(SCOPE, PROJECT_ID, pending());
+    savePending(SCOPE, OTHER_PROJECT_ID, pending());
     clearPending(PROJECT_ID);
-    expect(readPending(PROJECT_ID, NOW)).toBeNull();
-    expect(readPending(OTHER_PROJECT_ID, NOW)).not.toBeNull();
+    expect(readPending(SCOPE, PROJECT_ID, NOW)).toBeNull();
+    expect(readPending(SCOPE, OTHER_PROJECT_ID, NOW)).not.toBeNull();
   });
 });
 
 describe("clearAllFeatureStorage (déconnexion)", () => {
   it("efface tous les brouillons et marqueurs de suivi, et rien d'autre", () => {
-    saveDraft(PROJECT_ID, "new", draft());
-    saveDraft(PROJECT_ID, "F-001", draft());
-    saveDraft(OTHER_PROJECT_ID, "new", draft());
-    savePending(PROJECT_ID, pending());
+    saveDraft(SCOPE, PROJECT_ID, "new", draft());
+    saveDraft(SCOPE, PROJECT_ID, "F-001", draft());
+    saveDraft(SCOPE, OTHER_PROJECT_ID, "new", draft());
+    savePending(SCOPE, PROJECT_ID, pending());
     localStorage.setItem("koklo:theme", "dark");
     localStorage.setItem("autre-application", "x");
     clearAllFeatureStorage();

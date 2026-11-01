@@ -20,6 +20,7 @@ import {
 import { useFeatureDraft } from "./use-feature-draft.ts";
 import { useDraftChoices, useFormSave, useReload } from "./use-feature-form-actions.ts";
 import { WRITTEN_PHASES } from "./use-feature-submit.ts";
+import { useStorageScope } from "./use-storage-scope.ts";
 
 export type { Banner, FormArgs } from "./feature-form-state.ts";
 
@@ -90,11 +91,15 @@ function useFieldActions(setState: SetFormState) {
 /** Part d'état et actions du formulaire d'une fonctionnalité (création ou modification). */
 export function useFeatureForm(args: FormArgs) {
   const { projectId, mode, specId, detail, write, owner } = args;
-  const [init] = useState(() => initialState(args, detail ? valuesFromDetail(detail) : null));
+  const scope = useStorageScope();
+  const [init] = useState(() =>
+    initialState(args, detail ? valuesFromDetail(detail) : null, scope),
+  );
   const [state, setState] = useState<FormState>(init.state);
   const resumeKey = useRef(init.resume);
   const mine = write.meta?.owner === owner;
   const draft = useFeatureDraft({
+    scope,
     projectId,
     target: specId ?? "new",
     values: state.values,
