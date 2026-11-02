@@ -15,7 +15,7 @@ const GITHUB_CALLBACK_PATH = "/api/github/callback";
  * - `/api/webhooks/github` est relayé tel quel, sans session (livraisons signées de GitHub) ;
  * - `/api/github/callback` est relayé tel quel avec le cookie de session, sans lecture de session ici :
  *   l'API arbitre (session absente ou état invalide = `/github?result=invalid_state`, jamais `/login`) ;
- * - `/login`, `/projects`, `/projects/<id>/features`, `/kanban`, `/members`, `/github` et `/organizations` sont gardés
+ * - `/login`, `/projects`, `/projects/<id>/features`, `/projects/<id>/framing`, `/kanban`, `/members`, `/github` et `/organizations` sont gardés
  *   selon la session et l'organisation active ;
  * - `/accept-invitation/<id>` exige une session (sinon `/login?next=…`) mais jamais d'organisation active,
  *   et n'est jamais mis en cache.
@@ -71,6 +71,7 @@ export const config = {
     "/login",
     "/projects",
     "/projects/:projectId/features",
+    "/projects/:projectId/framing",
     "/kanban",
     "/members",
     "/github",

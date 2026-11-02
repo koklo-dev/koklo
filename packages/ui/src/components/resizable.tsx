@@ -22,7 +22,7 @@ export function ResizableHandle({
   return (
     <Separator
       className={cn(
-        "relative flex shrink-0 items-center justify-center bg-border transition-colors duration-150 hover:bg-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-[orientation=vertical]:w-px aria-[orientation=horizontal]:h-px aria-[orientation=vertical]:after:absolute aria-[orientation=vertical]:after:inset-y-0 aria-[orientation=vertical]:after:-left-1 aria-[orientation=vertical]:after:w-2 aria-[orientation=horizontal]:after:absolute aria-[orientation=horizontal]:after:inset-x-0 aria-[orientation=horizontal]:after:-top-1 aria-[orientation=horizontal]:after:h-2",
+        "relative flex shrink-0 items-center justify-center bg-border motion-safe:transition-colors duration-150 hover:bg-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-[orientation=vertical]:w-px aria-[orientation=horizontal]:h-px aria-[orientation=vertical]:after:absolute aria-[orientation=vertical]:after:inset-y-0 aria-[orientation=vertical]:after:-left-1 aria-[orientation=vertical]:after:w-2 aria-[orientation=horizontal]:after:absolute aria-[orientation=horizontal]:after:inset-x-0 aria-[orientation=horizontal]:after:-top-1 aria-[orientation=horizontal]:after:h-2",
         className,
       )}
       {...props}

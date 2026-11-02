@@ -24,7 +24,7 @@ function isStep(value: unknown): boolean {
   return isRecord(value) && STEP_TYPES.includes(value.type) && isText(value.text);
 }
 
-function isCriterion(value: unknown): boolean {
+export function isCriterion(value: unknown): boolean {
   return (
     isRecord(value) &&
     isOptional(value.id, (id) => typeof id === "string" && CRITERION_ID.test(id)) &&

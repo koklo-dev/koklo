@@ -36,6 +36,10 @@ interface ItemProps extends CriterionActions {
   readOnly: boolean;
   error: (field: string) => string | undefined;
   onBlur: () => void;
+  /** Identifiant DOM d'un champ (`criteria.2.title`) : par défaut celui du formulaire de fonctionnalité. */
+  idOf?: (field: string) => string;
+  /** Proposition de l'IA : tous les critères sont nouveaux (pas d'identité) et les boutons nomment le critère. */
+  named?: boolean;
 }
 
 function Identity({ criterion, renamed }: { criterion: CriterionValue; renamed: boolean }) {
@@ -51,6 +55,7 @@ function Identity({ criterion, renamed }: { criterion: CriterionValue; renamed: 
 }
 
 interface StepProps {
+  idOf: (field: string) => string;
   step: StepValue;
   criterion: number;
   position: number;
@@ -62,6 +67,7 @@ interface StepProps {
 }
 
 function StepRow({
+  idOf,
   step,
   criterion,
   position,
@@ -71,7 +77,7 @@ function StepRow({
   onRemove,
   onBlur,
 }: StepProps) {
-  const id = fieldId(`criteria.${criterion}.steps.${position}.text`);
+  const id = idOf(`criteria.${criterion}.steps.${position}.text`);
   return (
     <li className="flex flex-col gap-2 md:flex-row md:items-start">
       <Select
@@ -153,20 +159,23 @@ function CriterionTitle({ id, criterion, renamed, readOnly, error, onChange, onB
 }
 
 function ActionsBar(props: {
+  idOf: (field: string) => string;
+  /** Suffixe des libellés : « de « titre » » pour une proposition. */
+  suffix: string;
   number: number;
   count: number;
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
-  const { number, count, onMove, onRemove } = props;
+  const { idOf, suffix, number, count, onMove, onRemove } = props;
   return (
     <div className="grid grid-cols-3 gap-2 md:flex">
       <Button
-        id={fieldId(`criteria.${number}.up`)}
+        id={idOf(`criteria.${number}.up`)}
         type="button"
         variant="outline"
         className="h-11 md:h-9"
-        aria-label={`Monter le critère ${number}`}
+        aria-label={`Monter le critère ${number}${suffix}`}
         aria-disabled={number === 1 || undefined}
         onClick={() => number > 1 && onMove(-1)}
       >
@@ -174,11 +183,11 @@ function ActionsBar(props: {
         Monter
       </Button>
       <Button
-        id={fieldId(`criteria.${number}.down`)}
+        id={idOf(`criteria.${number}.down`)}
         type="button"
         variant="outline"
         className="h-11 md:h-9"
-        aria-label={`Descendre le critère ${number}`}
+        aria-label={`Descendre le critère ${number}${suffix}`}
         aria-disabled={number === count || undefined}
         onClick={() => number < count && onMove(1)}
       >
@@ -186,11 +195,11 @@ function ActionsBar(props: {
         Descendre
       </Button>
       <Button
-        id={fieldId(`criteria.${number}.remove`)}
+        id={idOf(`criteria.${number}.remove`)}
         type="button"
         variant="outline"
         className="h-11 md:h-9"
-        aria-label={`Retirer le critère ${number}`}
+        aria-label={`Retirer le critère ${number}${suffix}`}
         onClick={onRemove}
       >
         Retirer
@@ -199,8 +208,8 @@ function ActionsBar(props: {
   );
 }
 
-function Steps(props: ItemProps) {
-  const { criterion, number, readOnly, error, onBlur, onChange, onFocus } = props;
+function Steps(props: ItemProps & { idOf: (field: string) => string }) {
+  const { criterion, number, readOnly, error, onBlur, onChange, onFocus, idOf } = props;
   const set = (steps: StepValue[]) => onChange({ steps });
   if (criterion.steps.length === 0) {
     return (
@@ -216,6 +225,7 @@ function Steps(props: ItemProps) {
         <StepRow
           // biome-ignore lint/suspicious/noArrayIndexKey: étapes ordonnées, sans identifiant propre
           key={index}
+          idOf={idOf}
           step={step}
           criterion={number}
           position={index + 1}
@@ -224,7 +234,7 @@ function Steps(props: ItemProps) {
           onChange={(next) => set(criterion.steps.map((s, i) => (i === index ? next : s)))}
           onRemove={() => {
             set(criterion.steps.filter((_, i) => i !== index));
-            onFocus(fieldId(`criteria.${number}.add-step`));
+            onFocus(idOf(`criteria.${number}.add-step`));
           }}
           onBlur={onBlur}
         />
@@ -237,29 +247,31 @@ function Steps(props: ItemProps) {
 export function CriterionItem(props: ItemProps) {
   const { criterion, number, count, original, readOnly, error, onBlur } = props;
   const { onChange, onMove, onRemove, onFocus } = props;
+  const idOf = props.idOf ?? fieldId;
+  const named = props.named === true;
   const addStep = () => {
     onChange({ steps: [...criterion.steps, { type: nextStepType(criterion.steps), text: "" }] });
-    onFocus(fieldId(`criteria.${number}.steps.${criterion.steps.length + 1}.text`));
+    onFocus(idOf(`criteria.${number}.steps.${criterion.steps.length + 1}.text`));
   };
   return (
     <fieldset className="flex flex-col gap-3 rounded-lg border border-border p-3">
       <legend className="flex items-center gap-2 px-1 text-[13px] font-semibold">
         <span>{`Critère ${number}`}</span>
         <span className="sr-only">, </span>
-        <Identity criterion={criterion} renamed={isRenamed(criterion, original)} />
+        {named ? null : <Identity criterion={criterion} renamed={isRenamed(criterion, original)} />}
       </legend>
       <CriterionTitle
-        id={fieldId(`criteria.${number}.title`)}
+        id={idOf(`criteria.${number}.title`)}
         criterion={criterion}
-        renamed={isRenamed(criterion, original)}
+        renamed={!named && isRenamed(criterion, original)}
         readOnly={readOnly}
         error={error(`criteria.${number}.title`)}
         onChange={(title) => onChange({ title })}
         onBlur={onBlur}
       />
-      <Steps {...props} />
+      <Steps {...props} idOf={idOf} />
       <Button
-        id={fieldId(`criteria.${number}.add-step`)}
+        id={idOf(`criteria.${number}.add-step`)}
         type="button"
         variant="outline"
         className="h-11 w-full md:h-9 md:w-auto md:self-start"
@@ -268,7 +280,14 @@ export function CriterionItem(props: ItemProps) {
         <Icon name="add" size={16} />
         Ajouter une étape
       </Button>
-      <ActionsBar number={number} count={count} onMove={onMove} onRemove={onRemove} />
+      <ActionsBar
+        idOf={idOf}
+        suffix={named ? ` de « ${criterion.title} »` : ""}
+        number={number}
+        count={count}
+        onMove={onMove}
+        onRemove={onRemove}
+      />
     </fieldset>
   );
 }

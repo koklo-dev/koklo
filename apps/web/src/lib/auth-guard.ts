@@ -8,6 +8,9 @@ export type GuardedPath =
 
 /** Page d'un projet (TK-48d) : chemin dynamique, un seul segment `projectId`. */
 export type ProjectFeaturesPath = `/projects/${string}/features`;
+/** Cadrage assisté d'un projet (TK-59) : gardé comme la liste des fonctionnalités. */
+export type ProjectFramingPath = `/projects/${string}/framing`;
+export type ProjectPath = ProjectFeaturesPath | ProjectFramingPath;
 
 const EXACT_PATHS: readonly GuardedPath[] = [
   "/login",
@@ -17,24 +20,25 @@ const EXACT_PATHS: readonly GuardedPath[] = [
   "/github",
   "/organizations",
 ];
-/** `/projects/<un segment>/features` : jamais de sous-chemin ni de barre oblique finale. */
-const PROJECT_FEATURES = /^\/projects\/[^/]+\/features$/;
+/** `/projects/<un segment>/features` ou `/framing` : jamais de sous-chemin ni de barre oblique finale. */
+const PROJECT_PAGE = /^\/projects\/[^/]+\/(?:features|framing)$/;
 
 /**
- * Résout un chemin de requête en page gardée : les chemins exacts de `GuardedPath` et
- * `/projects/<un segment>/features`. Tout autre chemin (`/projects/<id>`, `/projects/<id>/features/x`) : null.
+ * Résout un chemin de requête en page gardée : les chemins exacts de `GuardedPath`, puis
+ * `/projects/<un segment>/features` et `/projects/<un segment>/framing`. Tout autre chemin
+ * (`/projects/<id>`, `/projects/<id>/features/x`) : null.
  */
-export function guardedPathFor(pathname: string): GuardedPath | ProjectFeaturesPath | null {
+export function guardedPathFor(pathname: string): GuardedPath | ProjectPath | null {
   const exact = EXACT_PATHS.find((path) => path === pathname);
   if (exact) return exact;
-  return PROJECT_FEATURES.test(pathname) ? (pathname as ProjectFeaturesPath) : null;
+  return PROJECT_PAGE.test(pathname) ? (pathname as ProjectPath) : null;
 }
 
 /** Destinations de redirection possibles (jamais /kanban ni /github : on y entre, on n'y renvoie pas). */
 export type RedirectPath = Exclude<GuardedPath, "/kanban" | "/github">;
 
 export interface AccessInput {
-  path: GuardedPath | ProjectFeaturesPath;
+  path: GuardedPath | ProjectPath;
   hasSession: boolean;
   /** Ignoré sans session ; absent = on ne sait pas, donc on ne renvoie pas vers /organizations. */
   hasActiveOrganization?: boolean;

@@ -6,7 +6,7 @@ import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 
 const itemBase =
-  "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors duration-150 focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
+  "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none motion-safe:transition-colors duration-150 focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
 
 export function DropdownMenu(props: ComponentProps<typeof MenuPrimitive.Root>) {
   return <MenuPrimitive.Root {...props} />;

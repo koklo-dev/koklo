@@ -19,7 +19,7 @@ export function SheetClose(props: ComponentProps<typeof SheetPrimitive.Close>) {
 }
 
 const sheetVariants = cva(
-  "fixed z-50 flex flex-col gap-4 border-border bg-background p-6 shadow-md transition-transform duration-150 motion-safe:animate-content-in motion-reduce:transition-none",
+  "fixed z-50 flex flex-col gap-4 border-border bg-background p-6 shadow-md motion-safe:transition-transform duration-150 motion-safe:animate-content-in motion-reduce:transition-none",
   {
     variants: {
       side: {
@@ -50,7 +50,7 @@ export function SheetContent({
         {children}
         <SheetPrimitive.Close
           aria-label={closeLabel}
-          className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none"
+          className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground motion-safe:transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none"
         >
           <Icon name="close" />
         </SheetPrimitive.Close>

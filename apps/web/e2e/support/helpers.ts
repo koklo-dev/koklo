@@ -13,7 +13,7 @@ import type { SpecRepoScenario } from "./stub-spec-repo.ts";
 export type ProjectsState = "loading" | "empty" | "data" | "error";
 export type Theme = "light" | "dark";
 
-const STUB = "http://127.0.0.1:3101";
+const STUB = `http://127.0.0.1:${process.env.E2E_API_PORT ?? 3101}`;
 
 /** Captures jointes à la PR : design/screens/captures/<écran>/<état>-<thème>.png */
 export const CAPTURES_DIR = resolve(import.meta.dirname, "../../../../design/screens/captures");
@@ -68,6 +68,10 @@ export async function switchToDark(page: Page): Promise<void> {
   // Avant l'hydratation le clic est sans effet : on le rejoue jusqu'à ce que la classe `dark` soit posée.
   await expect(async () => {
     const userMenu = page.getByRole("button", { name: "Menu utilisateur" });
+    const trigger = page.locator('[data-sidebar="trigger"]').first();
+    // Sous 768 px la barre latérale est un panneau : on l'ouvre pour atteindre le menu, puis on le referme.
+    const drawer = !(await userMenu.count()) && (await trigger.isVisible());
+    if (drawer) await trigger.click({ timeout: 2_000 });
     if (await userMenu.count()) {
       await userMenu.first().click({ timeout: 2_000 });
       await page
@@ -80,6 +84,7 @@ export async function switchToDark(page: Page): Promise<void> {
         .click({ timeout: 2_000 });
     }
     await expect(page.locator("html")).toHaveClass(/dark/, { timeout: 1_000 });
+    if (drawer) await page.keyboard.press("Escape");
   }).toPass({ timeout: 20_000 });
 }
 

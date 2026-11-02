@@ -30,7 +30,7 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
   return (
     <tr
       className={cn(
-        "border-b border-border transition-colors duration-150 hover:bg-muted data-[state=selected]:bg-accent",
+        "border-b border-border motion-safe:transition-colors duration-150 hover:bg-muted data-[state=selected]:bg-accent",
         className,
       )}
       {...props}
