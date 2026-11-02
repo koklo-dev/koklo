@@ -91,8 +91,7 @@ export const writeCount = (): number =>
 
 const nextId = (): string => `F-${String(4 + created.length).padStart(3, "0")}`;
 
-function apply(body: Record<string, unknown>): Batch["results"] {
-  const op = (body.operations as Array<Record<string, unknown>>)[0] ?? {};
+function applyOne(op: Record<string, unknown>, position: number): Batch["results"][number] {
   if (op.kind === "feature.create") {
     const specId = nextId();
     created.push({
@@ -102,12 +101,18 @@ function apply(body: Record<string, unknown>): Batch["results"] {
       priority: String(op.priority),
       criteriaCount: Array.isArray(op.criteria) ? op.criteria.length : 0,
     });
-    return [{ position: 0, kind: "feature.create", specId }];
+    return { position, kind: "feature.create", specId };
   }
   const specId = String(op.specId);
   if (op.kind === "feature.delete") deleted.push(specId);
   if (typeof op.title === "string") titles[specId] = op.title;
-  return [{ position: 0, kind: String(op.kind), specId }];
+  return { position, kind: String(op.kind), specId };
+}
+
+/** Applique toutes les opérations du lot (TK-59 : un lot de N créations), dans l'ordre. */
+function apply(body: Record<string, unknown>): Batch["results"] {
+  const operations = (body.operations as Array<Record<string, unknown>> | undefined) ?? [];
+  return operations.map((op, position) => applyOne(op, position));
 }
 
 const batchView = (batch: Batch, mode: WriteMode) => ({

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
+import type { AiScenario } from "./stub-ai.ts";
 import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
 import type {
@@ -31,7 +32,8 @@ export async function setScenario(
     invitation?: "ready" | "member" | "wrong" | "invalid";
   } & GithubScenario &
     SpecRepoScenario &
-    FeaturesScenario,
+    FeaturesScenario &
+    AiScenario,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
@@ -111,3 +113,11 @@ export interface SpecWrite {
 }
 export const specWritesSeen = async (): Promise<SpecWrite[]> =>
   (await fetch(`${STUB}/__spec-writes`)).json();
+
+/** Appels `ai.draftBrief` (`brief`) et `ai.proposeFeatures` (`features`) reçus par le faux modèle, dans l'ordre. */
+export interface AiCall {
+  kind: "brief" | "features";
+  body: Record<string, unknown>;
+}
+export const aiCallsSeen = async (): Promise<AiCall[]> =>
+  (await fetch(`${STUB}/__ai-calls`)).json();

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage } from "node:http";
+import { type AiScenario, handleAi, resetAi } from "./stub-ai.ts";
 import {
   type FeaturesScenario,
   handleFeatures,
@@ -28,7 +29,8 @@ type Scenario = {
 } & KanbanScenario &
   GithubScenario &
   SpecRepoScenario &
-  FeaturesScenario;
+  FeaturesScenario &
+  AiScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -159,6 +161,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetGithub();
     resetSpecRepo();
     resetFeatures();
+    resetAi();
     if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
   });
@@ -181,6 +184,7 @@ createServer((req, res) => {
   if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
   const knownProject = (id: string) =>
     [...PROJECTS, ...createdProjects].some((project) => project.id === id);
+  if (handleAi(req, url, { scenario, knownProject, send, hold })) return;
   if (handleFeatures(req, url, { scenario, knownProject, send, hold })) return;
   if (
     handleSpecRepo(req, path, {
