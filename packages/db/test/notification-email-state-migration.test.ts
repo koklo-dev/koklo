@@ -93,6 +93,8 @@ describe("TK-58a migration notification_email_state : dossier et contenu", () =>
     expect(migration(), "dossier de migration *_notification_email_state").toBeDefined();
     const previous = dirs().find((dir) => dir.endsWith(NOTIFICATION_SUFFIX)) as string;
     expect(migration() > previous).toBe(true);
+    const clientAccess = dirs().find((dir) => dir.endsWith("_project_client_access")) as string;
+    expect(migration() > clientAccess, "après 20261102090000_project_client_access").toBe(true);
     expect(sqlOf(migration(), "down.sql").trim().length).toBeGreaterThan(0);
   });
 
@@ -122,8 +124,8 @@ describe("TK-58a migration notification_email_state : dossier et contenu", () =>
     expect(down).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE)\b/i);
   });
 
-  it("n'ajoute aucune table : expectedTables reste à 39", () => {
-    expect(expectedTables).toHaveLength(39);
+  it("n'ajoute aucune table : expectedTables reste à 40", () => {
+    expect(expectedTables).toHaveLength(40);
     expect(expectedTables).toContain("notifications");
   });
 });
