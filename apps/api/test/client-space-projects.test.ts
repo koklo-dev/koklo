@@ -49,11 +49,12 @@ describe("clientSpace.projects : un client ne voit que ses projets liés", () =>
     expect(res.body).toEqual([]);
   });
 
-  it("ne montre jamais le projet d'une autre organisation, même à un client lié là-bas", async () => {
+  it("ne montre jamais le projet d'une autre organisation : un client étranger ne voit que le sien", async () => {
     const res = await projectsOf(scene.foreign.world.actors.client);
 
     expect(res.status).toBe(200);
-    expect(idsOf(res.body)).toEqual([]);
+    expect(idsOf(res.body)).toEqual([scene.foreign.projectId]);
+    expect(JSON.stringify(res.body)).not.toContain(scene.p1.projectId);
     expect(JSON.stringify((await projectsOf(scene.c1)).body)).not.toContain(
       scene.foreign.projectId,
     );

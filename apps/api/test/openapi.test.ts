@@ -21,6 +21,9 @@ describe("GET /openapi.json (C3.1)", () => {
     expect(response.body).toEqual(JSON.parse(JSON.stringify(await generateOpenApi())));
     expect(Object.keys(response.body.paths).sort()).toEqual([
       "/audit",
+      "/client-space/projects",
+      "/client-space/projects/{projectId}/features",
+      "/client-space/projects/{projectId}/features/{featureId}",
       "/comments",
       "/comments/{id}",
       "/health",

@@ -69,7 +69,7 @@ describe("clientSpace : un client lié lit son projet et seulement lui", () => {
 
     for (const shape of shapes) {
       expect(shape).toEqual(shapes[0]);
-      for (const part of shape) expect(part.body).toMatchObject({ code: "NOT_FOUND", status: 404 });
+      for (const part of shape) expect(part.body).toMatchObject({ code: "NOT_FOUND" });
     }
   });
 

@@ -547,6 +547,7 @@ member of the project and of the organization of the session.
 | `repo.list` | owner, admin, dev, designer |
 | `spec.head`, `spec.listFeatures`, `spec.getFeature` | owner, admin, dev, designer, business (never `client`, TK-55a) |
 | `projectClient.list`, `projectClient.add`, `projectClient.remove` | owner, admin |
+| `clientSpace.projects`, `clientSpace.features`, `clientSpace.feature` | all six roles (the `client` only on linked projects, 404 otherwise) |
 | `specBatch.submit` | owner, admin, dev; designer only for design-related features, checked per operation by the API |
 | `specBatch.get` | same roles as `specBatch.submit` |
 
@@ -1134,7 +1135,27 @@ sequenceDiagram
   A-->>B: 303 /github?result=installed
 ```
 
+## Client space reads (TK-55b)
+Contract 0.11.0, group `clientSpace` (`apps/api/src/client-space`), 57 routes, 42 paths, read only. All six roles
+read; a `client` reaches linked projects only, staff roles their whole organization, any other project is a uniform
+404. Business vocabulary only (no branch, SHA, file path, table or endpoint):
+
+| Procedure | Method | Path | Output |
+|---|---|---|---|
+| `clientSpace.projects` | GET | `/client-space/projects` | `[{ id, name, phase: framing or iteration }]` |
+| `clientSpace.features` | GET | `/client-space/projects/{projectId}/features?limit&cursor` | `{ items: [{ id, title, priority, criteriaCount, validation, previouslyValidated, openSuggestions }], version, nextCursor }` |
+| `clientSpace.feature` | GET | `/client-space/projects/{projectId}/features/{featureId}` | `{ id, title, description, priority, criteria, validation, previouslyValidated, version }` |
+
+- `version` is an opaque token (the head of the spec read); `phase` is `iteration` once a baseline is tagged.
+- `validation` (`validated`, `to_validate`, `to_revise`) comes from the latest review of the feature, valid only
+  while its recorded head is the current one; read only, empty until reviews are written (TK-55d).
+- A missing or failed index and any provider failure collapse into one typed error, `SPACE_NOT_READY` (503, no
+  `data`); `SPEC_INDEX_FAILED` and `PROVIDER_*` are never exposed here. Malformed `limit`, cursor or identifiers: 422.
+- The head is resolved by `SpecHeadResolver` (branch `cadrage` before the default branch), shared with `spec.*`.
+
 ## Version history
+- **0.11.0** (TK-55b): group `clientSpace` (`projects`, `features`, `feature`; 3 routes, 57 routes and 42 paths in
+  all), typed error `SPACE_NOT_READY` (503). Additive. Fingerprints of 0.1.0 to 0.10.0 unchanged.
 - **0.10.0** (TK-55a): group `projectClient` (`list`, `add`, `remove`; 3 routes, 54 routes and 39 paths in all),
   schemas `projectClientSchema` and its inputs. Additive. Fingerprints of 0.1.0 to 0.9.0 unchanged.
 - **0.9.0** (TK-54b): group `ai` (`draftBrief`, `proposeFeatures`, `proposeCriteria`) and `llmCredential.verify`

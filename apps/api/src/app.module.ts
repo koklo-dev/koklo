@@ -6,6 +6,7 @@ import { LoggerModule } from "nestjs-pino";
 import { AiModule } from "./ai/ai.module.ts";
 import { AuditModule } from "./audit/audit.module.ts";
 import { AuthModule } from "./auth/auth.module.ts";
+import { ClientSpaceModule } from "./client-space/client-space.module.ts";
 import { ClockModule } from "./clock.ts";
 import { CommentModule } from "./comment/comment.module.ts";
 import type { AppConfig } from "./config.ts";
@@ -94,6 +95,7 @@ export class AppModule {
         AiModule,
         SpecBatchModule,
         SpecReadModule,
+        ClientSpaceModule,
         WebhookModule,
       ],
       controllers: [OpenApiController],

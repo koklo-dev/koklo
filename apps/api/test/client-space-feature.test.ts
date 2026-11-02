@@ -122,7 +122,8 @@ describe("clientSpace.feature : détail métier", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("clientSpace : SPACE_NOT_READY masque tout échec d'index ou de fournisseur", () => {
-  const NOT_READY = { code: "SPACE_NOT_READY", status: 503 };
+  // Le statut HTTP est vérifié à part : le corps d'une erreur typée ne porte pas `status`.
+  const NOT_READY = { code: "SPACE_NOT_READY" };
 
   it("aucune spec indexée : 503 SPACE_NOT_READY sur la liste et le détail", async () => {
     const list = await api().features(scene.p1.projectId);

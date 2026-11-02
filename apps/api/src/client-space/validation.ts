@@ -17,16 +17,27 @@ export interface ValidationState {
 
 /**
  * Dernière review d'une cible : la plus récente par `createdAt`, à égalité l'identifiant le plus
- * grand (uuid v7, monotone). SQUELETTE DU RED.
+ * grand (uuid v7, monotone). Ne modifie pas la liste reçue.
  */
-export function latestReview(_reviews: readonly ReviewVerdict[]): ReviewVerdict | undefined {
-  return undefined;
+export function latestReview(reviews: readonly ReviewVerdict[]): ReviewVerdict | undefined {
+  return reviews.reduce<ReviewVerdict | undefined>(
+    (latest, review) => (latest === undefined || compare(review, latest) > 0 ? review : latest),
+    undefined,
+  );
 }
 
-/** Statut de validation au regard de la tête courante. SQUELETTE DU RED. */
-export function validationOf(
-  _latest: ReviewVerdict | undefined,
-  _headSha: string,
-): ValidationState {
-  return { validation: "to_validate", previouslyValidated: false };
+function compare(a: ReviewVerdict, b: ReviewVerdict): number {
+  return a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+/** Statut de validation au regard de la tête courante (comparaison exacte du SHA). */
+export function validationOf(latest: ReviewVerdict | undefined, headSha: string): ValidationState {
+  if (latest === undefined) return { validation: "to_validate", previouslyValidated: false };
+  if (latest.sha === headSha) {
+    return {
+      validation: latest.status === "approved" ? "validated" : "to_revise",
+      previouslyValidated: false,
+    };
+  }
+  return { validation: "to_validate", previouslyValidated: latest.status === "approved" };
 }

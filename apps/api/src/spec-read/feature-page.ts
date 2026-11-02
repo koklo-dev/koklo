@@ -1,4 +1,3 @@
-import type { FeatureSummary } from "@koklo/contract";
 import { validation } from "../tracker/api-errors.ts";
 
 const FEATURE_ID = /^F-\d{3,}$/;
@@ -22,11 +21,11 @@ function decodeCursor(cursor: string): string {
 }
 
 /** Page d'une liste triée numériquement, par curseur opaque (l'identifiant de la dernière ligne). */
-export function pageFeatures(
-  rows: readonly FeatureSummary[],
+export function pageFeatures<T extends { specId: string }>(
+  rows: readonly T[],
   limit: number,
   cursor: string | undefined,
-): { items: FeatureSummary[]; nextCursor: string | null } {
+): { items: T[]; nextCursor: string | null } {
   const after = cursor === undefined ? undefined : { specId: decodeCursor(cursor) };
   const sorted = [...rows]
     .sort(compareFeatures)
