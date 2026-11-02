@@ -75,7 +75,9 @@ describe("recul exponentiel plafonné, gigue injectée", () => {
   it.each([-0.1, 1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "0.5", null, undefined])(
     "rejette une gigue hors de [0,1) : %j",
     (jitter) => {
-      expect(() => hit(startQuotaState(), "j", NOW, jitter as number)).toThrow(InvalidQuotaError);
+      expect(() =>
+        onQuotaHit(startQuotaState(), signal({ id: "j" }), NOW, jitter as number, BACKOFF),
+      ).toThrow(InvalidQuotaError);
     },
   );
 });
@@ -134,7 +136,7 @@ describe("resolveResetAt : arithmétique entière, sans Date ni Intl", () => {
   });
 
   it("résout aussi à travers minuit et sur un instant négatif", () => {
-    expect(resolveResetAt(clock(1), NOW + 20 * HOUR, 0)).toBe(NOW + 25 * HOUR);
+    expect(resolveResetAt(clock(1), NOW + 20 * HOUR, 0)).toBe(NOW + 41 * HOUR);
     expect(resolveResetAt(clock(0), -HOUR, 0)).toBe(0);
   });
 

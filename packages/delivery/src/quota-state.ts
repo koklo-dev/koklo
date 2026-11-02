@@ -1,4 +1,7 @@
+import { assertFresh, assertNow, expectedVersionOf } from "./quota-check.ts";
 import type { QuotaScope, UsagePolicy } from "./quota-policy.ts";
+import { assertScope, assertUsagePolicy } from "./quota-usage-check.ts";
+import { capsFreeAt } from "./quota-window.ts";
 
 export const QUOTA_STATUSES = ["ok", "backoff", "exhausted"] as const;
 export type QuotaStatus = (typeof QUOTA_STATUSES)[number];
@@ -28,42 +31,80 @@ export type QuotaDecision =
   | { readonly action: "wait"; readonly until: number }
   | { readonly action: "halt"; readonly reason: "quota_exhausted" };
 
-export const startQuotaState = (): QuotaState => {
-  throw new Error("TK-74b : startQuotaState non implémenté");
+/** Copie gelée en profondeur : un état est une valeur, jamais modifiée sur place. */
+export const freezeQuotaState = (state: QuotaState): QuotaState => {
+  const windows = Object.entries(state.windows).map(([key, count]) => [
+    key,
+    Object.freeze({ start: count.start, runs: count.runs, tokens: count.tokens }),
+  ]);
+  return Object.freeze({
+    ...state,
+    windows: Object.freeze(Object.fromEntries(windows)),
+    usageIds: Object.freeze([...state.usageIds]),
+  });
 };
 
-export const canStart = (
-  _state: QuotaState,
-  _now: number,
-  _scope: QuotaScope,
-  _policy?: UsagePolicy,
-): boolean => {
-  throw new Error("TK-74b : canStart non implémenté");
-};
+export const startQuotaState = (): QuotaState =>
+  freezeQuotaState({
+    status: "ok",
+    resumeAt: null,
+    consecutiveHits: 0,
+    lastHitAt: null,
+    lastSignalId: null,
+    windows: {},
+    usageIds: [],
+    version: 0,
+  });
 
 /** `now` si libre ; epoch ms sinon ; null = attente humaine (`exhausted`). */
 export const nextAllowedAt = (
-  _state: QuotaState,
-  _now: number,
-  _scope: QuotaScope,
-  _policy?: UsagePolicy,
+  state: QuotaState,
+  now: number,
+  scope: QuotaScope,
+  policy?: UsagePolicy,
 ): number | null => {
-  throw new Error("TK-74b : nextAllowedAt non implémenté");
+  assertNow(now);
+  assertScope(scope);
+  if (policy !== undefined) assertUsagePolicy(policy);
+  if (state.status === "exhausted") return null;
+  const backoffUntil =
+    state.status === "backoff" && state.resumeAt !== null && now < state.resumeAt
+      ? state.resumeAt
+      : now;
+  const capsUntil = policy === undefined ? now : capsFreeAt(state, now, scope, policy);
+  return Math.max(backoffUntil, capsUntil);
 };
+
+export const canStart = (
+  state: QuotaState,
+  now: number,
+  scope: QuotaScope,
+  policy?: UsagePolicy,
+): boolean => nextAllowedAt(state, now, scope, policy) === now;
 
 export const quotaDecision = (
-  _state: QuotaState,
-  _now: number,
-  _scope: QuotaScope,
-  _policy?: UsagePolicy,
+  state: QuotaState,
+  now: number,
+  scope: QuotaScope,
+  policy?: UsagePolicy,
 ): QuotaDecision => {
-  throw new Error("TK-74b : quotaDecision non implémenté");
+  const until = nextAllowedAt(state, now, scope, policy);
+  if (until === null) return { action: "halt", reason: "quota_exhausted" };
+  return until === now ? { action: "start" } : { action: "wait", until };
 };
 
-/** Réarmement humain : retour à `ok`, compteurs de recul remis à zéro. */
+/** Réarmement humain : retour à `ok`, compteurs de recul remis à zéro ; sans effet si déjà libre. */
 export const clearQuota = (
-  _state: QuotaState,
-  _options?: { expectedVersion?: number },
+  state: QuotaState,
+  options?: { expectedVersion?: number },
 ): QuotaState => {
-  throw new Error("TK-74b : clearQuota non implémenté");
+  assertFresh(state.version, expectedVersionOf(options));
+  if (state.status === "ok" && state.consecutiveHits === 0) return state;
+  return freezeQuotaState({
+    ...state,
+    status: "ok",
+    resumeAt: null,
+    consecutiveHits: 0,
+    version: state.version + 1,
+  });
 };

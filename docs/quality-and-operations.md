@@ -1087,3 +1087,18 @@ organisation; they are deleted at the end only if the test App has the Administr
   `strict.file-size-*` and `strict.no-dead-code-or-orphan-todo` stay UNVERIFIED.
 - **Open point**: waivers on locked limits (vision §17.2) are rejected by this package; a
   tech-lead decision or another ticket must settle it.
+
+## Provider quotas: detection and backoff (TK-74 lots 74a and 74b)
+- **UNVERIFIED, NEEDS-HUMAN**: the 11 quota formulations in `QUOTA_PATTERNS` (`packages/delivery/
+  src/quota-signal.ts`) are HYPOTHESES from the analysis; no real capture has been compared. A human
+  must capture a real usage-limit message (stderr and `result` event) of the provider and add or
+  correct the matching pattern with its test. Until then the verdict on detection stays UNVERIFIED,
+  never PASS.
+- **Values to set by a human (D1)**: the package codes no default. The runner must give
+  `BackoffPolicy` (`baseMs`, `maxDelayMs`, `jitterRatio`, `maxConsecutiveHits`, `utcOffsetMinutes`)
+  and `UsagePolicy` (`windowMs`, `maxSeenIds`, ceilings per organization, project and agent).
+- **Operation**: `exhausted` means a human wait (empty credit or too many consecutive hits): re-arm
+  with `clearQuota` after fixing the account. A named zone (`(Europe/Paris)`) is not interpreted: the
+  exponential fallback applies unless the caller gives `utcOffsetMinutes` and the hint has no zone.
+- **Out of scope**: sleeping until `resumeAt`, the loop and the persistence of the serialised state
+  belong to TK-75; wiring the Claude Code `classify` on `detectQuota` is lot 74c.
