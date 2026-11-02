@@ -2,6 +2,8 @@ import { Alert, Button, Icon } from "@koklo/ui";
 import type { AiErrorView } from "../lib/ai-errors.ts";
 import { formatRetry } from "../lib/ai-errors.ts";
 import { IDS } from "../lib/framing-ids.ts";
+import { canManage } from "../lib/roles.ts";
+import { useActiveOrganization } from "../lib/use-active-organization.ts";
 
 interface Props {
   view: AiErrorView;
@@ -21,6 +23,22 @@ function Countdown({ remaining }: { remaining: number | null }) {
 }
 
 /**
+ * Propriétaires et administrateurs : lien vers les réglages de l'IA (S-framing §4.5) ; les autres rôles et le
+ * rôle encore inconnu (fail-closed) gardent le texte « Demandez... », jamais un lien vers une page refusée.
+ */
+function Action({ view }: { view: AiErrorView }) {
+  const { role } = useActiveOrganization();
+  if (view.kind === "not_configured" && canManage(role)) {
+    return (
+      <Button asChild variant="outline" className="h-11 md:h-9">
+        <a href="/settings/ai">Configurer l'IA</a>
+      </Button>
+    );
+  }
+  return view.action ? <p>{view.action}</p> : null;
+}
+
+/**
  * L'unique alerte d'échec d'un appel IA (S-framing §4.5 à §4.9) : icône + texte, jamais le message du
  * fournisseur ni le texte saisi. « Réessayer » seulement quand c'est sûr.
  */
@@ -34,7 +52,7 @@ export function AiErrorNotice({ view, remaining, onRetry }: Props) {
           <Countdown remaining={remaining} />
         </p>
         {view.detail ? <p>{view.detail}</p> : null}
-        {view.action ? <p>{view.action}</p> : null}
+        <Action view={view} />
         {view.retryable ? (
           <>
             <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onRetry}>

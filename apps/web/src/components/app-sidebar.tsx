@@ -18,6 +18,9 @@ const MEMBERS_ENTRY = { title: "Membres", url: "/members", icon: "person" } as c
 /** Réservée aux propriétaires et administrateurs ; tant que le rôle est inconnu, elle n'est pas rendue. */
 const GITHUB_ENTRY = { title: "GitHub", url: "/github", icon: "link" } as const;
 
+/** Réglages de l'IA (clé du fournisseur) : mêmes règles que GitHub, propriétaires et administrateurs seulement. */
+const AI_ENTRY = { title: "IA", url: "/settings/ai", icon: "smart_toy" } as const;
+
 function Navigation() {
   const pathname = usePathname();
   const { role } = useActiveOrganization();
@@ -25,7 +28,7 @@ function Navigation() {
     PROJECTS_ENTRY,
     KANBAN_ENTRY,
     ...(canListMembers(role) ? [MEMBERS_ENTRY] : []),
-    ...(canManage(role) ? [GITHUB_ENTRY] : []),
+    ...(canManage(role) ? [GITHUB_ENTRY, AI_ENTRY] : []),
   ];
   return <NavMain items={entries.map((item) => ({ ...item, isActive: pathname === item.url }))} />;
 }

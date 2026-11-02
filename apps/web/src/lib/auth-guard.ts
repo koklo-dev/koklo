@@ -4,6 +4,7 @@ export type GuardedPath =
   | "/kanban"
   | "/members"
   | "/github"
+  | "/settings/ai"
   | "/organizations";
 
 /** Page d'un projet (TK-48d) : chemin dynamique, un seul segment `projectId`. */
@@ -18,6 +19,7 @@ const EXACT_PATHS: readonly GuardedPath[] = [
   "/kanban",
   "/members",
   "/github",
+  "/settings/ai",
   "/organizations",
 ];
 /** `/projects/<un segment>/features` ou `/framing` : jamais de sous-chemin ni de barre oblique finale. */
@@ -34,8 +36,8 @@ export function guardedPathFor(pathname: string): GuardedPath | ProjectPath | nu
   return PROJECT_PAGE.test(pathname) ? (pathname as ProjectPath) : null;
 }
 
-/** Destinations de redirection possibles (jamais /kanban ni /github : on y entre, on n'y renvoie pas). */
-export type RedirectPath = Exclude<GuardedPath, "/kanban" | "/github">;
+/** Destinations de redirection possibles (jamais /kanban, /github ni /settings/ai : on y entre, on n'y renvoie pas). */
+export type RedirectPath = Exclude<GuardedPath, "/kanban" | "/github" | "/settings/ai">;
 
 export interface AccessInput {
   path: GuardedPath | ProjectPath;
