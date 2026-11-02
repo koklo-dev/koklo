@@ -1,4 +1,5 @@
 import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Icon } from "@koklo/ui";
+import { useState } from "react";
 import { BRIEF_FIELDS, linesOf } from "../lib/framing-brief.ts";
 import { IDS } from "../lib/framing-ids.ts";
 import type { BriefFields } from "../lib/framing-types.ts";
@@ -47,9 +48,60 @@ function PastedBrief({ page }: { page: FramingModel }) {
   );
 }
 
+/** Confirmation en ligne avant d'écraser un brief corrigé à la main (S-framing §3.4). */
+function RegenerateConfirm({ onReplace, onKeep }: { onReplace: () => void; onKeep: () => void }) {
+  return (
+    <fieldset
+      aria-label="Confirmer la régénération"
+      className="flex flex-col gap-2 rounded-md border border-border p-3"
+    >
+      <p className="text-sm">
+        Vos modifications du brief seront remplacées par un nouveau brief proposé par l'IA.
+      </p>
+      <div className="flex flex-col gap-2 md:flex-row">
+        <Button type="button" className="h-11 md:h-9" onClick={onReplace}>
+          Remplacer le brief
+        </Button>
+        <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onKeep}>
+          Garder mon brief
+        </Button>
+      </div>
+    </fieldset>
+  );
+}
+
+/** Un champ de réponse sous chaque question ouverte. */
+function AnswerFields({ page, questions }: { page: FramingModel; questions: string[] }) {
+  const { state, change } = page;
+  return (
+    <>
+      {questions.map((question, index) => (
+        <FramingTextField
+          // biome-ignore lint/suspicious/noArrayIndexKey: questions ordonnées, sans identifiant propre
+          key={index}
+          id={`framing-answer-${index + 1}`}
+          label={`Réponse ${index + 1}`}
+          rows={2}
+          help={question}
+          maxLength={1000}
+          value={state.answers[index] ?? ""}
+          onChange={(value) => {
+            const next = questions.map((_, i) => state.answers[i] ?? "");
+            next[index] = value;
+            change({ answers: next });
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 /** Réponses aux questions ouvertes (facultatif) : « Régénérer le brief » n'est jamais automatique. */
 function Questions({ page }: { page: FramingModel }) {
-  const { state, view, change, patch, call, calls } = page;
+  const { state, view, patch, call, calls } = page;
+  const [confirming, setConfirming] = useState(false);
+  // Un champ au moins n'est plus tel que proposé : la régénération écraserait des corrections humaines.
+  const edited = view.aiFields.length < BRIEF_FIELDS.length;
   const questions = linesOf(state.brief?.openQuestions ?? "");
   if (state.mode !== "idea" || questions.length === 0) return null;
   if (!view.answering) {
@@ -71,35 +123,34 @@ function Questions({ page }: { page: FramingModel }) {
   }
   return (
     <div className="flex flex-col gap-4">
-      {questions.map((question, index) => (
-        <FramingTextField
-          // biome-ignore lint/suspicious/noArrayIndexKey: questions ordonnées, sans identifiant propre
-          key={index}
-          id={`framing-answer-${index + 1}`}
-          label={`Réponse ${index + 1}`}
-          rows={2}
-          help={question}
-          maxLength={1000}
-          value={state.answers[index] ?? ""}
-          onChange={(value) => {
-            const next = questions.map((_, i) => state.answers[i] ?? "");
-            next[index] = value;
-            change({ answers: next });
-          }}
-        />
-      ))}
+      <AnswerFields page={page} questions={questions} />
       <FramingCallButton
         id={IDS.callBrief}
         label="Régénérer le brief"
         busy={call.pending === "regenerate"}
         disabled={call.pending !== null || call.waiting}
         cancelled={call.cancelled && calls.lastKind() === "regenerate"}
-        onClick={() => calls.generateBrief(true)}
+        onClick={() => {
+          if (edited) setConfirming(true);
+          else calls.generateBrief(true);
+        }}
         onCancel={() => {
           call.cancel();
           page.focusOn(IDS.callBrief);
         }}
       />
+      {confirming && edited && call.pending === null ? (
+        <RegenerateConfirm
+          onReplace={() => {
+            setConfirming(false);
+            calls.generateBrief(true);
+          }}
+          onKeep={() => {
+            setConfirming(false);
+            page.focusOn(IDS.callBrief);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -161,7 +212,7 @@ export function FramingBriefStep({ page }: { page: FramingModel }) {
         2. Le brief
       </h2>
       {failed && call.error ? (
-        <AiErrorNotice view={call.error} remaining={call.remaining} onRetry={call.retry} />
+        <AiErrorNotice view={call.error} remaining={call.remaining} onRetry={calls.retry} />
       ) : null}
       {state.mode === "idea" ? <BriefFieldsForm page={page} /> : <PastedBrief page={page} />}
       <Questions page={page} />

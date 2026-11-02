@@ -155,10 +155,13 @@ describe("LLM_PROVIDER_ERROR (502, §4.7)", () => {
 });
 
 describe("LLM_RATE_LIMITED (429) : compte à rebours par palier (§4.6)", () => {
+  /**
+   * Minuteurs simulés AVANT l'échec : le décompte naît sous l'horloge simulée et `tick` le pilote. Elle avance aussi
+   * un peu avec l'horloge réelle (saisie, rendu) ; l'arrondi à la seconde absorbe cette dérive sous charge.
+   */
   async function limited(seconds: number) {
-    const alert = await failBrief(apiError("LLM_RATE_LIMITED", { retryAfterSeconds: seconds }));
-    vi.useFakeTimers();
-    return alert;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    return failBrief(apiError("LLM_RATE_LIMITED", { retryAfterSeconds: seconds }));
   }
   const tick = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 

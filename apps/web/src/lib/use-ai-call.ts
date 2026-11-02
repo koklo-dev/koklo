@@ -70,7 +70,6 @@ function useCallRunner() {
   const [state, setState] = useState<CallState>(IDLE);
   const busy = useRef(false);
   const generation = useRef(0);
-  const last = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       generation.current += 1;
@@ -84,7 +83,6 @@ function useCallRunner() {
       busy.current = true;
       generation.current += 1;
       const mine = generation.current;
-      last.current = () => run(kind, call, onDone);
       setState({ ...IDLE, pending: kind });
       call().then(
         (output) => {
@@ -109,7 +107,7 @@ function useCallRunner() {
     setState({ ...IDLE, cancelled: true });
   }, []);
 
-  return { state, run, cancel, retry: () => last.current?.(), clear: () => setState(IDLE) };
+  return { state, run, cancel, clear: () => setState(IDLE) };
 }
 
 /**
@@ -118,7 +116,7 @@ function useCallRunner() {
  * toucher au brouillon.
  */
 export function useAiCall() {
-  const { state, run, cancel, retry, clear } = useCallRunner();
+  const { state, run, cancel, clear } = useCallRunner();
   const unauthorized = useUnauthorizedRedirect(state.raw);
   const countdown = useRetryCountdown(state.error);
   return {
@@ -132,7 +130,6 @@ export function useAiCall() {
     waiting: (countdown.remaining ?? 0) > 0,
     run,
     cancel,
-    retry,
     clear,
   };
 }

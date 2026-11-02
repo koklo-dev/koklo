@@ -174,7 +174,14 @@ const STATES: State[] = [
     name: "duplicates",
     ai: "duplicates",
     reach: toProposals,
-    visible: alertWith("Toutes ces propositions ressemblent à des fonctionnalités existantes."),
+    visible: (page) =>
+      expect(
+        page
+          .getByRole("note")
+          .filter({
+            hasText: "Toutes ces propositions ressemblent à des fonctionnalités existantes.",
+          }),
+      ).toBeVisible(),
   },
   {
     name: "not-configured",

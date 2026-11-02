@@ -242,7 +242,7 @@ describe("Doublons (non bloquants)", () => {
     expect(screen.queryByText(/déjà présent/)).not.toBeInTheDocument();
   });
 
-  it("toutes en doublon : alerte « Toutes ces propositions ressemblent à des fonctionnalités existantes. », liste conservée", async () => {
+  it("toutes en doublon : note (pas d'alerte, réservée à l'échec d'un appel) « Toutes ces propositions ressemblent à des fonctionnalités existantes. », liste conservée", async () => {
     procedures.aiProposeFeatures.mockResolvedValue({
       ...PROPOSALS_OUTPUT,
       features: PROPOSALS_OUTPUT.features.slice(0, 2),
@@ -253,9 +253,10 @@ describe("Doublons (non bloquants)", () => {
     });
     await openFraming();
     await proposeFeatures();
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(screen.getByRole("note")).toHaveTextContent(
       "Toutes ces propositions ressemblent à des fonctionnalités existantes.",
     );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(
       expect.arrayContaining([T1, T2]),
     );

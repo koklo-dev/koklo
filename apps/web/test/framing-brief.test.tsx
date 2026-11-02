@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_ID } from "./support/features.tsx";
@@ -157,6 +157,38 @@ describe("Questions ouvertes (§3.4)", () => {
       idea: IDEA,
       answers: expect.arrayContaining([expect.stringContaining("Oui, par carte")]),
     });
+  });
+});
+
+describe("Régénérer après des corrections humaines", () => {
+  async function editThenRegenerate() {
+    await openFraming();
+    await generateBrief();
+    await paste(screen.getByRole("textbox", { name: /^Titre/ }), "Titre corrigé");
+    await userEvent.click(screen.getByRole("button", { name: "Répondre aux questions" }));
+    await userEvent.click(screen.getByRole("button", { name: "Régénérer le brief" }));
+  }
+
+  it("demande confirmation avant d'écraser : aucun appel tant que rien n'est confirmé", async () => {
+    await editThenRegenerate();
+    expect(screen.getByRole("group", { name: "Confirmer la régénération" })).toHaveTextContent(
+      "Vos modifications du brief seront remplacées",
+    );
+    expect(briefCalls()).toHaveLength(1);
+  });
+
+  it("« Garder mon brief » conserve les corrections sans appel", async () => {
+    await editThenRegenerate();
+    await userEvent.click(screen.getByRole("button", { name: "Garder mon brief" }));
+    expect(briefCalls()).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: /^Titre/ })).toHaveDisplayValue(/Titre corrigé/);
+    expect(screen.queryByRole("group", { name: "Confirmer la régénération" })).toBeNull();
+  });
+
+  it("« Remplacer le brief » relance l'appel", async () => {
+    await editThenRegenerate();
+    await userEvent.click(screen.getByRole("button", { name: "Remplacer le brief" }));
+    await waitFor(() => expect(briefCalls()).toHaveLength(2));
   });
 });
 

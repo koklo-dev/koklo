@@ -111,7 +111,7 @@ export function FramingProposalsStep({ page }: { page: FramingModel }) {
             Relisez chaque proposition. Rien n'est accepté par défaut.
           </p>
           {proposals.allDuplicates ? (
-            <Alert role="alert">
+            <Alert role="note">
               <Icon name="warning" size={20} />
               <p>Toutes ces propositions ressemblent à des fonctionnalités existantes.</p>
             </Alert>

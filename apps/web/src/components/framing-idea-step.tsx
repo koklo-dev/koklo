@@ -162,7 +162,7 @@ export function FramingIdeaStep({ page }: { page: FramingModel }) {
         1. Votre idée
       </h2>
       {failed && call.error ? (
-        <AiErrorNotice view={call.error} remaining={call.remaining} onRetry={call.retry} />
+        <AiErrorNotice view={call.error} remaining={call.remaining} onRetry={calls.retry} />
       ) : null}
       {collapsed ? (
         <IdeaSummary page={page} />

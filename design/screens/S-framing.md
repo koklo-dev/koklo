@@ -53,7 +53,7 @@ Le bouton d'appel nomme le destinataire : « Générer un brief avec l'IA », «
 ### 3.4 Étape 2 : « Le brief » (éditable)
 - Le brief structuré s'affiche dans des champs **éditables** (`Input` / `Textarea` avec `label` visible) : « Titre », « Problème », « Utilisateurs », « Résultat attendu », « Contraintes », « Questions ouvertes » (une par ligne). L'humain peut tout corriger ; les champs sont concaténés en un texte unique (1 à 20 000 caractères) envoyé à `ai.proposeFeatures`.
 - Badge « Proposé par l'IA » (icône `smart_toy` + texte) au-dessus du brief généré, retiré dès la première modification du champ concerné.
-- Questions ouvertes : texte d'aide « Répondre à ces questions améliore le brief. » + bouton secondaire « Répondre aux questions » qui ouvre, sous chaque question, un champ de réponse ; « Régénérer le brief » relance `ai.draftBrief` avec ces réponses dans `answers` (jamais automatique). Facultatif.
+- Questions ouvertes : texte d'aide « Répondre à ces questions améliore le brief. » + bouton secondaire « Répondre aux questions » qui ouvre, sous chaque question, un champ de réponse ; « Régénérer le brief » relance `ai.draftBrief` avec ces réponses dans `answers` (jamais automatique). Si un champ du brief a été corrigé à la main, une confirmation en ligne (groupe « Confirmer la régénération » : « Vos modifications du brief seront remplacées par un nouveau brief proposé par l'IA. », boutons « Remplacer le brief » / « Garder mon brief ») précède l'appel. « Réessayer » après un échec renvoie la saisie affichée à ce moment, jamais celle du premier clic. Facultatif.
 - Bouton principal « Proposer des fonctionnalités avec l'IA », précédé du bloc 3.2. Bouton secondaire « Revenir à l'idée ».
 - Ligne technique repliée (équipe seulement) : « Modèle : `<meta.model>` · `<entrée>` / `<sortie>` jetons » (JetBrains Mono 12 px). Jamais de coût monétaire.
 
@@ -115,7 +115,7 @@ Une seule situation principale par zone. Priorité d'évaluation : session / org
 
 ### 4.4 Propositions vides ou toutes en doublon
 - Aucune proposition renvoyée : `Card` « L'IA n'a proposé aucune fonctionnalité nouvelle. » + conseil « Précisez le brief et réessayez. » + « Revenir au brief ».
-- Toutes en doublon : `Alert` (icône `warning`) « Toutes ces propositions ressemblent à des fonctionnalités existantes. » ; la liste reste affichée.
+- Toutes en doublon : note informative (`Alert` avec `role="note"`, icône `warning`, jamais `role="alert"` : réservé à l'échec d'un appel) « Toutes ces propositions ressemblent à des fonctionnalités existantes. » ; la liste reste affichée.
 
 ### 4.5 IA non configurée (`LLM_NOT_CONFIGURED`, 409)
 `Alert` titre « L'IA n'est pas encore configurée pour votre organisation. », icône `lock` ; le détail selon la raison :
@@ -212,12 +212,15 @@ Bandeau en haut de page (`DraftBanner` généralisé) : « Brouillon de cadrage 
 - **Q9** Modèle et jetons affichés à l'équipe seulement (pas aux non-admins) : à confirmer.
 - **Q10** `maxFeatures` non exposé (défaut 8).
 - **Q11** Page ouverte même quand la spec n'est pas prête (enregistrement bloqué) : à confirmer.
+- **Q12** (revue TK-59, à trancher) Rôle illisible : l'écran s'ouvre et l'API arbitre `ai.*` (aligné sur S-features), alors que §1 dit « tout rôle inconnu » sans écran. Aligner la fiche ou le code.
+- **Q13** (revue TK-59, comportement documenté) « Annuler l'attente » libère le verrou local mais la requête serveur continue : un second clic peut déclencher deux appels comptés dans le plafond de 10 par heure et par utilisateur. Message actuel « La demande a déjà été comptée. » ; à garder en tête pour le plafond.
 - Ordre Étant donné -> Quand -> Alors cassé par l'humain dans une édition : signalé ou refusé ? À vérifier au Red avec `SPEC_INVALID`.
 
 ## 10. Historique
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-11-02 | TK-59 | Création : écran de cadrage assisté (idée, brief éditable, propositions éditables À relire / Acceptée / Rejetée, récapitulatif, un seul `specBatch.submit`), bloc permanent « ce qui est envoyé à Anthropic », états IA non configurée, limite avec compte à rebours, erreurs fournisseur, sortie invalide, collision de délimiteur, spec non prête, designer. Détail : `.workflow/TK-59/02-design.md` |
+| 2 | 2026-11-02 | TK-59 (revue) | « Réessayer » repart de la saisie courante ; confirmation avant d'écraser un brief corrigé ; doublons en `role="note"` ; questions Q12 et Q13 |
 
 ## 11. Plan d'implémentation web et tests (brief développeur)
 Aucun changement de contrat ni nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.

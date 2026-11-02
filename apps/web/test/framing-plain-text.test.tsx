@@ -16,6 +16,7 @@ import {
   PROPOSE,
   serveFraming,
   step,
+  stepThree,
   stepTwo,
 } from "./support/framing.tsx";
 import { findNamed } from "./support/wait.ts";
@@ -105,6 +106,8 @@ describe("Propositions hostiles", () => {
     expect(item.textContent).toContain(`Critère ${IMG}`);
     expect(item.textContent).toContain(REF);
     expectInert(item, ALLOWED);
+    // Toute la portée de l'étape (cartes normales et hostile, listes de critères et d'étapes), pas la seule carte.
+    for (const list of stepThree().getAllByRole("list")) expectInert(list, ALLOWED);
   });
 
   it("le seul lien d'une carte est celui du doublon, construit à partir de F-nnn", async () => {

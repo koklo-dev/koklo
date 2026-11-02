@@ -63,6 +63,22 @@ interface CallsOptions {
 }
 
 /**
+ * « Réessayer » repart de la saisie affichée maintenant : on garde les gestionnaires du dernier rendu, jamais la
+ * fermeture du premier clic (sinon l'ancien texte partirait chez le fournisseur).
+ */
+function useRetry(
+  lastKind: { current: CallKind },
+  handlers: { generateBrief: (regenerate: boolean) => void; propose: () => void },
+): () => void {
+  const current = useRef(handlers);
+  current.current = handlers;
+  return () => {
+    if (lastKind.current === "propose") current.current.propose();
+    else current.current.generateBrief(lastKind.current === "regenerate");
+  };
+}
+
+/**
  * Les deux appels IA de l'écran : brief (idée -> brief) et propositions (brief -> fonctionnalités). Un clic est au
  * plus un appel ; une sortie ne crée jamais rien (S-framing §5.1, §5.2).
  */
@@ -111,9 +127,12 @@ export function useFramingCalls({ projectId, state, change, call, view }: CallsO
     );
   };
 
+  const retry = useRetry(lastKind, { generateBrief, propose });
+
   return {
     generateBrief,
     propose,
+    retry,
     /** Champ à qui rendre le focus quand le texte saisi est refusé (collision de délimiteur). */
     fieldToFix: (): string => {
       if (lastKind.current !== "propose") return IDS.idea;
