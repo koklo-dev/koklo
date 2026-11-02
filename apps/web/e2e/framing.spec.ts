@@ -176,11 +176,9 @@ const STATES: State[] = [
     reach: toProposals,
     visible: (page) =>
       expect(
-        page
-          .getByRole("note")
-          .filter({
-            hasText: "Toutes ces propositions ressemblent à des fonctionnalités existantes.",
-          }),
+        page.getByRole("note").filter({
+          hasText: "Toutes ces propositions ressemblent à des fonctionnalités existantes.",
+        }),
       ).toBeVisible(),
   },
   {
