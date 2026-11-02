@@ -28,7 +28,7 @@
     "resend": "6.35.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@biomejs/biome": "2.6.4",
     "@sentry/node": "11.10.0",
     "@testcontainers/postgresql": "12.2.1",
     "@types/node": "24.19.2",
