@@ -80,6 +80,10 @@ async function failPropose(error: unknown) {
 }
 
 describe("LLM_NOT_CONFIGURED (409, §4.5) : trois raisons", () => {
+  // Texte « Demandez à un administrateur... » : celui des rôles sans accès aux réglages (S-framing v2.1 §4.5) ;
+  // le lien « Configurer l'IA » des propriétaires et administrateurs est couvert par framing-configure-link.test.tsx.
+  beforeEach(() => serveFraming("dev"));
+
   it.each([
     ["missing", "Aucune clé n'a été enregistrée."],
     ["invalidated", "La clé enregistrée a été refusée par le fournisseur et a été désactivée."],

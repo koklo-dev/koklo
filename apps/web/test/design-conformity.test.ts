@@ -104,6 +104,14 @@ const FILES = [
   "components/framing-submit-bar.tsx",
   "lib/framing-operations.ts",
   "lib/use-framing-proposals.ts",
+  // Réglages de l'IA : clé du fournisseur de l'organisation (design/screens/S-ai-settings.md section 11)
+  "app/settings/ai/page.tsx",
+  "app/settings/ai/layout.tsx",
+  "components/ai-settings-page.tsx",
+  "components/ai-credential-card.tsx",
+  "components/ai-credential-form.tsx",
+  "components/ai-credential-remove.tsx",
+  "lib/ai-settings-labels.ts",
 ];
 
 const RAW_COLOR_CLASS =

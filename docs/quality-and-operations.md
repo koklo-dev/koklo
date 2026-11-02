@@ -238,6 +238,28 @@ covers_commit: bb9f740
   deleting keys still work. Audit lines (`llm_credential.*`) carry no detail: see
   [API contract](api-contract.md#byok-llm-credentials-tk-52b).
 
+### AI settings screen and the origin guard on key writes (web: AI settings)
+- **Web.** `/settings/ai` (owner and admin only) sends the key once, in the body of `PUT /llm-credentials/anthropic`.
+  The field is an uncontrolled `password` input emptied in a `finally` right after it is read (success, refusal
+  and network failure alike); the key is never in React state, storage, the TanStack cache (mutations use
+  `gcTime: 0` and are `reset()` once settled), the console, the URL or any message. After a failed `set` the
+  key is typed again, there is no "Réessayer". The route alone answers `Cache-Control: no-store` and
+  `Referrer-Policy: no-referrer` (`next.config.ts` `headers()`). Tests: `ai-settings-*`, guard
+  `ai-settings-secret-guard`, e2e `ai-settings.spec.ts` (the value appears only in the PUT body).
+- **API origin guard (CSRF).** The session travels in a cookie, so a foreign site could post a key write with
+  the visitor's cookie. `OriginGuard` (`apps/api/src/auth/origin.guard.ts`) refuses with `403 FORBIDDEN`, before
+  any session or service call, a write whose `Origin` header is present and is not strictly equal (scheme, host,
+  port; never a substring) to a trusted origin, i.e. the origin of `BETTER_AUTH_URL` (the public URL of the
+  web, also Better Auth's `trustedOrigins`). `Origin: null` is refused. Without `Origin` (server to server,
+  tools, tokens) the call is accepted unless the browser declares `Sec-Fetch-Site` other than `same-origin` or
+  `none`. The refusal never repeats the origin it received. Make sure `BETTER_AUTH_URL` is the exact public
+  origin users reach (the web proxies `/api/orpc` with the browser's `Origin` unchanged); a mismatch makes key
+  writes answer 403. Tests: `llm-credential-origin.test.ts`.
+- **Scope, on purpose.** The guard is applied to `llmCredential.set`, `remove`, `invalidate` and `verify` only.
+  The rest of the API is **not** covered by it yet; generalising it (every cookie-authenticated write, a shared
+  list of trusted origins, a global CSP) is a separate ticket to open. Do not assume other writes are protected.
+- Log level `trace`, stdout, stderr and Sentry never carry the key either (`llm-credential-set-logging.test.ts`).
+
 ### Suggestions: untrusted text (TK-51b)
 - `suggestions.body` and `suggestions.decision_note` are client-supplied and stored raw: never build a
   prompt by concatenation; wrap them with `Untrusted("client-suggestion")`. Do not log them in full

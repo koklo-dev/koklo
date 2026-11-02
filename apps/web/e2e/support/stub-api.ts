@@ -8,6 +8,7 @@ import {
 } from "./stub-features.ts";
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
+import { handleLlm, type LlmScenario, resetLlm } from "./stub-llm-credential.ts";
 import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
 
 /**
@@ -30,7 +31,8 @@ type Scenario = {
   GithubScenario &
   SpecRepoScenario &
   FeaturesScenario &
-  AiScenario;
+  AiScenario &
+  LlmScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -162,6 +164,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetSpecRepo();
     resetFeatures();
     resetAi();
+    resetLlm();
     if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
   });
@@ -173,6 +176,14 @@ const expireSession = () => {
   scenario.session = false;
 };
 
+const knownProject = (id: string) =>
+  [...PROJECTS, ...createdProjects].some((project) => project.id === id);
+
+/** Appels à l'IA (`ai.*`) et réglages de la clé (`llmCredential.*`) : même modèle simulé, jamais de fournisseur réel. */
+const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
+  handleLlm(req, url, { scenario, send, hold }) ||
+  handleAi(req, url, { scenario, knownProject, send, hold });
+
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://stub");
   const path = url.pathname;
@@ -182,9 +193,7 @@ createServer((req, res) => {
   if (path === "/__health") return send(json(200, { ok: true }));
   if (handleControl(req, path, send)) return;
   if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
-  const knownProject = (id: string) =>
-    [...PROJECTS, ...createdProjects].some((project) => project.id === id);
-  if (handleAi(req, url, { scenario, knownProject, send, hold })) return;
+  if (handleAiApis(req, url, send)) return;
   if (handleFeatures(req, url, { scenario, knownProject, send, hold })) return;
   if (
     handleSpecRepo(req, path, {

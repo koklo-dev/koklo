@@ -1,7 +1,7 @@
 ---
 id: S-framing
 titre: Cadrage assisté par IA (idée, brief, propositions de fonctionnalités)
-version: 1
+version: 1.1
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe qui écrit** : propriétaire, administrateur, développeur, designer (`canWriteSpec` = `SPEC_BATCH_ROLES` des appels `ai.*`). Elle transforme une idée en brief structuré, puis en propositions de fonctionnalités à relire, éditer, accepter ou rejeter, et enregistre les acceptées dans la spec en une seule fois.
@@ -18,7 +18,7 @@ version: 1
   - **Adresse directe** : la page s'ouvre quel que soit l'état de la spec (4.10).
   - Pas de nouvelle entrée de barre latérale : le cadrage est une dépendance du projet (même raisonnement que S-features §8, alternative 1).
 - Sorties : `UNAUTHORIZED` vers `/login` (brouillon local gardé) ; session sans organisation active vers `/organizations` ; fil d'Ariane vers « Projets » et vers le projet ; « Voir la liste » après un enregistrement vers `/projects/[projectId]/features`.
-- Hors lot : persistance du brief (jamais écrit en base ni dans le dépôt), page de réglages de la clé IA (ticket séparé), suggestions de critères pour une fonctionnalité existante (lot 59c, **reporté**, §9 Q1), découpage en tickets.
+- Hors lot : persistance du brief (jamais écrit en base ni dans le dépôt), page de réglages de la clé IA (écran S-ai-settings), suggestions de critères pour une fonctionnalité existante (lot 59c, **reporté**, §9 Q1), découpage en tickets.
 - Découpage de livraison : **59a** socle + étapes 1 et 2 (idée, brief) ; **59b** propositions + soumission ; **59c** reporté.
 
 ## 3. Contenu
@@ -123,8 +123,10 @@ Une seule situation principale par zone. Priorité d'évaluation : session / org
 - `invalidated` : « La clé enregistrée a été refusée par le fournisseur et a été désactivée. »
 - `undecryptable` : « La clé enregistrée est illisible : il faut la saisir à nouveau. »
 
-Action pour **tous les rôles** : « **Demandez à un administrateur de l'organisation d'ajouter la clé.** » (texte, jamais un lien mort : la page de réglages n'existe pas encore ; un lien « Ouvrir les réglages de l'IA » pour propriétaire / administrateur viendra avec ce ticket, §9 Q8). Saisie et brouillon conservés.
-- Clé refusée en cours d'usage (`LLM_PROVIDER_ERROR` `auth`) : même alerte, texte « Le fournisseur a refusé la clé de l'organisation. Elle est désactivée jusqu'à ce qu'un administrateur la remplace. »
+Action selon le rôle (saisie et brouillon conservés dans tous les cas) :
+- **Propriétaire / administrateur** : lien « **Configurer l'IA** » vers `/settings/ai` (S-ai-settings), à la place du texte « Demandez à un administrateur ». Le lien est un vrai lien, dans l'alerte, 44 px sous 768 px.
+- **Autres rôles** (développeur, designer, client, business, rôle inconnu) : texte inchangé, « **Demandez à un administrateur de l'organisation d'ajouter la clé.** » (jamais un lien : ils n'ont pas accès à la page de réglages).
+- Clé refusée en cours d'usage (`LLM_PROVIDER_ERROR` `auth`) : même alerte et même action selon le rôle, texte « Le fournisseur a refusé la clé de l'organisation. Elle est désactivée jusqu'à ce qu'un administrateur la remplace. »
 
 ### 4.6 Limite atteinte (`LLM_RATE_LIMITED`, 429) avec compte à rebours
 `Alert` (icône `schedule`) « Trop de demandes pour le moment. Réessayez dans `<N>` s. » ; le bouton d'appel est désactivé jusqu'à l'échéance puis réactivé. Compte à rebours **annoncé par palier** (`aria-live="polite"` toutes les 15 secondes, et à l'échéance « Vous pouvez réessayer. »), jamais chaque seconde ; le chiffre visible se met à jour chaque seconde mais n'est pas dans la région annoncée. Sous `prefers-reduced-motion`, aucun mouvement (le texte seul change). Au-delà de 60 s, affichage « environ N min ». Saisie conservée. Quota du fournisseur (`LLM_PROVIDER_ERROR` `quota`) : « Le crédit du compte du fournisseur est épuisé : à vérifier par un administrateur. »
@@ -208,7 +210,7 @@ Bandeau en haut de page (`DraftBanner` généralisé) : « Brouillon de cadrage 
 - **Q5** Designer : **voit l'écran mais ne peut pas enregistrer** les propositions sans écran lié (message 4.11) ; à confirmer (alternatives : masquer le bouton pour ce rôle, ou permettre de lier un écran dans la carte).
 - **Q6** Après un enregistrement réussi : propositions rejetées **jetées**.
 - **Q7** Durée du brouillon : 7 jours (alignée sur 48e) ; purgé à la déconnexion. Une durée plus courte (24 h) est possible, les propositions pouvant contenir des données saisies.
-- **Q8** Page de réglages de la clé IA : inexistante, ticket séparé à planifier avant l'essai de bout en bout ; en attendant, texte « Demandez à un administrateur ».
+- **Q8** Page de réglages de la clé IA : créée, voir [S-ai-settings](S-ai-settings.md) ; lien « Configurer l'IA » pour owner/admin, texte « Demandez à un administrateur » pour les autres rôles.
 - **Q9** Modèle et jetons affichés à l'équipe seulement (pas aux non-admins) : à confirmer.
 - **Q10** `maxFeatures` non exposé (défaut 8).
 - **Q11** Page ouverte même quand la spec n'est pas prête (enregistrement bloqué) : à confirmer.
@@ -221,6 +223,7 @@ Bandeau en haut de page (`DraftBanner` généralisé) : « Brouillon de cadrage 
 |---|---|---|---|
 | 1 | 2026-11-02 | TK-59 | Création : écran de cadrage assisté (idée, brief éditable, propositions éditables À relire / Acceptée / Rejetée, récapitulatif, un seul `specBatch.submit`), bloc permanent « ce qui est envoyé à Anthropic », états IA non configurée, limite avec compte à rebours, erreurs fournisseur, sortie invalide, collision de délimiteur, spec non prête, designer. Détail : `.workflow/TK-59/02-design.md` |
 | 2 | 2026-11-02 | TK-59 (revue) | « Réessayer » repart de la saisie courante ; confirmation avant d'écraser un brief corrigé ; doublons en `role="note"` ; questions Q12 et Q13 |
+| 2.1 | 2026-11-02 | Web : réglages IA | §4.5 : lien « Configurer l'IA » vers `/settings/ai` pour owner/admin ; texte « Demandez à un administrateur » inchangé pour les autres rôles ; Q8 résolue |
 
 ## 11. Plan d'implémentation web et tests (brief développeur)
 Aucun changement de contrat ni nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.

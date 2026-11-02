@@ -7,6 +7,7 @@ import {
   setScenario,
   switchToDark,
 } from "./support/helpers.ts";
+import type { LlmScenario } from "./support/stub-llm-credential.ts";
 
 type Page = {
   name: string;
@@ -18,6 +19,7 @@ type Page = {
   board?: KanbanBoard;
   role?: KanbanRole;
   installations?: "loading" | "empty" | "data" | "internal";
+  llm?: LlmScenario["llm"];
 };
 
 const PAGES: readonly Page[] = [
@@ -77,6 +79,49 @@ const PAGES: readonly Page[] = [
     installations: "data",
   },
   { name: "github non-manager", path: "/github", session: true, projects: "data", role: "dev" },
+  // Réglages de l'IA (S-ai-settings §7) : axe sans violation sur chaque état, clair et sombre
+  {
+    name: "ai-settings loading",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    llm: { list: "loading" },
+  },
+  {
+    name: "ai-settings absent",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    llm: { list: "absent" },
+  },
+  {
+    name: "ai-settings configured",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    llm: { list: "configured" },
+  },
+  {
+    name: "ai-settings invalid",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    llm: { list: "invalid" },
+  },
+  {
+    name: "ai-settings error",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    llm: { list: "internal" },
+  },
+  {
+    name: "ai-settings non-admin",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    role: "dev",
+  },
   {
     name: "organizations create",
     path: "/organizations",
@@ -114,6 +159,7 @@ for (const theme of ["light", "dark"] as const) {
     board,
     role,
     installations,
+    llm,
   } of PAGES) {
     test(`axe WCAG AA sans violation : ${name} (${theme})`, async ({ page }) => {
       await setScenario({
@@ -124,6 +170,7 @@ for (const theme of ["light", "dark"] as const) {
         ...(board ? { board } : {}),
         ...(role ? { role } : {}),
         ...(installations ? { installations } : {}),
+        ...(llm ? { llm } : {}),
       });
       await page.goto(path);
       if (theme === "dark") await switchToDark(page);

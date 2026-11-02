@@ -19,7 +19,7 @@ interface CallState {
 const IDLE: CallState = { pending: null, error: null, raw: null, cancelled: false };
 
 /** Secondes restantes avant l'échéance et texte à annoncer (palier de 15 s, puis « Vous pouvez réessayer. »). */
-function useRetryCountdown(error: AiErrorView | null) {
+export function useRetryCountdown(error: AiErrorView | null) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const seconds = error?.retryAfterSeconds ?? null;

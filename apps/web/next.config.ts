@@ -10,6 +10,17 @@ const config: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   // Dev uniquement : la pastille Next recouvre la bascule de thème (bas de la barre latérale) et intercepte les clics.
   devIndicators: false,
+  // Réglages de l'IA (S-ai-settings §5) : la saisie d'une clé ne doit ni être mise en cache ni fuiter par le Referer.
+  // Limités à cette route : aucune règle générale.
+  headers: async () => [
+    {
+      source: "/settings/ai",
+      headers: [
+        { key: "Cache-Control", value: "no-store" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+      ],
+    },
+  ],
 };
 
 export default config;
