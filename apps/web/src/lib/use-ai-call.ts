@@ -5,7 +5,7 @@ import { type AiErrorView, describeAiError, formatRetry } from "./ai-errors.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
 
 /** Palier d'annonce du compte à rebours (S-framing §4.6) : jamais chaque seconde. */
-export const ANNOUNCE_EVERY_S = 15;
+const ANNOUNCE_EVERY_S = 15;
 const SETTLE_TURNS = 2;
 
 interface CallState {

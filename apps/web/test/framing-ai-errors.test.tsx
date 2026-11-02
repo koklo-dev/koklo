@@ -279,10 +279,10 @@ describe("Autres échecs (§4.7, §4.12)", () => {
 
   it("UNAUTHORIZED sans session : /login, brouillon gardé, aucune alerte", async () => {
     procedures.aiDraftBrief.mockRejectedValue(apiError("UNAUTHORIZED"));
-    getSession.mockResolvedValue(NO_SESSION);
     await openFraming();
     await writeIdea();
     await waitFor(() => expect(localStorage.getItem(framingDraftKey(PROJECT_ID))).not.toBeNull());
+    getSession.mockResolvedValue(NO_SESSION);
     await userEvent.click(screen.getByRole("button", { name: GENERATE }));
     await waitFor(() => expect(navigations()).toContain("/login"));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

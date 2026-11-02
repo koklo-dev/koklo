@@ -14,7 +14,7 @@ const replaceIn = (
 ): FramingProposal[] => list.map((proposal) => (proposal.id === id ? next(proposal) : proposal));
 
 /** Compteurs de la barre d'enregistrement : seules les acceptées valides comptent. */
-export function summarize(proposals: FramingProposal[]) {
+function summarize(proposals: FramingProposal[]) {
   const accepted = proposals.filter(
     (proposal) => proposal.status === "accepted" && isValidProposal(proposal.value),
   );

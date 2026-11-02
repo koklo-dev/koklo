@@ -176,7 +176,7 @@ describe("Ligne technique repliée (§3.4)", () => {
     await openTechnical();
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toMatch(/Modèle : claude-test-1 · 812 \/ 344 jetons/);
-    expect(text).not.toMatch(/€|$|USD|EUR|coût de/i);
+    expect(text).not.toMatch(/€|\$|\bUSD\b|\bEUR\b|coût de/i);
   });
 
   it("le mot « jetons » n'apparaît nulle part ailleurs que dans cette ligne", async () => {

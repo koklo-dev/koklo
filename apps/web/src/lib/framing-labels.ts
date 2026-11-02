@@ -5,7 +5,6 @@ export const HELP_TEXT =
   "L'IA propose, vous décidez. Rien n'est enregistré dans la spec avant votre confirmation.";
 export const BUSY_TEXT =
   "Génération en cours. Cela peut prendre une minute. Vous pouvez continuer à lire.";
-export const BUSY_OTHER_TEXT = "Une génération est déjà en cours.";
 export const BRIEF_READY_TEXT = "Brief prêt, relisez-le.";
 export const SAVING_TEXT = "Enregistrement en cours…";
 export const CHECKING_TEXT = "Chargement du cadrage…";
@@ -15,7 +14,7 @@ export const NO_SPEC_TEXT = "Le projet n'a pas encore de spec.";
 export const SPEC_FAILED_TEXT = "La préparation de la spec a échoué.";
 export const DESIGNER_TEXT =
   "En tant que designer, vous ne pouvez enregistrer qu'une fonctionnalité liée à un écran. Les propositions n'en ont pas : relisez-les ici, puis créez-les depuis le formulaire de la fonctionnalité.";
-export const ANNOUNCE_TITLE_MAX = 60;
+const ANNOUNCE_TITLE_MAX = 60;
 
 /** « N proposition(s) à relire. » */
 export const proposalsReadyText = (count: number): string =>

@@ -83,11 +83,7 @@ describe("Éditions", () => {
   it("« Terminer la modification » applique le titre, referme, et rend le focus à « Modifier »", async () => {
     await openEditor();
     await paste(titleBox(T1), "Titre corrigé");
-    await userEvent.click(
-      inCard(T1.replace(T1, "Titre corrigé")).getByRole("button", {
-        name: "Terminer la modification",
-      }),
-    );
+    await userEvent.click(inCard(T1).getByRole("button", { name: "Terminer la modification" }));
     expect(screen.getByRole("heading", { name: "Titre corrigé", level: 3 })).toBeVisible();
     expect(inCard("Titre corrigé").getByRole("button", { name: "Modifier" })).toHaveFocus();
   });

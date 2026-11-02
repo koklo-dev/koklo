@@ -44,7 +44,7 @@ export function toProposals(output: Pick<ProposalsOutput, "features" | "duplicat
 }
 
 /** Idée et précisions envoyées à `ai.draftBrief` ; à la régénération, avec les réponses aux questions. */
-export function briefInput(projectId: string, state: FramingDraft, regenerate: boolean) {
+function briefInput(projectId: string, state: FramingDraft, regenerate: boolean) {
   const answers = regenerate
     ? [...linesOf(state.clarifications), ...answersOf(state.answers)].slice(0, 10)
     : linesOf(state.clarifications);
@@ -52,7 +52,7 @@ export function briefInput(projectId: string, state: FramingDraft, regenerate: b
 }
 
 /** Nature d'un appel : `brief` (étape 1), `regenerate` (étape 2, avec les réponses), `propose` (étape 2). */
-export type CallKind = "brief" | "regenerate" | "propose";
+type CallKind = "brief" | "regenerate" | "propose";
 
 interface CallsOptions {
   projectId: string;

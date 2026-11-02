@@ -5,7 +5,7 @@ import { GENERIC_ERROR } from "./form-errors.ts";
  * Table des erreurs `LLM_*` et voisines -> vue d'erreur de l'écran de cadrage (S-framing §4.5 à §4.9).
  * Jamais le message de l'erreur (il peut venir du fournisseur), jamais l'écho du texte saisi.
  */
-export type AiErrorKind =
+type AiErrorKind =
   | "not_configured"
   | "rate_limited"
   | "provider"

@@ -16,7 +16,6 @@ import {
   PROPOSE,
   serveFraming,
   step,
-  stepThree,
   stepTwo,
 } from "./support/framing.tsx";
 import { findNamed } from "./support/wait.ts";
@@ -105,7 +104,7 @@ describe("Propositions hostiles", () => {
     await userEvent.click(within(item).getByRole("button", { name: "1 critère d'acceptation" }));
     expect(item.textContent).toContain(`Critère ${IMG}`);
     expect(item.textContent).toContain(REF);
-    expectInert(stepThree().getByRole("list"), ALLOWED);
+    expectInert(item, ALLOWED);
   });
 
   it("le seul lien d'une carte est celui du doublon, construit à partir de F-nnn", async () => {

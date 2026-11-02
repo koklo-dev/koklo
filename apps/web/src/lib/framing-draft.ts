@@ -16,7 +16,8 @@ import type { FramingDraft } from "./framing-types.ts";
  * Le contenu relu est traité comme non fiable : schéma strict, sinon la clé est supprimée.
  */
 export { FRAMING_DRAFT_PREFIX };
-export const FRAMING_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const FRAMING_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const framingDraftKey = (projectId: string): string => `${FRAMING_DRAFT_PREFIX}${projectId}`;
 
 const MAX_TEXT = 100_000;

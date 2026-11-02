@@ -7,7 +7,7 @@ import type { FramingDraft } from "./framing-types.ts";
 import { useBeginFeatureSession, useStorageScope } from "./use-storage-scope.ts";
 
 /** Écriture du brouillon 300 ms après la dernière modification (le démontage écrit aussi, sauf session terminée). */
-export const FRAMING_DRAFT_DELAY_MS = 300;
+const FRAMING_DRAFT_DELAY_MS = 300;
 
 export type FramingPatch = Partial<Omit<FramingDraft, "savedAt">>;
 export type Change = (patch: FramingPatch | ((current: FramingDraft) => FramingPatch)) => void;

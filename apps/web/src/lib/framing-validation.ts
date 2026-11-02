@@ -6,7 +6,7 @@ import type { ProposedFeature } from "./framing-types.ts";
  * Validation d'une proposition : les règles du formulaire de fonctionnalité (titre, critères, étapes), sans les
  * liens que l'écran de cadrage n'édite pas (S-framing §3.5).
  */
-export const DESCRIPTION_MAX = 4000;
+const DESCRIPTION_MAX = 4000;
 export const ORDER_WARNING = "L'ordre habituel est Étant donné, Quand, Alors.";
 
 const LINK_FIELDS = /^(screens|roles|rules|tables|endpoints|nfr|status)$/;

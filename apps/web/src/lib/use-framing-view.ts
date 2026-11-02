@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { BriefFields } from "./framing-types.ts";
 
 /** Ce que l'écran garde en mémoire sans le sauvegarder dans le brouillon (S-framing §3, §4). */
-export interface FramingView {
+interface FramingView {
   /** Champs du brief encore tels que proposés par l'IA (badge « Proposé par l'IA »). */
   aiFields: Array<keyof BriefFields>;
   /** Ligne technique « Modèle : ... » (équipe seulement, repliée). */

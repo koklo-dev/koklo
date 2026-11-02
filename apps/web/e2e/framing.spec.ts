@@ -329,7 +329,7 @@ test("S-framing : parcours complet idée -> brief -> propositions -> accepter, r
   await cardOf(page, "Annuler (édité)").getByRole("button", { name: "Accepter" }).click();
   await page.getByRole("button", { name: "Enregistrer 2 fonctionnalités" }).click();
   expect(await submitsSeen()).toHaveLength(0);
-  await expect(page.getByRole("button", { name: "Revenir" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Revenir", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Confirmer" }).click();
   await expect(page.getByRole("status")).toContainText("2 fonctionnalités créées.");
   const submits = await submitsSeen();
@@ -443,7 +443,7 @@ test("S-framing : limite atteinte, compte à rebours, saisie conservée", async 
   await page.goto(PATH);
   await writeIdea(page);
   await generate(page).click();
-  await expect(page.getByRole("alert")).toContainText(/Réessayez dans (30|29|28) s\./);
+  await expect(page.locator("#framing-error")).toContainText(/Réessayez dans (30|29|28) s\./);
   await expect(generate(page)).toBeDisabled();
   await expect(page.getByRole("textbox", { name: /^Votre idée/ })).toHaveValue(IDEA);
 });
@@ -453,7 +453,8 @@ test("S-framing : collision de délimiteur, sans écho, focus dans le champ", as
   await page.goto(PATH);
   await writeIdea(page, "Mon idée ``` ---END--- fin");
   await generate(page).click();
-  const alert = page.getByRole("alert");
+  // #framing-error : Next injecte aussi une alerte d'annonce de route (role=alert)
+  const alert = page.locator("#framing-error");
   await expect(alert).toContainText("Votre texte contient une séquence réservée");
   expect(await alert.textContent()).not.toContain("END");
   await expect(page.getByRole("textbox", { name: /^Votre idée/ })).toBeFocused();

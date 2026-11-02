@@ -24,7 +24,7 @@ type Operations = SpecBatchSubmitInput["operations"];
 const OPERATION = /^\/operations\/(\d+)(?:\/|$)/;
 
 /** Ce qui remplace la barre d'enregistrement : le designer (permanent) ou la spec pas prête. */
-export type SaveBlock = "designer" | "spec" | null;
+type SaveBlock = "designer" | "spec" | null;
 
 /** Un lot de cadrage : création dont le titre est « N fonctionnalité(s) » (aussi à la reprise au rechargement). */
 const isFramingBatch = (meta: WriteMeta | null): boolean =>
@@ -40,7 +40,7 @@ interface SaveOptions {
 }
 
 /** Opération désignée par le rapport d'un lot refusé : son rang (à partir de 0) et le motif, ou `null`. */
-export function designatedFailure(
+function designatedFailure(
   report: { issues: ReadonlyArray<{ pointer: string; message: string }> } | undefined,
 ): { index: number; message: string } | null {
   for (const issue of report?.issues ?? []) {

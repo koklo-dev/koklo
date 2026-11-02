@@ -60,7 +60,7 @@ export const briefFromAi = (
 });
 
 /** Brief envoyé à `ai.proposeFeatures` : les champs renseignés, libellé et valeur, en un seul texte. */
-export function briefToText(brief: BriefFields): string {
+function briefToText(brief: BriefFields): string {
   return BRIEF_FIELDS.map(({ key, label }) => {
     const value = brief[key].trim();
     return value ? `${label} : ${value}` : "";
@@ -75,7 +75,7 @@ export const briefText = (state: Pick<FramingDraft, "mode" | "pastedBrief" | "br
   return state.brief ? briefToText(state.brief) : "";
 };
 
-export interface IdeaIssues {
+interface IdeaIssues {
   idea?: string;
   clarifications?: string;
 }

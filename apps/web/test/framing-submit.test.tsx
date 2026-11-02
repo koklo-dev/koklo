@@ -175,9 +175,7 @@ describe("« Confirmer » : un seul specBatch.submit", () => {
     );
     await userEvent.click(inCard(T2).getByRole("combobox", { name: /^Priorité/ }));
     await userEvent.click(await screen.findByRole("option", { name: "Souhaitable" }));
-    await userEvent.click(
-      inCard("Annuler (titre édité)").getByRole("button", { name: "Terminer la modification" }),
-    );
+    await userEvent.click(inCard(T2).getByRole("button", { name: "Terminer la modification" }));
     await accept("Annuler (titre édité)");
     await reject(T3);
     const panel = await askConfirmation();
