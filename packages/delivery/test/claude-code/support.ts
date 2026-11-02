@@ -15,6 +15,13 @@ import { afterEach, vi } from "vitest";
 import { ClaudeCodeRuntime, type ClaudeCodeRuntimeOptions } from "../../src/claude-code/index.ts";
 import type { AgentSessionRequest, AgentSessionResult } from "../../src/index.ts";
 
+// Ces tests lancent de vrais processus Node : sur un runner charge un test peut legitimement durer
+// bien plus que les 20 s par defaut. Les attentes ci-dessous sont des evenements, pas des delais.
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
+
+/** Borne HAUTE (jamais une duree attendue) de toute attente d'evenement : une CI saturee n'y arrive pas. */
+export const EVENT_DEADLINE_MS = 60_000;
+
 export const FAKE_CLAUDE = resolve(import.meta.dirname, "../fixtures/fake-claude.mjs");
 
 export interface Scenario {
@@ -110,18 +117,20 @@ export const isAlive = (pid: number): boolean => {
   }
 };
 
-/** Attend (au plus 3 s) que `pid` soit mort ; rend l'etat final. */
+/** Attend la mort de `pid` (borne haute `EVENT_DEADLINE_MS`) ; rend l'etat final. */
 export const waitDead = async (pid: number): Promise<boolean> => {
-  for (let i = 0; i < 60 && isAlive(pid); i++) {
-    await sleep(50);
+  const deadline = Date.now() + EVENT_DEADLINE_MS;
+  while (isAlive(pid) && Date.now() < deadline) {
+    await sleep(25);
   }
   return !isAlive(pid);
 };
 
-/** Attend activement (au plus 5 s) qu'un fichier de trace existe et soit non vide ; rend son pid. */
+/** Attend qu'un fichier de trace existe et soit non vide (borne haute `EVENT_DEADLINE_MS`) ; rend son contenu en nombre. */
 export const waitForPidFile = async (sandbox: Sandbox, name: string): Promise<number> => {
-  for (let i = 0; i < 250; i++) {
-    const file = join(sandbox.traces, name);
+  const file = join(sandbox.traces, name);
+  const deadline = Date.now() + EVENT_DEADLINE_MS;
+  while (Date.now() < deadline) {
     if (existsSync(file) && readFileSync(file, "utf8") !== "") {
       return Number(readFileSync(file, "utf8"));
     }

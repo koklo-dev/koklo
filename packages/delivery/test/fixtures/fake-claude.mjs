@@ -41,12 +41,14 @@ const withGrandchild = (stubborn) => {
   writeFileSync(join(dir, "grandchild.pid"), String(child.pid));
 };
 
+// `ready.txt` : tout ce qui precede est ecrit ET vide dans le pipe (jamais devine par un delai).
+const markReady = () => process.stdout.write("", () => writeFileSync(join(dir, "ready.txt"), "ready"));
+
 const hang = (stubborn) => {
   if (stubborn) process.on("SIGTERM", () => {});
   withGrandchild(stubborn);
   emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
-  // `ready.txt` : le texte est ecrit ET vide dans le pipe (jamais devine par un delai).
-  process.stdout.write("", () => writeFileSync(join(dir, "ready.txt"), "ready"));
+  markReady();
   setInterval(() => {}, 1000);
 };
 
@@ -94,13 +96,14 @@ const SCENARIOS = {
     result(false, leaked);
   },
   lingering: () => {
-    holdStdout("sleep", ["5"]);
+    holdStdout("sleep", ["120"]);
     emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
     result(false, text);
   },
   escape: () => {
-    holdStdout("setsid", ["sleep", "7"]);
+    holdStdout("setsid", ["sleep", "120"]);
     emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
+    markReady();
     setInterval(() => {}, 1000);
   },
   hang: () => hang(false),
