@@ -17,7 +17,11 @@ export const EMAIL_STATES = ["pending", "sent", "skipped", "failed"] as const;
 export type EmailState = (typeof EMAIL_STATES)[number];
 
 /** Types qui déclenchent réellement un e-mail (D2) ; les autres passent `skipped`. */
-export const EMAILED_TYPES: readonly NotificationType[] = [];
+export const EMAILED_TYPES: readonly NotificationType[] = [
+  "baseline.proposed",
+  "review.submitted",
+  "ticket.blocked",
+];
 
 /** Lot maximal par balayage et fenêtre de rattrapage (heures). */
 export const SWEEP_BATCH_SIZE = 50;

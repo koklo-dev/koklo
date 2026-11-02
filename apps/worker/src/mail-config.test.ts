@@ -41,7 +41,10 @@ describe("configuration d'envoi d'emails du worker (TK-22 C7)", () => {
   });
 
   it("avec RESEND_API_KEY, MAIL_DOMAIN et EMAIL_FROM : adaptateur Resend", () => {
-    expect(loadConfig({ ...BASE, APP_ENV: "production", ...FULL }).mail).toEqual({
+    expect(
+      loadConfig({ ...BASE, APP_ENV: "production", WEB_BASE_URL: "https://app.koklo.dev", ...FULL })
+        .mail,
+    ).toEqual({
       kind: "resend",
       apiKey: FULL.RESEND_API_KEY,
       domain: FULL.MAIL_DOMAIN,

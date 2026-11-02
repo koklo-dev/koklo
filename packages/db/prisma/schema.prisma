@@ -1175,6 +1175,8 @@ model Notification {
   subjectRef      String    @map("subject_ref")
   dedupeKey       String    @map("dedupe_key")
   readAt          DateTime? @map("read_at") @db.Timestamptz(3)
+  emailState      String    @default("pending") @map("email_state")
+  emailedAt       DateTime? @map("emailed_at") @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 

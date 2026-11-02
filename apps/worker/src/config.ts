@@ -30,7 +30,7 @@ export type WorkerConfig = {
   /** DSN GlitchTip/Sentry ; absent : le SDK d'erreurs reste désactivé. */
   readonly sentryDsn: string | undefined;
   readonly mail: MailConfig;
-  /** Origine publique du web (`WEB_BASE_URL`), base des liens d'e-mail. `loadConfig` la renseigne toujours ; SQUELETTE TK-58b : pas encore lue. */
+  /** Origine publique du web (`WEB_BASE_URL`), normalisée sans `/` final : base des liens d'e-mail. `loadConfig` la renseigne toujours. */
   readonly webBaseUrl?: string;
   /** Absent : fournisseur git non configuré (staging sans App) ; les lots `spec-write` échouent en `PROVIDER_UNAVAILABLE`. */
   readonly githubApp?: GithubAppSettings;
@@ -108,6 +108,33 @@ function parseMaxProviderCalls(value: string | undefined): number {
 }
 
 const STRICT_ENVS = ["staging", "production"];
+const LOCAL_ENVS = ["development", "test"];
+const LOCAL_WEB_BASE_URL = "http://localhost:3000";
+
+/**
+ * Origine du web : obligatoire et https en staging/production, défaut local ailleurs. Refuse
+ * identifiants, chemin, requête et fragment ; le message ne cite que la variable, jamais la valeur.
+ */
+function parseWebBaseUrl(value: string | undefined, appEnv: string): string {
+  if (value === undefined || value === "") {
+    return STRICT_ENVS.includes(appEnv)
+      ? fail("WEB_BASE_URL", `is required when APP_ENV is ${appEnv}`)
+      : LOCAL_WEB_BASE_URL;
+  }
+  const url = URL.canParse(value) ? new URL(value) : undefined;
+  const schemes = LOCAL_ENVS.includes(appEnv) ? ["http:", "https:"] : ["https:"];
+  const plainOrigin =
+    url !== undefined &&
+    url.hostname !== "" &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname === "/" &&
+    url.search === "" &&
+    url.hash === "";
+  return url !== undefined && plainOrigin && schemes.includes(url.protocol)
+    ? url.origin
+    : fail("WEB_BASE_URL", "must be a plain http(s) origin (https outside development and test)");
+}
 
 /** Domaine de l'adresse d'expéditeur (`Nom <a@b>` ou `a@b`), en minuscules. */
 function domainOfSender(from: string): string {
@@ -119,13 +146,13 @@ function domainOfSender(from: string): string {
 }
 
 /**
- * Sans clé : capture en development/test, échec en staging/production. Avec clé : domaine et
+ * Sans clé : capture en development/test, échec ailleurs (fermé par défaut). Avec clé : domaine et
  * expéditeur requis, l'expéditeur appartenant au domaine. Les messages ne citent que le nom
  * de la variable, jamais sa valeur.
  */
 function parseMail(env: Readonly<Record<string, string | undefined>>, appEnv: string): MailConfig {
   const apiKey = env.RESEND_API_KEY || undefined;
-  if (apiKey === undefined && !STRICT_ENVS.includes(appEnv)) {
+  if (apiKey === undefined && LOCAL_ENVS.includes(appEnv)) {
     return { kind: "capture" };
   }
   const domain = env.MAIL_DOMAIN || undefined;
@@ -161,6 +188,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     logLevel: parseLogLevel(env.LOG_LEVEL),
     sentryDsn: parseDsn(env.SENTRY_DSN),
     mail: parseMail(env, appEnv),
+    webBaseUrl: parseWebBaseUrl(env.WEB_BASE_URL, appEnv),
     ...(githubApp ? { githubApp } : {}),
     webhookRetentionDays: parseRetentionDays(env.WEBHOOK_RETENTION_DAYS),
     reconcileGraceMinutes: parseGraceMinutes(env.RECONCILE_GRACE_MINUTES),

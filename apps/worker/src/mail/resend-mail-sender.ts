@@ -1,3 +1,5 @@
+import { MailDeliveryError } from "./mail-errors.ts";
+import { assertMailMessageSafe } from "./mail-guards.ts";
 import type { MailMessage, MailSender } from "./mail-sender.ts";
 
 /** Partie du client Resend utilisée ici : le SDK renvoie `{ data, error }` sans lever. */
@@ -17,7 +19,20 @@ export interface ResendClient {
   };
 }
 
-/** Envoi via Resend. L'erreur citée ne porte que son nom : jamais le corps (lien, jeton). */
+/** 429 et 5xx : réessayer ; autre 4xx : refus définitif ; sans statut : le transport a échoué. */
+function classify(statusCode: number | null | undefined): MailDeliveryError {
+  if (statusCode === 429) {
+    return new MailDeliveryError("transient", "rate-limited");
+  }
+  if (statusCode == null) {
+    return new MailDeliveryError("transient", "network");
+  }
+  return statusCode >= 500
+    ? new MailDeliveryError("transient", "provider-unavailable")
+    : new MailDeliveryError("permanent", "rejected");
+}
+
+/** Envoi via Resend. L'erreur levée ne porte qu'un code fermé : jamais le corps, l'adresse ni la clé. */
 export class ResendMailSender implements MailSender {
   private readonly client: ResendClient;
   private readonly from: string;
@@ -27,9 +42,24 @@ export class ResendMailSender implements MailSender {
   }
 
   async send(message: MailMessage): Promise<void> {
-    const { error } = await this.client.emails.send({ from: this.from, ...message });
-    if (error) {
-      throw new Error(`Resend a refusé l'envoi (${error.name})`);
+    assertMailMessageSafe(message);
+    const { idempotencyKey, headers, ...content } = message;
+    const payload = {
+      from: this.from,
+      ...content,
+      ...(headers ? { headers: { ...headers } } : {}),
+    };
+    let result: Awaited<ReturnType<ResendClient["emails"]["send"]>>;
+    try {
+      result =
+        idempotencyKey === undefined
+          ? await this.client.emails.send(payload)
+          : await this.client.emails.send(payload, { idempotencyKey });
+    } catch {
+      throw new MailDeliveryError("transient", "network");
+    }
+    if (result.error) {
+      throw classify(result.error.statusCode);
     }
   }
 }

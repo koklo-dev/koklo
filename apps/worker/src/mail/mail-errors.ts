@@ -9,17 +9,19 @@ export type MailDeliveryCode =
   | "provider-unavailable"
   | "network";
 
-/** SQUELETTE (TK-58a, étape rouge) : à implémenter à l'étape verte. */
+/** Échec d'envoi typé : le message ne contient que le code fermé. */
 export class MailDeliveryError extends Error {
-  readonly kind!: MailDeliveryKind;
-  readonly code!: MailDeliveryCode;
+  readonly kind: MailDeliveryKind;
+  readonly code: MailDeliveryCode;
 
-  constructor(_kind: MailDeliveryKind, _code: MailDeliveryCode) {
-    super("not implemented");
-    throw new Error("not implemented");
+  constructor(kind: MailDeliveryKind, code: MailDeliveryCode) {
+    super(code);
+    this.name = "MailDeliveryError";
+    this.kind = kind;
+    this.code = code;
   }
 }
 
-export function isMailDeliveryError(_value: unknown): _value is MailDeliveryError {
-  throw new Error("not implemented");
+export function isMailDeliveryError(value: unknown): value is MailDeliveryError {
+  return value instanceof MailDeliveryError;
 }

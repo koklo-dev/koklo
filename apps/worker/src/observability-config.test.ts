@@ -31,6 +31,7 @@ describe("configuration d'observabilité du worker (TK-19)", () => {
         SENTRY_DSN: "https://clef@glitchtip.example.com/2",
         LOG_LEVEL: "warn",
         APP_ENV: "staging",
+        WEB_BASE_URL: "https://app.koklo.dev",
         APP_VERSION: "1.2.3",
         // staging exige la configuration d'envoi (TK-22) ; hors sujet ici.
         RESEND_API_KEY: "re_test",
