@@ -4,6 +4,7 @@ import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
 import { AiService } from "../ai/ai.service.ts";
+import { OriginGuard } from "../auth/origin.guard.ts";
 import { MANAGER_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { guard, requestIdOf } from "../request-context.ts";
@@ -13,8 +14,10 @@ import { orKeyNotFound, toStatusOutput, viaCredential } from "./llm-credential-a
 /**
  * Clés BYOK de l'organisation de la session : `MANAGER_ROLES` partout, `list` compris (CDC §14,
  * « clés BYOK »). L'organisation et l'acteur de l'audit viennent de la session, jamais de l'entrée.
+ * `OriginGuard` (niveau classe, donc avant les gardes de session) contrôle l'origine des écritures (CSRF) ; `list` (GET) y échappe.
  */
 @Controller()
+@UseGuards(OriginGuard)
 export class LlmCredentialController {
   constructor(
     @Inject(LlmCredentialService) private readonly service: LlmCredentialService,
