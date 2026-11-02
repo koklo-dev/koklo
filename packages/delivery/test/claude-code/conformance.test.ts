@@ -39,7 +39,7 @@ const subject = (): AgentConformanceSubject => {
       const scenarios = {
         failed: { scenario: "failed", text: output },
         timeout: { scenario: "hang", text: output },
-        quota: { scenario: "quota", text: output },
+        quota: { scenario: "quota", text: `${output}\nWeekly limit reached ∙ resets Mon 9am` },
         auth: { scenario: "auth" },
         unavailable: { scenario: "completed" },
       } as const;

@@ -209,6 +209,33 @@ flowchart LR
   ci["incident-25 boundary test"] -. "no agent invocation outside src/claude-code" .-> port
 ```
 
+### Delivery package: quota state and global backoff (TK-74 lots 74a and 74b)
+Pure core, no clock and no randomness: the caller passes `now` (epoch ms), the jitter and the
+policies. One `QuotaState` is shared by every worker; the `Run` is never touched by a quota.
+
+| File | Responsibility |
+|---|---|
+| `quota-signal.ts` / `quota-text.ts` | `QUOTA_PATTERNS` data table, `detectQuota`, `classifyAgentFailure`; output cleaning |
+| `quota-reset.ts` | `resolveResetAt` (integer wall-clock arithmetic) |
+| `quota-backoff.ts` | `onQuotaHit`, `quotaHitEvent`, `assertNoQuotaBlock` |
+| `quota-state.ts` | `QuotaState`, `canStart`, `nextAllowedAt`, `quotaDecision`, `clearQuota` |
+| `quota-usage.ts` / `quota-window.ts` | `recordUsage`, fixed windows and ceilings |
+| `quota-serialize.ts` / `quota-state-check.ts` | strict JSON in and out |
+| `quota-check.ts`, `quota-signal-check.ts`, `quota-usage-check.ts` | input validation (`InvalidQuotaError`) |
+
+```mermaid
+stateDiagram-v2
+  [*] --> ok
+  ok --> backoff: onQuotaHit (window or 429)
+  backoff --> backoff: burst before resumeAt (same step, may extend)
+  backoff --> backoff: hit at or after resumeAt (next step, delay x2)
+  backoff --> ok: recordUsage at or after resumeAt
+  backoff --> exhausted: maxConsecutiveHits reached
+  ok --> exhausted: credit balance too low
+  backoff --> exhausted: credit balance too low
+  exhausted --> ok: clearQuota (human)
+```
+
 ### Rules package: catalog and parser (TK-71 lot A)
 `packages/rules` (`@koklo/rules`, tag `rules`, private) is the pure engineering-rules library.
 Lot A ships the catalog model and its parser; composition, locks, waivers and resolution come

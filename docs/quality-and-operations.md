@@ -313,7 +313,7 @@ for a fixed delay.
 NEEDS-HUMAN: install the CLI, pin and record the tested version (2.1.316 was inspected locally), and
 authenticate it (subscription login in `HOME`, or a BYOK key passed as an opaque credential). NEEDS-HUMAN
 for TK-74: capture a real usage-limit message from the CLI (stderr and `result` event) to complete the
-quota table; today only the minimal phrases of `classifyClaudeFailure` are covered.
+quota table (`QUOTA_PATTERNS`); the adapter now classifies with that table (TK-74c), still UNVERIFIED.
 
 ### Writing a reliable process test (TK-73 stabilisation)
 
@@ -1087,3 +1087,27 @@ organisation; they are deleted at the end only if the test App has the Administr
   `strict.file-size-*` and `strict.no-dead-code-or-orphan-todo` stay UNVERIFIED.
 - **Open point**: waivers on locked limits (vision §17.2) are rejected by this package; a
   tech-lead decision or another ticket must settle it.
+
+## Provider quotas: detection and backoff (TK-74 lots 74a and 74b)
+- **UNVERIFIED, NEEDS-HUMAN**: the 11 quota formulations in `QUOTA_PATTERNS` (`packages/delivery/
+  src/quota-signal.ts`) are HYPOTHESES from the analysis; no real capture has been compared. A human
+  must capture a real usage-limit message (stderr and `result` event) of the provider and add or
+  correct the matching pattern with its test. Until then the verdict on detection stays UNVERIFIED,
+  never PASS. This now includes the strong/weak split and the safety-net phrases (`Usage limit
+  reached`, `Rate limit exceeded`, `You're out of extra usage`, `Request rejected (429)`, ...): they are
+  guesses chosen so that a real quota is never counted as a failure.
+- **Strong and weak signals**: only a strong signal (provider date, anchored phrase) counts toward
+  `exhausted`; a weak one (bare pattern, heuristic, safety net, coloured line) backs off by the base
+  delay without counting, so a quoted phrase cannot make `exhausted` sticky. Cost: a real quota
+  worded unexpectedly backs off but never escalates to `exhausted` until a human adds its pattern.
+- **Hard ceiling**: no backoff exceeds 24 h (`QUOTA_MAX_BACKOFF_MS`): policy `maxDelayMs`, provider
+  `retry-after`, the adapter `retryAfterMs` and (given `now`) a persisted `resumeAt` are all capped.
+- **Values to set by a human (D1)**: the package codes no default. The runner must give
+  `BackoffPolicy` (`baseMs`, `maxDelayMs`, `jitterRatio`, `maxConsecutiveHits`, `utcOffsetMinutes`)
+  and `UsagePolicy` (`windowMs`, `maxSeenIds`, ceilings per organization, project and agent).
+- **Operation**: `exhausted` means a human wait (empty credit or too many consecutive hits): re-arm
+  with `clearQuota` after fixing the account. A named zone (`(Europe/Paris)`) is not interpreted: the
+  exponential fallback applies unless the caller gives `utcOffsetMinutes` and the hint has no zone.
+- **Out of scope**: sleeping until `resumeAt`, the loop and the persistence of the serialised state
+  belong to TK-75. The Claude Code adapter (`classify.ts`) is wired on `detectQuota` (lot 74c): auth first,
+  then quota, only on the failure path.

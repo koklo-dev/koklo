@@ -634,6 +634,84 @@ Pure types and guards, no persistence. One session = one promise = one typed res
   `failed/budget_exceeded`, and records calls without the key. `runAgentRuntimeConformance` runs the
   14 shared cases against any `AgentConformanceSubject` with the engine injected by the caller.
 
+### Quotas: detection, global backoff, consumption (TK-74 lots 74a and 74b, `packages/delivery`)
+A provider quota (usage window, rate limit, empty credit) is **not a ticket defect**. The pure core
+detects it in the agent output and keeps ONE shared `QuotaState` per runner. The `Run` is never
+modified by a quota: `quota_hit` is a neutral event (`quotaHitEvent`) that leaves `attempts`,
+`reviewRounds`, `ciWaits`, `version` and the block untouched. All instants are integer epoch ms given
+by the caller; no value (base delay, ceiling, window) is coded in the package (D1): the caller passes
+`BackoffPolicy` and `UsagePolicy`.
+
+- **Detection** (`detectQuota(output)`, `classifyAgentFailure(output)`). Only the last
+  `QUOTA_SCAN_CHARS` (4000) characters are examined; ANSI sequences, controls and bidi characters are
+  removed first, and Unicode hyphens (U+2010..2012, U+2212) and no-break spaces are normalised. Quoted
+  lines are ignored, before AND after the ANSI cleaning: diff lines (`+`, `@@`, `-` unless it is a
+  `- Message` bullet and the text has no diff header), test names, `expect(`/`assert`/`toBe(`/
+  `toEqual(`/`toContain(`, `//` `#` `*` comments, `>` quotes, paired ``` blocks, assigned or lone
+  quoted strings. Each pattern runs on ONE line. `QUOTA_PATTERNS` is a data table, first match wins: `claude-usage-limit-reached-epoch` (`|<epoch s>` -> `resetAt`),
+  `five-hour-limit-resets-clock`, `weekly-limit-reached`, `opus-limit-reached`,
+  `your-limit-will-reset-at`, `hit-your-limit-resets` (wall clock `3pm`, `9:30am`; a named zone is kept
+  in `ClockHint.zone`, never interpreted), `api-429-retry-after` (`retryAfterMs`),
+  `api-429-rate-limit-error`, `api-429-too-many-requests`, `credit-balance-too-low` (kind `exhausted`),
+  `unknown-limit-heuristic` (kind `unknown_limit`, treated as a window), plus the weak safety net
+  (`rate-limit-error-bare`, `usage-limit-reached-net`, `exceeded-your-usage-limit`,
+  `out-of-usage-net`, `http-429-rate-limit-net`, `request-rejected-429`) and the strong
+  `out-of-usage-resets`. Bare `usage limit` and `429` are still NOT a quota. `overloaded_error` and
+  529 are NOT a quota (D4). **Strength** (`QuotaSignal.strength`): `strong` = provider date (epoch,
+  `retry-after`, explicit `resets <time>`) or a phrase anchored at line start / after `API Error: ` /
+  `Error: ` / a JSON `"result":"`; `weak` = bare pattern, heuristic, safety net, or any line printed
+  after an ANSI colour sequence. A weak signal backs off (`onQuotaHit`) WITHOUT counting toward
+  `exhausted`; only strong signals do. The signal is frozen, JSON-serialisable, `raw` is capped at 500 characters. The
+  patterns have no nested quantifier (a 1 MB hostile input stays under 500 ms). The formulations are
+  hypotheses: see `quality-and-operations.md`.
+- **Reset instant** (`resolveResetAt`): `resetAt`, else `now + retryAfterMs`, else the next STRICTLY
+  future wall-clock occurrence with an integer UTC offset (|offset| < 1440 min), else `null`
+  (exponential fallback). A named zone or a missing offset gives `null`. No `Date`, no `Intl`.
+- **`QuotaState`** `{ status: ok | backoff | exhausted, resumeAt, consecutiveHits, lastHitAt,
+  lastSignalId, windows, usageIds, version }`: an immutable, deeply frozen value, shared by every
+  worker (incident 26). `startQuotaState`, `canStart`, `nextAllowedAt` (`now` if free, epoch ms, or
+  `null` = human wait), `quotaDecision` (`start | wait | halt`), `clearQuota` (human re-arm).
+- **Global backoff** (`onQuotaHit(state, signal, now, jitter, policy, options?)`). Order: validation,
+  replay (same `signal.id` as `lastSignalId` = the identical state), `StaleQuotaError` on a wrong
+  `expectedVersion`, computation. Delay: provider date if in the future (capped at `maxDelayMs`), else
+  `min(maxDelayMs, baseMs * 2^consecutiveHits)`; jitter only adds: `floor(delay * (1 + jitter *
+  jitterRatio))` then capped by `min(maxDelayMs, ...)` AFTER the jitter; `jitter` in [0,1) is a
+  parameter (no randomness in the domain). Hard ceiling `QUOTA_MAX_BACKOFF_MS` = 24 h: `maxDelayMs` must
+  be <= 24 h, `jitterRatio` in [0,1], a provider `retry-after` is capped at 24 h (detection, `resolveResetAt`,
+  adapter `retryAfterMs`). `onQuotaHit` revalidates the received state (`consecutiveHits` and `version`
+  safe integers >= 0, `resumeAt` finite, known status) and throws `InvalidQuotaError`. `resumeAt` never
+  shortens. A burst (a hit while `status = backoff` and `now < resumeAt`) is ONE step: the counter is
+  unchanged and only a later provider date extends `resumeAt` (version +1 only if something changed).
+  `maxConsecutiveHits` or an `exhausted` signal gives `exhausted` (`resumeAt = null`), sticky until
+  `clearQuota`. `assertNoQuotaBlock` refuses a `block` event with cause `quota` (D2).
+- **Consumption windows** (`recordUsage(state, usage, now, policy, options?)`). Fixed aligned windows
+  `start = floor(now / windowMs) * windowMs`, keys `o:<org>`, `p:<org>/<project>`, `a:<org>/<agent>`
+  (only the levels present in the scope; an organization never contains `/`). A ceiling (`maxRuns`,
+  `maxTokens`, 0 blocks at once) is reached at `>=`; the most restrictive level wins and
+  `nextAllowedAt` is `max(resumeAt, window end)`. Expired windows are purged at each record. A
+  successful usage at or after `resumeAt` resets `consecutiveHits` to 0 and returns to `ok`.
+- **Idempotence**: an already counted `usage.id` (bounded list `usageIds`, `maxSeenIds` in 1..1000,
+  oldest evicted) returns the identical state; counters stay safe integers (overflow is refused).
+- **Serialisation** (`serializeQuotaState`, `parseQuotaState`): JSON with sorted keys, at most
+  `QUOTA_MAX_SERIALIZED_CHARS` (1 000 000). Parsing is strict: root object with exactly the 8 keys
+  (`__proto__`, `constructor` and any other key refused, also in `windows`), integers >= 0, known
+  status, `backoff` <=> `resumeAt` set, instants in [`QUOTA_MIN_EPOCH_MS`, `QUOTA_MAX_EPOCH_MS`] (2000
+  to 2100), window keys `o:`/`p:`/`a:`, at most 1000 ids; the result is deeply frozen and the error
+  message never repeats the forged text. `parseQuotaState(text, now?)`: with `now`, a persisted
+  `resumeAt` beyond `now + 24 h` is clamped to that ceiling (without `now` only the 2100 bound applies;
+  callers should pass `now`). Errors: `InvalidQuotaError(reason)`, `StaleQuotaError`.
+
+| Incident (vision annex C) | Guard | Named test |
+|---|---|---|
+| 22: a quota fell into "ambiguous spec" | `classifyAgentFailure` runs first, no `cause` | `incident-22-quota-is-never-ambiguous-spec` |
+| 22: a quota consumed attempts | `quota_hit` is neutral for the `Run` | `incident-22-quota-never-counts-as-attempt` |
+| 26: each worker rediscovered the limit | one shared state, all scopes blocked | `incident-26-one-hit-backs-off-all-workers` |
+| 26: a burst doubled the delay N times | a burst is one step | `incident-26-burst-counts-once` |
+| 26: a shorter hint reduced the wait | `resumeAt` never shortens | `incident-26-backoff-never-shortens` |
+
+Each of the 11 formulations also has a test named `incident-22-<pattern>` (stderr and result message).
+Sleeping until `resumeAt` and persisting the state are TK-75; wiring the Claude Code `classify` is 74c.
+
 ## Rules catalog (TK-71 lot A, `packages/rules`)
 A **catalog** is a versioned set of engineering rules and the profiles that group them. The
 input is JSON in snake_case (`schema_version`, `catalog_version`, `protected_rule_ids`); the
