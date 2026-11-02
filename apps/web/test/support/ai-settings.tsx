@@ -66,7 +66,11 @@ export function renderAiSettings() {
 
 /** Rend la page et attend la carte « Anthropic » (h2). */
 export async function openAiSettings(items?: unknown[], role = "owner") {
-  if (items) serveAiSettings(role, items);
+  // Seule la liste change : les réponses de set / verify / remove déjà préparées par le test restent en place.
+  if (items) {
+    asRole(role);
+    procedures.llmCredentialList.mockResolvedValue({ items });
+  }
   const view = renderAiSettings();
   await findNamed("heading", "Anthropic", { level: 2 });
   return view;

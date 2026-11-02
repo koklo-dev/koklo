@@ -184,7 +184,9 @@ test.describe("la clé n'existe plus nulle part après l'envoi", () => {
     await open(page, { list: "absent" });
     await page.route("**/llm-credentials/anthropic", (route) => route.abort("connectionreset"));
     await fillAndSend(page);
-    await expect(page.getByRole("alert")).toContainText("saisissez de nouveau la clé");
+    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toContainText(
+      "saisissez de nouveau la clé",
+    );
     await expect(keyField(page)).toHaveValue("");
     await page.waitForTimeout(500);
     await expectNoTrace(page, requests, consoleLines);

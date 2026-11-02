@@ -58,11 +58,14 @@ interface Call {
 const calls: Call[] = [];
 let leaks = 0;
 let stored: Record<string, unknown> | null = null;
+/** Après un `remove` réussi, `list` ne montre plus la clé du scénario (jusqu'au prochain `set`). */
+let removed = false;
 
 export function resetLlm(): void {
   calls.length = 0;
   leaks = 0;
   stored = null;
+  removed = false;
 }
 
 const status = (over: Record<string, unknown> = {}) => ({
@@ -76,6 +79,7 @@ const status = (over: Record<string, unknown> = {}) => ({
 
 function current(mode: LlmListMode): Record<string, unknown> | null {
   if (stored) return stored;
+  if (removed) return null;
   if (mode === "configured") return status({ lastUsedAt: "2026-11-02T12:00:00.000Z" });
   if (mode === "invalid")
     return status({ invalid: true, invalidatedAt: "2026-10-28T12:00:00.000Z" });
@@ -97,6 +101,7 @@ function setResponse(mode: LlmSetMode, body: Record<string, unknown>): Reply {
   }
   if (mode === "internal")
     return reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
+  removed = false;
   stored = status(typeof body.defaultModel === "string" ? { defaultModel: body.defaultModel } : {});
   return reply(200, stored);
 }
@@ -126,6 +131,7 @@ function removeResponse(mode: LlmRemoveMode): Reply {
   if (mode === "internal")
     return reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
   stored = null;
+  removed = true;
   return reply(200, { removed: true });
 }
 
