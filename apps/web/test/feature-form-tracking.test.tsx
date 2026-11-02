@@ -135,7 +135,9 @@ describe("Lot en attente : specBatch.get en backoff (§4.4)", () => {
     await fillAndSave();
     await advance(1400);
     expect(getTimes).toHaveLength(0);
-    await advance(55 * SECOND);
+    // 1,5 + 2,25 + 3,375 + 5 + 5 s : la quatrième relecture arrive à 12,1 s, la cinquième à 17,1 s.
+    await advance(18 * SECOND);
+    expect(getTimes.length).toBeGreaterThanOrEqual(5);
     const g = deltas(getTimes);
     expect(g[0]).toBeGreaterThanOrEqual(1500 - 50);
     expect(g[0]).toBeLessThan(1500 + TOL);
@@ -144,6 +146,7 @@ describe("Lot en attente : specBatch.get en backoff (§4.4)", () => {
     expect(spacing[0]).toBeLessThan(2250 + TOL);
     expect(spacing[1]).toBeGreaterThanOrEqual(3375 - 50);
     expect(spacing[1]).toBeLessThan(3375 + TOL);
+    expect(spacing.length).toBeGreaterThanOrEqual(4);
     for (const gap of spacing.slice(2)) {
       expect(gap).toBeGreaterThanOrEqual(5000 - 50);
       expect(gap).toBeLessThan(5000 + TOL);
