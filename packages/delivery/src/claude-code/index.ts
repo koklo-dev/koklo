@@ -1,9 +1,11 @@
 /** Sous-export `@koklo/delivery/claude-code` : seul endroit qui invoque l'outil d'agent. */
 
 export {
+  type ClaudeFailure,
   type ClaudeFailureContext,
   type ClaudeFailureKind,
   classifyClaudeFailure,
+  describeClaudeFailure,
 } from "./classify.ts";
 export {
   buildClaudeArgv,

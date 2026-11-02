@@ -2,7 +2,8 @@
 import { AgentAuthError } from "../agent-errors.ts";
 import { type AgentOutput, agentOutput } from "../agent-output.ts";
 import type { AgentSessionResult } from "../agent-runtime.ts";
-import { classifyClaudeFailure } from "./classify.ts";
+import type { QuotaSignal } from "../quota-signal.ts";
+import { describeClaudeFailure } from "./classify.ts";
 import type { ProcessOutcome } from "./process.ts";
 import { redactSecrets } from "./redact.ts";
 
@@ -29,19 +30,30 @@ const stopped = (outcome: ProcessOutcome, context: OutcomeContext): AgentSession
   }
 };
 
+/** Délai de reprise donné par le fournisseur : `retry-after`, sinon l'instant absolu restant (si futur). */
+const quotaDelayMs = (quota: QuotaSignal, now: number): number | null => {
+  if (quota.retryAfterMs !== null) {
+    return quota.retryAfterMs;
+  }
+  return quota.resetAt !== null && quota.resetAt > now ? quota.resetAt - now : null;
+};
+
 const failure = (outcome: ProcessOutcome, context: OutcomeContext): AgentSessionResult => {
   const result = outcome.stream.result;
   const resultIsError = result?.isError === true;
   const raw = [outcome.stderr, resultIsError ? result.text : ""].filter(Boolean).join("\n");
-  const kind = classifyClaudeFailure(raw, { exitCode: outcome.exitCode, resultIsError });
-  if (kind === "auth") {
+  const failed = describeClaudeFailure(raw, { exitCode: outcome.exitCode, resultIsError });
+  if (failed.kind === "auth") {
     throw new AgentAuthError({ operation: "session", runtime: "claude-code" });
   }
   const output = safeOutput(raw, context);
-  if (kind === "quota") {
-    return { status: "quota", output };
+  if (failed.kind === "quota") {
+    const retryAfterMs = quotaDelayMs(failed.quota, Date.now());
+    return retryAfterMs === null
+      ? { status: "quota", output }
+      : { status: "quota", output, retryAfterMs };
   }
-  return { status: "failed", reason: kind, output };
+  return { status: "failed", reason: failed.kind, output };
 };
 
 export const toSessionResult = (

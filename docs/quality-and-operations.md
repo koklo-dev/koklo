@@ -313,7 +313,7 @@ for a fixed delay.
 NEEDS-HUMAN: install the CLI, pin and record the tested version (2.1.316 was inspected locally), and
 authenticate it (subscription login in `HOME`, or a BYOK key passed as an opaque credential). NEEDS-HUMAN
 for TK-74: capture a real usage-limit message from the CLI (stderr and `result` event) to complete the
-quota table; today only the minimal phrases of `classifyClaudeFailure` are covered.
+quota table (`QUOTA_PATTERNS`); the adapter now classifies with that table (TK-74c), still UNVERIFIED.
 
 ### Writing a reliable process test (TK-73 stabilisation)
 
@@ -1101,4 +1101,5 @@ organisation; they are deleted at the end only if the test App has the Administr
   with `clearQuota` after fixing the account. A named zone (`(Europe/Paris)`) is not interpreted: the
   exponential fallback applies unless the caller gives `utcOffsetMinutes` and the hint has no zone.
 - **Out of scope**: sleeping until `resumeAt`, the loop and the persistence of the serialised state
-  belong to TK-75; wiring the Claude Code `classify` on `detectQuota` is lot 74c.
+  belong to TK-75. The Claude Code adapter (`classify.ts`) is wired on `detectQuota` (lot 74c): auth first,
+  then quota, only on the failure path.
