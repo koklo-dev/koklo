@@ -116,7 +116,7 @@ describe("files et planification (TK-58c)", () => {
         mail: { kind: "capture" as const },
         webBaseUrl: WEB,
       },
-      { mailSender: sender, logStream },
+      { mailSender: sender, logStream, notificationEmail: { retryLimit: 1, retryDelaySeconds: 1 } },
     );
     await second.stop();
     const schedules = (await worker.boss.getSchedules()).filter(
@@ -124,33 +124,6 @@ describe("files et planification (TK-58c)", () => {
     );
     expect(schedules).toHaveLength(1);
     expect(schedules[0]).toMatchObject({ cron: "* * * * *", timezone: "UTC" });
-  });
-
-  it("la file d'envoi : 4 reprises, 30 s, backoff, expiration 120 s, politique standard", async () => {
-    const second = await startWorker(
-      {
-        databaseUrl: bench.url,
-        appEnv: "test",
-        appVersion: "dev",
-        logLevel: "debug" as const,
-        sentryDsn: undefined,
-        mail: { kind: "capture" as const },
-        webBaseUrl: WEB,
-      },
-      { mailSender: sender, logStream },
-    );
-    try {
-      const queue = await second.boss.getQueue(SEND_NOTIFICATION_EMAIL_QUEUE);
-      expect(queue).toMatchObject({
-        retryLimit: 4,
-        retryDelay: 30,
-        retryBackoff: true,
-        expireInSeconds: 120,
-        policy: "standard",
-      });
-    } finally {
-      await second.stop();
-    }
   });
 
   it("la file de balayage existe, sans reprise (le tick suivant est la reprise)", async () => {
@@ -289,5 +262,35 @@ describe("double exécution concurrente (TK-58c)", () => {
     await Promise.all([handler(job), handler({ ...job, id: "j2" })]);
     expect(capture.sent).toHaveLength(1);
     expect((await bench.stateOf(id))?.email_state).toBe("sent");
+  });
+});
+
+// Dernier : ce démarrage réécrit la file d'envoi avec les valeurs par défaut.
+describe("valeurs par défaut de la file d'envoi (TK-58c)", () => {
+  it("la file d'envoi : 4 reprises, 30 s, backoff, expiration 120 s, politique standard", async () => {
+    const second = await startWorker(
+      {
+        databaseUrl: bench.url,
+        appEnv: "test",
+        appVersion: "dev",
+        logLevel: "debug" as const,
+        sentryDsn: undefined,
+        mail: { kind: "capture" as const },
+        webBaseUrl: WEB,
+      },
+      { mailSender: sender, logStream },
+    );
+    try {
+      const queue = await second.boss.getQueue(SEND_NOTIFICATION_EMAIL_QUEUE);
+      expect(queue).toMatchObject({
+        retryLimit: 4,
+        retryDelay: 30,
+        retryBackoff: true,
+        expireInSeconds: 120,
+        policy: "standard",
+      });
+    } finally {
+      await second.stop();
+    }
   });
 });
