@@ -5,6 +5,7 @@ import {
   apiAs,
   createProjectWithSpecRepo,
   createR2Workspace,
+  linkClientToProject,
   ORPC,
   type R2Member,
   type R2Workspace,
@@ -332,7 +333,7 @@ test("T6 deux écritures donnent deux commits distincts et ordonnés", async ({ 
   await project.owner.dispose();
 });
 
-test("T7 un rôle en lecture seule ne voit pas le formulaire et reçoit 403 à l'écriture", async ({
+test("T7 un rôle sans droit d'écriture ne voit pas le formulaire et reçoit 403 à l'écriture", async ({
   page,
 }) => {
   const workspace = await createR2Workspace();
@@ -346,7 +347,8 @@ test("T7 un rôle en lecture seule ne voit pas le formulaire et reçoit 403 à l
   await waitForDeliveryProcessed(initial.deliveryId);
   await waitForSpecHead(owner, projectId);
 
-  const reader = await apiAs(baseURL, workspace.client);
+  // `business` lit la spec (SPEC_READ_ROLES) mais n'écrit pas : le cas d'un rôle en lecture seule.
+  const reader = await apiAs(baseURL, workspace.business);
   const denied = await reader.post(`${ORPC}/projects/${projectId}/spec/batches`, {
     data: {
       idempotencyKey: `e2e-${randomUUID()}`,
@@ -355,7 +357,7 @@ test("T7 un rôle en lecture seule ne voit pas le formulaire et reçoit 403 à l
   });
   expect(denied.status()).toBe(403);
 
-  await signIn(page, workspace.client);
+  await signIn(page, workspace.business);
   await page.goto(featuresPath(projectId));
   await expect(
     page.getByRole("heading", { name: "Aucune fonctionnalité pour le moment" }),
@@ -366,6 +368,62 @@ test("T7 un rôle en lecture seule ne voit pas le formulaire et reçoit 403 à l
   const dev = await apiAs(baseURL, workspace.dev);
   await submitFeature(dev, projectId, "Autorisé");
   await Promise.all([reader.dispose(), dev.dispose(), owner.dispose()]);
+});
+
+async function statusOf(api: APIRequestContext, path: string): Promise<number> {
+  return (await api.get(path)).status();
+}
+
+const specBatchProbe = (projectId: string) => ({
+  path: `${ORPC}/projects/${projectId}/spec/batches`,
+  data: {
+    idempotencyKey: `e2e-${randomUUID()}`,
+    operations: [{ kind: "feature.create", title: "Interdit", priority: "must" }],
+  },
+});
+
+test("T7b un client non lié ne voit aucun projet : 404 uniforme, 403 sur la spec (TK-55a)", async () => {
+  const workspace = await createR2Workspace();
+  const owner = await apiAs(baseURL, workspace.owner);
+  const { projectId } = await createProjectWithSpecRepo(owner, workspace, slugOf("Cloisonne"));
+
+  const client = await apiAs(baseURL, workspace.client);
+  expect(await json<unknown[]>(await client.get(`${ORPC}/projects`))).toEqual([]);
+  // Sans lien, les ressources du projet (résolues par l'organisation) sont un 404 uniforme.
+  expect(await statusOf(client, `${ORPC}/tickets`)).toBe(404);
+  // spec.* est fermé au rôle client (D7) : le garde de rôle (403) précède le cloisonnement (404).
+  expect(await statusOf(client, `${ORPC}/projects/${projectId}/spec`)).toBe(403);
+  const probe = specBatchProbe(projectId);
+  expect((await client.post(probe.path, { data: probe.data })).status()).toBe(403);
+  await Promise.all([client.dispose(), owner.dispose()]);
+});
+
+test("T7c un client lié voit son projet seulement, sans la spec ni le formulaire (TK-55a)", async ({
+  page,
+}) => {
+  const workspace = await createR2Workspace();
+  const owner = await apiAs(baseURL, workspace.owner);
+  const mine = await createProjectWithSpecRepo(owner, workspace, slugOf("Mien"));
+  const other = await createProjectWithSpecRepo(owner, workspace, slugOf("Autre"));
+  await linkClientToProject(owner, mine.projectId, workspace.client);
+
+  const client = await apiAs(baseURL, workspace.client);
+  const visible = await json<{ id: string }[]>(await client.get(`${ORPC}/projects`));
+  expect(visible.map((project) => project.id)).toEqual([mine.projectId]);
+  // Lié, ses ressources de projet se résolvent ; le second projet de l'organisation reste invisible.
+  expect(await statusOf(client, `${ORPC}/tickets`)).toBe(200);
+
+  // Lié ou non, la spec reste fermée au client (D7) : lecture et écriture, 403.
+  expect(await statusOf(client, `${ORPC}/projects/${mine.projectId}/spec`)).toBe(403);
+  const probe = specBatchProbe(mine.projectId);
+  expect((await client.post(probe.path, { data: probe.data })).status()).toBe(403);
+  expect(await statusOf(client, `${ORPC}/projects/${other.projectId}/spec`)).toBe(403);
+
+  // Côté UI : pas de bouton d'écriture, et le projet non lié n'est pas listé.
+  await signIn(page, workspace.client);
+  await page.goto(featuresPath(mine.projectId));
+  await expect(page.getByRole("button", { name: "Nouvelle fonctionnalité" })).toHaveCount(0);
+  await Promise.all([client.dispose(), owner.dispose()]);
 });
 
 test("T8 installer l'App par OAuth factice relie le compte, le rejeu est refusé", async ({

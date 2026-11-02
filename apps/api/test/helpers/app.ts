@@ -25,6 +25,11 @@ export interface AppOptions {
    * qui garde les tests d'isolation C1.1 à C1.9 de project-list.test.ts inchangés.
    */
   organizationId?: string;
+  /**
+   * Avec `organizationId` : rôle de la session fixe. Absent = session SANS rôle (comme la session
+   * de test par en-tête historique) : le cloisonnement par projet est alors fail-closed (TK-55a).
+   */
+  role?: string;
   probe?: DatabaseProbe;
 }
 
@@ -54,7 +59,14 @@ export async function createApp(options: AppOptions): Promise<INestApplication> 
     const organizationId = options.organizationId;
     // Import différé : seuls les tests qui fixent l'organisation dépendent du module d'auth.
     const { SESSION_RESOLVER } = await import("../../src/auth/session.ts");
-    const resolver = { resolve: async () => ({ userId: "fixed-user", organizationId }) };
+    const role = options.role;
+    const resolver = {
+      resolve: async () => ({
+        userId: "fixed-user",
+        organizationId,
+        ...(role === undefined ? {} : { role }),
+      }),
+    };
     builder = builder.overrideProvider(SESSION_RESOLVER).useValue(resolver);
   }
   if (options.probe) {

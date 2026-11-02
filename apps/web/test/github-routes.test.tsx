@@ -71,6 +71,7 @@ describe("/github — page serveur (AC-48-16)", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même écran, un test par comportement
 describe("/github — gabarit et navigation (AC-48-17)", () => {
   it("fil d'Ariane « Koklo > GitHub » (page courante GitHub)", () => {
     renderLayout();
@@ -108,16 +109,25 @@ describe("/github — gabarit et navigation (AC-48-17)", () => {
     async (role) => {
       asRole(role);
       renderLayout();
-      await within(sidebar()).findByRole("link", { name: "Membres" });
+      await within(sidebar()).findByRole("link", { name: "Projets" });
       await within(sidebar()).findAllByText("Atelier Lumière");
       expect(within(sidebar()).queryByRole("link", { name: "GitHub" })).toBeNull();
     },
   );
 
-  it("rôle inconnu : entrée absente tant que organization.list n'a pas répondu", async () => {
+  it("rôle client : pas d'entrée « Membres » (member.list lui est fermé, TK-55 B1)", async () => {
+    asRole("client");
+    renderLayout();
+    await within(sidebar()).findByRole("link", { name: "Projets" });
+    await within(sidebar()).findAllByText("Atelier Lumière");
+    expect(within(sidebar()).queryByRole("link", { name: "Membres" })).toBeNull();
+  });
+
+  it("rôle inconnu : entrées « Membres » et « GitHub » absentes tant que organization.list n'a pas répondu", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));
     renderLayout();
-    await within(sidebar()).findByRole("link", { name: "Membres" });
+    await within(sidebar()).findByRole("link", { name: "Projets" });
+    expect(within(sidebar()).queryByRole("link", { name: "Membres" })).toBeNull();
     expect(within(sidebar()).queryByRole("link", { name: "GitHub" })).toBeNull();
   });
 });

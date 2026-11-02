@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { ai } from "./contract-ai.ts";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
+import { projectClient } from "./contract-project-client.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { spec, specBatch } from "./contract-spec.ts";
 import { dependency, sprint, ticket } from "./contract-tickets.ts";
@@ -47,6 +48,7 @@ import {
   projectSchema,
   type roleSchema,
 } from "./schemas.ts";
+import type { projectClientSchema } from "./schemas-project-client.ts";
 import type { installationSchema, repoSchema } from "./schemas-provider.ts";
 import type {
   featureDetailSchema,
@@ -82,7 +84,7 @@ const memberInvite = route("POST", "/members/invitations")
   .output(memberInviteOutputSchema);
 
 const memberList = route("GET", "/members")
-  .errors({ ...internalError, ...unauthorizedError })
+  .errors({ ...internalError, ...authErrors })
   .output(memberListOutputSchema);
 
 const memberSetRole = route("PATCH", "/members/{memberId}/role")
@@ -100,6 +102,7 @@ export const contract = {
   organization: { create: organizationCreate, list: organizationList },
   member: { invite: memberInvite, list: memberList, setRole: memberSetRole },
   project: { list: projectList, create: projectCreate },
+  projectClient,
   ticket,
   dependency,
   sprint,
@@ -153,3 +156,4 @@ export type SpecOperation = z.input<typeof specOperationSchema>;
 export type SpecBatchSubmitInput = z.input<typeof specBatchSubmitInputSchema>;
 export type SpecBatchOutput = z.output<typeof specBatchSchema>;
 export type ValidationReport = z.output<typeof validationReportSchema>;
+export type ProjectClient = z.output<typeof projectClientSchema>;

@@ -1739,5 +1739,6 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
 [0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data),
 [0014](adr/0014-agent-runtime.md) (proposed: AgentRuntime port, Claude Code subprocess adapter and the incident 25 boundary),
-[0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK; its use in the API, TK-54b).
+[0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK; its use in the API, TK-54b),
+[0016](adr/0016-client-access-by-project.md) (proposed: client access by project, central fail-closed scoping).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.

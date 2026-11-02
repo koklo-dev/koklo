@@ -84,3 +84,28 @@ export const REPO_READ_ROLES = ["owner", "admin", "dev", "designer"] as const;
  * worker, sur l'état réel de la branche. Client et business n'y accèdent jamais.
  */
 export const SPEC_BATCH_ROLES = ["owner", "admin", "dev", "designer"] as const;
+
+/**
+ * Rôles qui voient toute l'organisation (CDC §14, TK-55a) : seul le `client` est cloisonné par
+ * projet. Liste FERMÉE : un rôle absent ou inconnu n'en fait pas partie et est cloisonné comme un
+ * client (fail-closed, `AuthSession.role` est optionnel).
+ */
+export const STAFF_ROLES = ["owner", "admin", "dev", "designer", "business"] as const;
+
+/** Gérer les liens client <-> projet (`projectClient.*`) : comme « gérer membres » (CDC §14). */
+export const PROJECT_CLIENT_ROLES = MANAGER_ROLES;
+
+/**
+ * Lire la spec brute (`spec.head|listFeatures|getFeature`) : fermé au client (TK-55a, D7), qui
+ * passe par l'espace client (TK-55b). Le vocabulaire git (branche, SHA, chemins) n'est pas le sien.
+ */
+export const SPEC_READ_ROLES = STAFF_ROLES;
+
+/** Le seul rôle cloisonné par projet ; son rôle est vérifié à la liaison et purgé à la sortie. */
+export const CLIENT_ROLE = "client";
+
+/**
+ * Lire la liste des membres (`member.list`) : nom, e-mail et rôle de toute l'organisation. Fermé au
+ * client, lié ou non (TK-55, revue d'attaque B1) ; un rôle absent ou inconnu est refusé (403).
+ */
+export const MEMBER_LIST_ROLES = STAFF_ROLES;

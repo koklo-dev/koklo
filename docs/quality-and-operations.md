@@ -848,6 +848,40 @@ a new snapshot. After a commit through `specBatch`, `spec.head` lags until the p
 The list is sorted in memory over the features of one snapshot (bounded by `spec_too_large`). Logs and
 errors carry no token, provider message or file path.
 
+### Client scoping: operation and tests (TK-55a)
+No configuration. A `client` sees only the projects linked through `projectClient.add` (owner or admin); until
+a link exists its `project.list` is empty and every project procedure answers `404`. There is no screen to link a
+client yet (ticket web to plan): use the API. Removing a link, or moving the member out of the `client` role
+(`member.setRole`, links purged in the same transaction), closes the access on the next request (the role and
+links are re-read at every request). Isolation tests are guard rails and must not be loosened: between
+organizations, between clients of the same organization, role-less sessions (fail-closed), uniform `404`,
+`spec.*` closed to the client. The `x-test-session` header re-reads the role in `members`; a non-member has no
+role and is scoped. Migration `20261102090000_project_client_access` has a `down.sql` (one `DROP TABLE`; the
+links are lost, clients lose access, which fails closed).
+
+**Migration / release note (TK-55a, to repeat in the release notes).** Every existing `client` member LOSES
+access to all projects at deployment, until an owner or admin links them with `projectClient.add` (one call per
+client and project). There is no screen yet (web ticket to plan): do it through the API before or right after
+the release. `member.list` is closed to the client (403) and the "Membres" entry is hidden for them. Team roles
+and business keep seeing the whole organization.
+
+**Start-up guard (TK-55 N6).** The API refuses to start when `APP_ENV=test` and `NODE_ENV=production`
+(`assertSafeEnvironment`, called first in `main.ts`): `APP_ENV=test` enables the `x-test-session` header, which
+takes the role from the request. The error names the two variables, never a value.
+Both values are compared after `trim` and lower-casing (`Production`, `"production "` do not bypass it). An
+absent `NODE_ENV` is deliberately **not** refused: the e2e stack and local development run `APP_ENV=test` without
+`NODE_ENV`, so a deployment must set `NODE_ENV=production` (the container image does) and never `APP_ENV=test`.
+
+**Better Auth organization channel (TK-55 B1-bis).** `/api/auth/organization/*` is mounted by the Better Auth
+plugin and bypasses the API role guards. `AuthController` runs `OrganizationChannelPolicy` first
+(`src/auth/organization-channel.ts`): self reads and the invitation journey are served to any session, reads of
+other people (`list-members`, `get-full-organization`, `list-invitations`, `get-organization`) only to
+`STAFF_ROLES` (role re-read from `members`, an explicit `organizationId` must be the active one, `organizationSlug`
+is refused), every organization write is refused to every role (they go through `member.invite` / `member.setRole`,
+which audit and purge client links), and any route missing from the table is refused with a uniform 403
+`{"code":"FORBIDDEN","message":"Accès refusé"}`. After a Better Auth upgrade,
+`test/auth-organization-routes.test.ts` fails until each new route is classified. See ADR 0016.
+
 ### Webhook deliveries: configuration, retention and operation (TK-45b)
 | Variable | Read by | Meaning |
 |----------|---------|---------|
@@ -937,11 +971,11 @@ refuses `staging`/`production`). `e2e/` stays out of the Docker images (`.docker
 `e2e/tests/r2-stack.spec.ts` (health, webhook bad signature 401, `installation.start` URL of the fake).
 The real GitHub App proof stays manual.
 
-**R2 journeys (TK-49b)**: `e2e/tests/r2-journeys.spec.ts` (8 tests, about 12 s of the 46 tests of `pnpm e2e`,
+**R2 journeys (TK-49b)**: `e2e/tests/r2-journeys.spec.ts` (10 tests, about 13 s of the 48 tests of `pnpm e2e`,
 about 30 s of Playwright and about 1 min in all with a warm build cache) replays the R2 result of the vision
 against the real API + worker + web + Postgres with the injected fake. Each test builds its own workspace
-(`createR2Workspace()` in `e2e/support/r2-workspace.ts`: organization, seeded installation, owner, dev and
-client sessions), so no test depends on another; waits are bounded `expect.poll` (15 s), never fixed sleeps.
+(`createR2Workspace()` in `e2e/support/r2-workspace.ts`: organization, seeded installation, owner, dev,
+business and client sessions; `linkClientToProject()` links a client through `projectClient.add`), so no test depends on another; waits are bounded `expect.poll` (15 s), never fixed sleeps.
 Covered: T1 create a project from the UI (success status "Projet « X » et dépôt de spec créés.", `repo.list`
 spec/new repo, `project_repos` row, second `createSpec` = 409); T2 before the signed push the page says "La
 spec est en cours de préparation", after it (delivery `processed`, `spec.head` set, page reloaded) "Aucune
@@ -949,13 +983,19 @@ fonctionnalité pour le moment"; T3 bad signature 401 and one `webhook_deliverie
 id; T4 a feature written from the UI gives a `committed` batch with a 40-hex `commitSha` and `F-001`; T5 the
 next push indexes it (`spec.head.commitSha` = batch commit, the page lists the title: the index is rebuilt from
 the repository files, indirect proof of the commit); T6 two writes give two distinct ordered commits
-(`F-001`, `F-002`); T7 a read-only role (`client`) has no "Nouvelle fonctionnalité" button and gets 403 on
-`specBatch.submit`, a `dev` writes; T8 install through the fake OAuth (`installation.start` state, callback
+(`F-001`, `F-002`); T7 a role without write right (`business`: reads the spec, no `SPEC_BATCH_ROLES`) has no
+"Nouvelle fonctionnalité" button and gets 403 on `specBatch.submit`, a `dev` writes (it used a `client` before
+TK-55a, which closed `spec.*` to clients, D7, [ADR 0016](adr/0016-client-access-by-project.md)); T7b an unlinked
+client sees an empty `project.list`, a 404 on project resources (`ticket.list`) and a 403 on `spec.head` and
+`specBatch.submit` (the role guard precedes the scoping); T7c a client linked by an owner through
+`projectClient.add` sees only its project in `project.list` (a second project of the same organization stays
+invisible), resolves its project resources (`ticket.list` 200), still gets 403 on `spec.*` (both projects) and
+has no "Nouvelle fonctionnalité" button; T8 install through the fake OAuth (`installation.start` state, callback
 `code=fake-code-e2e-link-1` from the launcher pool, 303 to `/github?result=installed`, account listed, replay =
 `invalid_state`). The pool `e2e-link-1..3` is single use per run: the database is new at every `pnpm e2e`.
 The "Terminé" step badges of the creation panel are not asserted: the panel closes on full success (the stub
 suite `apps/web/e2e/project-create.spec.ts` covers them). Run three times in a row on ports 54339/3290/3291:
-46 passed each time.
+48 passed each time.
 
 ### Reconciliation job (TK-46a)
 | Variable | Read by | Meaning |

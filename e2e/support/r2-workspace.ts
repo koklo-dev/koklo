@@ -7,14 +7,16 @@ import { type SeededInstallation, seedProviderInstallation } from "./installatio
 /**
  * Support e2e (pas du code de production) : espace de travail isolé des parcours R2 (TK-49b).
  * Une organisation au slug unique, une installation GitHub active graine (le faux l'accepte), un owner,
- * un dev et un client (rôle en lecture seule), chacun avec une vraie session Better Auth.
+ * un dev, un business (lecture de la spec, aucune écriture) et un client (cloisonné par projet, TK-55a), chacun avec une vraie session Better Auth.
  * Aucun projet : c'est l'UI ou l'API du test qui le crée.
  */
 export { SESSION_COOKIE };
 
 export interface R2Member {
   userId: string;
-  role: "owner" | "dev" | "client";
+  role: "owner" | "dev" | "business" | "client";
+  /** `members.id`, attendu par `projectClient.add`. */
+  memberId: string;
   cookie: string;
 }
 
@@ -24,6 +26,7 @@ export interface R2Workspace {
   installation: SeededInstallation;
   owner: R2Member;
   dev: R2Member;
+  business: R2Member;
   client: R2Member;
 }
 
@@ -36,8 +39,8 @@ async function insertMember(
     email: `r2-${role}-${randomUUID()}@example.com`,
     name: `R2 ${role}`,
   });
-  await insertMembership(client, organizationId, userId, role);
-  return { userId, role, cookie: await insertSession(client, userId, organizationId) };
+  const memberId = await insertMembership(client, organizationId, userId, role);
+  return { userId, role, memberId, cookie: await insertSession(client, userId, organizationId) };
 }
 
 export function createR2Workspace(): Promise<R2Workspace> {
@@ -55,8 +58,9 @@ export function createR2Workspace(): Promise<R2Workspace> {
     });
     const owner = await insertMember(client, organizationId, "owner");
     const dev = await insertMember(client, organizationId, "dev");
+    const business = await insertMember(client, organizationId, "business");
     const reader = await insertMember(client, organizationId, "client");
-    return { organizationId, slug, installation, owner, dev, client: reader };
+    return { organizationId, slug, installation, owner, dev, business, client: reader };
   });
 }
 
@@ -106,4 +110,16 @@ export function repoExternalId(projectId: string): Promise<number> {
     expect(rows).toHaveLength(1);
     return Number(rows[0]?.external_id);
   });
+}
+
+/** Lie un client à un projet par l'API (`projectClient.add`, owner/admin), comme en production. */
+export async function linkClientToProject(
+  owner: APIRequestContext,
+  projectId: string,
+  member: R2Member,
+): Promise<void> {
+  const linked = await owner.post(`${ORPC}/projects/${projectId}/clients`, {
+    data: { memberId: member.memberId },
+  });
+  expect(linked.ok(), await linked.text()).toBe(true);
 }

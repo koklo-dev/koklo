@@ -53,6 +53,8 @@ export const expectedTables = [
   "baselines",
   // TK-51d : notifications in-app (destinataire membre, sans charge utile libre).
   "notifications",
+  // TK-55a : liaison client <-> projet (cloisonnement par projet).
+  "project_client_access",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */

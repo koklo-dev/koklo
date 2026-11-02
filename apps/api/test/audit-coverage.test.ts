@@ -16,6 +16,7 @@ import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./
 import { credentialRows } from "./helpers/llm-credential-routes.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { startQueueBoss } from "./helpers/organizations.ts";
+import { linkRows, projectClientApi } from "./helpers/project-client.ts";
 import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
@@ -127,6 +128,7 @@ const WRITE_GROUPS = [
   "organization",
   "member",
   "project",
+  "projectClient",
   "ticket",
   "dependency",
   "sprint",
@@ -194,6 +196,8 @@ const EXPECTED_WRITE_PROCEDURES = [
   "member.setRole",
   "organization.create",
   "project.create",
+  "projectClient.add",
+  "projectClient.remove",
   "projectState.update",
   "repo.createSpec",
   "repo.link",
@@ -577,6 +581,56 @@ const SCENARIOS: Scenario[] = [
     deniedStatuses: [403],
   },
   {
+    procedure: "projectClient.add",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      projectClientApi(app, ctx.world.actors.owner).add(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    expected: async (ctx) => ({
+      action: "project_client.add",
+      targetKind: "project_client",
+      targetId: (await linkRows(database, ctx.world.projectId))[0]?.id ?? "",
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      projectClientApi(app, ctx.world.actors.dev).add(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "projectClient.remove",
+    role: "owner",
+    prepare: async (ctx) => {
+      await projectClientApi(app, ctx.world.actors.owner).add(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      );
+      return { linkId: (await linkRows(database, ctx.world.projectId))[0]?.id ?? "" };
+    },
+    call: (ctx) =>
+      projectClientApi(app, ctx.world.actors.owner).remove(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    expected: async (_ctx, state) => ({
+      action: "project_client.remove",
+      targetKind: "project_client",
+      targetId: state.linkId,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      projectClientApi(app, ctx.world.actors.business).remove(
+        ctx.world.projectId,
+        ctx.world.actors.client.memberId,
+      ),
+    deniedStatuses: [403],
+  },
+  {
     procedure: "project.create",
     role: "owner",
     prepare: async () => ({}),
@@ -888,7 +942,7 @@ function llmCredentialScenarios(): Scenario[] {
 }
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 31 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 33 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -951,6 +1005,20 @@ describe("garde TK-54b : le groupe ai", () => {
   });
 });
 
+describe("garde TK-55a : le groupe projectClient", () => {
+  it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "projectClient"))).toBe(true);
+  });
+
+  it("projectClient.list est une lecture : hors des écritures à journaliser", () => {
+    expect(nonGetProcedures(["projectClient"]).sort()).toEqual([
+      "projectClient.add",
+      "projectClient.remove",
+    ]);
+  });
+});
+
 describe("garde TK-52b : le groupe llmCredential", () => {
   it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
     const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
@@ -959,7 +1027,7 @@ describe("garde TK-52b : le groupe llmCredential", () => {
 });
 
 async function checkSuccess(scenario: Scenario) {
-  const ctx = { world: await createWorld(database) };
+  const ctx = { world: await createWorld(database, { linkedClient: false }) };
   const state = await scenario.prepare(ctx);
   // L'organisation créée par organization.create n'existe pas avant l'appel : journal vide.
   const before = scenario.auditOrganization
@@ -992,7 +1060,7 @@ async function checkSuccess(scenario: Scenario) {
 }
 
 async function checkListed(scenario: Scenario) {
-  const ctx = { world: await createWorld(database) };
+  const ctx = { world: await createWorld(database, { linkedClient: false }) };
   const state = await scenario.prepare(ctx);
   const response = await scenario.call(ctx, state);
   expect(response.status).toBe(200);
@@ -1019,7 +1087,7 @@ async function checkListed(scenario: Scenario) {
 }
 
 async function checkDenied(scenario: Scenario) {
-  const ctx = { world: await createWorld(database) };
+  const ctx = { world: await createWorld(database, { linkedClient: false }) };
   const state = await scenario.prepare(ctx);
   const before = await auditRowsFull(database, ctx.world.organizationId);
 
@@ -1044,7 +1112,7 @@ describe.each(SCENARIOS)("$procedure", (scenario) => {
 
 describe("exception documentée : dependency.add d'une arête déjà posée", () => {
   it("la première pose produit une entrée, la seconde (no-op idempotent) n'en produit aucune", async () => {
-    const ctx = { world: await createWorld(database) };
+    const ctx = { world: await createWorld(database, { linkedClient: false }) };
     const a = await seed(ctx);
     const b = await seed(ctx);
     const dev = tickets(ctx);

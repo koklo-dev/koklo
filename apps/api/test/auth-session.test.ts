@@ -217,7 +217,7 @@ describe("session réelle : refus et isolation (C4.b, C4.c)", () => {
   it("C4.c l'isolation reste vraie : un membre d'une autre organisation ne voit que la sienne", async () => {
     const memberOfOther = randomUUID();
     await insertUser(database, memberOfOther, `${memberOfOther}@example.test`);
-    await insertMember(database, OTHER_ORG, memberOfOther);
+    await insertMember(database, OTHER_ORG, memberOfOther, "owner");
     const cookie = await insertSession(database, {
       userId: memberOfOther,
       activeOrganizationId: OTHER_ORG,

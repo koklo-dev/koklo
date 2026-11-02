@@ -170,14 +170,19 @@ describe("member.list (C1)", () => {
     const other = await newOrg();
     const owner = await insertActor(database, orgId, "owner");
     const client = await insertActor(database, orgId, "client");
+    const reader = await insertActor(database, orgId, "business");
     const stranger = await insertActor(database, other, "dev");
-    const response = await call(app, client.cookie, "get", "/members");
+    const response = await call(app, reader.cookie, "get", "/members");
     expect(response.status).toBe(200);
     expect(memberListOutputSchema.safeParse(response.body).success).toBe(true);
     const byId = Object.fromEntries(
       response.body.map((m: { id: string; role: string }) => [m.id, m.role]),
     );
-    expect(byId).toEqual({ [owner.memberId]: "owner", [client.memberId]: "client" });
+    expect(byId).toEqual({
+      [owner.memberId]: "owner",
+      [client.memberId]: "client",
+      [reader.memberId]: "business",
+    });
     expect(byId[stranger.memberId]).toBeUndefined();
   });
 });

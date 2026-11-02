@@ -46,7 +46,7 @@ const LOGIN: FeatureSeed = {
   nfr: ["NFR-perf"],
 };
 
-const getOf = (s: SpecReadScene, specId = "F-001", role: "dev" | "client" = "dev") =>
+const getOf = (s: SpecReadScene, specId = "F-001", role: "dev" | "client" | "business" = "dev") =>
   specReadApi(bench().app, s.world.actors[role]).get(s.projectId, specId);
 
 async function indexedLogin() {
@@ -157,13 +157,23 @@ describe("spec.getFeature : détail lu dans git au commit indexé", () => {
     expect(res.body.code).toBe("NOT_FOUND");
   });
 
-  it("le client (rôle en lecture) obtient le même détail", async () => {
+  it("le business (rôle en lecture) obtient le même détail", async () => {
+    const { s } = await indexedLogin();
+
+    const res = await getOf(s, "F-001", "business");
+
+    expect(res.status).toBe(200);
+    expect(res.body.title).toBe("Connexion");
+  });
+
+  it("le client est refusé (TK-55a, D7) : 403, sans titre ni chemin de fichier", async () => {
     const { s } = await indexedLogin();
 
     const res = await getOf(s, "F-001", "client");
 
-    expect(res.status).toBe(200);
-    expect(res.body.title).toBe("Connexion");
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("FORBIDDEN");
+    expect(JSON.stringify(res.body)).not.toMatch(/Connexion|filePath|commitSha/);
   });
 });
 

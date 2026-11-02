@@ -181,6 +181,35 @@ describe("isolation multi-tenant", () => {
     expect(await aiAuditRows(b.database, mine.world.organizationId)).toEqual([]);
   });
 
+  it.each(["admin", "dev", "designer"] as const)(
+    "%s : projet d'une autre organisation et projet inexistant donnent le même 404, sans dépense",
+    async (role) => {
+      const b = bench();
+      const mine = await keyedWorld(b);
+      const theirs = await keyedWorld(b);
+      const fake = FakeLlm.replying(BRIEF_REPLY);
+      b.use(fake);
+      const api = aiApi(b.app, mine.world.actors[role]);
+      const unknownProject = "00000000-0000-4000-8000-000000000000";
+      const NOT_FOUND = { code: "NOT_FOUND", message: "Ressource introuvable" };
+
+      for (const projectId of [theirs.world.projectId, unknownProject]) {
+        for (const res of [
+          await api.draftBrief(projectId),
+          await api.proposeFeatures(projectId),
+          await api.proposeCriteria(projectId),
+        ]) {
+          expect(res.status, JSON.stringify(res.body)).toBe(404);
+          expect({ code: res.body.code, message: res.body.message }).toEqual(NOT_FOUND);
+        }
+      }
+      expect(fake.calls).toHaveLength(0);
+      expect(b.provider.keysSeen).toEqual([]);
+      expect(await aiAuditRows(b.database, theirs.world.organizationId)).toEqual([]);
+      expect(await aiAuditRows(b.database, mine.world.organizationId)).toEqual([]);
+    },
+  );
+
   it("un projet inexistant : 404 NOT_FOUND", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);

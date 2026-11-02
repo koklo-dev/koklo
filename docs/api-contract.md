@@ -29,7 +29,7 @@ route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 | `organization.create` | POST | `/organizations` | session | `UNAUTHORIZED`, `CONFLICT` |
 | `organization.list` | GET | `/organizations` | session | `UNAUTHORIZED` |
 | `member.invite` | POST | `/members/invitations` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
-| `member.list` | GET | `/members` | session + active organization | `UNAUTHORIZED` |
+| `member.list` | GET | `/members` | session + active organization + team or business role | `UNAUTHORIZED`, `FORBIDDEN` |
 | `member.setRole` | PATCH | `/members/{memberId}/role` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
 | `project.list` | GET | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
 | `project.create` | POST | `/projects` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN` |
@@ -256,7 +256,7 @@ decision: lease expiry, "active lease" filters of `ticket.get`/`ticket.delete`. 
 |-----------|-------------------|-----------|
 | `organization.create` | `UserSessionGuard` | Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
 | `organization.list` | `UserSessionGuard` | Organizations the caller belongs to, with the caller's role |
-| `member.list` | `SessionGuard` | Members of the session organization |
+| `member.list` | `SessionGuard`, `RoleGuard` (`MEMBER_LIST_ROLES`) | Members of the session organization; closed to `client` (403, exposes names, emails and roles of the whole organization) and to any absent or unknown role |
 | `member.invite` | `SessionGuard`, `RoleGuard` | `already_member` / `already_invited` checks, then Better Auth `createInvitation`; its callback enqueues the email job |
 | `member.setRole` | `SessionGuard`, `RoleGuard` | Serializable transaction: `NOT_FOUND`, H3, `last_owner` |
 | `project.create` | `SessionGuard`, `RoleGuard` | Project created under the session organization |
@@ -275,7 +275,7 @@ drift apart.
 | Procedure | owner | admin | dev | designer | client | business |
 |-----------|:-----:|:-----:|:---:|:--------:|:------:|:--------:|
 | `organization.create`, `organization.list` | yes | yes | yes | yes | yes | yes |
-| `member.list` | yes | yes | yes | yes | yes | yes |
+| `member.list` | yes | yes | yes | yes | no | yes |
 | `member.invite` | yes | yes | no | no | no | no |
 | `member.setRole` | yes | yes | no | no | no | no |
 | `project.create` | yes | yes | no | no | no | no |
@@ -290,7 +290,7 @@ active organization, 403 for a role marked "no".
 | Screen | Procedure | Error handling in the UI |
 |--------|-----------|--------------------------|
 | `/organizations` | `organization.list`, `organization.create` | `CONFLICT slug_taken` shown under "Identifiant"; other errors in an alert; `UNAUTHORIZED` re-checks the session (no session: `/login`; session: `/organizations`) |
-| `/members` | `member.list`, `member.invite` | `CONFLICT already_member` / `already_invited` under "Adresse e-mail"; `FORBIDDEN` as a message; other errors in an alert |
+| `/members` | `member.list`, `member.invite` | `CONFLICT already_member` / `already_invited` under "Adresse e-mail"; `FORBIDDEN` as a message; other errors in an alert. A `client` never calls `member.list` (no "Membres" entry; the page shows a team-only notice) |
 | `/projects` | `project.list`, `project.create` | `FORBIDDEN` as a message; other errors in an alert |
 
 Organization activation is not an oRPC procedure: the web calls the Better Auth client
@@ -545,11 +545,12 @@ member of the project and of the organization of the session.
 | `installation.list`, `installation.start` | owner, admin |
 | `repo.link`, `repo.createSpec` | owner, admin |
 | `repo.list` | owner, admin, dev, designer |
-| `spec.head`, `spec.listFeatures`, `spec.getFeature` | every role, within their own project |
+| `spec.head`, `spec.listFeatures`, `spec.getFeature` | owner, admin, dev, designer, business (never `client`, TK-55a) |
+| `projectClient.list`, `projectClient.add`, `projectClient.remove` | owner, admin |
 | `specBatch.submit` | owner, admin, dev; designer only for design-related features, checked per operation by the API |
 | `specBatch.get` | same roles as `specBatch.submit` |
 
-`client` and `business` never write to the spec. A refused role returns `FORBIDDEN`.
+`client` and `business` never write to the spec; `client` does not read the raw spec either (`FORBIDDEN`, TK-55a). A refused role returns `FORBIDDEN`.
 
 ### Membership rule (anti-IDOR), to enforce before any access
 - Membership of the user in the project AND in the organization of the session is verified BEFORE
@@ -843,8 +844,9 @@ Contract 0.6.0 adds one typed error and no route (still 43 routes): `SPEC_INDEX_
 `{ errorCode, commitSha }`, `errorCode` is the stored code such as `spec_too_large`, no message) on
 `spec.listFeatures` and `spec.getFeature` only. OpenAPI component: `SpecIndexFailed`.
 
-- **Roles and scope**: every role reads its own project; no role guard, only the session. The project
-  must belong to the caller organisation, checked by the first read; a foreign or unknown project is
+- **Roles and scope**: the five team roles read (owner, admin, dev, designer, business); `client` gets
+  `403 FORBIDDEN` before any project check (TK-55a, D7), linked or not, so the answer is no oracle. The
+  project must belong to the caller organisation, checked before the work; a foreign or unknown project is
   `NOT_FOUND`, never `FORBIDDEN`, with the same response. A `specId` unknown to the project (or of
   another project) is `NOT_FOUND` before any call to the provider. No read writes an audit entry.
 - **Revision**: neither `branch` nor `commitSha` means the `cadrage` head if it has one, otherwise the
@@ -1006,6 +1008,42 @@ Then (rule 5 of `@koklo/schema`).
 - Quotas, budgets and model prices (D8); no persisted brief or proposal table (D3, D4); content policy (D6); `verify`
   audited and marking the key used (D9).
 
+## Client access by project (TK-55a)
+Contract 0.10.0 (stacked on 0.9.0), group `projectClient` (`apps/api/src/project-client`,
+[ADR 0016](adr/0016-client-access-by-project.md)), 54 routes, 39 paths. Roles: **owner and admin only**;
+every other role, the linked `client` included, gets `403`, no session `401`. Order of checks: role (403),
+project of the organization (404), then the member (422).
+
+| Operation | Method | Path | Input | Output | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`) |
+|-----------|--------|------|-------|--------|---------------------------------------------------------------|
+| `projectClient.list` | GET | `/projects/{projectId}/clients` | `{ projectId }` | `ProjectClient[]` | none |
+| `projectClient.add` | POST | `/projects/{projectId}/clients` | `{ projectId, memberId }` | `ProjectClient` | `VALIDATION` 422 |
+| `projectClient.remove` | DELETE | `/projects/{projectId}/clients/{memberId}` | `{ projectId, memberId }` | `{ removed: boolean }` | none |
+
+- `ProjectClient` = `{ memberId, userId, name, email, createdAt }`: no row id, no role. `memberId` is the id of
+  the `members` row. Organization, author and row id are set by the server, never read from the input.
+- `add` is idempotent: an existing link answers `200` with the same item (same `createdAt`), no extra row and
+  no audit line. A member who is not a `client`, belongs to another organization or does not exist is the same
+  `422 VALIDATION{field: "memberId", message}` (no oracle).
+- `remove` is idempotent: an absent link, or an unknown, foreign or non-client member, answers
+  `200 { removed: false }` without audit; otherwise only the link of this project is deleted.
+- `list` returns the clients linked to this project, ordered by link date then id.
+- **Audit** (same transaction as the write; an audit failure leaves no link): `project_client.add` and
+  `project_client.remove`, `targetKind` `project_client`, `targetId` the link row, no ticket, no free text.
+
+### Client scoping and uniform 404 (TK-55a)
+`isProjectScoped(role)` is true for every role outside `STAFF_ROLES` (fail-closed: absent, empty or unknown
+roles are scoped like `client`). All project procedures go through `scopeOf` / `inScope` / `inProject`
+(`apps/api/src/tracker/scope.ts`), which call `ProjectAccess.assertAccessible` **before** the work:
+- team roles and business: any project of their organization (no link needed);
+- `client`: only a linked project. The implicit project (`OldestProjectContext`) is the oldest **linked** one;
+  none means `NOT_FOUND`. `project.list` returns the linked projects (`[]` if none, never an error);
+- a role guard (403) always precedes the scoping (404): a client writing a ticket gets `403`, not `404`.
+
+The `NOT_FOUND` is **uniform**: unlinked client, project of another organization, unknown project and missing
+resource in an accessible project all return the same status and body, never `403`. The response time is not
+an oracle: the refusal costs one query round-trip in every case (tolerance-based test, no constant-time claim).
+
 ## Installations in the API (TK-48a2)
 `installation.list`, `installation.start` and the browser callback are implemented in
 `apps/api/src/installation`. Roles: owner and admin only (`FORBIDDEN` otherwise, `401` without session).
@@ -1097,10 +1135,12 @@ sequenceDiagram
 ```
 
 ## Version history
+- **0.10.0** (TK-55a): group `projectClient` (`list`, `add`, `remove`; 3 routes, 54 routes and 39 paths in all),
+  schemas `projectClientSchema` and its inputs. Additive. Fingerprints of 0.1.0 to 0.9.0 unchanged.
 - **0.9.0** (TK-54b): group `ai` (`draftBrief`, `proposeFeatures`, `proposeCriteria`) and `llmCredential.verify`
   (4 routes, 51 on 37 paths), five typed errors (`LLM_NOT_CONFIGURED`, `LLM_RATE_LIMITED`, `LLM_PROVIDER_ERROR`,
   `LLM_OUTPUT_INVALID`, `PROMPT_REJECTED`); `featureCreateSchema` exported. Additive. Fingerprints of 0.1.0 to 0.8.0
-  unchanged. 0.10.0 is reserved for TK-55.
+  unchanged.
 - **0.7.0** (TK-48a2): typed errors `PROVIDER_UNAVAILABLE` (503) and `VALIDATION` (422) on
   `installation.start`; `installation_id` optional in `installationCallbackQuerySchema` and the outcome `not_owner` in
   `installationCallbackOutcomeSchema` (both outside the OpenAPI document). Same 43 routes. Fingerprints of 0.1.0 to 0.6.0 unchanged.

@@ -21,12 +21,13 @@ const GROUPS: Record<string, string[]> = {
   installation: ["list", "start"],
   llmCredential: ["invalidate", "list", "remove", "set", "verify"],
   ai: ["draftBrief", "proposeCriteria", "proposeFeatures"],
+  projectClient: ["add", "list", "remove"],
   repo: ["createSpec", "link", "list"],
   spec: ["getFeature", "head", "listFeatures"],
   specBatch: ["get", "submit"],
 };
 
-describe("R1 routeur : 17 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1), 43 procédures", () => {
+describe("R1 routeur : 18 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a : +1), 46 procédures", () => {
   it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
@@ -41,6 +42,7 @@ describe("R1 routeur : 17 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1), 43 pro
         "member",
         "organization",
         "project",
+        "projectClient",
         "projectState",
         "repo",
         "spec",
@@ -66,6 +68,11 @@ const AI_PAIRS = [
   "POST /llm-credentials/{provider}/verify",
 ];
 
+const PROJECT_CLIENT_PAIRS = [
+  "GET /projects/{projectId}/clients",
+  "POST /projects/{projectId}/clients",
+  "DELETE /projects/{projectId}/clients/{memberId}",
+];
 const LLM_PAIRS = [
   "GET /llm-credentials",
   "PUT /llm-credentials/{provider}",
@@ -113,17 +120,15 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/spec/batches",
     "GET /projects/{projectId}/spec/batches/{batchId}",
   ];
-  it("les 25 paires de TK-29 les 10 de TK-42 et les 4 de TK-52b et les 4 de TK-54b sont présentes (51 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a sont présentes (54 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
     );
-    for (const pair of [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS, ...AI_PAIRS])
-      expect(pairs, pair).toContain(pair);
-    expect(pairs).toHaveLength(
-      8 + PAIRS.length + NEW_PAIRS.length + LLM_PAIRS.length + AI_PAIRS.length,
-    );
-    expect(pairs).toHaveLength(51);
+    const expected = [...PAIRS, ...NEW_PAIRS, ...LLM_PAIRS, ...AI_PAIRS, ...PROJECT_CLIENT_PAIRS];
+    for (const pair of expected) expect(pairs, pair).toContain(pair);
+    expect(pairs).toHaveLength(8 + expected.length);
+    expect(pairs).toHaveLength(54);
   });
 });
 

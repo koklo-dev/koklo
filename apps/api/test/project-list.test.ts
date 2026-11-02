@@ -15,8 +15,9 @@ const LATE = "01900000-0000-7000-8000-0000000000c2";
 let database: TestDatabase;
 const apps: INestApplication[] = [];
 
+/** Session fixe de rôle `owner` : un rôle absent est cloisonné (fail-closed, TK-55a). */
 async function appFor(organizationId?: string, databaseUrl = database.url) {
-  const app = await createApp({ databaseUrl, organizationId });
+  const app = await createApp({ databaseUrl, organizationId, role: "owner" });
   apps.push(app);
   return app;
 }

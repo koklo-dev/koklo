@@ -1,11 +1,13 @@
 import type { MemberListOutput, Role } from "@koklo/contract";
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
+import { CLIENT_ROLE } from "../auth/roles.ts";
 import { DatabaseService } from "../database/database.module.ts";
 import { type AuditActor, recordAudit } from "../tracker/audit.ts";
 
 export interface MemberRecord {
   id: string;
+  userId: string;
   role: string;
 }
 
@@ -72,10 +74,16 @@ export class MemberRepository {
         async (tx) => {
           const target = await tx.member.findFirst({
             where: { id: memberId, organizationId },
-            select: { id: true, role: true },
+            select: { id: true, userId: true, role: true },
           });
           const ownerCount = await tx.member.count({ where: { organizationId, role: "owner" } });
           authorize(target, ownerCount);
+          if (target?.role === CLIENT_ROLE && newRole !== CLIENT_ROLE) {
+            // Sortie du rôle client : ses liens de projet tombent avec lui (jamais ceux d'une autre organisation).
+            await tx.projectClientAccess.deleteMany({
+              where: { organizationId, userId: target.userId },
+            });
+          }
           const updated = await tx.member.update({
             where: { id: memberId },
             data: { role: newRole },

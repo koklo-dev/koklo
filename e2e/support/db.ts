@@ -41,12 +41,14 @@ export async function insertMembership(
   organizationId: string,
   userId: string,
   role: string,
-): Promise<void> {
+): Promise<string> {
+  const id = randomUUID();
   await client.query(
     `INSERT INTO members (id, organization_id, user_id, role, created_at, updated_at)
      VALUES ($1, $2, $3, $4, now(), now())`,
-    [randomUUID(), organizationId, userId, role],
+    [id, organizationId, userId, role],
   );
+  return id;
 }
 
 /** Insère une session (organisation active ou NULL) et renvoie la valeur du cookie `<token>.<hmac base64>` encodée. */
