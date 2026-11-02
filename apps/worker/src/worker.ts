@@ -20,10 +20,12 @@ import {
   SEND_MAGIC_LINK_RETENTION_SECONDS,
   SEND_MAGIC_LINK_RETRY_LIMIT,
 } from "./jobs/send-magic-link.ts";
+import type { NotificationEmailSettings } from "./jobs/send-notification-email.ts";
 import type { SpecWriteSettings } from "./jobs/spec-write.ts";
 import type { WebhookDeliverySettings } from "./jobs/webhook-delivery.ts";
 import { createMailSender } from "./mail/create-mail-sender.ts";
 import type { MailSender } from "./mail/mail-sender.ts";
+import { registerNotificationEmail } from "./notification/register.ts";
 import { instrumentJob, setupObservability } from "./observability.ts";
 import { registerReconcile } from "./reconcile/register.ts";
 import { providerOf, registerSpecWrite } from "./spec-write/register.ts";
@@ -47,6 +49,8 @@ export interface StartWorkerOptions {
   specWrite?: Partial<SpecWriteSettings>;
   /** Essais et concurrence de la file `webhook-delivery` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
   webhookDelivery?: Partial<WebhookDeliverySettings>;
+  /** Essais et concurrence de la file `send-notification-email` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
+  notificationEmail?: Partial<NotificationEmailSettings>;
 }
 
 interface MailQueue {
@@ -80,6 +84,7 @@ async function registerDatabaseJobs(
   database: PrismaClient,
   config: WorkerConfig,
   options: StartWorkerOptions,
+  mailSender: MailSender,
 ): Promise<void> {
   const provider = providerOf(config, options.gitProvider);
   const retentionDays = config.webhookRetentionDays ?? WEBHOOK_RETENTION_DAYS_DEFAULT;
@@ -91,6 +96,12 @@ async function registerDatabaseJobs(
   );
   await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
   await registerWebhookPurge(boss, logger, { raw: database, retentionDays });
+  await registerNotificationEmail(
+    boss,
+    logger,
+    { raw: database, mailSender, webBaseUrl: config.webBaseUrl },
+    options.notificationEmail,
+  );
   await registerReconcile(boss, logger, {
     raw: database,
     graceMinutes: config.reconcileGraceMinutes ?? RECONCILE_GRACE_MINUTES_DEFAULT,
@@ -138,7 +149,7 @@ export async function startWorker(
     ),
   );
   const database = createRawDbClient(config.databaseUrl);
-  await registerDatabaseJobs(boss, logger, database, config, options);
+  await registerDatabaseJobs(boss, logger, database, config, options, mailSender);
   logger.info("worker started");
   return {
     boss,

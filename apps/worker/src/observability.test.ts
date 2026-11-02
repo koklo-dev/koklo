@@ -12,6 +12,7 @@ const config: WorkerConfig = {
   logLevel: "info",
   sentryDsn: undefined,
   mail: { kind: "capture" },
+  webBaseUrl: "http://localhost:3000",
 };
 
 const lines: string[] = [];
@@ -86,5 +87,31 @@ describe("instrumentJob (TK-19)", () => {
     const logger = setupObservability(config, { logStream });
     await instrumentJob(logger, "noop", async () => undefined)([job("job-ok")]);
     expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe("instrumentJob codeOnly (revue TK-58 NB-4)", () => {
+  const job = (id: string) => ({ id, data: {} });
+
+  it("codeOnly : le journal ne contient que le nom et le code de l'erreur, jamais son contenu", async () => {
+    const logger = setupObservability(config, { logStream });
+    const secret = Object.assign(new Error("SELECT * FROM users WHERE email='a@secret.test'"), {
+      code: "P2010",
+    });
+    const run = instrumentJob(
+      logger,
+      "send-notification-email",
+      async () => {
+        throw secret;
+      },
+      { codeOnly: true },
+    );
+    await expect(run([job("job-c")])).rejects.toBe(secret);
+    const logged = lines.join("\n");
+    expect(logged).not.toContain("secret.test");
+    expect(logged).not.toContain("SELECT");
+    expect(logged).toContain("P2010");
+    const [captured] = vi.mocked(Sentry.captureException).mock.calls[0] ?? [];
+    expect(String((captured as Error).message)).not.toContain("secret.test");
   });
 });

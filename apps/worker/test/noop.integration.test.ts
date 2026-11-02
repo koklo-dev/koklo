@@ -16,6 +16,7 @@ beforeAll(async () => {
     logLevel: "silent",
     sentryDsn: undefined,
     mail: { kind: "capture" },
+    webBaseUrl: "http://localhost:3000",
   });
 });
 

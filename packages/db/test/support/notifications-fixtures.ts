@@ -7,6 +7,10 @@ import { insertScope, type Scope } from "./ticket-fixtures.ts";
 export const NOTIFICATION_TABLES = ["notifications"] as const;
 export const NOTIFICATION_MODELS = ["Notification"] as const;
 
+/** TK-58a : suivi de l'envoi d'e-mail (colonnes ajoutées par la migration additive suivante). */
+export const NOTIFICATION_EMAIL_STATE_SUFFIX = "_notification_email_state";
+export const NOTIFICATION_EMAIL_STATES = ["pending", "sent", "skipped", "failed"] as const;
+
 export const NOTIFICATION_SUFFIX = "_notifications";
 export const NOTIFICATION_MIGRATION = "20261101120000_notifications";
 
@@ -26,6 +30,8 @@ export const NOTIFICATION_SUBJECT_KINDS = ["suggestion", "review", "baseline", "
 export const NOTIFICATION_COLUMNS = {
   created_at: "timestamptz/NO",
   dedupe_key: "text/NO",
+  email_state: "text/NO",
+  emailed_at: "timestamptz/YES",
   id: "uuid/NO",
   organization_id: "uuid/NO",
   project_id: "uuid/YES",

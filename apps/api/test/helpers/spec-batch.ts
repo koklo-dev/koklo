@@ -133,6 +133,7 @@ function workerHandle(
           logLevel: "debug",
           sentryDsn: undefined,
           mail: { kind: "capture" },
+          webBaseUrl: "http://localhost:3000",
         },
         {
           gitProvider: provider,
