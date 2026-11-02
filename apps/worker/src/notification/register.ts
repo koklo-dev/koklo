@@ -27,6 +27,24 @@ export interface NotificationEmailRegistration {
 }
 
 /**
+ * `exclusive` : au plus un job `created|retry|active` par `singletonKey`, donc par notification. La
+ * politique `standard` ne déduplique rien. pg-boss ne change jamais la politique d'une file : une
+ * file `standard` laissée par une version précédente (jamais livrée) est supprimée puis recréée.
+ */
+async function ensureExclusiveQueue(
+  boss: PgBoss,
+  logger: Logger,
+  options: Record<string, number | boolean>,
+): Promise<void> {
+  const existing = await boss.getQueue(SEND_NOTIFICATION_EMAIL_QUEUE);
+  if (existing && existing.policy !== "exclusive") {
+    logger.warn({ queue: SEND_NOTIFICATION_EMAIL_QUEUE }, "recreating the queue as exclusive");
+    await boss.deleteQueue(SEND_NOTIFICATION_EMAIL_QUEUE);
+  }
+  await boss.createQueue(SEND_NOTIFICATION_EMAIL_QUEUE, { ...options, policy: "exclusive" });
+}
+
+/**
  * Files `notification-email-sweep` (planifiée chaque minute, une seule planification qui survit aux
  * redémarrages) et `send-notification-email` (4 reprises, backoff, expiration 120 s), avec leurs
  * consommateurs.
@@ -45,7 +63,7 @@ export async function registerNotificationEmail(
     retryBackoff: true,
     expireInSeconds: SEND_NOTIFICATION_EMAIL_EXPIRE_SECONDS,
   };
-  await boss.createQueue(SEND_NOTIFICATION_EMAIL_QUEUE, options);
+  await ensureExclusiveQueue(boss, logger, options);
   // `createQueue` ne réécrit pas une file existante : les options restent celles du code.
   await boss.updateQueue(SEND_NOTIFICATION_EMAIL_QUEUE, options);
   const send = createSendNotificationEmailHandler({
@@ -58,8 +76,13 @@ export async function registerNotificationEmail(
   await boss.work(
     SEND_NOTIFICATION_EMAIL_QUEUE,
     { localConcurrency: settings.concurrency },
-    instrumentJob(logger, SEND_NOTIFICATION_EMAIL_QUEUE, (job: SendNotificationEmailJob) =>
-      send(job),
+    instrumentJob(
+      logger,
+      SEND_NOTIFICATION_EMAIL_QUEUE,
+      (job: SendNotificationEmailJob) => send(job),
+      {
+        codeOnly: true,
+      },
     ),
   );
   // Sans reprise : le tick suivant est la reprise.
@@ -67,7 +90,7 @@ export async function registerNotificationEmail(
   const sweep = createNotificationSweepHandler({ store, queue: boss, logger });
   await boss.work(
     NOTIFICATION_EMAIL_SWEEP_QUEUE,
-    instrumentJob(logger, NOTIFICATION_EMAIL_SWEEP_QUEUE, sweep),
+    instrumentJob(logger, NOTIFICATION_EMAIL_SWEEP_QUEUE, sweep, { codeOnly: true }),
   );
   await boss.schedule(NOTIFICATION_EMAIL_SWEEP_QUEUE, NOTIFICATION_EMAIL_SWEEP_CRON, null, {
     tz: NOTIFICATION_EMAIL_SWEEP_TIMEZONE,

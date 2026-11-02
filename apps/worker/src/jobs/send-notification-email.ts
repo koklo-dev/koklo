@@ -93,6 +93,9 @@ export function createSendNotificationEmailHandler(deps: SendNotificationEmailDe
       await settleFailure(job, id, error);
       return;
     }
-    await store.markSent(id, now());
+    if (!(await store.markSent(id, now()))) {
+      // Signal d'un double envoi possible : la ligne n'était plus `pending` (jamais de contenu).
+      logger.warn({ jobId: job.id }, "send-notification-email: row not pending after send");
+    }
   };
 }

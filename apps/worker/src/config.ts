@@ -30,8 +30,8 @@ export type WorkerConfig = {
   /** DSN GlitchTip/Sentry ; absent : le SDK d'erreurs reste désactivé. */
   readonly sentryDsn: string | undefined;
   readonly mail: MailConfig;
-  /** Origine publique du web (`WEB_BASE_URL`), normalisée sans `/` final : base des liens d'e-mail. `loadConfig` la renseigne toujours. */
-  readonly webBaseUrl?: string;
+  /** Origine publique du web (`WEB_BASE_URL`), normalisée sans `/` final : base des liens d'e-mail. */
+  readonly webBaseUrl: string;
   /** Absent : fournisseur git non configuré (staging sans App) ; les lots `spec-write` échouent en `PROVIDER_UNAVAILABLE`. */
   readonly githubApp?: GithubAppSettings;
   /** Rétention des livraisons de webhook, en jours (`WEBHOOK_RETENTION_DAYS`, 1 à 365). `loadConfig` la renseigne toujours (défaut 30) ; absente, le défaut s'applique. */
@@ -107,7 +107,6 @@ function parseMaxProviderCalls(value: string | undefined): number {
       );
 }
 
-const STRICT_ENVS = ["staging", "production"];
 const LOCAL_ENVS = ["development", "test"];
 const LOCAL_WEB_BASE_URL = "http://localhost:3000";
 
@@ -117,9 +116,10 @@ const LOCAL_WEB_BASE_URL = "http://localhost:3000";
  */
 function parseWebBaseUrl(value: string | undefined, appEnv: string): string {
   if (value === undefined || value === "") {
-    return STRICT_ENVS.includes(appEnv)
-      ? fail("WEB_BASE_URL", `is required when APP_ENV is ${appEnv}`)
-      : LOCAL_WEB_BASE_URL;
+    // Repli local réservé à development/test : jamais pour un environnement inconnu.
+    return LOCAL_ENVS.includes(appEnv)
+      ? LOCAL_WEB_BASE_URL
+      : fail("WEB_BASE_URL", `is required when APP_ENV is ${appEnv}`);
   }
   const url = URL.canParse(value) ? new URL(value) : undefined;
   const schemes = LOCAL_ENVS.includes(appEnv) ? ["http:", "https:"] : ["https:"];
@@ -152,7 +152,9 @@ function domainOfSender(from: string): string {
  */
 function parseMail(env: Readonly<Record<string, string | undefined>>, appEnv: string): MailConfig {
   const apiKey = env.RESEND_API_KEY || undefined;
-  if (apiKey === undefined && LOCAL_ENVS.includes(appEnv)) {
+  // `NODE_ENV=production` n'autorise jamais la capture, même avec un APP_ENV local.
+  const captureAllowed = LOCAL_ENVS.includes(appEnv) && env.NODE_ENV !== "production";
+  if (apiKey === undefined && captureAllowed) {
     return { kind: "capture" };
   }
   const domain = env.MAIL_DOMAIN || undefined;
@@ -178,6 +180,10 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
+  }
+  if (!env.APP_ENV && env.NODE_ENV === "production") {
+    // Un déploiement de production sans APP_ENV ne doit pas retomber sur « development ».
+    fail("APP_ENV", "is required when NODE_ENV is production");
   }
   const appEnv = env.APP_ENV || "development";
   const githubApp = githubAppFromEnv(env);

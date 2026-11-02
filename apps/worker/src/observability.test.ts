@@ -12,6 +12,7 @@ const config: WorkerConfig = {
   logLevel: "info",
   sentryDsn: undefined,
   mail: { kind: "capture" },
+  webBaseUrl: "http://localhost:3000",
 };
 
 const lines: string[] = [];
@@ -70,6 +71,28 @@ describe("instrumentJob (TK-19)", () => {
     );
   });
 
+  it("le worker continue : après un échec, le même consommateur traite le job suivant", async () => {
+    const logger = setupObservability(config, { logStream });
+    const handler = vi
+      .fn<(j: { id: string }) => Promise<void>>()
+      .mockRejectedValueOnce(new Error("premier échec"))
+      .mockResolvedValueOnce(undefined);
+    const run = instrumentJob(logger, "noop", handler);
+    await expect(run([job("job-a")])).rejects.toThrow("premier échec");
+    await expect(run([job("job-b")])).resolves.toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("aucune capture quand le job réussit", async () => {
+    const logger = setupObservability(config, { logStream });
+    await instrumentJob(logger, "noop", async () => undefined)([job("job-ok")]);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe("instrumentJob codeOnly (revue TK-58 NB-4)", () => {
+  const job = (id: string) => ({ id, data: {} });
+
   it("codeOnly : le journal ne contient que le nom et le code de l'erreur, jamais son contenu", async () => {
     const logger = setupObservability(config, { logStream });
     const secret = Object.assign(new Error("SELECT * FROM users WHERE email='a@secret.test'"), {
@@ -90,23 +113,5 @@ describe("instrumentJob (TK-19)", () => {
     expect(logged).toContain("P2010");
     const [captured] = vi.mocked(Sentry.captureException).mock.calls[0] ?? [];
     expect(String((captured as Error).message)).not.toContain("secret.test");
-  });
-
-  it("le worker continue : après un échec, le même consommateur traite le job suivant", async () => {
-    const logger = setupObservability(config, { logStream });
-    const handler = vi
-      .fn<(j: { id: string }) => Promise<void>>()
-      .mockRejectedValueOnce(new Error("premier échec"))
-      .mockResolvedValueOnce(undefined);
-    const run = instrumentJob(logger, "noop", handler);
-    await expect(run([job("job-a")])).rejects.toThrow("premier échec");
-    await expect(run([job("job-b")])).resolves.toBeUndefined();
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-  });
-
-  it("aucune capture quand le job réussit", async () => {
-    const logger = setupObservability(config, { logStream });
-    await instrumentJob(logger, "noop", async () => undefined)([job("job-ok")]);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });

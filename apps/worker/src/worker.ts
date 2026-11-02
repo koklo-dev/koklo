@@ -32,8 +32,6 @@ import { providerOf, registerSpecWrite } from "./spec-write/register.ts";
 import { SpecWriteStore } from "./spec-write/store.ts";
 import { registerWebhookDelivery, registerWebhookPurge } from "./webhook/register.ts";
 
-const LOCAL_WEB_BASE_URL = "http://localhost:3000";
-
 export type Worker = { readonly boss: PgBoss; stop(): Promise<void> };
 
 export interface StartWorkerOptions {
@@ -101,7 +99,7 @@ async function registerDatabaseJobs(
   await registerNotificationEmail(
     boss,
     logger,
-    { raw: database, mailSender, webBaseUrl: config.webBaseUrl ?? LOCAL_WEB_BASE_URL },
+    { raw: database, mailSender, webBaseUrl: config.webBaseUrl },
     options.notificationEmail,
   );
   await registerReconcile(boss, logger, {

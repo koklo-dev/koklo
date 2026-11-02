@@ -71,16 +71,13 @@ describe("ResendMailSender : transmission au client", () => {
 });
 
 describe("ResendMailSender : classement des erreurs", () => {
-  it.each([400, 401, 403, 404, 422])(
-    "statut %d : permanent (rejected)",
-    async (statusCode) => {
-      const error = await failureOf(async () => ({
-        error: { name: "validation_error", statusCode },
-      }));
-      expect(error.kind).toBe("permanent");
-      expect(error.code).toBe("rejected");
-    },
-  );
+  it.each([400, 401, 403, 404, 422])("statut %d : permanent (rejected)", async (statusCode) => {
+    const error = await failureOf(async () => ({
+      error: { name: "validation_error", statusCode },
+    }));
+    expect(error.kind).toBe("permanent");
+    expect(error.code).toBe("rejected");
+  });
 
   it("409 (requête concurrente avec la même clé d'idempotence) : transitoire, jamais failed", async () => {
     const error = await failureOf(async () => ({

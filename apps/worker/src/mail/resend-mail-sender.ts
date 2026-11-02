@@ -19,8 +19,15 @@ export interface ResendClient {
   };
 }
 
-/** 429 et 5xx : réessayer ; autre 4xx : refus définitif ; sans statut : le transport a échoué. */
+/**
+ * 429, 409 et 5xx : réessayer ; autre 4xx : refus définitif ; sans statut : le transport a échoué.
+ * Le 409 (même clé d'idempotence en cours de traitement) ne prouve pas que le message n'est pas
+ * parti : jamais `failed`, la clé rend le renvoi sûr.
+ */
 function classify(statusCode: number | null | undefined): MailDeliveryError {
+  if (statusCode === 409) {
+    return new MailDeliveryError("transient", "idempotency-conflict");
+  }
   if (statusCode === 429) {
     return new MailDeliveryError("transient", "rate-limited");
   }

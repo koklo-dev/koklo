@@ -25,6 +25,7 @@ const config = (databaseUrl: string) => ({
   logLevel: "debug" as const,
   sentryDsn: undefined,
   mail: { kind: "capture" as const },
+  webBaseUrl: "http://localhost:3000",
 });
 
 async function start(mailSender: MailSender): Promise<Worker> {

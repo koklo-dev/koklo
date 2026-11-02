@@ -7,7 +7,8 @@ export type MailDeliveryCode =
   | "rejected"
   | "rate-limited"
   | "provider-unavailable"
-  | "network";
+  | "network"
+  | "idempotency-conflict";
 
 /** Échec d'envoi typé : le message ne contient que le code fermé. */
 export class MailDeliveryError extends Error {

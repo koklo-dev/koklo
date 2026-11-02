@@ -102,6 +102,7 @@ export class NotificationEmailStore {
         const rows = await tx.$queryRaw<{ id: string }[]>`
           SELECT id FROM notifications
           WHERE email_state = 'pending'
+            AND type = ANY(${[...EMAILED_TYPES]}::text[])
             AND created_at > ${options.now}::timestamptz - make_interval(hours => ${options.windowHours}::int)
           ORDER BY created_at, id
           LIMIT ${options.limit}
@@ -110,6 +111,16 @@ export class NotificationEmailStore {
       },
       { timeout: BATCH_TIMEOUT_MS, maxWait: 10_000 },
     );
+  }
+
+  /**
+   * Règle en un seul `UPDATE` toutes les lignes `pending` dont le type n'est pas e-mailé
+   * (`skipped`, raison `type-not-emailed`) ; renvoie leur nombre. Aucun job n'est enfilé.
+   */
+  async skipUnemailedTypes(): Promise<number> {
+    return this.raw.$executeRaw`
+      UPDATE notifications SET email_state = 'skipped', updated_at = now()
+      WHERE email_state = 'pending' AND NOT (type = ANY(${[...EMAILED_TYPES]}::text[]))`;
   }
 
   /** Relit la ligne et le destinataire ; classe `ready|skipped|settled|gone` et pose `skipped` si besoin. */

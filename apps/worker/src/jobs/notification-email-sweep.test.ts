@@ -1,6 +1,6 @@
-import { createLogger } from "@koklo/observability";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createLogger } from "@koklo/observability";
 import { describe, expect, it } from "vitest";
 import type { NotificationEmailStore } from "../notification/store.ts";
 import { SWEEP_BATCH_SIZE, SWEEP_WINDOW_HOURS } from "../notification/types.ts";
@@ -76,7 +76,10 @@ describe("constantes du balayage (TK-58c)", () => {
   });
 
   it("une seule définition des bornes du lot (types.ts), non redéfinie par le job", () => {
-    const source = readFileSync(resolve(import.meta.dirname, "notification-email-sweep.ts"), "utf8");
+    const source = readFileSync(
+      resolve(import.meta.dirname, "notification-email-sweep.ts"),
+      "utf8",
+    );
     expect(source).not.toMatch(/export const SWEEP_(BATCH_SIZE|WINDOW_HOURS)/);
   });
 });
@@ -128,6 +131,7 @@ describe("job de balayage : pannes (TK-58c)", () => {
       destination: { write: (l) => void lines.push(l) },
     });
     const store: SweepStore = {
+      skipUnemailedTypes: async () => 0,
       withPendingBatch: async () => {
         throw new Error("connection refused postgres://user:s3cret@db/koklo");
       },
