@@ -55,5 +55,6 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-kanban](screens/S-kanban.md) | 1 | TK-35 |
 | [S-github](screens/S-github.md) | 3 | TK-48 (48c) |
 | [S-features](screens/S-features.md) | 1.5 | TK-48 (48e), TK-59 |
-| [S-framing](screens/S-framing.md) | 1 | TK-59 |
+| [S-framing](screens/S-framing.md) | 1.1 | TK-59, réglages IA |
+| [S-ai-settings](screens/S-ai-settings.md) | 1 | Web : réglages IA |
 | [S-feature-form](screens/S-feature-form.md) | 1.3 | TK-48 (48e) |
