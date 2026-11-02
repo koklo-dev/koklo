@@ -271,10 +271,14 @@ describe("Succès (§3.7)", () => {
 
   it("les rejetées ne sont pas gardées dans le brouillon local", async () => {
     await saveTwo();
-    const raw = localStorage.getItem(`koklo:framing-draft:${PROJECT_ID}`);
-    const proposals = raw ? (JSON.parse(raw).proposals as Array<{ status: string }>) : [];
-    expect(proposals.filter((p) => p.status === "rejected")).toEqual([]);
-    expect(proposals.filter((p) => p.status === "accepted")).toEqual([]);
+    // L'écriture du brouillon est différée (anti-rebond 300 ms) : on attend qu'elle ait pris la purge du succès,
+    // le brouillon doit alors ne garder que les « À relire », jamais une acceptée ni une rejetée.
+    await waitFor(() => {
+      const raw = localStorage.getItem(`koklo:framing-draft:${PROJECT_ID}`);
+      const proposals = raw ? (JSON.parse(raw).proposals as Array<{ status: string }>) : [];
+      expect(proposals.filter((p) => p.status === "rejected")).toEqual([]);
+      expect(proposals.filter((p) => p.status === "accepted")).toEqual([]);
+    });
   });
 
   it("aucun second submit n'est parti", async () => {
