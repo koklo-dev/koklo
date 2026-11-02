@@ -381,6 +381,28 @@ Tests that spawn a real child (`packages/delivery/test/claude-code/`, fake execu
 - **Open**: remove `resend@6.35.0` from `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`)
   once its release age passes.
 
+## Notification emails (TK-58)
+- **Variables**: `RESEND_API_KEY`, `MAIL_DOMAIN`, `EMAIL_FROM` (same rules as above) and
+  `WEB_BASE_URL` (origin of the links in the emails; required in `staging` and `production`, the
+  worker stops at startup otherwise; `http://localhost:3000` in development and test).
+- **Sweep**: `notification-email-sweep` runs every minute (cron `* * * * *`, UTC, one schedule that
+  survives restarts, no retry). Under a row lock (`FOR UPDATE SKIP LOCKED`) it selects at most 50
+  `pending` notifications created in the last 24 h and enqueues one `send-notification-email` job
+  per id (`singletonKey` = id). Two workers get disjoint batches; a store error is logged (class
+  name only) and the next tick is the retry.
+- **Send**: `send-notification-email` rereads the row and the recipient, skips (`skipped`) types
+  not emailed, already read or unverified recipients, then sends with the idempotency key
+  `notification:<id>` and marks `sent`. Permanent refusal: `failed`, no retry. Transient failure:
+  4 retries, 30 s base with exponential backoff, job expiry 120 s; after the last attempt: `failed`.
+  Logs carry counts, job id and error codes, never an address, organization name, body or link.
+- **Recovery**: a notification stays `pending` until settled; after an outage the sweep catches up
+  everything younger than 24 h. Older ones are never sent. The idempotency key prevents a double
+  message if a job runs twice.
+- **No unsubscribe**: there is no opt-out in this version.
+- **Human actions before production**: create the Resend API key and set `RESEND_API_KEY`;
+  publish SPF, DKIM and DMARC records for `MAIL_DOMAIN` and verify the domain in Resend; GDPR
+  review (legal basis, privacy notice, retention of `emailed_at`, absence of an opt-out).
+
 ## Invitations (TK-23)
 - **Flow**: `member.invite` creates the invitation (`pending`, 7 days) and the plugin callback
   enqueues `{ email, url, inviterName, organizationName, role }` on `send-invitation`; the

@@ -1,7 +1,15 @@
 import type { Logger } from "@koklo/observability";
-import { QUEUE_DEFAULTS, type QueueSettings } from "../job-support.ts";
+import {
+  errorNameOf,
+  QUEUE_DEFAULTS,
+  type QueueSettings,
+  TransientJobError,
+  uuidFieldOf,
+} from "../job-support.ts";
+import { type MailDeliveryCode, MailDeliveryError } from "../mail/mail-errors.ts";
 import type { MailSender } from "../mail/mail-sender.ts";
-import type { NotificationEmailStore } from "../notification/store.ts";
+import { buildNotificationMessage } from "../mail/notification-message.ts";
+import type { NotificationEmailContext, NotificationEmailStore } from "../notification/store.ts";
 
 export const SEND_NOTIFICATION_EMAIL_QUEUE = "send-notification-email";
 
@@ -39,8 +47,52 @@ export interface SendNotificationEmailDeps {
  * figé avec la clé d'idempotence `notification:<id>`, puis marque `sent|failed`. Seule une panne
  * transitoire avant le dernier essai lève (`TransientJobError`, code seul) ; tout le reste termine.
  */
-export function createSendNotificationEmailHandler(_deps: SendNotificationEmailDeps) {
-  return async (_job: SendNotificationEmailJob): Promise<void> => {
-    // squelette : la logique vient à l'étape verte
+export function createSendNotificationEmailHandler(deps: SendNotificationEmailDeps) {
+  const { store, mailSender, logger, webBaseUrl, retryLimit } = deps;
+  const now = deps.now ?? (() => new Date());
+
+  const messageOf = (context: NotificationEmailContext) =>
+    buildNotificationMessage({
+      notificationId: context.id,
+      to: context.recipientEmail,
+      type: context.type,
+      organizationName: context.organizationName,
+      projectId: context.projectId,
+      subjectKind: context.subjectKind,
+      subjectRef: context.subjectRef,
+      webBaseUrl,
+    });
+
+  /** Permanent -> `failed` ; transitoire avant le dernier essai -> relance (code seul). */
+  const settleFailure = async (job: SendNotificationEmailJob, id: string, error: unknown) => {
+    const known = error instanceof MailDeliveryError;
+    const code: MailDeliveryCode = known ? error.code : "network";
+    logger.warn({ code, error: errorNameOf(error), retryCount: job.retryCount }, "email failed");
+    if (known && error.kind === "permanent") {
+      await store.markFailed(id);
+    } else if (job.retryCount < retryLimit) {
+      throw new TransientJobError(SEND_NOTIFICATION_EMAIL_QUEUE, code);
+    } else {
+      await store.markFailed(id);
+    }
+  };
+
+  return async (job: SendNotificationEmailJob): Promise<void> => {
+    const id = uuidFieldOf(job.data, "notificationId");
+    if (id === undefined) {
+      logger.warn({ jobId: job.id }, "send-notification-email: invalid payload");
+      return;
+    }
+    const claim = await store.claimForSend(id);
+    if (claim.kind !== "ready") {
+      return;
+    }
+    try {
+      await mailSender.send(messageOf(claim.context));
+    } catch (error) {
+      await settleFailure(job, id, error);
+      return;
+    }
+    await store.markSent(id, now());
   };
 }
