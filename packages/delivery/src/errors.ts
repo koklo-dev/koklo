@@ -58,3 +58,25 @@ export class ResumeRequiredError extends Error {
     this.pullRequest = pullRequest;
   }
 }
+
+/** Entrée de quota invalide (signal, politique, usage, état persisté) ; aucune donnée brute dans le message. */
+export class InvalidQuotaError extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(`Quota invalide : ${reason}`);
+    this.name = "InvalidQuotaError";
+    this.reason = reason;
+  }
+}
+
+/** L'état de quota est PARTAGÉ entre workers : une version périmée est refusée (concurrence optimiste). */
+export class StaleQuotaError extends Error {
+  readonly expectedVersion: number;
+  readonly actualVersion: number;
+  constructor(expectedVersion: number, actualVersion: number) {
+    super(`Quota périmé : version attendue ${expectedVersion}, version courante ${actualVersion}`);
+    this.name = "StaleQuotaError";
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+  }
+}
