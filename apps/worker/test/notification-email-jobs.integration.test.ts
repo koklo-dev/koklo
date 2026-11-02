@@ -27,17 +27,37 @@ class ScriptedSender implements MailSender {
   readonly capture = new CaptureMailSender();
   private readonly script = new Map<string, MailDeliveryKind[]>();
   readonly attempts = new Map<string, number>();
+  readonly inFlight = new Map<string, number>();
+  readonly maxInFlight = new Map<string, number>();
+  private readonly delays = new Map<string, number>();
+  slow(key: string, ms: number): void {
+    this.delays.set(key, ms);
+  }
   failures(key: string, ...kinds: MailDeliveryKind[]): void {
     this.script.set(key, kinds);
   }
   async send(message: MailMessage): Promise<void> {
     const key = message.idempotencyKey ?? "";
     this.attempts.set(key, (this.attempts.get(key) ?? 0) + 1);
+    const running = (this.inFlight.get(key) ?? 0) + 1;
+    this.inFlight.set(key, running);
+    this.maxInFlight.set(key, Math.max(this.maxInFlight.get(key) ?? 0, running));
+    try {
+      await this.delayOf(key);
+    } finally {
+      this.inFlight.set(key, running - 1);
+    }
     const kind = this.script.get(key)?.shift();
     if (kind !== undefined) {
       throw new MailDeliveryError(kind, kind === "transient" ? "provider-unavailable" : "rejected");
     }
     await this.capture.send(message);
+  }
+  private async delayOf(key: string): Promise<void> {
+    const ms = this.delays.get(key);
+    if (ms !== undefined) {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    }
   }
   sentFor(id: string): readonly MailMessage[] {
     return this.capture.sent.filter((m) => m.idempotencyKey === `notification:${id}`);
@@ -211,6 +231,71 @@ describe("Emails capturés en test : notifications sans e-mail (TK-58c)", () => 
   });
 });
 
+describe("unicité réelle des envois (revue TK-58 B1)", () => {
+  it("la file d'envoi garantit l'unicité par clé (politique exclusive)", async () => {
+    const queue = await worker.boss.getQueue(SEND_NOTIFICATION_EMAIL_QUEUE);
+    expect(queue?.policy).toBe("exclusive");
+  });
+
+  it("sender lent et balayages répétés : un seul envoi, jamais failed, état final sent", async () => {
+    const scene = await bench.scene("slow");
+    const id = await bench.notify(scene);
+    const key = `notification:${id}`;
+    sender.slow(key, 4000);
+    await sweep();
+    await new Promise((resolve) => setTimeout(resolve, 600)); // le job est actif
+    await sweep();
+    await sweep();
+    expect(await settled(id)).toBe("sent");
+    await sweep();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(sender.attempts.get(key)).toBe(1);
+    expect(sender.maxInFlight.get(key)).toBe(1);
+    expect(sender.sentFor(id)).toHaveLength(1);
+    expect((await bench.stateOf(id))?.email_state).toBe("sent");
+  }, 60_000);
+
+  it("deux jobs concurrents forcés sur la même notification : jamais failed, un seul message", async () => {
+    const scene = await bench.scene("forced");
+    const id = await bench.notify(scene);
+    sender.slow(`notification:${id}`, 2500);
+    await Promise.all([
+      worker.boss.send(SEND_NOTIFICATION_EMAIL_QUEUE, { notificationId: id }, { singletonKey: id }),
+      worker.boss.send(SEND_NOTIFICATION_EMAIL_QUEUE, { notificationId: id }, { singletonKey: id }),
+    ]);
+    expect(await settled(id)).toBe("sent");
+    expect(sender.maxInFlight.get(`notification:${id}`)).toBe(1);
+    expect(sender.sentFor(id)).toHaveLength(1);
+  }, 60_000);
+});
+
+describe("famine des types non e-mailés (revue TK-58 B2)", () => {
+  it("200 suggestion.created devant une baseline.proposed : elle est envoyée au prochain balayage", async () => {
+    const scene = await bench.scene("burst");
+    const burst: string[] = [];
+    for (let i = 0; i < 200; i += 1) {
+      burst.push(
+        await bench.notify(scene, {
+          type: "suggestion.created",
+          subjectKind: "suggestion",
+          subjectRef: `SG-${i}`,
+          ageHours: 3,
+        }),
+      );
+    }
+    const proposed = await bench.notify(scene, { type: "baseline.proposed", ageHours: 0 });
+    await sweep();
+    expect(await settled(proposed)).toBe("sent");
+    expect(sender.sentFor(proposed)).toHaveLength(1);
+    const states = await bench.query<{ email_state: string }>(
+      "SELECT email_state FROM notifications WHERE id = ANY($1::uuid[])",
+      [burst],
+    );
+    expect(states.every((row) => row.email_state === "skipped")).toBe(true);
+    for (const id of burst.slice(0, 5)) expect(sender.sentFor(id)).toEqual([]);
+  }, 60_000);
+});
+
 describe("Emails capturés en test : pannes (TK-58c)", () => {
   it("panne permanente : failed sans réessai", async () => {
     const scene = await bench.scene("permanent");
@@ -267,7 +352,7 @@ describe("double exécution concurrente (TK-58c)", () => {
 
 // Dernier : ce démarrage réécrit la file d'envoi avec les valeurs par défaut.
 describe("valeurs par défaut de la file d'envoi (TK-58c)", () => {
-  it("la file d'envoi : 4 reprises, 30 s, backoff, expiration 120 s, politique standard", async () => {
+  it("la file d'envoi : 4 reprises, 30 s, backoff, expiration 120 s, politique exclusive", async () => {
     const second = await startWorker(
       {
         databaseUrl: bench.url,
@@ -287,7 +372,7 @@ describe("valeurs par défaut de la file d'envoi (TK-58c)", () => {
         retryDelay: 30,
         retryBackoff: true,
         expireInSeconds: 120,
-        policy: "standard",
+        policy: "exclusive",
       });
     } finally {
       await second.stop();

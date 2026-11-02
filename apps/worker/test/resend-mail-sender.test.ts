@@ -71,7 +71,7 @@ describe("ResendMailSender : transmission au client", () => {
 });
 
 describe("ResendMailSender : classement des erreurs", () => {
-  it.each([400, 401, 403, 404, 409, 422])(
+  it.each([400, 401, 403, 404, 422])(
     "statut %d : permanent (rejected)",
     async (statusCode) => {
       const error = await failureOf(async () => ({
@@ -81,6 +81,14 @@ describe("ResendMailSender : classement des erreurs", () => {
       expect(error.code).toBe("rejected");
     },
   );
+
+  it("409 (requête concurrente avec la même clé d'idempotence) : transitoire, jamais failed", async () => {
+    const error = await failureOf(async () => ({
+      error: { name: "concurrent_idempotent_requests", statusCode: 409 },
+    }));
+    expect(error.kind).toBe("transient");
+    expect(error.code).toBe("idempotency-conflict");
+  });
 
   it("429 : transitoire (rate-limited)", async () => {
     const error = await failureOf(async () => ({

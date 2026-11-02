@@ -1,4 +1,6 @@
 import { createLogger } from "@koklo/observability";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { NotificationEmailStore } from "../notification/store.ts";
 import { SWEEP_BATCH_SIZE, SWEEP_WINDOW_HOURS } from "../notification/types.ts";
@@ -17,14 +19,14 @@ const ID_A = "01900000-0000-7000-8000-00000000000a";
 const ID_B = "01900000-0000-7000-8000-00000000000b";
 const ID_C = "01900000-0000-7000-8000-00000000000c";
 
-type SweepStore = Pick<NotificationEmailStore, "withPendingBatch">;
+type SweepStore = Pick<NotificationEmailStore, "withPendingBatch" | "skipUnemailedTypes">;
 interface Sent {
   name: string;
   data: object;
   options: { singletonKey: string };
 }
 
-function fixture(ids: readonly string[], opts: { failOn?: string } = {}) {
+function fixture(ids: readonly string[], opts: { failOn?: string; skipped?: number } = {}) {
   const lines: string[] = [];
   const logger = createLogger({
     level: "debug",
@@ -32,8 +34,14 @@ function fixture(ids: readonly string[], opts: { failOn?: string } = {}) {
   });
   const batches: { now: Date; limit: number; windowHours: number }[] = [];
   const sent: Sent[] = [];
+  const order: string[] = [];
   const store: SweepStore = {
+    skipUnemailedTypes: async () => {
+      order.push("skip");
+      return opts.skipped ?? 0;
+    },
     withPendingBatch: async (options, handler) => {
+      order.push("batch");
       batches.push(options);
       return handler(ids);
     },
@@ -46,8 +54,18 @@ function fixture(ids: readonly string[], opts: { failOn?: string } = {}) {
     },
   };
   const run = () => createNotificationSweepHandler({ store, queue, logger, now: () => NOW })();
-  return { run, batches, sent, lines };
+  return { run, batches, sent, lines, order };
 }
+
+describe("types non e-mailés (revue TK-58 B2)", () => {
+  it("règle d'abord les lignes non e-mailées en lot (sans job), puis enfile le lot", async () => {
+    const { run, order, sent, lines } = fixture([ID_A], { skipped: 120 });
+    await run();
+    expect(order).toEqual(["skip", "batch"]);
+    expect(sent).toHaveLength(1);
+    expect(lines.join("\n")).toContain("120");
+  });
+});
 
 describe("constantes du balayage (TK-58c)", () => {
   it("file notification-email-sweep, cron chaque minute en UTC", () => {
@@ -55,6 +73,11 @@ describe("constantes du balayage (TK-58c)", () => {
     expect(SEND_NOTIFICATION_EMAIL_QUEUE).toBe("send-notification-email");
     expect(NOTIFICATION_EMAIL_SWEEP_CRON).toBe("* * * * *");
     expect(NOTIFICATION_EMAIL_SWEEP_TIMEZONE).toBe("UTC");
+  });
+
+  it("une seule définition des bornes du lot (types.ts), non redéfinie par le job", () => {
+    const source = readFileSync(resolve(import.meta.dirname, "notification-email-sweep.ts"), "utf8");
+    expect(source).not.toMatch(/export const SWEEP_(BATCH_SIZE|WINDOW_HOURS)/);
   });
 });
 

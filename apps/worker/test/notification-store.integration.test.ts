@@ -90,6 +90,33 @@ describe("withPendingBatch : lot borné dans la fenêtre", () => {
   });
 });
 
+describe("types non e-mailés : jamais dans le lot, réglés en lot (revue TK-58 B2)", () => {
+  it("le lot ne contient que les types e-mailés", async () => {
+    await settleAll();
+    const scene = await bench.scene("typed");
+    for (let i = 0; i < 5; i += 1) {
+      await bench.notify(scene, { type: "suggestion.created", ageHours: 10 });
+    }
+    const wanted = await bench.notify(scene, { type: "baseline.proposed", ageHours: 1 });
+    expect(await batch(3)).toEqual([wanted]);
+  });
+
+  it("skipUnemailedTypes règle les autres types en skipped, en un lot, et renvoie leur nombre", async () => {
+    await settleAll();
+    const scene = await bench.scene("skip-bulk");
+    const noise = [
+      await bench.notify(scene, { type: "suggestion.created" }),
+      await bench.notify(scene, { type: "baseline.validated", ageHours: 30 }),
+      await bench.notify(scene, { type: "baseline.tagged" }),
+    ];
+    const kept = await bench.notify(scene, { type: "review.submitted", subjectKind: "review" });
+    expect(await store.skipUnemailedTypes()).toBe(3);
+    for (const id of noise) expect((await bench.stateOf(id))?.email_state).toBe("skipped");
+    expect((await bench.stateOf(kept))?.email_state).toBe("pending");
+    expect(await store.skipUnemailedTypes()).toBe(0);
+  });
+});
+
 describe("withPendingBatch : lecture seule et erreurs", () => {
   it("n'en modifie aucune : un balayage seul laisse les lignes pending", async () => {
     await settleAll();

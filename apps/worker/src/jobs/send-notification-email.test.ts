@@ -38,7 +38,11 @@ const CONTEXT: NotificationEmailContext = {
   createdAt: NOW,
 };
 
-function fixture(claim: ClaimResult, sender: MailSender = new CaptureMailSender()) {
+function fixture(
+  claim: ClaimResult,
+  sender: MailSender = new CaptureMailSender(),
+  markSentResult = true,
+) {
   const lines: string[] = [];
   const logger = createLogger({
     level: "debug",
@@ -53,7 +57,7 @@ function fixture(claim: ClaimResult, sender: MailSender = new CaptureMailSender(
     },
     markSent: async (id, at) => {
       calls.push(`sent:${id}:${at.toISOString()}`);
-      return true;
+      return markSentResult;
     },
     markSkipped: async (id) => {
       calls.push(`skipped:${id}`);
@@ -121,6 +125,15 @@ describe("envoi d'une notification prête (TK-58c)", () => {
     const { run, calls } = fixture(ready);
     await run();
     expect(calls).toEqual([`sent:${ID}:${NOW.toISOString()}`]);
+  });
+
+  it("markSent qui ne trouve plus la ligne pending : journalisé (sans contenu), le job termine", async () => {
+    const { run, lines } = fixture(ready, new CaptureMailSender(), false);
+    await run();
+    const logged = lines.join("\n");
+    expect(logged).toContain("not pending");
+    expect(logged).not.toContain(ADDRESS);
+    expect(logged).not.toContain(ORG);
   });
 
   it("un rejeu après envoi n'envoie pas deux fois (clé d'idempotence)", async () => {

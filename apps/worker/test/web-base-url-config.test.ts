@@ -182,3 +182,42 @@ describe("parité entre la configuration lue et .env.example", () => {
     }
   });
 });
+
+describe("production sans APP_ENV connu (revue TK-58 NB-1, NB-8)", () => {
+  const WEB = { WEB_BASE_URL: "https://app.koklo.dev" };
+
+  it("NODE_ENV=production sans APP_ENV : démarrage refusé (APP_ENV nommée)", () => {
+    expect(messageOf({ ...BASE, NODE_ENV: "production" })).toContain("APP_ENV");
+    expect(messageOf({ ...BASE, ...WEB, NODE_ENV: "production" })).toContain("APP_ENV");
+  });
+
+  it("NODE_ENV=production avec APP_ENV=development et sans clé : jamais la capture", () => {
+    const message = messageOf({ ...BASE, NODE_ENV: "production", APP_ENV: "development" });
+    expect(message).toMatch(/APP_ENV|RESEND_API_KEY/);
+  });
+
+  it("NODE_ENV=production avec une configuration complète : accepté", () => {
+    const config = loadConfig({
+      ...BASE,
+      ...MAIL,
+      ...WEB,
+      NODE_ENV: "production",
+      APP_ENV: "production",
+    });
+    expect(config.mail.kind).toBe("resend");
+  });
+
+  it.each(["prod", "live", "preprod"])(
+    "APP_ENV %j non reconnu sans WEB_BASE_URL : échec, pas de repli sur localhost",
+    (appEnv) => {
+      expect(messageOf({ ...BASE, ...MAIL, APP_ENV: appEnv })).toContain("WEB_BASE_URL");
+    },
+  );
+
+  it("webBaseUrl est obligatoire dans WorkerConfig et le worker n'a plus de repli localhost", () => {
+    const worker_ = readFileSync(join(worker, "src/worker.ts"), "utf8");
+    expect(worker_).not.toContain("LOCAL_WEB_BASE_URL");
+    const config = readFileSync(join(worker, "src/config.ts"), "utf8");
+    expect(config).toMatch(/\bwebBaseUrl: string;/);
+  });
+});

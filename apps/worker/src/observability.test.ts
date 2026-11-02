@@ -70,6 +70,28 @@ describe("instrumentJob (TK-19)", () => {
     );
   });
 
+  it("codeOnly : le journal ne contient que le nom et le code de l'erreur, jamais son contenu", async () => {
+    const logger = setupObservability(config, { logStream });
+    const secret = Object.assign(new Error("SELECT * FROM users WHERE email='a@secret.test'"), {
+      code: "P2010",
+    });
+    const run = instrumentJob(
+      logger,
+      "send-notification-email",
+      async () => {
+        throw secret;
+      },
+      { codeOnly: true },
+    );
+    await expect(run([job("job-c")])).rejects.toBe(secret);
+    const logged = lines.join("\n");
+    expect(logged).not.toContain("secret.test");
+    expect(logged).not.toContain("SELECT");
+    expect(logged).toContain("P2010");
+    const [captured] = vi.mocked(Sentry.captureException).mock.calls[0] ?? [];
+    expect(String((captured as Error).message)).not.toContain("secret.test");
+  });
+
   it("le worker continue : après un échec, le même consommateur traite le job suivant", async () => {
     const logger = setupObservability(config, { logStream });
     const handler = vi
