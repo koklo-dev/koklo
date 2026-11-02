@@ -97,6 +97,7 @@ function specWorkerOf() {
         logLevel: "silent",
         sentryDsn: undefined,
         mail: { kind: "capture" },
+        webBaseUrl: "http://localhost:3000",
       },
       { gitProvider: harness.provider, mailSender: new CaptureMailSender() },
     );

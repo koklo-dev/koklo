@@ -48,6 +48,7 @@ export async function startCaptureWorker(
       logLevel: "debug",
       sentryDsn: undefined,
       mail: { kind: "capture" },
+      webBaseUrl: "http://localhost:3000",
     },
     { mailSender: sender, logStream: sink.stream },
   );
