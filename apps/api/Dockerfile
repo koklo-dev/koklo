@@ -1,7 +1,7 @@
 # Image api (TK-16, vision §20.4). Contexte = racine du dépôt : docker build -f apps/api/Dockerfile .
 # Aucune variable d'environnement n'est figée : tout est lu à l'exécution (image promouvable).
 
-FROM node:24.22.1-alpine AS base
+FROM node:26.13.0-alpine AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable \
     && corepack prepare pnpm@12.15.0 --activate \
@@ -29,7 +29,7 @@ RUN pnpm turbo run build --filter=@koklo/api \
     && npm install --omit=dev --ignore-scripts=false "prisma@$(node -p "require('/repo/packages/db/package.json').devDependencies.prisma")"
 
 # 3. Image finale : runtime seul, utilisateur non-root, aucun fichier .env.
-FROM node:24.22.1-alpine AS runner
+FROM node:26.13.0-alpine AS runner
 ENV NODE_ENV=production PORT=3000
 WORKDIR /app
 COPY --from=builder --chown=node:node /deploy/ ./
