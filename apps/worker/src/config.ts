@@ -30,6 +30,8 @@ export type WorkerConfig = {
   /** DSN GlitchTip/Sentry ; absent : le SDK d'erreurs reste désactivé. */
   readonly sentryDsn: string | undefined;
   readonly mail: MailConfig;
+  /** Origine publique du web (`WEB_BASE_URL`), base des liens d'e-mail. `loadConfig` la renseigne toujours ; SQUELETTE TK-58b : pas encore lue. */
+  readonly webBaseUrl?: string;
   /** Absent : fournisseur git non configuré (staging sans App) ; les lots `spec-write` échouent en `PROVIDER_UNAVAILABLE`. */
   readonly githubApp?: GithubAppSettings;
   /** Rétention des livraisons de webhook, en jours (`WEBHOOK_RETENTION_DAYS`, 1 à 365). `loadConfig` la renseigne toujours (défaut 30) ; absente, le défaut s'applique. */

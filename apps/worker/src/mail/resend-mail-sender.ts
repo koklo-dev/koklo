@@ -3,13 +3,17 @@ import type { MailMessage, MailSender } from "./mail-sender.ts";
 /** Partie du client Resend utilisée ici : le SDK renvoie `{ data, error }` sans lever. */
 export interface ResendClient {
   emails: {
-    send(payload: {
-      from: string;
-      to: string;
-      subject: string;
-      text: string;
-      html: string;
-    }): Promise<{ error: { name: string } | null }>;
+    send(
+      payload: {
+        from: string;
+        to: string;
+        subject: string;
+        text: string;
+        html: string;
+        headers?: Record<string, string>;
+      },
+      options?: { idempotencyKey?: string },
+    ): Promise<{ error: { name: string; statusCode?: number | null } | null }>;
   };
 }
 
