@@ -5,6 +5,7 @@ import { BUDGET, makeRequest } from "../agent-helpers.ts";
 import {
   isAlive,
   killSurvivor,
+  launchTimedOut,
   makeRuntime,
   makeSandbox,
   recordedPid,
@@ -13,27 +14,17 @@ import {
   waitForPidFile,
 } from "./support.ts";
 
-const PENDING = Symbol("pending");
-
-/** Rend la valeur de `promise` ou PENDING si elle ne se resout pas avant `ms`. */
-const within = <T>(promise: Promise<T>, ms: number): Promise<T | typeof PENDING> =>
-  Promise.race([promise, new Promise<typeof PENDING>((done) => setTimeout(done, ms, PENDING))]);
-
 describe("petit-fils qui garde stdout ouvert", () => {
-  it("dans le groupe : la session rend `completed` sans attendre le petit-fils (5 s)", async () => {
+  it("dans le groupe : la session rend `completed` sans attendre le petit-fils", async () => {
     const sandbox = makeSandbox();
     script(sandbox, { scenario: "lingering", text: "resultat-final" });
-    const started = Date.now();
-    const result = await within(
-      makeRuntime(sandbox).launchSession(makeRequest({ worktree: sandbox.worktree })),
-      3_000,
+    // Le petit-fils dort 120 s : s'il retenait la session, le test expirerait. Aucune duree absolue
+    // n'est assertee, donc la charge du runner n'y change rien.
+    const result = await makeRuntime(sandbox).launchSession(
+      makeRequest({ worktree: sandbox.worktree }),
     );
-    expect(result).not.toBe(PENDING);
-    expect(Date.now() - started).toBeLessThan(3_000);
-    if (result !== PENDING) {
-      expect(result.status).toBe("completed");
-      expect(revealUntrusted(result.output)).toBe("resultat-final");
-    }
+    expect(result.status).toBe("completed");
+    expect(revealUntrusted(result.output)).toBe("resultat-final");
     const grandchild = await waitForPidFile(sandbox, "grandchild.pid");
     expect(await waitDead(grandchild)).toBe(true); // le groupe est tue a la fin du fils
   });
@@ -45,19 +36,19 @@ describe("petit-fils qui garde stdout ouvert", () => {
       worktree: sandbox.worktree,
       budget: { ...BUDGET, timeoutMs: 500 },
     });
-    const pending = makeRuntime(sandbox, { killGraceMs: 200 }).launchSession(request);
-    const escaped = await waitForPidFile(sandbox, "grandchild.pid");
+    // le minuteur ne part qu'une fois le fils pret et le petit-fils ne ; l'attente reste reelle
     try {
-      const result = await within(pending, 3_000);
-      expect(result).not.toBe(PENDING);
-      if (result !== PENDING) {
-        expect(result.status).toBe("timeout");
-      }
+      const result = await launchTimedOut(
+        makeRuntime(sandbox, { killGraceMs: 200 }),
+        sandbox,
+        request,
+      );
+      expect(result.status).toBe("timeout");
       expect(await waitDead(recordedPid(sandbox))).toBe(true);
       // limite assumee (ADR 0014) : setsid echappe au groupe, il faut une isolation cgroup/conteneur
-      expect(isAlive(escaped)).toBe(true);
+      expect(isAlive(await waitForPidFile(sandbox, "grandchild.pid"))).toBe(true);
     } finally {
-      await killSurvivor(escaped);
+      await killSurvivor(await waitForPidFile(sandbox, "grandchild.pid"));
     }
   });
 });

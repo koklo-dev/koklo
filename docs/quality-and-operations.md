@@ -315,6 +315,29 @@ authenticate it (subscription login in `HOME`, or a BYOK key passed as an opaque
 for TK-74: capture a real usage-limit message from the CLI (stderr and `result` event) to complete the
 quota table; today only the minimal phrases of `classifyClaudeFailure` are covered.
 
+### Writing a reliable process test (TK-73 stabilisation)
+
+Tests that spawn a real child (`packages/delivery/test/claude-code/`, fake executable
+`test/fixtures/fake-claude.mjs`) must not depend on how fast the runner is. Measured before the fix
+(10 passes under 16 CPU-burning loops pinned to one core): the `escape` test failed 8 times out of
+10 and each conformance case 2 to 3 times out of 10; after the fix, 0 failures in 20 passes.
+
+- **Wait for an event, never for a delay.** The fake writes `ready.txt` once its output is written
+  and flushed into the pipe (`markReady`); the test waits for that file (`waitForPidFile`), then acts.
+  Bounds on such waits (`EVENT_DEADLINE_MS`) are ceilings, not expected durations.
+- **Start the adapter's `timeoutMs` clock after the child is ready.** `launchTimedOut` fakes only
+  `setTimeout`, waits for `ready.txt`, then advances the timers. A timer armed at spawn also covers
+  the Node start-up, which on a saturated runner can exceed it (the result is then `timeout`
+  instead of `failed`, `quota` or `completed`). Shorten a budget only for the scenario that is
+  meant to expire (see the conformance subject).
+- **No absolute duration assertions** (`elapsed < 3000`). Prove "does not wait for the grandchild"
+  by making the grandchild outlive the test (120 s) and letting the test timeout be the detector.
+- **One sandbox per test** (`makeSandbox`): traces, pid and ready files are never shared.
+- **Explicit `testTimeout`** for these files (`vi.setConfig` in `support.ts`) and no retry: a retry
+  would hide a real race. A product change needs a red test first.
+- **Reproduce under load** before and after: `taskset -c 0` on the test run plus 16 `taskset -c 0
+  yes > /dev/null` loops, and kill only the loops you started.
+
 ### Anthropic adapter: import guard and real conformance (TK-54a)
 - **No network in CI.** `packages/llm/vitest.setup.ts` replaces `globalThis.fetch` with a function that
   throws; `AnthropicProvider` receives a `SimulatedAnthropicTransport` by injection. A call that bypasses
