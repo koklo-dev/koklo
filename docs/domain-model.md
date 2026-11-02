@@ -644,14 +644,24 @@ by the caller; no value (base delay, ceiling, window) is coded in the package (D
 
 - **Detection** (`detectQuota(output)`, `classifyAgentFailure(output)`). Only the last
   `QUOTA_SCAN_CHARS` (4000) characters are examined; ANSI sequences, controls and bidi characters are
-  removed first; diff lines (`+`, `-`, `@@`) and test names are ignored. `QUOTA_PATTERNS` is a data
-  table, first match wins: `claude-usage-limit-reached-epoch` (`|<epoch s>` -> `resetAt`),
+  removed first, and Unicode hyphens (U+2010..2012, U+2212) and no-break spaces are normalised. Quoted
+  lines are ignored, before AND after the ANSI cleaning: diff lines (`+`, `@@`, `-` unless it is a
+  `- Message` bullet and the text has no diff header), test names, `expect(`/`assert`/`toBe(`/
+  `toEqual(`/`toContain(`, `//` `#` `*` comments, `>` quotes, paired ``` blocks, assigned or lone
+  quoted strings. Each pattern runs on ONE line. `QUOTA_PATTERNS` is a data table, first match wins: `claude-usage-limit-reached-epoch` (`|<epoch s>` -> `resetAt`),
   `five-hour-limit-resets-clock`, `weekly-limit-reached`, `opus-limit-reached`,
   `your-limit-will-reset-at`, `hit-your-limit-resets` (wall clock `3pm`, `9:30am`; a named zone is kept
   in `ClockHint.zone`, never interpreted), `api-429-retry-after` (`retryAfterMs`),
   `api-429-rate-limit-error`, `api-429-too-many-requests`, `credit-balance-too-low` (kind `exhausted`),
-  `unknown-limit-heuristic` (kind `unknown_limit`, treated as a window). `overloaded_error` and 529 are
-  NOT a quota (D4). The signal is frozen, JSON-serialisable, `raw` is capped at 500 characters. The
+  `unknown-limit-heuristic` (kind `unknown_limit`, treated as a window), plus the weak safety net
+  (`rate-limit-error-bare`, `usage-limit-reached-net`, `exceeded-your-usage-limit`,
+  `out-of-usage-net`, `http-429-rate-limit-net`, `request-rejected-429`) and the strong
+  `out-of-usage-resets`. Bare `usage limit` and `429` are still NOT a quota. `overloaded_error` and
+  529 are NOT a quota (D4). **Strength** (`QuotaSignal.strength`): `strong` = provider date (epoch,
+  `retry-after`, explicit `resets <time>`) or a phrase anchored at line start / after `API Error: ` /
+  `Error: ` / a JSON `"result":"`; `weak` = bare pattern, heuristic, safety net, or any line printed
+  after an ANSI colour sequence. A weak signal backs off (`onQuotaHit`) WITHOUT counting toward
+  `exhausted`; only strong signals do. The signal is frozen, JSON-serialisable, `raw` is capped at 500 characters. The
   patterns have no nested quantifier (a 1 MB hostile input stays under 500 ms). The formulations are
   hypotheses: see `quality-and-operations.md`.
 - **Reset instant** (`resolveResetAt`): `resetAt`, else `now + retryAfterMs`, else the next STRICTLY
@@ -665,7 +675,11 @@ by the caller; no value (base delay, ceiling, window) is coded in the package (D
   replay (same `signal.id` as `lastSignalId` = the identical state), `StaleQuotaError` on a wrong
   `expectedVersion`, computation. Delay: provider date if in the future (capped at `maxDelayMs`), else
   `min(maxDelayMs, baseMs * 2^consecutiveHits)`; jitter only adds: `floor(delay * (1 + jitter *
-  jitterRatio))`, `jitter` in [0,1) is a parameter (no randomness in the domain). `resumeAt` never
+  jitterRatio))` then capped by `min(maxDelayMs, ...)` AFTER the jitter; `jitter` in [0,1) is a
+  parameter (no randomness in the domain). Hard ceiling `QUOTA_MAX_BACKOFF_MS` = 24 h: `maxDelayMs` must
+  be <= 24 h, `jitterRatio` in [0,1], a provider `retry-after` is capped at 24 h (detection, `resolveResetAt`,
+  adapter `retryAfterMs`). `onQuotaHit` revalidates the received state (`consecutiveHits` and `version`
+  safe integers >= 0, `resumeAt` finite, known status) and throws `InvalidQuotaError`. `resumeAt` never
   shortens. A burst (a hit while `status = backoff` and `now < resumeAt`) is ONE step: the counter is
   unchanged and only a later provider date extends `resumeAt` (version +1 only if something changed).
   `maxConsecutiveHits` or an `exhausted` signal gives `exhausted` (`resumeAt = null`), sticky until
@@ -683,7 +697,9 @@ by the caller; no value (base delay, ceiling, window) is coded in the package (D
   (`__proto__`, `constructor` and any other key refused, also in `windows`), integers >= 0, known
   status, `backoff` <=> `resumeAt` set, instants in [`QUOTA_MIN_EPOCH_MS`, `QUOTA_MAX_EPOCH_MS`] (2000
   to 2100), window keys `o:`/`p:`/`a:`, at most 1000 ids; the result is deeply frozen and the error
-  message never repeats the forged text. Errors: `InvalidQuotaError(reason)`, `StaleQuotaError`.
+  message never repeats the forged text. `parseQuotaState(text, now?)`: with `now`, a persisted
+  `resumeAt` beyond `now + 24 h` is clamped to that ceiling (without `now` only the 2100 bound applies;
+  callers should pass `now`). Errors: `InvalidQuotaError(reason)`, `StaleQuotaError`.
 
 | Incident (vision annex C) | Guard | Named test |
 |---|---|---|

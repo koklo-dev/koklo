@@ -1093,7 +1093,15 @@ organisation; they are deleted at the end only if the test App has the Administr
   src/quota-signal.ts`) are HYPOTHESES from the analysis; no real capture has been compared. A human
   must capture a real usage-limit message (stderr and `result` event) of the provider and add or
   correct the matching pattern with its test. Until then the verdict on detection stays UNVERIFIED,
-  never PASS.
+  never PASS. This now includes the strong/weak split and the safety-net phrases (`Usage limit
+  reached`, `Rate limit exceeded`, `You're out of extra usage`, `Request rejected (429)`, ...): they are
+  guesses chosen so that a real quota is never counted as a failure.
+- **Strong and weak signals**: only a strong signal (provider date, anchored phrase) counts toward
+  `exhausted`; a weak one (bare pattern, heuristic, safety net, coloured line) backs off by the base
+  delay without counting, so a quoted phrase cannot make `exhausted` sticky. Cost: a real quota
+  worded unexpectedly backs off but never escalates to `exhausted` until a human adds its pattern.
+- **Hard ceiling**: no backoff exceeds 24 h (`QUOTA_MAX_BACKOFF_MS`): policy `maxDelayMs`, provider
+  `retry-after`, the adapter `retryAfterMs` and (given `now`) a persisted `resumeAt` are all capped.
 - **Values to set by a human (D1)**: the package codes no default. The runner must give
   `BackoffPolicy` (`baseMs`, `maxDelayMs`, `jitterRatio`, `maxConsecutiveHits`, `utcOffsetMinutes`)
   and `UsagePolicy` (`windowMs`, `maxSeenIds`, ceilings per organization, project and agent).
