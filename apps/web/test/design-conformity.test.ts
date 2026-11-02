@@ -87,6 +87,23 @@ const FILES = [
   "lib/use-feature-submit.ts",
   "lib/use-feature-draft.ts",
   "lib/use-pending-save.ts",
+  // TK-59 / 59a : cadrage assisté, socle et brief (design/screens/S-framing.md section 11)
+  "app/projects/[projectId]/framing/page.tsx",
+  "app/projects/[projectId]/framing/layout.tsx",
+  "components/framing-page.tsx",
+  "components/ai-send-policy.tsx",
+  "components/ai-error-notice.tsx",
+  "lib/ai-errors.ts",
+  "lib/use-ai-call.ts",
+  "lib/framing-draft.ts",
+  "lib/framing-labels.ts",
+  "lib/framing-types.ts",
+  // TK-59 / 59b : propositions et enregistrement
+  "components/framing-proposals.tsx",
+  "components/framing-proposal-card.tsx",
+  "components/framing-submit-bar.tsx",
+  "lib/framing-operations.ts",
+  "lib/use-framing-proposals.ts",
 ];
 
 const RAW_COLOR_CLASS =

@@ -51,6 +51,9 @@ export const procedures = {
   // TK-48e : écriture de la spec par lots (contrat 0.7.0)
   specBatchSubmit: vi.fn(),
   specBatchGet: vi.fn(),
+  // TK-59 : propositions de l'IA (contrat 0.9.0), jamais d'appel réel
+  aiDraftBrief: vi.fn(),
+  aiProposeFeatures: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -160,6 +163,11 @@ export const orpc = {
       ...queryFull(["specBatch", "get"], procedures.specBatchGet),
       call: (input?: unknown) => procedures.specBatchGet(input),
     },
+  },
+  ai: {
+    key: () => ["ai"],
+    draftBrief: mutation(procedures.aiDraftBrief),
+    proposeFeatures: mutation(procedures.aiProposeFeatures),
   },
   ticket: {
     key: () => ["ticket"],

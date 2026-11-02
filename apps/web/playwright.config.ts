@@ -2,8 +2,9 @@ import { defineConfig } from "@playwright/test";
 
 // PLAYWRIGHT_CHANNEL=chrome réutilise un Chrome déjà installé ; sinon `playwright install chromium`.
 const channel = process.env.PLAYWRIGHT_CHANNEL;
-const WEB_PORT = 3100;
-const API_PORT = 3101;
+// Ports surchargeables (E2E_WEB_PORT, E2E_API_PORT) pour lancer deux sessions côte à côte sans collision.
+const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 3100);
+const API_PORT = Number(process.env.E2E_API_PORT ?? 3101);
 
 export default defineConfig({
   testDir: "e2e",

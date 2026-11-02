@@ -11,6 +11,8 @@ export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 const DRAFT_PREFIX = "koklo:feature-draft:";
 const PENDING_PREFIX = "koklo:feature-pending:";
+/** Brouillon de cadrage (TK-59) : même cycle de vie, purgé avec les autres à la fin de session. */
+export const FRAMING_DRAFT_PREFIX = "koklo:framing-draft:";
 
 export interface FeatureDraft {
   values: FeatureFormValues;
@@ -45,7 +47,7 @@ export const pendingKey = (projectId: string): string => `${PENDING_PREFIX}${pro
 /** Vrai une fois la session terminée : plus rien n'est écrit (le démontage d'un formulaire ne réécrit pas). */
 let sessionEnded = false;
 
-function write(key: string, value: unknown): boolean {
+export function writeStored(key: string, value: unknown): boolean {
   if (sessionEnded) return false;
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -55,7 +57,7 @@ function write(key: string, value: unknown): boolean {
   }
 }
 
-function remove(key: string): void {
+export function removeStored(key: string): void {
   try {
     localStorage.removeItem(key);
   } catch {
@@ -75,7 +77,7 @@ const owned = (data: Record<string, unknown>, scope: StorageScope): boolean =>
   data.ownerId === scope.userId && data.organizationId === scope.organizationId;
 
 /** Lit un objet JSON valide, non expiré, de ce propriétaire ; sinon `null` et la clé est supprimée. */
-function read(
+export function readStored(
   key: string,
   scope: Scope,
   now: number,
@@ -100,11 +102,11 @@ function read(
 }
 
 function discard(key: string): null {
-  remove(key);
+  removeStored(key);
   return null;
 }
 
-const withOwner = (scope: StorageScope, value: object) => ({
+export const withOwner = (scope: StorageScope, value: object) => ({
   ...value,
   ownerId: scope.userId,
   organizationId: scope.organizationId,
@@ -115,7 +117,7 @@ export const saveDraft = (
   projectId: string,
   target: string,
   draft: FeatureDraft,
-): boolean => (scope ? write(draftKey(projectId, target), withOwner(scope, draft)) : false);
+): boolean => (scope ? writeStored(draftKey(projectId, target), withOwner(scope, draft)) : false);
 
 export const readDraft = (
   scope: Scope,
@@ -123,17 +125,19 @@ export const readDraft = (
   target: string,
   now: number = Date.now(),
 ): FeatureDraft | null =>
-  read(draftKey(projectId, target), scope, now, DRAFT_TTL_MS, isDraft) as FeatureDraft | null;
+  readStored(draftKey(projectId, target), scope, now, DRAFT_TTL_MS, isDraft) as FeatureDraft | null;
 
 export const clearDraft = (projectId: string, target: string): void =>
-  remove(draftKey(projectId, target));
+  removeStored(draftKey(projectId, target));
+
+const OWNED_PREFIXES = [DRAFT_PREFIX, PENDING_PREFIX, FRAMING_DRAFT_PREFIX];
 
 function removeWhere(drop: (key: string, data: unknown) => boolean): void {
   try {
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
     for (const key of keys) {
-      if (!key?.startsWith(DRAFT_PREFIX) && !key?.startsWith(PENDING_PREFIX)) continue;
-      if (drop(key, parse(localStorage.getItem(key) ?? ""))) remove(key);
+      if (!key || !OWNED_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+      if (drop(key, parse(localStorage.getItem(key) ?? ""))) removeStored(key);
     }
   } catch {
     // stockage indisponible : rien à effacer
@@ -158,13 +162,13 @@ export function beginFeatureSession(scope: StorageScope): void {
 }
 
 export const savePending = (scope: Scope, projectId: string, pending: PendingSave): boolean =>
-  scope ? write(pendingKey(projectId), withOwner(scope, pending)) : false;
+  scope ? writeStored(pendingKey(projectId), withOwner(scope, pending)) : false;
 
 export const readPending = (
   scope: Scope,
   projectId: string,
   now: number = Date.now(),
 ): PendingSave | null =>
-  read(pendingKey(projectId), scope, now, PENDING_TTL_MS, isPending) as PendingSave | null;
+  readStored(pendingKey(projectId), scope, now, PENDING_TTL_MS, isPending) as PendingSave | null;
 
-export const clearPending = (projectId: string): void => remove(pendingKey(projectId));
+export const clearPending = (projectId: string): void => removeStored(pendingKey(projectId));

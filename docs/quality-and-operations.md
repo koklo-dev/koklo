@@ -194,6 +194,14 @@ covers_commit: bb9f740
 - Every call has a mandatory budget (tokens, duration, prompt size, cost) capped by the domain at
   5 USD per call; run `assertLlmRequest` before any network call and refuse, never clamp silently.
 
+### AI framing screen: what is sent and replayed (TK-59)
+- Only `{ projectId, idea, answers }` (brief) and `{ projectId, brief }` (proposals) leave for the provider;
+  never a person identifier. Proposals are rendered as plain text (guard test `framing-plain-text-guard`).
+- **"Réessayer" replays the current input, not the first click's**: `useFramingCalls.retry` calls the handlers of
+  the latest render, so an idea or brief edited after a failure is what is sent (test `framing-retry`).
+- Cancelling the wait frees the local lock only; the server request continues and stays counted in the
+  per-user hourly cap. Functional guide: `docs/functional/guides/frame-with-ai.md`.
+
 ### BYOK credentials table: database errors (TK-51a)
 - **Never log the raw `meta` or `message` of a database error raised on `llm_provider_credentials`.**
   A violated CHECK or unique constraint can carry the offending row, which holds the encrypted key

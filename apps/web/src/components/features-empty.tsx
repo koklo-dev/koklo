@@ -1,7 +1,14 @@
 import { Button, Card, Icon } from "@koklo/ui";
+import { FramingLink } from "./framing-link.tsx";
 
 /** Spec lue, aucune fonctionnalité, aucun filtre ; l'équipe qui écrit peut créer la première. */
-export function FeaturesEmpty({ onCreate }: { onCreate: (() => void) | undefined }) {
+export function FeaturesEmpty({
+  projectId,
+  onCreate,
+}: {
+  projectId: string;
+  onCreate: (() => void) | undefined;
+}) {
   return (
     <Card className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="checklist" size={28} className="text-muted-foreground" />
@@ -12,10 +19,13 @@ export function FeaturesEmpty({ onCreate }: { onCreate: (() => void) | undefined
         La spec de ce projet ne décrit encore aucune fonctionnalité.
       </p>
       {onCreate ? (
-        <Button type="button" className="h-11 md:h-9" onClick={onCreate}>
-          <Icon name="add" size={20} />
-          Nouvelle fonctionnalité
-        </Button>
+        <div className="flex flex-col gap-2 md:flex-row">
+          <FramingLink projectId={projectId} />
+          <Button type="button" className="h-11 md:h-9" onClick={onCreate}>
+            <Icon name="add" size={20} />
+            Nouvelle fonctionnalité
+          </Button>
+        </div>
       ) : null}
     </Card>
   );

@@ -1,18 +1,6 @@
 "use client";
 
-import {
-  Alert,
-  AlertDescription,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-  Button,
-  Icon,
-} from "@koklo/ui";
-import type { Ref } from "react";
+import { Alert, AlertDescription, Icon } from "@koklo/ui";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { canManage } from "../lib/roles.ts";
 import { type FeaturesPageModel, useFeaturesPage } from "../lib/use-features-page.ts";
@@ -21,6 +9,7 @@ import { FeatureFormSheet } from "./feature-form-sheet.tsx";
 import { FeatureSheet } from "./feature-sheet.tsx";
 import { FeaturesEmpty, FeaturesEmptyFiltered, ProjectNotFound } from "./features-empty.tsx";
 import { FeaturesFilters } from "./features-filters.tsx";
+import { FeaturesHeader } from "./features-header.tsx";
 import { FeaturesList } from "./features-list.tsx";
 import { WriteFailure, WriteNotice } from "./saved-notice.tsx";
 import { SpecIndexFailed } from "./spec-index-failed.tsx";
@@ -37,62 +26,6 @@ function Skeleton() {
           className="h-10 rounded-md bg-muted motion-safe:animate-pulse"
         />
       ))}
-    </div>
-  );
-}
-
-function Header({
-  name,
-  titleRef,
-  onCreate,
-}: {
-  name: string | undefined;
-  titleRef: Ref<HTMLHeadingElement>;
-  /** Présent seulement pour l'équipe qui écrit, quand la spec est lue. */
-  onCreate: (() => void) | undefined;
-}) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <Breadcrumb className="mb-3">
-          <BreadcrumbList>
-            <BreadcrumbItem>Koklo</BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/projects">Projets</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            {name ? (
-              <>
-                <BreadcrumbItem>{name}</BreadcrumbItem>
-                <BreadcrumbSeparator />
-              </>
-            ) : null}
-            <BreadcrumbItem>
-              <BreadcrumbPage>Fonctionnalités</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <h1
-          ref={titleRef}
-          tabIndex={-1}
-          className="text-[30px] font-semibold tracking-[-0.025em] outline-none"
-        >
-          Fonctionnalités
-        </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">{name ?? "Projet"}</p>
-      </div>
-      {onCreate ? (
-        <Button
-          type="button"
-          data-new-feature
-          className="h-11 w-full md:h-9 md:w-auto"
-          onClick={onCreate}
-        >
-          <Icon name="add" size={20} />
-          Nouvelle fonctionnalité
-        </Button>
-      ) : null}
     </div>
   );
 }
@@ -201,7 +134,12 @@ function Body({ page }: { page: FeaturesPageModel }) {
     case "preparing":
       return <Preparing page={page} />;
     case "empty":
-      return <FeaturesEmpty onCreate={page.form.canWrite ? page.form.openCreate : undefined} />;
+      return (
+        <FeaturesEmpty
+          projectId={page.data.projectId}
+          onCreate={page.form.canWrite ? page.form.openCreate : undefined}
+        />
+      );
     case "empty-filtered":
       return <FeaturesEmptyFiltered onClear={page.filters.onClear} />;
     case "list":
@@ -254,7 +192,8 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
   const { head, projectName } = page.data;
   return (
     <div className="flex flex-col gap-4">
-      <Header
+      <FeaturesHeader
+        projectId={projectId}
         name={projectName}
         titleRef={page.titleRef}
         onCreate={page.form.canWrite ? page.form.openCreate : undefined}
