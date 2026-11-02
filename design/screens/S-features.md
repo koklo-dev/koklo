@@ -1,12 +1,12 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1.4
+version: 1.5
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
 - **Vue client / business** : lit les fonctionnalités en langage courant, sans jamais croiser de vocabulaire git (vision §1 principe 7, AC-48-28) : ni « commit », ni « branche », ni SHA, ni chemin de fichier, ni code d'erreur technique.
-- Écran **par projet**, en **lecture seule** (TK-48 / 48d). L'écriture (créer, modifier, supprimer) est décrite par la fiche [S-feature-form](S-feature-form.md) (48e) : pour la vue équipe qui écrit (propriétaire, administrateur, développeur, designer) et seulement quand la spec est lue (`ready`), s'ajoutent le bouton « Nouvelle fonctionnalité » (en-tête et état vide 4.3), le bouton « Modifier » dans le pied de la fiche, le bloc de confirmation ou de suivi au-dessus du tableau et les paramètres d'adresse `?new=1` / `?edit=F-001`. Client et business : aucun bouton d'écriture, aucun emplacement vide. Arrive depuis la liste des projets ou la barre latérale.
+- Écran **par projet**, en **lecture seule** (TK-48 / 48d). L'écriture (créer, modifier, supprimer) est décrite par la fiche [S-feature-form](S-feature-form.md) (48e) : pour la vue équipe qui écrit (propriétaire, administrateur, développeur, designer) et seulement quand la spec est lue (`ready`), s'ajoutent le bouton « Nouvelle fonctionnalité » (en-tête et état vide 4.3), le bouton « Modifier » dans le pied de la fiche, le bloc de confirmation ou de suivi au-dessus du tableau et les paramètres d'adresse `?new=1` / `?edit=F-001`. Client et business : aucun bouton d'écriture, aucun emplacement vide. S'y ajoute le bouton « Cadrer avec l'IA » (§3.1.1, page décrite par [S-framing](S-framing.md)). Arrive depuis la liste des projets ou la barre latérale.
 
 ## 2. Tâches et parcours
 - Principale : parcourir la liste des fonctionnalités et ouvrir la fiche de l'une d'elles.
@@ -30,6 +30,9 @@ Sources du contrat `@koklo/contract` 0.7.0 (aucun changement de contrat) :
 - Ligne de version (texte secondaire 12 px, une seule ligne, absente tant que `spec.head` n'a pas répondu ou s'il vaut `null`) :
   - équipe : icône `commit` 16 + « Version de la spec » + identifiant court (7 premiers caractères de `commitSha`, JetBrains Mono 12 px) + « · indexée le `<date>` » (`indexedAt`, format long français, fuseau local) ;
   - client / business : « Mise à jour le `<date>` » (`indexedAt`). Aucun identifiant technique.
+
+### 3.1.1 Bouton « Cadrer avec l'IA » (TK-59)
+`Button variant="outline"` (icône `smart_toy` 20, libellé « Cadrer avec l'IA »), dans l'en-tête **à droite** de « Nouvelle fonctionnalité » et dans l'état vide 4.3 (liste vide = moment naturel du cadrage). Lien vers `/projects/[projectId]/framing`. Visible pour **propriétaire, administrateur, développeur et designer seulement**, et seulement quand la spec est lue (`ready`) : comme « Nouvelle fonctionnalité », jamais grisé, absent pour client et business (aucun emplacement vide). Sous 768 px, pleine largeur sous « Nouvelle fonctionnalité », 44 px. Le designer voit le bouton (la page lui explique ce qu'il ne peut pas enregistrer, S-framing 4.11).
 
 ### 3.2 Filtres
 Deux `Select` à libellé visible (au-dessus ou à gauche selon la largeur), sans bouton « Appliquer » : le changement relance la requête (retour au début de la liste, curseur oublié).
@@ -85,7 +88,7 @@ Zone `role="status"` `aria-busy="true"`, libellé visible « Chargement des fonc
 Compteur, ligne de version, filtres, table, éventuel « Afficher plus » (§3).
 
 ### 4.3 Vide (spec lue, aucune fonctionnalité, aucun filtre)
-`Card` centrée : icône `checklist` (28), titre « Aucune fonctionnalité pour le moment », texte « La spec de ce projet ne décrit encore aucune fonctionnalité. » Client et business : aucun bouton. Équipe qui écrit (S-feature-form §4.1) : `Button` principal « Nouvelle fonctionnalité » (icône `add`).
+`Card` centrée : icône `checklist` (28), titre « Aucune fonctionnalité pour le moment », texte « La spec de ce projet ne décrit encore aucune fonctionnalité. » Client et business : aucun bouton. Équipe qui écrit (S-feature-form §4.1) : `Button` principal « Nouvelle fonctionnalité » (icône `add`), suivi du `Button variant="outline"` « Cadrer avec l'IA » (icône `smart_toy`, §3.1.1).
 
 ### 4.4 Vide filtré
 Filtres conservés et rendus. À la place de la table : texte `role="status"` « Aucune fonctionnalité ne correspond à ces filtres. » et `Button variant="outline"` « Effacer les filtres » (le focus reste sur les `Select` au changement ; sur « Effacer » le focus passe au premier `Select`).
@@ -194,6 +197,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 | 1.2 | 2026-10-31 | TK-48 (48e) | Points d'entrée de l'écriture (bouton « Nouvelle fonctionnalité », « Modifier » dans la fiche, état vide pour l'équipe qui écrit, `?new`/`?edit`, bloc de confirmation et de suivi) ; le formulaire lui-même est dans la fiche S-feature-form v1. Aucun changement pour les rôles en lecture. |
 | 1.3 | 2026-11-01 | TK-48 (48e-1, refactor) | Boutons d'entrée livrés tels que décrits ; la région d'état unique de cet écran perd son rôle et son contenu tant que le formulaire est ouvert (elle revient à la fermeture), le panneau portant alors la région (voir S-feature-form v1.1). La ligne de version et la fiche s'affichent sans attendre le rôle (client par défaut) ; rien d'autre ne change pour la lecture. |
 | 1.4 | 2026-11-01 | TK-48 (48e-2, refactor) | Après une suppression, la liste est relue sans la fonctionnalité (filtres gardés, curseur oublié) et la région d'état dit « F-001 supprimée. » (pas de « Voir la fiche »), focus sur le h1 ; un suivi de suppression page fermée dit « Suppression de « Titre » en cours… ». Détail : S-feature-form §4.8. |
+| 1.5 | 2026-11-02 | TK-59 | Bouton « Cadrer avec l'IA » (§3.1.1) dans l'en-tête et dans l'état vide, pour propriétaire, administrateur, développeur et designer avec spec lue ; la page est décrite par [S-framing](S-framing.md). Aucun changement pour les rôles en lecture. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.
