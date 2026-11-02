@@ -143,7 +143,7 @@ const WRITE_GROUPS = [
   "ai",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
-const READ_ONLY_GROUPS = ["audit", "spec"];
+const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace"];
 /**
  * Groupes du contrat sans implémentation API : plus aucun depuis TK-48a2 (`installation` a rejoint
  * WRITE_GROUPS : `installation.start` est une écriture, `installation.list` une lecture du même groupe,

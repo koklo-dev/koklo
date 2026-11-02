@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 0.10.0 (54 routes, 39 chemins), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 0.11.0 (57 routes, 42 chemins), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /comments/{id}",
   "DELETE /llm-credentials/{provider}",
@@ -7,6 +7,9 @@ export const ALL_PAIRS: string[] = [
   "DELETE /tickets/{key}/dependencies/{dependsOn}",
   "DELETE /tickets/{key}/lease",
   "GET /audit",
+  "GET /client-space/projects",
+  "GET /client-space/projects/{projectId}/features",
+  "GET /client-space/projects/{projectId}/features/{featureId}",
   "GET /comments",
   "GET /health",
   "GET /llm-credentials",
@@ -58,6 +61,9 @@ export const ALL_PAIRS: string[] = [
 
 export const ALL_PATHS: string[] = [
   "/audit",
+  "/client-space/projects",
+  "/client-space/projects/{projectId}/features",
+  "/client-space/projects/{projectId}/features/{featureId}",
   "/comments",
   "/comments/{id}",
   "/health",
