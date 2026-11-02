@@ -8,6 +8,7 @@ import type {
   KanbanRole,
   TransitionMode as KanbanTransition,
 } from "./stub-kanban.ts";
+import type { LlmScenario } from "./stub-llm-credential.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
 
 export type ProjectsState = "loading" | "empty" | "data" | "error";
@@ -33,7 +34,8 @@ export async function setScenario(
   } & GithubScenario &
     SpecRepoScenario &
     FeaturesScenario &
-    AiScenario,
+    AiScenario &
+    LlmScenario,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
@@ -126,3 +128,15 @@ export interface AiCall {
 }
 export const aiCallsSeen = async (): Promise<AiCall[]> =>
   (await fetch(`${STUB}/__ai-calls`)).json();
+
+/** Appels `llmCredential.*` reçus par le faux API (le corps du PUT porte la clé), dans l'ordre. */
+export interface LlmCall {
+  method: string;
+  path: string;
+  body: unknown;
+}
+export const llmCallsSeen = async (): Promise<LlmCall[]> =>
+  (await fetch(`${STUB}/__llm-calls`)).json();
+/** Nombre de requêtes dont l'URL, la query ou un en-tête (hors corps) contenait la clé de test. */
+export const llmSecretLeaks = async (): Promise<number> =>
+  ((await (await fetch(`${STUB}/__llm-secret-leaks`)).json()) as { leaks: number }).leaks;

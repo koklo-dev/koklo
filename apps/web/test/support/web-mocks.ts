@@ -54,6 +54,11 @@ export const procedures = {
   // TK-59 : propositions de l'IA (contrat 0.9.0), jamais d'appel réel
   aiDraftBrief: vi.fn(),
   aiProposeFeatures: vi.fn(),
+  // Réglages IA (contrat 0.9.0) : list / set / verify / remove, jamais d'appel réel
+  llmCredentialList: vi.fn(),
+  llmCredentialSet: vi.fn(),
+  llmCredentialVerify: vi.fn(),
+  llmCredentialRemove: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -116,6 +121,10 @@ const mutation = (mutationFn: ReturnType<typeof vi.fn>) => ({
   mutationOptions: () => ({ mutationFn }),
 });
 
+const mutationWithOptions = (mutationFn: ReturnType<typeof vi.fn>) => ({
+  mutationOptions: (options: Record<string, unknown> = {}) => ({ mutationFn, ...options }),
+});
+
 export const orpc = {
   organization: {
     list: query(["organization", "list"], procedures.organizationList),
@@ -168,6 +177,14 @@ export const orpc = {
     key: () => ["ai"],
     draftBrief: mutation(procedures.aiDraftBrief),
     proposeFeatures: mutation(procedures.aiProposeFeatures),
+  },
+  llmCredential: {
+    key: () => ["llmCredential"],
+    list: queryFull(["llmCredential", "list"], procedures.llmCredentialList),
+    // Les options (`gcTime`, `retry`...) sont transmises telles quelles, comme le client oRPC réel.
+    set: mutationWithOptions(procedures.llmCredentialSet),
+    verify: mutationWithOptions(procedures.llmCredentialVerify),
+    remove: mutationWithOptions(procedures.llmCredentialRemove),
   },
   ticket: {
     key: () => ["ticket"],
