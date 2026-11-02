@@ -93,7 +93,7 @@ describe("assertMailAddress", () => {
     const error = failureOf(() => assertMailAddress(value));
     expect(error).toBeInstanceOf(MailDeliveryError);
     expect(error?.kind).toBe("permanent");
-    expect(error?.message).not.toContain(value.slice(0, 12));
+    if (value.length > 0) expect(error?.message).not.toContain(value.slice(0, 12));
   });
 });
 
