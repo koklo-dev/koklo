@@ -86,6 +86,48 @@ const PHRASES: readonly Phrase[] = [
     kind: "unknown_limit",
     expected: {},
   },
+  {
+    name: "rate-limit-error-bare",
+    text: "request failed with rate_limit_error",
+    kind: "rate_window",
+    expected: {},
+  },
+  {
+    name: "out-of-usage-resets",
+    text: "You're out of extra usage · resets 3pm",
+    kind: "rate_window",
+    expected: { resetHint: { hour: 15, minute: 0, zone: null } },
+  },
+  {
+    name: "out-of-usage-net",
+    text: "You're out of extra usage",
+    kind: "unknown_limit",
+    expected: {},
+  },
+  {
+    name: "usage-limit-reached-net",
+    text: "Usage limit reached",
+    kind: "unknown_limit",
+    expected: {},
+  },
+  {
+    name: "exceeded-your-usage-limit",
+    text: "You have exceeded your usage limit",
+    kind: "unknown_limit",
+    expected: {},
+  },
+  {
+    name: "http-429-rate-limit-net",
+    text: "HTTP 429 rate limit hit",
+    kind: "unknown_limit",
+    expected: {},
+  },
+  {
+    name: "request-rejected-429",
+    text: "Request rejected (429)",
+    kind: "unknown_limit",
+    expected: {},
+  },
 ];
 
 const FORBIDDEN = /[\u2066-\u2069\u202a-\u202e\u200e\u200f]/;

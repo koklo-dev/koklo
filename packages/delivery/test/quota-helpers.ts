@@ -38,6 +38,7 @@ export const OTHER_SCOPES: readonly QuotaScope[] = [
 
 export const signal = (overrides: Partial<QuotaSignal> = {}): QuotaSignal => ({
   kind: "rate_window",
+  strength: "strong",
   resetAt: null,
   retryAfterMs: null,
   resetHint: null,

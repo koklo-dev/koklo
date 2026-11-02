@@ -1,4 +1,4 @@
-import { fail, isObject, isUtcOffset } from "./quota-check.ts";
+import { fail, isObject, isUtcOffset, QUOTA_MAX_BACKOFF_MS } from "./quota-check.ts";
 import type { ClockHint, QuotaSignal } from "./quota-signal.ts";
 
 const MINUTE_MS = 60_000;
@@ -29,7 +29,8 @@ export const resolveResetAt = (
 ): number | null => {
   if (!Number.isSafeInteger(now)) return fail("instant invalide");
   if (signal.resetAt !== null) return signal.resetAt;
-  if (signal.retryAfterMs !== null) return now + signal.retryAfterMs;
+  if (signal.retryAfterMs !== null)
+    return now + Math.min(signal.retryAfterMs, QUOTA_MAX_BACKOFF_MS);
   const hint = signal.resetHint;
   if (hint === null || hint.zone !== null) return null;
   assertClock(hint);

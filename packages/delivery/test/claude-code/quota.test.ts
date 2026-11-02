@@ -19,6 +19,13 @@ const PHRASES: Readonly<Record<string, string>> = {
   "api-429-too-many-requests": "API Error: 429 Too Many Requests",
   "credit-balance-too-low": "Credit balance is too low",
   "unknown-limit-heuristic": "Monthly limit reached ∙ resets Dec 1",
+  "rate-limit-error-bare": "request failed with rate_limit_error",
+  "out-of-usage-resets": "You're out of extra usage · resets 3pm",
+  "out-of-usage-net": "You're out of extra usage",
+  "usage-limit-reached-net": "Usage limit reached",
+  "exceeded-your-usage-limit": "You have exceeded your usage limit",
+  "http-429-rate-limit-net": "HTTP 429 rate limit hit",
+  "request-rejected-429": "Request rejected (429)",
 };
 const phrase = (name: string): string => PHRASES[name] ?? "";
 const AUTH = "Invalid API key · Please run /login";

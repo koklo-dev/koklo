@@ -1,3 +1,5 @@
+import { quotedLines } from "./quota-quote.ts";
+
 /** Nettoyage de la sortie d'agent avant détection : ni séquence ANSI, ni contrôle, ni bidi. */
 const ESC = 27;
 const TAB = 9;
@@ -21,6 +23,12 @@ const skipEscape = (text: string, afterEsc: number): number => {
   return inRange(text.charCodeAt(index), 0x40, 0x7e) ? index + 1 : index;
 };
 
+/** Tirets insécables/typographiques (U+2010 à U+2012, U+2212) -> `-` ; espaces insécables/fins -> espace. */
+const normalizeUnicode = (text: string): string =>
+  text
+    .replace(/[\u2010-\u2012\u2212]/g, "-")
+    .replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, " ");
+
 export const cleanText = (text: string): string => {
   const kept: string[] = [];
   let index = 0;
@@ -33,15 +41,27 @@ export const cleanText = (text: string): string => {
     if (!isForbiddenCode(code)) kept.push(text[index] as string);
     index += 1;
   }
-  return kept.join("").replace(/[ \t ]+/g, " ");
+  return normalizeUnicode(kept.join("")).replace(/[ \t]+/g, " ");
 };
 
-/** Ligne de diff (`+`, `-`, `@@`) ou nom de test : une citation, jamais une sortie du fournisseur. */
-const QUOTED_LINE = /^(?:[+-]|@@|\s*(?:it|test|describe)(?:\.\w+)*\()/;
+/** Une ligne nettoyée ; `colored` = elle commençait par une séquence ANSI (sortie de terminal). */
+export interface ScannedLine {
+  readonly text: string;
+  readonly colored: boolean;
+}
 
-/** Les derniers `maxChars` caractères, nettoyés, sans les lignes citées. */
-export const scanText = (output: string, maxChars: number): string =>
-  cleanText(output.slice(-maxChars))
-    .split("\n")
-    .filter((line) => !QUOTED_LINE.test(line))
-    .join("\n");
+const startsColored = (line: string): boolean => line.trimStart().startsWith("\u001b[");
+
+/**
+ * Les derniers `maxChars` caractères, ligne à ligne, nettoyés, sans les lignes citées. Le filtre de
+ * citations s'applique avant ET après le nettoyage ANSI.
+ */
+export const scanLines = (output: string, maxChars: number): readonly ScannedLine[] => {
+  const raw = output.slice(-maxChars).split("\n");
+  const cleaned = raw.map(cleanText);
+  const quoted = quotedLines(raw);
+  const quotedClean = quotedLines(cleaned);
+  return cleaned.flatMap((text, i) =>
+    quoted[i] || quotedClean[i] ? [] : [{ text, colored: startsColored(raw[i] as string) }],
+  );
+};

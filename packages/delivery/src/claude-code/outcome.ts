@@ -2,6 +2,7 @@
 import { AgentAuthError } from "../agent-errors.ts";
 import { type AgentOutput, agentOutput } from "../agent-output.ts";
 import type { AgentSessionResult } from "../agent-runtime.ts";
+import { QUOTA_MAX_BACKOFF_MS } from "../quota-check.ts";
 import type { QuotaSignal } from "../quota-signal.ts";
 import { describeClaudeFailure } from "./classify.ts";
 import type { ProcessOutcome } from "./process.ts";
@@ -30,12 +31,13 @@ const stopped = (outcome: ProcessOutcome, context: OutcomeContext): AgentSession
   }
 };
 
-/** Délai de reprise donné par le fournisseur : `retry-after`, sinon l'instant absolu restant (si futur). */
+/** Délai de reprise du fournisseur, entier dans [0, 24 h] ; sinon (négatif, NaN, démesuré) borné ou absent. */
 const quotaDelayMs = (quota: QuotaSignal, now: number): number | null => {
-  if (quota.retryAfterMs !== null) {
-    return quota.retryAfterMs;
-  }
-  return quota.resetAt !== null && quota.resetAt > now ? quota.resetAt - now : null;
+  const delay =
+    quota.retryAfterMs ??
+    (quota.resetAt !== null && quota.resetAt > now ? quota.resetAt - now : null);
+  if (delay === null || !Number.isFinite(delay) || delay < 0) return null;
+  return Math.min(Math.floor(delay), QUOTA_MAX_BACKOFF_MS);
 };
 
 const failure = (outcome: ProcessOutcome, context: OutcomeContext): AgentSessionResult => {

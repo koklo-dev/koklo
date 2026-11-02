@@ -84,6 +84,7 @@ export type {
 export { resolveResetAt } from "./quota-reset.ts";
 export {
   parseQuotaState,
+  QUOTA_MAX_BACKOFF_MS,
   QUOTA_MAX_EPOCH_MS,
   QUOTA_MAX_SERIALIZED_CHARS,
   QUOTA_MIN_EPOCH_MS,
@@ -98,9 +99,11 @@ export {
   QUOTA_PATTERNS,
   QUOTA_RAW_MAX_CHARS,
   QUOTA_SCAN_CHARS,
+  QUOTA_STRENGTHS,
   type QuotaKind,
   type QuotaPattern,
   type QuotaSignal,
+  type QuotaStrength,
 } from "./quota-signal.ts";
 export {
   canStart,

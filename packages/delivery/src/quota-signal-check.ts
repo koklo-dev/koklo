@@ -1,6 +1,14 @@
-import { fail, isObject, isPositiveInt, isSafeCount, isUtcOffset } from "./quota-check.ts";
+import {
+  fail,
+  isObject,
+  isPositiveInt,
+  isSafeCount,
+  isUtcOffset,
+  QUOTA_MAX_BACKOFF_MS,
+} from "./quota-check.ts";
 import type { BackoffPolicy } from "./quota-policy.ts";
-import { QUOTA_KINDS, type QuotaSignal } from "./quota-signal.ts";
+import { QUOTA_KINDS, QUOTA_STRENGTHS, type QuotaSignal } from "./quota-signal.ts";
+import { QUOTA_STATUSES, type QuotaState } from "./quota-state.ts";
 import { isText } from "./value-check.ts";
 
 const nullableCount = (value: unknown): boolean => value === null || isSafeCount(value);
@@ -15,9 +23,11 @@ export const assertBackoffPolicy = (policy: BackoffPolicy): void => {
   if (!isObject(policy)) fail("politique de recul absente");
   const { baseMs, maxDelayMs, jitterRatio, maxConsecutiveHits, utcOffsetMinutes } = policy;
   if (!isPositiveInt(baseMs)) fail("baseMs invalide");
-  if (!isSafeCount(maxDelayMs) || maxDelayMs < baseMs) fail("maxDelayMs invalide");
-  if (typeof jitterRatio !== "number" || !Number.isFinite(jitterRatio) || jitterRatio < 0) {
-    fail("jitterRatio invalide");
+  if (!isSafeCount(maxDelayMs) || maxDelayMs < baseMs || maxDelayMs > QUOTA_MAX_BACKOFF_MS) {
+    fail("maxDelayMs invalide (plafond dur de 24 h)");
+  }
+  if (typeof jitterRatio !== "number" || !(jitterRatio >= 0 && jitterRatio <= 1)) {
+    fail("jitterRatio hors de [0,1]");
   }
   if (!isPositiveInt(maxConsecutiveHits)) fail("maxConsecutiveHits invalide");
   if (utcOffsetMinutes !== null && !isUtcOffset(utcOffsetMinutes)) fail("décalage UTC invalide");
@@ -26,6 +36,7 @@ export const assertBackoffPolicy = (policy: BackoffPolicy): void => {
 export const assertSignal = (signal: QuotaSignal): void => {
   if (!isObject(signal)) fail("signal de quota absent");
   if (!QUOTA_KINDS.includes(signal.kind)) fail("nature de signal inconnue");
+  if (!QUOTA_STRENGTHS.includes(signal.strength)) fail("force de signal inconnue");
   if (!nullableCount(signal.resetAt) || !nullableCount(signal.retryAfterMs)) {
     fail("date ou délai de reprise invalide");
   }
@@ -34,4 +45,14 @@ export const assertSignal = (signal: QuotaSignal): void => {
     fail("signal incomplet");
   }
   if (signal.id !== undefined && !isText(signal.id)) fail("identifiant de signal invalide");
+};
+
+/** Un état reçu en mémoire peut être forgé : compteurs, version et reprise sont revalidés. */
+export const assertStateInput = (state: QuotaState): void => {
+  if (!isObject(state)) fail("état de quota absent");
+  if (!QUOTA_STATUSES.includes(state.status)) fail("statut inconnu");
+  if (!isSafeCount(state.consecutiveHits) || !isSafeCount(state.version)) {
+    fail("compteur ou version invalide");
+  }
+  if (!nullableCount(state.resumeAt)) fail("resumeAt invalide");
 };

@@ -4,6 +4,8 @@ import type { QuotaOptions } from "./quota-policy.ts";
 /** Bornes de plausibilité d'un instant persisté : 2000-01-01 et 2100-01-01 (epoch ms). */
 export const QUOTA_MIN_EPOCH_MS = 946_684_800_000;
 export const QUOTA_MAX_EPOCH_MS = 4_102_444_800_000;
+/** Plafond DUR de tout recul : 24 h, quelle que soit la politique ou la date du fournisseur. */
+export const QUOTA_MAX_BACKOFF_MS = 86_400_000;
 /** Un décalage UTC se compte en minutes, strictement entre -24 h et +24 h. */
 const MAX_OFFSET_MINUTES = 1440;
 
