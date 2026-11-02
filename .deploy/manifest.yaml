@@ -8,7 +8,7 @@ secrets: [OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET, GH_APP_ID, GH_APP_
 optionalSecrets: [GH_APP_CLIENT_ID, GH_APP_CLIENT_SECRET, SENTRY_DSN]  # GH_APP_CLIENT_* restent facultatifs (jetons utilisateur, flux absent -> USER_TOKEN_REQUIRED) ; mappés en GITHUB_APP_CLIENT_* par `vars`
 generate: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]
 lockedSecrets: [BETTER_AUTH_SECRET, KOKLO_ENCRYPTION_KEY]     # sessions signées, données chiffrées
-vars: { LOG_LEVEL: info, EMAIL_FROM: 'Koklo <no-reply@koklo.dev>', BETTER_AUTH_URL: 'https://${domains.app}' }   # origine web : l'API n'est pas exposée
+vars: { LOG_LEVEL: info, EMAIL_FROM: 'Koklo <no-reply@koklo.dev>', BETTER_AUTH_URL: 'https://${domains.app}', WEB_BASE_URL: 'https://${domains.app}' }   # origine web : l'API n'est pas exposée ; WEB_BASE_URL = base des liens d'e-mail (worker, obligatoire en staging et production)
 
 apps:
   web: { image: ghcr.io/koklo-dev/koklo-web, registry: ghcr, port: 3000, domain: app, healthcheck: /api/health,
