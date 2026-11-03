@@ -59,7 +59,8 @@ const ownerAndAdmin = ["owner", "admin"] as const;
 const procedures: Procedure[] = [
   {
     name: "organization.create",
-    allowed: everyRole,
+    // Le client (seule appartenance de l'acteur) est refusé : TK-55e, cf. organization-create-clients.
+    allowed: ["owner", "admin", "dev", "designer", "business"],
     run: (a) => call(app, a.cookie, "post", "/organizations", { name: `Org ${unique()}` }),
   },
   {

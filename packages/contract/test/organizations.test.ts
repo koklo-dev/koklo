@@ -87,6 +87,14 @@ describe("C1 organization.create", () => {
   });
 });
 
+describe("C1 organization.create : erreurs typées (TK-55e)", () => {
+  it("expose FORBIDDEN (403) : un client ne crée pas d'organisation, en plus d'UNAUTHORIZED et CONFLICT", () => {
+    const errors = (proc["organization.create"]() as { "~orpc": { errorMap: Record<string, { status?: number }> } })["~orpc"].errorMap;
+    expect(errors.FORBIDDEN?.status).toBe(403);
+    expect(Object.keys(errors).sort()).toEqual(["CONFLICT", "FORBIDDEN", "INTERNAL", "UNAUTHORIZED"]);
+  });
+});
+
 describe("C1 organization.list", () => {
   it("sortie : tableau { id, name, slug, role }", async () => {
     const o = output(proc["organization.list"]());
