@@ -12,7 +12,7 @@ import {
   seedReview,
 } from "./helpers/client-space.ts";
 import { installBench } from "./helpers/repo-scene.ts";
-import { type FeatureSeed, seedIndex } from "./helpers/spec-read.ts";
+import { type FeatureSeed, featurePath, SPEC_BRANCH, seedIndex } from "./helpers/spec-read.ts";
 
 /**
  * TK-55b : `clientSpace.feature` (détail) et `SPACE_NOT_READY`. Le détail est lu dans git au SHA
@@ -189,6 +189,42 @@ describe("clientSpace : SPACE_NOT_READY masque tout échec d'index ou de fournis
       expect(JSON.stringify(res.body)).not.toMatch(/PROVIDER_|features\/F-001|retry/i);
     },
   );
+
+  it.each([["authenticate"], ["readFile"]])(
+    "%s lève une erreur brute (non typée) : 503 SPACE_NOT_READY, sans data ni message d'origine",
+    async (method) => {
+      await indexedLogin();
+      bench().harness.failWith(method, new Error("socket hang up token=ghs_SECRET"));
+
+      const res = await api().feature(scene.p1.projectId, "F-001");
+
+      expect(res.status, JSON.stringify(res.body)).toBe(503);
+      expect(res.body).toMatchObject(NOT_READY);
+      expect(res.body.data).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toMatch(/socket|ghs_SECRET|hang/i);
+    },
+  );
+
+  it("fichier indexé non parsable : 503 SPACE_NOT_READY, sans data ni message interne", async () => {
+    await indexedLogin();
+    const auth = await bench().harness.authFor(scene.p1.owner);
+    const commit = await bench().harness.inner.writeCommit({
+      auth,
+      repo: scene.p1.ref,
+      branch: SPEC_BRANCH,
+      author: { name: "Koklo", email: "koklo-bot@users.noreply.invalid" },
+      message: "test: fichier illisible",
+      files: [{ path: featurePath(LOGIN), content: "pas du markdown de feature" }],
+    });
+    await bench().database.query("UPDATE spec_snapshots SET commit_sha = $1", [commit.sha]);
+
+    const res = await api().feature(scene.p1.projectId, "F-001");
+
+    expect(res.status, JSON.stringify(res.body)).toBe(503);
+    expect(res.body).toMatchObject(NOT_READY);
+    expect(res.body.data).toBeUndefined();
+    expect(JSON.stringify(res.body)).not.toMatch(/parseable|indexed feature/i);
+  });
 
   it("fournisseur non configuré : 503 SPACE_NOT_READY ; la liste (index seul) reste lisible", async () => {
     await indexedLogin();

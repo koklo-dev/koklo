@@ -6,6 +6,7 @@ import type {
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type { z } from "zod";
+import { requestLogger } from "../request-logger.ts";
 import { pageFeatures } from "../spec-read/feature-page.ts";
 import { SpecReadService } from "../spec-read/spec-read.service.ts";
 import { notFound } from "../tracker/api-errors.ts";
@@ -25,12 +26,27 @@ type Feature = z.output<typeof clientSpaceFeatureOutputSchema>;
 /** Seule erreur de lecture exposée : elle masque index absent ou en échec et pannes du fournisseur. */
 const notReady = () => new ORPCError("SPACE_NOT_READY");
 
-/** Après le contrôle de l'index, tout échec de lecture (fichier, fournisseur) est masqué. */
+/**
+ * Après le contrôle de l'index, tout échec de lecture (fichier, fournisseur) est masqué : les
+ * erreurs typées de lecture, mais aussi toute erreur non typée (fichier non parsable, réseau brut).
+ * Seules les autres erreurs typées (autorisation, cloisonnement) gardent leur code.
+ */
 const isHiddenFailure = (error: unknown): boolean =>
-  error instanceof ORPCError &&
-  (error.code === "NOT_FOUND" ||
-    error.code === "SPEC_INDEX_FAILED" ||
-    error.code.startsWith("PROVIDER_"));
+  !(error instanceof ORPCError) ||
+  error.code === "NOT_FOUND" ||
+  error.code === "SPEC_INDEX_FAILED" ||
+  error.code.startsWith("PROVIDER_");
+
+/** Cause côté serveur, sans message ni secret : le client ne voit que `SPACE_NOT_READY`. */
+function logHiddenFailure(error: unknown): void {
+  requestLogger().warn(
+    {
+      errorName: error instanceof Error ? error.name : "erreur",
+      ...(error instanceof ORPCError ? { code: error.code } : {}),
+    },
+    "client space feature read failed",
+  );
+}
 
 const stateOf = (trail: FeatureTrail | undefined, sha: string) => ({
   ...validationOf(trail?.latestReview, sha),
@@ -81,7 +97,9 @@ export class ClientSpaceService {
     if (head === null) throw notReady();
     if (!head.found) throw notFound();
     const detail = await this.specs.getFeature(scope, featureId).catch((error: unknown) => {
-      throw isHiddenFailure(error) ? notReady() : error;
+      if (!isHiddenFailure(error)) throw error;
+      logHiddenFailure(error);
+      throw notReady();
     });
     const trail = (await this.repository.trails(scope, [featureId])).get(featureId);
     const { openSuggestions: _open, ...state } = stateOf(trail, detail.commitSha);
