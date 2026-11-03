@@ -62,6 +62,7 @@ export {
   specBatchConflictError,
   specIndexFailedError,
   specInvalidError,
+  staleVersionError,
   unauthorizedError,
   userTokenRequiredError,
   validationError,
@@ -92,6 +93,7 @@ export * from "./schemas-collaboration.ts";
 export * from "./schemas-llm-credential.ts";
 export * from "./schemas-project-client.ts";
 export * from "./schemas-provider.ts";
+export * from "./schemas-review.ts";
 export * from "./schemas-spec.ts";
 export * from "./schemas-suggestion.ts";
 export * from "./schemas-tickets.ts";

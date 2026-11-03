@@ -25,7 +25,8 @@ type ConflictReason =
   | "repo_name_taken"
   | "suggestion_quota"
   | "framing_closed"
-  | "suggestion_not_open";
+  | "suggestion_not_open"
+  | "baseline_not_open";
 
 export const notFound = () => new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });
 /** Une ressource absente ou hors du projet est `NOT_FOUND` (aucune fuite entre projets). */

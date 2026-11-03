@@ -51,6 +51,16 @@ export const conflictError = {
   },
 } as const;
 
+/** Raisons de conflit propres à une route : aucune ne parle de la structure interne. */
+export const conflictOf = <R extends [string, ...string[]]>(...reasons: R) =>
+  ({
+    CONFLICT: {
+      status: 409,
+      message: "Conflit avec l'état actuel",
+      data: z.object({ reason: z.enum(reasons) }),
+    },
+  }) as const;
+
 /** Transition refusée par la table du cycle de vie d'un ticket (`InvalidTicketTransitionError`). */
 export const invalidTransitionError = {
   INVALID_TRANSITION: {
@@ -120,6 +130,14 @@ export const validationError = {
  */
 export const spaceNotReadyError = {
   SPACE_NOT_READY: { status: 503, message: "L'espace n'est pas encore prêt" },
+} as const;
+
+/**
+ * Validation d'une cible (TK-55d) : la version lue par le client n'est plus la tête. Aucune donnée :
+ * ni la tête ni la version reçue ne sortent, que celle-ci soit périmée, inconnue ou illisible.
+ */
+export const staleVersionError = {
+  STALE_VERSION: { status: 409, message: "La version a changé, relisez avant de valider" },
 } as const;
 
 export * from "./errors-provider.ts";

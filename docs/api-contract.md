@@ -1189,7 +1189,42 @@ project, allocated in the transaction of the write (a refusal or a replay never 
 - Typed errors: `UNAUTHORIZED`, `FORBIDDEN` (not on `list`), `NOT_FOUND`, `VALIDATION`, `CONFLICT` with a reduced reason
   set per route (`suggestion_quota` and `framing_closed` on create, `suggestion_not_open` on the others; not on `list`).
 
+## Reviews (TK-55d)
+Contract 0.13.0, group `review` (`apps/api/src/review`), 64 routes, 47 paths. The client validates a feature or a
+baseline against the exact version it read; the team reads the journal with the technical proof.
+
+| Procedure | Method | Path | Roles |
+|---|---|---|---|
+| `review.submit` | POST | `/projects/{projectId}/reviews` | client only (never owner, admin or the team) |
+| `review.list` | GET | `/projects/{projectId}/reviews?targetKind&targetRef&limit&cursor` | owner, admin, dev, designer, business |
+
+- Input of `submit`: `{ projectId, targetKind: feature or baseline, targetRef (F-nnn or baseline-n, matching the kind),
+  version, status: approved or changes_requested, comment? }`. `version` is an opaque token (1 to 256 characters, no
+  format imposed); `comment` 0 to 2000 characters, same forbidden characters as suggestions, stored unchanged. Author,
+  role, repository, organization and the retained head are set by the server and ignored if sent.
+- Output of `submit`: `{ id, status, validation, createdAt }` only. `list` items: `{ id, targetKind, targetRef, sha,
+  status, authorId, authorRole, comment, createdAt, current }`, newest first; `current` is true when `sha` is the head.
+- Order of checks: role (403), project reach (uniform 404), head readable (503 `SPACE_NOT_READY` otherwise), `version`
+  equal to the head (409 `STALE_VERSION`, no data: a stale, unknown, unreadable, upper-case or foreign version all get
+  the same answer), target exists (404), baseline tagged (409 `baseline_not_open`), identical replay (200), baseline
+  not `proposed` (409 `baseline_not_open`) or `proposed_sha` different from the head (409 `STALE_VERSION`).
+- Journal: append-only (no update or delete route, and the database refuses both). A strictly identical replay of the
+  author's own latest review of the target (sha, status, comment) returns that row and writes nothing; changing one's
+  mind appends a new row. The latest review of a target, any client, decides `validation` in `clientSpace.*` and counts
+  only if its sha is the head.
+- Approving a `proposed` baseline moves it to `validated` (`review_id`, `validated_at`) in the same transaction as the
+  review, the audit entry and the notifications; two parallel approvals give one 200 and one 409. `changes_requested`
+  leaves the baseline untouched. Merging and tagging stay with TK-56.
+- Audit: `review.approve` / `review.request_changes`, target kind `review`, target id the row, no comment, sha or ref.
+  Notifications (one emitter, same transaction): `review.submitted` and, on a baseline approval, `baseline.validated`,
+  to owner, admin, dev and designer (never business, clients or the author).
+- The comment reaches a prompt only through `untrustedReviewComment` (origin `client-suggestion`).
+- Typed errors: `submit` exposes `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`, `CONFLICT` (reason
+  `baseline_not_open` only), `STALE_VERSION` (409) and `SPACE_NOT_READY` (503); `list` has no conflict or stale error.
+
 ## Version history
+- **0.13.0** (TK-55d): group `review` (`submit`, `list`; 2 routes, 64 routes and 47 paths in all), typed error
+  `STALE_VERSION` (409), `CONFLICT` reason `baseline_not_open`. Additive. Fingerprints of 0.1.0 to 0.12.0 unchanged.
 - **0.12.0** (TK-55c): group `suggestion` (`create`, `list`, `withdraw`, `accept`, `reject`; 5 routes, 62 routes and 46
   paths in all), schemas `suggestionSchema` and its inputs, three per-route `CONFLICT` reasons. Additive. Fingerprints of
   0.1.0 to 0.11.0 unchanged.

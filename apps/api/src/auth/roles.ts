@@ -127,3 +127,15 @@ export const SUGGESTION_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
 
 /** Accepter ou rejeter (`suggestion.accept|reject`, « Éditer features », TK-55c, D4) : designer exclu. */
 export const SUGGESTION_DECIDE_ROLES = ["owner", "admin", "dev"] as const;
+
+/**
+ * Valider une feature ou une baseline (`review.submit`, CDC §14, TK-55d) : le CLIENT seul, jamais le
+ * propriétaire ni l'équipe (une validation est une preuve d'avenant).
+ */
+export const REVIEW_SUBMIT_ROLES = [CLIENT_ROLE] as const;
+
+/** Relire le journal des validations avec le SHA (`review.list`) : équipe et business, pas le client. */
+export const REVIEW_READ_ROLES = STAFF_ROLES;
+
+/** Notifiés d'une validation (`review.submitted`, `baseline.validated`) : l'équipe qui agit, pas le business. */
+export const REVIEW_NOTIFIED_ROLES = ["owner", "admin", "dev", "designer"] as const;
