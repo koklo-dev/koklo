@@ -114,4 +114,12 @@ export const validationError = {
   },
 } as const;
 
+/**
+ * Espace client (TK-55b) : seule erreur de lecture exposée au client. Elle masque l'absence de
+ * spec indexée, l'échec d'indexation et toute panne du fournisseur (aucun détail technique).
+ */
+export const spaceNotReadyError = {
+  SPACE_NOT_READY: { status: 503, message: "L'espace n'est pas encore prêt" },
+} as const;
+
 export * from "./errors-provider.ts";

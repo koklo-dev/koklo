@@ -7,7 +7,7 @@ import { validation } from "./tracker/api-errors.ts";
  * titre qu'une cible qui n'est pas un UUID (`targetId`, contrat 0.5.0), en création comme en liste.
  * Les lectures de la spec en relèvent aussi : `branch` et `commitSha` exclusifs, filtre ou limite inconnus
  * (contrat 0.6.0). Les clés BYOK aussi : fournisseur inconnu, clé ou modèle refusés (contrat 0.8.0), comme les propositions de l'IA et la vérification d'une clé (0.9.0). Les liens client <-> projet aussi :
- * identifiant de projet ou de membre mal formé (contrat 0.10.0).
+ * identifiant de projet ou de membre mal formé (contrat 0.10.0), comme les lectures de l'espace client : limite, projet ou feature mal formés (0.11.0).
  */
 const VALIDATION_ROUTES = new Set([
   "POST /comments",
@@ -24,6 +24,8 @@ const VALIDATION_ROUTES = new Set([
   "GET /projects/{projectId}/clients",
   "POST /projects/{projectId}/clients",
   "DELETE /projects/{projectId}/clients/{memberId}",
+  "GET /client-space/projects/{projectId}/features",
+  "GET /client-space/projects/{projectId}/features/{featureId}",
 ]);
 
 interface RouteMeta {

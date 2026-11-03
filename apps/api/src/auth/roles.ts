@@ -109,3 +109,9 @@ export const CLIENT_ROLE = "client";
  * client, lié ou non (TK-55, revue d'attaque B1) ; un rôle absent ou inconnu est refusé (403).
  */
 export const MEMBER_LIST_ROLES = STAFF_ROLES;
+
+/**
+ * Lire l'espace client (`clientSpace.*`, TK-55b) : les six rôles. Le client n'y voit que ses projets
+ * liés (cloisonnement central), les autres rôles toute l'organisation.
+ */
+export const CLIENT_SPACE_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;

@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { ai } from "./contract-ai.ts";
+import { clientSpace } from "./contract-client-space.ts";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
 import { projectClient } from "./contract-project-client.ts";
@@ -103,6 +104,7 @@ export const contract = {
   member: { invite: memberInvite, list: memberList, setRole: memberSetRole },
   project: { list: projectList, create: projectCreate },
   projectClient,
+  clientSpace,
   ticket,
   dependency,
   sprint,
