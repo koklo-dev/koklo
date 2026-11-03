@@ -30,6 +30,7 @@ import { RepoModule } from "./repo/repo.module.ts";
 import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest, serializeResponse } from "./request-serializer.ts";
+import { ReviewModule } from "./review/review.module.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SpecReadModule } from "./spec-read/spec-read.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
@@ -45,6 +46,14 @@ export interface AppModuleOptions {
 
 const requestIdOfMessage = (request: IncomingMessage): string =>
   requestIdFrom(request.headers["x-request-id"]);
+
+/** Espace client (TK-55) : lectures, suggestions, validation et l'émetteur de notifications partagé. */
+const CLIENT_SPACE_MODULES = [
+  ClientSpaceModule,
+  NotificationModule,
+  SuggestionModule,
+  ReviewModule,
+];
 
 @Module({})
 export class AppModule {
@@ -97,9 +106,7 @@ export class AppModule {
         AiModule,
         SpecBatchModule,
         SpecReadModule,
-        ClientSpaceModule,
-        NotificationModule,
-        SuggestionModule,
+        ...CLIENT_SPACE_MODULES,
         WebhookModule,
       ],
       controllers: [OpenApiController],

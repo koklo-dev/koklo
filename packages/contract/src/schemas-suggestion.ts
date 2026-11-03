@@ -26,11 +26,11 @@ const hasLoneSurrogate = (text: string): boolean => {
   return false;
 };
 
-const isCleanText = (text: string): boolean =>
+export const isCleanText = (text: string): boolean =>
   !hasLoneSurrogate(text) && ![...text].some((char) => isControl(char.charCodeAt(0)));
 
 /** Texte libre du client ou de l'équipe : conservé tel quel (hors trim), sans contrôle ni substitut isolé. */
-const CLEAN_MESSAGE = "Caractères de contrôle ou substitut isolé interdits";
+export const CLEAN_MESSAGE = "Caractères de contrôle ou substitut isolé interdits";
 
 export const suggestionTargetKindSchema = z.enum(["feature", "project"]);
 export const suggestionStatusSchema = z.enum(["open", "accepted", "rejected", "withdrawn"]);

@@ -1,5 +1,53 @@
-import { Controller } from "@nestjs/common";
+import { contract } from "@koklo/contract";
+import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
+import { Implement } from "@orpc/nest";
+import { implement } from "@orpc/server";
+import type { Request } from "express";
+import { REVIEW_READ_ROLES, REVIEW_SUBMIT_ROLES } from "../auth/roles.ts";
+import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
+import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
+import { inProject } from "../tracker/scope.ts";
+import { ReviewService } from "./review.service.ts";
 
-/** Squelette du Red (TK-55d) : `review.submit` et `review.list` sont écrits au Green. */
+/**
+ * Validation (CDC §14, TK-55d). Ordre : garde de rôle (403), projet atteignable (404 uniforme, le
+ * client n'atteint que ses projets liés), puis la tête, la version et la cible. Valider est un acte
+ * de session humaine du client : aucun garde par jeton, agent ou runner n'est monté ici.
+ */
 @Controller()
-export class ReviewController {}
+export class ReviewController {
+  constructor(
+    @Inject(ReviewService) private readonly service: ReviewService,
+    @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
+  ) {}
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...REVIEW_SUBMIT_ROLES)
+  @Implement(contract.review.submit)
+  submit(@Req() request: Request) {
+    return implement(contract.review.submit).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.submit(scope, requireSession(request).role, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...REVIEW_READ_ROLES)
+  @Implement(contract.review.list)
+  list(@Req() request: Request) {
+    return implement(contract.review.list).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.list(scope, input),
+        this.access,
+      ),
+    );
+  }
+}

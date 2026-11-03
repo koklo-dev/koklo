@@ -1,5 +1,4 @@
-import { z } from "zod";
-import { validationError } from "./errors.ts";
+import { conflictOf, validationError } from "./errors.ts";
 import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
 import {
   suggestionCreateInputSchema,
@@ -11,16 +10,6 @@ import {
 } from "./schemas-suggestion.ts";
 
 const COLLECTION = "/projects/{projectId}/suggestions";
-
-/** Raisons de conflit propres au client : aucune ne parle de la structure interne. */
-const conflictOf = <R extends [string, ...string[]]>(...reasons: R) =>
-  ({
-    CONFLICT: {
-      status: 409,
-      message: "Conflit avec l'état actuel",
-      data: z.object({ reason: z.enum(reasons) }),
-    },
-  }) as const;
 
 const createErrors = {
   ...writeOneErrors,

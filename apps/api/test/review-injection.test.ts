@@ -19,7 +19,7 @@ const HOSTILE = [
   "'; DROP TABLE reviews; --",
   "ligne 1\nligne 2\tfin",
   "emoji \u{1F600} bidi \u202eabc\u202c zéro\u200blargeur",
-  "{{7*7}} ${process.env.SECRET} %s",
+  `{{7*7}} ${"$"}{process.env.SECRET} %s`,
   "x".repeat(2000),
 ];
 

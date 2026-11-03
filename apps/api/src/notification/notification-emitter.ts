@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { SUGGESTION_DECIDE_ROLES } from "../auth/roles.ts";
+import { REVIEW_NOTIFIED_ROLES, SUGGESTION_DECIDE_ROLES } from "../auth/roles.ts";
 import { isProjectScoped } from "../project/project-access.ts";
 import type { Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -7,12 +7,13 @@ import type { ProjectScope } from "../tracker/scope.ts";
 type Draft = {
   recipientUserId: string;
   type: string;
+  subjectKind: "suggestion" | "review" | "baseline";
   subjectRef: string;
   dedupeKey: string;
 };
 
 /**
- * Émetteur unique des lignes `notifications` (TK-55c) : écrit dans la transaction de l'événement,
+ * Émetteur unique des lignes `notifications` (TK-55c, TK-55d) : écrit dans la transaction de l'événement,
  * sans contenu libre (type, sujet, clé de dédoublonnage), `email_state` à `pending` par défaut. Le
  * projet figure dans la clé de dédoublonnage, la contrainte d'unicité n'en portant pas.
  */
@@ -34,6 +35,7 @@ export class NotificationEmitter {
       members.map(({ userId }) => ({
         recipientUserId: userId,
         type: "suggestion.created",
+        subjectKind: "suggestion",
         subjectRef: key,
         dedupeKey: `suggestion.created:${scope.projectId}:${key}`,
       })),
@@ -67,10 +69,53 @@ export class NotificationEmitter {
       {
         recipientUserId: authorUserId,
         type: "suggestion.decided",
+        subjectKind: "suggestion",
         subjectRef: suggestion.key,
         dedupeKey: `suggestion.decided:${scope.projectId}:${suggestion.key}:${suggestion.decision}`,
       },
     ]);
+  }
+
+  /** `review.submitted` : l'équipe qui décide de la suite (jamais le business, un client ni l'auteur). */
+  async reviewSubmitted(tx: Tx, scope: ProjectScope, reviewId: string): Promise<void> {
+    await this.write(
+      tx,
+      scope,
+      (await this.team(tx, scope)).map((recipientUserId) => ({
+        recipientUserId,
+        type: "review.submitted",
+        subjectKind: "review",
+        subjectRef: reviewId,
+        dedupeKey: `review.submitted:${scope.projectId}:${reviewId}`,
+      })),
+    );
+  }
+
+  /** `baseline.validated` : la même équipe, quand le client approuve une baseline proposée. */
+  async baselineValidated(tx: Tx, scope: ProjectScope, number: number): Promise<void> {
+    await this.write(
+      tx,
+      scope,
+      (await this.team(tx, scope)).map((recipientUserId) => ({
+        recipientUserId,
+        type: "baseline.validated",
+        subjectKind: "baseline",
+        subjectRef: `baseline-${number}`,
+        dedupeKey: `baseline.validated:${scope.projectId}:${number}`,
+      })),
+    );
+  }
+
+  private async team(tx: Tx, scope: ProjectScope): Promise<string[]> {
+    const members = await tx.member.findMany({
+      where: {
+        organizationId: scope.organizationId,
+        role: { in: [...REVIEW_NOTIFIED_ROLES] },
+        userId: { not: scope.userId },
+      },
+      select: { userId: true },
+    });
+    return members.map(({ userId }) => userId);
   }
 
   private async write(tx: Tx, scope: ProjectScope, drafts: Draft[]): Promise<void> {
@@ -80,7 +125,6 @@ export class NotificationEmitter {
         ...draft,
         organizationId: scope.organizationId,
         projectId: scope.projectId,
-        subjectKind: "suggestion",
       })),
       skipDuplicates: true,
     });
