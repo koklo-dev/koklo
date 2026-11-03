@@ -139,3 +139,12 @@ export const REVIEW_READ_ROLES = STAFF_ROLES;
 
 /** Notifiés d'une validation (`review.submitted`, `baseline.validated`) : l'équipe qui agit, pas le business. */
 export const REVIEW_NOTIFIED_ROLES = ["owner", "admin", "dev", "designer"] as const;
+
+/**
+ * Créer une organisation (`organization.create`, TK-55e) : le rôle est PAR organisation. Autorisé à
+ * qui n'a aucune appartenance (premier compte) ou au moins une appartenance d'équipe ; refusé à qui
+ * n'est que `client`, ou n'a que des rôles hors de la liste fermée `STAFF_ROLES` (fail-closed).
+ */
+export function mayCreateOrganization(roles: readonly string[]): boolean {
+  return roles.length === 0 || roles.some((role) => STAFF_ROLES.some((staff) => staff === role));
+}

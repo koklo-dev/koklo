@@ -111,7 +111,9 @@ describe("organization.create refusée à l'utilisateur uniquement client", () =
     expect(body).not.toContain(scene.foreign.organizationId);
     expect(body).not.toContain("tk55a-");
   });
+});
 
+describe("organization.create : rôles lus en base, fail-closed", () => {
   it.each(["member", "Client", "OWNER", "client,owner", "owner,client", " owner", ""])(
     "rôle %j (inconnu, casse, multiple, vide) : refusé, fail-closed",
     async (role) => {

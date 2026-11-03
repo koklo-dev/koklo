@@ -26,7 +26,7 @@ route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
 | Operation | Method | Path | Auth | Typed errors (besides `INTERNAL`) |
 |-----------|--------|------|------|-----------------------------------|
 | `health` | GET | `/health` | none (public) | none |
-| `organization.create` | POST | `/organizations` | session | `UNAUTHORIZED`, `CONFLICT` |
+| `organization.create` | POST | `/organizations` | session, not client-only (TK-55e) | `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
 | `organization.list` | GET | `/organizations` | session | `UNAUTHORIZED` |
 | `member.invite` | POST | `/members/invitations` | session + active organization | `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT` |
 | `member.list` | GET | `/members` | session + active organization + team or business role | `UNAUTHORIZED`, `FORBIDDEN` |
@@ -254,7 +254,7 @@ decision: lease expiry, "active lease" filters of `ticket.get`/`ticket.delete`. 
 ## Implementation of the six procedures (TK-23)
 | Procedure | Controller guards | Behaviour |
 |-----------|-------------------|-----------|
-| `organization.create` | `UserSessionGuard` | Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
+| `organization.create` | `UserSessionGuard`, then `OrganizationCreatorGuard` (TK-55e) | Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
 | `organization.list` | `UserSessionGuard` | Organizations the caller belongs to, with the caller's role |
 | `member.list` | `SessionGuard`, `RoleGuard` (`MEMBER_LIST_ROLES`) | Members of the session organization; closed to `client` (403, exposes names, emails and roles of the whole organization) and to any absent or unknown role |
 | `member.invite` | `SessionGuard`, `RoleGuard` | `already_member` / `already_invited` checks, then Better Auth `createInvitation`; its callback enqueues the email job |
@@ -274,7 +274,8 @@ drift apart.
 
 | Procedure | owner | admin | dev | designer | client | business |
 |-----------|:-----:|:-----:|:---:|:--------:|:------:|:--------:|
-| `organization.create`, `organization.list` | yes | yes | yes | yes | yes | yes |
+| `organization.list` | yes | yes | yes | yes | yes | yes |
+| `organization.create` (per-user rule, see below) | yes | yes | yes | yes | no | yes |
 | `member.list` | yes | yes | yes | yes | no | yes |
 | `member.invite` | yes | yes | no | no | no | no |
 | `member.setRole` | yes | yes | no | no | no | no |
@@ -1222,7 +1223,18 @@ baseline against the exact version it read; the team reads the journal with the 
 - Typed errors: `submit` exposes `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`, `CONFLICT` (reason
   `baseline_not_open` only), `STALE_VERSION` (409) and `SPACE_NOT_READY` (503); `list` has no conflict or stale error.
 
+## Organization creation closed to clients (TK-55e)
+Contract 0.14.0 adds the typed error `FORBIDDEN` (403) to `organization.create`; no route is added (64 routes, 47
+paths). The role is per organization, so the rule is per user and reads `members` on every call
+(`OrganizationCreatorGuard`, `mayCreateOrganization` in `apps/api/src/auth/roles.ts`): a user with no membership
+(first account) may create; a user with at least one membership in the closed list `STAFF_ROLES` (owner, admin, dev,
+designer, business) may create; a user whose memberships are all `client`, or all outside that list (unknown, wrong
+case, multiple or empty role: fail-closed), gets 403 `FORBIDDEN` with the uniform "Accès refusé" body, before the input
+is validated and before any write (no organization, member or audit row). The role never comes from the input or the
+session. The Better Auth route `/api/auth/organization/create` stays closed to everyone by the channel policy.
+
 ## Version history
+- **0.14.0** (TK-55e): `FORBIDDEN` declared on `organization.create`. Additive. Fingerprints of 0.1.0 to 0.13.0 unchanged.
 - **0.13.0** (TK-55d): group `review` (`submit`, `list`; 2 routes, 64 routes and 47 paths in all), typed error
   `STALE_VERSION` (409), `CONFLICT` reason `baseline_not_open`. Additive. Fingerprints of 0.1.0 to 0.12.0 unchanged.
 - **0.12.0** (TK-55c): group `suggestion` (`create`, `list`, `withdraw`, `accept`, `reject`; 5 routes, 62 routes and 46

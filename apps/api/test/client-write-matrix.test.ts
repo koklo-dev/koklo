@@ -87,9 +87,7 @@ describe("classement exhaustif des écritures du contrat", () => {
   });
 
   it("aucune écriture n'échappe à la règle : le critère ne laisse plus d'exception de compte", () => {
-    const exempt = writes().filter(
-      (r) => ![...ALLOWED, ...OWN_ONLY, ...DENIED].includes(r.name),
-    );
+    const exempt = writes().filter((r) => ![...ALLOWED, ...OWN_ONLY, ...DENIED].includes(r.name));
     expect(exempt).toEqual([]);
     expect(DENIED).toContain("organization.create");
   });

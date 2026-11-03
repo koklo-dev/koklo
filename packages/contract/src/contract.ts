@@ -73,7 +73,7 @@ const projectList = route("GET", "/projects")
   .output(projectListOutputSchema);
 
 const organizationCreate = route("POST", "/organizations")
-  .errors({ ...internalError, ...unauthorizedError, ...conflictError })
+  .errors({ ...internalError, ...authErrors, ...conflictError })
   .input(organizationCreateInputSchema)
   .output(organizationCreateOutputSchema);
 
