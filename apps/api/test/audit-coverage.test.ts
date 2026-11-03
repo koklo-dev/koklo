@@ -19,11 +19,13 @@ import { startQueueBoss } from "./helpers/organizations.ts";
 import { linkRows, projectClientApi } from "./helpers/project-client.ts";
 import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
+import { reviewApi } from "./helpers/reviews.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import { suggestionApi } from "./helpers/suggestions.ts";
 import {
   apiFor,
   createWorld,
+  linkClient,
   seedSprint,
   seedTicket,
   send,
@@ -132,6 +134,7 @@ const WRITE_GROUPS = [
   "project",
   "projectClient",
   "suggestion",
+  "review",
   "ticket",
   "dependency",
   "sprint",
@@ -204,6 +207,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "projectState.update",
   "repo.createSpec",
   "repo.link",
+  "review.submit",
   "specBatch.submit",
   "sprint.activate",
   "sprint.close",
@@ -764,6 +768,7 @@ const SCENARIOS: Scenario[] = [
   },
   ...llmCredentialScenarios(),
   ...suggestionScenarios(),
+  ...reviewScenarios(),
   ...aiScenarios(),
 ];
 
@@ -946,6 +951,52 @@ function suggestionScenarios(): Scenario[] {
   ];
 }
 
+/**
+ * TK-55d : validation d'une feature par le client lié (spec indexée et committée dans le faux
+ * fournisseur du banc `repo`). La cible de l'audit est l'id de la review ; ni SHA ni commentaire.
+ */
+function reviewScenarios(): Scenario[] {
+  const prepare = async (ctx: Ctx) => {
+    const runtime = await repoRuntimeOf();
+    const bench = { database, app: runtime.app, harness: runtime.harness } as unknown as RepoBench;
+    const scene = await readScene(bench, { world: ctx.world });
+    await linkClient(
+      database,
+      ctx.world.organizationId,
+      ctx.world.projectId,
+      ctx.world.actors.client.userId,
+    );
+    const { sha } = await seedIndex(bench, scene, [{ id: "F-001", titre: "Connexion" }], {
+      commit: true,
+    });
+    return { sha };
+  };
+  return [
+    {
+      procedure: "review.submit",
+      role: "client",
+      prepare,
+      call: async (ctx, state) =>
+        reviewApi((await repoRuntimeOf()).app, ctx.world.actors.client).submit(
+          ctx.world.projectId,
+          state.sha,
+        ),
+      expected: async (_ctx, _state, res) => ({
+        action: "review.approve",
+        targetKind: "review",
+        targetId: res.body.id,
+        ticketId: null,
+      }),
+      denied: async (ctx, state) =>
+        reviewApi((await repoRuntimeOf()).app, ctx.world.actors.owner).submit(
+          ctx.world.projectId,
+          state.sha,
+        ),
+      deniedStatuses: [403],
+    },
+  ];
+}
+
 function llmCredentialScenarios(): Scenario[] {
   const appOf = async () => (await repoRuntimeOf()).app;
   const putKey = async (ctx: Ctx, role: Role = "owner") =>
@@ -1006,7 +1057,7 @@ function llmCredentialScenarios(): Scenario[] {
 }
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 37 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 38 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -1096,6 +1147,17 @@ describe("garde TK-55c : le groupe suggestion", () => {
       "suggestion.reject",
       "suggestion.withdraw",
     ]);
+  });
+});
+
+describe("garde TK-55d : le groupe review", () => {
+  it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "review"))).toBe(true);
+  });
+
+  it("review.list est une lecture : seule review.submit est à journaliser", () => {
+    expect(nonGetProcedures(["review"])).toEqual(["review.submit"]);
   });
 });
 
