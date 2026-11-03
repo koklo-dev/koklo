@@ -18,6 +18,7 @@ import { InstallationModule } from "./installation/installation.module.ts";
 import { LeaseModule } from "./lease/lease.module.ts";
 import { LlmCredentialRoutesModule } from "./llm-credential/llm-credential-routes.module.ts";
 import { MemberModule } from "./member/member.module.ts";
+import { NotificationModule } from "./notification/notification.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
 import { OrganizationModule } from "./organization/organization.module.ts";
 import { ProjectModule } from "./project/project.module.ts";
@@ -33,6 +34,7 @@ import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SpecReadModule } from "./spec-read/spec-read.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
 import { SprintImportModule } from "./sprint-import/sprint-import.module.ts";
+import { SuggestionModule } from "./suggestion/suggestion.module.ts";
 import { TicketModule } from "./ticket/ticket.module.ts";
 import { WebhookModule } from "./webhook/webhook.module.ts";
 
@@ -96,6 +98,8 @@ export class AppModule {
         SpecBatchModule,
         SpecReadModule,
         ClientSpaceModule,
+        NotificationModule,
+        SuggestionModule,
         WebhookModule,
       ],
       controllers: [OpenApiController],

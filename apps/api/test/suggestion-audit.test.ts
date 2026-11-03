@@ -63,11 +63,13 @@ describe("aucune entrée sans écriture réelle", () => {
     const id = (await client().create(p1(), { body: "Pour le journal" })).body.id;
     expect(id, "précondition : la suggestion existe").toEqual(expect.any(String));
     expect((await owner().accept(p1(), id)).status).toBe(200);
+    // Le doublon n'est idempotent que tant que la suggestion est ouverte : `id` est décidée.
+    expect((await client().create(p1(), { body: "Encore ouverte" })).status).toBe(200);
     const before = await total();
 
     await client().list(p1());
     await owner().list(p1());
-    await client().create(p1(), { body: "Pour le journal" });
+    await client().create(p1(), { body: "Encore ouverte" });
     await owner().accept(p1(), id);
     await client().withdraw(p1(), id);
     await owner().reject(p1(), id);

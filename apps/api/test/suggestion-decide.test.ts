@@ -140,6 +140,11 @@ describe("contre-décision et course", () => {
 
   it("accept et reject en parallèle : un 200 et un 409, une seule entrée d'audit, une seule notification", async () => {
     const id = await open();
+    const decidedBefore = await count(
+      bench().database,
+      "notifications",
+      "type = 'suggestion.decided'",
+    );
 
     const [accepted, rejected] = await Promise.all([
       owner().accept(p1(), id),
@@ -151,7 +156,12 @@ describe("contre-décision et course", () => {
     const winner = accepted.status === 200 ? "accepted" : "rejected";
     expect(row?.status).toBe(winner);
     expect((await decisions("accept")).length + (await decisions("reject")).length).toBe(1);
-    expect(await count(bench().database, "notifications", "type = 'suggestion.decided'")).toBe(1);
+    const decidedAfter = await count(
+      bench().database,
+      "notifications",
+      "type = 'suggestion.decided'",
+    );
+    expect(decidedAfter - decidedBefore).toBe(1);
   });
 });
 

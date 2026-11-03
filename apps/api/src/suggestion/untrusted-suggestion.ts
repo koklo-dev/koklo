@@ -1,4 +1,4 @@
-import type { Untrusted } from "@koklo/domain";
+import { Untrusted } from "@koklo/domain";
 
 /** Les deux textes libres d'une suggestion : le corps du client et la note de l'équipe. */
 export interface SuggestionTexts {
@@ -7,15 +7,16 @@ export interface SuggestionTexts {
 }
 
 /**
- * Squelette du Red (TK-55c) : l'accesseur unique par lequel un texte de suggestion peut atteindre un
- * prompt (TK-54/57). Le Green l'enveloppe dans `Untrusted("client-suggestion", ...)`.
+ * L'accesseur unique par lequel un texte de suggestion peut atteindre un prompt (TK-54/57) : le
+ * corps et la note sont enveloppés dans `Untrusted("client-suggestion")`, qui ne s'interpole ni ne
+ * se journalise. C'est le seul endroit qui construit cette origine.
  */
 export function untrustedSuggestion(row: SuggestionTexts): {
   body: Untrusted;
   note: Untrusted | null;
 } {
   return {
-    body: row.body as unknown as Untrusted,
-    note: row.decisionNote as unknown as Untrusted | null,
+    body: new Untrusted("client-suggestion", row.body),
+    note: row.decisionNote === null ? null : new Untrusted("client-suggestion", row.decisionNote),
   };
 }

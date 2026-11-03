@@ -92,13 +92,14 @@ describe("atomicité : suggestion, clé, notifications et audit partagent la tra
   it("échec d'audit : 500 INTERNAL, ni ligne, ni notification, la clé SG-1 reste libre", async () => {
     const db = bench().database;
     await db.query("INSERT INTO audit_fail (action) VALUES ('suggestion.create')");
+    const notificationsBefore = await count(db, "notifications");
 
     const failed = await client().create(p1());
 
     expect(failed.status).toBe(500);
     expect(failed.body.code).toBe("INTERNAL");
     expect(await rows()).toHaveLength(0);
-    expect(await count(db, "notifications")).toBe(0);
+    expect(await count(db, "notifications")).toBe(notificationsBefore);
     await db.query("DELETE FROM audit_fail");
     expect((await client().create(p1())).body.key).toBe("SG-1");
   });

@@ -22,7 +22,10 @@ type ConflictReason =
   | "counter_limit_reached"
   | "spec_repo_exists"
   | "repo_already_linked"
-  | "repo_name_taken";
+  | "repo_name_taken"
+  | "suggestion_quota"
+  | "framing_closed"
+  | "suggestion_not_open";
 
 export const notFound = () => new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });
 /** Une ressource absente ou hors du projet est `NOT_FOUND` (aucune fuite entre projets). */
