@@ -1,8 +1,8 @@
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
-import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
-import { ProjectTransactions } from "../tracker/project-transactions.ts";
+import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
   ClientProjectRecord,
@@ -43,12 +43,18 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
     }));
   }
 
+  /** Instantané de la tête courante, `null` si rien n'est indexé ou si l'indexation a échoué. */
+  private async readySnapshot(tx: Tx, scope: ProjectScope): Promise<Snapshot | null> {
+    const found = await this.resolver.resolve(tx, scope, {});
+    return found && found.snapshot.status !== "failed" ? found.snapshot : null;
+  }
+
   indexedHead(scope: ProjectScope): Promise<IndexedHead | null> {
     return this.transactions.run(scope, async (tx) => {
-      const found = await this.resolver.resolve(tx, scope, {});
-      if (!found || found.snapshot.status === "failed") return null;
+      const snapshot = await this.readySnapshot(tx, scope);
+      if (!snapshot) return null;
       const features = await tx.specFeature.findMany({
-        where: { snapshotId: found.snapshot.id },
+        where: { snapshotId: snapshot.id },
         select: {
           specId: true,
           title: true,
@@ -60,16 +66,16 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
         ...row,
         criteriaCount: _count.criteria,
       }));
-      return { sha: found.snapshot.commitSha, rows };
+      return { sha: snapshot.commitSha, rows };
     });
   }
 
   featureHead(scope: ProjectScope, specId: string): Promise<{ found: boolean } | null> {
     return this.transactions.run(scope, async (tx) => {
-      const found = await this.resolver.resolve(tx, scope, {});
-      if (!found || found.snapshot.status === "failed") return null;
+      const snapshot = await this.readySnapshot(tx, scope);
+      if (!snapshot) return null;
       const feature = await tx.specFeature.findFirst({
-        where: { snapshotId: found.snapshot.id, specId },
+        where: { snapshotId: snapshot.id, specId },
         select: { id: true },
       });
       return { found: feature !== null };

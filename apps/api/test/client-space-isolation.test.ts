@@ -30,6 +30,8 @@ const both = async (actor: { cookie: string }, projectId: string) => [
   await as(actor).feature(projectId, "F-001"),
 ];
 
+const UNIFORM_404 = { status: 404, body: { code: "NOT_FOUND" } };
+
 describe("clientSpace : un client lié lit son projet et seulement lui", () => {
   it("c1 lit p1 (liste et détail), sans rien de p2", async () => {
     const [list, one] = await both(scene.c1, scene.p1.projectId);
@@ -69,7 +71,7 @@ describe("clientSpace : un client lié lit son projet et seulement lui", () => {
 
     for (const shape of shapes) {
       expect(shape).toEqual(shapes[0]);
-      for (const part of shape) expect(part.body).toMatchObject({ code: "NOT_FOUND" });
+      for (const part of shape) expect(part).toMatchObject(UNIFORM_404);
     }
   });
 
