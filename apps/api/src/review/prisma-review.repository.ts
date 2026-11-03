@@ -67,6 +67,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       const headSha = head.snapshot.commitSha;
       if (input.version !== headSha) throw staleVersion();
       const baseline = await this.assertTarget(tx, scope, head.snapshot.id, input);
+      // Une baseline taguée est refusée avant le rejeu : une review identique antérieure ne la rouvre pas.
       if (baseline?.status === "tagged") throw conflict("baseline_not_open");
       const same = await this.findReplay(tx, scope, input, headSha);
       if (same) return { record: same, headSha };
@@ -74,15 +75,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       const record = await this.insert(tx, scope, actor, head.repo.id, input, headSha);
       const validates = baseline !== null && input.status === "approved";
       if (validates) await this.validateBaseline(tx, baseline.id, headSha, record, actor.now);
-      await this.notifications.reviewSubmitted(tx, scope, record.id);
-      if (validates) {
-        await this.notifications.baselineValidated(tx, scope, baselineNumber(input.targetRef));
-      }
-      await recordAudit(tx, scope, {
-        action: input.status === "approved" ? "review.approve" : "review.request_changes",
-        targetKind: "review",
-        targetId: record.id,
-      });
+      await this.announce(tx, scope, record, validates ? baselineNumber(input.targetRef) : null);
       return { record, headSha };
     });
   }
@@ -108,6 +101,24 @@ export class PrismaReviewRepository implements ReviewRepository {
         nextCursor: page.nextCursor,
         headSha: found && found.snapshot.status !== "failed" ? found.snapshot.commitSha : null,
       };
+    });
+  }
+
+  /** Notifications puis audit, dans la transaction de l'écriture (`validatedNumber` : baseline validée). */
+  private async announce(
+    tx: Tx,
+    scope: ProjectScope,
+    record: ReviewRecord,
+    validatedNumber: number | null,
+  ): Promise<void> {
+    await this.notifications.reviewSubmitted(tx, scope, record.id);
+    if (validatedNumber !== null) {
+      await this.notifications.baselineValidated(tx, scope, validatedNumber);
+    }
+    await recordAudit(tx, scope, {
+      action: record.status === "approved" ? "review.approve" : "review.request_changes",
+      targetKind: "review",
+      targetId: record.id,
     });
   }
 
