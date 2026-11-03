@@ -17,7 +17,8 @@ export interface AuditEntry {
     | "installation"
     | "spec_batch"
     | "llm_credential"
-    | "project_client";
+    | "project_client"
+    | "suggestion";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;

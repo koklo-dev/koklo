@@ -20,6 +20,7 @@ import { linkRows, projectClientApi } from "./helpers/project-client.ts";
 import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
+import { suggestionApi } from "./helpers/suggestions.ts";
 import {
   apiFor,
   createWorld,
@@ -130,6 +131,7 @@ const WRITE_GROUPS = [
   "member",
   "project",
   "projectClient",
+  "suggestion",
   "ticket",
   "dependency",
   "sprint",
@@ -207,6 +209,10 @@ const EXPECTED_WRITE_PROCEDURES = [
   "sprint.close",
   "sprint.create",
   "sprint.update",
+  "suggestion.accept",
+  "suggestion.create",
+  "suggestion.reject",
+  "suggestion.withdraw",
   "ticket.create",
   "ticket.delete",
   "ticket.transition",
@@ -757,6 +763,7 @@ const SCENARIOS: Scenario[] = [
     deniedStatuses: [403],
   },
   ...llmCredentialScenarios(),
+  ...suggestionScenarios(),
   ...aiScenarios(),
 ];
 
@@ -883,6 +890,62 @@ function aiScenarios(): Scenario[] {
 const LLM_KEY = makeSentinel();
 const llmPath = (suffix = "") => `/llm-credentials/anthropic${suffix}`;
 
+/**
+ * TK-55c : suggestions. Cible `project` (aucune spec indexée requise). La cible de l'audit est l'id de
+ * la ligne ; aucun contenu libre n'est journalisé.
+ */
+function suggestionScenarios(): Scenario[] {
+  const as = (ctx: Ctx, role: Role) => suggestionApi(app, ctx.world.actors[role]);
+  const open = async (ctx: Ctx) => {
+    const created = await as(ctx, "dev").create(ctx.world.projectId);
+    return { id: created.body.id as string };
+  };
+  const expected = (action: string) => async (_ctx: Ctx, state: State, res: Response) => ({
+    action,
+    targetKind: "suggestion",
+    targetId: state?.id ?? res.body.id,
+    ticketId: null,
+  });
+  return [
+    {
+      procedure: "suggestion.create",
+      role: "dev",
+      prepare: async () => ({}),
+      call: (ctx) => as(ctx, "dev").create(ctx.world.projectId),
+      expected: expected("suggestion.create"),
+      denied: (ctx) => as(ctx, "business").create(ctx.world.projectId),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "suggestion.withdraw",
+      role: "dev",
+      prepare: open,
+      call: (ctx, state) => as(ctx, "dev").withdraw(ctx.world.projectId, state.id),
+      expected: expected("suggestion.withdraw"),
+      denied: (ctx, state) => as(ctx, "business").withdraw(ctx.world.projectId, state.id),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "suggestion.accept",
+      role: "owner",
+      prepare: open,
+      call: (ctx, state) => as(ctx, "owner").accept(ctx.world.projectId, state.id),
+      expected: expected("suggestion.accept"),
+      denied: (ctx, state) => as(ctx, "designer").accept(ctx.world.projectId, state.id),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "suggestion.reject",
+      role: "owner",
+      prepare: open,
+      call: (ctx, state) => as(ctx, "owner").reject(ctx.world.projectId, state.id),
+      expected: expected("suggestion.reject"),
+      denied: (ctx, state) => as(ctx, "client").reject(ctx.world.projectId, state.id),
+      deniedStatuses: [403],
+    },
+  ];
+}
+
 function llmCredentialScenarios(): Scenario[] {
   const appOf = async () => (await repoRuntimeOf()).app;
   const putKey = async (ctx: Ctx, role: Role = "owner") =>
@@ -943,7 +1006,7 @@ function llmCredentialScenarios(): Scenario[] {
 }
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 33 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 37 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
@@ -1016,6 +1079,22 @@ describe("garde TK-55a : le groupe projectClient", () => {
     expect(nonGetProcedures(["projectClient"]).sort()).toEqual([
       "projectClient.add",
       "projectClient.remove",
+    ]);
+  });
+});
+
+describe("garde TK-55c : le groupe suggestion", () => {
+  it("est implémenté par l'API (la garde ne couvre pas du vide)", () => {
+    const sources = apiSourceFiles().map((file) => stripComments(readFileSync(file, "utf8")));
+    expect(sources.some((source) => referencesGroup(source, "suggestion"))).toBe(true);
+  });
+
+  it("suggestion.list est une lecture : hors des écritures à journaliser", () => {
+    expect(nonGetProcedures(["suggestion"]).sort()).toEqual([
+      "suggestion.accept",
+      "suggestion.create",
+      "suggestion.reject",
+      "suggestion.withdraw",
     ]);
   });
 });
