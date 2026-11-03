@@ -87,6 +87,23 @@ describe("C1 organization.create", () => {
   });
 });
 
+describe("C1 organization.create : erreurs typées (TK-55e)", () => {
+  it("expose FORBIDDEN (403) : un client ne crée pas d'organisation, en plus d'UNAUTHORIZED et CONFLICT", () => {
+    const errors = (
+      proc["organization.create"]() as {
+        "~orpc": { errorMap: Record<string, { status?: number }> };
+      }
+    )["~orpc"].errorMap;
+    expect(errors.FORBIDDEN?.status).toBe(403);
+    expect(Object.keys(errors).sort()).toEqual([
+      "CONFLICT",
+      "FORBIDDEN",
+      "INTERNAL",
+      "UNAUTHORIZED",
+    ]);
+  });
+});
+
 describe("C1 organization.list", () => {
   it("sortie : tableau { id, name, slug, role }", async () => {
     const o = output(proc["organization.list"]());
@@ -172,7 +189,7 @@ describe("C1 project.create", () => {
 
 describe("C3 erreurs typées par route", () => {
   const expected: Record<string, Record<string, number>> = {
-    "organization.create": { INTERNAL: 500, UNAUTHORIZED: 401, CONFLICT: 409 },
+    "organization.create": { INTERNAL: 500, UNAUTHORIZED: 401, FORBIDDEN: 403, CONFLICT: 409 },
     "organization.list": { INTERNAL: 500, UNAUTHORIZED: 401 },
     "member.invite": { INTERNAL: 500, UNAUTHORIZED: 401, FORBIDDEN: 403, CONFLICT: 409 },
     "member.list": { INTERNAL: 500, UNAUTHORIZED: 401 },
@@ -192,7 +209,7 @@ describe("C3 erreurs typées par route", () => {
     }
   });
   it("n'expose pas les erreurs hors de ses routes", () => {
-    expect(errors(proc["organization.create"]()).FORBIDDEN).toBeUndefined();
+    expect(errors(proc["organization.list"]()).FORBIDDEN).toBeUndefined();
     expect(errors(proc["project.create"]()).CONFLICT).toBeUndefined();
     expect(errors(proc["member.invite"]()).NOT_FOUND).toBeUndefined();
     expect(errors(proc["member.list"]()).CONFLICT).toBeUndefined();

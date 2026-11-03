@@ -71,9 +71,9 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 0.13.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("0.13.0");
-    expect((await doc()).info.version).toBe("0.13.0");
+  it("le contrat courant est 0.14.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("0.14.0");
+    expect((await doc()).info.version).toBe("0.14.0");
   });
 });
 

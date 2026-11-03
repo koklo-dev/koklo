@@ -29,6 +29,15 @@ export class OrganizationRepository {
     return new Set(rows.map((row) => row.slug));
   }
 
+  /** Rôles de l'utilisateur dans toutes ses organisations, relus en base à chaque appel. */
+  async rolesOfUser(userId: string): Promise<string[]> {
+    const members = await this.database.client.member.findMany({
+      where: { userId },
+      select: { role: true },
+    });
+    return members.map(({ role }) => role);
+  }
+
   async listForUser(userId: string): Promise<OrganizationListOutput> {
     const members = await this.database.client.member.findMany({
       where: { userId },

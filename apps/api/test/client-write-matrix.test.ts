@@ -10,13 +10,11 @@ import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
  * TK-55 (critère unique) : « un client ne peut pas éditer, seulement suggérer et valider ». Les écritures
  * sont ÉNUMÉRÉES DEPUIS LE CONTRAT COMPLET (toute procédure dont la méthode OpenAPI n'est pas GET) et
  * classées : une route d'écriture ajoutée sans classement fait échouer le test. Le client lié ne peut
- * que suggérer (create, withdraw), valider (review.submit) et commenter ; tout le reste est 403.
+ * que suggérer (create, withdraw), valider (review.submit) et commenter ; tout le reste est 403, y compris la création d'une organisation (TK-55e).
  */
 const ALLOWED = ["comment.create", "review.submit", "suggestion.create", "suggestion.withdraw"];
 /** Suppression de SON propre commentaire : droit d'auteur vérifié dans le service (comment-permissions). */
 const OWN_ONLY = ["comment.delete"];
-/** Compte utilisateur, hors de tout projet : créer une organisation ne touche aucun projet existant. */
-const ACCOUNT_SCOPED = ["organization.create"];
 const DENIED = [
   "ai.draftBrief",
   "ai.proposeCriteria",
@@ -33,6 +31,7 @@ const DENIED = [
   "llmCredential.verify",
   "member.invite",
   "member.setRole",
+  "organization.create",
   "project.create",
   "projectClient.add",
   "projectClient.remove",
@@ -78,13 +77,19 @@ function routes(): Route[] {
 const writes = () => routes().filter((r) => r.method !== "GET");
 
 describe("classement exhaustif des écritures du contrat", () => {
-  it("toute écriture du contrat est classée : autorisée, propre à l'auteur, de compte ou interdite", () => {
-    const classified = [...ALLOWED, ...OWN_ONLY, ...ACCOUNT_SCOPED, ...DENIED].sort();
+  it("toute écriture du contrat est classée : autorisée, propre à l'auteur ou interdite", () => {
+    const classified = [...ALLOWED, ...OWN_ONLY, ...DENIED].sort();
     expect(
       writes()
         .map((r) => r.name)
         .sort(),
     ).toEqual(classified.filter((n) => n !== "review.list"));
+  });
+
+  it("aucune écriture n'échappe à la règle : le critère ne laisse plus d'exception de compte", () => {
+    const exempt = writes().filter((r) => ![...ALLOWED, ...OWN_ONLY, ...DENIED].includes(r.name));
+    expect(exempt).toEqual([]);
+    expect(DENIED).toContain("organization.create");
   });
 
   it("review.list est une lecture (GET) classée interdite au client au titre du détail technique", () => {

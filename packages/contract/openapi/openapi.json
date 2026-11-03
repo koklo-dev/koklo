@@ -983,7 +983,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "0.13.0"
+    "version": "0.14.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3480,6 +3480,23 @@
               }
             },
             "description": "Session absente ou expirée"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Forbidden"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Accès refusé"
           },
           "409": {
             "content": {
