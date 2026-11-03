@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 0.11.0 (57 routes, 42 chemins), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 0.12.0 (62 routes, 46 chemins), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /comments/{id}",
   "DELETE /llm-credentials/{provider}",
@@ -23,6 +23,7 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/spec/batches/{batchId}",
   "GET /projects/{projectId}/spec/features",
   "GET /projects/{projectId}/spec/features/{specId}",
+  "GET /projects/{projectId}/suggestions",
   "GET /provider/installations",
   "GET /sprints",
   "GET /sprints/{key}",
@@ -46,6 +47,10 @@ export const ALL_PAIRS: string[] = [
   "POST /projects/{projectId}/repos",
   "POST /projects/{projectId}/spec-repo",
   "POST /projects/{projectId}/spec/batches",
+  "POST /projects/{projectId}/suggestions",
+  "POST /projects/{projectId}/suggestions/{id}/accept",
+  "POST /projects/{projectId}/suggestions/{id}/reject",
+  "POST /projects/{projectId}/suggestions/{id}/withdraw",
   "POST /provider/installations/start",
   "POST /sprints",
   "POST /sprints/{key}/activate",
@@ -89,6 +94,10 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/spec/batches/{batchId}",
   "/projects/{projectId}/spec/features",
   "/projects/{projectId}/spec/features/{specId}",
+  "/projects/{projectId}/suggestions",
+  "/projects/{projectId}/suggestions/{id}/accept",
+  "/projects/{projectId}/suggestions/{id}/reject",
+  "/projects/{projectId}/suggestions/{id}/withdraw",
   "/provider/installations",
   "/provider/installations/start",
   "/sprints",

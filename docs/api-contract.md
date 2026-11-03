@@ -3,7 +3,7 @@ title: API contract
 audience: technical
 doc_version: 0.4.0
 status: draft
-last_reviewed: 2026-11-01
+last_reviewed: 2026-11-03
 covers_release: unreleased
 sources: []
 covers_commit: 7f97066
@@ -1153,7 +1153,46 @@ read; a `client` reaches linked projects only, staff roles their whole organizat
   `data`); `SPEC_INDEX_FAILED` and `PROVIDER_*` are never exposed here. Malformed `limit`, cursor or identifiers: 422.
 - The head is resolved by `SpecHeadResolver` (branch `cadrage` before the default branch), shared with `spec.*`.
 
+## Suggestions (TK-55c)
+Contract 0.12.0, group `suggestion` (`apps/api/src/suggestion`), 62 routes, 46 paths. The client suggests, the team
+decides; accepting a suggestion records the decision only and never writes the spec. Keys are `SG-n`, one counter per
+project, allocated in the transaction of the write (a refusal or a replay never consumes one).
+
+| Procedure | Method | Path | Roles |
+|---|---|---|---|
+| `suggestion.create` | POST | `/projects/{projectId}/suggestions` | owner, admin, dev, designer, client |
+| `suggestion.list` | GET | `/projects/{projectId}/suggestions?status&targetRef&limit&cursor` | all six roles |
+| `suggestion.withdraw` | POST | `/projects/{projectId}/suggestions/{id}/withdraw` | the author (same roles as create) |
+| `suggestion.accept` | POST | `/projects/{projectId}/suggestions/{id}/accept` | owner, admin, dev |
+| `suggestion.reject` | POST | `/projects/{projectId}/suggestions/{id}/reject` | owner, admin, dev |
+
+- Input of `create`: `{ projectId, targetKind: feature or project, targetRef (F-nnn, feature only), body }`. `body` is
+  trimmed, 1 to 5000 characters; `note` of accept and reject, 0 to 2000. Control characters other than newline, tab and
+  carriage return, and lone UTF-16 surrogates, are refused (422). The text is stored and returned unchanged; it is never
+  logged, never put in the audit log or a notification, and reaches a prompt only through `untrustedSuggestion`.
+  Server-set fields (author, role, key, status, base head) are ignored if sent.
+- Output (one schema): `{ id, key, targetKind, targetRef, body, status, decisionNote, createdAt, decidedAt, mine,
+  outdated }` plus `authorRole` for the team only. No head identifier, author identity or organization.
+  `outdated` is true when the spec head moved since the suggestion was made.
+- Lists are newest first, cursor paginated. A client sees every suggestion of its linked project (`mine` marks its own).
+- Guards: role first (403), then project reach (uniform 404 for a client not linked, a foreign or an unknown project),
+  then the suggestion. Withdraw by a non-author, or an unknown id, is the same 404.
+- `create`: a feature target must exist in the current spec head (404 otherwise); an identical open suggestion of the
+  same author is returned unchanged (200, nothing written); 409 `suggestion_quota` beyond 50 open per author and per
+  project or 500 per project; 409 `framing_closed` for a client once the first baseline is tagged (the team can still
+  suggest).
+- `withdraw`, `accept`, `reject` are compare-and-set on `open`: replaying the same outcome is a 200 with nothing written,
+  any other state is 409 `suggestion_not_open`. Decisions are made by a human session only.
+- Audit: `suggestion.create|withdraw|accept|reject`, target kind `suggestion`, no content. Notifications (one emitter,
+  same transaction): `suggestion.created` to owner, admin and dev except the author; `suggestion.decided` to the author
+  (still a member, still linked for a client), never to the decider.
+- Typed errors: `UNAUTHORIZED`, `FORBIDDEN` (not on `list`), `NOT_FOUND`, `VALIDATION`, `CONFLICT` with a reduced reason
+  set per route (`suggestion_quota` and `framing_closed` on create, `suggestion_not_open` on the others; not on `list`).
+
 ## Version history
+- **0.12.0** (TK-55c): group `suggestion` (`create`, `list`, `withdraw`, `accept`, `reject`; 5 routes, 62 routes and 46
+  paths in all), schemas `suggestionSchema` and its inputs, three per-route `CONFLICT` reasons. Additive. Fingerprints of
+  0.1.0 to 0.11.0 unchanged.
 - **0.11.0** (TK-55b): group `clientSpace` (`projects`, `features`, `feature`; 3 routes, 57 routes and 42 paths in
   all), typed error `SPACE_NOT_READY` (503). Additive. Fingerprints of 0.1.0 to 0.10.0 unchanged.
 - **0.10.0** (TK-55a): group `projectClient` (`list`, `add`, `remove`; 3 routes, 54 routes and 39 paths in all),

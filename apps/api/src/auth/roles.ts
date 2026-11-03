@@ -115,3 +115,15 @@ export const MEMBER_LIST_ROLES = STAFF_ROLES;
  * liés (cloisonnement central), les autres rôles toute l'organisation.
  */
 export const CLIENT_SPACE_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
+
+/**
+ * Proposer une suggestion et retirer la sienne (`suggestion.create|withdraw`, CDC §14 « Proposer »,
+ * TK-55c, D3) : les rôles de §14 ; le business lit seulement. Le client ne propose qu'en cadrage.
+ */
+export const SUGGESTION_CREATE_ROLES = ["owner", "admin", "dev", "designer", "client"] as const;
+
+/** Lire les suggestions d'un projet (`suggestion.list`) : les six rôles, le client sur ses projets liés. */
+export const SUGGESTION_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
+
+/** Accepter ou rejeter (`suggestion.accept|reject`, « Éditer features », TK-55c, D4) : designer exclu. */
+export const SUGGESTION_DECIDE_ROLES = ["owner", "admin", "dev"] as const;

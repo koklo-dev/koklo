@@ -6,6 +6,7 @@ import { llmCredential } from "./contract-llm-credential.ts";
 import { projectClient } from "./contract-project-client.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { spec, specBatch } from "./contract-spec.ts";
+import { suggestion } from "./contract-suggestion.ts";
 import { dependency, sprint, ticket } from "./contract-tickets.ts";
 import {
   authErrors,
@@ -105,6 +106,7 @@ export const contract = {
   project: { list: projectList, create: projectCreate },
   projectClient,
   clientSpace,
+  suggestion,
   ticket,
   dependency,
   sprint,

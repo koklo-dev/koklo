@@ -76,8 +76,8 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
     }
   });
 
-  it("l'OpenAPI est en 0.11.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace)", async () => {
-    expect((await doc()).info.version).toBe("0.11.0");
+  it("l'OpenAPI est en 0.12.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion)", async () => {
+    expect((await doc()).info.version).toBe("0.12.0");
   });
 
   it("featureCreateSchema est exporté (parité avec specBatch.submit)", () => {

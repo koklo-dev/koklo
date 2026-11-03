@@ -26,9 +26,10 @@ const GROUPS: Record<string, string[]> = {
   repo: ["createSpec", "link", "list"],
   spec: ["getFeature", "head", "listFeatures"],
   specBatch: ["get", "submit"],
+  suggestion: ["accept", "create", "list", "reject", "withdraw"],
 };
 
-describe("R1 routeur : 19 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a : +1, TK-55b : +1), 49 procédures", () => {
+describe("R1 routeur : 20 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a : +1, TK-55b : +1, TK-55c : +1), 54 procédures", () => {
   it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
@@ -50,6 +51,7 @@ describe("R1 routeur : 19 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
         "spec",
         "specBatch",
         "sprint",
+        "suggestion",
         "ticket",
       ].sort(),
     );
@@ -68,6 +70,14 @@ const AI_PAIRS = [
   "POST /projects/{projectId}/ai/features",
   "POST /projects/{projectId}/ai/criteria",
   "POST /llm-credentials/{provider}/verify",
+];
+
+const SUGGESTION_PAIRS = [
+  "GET /projects/{projectId}/suggestions",
+  "POST /projects/{projectId}/suggestions",
+  "POST /projects/{projectId}/suggestions/{id}/withdraw",
+  "POST /projects/{projectId}/suggestions/{id}/accept",
+  "POST /projects/{projectId}/suggestions/{id}/reject",
 ];
 
 const CLIENT_SPACE_PAIRS = [
@@ -128,7 +138,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/spec/batches",
     "GET /projects/{projectId}/spec/batches/{batchId}",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a et les 3 de TK-55b sont présentes (57 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b et les 5 de TK-55c sont présentes (62 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -140,10 +150,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...AI_PAIRS,
       ...PROJECT_CLIENT_PAIRS,
       ...CLIENT_SPACE_PAIRS,
+      ...SUGGESTION_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(57);
+    expect(pairs).toHaveLength(62);
   });
 });
 

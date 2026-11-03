@@ -14,7 +14,9 @@ afterAll(async () => {
   await app?.close();
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("GET /openapi.json (C3.1)", () => {
+  // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
   it("sert le document de generateOpenApi(), avec toutes les routes du contrat", async () => {
     const response = await request(app.getHttpServer()).get("/openapi.json");
     expect(response.status).toBe(200);
@@ -49,6 +51,10 @@ describe("GET /openapi.json (C3.1)", () => {
       "/projects/{projectId}/spec/batches/{batchId}",
       "/projects/{projectId}/spec/features",
       "/projects/{projectId}/spec/features/{specId}",
+      "/projects/{projectId}/suggestions",
+      "/projects/{projectId}/suggestions/{id}/accept",
+      "/projects/{projectId}/suggestions/{id}/reject",
+      "/projects/{projectId}/suggestions/{id}/withdraw",
       "/provider/installations",
       "/provider/installations/start",
       "/sprints",
