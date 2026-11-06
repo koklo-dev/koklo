@@ -1,0 +1,62 @@
+# Refonte du 6 novembre 2026 · Questions ouvertes
+
+> Une ligne par question. **Lecture prudente** = ce que l'agent fait en attendant la réponse. Une question passe à « Répondue » avec la date et la réponse de Brice ; elle ne disparaît pas.
+> Ticket = premier ticket qui en dépend : la question est posée au plus tard au démarrage de ce ticket.
+
+## A. Points à confirmer listés dans les passations
+
+| # | Question | Source | Lecture prudente | Ticket | État |
+|---|---|---|---|---|---|
+| A1 | Plafond mensuel d'IA par défaut (100 € sur la maquette) et comportement exact au plafond | 19 §5 | Pas de plafond par défaut tant qu'il n'est pas saisi ; au plafond, propositions suspendues avec un message, l'éditeur reste utilisable | TK-98 | Ouverte |
+| A2 | Durée du jeton d'agent (12 h) | 19 §5, §2.7 | 12 h, révocable | TK-63 | Ouverte |
+| A3 | « Le client peut commenter les tickets » désactivé par défaut ? | 19 §5 | Désactivé | TK-132 | Ouverte |
+| A4 | Liste des modèles qualifiés par usage au lancement et noms affichés | 19 §5, 20 | Le modèle actuel d'Anthropic seul qualifié pour les 4 usages ; les autres fournisseurs s'ajoutent sans modèle tant que la suite de qualification ne les a pas passés | TK-95 | Répondue le 2026-11-06 : par défaut Anthropic en Sonnet |
+| A5 | Règle exacte « données en UE » par fournisseur, au-delà d'OpenRouter | 19 §5, 20 | Seul OpenRouter est exclu ; aucun attribut « UE » ajouté au projet tant que la règle n'est pas écrite | TK-98 | Ouverte |
+| A6 | Niveau ASVS par défaut selon le type de projet | 21 §6 | Niveau 2 dès qu'une donnée personnelle est classée, sinon 1 | TK-117 | Ouverte |
+| A7 | Durées de conservation par défaut proposées par l'agent (relecture juridique) | 21 §6 | L'agent propose, la valeur reste « À décider » jusqu'à une saisie humaine ; aucune durée par défaut codée | TK-117 | Ouverte |
+| A8 | Outils de sécurité en CI (Semgrep, Gitleaks, OSV-Scanner) | 21 §6 | Choix porté par le cahier technique du projet ; pour Koklo lui-même, ceux déjà en place (Trivy) en attendant | TK-133 | Ouverte |
+| A9 | Délai de signature du PV et relance automatique du client | 22 §7 | Pas de relance automatique ; « Copier le lien » comme au lot 3 | TK-136 | Ouverte |
+| A10 | Hébergeurs pris en charge au lancement (GitHub Actions, Vercel, Netlify) | 22 §7 | Lecture générique des `deployment` / `deployment_status` GitHub, sans traitement propre à un hébergeur | TK-134 | Ouverte |
+
+## B. Contradictions entre documents (règle appliquée en attendant)
+
+| # | Contradiction | Sources | Lecture prudente | Ticket | État |
+|---|---|---|---|---|---|
+| B1 | Ordre de disponibilité de Qualité : « après Fonctionnel et Technique » (05) contre « après le design » (13 §2.1, §5). Rien ne dit si Sécurité bloque Design ou Qualité. | 05 §2, 12 §5, 13 §5, 21 §0 | Fonctionnel ← idea-v1 ; Données ← Fonctionnel ; Architecture ← Données ; Technique ← Architecture ; Sécurité ← Technique ; Design ← Fonctionnel ; Qualité ← Technique, Sécurité et Design (le plus récent et le plus strict) | TK-100 | Ouverte |
+| B2 | Les planches 05 (coquille) et 07 (vue d'ensemble) montrent encore « Spec 2/6 », un chevron, l'ordre « Fonctionnel, Design, Données… » et « Cadrer avec l'IA » | maquettes 05, 07 ; 05 §2 ; 21 §0 | Les décisions l'emportent : « SPEC N/7 », entrées numérotées, sans chevron, cadenas. Écart documenté sur chaque PR | TK-88 | Ouverte (signalée) |
+| B3 | Recherche ⌘K : « locale » (01 §1.1) contre « serveur, 20 résultats » (07 §2) | 01, 07 | Serveur (07, plus récent) | TK-88 | Appliquée |
+| B4 | Réglages : 3 routes `/settings/members|github|ai` (01 §1.2) contre `/settings/[section]` à 8 sections (19, 21 §3) | 01, 19 | Lot 1 crée `/settings/[section]` avec les trois sections existantes ; le lot 13 ajoute les autres | TK-88 | Appliquée |
+| B5 | Jeux de données à trois endroits : `data/fixtures/FX-*.yaml` (09), `design/fixtures/*.yaml` (13), `quality/fixtures/FX-*.yaml` (15, « générées depuis data/ ») | 09 §1, 13 §1, 15 §1 | Source de vérité unique `data/fixtures/FX-*.yaml` ; le design et la qualité y font référence | TK-107 | Ouverte |
+| B6 | Vue d'ensemble d'architecture : `architecture/overview.md` (10) contre sections `architecture/overview/NN-*.md` (12 §8.1) | 10 §1, 12 §8.1 | Sections (12, plus récent) | TK-111 | Appliquée |
+| B7 | Parcours : `design/flows/P-*.json` (06 §6), `architecture/flows/<P-id>.yaml` (10), `design/flows/P-*.yaml` (13) ; scénarios SC- partagés entre design (13 §4) et qualité (15 §4.1) | 06, 10, 13, 15 | Le parcours métier vit dans `design/flows/P-*.yaml` (format YAML, comme 13, le plus récent) ; le flux technique dans `architecture/flows/` ; un scénario a une seule source : `quality/scenarios/` | TK-103 | Ouverte |
+| B8 | Nom des fichiers de table : `data/tables/<slug>.yaml` (09) alors que le code impose `T-*.yaml` et `idMatchesFile` | 09 §1 | `data/tables/<slug>.yaml` avec `id: T-<slug>` ; la règle « id = nom de fichier » compare au slug | TK-106 | Ouverte |
+| B9 | Champ de zone : `domaine:` (08 §2.1) contre `zone:` (10 §1, 08 §1.2 pour les fonctionnalités) | 08, 10 | `zone:` partout, lu aussi sous le nom `domaine:` pendant la transition | TK-106 | Ouverte |
+| B10 | Vocabulaire des règles métier : ADR 0012 (`contrainte|calcul|workflow`, `tables`, `endpoints`, `exemples`) contre 06 §6 (`constraint|calc|workflow`, `etats`, `fonctionnalites`) | ADR 0012, 06 §6 | Garder le vocabulaire français de l'ADR 0012 et ajouter `etats` et `fonctionnalites` : aucune réécriture de fichiers existants | TK-103 | Ouverte |
+| B11 | Un commit de mise en page (`_layout.yaml`, sans relecture) invalide-t-il la validation du livrable ? | 09 §3.4, §3.5 | Non : la validation porte sur le hachage du contenu des éléments, la mise en page en est exclue | TK-100 | Ouverte |
+| B12 | Couverture des exigences : le Technique (lot 8) est validé avant que la Qualité existe | 12 §4.3, 15 §4.2 | Avant la Qualité, l'onglet Exigences affiche « Couverture : après la Qualité » sans compter ; aucune exigence ne bloque la validation du Technique | TK-116 | Ouverte |
+| B13 | Pose de la Baseline 0 : tag seul sur le dépôt de spec (16 §1) contre fusion `cadrage` → `main` puis tag (v0.6 §4.0, §6.0, ancien TK-56) ; et qui pose (v0.6 §8.7 : owner / admin ; 16 §1 : Koklo à la validation du client) | 16 §1, v0.6 | Koklo pose le tag à la validation du client (16, plus récent). Fusion `cadrage` → `main` puis tag sur `main` (v0.6, que 16 ne contredit pas). `cadrage` est ensuite fermée en écriture | TK-127 | Ouverte |
+| B14 | Numéros de lots d'opérations : `OPB-nnn` (13 §1) contre le trailer `Koklo-Ops: <uuid>` en production | 13 §1, `apps/worker/src/spec-write/message.ts` | Garder le trailer existant et y ajouter `OPB-nnn` (compteur par projet) | TK-118 | Ouverte |
+| B15 | Bloc « Votre texte est envoyé à Anthropic » (01 §0.3, imposé) alors que l'organisation peut avoir plusieurs fournisseurs (20) | 01, 20 | Le texte nomme le fournisseur réellement utilisé pour l'usage (« … envoyé à Mistral AI avec la clé de l'organisation ») ; « Anthropic » tant qu'il est le seul | TK-87 | Répondue le 2026-11-06 : ne jamais nommer le fournisseur ; dire « action IA » ou « agent IA » |
+| B16 | Thème « Système » (19 §2.6) contre la décision H-24 (clair par défaut) | 19 §2.6, `apps/web/src/lib/theme.ts` | Ajouter « Système » comme choix, garder « Clair » par défaut | TK-97 | Ouverte |
+| B17 | Contrôle de Baseline « chaque fonctionnalité indispensable a un écran ou une opération » (bloquant, 16 §4.2) recoupe la règle R5 existante (avertissement ou erreur selon le statut) et les vérifications d'architecture (avertissements, 10 §1) | 16 §4.2, 10 §1 | Les vérifications de livrable restent des avertissements ; seul le contrôle de Baseline bloque | TK-126 | Ouverte |
+| B18 | La consommation d'IA affichée en euros (19 §2.1, §2.3) et « aucun aspect financier » (22 §0) | 19, 22 | Le refus du financier porte sur le projet du client (jalons, montants, factures) ; la consommation d'IA de l'organisation reste affichée | TK-98 | Ouverte |
+| B19 | Volumes du jeu `seed:large` : 1 000 fonctionnalités, 300 règles, 80 tables, 500 tickets, 400 propositions (07 §6) contre 248 / 86 / 65 / 1 240 lignes (08 §4, « prime » pour les lots 5 et 6) | 07, 08 | Deux profils : `seed:large` (charge, 07) et `seed:planche` (volumes des planches, pour la comparaison visuelle) | TK-94 | Répondue le 2026-11-06 : oui, deux profils, pour recetter en local |
+| B20 | Qui valide le livrable Sécurité ? La passation 21 ne donne pas de tableau des droits (« le client n'en valide pas le détail ») | 21 en-tête, §1 | L'équipe (owner, admin, développeur), comme Données à Technique ; le client lit le résumé, repris dans la Baseline | TK-117 | Ouverte |
+| B21 | Bouton commun de l'agent sur la Sécurité : la passation 14 §3 n'a pas de ligne Sécurité, la 21 §4 prévoit `security.propose({ mode })` | 14 §3, 21 §4 | Bouton commun `AgentProposeButton` ; choix = modes de 21 §4 (menaces, classer les données, ASVS, résumé) ; procédure `ai.proposeDeliverable({ deliverable: 'security', mode })` | TK-117 | Ouverte |
+
+## C. Questions de pilotage (vault, sprints, vision)
+
+| # | Question | Lecture prudente | État |
+|---|---|---|---|
+| C1 | `vision.md` (CDC) n'est pas modifiable par un agent et ne connaît ni l'espace Idée ni les 7 livrables ni les agents locaux. Les passations validées valent-elles approbation explicite des fonctions absentes de la vision (règle de CLAUDE.md) ? | Oui pour tout ce qui est dans une passation validée ; rien au-delà | Répondue le 2026-11-06 : oui, une passation validée vaut approbation |
+| C2 | Sprint 017 « Bascule : Koklo se livre lui-même » repose sur `koklo deliver` (boucle autonome côté Koklo), annulé par la décision du 06/11. Le garder en le réécrivant (Koklo piloté via MCP par des agents locaux) ou le déplacer après le dernier sprint de la refonte ? | Déplacer après le sprint Recette, contenu à réécrire | Répondue le 2026-11-06 : `koklo deliver` est entièrement à revoir, sans baser la mécanique sur Shipyard, en s'inspirant de ses agents et de ses retours d'expérience → ticket d'étude TK-137 (sprint 036) |
+| C3 | La boucle Shipyard livre Koklo avec des sous-agents locaux : elle est compatible avec la décision du 06/11, mais elle doit rester arrêtée tant que le vault n'est pas réorganisé (sinon elle prendrait TK-56, TK-57… devenus caducs) | Boucle arrêtée jusqu'au « go » | Répondue le 2026-11-06 : « go » donné ; la boucle peut reprendre une fois le vault réorganisé |
+| C4 | Les dépôts de spec existants (projets réels en staging ?) doivent-ils être migrés au format v2, ou peut-on considérer qu'il n'y a pas encore de projet client réel ? | Migration outillée et réversible, lancée projet par projet par un owner | Ouverte |
+
+## D. Décisions de Brice (2026-11-06)
+
+| # | Décision | Effet |
+|---|---|---|
+| D0 | Découpage en 18 sprints et tri des tickets existants validés | Vault réorganisé selon `feuille-de-route.md` |
+| D1 | Projet **sans client invité** : le propriétaire et l'administrateur valident le Fonctionnel, les écrans du Design et la Baseline 0 (projet solo, personne technique ou non). Dès qu'un client est invité, il est seul à valider ces cibles. Étendu par lecture prudente à la signature du PV de recette | TK-100, TK-104, TK-92, TK-123, TK-127, TK-136 |
+| D2 | Livrables validés par l'équipe (Données, Architecture, Technique, Sécurité, Qualité) : propriétaire, administrateur ou développeur, comme dans les passations | TK-100 et suivants (inchangé) |
