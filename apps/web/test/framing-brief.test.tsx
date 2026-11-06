@@ -112,15 +112,20 @@ describe("Brief éditable", () => {
     expect(proposeCalls()).toHaveLength(0);
   });
 
-  it("le bloc « ce qui est envoyé » précède le bouton « Proposer des fonctionnalités avec l'IA »", async () => {
+  it("le bloc d'envoi (InlineAlert neutre, TK-87) précède le bouton « Proposer des fonctionnalités avec l'IA »", async () => {
     await openFraming();
     await generateBrief();
-    const headings = screen.getAllByRole("heading", {
-      name: "Ce qui est envoyé à Anthropic",
-      level: 3,
-    });
+    const blocks = screen
+      .getAllByRole("note")
+      .filter((n) =>
+        n.textContent?.includes(
+          "Votre texte est envoyé à l'agent IA avec la clé de l'organisation.",
+        ),
+      );
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toMatch(/Anthropic|États-Unis/);
     const button = screen.getByRole("button", { name: PROPOSE });
-    const last = headings.at(-1) as HTMLElement;
+    const last = blocks.at(-1) as HTMLElement;
     expect(last.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

@@ -37,11 +37,11 @@ function SignOut() {
 function Heading({ hasOrganizations, active }: { hasOrganizations: boolean; active: boolean }) {
   return (
     <div className="flex flex-col gap-2">
-      <h1 className="text-[24px] font-semibold tracking-[-0.015em]">
+      <h1 className="text-page-title">
         {hasOrganizations ? "Choisir une organisation" : "Créer votre organisation"}
       </h1>
       {hasOrganizations ? null : (
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           Une organisation regroupe vos projets et votre équipe. Vous en serez le propriétaire.
         </p>
       )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertContrast, contrastRatio, WCAG_AA_TEXT } from "./helpers/contrast.ts";
-import { effectiveTheme, loadBlocks, type StatusKey } from "./helpers/css.ts";
+import { effectiveTheme, loadBlocks, resolveVar, type StatusKey } from "./helpers/css.ts";
 import { cssPath } from "./helpers/paths.ts";
 
 /** Paires texte / fond de DESIGN.md §2.1 (analyse CA2), à valider en clair et en sombre. */
@@ -21,6 +21,11 @@ const THEME_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ["--destructive", "--background"],
   ["--destructive", "--card"],
   ["--destructive-foreground", "--destructive"],
+  // TK-87 (DESIGN.md v2 §2.1) : nouvelles surfaces
+  ["--foreground", "--surface"],
+  ["--foreground", "--raised"],
+  ["--muted-foreground", "--surface"],
+  ["--muted-foreground", "--raised"],
 ];
 
 const STATUSES: readonly StatusKey[] = ["validated", "pending", "revise"];
@@ -45,6 +50,23 @@ describe.each([":root", ".dark"] as const)("CA2 - contraste WCAG AA du thème %s
       assertContrast(`${selector} statut ${status}`, fg as string, bg as string),
     ).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
   });
+});
+
+describe.each([":root", ".dark"] as const)("CA1 (TK-87) - contraste des alertes %s", (selector) => {
+  it.each(["neutral", "warning", "error"] as const)(
+    "alerte %s : texte sur fond >= 4,5:1 (alias résolus contre le thème)",
+    (alert) => {
+      const theme = effectiveTheme(selector);
+      const vars = loadBlocks(cssPath.status)[selector] ?? {};
+      const fg = resolveVar(vars[`--alert-${alert}-fg`], theme);
+      const bg = resolveVar(vars[`--alert-${alert}-bg`], theme);
+      expect(fg ?? "(absente)", `${selector} --alert-${alert}-fg`).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(bg ?? "(absente)", `${selector} --alert-${alert}-bg`).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(
+        assertContrast(`${selector} alerte ${alert}`, fg as string, bg as string),
+      ).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
+    },
+  );
 });
 
 describe("CA2 - le calcul de contraste échoue sous le seuil", () => {

@@ -228,14 +228,21 @@ describe("KanbanPage — cartes (C2)", () => {
   });
 
   it.each([
-    ["TK-110", "Priorité critique"],
-    ["TK-102", "Priorité haute"],
-    ["TK-103", "Priorité moyenne"],
-    ["TK-101", "Priorité basse"],
-  ])("%s : priorité « %s »", async (key, text) => {
-    await renderBoard();
-    expect(within(card(key)).getByText(text)).toBeInTheDocument();
-  });
+    ["TK-110", "Priorité critique", "3"],
+    ["TK-102", "Priorité haute", "2"],
+    ["TK-103", "Priorité moyenne", "1"],
+    ["TK-101", "Priorité basse", "0"],
+  ])(
+    "%s : priorité « %s » en PriorityIndicator, %s barre(s) (TK-87, H4)",
+    async (key, text, level) => {
+      await renderBoard();
+      const label = within(card(key)).getByText(text);
+      const indicator = label.closest("[data-slot='priority-indicator']");
+      expect(indicator, "PriorityIndicator").not.toBeNull();
+      expect(indicator).toHaveAttribute("data-level", level);
+      expect(label.className).not.toMatch(/font-semibold/);
+    },
+  );
 
   it("un ticket sensible affiche « Sensible » avec l'icône cadenas ; un ticket sûr n'en a pas", async () => {
     await renderBoard();

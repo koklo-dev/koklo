@@ -34,7 +34,7 @@ export function DropdownMenuContent({
       <MenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-md motion-safe:animate-content-in",
+          "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-floating motion-safe:animate-content-in",
           className,
         )}
         {...props}
@@ -92,7 +92,7 @@ export function DropdownMenuLabel({
 }: ComponentProps<typeof MenuPrimitive.Label> & { inset?: boolean }) {
   return (
     <MenuPrimitive.Label
-      className={cn("px-2 py-1.5 text-[13px] font-medium", inset && "pl-8", className)}
+      className={cn("px-2 py-1.5 text-meta font-medium", inset && "pl-8", className)}
       {...props}
     />
   );
@@ -141,7 +141,7 @@ export function DropdownMenuSubContent({
   return (
     <MenuPrimitive.SubContent
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-md motion-safe:animate-content-in",
+        "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-floating motion-safe:animate-content-in",
         className,
       )}
       {...props}

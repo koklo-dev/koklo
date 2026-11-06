@@ -19,11 +19,11 @@ function currentTheme(): Theme {
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, currentTheme, () => "light" as Theme);
   const next: Theme = theme === "dark" ? "light" : "dark";
-  const toggle = () => {
-    applyTheme(next);
+  const select = (value: Theme) => {
+    applyTheme(value);
     for (const listener of listeners) listener();
   };
-  return { theme, next, toggle };
+  return { theme, next, toggle: () => select(next), select };
 }
 
 export function ThemeToggle({ className }: { className?: string }) {

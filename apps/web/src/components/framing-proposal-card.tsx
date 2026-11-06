@@ -1,16 +1,16 @@
 import { Button } from "@koklo/ui";
 import { useEffect, useRef } from "react";
-import { priorityLabel } from "../lib/feature-labels.ts";
 import { proposalCardId } from "../lib/framing-ids.ts";
 import type { FramingProposal } from "../lib/framing-types.ts";
 import { useCardEdit } from "../lib/use-framing-card-edit.ts";
 import type { ProposalActions } from "../lib/use-framing-proposals.ts";
+import { FeaturePriority } from "./feature-status.tsx";
 import {
   AiBadge,
   Criteria,
   Description,
   Duplicate,
-  StatusBadge,
+  ProposalStatusPill,
 } from "./framing-proposal-parts.tsx";
 import { ProposalEditor } from "./proposal-editor.tsx";
 
@@ -93,13 +93,11 @@ export function FramingProposalCard({ projectId, proposal, actions, locked, anno
       className="flex flex-col gap-3 rounded-lg border bg-card p-4 text-card-foreground outline-none"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="min-w-0 break-words text-base font-semibold">
-          {value.title || "Sans titre"}
-        </h3>
-        <StatusBadge status={status} />
+        <h3 className="min-w-0 break-words text-subsection-title">{value.title || "Sans titre"}</h3>
+        <ProposalStatusPill status={status} />
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
-        <span>{priorityLabel(value.priority)}</span>
+      <div className="flex flex-wrap items-center gap-2 text-meta text-muted-foreground">
+        <FeaturePriority priority={value.priority} />
         <AiBadge />
       </div>
       {proposal.duplicateOf ? (

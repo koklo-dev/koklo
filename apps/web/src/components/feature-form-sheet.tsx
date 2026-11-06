@@ -54,7 +54,7 @@ function ScrollRegion({ className = "", children }: { className?: string; childr
 function Loading() {
   return (
     <div aria-busy="true" className="flex flex-col gap-3">
-      <p className="text-[13px] text-muted-foreground">Chargement de la fonctionnalité…</p>
+      <p className="text-meta text-muted-foreground">Chargement de la fonctionnalité…</p>
       {Array.from({ length: 4 }, (_, row) => (
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: squelettes statiques, sans identité
@@ -138,7 +138,7 @@ function FormBody(props: BodyProps) {
         <SaveProgress write={write} version={write.batch?.commitSha?.slice(0, 7) ?? null} />
       ) : null}
       {reason ? (
-        <p id={REASON_ID} className="text-[13px] text-muted-foreground">
+        <p id={REASON_ID} className="text-meta text-muted-foreground">
           {reason}
         </p>
       ) : null}
@@ -202,7 +202,7 @@ export function FeatureFormSheet(props: FormSheetProps) {
         }}
       >
         <SheetHeader>
-          <SheetTitle className="text-xl font-semibold tracking-[-0.015em]">
+          <SheetTitle className="text-section-title">
             <Title mode={mode} specId={specId} />
           </SheetTitle>
         </SheetHeader>

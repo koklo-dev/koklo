@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { designStatus, loadBlocks, norm, type StatusKey } from "./helpers/css.ts";
+import { designAlerts, designStatus, loadBlocks, norm, type StatusKey } from "./helpers/css.ts";
 import { cssPath, readRequired, stylesDir, walk } from "./helpers/paths.ts";
 
 const STATUSES: readonly StatusKey[] = ["validated", "pending", "revise"];
@@ -18,29 +18,83 @@ describe("CA4 - variables de statut (DESIGN.md §2.2)", () => {
     expect(norm(dark[`--status-${status}-fg`])).toBe(expected.darkFg);
   });
 
-  it("exactement 12 variables --status-*, 6 par thème, sans dérivation de --primary", () => {
+  it("exactement 6 variables --status-* par thème, en hex, sans dérivation de --primary", () => {
     const blocks = loadBlocks(cssPath.status);
     for (const selector of [":root", ".dark"]) {
       const vars = blocks[selector] ?? {};
-      expect(Object.keys(vars).sort()).toEqual(
+      const statusVars = Object.keys(vars).filter((n) => n.startsWith("--status-"));
+      expect(statusVars.sort()).toEqual(
         STATUSES.flatMap((s) => [`--status-${s}-bg`, `--status-${s}-fg`]).sort(),
       );
-      for (const value of Object.values(vars)) {
-        expect(value).toMatch(/^#[0-9a-fA-F]{6}$/);
-      }
+      for (const name of statusVars) expect(vars[name]).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
     expect(readRequired(cssPath.status)).not.toMatch(/--primary|--ring|--accent/);
   });
+
+  it("status.css ne déclare que des --status-* et des --alert-* (TK-87)", () => {
+    const blocks = loadBlocks(cssPath.status);
+    for (const selector of [":root", ".dark"]) {
+      const names = Object.keys(blocks[selector] ?? {});
+      expect(names.filter((n) => !/^--(status|alert)-/.test(n))).toEqual([]);
+    }
+  });
 });
 
-/** Échelle §3 : rôle -> taille (px), graisses admises, interlettrage attendu. */
+const ALERT_PARTS = ["bg", "border", "fg"] as const;
+
+describe("CA1 (TK-87) - couleurs d'alerte (DESIGN.md §2.2 v2, passation 01 §0.1)", () => {
+  it.each(["warning", "error"] as const)(
+    "alerte %s : fond, bordure et texte aux valeurs de DESIGN.md, en clair et en sombre",
+    (alert) => {
+      const expected = designAlerts()[alert];
+      const blocks = loadBlocks(cssPath.status);
+      for (const part of ALERT_PARTS) {
+        expect(norm(blocks[":root"]?.[`--alert-${alert}-${part}`]), `clair ${part}`).toBe(
+          expected.light[part],
+        );
+        expect(norm(blocks[".dark"]?.[`--alert-${alert}-${part}`]), `sombre ${part}`).toBe(
+          expected.dark[part],
+        );
+      }
+    },
+  );
+
+  it("valeurs du tableau 01 §0.1 (garde contre une dérive de DESIGN.md)", () => {
+    expect(designAlerts()).toEqual({
+      warning: {
+        light: { bg: "#fffbeb", border: "#fcd34d", fg: "#78350f" },
+        dark: { bg: "#3a2a0c", border: "#78350f", fg: "#fde68a" },
+      },
+      error: {
+        light: { bg: "#fef2f2", border: "#fca5a5", fg: "#991b1b" },
+        dark: { bg: "#3b1219", border: "#7f1d1d", fg: "#fecaca" },
+      },
+    });
+  });
+
+  it("variante neutre : alias de --surface (clair) / --raised (sombre), --border, --foreground", () => {
+    const blocks = loadBlocks(cssPath.status);
+    const light = blocks[":root"] ?? {};
+    const dark = blocks[".dark"] ?? {};
+    expect(norm(light["--alert-neutral-bg"])).toBe("var(--surface)");
+    expect(norm(dark["--alert-neutral-bg"])).toBe("var(--raised)");
+    for (const vars of [light, dark]) {
+      expect(norm(vars["--alert-neutral-border"])).toBe("var(--border)");
+      expect(norm(vars["--alert-neutral-fg"])).toBe("var(--foreground)");
+    }
+  });
+});
+
+/** Échelle §3 v2 (passation 01 §0.2, TK-87) : rôle -> taille (px), graisse, interlettrage exacts. */
 const SCALE = {
-  "page-title": { size: [30, 30], weights: [600], tracking: "-0.025em" },
-  "section-title": { size: [22, 24], weights: [600], tracking: "-0.015em" },
-  body: { size: [14, 15], weights: [400], tracking: "normal" },
-  secondary: { size: [13, 13], weights: [400, 500], tracking: "normal" },
-  caption: { size: [12, 12], weights: [500], tracking: "normal" },
-  code: { size: [12, 12], weights: [400, 500], tracking: "normal" },
+  "page-title": { size: 24, weight: 600, tracking: "-0.02em" },
+  "section-title": { size: 16, weight: 600, tracking: "normal" },
+  "subsection-title": { size: 14, weight: 600, tracking: "normal" },
+  body: { size: 14, weight: 400, tracking: "normal" },
+  secondary: { size: 13, weight: 400, tracking: "normal" },
+  "group-label": { size: 11, weight: 600, tracking: "0.06em" },
+  caption: { size: 12, weight: 500, tracking: "normal" },
+  code: { size: 12, weight: 500, tracking: "normal" },
 } as const;
 
 describe("CA4 - échelle typographique (DESIGN.md §3)", () => {
@@ -51,18 +105,25 @@ describe("CA4 - échelle typographique (DESIGN.md §3)", () => {
   });
 
   it.each(Object.keys(SCALE) as Array<keyof typeof SCALE>)(
-    "rôle %s : taille, graisse, interlettrage",
+    "rôle %s : taille, graisse, interlettrage (v2)",
     (role) => {
       const root = loadBlocks(cssPath.typography)[":root"] ?? {};
       const spec = SCALE[role];
       const size = /^(\d+(?:\.\d+)?)px$/.exec(root[`--text-${role}-size`] ?? "")?.[1];
       expect(size, `--text-${role}-size en px`).toBeDefined();
-      expect(Number(size)).toBeGreaterThanOrEqual(spec.size[0]);
-      expect(Number(size)).toBeLessThanOrEqual(spec.size[1]);
-      expect(spec.weights as readonly number[]).toContain(Number(root[`--text-${role}-weight`]));
-      expect(norm(root[`--text-${role}-tracking`])).toBe(spec.tracking);
+      expect(Number(size), `--text-${role}-size`).toBe(spec.size);
+      expect(Number(root[`--text-${role}-weight`]), `--text-${role}-weight`).toBe(spec.weight);
+      expect(norm(root[`--text-${role}-tracking`]), `--text-${role}-tracking`).toBe(spec.tracking);
     },
   );
+
+  it("chaque rôle de l'échelle a sa famille (--font-sans, --font-mono pour le code)", () => {
+    const root = loadBlocks(cssPath.typography)[":root"] ?? {};
+    for (const role of Object.keys(SCALE)) {
+      const expected = role === "code" ? "var(--font-mono)" : "var(--font-sans)";
+      expect(norm(root[`--text-${role}-font`]), `--text-${role}-font`).toBe(expected);
+    }
+  });
 
   it("la graisse du code est en JetBrains Mono (--font-mono) et le titre en Instrument Sans", () => {
     const root = loadBlocks(cssPath.typography)[":root"] ?? {};

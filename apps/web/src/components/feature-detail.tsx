@@ -7,9 +7,7 @@ type Criterion = Detail["criteria"][number];
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
+      <h3 className="text-subsection-title text-muted-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -18,9 +16,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Criteria({ criteria }: { criteria: Criterion[] }) {
   if (criteria.length === 0) {
     return (
-      <p className="text-[13px] text-muted-foreground">
-        Aucun critère d'acceptation pour le moment.
-      </p>
+      <p className="text-meta text-muted-foreground">Aucun critère d'acceptation pour le moment.</p>
     );
   }
   return (
@@ -73,7 +69,7 @@ function Links({ detail, team }: { detail: Detail; team: boolean }) {
       <dl className="flex flex-col gap-3">
         {groups.map((group) => (
           <div key={group.label} className="flex flex-col gap-1">
-            <dt className="text-[13px]">{group.label}</dt>
+            <dt className="text-meta">{group.label}</dt>
             <dd className="flex flex-wrap gap-1.5">
               {group.values.map((value) => (
                 <Badge key={value} variant="outline" className="font-mono">
@@ -115,7 +111,7 @@ export function FeatureDetail({ detail, team }: { detail: Detail; team: boolean 
         {detail.description ? (
           <p className="whitespace-pre-wrap text-sm">{detail.description}</p>
         ) : (
-          <p className="text-[13px] text-muted-foreground">Aucune description.</p>
+          <p className="text-meta text-muted-foreground">Aucune description.</p>
         )}
       </Section>
       <Section title="Critères d'acceptation">

@@ -83,12 +83,15 @@ describe("Aucune création sans action humaine", () => {
     if (button) expect(button).toBeDisabled();
   });
 
-  it("rappel sous la barre : « Ces propositions viennent d'Anthropic et ne sont pas encore enregistrées. »", async () => {
+  it("rappel sous la barre : « Ces propositions viennent de l'agent IA et ne sont pas encore enregistrées. » (B15)", async () => {
     await openFraming();
     await proposeFeatures();
     expect(
-      screen.getByText("Ces propositions viennent d'Anthropic et ne sont pas encore enregistrées."),
+      screen.getByText(
+        "Ces propositions viennent de l'agent IA et ne sont pas encore enregistrées.",
+      ),
     ).toBeVisible();
+    expect(screen.queryByText(/Ces propositions viennent d'Anthropic/)).toBeNull();
   });
 
   it("« Enregistrer N fonctionnalité(s) » ne fait que ouvrir le récapitulatif : toujours zéro submit", async () => {

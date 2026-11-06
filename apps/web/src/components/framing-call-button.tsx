@@ -8,8 +8,8 @@ interface Props {
   busy: boolean;
   /** Un autre appel attend, ou une limite est en cours : le bouton reste inactif. */
   disabled: boolean;
-  /** Raison affichée sous le bouton quand il est inactif (relié par `aria-describedby`). */
-  reasonId?: string | undefined;
+  /** Raison d'un désactivé durable (saisie vide), affichée à côté du bouton par `Button disabledReason`. */
+  reason?: string | undefined;
   /** L'attente vient d'être abandonnée : la demande est déjà comptée. */
   cancelled: boolean;
   onClick: () => void;
@@ -35,7 +35,7 @@ function CancelWait({ onCancel }: { onCancel: () => void }) {
 
 /** Bouton d'appel IA qui nomme le destinataire (« ... avec l'IA ») et gère l'attente : un seul appel à la fois. */
 export function FramingCallButton(props: Props) {
-  const { id, label, busy, disabled, reasonId, cancelled, onClick, onCancel } = props;
+  const { id, label, busy, disabled, reason, cancelled, onClick, onCancel } = props;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 md:flex-row">
@@ -44,7 +44,7 @@ export function FramingCallButton(props: Props) {
           type="button"
           className="h-11 w-full md:h-9 md:w-auto"
           disabled={busy || disabled}
-          aria-describedby={reasonId}
+          disabledReason={reason}
           onClick={onClick}
         >
           <Icon name="smart_toy" size={20} />
@@ -53,7 +53,7 @@ export function FramingCallButton(props: Props) {
         {busy ? <CancelWait onCancel={onCancel} /> : null}
       </div>
       {cancelled ? (
-        <p className="text-[13px] text-muted-foreground">La demande a déjà été comptée.</p>
+        <p className="text-meta text-muted-foreground">La demande a déjà été comptée.</p>
       ) : null}
     </div>
   );

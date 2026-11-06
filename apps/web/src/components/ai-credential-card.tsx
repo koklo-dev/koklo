@@ -45,7 +45,7 @@ export function AiCredentialCard({
       className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground md:p-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={headingId} className="text-[22px] font-semibold tracking-[-0.015em]">
+        <h2 id={headingId} className="text-section-title">
           {L.provider}
         </h2>
         <AiCredentialStatus item={item} state={cardState} verifying={state.phase === "verifying"} />
@@ -53,7 +53,7 @@ export function AiCredentialCard({
       {explanation ? <p className="break-words text-sm">{explanation}</p> : null}
       {item ? <AiCredentialFacts item={item} verifiedModel={state.verifiedModel} /> : null}
       <AiSendPolicy />
-      <p className="flex items-start gap-2 text-[13px] text-muted-foreground">
+      <p className="flex items-start gap-2 text-meta text-muted-foreground">
         <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
         <span className="min-w-0 break-words">{L.encrypted}</span>
       </p>
@@ -85,9 +85,7 @@ export function AiCredentialCard({
           onRestored={() => setRestoreReplace(false)}
         />
       ) : null}
-      {item && !showForm ? (
-        <p className="text-[13px] text-muted-foreground">{L.quotaNote}</p>
-      ) : null}
+      {item && !showForm ? <p className="text-meta text-muted-foreground">{L.quotaNote}</p> : null}
     </section>
   );
 }

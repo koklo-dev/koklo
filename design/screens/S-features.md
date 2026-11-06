@@ -1,7 +1,7 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1.5
+version: 1.6
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
@@ -48,11 +48,13 @@ Deux `Select` à libellé visible (au-dessus ou à gauche selon la largeur), san
 |---|---|---|
 | Identifiant | `F-001` en JetBrains Mono 12 px, `--muted-foreground` | `specId` |
 | Titre | lien (vrai `a`) vers `?feature=<specId>`, 14 px/500, 2 lignes max, `title` complet en infobulle native | `title` |
-| Statut | `Badge variant="outline"` : icône + libellé (tableau ci-dessous) | `status` |
-| Priorité | texte du libellé de priorité, 13 px (tableau ci-dessous) | `priority` |
+| Avancement (v2, TK-87) | `LifecycleStatus` : jauge 6 crans + libellé, stade dérivé (ci-dessous) | `status`, `criteriaCount` |
+| Priorité | `PriorityIndicator` : 3 barres + libellé (v2, TK-87) | `priority` |
 | Critères | nombre et libellé « N critère(s) », aligné à droite, 13 px | `criteriaCount` |
 
-Libellés de statut, **icône + texte, jamais une teinte** (les couleurs `status-*` de DESIGN §2.2 sont réservées à la validation client Validée / À valider / À revoir et ne sont pas réutilisées ici : un statut de spec n'est pas un statut de validation) :
+**v2 (TK-87)** : la colonne s'intitule « Avancement » et rend `LifecycleStatus` (DESIGN.md v2 §5.1). Stade dérivé côté web tant que le serveur ne le calcule pas (questions.md B22) : `implementee` ou `adoptee` → Implémentée (étape 4 sur 6) ; sinon au moins un critère → Spécifiée (2 sur 6) ; sinon Idée (1 sur 6). Conçue, Testée et Livrée ne sont jamais affichés sans donnée. Le filtre « Statut » garde ses valeurs v1 jusqu'à TK-88 (questions.md B31). Le tableau ci-dessous ne sert plus qu'aux options du filtre.
+
+Libellés de statut v1 (filtre), **icône + texte, jamais une teinte** (les couleurs `status-*` de DESIGN §2.2 sont réservées à la validation client Validée / À valider / À revoir et ne sont pas réutilisées ici : un statut de spec n'est pas un statut de validation) :
 
 | Valeur | Libellé | Icône (existe dans la bibliothèque) |
 |---|---|---|
@@ -61,7 +63,7 @@ Libellés de statut, **icône + texte, jamais une teinte** (les couleurs `status
 | `implementee` | Implémentée | `task_alt` |
 | `adoptee` | Adoptée | `check_circle` (pleine) |
 
-Libellés de priorité (méthode MoSCoW traduite, sans jargon) : `must` Indispensable, `should` Importante, `could` Souhaitable, `wont` Reportée. Le sens est dans les mots ; « Indispensable » est en `font-weight 600` et `text-foreground`, les autres en `text-muted-foreground`. Aucune couleur de statut ni d'alerte.
+Libellés de priorité (méthode MoSCoW traduite, sans jargon) : `must` Indispensable, `should` Importante, `could` Souhaitable, `wont` Reportée. Le sens est dans les mots. v2 (TK-87) : rendu par `PriorityIndicator` (Indispensable 3 barres, Importante 2, Souhaitable 1, Reportée 0), qui remplace le gras / gris v1. Aucune couleur de statut ni d'alerte.
 
 Tri : celui de l'API (numérique sur `F-nnn`). Aucun tri côté web.
 
@@ -69,7 +71,7 @@ Pagination : page de 50 (`limit` 50). Sous la table, `Button variant="outline"` 
 
 ### 3.4 Fiche d'une fonctionnalité (`Sheet`, 440 px)
 Ouverte par le lien du titre ou par `?feature=`. Sources : ligne de la liste (en-tête immédiat) puis `spec.getFeature` (détail).
-- En-tête : `F-001` mono + titre en h2 (nom accessible du dialogue) ; sous le titre, badge de statut et priorité (mêmes libellés que la liste).
+- En-tête : `F-001` mono + titre en h2 (nom accessible du dialogue) ; sous le titre, `LifecycleStatus` et `PriorityIndicator` (mêmes composants que la liste, v2 TK-87).
 - « Description » : `description` rendue en **texte brut** avec retours à la ligne conservés (`white-space: pre-wrap`). Aucun rendu Markdown ni HTML (pas de dépendance nouvelle, pas de contenu actif). Description vide : « Aucune description. » en texte secondaire.
 - « Critères d'acceptation » : `ol` ; chaque critère : identifiant `AC-1` (mono 12 px) + titre (14 px/500) ; ses étapes en `ul` sans puce, le mot d'ouverture en gras suivi du texte : « Étant donné », « Quand », « Alors », « Et » (`stepType`). Aucun critère : « Aucun critère d'acceptation pour le moment. »
 - « Éléments liés » (chaque groupe n'apparaît que s'il n'est pas vide, valeurs en `Badge variant="outline"` JetBrains Mono, non cliquables en 48d car aucune cible n'existe) :
@@ -198,6 +200,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 | 1.3 | 2026-11-01 | TK-48 (48e-1, refactor) | Boutons d'entrée livrés tels que décrits ; la région d'état unique de cet écran perd son rôle et son contenu tant que le formulaire est ouvert (elle revient à la fermeture), le panneau portant alors la région (voir S-feature-form v1.1). La ligne de version et la fiche s'affichent sans attendre le rôle (client par défaut) ; rien d'autre ne change pour la lecture. |
 | 1.4 | 2026-11-01 | TK-48 (48e-2, refactor) | Après une suppression, la liste est relue sans la fonctionnalité (filtres gardés, curseur oublié) et la région d'état dit « F-001 supprimée. » (pas de « Voir la fiche »), focus sur le h1 ; un suivi de suppression page fermée dit « Suppression de « Titre » en cours… ». Détail : S-feature-form §4.8. |
 | 1.5 | 2026-11-02 | TK-59 | Bouton « Cadrer avec l'IA » (§3.1.1) dans l'en-tête et dans l'état vide, pour propriétaire, administrateur, développeur et designer avec spec lue ; la page est décrite par [S-framing](S-framing.md). Aucun changement pour les rôles en lecture. |
+| 1.6 | 2026-11-06 | TK-87 | Lot 0 : colonne « Statut » renommée « Avancement » et rendue par `LifecycleStatus` (stade dérivé, B22) ; priorité en `PriorityIndicator` dans la liste, la ligne méta mobile et la fiche ; plus aucun badge fait main ; h1 24 px (échelle v2). Filtres inchangés jusqu'à TK-88 (B31). Détail : `.workflow/TK-87/02-design.md` |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.

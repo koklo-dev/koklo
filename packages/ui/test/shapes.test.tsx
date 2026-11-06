@@ -6,6 +6,8 @@ import {
   Badge,
   Button,
   Card,
+  CardDescription,
+  CardTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -62,16 +64,16 @@ describe("formes (02-design.md §2)", () => {
     expect(screen.getByRole("combobox")).toHaveClass("h-9", "rounded-md");
   });
 
-  it("Popover : rounded-xl shadow-md (flottant)", () => {
+  it("Popover : rounded-xl shadow-floating (flottant, DESIGN.md v2 §2.1)", () => {
     render(
       <Popover open>
         <PopoverContent>contenu</PopoverContent>
       </Popover>,
     );
-    expect(screen.getByRole("dialog")).toHaveClass("rounded-xl", "shadow-md");
+    expect(screen.getByRole("dialog")).toHaveClass("rounded-xl", "shadow-floating");
   });
 
-  it("DropdownMenu content : rounded-xl shadow-md", () => {
+  it("DropdownMenu content : rounded-xl shadow-floating", () => {
     render(
       <DropdownMenu open>
         <DropdownMenuTrigger>ouvrir</DropdownMenuTrigger>
@@ -80,10 +82,10 @@ describe("formes (02-design.md §2)", () => {
         </DropdownMenuContent>
       </DropdownMenu>,
     );
-    expect(screen.getByRole("menu")).toHaveClass("rounded-xl", "shadow-md");
+    expect(screen.getByRole("menu")).toHaveClass("rounded-xl", "shadow-floating");
   });
 
-  it("Sheet content : shadow-md (flottant)", () => {
+  it("Sheet content : shadow-floating sur --raised (flottant)", () => {
     render(
       <Sheet open>
         <SheetContent>
@@ -92,6 +94,32 @@ describe("formes (02-design.md §2)", () => {
         </SheetContent>
       </Sheet>,
     );
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-md");
+    expect(screen.getByRole("dialog")).toHaveClass("shadow-floating", "bg-raised");
+  });
+});
+
+describe("titres sur l'échelle v2 (DESIGN.md §3)", () => {
+  it("titres par défaut sur l'échelle v2 : Sheet en section (16/600), Card en sous-section (14/600)", () => {
+    render(
+      <Sheet open>
+        <SheetContent>
+          <SheetTitle>Titre du panneau</SheetTitle>
+          <SheetDescription>d</SheetDescription>
+        </SheetContent>
+      </Sheet>,
+    );
+    expect(screen.getByRole("heading", { name: "Titre du panneau" })).toHaveClass(
+      "text-section-title",
+    );
+    const { container } = render(
+      <Card>
+        <CardTitle>Titre de carte</CardTitle>
+        <CardDescription>Texte</CardDescription>
+      </Card>,
+    );
+    const h3 = container.querySelector("h3");
+    expect(h3).toHaveClass("text-subsection-title");
+    expect(h3?.className).not.toMatch(/text-base|tracking-\[/);
+    expect(container.querySelector("p")).toHaveClass("text-meta");
   });
 });

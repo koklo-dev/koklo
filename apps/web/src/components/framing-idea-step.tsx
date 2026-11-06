@@ -20,7 +20,7 @@ import { FramingTextField } from "./framing-text-field.tsx";
 
 const HELP_IDEA =
   "Décrivez le besoin en quelques phrases : qui, quel problème, ce que vous attendez.";
-const REASON_ID = "framing-idea-reason";
+const BLANK_REASON = "Écrivez votre idée pour continuer.";
 
 function Clarifications({ page }: { page: FramingModel }) {
   const { state, change, ideaIssues } = page;
@@ -71,17 +71,12 @@ function IdeaPath({ page }: { page: FramingModel }) {
       />
       <Clarifications page={page} />
       <AiSendPolicy />
-      {blank ? (
-        <p id={REASON_ID} className="text-[13px] text-muted-foreground">
-          Écrivez votre idée pour continuer.
-        </p>
-      ) : null}
       <FramingCallButton
         id={IDS.callBrief}
         label="Générer un brief avec l'IA"
         busy={call.pending === "brief"}
         disabled={blank || call.pending !== null || call.waiting}
-        reasonId={blank ? REASON_ID : undefined}
+        reason={blank ? BLANK_REASON : undefined}
         cancelled={call.cancelled && calls.lastKind() === "brief"}
         onClick={generate}
         onCancel={() => {
@@ -158,7 +153,7 @@ export function FramingIdeaStep({ page }: { page: FramingModel }) {
       aria-busy={call.pending === "brief" || undefined}
       className="flex flex-col gap-4"
     >
-      <h2 id="framing-heading-idea" className="text-[22px] font-semibold tracking-[-0.015em]">
+      <h2 id="framing-heading-idea" className="text-section-title">
         1. Votre idée
       </h2>
       {failed && call.error ? (

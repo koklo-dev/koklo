@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  AXE_TAGS,
   CAPTURES_DIR,
   githubStartsSeen,
   projectCreatesSeen,
@@ -168,9 +169,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
       await arrive(page);
       await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^((?!dark).)*$/);
       await capture(page, name, theme);
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
       expect(results.violations).toEqual([]);
       await releaseHeld();
     });

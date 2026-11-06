@@ -17,12 +17,39 @@ const ALLOWED_EXTENSIONS = [
 ];
 
 describe("CA1 - source de vérité DESIGN.md §2.1", () => {
-  it("expose 19 variables en clair (dont --radius) et 18 en sombre", () => {
+  it("expose 24 variables en clair (dont --radius) et 23 en sombre (v2, TK-87)", () => {
     const design = designTokens();
-    expect(Object.keys(design[":root"] ?? {})).toHaveLength(19);
-    expect(Object.keys(design[".dark"] ?? {})).toHaveLength(18);
+    expect(Object.keys(design[":root"] ?? {})).toHaveLength(24);
+    expect(Object.keys(design[".dark"] ?? {})).toHaveLength(23);
     expect(design[":root"]?.["--radius"]).toBe("0.5rem");
     expect(design[".dark"]?.["--radius"]).toBeUndefined();
+  });
+});
+
+/** TK-87, passation 01 §0.1 et 02 §6.4 : jetons v2 attendus mot pour mot (clair, sombre). */
+const V2_TOKENS: ReadonlyArray<readonly [string, string, string]> = [
+  ["--surface", "#f7f5ff", "#15122b"],
+  ["--raised", "#ffffff", "#1d1838"],
+  ["--border-strong", "#cfc7ee", "#3d3670"],
+  ["--diff-bg", "#faf8ff", "#1a1536"],
+  ["--popover", "#ffffff", "#1d1838"],
+  ["--muted", "#f7f5ff", "#15122b"],
+  ["--shadow-floating", "0 8px 24px rgb(20 16 43 / .12)", "none"],
+];
+
+describe("CA1 (TK-87) - jetons v2 de surface, bordure forte, diff et ombre", () => {
+  it.each(V2_TOKENS)("%s : %s en clair, %s en sombre dans theme.css", (name, light, dark) => {
+    expect(norm(effectiveTheme(":root")[name]), `:root ${name}`).toBe(norm(light));
+    expect(norm(effectiveTheme(".dark")[name]), `.dark ${name}`).toBe(norm(dark));
+  });
+
+  it("--popover prend la valeur de --raised et --muted celle de --surface (alias H1)", () => {
+    for (const selector of [":root", ".dark"] as const) {
+      const theme = effectiveTheme(selector);
+      expect(theme["--raised"], `${selector} --raised`).toBeDefined();
+      expect(norm(theme["--popover"])).toBe(norm(theme["--raised"]));
+      expect(norm(theme["--muted"])).toBe(norm(theme["--surface"]));
+    }
   });
 });
 

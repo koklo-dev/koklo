@@ -1,4 +1,4 @@
-import { Badge, Icon, type IconName, StatusBadge } from "@koklo/ui";
+import { ValidationStatus } from "@koklo/ui";
 import {
   AUTHORIZATION_LABELS,
   INSTALLATION_STATUS_LABELS,
@@ -6,29 +6,26 @@ import {
   type UserAuthorization,
 } from "../lib/github-labels.ts";
 
-const OUTLINE_ICONS: Record<Exclude<InstallationStatus, "active">, IconName> = {
-  suspended: "block",
-  deleted: "cancel",
-};
-
-/** Statut de l'installation : icône + texte, jamais la couleur seule. */
-export function InstallationStatusBadge({ status }: { status: InstallationStatus }) {
+/**
+ * Statut de l'installation en `ValidationStatus` (H7, B25, B33) : Active -> Validée ; Suspendue -> Non
+ * soumise + `block` ; Désinstallée -> Non soumise + `cancel`. Icône et libellé, jamais la couleur seule.
+ */
+export function InstallationStatusPill({ status }: { status: InstallationStatus }) {
   const label = INSTALLATION_STATUS_LABELS[status];
-  if (status === "active") return <StatusBadge status="validated" label={label} />;
+  if (status === "active") return <ValidationStatus status="validated" label={label} />;
   return (
-    <Badge variant="outline">
-      <span className="inline-flex items-center gap-1">
-        <Icon name={OUTLINE_ICONS[status]} size={16} />
-        {label}
-      </span>
-    </Badge>
+    <ValidationStatus
+      status="unsubmitted"
+      icon={status === "suspended" ? "block" : "cancel"}
+      label={label}
+    />
   );
 }
 
-/** Autorisation de la personne : « Autorisée » ou à (ré)autoriser. */
-export function AuthorizationBadge({ authorization }: { authorization: UserAuthorization }) {
+/** Autorisation de la personne : « Autorisée » (Validée) ou à (ré)autoriser (À valider). */
+export function AuthorizationPill({ authorization }: { authorization: UserAuthorization }) {
   return (
-    <StatusBadge
+    <ValidationStatus
       status={authorization === "active" ? "validated" : "pending"}
       label={AUTHORIZATION_LABELS[authorization]}
     />

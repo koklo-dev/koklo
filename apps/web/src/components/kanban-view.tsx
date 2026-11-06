@@ -29,7 +29,7 @@ function Loading() {
       aria-busy="true"
       className="flex flex-col gap-4"
     >
-      <p className="text-[13px] text-muted-foreground">Chargement du kanban…</p>
+      <p className="text-meta text-muted-foreground">Chargement du kanban…</p>
       <div className="flex gap-4 overflow-hidden" aria-hidden="true">
         {SKELETON_CARDS.map((cards, column) => (
           <div
@@ -66,7 +66,7 @@ function CenteredCard({
   return (
     <Card data-testid={testId} className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name={icon} size={28} className="text-muted-foreground" />
-      <h2 className="text-base font-semibold tracking-[-0.015em]">{title}</h2>
+      <h2 className="text-section-title">{title}</h2>
       {children}
     </Card>
   );
@@ -80,7 +80,7 @@ function Header({
   readOnly: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1 text-[13px] text-muted-foreground">
+    <div className="flex flex-col gap-1 text-meta text-muted-foreground">
       <div className="flex flex-wrap gap-x-3">
         <p>{`Sprint ${data.sprintKey} · ${data.goal}`}</p>
         <p>{data.total === 1 ? "1 ticket" : `${data.total} tickets`}</p>
@@ -108,7 +108,7 @@ function Board({
     <div data-testid="kanban-board" className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Header data={data} readOnly={!interaction.canMove} />
-        <div role="status" className="text-[13px] text-muted-foreground empty:hidden">
+        <div role="status" className="text-meta text-muted-foreground empty:hidden">
           {announcement}
         </div>
       </div>
@@ -150,7 +150,7 @@ export function KanbanView({ data, onRetry, ...board }: KanbanViewProps) {
     case "no-sprint":
       return (
         <CenteredCard testId="kanban-no-sprint" icon="checklist" title="Aucun sprint actif">
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-meta text-muted-foreground">
             Le kanban affiche les tickets du sprint en cours. Il apparaîtra dès qu'un sprint sera
             démarré.
           </p>

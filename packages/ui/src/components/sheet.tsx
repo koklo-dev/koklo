@@ -19,7 +19,7 @@ export function SheetClose(props: ComponentProps<typeof SheetPrimitive.Close>) {
 }
 
 const sheetVariants = cva(
-  "fixed z-50 flex flex-col gap-4 border-border bg-background p-6 shadow-md motion-safe:transition-transform duration-150 motion-safe:animate-content-in motion-reduce:transition-none",
+  "fixed z-50 flex flex-col gap-4 border-border bg-raised p-6 shadow-floating motion-safe:transition-transform duration-150 motion-safe:animate-content-in motion-reduce:transition-none",
   {
     variants: {
       side: {
@@ -75,7 +75,7 @@ export function SheetFooter({ className, ...props }: ComponentProps<"div">) {
 export function SheetTitle({ className, ...props }: ComponentProps<typeof SheetPrimitive.Title>) {
   return (
     <SheetPrimitive.Title
-      className={cn("text-base font-semibold text-foreground", className)}
+      className={cn("text-section-title text-foreground", className)}
       {...props}
     />
   );
@@ -87,7 +87,7 @@ export function SheetDescription({
 }: ComponentProps<typeof SheetPrimitive.Description>) {
   return (
     <SheetPrimitive.Description
-      className={cn("text-[13px] text-muted-foreground", className)}
+      className={cn("text-meta text-muted-foreground", className)}
       {...props}
     />
   );

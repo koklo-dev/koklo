@@ -12,10 +12,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
   Icon,
+  PriorityIndicator,
 } from "@koklo/ui";
 import { useEffect, useId, useRef } from "react";
 import {
   PRIORITY_LABELS,
+  PRIORITY_LEVELS,
   STATUS_ICONS,
   STATUS_LABELS,
   STATUS_ORDER,
@@ -33,8 +35,6 @@ interface KanbanCardProps {
   onDragEnd: () => void;
 }
 
-const HEAVY = new Set<string>(["critical", "high"]);
-
 function Meta({ ticket }: { ticket: TicketOutput }) {
   const sensitive = ticket.sensitivity === "sensitive";
   return (
@@ -46,13 +46,10 @@ function Meta({ ticket }: { ticket: TicketOutput }) {
         {sensitive ? <Icon name="lock" size={16} /> : null}
         {sensitive ? "Sensible" : "Sûr"}
       </Badge>
-      <span
-        className={
-          HEAVY.has(ticket.priority) ? "font-semibold text-foreground" : "text-muted-foreground"
-        }
-      >
-        {PRIORITY_LABELS[ticket.priority]}
-      </span>
+      <PriorityIndicator
+        level={PRIORITY_LEVELS[ticket.priority]}
+        label={PRIORITY_LABELS[ticket.priority]}
+      />
     </div>
   );
 }

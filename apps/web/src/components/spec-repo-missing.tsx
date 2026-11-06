@@ -29,10 +29,8 @@ export function SpecRepoMissing({
   return (
     <Card className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="link" size={28} className="text-muted-foreground" />
-      <h2 className="text-base font-semibold tracking-[-0.015em]">
-        Ce projet n'a pas de dépôt de spec
-      </h2>
-      <p className="text-[13px] text-muted-foreground">
+      <h2 className="text-section-title">Ce projet n'a pas de dépôt de spec</h2>
+      <p className="text-meta text-muted-foreground">
         {canCreate
           ? "Sans dépôt de spec, Koklo ne peut pas afficher ni enregistrer les fonctionnalités. Créez-le maintenant : il sera privé et lié à ce projet."
           : "Ce projet n'a pas encore de dépôt de spec. Un propriétaire ou un administrateur peut le créer."}

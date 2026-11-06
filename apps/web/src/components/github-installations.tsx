@@ -1,7 +1,7 @@
 import type { InstallationOutput } from "@koklo/contract";
 import { Button, cn } from "@koklo/ui";
 import { ownerKindLabel, REDIRECTING_LABEL } from "../lib/github-labels.ts";
-import { AuthorizationBadge, InstallationStatusBadge } from "./github-status.tsx";
+import { AuthorizationPill, InstallationStatusPill } from "./github-status.tsx";
 
 const longDate = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
 
@@ -34,18 +34,18 @@ function InstallationRow({ installation, locked, redirecting, onAuthorize }: Row
       )}
     >
       <div className="flex flex-col gap-1">
-        <h2 className="font-mono text-base font-normal">{ownerLogin}</h2>
-        <p className="text-[13px] text-muted-foreground">{ownerKindLabel(ownerKind)}</p>
-        <p className="text-[13px] text-muted-foreground">
+        <h2 className="text-section-title font-mono">{ownerLogin}</h2>
+        <p className="text-meta text-muted-foreground">{ownerKindLabel(ownerKind)}</p>
+        <p className="text-meta text-muted-foreground">
           Installée le {longDate.format(new Date(createdAt))}
         </p>
       </div>
       <div className="flex flex-col gap-2 md:items-start">
         <div className="flex flex-wrap gap-2">
-          <InstallationStatusBadge status={status} />
-          {status === "active" ? <AuthorizationBadge authorization={userAuthorization} /> : null}
+          <InstallationStatusPill status={status} />
+          {status === "active" ? <AuthorizationPill authorization={userAuthorization} /> : null}
         </div>
-        <p className="text-[13px] text-muted-foreground">{noteFor(installation)}</p>
+        <p className="text-meta text-muted-foreground">{noteFor(installation)}</p>
       </div>
       {authorizable ? (
         <Button
@@ -78,7 +78,7 @@ export function GithubInstallations({
 }: InstallationsProps) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-meta text-muted-foreground">
         {installations.length === 1 ? "1 installation" : `${installations.length} installations`}
       </p>
       <ul aria-label="Installations GitHub" className="flex flex-col gap-3">

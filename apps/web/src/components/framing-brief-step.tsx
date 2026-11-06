@@ -107,7 +107,7 @@ function Questions({ page }: { page: FramingModel }) {
   if (!view.answering) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           Répondre à ces questions améliore le brief.
         </p>
         <Button
@@ -188,7 +188,7 @@ function ProposeButton({ page }: { page: FramingModel }) {
           page.focusOn(IDS.callPropose);
         }}
       />
-      {briefIssue ? <p className="text-[13px] text-destructive">{briefIssue}</p> : null}
+      {briefIssue ? <p className="text-meta text-destructive">{briefIssue}</p> : null}
     </div>
   );
 }
@@ -204,11 +204,7 @@ export function FramingBriefStep({ page }: { page: FramingModel }) {
       aria-busy={call.pending === "regenerate" || call.pending === "propose" || undefined}
       className="flex flex-col gap-4"
     >
-      <h2
-        id={IDS.stepBrief}
-        tabIndex={-1}
-        className="text-[22px] font-semibold tracking-[-0.015em] outline-none"
-      >
+      <h2 id={IDS.stepBrief} tabIndex={-1} className="text-section-title outline-none">
         2. Le brief
       </h2>
       {failed && call.error ? (

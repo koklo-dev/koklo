@@ -96,8 +96,11 @@ describe("repères et libellés", () => {
 });
 
 describe("ordre de focus (§7)", () => {
-  it("champ de clé, puis « Avancé », puis « Enregistrer et vérifier »", async () => {
+  // TK-87 : le bloc d'envoi (au-dessus du formulaire) porte « Détails », premier arrêt de tabulation.
+  it("« Détails » du bloc d'envoi, champ de clé, puis « Avancé », puis « Enregistrer et vérifier »", async () => {
     await openAiSettings([]);
+    await userEvent.tab();
+    expect(screen.getByRole("button", { name: "Détails" })).toHaveFocus();
     await userEvent.tab();
     expect(keyField()).toHaveFocus();
     await userEvent.tab();
@@ -115,8 +118,10 @@ describe("ordre de focus (§7)", () => {
     expect(button(SAVE_VERIFY)).toHaveFocus();
   });
 
-  it("carte configurée : Vérifier à nouveau, Remplacer la clé, Retirer la clé, dans cet ordre", async () => {
+  it("carte configurée : Détails, Vérifier à nouveau, Remplacer la clé, Retirer la clé, dans cet ordre", async () => {
     await openAiSettings([credential()]);
+    await userEvent.tab();
+    expect(screen.getByRole("button", { name: "Détails" })).toHaveFocus();
     await userEvent.tab();
     expect(button("Vérifier à nouveau")).toHaveFocus();
     await userEvent.tab();
@@ -223,7 +228,11 @@ describe("mouvement réduit, cibles tactiles et 375 px (§6)", () => {
     ]);
     const page = screen.getByTestId("ai-settings-page");
     expect(page.innerHTML).toMatch(/break-words|break-all|\[overflow-wrap:anywhere\]|min-w-0/);
-    expect(page.innerHTML).not.toMatch(/\bwhitespace-nowrap\b|\boverflow-x-(?:auto|scroll)\b/);
+    // Les pastilles de statut (DESIGN.md v2 §5.1, libellé court et fixe) ne se coupent pas : c'est leur
+    // ligne qui passe à la suivante. Le garde porte sur tout le reste de la page.
+    const rest = page.cloneNode(true) as HTMLElement;
+    for (const pill of rest.querySelectorAll("[data-slot='validation-status']")) pill.remove();
+    expect(rest.innerHTML).not.toMatch(/\bwhitespace-nowrap\b|\boverflow-x-(?:auto|scroll)\b/);
   });
 });
 

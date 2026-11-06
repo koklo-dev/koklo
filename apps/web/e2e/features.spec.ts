@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import {
+  AXE_TAGS,
   CAPTURES_DIR,
   type KanbanRole,
   projectCreatesSeen,
@@ -26,7 +27,6 @@ import {
  * Captures dans design/screens/captures/S-features/<état>-<thème>.png (+ -mobile à 375 px).
  */
 /** Même référentiel que les autres specs : WCAG A/AA (les règles « best-practice » visent un autre périmètre). */
-const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa"];
 const PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
 const FICHE_TITLE = "Connexion par e-mail";
 const ids = (role?: KanbanRole) => (role ? { role } : {});
@@ -395,11 +395,13 @@ test.describe("375 px", () => {
     await page.goto(PATH);
     const table = page.getByRole("table", { name: /^Fonctionnalités du projet/ });
     await expect(table).toBeVisible();
-    for (const name of ["Statut", "Priorité", "Critères"]) {
+    for (const name of ["Avancement", "Priorité", "Critères"]) {
       await expect(page.getByRole("columnheader", { name })).toHaveCount(0);
     }
     // La ligne méta (statut · priorité · critères) remplace les colonnes masquées ; la cellule Priorité reste masquée.
-    await expect(table.getByText(/Brouillon · Indispensable · 3 critères/)).toBeVisible();
+    // TK-87 : LifecycleStatus et PriorityIndicator dans la ligne méta (S-features, B22).
+    await expect(table.getByLabel("Avancement : Spécifiée, étape 2 sur 6").first()).toBeVisible();
+    await expect(table.getByText("3 critères").first()).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

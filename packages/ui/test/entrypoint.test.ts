@@ -84,6 +84,22 @@ describe("CA4 : point d'entrée unique de @koklo/ui", () => {
     }
   });
 
+  it.each([
+    "LifecycleStatus",
+    "ValidationStatus",
+    "DeliverableStatus",
+    "PriorityIndicator",
+    "EntityChip",
+    "HoverCard",
+    "HoverCardTrigger",
+    "HoverCardContent",
+    "InlineAlert",
+    "EmptyState",
+    "PhaseRail",
+  ])("TK-87 : src/index.ts exporte le composant du lot 0 %s", (name) => {
+    expect(ui).toHaveProperty(name);
+  });
+
   it.each(SHADCN_ROOTS)("src/index.ts exporte le composant shadcn %s", (name) => {
     expect(ui).toHaveProperty(name);
   });

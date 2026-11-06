@@ -168,7 +168,9 @@ describe("Chargement de la fiche (§4.11)", () => {
     const dialog = await sheet();
     expect(within(dialog).getByRole("heading", { level: 2, name: TITLE })).toBeInTheDocument();
     expect(within(dialog).getByText("F-001")).toBeInTheDocument();
-    expect(within(dialog).getByText("Brouillon")).toBeInTheDocument();
+    expect(
+      within(dialog).getByLabelText("Avancement : Spécifiée, étape 2 sur 6"),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText("Indispensable")).toBeInTheDocument();
     const loading = within(dialog).getByRole("status");
     expect(loading).toHaveAttribute("aria-busy", "true");
@@ -179,12 +181,18 @@ describe("Chargement de la fiche (§4.11)", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Contenu de la fiche — vue équipe (§3.4)", () => {
-  it("en-tête : identifiant mono, titre h2, badge de statut et priorité avec les mêmes libellés que la liste", async () => {
+  it("en-tête : identifiant mono, titre h2, LifecycleStatus et PriorityIndicator comme la liste (TK-87)", async () => {
     renderFeatures({ search: "?feature=F-001" });
     const dialog = await sheet();
     expect(within(dialog).getByText("F-001").className).toMatch(/font-mono/);
-    expect(within(dialog).getByText("Brouillon")).toBeInTheDocument();
-    expect(within(dialog).getByText("Indispensable")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Avancement : Spécifiée, étape 2 sur 6")).toHaveAttribute(
+      "data-slot",
+      "lifecycle-status",
+    );
+    const indicator = dialog.querySelector("[data-slot='priority-indicator']");
+    expect(indicator).toHaveAttribute("data-level", "3");
+    expect(indicator).toHaveTextContent("Indispensable");
+    expect(within(dialog).queryByText("Brouillon")).toBeNull();
   });
 
   it("description en TEXTE BRUT : retours à la ligne conservés, Markdown et HTML non interprétés", async () => {

@@ -12,11 +12,11 @@ export function CardHeader({ className, ...props }: ComponentProps<"div">) {
 }
 
 export function CardTitle({ className, ...props }: ComponentProps<"h3">) {
-  return <h3 className={cn("text-base font-semibold tracking-[-0.015em]", className)} {...props} />;
+  return <h3 className={cn("text-subsection-title", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: ComponentProps<"p">) {
-  return <p className={cn("text-[13px] text-muted-foreground", className)} {...props} />;
+  return <p className={cn("text-meta text-muted-foreground", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: ComponentProps<"div">) {

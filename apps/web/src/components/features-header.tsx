@@ -46,14 +46,10 @@ export function FeaturesHeader({
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <h1
-          ref={titleRef}
-          tabIndex={-1}
-          className="text-[30px] font-semibold tracking-[-0.025em] outline-none"
-        >
+        <h1 ref={titleRef} tabIndex={-1} className="text-page-title outline-none">
           Fonctionnalités
         </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">{name ?? "Projet"}</p>
+        <p className="mt-1 text-meta text-muted-foreground">{name ?? "Projet"}</p>
       </div>
       {onCreate ? (
         <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">

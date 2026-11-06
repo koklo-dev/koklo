@@ -154,27 +154,60 @@ describe("Précisions (§3.3)", () => {
   });
 });
 
-describe("Bloc « Ce qui est envoyé à Anthropic » (§3.2)", () => {
-  it("dans le DOM avant toute requête, au-dessus du bouton d'appel, texte complet, jamais replié", async () => {
+const SEND_LINE = "Votre texte est envoyé à l'agent IA avec la clé de l'organisation.";
+const PROVIDERS = /Anthropic|OpenAI|Gemini|Mistral|OpenRouter|États-Unis/;
+
+/** Bloc d'envoi de l'étape : l'`InlineAlert` neutre qui porte la ligne d'envoi. */
+function sendBlock(): HTMLElement {
+  const block = screen.queryAllByRole("note").find((n) => n.textContent?.includes(SEND_LINE));
+  if (!block)
+    throw new Error(`Bloc d'envoi absent : aucune InlineAlert role=note « ${SEND_LINE} »`);
+  return block;
+}
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("Bloc d'envoi à l'agent IA (§3.2 v2, TK-87, B15)", () => {
+  it("InlineAlert neutre role=note dans le DOM avant toute requête, au-dessus du bouton d'appel", async () => {
     await openFraming();
     expect(aiCallCount()).toBe(0);
-    const block = screen
-      .getByRole("heading", { name: "Ce qui est envoyé à Anthropic", level: 3 })
-      .closest("[role='alert'], [data-slot='alert'], div") as HTMLElement;
-    const text = block.parentElement?.textContent ?? "";
+    const block = sendBlock();
+    expect(block, "bloc d'envoi").toBeDefined();
+    expect(block).toHaveAttribute("data-slot", "inline-alert");
+    const button = screen.getByRole("button", { name: GENERATE });
+    expect(block.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(block.querySelector("input[type='checkbox']")).toBeNull();
+  });
+
+  it("replié par défaut : « Détails » aria-expanded=false, détail absent", async () => {
+    await openFraming();
+    const toggle = within(sendBlock()).getByRole("button", { name: "Détails" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Ne saisissez pas de données personnelles.")).toBeNull();
+  });
+
+  it("« Détails » déplie le détail complet sans aucune requête", async () => {
+    await openFraming();
+    const toggle = within(sendBlock()).getByRole("button", { name: "Détails" });
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const region = document.getElementById(toggle.getAttribute("aria-controls") ?? "");
     for (const part of [
-      "sont envoyés à Anthropic (États-Unis), avec la clé de votre organisation",
+      "sont envoyés à l'agent IA, avec la clé de votre organisation",
       "Ne saisissez pas de données personnelles.",
       "Jamais envoyés : clés, identifiants de personnes, noms de l'organisation, du projet ou des dépôts.",
       "Rien n'est enregistré dans votre projet avant votre confirmation.",
       "Les appels sont comptés pour votre organisation.",
     ]) {
-      expect(text).toContain(part);
+      expect(region).toHaveTextContent(part);
     }
-    const button = screen.getByRole("button", { name: GENERATE });
-    expect(block.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(block.closest("details")).toBeNull();
-    expect(block.querySelector("input[type='checkbox']")).toBeNull();
+    expect(aiCallCount()).toBe(0);
+  });
+
+  it("aucun nom de fournisseur dans l'écran, replié comme déplié", async () => {
+    await openFraming();
+    expect(document.body.textContent).not.toMatch(PROVIDERS);
+    await userEvent.click(within(sendBlock()).getByRole("button", { name: "Détails" }));
+    expect(document.body.textContent).not.toMatch(PROVIDERS);
   });
 
   it("n'est pas l'alerte d'échec : aucun role=alert tant qu'il n'y a pas d'erreur, aucune case à cocher", async () => {
@@ -189,6 +222,20 @@ describe("Bloc « Ce qui est envoyé à Anthropic » (§3.2)", () => {
     await userEvent.click(screen.getByRole("button", { name: GENERATE }));
     await findNamed("heading", /^2\. Le brief/);
     expect(Object.keys(localStorage).filter((k) => /consent/i.test(k))).toEqual([]);
+  });
+
+  it("bouton d'appel désactivé à idée vide : la raison est reliée par aria-describedby (§5.2 v2)", async () => {
+    await openFraming();
+    const button = screen.getByRole("button", { name: GENERATE });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(/Écrivez votre idée pour continuer\./);
+  });
+
+  it("la raison suit le bouton dans le même conteneur (Button disabledReason), pas au-dessus", async () => {
+    await openFraming();
+    const button = screen.getByRole("button", { name: GENERATE });
+    const reason = screen.getByText("Écrivez votre idée pour continuer.");
+    expect(button.nextElementSibling).toBe(reason);
   });
 });
 
@@ -272,11 +319,11 @@ describe("« J'ai déjà un brief » : sans appel draftBrief (§3.3)", () => {
     expect(screen.queryByRole("heading", { name: /^2\./ })).not.toBeInTheDocument();
   });
 
-  it("le bloc « ce qui est envoyé » reste affiché sur ce chemin aussi", async () => {
+  it("le bloc d'envoi reste affiché sur ce chemin aussi", async () => {
     await openFraming();
     await userEvent.click(screen.getByRole("tab", { name: "J'ai déjà un brief" }));
     expect(
-      screen.getByRole("heading", { name: "Ce qui est envoyé à Anthropic", level: 3 }),
+      screen.getByText("Votre texte est envoyé à l'agent IA avec la clé de l'organisation."),
     ).toBeVisible();
   });
 });

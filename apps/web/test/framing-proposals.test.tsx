@@ -80,17 +80,25 @@ describe("Liste des propositions", () => {
     expect(submits()).toHaveLength(0);
   });
 
-  it("la carte porte la priorité en mots, le badge « Proposé par l'IA » et le statut en badge outline icône + texte", async () => {
+  // TK-87 (CA3, cas 3.2 ; H7, B25, B33) : statut en ValidationStatus, priorité en PriorityIndicator.
+  it("la carte porte la priorité en PriorityIndicator, le badge « Proposé par l'IA » et le statut en ValidationStatus", async () => {
     await openFraming();
     await proposeFeatures();
-    expect(inCard(T1).getByText("Indispensable")).toBeVisible();
-    expect(inCard(T2).getByText("Importante")).toBeVisible();
-    expect(inCard(T3).getByText("Souhaitable")).toBeVisible();
+    for (const [title, label, level] of [
+      [T1, "Indispensable", "3"],
+      [T2, "Importante", "2"],
+      [T3, "Souhaitable", "1"],
+    ] as const) {
+      const indicator = inCard(title).getByText(label).closest("[data-slot='priority-indicator']");
+      expect(indicator, `${title} : PriorityIndicator`).not.toBeNull();
+      expect(indicator).toHaveAttribute("data-level", level);
+    }
     expect(inCard(T1).getByText("Proposé par l'IA")).toBeVisible();
-    const badge = inCard(T1).getByText("À relire").closest("[data-slot='badge']") as HTMLElement;
-    expect(badge).not.toBeNull();
-    expect(badge.querySelector("svg[aria-hidden='true']")).not.toBeNull();
-    expect(badge.className).not.toMatch(/status-|bg-primary|violet|purple/);
+    const status = inCard(T1).getByText("À relire").closest("[data-slot='validation-status']");
+    expect(status, "ValidationStatus").not.toBeNull();
+    expect(status).toHaveAttribute("data-status", "pending");
+    expect(status?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+    expect(status?.className ?? "").not.toMatch(/bg-primary|violet|purple/);
   });
 
   it("description à retours à la ligne conservés (pre-wrap), repliée avec « Afficher la suite » / « Réduire »", async () => {
@@ -155,6 +163,17 @@ describe("Accepter, rejeter, reprendre", () => {
     expect(inCard(T2).getByRole("button", { name: "Reprendre" })).toHaveFocus();
     expect(inCard(T2).getByText(/Description de Annuler une réservation/)).toBeVisible();
     expect(liveText()).toContain("Proposition « Annuler une réservation » rejetée.");
+  });
+
+  it("Acceptée -> ValidationStatus validated ; Rejetée -> unsubmitted (icône cancel) (TK-87, H7)", async () => {
+    await openFraming();
+    await proposeFeatures();
+    await accept(T1);
+    await reject(T2);
+    const accepted = inCard(T1).getByText("Acceptée").closest("[data-slot='validation-status']");
+    expect(accepted).toHaveAttribute("data-status", "validated");
+    const rejected = inCard(T2).getByText("Rejetée").closest("[data-slot='validation-status']");
+    expect(rejected).toHaveAttribute("data-status", "unsubmitted");
   });
 
   it("« Reprendre » remet la carte à relire", async () => {

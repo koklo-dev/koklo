@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
+  AXE_TAGS,
   aiCallsSeen,
   CAPTURES_DIR,
   type KanbanRole,
@@ -21,7 +22,6 @@ import { FEATURE_PROJECT_ID, UNKNOWN_PROJECT_ID } from "./support/stub-features.
  * github.com ni Postgres. Captures : design/screens/captures/S-framing/<état>-<thème>.png (+ -mobile à 375 px) ;
  * le Red n'en écrit aucune, le Green/Refactor les génère.
  */
-const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa"];
 const PATH = `/projects/${FEATURE_PROJECT_ID}/framing`;
 const FEATURES_PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
 const IDEA = "Un portail pour réserver des créneaux en ligne.";
@@ -97,11 +97,23 @@ const STATES: State[] = [
   },
   {
     name: "idea-policy",
-    reach: (page) => writeIdea(page),
-    visible: (page) =>
-      expect(
-        page.getByRole("heading", { name: "Ce qui est envoyé à Anthropic" }).first(),
-      ).toBeVisible(),
+    // TK-87 (S-framing §3.2 v2, B15) : bloc d'envoi en InlineAlert neutre, « Détails » déplié pour la capture.
+    reach: async (page) => {
+      await writeIdea(page);
+      await page.getByRole("button", { name: "Détails" }).first().click();
+    },
+    visible: async (page) => {
+      await expect(
+        page
+          .getByText("Votre texte est envoyé à l'agent IA avec la clé de l'organisation.")
+          .first(),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Détails" }).first()).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await expect(page.locator("body")).not.toContainText(/Anthropic|États-Unis/);
+    },
   },
   {
     name: "loading",

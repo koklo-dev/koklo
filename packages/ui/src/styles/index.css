@@ -8,6 +8,8 @@
 /* Expose les variables à Tailwind (utilitaires bg-primary, text-muted-foreground, etc.). */
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -24,7 +26,9 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
+  --color-diff-bg: var(--diff-bg);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -42,10 +46,48 @@
   --color-status-revise: var(--status-revise-bg);
   --color-status-revise-foreground: var(--status-revise-fg);
 
+  --color-alert-neutral: var(--alert-neutral-bg);
+  --color-alert-neutral-border: var(--alert-neutral-border);
+  --color-alert-neutral-foreground: var(--alert-neutral-fg);
+  --color-alert-warning: var(--alert-warning-bg);
+  --color-alert-warning-border: var(--alert-warning-border);
+  --color-alert-warning-foreground: var(--alert-warning-fg);
+  --color-alert-error: var(--alert-error-bg);
+  --color-alert-error-border: var(--alert-error-border);
+  --color-alert-error-foreground: var(--alert-error-fg);
+
+  /* Ombre des éléments flottants (none en sombre) : utilitaire shadow-floating. */
+  --shadow-floating: var(--shadow-floating);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Échelle typographique v2 (DESIGN.md §3) : utilitaires text-<rôle> tirés de typography.css.
+   Bloc séparé du mappage des couleurs : il ne référence que des variables de typography.css. */
+@theme inline {
+  --text-page-title: var(--text-page-title-size);
+  --text-page-title--font-weight: var(--text-page-title-weight);
+  --text-page-title--letter-spacing: var(--text-page-title-tracking);
+  --text-section-title: var(--text-section-title-size);
+  --text-section-title--font-weight: var(--text-section-title-weight);
+  --text-section-title--letter-spacing: var(--text-section-title-tracking);
+  --text-subsection-title: var(--text-subsection-title-size);
+  --text-subsection-title--font-weight: var(--text-subsection-title-weight);
+  --text-subsection-title--letter-spacing: var(--text-subsection-title-tracking);
+  --text-body: var(--text-body-size);
+  --text-body--font-weight: var(--text-body-weight);
+  --text-meta: var(--text-secondary-size);
+  --text-meta--font-weight: var(--text-secondary-weight);
+  --text-group-label: var(--text-group-label-size);
+  --text-group-label--font-weight: var(--text-group-label-weight);
+  --text-group-label--letter-spacing: var(--text-group-label-tracking);
+  --text-caption: var(--text-caption-size);
+  --text-caption--font-weight: var(--text-caption-weight);
+  --text-code: var(--text-code-size);
+  --text-code--font-weight: var(--text-code-weight);
 }
 
 /* Mouvement : seules ces animations existent ; elles s'emploient toujours avec le préfixe motion-safe:. */

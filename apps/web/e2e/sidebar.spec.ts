@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { setScenario, sidebarOf, switchToDark, triggerOf } from "./support/helpers.ts";
+import { AXE_TAGS, setScenario, sidebarOf, switchToDark, triggerOf } from "./support/helpers.ts";
 
 test.beforeEach(async () => {
   await setScenario({ session: true, projects: "data" });
@@ -43,8 +43,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`sidebar : axe WCAG AA sans violation, étendue et repliée (${theme})`, async ({ page }) => {
     await page.goto("/projects");
     if (theme === "dark") await switchToDark(page);
-    const scan = () =>
-      new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    const scan = () => new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
     expect((await scan()).violations).toEqual([]);
     await triggerOf(page).click();
     await expect(sidebarOf(page)).toHaveAttribute("data-state", "collapsed");

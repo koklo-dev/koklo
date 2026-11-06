@@ -60,8 +60,8 @@ function Empty({
   return (
     <Card data-testid="projects-empty" className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="account_tree" size={28} className="text-muted-foreground" />
-      <h2 className="text-base font-semibold tracking-[-0.015em]">Aucun projet pour le moment</h2>
-      <p className="text-[13px] text-muted-foreground">
+      <h2 className="text-section-title">Aucun projet pour le moment</h2>
+      <p className="text-meta text-muted-foreground">
         {onCreate
           ? "Créez votre premier projet pour commencer."
           : "Les projets auxquels vous avez accès apparaîtront ici."}
@@ -79,7 +79,7 @@ function Projects({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           {projects.length === 1 ? "1 projet" : `${projects.length} projets`}
         </p>
         {onCreate ? <CreateButton onCreate={onCreate} buttonRef={createButtonRef} /> : null}
