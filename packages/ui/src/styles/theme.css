@@ -1,8 +1,12 @@
-/* Thème Indigo - DESIGN.md §2.1.
+/* Thème Indigo - DESIGN.md §2.1 (v2, TK-87). Valeurs recopiées telles quelles du bloc css de §2.1.
    --primary, --ring, --destructive et --destructive-foreground (valeurs « à confirmer »)
-   vivent uniquement dans tentative.css. */
+   vivent uniquement dans tentative.css.
+   Alias v1 (décision H1) : --muted vaut --surface, --popover vaut --raised ; --card reste
+   une carte posée sur le contenu. */
 :root {
   --background: #ffffff;
+  --surface: #f7f5ff;
+  --raised: #ffffff;
   --foreground: #14102b;
   --card: #ffffff;
   --card-foreground: #14102b;
@@ -16,7 +20,11 @@
   --accent: #eeeaff;
   --accent-foreground: #43299f;
   --border: #e6e1f8;
+  --border-strong: #cfc7ee;
   --input: #e6e1f8;
+  --diff-bg: #faf8ff;
+  /* biome-ignore format: valeur recopiée mot pour mot de DESIGN.md §2.1 (test de fidélité). */
+  --shadow-floating: 0 8px 24px rgb(20 16 43 / .12);
   --radius: 0.5rem;
   --sidebar: var(--card);
   --sidebar-foreground: var(--card-foreground);
@@ -30,10 +38,12 @@
 
 .dark {
   --background: #0d0b1c;
+  --surface: #15122b;
+  --raised: #1d1838;
   --foreground: #f1efff;
   --card: #15122b;
   --card-foreground: #f1efff;
-  --popover: #15122b;
+  --popover: #1d1838;
   --popover-foreground: #f1efff;
   --primary-foreground: #0d0b1c;
   --secondary: #231d4a;
@@ -43,5 +53,9 @@
   --accent: #231d4a;
   --accent-foreground: #cbc1ff;
   --border: #2a2550;
+  --border-strong: #3d3670;
   --input: #2a2550;
+  --diff-bg: #1a1536;
+  /* En sombre, la bordure suffit. */
+  --shadow-floating: none;
 }

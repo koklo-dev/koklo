@@ -1,7 +1,7 @@
 ---
 id: S-framing
 titre: Cadrage assisté par IA (idée, brief, propositions de fonctionnalités)
-version: 1.1
+version: 2.2
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe qui écrit** : propriétaire, administrateur, développeur, designer (`canWriteSpec` = `SPEC_BATCH_ROLES` des appels `ai.*`). Elle transforme une idée en brief structuré, puis en propositions de fonctionnalités à relire, éditer, accepter ou rejeter, et enregistre les acceptées dans la spec en une seule fois.
@@ -31,17 +31,19 @@ Sources du contrat `@koklo/contract` 0.9.0 (aucun changement) : `ai.draftBrief`,
 - Trois sections, chacune avec son h2 (22 px/600, -0,015 em) : « 1. Votre idée », « 2. Le brief », « 3. Les propositions ». Les sections 2 et 3 apparaissent quand elles ont du contenu ; la section 1 reste en place et repliable (résumé « Idée de N caractères » + « Modifier ») une fois le brief produit.
 - Une **région d'état unique** `role="status"` `aria-live="polite"` en haut de page porte l'avancement et les confirmations ; une seule `Alert` d'échec (`role="alert"`) à la fois, placée sous le titre de l'étape concernée.
 
-### 3.2 Bloc permanent « Ce qui est envoyé à Anthropic »
-`Alert` (variante neutre, jamais la couleur de marque ni de statut), icône `lock` 16, **toujours rendue** au-dessus du bouton d'appel de chaque étape (idée, brief) et rappelée sous la barre d'enregistrement : ce n'est ni une infobulle ni un panneau replié. **Affichage seul** : aucun consentement mémorisé, aucune case à cocher, aucun blocage (arbitrage produit, §9 Q3). Le bloc est dans le DOM **avant** toute requête.
+### 3.2 Bloc d'envoi à l'agent IA (v2, TK-87)
+`InlineAlert` neutre (`role="note"`, DESIGN.md v2 §5.1), icône `lock` 18, **toujours rendue** au-dessus du bouton d'appel de chaque étape (idée, brief) : une ligne, « Votre texte est envoyé à l'agent IA avec la clé de l'organisation. », et une seule action, « Détails » (`button`, `aria-expanded`, `aria-controls`), qui déplie le détail sous la ligne. Replié par défaut. **Affichage seul** : aucun consentement mémorisé, aucune case à cocher, aucun blocage (arbitrage produit, §9 Q3). Le bloc est dans le DOM **avant** toute requête. Il ne nomme jamais le fournisseur (décision B15).
 
-Titre (h3, 14 px/600) : « Ce qui est envoyé à Anthropic ». Texte (13 px, libellé final à valider par le produit pour le RGPD) :
-- « Le texte saisi sur cet écran (idée, précisions, brief) et les titres, statuts et priorités des fonctionnalités déjà présentes dans le projet sont envoyés à Anthropic (États-Unis), avec la clé de votre organisation. »
+Détail déplié (13 px, libellé final à valider par le produit pour le RGPD ; questions.md B24) :
+- « Le texte saisi sur cet écran (idée, précisions, brief) et les titres, statuts et priorités des fonctionnalités déjà présentes dans le projet sont envoyés à l'agent IA, avec la clé de votre organisation. »
 - « Ne saisissez pas de données personnelles. »
 - « Jamais envoyés : clés, identifiants de personnes, noms de l'organisation, du projet ou des dépôts. »
 - « Rien n'est enregistré dans votre projet avant votre confirmation. »
-- Une ligne secondaire : « Les appels sont comptés pour votre organisation. »
+- Une ligne secondaire (`--muted-foreground`) : « Les appels sont comptés pour votre organisation. »
 
-Le bouton d'appel nomme le destinataire : « Générer un brief avec l'IA », « Proposer des fonctionnalités avec l'IA ».
+Le titre h3 « Ce qui est envoyé à Anthropic » et la mention « (États-Unis) » disparaissent (avec plusieurs fournisseurs, le pays désignerait le fournisseur).
+
+Le bouton d'appel nomme le destinataire : « Générer un brief avec l'IA », « Proposer des fonctionnalités avec l'IA ». Quand il est désactivé à idée vide, sa raison (« Écrivez votre idée pour continuer. ») est le texte d'aide déjà présent, relié au bouton par `aria-describedby` (DESIGN.md v2 §5.2).
 
 ### 3.3 Étape 1 : « Votre idée »
 - Deux chemins, présentés comme deux choix clairs (`Tabs` : « Partir d'une idée » (par défaut) / « J'ai déjà un brief »). Le second saute l'étape de génération : un `Textarea` « Votre brief » (1 à 20 000 caractères) alimente directement l'étape 2.
@@ -63,15 +65,15 @@ Liste ordonnée `ol` de cartes (`Card`, un `li` par proposition). Une phrase au-
 **Texte brut absolu** (relecture de sécurité du ticket 54, non bloquant n°1) : titres, descriptions, étapes, brief et questions ouvertes sont rendus comme de simples **nœuds texte**, descriptions avec retours à la ligne conservés (`white-space: pre-wrap`). Jamais de rendu Markdown ni HTML, jamais de lien, d'image ni de `dangerouslySetInnerHTML` construit à partir d'une sortie du modèle ou d'une valeur éditée. Une valeur comme `[x][1]`, `javascript:`, `//evil.com`, `www.`, `**gras**` ou `<script>` s'affiche **telle quelle**, inerte. Le seul lien d'une carte (doublon) est construit par l'application à partir d'un identifiant `F-nnn` validé.
 
 Contenu d'une carte :
-- En-tête : titre (h3, 16 px/600) et **statut de la carte** en `Badge variant="outline"` (icône + texte, jamais la couleur seule, jamais les couleurs `status-*` de DESIGN §2.2 ni le violet de marque) :
+- En-tête : titre (h3, 14 px/600 en v2, `text-subsection-title`) et **statut de la carte** en `ValidationStatus` (v2, TK-87 : icône + texte + couleurs de DESIGN.md v2 §2.2, jamais le violet de marque ; questions.md B25) :
 
 | Statut | Libellé | Icône |
 |---|---|---|
-| À relire (initial) | À relire | `schedule` |
-| Acceptée | Acceptée | `check_circle` (pleine) |
-| Rejetée | Rejetée | `cancel` |
+| À relire (initial) | À relire | `schedule` (tonalité À valider) |
+| Acceptée | Acceptée | `check_circle` (tonalité Validée) |
+| Rejetée | Rejetée | `cancel` (tonalité Non soumise) |
 
-- Ligne méta : priorité en mots (Indispensable, Importante, Souhaitable, Reportée, mêmes libellés que S-features §3.3) ; badge « Proposé par l'IA ».
+- Ligne méta : priorité en `PriorityIndicator` (v2, TK-87 : 3 barres + libellé Indispensable, Importante, Souhaitable, Reportée, mêmes libellés que S-features §3.3) ; badge « Proposé par l'IA » (inchangé : ce n'est pas un statut).
 - Description repliée à 3 lignes avec « Afficher la suite » / « Réduire » (vrai `button`, `aria-expanded`).
 - Critères d'acceptation dans un `Accordion` fermé : « N critère(s) d'acceptation » ; chaque critère en `ol`, ses étapes en `ul` sans puce, mot d'ouverture en gras (« Étant donné », « Quand », « Alors », « Et ») comme dans la fiche de S-features.
 - **Doublon** : si l'API signale un titre déjà présent, ligne « Titre déjà présent : F-003 » avec icône `warning` + texte et lien « Voir F-003 » vers `/projects/[projectId]/features?feature=F-003`. Non bloquant : l'humain décide.
@@ -82,7 +84,7 @@ Contenu d'une carte :
 **Barre d'enregistrement** (collante en bas sur mobile, en bas de la liste sur grand écran) :
 - Compteur dans la région d'état : « N acceptée(s) sur M » (+ « K rejetée(s) » si K > 0).
 - Bouton principal « Enregistrer N fonctionnalité(s) » (icône `add`), **actif seulement si N >= 1** acceptée valide. À 0 acceptée : texte « Acceptez au moins une proposition pour continuer. »
-- Bloc 3.2 rappelé en une ligne : « Ces propositions viennent d'Anthropic et ne sont pas encore enregistrées. »
+- Bloc 3.2 rappelé en une ligne (`lock` 16, 13 px `--muted-foreground`, sans action) : « Ces propositions viennent de l'agent IA et ne sont pas encore enregistrées. »
 - Lien secondaire « Proposer d'autres fonctionnalités » : relance `ai.proposeFeatures` après confirmation en ligne si des propositions existent (« Les propositions actuelles seront remplacées. [Remplacer] [Garder] », focus sur « Garder »).
 
 ### 3.6 Récapitulatif de confirmation (en ligne, pas de modale)
@@ -224,6 +226,7 @@ Bandeau en haut de page (`DraftBanner` généralisé) : « Brouillon de cadrage 
 | 1 | 2026-11-02 | TK-59 | Création : écran de cadrage assisté (idée, brief éditable, propositions éditables À relire / Acceptée / Rejetée, récapitulatif, un seul `specBatch.submit`), bloc permanent « ce qui est envoyé à Anthropic », états IA non configurée, limite avec compte à rebours, erreurs fournisseur, sortie invalide, collision de délimiteur, spec non prête, designer. Détail : `.workflow/TK-59/02-design.md` |
 | 2 | 2026-11-02 | TK-59 (revue) | « Réessayer » repart de la saisie courante ; confirmation avant d'écraser un brief corrigé ; doublons en `role="note"` ; questions Q12 et Q13 |
 | 2.1 | 2026-11-02 | Web : réglages IA | §4.5 : lien « Configurer l'IA » vers `/settings/ai` pour owner/admin ; texte « Demandez à un administrateur » inchangé pour les autres rôles ; Q8 résolue |
+| 2.2 | 2026-11-06 | TK-87 | Lot 0 : bloc d'envoi en `InlineAlert` neutre d'une ligne + « Détails » replié, sans nom de fournisseur ni pays (B15, B24) ; statut des propositions en `ValidationStatus` (B25) et priorité en `PriorityIndicator`, à la place des badges faits main ; rappel « …viennent de l'agent IA… » ; raison du bouton désactivé reliée par `aria-describedby` ; échelle v2 (h1 24 px, h2 16 px, h3 de carte 14 px). Détail : `.workflow/TK-87/02-design.md` |
 
 ## 11. Plan d'implémentation web et tests (brief développeur)
 Aucun changement de contrat ni nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.

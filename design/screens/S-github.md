@@ -1,7 +1,7 @@
 ---
 id: S-github
 titre: Application GitHub (installation et autorisation)
-version: 3
+version: 4
 ---
 ## 1. Utilisateurs et objectif
 Propriétaires et administrateurs de l'organisation active (vue équipe, vision §14). Les autres rôles (développeur, designer, client, business) n'ont pas cette page : l'entrée est absente de la navigation et un accès direct affiche un message sans action. Arrivée : entrée « GitHub » de la barre latérale, ou retour de GitHub après une installation (`/github?result=…`), ou lien depuis la création de projet (48c).
@@ -33,14 +33,14 @@ Sources : `installation.list` (`{ id, provider, ownerKind, ownerLogin, status, u
 ### Statuts (jamais la couleur seule)
 | Donnée | Valeur | Rendu (icône + texte) | Composant |
 |---|---|---|---|
-| Installation | `active` | `check_circle` pleine + « Active » | `StatusBadge` validated |
-| Installation | `suspended` | `block` + « Suspendue » | `Badge` outline |
-| Installation | `deleted` | `cancel` + « Désinstallée » | `Badge` outline |
-| Autorisation | `active` | `check_circle` pleine + « Autorisée » | `StatusBadge` validated |
-| Autorisation | `absent` | `schedule` pleine + « À autoriser » | `StatusBadge` pending |
-| Autorisation | `expired` | `schedule` pleine + « Autorisation expirée » | `StatusBadge` pending |
+| Installation | `active` | `check_circle` pleine + « Active » | `ValidationStatus` validated |
+| Installation | `suspended` | `block` pleine + « Suspendue » | `ValidationStatus` unsubmitted, icône `block` |
+| Installation | `deleted` | `cancel` pleine + « Désinstallée » | `ValidationStatus` unsubmitted, icône `cancel` |
+| Autorisation | `active` | `check_circle` pleine + « Autorisée » | `ValidationStatus` validated |
+| Autorisation | `absent` | `schedule` pleine + « À autoriser » | `ValidationStatus` pending |
+| Autorisation | `expired` | `schedule` pleine + « Autorisation expirée » | `ValidationStatus` pending |
 
-`Badge` outline : l'icône (16 px) et le texte sont dans le badge, couleur de texte `foreground` ; aucune couleur de statut hors tokens `status-*` du kit. Le violet de marque n'est jamais utilisé pour un statut ni une alerte. Aucune icône nouvelle : `check_circle`, `schedule`, `block`, `cancel`, `warning`, `lock`, `link`, `add` existent déjà dans `@koklo/ui`.
+v2 (TK-87) : un seul composant, `ValidationStatus` (DESIGN.md v2 §5.1), avec le libellé de l'écran et la tonalité la plus proche (questions.md B25) ; plus de `Badge` outline fait main. Le violet de marque n'est jamais utilisé pour un statut ni une alerte. Aucune icône nouvelle : `check_circle`, `schedule`, `block`, `cancel`, `warning`, `lock`, `link`, `add` existent déjà dans `@koklo/ui`.
 
 ## 4. États
 - **Rôle inconnu** : `LoadingStatus` « Chargement… » ; aucun appel `installation.list` tant que le rôle n'est pas connu et gestionnaire (requête `enabled`), aucun message de droits.
@@ -122,6 +122,7 @@ Sous 768 px : le h1 et le bouton « Installer l'application GitHub » s'empilent
 | 2 | 2026-10-31 | TK-48 (48b) | Implémentation : à l'état vide le bouton d'installation reste dans l'en-tête (la carte ne porte que titre + texte) ; captures générées (§12). |
 | 3 | 2026-10-31 | TK-48 (48c) | Lien de reprise « Reprendre la création du projet » après `installed` quand un marqueur de création de projet existe (voir S-projects §5.1). |
 | 3.1 | 2026-10-31 | TK-48 (48c, refactor) | Lien de reprise vérifié en e2e (`project-create.spec.ts`, retour `?result=installed`, puis notice et reprise) ; aucun changement d'écran. |
+| 4 | 2026-11-06 | TK-87 | Lot 0 : statuts d'installation et d'autorisation en `ValidationStatus` (Suspendue et Désinstallée en tonalité Non soumise avec `block` / `cancel`, B25) à la place de `StatusBadge` et des `Badge` outline ; h1 24 px (échelle v2) ; bouton désactivé en pointillés. Détail : `.workflow/TK-87/02-design.md` |
 
 ## 11. Plan d'implémentation web (brief développeur)
 Routes et garde

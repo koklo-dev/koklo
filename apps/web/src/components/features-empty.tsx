@@ -12,10 +12,8 @@ export function FeaturesEmpty({
   return (
     <Card className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="checklist" size={28} className="text-muted-foreground" />
-      <h2 className="text-base font-semibold tracking-[-0.015em]">
-        Aucune fonctionnalité pour le moment
-      </h2>
-      <p className="text-[13px] text-muted-foreground">
+      <h2 className="text-section-title">Aucune fonctionnalité pour le moment</h2>
+      <p className="text-meta text-muted-foreground">
         La spec de ce projet ne décrit encore aucune fonctionnalité.
       </p>
       {onCreate ? (
@@ -47,8 +45,8 @@ export function ProjectNotFound() {
   return (
     <Card className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="lock" size={28} className="text-muted-foreground" />
-      <h2 className="text-base font-semibold tracking-[-0.015em]">Projet introuvable</h2>
-      <p className="text-[13px] text-muted-foreground">
+      <h2 className="text-section-title">Projet introuvable</h2>
+      <p className="text-meta text-muted-foreground">
         Ce projet n'existe pas ou vous n'y avez pas accès.
       </p>
       <Button asChild variant="outline" className="h-11 md:h-9">

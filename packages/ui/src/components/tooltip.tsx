@@ -30,7 +30,7 @@ export function TooltipContent({
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-fit rounded-md bg-foreground px-3 py-1.5 text-xs text-background motion-safe:animate-content-in",
+          "z-50 w-fit rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-floating motion-safe:animate-content-in",
           className,
         )}
         {...props}

@@ -157,7 +157,8 @@ describe("Accessibilité (§7)", () => {
     await accept(T1);
     for (const label of ["Acceptée", "À relire"]) {
       for (const badge of within(card(T1)).queryAllByText(label)) {
-        const holder = badge.closest("[data-slot='badge']") as HTMLElement;
+        // TK-87 (H7) : le statut de proposition est une ValidationStatus, plus un Badge outline.
+        const holder = badge.closest("[data-slot='validation-status']") as HTMLElement;
         expect(holder.querySelector("svg[aria-hidden='true']")).not.toBeNull();
       }
     }

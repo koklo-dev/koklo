@@ -55,7 +55,7 @@ export function KanbanColumn({ status, tickets, interaction }: KanbanColumnProps
     >
       <div className="flex items-center gap-2">
         <Icon name={STATUS_ICONS[status]} size={18} fill={status === "done"} />
-        <h2 id={headingId} className="text-sm font-semibold">
+        <h2 id={headingId} className="text-subsection-title">
           {label}
         </h2>
         <Badge variant="outline" aria-label={countLabel(tickets.length)} className="ml-auto">
@@ -63,10 +63,10 @@ export function KanbanColumn({ status, tickets, interaction }: KanbanColumnProps
         </Badge>
       </div>
       {over && accepting ? (
-        <p className="text-[13px] font-medium">{`Déposer ici pour passer en ${label}`}</p>
+        <p className="text-meta font-medium">{`Déposer ici pour passer en ${label}`}</p>
       ) : null}
       {tickets.length === 0 ? (
-        <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed text-[13px] text-muted-foreground">
+        <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed text-meta text-muted-foreground">
           Aucun ticket
         </div>
       ) : (

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Kanban · Koklo" };
 export default function Page() {
   return (
     <>
-      <h1 className="mb-2 text-[30px] font-semibold tracking-[-0.025em]">Kanban</h1>
+      <h1 className="mb-2 text-page-title">Kanban</h1>
       <KanbanPage />
     </>
   );

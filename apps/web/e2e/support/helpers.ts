@@ -11,6 +11,10 @@ import type {
 import type { LlmScenario } from "./stub-llm-credential.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
 
+/** Jeux de règles axe communs à toutes les specs (WCAG 2.0 à 2.2, A et AA) : un écran ne peut
+ * pas en omettre un, sinon un défaut de niveau A comme « Label in Name » (2.5.3) lui échappe. */
+export const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
 export type ProjectsState = "loading" | "empty" | "data" | "error";
 export type Theme = "light" | "dark";
 

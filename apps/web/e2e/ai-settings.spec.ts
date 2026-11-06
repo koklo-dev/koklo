@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type Request, test } from "@playwright/test";
 import {
+  AXE_TAGS,
   CAPTURES_DIR,
   llmCallsSeen,
   llmSecretLeaks,
@@ -20,7 +21,6 @@ import { E2E_MODEL, E2E_SECRET, type LlmScenario } from "./support/stub-llm-cred
  * sentinelle clairement factice. Captures : design/screens/captures/S-ai-settings/<état>-<thème>.png
  * (+ -mobile à 375 px) ; le Red n'en écrit aucune, le Green/Refactor les génère.
  */
-const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa"];
 const PATH = "/settings/ai";
 const SAVE = "Enregistrer et vérifier";
 const FIELD = "Clé API Anthropic";

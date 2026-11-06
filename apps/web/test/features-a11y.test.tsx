@@ -127,12 +127,16 @@ describe("Accessibilité de la liste (§7)", () => {
     }
   });
 
-  it("toutes les icônes de la table sont décoratives (aria-hidden), jamais le seul porteur de sens", async () => {
+  // TK-87 : la table n'a plus d'icône de statut ; la jauge de LifecycleStatus et les barres de
+  // PriorityIndicator sont les formes décoratives, toujours doublées d'un libellé.
+  it("toutes les icônes et formes de la table sont décoratives (aria-hidden), jamais le seul porteur de sens", async () => {
     renderFeatures();
     const table = await findTable();
-    const icons = table.querySelectorAll("svg");
-    expect(icons.length).toBeGreaterThan(0);
-    for (const icon of icons) expect(icon).toHaveAttribute("aria-hidden", "true");
+    const shapes = table.querySelectorAll(
+      "svg, [data-slot='lifecycle-status'] > span, [data-slot='priority-indicator'] > span",
+    );
+    expect(shapes.length).toBeGreaterThan(0);
+    for (const shape of shapes) expect(shape).toHaveAttribute("aria-hidden", "true");
   });
 
   it("ordre de focus : filtres, liens de titre dans l'ordre de la table, puis « Afficher plus »", async () => {
@@ -165,10 +169,11 @@ describe("Accessibilité de la liste (§7)", () => {
 describe("Mobile 375 px (§6)", () => {
   beforeEach(() => setViewport(375));
 
-  it("colonnes Statut, Priorité, Critères retirées de l'arbre d'accessibilité (hidden md:table-cell)", async () => {
+  it("colonnes Avancement, Priorité, Critères retirées de l'arbre d'accessibilité (hidden md:table-cell)", async () => {
     renderFeatures();
     const table = await findTable();
-    for (const name of ["Statut", "Priorité", "Critères"]) {
+    // TK-87 (02-design §2.4, B31) : la colonne « Statut » devient « Avancement ».
+    for (const name of ["Avancement", "Priorité", "Critères"]) {
       const header = within(table).getByRole("columnheader", { name, hidden: true });
       expect(header.className).toMatch(/\bhidden\b/);
       expect(header.className).toMatch(/md:table-cell/);
@@ -178,14 +183,17 @@ describe("Mobile 375 px (§6)", () => {
     }
   });
 
-  it("ligne méta md:hidden sous le titre : statut, priorité et critères, sans perte d'information", async () => {
+  it("ligne méta md:hidden sous le titre : LifecycleStatus, PriorityIndicator et critères (TK-87)", async () => {
     renderFeatures();
     const table = await findTable();
     const meta = Array.from(table.querySelectorAll<HTMLElement>("*")).filter(
-      (el) => /\bmd:hidden\b/.test(el.className) && /Brouillon/.test(el.textContent ?? ""),
+      (el) => /\bmd:hidden\b/.test(el.className) && /3 critères/.test(el.textContent ?? ""),
     );
     expect(meta.length).toBeGreaterThan(0);
-    const text = meta[0]?.textContent ?? "";
+    const first = meta[0] as HTMLElement;
+    const text = first.textContent ?? "";
+    expect(first.querySelector("[data-slot='lifecycle-status']")).not.toBeNull();
+    expect(first.querySelector("[data-slot='priority-indicator']")).not.toBeNull();
     expect(text).toContain("Indispensable");
     expect(text).toContain("3 critères");
   });

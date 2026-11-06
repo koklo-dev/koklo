@@ -108,7 +108,7 @@ export function InviteForm({ role }: { role: Role }) {
   const form = useInviteForm();
   return (
     <Card className="flex max-w-xl flex-col gap-4 p-5">
-      <h2 className="text-base font-semibold tracking-[-0.015em]">Inviter un membre</h2>
+      <h2 className="text-section-title">Inviter un membre</h2>
       <form onSubmit={form.submit} noValidate className="flex flex-col gap-4">
         {form.failure ? <InviteFailure error={form.failure.error} /> : null}
         <FormField

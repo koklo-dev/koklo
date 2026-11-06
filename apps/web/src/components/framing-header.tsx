@@ -40,17 +40,13 @@ export function FramingHeader({
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1
-        id={IDS.title}
-        tabIndex={-1}
-        className="text-[30px] font-semibold tracking-[-0.025em] outline-none"
-      >
+      <h1 id={IDS.title} tabIndex={-1} className="text-page-title outline-none">
         Cadrage
       </h1>
-      <p className="mt-1 break-words text-[13px] text-muted-foreground">
+      <p className="mt-1 break-words text-meta text-muted-foreground">
         {name ? `Projet ${name}` : "Projet"}
       </p>
-      <p className="mt-2 text-[13px] text-muted-foreground">{HELP_TEXT}</p>
+      <p className="mt-2 text-meta text-muted-foreground">{HELP_TEXT}</p>
     </header>
   );
 }

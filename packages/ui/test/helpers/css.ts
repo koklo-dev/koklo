@@ -85,3 +85,36 @@ export function designStatus(): Record<StatusKey, StatusColors> {
 export function norm(value: string | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
+
+export type AlertKey = "warning" | "error";
+export interface AlertColors {
+  light: { bg: string; border: string; fg: string };
+  dark: { bg: string; border: string; fg: string };
+}
+
+const alertRows: Record<AlertKey, string> = { warning: "Attention", error: "Erreur" };
+
+/** Couleurs d'alerte §2.2 v2 de DESIGN.md (fond / bordure / texte, clair puis sombre). */
+export function designAlerts(): Record<AlertKey, AlertColors> {
+  const md = readRequired(designPath);
+  const section = md.split(/^### 2\.2\b.*$/m)[1]?.split(/^## 3\./m)[0] ?? "";
+  const out = {} as Record<AlertKey, AlertColors>;
+  for (const key of Object.keys(alertRows) as AlertKey[]) {
+    const row = section.split("\n").find((l) => l.startsWith(`| ${alertRows[key]} `));
+    const hex = [...(row ?? "").matchAll(/`(#[0-9a-fA-F]{6})`/g)].map((m) =>
+      (m[1] ?? "").toLowerCase(),
+    );
+    const [lb, lbo, lf, db, dbo, df] = hex;
+    if (!lb || !lbo || !lf || !db || !dbo || !df) {
+      throw new Error(`Ligne d'alerte §2.2 introuvable ou incomplète : ${alertRows[key]}`);
+    }
+    out[key] = { light: { bg: lb, border: lbo, fg: lf }, dark: { bg: db, border: dbo, fg: df } };
+  }
+  return out;
+}
+
+/** Résout une valeur `var(--x)` contre un thème (un seul niveau d'alias, comme status.css). */
+export function resolveVar(value: string | undefined, theme: VarMap): string | undefined {
+  const m = /^var\((--[\w-]+)\)$/.exec((value ?? "").trim());
+  return m?.[1] ? theme[m[1]] : value;
+}

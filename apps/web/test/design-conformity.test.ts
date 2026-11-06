@@ -1,135 +1,80 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
-/** TK-24 C5 : uniquement composants et tokens de @koklo/ui (DESIGN.md) dans les fichiers du ticket. */
+/**
+ * TK-24 C5 puis TK-87 (CA1, cas 1.5) : uniquement composants et jetons de @koklo/ui (DESIGN.md) dans
+ * **tout** `apps/web/src`, parcouru par glob, sans liste blanche. Un fichier ajouté est couvert d'office.
+ */
 const src = join(import.meta.dirname, "../src");
-const FILES = [
-  "components/organizations-page.tsx",
-  "components/members-page.tsx",
-  "components/projects-page.tsx",
-  "components/projects-view.tsx",
-  "components/team-switcher.tsx",
-  "components/app-sidebar.tsx",
-  "app/organizations/page.tsx",
-  "app/members/page.tsx",
-  "app/members/layout.tsx",
-  "components/accept-invitation-page.tsx",
-  "app/accept-invitation/[id]/page.tsx",
-  // TK-35 : kanban
-  "components/kanban-page.tsx",
-  "components/kanban-view.tsx",
-  "components/kanban-column.tsx",
-  "components/kanban-card.tsx",
-  "app/kanban/page.tsx",
-  "app/kanban/layout.tsx",
-  // TK-48b : écran /github
-  "components/github-page.tsx",
-  "components/github-installations.tsx",
-  "components/github-status.tsx",
-  "components/github-result-notice.tsx",
-  "components/github-empty.tsx",
-  "lib/github-labels.ts",
-  "lib/github-redirect.ts",
-  "app/github/page.tsx",
-  "app/github/layout.tsx",
-  // TK-48c : création de projet avec dépôt de spec (design/screens/S-projects.md section 11)
-  "components/project-create-sheet.tsx",
-  "components/project-create-flow.tsx",
-  "components/project-create-steps.tsx",
-  "components/github-account-field.tsx",
-  "components/spec-repo-failure.tsx",
-  "components/spec-repo-resume-notice.tsx",
-  "lib/use-project-creation.ts",
-  "lib/spec-repo-errors.ts",
-  "lib/spec-repo-name.ts",
-  "lib/creation-resume.ts",
-  // TK-48c, repli repo.link (sous-lot détachable)
-  "components/spec-repo-link-form.tsx",
-  // TK-48d : liste des fonctionnalités d'un projet (design/screens/S-features.md section 11)
-  "components/features-page.tsx",
-  "components/features-list.tsx",
-  "components/features-filters.tsx",
-  "components/feature-sheet.tsx",
-  "components/feature-detail.tsx",
-  "components/features-empty.tsx",
-  "components/spec-preparing.tsx",
-  "components/spec-repo-missing.tsx",
-  "components/spec-index-failed.tsx",
-  "components/feature-error.tsx",
-  "components/nav-projects.tsx",
-  "lib/feature-labels.ts",
-  "lib/features-url.ts",
-  "lib/spec-errors.ts",
-  "lib/use-features.ts",
-  "lib/use-spec-head.ts",
-  "app/projects/[projectId]/features/page.tsx",
-  "app/projects/[projectId]/features/layout.tsx",
-  // TK-48e : formulaire d'une fonctionnalité (design/screens/S-feature-form.md section 11)
-  "components/feature-form-sheet.tsx",
-  "components/feature-form-fields.tsx",
-  "components/feature-criteria-editor.tsx",
-  "components/criterion-item.tsx",
-  "components/feature-links-fields.tsx",
-  "components/feature-form-errors.tsx",
-  "components/save-progress.tsx",
-  "components/draft-banner.tsx",
-  "components/saved-notice.tsx",
-  // TK-48e-2 : suppression d'une fonctionnalité (S-feature-form §4.8)
-  "components/feature-delete-confirm.tsx",
-  "lib/feature-form.ts",
-  "lib/feature-operation.ts",
-  "lib/feature-draft.ts",
-  "lib/feature-rebase.ts",
-  "lib/feature-errors.ts",
-  "lib/feature-tracking.ts",
-  "lib/spec-issues.ts",
-  "lib/use-feature-submit.ts",
-  "lib/use-feature-draft.ts",
-  "lib/use-pending-save.ts",
-  // TK-59 / 59a : cadrage assisté, socle et brief (design/screens/S-framing.md section 11)
-  "app/projects/[projectId]/framing/page.tsx",
-  "app/projects/[projectId]/framing/layout.tsx",
-  "components/framing-page.tsx",
-  "components/ai-send-policy.tsx",
-  "components/ai-error-notice.tsx",
-  "lib/ai-errors.ts",
-  "lib/use-ai-call.ts",
-  "lib/framing-draft.ts",
-  "lib/framing-labels.ts",
-  "lib/framing-types.ts",
-  // TK-59 / 59b : propositions et enregistrement
-  "components/framing-proposals.tsx",
-  "components/framing-proposal-card.tsx",
-  "components/framing-submit-bar.tsx",
-  "lib/framing-operations.ts",
-  "lib/use-framing-proposals.ts",
-  // Réglages de l'IA : clé du fournisseur de l'organisation (design/screens/S-ai-settings.md section 11)
-  "app/settings/ai/page.tsx",
-  "app/settings/ai/layout.tsx",
-  "components/ai-settings-page.tsx",
-  "components/ai-credential-card.tsx",
-  "components/ai-credential-form.tsx",
-  "components/ai-credential-remove.tsx",
-  "lib/ai-settings-labels.ts",
+
+const FILES = readdirSync(src, { recursive: true, withFileTypes: true })
+  .filter((entry) => entry.isFile() && /\.(ts|tsx|css)$/.test(entry.name))
+  .map((entry) => relative(src, join(entry.parentPath, entry.name)))
+  .sort();
+
+const PALETTE =
+  "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|white|black";
+const RULES: ReadonlyArray<readonly [string, RegExp]> = [
+  ["couleur hexadécimale", /(?<![\w&/])#[0-9a-fA-F]{3,8}\b/],
+  ["fonction de couleur", /\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/],
+  [
+    "classe de palette Tailwind",
+    new RegExp(
+      `\\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|decoration|shadow|accent|caret)-(?:${PALETTE})(?:-\\d{2,3})?(?:/\\d+)?\\b`,
+    ),
+  ],
+  ["SVG en ligne", /<svg\b/],
 ];
 
-const RAW_COLOR_CLASS =
-  /\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|decoration)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|white|black)(?:-\d{2,3})?\b/;
+/** Règles enfreintes par un source (libellés). */
+function colorViolations(code: string): string[] {
+  return RULES.filter(([, re]) => re.test(code)).map(([label]) => label);
+}
 
-describe.each(FILES)("%s", (file) => {
-  const path = join(src, file);
-
-  it("existe", () => {
-    expect(existsSync(path), `${file} absent`).toBe(true);
+describe("le garde parcourt tout apps/web/src par glob", () => {
+  it("trouve les sources de chaque dossier (app, components, lib, proxy.ts, globals.css)", () => {
+    expect(FILES.length).toBeGreaterThan(150);
+    for (const expected of [
+      "proxy.ts",
+      "app/globals.css",
+      "app/layout.tsx",
+      "components/ai-send-policy.tsx",
+      "lib/feature-labels.ts",
+    ]) {
+      expect(FILES, expected).toContain(expected);
+    }
   });
 
-  it("n'embarque ni couleur en dur ni classe de couleur Tailwind brute ni SVG inline", () => {
-    if (!existsSync(path)) throw new Error(`${file} absent`);
-    const code = readFileSync(path, "utf8");
-    expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(code).not.toMatch(/\brgba?\(|\bhsla?\(|\boklch\(/);
-    expect(code).not.toMatch(RAW_COLOR_CLASS);
-    expect(code).not.toMatch(/<svg\b/);
+  it("couvre la galerie /dev/ui sans qu'on ait à la déclarer (TK-87)", () => {
+    expect(FILES.some((f) => f.startsWith("app/dev/ui/"))).toBe(true);
+  });
+});
+
+describe.each(FILES)("%s", (file) => {
+  it("n'embarque ni couleur en dur ni classe de couleur Tailwind brute ni SVG en ligne", () => {
+    expect(colorViolations(readFileSync(join(src, file), "utf8")), file).toEqual([]);
+  });
+});
+
+describe("le détecteur reconnaît chaque forme interdite (preuve sans liste blanche)", () => {
+  it.each([
+    ['<p className="bg-amber-100 text-amber-900">', "classe de palette Tailwind"],
+    ['<p className="border-slate-200/50">', "classe de palette Tailwind"],
+    ['const c = "#abc";', "couleur hexadécimale"],
+    ['style={{ color: "#5b3fd9" }}', "couleur hexadécimale"],
+    ['const shadow = "0 1px 2px rgb(0 0 0 / .1)";', "fonction de couleur"],
+    ['const c = "oklch(0.62 0.2 280)";', "fonction de couleur"],
+    ["<svg viewBox='0 0 1 1' />", "SVG en ligne"],
+  ])("%s -> %s", (code, label) => {
+    expect(colorViolations(code)).toContain(label);
+  });
+
+  it("les jetons et les ancres ne sont pas des violations", () => {
+    expect(
+      colorViolations(
+        '<a href="#F-001" className="bg-surface text-muted-foreground border-border-strong shadow-floating" />',
+      ),
+    ).toEqual([]);
   });
 });

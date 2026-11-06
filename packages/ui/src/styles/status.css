@@ -1,5 +1,6 @@
-/* Couleurs de statut - DESIGN.md §2.2. Valeurs littérales : le violet de marque
-   n'est jamais un statut. */
+/* Couleurs de statut et d'alerte - DESIGN.md §2.2 (v2, TK-87). Valeurs littérales : le violet
+   de marque n'est jamais un statut ni une alerte. La variante neutre est un alias des jetons
+   de §2.1 (--surface en clair, --raised en sombre). */
 :root {
   --status-validated-bg: #dcfce7;
   --status-validated-fg: #166534;
@@ -7,6 +8,16 @@
   --status-pending-fg: #92400e;
   --status-revise-bg: #fee2e2;
   --status-revise-fg: #991b1b;
+
+  --alert-neutral-bg: var(--surface);
+  --alert-neutral-border: var(--border);
+  --alert-neutral-fg: var(--foreground);
+  --alert-warning-bg: #fffbeb;
+  --alert-warning-border: #fcd34d;
+  --alert-warning-fg: #78350f;
+  --alert-error-bg: #fef2f2;
+  --alert-error-border: #fca5a5;
+  --alert-error-fg: #991b1b;
 }
 
 .dark {
@@ -16,4 +27,14 @@
   --status-pending-fg: #fde68a;
   --status-revise-bg: #7f1d1d;
   --status-revise-fg: #fecaca;
+
+  --alert-neutral-bg: var(--raised);
+  --alert-neutral-border: var(--border);
+  --alert-neutral-fg: var(--foreground);
+  --alert-warning-bg: #3a2a0c;
+  --alert-warning-border: #78350f;
+  --alert-warning-fg: #fde68a;
+  --alert-error-bg: #3b1219;
+  --alert-error-border: #7f1d1d;
+  --alert-error-fg: #fecaca;
 }

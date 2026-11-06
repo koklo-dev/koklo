@@ -26,7 +26,7 @@ export const messageOf = (model: FeatureFormModel, field: string): string | unde
 /** Message d'erreur d'un champ : icône et texte, relié au champ par `aria-describedby`. */
 export function FieldMessage({ id, text }: { id: string; text: string }) {
   return (
-    <p id={id} className="flex items-start gap-1 text-[13px] text-destructive">
+    <p id={id} className="flex items-start gap-1 text-meta text-destructive">
       <Icon name="warning" size={16} className="mt-0.5" />
       <span>{text}</span>
     </p>
@@ -53,7 +53,7 @@ function CurrentValue({ field, model }: { field: FieldKey; model: FeatureFormMod
   const { current, conflicts } = model.state;
   if (!current || !conflicts.includes(field)) return null;
   return (
-    <div className="flex flex-col items-start gap-1.5 rounded-md bg-muted p-2 text-[13px]">
+    <div className="flex flex-col items-start gap-1.5 rounded-md bg-muted p-2 text-meta">
       <p>{`Valeur actuelle dans la spec : ${describeCurrentValue(field, current)}`}</p>
       <Button
         type="button"
@@ -91,7 +91,7 @@ export function FieldShell({ field, label, model, hint, hintId, children }: Shel
 }
 
 const Hint = ({ id, children }: { id: string; children: ReactNode }) => (
-  <p id={id} className="text-[13px] text-muted-foreground">
+  <p id={id} className="text-meta text-muted-foreground">
     {children}
   </p>
 );
@@ -143,7 +143,7 @@ export function GeneralFields({ model, readOnly }: FieldsProps) {
   const counterId = `${fieldId("title")}-count`;
   return (
     <section aria-labelledby="feature-form-general" className="flex flex-col gap-4">
-      <h3 id="feature-form-general" className="text-[13px] font-semibold text-muted-foreground">
+      <h3 id="feature-form-general" className="text-subsection-title text-muted-foreground">
         Général
       </h3>
       <FieldShell
@@ -153,7 +153,7 @@ export function GeneralFields({ model, readOnly }: FieldsProps) {
         hintId={counterId}
         hint={
           length >= 180 ? (
-            <p id={counterId} aria-live="polite" className="text-[13px] text-muted-foreground">
+            <p id={counterId} aria-live="polite" className="text-meta text-muted-foreground">
               {`${length} / ${TITLE_MAX}`}
             </p>
           ) : null

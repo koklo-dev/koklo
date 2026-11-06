@@ -199,7 +199,7 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(headers.map((h) => h.textContent)).toEqual([
       "Identifiant",
       "Titre",
-      "Statut",
+      "Avancement",
       "Priorité",
       "Critères",
     ]);
@@ -240,37 +240,43 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(within(rowOf("Tableau kanban")).getAllByRole("link")).toHaveLength(1);
   });
 
+  // TK-87 (CA3, cas 3.1 ; H3, B22, B31) : LifecycleStatus (stade dérivé) et PriorityIndicator remplacent
+  // le badge « Brouillon / Spécifiée… » et la priorité en gras ou gris.
   it.each([
-    ["Connexion par e-mail", "Brouillon", "Indispensable", "3 critères"],
-    ["Tableau kanban", "Implémentée", "Importante", "1 critère"],
-    ["Export des tickets", "Adoptée", "Reportée", "0 critère"],
-  ])(
-    "« %s » : statut %s (icône + texte), priorité %s, %s",
-    async (title, status, priority, criteria) => {
+    ["Connexion par e-mail", "Spécifiée, étape 2", "Indispensable", 3, "3 critères"],
+    ["Tableau kanban", "Implémentée, étape 4", "Importante", 2, "1 critère"],
+    ["Export des tickets", "Implémentée, étape 4", "Reportée", 0, "0 critère"],
+  ] as const)(
+    "« %s » : avancement « %s sur 6 », priorité %s (%i barres), %s",
+    async (title, stage, priority, level, criteria) => {
       renderFeatures();
       await findTable();
       const row = rowOf(title);
-      const badge = within(row).getByText(status);
-      expect(badge.closest("[data-slot='badge'], span, div")).not.toBeNull();
-      // icône décorative doublant le libellé : jamais la couleur seule
-      expect(
-        badge.parentElement?.querySelector('svg[aria-hidden="true"]') ??
-          badge.querySelector('svg[aria-hidden="true"]'),
-      ).not.toBeNull();
-      expect(within(row).getByText(priority)).toBeInTheDocument();
-      expect(within(row).getByText(criteria)).toBeInTheDocument();
+      // Deux rendus par ligne, identiques : la ligne méta mobile (md:hidden) et les colonnes (hidden md:table-cell).
+      const lifecycles = within(row).getAllByLabelText(`Avancement : ${stage} sur 6`);
+      expect(lifecycles).toHaveLength(2);
+      for (const lifecycle of lifecycles) {
+        expect(lifecycle).toHaveAttribute("data-slot", "lifecycle-status");
+      }
+      const indicators = row.querySelectorAll("[data-slot='priority-indicator']");
+      expect(indicators, "PriorityIndicator").toHaveLength(2);
+      for (const indicator of indicators) {
+        expect(indicator).toHaveAttribute("data-level", String(level));
+        expect(indicator).toHaveTextContent(priority);
+      }
+      expect(within(row).getAllByText(criteria)).toHaveLength(2);
     },
   );
 
-  it("« Indispensable » est en gras et en texte principal, les autres en texte atténué", async () => {
+  it("plus de badge de statut v1 ni de priorité en gras ou gris dans la liste", async () => {
     renderFeatures();
     await findTable();
-    expect(within(rowOf("Connexion par e-mail")).getByText("Indispensable").className).toMatch(
-      /font-semibold/,
-    );
-    expect(within(rowOf("Tableau kanban")).getByText("Importante").className).toMatch(
-      /text-muted-foreground/,
-    );
+    const row = rowOf("Connexion par e-mail");
+    expect(row.querySelector("[data-slot='badge']")).toBeNull();
+    const labels = within(row).getAllByText("Indispensable");
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) expect(label.className).not.toMatch(/font-semibold/);
+    expect(within(row).queryByText("Brouillon")).toBeNull();
   });
 
   it("aucune valeur brute du contrat dans le DOM (brouillon, specifiee, must...)", async () => {

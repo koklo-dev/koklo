@@ -2,7 +2,10 @@ import type { ComponentProps } from "react";
 import { Icon, type IconName } from "../icons/icon.tsx";
 import { Button } from "./button.tsx";
 
-export type IconButtonProps = Omit<
+/** `Omit` distribué sur l'union de `ButtonProps`, pour garder l'exclusion `asChild` / `disabledReason`. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+export type IconButtonProps = DistributiveOmit<
   ComponentProps<typeof Button>,
   "size" | "children" | "aria-label"
 > & {

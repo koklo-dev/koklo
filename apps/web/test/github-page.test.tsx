@@ -161,6 +161,22 @@ describe("S-github — liste des installations (AC-48-14)", () => {
     }
   });
 
+  // TK-87 (CA3, cas 3.4 ; H7, 02-design §2.4) : statuts en ValidationStatus, tonalité et icône bornées.
+  it.each([
+    ["acme-corp", "Active", "validated"],
+    ["pause-sa", "Suspendue", "unsubmitted"],
+    ["parti-sas", "Désinstallée", "unsubmitted"],
+    ["acme-corp", "Autorisée", "validated"],
+    ["awa-kone", "À autoriser", "pending"],
+    ["vieux-studio", "Autorisation expirée", "pending"],
+  ] as const)("%s : « %s » en ValidationStatus %s", async (login, label, status) => {
+    renderWithQuery(<GithubPage />);
+    await screen.findByRole("heading", { level: 2, name: "acme-corp" });
+    const badge = within(rowOf(login)).getByText(label).closest("[data-slot='validation-status']");
+    expect(badge, `${login} : ValidationStatus`).not.toBeNull();
+    expect(badge).toHaveAttribute("data-status", status);
+  });
+
   it("actions : « Autoriser » (absent) et « Réautoriser » (expiré) nommés avec le compte ; rien pour une autorisation active", async () => {
     renderWithQuery(<GithubPage />);
     await screen.findByRole("heading", { level: 2, name: "acme-corp" });

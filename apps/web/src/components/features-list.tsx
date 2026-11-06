@@ -2,9 +2,7 @@
 
 import type { FeatureSummary } from "@koklo/contract";
 import {
-  Badge,
   Button,
-  Icon,
   Table,
   TableBody,
   TableCaption,
@@ -14,29 +12,10 @@ import {
   TableRow,
 } from "@koklo/ui";
 import type { MouseEvent } from "react";
-import { criteriaLabel, priorityLabel, statusIcon, statusLabel } from "../lib/feature-labels.ts";
+import { criteriaLabel } from "../lib/feature-labels.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { ErrorNotice } from "./error-notice.tsx";
-
-/** Priorité en mots : « Indispensable » ressort par la graisse, jamais par une couleur. */
-export function PriorityText({ priority }: { priority: string }) {
-  return (
-    <span
-      className={priority === "must" ? "font-semibold text-foreground" : "text-muted-foreground"}
-    >
-      {priorityLabel(priority)}
-    </span>
-  );
-}
-
-export function StatusBadge({ status }: { status: string }) {
-  return (
-    <Badge variant="outline" className="gap-1">
-      <Icon name={statusIcon(status)} size={16} />
-      <span>{statusLabel(status)}</span>
-    </Badge>
-  );
-}
+import { FeatureLifecycle, FeaturePriority } from "./feature-status.tsx";
 
 interface RowProps {
   feature: FeatureSummary;
@@ -50,7 +29,6 @@ function plainClick(event: MouseEvent): boolean {
 }
 
 function FeatureRow({ feature, href, onOpen }: RowProps) {
-  const meta = `${statusLabel(feature.status)} · ${priorityLabel(feature.priority)} · ${criteriaLabel(feature.criteriaCount)}`;
   return (
     <TableRow className="relative">
       <TableCell className="align-top font-mono text-xs text-muted-foreground">
@@ -70,18 +48,19 @@ function FeatureRow({ feature, href, onOpen }: RowProps) {
         >
           {feature.title}
         </a>
-        <p className="mt-1 flex items-center gap-1 text-[13px] text-muted-foreground md:hidden">
-          <Icon name={statusIcon(feature.status)} size={16} />
-          {meta}
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground md:hidden">
+          <FeatureLifecycle feature={feature} />
+          <FeaturePriority priority={feature.priority} />
+          <span>{criteriaLabel(feature.criteriaCount)}</span>
         </p>
       </TableCell>
       <TableCell className="hidden align-top md:table-cell">
-        <StatusBadge status={feature.status} />
+        <FeatureLifecycle feature={feature} />
       </TableCell>
-      <TableCell className="hidden align-top text-[13px] md:table-cell">
-        <PriorityText priority={feature.priority} />
+      <TableCell className="hidden align-top md:table-cell">
+        <FeaturePriority priority={feature.priority} />
       </TableCell>
-      <TableCell className="hidden align-top text-right text-[13px] md:table-cell">
+      <TableCell className="hidden align-top text-right text-meta md:table-cell">
         {criteriaLabel(feature.criteriaCount)}
       </TableCell>
     </TableRow>
@@ -127,7 +106,7 @@ interface ListProps {
 const HEADERS = [
   { label: "Identifiant", className: "" },
   { label: "Titre", className: "" },
-  { label: "Statut", className: "hidden md:table-cell" },
+  { label: "Avancement", className: "hidden md:table-cell" },
   { label: "Priorité", className: "hidden md:table-cell" },
   { label: "Critères", className: "hidden text-right md:table-cell" },
 ];

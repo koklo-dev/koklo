@@ -1,17 +1,25 @@
-/* Typographie - DESIGN.md §3. */
+/* Typographie - DESIGN.md §3 (échelle v2, TK-87). Exposée à Tailwind par index.css
+   (text-page-title, text-section-title, text-subsection-title, text-body, text-meta,
+   text-group-label, text-caption, text-code). Le secondaire garde ses variables
+   --text-secondary-* mais s'utilise en text-meta : text-secondary est une couleur. */
 :root {
   --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --text-page-title-font: var(--font-sans);
-  --text-page-title-size: 30px;
+  --text-page-title-size: 24px;
   --text-page-title-weight: 600;
-  --text-page-title-tracking: -0.025em;
+  --text-page-title-tracking: -0.02em;
 
   --text-section-title-font: var(--font-sans);
-  --text-section-title-size: 24px;
+  --text-section-title-size: 16px;
   --text-section-title-weight: 600;
-  --text-section-title-tracking: -0.015em;
+  --text-section-title-tracking: normal;
+
+  --text-subsection-title-font: var(--font-sans);
+  --text-subsection-title-size: 14px;
+  --text-subsection-title-weight: 600;
+  --text-subsection-title-tracking: normal;
 
   --text-body-font: var(--font-sans);
   --text-body-size: 14px;
@@ -23,13 +31,20 @@
   --text-secondary-weight: 400;
   --text-secondary-tracking: normal;
 
+  /* Libellé de groupe : capitales en classe (uppercase), Tailwind ne les porte pas dans --text-*. */
+  --text-group-label-font: var(--font-sans);
+  --text-group-label-size: 11px;
+  --text-group-label-weight: 600;
+  --text-group-label-tracking: 0.06em;
+
   --text-caption-font: var(--font-sans);
   --text-caption-size: 12px;
   --text-caption-weight: 500;
   --text-caption-tracking: normal;
 
+  /* Code : famille en classe (font-mono). */
   --text-code-font: var(--font-mono);
   --text-code-size: 12px;
-  --text-code-weight: 400;
+  --text-code-weight: 500;
   --text-code-tracking: normal;
 }

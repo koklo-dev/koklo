@@ -54,7 +54,9 @@ describe("PROVIDER_UNAVAILABLE (503)", () => {
     expect(
       within(dialog).getByRole("heading", { level: 2, name: "Connexion par e-mail" }),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText("Brouillon")).toBeInTheDocument();
+    expect(
+      within(dialog).getByLabelText("Avancement : Spécifiée, étape 2 sur 6"),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText("Indispensable")).toBeInTheDocument();
     expect(screen.getByRole("table", { hidden: true })).toBeInTheDocument();
   });

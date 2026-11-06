@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Projets · Koklo" };
 export default function Page() {
   return (
     <>
-      <h1 className="mb-6 text-[30px] font-semibold tracking-[-0.025em]">Projets</h1>
+      <h1 className="mb-6 text-page-title">Projets</h1>
       <ProjectsPage />
     </>
   );

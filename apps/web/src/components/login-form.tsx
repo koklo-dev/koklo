@@ -46,7 +46,7 @@ export function LoginForm({ className, next, ...props }: LoginFormProps) {
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
             <BrandMark />
-            <h1 className="text-[24px] font-semibold tracking-[-0.015em]">Connexion à Koklo</h1>
+            <h1 className="text-page-title">Connexion à Koklo</h1>
             <FieldDescription>
               Connectez-vous avec votre compte GitHub pour accéder à vos projets.
             </FieldDescription>

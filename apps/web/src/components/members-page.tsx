@@ -27,7 +27,7 @@ import { LoadingStatus } from "./loading-status.tsx";
 function MembersTable({ members }: { members: MemberListOutput }) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-meta text-muted-foreground">
         {members.length === 1 ? "1 membre" : `${members.length} membres`}
       </p>
       <Table>
@@ -44,7 +44,7 @@ function MembersTable({ members }: { members: MemberListOutput }) {
               <TableCell>
                 <div className="flex flex-col">
                   <span className="font-medium">{member.name}</span>
-                  <span className="text-[13px] text-muted-foreground">{member.email}</span>
+                  <span className="text-meta text-muted-foreground">{member.email}</span>
                 </div>
               </TableCell>
               <TableCell>
@@ -111,7 +111,7 @@ export function MembersPage() {
 
   return (
     <div data-testid="members-page" className="flex flex-col gap-6">
-      <h1 className="text-[30px] font-semibold tracking-[-0.025em]">Membres</h1>
+      <h1 className="text-page-title">Membres</h1>
       {invitation}
       {list}
     </div>

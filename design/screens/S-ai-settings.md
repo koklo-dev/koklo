@@ -1,7 +1,7 @@
 ---
 id: S-ai-settings
 titre: Réglages de l'IA (clé du fournisseur de l'organisation)
-version: 1
+version: 1.1
 ---
 ## 1. Utilisateurs et objectif
 Propriétaires et administrateurs de l'organisation active (vue équipe, vision §14 « fournisseurs, clés BYOK : propriétaire/admin seulement »). Les autres rôles (développeur, designer, client, business) n'ont pas cette page : l'entrée est absente de la navigation et un accès direct affiche un message sans action ni appel d'API. Arrivée : entrée « IA » de la barre latérale, ou lien « Configurer l'IA » de l'écran de cadrage (S-framing §4.5) pour owner/admin.
@@ -29,7 +29,7 @@ Sources : `llmCredential.list` (`{ items: Status[] }`, `Status = { provider, def
   1. **Statut** (icône + texte, tableau ci-dessous).
   2. **Lecture seule** quand la clé existe : « Enregistrée le <date longue> » (`createdAt`) ; « Modifiée le <date> » si `updatedAt` diffère ; « Dernière utilisation : <date> » ou « Jamais utilisée » (`lastUsedAt`) ; « Modèle par défaut : <defaultModel> » (police mono) si fixé. Dates en texte, jamais d'heure relative seule. **Aucune** mention de longueur, de fin de clé, de masque `••••` : la clé n'est pas représentée du tout (ADR 0013).
   3. **Formulaire** (4.2) ou actions (4.3).
-- Bloc « Ce qui est envoyé au fournisseur » : réutilise `ai-send-policy.tsx` (texte envoyé, sous-traitant américain, jamais envoyés : clés, identifiants de personnes, noms), `Alert` neutre, icône `lock`, **toujours rendu** au-dessus du formulaire et visible aussi quand la clé existe (pas replié). Ajout d'une ligne propre à cet écran : « Votre clé est chiffrée sur nos serveurs. Elle ne peut plus être affichée, seulement remplacée ou retirée. » Libellé RGPD final à valider par le produit (S-framing Q3), ne bloque rien.
+- Bloc d'envoi à l'agent IA (v2, TK-87) : réutilise `ai-send-policy.tsx`, `InlineAlert` neutre d'une ligne, icône `lock`, « Votre texte est envoyé à l'agent IA avec la clé de l'organisation. » + « Détails » replié (même détail que S-framing §3.2, sans nom de fournisseur ni pays, B15, B24), **toujours rendu** au-dessus du formulaire et visible aussi quand la clé existe. En sombre, fond `--raised`. Ajout d'une ligne propre à cet écran : « Votre clé est chiffrée sur nos serveurs. Elle ne peut plus être affichée, seulement remplacée ou retirée. » Libellé RGPD final à valider par le produit (S-framing Q3), ne bloque rien.
 - Ligne sous le bouton de vérification : « Chaque vérification est comptée dans les limites de votre organisation (5 par heure). »
 
 ### Statuts (jamais la couleur seule)
@@ -146,6 +146,7 @@ Sous 768 px (375 px testé) : marge 16 px ; h1 puis carte pleine largeur ; champ
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-11-02 | Web : réglages IA (clé BYOK) | Création : route `/settings/ai`, owner/admin, Anthropic seul, « Enregistrer et vérifier » (set puis verify), états absente / configurée / invalide / illisible / en cours / échec réseau / quota 5 par heure / non-admin, remplacement et retrait avec confirmation, clé jamais réaffichée. Détail : `.workflow/AI-SETTINGS/02-design.md` |
+| 1.1 | 2026-11-06 | TK-87 | Lot 0 : bloc d'envoi en `InlineAlert` neutre + « Détails » (S-framing §3.2 v2), sans nom de fournisseur dans le bloc (B15) ; la ligne « Votre clé est chiffrée… » reste hors du bloc, inchangée ; h1 et h2 à l'échelle v2. Les libellés « Anthropic » de la carte (nom du fournisseur de la clé) et ses `Badge` d'état restent jusqu'à TK-98 (B30). Détail : `.workflow/TK-87/02-design.md` |
 
 ## 11. Plan d'implémentation web (brief développeur)
 Aucun changement de contrat ni de dépendance.

@@ -77,7 +77,7 @@ export function SelectContent({
       <SelectPrimitive.Content
         position={position}
         className={cn(
-          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md motion-safe:animate-content-in",
+          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-floating motion-safe:animate-content-in",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className,
@@ -102,7 +102,7 @@ export function SelectContent({
 export function SelectLabel({ className, ...props }: ComponentProps<typeof SelectPrimitive.Label>) {
   return (
     <SelectPrimitive.Label
-      className={cn("px-2 py-1.5 text-[13px] font-medium", className)}
+      className={cn("px-2 py-1.5 text-meta font-medium", className)}
       {...props}
     />
   );

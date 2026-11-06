@@ -1,5 +1,5 @@
 import type { TicketOutput, TicketStatus } from "@koklo/contract";
-import type { IconName } from "@koklo/ui";
+import type { IconName, PriorityLevel } from "@koklo/ui";
 
 /** Priorité d'un ticket, telle que l'API la sert. */
 export type TicketPriority = TicketOutput["priority"];
@@ -41,6 +41,14 @@ export const PRIORITY_LABELS: Record<TicketPriority, string> = {
   medium: "Priorité moyenne",
   high: "Priorité haute",
   critical: "Priorité critique",
+};
+
+/** Barres allumées de `PriorityIndicator` (H4, questions.md B23) : critical 3 … low 0. */
+export const PRIORITY_LEVELS: Record<TicketPriority, PriorityLevel> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  critical: 3,
 };
 
 export function isStatus(value: unknown): value is TicketStatus {

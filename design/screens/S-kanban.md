@@ -1,7 +1,7 @@
 ---
 id: S-kanban
 titre: Kanban des tickets du sprint actif
-version: 1
+version: 1.1
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (owner, admin, dev, designer) : voit où en est chaque ticket du sprint actif et le fait avancer d'un statut à l'autre. Arrive depuis la barre latérale (« Kanban »).
@@ -35,7 +35,7 @@ Sources : `sprint.list({status:"active"})` puis `ticket.list({sprintId})` (pagin
 - **Carte** (`Card`, rayon 8 px, bordure `--border`, pas d'ombre au repos), de haut en bas :
   1. Ligne 1 : clé `TK-35` (JetBrains Mono 12 px, `--muted-foreground`) ; à droite le bouton « Déplacer » (équipe seulement).
   2. Titre (14 px/500, 3 lignes max, `title` complet en infobulle native).
-  3. Ligne de méta (12 px, retour à la ligne autorisé) : `Badge outline` du paquet (`pkg`, JetBrains Mono) ; `Badge outline` sensibilité : « Sensible » avec `lock` 16, ou « Sûr » sans icône ; priorité en **texte** « Priorité haute » / « Priorité critique » / « Priorité moyenne » / « Priorité basse ». La priorité critique et haute utilisent `font-weight 600` et `text-foreground`, les autres `text-muted-foreground` : le sens est dans les mots, la graisse n'est qu'un renfort. Aucune couleur de statut.
+  3. Ligne de méta (12 px, retour à la ligne autorisé) : `Badge outline` du paquet (`pkg`, JetBrains Mono) ; `Badge outline` sensibilité : « Sensible » avec `lock` 16, ou « Sûr » sans icône ; priorité en `PriorityIndicator` (v2, TK-87) : barres critique 3, haute 2, moyenne 1, basse 0 + libellé « Priorité critique » / « Priorité haute » / « Priorité moyenne » / « Priorité basse » (questions.md B23) ; le sens est dans les mots, les barres sont décoratives. Aucune couleur de statut.
   4. Type et assigné : non affichés en v1 (densité, pas de besoin client).
 - Tri dans la colonne : priorité décroissante puis clé (déterministe, sans ordre manuel).
 
@@ -114,3 +114,4 @@ Un seul message d'erreur de déplacement à la fois (le dernier remplace le pré
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-10-30 | TK-35 | Création : 7 colonnes, cartes, glisser-déposer natif et alternative « Déplacer », états et refus serveur, lecture seule client/business, entrée « Kanban » (icône `checklist`) dans la barre latérale. Détail : `.workflow/TK-35/02-design.md` |
+| 1.1 | 2026-11-06 | TK-87 | Lot 0 : priorité de carte en `PriorityIndicator` (4 niveaux ramenés à 0..3, libellés de ticket conservés, B23) à la place du gras / gris ; h1 24 px (échelle v2). Pastilles `pkg` et « Sûr / Sensible » inchangées (ni statut ni priorité). Détail : `.workflow/TK-87/02-design.md` |

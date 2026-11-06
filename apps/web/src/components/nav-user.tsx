@@ -65,10 +65,12 @@ export function NavUser() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              aria-label="Menu utilisateur"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               {identity}
+              {/* Nom accessible = texte visible + rôle (WCAG 2.5.3 « Label in Name ») : pas d'aria-label
+                  qui remplacerait l'identité affichée. */}
+              <span className="sr-only">Menu utilisateur</span>
               <Icon name="unfold_more" size={16} className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>

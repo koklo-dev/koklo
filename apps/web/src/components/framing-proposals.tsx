@@ -96,11 +96,7 @@ export function FramingProposalsStep({ page }: { page: FramingModel }) {
       aria-busy={call.pending === "propose" || undefined}
       className="flex flex-col gap-4"
     >
-      <h2
-        id={IDS.stepProposals}
-        tabIndex={-1}
-        className="text-[22px] font-semibold tracking-[-0.015em] outline-none"
-      >
+      <h2 id={IDS.stepProposals} tabIndex={-1} className="text-section-title outline-none">
         3. Les propositions
       </h2>
       {state.proposals.length === 0 ? (

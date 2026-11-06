@@ -66,6 +66,7 @@ describe("chargement et erreur de list (§4.1)", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("page : structure et politique d'envoi (§3)", () => {
   it("h1 « IA », introduction, une seule carte « Anthropic », aucune carte OpenAI ni Google", async () => {
     await openAiSettings([]);
@@ -85,25 +86,36 @@ describe("page : structure et politique d'envoi (§3)", () => {
     ["configurée", [credential()]],
     ["invalide", [credential({ invalid: true, invalidatedAt: "2026-10-28T12:00:00.000Z" })]],
   ])(
-    "état %s : le bloc « Ce qui est envoyé » et la mention « chiffrée » sont toujours rendus",
+    "état %s : le bloc d'envoi (InlineAlert + « Détails », TK-87) et la mention « chiffrée » sont toujours rendus",
     async (_n, items) => {
       await openAiSettings(items);
-      expect(screen.getByText("Ce qui est envoyé à Anthropic")).toBeInTheDocument();
-      expect(body()).toMatch(/Anthropic \(États-Unis\)/);
+      const note = screen
+        .getAllByRole("note")
+        .find((n) =>
+          n.textContent?.includes(
+            "Votre texte est envoyé à l'agent IA avec la clé de l'organisation.",
+          ),
+        ) as HTMLElement;
+      expect(note, "bloc d'envoi").toBeDefined();
+      expect(note.textContent).not.toMatch(/Anthropic|États-Unis/);
+      const toggle = within(note).getByRole("button", { name: "Détails" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(toggle);
       expect(body()).toMatch(/Jamais envoyés : clés, identifiants de personnes/);
       expect(
         screen.getByText(
           "Votre clé est chiffrée sur nos serveurs. Elle ne peut plus être affichée, seulement remplacée ou retirée.",
         ),
       ).toBeInTheDocument();
-      // Pas replié : le texte est dans le document sans action de l'utilisateur.
       expect(screen.queryByRole("button", { name: /Ce qui est envoyé/ })).not.toBeInTheDocument();
     },
   );
 
   it("le bloc de politique précède le formulaire dans le document (clé absente)", async () => {
     await openAiSettings([]);
-    const policy = screen.getByText("Ce qui est envoyé à Anthropic");
+    const policy = screen.getByText(
+      "Votre texte est envoyé à l'agent IA avec la clé de l'organisation.",
+    );
     expect(
       policy.compareDocumentPosition(keyField()) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();

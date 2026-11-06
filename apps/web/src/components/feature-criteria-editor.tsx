@@ -33,7 +33,7 @@ export function CriteriaEditor({ model, readOnly, announce, original }: EditorPr
     <section aria-labelledby="feature-form-criteria-heading" className="flex flex-col gap-3">
       <h3
         id="feature-form-criteria-heading"
-        className="text-[13px] font-semibold text-muted-foreground"
+        className="text-subsection-title text-muted-foreground"
       >
         Critères d'acceptation
       </h3>
@@ -67,7 +67,7 @@ export function CriteriaEditor({ model, readOnly, announce, original }: EditorPr
           ))}
         </ol>
       ) : null}
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-meta text-muted-foreground">
         Changer le titre d'un critère le remplace par un nouveau critère. Les identifiants ne sont
         jamais réutilisés : les scénarios de test qui citaient l'ancien devront être mis à jour.
       </p>

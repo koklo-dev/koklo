@@ -1,5 +1,5 @@
 import type { FeatureDetail, FeatureSummary } from "@koklo/contract";
-import type { IconName } from "@koklo/ui";
+import type { IconName, LifecycleStage, PriorityLevel } from "@koklo/ui";
 
 export type FeatureStatus = FeatureSummary["status"];
 export type FeaturePriority = FeatureSummary["priority"];
@@ -20,6 +20,14 @@ const PRIORITIES: Record<FeaturePriority, string> = {
   should: "Importante",
   could: "Souhaitable",
   wont: "Reportée",
+};
+
+/** Barres allumées de `PriorityIndicator` (DESIGN.md v2 §5.1) : must 3 … wont 0. */
+const PRIORITY_LEVELS: Record<FeaturePriority, PriorityLevel> = {
+  must: 3,
+  should: 2,
+  could: 1,
+  wont: 0,
 };
 
 const STEPS: Record<StepType, string> = {
@@ -46,6 +54,21 @@ export function statusIcon(status: string): IconName {
 /** Libellé de priorité (Indispensable, Importante, Souhaitable, Reportée). */
 export function priorityLabel(priority: string): string {
   return lookup(PRIORITIES, priority) ?? UNKNOWN;
+}
+
+/** Niveau de `PriorityIndicator` ; une valeur inconnue n'allume aucune barre. */
+export function priorityLevel(priority: string): PriorityLevel {
+  return lookup(PRIORITY_LEVELS, priority) ?? 0;
+}
+
+/**
+ * Stade de `LifecycleStatus` dérivé des données présentes (H3, questions.md B22), en attendant le calcul
+ * serveur : implementee ou adoptee -> Implémentée (3) ; sinon au moins un critère -> Spécifiée (1) ; sinon
+ * Idée (0). Conçue, Testée et Livrée ne sont jamais déduits : la donnée manque, pas de faux contenu.
+ */
+export function lifecycleStage(feature: { status: string; criteriaCount: number }): LifecycleStage {
+  if (feature.status === "implementee" || feature.status === "adoptee") return 3;
+  return feature.criteriaCount > 0 ? 1 : 0;
 }
 
 /** Mot d'ouverture d'une étape (Étant donné, Quand, Alors, Et). */

@@ -29,7 +29,7 @@ const isKnownOutcome = (value: unknown): value is InstallationCallbackOutcome =>
   typeof value === "string" && Object.hasOwn(RESULT_NOTICES, value);
 
 function Title() {
-  return <h1 className="text-[30px] font-semibold tracking-[-0.025em]">GitHub</h1>;
+  return <h1 className="text-page-title">GitHub</h1>;
 }
 
 /** Liste, vide, chargement ou erreur selon la requête des installations. */
@@ -122,7 +122,7 @@ function GithubManager({ result }: { result: InstallationCallbackOutcome | undef
         {installButton}
       </div>
       {active === undefined ? null : (
-        <p role="status" className="text-[13px] text-muted-foreground">
+        <p role="status" className="text-meta text-muted-foreground">
           {REDIRECTING_LABEL}
         </p>
       )}

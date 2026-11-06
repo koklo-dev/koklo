@@ -5,29 +5,25 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
   Icon,
-  type IconName,
+  ValidationStatus,
 } from "@koklo/ui";
 import { useState } from "react";
 import { stepLabel } from "../lib/feature-labels.ts";
 import type { ProposalStatus, ProposedFeature } from "../lib/framing-types.ts";
 
-const STATUS: Record<ProposalStatus, { label: string; icon: IconName; fill: boolean }> = {
-  to_review: { label: "À relire", icon: "schedule", fill: false },
-  accepted: { label: "Acceptée", icon: "check_circle", fill: true },
-  rejected: { label: "Rejetée", icon: "cancel", fill: false },
-};
-
 /** Description repliée à 3 lignes au-delà de 3 retours à la ligne ou d'une longueur qui dépasse 3 lignes. */
 const isLong = (text: string): boolean => text.split("\n").length > 3 || text.length > 240;
 
-export function StatusBadge({ status }: { status: ProposalStatus }) {
-  const { label, icon, fill } = STATUS[status];
-  return (
-    <Badge variant="outline" data-slot="badge" className="gap-1">
-      <Icon name={icon} size={16} fill={fill} />
-      <span>{label}</span>
-    </Badge>
-  );
+/**
+ * Statut d'une proposition en `ValidationStatus` (H7, B25, B33) : À relire -> À valider, Acceptée -> Validée,
+ * Rejetée -> Non soumise avec l'icône de rejet. Libellés propres à l'écran.
+ */
+export function ProposalStatusPill({ status }: { status: ProposalStatus }) {
+  if (status === "accepted") return <ValidationStatus status="validated" label="Acceptée" />;
+  if (status === "rejected") {
+    return <ValidationStatus status="unsubmitted" icon="cancel" label="Rejetée" />;
+  }
+  return <ValidationStatus status="pending" label="À relire" />;
 }
 
 export function Description({ text }: { text: string }) {
@@ -90,7 +86,7 @@ export function Criteria({ criteria }: { criteria: ProposedFeature["criteria"] }
 
 export function Duplicate({ projectId, specId }: { projectId: string; specId: string }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-2 text-[13px]">
+    <p className="flex flex-wrap items-center gap-x-2 text-meta">
       <Icon name="warning" size={16} />
       <span>{`Titre déjà présent : ${specId}`}</span>
       <a

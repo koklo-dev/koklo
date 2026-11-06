@@ -16,7 +16,7 @@ const FULL_WIDTH = "h-11 w-full md:h-9";
 
 function Title({ children }: { children: ReactNode }) {
   return (
-    <h1 tabIndex={-1} className="text-[24px] font-semibold tracking-[-0.015em] outline-none">
+    <h1 tabIndex={-1} className="text-page-title outline-none">
       {children}
     </h1>
   );
@@ -35,7 +35,7 @@ function Status({ icon, title, text }: { icon: IconName; title: string; text: st
     <div role="status" className="flex flex-col gap-2">
       <Icon name={icon} size={20} />
       <Title>{title}</Title>
-      <p className="text-[13px] text-muted-foreground">{text}</p>
+      <p className="text-meta text-muted-foreground">{text}</p>
     </div>
   );
 }
@@ -50,7 +50,7 @@ function Ready({ api, state }: { api: Invitation; state: ReadyState }) {
       <div className="flex flex-col gap-2">
         <Title>Rejoindre {preview.organizationName}</Title>
         {/* `div` et non `p` : le Badge du kit est un `div`, interdit dans un paragraphe. */}
-        <div className="text-[13px] text-muted-foreground">
+        <div className="text-meta text-muted-foreground">
           {who} à rejoindre cette organisation avec le rôle{" "}
           <Badge variant="outline">{ROLE_LABELS[preview.role] ?? preview.role}</Badge>.
         </div>
@@ -165,7 +165,7 @@ function Footer({ api }: { api: Invitation }) {
   if (!api.email || !WITH_FOOTER.has(api.state.kind)) return null;
   return (
     <div className="flex flex-col items-start gap-1 border-t pt-4 md:flex-row md:items-center md:justify-between">
-      <p className="break-words text-[13px] text-muted-foreground">
+      <p className="break-words text-meta text-muted-foreground">
         Connecté en tant que {api.email}
       </p>
       <Button variant="ghost" className="h-11 md:h-9" onClick={() => void api.signOut()}>

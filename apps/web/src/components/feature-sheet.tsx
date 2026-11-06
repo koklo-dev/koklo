@@ -10,7 +10,7 @@ import { describeFeatureError } from "../lib/spec-errors.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { FeatureDetail } from "./feature-detail.tsx";
 import { FeatureError } from "./feature-error.tsx";
-import { PriorityText, StatusBadge } from "./features-list.tsx";
+import { FeatureLifecycle, FeaturePriority } from "./feature-status.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
 
 interface SheetProps {
@@ -75,6 +75,7 @@ export function FeatureSheet({
   }, [gone, onGone]);
 
   const shown = summary ?? query.data;
+  const criteriaCount = summary?.criteriaCount ?? query.data?.criteria.length ?? 0;
   return (
     <Sheet open onOpenChange={(open) => open || onClose()}>
       <SheetContent
@@ -91,19 +92,13 @@ export function FeatureSheet({
       >
         <SheetHeader>
           <span className="font-mono text-xs text-muted-foreground">{specId}</span>
-          <SheetTitle
-            ref={title}
-            tabIndex={-1}
-            className="text-xl font-semibold tracking-[-0.015em] outline-none"
-          >
+          <SheetTitle ref={title} tabIndex={-1} className="text-section-title outline-none">
             {shown?.title ?? specId}
           </SheetTitle>
           {shown ? (
             <div className="flex flex-wrap items-center gap-3">
-              <StatusBadge status={shown.status} />
-              <span className="text-[13px]">
-                <PriorityText priority={shown.priority} />
-              </span>
+              <FeatureLifecycle feature={{ status: shown.status, criteriaCount }} />
+              <FeaturePriority priority={shown.priority} />
             </div>
           ) : null}
         </SheetHeader>
