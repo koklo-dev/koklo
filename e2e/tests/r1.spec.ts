@@ -96,7 +96,9 @@ async function move(page: Page, key: string, label: string): Promise<void> {
 async function moveOk(page: Page, key: string, status: string, label: string): Promise<void> {
   await move(page, key, label);
   await expect(
-    page.getByRole("status").filter({ hasText: `${key} déplacé vers ${label}.` }),
+    page
+      .getByRole("status")
+      .filter({ hasText: new RegExp(`${key} déplacé vers ${label} · ${label} : \\d+`) }),
   ).toBeVisible();
   await expect(column(page, status).getByTestId(`kanban-card-${key}`)).toBeVisible();
 }
