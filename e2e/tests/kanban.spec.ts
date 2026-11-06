@@ -38,7 +38,7 @@ test("kanban : « Déplacer » fait passer TK-6 de « Backlog » à « À faire 
   await page.getByRole("menuitem", { name: "À faire" }).click();
   await expect(column(page, "todo").getByTestId("kanban-card-TK-6")).toBeVisible();
   await expect(
-    page.getByRole("status").filter({ hasText: "TK-6 déplacé vers À faire." }),
+    page.getByRole("status").filter({ hasText: /TK-6 déplacé vers À faire · À faire : \d+/ }),
   ).toBeVisible();
 
   await page.reload();
