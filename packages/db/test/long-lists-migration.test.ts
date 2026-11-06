@@ -135,17 +135,19 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
     const repo = await insertRepo(db, scope, installation, { role: "spec" });
     snapshotId = await insertSnapshot(db, scope, repo);
     await insertHead(db, scope, repo, snapshotId);
-    for (const specId of ["F-999", "F-1000", "F-002"]) {
+    for (const specId of ["F-999", "F-9999999999", "F-1000", "F-002"]) {
       await insertFeature(db, scope, snapshotId, specId);
     }
     const rows = await db.query<{ spec_id: string; spec_number: number }>(
       "SELECT spec_id, spec_number FROM spec_features WHERE snapshot_id = $1 ORDER BY spec_number, id",
       [snapshotId],
     );
+    // Au-delà de 9 chiffres, l'identifiant ne tient pas dans INTEGER : il est rangé en dernier.
     expect(rows.map((r) => [r.spec_id, r.spec_number])).toEqual([
       ["F-002", 2],
       ["F-999", 999],
       ["F-1000", 1000],
+      ["F-9999999999", 2_147_483_647],
     ]);
   });
 
@@ -213,7 +215,7 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
     await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
     expect(await inventory(db)).toEqual(expected);
     const rows = await db.query("SELECT 1 FROM spec_features WHERE snapshot_id = $1", [snapshotId]);
-    expect(rows, "les fonctionnalités existantes sont conservées").toHaveLength(3);
+    expect(rows, "les fonctionnalités existantes sont conservées").toHaveLength(4);
   }, 180_000);
 
   it("second deploy : même inventaire qu'au premier up, colonnes recalculées", async () => {
