@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
@@ -59,7 +60,8 @@ const ownerAndAdmin = ["owner", "admin"] as const;
 const procedures: Procedure[] = [
   {
     name: "organization.create",
-    allowed: everyRole,
+    // TK-55 : un compte dont toutes les adhésions sont « client » ne crée pas d'organisation.
+    allowed: ["owner", "admin", "dev", "designer", "business"],
     run: (a) => call(app, a.cookie, "post", "/organizations", { name: `Org ${unique()}` }),
   },
   {
@@ -262,5 +264,33 @@ describe("le rôle vient de la table members, jamais de l'entrée (C1)", () => {
     });
     expect(response.status).toBe(200);
     expect(await count(database, "projects", "organization_id = $1", [other])).toBe(0);
+  });
+});
+
+describe("organization.create fermé aux comptes qui ne sont que clients (TK-55)", () => {
+  it("un compte dont la seule adhésion est « client » reçoit 403 et aucune organisation n'est créée", async () => {
+    const client = await insertActor(database, orgId, "client", "client-seul");
+    const before = await count(database, "organizations");
+    const response = await call(app, client.cookie, "post", "/organizations", {
+      name: "Org du client",
+    });
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe("FORBIDDEN");
+    expect(response.body.data).toEqual({ reason: "client_only" });
+    expect(await count(database, "organizations")).toBe(before);
+  });
+
+  it("un client qui a aussi un autre rôle dans une autre organisation peut créer une organisation", async () => {
+    const client = await insertActor(database, orgId, "client", "client-et-dev");
+    const otherOrg = await insertOrganization(database, `autre-${unique()}`);
+    await database.query(
+      `INSERT INTO members (id, organization_id, user_id, role, created_at, updated_at)
+       VALUES ($1, $2, $3, 'dev', now(), now())`,
+      [randomUUID(), otherOrg, client.userId],
+    );
+    const response = await call(app, client.cookie, "post", "/organizations", {
+      name: `Org ${unique()}`,
+    });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
   });
 });

@@ -24,6 +24,16 @@ export const forbiddenError = {
 
 export const authErrors = { ...unauthorizedError, ...forbiddenError } as const;
 
+/** Refus motivé propre à une route (la raison ne révèle rien de la structure interne). */
+export const forbiddenOf = <R extends [string, ...string[]]>(...reasons: R) =>
+  ({
+    FORBIDDEN: {
+      status: 403,
+      message: "Accès refusé",
+      data: z.object({ reason: z.enum(reasons) }),
+    },
+  }) as const;
+
 export const notFoundError = {
   NOT_FOUND: { status: 404, message: "Ressource introuvable" },
 } as const;

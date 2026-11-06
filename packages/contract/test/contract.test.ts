@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d)", () => {
-  it("est en 0.13.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.13.0");
-    expect(CONTRACT_VERSION).toBe("0.13.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55)", () => {
+  it("est en 0.14.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("0.14.0");
+    expect(CONTRACT_VERSION).toBe("0.14.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -221,6 +221,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "0.11.0",
       "0.12.0",
       "0.13.0",
+      "0.14.0",
     ]);
   });
 });
@@ -289,13 +290,20 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     );
   });
 
-  it("l'empreinte 0.13.0 est celle du document généré et diffère de 0.12.0 (groupe review)", async () => {
+  it("conserve l'empreinte figée de 0.13.0 (TK-55d) : elle ne suit plus le document courant", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["0.13.0"]).toBe(
+      "7e27df39514a0ff7b44417fe1252b90717457b0ccd07223edeaca6b4731d1c76",
+    );
+  });
+
+  it("l'empreinte 0.14.0 est celle du document généré et diffère de 0.13.0 (FORBIDDEN client_only)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["0.13.0"]).toBe(hash);
-    expect(versions["0.13.0"]).not.toBe(versions["0.12.0"]);
+    expect(versions["0.14.0"]).toBe(hash);
+    expect(versions["0.14.0"]).not.toBe(versions["0.13.0"]);
   });
 });
 

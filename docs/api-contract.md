@@ -254,7 +254,7 @@ decision: lease expiry, "active lease" filters of `ticket.get`/`ticket.delete`. 
 ## Implementation of the six procedures (TK-23)
 | Procedure | Controller guards | Behaviour |
 |-----------|-------------------|-----------|
-| `organization.create` | `UserSessionGuard` | Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
+| `organization.create` | `UserSessionGuard`, `NotClientOnlyGuard` (since 0.14.0) | Refused with `FORBIDDEN { reason: client_only }` when every membership of the caller is `client` (TK-55); a caller with no membership, or with any other role somewhere, may create. Slug checked (`slug_taken`) or derived from the name with a numeric suffix; creation through Better Auth `createOrganization` (caller becomes `owner`, organization becomes active on the session) |
 | `organization.list` | `UserSessionGuard` | Organizations the caller belongs to, with the caller's role |
 | `member.list` | `SessionGuard`, `RoleGuard` (`MEMBER_LIST_ROLES`) | Members of the session organization; closed to `client` (403, exposes names, emails and roles of the whole organization) and to any absent or unknown role |
 | `member.invite` | `SessionGuard`, `RoleGuard` | `already_member` / `already_invited` checks, then Better Auth `createInvitation`; its callback enqueues the email job |
@@ -274,13 +274,14 @@ drift apart.
 
 | Procedure | owner | admin | dev | designer | client | business |
 |-----------|:-----:|:-----:|:---:|:--------:|:------:|:--------:|
-| `organization.create`, `organization.list` | yes | yes | yes | yes | yes | yes |
+| `organization.create` | yes | yes | yes | yes | no (client-only account, since 0.14.0) | yes |
+| `organization.list` | yes | yes | yes | yes | yes | yes |
 | `member.list` | yes | yes | yes | yes | no | yes |
 | `member.invite` | yes | yes | no | no | no | no |
 | `member.setRole` | yes | yes | no | no | no | no |
 | `project.create` | yes | yes | no | no | no | no |
 
-`organization.*` needs a session only (any user; no role). Others: 401 without session or
+`organization.*` needs a session only (no active organization). `organization.create` is refused to an account whose memberships are all `client` (403 before input validation). Others: 401 without session or
 active organization, 403 for a role marked "no".
 
 ### Web consumer (TK-24)
@@ -1223,6 +1224,9 @@ baseline against the exact version it read; the team reads the journal with the 
   `baseline_not_open` only), `STALE_VERSION` (409) and `SPACE_NOT_READY` (503); `list` has no conflict or stale error.
 
 ## Version history
+- **0.14.0** (TK-55): `organization.create` declares `FORBIDDEN` with `data.reason` `client_only` (helper
+  `forbiddenOf` in `errors.ts`); an account whose memberships are all `client` can no longer create an organization.
+  Additive (new error on an existing route). Fingerprints of 0.1.0 to 0.13.0 unchanged.
 - **0.13.0** (TK-55d): group `review` (`submit`, `list`; 2 routes, 64 routes and 47 paths in all), typed error
   `STALE_VERSION` (409), `CONFLICT` reason `baseline_not_open`. Additive. Fingerprints of 0.1.0 to 0.12.0 unchanged.
 - **0.12.0** (TK-55c): group `suggestion` (`create`, `list`, `withdraw`, `accept`, `reject`; 5 routes, 62 routes and 46

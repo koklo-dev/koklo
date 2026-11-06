@@ -12,6 +12,7 @@ import { dependency, sprint, ticket } from "./contract-tickets.ts";
 import {
   authErrors,
   conflictError,
+  forbiddenOf,
   internalError,
   notFoundError,
   unauthorizedError,
@@ -72,8 +73,14 @@ const projectList = route("GET", "/projects")
   .errors({ ...internalError, ...authErrors })
   .output(projectListOutputSchema);
 
+/** TK-55 : un compte dont toutes les adhésions sont « client » ne crée pas d'organisation. */
 const organizationCreate = route("POST", "/organizations")
-  .errors({ ...internalError, ...unauthorizedError, ...conflictError })
+  .errors({
+    ...internalError,
+    ...unauthorizedError,
+    ...forbiddenOf("client_only"),
+    ...conflictError,
+  })
   .input(organizationCreateInputSchema)
   .output(organizationCreateOutputSchema);
 
