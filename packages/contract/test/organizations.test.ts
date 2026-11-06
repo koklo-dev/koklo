@@ -192,10 +192,15 @@ describe("C3 erreurs typées par route", () => {
     }
   });
   it("n'expose pas les erreurs hors de ses routes", () => {
-    expect(errors(proc["organization.create"]()).FORBIDDEN).toBeUndefined();
     expect(errors(proc["project.create"]()).CONFLICT).toBeUndefined();
     expect(errors(proc["member.invite"]()).NOT_FOUND).toBeUndefined();
     expect(errors(proc["member.list"]()).CONFLICT).toBeUndefined();
+  });
+  it("organization.create : FORBIDDEN borné à la raison client_only (TK-55)", async () => {
+    const forbidden = errors(proc["organization.create"]()).FORBIDDEN;
+    expect(forbidden?.status).toBe(403);
+    expect(await isValid(forbidden?.data, { reason: "client_only" })).toBe(true);
+    expect(await isValid(forbidden?.data, { reason: "autre" })).toBe(false);
   });
   it("CONFLICT.data.reason est borné à l'enum", async () => {
     const data = errors(proc["member.setRole"]()).CONFLICT?.data;
@@ -219,7 +224,9 @@ describe("C2 routes HTTP et OpenAPI", () => {
     };
     const r = (path: string, method: string) =>
       Object.keys(doc.paths[path]?.[method]?.responses ?? {});
-    expect(r("/organizations", "post")).toEqual(expect.arrayContaining(["401", "409", "500"]));
+    expect(r("/organizations", "post")).toEqual(
+      expect.arrayContaining(["401", "403", "409", "500"]),
+    );
     expect(r("/organizations", "get")).toEqual(expect.arrayContaining(["401", "500"]));
     expect(r("/members/invitations", "post")).toEqual(
       expect.arrayContaining(["401", "403", "409", "500"]),

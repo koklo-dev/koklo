@@ -15,8 +15,6 @@ import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
 const ALLOWED = ["comment.create", "review.submit", "suggestion.create", "suggestion.withdraw"];
 /** Suppression de SON propre commentaire : droit d'auteur vérifié dans le service (comment-permissions). */
 const OWN_ONLY = ["comment.delete"];
-/** Compte utilisateur, hors de tout projet : créer une organisation ne touche aucun projet existant. */
-const ACCOUNT_SCOPED = ["organization.create"];
 const DENIED = [
   "ai.draftBrief",
   "ai.proposeCriteria",
@@ -33,6 +31,8 @@ const DENIED = [
   "llmCredential.verify",
   "member.invite",
   "member.setRole",
+  // TK-55 (décision du 2026-11-06) : un compte qui n'est que client ne crée pas d'organisation.
+  "organization.create",
   "project.create",
   "projectClient.add",
   "projectClient.remove",
@@ -78,8 +78,8 @@ function routes(): Route[] {
 const writes = () => routes().filter((r) => r.method !== "GET");
 
 describe("classement exhaustif des écritures du contrat", () => {
-  it("toute écriture du contrat est classée : autorisée, propre à l'auteur, de compte ou interdite", () => {
-    const classified = [...ALLOWED, ...OWN_ONLY, ...ACCOUNT_SCOPED, ...DENIED].sort();
+  it("toute écriture du contrat est classée : autorisée, propre à l'auteur ou interdite", () => {
+    const classified = [...ALLOWED, ...OWN_ONLY, ...DENIED].sort();
     expect(
       writes()
         .map((r) => r.name)

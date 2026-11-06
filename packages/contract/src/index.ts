@@ -47,6 +47,7 @@ export {
   dependencyCycleError,
   encryptionUnavailableError,
   forbiddenError,
+  forbiddenOf,
   internalError,
   invalidTransitionError,
   leaseExpiredError,
