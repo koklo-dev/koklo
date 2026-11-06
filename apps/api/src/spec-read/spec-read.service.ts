@@ -8,9 +8,11 @@ import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { detailOf } from "./feature-detail.ts";
-import { compareFeatures, pageFeatures } from "./feature-page.ts";
+import { compareFeatures } from "./feature-page.ts";
 import {
   type FeatureFilter,
+  type FeatureListRequest,
+  type FeaturePage,
   type Revision,
   SPEC_READ_REPOSITORY,
   type SpecReadRepository,
@@ -20,6 +22,16 @@ const indexFailed = (failure: { errorCode: string; commitSha: string }) =>
   new ORPCError("SPEC_INDEX_FAILED", {
     data: { errorCode: failure.errorCode, commitSha: failure.commitSha },
   });
+
+/** Page rendue quand la révision n'est pas indexée : une liste vide, pas une erreur. */
+const EMPTY_PAGE: FeaturePage = {
+  items: [],
+  nextCursor: null,
+  previousCursor: null,
+  offset: 0,
+  total: 0,
+  facets: { status: {}, priority: {} },
+};
 
 /**
  * Lectures de la spec (TK-45c2). `head` et `listFeatures` ne lisent que l'index ; `getFeature`
@@ -40,16 +52,18 @@ export class SpecReadService {
 
   async listFeatures(
     scope: ProjectScope,
-    input: Revision & FeatureFilter & { limit?: number; cursor?: string },
-  ): Promise<{ items: FeatureSummary[]; nextCursor: string | null }> {
-    const { branch, commitSha, status, priority, limit, cursor } = input;
-    const indexed = await this.repository.features(
+    input: Revision &
+      FeatureFilter &
+      Omit<FeatureListRequest, "filter" | "limit"> & { limit?: number },
+  ): Promise<FeaturePage> {
+    const { branch, commitSha, status, priority, limit, q, cursor, around } = input;
+    const indexed = await this.repository.featuresPage(
       scope,
       { branch, commitSha },
-      { status, priority },
+      { filter: { status, priority }, q, cursor, around, limit: limit ?? DEFAULT_PAGE_SIZE },
     );
     if (indexed?.kind === "failed") throw indexFailed(indexed);
-    return pageFeatures(indexed?.rows ?? [], limit ?? DEFAULT_PAGE_SIZE, cursor);
+    return indexed?.page ?? EMPTY_PAGE;
   }
 
   /**
@@ -58,7 +72,7 @@ export class SpecReadService {
    * de l'organisation.
    */
   async indexedFeatures(scope: ProjectScope): Promise<FeatureSummary[]> {
-    const indexed = await this.repository.features(scope, {}, {});
+    const indexed = await this.repository.features(scope, {});
     return indexed?.kind === "rows" ? [...indexed.rows].sort(compareFeatures) : [];
   }
 

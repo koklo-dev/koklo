@@ -209,7 +209,7 @@ createServer((req, res) => {
     if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
     return send(projectsResponse());
   }
-  if (handleKanban(req, path, scenario, send, hold, expireSession)) return;
+  if (handleKanban(req, url, scenario, send, hold, expireSession)) return;
   if (handleGithub(req, path, scenario, send, hold)) return;
   send(invitationEndpoint(path) ?? readEndpoint(req.method, path));
 }).listen(Number(process.env.STUB_API_PORT ?? 3101), "127.0.0.1");

@@ -16,6 +16,8 @@ cp packages/db/.env.example packages/db/.env       # ajuster le port si besoin
 pnpm db:migrate                                    # prisma migrate deploy
 pnpm db:rollback                                   # annule la dernière migration
 pnpm db:seed                                       # jeu de démo déterministe (idempotent), jamais en production
+pnpm seed:large                                    # jeu de charge « Volume · charge » (1 000 fonctionnalités, 500 tickets)
+pnpm seed:planche                                  # jeu de la planche « Volume · planche » (248 fonctionnalités, 60 tickets)
 pnpm --filter @koklo/db generate                   # client dans packages/db/src/generated (ignoré par git)
 ```
 
@@ -145,6 +147,18 @@ après incident, avec sauvegarde préalable ailleurs.
 
 `pnpm --filter @koklo/db test` démarre un Postgres 17 éphémère via Docker (port hôte aléatoire,
 jamais 5432) ou utilise `TEST_DATABASE_URL`. Sans l'un ni l'autre, le test échoue (pas de skip).
+
+## Seeds de volume (TK-94)
+
+`pnpm seed:large` et `pnpm seed:planche` chargent deux projets distincts de l'organisation de démo
+(« Volume · charge » : 1 000 fonctionnalités, 80 tables, 50 points d'accès, 500 tickets sur 7 statuts ;
+« Volume · planche » : 248, 65, 47, 60 tickets). Chacun a son installation fictive, son dépôt de spec, un
+instantané `ready`, une tête `main`, un sprint actif et des compteurs cohérents. Idempotents (identifiants
+dérivés du projet), une transaction, refusés quand `NODE_ENV=production`, sans toucher au projet de démo.
+Ils n'insèrent que ce que le schéma sait porter : les volumes des règles (300 et 86), propositions (400),
+parcours (18) et lignes d'exemple (1 240) sont déclarés dans `src/seed-volumes.ts`, avec un test qui échoue
+si un de ces modèles apparaît dans `schema.prisma` sans être seedé (question B34). Code :
+`src/seed-volume.ts`, `src/seed-volume-statements.ts`. Tests : `test/seed-volume.test.ts`.
 
 ## Seed de démo
 

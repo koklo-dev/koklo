@@ -3,30 +3,17 @@
 import type { Role } from "@koklo/contract";
 import { Alert, Button, Icon } from "@koklo/ui";
 import { describeSaveError } from "../lib/feature-errors.ts";
+import { confirmationText, PLACEMENT_TEXT } from "../lib/features-region.ts";
 import { canReadRepos } from "../lib/roles.ts";
-import type { FeatureWrite, WriteMeta } from "../lib/use-feature-submit.ts";
-import type { Placement } from "../lib/use-index-wait.ts";
+import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
 import { WaitNotice } from "./write-wait-notice.tsx";
-
-const PLACEMENT_TEXT: Partial<Record<Placement, string>> = {
-  filtered: "Elle n'apparaît pas avec les filtres actuels.",
-  more: "Utilisez « Afficher plus de fonctionnalités » pour la voir.",
-};
 
 interface NoticeProps {
   write: FeatureWrite;
   role: Role | undefined;
   hrefFor: (specId: string) => string;
   onOpen: (specId: string) => void;
-}
-
-/** « F-001 supprimée. » (sans titre) ou « F-004 « Titre » créée. » / « … enregistrée. » ; phrase propre si l'index a échoué. */
-function confirmationText(meta: WriteMeta, indexFailed: boolean): string {
-  if (indexFailed)
-    return "Votre modification a été enregistrée, mais la spec n'a pas pu être relue.";
-  if (meta.kind === "delete") return `${meta.specId} supprimée.`;
-  return `${meta.specId} « ${meta.title} » ${meta.kind === "create" ? "créée" : "enregistrée"}.`;
 }
 
 function Confirmation({ write, role, hrefFor, onOpen }: NoticeProps) {

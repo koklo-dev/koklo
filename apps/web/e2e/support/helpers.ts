@@ -49,6 +49,11 @@ export async function transitionsSeen(): Promise<Array<{ key: string; to: string
   return (await fetch(`${STUB}/__transitions`)).json();
 }
 
+/** Requêtes `ticket.list` reçues par le faux API (chemin et query), dans l'ordre. */
+export async function ticketReadsSeen(): Promise<string[]> {
+  return (await fetch(`${STUB}/__ticket-reads`)).json();
+}
+
 /** Corps reçus par `installation.start` sur le faux API, dans l'ordre. */
 export async function githubStartsSeen(): Promise<unknown[]> {
   return (await fetch(`${STUB}/__github-starts`)).json();

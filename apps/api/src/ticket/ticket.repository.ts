@@ -107,9 +107,25 @@ export interface TicketFilter {
   assignee?: string;
 }
 
+/** Demande de page de `ticket.list` : filtres, recherche, position (curseur ou `around`) et taille. */
+export interface TicketListRequest {
+  filter: TicketFilter;
+  /** Recherche plein texte (clé, titre, description). */
+  q?: string;
+  limit: number;
+  cursor?: string;
+  /** Clé `TK-n` à amener dans la page. */
+  around?: string;
+}
+
 export interface TicketPage {
   items: TicketRecord[];
   nextCursor: string | null;
+  previousCursor: string | null;
+  /** Rang du premier ticket dans la liste filtrée. */
+  offset: number;
+  total: number;
+  facets: { status: Record<string, number>; pkg: Record<string, number> };
 }
 
 /** Opérations d'une transaction de projet : toutes bornées à l'organisation et au projet de la portée. */
@@ -119,7 +135,8 @@ export interface TicketStore {
   findSprint(key: string): Promise<SprintRef | null>;
   /** Ticket non supprimé du projet. */
   find(key: string): Promise<TicketRecord | null>;
-  list(filter: TicketFilter, limit: number, cursor?: string): Promise<TicketPage>;
+  /** `NOT_FOUND` si `around` n'est pas un ticket du projet ; `VALIDATION{cursor}` pour un curseur étranger. */
+  list(request: TicketListRequest): Promise<TicketPage>;
   insert(ticket: NewTicket): Promise<TicketRecord>;
   /** Insère avec la clé fournie, sans compteur ni règle de statut initial (import TK-34). */
   insertImported(ticket: ImportedTicket): Promise<TicketRecord>;

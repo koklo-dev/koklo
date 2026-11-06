@@ -95,6 +95,7 @@ interface Saved {
 interface Filters {
   status?: string | undefined;
   priority?: string | undefined;
+  q?: string | undefined;
 }
 
 /** Relit la liste depuis le début (filtres gardés) et dit où se trouve la ligne enregistrée. */
@@ -110,7 +111,9 @@ export async function reloadList(
   const query = queryClient.getQueryCache().findAll({ queryKey, type: "active" })[0];
   const pages = (query?.state.data as { pages: ListPage[] } | undefined)?.pages ?? [];
   if (pages.some((page) => page.items.some((item) => item.specId === saved.specId))) return "row";
+  // Une recherche en cours : sans la ligne dans la liste, rien ne dit qu'elle y correspond.
   const visible =
+    !filters.q &&
     (!filters.status || filters.status === saved.status) &&
     (!filters.priority || filters.priority === saved.priority);
   if (!visible) return "filtered";

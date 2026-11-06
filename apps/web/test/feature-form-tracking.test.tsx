@@ -35,6 +35,7 @@ import {
   FEATURES,
   head,
   inputsOf,
+  list,
   PROJECT_ID,
   renderFeatures,
   SCOPE,
@@ -324,13 +325,16 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
     await fillAndSave();
     indexCatchesUp();
     await advance(4 * SECOND);
-    const region = liveRegion();
-    await waitFor(() => expect(region).toHaveTextContent(`${CREATED_ID} « ${NEW_TITLE} » créée.`));
-    expect(within(region).getByLabelText(`Version de la spec ${NEW_SHORT_SHA}`)).toBeVisible();
-    expect(
-      within(region).getByRole("link", { name: "Voir la fiche" }).getAttribute("href"),
-    ).toMatch(new RegExp(`feature=${CREATED_ID}`));
-    expect(within(region).getByRole("button", { name: "Fermer" })).toBeVisible();
+    await waitFor(() =>
+      expect(liveRegion()).toHaveTextContent(`${CREATED_ID} « ${NEW_TITLE} » créée.`),
+    );
+    // TK-94 : la région d'état unique est celle de la barre de compte ; le bloc est affiché à côté et annoncé par elle.
+    const block = await screen.findByRole("group", { name: "Enregistrement terminé" });
+    expect(within(block).getByLabelText(`Version de la spec ${NEW_SHORT_SHA}`)).toBeVisible();
+    expect(within(block).getByRole("link", { name: "Voir la fiche" }).getAttribute("href")).toMatch(
+      new RegExp(`sel=${CREATED_ID}`),
+    );
+    expect(within(block).getByRole("button", { name: "Fermer" })).toBeVisible();
   });
 
   it("le focus va sur le lien du titre de la ligne enregistrée", async () => {
@@ -358,7 +362,7 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
 
   it("ligne hors de la liste affichée à cause des filtres : focus sur le h1 et « Elle n'apparaît pas avec les filtres actuels. »", async () => {
     submitReplies(batch());
-    procedures.specListFeatures.mockResolvedValue({ items: [FEATURES[2]], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([FEATURES[2]]));
     renderFeatures({ search: "?status=adoptee&new=1" });
     const panel = await form();
     await fillMinimum(panel);
@@ -372,12 +376,11 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
     expect(liveText()).toContain("Elle n'apparaît pas avec les filtres actuels.");
   });
 
-  it("ligne plus loin que la première page : « Utilisez « Afficher plus de fonctionnalités » pour la voir. »", async () => {
+  it("ligne plus loin que la première page : « Utilisez « Charger la suite » pour la voir. »", async () => {
     submitReplies(batch());
-    procedures.specListFeatures.mockResolvedValue({
-      items: [summary(1), summary(2)],
-      nextCursor: "50",
-    });
+    procedures.specListFeatures.mockResolvedValue(
+      list([summary(1), summary(2)], { nextCursor: "50", total: 80 }),
+    );
     renderFeatures({ search: "?new=1" });
     const panel = await form();
     await fillMinimum(panel);
@@ -388,7 +391,7 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toHaveFocus(),
     );
-    expect(liveText()).toContain("Utilisez « Afficher plus de fonctionnalités » pour la voir.");
+    expect(liveText()).toContain("Utilisez « Charger la suite » pour la voir.");
   });
 
   it("le brouillon est supprimé dès que le lot est committed", async () => {
@@ -403,10 +406,9 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
     await setText(titleField(panel), "Connexion modifiée");
     await clickSave(panel);
     headValue = head({ commitSha: NEW_SHA });
-    procedures.specListFeatures.mockResolvedValue({
-      items: [summary(1, { title: "Connexion modifiée" }), summary(2)],
-      nextCursor: null,
-    });
+    procedures.specListFeatures.mockResolvedValue(
+      list([summary(1, { title: "Connexion modifiée" }), summary(2)]),
+    );
     await advance(5 * SECOND);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain("F-001 « Connexion modifiée » enregistrée.");
@@ -725,7 +727,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
       savedAt: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
     });
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: "Connexion par e-mail" });
+    await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
     expect(localStorage.getItem(`koklo:feature-pending:${PROJECT_ID}`)).toBeNull();
     expect(liveText()).not.toContain("en cours…");
@@ -739,7 +741,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
       savedAt: new Date().toISOString(),
     });
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: "Connexion par e-mail" });
+    await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
   });
 
@@ -753,7 +755,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     });
     procedures.specHead.mockImplementation(async () => head());
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: "Connexion par e-mail" });
+    await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
     expect(liveText()).not.toContain("en cours…");
     cleanup();

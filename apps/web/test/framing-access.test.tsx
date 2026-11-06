@@ -1,6 +1,14 @@
 import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CLIENT_SIDE, head, PROJECT_ID, renderFeatures, serve, TEAM } from "./support/features.tsx";
+import {
+  CLIENT_SIDE,
+  head,
+  list,
+  PROJECT_ID,
+  renderFeatures,
+  serve,
+  TEAM,
+} from "./support/features.tsx";
 import {
   aiCallCount,
   openFraming,
@@ -61,7 +69,7 @@ describe("Bouton « Cadrer avec l'IA » sur la liste des fonctionnalités (S-fea
   it.each(CLIENT_SIDE)("%s ne voit aucun bouton « Cadrer avec l'IA »", async (role) => {
     serve(role);
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: "Connexion par e-mail" });
+    await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
     expect(screen.queryByText(FRAME_BUTTON)).not.toBeInTheDocument();
     expect(aiCallCount()).toBe(0);
   });
@@ -70,7 +78,7 @@ describe("Bouton « Cadrer avec l'IA » sur la liste des fonctionnalités (S-fea
     procedures.specHead.mockResolvedValue(
       head({ counts: { features: 0, tables: 0, endpoints: 0 } }),
     );
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     await findNamed("heading", "Aucune fonctionnalité pour le moment");
     expect(screen.getAllByRole("link", { name: FRAME_BUTTON }).length).toBeGreaterThanOrEqual(1);

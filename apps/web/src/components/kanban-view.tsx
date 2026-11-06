@@ -125,7 +125,7 @@ function Board({
           <KanbanColumn
             key={status}
             status={status}
-            tickets={data.columns[status]}
+            column={data.columns[status]}
             interaction={interaction}
           />
         ))}

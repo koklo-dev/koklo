@@ -91,7 +91,11 @@ interface KeyRecord {
 export interface WriteOptions {
   projectId: string;
   /** Filtres de la liste, pour dire où la ligne enregistrée apparaîtra. */
-  filters: () => { status?: string | undefined; priority?: string | undefined };
+  filters: () => {
+    status?: string | undefined;
+    priority?: string | undefined;
+    q?: string | undefined;
+  };
 }
 
 const newKey = (): string => `feature-${crypto.randomUUID()}`;

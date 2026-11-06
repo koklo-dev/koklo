@@ -21,7 +21,7 @@ const PROJECT = SEED_IDS.project;
  * `created_at` et `updated_at` valent `SEED_DATE` (jamais d'horloge) ; `extraSet` remplace
  * l'affectation par défaut d'une colonne (ex. `GREATEST` pour un compteur monotone).
  */
-function upsert(
+export function upsert(
   table: string,
   conflict: string,
   values: Record<string, unknown>,
@@ -42,7 +42,8 @@ function upsert(
   };
 }
 
-function baseStatements(): SeedStatement[] {
+/** Organisation de démo, ses deux utilisateurs et leurs adhésions : socle commun à tous les jeux. */
+export function organizationStatements(): SeedStatement[] {
   const users = [
     [SEED_IDS.adminUser, "Alice Admin", "admin@demo.koklo.test"],
     [SEED_IDS.clientUser, "Claire Cliente", "client@demo.koklo.test"],
@@ -63,6 +64,12 @@ function baseStatements(): SeedStatement[] {
     ...members.map(([id, userId, role]) =>
       upsert("members", "id", { id, organization_id: ORG, user_id: userId, role }),
     ),
+  ];
+}
+
+function baseStatements(): SeedStatement[] {
+  return [
+    ...organizationStatements(),
     upsert("projects", "id", { id: PROJECT, organization_id: ORG, name: "Projet de démo" }),
   ];
 }

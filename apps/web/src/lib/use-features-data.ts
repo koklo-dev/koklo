@@ -7,7 +7,7 @@ import { deriveFeaturesView } from "./features-view.ts";
 import { orpc } from "./orpc.ts";
 import { canReadRepos } from "./roles.ts";
 import { useActiveOrganization } from "./use-active-organization.ts";
-import { useFeatures } from "./use-features.ts";
+import { useDeepLink, useFeatures } from "./use-features.ts";
 import { useSpecHead } from "./use-spec-head.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
 
@@ -16,6 +16,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 interface Filters {
   status: FeatureStatus | undefined;
   priority: FeaturePriority | undefined;
+  q: string | undefined;
+  /** Fiche ouverte (`?sel=`) : à l'ouverture de l'écran, la liste s'ouvre sur la page qui la contient. */
+  selected: string | undefined;
 }
 
 /** Relit la liste quand la version indexée change (fin de préparation, nouvelle version). */
@@ -37,6 +40,19 @@ function useListRefresh(head: { status: string; commitSha: string } | null | und
   }, [signature, queryClient]);
 }
 
+/** La liste, ouverte sur la page de la fiche d'un lien direct tant que les filtres sont ceux de l'ouverture. */
+function useFeaturesList(projectId: string, filters: Filters, options: { enabled: boolean }) {
+  const { selected, ...search } = filters;
+  const deepLink = useDeepLink(selected, `${search.status}|${search.priority}|${search.q}`);
+  const features = useFeatures({ projectId, ...search, around: deepLink.around, ...options });
+  const { aroundMissing } = features;
+  const dropAround = deepLink.drop;
+  useEffect(() => {
+    if (aroundMissing) dropAround();
+  }, [aroundMissing, dropAround]);
+  return { features, around: deepLink.around };
+}
+
 /**
  * Données de l'écran des fonctionnalités : `spec.head` d'abord, `repo.list` seulement s'il est vide et que le
  * rôle le permet, la liste seulement quand quelque chose est indexé et lisible.
@@ -53,9 +69,7 @@ export function useFeaturesData(projectId: string, filters: Filters) {
     ...orpc.repo.list.queryOptions({ input: { projectId } }),
     enabled: valid && headData === null && canReadRepos(role),
   });
-  const features = useFeatures({
-    projectId,
-    ...filters,
+  const { features, around } = useFeaturesList(projectId, filters, {
     enabled: valid && Boolean(headData) && headData?.status !== "failed",
   });
   // Une fois établi qu'aucun dépôt de spec n'existe, rien à attendre : on ne relit plus `spec.head`.
@@ -70,11 +84,13 @@ export function useFeaturesData(projectId: string, filters: Filters) {
     roleKnown: !organizations.isPending && !session.isPending,
     role,
     redirecting,
-    filtered: Boolean(filters.status || filters.priority),
+    filtered: Boolean(filters.status || filters.priority || filters.q),
     head: head.query,
     repos,
     features: {
       ...features.query,
+      // Un `around` inconnu n'est pas un projet introuvable : la liste se relit sans lui.
+      isError: features.query.isError && !features.aroundMissing,
       itemCount: features.items.length,
       fetching: features.query.isFetching,
     },
@@ -87,6 +103,7 @@ export function useFeaturesData(projectId: string, filters: Filters) {
     head: headData ?? null,
     projectName: project.data?.find((candidate) => candidate.id === projectId)?.name,
     features,
+    around,
     repos,
     expired: head.expired,
     /** « Réessayer » de l'erreur de chargement : relit ce qui a échoué (`spec.head`, sinon la liste). */

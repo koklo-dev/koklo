@@ -1,30 +1,98 @@
 "use client";
 
 import { type RefObject, useEffect, useRef } from "react";
-import { beginFeatureSession } from "./feature-draft.ts";
-import { regionText, showsFilters, showsVersion, writeRegionText } from "./features-region.ts";
+import {
+  regionText,
+  searchResultText,
+  showsCountBar,
+  showsFilters,
+  showsVersion,
+  writeNoticeText,
+  writeRegionText,
+} from "./features-region.ts";
+import type { FeaturesView } from "./features-view.ts";
 import { canReadRepos } from "./roles.ts";
 import { useFeatureFormPanel } from "./use-feature-form-panel.ts";
 import { useFeatureSheet } from "./use-feature-sheet.ts";
 import { useFeatureWrite } from "./use-feature-submit.ts";
 import { useAnnouncements, useRepoCreated } from "./use-features-actions.ts";
 import { useFeaturesData } from "./use-features-data.ts";
-import { useFilterActions, useMore } from "./use-features-list.ts";
+import {
+  useFilterActions,
+  useListFooter,
+  useResultAnnouncement,
+  useSearchBox,
+} from "./use-features-list.ts";
 import { useFeaturesUrl } from "./use-features-url.ts";
 import { usePendingResume } from "./use-pending-save.ts";
-import { useStorageScope } from "./use-storage-scope.ts";
+
+/** Ce que la liste dit d'elle-même : barre de compte, résultat annoncé après la frappe, avis « hors des filtres ». */
+function useListSummary(
+  url: ReturnType<typeof useFeaturesUrl>,
+  data: ReturnType<typeof useFeaturesData>,
+) {
+  const { features, head, view } = data;
+  const filtered = Boolean(url.status || url.priority || url.q);
+  const countBar = showsCountBar(view);
+  const resultText = useResultAnnouncement(
+    countBar
+      ? searchResultText({
+          q: url.q,
+          filtered,
+          total: features.total,
+          projectTotal: head?.counts.features,
+        })
+      : "",
+    !features.query.isFetching && !features.stale,
+    features.items.length,
+  );
+  // Lien direct : la ligne ouverte n'est pas dans la liste filtrée (l'avis reste après la fermeture de la fiche).
+  const outsideFilters =
+    Boolean(data.around) &&
+    filtered &&
+    !features.query.isFetching &&
+    features.query.data !== undefined &&
+    !features.items.some((item) => item.specId === data.around);
+  return { countBar, resultText, outsideFilters };
+}
+
+interface RegionParts {
+  view: FeaturesView;
+  expired: boolean;
+  announcement: string;
+  write: ReturnType<typeof useFeatureWrite>;
+  formOpen: boolean;
+  summary: ReturnType<typeof useListSummary>;
+}
+
+/** Textes de la région d'état de l'écran, selon qu'elle est celle de la page, de la barre de compte ou du panneau. */
+function regionOf({ view, expired, announcement, write, formOpen, summary }: RegionParts) {
+  const writeText = writeRegionText(write, formOpen);
+  return {
+    /** Texte de la région d'état de la page ; sous la barre de compte, il passe dans la sienne. */
+    text: [regionText({ view, expired }), announcement, writeText].filter(Boolean).join(" "),
+    /** Annonce portée par la barre de compte (seule région d'état quand la liste est affichée). */
+    countText: [summary.resultText, announcement, writeText, writeNoticeText(write)]
+      .filter(Boolean)
+      .join(" "),
+    /** Formulaire ouvert : la page est masquée aux lecteurs d'écran, la région d'état passe dans le panneau. */
+    panelText: [announcement, writeRegionText(write, true)].filter(Boolean).join(" "),
+    busy: view.kind === "loading",
+    countBar: summary.countBar,
+    /** Formulaire ouvert : la région d'état est celle du panneau, la page n'en porte pas une seconde. */
+    showCount: summary.countBar && !formOpen,
+  };
+}
 
 /** Tout ce que l'écran des fonctionnalités pilote : données, adresse, annonces, liste, fiche et visibilités. */
 export function useFeaturesPage(projectId: string) {
   const url = useFeaturesUrl();
-  const data = useFeaturesData(projectId, { status: url.status, priority: url.priority });
-  const { announcement, announce, moreShown } = useAnnouncements(data.view);
+  const filters = { status: url.status, priority: url.priority, q: url.q };
+  const data = useFeaturesData(projectId, { ...filters, selected: url.feature });
+  const { announcement, announce } = useAnnouncements(data.view);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const more = useMore(data, moreShown);
-  const write = useFeatureWrite({
-    projectId,
-    filters: () => ({ status: url.status, priority: url.priority }),
-  });
+  const footer = useListFooter(data.features);
+  const write = useFeatureWrite({ projectId, filters: () => filters });
   usePendingResume(projectId, data.role, write);
   const form = useFeatureFormPanel(url, data, write);
   const keepFocus = useRef(false);
@@ -32,20 +100,15 @@ export function useFeaturesPage(projectId: string) {
   useSavedFocus(write, form.open, data.features.items, titleRef);
   const { view, head } = data;
   const headReady = head !== null && head.status !== "failed";
-  const text = regionText({
-    view,
-    expired: data.expired,
-    filtered: Boolean(url.status || url.priority),
-    total: head?.counts.features,
-    shown: data.features.items.length,
-    hasNext: more.hasNext,
-  });
+  const summary = useListSummary(url, data);
 
   return {
     url,
     data,
     announcement,
-    more,
+    footer,
+    search: useSearchBox(url),
+    outsideFilters: summary.outsideFilters,
     filters: useFilterActions(url, announce),
     titleRef,
     team: canReadRepos(data.role),
@@ -61,12 +124,14 @@ export function useFeaturesPage(projectId: string) {
     },
     keepFocus,
     announce,
-    region: {
-      text: [text, announcement, writeRegionText(write, form.open)].filter(Boolean).join(" "),
-      /** Formulaire ouvert : la page est masquée aux lecteurs d'écran, la région d'état passe dans le panneau. */
-      panelText: [announcement, writeRegionText(write, true)].filter(Boolean).join(" "),
-      busy: view.kind === "loading",
-    },
+    region: regionOf({
+      view,
+      expired: data.expired,
+      announcement,
+      write,
+      formOpen: form.open,
+      summary,
+    }),
     showFilters: headReady && showsFilters(view),
     showVersion: headReady && showsVersion(view),
     sheetOpen: Boolean(url.feature) && view.kind === "list",

@@ -239,7 +239,7 @@ describe("Doublons (non bloquants)", () => {
     expect(line.closest("div,p,li")?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
     expect(inCard(T3).getByRole("link", { name: "Voir F-003" })).toHaveAttribute(
       "href",
-      `/projects/${PROJECT_ID}/features?feature=F-003`,
+      `/projects/${PROJECT_ID}/features?sel=F-003`,
     );
     expect(within(card(T1)).queryByText(/déjà présent/)).not.toBeInTheDocument();
   });

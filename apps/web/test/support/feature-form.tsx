@@ -7,6 +7,7 @@ import {
   FEATURES,
   head,
   inputsOf,
+  list,
   type Role,
   renderFeatures,
   serve,
@@ -58,10 +59,8 @@ export const conflictBatch = (errorCode: string) =>
   batch({ status: "conflict", commitSha: null, committedAt: null, errorCode });
 
 /** Une page de la liste qui contient la fonctionnalité créée (F-004). */
-export const listWithCreated = (title = NEW_TITLE) => ({
-  items: [...FEATURES, summary(4, { title, status: "brouillon", priority: "should" })],
-  nextCursor: null,
-});
+export const listWithCreated = (title = NEW_TITLE) =>
+  list([...FEATURES, summary(4, { title, status: "brouillon", priority: "should" })]);
 
 /** Après l'écriture, l'index a rattrapé le commit et la liste contient la fonctionnalité créée. */
 export function indexCatchesUp(title = NEW_TITLE): void {
@@ -77,7 +76,7 @@ export const deletedBatch = (specId = "F-001", over: Record<string, unknown> = {
     ...over,
   });
 /** La liste d'après la suppression de F-001 (les deux autres restent). */
-export const listWithoutF001 = () => ({ items: FEATURES.slice(1), nextCursor: null });
+export const listWithoutF001 = () => list(FEATURES.slice(1));
 
 /** Après la suppression, l'index a rattrapé le commit et la liste ne contient plus F-001. */
 export function indexCatchesUpAfterDelete(): void {
@@ -116,7 +115,7 @@ export const form = async () => within(await dialog());
 /** Rend la page, attend la liste et ouvre le formulaire de création par son bouton. */
 export async function openCreate(user: { click: (element: Element) => Promise<void> } = userEvent) {
   renderFeatures();
-  await findNamed("table", /^Fonctionnalités du projet/, { text: "Connexion par e-mail" });
+  await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
   await user.click(await findNamed("button", "Nouvelle fonctionnalité"));
   return form();
 }

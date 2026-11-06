@@ -16,7 +16,7 @@ import {
 } from "./support/feature-form.tsx";
 import {
   CLIENT_SIDE,
-  findTable,
+  findList,
   GIT_VOCABULARY,
   renderFeatures,
   visibleText,
@@ -257,7 +257,7 @@ describe("Vocabulaire (§5.9, AC-48-28)", () => {
     async (role) => {
       serveWrite(role);
       renderFeatures({ search: "?new=1" });
-      await findTable();
+      await findList();
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(visibleText()).not.toMatch(GIT_VOCABULARY);
       expect(visibleText()).not.toMatch(
@@ -281,7 +281,7 @@ describe("Vocabulaire (§5.9, AC-48-28)", () => {
         }),
       );
       renderFeatures();
-      await findTable();
+      await findList();
       expect(visibleText()).not.toContain("Secret");
     },
   );

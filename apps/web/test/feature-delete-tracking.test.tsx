@@ -244,12 +244,13 @@ describe("Succès : la fonctionnalité disparaît de la liste relue (§4.5, §5.
     submitReplies(deletedBatch());
     await startDelete();
     await catchUp();
-    const region = liveRegion();
-    await waitFor(() => expect(region).toHaveTextContent("F-001 supprimée."));
-    expect(within(region).getByLabelText(`Version de la spec ${NEW_SHORT_SHA}`)).toBeVisible();
-    expect(within(region).queryByRole("link", { name: "Voir la fiche" })).toBeNull();
-    expect(within(region).getByRole("button", { name: "Fermer" })).toBeVisible();
-    await user().click(within(region).getByRole("button", { name: "Fermer" }));
+    await waitFor(() => expect(liveRegion()).toHaveTextContent("F-001 supprimée."));
+    // TK-94 : le bloc est affiché à côté de la région d'état (celle de la barre de compte), qui l'annonce.
+    const block = await screen.findByRole("group", { name: "Enregistrement terminé" });
+    expect(within(block).getByLabelText(`Version de la spec ${NEW_SHORT_SHA}`)).toBeVisible();
+    expect(within(block).queryByRole("link", { name: "Voir la fiche" })).toBeNull();
+    expect(within(block).getByRole("button", { name: "Fermer" })).toBeVisible();
+    await user().click(within(block).getByRole("button", { name: "Fermer" }));
     await waitFor(() => expect(liveText()).not.toContain("supprimée."));
     expect(statusRegions()).toHaveLength(1);
   });
@@ -570,7 +571,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
       savedAt: new Date().toISOString(),
     });
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: TITLE });
+    await findNamed("list", "Fonctionnalités", { text: TITLE, hidden: true });
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
     expect(liveText()).not.toContain("Suppression de");
     expect(localStorage.getItem(`koklo:feature-pending:${PROJECT_ID}`)).toBeNull();
@@ -592,7 +593,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
       savedAt: new Date().toISOString(),
     });
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: TITLE });
+    await findNamed("list", "Fonctionnalités", { text: TITLE, hidden: true });
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
   });
 
@@ -607,7 +608,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
       savedAt: new Date().toISOString(),
     });
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/, { text: TITLE });
+    await findNamed("list", "Fonctionnalités", { text: TITLE, hidden: true });
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
     expect(liveText()).not.toContain("Suppression de");
   });
@@ -617,8 +618,9 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     await startDelete();
     await catchUp();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    const table = await findNamed("table", /^Fonctionnalités du projet/, {
+    const table = await findNamed("list", "Fonctionnalités", {
       text: "Tableau kanban",
+      hidden: true,
     });
     expect(within(table).getByText("Export des tickets")).toBeVisible();
     expect(within(table).getAllByRole("link")).toHaveLength(FEATURES.length - 1);

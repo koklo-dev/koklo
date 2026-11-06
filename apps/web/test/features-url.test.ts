@@ -70,7 +70,7 @@ describe("withFeaturesUrl", () => {
 
   it("cumule statut, priorité et fiche", () => {
     const next = withFeaturesUrl("?status=adoptee", { priority: "wont", feature: "F-003" });
-    expect(params(next)).toEqual({ status: "adoptee", priority: "wont", feature: "F-003" });
+    expect(params(next)).toEqual({ status: "adoptee", priority: "wont", sel: "F-003" });
   });
 
   it("null efface le paramètre, les autres sont conservés", () => {
@@ -93,5 +93,56 @@ describe("withFeaturesUrl", () => {
       utm: "x",
       status: "adoptee",
     });
+  });
+});
+
+/** TK-94 lot C : `?sel=F-nnn` remplace `?feature=` (lu, jamais écrit) et `?q=` porte la recherche. */
+describe("readFeaturesUrl — sel et q (TK-94)", () => {
+  it("?sel=F-187 donne la fiche ouverte", () => {
+    expect(readFeaturesUrl("?sel=F-187")).toEqual({ feature: "F-187" });
+  });
+
+  it("sel l'emporte sur l'ancien paramètre feature", () => {
+    expect(readFeaturesUrl("?sel=F-002&feature=F-001")).toEqual({ feature: "F-002" });
+  });
+
+  it.each(["f-187", "F-1", "x", ""])("sel=%s : ignoré", (value) => {
+    expect(readFeaturesUrl(`?sel=${value}`)).toEqual({});
+  });
+
+  it("q est lu, sans les espaces de bord ; vide, il est ignoré", () => {
+    expect(readFeaturesUrl("?q=annulation%20group%C3%A9e")).toEqual({ q: "annulation groupée" });
+    expect(readFeaturesUrl("?q=%20annul%20")).toEqual({ q: "annul" });
+    expect(readFeaturesUrl("?q=")).toEqual({});
+    expect(readFeaturesUrl("?q=%20%20")).toEqual({});
+  });
+
+  it("q est borné à 200 caractères, comme le contrat", () => {
+    expect(readFeaturesUrl(`?q=${"a".repeat(300)}`).q).toHaveLength(200);
+  });
+});
+
+describe("withFeaturesUrl — sel et q (TK-94)", () => {
+  it("la fiche s'écrit en sel, jamais en feature", () => {
+    expect(params(withFeaturesUrl("", { feature: "F-003" }))).toEqual({ sel: "F-003" });
+  });
+
+  it("écrire la fiche retire l'ancien paramètre feature (réécriture du lien)", () => {
+    expect(params(withFeaturesUrl("?feature=F-001&status=adoptee", { feature: "F-001" }))).toEqual({
+      sel: "F-001",
+      status: "adoptee",
+    });
+  });
+
+  it("feature: null efface sel et l'ancien feature", () => {
+    expect(withFeaturesUrl("?sel=F-001&feature=F-001", { feature: null })).toBe("");
+  });
+
+  it("q s'écrit et s'efface comme un filtre", () => {
+    expect(params(withFeaturesUrl("?status=adoptee", { q: "annul" }))).toEqual({
+      status: "adoptee",
+      q: "annul",
+    });
+    expect(withFeaturesUrl("?q=annul", { q: null })).toBe("");
   });
 });

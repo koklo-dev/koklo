@@ -15,9 +15,13 @@ export interface FocusRequest {
 
 /**
  * Déplacement d'un ticket, non optimiste : la carte change de colonne quand le serveur a répondu et que
- * le tableau est rechargé. Garde l'annonce, le refus à afficher et le focus à rendre.
+ * les colonnes sont rechargées (les deux totaux avec). L'annonce donne le total d'arrivée : « TK-12 déplacé vers
+ * Terminé · Terminé : 143 ». Garde aussi le refus à afficher et le focus à rendre.
  */
-export function useTicketMove(reload: () => Promise<unknown>) {
+export function useTicketMove(
+  reload: () => Promise<unknown>,
+  totalOf: (status: TicketStatus) => number | undefined,
+) {
   const { mutateAsync } = useMutation(orpc.ticket.transition.mutationOptions());
   const [moving, setMoving] = useState<readonly string[]>([]);
   const [announcement, setAnnouncement] = useState("");
@@ -33,7 +37,10 @@ export function useTicketMove(reload: () => Promise<unknown>) {
       try {
         await mutateAsync({ key, to });
         await reload();
-        setAnnouncement(`${key} déplacé vers ${label}.`);
+        const total = totalOf(to);
+        setAnnouncement(
+          `${key} déplacé vers ${label}${total === undefined ? "." : ` · ${label} : ${total}`}`,
+        );
       } catch (error) {
         setAnnouncement("");
         setFailure({ key, from, to, error });
@@ -43,7 +50,7 @@ export function useTicketMove(reload: () => Promise<unknown>) {
         setFocus({ key });
       }
     },
-    [mutateAsync, reload],
+    [mutateAsync, reload, totalOf],
   );
 
   return {

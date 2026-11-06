@@ -2,7 +2,7 @@ import { configure, screen, within } from "@testing-library/react";
 import { FeaturesPage } from "../../src/components/features-page.tsx";
 import { asRole } from "./github-fixtures.ts";
 import { renderWithQuery } from "./render.tsx";
-import { findRole } from "./wait.ts";
+import { findNamed } from "./wait.ts";
 import { ORG_ID, procedures, setUrl } from "./web-mocks.ts";
 
 /**
@@ -97,11 +97,35 @@ export const DETAIL = {
   commitSha: SHA,
 };
 
-/** Une page de `count` fonctionnalités à partir du numéro `from`. */
-export const page = (from: number, count: number, nextCursor: string | null = null) => ({
-  items: Array.from({ length: count }, (_, i) => summary(from + i)),
-  nextCursor,
+/**
+ * Réponse de `spec.listFeatures` (contrat 1.0.0) : `total` vaut le nombre d'éléments sauf indication,
+ * `offset` 0 et pas de page précédente.
+ */
+export const list = (items: unknown[], over: Record<string, unknown> = {}) => ({
+  items,
+  nextCursor: null,
+  previousCursor: null,
+  offset: 0,
+  total: items.length,
+  ...over,
 });
+
+/** Une page de `count` fonctionnalités à partir du numéro `from` ; `total` et `offset` suivent le rang. */
+export const page = (
+  from: number,
+  count: number,
+  nextCursor: string | null = null,
+  over: Record<string, unknown> = {},
+) =>
+  list(
+    Array.from({ length: count }, (_, i) => summary(from + i)),
+    {
+      nextCursor,
+      offset: from - 1,
+      total: nextCursor ? from - 1 + count + 1 : from - 1 + count,
+      ...over,
+    },
+  );
 
 export type Role = "owner" | "admin" | "dev" | "designer" | "client" | "business";
 export const TEAM: Role[] = ["owner", "admin", "dev", "designer"];
@@ -115,7 +139,7 @@ export function serve(role: Role = "owner"): void {
   asRole(role);
   procedures.projectList.mockResolvedValue([PROJECT]);
   procedures.specHead.mockResolvedValue(head());
-  procedures.specListFeatures.mockResolvedValue({ items: FEATURES, nextCursor: null });
+  procedures.specListFeatures.mockResolvedValue(list(FEATURES));
   procedures.specGetFeature.mockResolvedValue(DETAIL);
   procedures.repoList.mockResolvedValue([]);
 }
@@ -132,9 +156,12 @@ export function renderFeatures({ projectId = PROJECT_ID, search = "" }: RenderOp
   return renderWithQuery(<FeaturesPage projectId={projectId} />);
 }
 
-/** Attend que la table des fonctionnalités soit affichée. */
-export const findTable = (): Promise<HTMLElement> =>
-  findRole("table", { name: /^Fonctionnalités du projet/ });
+/**
+ * Attend que la liste des fonctionnalités soit affichée (liste virtualisée, TK-94). `hidden` : une fiche ouverte
+ * masque le reste de la page aux technologies d'assistance, la liste y comprise.
+ */
+export const findList = (): Promise<HTMLElement> =>
+  findNamed("list", "Fonctionnalités", { text: /^F-\d{3,}$/, hidden: true });
 
 export const titleLink = (title: string): HTMLElement => screen.getByRole("link", { name: title });
 
@@ -152,6 +179,13 @@ export const visibleText = (root: HTMLElement = document.body): string =>
  */
 export const GIT_VOCABULARY =
   /commit|branche|branch|\bSHA\b|a1b2c3d|version de la spec|\.ya?ml|\.koklo|features\/|spec_too_large|\bindex|repository|d[ée]p[oô]t git|OAuth|token|jeton|SPEC_INDEX_FAILED|PROVIDER_/i;
+
+/** Ligne de la liste qui porte ce titre. */
+export const rowOf = (title: string): HTMLElement => {
+  const row = screen.getByRole("link", { name: title, hidden: true }).closest("li");
+  if (!row) throw new Error(`ligne de « ${title} » introuvable`);
+  return row;
+};
 
 /** Région d'état unique de l'écran. */
 export const statusRegion = (): HTMLElement => screen.getByRole("status");

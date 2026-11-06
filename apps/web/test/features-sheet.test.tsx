@@ -3,7 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DETAIL,
-  findTable,
+  findList,
   inputsOf,
   PROJECT_ID,
   renderFeatures,
@@ -55,7 +55,7 @@ describe("Ouverture et fermeture", () => {
 
   it("sans ?feature, spec.getFeature n'est jamais appelé et aucun dialogue n'existe", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(procedures.specGetFeature).not.toHaveBeenCalled();
   });
@@ -64,25 +64,25 @@ describe("Ouverture et fermeture", () => {
     "identifiant ?feature=%s qui ne respecte pas F-nnn : ignoré (aucun dialogue, aucun appel)",
     async (value) => {
       renderFeatures({ search: `?feature=${encodeURIComponent(value)}` });
-      await findTable();
+      await findList();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(procedures.specGetFeature).not.toHaveBeenCalled();
     },
   );
 
-  it("cliquer le titre ouvre la fiche : adresse ?feature=F-002 poussée dans l'historique", async () => {
+  it("cliquer le titre ouvre la fiche : adresse ?sel=F-002 poussée dans l'historique", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const length = window.history.length;
     await userEvent.click(titleLink("Tableau kanban"));
     expect(await findNamed("dialog", "Tableau kanban")).toBeVisible();
-    expect(new URLSearchParams(window.location.search).get("feature")).toBe("F-002");
+    expect(new URLSearchParams(window.location.search).get("sel")).toBe("F-002");
     expect(window.history.length).toBe(length + 1);
   });
 
   it("la touche Retour du navigateur ferme la fiche", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     await userEvent.click(titleLink(TITLE));
     await sheet();
     window.history.back();
@@ -92,12 +92,12 @@ describe("Ouverture et fermeture", () => {
 
   it("garde les filtres de l'adresse à l'ouverture et à la fermeture", async () => {
     renderFeatures({ search: "?status=brouillon" });
-    await findTable();
+    await findList();
     await userEvent.click(titleLink(TITLE));
     await sheet();
     expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
       status: "brouillon",
-      feature: "F-001",
+      sel: "F-001",
     });
     await userEvent.click(screen.getByRole("button", { name: "Fermer" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -106,7 +106,7 @@ describe("Ouverture et fermeture", () => {
 
   it("« Fermer » retire le paramètre et rend le focus au lien de la ligne d'origine", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     await userEvent.click(titleLink(TITLE));
     await sheet();
     await userEvent.click(screen.getByRole("button", { name: "Fermer" }));
@@ -117,7 +117,7 @@ describe("Ouverture et fermeture", () => {
 
   it("Échap ferme la fiche et restitue le focus au lien d'origine", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     await userEvent.click(titleLink("Tableau kanban"));
     await sheet();
     await userEvent.keyboard("{Escape}");
@@ -163,7 +163,7 @@ describe("Chargement de la fiche (§4.11)", () => {
   it("en-tête immédiat depuis la ligne, puis « Chargement de la fiche… » aria-busy et squelettes", async () => {
     procedures.specGetFeature.mockImplementation(() => new Promise(() => undefined));
     renderFeatures();
-    await findTable();
+    await findList();
     await userEvent.click(titleLink(TITLE));
     const dialog = await sheet();
     expect(within(dialog).getByRole("heading", { level: 2, name: TITLE })).toBeInTheDocument();

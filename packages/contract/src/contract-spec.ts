@@ -6,6 +6,7 @@ import {
   validationError,
 } from "./errors.ts";
 import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
+import { listOf } from "./schemas-lists.ts";
 import {
   featureDetailSchema,
   featureGetInputSchema,
@@ -17,7 +18,6 @@ import {
   specHeadInputSchema,
   specHeadSchema,
 } from "./schemas-spec.ts";
-import { pageOf } from "./schemas-tickets.ts";
 
 /** Lecture depuis l'index en base (CDC §8.2) : ouverte à tous les rôles, 404 hors projet. */
 const readIndexErrors = { ...readOneErrors, ...validationError } as const;
@@ -30,7 +30,7 @@ const spec = {
   listFeatures: route("GET", "/projects/{projectId}/spec/features")
     .errors({ ...readIndexErrors, ...specIndexFailedError })
     .input(featureListInputSchema)
-    .output(pageOf(featureSummarySchema)),
+    .output(listOf(featureSummarySchema)),
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })
     .input(featureGetInputSchema)

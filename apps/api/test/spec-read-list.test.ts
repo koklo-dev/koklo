@@ -21,6 +21,7 @@ const feature = (n: number, over: Partial<FeatureSeed> = {}): FeatureSeed => ({
   ...over,
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("spec.listFeatures : contenu d'un résumé", () => {
   it("specId, title, status, priority, filePath, criteriaCount, rien d'autre", async () => {
     const s = await readScene(bench());
@@ -57,6 +58,13 @@ describe("spec.listFeatures : contenu d'un résumé", () => {
         },
       ],
       nextCursor: null,
+      previousCursor: null,
+      offset: 0,
+      total: 2,
+      facets: {
+        status: { brouillon: 1, specifiee: 1 },
+        priority: { must: 1, should: 1 },
+      },
     });
   });
 
@@ -70,7 +78,14 @@ describe("spec.listFeatures : contenu d'un résumé", () => {
 
     for (const res of [noRepo, noHead, unknown]) {
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ items: [], nextCursor: null });
+      expect(res.body).toEqual({
+        items: [],
+        nextCursor: null,
+        previousCursor: null,
+        offset: 0,
+        total: 0,
+        facets: { status: {}, priority: {} },
+      });
     }
   });
 });

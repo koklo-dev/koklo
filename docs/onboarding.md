@@ -42,6 +42,8 @@ pnpm e2e         # real-stack e2e (TK-15): Compose Postgres, migrate, seed, buil
 pnpm db:migrate  # prisma migrate deploy (needs DATABASE_URL)
 pnpm db:rollback # undo the latest migration through its down.sql
 pnpm db:seed     # deterministic demo data: sprint + 6 tickets (needs DATABASE_URL), safe to re-run, refused when NODE_ENV=production
+pnpm seed:large  # long-list load data (1 000 features, 500 tickets) in its own project, same guarantees as db:seed
+pnpm seed:planche # "Volume réel" board data (248 features, 60 tickets) in its own project
 ```
 
 Local database (TK-7): `docker compose up -d postgres` at the root (set `KOKLO_DB_PORT`

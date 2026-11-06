@@ -73,7 +73,14 @@ async function applyEarlierMigrations(target: TestDatabase): Promise<TestDatabas
   return target;
 }
 
+/** Défait d'abord les migrations postérieures (TK-94), de la plus récente à la plus ancienne. */
 async function rollBackEmailState(db: TestDatabase): Promise<void> {
+  for (const later of dirs()
+    .filter((d) => d > migration())
+    .reverse()) {
+    runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, later, "down.sql")], db.url);
+    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [later]);
+  }
   const dir = migration();
   runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
   await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);

@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55)", () => {
-  it("est en 0.14.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("0.14.0");
-    expect(CONTRACT_VERSION).toBe("0.14.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94)", () => {
+  it("est en 1.0.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("1.0.0");
+    expect(CONTRACT_VERSION).toBe("1.0.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -222,6 +222,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "0.12.0",
       "0.13.0",
       "0.14.0",
+      "1.0.0",
     ]);
   });
 });
@@ -297,13 +298,20 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     );
   });
 
-  it("l'empreinte 0.14.0 est celle du document généré et diffère de 0.13.0 (FORBIDDEN client_only)", async () => {
+  it("conserve l'empreinte figée de 0.14.0 (TK-55) : elle ne suit plus le document courant", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["0.14.0"]).toBe(
+      "804e8e63c2d69194d0482c99e9d4eaca05ff53445f70b80fe36794adbebcfce6",
+    );
+  });
+
+  it("l'empreinte 1.0.0 est celle du document généré et diffère de 0.14.0 (listes longues)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["0.14.0"]).toBe(hash);
-    expect(versions["0.14.0"]).not.toBe(versions["0.13.0"]);
+    expect(versions["1.0.0"]).toBe(hash);
+    expect(versions["1.0.0"]).not.toBe(versions["0.14.0"]);
   });
 });
 

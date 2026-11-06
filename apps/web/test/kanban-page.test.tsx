@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KanbanPage } from "../src/components/kanban-page.tsx";
+import { listFor } from "./support/kanban-server.ts";
 import { renderWithQuery } from "./support/render.tsx";
 import { findNamed } from "./support/wait.ts";
 import {
@@ -94,10 +95,9 @@ let board: Ticket[] = [];
 function serve(): void {
   board = initialBoard();
   procedures.sprintList.mockResolvedValue([SPRINT]);
-  procedures.ticketList.mockImplementation(async () => ({
-    items: board.map((t) => ({ ...t })),
-    nextCursor: null,
-  }));
+  procedures.ticketList.mockImplementation(async (input: Parameters<typeof listFor>[1]) =>
+    listFor(board, input),
+  );
   procedures.ticketTransition.mockImplementation(async (input: { key: string; to: Status }) => {
     const found = board.find((t) => t.key === input.key);
     if (!found) throw apiError("NOT_FOUND");
@@ -210,9 +210,12 @@ describe("KanbanPage — colonnes et compteurs (C1)", () => {
     );
   });
 
-  it("trie chaque colonne par priorité décroissante puis par clé", async () => {
+  // TK-94, B42 : une colonne est paginée par le serveur, qui la trie par priorité décroissante ; un tri sur les
+  // seules cartes chargées changerait d'ordre à chaque page. Ici le serveur rend un ordre volontairement non trié :
+  // le web doit l'afficher tel quel.
+  it("affiche chaque colonne dans l'ordre du serveur, sans tri côté web", async () => {
     await renderBoard();
-    expect(keysIn("todo")).toEqual(["TK-110", "TK-102", "TK-111", "TK-103"]);
+    expect(keysIn("todo")).toEqual(["TK-102", "TK-103", "TK-110", "TK-111"]);
   });
 });
 
@@ -358,28 +361,19 @@ describe("KanbanPage — états (C3)", () => {
 });
 
 describe("KanbanPage — pagination (C4)", () => {
-  it("suit nextCursor jusqu'à épuisement et affiche toutes les cartes", async () => {
-    const pages: Record<string, { items: Ticket[]; nextCursor: string | null }> = {
-      first: {
-        items: [ticket("TK-201", "todo"), ticket("TK-202", "todo")],
-        nextCursor: "c1",
-      },
-      c1: { items: [ticket("TK-203", "in_progress")], nextCursor: "c2" },
-      c2: { items: [ticket("TK-204", "done")], nextCursor: null },
-    };
-    procedures.ticketList.mockImplementation(async (input: { cursor?: string }) => {
-      const page = pages[input?.cursor ?? "first"];
-      if (!page) throw new Error(`curseur inattendu ${String(input?.cursor)}`);
-      return page;
-    });
+  // TK-94 : le kanban ne suit plus nextCursor jusqu'au bout ; une page par colonne (voir kanban-columns.test.tsx).
+  it("une colonne qui a une suite ne déclenche aucune requête de plus", async () => {
+    procedures.ticketList.mockImplementation(async (input: { status?: string }) => ({
+      items: input.status === "todo" ? [ticket("TK-201", "todo")] : [],
+      nextCursor: input.status === "todo" ? "c1" : null,
+      previousCursor: null,
+      offset: 0,
+      total: input.status === "todo" ? 40 : 0,
+    }));
     await renderBoard();
-    await waitFor(() => expect(screen.getByText("4 tickets")).toBeInTheDocument());
-    expect(keysIn("todo")).toEqual(["TK-201", "TK-202"]);
-    expect(keysIn("in_progress")).toEqual(["TK-203"]);
-    expect(keysIn("done")).toEqual(["TK-204"]);
-    const cursors = procedures.ticketList.mock.calls.map((call) => call[0]?.cursor);
-    expect(cursors).toContain("c1");
-    expect(cursors).toContain("c2");
+    expect(within(column("todo")).getByLabelText("40 tickets")).toBeInTheDocument();
+    expect(keysIn("todo")).toEqual(["TK-201"]);
+    expect(procedures.ticketList.mock.calls.some((call) => call[0]?.cursor)).toBe(false);
   });
 });
 
@@ -491,7 +485,9 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
     expect(keysIn("todo")).not.toContain("TK-102");
     expect(within(column("in_progress")).getByLabelText("2 tickets")).toBeInTheDocument();
     expect(within(column("todo")).getByLabelText("3 tickets")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("TK-102 déplacé vers En cours.");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "TK-102 déplacé vers En cours · En cours : 2",
+    );
     await waitFor(() => expect(moveButton("TK-102")).toHaveFocus());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -626,7 +622,9 @@ describe("KanbanPage — glisser-déposer natif (C6)", () => {
       to: "in_review",
     });
     await waitFor(() => expect(keysIn("in_review")).toContain("TK-102"));
-    expect(screen.getByRole("status")).toHaveTextContent("TK-102 déplacé vers En revue.");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "TK-102 déplacé vers En revue · En revue : 2",
+    );
   });
 
   it("la colonne d'origine n'offre pas de retour de dépôt et déposer dessus ne fait rien", async () => {

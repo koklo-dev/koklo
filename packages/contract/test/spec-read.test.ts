@@ -54,6 +54,7 @@ describe("S1 spec.head", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("S2 spec.listFeatures", () => {
   const i = () => input("spec.listFeatures");
   it("entrée : filtres status/priority, branch ou commitSha, pagination", async () => {
@@ -85,26 +86,42 @@ describe("S2 spec.listFeatures", () => {
     expect(await isValid(i(), {})).toBe(false);
     expect(await isValid(i(), { projectId: "x" })).toBe(false);
   });
-  it("sortie : page de résumés { items, nextCursor }", async () => {
+  it("sortie : liste longue { items, nextCursor, previousCursor, offset, total, facets? } (1.0.0)", async () => {
     const o = output("spec.listFeatures");
-    expect(await isValid(o, { items: [featureSummary], nextCursor: null })).toBe(true);
-    expect(await isValid(o, { items: [], nextCursor: "c" })).toBe(true);
+    const page = { nextCursor: null, previousCursor: null, offset: 0, total: 1 };
+    expect(await isValid(o, { items: [featureSummary], ...page })).toBe(true);
+    expect(await isValid(o, { items: [], ...page, nextCursor: "c", total: 1000 })).toBe(true);
+    expect(
+      await isValid(o, {
+        items: [],
+        ...page,
+        facets: { status: { brouillon: 4, specifiee: 2 }, priority: { must: 6 } },
+      }),
+    ).toBe(true);
+    expect(await isValid(o, { items: [], nextCursor: null })).toBe(false);
     expect(await isValid(o, [featureSummary])).toBe(false);
-    expect(
-      await isValid(o, { items: [{ ...featureSummary, specId: "F-1" }], nextCursor: null }),
-    ).toBe(false);
-    expect(
-      await isValid(o, { items: [{ ...featureSummary, status: "done" }], nextCursor: null }),
-    ).toBe(false);
-    expect(
-      await isValid(o, { items: [{ ...featureSummary, priority: "high" }], nextCursor: null }),
-    ).toBe(false);
+    expect(await isValid(o, { items: [{ ...featureSummary, specId: "F-1" }], ...page })).toBe(
+      false,
+    );
+    expect(await isValid(o, { items: [{ ...featureSummary, status: "done" }], ...page })).toBe(
+      false,
+    );
+    expect(await isValid(o, { items: [{ ...featureSummary, priority: "high" }], ...page })).toBe(
+      false,
+    );
     for (const field of Object.keys(featureSummary)) {
       expect(
-        await isValid(o, { items: [{ ...featureSummary, [field]: undefined }], nextCursor: null }),
+        await isValid(o, { items: [{ ...featureSummary, [field]: undefined }], ...page }),
         field,
       ).toBe(false);
     }
+  });
+  it("entrée : q (1..200), around F-nnn ; around et cursor ne vont pas ensemble (1.0.0)", async () => {
+    expect(await isValid(i(), { projectId: UUID, q: "annulation groupée" })).toBe(true);
+    expect(await isValid(i(), { projectId: UUID, around: "F-187" })).toBe(true);
+    expect(await isValid(i(), { projectId: UUID, around: "F-187", cursor: "c" })).toBe(false);
+    expect(await isValid(i(), { projectId: UUID, q: "" })).toBe(false);
+    expect(await isValid(i(), { projectId: UUID, q: "x".repeat(201) })).toBe(false);
   });
 });
 

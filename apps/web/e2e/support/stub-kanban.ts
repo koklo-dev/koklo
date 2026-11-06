@@ -12,7 +12,13 @@ export type BoardMode =
   | "empty"
   | "data"
   | "internal"
-  | "unauthorized";
+  | "unauthorized"
+  /** 142 tickets « À faire » (TK-1000 à TK-1141), 3 « En cours », 1 « Terminé » : 30 par page (TK-94). */
+  | "large"
+  /** `large` dont la première page demandée par curseur échoue (500), puis réussit. */
+  | "largeMoreError"
+  /** `large` dont la colonne « Bloqué » ne répond pas (500). */
+  | "largeColumnError";
 export type TransitionMode = "ok" | "invalid" | "forbidden" | "internal";
 export type KanbanRole = "owner" | "admin" | "dev" | "designer" | "client" | "business";
 export type KanbanScenario = { board?: BoardMode; transition?: TransitionMode };
@@ -79,12 +85,54 @@ const seed = () => [
   ticket(108, "Supprimer l'ancien tableau", { status: "cancelled", priority: "low", pkg: "infra" }),
 ];
 
+const LARGE_TODO = 142;
+const LARGE_PRIORITIES = ["low", "critical", "medium", "high"] as const;
+const largeTodo = () =>
+  Array.from({ length: LARGE_TODO }, (_, i) =>
+    ticket(1000 + i, `Ticket à faire numéro ${i + 1}`, {
+      status: "todo",
+      priority: LARGE_PRIORITIES[i % LARGE_PRIORITIES.length],
+    }),
+  );
+const large = () => [
+  ...largeTodo(),
+  ...seed().filter(
+    (t) => t.status !== "todo" && t.status !== "backlog" && t.status !== "cancelled",
+  ),
+  ticket(101, "Préparer le jeu de données de démonstration", {
+    status: "backlog",
+    priority: "low",
+  }),
+];
+const isLarge = (mode: BoardMode) => mode.startsWith("large");
+
+/** Ordre par défaut du serveur (B42) : priorité décroissante, puis numéro de la clé. */
+const RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+const keyNumber = (key: string) => Number(key.replace(/\D/g, ""));
+const byServerOrder = (a: Ticket, b: Ticket) =>
+  (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3) || keyNumber(a.key) - keyNumber(b.key);
+type Ticket = ReturnType<typeof ticket>;
+
+/** Clés de la colonne « À faire » du jeu `large` dans l'ordre que le serveur doit rendre. */
+export const largeTodoKeys = (): string[] =>
+  largeTodo()
+    .sort(byServerOrder)
+    .map((t) => t.key);
+
 let tickets = seed();
+/** Requêtes `ticket.list` reçues (chemin + query), dans l'ordre : consultables par `/__ticket-reads`. */
+const reads: string[] = [];
 export let transitions: Array<{ key: string; to: string }> = [];
 
 export function resetKanban(): void {
   tickets = seed();
   transitions = [];
+  reads.length = 0;
+}
+
+/** Le jeu `large` n'est posé qu'une fois par scénario, pour que les transitions y soient visibles. */
+function ensureLarge(mode: BoardMode): void {
+  if (isLarge(mode) && tickets.length < LARGE_TODO) tickets = large();
 }
 
 /** Réponse de `sprint.list` selon le scénario. */
@@ -103,12 +151,31 @@ export function sprintsResponse(mode: BoardMode): Reply {
   }
 }
 
-/** Réponse de `ticket.list` (une seule page) selon le scénario. */
-export function ticketsResponse(mode: BoardMode): Reply {
-  if (mode === "internal") {
-    return reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
+/** Réponse de `ticket.list` (contrat 1.0.0) : filtre par statut, ordre du serveur (priorité puis clé), page par `limit` et `cursor` (rang), `total` du serveur. */
+export function ticketsResponse(mode: BoardMode, query: URLSearchParams): Reply {
+  const status = query.get("status");
+  const cursor = query.get("cursor");
+  const internal = reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
+  if (mode === "internal") return internal;
+  if (mode === "largeColumnError" && status === "blocked") return internal;
+  if (mode === "largeMoreError" && cursor) {
+    return internal;
   }
-  return reply(200, { items: mode === "empty" ? [] : tickets, nextCursor: null });
+  ensureLarge(mode);
+  const matching =
+    mode === "empty"
+      ? []
+      : tickets.filter((t) => !status || t.status === status).sort(byServerOrder);
+  const limit = Number(query.get("limit") ?? 50) || 50;
+  const start = Number(cursor ?? 0) || 0;
+  const end = start + limit;
+  return reply(200, {
+    items: matching.slice(start, end),
+    nextCursor: end < matching.length ? String(end) : null,
+    previousCursor: start > 0 ? String(Math.max(0, start - limit)) : null,
+    offset: start,
+    total: matching.length,
+  });
 }
 
 /** `ticket.transition` : "ok" accepte tout, "invalid" refuse tout avec départ et arrivée. */
@@ -142,13 +209,18 @@ type Send = (reply: Reply) => void;
  */
 export function handleKanban(
   req: IncomingMessage,
-  path: string,
+  url: URL,
   scenario: KanbanScenario,
   send: Send,
   hold: (release: () => void) => void,
   expireSession: () => void,
 ): boolean {
+  const path = url.pathname;
   const board = scenario.board ?? "data";
+  if (path === "/__ticket-reads") {
+    send(reply(200, reads));
+    return true;
+  }
   if (path === "/__transitions") {
     send(reply(200, transitions));
     return true;
@@ -160,7 +232,8 @@ export function handleKanban(
     return true;
   }
   if (req.method === "GET" && path.endsWith("/tickets")) {
-    send(ticketsResponse(board));
+    reads.push(`${path}${url.search}`);
+    send(ticketsResponse(board, url.searchParams));
     return true;
   }
   const move = /\/tickets\/(TK-[1-9][0-9]*)\/transition$/.exec(path);

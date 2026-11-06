@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import { PrismaSprintStore } from "../sprint/prisma-sprint.repository.ts";
 import { PrismaTicketStore } from "../ticket/prisma-ticket.repository.ts";
+import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { ProjectTransactions } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { ImportStores, SprintImportRepository } from "./sprint-import.repository.ts";
@@ -14,6 +15,7 @@ export class PrismaSprintImportRepository implements SprintImportRepository {
   constructor(
     @Inject(ProjectTransactions) private readonly transactions: ProjectTransactions,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(FullTextSearch) private readonly search: FullTextSearch,
   ) {}
 
   run<T>(scope: ProjectScope, work: (stores: ImportStores) => Promise<T>): Promise<T> {
@@ -21,7 +23,7 @@ export class PrismaSprintImportRepository implements SprintImportRepository {
       scope,
       (tx) =>
         work({
-          tickets: new PrismaTicketStore(tx, scope, this.clock),
+          tickets: new PrismaTicketStore(tx, scope, this.clock, this.search),
           sprints: new PrismaSprintStore(tx, scope),
         }),
       { timeoutMs: IMPORT_TRANSACTION_TIMEOUT_MS },

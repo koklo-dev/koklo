@@ -27,6 +27,7 @@
     "@fontsource/instrument-sans": "5.3.0",
     "@fontsource/jetbrains-mono": "5.3.0",
     "@koklo/config": "workspace:*",
+    "@tanstack/react-virtual": "3.14.26",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "radix-ui": "1.8.1",

@@ -28,6 +28,9 @@ import {
  */
 /** Même référentiel que les autres specs : WCAG A/AA (les règles « best-practice » visent un autre périmètre). */
 const PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
+/** Les lignes de la liste des fonctionnalités (pas les éléments de liste du gabarit). */
+const rows = (page: Page) =>
+  page.getByRole("list", { name: "Fonctionnalités" }).getByRole("listitem");
 const FICHE_TITLE = "Connexion par e-mail";
 const ids = (role?: KanbanRole) => (role ? { role } : {});
 
@@ -61,15 +64,16 @@ const STATES: State[] = [
   },
   {
     name: "data",
-    visible: (page) =>
-      expect(page.getByRole("table", { name: /^Fonctionnalités du projet/ })).toBeVisible(),
+    visible: (page) => expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible(),
   },
   { name: "empty", spec: "empty", visible: heading("Aucune fonctionnalité pour le moment") },
   {
     name: "empty-filtered",
     path: `${PATH}?priority=could`,
     visible: (page) =>
-      expect(page.getByText("Aucune fonctionnalité ne correspond à ces filtres.")).toBeVisible(),
+      expect(page.locator("[data-slot='empty-state']")).toContainText(
+        "Aucune fonctionnalité ne correspond à ces filtres.",
+      ),
   },
   { name: "preparing", spec: "building", visible: heading("La spec est en cours de préparation") },
   {
@@ -208,14 +212,14 @@ test("S-features : filtres dans l'adresse, requête relancée, « Effacer les fi
 }) => {
   await setScenario({ session: true, projects: "data" });
   await page.goto(PATH);
-  await expect(page.getByRole("row")).toHaveCount(4);
+  await expect(rows(page)).toHaveCount(3);
   await page.getByRole("combobox", { name: "Statut" }).click();
   await page.getByRole("option", { name: "Brouillon" }).click();
   await expect(page).toHaveURL(/status=brouillon/);
-  await expect(page.getByRole("row")).toHaveCount(2);
+  await expect(rows(page)).toHaveCount(1);
   await expect(page.getByRole("link", { name: FICHE_TITLE })).toBeVisible();
   await page.getByRole("button", { name: "Effacer les filtres" }).click();
-  await expect(page.getByRole("row")).toHaveCount(4);
+  await expect(rows(page)).toHaveCount(3);
   await expect(page).not.toHaveURL(/status=/);
   await expect(page.getByRole("combobox", { name: "Statut" })).toBeFocused();
   const reads = await specReadsSeen();
@@ -230,7 +234,7 @@ test("S-features : fiche ouverte au clavier, lien partageable, Retour et Échap 
   const link = page.getByRole("link", { name: FICHE_TITLE });
   await link.focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/feature=F-001/);
+  await expect(page).toHaveURL(/sel=F-001/);
   const dialog = page.getByRole("dialog", { name: FICHE_TITLE });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("heading", { name: FICHE_TITLE })).toBeFocused();
@@ -244,22 +248,26 @@ test("S-features : fiche ouverte au clavier, lien partageable, Retour et Échap 
   await page.goto(`${PATH}?feature=F-002`);
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.goto(`${PATH}?feature=F-1`);
-  await expect(page.getByRole("table", { name: /^Fonctionnalités du projet/ })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("S-features : « Afficher plus de fonctionnalités » ajoute la page suivante puis disparaît", async ({
+test("S-features : « Charger la suite » ajoute la page suivante puis la liste se termine", async ({
   page,
 }) => {
   await setScenario({ session: true, projects: "data", spec: "paginated" });
   await page.goto(PATH);
-  await expect(page.getByRole("row")).toHaveCount(51);
-  await page.getByRole("button", { name: "Afficher plus de fonctionnalités" }).click();
-  await expect(page.getByRole("row")).toHaveCount(61);
-  await expect(page.getByRole("button", { name: "Afficher plus de fonctionnalités" })).toHaveCount(
-    0,
+  await expect(page.locator("[data-slot='count-bar']")).toContainText(
+    "60 fonctionnalités · 50 chargées",
   );
-  await expect(page.getByRole("status")).toContainText("10 fonctionnalités de plus affichées.");
+  await page.getByRole("button", { name: "Charger la suite" }).click();
+  await expect(page.locator("[data-slot='list-footer']")).toContainText(
+    "Fin de la liste · 60 fonctionnalités",
+  );
+  await expect(page.getByRole("button", { name: "Charger la suite" })).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText(
+    "10 fonctionnalités de plus chargées · 60 sur 60",
+  );
 });
 
 test("S-features : « Actualiser » une spec en préparation devenue prête affiche la liste", async ({
@@ -272,7 +280,7 @@ test("S-features : « Actualiser » une spec en préparation devenue prête affi
   ).toBeVisible();
   await setScenario({ session: true, projects: "data", spec: "ready" });
   await page.getByRole("button", { name: "Actualiser" }).click();
-  await expect(page.getByRole("table", { name: /^Fonctionnalités du projet/ })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("La spec est prête.");
 });
 
@@ -393,15 +401,11 @@ test.describe("375 px", () => {
   }) => {
     await setScenario({ session: true, projects: "data" });
     await page.goto(PATH);
-    const table = page.getByRole("table", { name: /^Fonctionnalités du projet/ });
+    const table = page.getByRole("list", { name: "Fonctionnalités" });
     await expect(table).toBeVisible();
-    for (const name of ["Avancement", "Priorité", "Critères"]) {
-      await expect(page.getByRole("columnheader", { name })).toHaveCount(0);
-    }
-    // La ligne méta (statut · priorité · critères) remplace les colonnes masquées ; la cellule Priorité reste masquée.
-    // TK-87 : LifecycleStatus et PriorityIndicator dans la ligne méta (S-features, B22).
+    // La ligne de 52 px garde l'identifiant et le titre ; avancement et priorité passent sous le titre (TK-87, B22).
     await expect(table.getByLabel("Avancement : Spécifiée, étape 2 sur 6").first()).toBeVisible();
-    await expect(table.getByText("3 critères").first()).toBeVisible();
+    await expect(table.getByText("3 critères")).toBeHidden();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

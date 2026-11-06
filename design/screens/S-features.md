@@ -34,20 +34,22 @@ Sources du contrat `@koklo/contract` 0.7.0 (aucun changement de contrat) :
 ### 3.1.1 Bouton « Cadrer avec l'IA » (TK-59)
 `Button variant="outline"` (icône `smart_toy` 20, libellé « Cadrer avec l'IA »), dans l'en-tête **à droite** de « Nouvelle fonctionnalité » et dans l'état vide 4.3 (liste vide = moment naturel du cadrage). Lien vers `/projects/[projectId]/framing`. Visible pour **propriétaire, administrateur, développeur et designer seulement**, et seulement quand la spec est lue (`ready`) : comme « Nouvelle fonctionnalité », jamais grisé, absent pour client et business (aucun emplacement vide). Sous 768 px, pleine largeur sous « Nouvelle fonctionnalité », 44 px. Le designer voit le bouton (la page lui explique ce qu'il ne peut pas enregistrer, S-framing 4.11).
 
-### 3.2 Filtres
+### 3.2 Recherche et filtres
+**Recherche** (TK-94) : champ `type="search"` « Rechercher une fonctionnalité », libellé visible, pleine largeur sous 768 px, 44 px au tactile. La saisie relance la requête après 200 ms (`?q=`, 1 à 200 caractères), porte sur toutes les fonctionnalités du projet et non sur celles affichées ; `/` y met le focus. Le résultat est annoncé 500 ms après la frappe (« 12 fonctionnalités trouvées sur 1 000 », « Aucun résultat pour « … » »).
+
 Deux `Select` à libellé visible (au-dessus ou à gauche selon la largeur), sans bouton « Appliquer » : le changement relance la requête (retour au début de la liste, curseur oublié).
 - « Statut » : Tous / Brouillon / Spécifiée / Implémentée / Adoptée (`featureStatusSchema`).
 - « Priorité » : Toutes / Indispensable / Importante / Souhaitable / Reportée (`featurePrioritySchema`).
 - Bouton `Button variant="ghost"` « Effacer les filtres », rendu seulement si un filtre est actif.
 - Les filtres sont inertes tant que le projet n'a aucune fonctionnalité indexée (états §4.2 à §4.8 sans liste) : ils ne sont pas rendus dans ces états.
 
-### 3.3 Liste (`Table`)
-`TableCaption` masquée visuellement : « Fonctionnalités du projet `<nom>` ». Trois colonnes de contenu plus la méta :
+### 3.3 Liste (`VirtualList`, TK-94)
+Liste virtualisée `role="list"` nommée « Fonctionnalités » (plus de `table`), lignes de 52 px, `aria-setsize` = total du serveur, `aria-posinset` = rang réel (`offset` + position). Une seule entrée de tabulation (flèches, Début, Fin entre les lignes ; Entrée ou Espace ouvre la fiche). Au-dessus, la `CountBar` (total, chargées, tri « identifiant »). Sous 768 px, avancement et priorité passent sous le titre (B40). Cellules d'une ligne :
 
 | Colonne | Contenu | Source |
 |---|---|---|
 | Identifiant | `F-001` en JetBrains Mono 12 px, `--muted-foreground` | `specId` |
-| Titre | lien (vrai `a`) vers `?feature=<specId>`, 14 px/500, 2 lignes max, `title` complet en infobulle native | `title` |
+| Titre | lien (vrai `a`, hors de la tabulation) vers `?sel=<specId>`, 14 px/500, 1 ligne tronquée, `title` complet en infobulle native | `title` |
 | Avancement (v2, TK-87) | `LifecycleStatus` : jauge 6 crans + libellé, stade dérivé (ci-dessous) | `status`, `criteriaCount` |
 | Priorité | `PriorityIndicator` : 3 barres + libellé (v2, TK-87) | `priority` |
 | Critères | nombre et libellé « N critère(s) », aligné à droite, 13 px | `criteriaCount` |
@@ -67,7 +69,7 @@ Libellés de priorité (méthode MoSCoW traduite, sans jargon) : `must` Indispen
 
 Tri : celui de l'API (numérique sur `F-nnn`). Aucun tri côté web.
 
-Pagination : page de 50 (`limit` 50). Sous la table, `Button variant="outline"` « Afficher plus de fonctionnalités » tant que `nextCursor` n'est pas `null` ; les éléments s'ajoutent à la suite (pas de remplacement), le focus reste sur le bouton, qui est retiré à la dernière page. Pendant l'appel : `disabled`, `aria-busy`, texte « Chargement… ». La région d'état annonce « 50 fonctionnalités de plus affichées. » (nombre réel).
+Pagination (TK-94) : pages de 50 (`limit` 50, curseur opaque). La suivante se charge à 80 % du défilement ; le pied de liste (`ListFooter`) dit l'état (« Charger la suite », « Chargement des 50 suivantes… », « Impossible de charger la suite. Les N premières restent affichées. », « Fin de la liste · N fonctionnalités »). Lien direct `?sel=F-nnn` : la page qui contient la ligne est chargée (`around`), la ligne est sélectionnée et amenée au centre, remonter charge la page précédente ; le pied est une ligne comme sur la planche 12 (icône, texte à gauche, bouton `sm` à droite, 55 px à 1280 px ; à 375 px le texte passe sur deux lignes et le bouton prend la largeur à 44 px), et non plus une colonne centrée en cadre pointillé (version compacte du kanban inchangée) ; hors des filtres actifs, une `InlineAlert` neutre le dit avec « Effacer les filtres » (B43).
 
 ### 3.4 Fiche d'une fonctionnalité (`Sheet`, 440 px)
 Ouverte par le lien du titre ou par `?feature=`. Sources : ligne de la liste (en-tête immédiat) puis `spec.getFeature` (détail).
@@ -92,8 +94,8 @@ Compteur, ligne de version, filtres, table, éventuel « Afficher plus » (§3).
 ### 4.3 Vide (spec lue, aucune fonctionnalité, aucun filtre)
 `Card` centrée : icône `checklist` (28), titre « Aucune fonctionnalité pour le moment », texte « La spec de ce projet ne décrit encore aucune fonctionnalité. » Client et business : aucun bouton. Équipe qui écrit (S-feature-form §4.1) : `Button` principal « Nouvelle fonctionnalité » (icône `add`), suivi du `Button variant="outline"` « Cadrer avec l'IA » (icône `smart_toy`, §3.1.1).
 
-### 4.4 Vide filtré
-Filtres conservés et rendus. À la place de la table : texte `role="status"` « Aucune fonctionnalité ne correspond à ces filtres. » et `Button variant="outline"` « Effacer les filtres » (le focus reste sur les `Select` au changement ; sur « Effacer » le focus passe au premier `Select`).
+### 4.4 Vide filtré (recherche vide, TK-94)
+Filtres et recherche conservés et rendus. À la place de la liste : `EmptyState` (icône `search_off`). Avec une recherche : « Aucune fonctionnalité ne correspond à « annulation » », « La recherche porte sur les 1 000 fonctionnalités, pas seulement celles affichées. » et « Effacer la recherche ». Avec des filtres seuls : « Aucune fonctionnalité ne correspond à ces filtres. » et « Effacer les filtres ». Le message est aussi annoncé par la région d'état (celle de la `CountBar`) (le focus reste sur les `Select` au changement ; sur « Effacer » le focus passe au premier `Select`).
 
 ### 4.5 Spec en préparation (`building`, ou projet avec dépôt de spec mais rien d'indexé)
 Cas : `spec.head` vaut `building`, ou vaut `null` alors que `repo.list` montre un dépôt de spec (équipe), ou vaut `null` pour un rôle qui ne peut pas lire `repo.list` (voir 4.6 pour ce dernier).
@@ -201,6 +203,8 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 | 1.4 | 2026-11-01 | TK-48 (48e-2, refactor) | Après une suppression, la liste est relue sans la fonctionnalité (filtres gardés, curseur oublié) et la région d'état dit « F-001 supprimée. » (pas de « Voir la fiche »), focus sur le h1 ; un suivi de suppression page fermée dit « Suppression de « Titre » en cours… ». Détail : S-feature-form §4.8. |
 | 1.5 | 2026-11-02 | TK-59 | Bouton « Cadrer avec l'IA » (§3.1.1) dans l'en-tête et dans l'état vide, pour propriétaire, administrateur, développeur et designer avec spec lue ; la page est décrite par [S-framing](S-framing.md). Aucun changement pour les rôles en lecture. |
 | 1.6 | 2026-11-06 | TK-87 | Lot 0 : colonne « Statut » renommée « Avancement » et rendue par `LifecycleStatus` (stade dérivé, B22) ; priorité en `PriorityIndicator` dans la liste, la ligne méta mobile et la fiche ; plus aucun badge fait main ; h1 24 px (échelle v2). Filtres inchangés jusqu'à TK-88 (B31). Détail : `.workflow/TK-87/02-design.md` |
+| 1.7 | 2026-11-06 | TK-94 | Schéma 1.1 des listes longues (DESIGN.md §5.3) : défilement infini par pages de 50 à 80 %, liste virtualisée (52 px), `CountBar` (« 1 000 fonctionnalités · 50 chargées · 31 à valider »), `ListFooter` à 4 états en remplacement de « Afficher plus » (bouton « Charger la suite » en repli clavier), recherche serveur `?q=`, lien direct `?sel=F-nnn` (remplace `?feature=`, ancien lien lu puis réécrit), `EmptyState` de recherche vide, annonces et `aria-setsize` / `aria-posinset`. Détail : `.workflow/TK-94/02-design.md` |
+| 1.8 | 2026-11-06 | TK-94 (lot C) | Écran réécrit sur la liste virtualisée : §3.2 (recherche), §3.3, §4.4 mis à jour. Écarts à la fiche 02-design : avancement et priorité sous le titre sous 768 px et non réduits à des icônes (B40) ; pas de compteur « à valider » (B41) ; avis « hors des filtres » en `note` et conservé après la fermeture de la fiche (B43) ; avis d'écriture affichés en blocs mais annoncés par la région d'état de la `CountBar` (une seule région par écran) ; filtres et recherche : la liste précédente reste affichée pendant le rechargement |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.

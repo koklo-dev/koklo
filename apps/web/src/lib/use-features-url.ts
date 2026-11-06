@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { type FeaturesUrlPatch, readFeaturesUrl, withFeaturesUrl } from "./features-url.ts";
 
 function write(patch: FeaturesUrlPatch, mode: "push" | "replace"): void {
@@ -12,16 +12,23 @@ function write(patch: FeaturesUrlPatch, mode: "push" | "replace"): void {
 }
 
 /**
- * Filtres, fiche et formulaire ouverts, lus dans l'adresse (`useSearchParams`) et écrits par l'API History :
- * la fiche et le formulaire s'empilent (Retour les ferme), les filtres remplacent l'entrée courante.
+ * Filtres, recherche, fiche et formulaire ouverts, lus dans l'adresse (`useSearchParams`) et écrits par l'API History :
+ * la fiche et le formulaire s'empilent (Retour les ferme), les filtres et la recherche remplacent l'entrée courante.
+ * Un lien en `?feature=F-001` (ancien nom de `?sel=`) est réécrit en `?sel=` au chargement.
  */
 export function useFeaturesUrl() {
   const search = useSearchParams().toString();
   const state = useMemo(() => readFeaturesUrl(search), [search]);
+  useEffect(() => {
+    if (new URLSearchParams(search).has("feature") && state.feature) {
+      write({ feature: state.feature }, "replace");
+    }
+  }, [search, state.feature]);
   return {
     ...state,
     search,
     setFilters: useCallback((patch: FeaturesUrlPatch) => write(patch, "replace"), []),
+    setQuery: useCallback((q: string | null) => write({ q }, "replace"), []),
     openFeature: useCallback((feature: string) => write({ feature }, "push"), []),
     closeFeature: useCallback(() => write({ feature: null }, "replace"), []),
     openCreate: useCallback(() => write({ new: true, edit: null, feature: null }, "push"), []),

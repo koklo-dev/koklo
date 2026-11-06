@@ -79,6 +79,9 @@ async function openF001(page: Page): Promise<void> {
 const submitsSeen = async () => (await specWritesSeen()).filter((entry) => entry.kind === "submit");
 const save = (page: Page) => dialogOf(page).getByRole("button", { name: "Enregistrer" }).click();
 const region = (page: Page) => page.locator('[role="status"], output');
+/** Les lignes de la liste des fonctionnalités (pas les éléments de liste du gabarit). */
+const rows = (page: Page) =>
+  page.getByRole("list", { name: "Fonctionnalités" }).getByRole("listitem");
 
 async function capture(page: Page, name: string, theme: Theme, suffix = ""): Promise<void> {
   await settle(page);
@@ -339,7 +342,7 @@ test("S-feature-form : création, la fonctionnalité est dans la liste relue, an
   await expect(dialogOf(page)).toBeHidden();
   await expect(page).not.toHaveURL(/new=/);
   await expect(page.getByRole("link", { name: TITLE })).toBeFocused();
-  await expect(page.getByRole("row")).toHaveCount(5);
+  await expect(rows(page)).toHaveCount(4);
   const submits = (await specWritesSeen()).filter((entry) => entry.kind === "submit");
   expect(submits).toHaveLength(1);
   const [body] = submits;
@@ -543,7 +546,7 @@ test.describe("rôles", () => {
     }) => {
       await scenario({ write: "ok", role });
       await page.goto(`${PATH}?new=1`);
-      await expect(page.getByRole("table", { name: /^Fonctionnalités du projet/ })).toBeVisible();
+      await expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page).not.toHaveURL(/new=/);
       await expect(
@@ -694,7 +697,7 @@ test.describe("Suppression (48e-2)", () => {
     await expect(dialogOf(page)).toBeHidden();
     await expect(page).not.toHaveURL(/edit=/);
     await expect(page.getByRole("link", { name: "Connexion par e-mail" })).toHaveCount(0);
-    await expect(page.getByRole("row")).toHaveCount(3);
+    await expect(rows(page)).toHaveCount(2);
     await expect(page.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toBeFocused();
     await expect(page.getByRole("status")).toHaveCount(1);
     const submits = await submitsSeen();
