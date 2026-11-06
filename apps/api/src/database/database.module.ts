@@ -22,6 +22,8 @@ export const APP_CONFIG = Symbol("APP_CONFIG");
  * Règle : tout code métier utilise `client` (multi-tenant, sous `withOrganization`). `raw` n'applique
  * AUCUN filtre d'organisation : réservé à Better Auth, à la sonde de santé et aux modèles exclus
  * (`TENANT_EXCLUDED_MODELS`). Ne jamais lire ni écrire un modèle métier via `raw`.
+ * Seule exception, étroite : `searchIds` (`@koklo/db`, recherche plein texte des listes longues, TK-94),
+ * qui filtre toujours sur l'organisation du contexte et ne rend que des identifiants.
  */
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {

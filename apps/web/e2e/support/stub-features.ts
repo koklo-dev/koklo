@@ -26,7 +26,13 @@ export type SpecMode =
   | "noSpecRepo"
   | "failed"
   | "listError"
-  | "paginated";
+  | "paginated"
+  /** 1 000 fonctionnalités (TK-94) : fenêtres, recherche, `around`. */
+  | "large"
+  /** `large` dont la première requête avec curseur échoue (500), puis réussit. */
+  | "largeMoreError"
+  /** `large` dont les requêtes avec curseur sont retenues jusqu'à POST /__release. */
+  | "largeMoreSlow";
 export type FeatureMode =
   | "ok"
   | "unavailable"
@@ -82,6 +88,19 @@ const FEW = [
 ];
 const MANY = Array.from({ length: 60 }, (_, i) => summary(i + 1));
 const PAGE = 50;
+const LARGE_COUNT = 1000;
+const LARGE_STATUSES = ["brouillon", "specifiee", "implementee", "adoptee"];
+const LARGE_PRIORITIES = ["must", "should", "could", "wont"];
+/** F-021, F-104, F-187... (12 en tout) portent « Résiliation » : la recherche « résiliation » en trouve 12. */
+const LARGE = Array.from({ length: LARGE_COUNT }, (_, i) =>
+  summary(i + 1, {
+    title:
+      (i + 1) % 83 === 21 ? `Résiliation d'abonnement ${i + 1}` : `Fonctionnalité numéro ${i + 1}`,
+    status: LARGE_STATUSES[i % 4],
+    priority: LARGE_PRIORITIES[(i >> 2) % 4],
+  }),
+);
+const isLarge = (mode: SpecMode) => mode.startsWith("large");
 
 const DETAIL = {
   specId: "F-001",
@@ -160,6 +179,10 @@ const head = (mode: SpecMode) => {
       return { ...baseHead(), counts: { features: 0, tables: 0, endpoints: 0 } };
     case "paginated":
       return { ...baseHead(), counts: { features: MANY.length, tables: 2, endpoints: 4 } };
+    case "large":
+    case "largeMoreError":
+    case "largeMoreSlow":
+      return { ...baseHead(), counts: { features: LARGE_COUNT, tables: 2, endpoints: 4 } };
     default:
       return baseHead();
   }
@@ -178,12 +201,57 @@ const baseHead = () => ({
   },
 });
 
+interface ListWindow {
+  items: ReturnType<typeof summary>[];
+  offset: number;
+  total: number;
+  nextCursor: string | null;
+  previousCursor: string | null;
+}
+
+/** Curseurs opaques du faux API : `a:N` = les lignes après le rang N, `b:N` = celles d'avant le rang N. */
+function windowOf(
+  filtered: ReturnType<typeof summary>[],
+  query: URLSearchParams,
+  all: ReturnType<typeof summary>[],
+) {
+  const limit = Number(query.get("limit") ?? PAGE) || PAGE;
+  const cursor = query.get("cursor");
+  const around = query.get("around");
+  let start = 0;
+  let end = 0;
+  if (cursor) {
+    const [direction, rank] = cursor.split(":");
+    const at = Number(rank);
+    start = direction === "b" ? Math.max(0, at - limit) : at;
+    end = direction === "b" ? at : Math.min(filtered.length, at + limit);
+  } else {
+    const index = around ? filtered.findIndex((item) => item.specId === around) : -1;
+    start = index >= 0 ? Math.floor(index / limit) * limit : 0;
+    end = Math.min(filtered.length, start + limit);
+  }
+  const result: ListWindow = {
+    items: filtered.slice(start, end),
+    offset: start,
+    total: filtered.length,
+    nextCursor: end < filtered.length ? `a:${end}` : null,
+    previousCursor: start > 0 ? `b:${start}` : null,
+  };
+  return { around, known: around ? all.some((item) => item.specId === around) : true, result };
+}
+
 function listFeatures(mode: SpecMode, query: URLSearchParams): Reply {
   if (mode === "listError") return reply(500, { defined: false, code: "INTERNAL", message: "x" });
   if (mode === "failed") {
     return typed(409, "SPEC_INDEX_FAILED", { errorCode: "spec_too_large", commitSha: SHA });
   }
-  const base = mode === "paginated" ? MANY : mode === "empty" || mode === "building" ? [] : FEW;
+  const base = isLarge(mode)
+    ? LARGE
+    : mode === "paginated"
+      ? MANY
+      : mode === "empty" || mode === "building"
+        ? []
+        : FEW;
   const source = [
     ...base.map((item) => ({ ...item, title: renamed(item.specId) ?? item.title })),
     ...(mode === "ready" || mode === "paginated"
@@ -199,16 +267,17 @@ function listFeatures(mode: SpecMode, query: URLSearchParams): Reply {
   ];
   const status = query.get("status");
   const priority = query.get("priority");
+  const search = query.get("q")?.toLowerCase();
   const filtered = source.filter(
     (item) =>
       !deletedFeatures().includes(item.specId) &&
       (!status || item.status === status) &&
-      (!priority || item.priority === priority),
+      (!priority || item.priority === priority) &&
+      (!search || item.title.toLowerCase().includes(search)),
   );
-  const start = Number(query.get("cursor") ?? 0) || 0;
-  const items = filtered.slice(start, start + PAGE);
-  const next = start + PAGE < filtered.length ? String(start + PAGE) : null;
-  return reply(200, { items, nextCursor: next });
+  const { known, result } = windowOf(filtered, query, source);
+  if (!known) return typed(404, "NOT_FOUND");
+  return reply(200, result);
 }
 
 function getFeature(mode: FeatureMode, specId: string): Reply {
@@ -285,12 +354,26 @@ function answerRead(
     return;
   }
   if (isFeatures) {
-    h.send(listFeatures(mode, url.searchParams));
+    answerList(h, mode, url.searchParams);
     return;
   }
   const answer = reply(200, head(mode));
   if (mode === "loading") h.hold(() => h.send(answer));
   else h.send(answer);
+}
+
+/** `largeMoreError` : toute page demandée par curseur échoue (état d'erreur stable) ; `largeMoreSlow` : elle est retenue. */
+function answerList(h: Handlers, mode: SpecMode, query: URLSearchParams): void {
+  const next = query.get("cursor")?.startsWith("a:");
+  if (mode === "largeMoreError" && next) {
+    h.send(reply(500, { defined: false, code: "INTERNAL", message: "x" }));
+    return;
+  }
+  if (mode === "largeMoreSlow" && next) {
+    h.hold(() => h.send(listFeatures(mode, query)));
+    return;
+  }
+  h.send(listFeatures(mode, query));
 }
 
 function repoList(projectId: string, h: Handlers): boolean {

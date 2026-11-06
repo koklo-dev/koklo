@@ -188,7 +188,7 @@ export const orpc = {
   },
   ticket: {
     key: () => ["ticket"],
-    list: queryWithInput(["ticket", "list"], procedures.ticketList),
+    list: queryFull(["ticket", "list"], procedures.ticketList),
     transition: mutation(procedures.ticketTransition),
   },
 };

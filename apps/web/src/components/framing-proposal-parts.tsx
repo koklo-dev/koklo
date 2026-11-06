@@ -90,7 +90,7 @@ export function Duplicate({ projectId, specId }: { projectId: string; specId: st
       <Icon name="warning" size={16} />
       <span>{`Titre déjà présent : ${specId}`}</span>
       <a
-        href={`/projects/${projectId}/features?feature=${specId}`}
+        href={`/projects/${projectId}/features?sel=${specId}`}
         className="underline underline-offset-4"
       >
         {`Voir ${specId}`}

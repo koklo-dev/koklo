@@ -15,8 +15,8 @@ version: 1.1
 - Hors lot : détail de ticket, création, filtres, tri dans une colonne, choix du projet ou du sprint, temps réel.
 
 ## 3. Contenu
-Sources : `sprint.list({status:"active"})` puis `ticket.list({sprintId})` (pagination suivie jusqu'à épuisement de `nextCursor`), `ticket.transition({key,to})`.
-- Titre h1 « Kanban » (30 px/600). Sous-titre texte secondaire 13 px : « Sprint SP-n · <objectif> » ; compteur « N ticket(s) ».
+Sources : `sprint.list({status:"active"})` puis, **par colonne**, `ticket.list({sprintId, status, limit: 30})` (une seule page ; la suite par curseur, à la demande, TK-94), `ticket.transition({key,to})`.
+- Titre h1 « Kanban » (30 px/600). Sous-titre texte secondaire 13 px : « Sprint SP-n · <objectif> » ; compteur « N ticket(s) » = somme des totaux des colonnes selon le serveur.
 - Mention lecture seule (client/business) sous le sous-titre : icône `lock` + « Lecture seule : votre rôle ne permet pas de déplacer les tickets. »
 - **7 colonnes**, dans l'ordre du cycle de vie. Libellé en français, icône en `Icon`, jamais de teinte propre (H6 : `--primary` ne sert pas de statut) :
 
@@ -31,13 +31,13 @@ Sources : `sprint.list({status:"active"})` puis `ticket.list({sprintId})` (pagin
 | cancelled | Annulé | `cancel` | **à ajouter** |
 
   Les cinq icônes à ajouter vont dans `ICON_NAMES` de `packages/ui/scripts/generate-icons.ts` puis `pnpm icons:generate` (comme `logout` en TK-85) ; jamais de SVG inline. DESIGN §4 liste `inbox` etc. comme absentes : à consigner dans DESIGN §4 par le développeur (sous « Interface »).
-- **En-tête de colonne** : `Icon` 18 + libellé (14 px/600) + compteur dans un `Badge variant="outline"` (nombre, `aria-label` « N ticket(s) »). Le titre est un `h2`.
+- **En-tête de colonne** : `Icon` 18 + libellé (14 px/600) + total du serveur dans un `Badge variant="outline"` (nombre, `aria-label` « N ticket(s) », 142 même si 30 cartes sont montées). Le titre est un `h2`.
 - **Carte** (`Card`, rayon 8 px, bordure `--border`, pas d'ombre au repos), de haut en bas :
   1. Ligne 1 : clé `TK-35` (JetBrains Mono 12 px, `--muted-foreground`) ; à droite le bouton « Déplacer » (équipe seulement).
   2. Titre (14 px/500, 3 lignes max, `title` complet en infobulle native).
   3. Ligne de méta (12 px, retour à la ligne autorisé) : `Badge outline` du paquet (`pkg`, JetBrains Mono) ; `Badge outline` sensibilité : « Sensible » avec `lock` 16, ou « Sûr » sans icône ; priorité en `PriorityIndicator` (v2, TK-87) : barres critique 3, haute 2, moyenne 1, basse 0 + libellé « Priorité critique » / « Priorité haute » / « Priorité moyenne » / « Priorité basse » (questions.md B23) ; le sens est dans les mots, les barres sont décoratives. Aucune couleur de statut.
   4. Type et assigné : non affichés en v1 (densité, pas de besoin client).
-- Tri dans la colonne : priorité décroissante puis clé (déterministe, sans ordre manuel).
+- Ordre dans la colonne : celui du serveur, par priorité décroissante puis numéro de la clé (B42, décidé le 2026-11-06) ; aucun tri côté web sur les seules cartes chargées. Pied de colonne (`ListFooter` compact) à partir de 30 cartes : « Charger la suite · 112 restantes », « Chargement… », « Impossible de charger la suite. » + « Réessayer », « Fin de la colonne » ; la suite se charge aussi à 80 % du défilement de la colonne. Première page en échec : l'erreur reste dans la colonne (« Impossible de charger cette colonne. » + « Réessayer »), les autres colonnes sont servies ; toutes en échec : l'état d'erreur de l'écran.
 
 ## 4. États
 - **Chargement** : zone `role="status"` `aria-busy="true"`, libellé visible « Chargement du kanban… », 7 colonnes squelette (en-tête `Skeleton` + 2 ou 3 cartes `Skeleton` de 88 px). Squelette immobile en mouvement réduit.
@@ -115,3 +115,6 @@ Un seul message d'erreur de déplacement à la fois (le dernier remplace le pré
 |---|---|---|---|
 | 1 | 2026-10-30 | TK-35 | Création : 7 colonnes, cartes, glisser-déposer natif et alternative « Déplacer », états et refus serveur, lecture seule client/business, entrée « Kanban » (icône `checklist`) dans la barre latérale. Détail : `.workflow/TK-35/02-design.md` |
 | 1.1 | 2026-11-06 | TK-87 | Lot 0 : priorité de carte en `PriorityIndicator` (4 niveaux ramenés à 0..3, libellés de ticket conservés, B23) à la place du gras / gris ; h1 24 px (échelle v2). Pastilles `pkg` et « Sûr / Sensible » inchangées (ni statut ni priorité). Détail : `.workflow/TK-87/02-design.md` |
+| 1.2 | 2026-11-06 | TK-94 | Plus de chargement complet : 30 cartes par colonne puis suite en défilant dans la colonne (sentinelle à 80 %, « Charger la suite » en repli), compteur de colonne = total du serveur, pied de colonne (suite, chargement, erreur, fin), annonce des cartes reçues. Détail : `.workflow/TK-94/02-design.md` |
+| 1.3 | 2026-11-06 | TK-94 (lot C) | Écran branché sur les colonnes paginées (§3). Écarts : le total de colonne reste un `Badge` et non une `CountBar` compacte, pour ne pas multiplier les régions d'état (B44) ; ordre du serveur dans les colonnes (B42, ordre de création) ; annonce d'un déplacement « TK-12 déplacé vers Terminé · Terminé : 143 » |
+| 1.4 | 2026-11-06 | TK-94 (B42) | Décision de Brice : les colonnes gardent le tri par priorité (critique, haute, moyenne, basse), puis le numéro de la clé ; il est fait côté serveur (ordre par défaut de `ticket.list`, pas de `sort`), le web affiche l'ordre reçu sans tri local |

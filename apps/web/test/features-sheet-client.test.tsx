@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CLIENT_SIDE,
   DETAIL,
-  findTable,
+  findList,
   GIT_VOCABULARY,
   head,
   inputsOf,
@@ -77,7 +77,7 @@ describe("Vue client / business — liste", () => {
     async (role) => {
       serve(role);
       renderFeatures();
-      await findTable();
+      await findList();
       expect(everythingVisible()).not.toMatch(GIT_VOCABULARY);
       expect(everythingVisible()).not.toMatch(TECHNICAL_VALUE);
       expect(visibleText()).toContain("Mise à jour le");
@@ -87,7 +87,7 @@ describe("Vue client / business — liste", () => {
   it("contrôle : la vue équipe affiche bien la version (le test client n'est pas vacuous)", async () => {
     serve("dev");
     renderFeatures();
-    await findTable();
+    await findList();
     expect(everythingVisible()).toMatch(/a1b2c3d/);
   });
 });
@@ -212,7 +212,7 @@ describe("Vue client / business — erreurs sans terme technique", () => {
   it("la fiche ouverte depuis la liste (clic) respecte aussi la vue client", async () => {
     serve("client");
     renderFeatures();
-    await findTable();
+    await findList();
     await userEvent.click(titleLink("Connexion par e-mail"));
     const dialog = await findRole("dialog");
     await within(dialog).findByText("Description");

@@ -41,7 +41,7 @@ test.describe("E1 — glisser une carte vers une colonne valide", () => {
     await card(page, "TK-102").dragTo(column(page, "in_progress"));
     await expect(column(page, "in_progress").getByTestId("kanban-card-TK-102")).toBeVisible();
     await expect(column(page, "todo").getByTestId("kanban-card-TK-102")).toHaveCount(0);
-    await expect(page.getByText("TK-102 déplacé vers En cours.")).toBeVisible();
+    await expect(page.getByText("TK-102 déplacé vers En cours · En cours : 2")).toBeVisible();
     expect(await transitionsSeen()).toEqual([{ key: "TK-102", to: "in_progress" }]);
   });
 
@@ -113,7 +113,7 @@ test.describe("E3 — les mêmes déplacements au clavier", () => {
     await page.getByRole("menuitem", { name: "En cours" }).focus();
     await page.keyboard.press("Enter");
     await expect(column(page, "in_progress").getByTestId("kanban-card-TK-102")).toBeVisible();
-    await expect(page.getByText("TK-102 déplacé vers En cours.")).toBeVisible();
+    await expect(page.getByText("TK-102 déplacé vers En cours · En cours : 2")).toBeVisible();
     await expect(page.getByRole("button", { name: "Déplacer TK-102" })).toBeFocused();
     expect(await transitionsSeen()).toEqual([{ key: "TK-102", to: "in_progress" }]);
   });
@@ -199,7 +199,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
   }
 }
 
-test("E5 : 7 colonnes dans l'ordre, cartes triées, défilement dans la région du tableau", async ({
+test("E5 : 7 colonnes dans l'ordre, cartes dans l'ordre du serveur, défilement dans la région du tableau", async ({
   page,
 }) => {
   await open(page);

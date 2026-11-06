@@ -14,9 +14,9 @@ const GRABBED = "saisi. Déposez-le sur une colonne.";
 
 /** Kanban du sprint actif : données, déplacement (menu ou glisser), rôle et annonces. */
 export function KanbanPage() {
-  const { data, reload, retry } = useKanbanData();
+  const { data, reload, retry, totalOf } = useKanbanData();
   const { role } = useActiveOrganization();
-  const move = useTicketMove(reload);
+  const move = useTicketMove(reload, totalOf);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const redirecting = useUnauthorizedRedirect(move.failure?.error);
 

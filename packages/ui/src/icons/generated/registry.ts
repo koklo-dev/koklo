@@ -56,6 +56,13 @@ export const iconLoaders = {
   chevron_right: () => import("./chevron_right.ts"),
   drag_indicator: () => import("./drag_indicator.ts"),
   more_horiz: () => import("./more_horiz.ts"),
+  expand_circle_down: () => import("./expand_circle_down.ts"),
+  search_off: () => import("./search_off.ts"),
+  done_all: () => import("./done_all.ts"),
+  chevron_left: () => import("./chevron_left.ts"),
+  arrow_upward: () => import("./arrow_upward.ts"),
+  swap_vert: () => import("./swap_vert.ts"),
+  fit_screen: () => import("./fit_screen.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

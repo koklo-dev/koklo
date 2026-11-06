@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
 
 /** Valeurs littérales identiques à celles du domaine (parité vérifiée par apps/api/test). */
 export const ticketStatusSchema = z.enum([
@@ -121,13 +122,15 @@ export const ticketCreateInputSchema = z.object({
 
 export const ticketKeyInputSchema = z.object({ key: ticketKeySchema });
 
-export const ticketListInputSchema = z.object({
-  status: ticketStatusSchema.optional(),
-  sprintId: sprintKeySchema.optional(),
-  pkg: ticketPackageSchema.optional(),
-  assignee: z.string().min(1).optional(),
-  ...pageInputSchema,
-});
+export const ticketListInputSchema = z
+  .object({
+    status: ticketStatusSchema.optional(),
+    sprintId: sprintKeySchema.optional(),
+    pkg: ticketPackageSchema.optional(),
+    assignee: z.string().min(1).optional(),
+    ...listInputShape(ticketKeySchema),
+  })
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
 
 /** Strict : le statut ne se modifie que par `ticket.transition`. */
 export const ticketUpdateInputSchema = z.strictObject({

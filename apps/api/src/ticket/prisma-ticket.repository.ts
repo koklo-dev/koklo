@@ -4,6 +4,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { nextCounterValue } from "../tracker/counters.ts";
+import { FullTextSearch } from "../tracker/full-text-search.ts";
+import { loadWindow } from "../tracker/long-list.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
@@ -14,27 +16,23 @@ import type {
   NewTicket,
   SprintRef,
   TicketChanges,
-  TicketFilter,
   TicketIdentity,
+  TicketListRequest,
   TicketPage,
   TicketRecord,
   TicketRepository,
   TicketStatus,
   TicketStore,
 } from "./ticket.repository.ts";
-import {
-  listWhere,
-  pageOfRows,
-  ticketInclude,
-  toLeaseRecord,
-  toTicketRecord,
-} from "./ticket-rows.ts";
+import { ticketFacets, ticketSource, ticketWhere } from "./ticket-list.ts";
+import { ticketInclude, toLeaseRecord, toTicketRecord } from "./ticket-rows.ts";
 
 export class PrismaTicketStore implements TicketStore {
   constructor(
     private readonly tx: Tx,
     private readonly scope: ProjectScope,
     private readonly clock: Clock,
+    private readonly search: FullTextSearch,
   ) {}
 
   nextNumber(): Promise<number> {
@@ -56,14 +54,14 @@ export class PrismaTicketStore implements TicketStore {
     return row && toTicketRecord(row);
   }
 
-  async list(filter: TicketFilter, limit: number, cursor?: string): Promise<TicketPage> {
-    const rows = await this.tx.ticket.findMany({
-      where: listWhere(this.scope.projectId, filter, cursor),
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: limit + 1,
-      include: ticketInclude,
-    });
-    return pageOfRows(rows, limit);
+  async list({ filter, q, ...request }: TicketListRequest): Promise<TicketPage> {
+    const { projectId } = this.scope;
+    const ids = q === undefined ? null : await this.search.ids("ticket", projectId, q);
+    const source = ticketSource(this.tx, projectId, ticketWhere(projectId, filter, ids));
+    const window = await loadWindow(source, request);
+    const facets = await ticketFacets(this.tx, projectId, filter, ids);
+    const { rows, ...position } = window;
+    return { items: rows.map(toTicketRecord), ...position, facets };
   }
 
   insert(ticket: NewTicket): Promise<TicketRecord> {
@@ -299,9 +297,12 @@ export class PrismaTicketRepository implements TicketRepository {
   constructor(
     @Inject(ProjectTransactions) private readonly transactions: ProjectTransactions,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(FullTextSearch) private readonly search: FullTextSearch,
   ) {}
 
   run<T>(scope: ProjectScope, work: (store: TicketStore) => Promise<T>): Promise<T> {
-    return this.transactions.run(scope, (tx) => work(new PrismaTicketStore(tx, scope, this.clock)));
+    return this.transactions.run(scope, (tx) =>
+      work(new PrismaTicketStore(tx, scope, this.clock, this.search)),
+    );
   }
 }

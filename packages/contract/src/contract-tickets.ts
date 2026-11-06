@@ -9,7 +9,6 @@ import {
   dependencyAddInputSchema,
   dependencyEdgeInputSchema,
   dependencySchema,
-  pageOf,
   sprintCreateInputSchema,
   sprintKeyInputSchema,
   sprintListInputSchema,
@@ -23,6 +22,7 @@ import {
   ticketTransitionInputSchema,
   ticketUpdateInputSchema,
 } from "./schemas.ts";
+import { listOf } from "./schemas-lists.ts";
 
 export const ticket = {
   create: route("POST", "/tickets")
@@ -34,9 +34,9 @@ export const ticket = {
     .input(ticketKeyInputSchema)
     .output(ticketDetailSchema),
   list: route("GET", "/tickets")
-    .errors(readErrors)
+    .errors(readOneErrors)
     .input(ticketListInputSchema)
-    .output(pageOf(ticketSchema)),
+    .output(listOf(ticketSchema)),
   update: route("PATCH", "/tickets/{key}")
     .errors({ ...writeOneErrors, ...validationError })
     .input(ticketUpdateInputSchema)

@@ -23,7 +23,7 @@ import {
 import {
   CLIENT_SIDE,
   DETAIL,
-  findTable,
+  findList,
   GIT_VOCABULARY,
   head,
   PROJECT_ID,
@@ -122,7 +122,7 @@ describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
   it("rôle inconnu : aucun bouton", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));
     renderFeatures({ search: "?edit=F-001" });
-    await findTable().catch(() => undefined);
+    await findList().catch(() => undefined);
     expect(deleteButton()).toBeNull();
   });
 

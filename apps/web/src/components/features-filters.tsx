@@ -19,6 +19,8 @@ import {
   statusLabel,
 } from "../lib/feature-labels.ts";
 import type { FeaturesUrlPatch } from "../lib/features-url.ts";
+import type { useSearchBox } from "../lib/use-features-list.ts";
+import { FeaturesSearch } from "./features-search.tsx";
 
 const ALL = "all";
 
@@ -76,12 +78,21 @@ interface FiltersProps {
   onChange: (patch: FeaturesUrlPatch) => void;
   onClear: () => void;
   statusRef: Ref<HTMLButtonElement>;
+  search: ReturnType<typeof useSearchBox>;
 }
 
-/** Filtres de statut et de priorité : le changement relance la requête, sans bouton « Appliquer ». */
-export function FeaturesFilters({ status, priority, onChange, onClear, statusRef }: FiltersProps) {
+/** Recherche puis filtres de statut et de priorité : le changement relance la requête, sans bouton « Appliquer ». */
+export function FeaturesFilters({
+  status,
+  priority,
+  onChange,
+  onClear,
+  statusRef,
+  search,
+}: FiltersProps) {
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-end">
+    <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
+      <FeaturesSearch search={search} />
       <FilterSelect
         label="Statut"
         allLabel="Tous"

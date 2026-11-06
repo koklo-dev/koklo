@@ -13,7 +13,9 @@
     "deploy:check": "bash scripts/deploy-check.sh",
     "db:migrate": "pnpm --filter @koklo/db migrate",
     "db:rollback": "pnpm --filter @koklo/db rollback",
-    "db:seed": "pnpm --filter @koklo/db seed"
+    "db:seed": "pnpm --filter @koklo/db seed",
+    "seed:large": "pnpm --filter @koklo/db seed:large",
+    "seed:planche": "pnpm --filter @koklo/db seed:planche"
   },
   "devDependencies": {
     "turbo": "2.11.10"

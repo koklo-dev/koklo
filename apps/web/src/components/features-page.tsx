@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, AlertDescription, Icon } from "@koklo/ui";
+import { Alert, AlertDescription, CountBar, Icon, InlineAlert } from "@koklo/ui";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { canManage } from "../lib/roles.ts";
 import { type FeaturesPageModel, useFeaturesPage } from "../lib/use-features-page.ts";
@@ -16,15 +16,24 @@ import { SpecIndexFailed } from "./spec-index-failed.tsx";
 import { SpecPreparing } from "./spec-preparing.tsx";
 import { SpecRepoMissing } from "./spec-repo-missing.tsx";
 
+/** Huit lignes de 52 px comme celles de la liste : la mise en page ne bouge pas quand les données arrivent. */
 function Skeleton() {
   return (
-    <div aria-hidden="true" className="flex flex-col gap-3">
-      {Array.from({ length: 5 }, (_, row) => (
+    <div
+      data-testid="features-skeleton"
+      aria-hidden="true"
+      aria-busy="true"
+      className="flex flex-col overflow-hidden rounded-lg border border-border"
+    >
+      {Array.from({ length: 8 }, (_, row) => (
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: squelettes statiques, sans identité
           key={row}
-          className="h-10 rounded-md bg-muted motion-safe:animate-pulse"
-        />
+          className="flex h-[52px] items-center gap-3 border-b border-border px-4 last:border-b-0"
+        >
+          <div className="h-4 w-14 rounded-sm bg-muted motion-safe:animate-pulse" />
+          <div className="h-4 flex-1 rounded-sm bg-muted motion-safe:animate-pulse" />
+        </div>
       ))}
     </div>
   );
@@ -83,15 +92,54 @@ function Preparing({ page }: { page: FeaturesPageModel }) {
 }
 
 function ListView({ page, building }: { page: FeaturesPageModel; building: boolean }) {
+  const { features } = page.data;
   return (
     <div className="flex flex-col gap-4">
       {building ? <BuildingNotice /> : null}
+      {page.outsideFilters ? (
+        <InlineAlert
+          variant="neutral"
+          icon="search_off"
+          action={{ label: "Effacer les filtres", onClick: page.filters.onClear }}
+        >
+          Cette fonctionnalité n'apparaît pas avec les filtres actuels.
+        </InlineAlert>
+      ) : null}
       <FeaturesList
-        projectName={page.data.projectName}
-        items={page.data.features.items}
+        items={features.items}
+        total={features.total}
+        offset={features.offset}
+        stale={features.stale}
+        selected={page.url.feature}
+        centerOn={page.data.around}
         hrefFor={page.sheet.hrefFor}
         onOpen={page.url.openFeature}
-        more={page.more}
+        footer={page.footer}
+        announcement={page.region.countText}
+        showCount={page.region.showCount}
+      />
+    </div>
+  );
+}
+
+/** Recherche ou filtres sans résultat : la barre de compte porte l'annonce, l'état vide propose la sortie. */
+function NoResults({ page }: { page: FeaturesPageModel }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {page.region.showCount ? (
+        <CountBar
+          total={0}
+          loaded={0}
+          noun={{ one: "fonctionnalité", other: "fonctionnalités" }}
+          busy={page.data.features.stale}
+          {...(page.region.countText ? { announcement: page.region.countText } : {})}
+        />
+      ) : null}
+      <FeaturesEmptyFiltered
+        q={page.url.q}
+        projectTotal={page.data.head?.counts.features}
+        onClearSearch={page.search.clear}
+        onClearFilters={page.filters.onClear}
       />
     </div>
   );
@@ -141,7 +189,7 @@ function Body({ page }: { page: FeaturesPageModel }) {
         />
       );
     case "empty-filtered":
-      return <FeaturesEmptyFiltered onClear={page.filters.onClear} />;
+      return <NoResults page={page} />;
     case "list":
       return <ListView page={page} building={view.building} />;
   }
@@ -200,14 +248,15 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
       />
       {page.showVersion && head ? <VersionLine head={head} team={page.team} /> : null}
       <div
-        // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau.
-        role={page.form.open ? undefined : "status"}
+        // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau ; avec la
+        // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
+        role={page.form.open || page.region.countBar ? undefined : "status"}
         aria-busy={page.region.busy || undefined}
         className="text-[13px] text-muted-foreground empty:hidden"
       >
         {page.form.open ? null : (
           <>
-            {page.region.text}
+            {page.region.countBar ? null : page.region.text}
             <WriteNotice
               write={page.write}
               role={page.data.role}
@@ -227,6 +276,7 @@ export function FeaturesPage({ projectId }: { projectId: string }) {
           onChange={page.filters.onChange}
           onClear={page.filters.onClear}
           statusRef={page.filters.statusRef}
+          search={page.search}
         />
       ) : null}
       <Body page={page} />

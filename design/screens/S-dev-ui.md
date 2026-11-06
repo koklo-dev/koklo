@@ -1,7 +1,7 @@
 ---
 id: S-dev-ui
 titre: Galerie des composants (/dev/ui, équipe, hors production)
-version: 1
+version: 2
 ---
 ## 1. Utilisateurs et objectif
 L'équipe Koklo (développeurs, designer, agents de développement et de revue) et les tests de captures. Ce n'est pas un écran du produit : aucun client ni rôle d'organisation n'y a affaire. Arrivée : adresse saisie `/dev/ui`, ou les tests `apps/web/e2e/dev-ui.spec.ts`.
@@ -41,6 +41,15 @@ Corps (fond `--surface`, colonne de 1120 px au plus, marges 32 px, sections espa
    - « Bloc d'envoi » : le vrai `AiSendPolicy` de `apps/web` (variante complète, repliée) et sa variante `reminder`.
    - « EmptyState » : `lightbulb`, « Aucune idée encore », « Racontez le projet en quelques phrases, l'agent vous aide à le structurer. », action principale `edit` « Commencer le dossier ».
    - « PhaseRail » (pleine largeur) : grand en phase Cadrage (Idée terminée « Dossier stable, 8 pages sur 10 », Cadrage en cours « 4 fonctionnalités sur 7 validées », Baseline 0 à venir « Posée à la validation du client », Itérations à venir « Sprints et demandes de changement ») ; grand en phase Idée ; grand en phase Itérations ; miniatures des 4 phases (« Idée · 1 sur 4 » … « Itérations · 4 sur 4 »).
+
+Section « Listes longues » (TK-94, DESIGN.md §5.3), après « EmptyState » et « PhaseRail » :
+- « VirtualList » : 1 000 lignes fictives (identifiant `F-nnn` en mono, titre, `LifecycleStatus`), cadre de 420 px de haut défilant, hauteur de ligne 52 px, `aria-setsize` 1 000 ; une page de 50 se « charge » à 80 % (délai simulé de 400 ms, jamais d'appel réseau) ; une ligne sélectionnée.
+- « CountBar » : « 1 000 fonctionnalités · 50 chargées · 31 à valider » avec tri ; variante filtrée.
+- « ListFooter » : les 4 états côte à côte (suite, chargement, erreur, fin) ; « Charger la suite », « Réessayer » font avancer la démonstration ; « Revenir en haut » dans l'état fin.
+- « Recherche vide » : `EmptyState` `search_off` « Aucune fonctionnalité ne correspond à « annulation groupée » ».
+- « Pagination » : « 1–25 sur 1 240 », pages 1, 20, 50 (ellipses), tailles 25 / 50 / 100, première et dernière page (précédent / suivant désactivés avec raison).
+- « GroupSection » : un groupe ouvert (« Fonctionnalités · Réservation · 42 · 18 acceptées · 22 à relire », 8 lignes, « Afficher 20 de plus ») et un groupe replié.
+- « DiagramMinimap » et « ZoneNode » : trois zones fictives (« Réservation · 14 tables », « Clients · 9 tables », « Paiement · 7 tables ») et leur mini-carte avec cadre de vue.
 
 Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer le dossier ») ne font rien ; « Détails » déplie réellement.
 
@@ -88,6 +97,7 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-11-06 | TK-87 | Création : galerie autonome des jetons et des 8 composants du lot 0 (DESIGN.md v2), tous états, bascule de thème, 404 en production, captures clair / sombre / 375 px. Détail : `.workflow/TK-87/02-design.md` |
+| 2 | 2026-11-06 | TK-94 | Section « Listes longues » : `VirtualList` (1 000 lignes simulées), `CountBar`, `ListFooter` (4 états), `EmptyState` de recherche vide, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`, tous états, clair et sombre. Détail : `.workflow/TK-94/02-design.md` |
 
 ## 11. Captures (générées par `apps/web/e2e/dev-ui.spec.ts`)
-Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`.
+Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`. TK-94 : `lists-light.png`, `lists-dark.png`, `lists-light-mobile.png`, `lists-dark-mobile.png` (section « Listes longues »).

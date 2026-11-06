@@ -91,6 +91,7 @@ export {
 export * from "./schemas-ai.ts";
 export * from "./schemas-client-space.ts";
 export * from "./schemas-collaboration.ts";
+export * from "./schemas-lists.ts";
 export * from "./schemas-llm-credential.ts";
 export * from "./schemas-project-client.ts";
 export * from "./schemas-provider.ts";

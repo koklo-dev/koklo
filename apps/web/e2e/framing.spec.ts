@@ -433,7 +433,7 @@ test("S-framing : texte hostile rendu littéralement, aucun lien ni script issu 
     .locator("main a[href]")
     .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
   for (const href of hrefs)
-    expect(href).toMatch(/^\/projects(\/[0-9a-f-]{36}\/(features|framing)(\?feature=F-\d{3})?)?$/);
+    expect(href).toMatch(/^\/projects(\/[0-9a-f-]{36}\/(features|framing)(\?sel=F-\d{3})?)?$/);
   expect(
     await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
   ).toBeUndefined();

@@ -1,4 +1,4 @@
-import { Button, Card, Icon } from "@koklo/ui";
+import { Button, Card, EmptyState, formatCount, Icon } from "@koklo/ui";
 import { FramingLink } from "./framing-link.tsx";
 
 /** Spec lue, aucune fonctionnalité, aucun filtre ; l'équipe qui écrit peut créer la première. */
@@ -29,14 +29,50 @@ export function FeaturesEmpty({
   );
 }
 
-/** Filtres sans résultat : le message vit dans la région d'état de l'écran, ici seulement l'action. */
-export function FeaturesEmptyFiltered({ onClear }: { onClear: () => void }) {
+/**
+ * Recherche ou filtres sans résultat : l'état vide dit sur quoi porte la recherche (tout le projet) et propose
+ * l'unique action utile, effacer la recherche ou, sans recherche, les filtres.
+ */
+export function FeaturesEmptyFiltered({
+  q,
+  projectTotal,
+  onClearSearch,
+  onClearFilters,
+}: {
+  q: string | undefined;
+  projectTotal: number | undefined;
+  onClearSearch: () => void;
+  onClearFilters: () => void;
+}) {
+  if (!q) {
+    return (
+      <EmptyState
+        icon="search_off"
+        title="Aucune fonctionnalité ne correspond à ces filtres."
+        description="Modifiez ou effacez les filtres pour revoir la liste."
+        action={
+          <Button variant="outline" className="h-11 md:h-9" onClick={onClearFilters}>
+            Effacer les filtres
+          </Button>
+        }
+      />
+    );
+  }
+  const scope =
+    projectTotal === undefined
+      ? "La recherche porte sur toutes les fonctionnalités, pas seulement celles affichées."
+      : `La recherche porte sur les ${formatCount(projectTotal)} fonctionnalités, pas seulement celles affichées.`;
   return (
-    <div className="flex">
-      <Button variant="outline" className="h-11 w-full md:h-9 md:w-auto" onClick={onClear}>
-        Effacer les filtres
-      </Button>
-    </div>
+    <EmptyState
+      icon="search_off"
+      title={`Aucune fonctionnalité ne correspond à « ${q} »`}
+      description={scope}
+      action={
+        <Button variant="outline" className="h-11 md:h-9" onClick={onClearSearch}>
+          Effacer la recherche
+        </Button>
+      }
+    />
   );
 }
 

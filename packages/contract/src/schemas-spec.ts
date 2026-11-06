@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { instantSchema, pageInputSchema } from "./schemas-tickets.ts";
+import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
+import { instantSchema } from "./schemas-tickets.ts";
 
 /** Valeurs et motifs identiques à ceux de @koklo/schema (parité vérifiée par apps/api/test). */
 export const featureStatusSchema = z.enum(["brouillon", "specifiee", "implementee", "adoptee"]);
@@ -85,9 +86,10 @@ export const featureListInputSchema = z
     status: featureStatusSchema.optional(),
     priority: featurePrioritySchema.optional(),
     ...revisionFields,
-    ...pageInputSchema,
+    ...listInputShape(featureIdSchema),
   })
-  .refine(exclusiveRevision, REVISION_MESSAGE);
+  .refine(exclusiveRevision, REVISION_MESSAGE)
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
 export const featureSummarySchema = z.object({
   specId: featureIdSchema,
   title: z.string(),

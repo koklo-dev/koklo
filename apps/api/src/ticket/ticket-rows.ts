@@ -1,12 +1,4 @@
-import { decodeCursor, keysetAfter, pageOfItems } from "../tracker/cursor.ts";
-import type {
-  Holder,
-  LeaseRecord,
-  TicketFilter,
-  TicketPage,
-  TicketRecord,
-  TicketStatus,
-} from "./ticket.repository.ts";
+import type { Holder, LeaseRecord, TicketRecord, TicketStatus } from "./ticket.repository.ts";
 
 /** Colonnes lues pour un ticket, avec ses étiquettes, fonctionnalités et la clé de son sprint. */
 export const ticketInclude = {
@@ -15,7 +7,7 @@ export const ticketInclude = {
   sprint: { select: { key: true } },
 } as const;
 
-type TicketRow = {
+export type TicketRow = {
   id: string;
   key: string;
   title: string;
@@ -26,6 +18,9 @@ type TicketRow = {
   assigneeKind: Holder["kind"] | null;
   assigneeId: string | null;
   pkg: TicketRecord["pkg"];
+  /** Colonnes générées de l'ordre par défaut (B42) : lues pour le curseur, absentes de la sortie. */
+  priorityRank?: number | null;
+  keyNumber?: number | null;
   sensitivity: TicketRecord["sensitivity"];
   estimateHours: { toNumber(): number } | null;
   branch: string | null;
@@ -83,30 +78,3 @@ export const toLeaseRecord = (row: {
   ttlMs: row.ttlMs,
   released: row.releasedAt !== null,
 });
-
-export const pageOfRows = (rows: TicketRow[], limit: number): TicketPage =>
-  pageOfItems(rows, limit, (row) => row.createdAt, toTicketRecord);
-
-/** `kind:id` ou un identifiant seul, comme `ticket.list` le reçoit dans le filtre `assignee`. */
-function assigneeFilter(assignee: string) {
-  const separator = assignee.indexOf(":");
-  if (separator < 0) return { assigneeId: assignee };
-  return {
-    assigneeKind: assignee.slice(0, separator) as "member" | "runner",
-    assigneeId: assignee.slice(separator + 1),
-  };
-}
-
-/** Filtre de `ticket.list` : projet, non supprimés, critères optionnels, puis reprise après le curseur. */
-export function listWhere(projectId: string, filter: TicketFilter, cursor?: string) {
-  const after = cursor ? decodeCursor(cursor) : null;
-  return {
-    projectId,
-    deletedAt: null,
-    ...(filter.status ? { status: filter.status } : {}),
-    ...(filter.sprintKey ? { sprint: { key: filter.sprintKey } } : {}),
-    ...(filter.pkg ? { pkg: filter.pkg } : {}),
-    ...(filter.assignee ? assigneeFilter(filter.assignee) : {}),
-    ...(after ? keysetAfter("createdAt", after, "asc") : {}),
-  };
-}

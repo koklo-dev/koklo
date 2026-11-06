@@ -5,7 +5,7 @@ import FeaturesLayout from "../src/app/projects/[projectId]/features/layout.tsx"
 import * as route from "../src/app/projects/[projectId]/features/page.tsx";
 import {
   FEATURES,
-  findTable,
+  findList,
   PROJECT_ID,
   page,
   renderFeatures,
@@ -62,7 +62,7 @@ describe("Route /projects/[projectId]/features", () => {
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
     expect(await findNamed("heading", "Fonctionnalités", { level: 1 })).toBeInTheDocument();
-    await findTable();
+    await findList();
     expect(procedures.specHead.mock.calls[0]?.[0]).toMatchObject({ projectId: PROJECT_ID });
   });
 
@@ -85,7 +85,7 @@ describe("Gabarit de la route", () => {
         <FeaturesLayout>{element}</FeaturesLayout>
       </QueryClientProvider>,
     );
-    await findTable();
+    await findList();
   }
 
   it("un seul main, un seul h1, un seul fil d'Ariane (Koklo > Projets > nom > Fonctionnalités)", async () => {
@@ -110,16 +110,17 @@ describe("Gabarit de la route", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Accessibilité de la liste (§7)", () => {
   it("un seul role=status poli à l'écran (compteur, chargement, annonces)", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 
   it("les deux Select ont un libellé visible lié", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     for (const name of ["Statut", "Priorité"]) {
       const select = screen.getByRole("combobox", { name });
       expect(select).toHaveAccessibleName(name);
@@ -131,7 +132,7 @@ describe("Accessibilité de la liste (§7)", () => {
   // PriorityIndicator sont les formes décoratives, toujours doublées d'un libellé.
   it("toutes les icônes et formes de la table sont décoratives (aria-hidden), jamais le seul porteur de sens", async () => {
     renderFeatures();
-    const table = await findTable();
+    const table = await findList();
     const shapes = table.querySelectorAll(
       "svg, [data-slot='lifecycle-status'] > span, [data-slot='priority-indicator'] > span",
     );
@@ -139,27 +140,31 @@ describe("Accessibilité de la liste (§7)", () => {
     for (const shape of shapes) expect(shape).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("ordre de focus : filtres, liens de titre dans l'ordre de la table, puis « Afficher plus »", async () => {
+  it("ordre de focus : recherche, filtres, une seule ligne de la liste, puis « Charger la suite »", async () => {
     procedures.specListFeatures.mockResolvedValue(page(1, 3, "c1"));
     renderFeatures({ search: "?status=specifiee" });
-    await findTable();
+    await findList();
     const order = Array.from(
       document.querySelectorAll<HTMLElement>(
-        "button, a[href], [role='combobox'], input, [tabindex='0']",
+        "button, [role='combobox'], input, [tabindex='0'], a[href]:not([tabindex='-1'])",
       ),
     )
-      .map((el) => el.getAttribute("aria-label") ?? el.textContent?.trim() ?? "")
+      .map((el) => el.getAttribute("aria-label") ?? el.textContent?.trim() ?? el.id)
       .filter(Boolean);
     const at = (text: string) => order.findIndex((label) => label.includes(text));
     expect(at("Statut")).toBeLessThan(at("Effacer les filtres"));
-    expect(at("Effacer les filtres")).toBeLessThan(at("Fonctionnalité numéro 1"));
-    expect(at("Fonctionnalité numéro 1")).toBeLessThan(at("Fonctionnalité numéro 3"));
-    expect(at("Fonctionnalité numéro 3")).toBeLessThan(at("Afficher plus"));
+    expect(at("Effacer les filtres")).toBeLessThan(at("F-001"));
+    // Une seule entrée dans la liste : les liens de titre n'entrent pas dans la tabulation (flèches entre lignes).
+    const list = screen.getByRole("list", { name: "Fonctionnalités" });
+    expect(list.querySelectorAll("a[href]:not([tabindex='-1'])")).toHaveLength(0);
+    expect(list.querySelectorAll("[tabindex='0']")).toHaveLength(1);
+    expect(at("F-001")).toBeLessThan(at("Charger la suite"));
+    expect(at("Charger la suite")).toBeGreaterThan(-1);
   });
 
   it("aucun tabindex positif", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(
       document.querySelector("[tabindex]:not([tabindex='-1']):not([tabindex='0'])"),
     ).toBeNull();
@@ -169,46 +174,36 @@ describe("Accessibilité de la liste (§7)", () => {
 describe("Mobile 375 px (§6)", () => {
   beforeEach(() => setViewport(375));
 
-  it("colonnes Avancement, Priorité, Critères retirées de l'arbre d'accessibilité (hidden md:table-cell)", async () => {
-    renderFeatures();
-    const table = await findTable();
-    // TK-87 (02-design §2.4, B31) : la colonne « Statut » devient « Avancement ».
-    for (const name of ["Avancement", "Priorité", "Critères"]) {
-      const header = within(table).getByRole("columnheader", { name, hidden: true });
-      expect(header.className).toMatch(/\bhidden\b/);
-      expect(header.className).toMatch(/md:table-cell/);
-    }
-    for (const name of ["Identifiant", "Titre"]) {
-      expect(within(table).getByRole("columnheader", { name }).className).not.toMatch(/\bhidden\b/);
-    }
-  });
-
   it("ligne méta md:hidden sous le titre : LifecycleStatus, PriorityIndicator et critères (TK-87)", async () => {
     renderFeatures();
-    const table = await findTable();
-    const meta = Array.from(table.querySelectorAll<HTMLElement>("*")).filter(
-      (el) => /\bmd:hidden\b/.test(el.className) && /3 critères/.test(el.textContent ?? ""),
+    const table = await findList();
+    // La ligne de 52 px garde l'identifiant et le titre ; avancement et priorité passent sous le titre.
+    const meta = Array.from(table.querySelectorAll<HTMLElement>("p")).filter(
+      (el) => /\bmd:hidden\b/.test(el.className) && /Indispensable/.test(el.textContent ?? ""),
     );
     expect(meta.length).toBeGreaterThan(0);
     const first = meta[0] as HTMLElement;
-    const text = first.textContent ?? "";
     expect(first.querySelector("[data-slot='lifecycle-status']")).not.toBeNull();
     expect(first.querySelector("[data-slot='priority-indicator']")).not.toBeNull();
-    expect(text).toContain("Indispensable");
-    expect(text).toContain("3 critères");
+    // Les cellules d'écran large (md:flex) portent la même information, plus les critères.
+    const wide = Array.from(table.querySelectorAll<HTMLElement>("div")).filter(
+      (el) => /\bmd:flex\b/.test(el.className) && /3 critères/.test(el.textContent ?? ""),
+    );
+    expect(wide.length).toBeGreaterThan(0);
   });
 
-  it("« Afficher plus de fonctionnalités », filtres et « Effacer » à 44 px, pleine largeur", async () => {
+  it("« Charger la suite », filtres et « Effacer » à 44 px, pleine largeur", async () => {
     procedures.specListFeatures.mockResolvedValue(page(1, 3, "c1"));
     renderFeatures({ search: "?status=specifiee" });
-    await findTable();
-    for (const control of [
-      screen.getByRole("button", { name: "Afficher plus de fonctionnalités" }),
-      screen.getByRole("button", { name: "Effacer les filtres" }),
-    ]) {
-      expect(control.className).toMatch(/\bh-11\b/);
-      expect(control.className).toMatch(/\bw-full\b|\bmax-md:w-full\b/);
-    }
+    await findList();
+    const control = screen.getByRole("button", { name: "Effacer les filtres" });
+    expect(control.className).toMatch(/\bh-11\b/);
+    expect(control.className).toMatch(/\bw-full\b|\bmax-md:w-full\b/);
+    // Le pied de liste est celui de packages/ui : ses boutons passent à 44 px et pleine largeur sous 768 px.
+    const footer = document.querySelector("[data-slot='list-footer']") as HTMLElement;
+    expect(footer.className).toMatch(/max-md:\[&_button\]:h-11/);
+    expect(footer.className).toMatch(/max-md:\[&_button\]:w-full/);
+    expect(within(footer).getByRole("button", { name: "Charger la suite" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Statut" }).className).toMatch(
       /\bh-11\b|max-md:h-11/,
     );
@@ -216,7 +211,7 @@ describe("Mobile 375 px (§6)", () => {
 
   it("aucun défilement horizontal imposé à la page (pas de largeur fixe ni d'overflow-x sur le conteneur)", async () => {
     renderFeatures();
-    const table = await findTable();
+    const table = await findList();
     expect(table.className).not.toMatch(/\bmin-w-\[?\d+/);
     expect(document.body.innerHTML).not.toMatch(/\bw-\[(?:[4-9]\d{2}|\d{4,})px\]/);
   });
@@ -238,17 +233,21 @@ describe("Mouvement réduit et chargement (§7)", () => {
 
   it("aucune animation hors squelette dans la liste (aucun animate-* ni transition de couleur imposée)", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(document.body.innerHTML).not.toMatch(/(^|[\s"])animate-(spin|pulse|bounce|ping)/);
   });
 });
 
 describe("Données volumineuses", () => {
-  it("50 lignes : un seul tableau, un lien par ligne, aucun doublon d'identifiant de lien", async () => {
-    procedures.specListFeatures.mockResolvedValue(page(1, 50, "c1"));
+  it("1 000 fonctionnalités : seules les lignes proches de l'écran sont dans le DOM, un lien par ligne, sans doublon", async () => {
+    procedures.specListFeatures.mockResolvedValue(page(1, 50, "c1", { total: 1000 }));
     renderFeatures();
-    const table = await findTable();
-    expect(within(table).getAllByRole("link")).toHaveLength(50);
+    const list = await findList();
+    const links = within(list).getAllByRole("link");
+    expect(links.length).toBeLessThan(40);
+    expect(links).toHaveLength(within(list).getAllByRole("listitem").length);
+    const ids = links.map((link) => link.getAttribute("data-feature-link"));
+    expect(new Set(ids).size).toBe(ids.length);
     expect(FEATURES).toHaveLength(3);
   });
 });

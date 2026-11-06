@@ -14,6 +14,32 @@ export interface FeatureFilter {
   priority?: FeatureSummary["priority"];
 }
 
+/** Demande de page de `spec.listFeatures` : filtres, recherche, position (curseur ou `around`), taille. */
+export interface FeatureListRequest {
+  filter: FeatureFilter;
+  /** Recherche plein texte (identifiant et titre). */
+  q?: string;
+  limit: number;
+  cursor?: string;
+  /** Identifiant `F-nnn` à amener dans la page. */
+  around?: string;
+}
+
+export interface FeaturePage {
+  items: FeatureSummary[];
+  nextCursor: string | null;
+  previousCursor: string | null;
+  /** Rang de la première fonctionnalité dans la liste filtrée. */
+  offset: number;
+  total: number;
+  facets: { status: Record<string, number>; priority: Record<string, number> };
+}
+
+/** Page lue : `null` quand le projet n'a pas de dépôt de spec ou que la révision n'est pas indexée. */
+export type IndexedFeaturePage =
+  | { kind: "failed"; errorCode: string; commitSha: string }
+  | { kind: "page"; page: FeaturePage };
+
 /** Instantané lu : `null` quand le projet n'a pas de dépôt de spec ou que la révision n'est pas indexée. */
 export type IndexedFeatures =
   | { kind: "failed"; errorCode: string; commitSha: string }
@@ -39,12 +65,18 @@ export type FeatureSource =
 export interface SpecReadRepository {
   /** `NOT_FOUND` si le projet n'est pas de l'organisation ; `null` si la révision n'est pas indexée. */
   head(scope: ProjectScope, revision: Revision): Promise<SpecHeadOutput>;
-  /** Features de la révision (filtrées, non triées) ; `null` si la révision n'est pas indexée. */
-  features(
+  /**
+   * Une page de features de la révision, filtrée et triée numériquement, avec total et facettes.
+   * `NOT_FOUND` si `around` n'est pas une feature de la révision, `VALIDATION{cursor}` pour un
+   * curseur étranger ; `null` si la révision n'est pas indexée.
+   */
+  featuresPage(
     scope: ProjectScope,
     revision: Revision,
-    filter: FeatureFilter,
-  ): Promise<IndexedFeatures | null>;
+    request: FeatureListRequest,
+  ): Promise<IndexedFeaturePage | null>;
+  /** Toutes les features de la révision, non triées (prompts de l'agent) ; `null` si non indexée. */
+  features(scope: ProjectScope, revision: Revision): Promise<IndexedFeatures | null>;
   /** Feature de la tête par défaut du projet ; `null` si absente de l'instantané courant. */
   featureSource(scope: ProjectScope, specId: string): Promise<FeatureSource | null>;
 }

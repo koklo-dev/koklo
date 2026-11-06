@@ -1,45 +1,43 @@
+import { formatCount } from "@koklo/ui";
 import type { FeaturesView } from "./features-view.ts";
-import type { FeatureWrite } from "./use-feature-submit.ts";
+import type { FeatureWrite, WriteMeta } from "./use-feature-submit.ts";
+import type { Placement } from "./use-index-wait.ts";
 
 export const plural = (count: number, word: string): string =>
   `${count} ${word}${count > 1 ? "s" : ""}`;
 
-/** « N fonctionnalité(s) » sans filtre, « N fonctionnalité(s) affichée(s) [sur plus de N] » avec un filtre. */
-export function counterText(options: {
-  filtered: boolean;
-  total: number | undefined;
-  shown: number;
-  hasNext: boolean;
-}): string {
-  const { filtered, total, shown, hasNext } = options;
-  if (!filtered) return total === undefined ? "" : plural(total, "fonctionnalité");
-  const base = `${plural(shown, "fonctionnalité")} ${shown > 1 ? "affichées" : "affichée"}`;
-  return hasNext ? `${base} sur plus de ${shown}` : base;
-}
-
-interface RegionSources {
-  view: FeaturesView;
-  filtered: boolean;
-  total: number | undefined;
-  shown: number;
-  hasNext: boolean;
-  expired: boolean;
-}
-
-/** Texte de la région d'état unique de l'écran (chargement, compteur, vide filtré, préparation). */
-export function regionText({ view, expired, ...counter }: RegionSources): string {
+/** Texte de la région d'état quand la barre de compte n'est pas affichée (chargement, préparation). */
+export function regionText({ view, expired }: { view: FeaturesView; expired: boolean }): string {
   switch (view.kind) {
     case "loading":
       return "Chargement des fonctionnalités…";
-    case "list":
-      return counterText(counter);
-    case "empty-filtered":
-      return "Aucune fonctionnalité ne correspond à ces filtres.";
     case "preparing":
       return expired ? "" : "Préparation de la spec en cours.";
     default:
       return "";
   }
+}
+
+/** La barre de compte, et avec elle la région d'état de l'écran, accompagne la liste et ses résultats vides. */
+export const showsCountBar = (view: FeaturesView): boolean =>
+  view.kind === "list" || view.kind === "empty-filtered";
+
+/** Annonce d'un résultat de recherche ou de filtre : « 12 fonctionnalités trouvées sur 1 000 », « Aucun résultat… ». */
+export function searchResultText(options: {
+  q: string | undefined;
+  filtered: boolean;
+  total: number;
+  projectTotal: number | undefined;
+}): string {
+  const { q, filtered, total, projectTotal } = options;
+  if (total === 0) {
+    return q
+      ? `Aucun résultat pour « ${q} »`
+      : "Aucune fonctionnalité ne correspond à ces filtres.";
+  }
+  if (!q && !filtered) return "";
+  const found = `${plural(total, "fonctionnalité")} ${total > 1 ? "trouvées" : "trouvée"}`;
+  return projectTotal === undefined ? found : `${found} sur ${formatCount(projectTotal)}`;
 }
 
 /** Vues où le projet a une spec lisible : les filtres et la ligne de version ont un sens. */
@@ -82,4 +80,31 @@ export function writeRegionText(write: FeatureWrite, formOpen: boolean): string 
   if (phase !== "tracking" || slow) return "";
   if (batch?.status === "committing") return texts.committing;
   return `En attente de son tour.${progressSuffix(meta)}`;
+}
+
+export const PLACEMENT_TEXT: Partial<Record<Placement, string>> = {
+  filtered: "Elle n'apparaît pas avec les filtres actuels.",
+  more: "Utilisez « Charger la suite » pour la voir.",
+};
+
+/** « F-001 supprimée. » (sans titre) ou « F-004 « Titre » créée. » / « … enregistrée. » ; phrase propre si l'index a échoué. */
+export function confirmationText(meta: WriteMeta, indexFailed: boolean): string {
+  if (indexFailed)
+    return "Votre modification a été enregistrée, mais la spec n'a pas pu être relue.";
+  if (meta.kind === "delete") return `${meta.specId} supprimée.`;
+  return `${meta.specId} « ${meta.title} » ${meta.kind === "create" ? "créée" : "enregistrée"}.`;
+}
+
+/**
+ * Ce que les avis d'écriture de la page (confirmation, suivi lent, liste en retard) disent à la région d'état
+ * quand la barre de compte la porte : ils sont affichés en blocs, mais seule cette région les annonce.
+ */
+export function writeNoticeText(write: FeatureWrite): string {
+  const { saved } = write;
+  if (write.phase === "saved" && saved) {
+    const placement = saved.placement ? PLACEMENT_TEXT[saved.placement] : undefined;
+    return [confirmationText(saved.meta, saved.indexFailed), placement].filter(Boolean).join(" ");
+  }
+  if (write.phase === "tracking" && write.slow) return SLOW_TEXT;
+  return write.phase === "late" ? LATE_TEXT : "";
 }

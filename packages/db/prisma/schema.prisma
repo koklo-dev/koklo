@@ -129,8 +129,8 @@ model Member {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications Notification[]
   projectAccess ProjectClientAccess[]
 
@@ -166,7 +166,7 @@ model Project {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tickets       Ticket[]
   sprints       Sprint[]
   state         ProjectState?
@@ -317,28 +317,34 @@ enum CounterName {
 }
 
 model Ticket {
-  id             String         @id @default(uuid(7)) @db.Uuid
-  organizationId String         @map("organization_id") @db.Uuid
-  projectId      String         @map("project_id") @db.Uuid
+  id             String                   @id @default(uuid(7)) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  projectId      String                   @map("project_id") @db.Uuid
   key            String
   title          String
   description    String
   type           TicketType
   status         TicketStatus
   priority       TicketPriority
-  sprintId       String?        @map("sprint_id") @db.Uuid
-  assigneeKind   HolderKind?    @map("assignee_kind")
-  assigneeId     String?        @map("assignee_id")
+  sprintId       String?                  @map("sprint_id") @db.Uuid
+  assigneeKind   HolderKind?              @map("assignee_kind")
+  assigneeId     String?                  @map("assignee_id")
   pkg            TicketPackage
   sensitivity    Sensitivity
-  estimateHours  Decimal?       @map("estimate_hours") @db.Decimal(6, 2)
+  estimateHours  Decimal?                 @map("estimate_hours") @db.Decimal(6, 2)
   branch         String?
-  pullRequest    String?        @map("pull_request")
-  attempts       Int            @default(0)
-  reviewRounds   Int            @default(0) @map("review_rounds")
-  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(3)
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  pullRequest    String?                  @map("pull_request")
+  attempts       Int                      @default(0)
+  reviewRounds   Int                      @default(0) @map("review_rounds")
+  deletedAt      DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  /// Colonne générée (migration) : rang de la priorité, critical 0 à low 3 (ordre par défaut, B42). Jamais écrite par Prisma.
+  priorityRank   Int?                     @default(dbgenerated("\nCASE priority\n    WHEN 'critical'::ticket_priority THEN 0\n    WHEN 'high'::ticket_priority THEN 1\n    WHEN 'medium'::ticket_priority THEN 2\n    ELSE 3\nEND")) @map("priority_rank")
+  /// Colonne générée (migration) : numéro de la clé (TK-10 après TK-9), départage de l'ordre par défaut. Jamais écrite par Prisma.
+  keyNumber      Int?                     @default(dbgenerated("COALESCE((\"substring\"(key, '[0-9]+$'::text))::integer, 0)")) @map("key_number")
+  /// Colonne générée (migration) : clé, titre et description, configuration `french`. Jamais écrite par Prisma.
+  search         Unsupported("tsvector")? @default(dbgenerated("to_tsvector('french'::regconfig, ((((replace(key, '-'::text, ' '::text) || ' '::text) || title) || ' '::text) || description))"))
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -354,6 +360,7 @@ model Ticket {
   @@index([organizationId])
   @@index([projectId, status])
   @@index([sprintId])
+  @@index([search], type: Gin)
   @@map("tickets")
 }
 
@@ -757,16 +764,20 @@ model SpecHead {
 
 /// CHECK de format sur `spec_id` (`^F-\d{3,}$`) dans la migration.
 model SpecFeature {
-  id             String          @id @default(uuid(7)) @db.Uuid
-  organizationId String          @map("organization_id") @db.Uuid
-  snapshotId     String          @map("snapshot_id") @db.Uuid
-  specId         String          @map("spec_id")
+  id             String                   @id @default(uuid(7)) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  snapshotId     String                   @map("snapshot_id") @db.Uuid
+  specId         String                   @map("spec_id")
   title          String
   status         FeatureStatus
   priority       FeaturePriority
-  filePath       String          @map("file_path")
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  filePath       String                   @map("file_path")
+  /// Colonne générée (migration) : numéro de `F-nnn`, tri numérique. Jamais écrite par Prisma.
+  specNumber     Int?                     @default(dbgenerated("(SUBSTRING(spec_id FROM 3))::integer")) @map("spec_number")
+  /// Colonne générée (migration) : texte de recherche, configuration `french`.
+  search         Unsupported("tsvector")? @default(dbgenerated("to_tsvector('french'::regconfig, ((replace(spec_id, '-'::text, ' '::text) || ' '::text) || title))"))
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   snapshot      SpecSnapshot          @relation(fields: [organizationId, snapshotId], references: [organizationId, id], onDelete: Cascade)
@@ -777,6 +788,8 @@ model SpecFeature {
   @@unique([snapshotId, specId])
   @@unique([organizationId, id])
   @@index([organizationId])
+  @@index([snapshotId, specNumber, id])
+  @@index([search], type: Gin)
   @@map("spec_features")
 }
 
@@ -1124,7 +1137,7 @@ model Review {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  project   Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  project   Project    @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
   baselines Baseline[]
 
   @@unique([organizationId, id])
@@ -1152,8 +1165,8 @@ model Baseline {
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  project Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
-  review  Review?     @relation(fields: [organizationId, projectId, reviewId], references: [organizationId, projectId, id], onDelete: NoAction, onUpdate: NoAction)
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  review  Review? @relation(fields: [organizationId, projectId, reviewId], references: [organizationId, projectId, id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([projectId, number])
   @@unique([organizationId, id])

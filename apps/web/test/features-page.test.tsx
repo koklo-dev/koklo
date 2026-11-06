@@ -4,14 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CLIENT_SIDE,
   FEATURES,
-  findTable,
+  findList,
   GIT_VOCABULARY,
   head,
   inputsOf,
+  list,
   OTHER_PROJECT_ID,
   PROJECT_ID,
   page,
   renderFeatures,
+  rowOf,
   SHORT_SHA,
   serve,
   statusRegion,
@@ -61,11 +63,8 @@ beforeEach(() => {
 const EMPTY_HEAD = head({ counts: { features: 0, tables: 0, endpoints: 0 } });
 const neverResolves = () => new Promise<never>(() => undefined);
 const reject = (code: string, data?: unknown) => () => Promise.reject(apiError(code, data));
-const rowOf = (title: string): HTMLElement => {
-  const row = screen.getByRole("link", { name: title }).closest("tr");
-  if (!row) throw new Error(`ligne de « ${title} » introuvable`);
-  return row;
-};
+const countBar = (): HTMLElement =>
+  document.querySelector("[data-slot='count-bar']") as HTMLElement;
 
 describe("Chargement (§4.1)", () => {
   // Corps entre accolades : rendre le mock lui-même ferait de lui un « nettoyage » appelé et attendu (délai dépassé).
@@ -99,7 +98,7 @@ describe("Chargement (§4.1)", () => {
 describe("En-tête (§3.1)", () => {
   it("h1 unique « Fonctionnalités » et sous-titre : le nom du projet", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Fonctionnalités");
     // le nom du projet figure aussi dans le fil d'Ariane : on vise le sous-titre
@@ -109,13 +108,13 @@ describe("En-tête (§3.1)", () => {
   it("pendant le chargement du nom, le sous-titre est « Projet »", async () => {
     procedures.projectList.mockImplementation(neverResolves);
     renderFeatures();
-    await findNamed("table", /^Fonctionnalités du projet/);
+    await findList();
     expect(screen.getByText("Projet")).toBeInTheDocument();
   });
 
   it("fil d'Ariane nommé : Projets (lien) > nom du projet > Fonctionnalités (page courante)", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const crumbs = screen.getByRole("navigation", { name: /fil d'ariane|breadcrumb/i });
     expect(within(crumbs).getByRole("link", { name: "Projets" })).toHaveAttribute(
       "href",
@@ -127,22 +126,20 @@ describe("En-tête (§3.1)", () => {
 
   it("compteur sans filtre : N fonctionnalités (spec.head.counts.features), au singulier à 1", async () => {
     renderFeatures();
-    await findTable();
-    expect(statusRegion()).toHaveTextContent("3 fonctionnalités");
-    expect(statusRegion()).not.toHaveTextContent("affichée");
+    await findList();
+    expect(countBar()).toHaveTextContent("3 fonctionnalités");
+    expect(countBar()).not.toHaveTextContent("chargées");
   });
 
   it("compteur au singulier", async () => {
     procedures.specHead.mockResolvedValue(
       head({ counts: { features: 1, tables: 0, endpoints: 0 } }),
     );
-    procedures.specListFeatures.mockResolvedValue({
-      items: FEATURES.slice(0, 1),
-      nextCursor: null,
-    });
+    procedures.specListFeatures.mockResolvedValue(list(FEATURES.slice(0, 1)));
     renderFeatures();
-    await findTable();
-    expect(statusRegion()).toHaveTextContent(/(^|\s)1 fonctionnalité(\s|$)/);
+    await findList();
+    expect(countBar()).toHaveTextContent("1 fonctionnalité");
+    expect(countBar()).not.toHaveTextContent("1 fonctionnalités");
   });
 
   it.each(TEAM)(
@@ -150,7 +147,7 @@ describe("En-tête (§3.1)", () => {
     async (role) => {
       serve(role);
       renderFeatures();
-      await findTable();
+      await findList();
       const version = screen.getByLabelText(`Version de la spec ${SHORT_SHA}`);
       expect(version).toHaveTextContent(SHORT_SHA);
       expect(version.className).toMatch(/font-mono/);
@@ -163,7 +160,7 @@ describe("En-tête (§3.1)", () => {
   it.each(CLIENT_SIDE)("%s : « Mise à jour le … », aucun identifiant technique", async (role) => {
     serve(role);
     renderFeatures();
-    await findTable();
+    await findList();
     expect(visibleText()).toMatch(/Mise à jour le 30 octobre 2026/);
     expect(visibleText()).not.toMatch(/a1b2c3d|Version de la spec|indexée/i);
     expect(screen.queryByLabelText(/Version de la spec/)).not.toBeInTheDocument();
@@ -181,7 +178,7 @@ describe("En-tête (§3.1)", () => {
 describe("Liste (§3.3, §4.2)", () => {
   it("interroge head puis la liste du projet : limite 50, aucun filtre ni curseur", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(inputsOf(procedures.specHead)[0]).toMatchObject({ projectId: PROJECT_ID });
     const first = inputsOf(procedures.specListFeatures)[0];
     expect(first).toMatchObject({ projectId: PROJECT_ID, limit: 50 });
@@ -191,50 +188,40 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(procedures.repoList).not.toHaveBeenCalled();
   });
 
-  it("table nommée par sa légende, cinq en-têtes de colonne avec scope=col", async () => {
+  it("liste nommée « Fonctionnalités » : ni table ni en-têtes de colonne (TK-94)", async () => {
     renderFeatures();
-    const table = await findTable();
-    expect(table).toHaveAccessibleName("Fonctionnalités du projet Alpha");
-    const headers = within(table).getAllByRole("columnheader");
-    expect(headers.map((h) => h.textContent)).toEqual([
-      "Identifiant",
-      "Titre",
-      "Avancement",
-      "Priorité",
-      "Critères",
-    ]);
-    for (const header of headers) expect(header).toHaveAttribute("scope", "col");
+    const list = await findList();
+    expect(list).toHaveAccessibleName("Fonctionnalités");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("columnheader")).toHaveLength(0);
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("une ligne par fonctionnalité, dans l'ordre de l'API (aucun tri côté web)", async () => {
-    procedures.specListFeatures.mockResolvedValue({
-      items: [FEATURES[2], FEATURES[0], FEATURES[1]],
-      nextCursor: null,
-    });
+    procedures.specListFeatures.mockResolvedValue(list([FEATURES[2], FEATURES[0], FEATURES[1]]));
     renderFeatures();
-    const table = await findTable();
-    const ids = within(table)
-      .getAllByRole("row")
-      .slice(1)
-      .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+    const listbox = await findList();
+    const ids = within(listbox)
+      .getAllByRole("listitem")
+      .map((row) => row.textContent?.slice(0, 5));
     expect(ids).toEqual(["F-003", "F-001", "F-002"]);
   });
 
-  it("identifiant en mono, titre en vrai lien vers ?feature=, infobulle native avec le titre complet", async () => {
+  it("identifiant en mono, titre en vrai lien vers ?sel=, infobulle native avec le titre complet", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const row = rowOf("Connexion par e-mail");
     const id = within(row).getByText("F-001");
     expect(id.className).toMatch(/font-mono/);
     const link = within(row).getByRole("link", { name: "Connexion par e-mail" });
     expect(link.tagName).toBe("A");
-    expect(link.getAttribute("href")).toMatch(/\?feature=F-001$/);
+    expect(link.getAttribute("href")).toMatch(/\?sel=F-001$/);
     expect(link).toHaveAttribute("title", "Connexion par e-mail");
   });
 
   it("le titre est le seul élément interactif de la ligne", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const interactive = within(rowOf("Tableau kanban")).queryAllByRole("button");
     expect(interactive).toHaveLength(0);
     expect(within(rowOf("Tableau kanban")).getAllByRole("link")).toHaveLength(1);
@@ -250,9 +237,9 @@ describe("Liste (§3.3, §4.2)", () => {
     "« %s » : avancement « %s sur 6 », priorité %s (%i barres), %s",
     async (title, stage, priority, level, criteria) => {
       renderFeatures();
-      await findTable();
+      await findList();
       const row = rowOf(title);
-      // Deux rendus par ligne, identiques : la ligne méta mobile (md:hidden) et les colonnes (hidden md:table-cell).
+      // Deux rendus par ligne, identiques : la ligne méta mobile (md:hidden) et les cellules (hidden md:flex).
       const lifecycles = within(row).getAllByLabelText(`Avancement : ${stage} sur 6`);
       expect(lifecycles).toHaveLength(2);
       for (const lifecycle of lifecycles) {
@@ -264,13 +251,14 @@ describe("Liste (§3.3, §4.2)", () => {
         expect(indicator).toHaveAttribute("data-level", String(level));
         expect(indicator).toHaveTextContent(priority);
       }
-      expect(within(row).getAllByText(criteria)).toHaveLength(2);
+      // Les critères n'ont qu'une cellule (écran large) : sous 768 px la ligne de 52 px garde avancement et priorité.
+      expect(within(row).getAllByText(criteria)).toHaveLength(1);
     },
   );
 
   it("plus de badge de statut v1 ni de priorité en gras ou gris dans la liste", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const row = rowOf("Connexion par e-mail");
     expect(row.querySelector("[data-slot='badge']")).toBeNull();
     const labels = within(row).getAllByText("Indispensable");
@@ -281,24 +269,25 @@ describe("Liste (§3.3, §4.2)", () => {
 
   it("aucune valeur brute du contrat dans le DOM (brouillon, specifiee, must...)", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(visibleText()).not.toMatch(
       /\b(brouillon|specifiee|implementee|adoptee|must|should|could|wont)\b/,
     );
   });
 
-  it("aucune fonctionnalité sans version : pas de « Afficher plus » quand nextCursor est null", async () => {
+  it("pas de « Charger la suite » quand nextCursor est null : fin de liste", async () => {
     renderFeatures();
-    await findTable();
-    expect(
-      screen.queryByRole("button", { name: "Afficher plus de fonctionnalités" }),
-    ).not.toBeInTheDocument();
+    await findList();
+    expect(screen.queryByRole("button", { name: "Charger la suite" })).not.toBeInTheDocument();
+    expect(document.querySelector("[data-slot='list-footer']")).toHaveTextContent(
+      "Fin de la liste",
+    );
   });
 
   it("le client ne voit aucun bouton d'écriture (créer, modifier, supprimer) ; l'équipe, 48e-1", async () => {
     serve("client");
     renderFeatures();
-    await findTable();
+    await findList();
     expect(
       screen.queryByRole("button", { name: /nouvelle|créer|modifier|supprimer|ajouter/i }),
     ).not.toBeInTheDocument();
@@ -307,7 +296,7 @@ describe("Liste (§3.3, §4.2)", () => {
   it("le client ne voit aucun chemin de fichier dans la liste", async () => {
     serve("client");
     renderFeatures();
-    await findTable();
+    await findList();
     expect(visibleText()).not.toMatch(GIT_VOCABULARY);
   });
 });
@@ -315,7 +304,7 @@ describe("Liste (§3.3, §4.2)", () => {
 describe("Vide (§4.3)", () => {
   beforeEach(() => {
     procedures.specHead.mockResolvedValue(EMPTY_HEAD);
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
   });
 
   it("carte « Aucune fonctionnalité pour le moment » avec son texte, sans table ni filtres", async () => {
@@ -329,7 +318,7 @@ describe("Vide (§4.3)", () => {
   it("le client ne voit aucun bouton, aucun emplacement d'écriture vide", async () => {
     serve("client");
     procedures.specHead.mockResolvedValue(EMPTY_HEAD);
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     await findNamed("heading", "Aucune fonctionnalité pour le moment");
     expect(screen.queryAllByRole("button")).toHaveLength(0);
@@ -338,7 +327,7 @@ describe("Vide (§4.3)", () => {
 
   it.each([...TEAM, ...CLIENT_SIDE])("même carte pour %s", async (role) => {
     serve(role);
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     procedures.specHead.mockResolvedValue(EMPTY_HEAD);
     renderFeatures();
     expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
@@ -356,7 +345,7 @@ describe("Filtres (§3.2)", () => {
 
   it("deux Select à libellé visible, sans bouton « Appliquer », sur « Tous » / « Toutes »", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     expect(statusSelect()).toHaveTextContent("Tous");
     expect(prioritySelect()).toHaveTextContent("Toutes");
     // « Statut » et « Priorité » sont aussi des en-têtes de colonne : on vise les libellés des filtres
@@ -368,7 +357,7 @@ describe("Filtres (§3.2)", () => {
 
   it("options du statut et de la priorité, en toutes lettres", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     await userEvent.click(statusSelect());
     expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
       "Tous",
@@ -390,7 +379,7 @@ describe("Filtres (§3.2)", () => {
 
   it("choisir un statut relance la requête avec status, met à jour l'adresse sans empiler l'historique", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const length = window.history.length;
     await pick(statusSelect(), "Brouillon");
     await waitFor(() =>
@@ -402,7 +391,7 @@ describe("Filtres (§3.2)", () => {
 
   it("choisir une priorité envoie priority ; les deux filtres se cumulent", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     await pick(prioritySelect(), "Indispensable");
     await waitFor(() =>
       expect(inputsOf(procedures.specListFeatures).at(-1)).toMatchObject({ priority: "must" }),
@@ -422,7 +411,7 @@ describe("Filtres (§3.2)", () => {
 
   it("filtres lus dans l'adresse au chargement", async () => {
     renderFeatures({ search: "?status=adoptee&priority=wont" });
-    await findTable();
+    await findList();
     expect(inputsOf(procedures.specListFeatures)[0]).toMatchObject({
       status: "adoptee",
       priority: "wont",
@@ -433,34 +422,33 @@ describe("Filtres (§3.2)", () => {
 
   it("valeur d'adresse inconnue ignorée : requête sans filtre, pas d'« Effacer »", async () => {
     renderFeatures({ search: "?status=zzz&priority=high" });
-    await findTable();
+    await findList();
     expect(inputsOf(procedures.specListFeatures)[0]).not.toHaveProperty("status");
     expect(inputsOf(procedures.specListFeatures)[0]).not.toHaveProperty("priority");
     expect(screen.queryByRole("button", { name: "Effacer les filtres" })).not.toBeInTheDocument();
   });
 
-  it("filtre actif : compteur « N fonctionnalité(s) affichée(s) » et bouton « Effacer les filtres »", async () => {
-    procedures.specListFeatures.mockResolvedValue({
-      items: FEATURES.slice(0, 2),
-      nextCursor: null,
-    });
+  it("filtre actif : total du serveur dans la barre de compte et bouton « Effacer les filtres »", async () => {
+    procedures.specListFeatures.mockResolvedValue(list(FEATURES.slice(0, 2)));
     renderFeatures({ search: "?status=brouillon" });
-    await findTable();
-    expect(statusRegion()).toHaveTextContent("2 fonctionnalités affichées");
-    expect(statusRegion()).not.toHaveTextContent("plus de");
+    await findList();
+    expect(countBar()).toHaveTextContent("2 fonctionnalités");
     expect(screen.getByRole("button", { name: "Effacer les filtres" })).toBeEnabled();
+    await waitFor(() =>
+      expect(statusRegion()).toHaveTextContent("2 fonctionnalités trouvées sur 3"),
+    );
   });
 
-  it("filtre actif avec une suite : « sur plus de N »", async () => {
-    procedures.specListFeatures.mockResolvedValue(page(1, 50, "c1"));
+  it("filtre actif avec une suite : le total du serveur, pas la longueur de la page", async () => {
+    procedures.specListFeatures.mockResolvedValue(page(1, 50, "c1", { total: 312 }));
     renderFeatures({ search: "?priority=must" });
-    await findTable();
-    expect(statusRegion()).toHaveTextContent(/50 fonctionnalités affichées sur plus de 50/);
+    await findList();
+    expect(countBar()).toHaveTextContent("312 fonctionnalités · 50 chargées");
   });
 
   it("« Effacer les filtres » retire les paramètres, relance sans filtre et passe le focus au premier Select", async () => {
     renderFeatures({ search: "?status=brouillon&priority=must" });
-    await findTable();
+    await findList();
     await userEvent.click(screen.getByRole("button", { name: "Effacer les filtres" }));
     await waitFor(() =>
       expect(inputsOf(procedures.specListFeatures).at(-1)).not.toHaveProperty("status"),
@@ -471,25 +459,25 @@ describe("Filtres (§3.2)", () => {
     expect(screen.queryByRole("button", { name: "Effacer les filtres" })).not.toBeInTheDocument();
   });
 
-  it("pendant le rechargement : les éléments précédents disparaissent, les filtres restent, état de chargement", async () => {
+  it("pendant le rechargement : la liste précédente reste affichée, les filtres aussi, la barre de compte est occupée", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     procedures.specListFeatures.mockImplementation(neverResolves);
     await pick(statusSelect(), "Adoptée");
-    await waitFor(() =>
-      expect(screen.queryByRole("link", { name: "Connexion par e-mail" })).not.toBeInTheDocument(),
+    await waitFor(() => expect(countBar()).toHaveAttribute("aria-busy", "true"));
+    expect(screen.getByRole("link", { name: "Connexion par e-mail" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Fonctionnalités" })).toHaveAttribute(
+      "aria-busy",
+      "true",
     );
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(statusSelect()).toBeVisible();
-    expect(statusRegion()).toHaveAttribute("aria-busy", "true");
-    expect(statusRegion()).toHaveTextContent("Chargement des fonctionnalités…");
   });
 
   it("changer de filtre oublie le curseur et remplace la liste", async () => {
     procedures.specListFeatures.mockResolvedValueOnce(page(1, 50, "c1"));
     renderFeatures();
-    await findTable();
-    await userEvent.click(screen.getByRole("button", { name: "Afficher plus de fonctionnalités" }));
+    await findList();
+    await userEvent.click(screen.getByRole("button", { name: "Charger la suite" }));
     await waitFor(() =>
       expect(inputsOf(procedures.specListFeatures).at(-1)).toMatchObject({ cursor: "c1" }),
     );
@@ -508,14 +496,21 @@ describe("Filtres (§3.2)", () => {
 });
 
 describe("Vide filtré (§4.4)", () => {
-  beforeEach(() => procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null }));
+  beforeEach(() => procedures.specListFeatures.mockResolvedValue(list([])));
 
-  it("filtres conservés, message en role=status, « Effacer les filtres » à la place de la table", async () => {
+  it("filtres conservés, état vide visible, message annoncé par la région d'état, « Effacer les filtres »", async () => {
     renderFeatures({ search: "?status=adoptee" });
-    expect(
-      await screen.findByText("Aucune fonctionnalité ne correspond à ces filtres."),
-    ).toBeInTheDocument();
-    expect(statusRegion()).toHaveTextContent("Aucune fonctionnalité ne correspond à ces filtres.");
+    const empty = await waitFor(() => {
+      const found = document.querySelector("[data-slot='empty-state']");
+      if (!found) throw new Error("pas d'état vide");
+      return found;
+    });
+    expect(empty).toHaveTextContent("Aucune fonctionnalité ne correspond à ces filtres.");
+    await waitFor(() =>
+      expect(statusRegion()).toHaveTextContent(
+        "Aucune fonctionnalité ne correspond à ces filtres.",
+      ),
+    );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Statut" })).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Priorité" })).toBeVisible();
@@ -529,106 +524,14 @@ describe("Vide filtré (§4.4)", () => {
 
   it("« Effacer les filtres » ramène la liste et le focus sur le premier Select", async () => {
     renderFeatures({ search: "?status=adoptee" });
-    await screen.findByText("Aucune fonctionnalité ne correspond à ces filtres.");
-    procedures.specListFeatures.mockResolvedValue({ items: FEATURES, nextCursor: null });
+    await waitFor(() => expect(document.querySelector("[data-slot='empty-state']")).not.toBeNull());
+    procedures.specListFeatures.mockResolvedValue(list(FEATURES));
     await userEvent.click(
       screen.getAllByRole("button", { name: "Effacer les filtres" })[0] as HTMLElement,
     );
-    await findTable();
+    await findList();
     expect(window.location.search).toBe("");
     expect(screen.getByRole("combobox", { name: "Statut" })).toHaveFocus();
-  });
-});
-
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
-describe("Afficher plus (§3.3)", () => {
-  const more = () => screen.getByRole("button", { name: "Afficher plus de fonctionnalités" });
-
-  it("page de 50 : bouton sous la table, nextCursor transmis au clic, éléments ajoutés à la suite", async () => {
-    procedures.specListFeatures
-      .mockResolvedValueOnce(page(1, 50, "c1"))
-      .mockResolvedValueOnce(page(51, 10, null));
-    renderFeatures();
-    const table = await findTable();
-    expect(within(table).getAllByRole("row")).toHaveLength(51);
-    await userEvent.click(more());
-    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(61));
-    expect(inputsOf(procedures.specListFeatures)[1]).toMatchObject({
-      projectId: PROJECT_ID,
-      limit: 50,
-      cursor: "c1",
-    });
-    expect(screen.getByRole("link", { name: "Fonctionnalité numéro 1" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Fonctionnalité numéro 60" })).toBeInTheDocument();
-  });
-
-  it("annonce « N fonctionnalités de plus affichées. » avec le nombre réel, et retire le bouton à la dernière page", async () => {
-    procedures.specListFeatures
-      .mockResolvedValueOnce(page(1, 50, "c1"))
-      .mockResolvedValueOnce(page(51, 10, null));
-    renderFeatures();
-    await findTable();
-    await userEvent.click(more());
-    await waitFor(() =>
-      expect(statusRegion()).toHaveTextContent("10 fonctionnalités de plus affichées."),
-    );
-    expect(
-      screen.queryByRole("button", { name: "Afficher plus de fonctionnalités" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("pendant l'appel : bouton désactivé, aria-busy, « Chargement… », focus conservé", async () => {
-    let release: (value: unknown) => void = () => undefined;
-    procedures.specListFeatures
-      .mockResolvedValueOnce(page(1, 50, "c1"))
-      .mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
-    renderFeatures();
-    await findTable();
-    await userEvent.click(more());
-    const busy = await findNamed("button", "Chargement…");
-    expect(busy).toBeDisabled();
-    expect(busy).toHaveAttribute("aria-busy", "true");
-    expect(busy).toHaveFocus();
-    release(page(51, 1, null));
-    await findNamed("link", "Fonctionnalité numéro 51");
-  });
-
-  it("échec de la suite : alerte sous la table, éléments déjà chargés conservés, « Réessayer » relance la même page", async () => {
-    procedures.specListFeatures
-      .mockResolvedValueOnce(page(1, 50, "c1"))
-      .mockImplementationOnce(reject("INTERNAL"))
-      .mockResolvedValueOnce(page(51, 5, null));
-    renderFeatures();
-    const table = await findTable();
-    await userEvent.click(more());
-    const alert = await findRole("alert");
-    expect(alert.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    expect(within(table).getAllByRole("row")).toHaveLength(51);
-    await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
-    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(56));
-    expect(inputsOf(procedures.specListFeatures).at(-1)).toMatchObject({ cursor: "c1" });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("VALIDATION sur la suite : « La liste n'a pas pu être poursuivie » et « Revenir au début » (filtres conservés)", async () => {
-    procedures.specListFeatures
-      .mockResolvedValueOnce(page(1, 50, "c1"))
-      .mockImplementationOnce(reject("VALIDATION"))
-      .mockResolvedValueOnce(page(1, 50, "c2"));
-    renderFeatures({ search: "?status=specifiee" });
-    const table = await findTable();
-    await userEvent.click(more());
-    const alert = await findRole("alert");
-    expect(alert).toHaveTextContent("La liste n'a pas pu être poursuivie");
-    expect(alert).toHaveTextContent("Revenez au début de la liste puis réessayez.");
-    expect(within(table).getAllByRole("row")).toHaveLength(51);
-    await userEvent.click(within(alert).getByRole("button", { name: "Revenir au début" }));
-    await waitFor(() => expect(procedures.specListFeatures).toHaveBeenCalledTimes(3));
-    const restart = inputsOf(procedures.specListFeatures)[2];
-    expect(restart).not.toHaveProperty("cursor");
-    expect(restart).toMatchObject({ status: "specifiee" });
-    expect(window.location.search).toContain("status=specifiee");
-    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 });
 
@@ -650,7 +553,7 @@ describe("Erreur de chargement de la liste (§4.9)", () => {
       expect(screen.queryByRole("table")).not.toBeInTheDocument();
       expect(visibleText()).not.toMatch(/fetch failed|INTERNAL/);
       await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
-      await findTable();
+      await findList();
       expect(procedures.specListFeatures).toHaveBeenCalledTimes(2);
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     },
@@ -662,7 +565,7 @@ describe("Erreur de chargement de la liste (§4.9)", () => {
     const alert = await findRole("alert");
     expect(alert).toHaveTextContent("Impossible de charger les fonctionnalités");
     await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
-    await findTable();
+    await findList();
   });
 });
 

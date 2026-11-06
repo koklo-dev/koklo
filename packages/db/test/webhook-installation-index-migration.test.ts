@@ -12,6 +12,7 @@ import {
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
+import { LONG_LISTS_INDEXES } from "./support/long-lists-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import { PROJECT_CLIENT_TABLES } from "./support/project-client-fixtures.ts";
@@ -102,6 +103,17 @@ async function rollBack(db: TestDatabase): Promise<void> {
   );
   await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [migration()]);
 }
+
+/** Tables et index créés par des migrations postérieures : leur retrait n'est pas celui de TK-45a. */
+const LATER_OBJECTS: readonly string[] = [
+  ...OAUTH_TABLES,
+  ...LLM_TABLES,
+  ...SUGGESTION_TABLES,
+  ...REVIEW_TABLES,
+  ...NOTIFICATION_TABLES,
+  ...PROJECT_CLIENT_TABLES,
+  ...LONG_LISTS_INDEXES,
+];
 
 const deliveriesOf = (db: TestDatabase) =>
   db.query<{ delivery_id: string; installation_external_id: string | null }>(
@@ -224,17 +236,7 @@ describe("TK-45a migration webhook_installation_index : retour arrière et sché
     expect(actual.indexes.some((line) => line.startsWith(`${INDEX} `))).toBe(false);
     const removed = afterFirstUp.indexes.filter((line) => !actual.indexes.includes(line));
     expect(
-      removed.filter(
-        (line) =>
-          ![
-            ...OAUTH_TABLES,
-            ...LLM_TABLES,
-            ...SUGGESTION_TABLES,
-            ...REVIEW_TABLES,
-            ...NOTIFICATION_TABLES,
-            ...PROJECT_CLIENT_TABLES,
-          ].some((table) => line.includes(table)),
-      ),
+      removed.filter((line) => !LATER_OBJECTS.some((name) => line.includes(name))),
     ).toHaveLength(1);
     expect(await deliveriesOf(db)).toEqual(before);
   }, 180_000);

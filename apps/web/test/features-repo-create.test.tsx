@@ -6,6 +6,7 @@ import {
   head,
   INSTALLATION_ID,
   inputsOf,
+  list,
   PROJECT_ID,
   renderFeatures,
   serve,
@@ -130,7 +131,7 @@ describe("Création du dépôt", () => {
     const dialog = await openPanel();
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
     procedures.repoList.mockResolvedValue([REPO]);
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     const title = await findNamed("heading", PREPARING);
@@ -156,7 +157,7 @@ describe("Création du dépôt", () => {
     );
     procedures.repoList.mockResolvedValue([REPO]);
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
     await within(dialog).findByText("Ce projet a déjà son dépôt de spec.");
     await userEvent.click(within(dialog).getByRole("button", { name: "Fermer" }));
@@ -183,7 +184,7 @@ describe("Erreurs de 48c rendues dans le panneau", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Créer le dépôt" }));
     expect(await findRole("alert", { from: dialog })).toBeInTheDocument();
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     await userEvent.click(await findNamed("button", /^Réessayer/, { scope: within(dialog) }));
     await waitFor(() => expect(procedures.repoCreateSpec).toHaveBeenCalledTimes(2));
     expect(procedures.projectCreate).not.toHaveBeenCalled();

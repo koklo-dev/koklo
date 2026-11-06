@@ -22,7 +22,9 @@
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "rollback": "node scripts/rollback.ts",
-    "seed": "node scripts/seed.ts"
+    "seed": "node scripts/seed.ts",
+    "seed:large": "node scripts/seed-large.ts",
+    "seed:planche": "node scripts/seed-planche.ts"
   },
   "dependencies": {
     "@koklo/config": "workspace:*",

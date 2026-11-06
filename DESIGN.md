@@ -218,6 +218,42 @@ Galerie de référence : `/dev/ui` (fiche `design/screens/S-dev-ui.md`), chaque 
 - **Désactivé** : bordure **pointillée** `--border-strong`, fond `--surface`, texte `--muted-foreground`, quelle que soit la variante. Plus de lavande délavée (`opacity-50` supprimé).
 - **Raison visible** : un bouton désactivé durablement (prérequis manquant, droits) a toujours sa raison à côté, en 13 px `--muted-foreground`, reliée par `aria-describedby`. Un bouton désactivé le temps d'une requête n'en a pas : la région d'état parle déjà (règle 5 ; questions.md B26).
 
+### 5.3 Listes longues (v2.1, TK-94, retenu, passation 07 validée le 05/11/2026)
+
+Règle de base : rien de ce qui vient de la base n'est chargé en entier. Le total est toujours celui du serveur, la recherche et les filtres s'appliquent au serveur, l'état vit dans l'URL (`?q=`, filtres, `?page=`, `?sel=`). Galerie de référence : `/dev/ui` (section « Listes longues », fiche `design/screens/S-dev-ui.md`) ; planche : `docs/refonte/maquettes/12-PrincipeListes.html`.
+
+| Schéma | Usage | Composants |
+|---|---|---|
+| 1.1 Liste + fiche, défilement infini | parcourir et ouvrir un élément (fonctionnalités, règles, tickets par colonne, commentaires, sélecteurs) | `VirtualList`, `CountBar`, `ListFooter`, `EmptyState` (recherche vide) |
+| 1.2 Tableau paginé | comparer, retrouver par position | `Pagination` |
+| 1.3 Diagramme par zones | modèle de plus de 25 nœuds | `ZoneNode`, `DiagramMinimap` |
+| 1.4 Relecture en volume | plus de 30 propositions | `GroupSection`, `CountBar` |
+
+**`VirtualList`** : liste à hauteur de ligne fixe (52 px, 44 px pour la relecture), seules les lignes visibles et 10 de marge sont dans le DOM. `role="list"` et `role="listitem"` conservés ; chaque ligne rendue porte `aria-setsize` (total du serveur) et `aria-posinset` (rang réel, 1 pour la première de la liste, pas de la fenêtre). Lignes séparées par une bordure basse `--border`, survol `--accent`, ligne sélectionnée : fond `--secondary` et bande de 3 px `--primary` à gauche (la sélection est portée aussi par `aria-current="true"`). La page suivante est demandée à **80 %** du défilement par une sentinelle (`IntersectionObserver`), sans clic ; le focus reste sur l'élément actif quand la liste grandit. Retour depuis une fiche : pages et position restaurées. Grilles de cartes : pages de 24, virtualisation par rangée.
+
+**`CountBar`** : barre au-dessus de la liste, `role="status"`, 13 px. Format : **total en gras** · « N chargées » · compteur de filtre (« 31 à valider »), puis le tri à droite (`swap_vert`). La barre annonce aussi l'arrivée d'une page (« 50 fonctionnalités de plus chargées · 100 sur 248 ») ; une seule région d'état par écran (règle 5 du §1.1).
+
+**`ListFooter`** : pied de liste, cadre pointillé `--border-strong` sur `--surface`, rayon 12, marges 14 / 16 px, centré, **quatre états** :
+
+| État | Icône | Texte | Action |
+|---|---|---|---|
+| Suite à charger | `expand_circle_down` | « Les 50 suivantes se chargent automatiquement en approchant du bas. » | « Charger la suite » (secondaire) |
+| Chargement | aucune | « Chargement des 50 suivantes… » sous 4 lignes squelettes (`motion-safe:animate-pulse`) | aucune ; `aria-busy="true"` |
+| Erreur | `error` | « Impossible de charger la suite. Les N premières restent affichées. » sur le fond d'alerte d'erreur (§2.2) | « Réessayer » (secondaire) |
+| Fin | `check` | « Fin de la liste · 248 fonctionnalités » | « Revenir en haut » (discret, `arrow_upward`), seulement si la liste dépasse deux écrans |
+
+La **recherche sans résultat** n'est pas un état du pied : c'est un `EmptyState` (`search_off`, « Aucune fonctionnalité ne correspond à « … » », « La recherche porte sur les 248 fonctionnalités, pas seulement celles affichées. », action « Effacer la recherche »). Le texte varie avec le nom du type et le nombre de la page (50, 30 ou 24).
+
+**`Pagination`** : `nav` « Pagination ». Texte « 1–25 sur 1 240 », précédent / suivant (`chevron_left`, `chevron_right`), numéros avec ellipses (`1 … 19 20 21 … 50`), page courante en `--primary` (`aria-current="page"`), taille 25 / 50 / 100 dans un `Select`. Changer un filtre ou la taille revient en page 1. Pendant le changement de page, la page précédente reste visible en fondu (`motion-safe:`), sans saut de hauteur. Au-delà de 10 000 lignes : « environ 12 000 » et précédent / suivant seulement.
+
+**`GroupSection`** : groupe repliable, en-tête collant sur `--surface` (libellé 11/600 en capitales ou 14/600, compteurs « 42 · 18 acceptées · 22 à relire »), bouton d'en-tête avec `aria-expanded`, action de groupe nommée avec son compte (« Accepter les 22 restantes »), « Afficher 20 de plus · N restantes dans ce groupe » ; 8 éléments à l'ouverture.
+
+**`DiagramMinimap`** (150 px, en bas à gauche, cadre de la vue en `--primary`, cliquable) et **`ZoneNode`** (cadre pointillé `--border-strong`, nom, icône, « 14 tables », aperçu) : composants du schéma 1.3, livrés dans la galerie au lot 0 des listes ; leurs écrans sont au lot 6.
+
+Annonces et accessibilité (passation 07 §5) : arrivée d'une page annoncée en `role="status"` sans voler le focus ; « Charger la suite » toujours atteignable au clavier (le chargement à 80 % ne s'applique pas au clavier pur) ; pagination nommée, ellipses non focalisables ; groupes avec `aria-expanded`. Mouvement réduit : squelettes et fondus sous `motion-safe:`. Aucune couleur en dur : jetons seulement.
+
+Écartées : pagination classique « Page 1, 2, 3 » pour les fonctionnalités (perd la position et le retour arrière), bouton « Afficher plus » seul (déjà en v1, jugé lent pour 1 000 éléments), tableau HTML virtualisé (la sémantique de table avec lignes absentes du DOM est mal lue par les lecteurs d'écran ; la liste avec `aria-setsize` est retenue par la passation).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -249,7 +285,7 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 5. Reprise des écrans « Aperçu annoté » et « Change request » en Indigo.
 6. Export des tokens au format DTCG pour la bibliothèque d'organisation de Koklo.
 7. Typographie et identité du site vitrine (serif éditorial en option).
-8. Questions de la v2 : voir `docs/refonte/questions.md` (B22 à B33, C5).
+8. Questions de la v2 : voir `docs/refonte/questions.md` (B22 à B36, C5).
 
 ## 9. Historique des décisions
 
@@ -261,3 +297,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 26/10/2026 | Typographie : Instrument Sans + JetBrains Mono |
 | 26/10/2026 | Couleur : Indigo retenu après essai de Forêt, écarté |
 | 06/11/2026 | v2 (TK-87, passation 01 §0) : jetons `--surface`, `--raised`, `--border-strong`, `--diff-bg`, `--shadow-floating` ; couleurs d'alerte ; « Non soumise » ; échelle resserrée (h1 24, h2 16, h3 14) ; 8 composants de statut et signature ; bouton désactivé en pointillés avec raison ; règles d'écran 1 à 7 ; le fournisseur d'IA n'est jamais nommé dans l'interface (B15) |
+| 06/11/2026 | v2.1 (TK-94, passation 07 §0 à §5) : §5.3 listes longues (`VirtualList`, `CountBar`, `ListFooter` à 4 états, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`), annonces et `aria-setsize` / `aria-posinset` |

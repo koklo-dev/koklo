@@ -155,8 +155,11 @@ describe("contenu de la galerie (S-dev-ui §3)", () => {
   it("InlineAlert : neutre, attention, erreur ; bloc d'envoi complet et rappel", async () => {
     await renderPage("test");
     expect(screen.getAllByRole("note").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("status")).toHaveTextContent("Trop de demandes.");
-    expect(screen.getByRole("alert")).toHaveTextContent("Le fournisseur n'a pas répondu à temps.");
+    // Depuis TK-94 la galerie montre aussi des régions d'état et d'alerte de listes : on cible les InlineAlert.
+    const alerts = (role: string) =>
+      document.querySelector(`[data-slot='inline-alert'][role='${role}']`);
+    expect(alerts("status")).toHaveTextContent("Trop de demandes.");
+    expect(alerts("alert")).toHaveTextContent("Le fournisseur n'a pas répondu à temps.");
     expect(
       screen.getAllByText("Votre texte est envoyé à l'agent IA avec la clé de l'organisation.")
         .length,

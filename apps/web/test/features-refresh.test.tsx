@@ -3,8 +3,9 @@ import { act, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FEATURES,
-  findTable,
+  findList,
   head,
+  list,
   renderFeatures,
   serve,
   statusRegion,
@@ -57,7 +58,7 @@ beforeEach(() => {
   serve();
   setTabVisibility(true);
   procedures.specHead.mockResolvedValue(head({ status: "building" }));
-  procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+  procedures.specListFeatures.mockResolvedValue(list([]));
 });
 
 afterEach(() => {
@@ -128,12 +129,10 @@ describe("Actualisation automatique de la spec en préparation (§4.5)", () => {
     procedures.specHead
       .mockResolvedValueOnce(head({ status: "building" }))
       .mockResolvedValue(head({ status: "ready" }));
-    procedures.specListFeatures
-      .mockResolvedValueOnce({ items: [], nextCursor: null })
-      .mockResolvedValue({ items: FEATURES, nextCursor: null });
+    procedures.specListFeatures.mockResolvedValueOnce(list([])).mockResolvedValue(list(FEATURES));
     await renderPreparing();
     await advance(6 * SECOND);
-    await findTable();
+    await findList();
     expect(screen.queryByRole("heading", { name: PREPARING })).not.toBeInTheDocument();
     expect(statusRegion()).toHaveTextContent("La spec est prête.");
     const settled = headCalls();
@@ -143,9 +142,9 @@ describe("Actualisation automatique de la spec en préparation (§4.5)", () => {
 
   it("un projet prêt n'est jamais relu automatiquement", async () => {
     procedures.specHead.mockResolvedValue(head());
-    procedures.specListFeatures.mockResolvedValue({ items: FEATURES, nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list(FEATURES));
     renderFeatures();
-    await findTable();
+    await findList();
     const initial = headCalls();
     await advance(60 * SECOND);
     expect(headCalls()).toBe(initial);

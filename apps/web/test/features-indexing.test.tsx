@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CLIENT_SIDE,
   FEATURES,
-  findTable,
+  findList,
   GIT_VOCABULARY,
   head,
   inputsOf,
+  list,
   PROJECT_ID,
   renderFeatures,
   serve,
@@ -190,7 +191,7 @@ describe("Spec en préparation (§4.5)", () => {
 
   it("spec.head « building » sans élément : carte « en cours de préparation »", async () => {
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     await expectPreparing();
   });
@@ -212,7 +213,7 @@ describe("Spec en préparation (§4.5)", () => {
   it.each(CLIENT_SIDE)("%s : « building » = même carte, vocabulaire sans git", async (role) => {
     serve(role);
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     await expectPreparing();
     expect(visibleText()).not.toMatch(/commit|branche|SHA|indexation|index\b/i);
@@ -222,16 +223,11 @@ describe("Spec en préparation (§4.5)", () => {
     procedures.specHead
       .mockResolvedValueOnce(head({ status: "building" }))
       .mockResolvedValue(head({ status: "ready" }));
-    procedures.specListFeatures
-      .mockResolvedValueOnce({ items: [], nextCursor: null })
-      .mockResolvedValue({
-        items: FEATURES,
-        nextCursor: null,
-      });
+    procedures.specListFeatures.mockResolvedValueOnce(list([])).mockResolvedValue(list(FEATURES));
     renderFeatures();
     await heading(PREPARING_TITLE);
     await userEvent.click(screen.getByRole("button", { name: "Actualiser" }));
-    await findTable();
+    await findList();
     expect(screen.queryByRole("heading", { name: PREPARING_TITLE })).not.toBeInTheDocument();
     expect(statusRegion()).toHaveTextContent("La spec est prête.");
   });
@@ -239,7 +235,7 @@ describe("Spec en préparation (§4.5)", () => {
   it("« building » avec déjà des éléments : la liste s'affiche avec une alerte neutre au-dessus", async () => {
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
     renderFeatures();
-    const table = await findTable();
+    const table = await findList();
     const notice = screen.getByText(
       "La spec est en cours de mise à jour : la liste peut être incomplète.",
     );
@@ -333,7 +329,7 @@ describe("Index en échec (§4.8)", () => {
     renderFeatures();
     const alert = await findRole("alert");
     await userEvent.click(within(alert).getByRole("button", { name: "Actualiser" }));
-    await findTable();
+    await findList();
     expect(procedures.specHead).toHaveBeenCalledTimes(2);
     for (const input of inputsOf(procedures.specHead)) {
       expect(input).not.toHaveProperty("branch");

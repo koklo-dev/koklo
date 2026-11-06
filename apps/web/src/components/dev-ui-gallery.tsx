@@ -1,5 +1,6 @@
 import { SURFACES, TYPE_SCALE } from "./dev-ui-data.ts";
 import { DevUiFrame, DevUiSection } from "./dev-ui-frame.tsx";
+import { DevUiLists } from "./dev-ui-lists.tsx";
 import { DevUiSignature } from "./dev-ui-signature.tsx";
 import { DevUiStatuses } from "./dev-ui-statuses.tsx";
 import { DevUiThemeSwitch } from "./dev-ui-theme-switch.tsx";
@@ -70,6 +71,7 @@ export function DevUiGallery() {
         <TypeScale />
         <DevUiStatuses />
         <DevUiSignature />
+        <DevUiLists />
       </main>
     </div>
   );

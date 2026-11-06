@@ -93,7 +93,7 @@ and `audit_log` row (`tracker/audit.ts`) commit or roll back together.
 |-----------|-----------|
 | `ticket.create` | Domain validation; `pkg:*` labels rejected (`VALIDATION`, field `labels`, rule `assertNoPackageLabel` of `@koklo/domain`); `sprintId` must be a planned or active sprint of the project; key from the counter; criteria stored with 1-based positions |
 | `ticket.get` | Detail with criteria, dependencies and active lease; `lease.worktree` is `""` unless the caller's role is in `TICKET_WRITE_ROLES` (owner, admin, dev, designer; deny by default, also without role) |
-| `ticket.list` | Filters `status`, `sprintId`, `pkg`, `assignee` (`kind:id` or bare id); order `(createdAt, id)`; cursor pagination; **an invalid cursor is ignored** (first page) because the contract declares no `VALIDATION` error on this route |
+| `ticket.list` | Filters `status`, `sprintId`, `pkg`, `assignee` (`kind:id` or bare id); default order priority descending, then ticket number, then id (see "Long lists (TK-94)"); cursor pagination; **an invalid cursor is ignored** (first page) because the contract declares no `VALIDATION` error on this route |
 | `ticket.update` | Merged state validated by the domain, then only the provided fields are written; a provided `labels` or `linkedFeatures` list replaces the stored one |
 | `ticket.delete` | Soft delete; `CONFLICT ticket_has_active_lease` while a lease is held |
 | `ticket.transition` | Table H1, then CDC §7.2 for `todo -> in_progress`: every `blocks` dependency must be `done`, otherwise `INVALID_TRANSITION { from, to }` |
@@ -860,7 +860,7 @@ Contract 0.6.0 adds one typed error and no route (still 43 routes): `SPEC_INDEX_
 - **`spec.head`** reads the index only. It returns `status` and `errorCode` as stored, including for
   a `failed` snapshot (200, not an error), so a client can show why a branch is not readable.
 - **`spec.listFeatures`** reads the index only (no provider call), sorted numerically on `F-nnn`
-  (`F-999` before `F-1000`), default page of 50, opaque cursor (the last returned id).
+  (`F-999` before `F-1000`), default page of 50. Since 1.0.0 it is a long list (see "Long lists (TK-94)").
 - **`spec.getFeature`** decides on the index (snapshot of the default head, then the feature row),
   then reads the file from git at the **indexed commit**, not the current branch head, outside any SQL
   transaction: `authenticate` then one `readFile` of `<spec_path>/<file_path>`. The answer carries
@@ -1223,7 +1223,71 @@ baseline against the exact version it read; the team reads the journal with the 
 - Typed errors: `submit` exposes `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`, `CONFLICT` (reason
   `baseline_not_open` only), `STALE_VERSION` (409) and `SPACE_NOT_READY` (503); `list` has no conflict or stale error.
 
+## Long lists (TK-94)
+Contract **1.0.0** (a major version: the output of two routes is widened with required fields and the cursor
+of `spec.listFeatures` changes shape; see the history). Principle: nothing that comes from the database is
+loaded whole (passation 07). Search, filters, counters and position are computed on the server.
+
+**Input** (`listInputSchema`, shape `listInputShape(around)` in `schemas-lists.ts`; the filters stay typed
+fields of each route, not a free object, because a GET request is described field by field in OpenAPI):
+
+| Field | Rule |
+|-------|------|
+| `q` | 1 to 200 characters. Full-text search, every word required, the last one a prefix (`annul` finds `annulation`). Accents matter (`réservation` is found by `réservation`, not by `reservation`, see questions H5) |
+| `cursor` | Opaque. Pages after (`nextCursor`) or before (`previousCursor`) a row |
+| `limit` | 1 to 100, coerced from the query string. Default **50**, applied by the server |
+| `around` | Identifier of the row to bring into the page (`F-nnn`, `TK-n`). Excludes `cursor` (`around` and `cursor` together are `VALIDATION` / `BAD_REQUEST`) |
+
+**Output** (`listOf(item)`): `{ items, nextCursor, previousCursor, offset, total, facets? }`.
+- `total`: real size of the filtered list (exact; the search keeps at most 10 000 matches, `SEARCH_LIMIT`).
+- `offset`: rank (0 for the first) of the first item in the filtered list. The client derives `aria-posinset`
+  as `offset + index + 1` and `aria-setsize` as `total`.
+- `previousCursor`: loads the page before the first item, `null` at the head. `nextCursor`: `null` at the end.
+- `facets`: count per value of each filterable dimension, **ignoring the filter of that dimension** (so a
+  filter bar keeps the other choices visible). Only non-zero values are listed. `spec.listFeatures`:
+  `status`, `priority`. `ticket.list`: `status`, `pkg`.
+- `around`: the page that contains the row, aligned on a multiple of `limit` (`offset % limit == 0`), with
+  `previousCursor` set when it is not the first. A key unknown to the project (or deleted) is `NOT_FOUND`
+  (now declared on `ticket.list`). A row that exists but is excluded by the active filters returns the first
+  page without error: the client sees that the row is not in it (question B35).
+- Cursors are opaque and stable under insertion and deletion: they carry the sort key and the id of a row
+  (`[direction, key, id]`), never a rank. A cursor not issued by the server is `VALIDATION{cursor}`.
+- Sort: `spec.listFeatures` by `F-nnn` numeric order (generated column `spec_number`), `ticket.list` by
+  **priority descending** (`critical`, `high`, `medium`, `low`), then ticket number (`TK-9` before `TK-10`), then
+  id (question B42, decided 2026-11-06). It is the default order of tickets, for the list and for every kanban
+  column, computed by the server over all rows: a client never sorts the cards it has loaded. There is no
+  `sort` parameter (question B37).
+
+**Table pagination** (schema 1.2, not used by any route yet, lots 6, 11 and 13): `pageNumberInputSchema`
+(`q?`, `page >= 1`, `size` 25, 50 or 100) and `pageNumberOf(item)` (`items`, `total`, `totalIsEstimate`).
+
+**Database** (migration `20261106150913_long_lists`, additive, `down.sql` reversible): generated columns
+`spec_features.spec_number` and `search`, `tickets.priority_rank` (critical 0 to low 3), `tickets.key_number`
+and `tickets.search` (`to_tsvector('french', ...)`; the dash of
+`F-187` and `TK-420` is replaced by a space, otherwise the number is read as `-187`), indexes
+`(snapshot_id, spec_number, id)`, `(project_id, priority_rank, key_number, id)` and
+`(project_id, status, priority_rank, key_number, id)` (both partial on `deleted_at IS NULL`, the second serves one kanban column) and two GIN indexes on `search`.
+
+**API** (`apps/api/src/tracker/long-list.ts`): one engine for both lists (a source provides `total`, `page`,
+`countBefore`, `locate`). The tenant client refuses raw SQL, so the full-text match is the single exception:
+`searchIds` in `@koklo/db` runs under `withOrganization`, always filters on the organization of the context,
+takes a closed list of targets, binds the user text as a parameter after turning it into letters and digits only
+(`tsqueryOf`: no `tsquery` syntax comes from outside), and returns identifiers that the repository then reads
+through the tenant client. First page measured on `seed:large`: see `apps/api/test/long-lists-performance.test.ts`
+(budget 300 ms server side, median of 15 calls).
+
+**Seeds**: `pnpm seed:large` (project "Volume · charge": 1 000 features, 80 tables, 50 endpoints, 500 tickets over 7
+statuses) and `pnpm seed:planche` (project "Volume · planche": 248, 65, 47, 60 tickets). Idempotent, refused when
+`NODE_ENV=production`, the demo project is untouched. Volumes of models that do not exist yet (rules 300 and 86,
+proposals 400, journeys 18, sample rows 1 240) are declared in `packages/db/src/seed-volumes.ts` (question B34).
+
 ## Version history
+- **1.0.0** (TK-94): long lists. `spec.listFeatures` and `ticket.list` take `q` and `around` and return
+  `previousCursor`, `offset`, `total` and `facets` (required except `facets`); `ticket.list` declares `NOT_FOUND`;
+  the page size defaults to 50 on both. New exported schemas `listInputSchema`, `listInputShape`, `listOf`,
+  `facetsSchema`, `pageNumberInputSchema`, `pageNumberOf`. **Breaking**: the output of the two routes gains required
+  fields, and the cursor of `spec.listFeatures` (the raw `F-nnn`) becomes a composite cursor. Route and path counts
+  unchanged (64 routes, 47 paths). Fingerprints of 0.1.0 to 0.14.0 unchanged.
 - **0.14.0** (TK-55): `organization.create` declares `FORBIDDEN` with `data.reason` `client_only` (helper
   `forbiddenOf` in `errors.ts`); an account whose memberships are all `client` can no longer create an organization.
   Additive (new error on an existing route). Fingerprints of 0.1.0 to 0.13.0 unchanged.

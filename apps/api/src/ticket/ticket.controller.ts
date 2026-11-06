@@ -57,8 +57,14 @@ export class TicketController {
         this.project,
         errors,
         (scope) => {
-          const { limit, cursor, sprintId, ...filter } = input;
-          return this.service.list(scope, { ...filter, sprintKey: sprintId }, limit, cursor);
+          const { limit, cursor, around, q, sprintId, ...filter } = input;
+          return this.service.list(scope, {
+            filter: { ...filter, sprintKey: sprintId },
+            q,
+            limit,
+            cursor,
+            around,
+          });
         },
         this.access,
       ),

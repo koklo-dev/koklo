@@ -58,7 +58,7 @@ describe("PROVIDER_UNAVAILABLE (503)", () => {
       within(dialog).getByLabelText("Avancement : Spécifiée, étape 2 sur 6"),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Indispensable")).toBeInTheDocument();
-    expect(screen.getByRole("table", { hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Fonctionnalités", hidden: true })).toBeInTheDocument();
   });
 
   it("« Réessayer » rappelle spec.getFeature et affiche la fiche", async () => {

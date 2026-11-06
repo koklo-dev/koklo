@@ -11,9 +11,10 @@ import {
 } from "./support/feature-form.tsx";
 import {
   CLIENT_SIDE,
-  findTable,
+  findList,
   head,
   inputsOf,
+  list,
   PROJECT_ID,
   renderFeatures,
   TEAM,
@@ -57,7 +58,7 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
   it.each(TEAM)("%s : un bouton à droite du titre de page, quand la spec est lue", async (role) => {
     serveWrite(role);
     renderFeatures();
-    await findTable();
+    await findList();
     expect(await findNamed("button", NEW_BUTTON)).toBeVisible();
     expect(newButtons()).toHaveLength(1);
   });
@@ -67,7 +68,7 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
     async (role) => {
       serveWrite(role);
       renderFeatures();
-      await findTable();
+      await findList();
       expect(newButtons()).toHaveLength(0);
       expect(screen.queryByRole("button", { name: /Modifier|Enregistrer|Nouvelle/ })).toBeNull();
       expect(screen.queryAllByRole("button").filter((b) => b.hasAttribute("disabled"))).toEqual([]);
@@ -77,13 +78,13 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
   it("tant que le rôle est inconnu, aucun bouton (jamais d'apparition puis de disparition)", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));
     renderFeatures();
-    await findTable();
+    await findList();
     expect(newButtons()).toHaveLength(0);
   });
 
   it("spec en préparation : aucun bouton", async () => {
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     await screen.findByText("La spec est en cours de préparation");
     expect(newButtons()).toHaveLength(0);
@@ -121,7 +122,7 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
     procedures.specHead.mockResolvedValue(
       head({ counts: { features: 0, tables: 0, endpoints: 0 } }),
     );
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     const heading = await findNamed("heading", "Aucune fonctionnalité pour le moment");
     const card = heading.parentElement as HTMLElement;
@@ -133,7 +134,7 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
     procedures.specHead.mockResolvedValue(
       head({ counts: { features: 0, tables: 0, endpoints: 0 } }),
     );
-    procedures.specListFeatures.mockResolvedValue({ items: [], nextCursor: null });
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     await findNamed("heading", "Aucune fonctionnalité pour le moment");
     expect(newButtons()).toHaveLength(0);
@@ -143,7 +144,7 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
 describe("Ouverture de la création", () => {
   it("le bouton pousse ?new=1 dans l'historique et ouvre un dialogue nommé « Nouvelle fonctionnalité »", async () => {
     renderFeatures();
-    await findTable();
+    await findList();
     const length = window.history.length;
     await userEvent.click(await findNamed("button", NEW_BUTTON));
     const panel = await dialog();
@@ -168,7 +169,7 @@ describe("Ouverture de la création", () => {
     "adresse ?%s invalide : ignorée, aucun dialogue",
     async (search) => {
       renderFeatures({ search: `?${search}` });
-      await findTable();
+      await findList();
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(procedures.specGetFeature).not.toHaveBeenCalled();
     },
@@ -176,7 +177,7 @@ describe("Ouverture de la création", () => {
 
   it("les filtres de l'adresse sont gardés à l'ouverture", async () => {
     renderFeatures({ search: "?priority=must" });
-    await findTable();
+    await findList();
     await userEvent.click(await findNamed("button", NEW_BUTTON));
     await dialog();
     const params = new URLSearchParams(window.location.search);
@@ -191,7 +192,7 @@ describe("Client et business : adresses d'écriture ignorées (AC-48-27)", () =>
     async (role) => {
       serveWrite(role);
       renderFeatures({ search: "?new=1&status=brouillon" });
-      await findTable();
+      await findList();
       expect(screen.queryByRole("dialog")).toBeNull();
       await waitFor(() =>
         expect(new URLSearchParams(window.location.search).has("new")).toBe(false),
@@ -212,7 +213,7 @@ describe("Client et business : adresses d'écriture ignorées (AC-48-27)", () =>
       await waitFor(() => {
         const params = new URLSearchParams(window.location.search);
         expect(params.has("edit")).toBe(false);
-        expect(params.get("feature")).toBe("F-001");
+        expect(params.get("sel")).toBe("F-001");
       });
       expect(writeCalls()).toBe(0);
     },
@@ -229,7 +230,7 @@ describe("Client et business : adresses d'écriture ignorées (AC-48-27)", () =>
   it("aucune adresse d'écriture ne se transforme en appel `submit` pour un rôle inconnu", async () => {
     serveWrite("visiteur" as never);
     renderFeatures({ search: "?new=1" });
-    await findTable();
+    await findList();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(writeCalls()).toBe(0);
   });
@@ -289,7 +290,7 @@ describe("Ouverture de la modification", () => {
       () => expect(screen.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible(),
       { timeout: 8000 },
     );
-    expect(new URLSearchParams(window.location.search).get("feature")).toBe("F-001");
+    expect(new URLSearchParams(window.location.search).get("sel")).toBe("F-001");
   });
 
   it("modification d'une fonctionnalité qui n'existe plus : « Cette fonctionnalité n'existe plus dans la spec. »", async () => {

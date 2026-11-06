@@ -87,6 +87,81 @@ for (const theme of ["light", "dark"] as Theme[]) {
   });
 }
 
+/** TK-94 lot B : section « Listes longues » (fiche S-dev-ui §3, captures lists-*). */
+const lists = (page: Page) => page.getByRole("region", { name: "Listes longues" });
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui listes longues ${viewport.name} (${theme}) : axe sans violation, sans défilement horizontal, capture`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await lists(page).scrollIntoViewIfNeeded();
+      await settle(page);
+      const results = await new AxeBuilder({ page })
+        .include("[aria-labelledby='dev-ui-lists']")
+        .withTags(AXE_TAGS)
+        .analyze();
+      expect(results.violations).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      await lists(page).screenshot({ path: `${DIR}/lists-${theme}${viewport.suffix}.png` });
+    });
+  }
+}
+
+test("S-dev-ui GroupSection à 375 px : titre, compteurs et action ne se chevauchent pas", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page, "light");
+  const header = lists(page).locator("[data-slot='group-section-header']").first();
+  await header.scrollIntoViewIfNeeded();
+  const boxes = await Promise.all(
+    [
+      header.locator("button[aria-expanded] > span").nth(0),
+      header.locator("button[aria-expanded] > span").nth(1),
+      header.getByRole("button", { name: "Accepter les 22 restantes" }),
+    ].map((item) => item.boundingBox()),
+  );
+  const [title, counts, action] = boxes;
+  for (const box of [title, counts, action]) {
+    expect(box).not.toBeNull();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(375);
+  }
+  const apart = (a: NonNullable<typeof title>, b: NonNullable<typeof title>) =>
+    a.y + a.height <= b.y + 1 ||
+    b.y + b.height <= a.y + 1 ||
+    a.x + a.width <= b.x ||
+    b.x + b.width <= a.x;
+  expect(apart(title!, counts!)).toBe(true);
+  expect(apart(counts!, action!)).toBe(true);
+  await expect(header.getByRole("button", { name: "Accepter les 22 restantes" })).toBeVisible();
+});
+
+test("S-dev-ui VirtualList : peu de lignes dans le DOM, la suite arrive en approchant du bas, l'annonce ne vole pas le focus", async ({
+  page,
+}) => {
+  await open(page, "light");
+  const list = lists(page).getByRole("list", { name: "Fonctionnalités (exemple)" });
+  await list.scrollIntoViewIfNeeded();
+  const rows = list.getByRole("listitem");
+  expect(await rows.count()).toBeLessThanOrEqual(80);
+  await expect(rows.first()).toHaveAttribute("aria-setsize", "1000");
+  const status = lists(page).getByRole("status").first();
+  const scroller = lists(page).locator("[data-slot='virtual-list']");
+  await rows.nth(3).focus();
+  // 50 lignes de 52 px = 2 600 px : à 80 % de la liste chargée (2 080 px), la sentinelle déclenche la page suivante.
+  await scroller.evaluate((el) => {
+    el.scrollTop = 1_900;
+  });
+  await expect(status).toHaveText("50 fonctionnalités de plus chargées · 100 sur 1 000", {
+    timeout: 5_000,
+  });
+  expect(await rows.count()).toBeLessThanOrEqual(80);
+  await expect(page.locator("[data-row-key]:focus")).toHaveCount(1);
+});
+
 test("S-dev-ui : les 8 composants, HoverCard, les boutons et le désactivé avec sa raison", async ({
   page,
 }) => {

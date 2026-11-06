@@ -27,7 +27,7 @@ import type { ProjectScope } from "../tracker/scope.ts";
 import {
   TICKET_REPOSITORY,
   type TicketChanges,
-  type TicketFilter,
+  type TicketListRequest,
   type TicketPage,
   type TicketRecord,
   type TicketRepository,
@@ -106,13 +106,14 @@ export class TicketService {
 
   list(
     scope: ProjectScope,
-    filter: TicketFilter,
-    limit = DEFAULT_PAGE_SIZE,
-    cursor?: string,
-  ): Promise<{ items: TicketOutput[]; nextCursor: TicketPage["nextCursor"] }> {
+    request: Omit<TicketListRequest, "limit"> & { limit?: number },
+  ): Promise<Omit<TicketPage, "items"> & { items: TicketOutput[] }> {
     return this.repository.run(scope, async (store) => {
-      const page = await store.list(filter, limit, cursor);
-      return { items: page.items.map(toTicketOutput), nextCursor: page.nextCursor };
+      const { items, ...page } = await store.list({
+        ...request,
+        limit: request.limit ?? DEFAULT_PAGE_SIZE,
+      });
+      return { items: items.map(toTicketOutput), ...page };
     });
   }
 

@@ -229,12 +229,25 @@ describe("T6 ticket.list", () => {
       expect(await isValid(i(), { limit }), String(limit)).toBe(false);
     }
   });
-  it("sortie : { items, nextCursor } paginée", async () => {
+  it("sortie : liste longue { items, nextCursor, previousCursor, offset, total, facets? } (1.0.0)", async () => {
     const o = output("ticket.list");
-    expect(await isValid(o, { items: [], nextCursor: null })).toBe(true);
-    expect(await isValid(o, { items: [ticket], nextCursor: "abc" })).toBe(true);
-    expect(await isValid(o, { items: [{ ...ticket, status: "x" }], nextCursor: null })).toBe(false);
+    const page = { nextCursor: null, previousCursor: null, offset: 0, total: 0 };
+    expect(await isValid(o, { items: [], ...page })).toBe(true);
+    expect(await isValid(o, { items: [ticket], ...page, nextCursor: "abc", total: 142 })).toBe(
+      true,
+    );
+    expect(
+      await isValid(o, { items: [], ...page, facets: { status: { todo: 3 }, pkg: { api: 3 } } }),
+    ).toBe(true);
+    expect(await isValid(o, { items: [{ ...ticket, status: "x" }], ...page })).toBe(false);
+    expect(await isValid(o, { items: [], nextCursor: null })).toBe(false);
     expect(await isValid(o, [ticket])).toBe(false);
+  });
+  it("entrée : q, around ; around et cursor ne vont pas ensemble (1.0.0)", async () => {
+    expect(await isValid(i(), { q: "annulation" })).toBe(true);
+    expect(await isValid(i(), { around: "TK-420" })).toBe(true);
+    expect(await isValid(i(), { around: "TK-420", cursor: "c" })).toBe(false);
+    expect(await isValid(i(), { q: "" })).toBe(false);
   });
 });
 
