@@ -67,7 +67,7 @@ describe.each([":root", ".dark"] as const)("CA2 - contraste WCAG AA du thème %s
 });
 
 describe.each([":root", ".dark"] as const)("CA1 (TK-87) - contraste des alertes %s", (selector) => {
-  it.each(["neutral", "warning", "error"] as const)(
+  it.each(["neutral", "success", "warning", "error"] as const)(
     "alerte %s : texte sur fond >= 4,5:1 (alias résolus contre le thème)",
     (alert) => {
       const theme = effectiveTheme(selector);

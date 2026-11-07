@@ -17,6 +17,10 @@ const alertVariants = cva(
 
 export type AlertProps = ComponentProps<"div"> & VariantProps<typeof alertVariants>;
 
+/**
+ * @deprecated Utiliser `InlineAlert` (DESIGN.md §5.6) : `InlineAlert neutral` remplace `Alert`. Conservé tel
+ * quel pour les écrans d'`apps/web` pas encore migrés.
+ */
 export function Alert({ className, variant, role, ...props }: AlertProps) {
   const defaultRole = variant === "destructive" ? "alert" : "status";
   return (

@@ -3,8 +3,12 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import type { ComponentProps } from "react";
-import { Icon } from "../icons/icon.tsx";
+import type { IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
+import { DIALOG_DESCRIPTION, DIALOG_TITLE } from "./dialog.tsx";
+import { IconButton } from "./icon-button.tsx";
+import { IconTile } from "./icon-tile.tsx";
+import { IdTag } from "./id-tag.tsx";
 
 export function Sheet(props: ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root {...props} />;
@@ -19,17 +23,28 @@ export function SheetClose(props: ComponentProps<typeof SheetPrimitive.Close>) {
 }
 
 const sheetVariants = cva(
-  "fixed z-50 flex flex-col gap-4 border-border bg-raised p-6 shadow-floating motion-safe:transition-transform duration-150 motion-safe:animate-content-in motion-reduce:transition-none",
+  "fixed z-50 flex flex-col gap-4 border-border bg-raised px-5 py-4 shadow-sheet motion-safe:transition-transform duration-150 motion-safe:animate-content-in motion-reduce:transition-none",
   {
     variants: {
       side: {
-        right: "inset-y-0 right-0 h-full w-full rounded-l-xl border-l sm:max-w-[440px]",
-        left: "inset-y-0 left-0 h-full w-full rounded-r-xl border-r sm:max-w-[440px]",
+        right: "inset-y-0 right-0 h-full w-full rounded-l-xl border-l",
+        left: "inset-y-0 left-0 h-full w-full rounded-r-xl border-r",
         top: "inset-x-0 top-0 rounded-b-xl border-b",
         bottom: "inset-x-0 bottom-0 rounded-t-xl border-t",
       },
+      /** Largeur d'un tiroir latéral ; plein écran sous 640 (DESIGN.md §5.6). */
+      size: {
+        detail: "",
+        form: "",
+        wide: "",
+      },
     },
-    defaultVariants: { side: "right" },
+    compoundVariants: (["right", "left"] as const).flatMap((side) => [
+      { side, size: "detail" as const, class: "sm:max-w-[440px]" },
+      { side, size: "form" as const, class: "sm:max-w-[540px]" },
+      { side, size: "wide" as const, class: "sm:max-w-[620px]" },
+    ]),
+    defaultVariants: { side: "right", size: "detail" },
   },
 );
 
@@ -38,6 +53,7 @@ export type SheetContentProps = ComponentProps<typeof SheetPrimitive.Content> &
 
 export function SheetContent({
   side,
+  size,
   className,
   children,
   closeLabel = "Fermer",
@@ -45,40 +61,59 @@ export function SheetContent({
 }: SheetContentProps) {
   return (
     <SheetPrimitive.Portal>
-      <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/40 motion-safe:animate-overlay-in" />
-      <SheetPrimitive.Content className={cn(sheetVariants({ side }), className)} {...props}>
+      <SheetPrimitive.Overlay
+        data-slot="sheet-overlay"
+        className="fixed inset-0 z-50 bg-overlay motion-safe:animate-overlay-in"
+      />
+      <SheetPrimitive.Content className={cn(sheetVariants({ side, size }), className)} {...props}>
         {children}
-        <SheetPrimitive.Close
-          aria-label={closeLabel}
-          className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground motion-safe:transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none"
-        >
-          <Icon name="close" />
+        <SheetPrimitive.Close asChild>
+          <IconButton
+            icon="close"
+            size="sm"
+            aria-label={closeLabel}
+            className="absolute right-4 top-4"
+          />
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
     </SheetPrimitive.Portal>
   );
 }
 
-export function SheetHeader({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("flex flex-col gap-1.5", className)} {...props} />;
+export type SheetHeaderProps = ComponentProps<"div"> & {
+  /** Tuile d'icône 36 `soft`, décorative, avant le titre. */
+  icon?: IconName;
+  /** Identifiant (ticket, écran) en `IdTag`, sous le sous-titre. */
+  tag?: string;
+};
+
+export function SheetHeader({ icon, tag, className, children, ...props }: SheetHeaderProps) {
+  return (
+    <div className={cn("flex items-start gap-3 pr-10", className)} {...props}>
+      {icon ? <IconTile icon={icon} size={36} tone="soft" /> : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {children}
+        {tag ? <IdTag className="self-start">{tag}</IdTag> : null}
+      </div>
+    </div>
+  );
 }
 
+/** Pied `--surface` à bordure haute, collé aux bords du tiroir (compense les marges 16 / 20). */
 export function SheetFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={cn("mt-auto flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      className={cn(
+        "-mx-5 -mb-4 mt-auto flex flex-wrap justify-end gap-2 border-t border-border bg-surface px-5 py-3",
+        className,
+      )}
       {...props}
     />
   );
 }
 
 export function SheetTitle({ className, ...props }: ComponentProps<typeof SheetPrimitive.Title>) {
-  return (
-    <SheetPrimitive.Title
-      className={cn("text-section-title text-foreground", className)}
-      {...props}
-    />
-  );
+  return <SheetPrimitive.Title className={cn(DIALOG_TITLE, className)} {...props} />;
 }
 
 export function SheetDescription({
@@ -87,7 +122,7 @@ export function SheetDescription({
 }: ComponentProps<typeof SheetPrimitive.Description>) {
   return (
     <SheetPrimitive.Description
-      className={cn("text-meta text-muted-foreground", className)}
+      className={cn(DIALOG_DESCRIPTION, "text-caption font-normal", className)}
       {...props}
     />
   );

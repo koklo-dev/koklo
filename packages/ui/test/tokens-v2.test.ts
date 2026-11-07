@@ -82,7 +82,12 @@ describe("CA1 (TK-87) - jetons de couleur v2 exposés à Tailwind", () => {
 });
 
 /** Éléments flottants (DESIGN.md v2 §2.1) : `--raised` (via `bg-popover` ou `bg-raised`) et `shadow-floating`. */
-const FLOATING = ["popover", "dropdown-menu", "select", "sheet", "tooltip"] as const;
+const FLOATING = ["popover", "dropdown-menu", "select", "tooltip"] as const;
+/** Tiroir et dialogues : ombres dédiées `--shadow-sheet` / `--shadow-dialog` (TK-139). */
+const OVERLAYS = [
+  ["sheet", "shadow-sheet"],
+  ["dialog", "shadow-dialog"],
+] as const;
 
 describe("CA1 (TK-87) - éléments flottants sur le jeton d'ombre", () => {
   it.each(FLOATING)("%s : shadow-floating, jamais shadow-md ni rgb(", (name) => {
@@ -90,6 +95,13 @@ describe("CA1 (TK-87) - éléments flottants sur le jeton d'ombre", () => {
     expect(src).not.toMatch(/\bshadow-md\b/);
     expect(src).not.toMatch(/\brgba?\(/);
     expect(src).toMatch(/\bshadow-floating\b/);
+  });
+
+  it.each(OVERLAYS)("%s : %s, jamais shadow-md ni rgb(", (name, token) => {
+    const src = readFileSync(join(uiRoot, "src/components", `${name}.tsx`), "utf8");
+    expect(src).not.toMatch(/\bshadow-md\b/);
+    expect(src).not.toMatch(/\brgba?\(/);
+    expect(src).toMatch(new RegExp(`\\b${token}\\b`));
   });
 
   it.each(FLOATING)("%s : surface élevée (bg-popover ou bg-raised)", (name) => {

@@ -87,6 +87,7 @@ export const iconLoaders = {
   speed: () => import("./speed.ts"),
   description: () => import("./description.ts"),
   subdirectory_arrow_right: () => import("./subdirectory_arrow_right.ts"),
+  rate_review: () => import("./rate_review.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

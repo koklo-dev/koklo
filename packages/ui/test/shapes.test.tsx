@@ -35,9 +35,9 @@ describe("formes (02-design.md §2)", () => {
     expect(icon).toHaveClass("size-9", "rounded-md");
   });
 
-  it("Card : rounded-lg, bordure 1px, sans ombre", () => {
+  it("Card : rounded-xl (12), bordure 1px, sans ombre", () => {
     const el = render(<Card />).container.firstElementChild;
-    expect(el).toHaveClass("rounded-lg", "border");
+    expect(el).toHaveClass("rounded-xl", "border");
     noShadow(el);
   });
 
@@ -85,7 +85,7 @@ describe("formes (02-design.md §2)", () => {
     expect(screen.getByRole("menu")).toHaveClass("rounded-xl", "shadow-floating");
   });
 
-  it("Sheet content : shadow-floating sur --raised (flottant)", () => {
+  it("Sheet content : shadow-sheet sur --raised (flottant)", () => {
     render(
       <Sheet open>
         <SheetContent>
@@ -94,12 +94,12 @@ describe("formes (02-design.md §2)", () => {
         </SheetContent>
       </Sheet>,
     );
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-floating", "bg-raised");
+    expect(screen.getByRole("dialog")).toHaveClass("shadow-sheet", "bg-raised");
   });
 });
 
 describe("titres sur l'échelle v2 (DESIGN.md §3)", () => {
-  it("titres par défaut sur l'échelle v2 : Sheet en section (16/600), Card en sous-section (14/600)", () => {
+  it("titres par défaut sur l'échelle v2 : Sheet en dialogue (18/600), Card en 15/600", () => {
     render(
       <Sheet open>
         <SheetContent>
@@ -109,7 +109,7 @@ describe("titres sur l'échelle v2 (DESIGN.md §3)", () => {
       </Sheet>,
     );
     expect(screen.getByRole("heading", { name: "Titre du panneau" })).toHaveClass(
-      "text-section-title",
+      "text-dialog-title",
     );
     const { container } = render(
       <Card>
@@ -118,7 +118,7 @@ describe("titres sur l'échelle v2 (DESIGN.md §3)", () => {
       </Card>,
     );
     const h3 = container.querySelector("h3");
-    expect(h3).toHaveClass("text-subsection-title");
+    expect(h3).toHaveClass("text-card-title");
     expect(h3?.className).not.toMatch(/text-base|tracking-\[/);
     expect(container.querySelector("p")).toHaveClass("text-meta");
   });

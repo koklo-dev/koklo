@@ -6,6 +6,7 @@ import {
   type KanbanRole,
   releaseHeld,
   setScenario,
+  settle,
   switchToDark,
 } from "./support/helpers.ts";
 import type { ProvidersScenario } from "./support/stub-ai-providers.ts";
@@ -259,7 +260,7 @@ for (const theme of ["light", "dark"] as const) {
       if (theme === "dark") await switchToDark(page);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       // Les transitions de couleur de la bascule de thème faussent le contraste : on attend leur fin.
-      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      await settle(page);
       const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
       expect(results.violations).toEqual([]);
       await releaseHeld();
