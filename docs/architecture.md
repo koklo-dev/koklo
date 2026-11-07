@@ -625,7 +625,9 @@ holds the use cases, a port (`TicketRepository`, `SprintRepository`) hides Prism
 
 - **One transaction per use case** (`ProjectTransactions`): project check, read/write, key counter
   and audit row commit together under `withOrganization`.
-- **Current project**: `PROJECT_CONTEXT` (`OldestProjectContext` in v1), never from the client.
+- **Project**: explicit `projectId` input (contract 2.0.0, TK-96), checked by `inProject` + `ProjectAccess.assertAccessible`
+  before any work (uniform `NOT_FOUND`); the organization and the actor come from the session. There is no
+  implicit "oldest project" any more.
 - **Shared bricks** in `tracker/`: `scope.ts`, `counters.ts`, `audit.ts`, `api-errors.ts`
   (domain errors translated to typed contract errors).
 - **Debt**: no composite FK child -> ticket (TK-28); covered by the application safety net

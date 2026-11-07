@@ -43,6 +43,8 @@ const COLUMNS: Array<{ status: Status; label: string }> = [
 ];
 const LABEL = Object.fromEntries(COLUMNS.map((c) => [c.status, c.label])) as Record<Status, string>;
 
+const PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
+
 const SPRINT = {
   id: "01900000-0000-7000-8000-0000000000f1",
   key: "SP-7",
@@ -94,16 +96,19 @@ const initialBoard = (): Ticket[] => [
 let board: Ticket[] = [];
 function serve(): void {
   board = initialBoard();
+  procedures.projectList.mockResolvedValue([{ id: PROJECT_ID, name: "Atelier Lumière" }]);
   procedures.sprintList.mockResolvedValue([SPRINT]);
   procedures.ticketList.mockImplementation(async (input: Parameters<typeof listFor>[1]) =>
     listFor(board, input),
   );
-  procedures.ticketTransition.mockImplementation(async (input: { key: string; to: Status }) => {
-    const found = board.find((t) => t.key === input.key);
-    if (!found) throw apiError("NOT_FOUND");
-    found.status = input.to;
-    return { ...found };
-  });
+  procedures.ticketTransition.mockImplementation(
+    async (input: { projectId: string; key: string; to: Status }) => {
+      const found = board.find((t) => t.key === input.key);
+      if (!found) throw apiError("NOT_FOUND");
+      found.status = input.to;
+      return { ...found };
+    },
+  );
 }
 
 function asRole(role: string) {
@@ -202,20 +207,41 @@ describe("KanbanPage — colonnes et compteurs (C1)", () => {
     expect(screen.getByText("10 tickets")).toBeInTheDocument();
   });
 
-  it("charge le sprint actif puis ses tickets (sprint.list status=active, ticket.list sprintId)", async () => {
-    await renderBoard();
-    expect(procedures.sprintList).toHaveBeenCalledWith({ status: "active" });
-    expect(procedures.ticketList).toHaveBeenCalledWith(
-      expect.objectContaining({ sprintId: "SP-7" }),
-    );
-  });
-
   // TK-94, B42 : une colonne est paginée par le serveur, qui la trie par priorité décroissante ; un tri sur les
   // seules cartes chargées changerait d'ordre à chaque page. Ici le serveur rend un ordre volontairement non trié :
   // le web doit l'afficher tel quel.
   it("affiche chaque colonne dans l'ordre du serveur, sans tri côté web", async () => {
     await renderBoard();
     expect(keysIn("todo")).toEqual(["TK-102", "TK-103", "TK-110", "TK-111"]);
+  });
+});
+
+describe("KanbanPage — projet explicite (TK-96)", () => {
+  it("charge le projet puis le sprint actif puis ses tickets, tous avec projectId (TK-96)", async () => {
+    await renderBoard();
+    expect(procedures.projectList).toHaveBeenCalled();
+    expect(procedures.sprintList).toHaveBeenCalledWith({ projectId: PROJECT_ID, status: "active" });
+    expect(procedures.ticketList).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: PROJECT_ID, sprintId: "SP-7" }),
+    );
+    for (const call of procedures.ticketList.mock.calls)
+      expect(call[0]).toHaveProperty("projectId", PROJECT_ID);
+  });
+
+  it("sans projet (project.list vide) : « Aucun projet », ni sprint.list ni ticket.list (TK-96)", async () => {
+    procedures.projectList.mockResolvedValue([]);
+    renderWithQuery(<KanbanPage />);
+    await screen.findByTestId("kanban-no-project");
+    expect(procedures.sprintList).not.toHaveBeenCalled();
+    expect(procedures.ticketList).not.toHaveBeenCalled();
+  });
+
+  it("project.list en erreur : état d'erreur, aucun appel de sprint ni de ticket (TK-96)", async () => {
+    procedures.projectList.mockRejectedValue(new Error("boom"));
+    renderWithQuery(<KanbanPage />);
+    await screen.findByTestId("kanban-error");
+    expect(procedures.sprintList).not.toHaveBeenCalled();
+    expect(procedures.ticketList).not.toHaveBeenCalled();
   });
 });
 
@@ -418,6 +444,7 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(procedures.ticketTransition).toHaveBeenCalled());
     expect(procedures.ticketTransition.mock.calls[0]?.[0]).toEqual({
+      projectId: PROJECT_ID,
       key: "TK-102",
       to: "in_progress",
     });
@@ -431,6 +458,7 @@ describe("KanbanPage — « Déplacer » au clavier (C5)", () => {
     await userEvent.click(within(menu).getByRole("menuitem", { name: "En revue" }));
     await waitFor(() =>
       expect(procedures.ticketTransition.mock.calls[0]?.[0]).toEqual({
+        projectId: PROJECT_ID,
         key: "TK-104",
         to: "in_review",
       }),
@@ -586,6 +614,7 @@ describe("KanbanPage — déplacement, succès et refus (C6)", () => {
     await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
     await waitFor(() => expect(procedures.ticketTransition).toHaveBeenCalledTimes(2));
     expect(procedures.ticketTransition.mock.calls[1]?.[0]).toEqual({
+      projectId: PROJECT_ID,
       key: "TK-102",
       to: "in_progress",
     });
@@ -618,6 +647,7 @@ describe("KanbanPage — glisser-déposer natif (C6)", () => {
     fireEvent.drop(column("in_review"), { dataTransfer: dt });
     await waitFor(() => expect(procedures.ticketTransition).toHaveBeenCalled());
     expect(procedures.ticketTransition.mock.calls[0]?.[0]).toEqual({
+      projectId: PROJECT_ID,
       key: "TK-102",
       to: "in_review",
     });
@@ -646,6 +676,7 @@ describe("KanbanPage — glisser-déposer natif (C6)", () => {
     fireEvent.drop(column("blocked"), { dataTransfer: dt });
     await waitFor(() =>
       expect(procedures.ticketTransition.mock.calls[0]?.[0]).toEqual({
+        projectId: PROJECT_ID,
         key: "TK-102",
         to: "blocked",
       }),

@@ -34,7 +34,7 @@ afterAll(async () => {
 describe("ticket.create", () => {
   it("crée un ticket backlog par défaut, conforme à ticketSchema, clé TK-1", async () => {
     const world = await createWorld(database);
-    const response = await apiFor(app, world.actors.dev).createTicket({
+    const response = await apiFor(app, world.actors.dev, world.projectId).createTicket({
       title: "Écrire le contrat",
       description: "Détails",
       labels: ["front", "urgent"],
@@ -69,7 +69,7 @@ describe("ticket.create", () => {
 describe("ticket.create (suite 2)", () => {
   it("accepte status todo à la création, refuse les autres statuts", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     expect((await dev.createTicket({ status: "todo" })).body.status).toBe("todo");
     const refused = await dev.createTicket({ status: "in_progress" });
     expect(refused.status).toBeGreaterThanOrEqual(400);
@@ -81,7 +81,7 @@ describe("ticket.create (suite 2)", () => {
 
   it("stocke l'assignee en assigneeKind/assigneeId et le restitue en chaîne", async () => {
     const world = await createWorld(database);
-    const created = await apiFor(app, world.actors.dev).createTicket({
+    const created = await apiFor(app, world.actors.dev, world.projectId).createTicket({
       assignee: { kind: "member", id: "membre-42" },
     });
     expect(created.status).toBe(200);
@@ -94,7 +94,9 @@ describe("ticket.create (suite 2)", () => {
 
   it("rejette un label pkg:* (VALIDATION) sans écrire de ticket", async () => {
     const world = await createWorld(database);
-    const response = await apiFor(app, world.actors.dev).createTicket({ labels: ["pkg:web"] });
+    const response = await apiFor(app, world.actors.dev, world.projectId).createTicket({
+      labels: ["pkg:web"],
+    });
     expect(response.status).toBe(422);
     expect(response.body.code).toBe("VALIDATION");
     expect(response.body.data.field).toBe("labels");
@@ -107,7 +109,9 @@ describe("ticket.create (suite 2)", () => {
 describe("ticket.create (suite 3)", () => {
   it("rejette un sprintId inconnu avec VALIDATION sur sprintId", async () => {
     const world = await createWorld(database);
-    const response = await apiFor(app, world.actors.dev).createTicket({ sprintId: "SP-9" });
+    const response = await apiFor(app, world.actors.dev, world.projectId).createTicket({
+      sprintId: "SP-9",
+    });
     expect(response.status).toBe(422);
     expect(response.body.code).toBe("VALIDATION");
     expect(response.body.data.field).toBe("sprintId");
@@ -115,8 +119,10 @@ describe("ticket.create (suite 3)", () => {
 
   it("rattache le ticket au sprint demandé", async () => {
     const world = await createWorld(database);
-    const sprint = await seedSprint(app, world.actors.dev);
-    const created = await apiFor(app, world.actors.dev).createTicket({ sprintId: sprint.key });
+    const sprint = await seedSprint(app, world.actors.dev, world.projectId);
+    const created = await apiFor(app, world.actors.dev, world.projectId).createTicket({
+      sprintId: sprint.key,
+    });
     expect(created.body.sprint).toBe(sprint.key);
   });
 });
@@ -124,7 +130,7 @@ describe("ticket.create (suite 3)", () => {
 describe("clés TK-n attribuées par le compteur du projet", () => {
   it("dix créations concurrentes produisent dix clés distinctes", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     const responses = await Promise.all(Array.from({ length: 10 }, () => dev.createTicket()));
     expect(responses.map((r) => r.status)).toEqual(Array(10).fill(200));
     const keys = responses.map((r) => r.body.key as string);
@@ -139,15 +145,17 @@ describe("clés TK-n attribuées par le compteur du projet", () => {
        VALUES ($1, $2, 'ticket', 41, now(), now())`,
       [world.organizationId, world.projectId],
     );
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     expect((await dev.createTicket()).body.key).toBe("TK-42");
     const other = await createWorld(database);
-    expect((await apiFor(app, other.actors.dev).createTicket()).body.key).toBe("TK-1");
+    expect((await apiFor(app, other.actors.dev, other.projectId).createTicket()).body.key).toBe(
+      "TK-1",
+    );
   });
 
   it("la clé d'un ticket supprimé n'est jamais réutilisée", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     await dev.createTicket();
     await dev.createTicket();
     expect((await dev.deleteTicket("TK-2")).status).toBe(200);
@@ -158,7 +166,7 @@ describe("clés TK-n attribuées par le compteur du projet", () => {
 describe("ticket.get et ticket.list", () => {
   it("get renvoie un ticketDetail avec critères, dépendances et lease null", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     await dev.createTicket({ criteria: [{ statement: "A", specRef: "§1" }, { statement: "B" }] });
     await dev.createTicket();
     await dev.addDependency("TK-1", "TK-2", "blocks");
@@ -177,7 +185,7 @@ describe("ticket.get et ticket.list", () => {
 
   it("get d'une clé inconnue est NOT_FOUND", async () => {
     const world = await createWorld(database);
-    const response = await apiFor(app, world.actors.dev).getTicket("TK-77");
+    const response = await apiFor(app, world.actors.dev, world.projectId).getTicket("TK-77");
     expect(response.status).toBe(404);
     expect(response.body.code).toBe("NOT_FOUND");
   });
@@ -186,8 +194,8 @@ describe("ticket.get et ticket.list", () => {
 describe("ticket.get et ticket.list (suite 2)", () => {
   it("list pagine par curseur stable (createdAt,id), limite par défaut et filtres", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const sprint = await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const sprint = await seedSprint(app, world.actors.dev, world.projectId);
     for (let i = 0; i < 5; i++) {
       await dev.createTicket({
         status: i % 2 === 0 ? "todo" : "backlog",
@@ -221,7 +229,7 @@ describe("ticket.get et ticket.list (suite 2)", () => {
 describe("ticket.update", () => {
   it("modifie les champs fournis, remplace les listes fournies, laisse le reste", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     await dev.createTicket({ title: "Avant", labels: ["a", "b"], linkedFeatures: ["F-1"] });
     const updated = await dev.updateTicket("TK-1", {
       title: "Après",
@@ -242,7 +250,7 @@ describe("ticket.update", () => {
 
   it("ne modifie jamais le statut (schéma strict)", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     await dev.createTicket();
     const response = await dev.updateTicket("TK-1", { status: "done" });
     expect(response.status).toBeGreaterThanOrEqual(400);
@@ -254,7 +262,7 @@ describe("ticket.update", () => {
 describe("ticket.update (suite 2)", () => {
   it("rejette un label pkg:* et un sprintId inconnu en VALIDATION", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     await dev.createTicket();
     const label = await dev.updateTicket("TK-1", { labels: ["pkg:db"] });
     expect(label.status).toBe(422);
@@ -266,7 +274,9 @@ describe("ticket.update (suite 2)", () => {
 
   it("une clé inconnue est NOT_FOUND", async () => {
     const world = await createWorld(database);
-    const response = await apiFor(app, world.actors.dev).updateTicket("TK-9", { title: "x" });
+    const response = await apiFor(app, world.actors.dev, world.projectId).updateTicket("TK-9", {
+      title: "x",
+    });
     expect(response.status).toBe(404);
     expect(response.body.code).toBe("NOT_FOUND");
   });
@@ -275,7 +285,7 @@ describe("ticket.update (suite 2)", () => {
 describe("ticket.delete : suppression logique", () => {
   it("pose deleted_at, garde la ligne, et le ticket disparaît partout", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     await dev.createTicket({ status: "todo" });
     await dev.createTicket();
 
@@ -296,8 +306,8 @@ describe("ticket.delete : suppression logique", () => {
 
   it("refuse la suppression avec un bail non libéré (ticket_has_active_lease)", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     await insertLease(database, world.organizationId, ticket.id);
 
     const refused = await dev.deleteTicket(ticket.key);
@@ -309,8 +319,8 @@ describe("ticket.delete : suppression logique", () => {
 
   it("autorise la suppression quand le bail est libéré", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     await insertLease(database, world.organizationId, ticket.id, { released: true });
     expect((await dev.deleteTicket(ticket.key)).status).toBe(200);
   });
@@ -319,19 +329,19 @@ describe("ticket.delete : suppression logique", () => {
 describe("ticket.get : masquage de lease.worktree", () => {
   it("expose le worktree à owner, admin, dev, designer ; le masque pour client et business", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     await insertLease(database, world.organizationId, ticket.id, {
       worktree: "/srv/worktrees/secret-tree",
     });
 
     for (const role of ["owner", "admin", "dev", "designer"] as const) {
-      const response = await apiFor(app, world.actors[role]).getTicket(ticket.key);
+      const response = await apiFor(app, world.actors[role], world.projectId).getTicket(ticket.key);
       expect(response.status).toBe(200);
       expect(ticketDetailSchema.safeParse(response.body).success).toBe(true);
       expect(response.body.lease.worktree).toBe("/srv/worktrees/secret-tree");
     }
     for (const role of ["client", "business"] as const) {
-      const response = await apiFor(app, world.actors[role]).getTicket(ticket.key);
+      const response = await apiFor(app, world.actors[role], world.projectId).getTicket(ticket.key);
       expect(response.status).toBe(200);
       expect(ticketDetailSchema.safeParse(response.body).success).toBe(true);
       expect(response.body.lease).toMatchObject({
@@ -354,7 +364,12 @@ describe("erreurs inattendues et contexte de projet", () => {
       role: "owner",
     });
     extraApps.push(unreachable);
-    const response = await send(unreachable, undefined, "get", "/tickets");
+    const response = await send(
+      unreachable,
+      undefined,
+      "get",
+      `/projects/${SEED_IDS.project}/tickets`,
+    );
     expect(response.status).toBe(500);
     expect(response.body.code).toBe("INTERNAL");
     expect(response.body.data.requestId).toEqual(expect.any(String));
@@ -366,7 +381,7 @@ describe("erreurs inattendues et contexte de projet", () => {
   it("projet courant v1 : le plus ancien projet de l'organisation (H2)", async () => {
     const world = await createWorld(database);
     await insertProject(database, world.organizationId, "Plus récent", "2026-06-01T00:00:00.000Z");
-    const created = await apiFor(app, world.actors.dev).createTicket();
+    const created = await apiFor(app, world.actors.dev, world.projectId).createTicket();
     expect(created.status).toBe(200);
     const rows = await database.query<{ project_id: string }>(
       "SELECT project_id FROM tickets WHERE organization_id = $1",
@@ -378,7 +393,7 @@ describe("erreurs inattendues et contexte de projet", () => {
   it("une organisation sans projet : lecture NOT_FOUND, création sans écriture", async () => {
     const world = await createWorld(database);
     await database.query("DELETE FROM projects WHERE id = $1", [world.projectId]);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     const read = await dev.getTicket("TK-1");
     expect(read.status).toBe(404);
     expect(read.body.code).toBe("NOT_FOUND");

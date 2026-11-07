@@ -117,6 +117,12 @@ SQL in migration `*_tickets_sprints_leases` (Prisma cannot express it): partial 
 UPDATE/DELETE/TRUNCATE (except the cascade of an organization deletion) and a trigger keeping
 `project_counters.last_value` from decreasing. Procedure in `packages/db/README.md`.
 
+`audit_log.project_id` (TK-96, migration `*_audit_project`): nullable UUID without foreign key (the log is append-only
+and outlives a project), set by the server from the explicit `projectId` of the request. NULL means an
+organization-level entry (member, provider key, project creation, AI call). `audit.list` reads the entries of the
+requested project plus the NULL ones. Existing rows are back-filled from their ticket, sprint, project state,
+suggestion or review.
+
 ### Git provider and spec index tables (TK-41)
 Thirteen tables, migration `*_provider_spec_index` (additive, reversible):
 - **Installations and repos** (tenant): `provider_installations` holds only public provider

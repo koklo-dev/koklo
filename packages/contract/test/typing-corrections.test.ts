@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import * as schemas from "../src/schemas.ts";
-import { auditEntry, comment, errors, input, isValid, output, UUID, UUID2 } from "./support.ts";
+import {
+  auditEntry,
+  comment,
+  errors,
+  scopedInput as input,
+  isValid,
+  output,
+  UUID,
+  UUID2,
+} from "./support.ts";
 
 /** Corrections de typage regroupées dans 0.5.0 (notes TK-29 -> TK-32, analyse TK-42 §6). */
 describe("K1 comment.* : VALIDATION et NOT_FOUND typés", () => {

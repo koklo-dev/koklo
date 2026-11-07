@@ -40,9 +40,9 @@ afterAll(async () => {
 describe("audit des baux et de l'état de projet", () => {
   it("chaque écriture ajoute une ligne : acteur humain, targetKind, targetId serveur, ticketId", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
-    const owner = collaborationFor(app, world.actors.owner);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
 
     await dev.acquire(ticket.key);
     await dev.heartbeat(ticket.key);
@@ -78,13 +78,13 @@ describe("audit des baux et de l'état de projet", () => {
 
   it("un refus ne laisse aucun audit (LEASE_HELD, LEASE_NOT_HOLDER, VERSION_CONFLICT)", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await collaborationFor(app, world.actors.dev).acquire(ticket.key);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await collaborationFor(app, world.actors.dev, world.projectId).acquire(ticket.key);
     const before = (await auditRows(database, world.organizationId)).length;
-    await collaborationFor(app, world.actors.admin).acquire(ticket.key);
-    await collaborationFor(app, world.actors.admin).heartbeat(ticket.key);
-    await collaborationFor(app, world.actors.admin).release(ticket.key);
-    await collaborationFor(app, world.actors.owner).updateState(9, {});
+    await collaborationFor(app, world.actors.admin, world.projectId).acquire(ticket.key);
+    await collaborationFor(app, world.actors.admin, world.projectId).heartbeat(ticket.key);
+    await collaborationFor(app, world.actors.admin, world.projectId).release(ticket.key);
+    await collaborationFor(app, world.actors.owner, world.projectId).updateState(9, {});
     expect((await auditRows(database, world.organizationId)).length).toBe(before);
   });
 });
@@ -92,9 +92,11 @@ describe("audit des baux et de l'état de projet", () => {
 describe("atomicité : l'audit qui échoue annule l'écriture", () => {
   it("lease.acquire : aucun bail", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     await database.query("INSERT INTO audit_fail VALUES ('lease.acquire')");
-    const response = await collaborationFor(app, world.actors.dev).acquire(ticket.key);
+    const response = await collaborationFor(app, world.actors.dev, world.projectId).acquire(
+      ticket.key,
+    );
     expect(response.status).toBe(500);
     expect(response.body.code).toBe("INTERNAL");
     expect(await leaseRows(database, ticket.id)).toHaveLength(0);
@@ -102,8 +104,8 @@ describe("atomicité : l'audit qui échoue annule l'écriture", () => {
 
   it("lease.heartbeat : expires_at inchangé", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     await dev.acquire(ticket.key);
     const [before] = await leaseRows(database, ticket.id);
     clock.advance(60_000);
@@ -116,8 +118,8 @@ describe("atomicité : l'audit qui échoue annule l'écriture", () => {
 
   it("lease.release : le bail reste actif", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     await dev.acquire(ticket.key);
     await database.query("INSERT INTO audit_fail VALUES ('lease.release')");
     expect((await dev.release(ticket.key)).status).toBe(500);
@@ -126,7 +128,7 @@ describe("atomicité : l'audit qui échoue annule l'écriture", () => {
 
   it("project_state.update : version et contenu inchangés", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     await owner.getState();
     await database.query("INSERT INTO audit_fail VALUES ('project_state.update')");
     expect((await owner.updateState(1, { a: 1 })).status).toBe(500);
@@ -138,17 +140,17 @@ describe("isolation", () => {
   it("un utilisateur d'une autre organisation ne voit ni ne touche un bail ; le même ticket key coexiste", async () => {
     const one = await createWorld(database);
     const two = await createWorld(database);
-    const ticketOne = await seedTicket(app, one.actors.dev);
-    const ticketTwo = await seedTicket(app, two.actors.dev);
+    const ticketOne = await seedTicket(app, one.actors.dev, one.projectId);
+    const ticketTwo = await seedTicket(app, two.actors.dev, two.projectId);
     expect(ticketOne.key).toBe(ticketTwo.key);
-    await collaborationFor(app, one.actors.dev).acquire(ticketOne.key);
-    const b = collaborationFor(app, two.actors.dev);
+    await collaborationFor(app, one.actors.dev, one.projectId).acquire(ticketOne.key);
+    const b = collaborationFor(app, two.actors.dev, two.projectId);
 
     expect((await b.getLease(ticketTwo.key)).body).toBeNull();
     expect((await b.heartbeat(ticketTwo.key)).status).toBe(404);
     expect((await b.release(ticketTwo.key)).status).toBe(404);
     expect(
-      (await collaborationFor(app, one.actors.dev).getLease(ticketOne.key)).body,
+      (await collaborationFor(app, one.actors.dev, one.projectId).getLease(ticketOne.key)).body,
     ).not.toBeNull();
     expect((await b.acquire(ticketTwo.key)).status).toBe(200);
     expect(await count(database, "leases", "organization_id = $1", [one.organizationId])).toBe(1);
@@ -157,12 +159,12 @@ describe("isolation", () => {
   it("l'état de projet est propre à chaque organisation", async () => {
     const one = await createWorld(database);
     const two = await createWorld(database);
-    await collaborationFor(app, one.actors.owner).updateState(1, { secret: "A" });
-    const other = await collaborationFor(app, two.actors.owner).getState();
+    await collaborationFor(app, one.actors.owner, one.projectId).updateState(1, { secret: "A" });
+    const other = await collaborationFor(app, two.actors.owner, two.projectId).getState();
     expect(other.body).toEqual({ version: 1, content: {} });
   });
 
-  it("un bail d'un ticket d'un autre projet est introuvable (projet courant imposé)", async () => {
+  it("un bail d'un ticket d'un autre projet est introuvable (projet désigné)", async () => {
     const world = await createWorld(database);
     const secondProject = await insertProject(
       database,
@@ -170,22 +172,16 @@ describe("isolation", () => {
       "Second",
       "2026-06-01T00:00:00.000Z",
     );
-    const { createAppForProject } = await import("./helpers/tickets.ts");
-    const appSecond = await createAppForProject(database.url, secondProject);
-    try {
-      const ticket = await seedTicket(app, world.actors.dev);
-      const second = collaborationFor(appSecond, world.actors.dev);
-      for (const response of [
-        await second.acquire(ticket.key),
-        await second.heartbeat(ticket.key),
-        await second.release(ticket.key),
-        await second.getLease(ticket.key),
-      ]) {
-        expect(response.status).toBe(404);
-      }
-      expect(await leaseRows(database, ticket.id)).toHaveLength(0);
-    } finally {
-      await appSecond.close();
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const second = collaborationFor(app, world.actors.dev, secondProject);
+    for (const response of [
+      await second.acquire(ticket.key),
+      await second.heartbeat(ticket.key),
+      await second.release(ticket.key),
+      await second.getLease(ticket.key),
+    ]) {
+      expect(response.status).toBe(404);
     }
+    expect(await leaseRows(database, ticket.id)).toHaveLength(0);
   });
 });

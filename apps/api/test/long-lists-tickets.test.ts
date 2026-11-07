@@ -26,7 +26,7 @@ afterAll(async () => {
 });
 
 const list = (query = "", target: World = world, role: "dev" | "client" = "dev") =>
-  apiFor(app, target.actors[role]).listTickets(query);
+  apiFor(app, target.actors[role], target.projectId).listTickets(query);
 const encoded = (value: string) => encodeURIComponent(value);
 /**
  * Ordre attendu (B42) : priorité décroissante, puis numéro de la clé, puis id. Calculé par une

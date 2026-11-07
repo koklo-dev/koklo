@@ -57,7 +57,7 @@ describe("import de la fixture réelle", () => {
 
   it("conserve clé, titre, paquet, sensibilité, état, sprint et critères de chaque ticket", async () => {
     const { world } = await importedWorld();
-    const api = apiFor(app, world.actors.owner);
+    const api = apiFor(app, world.actors.owner, world.projectId);
     const worker = (await api.getTicket("TK-12")).body;
     expect(worker).toMatchObject({
       key: "TK-12",
@@ -138,7 +138,7 @@ describe("import de la fixture réelle (suite 3)", () => {
 
   it("relève les compteurs : le prochain ticket est TK-87, le prochain sprint SP-18", async () => {
     const { world } = await importedWorld();
-    const api = apiFor(app, world.actors.owner);
+    const api = apiFor(app, world.actors.owner, world.projectId);
     expect((await api.createTicket({ status: "todo" })).body.key).toBe("TK-87");
     expect((await api.createSprint()).body.key).toBe("SP-18");
   });
@@ -197,7 +197,9 @@ describe("--dry-run", () => {
       audit: 0,
     });
     // Aucun compteur relevé non plus : le premier ticket reçoit TK-1.
-    const first = await apiFor(app, dryWorld.actors.owner).createTicket({ status: "todo" });
+    const first = await apiFor(app, dryWorld.actors.owner, dryWorld.projectId).createTicket({
+      status: "todo",
+    });
     expect(first.body.key).toBe("TK-1");
   });
 });

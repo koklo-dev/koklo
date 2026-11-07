@@ -53,6 +53,12 @@ export const pageOf = <T extends z.ZodType>(item: T) =>
 
 export const holderSchema = z.object({ kind: holderKindSchema, id: z.string().min(1) });
 
+/**
+ * Projet explicite (2.0.0, TK-96) : paramètre de chemin `/projects/{projectId}/...` de toutes les
+ * procédures de pilotage. Le serveur vérifie l'accès avant tout travail (404 uniforme sinon).
+ */
+export const projectScopeShape = { projectId: z.uuid() };
+
 const titleSchema = z.string().min(1).max(200);
 const estimateSchema = z.number().min(0);
 
@@ -103,6 +109,7 @@ export const ticketDetailSchema = ticketSchema.extend({
 });
 
 export const ticketCreateInputSchema = z.object({
+  ...projectScopeShape,
   title: titleSchema,
   description: z.string().optional(),
   type: ticketTypeSchema,
@@ -120,10 +127,16 @@ export const ticketCreateInputSchema = z.object({
     .optional(),
 });
 
-export const ticketKeyInputSchema = z.object({ key: ticketKeySchema });
+/** Sortie de `ticket.delete` : la clé seule, sans le projet (sorties inchangées en 2.0.0). */
+export const ticketKeyOutputSchema = z.object({ key: ticketKeySchema });
+export const ticketKeyInputSchema = z.object({
+  ...projectScopeShape,
+  ...ticketKeyOutputSchema.shape,
+});
 
 export const ticketListInputSchema = z
   .object({
+    ...projectScopeShape,
     status: ticketStatusSchema.optional(),
     sprintId: sprintKeySchema.optional(),
     pkg: ticketPackageSchema.optional(),
@@ -134,6 +147,7 @@ export const ticketListInputSchema = z
 
 /** Strict : le statut ne se modifie que par `ticket.transition`. */
 export const ticketUpdateInputSchema = z.strictObject({
+  ...projectScopeShape,
   key: ticketKeySchema,
   title: titleSchema.optional(),
   description: z.string().optional(),
@@ -148,14 +162,20 @@ export const ticketUpdateInputSchema = z.strictObject({
 });
 
 export const ticketTransitionInputSchema = z.object({
+  ...projectScopeShape,
   key: ticketKeySchema,
   to: ticketStatusSchema,
 });
 
-export const dependencyEdgeInputSchema = z.object({
+/** Sortie de `dependency.remove` : l'arête seule, sans le projet. */
+export const dependencyEdgeOutputSchema = z.object({
   key: ticketKeySchema,
   dependsOn: ticketKeySchema,
   type: dependencyTypeSchema,
+});
+export const dependencyEdgeInputSchema = z.object({
+  ...projectScopeShape,
+  ...dependencyEdgeOutputSchema.shape,
 });
 export const dependencyAddInputSchema = dependencyEdgeInputSchema.refine(
   (edge) => edge.key !== edge.dependsOn,
@@ -179,6 +199,7 @@ export const sprintSchema = z.object({
 
 export const sprintCreateInputSchema = z
   .object({
+    ...projectScopeShape,
     goal: z.string().min(1),
     startsOn: dateSchema,
     endsOn: dateSchema,
@@ -186,12 +207,16 @@ export const sprintCreateInputSchema = z
   })
   .refine(endsAfterStart, endsAfterStartIssue);
 
-export const sprintKeyInputSchema = z.object({ key: sprintKeySchema });
-export const sprintListInputSchema = z.object({ status: sprintStatusSchema.optional() });
+export const sprintKeyInputSchema = z.object({ ...projectScopeShape, key: sprintKeySchema });
+export const sprintListInputSchema = z.object({
+  ...projectScopeShape,
+  status: sprintStatusSchema.optional(),
+});
 
 /** Strict : le statut passe par `activate` et `close`. */
 export const sprintUpdateInputSchema = z
   .strictObject({
+    ...projectScopeShape,
     key: sprintKeySchema,
     goal: z.string().min(1).optional(),
     startsOn: dateSchema.optional(),

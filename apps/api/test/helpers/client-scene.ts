@@ -2,14 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
 import { type Actor, insertActor, insertOrganization } from "./organizations.ts";
-import {
-  createAppForProject,
-  insertLease,
-  insertProject,
-  seedSprint,
-  seedTicket,
-  send,
-} from "./tickets.ts";
+import { insertLease, insertProject, seedSprint, seedTicket, send } from "./tickets.ts";
 
 /** Rôles d'équipe et business : ils voient toute l'organisation (CDC §14), seul le client est cloisonné. */
 export const STAFF = ["owner", "admin", "dev", "designer", "business"] as const;
@@ -138,8 +131,11 @@ export const P1_WORKTREE = "/srv/worktrees/p1-secret-tree";
  * Titres de ticket `secret-<projet>-<n>`, objectif de sprint `goal-<projet>-<n>`. Un bail actif est
  * posé en SQL sur le ticket `TK-2` de p1.
  */
-export async function seedWork(database: TestDatabase, scene: ClientScene): Promise<SeededTickets> {
-  const databaseUrl = database.url;
+export async function seedWork(
+  app: INestApplication,
+  database: TestDatabase,
+  scene: ClientScene,
+): Promise<SeededTickets> {
   const plan = [
     ["old", scene.projects.old, scene.staff.owner, 1, 1],
     ["p1", scene.projects.p1, scene.staff.owner, 2, 1],
@@ -149,18 +145,13 @@ export async function seedWork(database: TestDatabase, scene: ClientScene): Prom
   const empty = (): SeededProject => ({ tickets: [], sprints: [] });
   const out: SeededTickets = { old: empty(), p1: empty(), p2: empty(), foreign: empty() };
   for (const [name, projectId, owner, tickets, sprints] of plan) {
-    const app = await createAppForProject(databaseUrl, projectId);
-    try {
-      for (let n = 1; n <= tickets; n++) {
-        const ticket = await seedTicket(app, owner, { title: `secret-${name}-${n}` });
-        out[name].tickets.push({ key: ticket.key, id: ticket.id });
-      }
-      for (let n = 1; n <= sprints; n++) {
-        const sprint = await seedSprint(app, owner, { goal: `goal-${name}-${n}` });
-        out[name].sprints.push({ key: sprint.key, id: sprint.id });
-      }
-    } finally {
-      await app.close();
+    for (let n = 1; n <= tickets; n++) {
+      const ticket = await seedTicket(app, owner, projectId, { title: `secret-${name}-${n}` });
+      out[name].tickets.push({ key: ticket.key, id: ticket.id });
+    }
+    for (let n = 1; n <= sprints; n++) {
+      const sprint = await seedSprint(app, owner, projectId, { goal: `goal-${name}-${n}` });
+      out[name].sprints.push({ key: sprint.key, id: sprint.id });
     }
   }
   const leased = out.p1.tickets[1] as SeededItem;

@@ -21,6 +21,22 @@ export const proc = (path: string): Procedure | undefined => {
 };
 
 export const input = (path: string) => proc(path)?.["~orpc"].inputSchemas?.[0];
+/**
+ * Entrée d'une procédure de pilotage (TK-96) : `projectId` est obligatoire (cf. project-scope.test.ts) ;
+ * les suites de champs l'ajoutent par défaut pour ne tester que le reste de l'entrée.
+ */
+export const scopedInput = (path: string): StandardLike | undefined => {
+  const schema = input(path);
+  if (!schema) return undefined;
+  return {
+    "~standard": {
+      validate: (value) =>
+        schema["~standard"].validate(
+          typeof value === "object" && value !== null ? { projectId: UUID, ...value } : value,
+        ),
+    },
+  };
+};
 export const output = (path: string) => proc(path)?.["~orpc"].outputSchemas?.[0];
 export const errors = (path: string) => proc(path)?.["~orpc"].errorMap ?? {};
 

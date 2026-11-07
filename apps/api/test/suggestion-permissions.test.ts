@@ -142,7 +142,7 @@ describe("un client ne peut pas éditer : ses seules écritures sont suggérer, 
   it("ticket.create reste 403 pour le client lié, suggestion.create est 200", async () => {
     const client = scene.p1.world.actors.client;
 
-    expect((await apiFor(bench().app, client).createTicket()).status).toBe(403);
+    expect((await apiFor(bench().app, client, scene.p1.projectId).createTicket()).status).toBe(403);
     expect((await suggestionApi(bench().app, client).create(scene.p1.projectId)).status).toBe(200);
   });
 });

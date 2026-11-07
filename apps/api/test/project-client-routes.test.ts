@@ -126,11 +126,15 @@ describe("projectClient.add", () => {
   it("ouvre l'accès du client à ce projet (liste de projets, tickets) dès l'appel suivant", async () => {
     const client = await freshClient("add-effect");
     expect((await send(app, client.cookie, "get", "/projects")).body).toEqual([]);
-    expect((await send(app, client.cookie, "get", "/tickets")).status).toBe(404);
+    expect(
+      (await send(app, client.cookie, "get", `/projects/${scene.projects.p1}/tickets`)).status,
+    ).toBe(404);
     await api().add(scene.projects.p1, client.memberId);
     const projects = await send(app, client.cookie, "get", "/projects");
     expect(projects.body.map((p: { id: string }) => p.id)).toEqual([scene.projects.p1]);
-    expect((await send(app, client.cookie, "get", "/tickets")).status).toBe(200);
+    expect(
+      (await send(app, client.cookie, "get", `/projects/${scene.projects.p1}/tickets`)).status,
+    ).toBe(200);
   });
 
   it("idempotent : un second appel renvoie 200 et la même ligne, sans doublon ni nouvel audit", async () => {
@@ -312,14 +316,18 @@ describe("projectClient.remove", () => {
   it("retire le lien : { removed: true }, ligne supprimée, accès fermé aussitôt", async () => {
     const client = await freshClient("remove-ok");
     await api().add(scene.projects.p1, client.memberId);
-    expect((await send(app, client.cookie, "get", "/tickets")).status).toBe(200);
+    expect(
+      (await send(app, client.cookie, "get", `/projects/${scene.projects.p1}/tickets`)).status,
+    ).toBe(200);
     const res = await api().remove(scene.projects.p1, client.memberId);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ removed: true });
     expect((await linkRows(database, scene.projects.p1)).map((r) => r.user_id)).not.toContain(
       client.userId,
     );
-    expect((await send(app, client.cookie, "get", "/tickets")).status).toBe(404);
+    expect(
+      (await send(app, client.cookie, "get", `/projects/${scene.projects.p1}/tickets`)).status,
+    ).toBe(404);
   });
 
   it("idempotent : retirer un lien absent est un 200 { removed: false }, sans audit", async () => {

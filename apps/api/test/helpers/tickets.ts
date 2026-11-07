@@ -2,15 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
 import request from "supertest";
-import { AppModule } from "../../src/app.module.ts";
-import { configFor } from "./app.ts";
 import { type Actor, insertActor, insertOrganization, ROLES } from "./organizations.ts";
 
 /**
- * Monde de test des tickets : une organisation, un projet (le plus ancien : celui que résout le
- * contexte v1, H2) et un utilisateur par rôle, chacun avec une session Better Auth réelle.
+ * Monde de test des tickets : une organisation, un projet et un utilisateur par rôle, chacun avec
+ * une session Better Auth réelle. Le projet est toujours passé explicitement aux appels (TK-96).
  */
 export interface World {
   organizationId: string;
@@ -99,32 +96,41 @@ export const SPRINT_DEFAULTS = {
   endsOn: "2026-11-13",
 } as const;
 
-/** Client de l'API pour un acteur ; les appels sont ceux du contrat 0.4.0 (HTTP réel). */
-export function apiFor(app: INestApplication, actor: Pick<Actor, "cookie"> | undefined) {
+/** Chemin d'une ressource de pilotage : `/projects/{projectId}/<suffixe>` (contrat 2.0.0). */
+export const projectPath = (projectId: string, suffix: string) => `/projects/${projectId}${suffix}`;
+
+/** Client de l'API pour un acteur et un projet ; les appels sont ceux du contrat 2.0.0 (HTTP réel). */
+export function apiFor(
+  app: INestApplication,
+  actor: Pick<Actor, "cookie"> | undefined,
+  projectId: string,
+) {
   const cookie = actor?.cookie;
+  const at = (suffix: string) => projectPath(projectId, suffix);
   return {
     createTicket: (over: Record<string, unknown> = {}) =>
-      send(app, cookie, "post", "/tickets", { ...TICKET_DEFAULTS, ...over }),
-    getTicket: (key: string) => send(app, cookie, "get", `/tickets/${key}`),
-    listTickets: (query = "") => send(app, cookie, "get", `/tickets${query}`),
+      send(app, cookie, "post", at("/tickets"), { ...TICKET_DEFAULTS, ...over }),
+    getTicket: (key: string) => send(app, cookie, "get", at(`/tickets/${key}`)),
+    listTickets: (query = "") => send(app, cookie, "get", at(`/tickets${query}`)),
     updateTicket: (key: string, over: Record<string, unknown>) =>
-      send(app, cookie, "patch", `/tickets/${key}`, { key, ...over }),
-    deleteTicket: (key: string) => send(app, cookie, "delete", `/tickets/${key}`),
+      send(app, cookie, "patch", at(`/tickets/${key}`), { key, ...over }),
+    deleteTicket: (key: string) => send(app, cookie, "delete", at(`/tickets/${key}`)),
     transition: (key: string, to: string) =>
-      send(app, cookie, "post", `/tickets/${key}/transition`, { key, to }),
+      send(app, cookie, "post", at(`/tickets/${key}/transition`), { key, to }),
     addDependency: (key: string, dependsOn: string, type = "blocks") =>
-      send(app, cookie, "post", `/tickets/${key}/dependencies`, { key, dependsOn, type }),
+      send(app, cookie, "post", at(`/tickets/${key}/dependencies`), { key, dependsOn, type }),
     removeDependency: (key: string, dependsOn: string, type = "blocks") =>
-      send(app, cookie, "delete", `/tickets/${key}/dependencies/${dependsOn}`, { type }),
-    listDependencies: (key: string) => send(app, cookie, "get", `/tickets/${key}/dependencies`),
+      send(app, cookie, "delete", at(`/tickets/${key}/dependencies/${dependsOn}`), { type }),
+    listDependencies: (key: string) => send(app, cookie, "get", at(`/tickets/${key}/dependencies`)),
     createSprint: (over: Record<string, unknown> = {}) =>
-      send(app, cookie, "post", "/sprints", { ...SPRINT_DEFAULTS, ...over }),
-    getSprint: (key: string) => send(app, cookie, "get", `/sprints/${key}`),
-    listSprints: (query = "") => send(app, cookie, "get", `/sprints${query}`),
+      send(app, cookie, "post", at("/sprints"), { ...SPRINT_DEFAULTS, ...over }),
+    getSprint: (key: string) => send(app, cookie, "get", at(`/sprints/${key}`)),
+    listSprints: (query = "") => send(app, cookie, "get", at(`/sprints${query}`)),
     updateSprint: (key: string, over: Record<string, unknown>) =>
-      send(app, cookie, "patch", `/sprints/${key}`, { key, ...over }),
-    activateSprint: (key: string) => send(app, cookie, "post", `/sprints/${key}/activate`, { key }),
-    closeSprint: (key: string) => send(app, cookie, "post", `/sprints/${key}/close`, { key }),
+      send(app, cookie, "patch", at(`/sprints/${key}`), { key, ...over }),
+    activateSprint: (key: string) =>
+      send(app, cookie, "post", at(`/sprints/${key}/activate`), { key }),
+    closeSprint: (key: string) => send(app, cookie, "post", at(`/sprints/${key}/close`), { key }),
   };
 }
 
@@ -132,9 +138,10 @@ export function apiFor(app: INestApplication, actor: Pick<Actor, "cookie"> | und
 export async function seedTicket(
   app: INestApplication,
   actor: Actor,
+  projectId: string,
   over: Record<string, unknown> = {},
 ): Promise<{ key: string; id: string } & Record<string, unknown>> {
-  const response = await apiFor(app, actor).createTicket({ status: "todo", ...over });
+  const response = await apiFor(app, actor, projectId).createTicket({ status: "todo", ...over });
   if (response.status !== 200) {
     throw new Error(
       `ticket.create a répondu ${response.status} : ${JSON.stringify(response.body)}`,
@@ -146,9 +153,10 @@ export async function seedTicket(
 export async function seedSprint(
   app: INestApplication,
   actor: Actor,
+  projectId: string,
   over: Record<string, unknown> = {},
 ): Promise<{ key: string; id: string } & Record<string, unknown>> {
-  const response = await apiFor(app, actor).createSprint(over);
+  const response = await apiFor(app, actor, projectId).createSprint(over);
   if (response.status !== 200) {
     throw new Error(
       `sprint.create a répondu ${response.status} : ${JSON.stringify(response.body)}`,
@@ -211,24 +219,4 @@ export async function insertLease(
       over.released ? new Date().toISOString() : null,
     ],
   );
-}
-
-/**
- * Application dont le projet courant est imposé : seul moyen de tester l'isolation entre projets
- * d'une même organisation (le contexte v1 résout toujours le plus ancien).
- */
-export async function createAppForProject(
-  databaseUrl: string,
-  projectId: string,
-): Promise<INestApplication> {
-  const { PROJECT_CONTEXT } = await import("../../src/project/project-context.ts");
-  const context = { projectId: async () => projectId };
-  const app = (
-    await Test.createTestingModule({ imports: [AppModule.forRoot(configFor({ databaseUrl }))] })
-      .overrideProvider(PROJECT_CONTEXT)
-      .useValue(context)
-      .compile()
-  ).createNestApplication();
-  await app.init();
-  return app;
 }

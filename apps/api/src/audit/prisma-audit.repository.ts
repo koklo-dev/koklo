@@ -32,7 +32,11 @@ const toRecord = (row: AuditRow, keys: Map<string, string>): AuditRecord => ({
   occurredAt: row.occurredAt,
 });
 
-/** Filtres combinés en ET, organisation d'abord, puis reprise après le curseur (récent vers ancien). */
+/**
+ * Filtres combinés en ET, organisation d'abord, puis reprise après le curseur (récent vers ancien).
+ * Le journal d'un projet est celui de ses écritures (`project_id`) plus celles de l'organisation
+ * (`project_id` NULL : membre, clé BYOK…), jamais celles d'un autre projet.
+ */
 function auditWhere(
   scope: ProjectScope,
   filter: AuditFilter,
@@ -45,6 +49,7 @@ function auditWhere(
   };
   return {
     organizationId: scope.organizationId,
+    AND: [{ OR: [{ projectId: scope.projectId }, { projectId: null }] }],
     ...(ticketId ? { ticketId } : {}),
     ...(filter.actorKind ? { actorKind: filter.actorKind } : {}),
     ...(filter.action ? { action: filter.action } : {}),

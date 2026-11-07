@@ -45,9 +45,9 @@ describe("R1 : prise simultanée du même ticket par deux titulaires", () => {
   it("exactement un 200 et un 409 LEASE_HELD, une seule ligne active, une seule ligne d'audit, aucun 500", async () => {
     for (let round = 0; round < 5; round++) {
       const world = await worldWithSecondDev();
-      const ticket = await seedTicket(app, world.actors.dev);
-      const a = collaborationFor(app, world.actors.dev);
-      const b = collaborationFor(app, world.dev2);
+      const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+      const a = collaborationFor(app, world.actors.dev, world.projectId);
+      const b = collaborationFor(app, world.dev2, world.projectId);
 
       const responses = await Promise.all([a.acquire(ticket.key), b.acquire(ticket.key)]);
 
@@ -71,8 +71,8 @@ describe("R1 : prise simultanée du même ticket par deux titulaires", () => {
 
   it("variante même titulaire : deux requêtes identiques, une seule gagne, l'autre LEASE_HELD", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
 
     const responses = await Promise.all([dev.acquire(ticket.key), dev.acquire(ticket.key)]);
 
@@ -84,8 +84,8 @@ describe("R1 : prise simultanée du même ticket par deux titulaires", () => {
 
   it("le même titulaire qui reprend un bail déjà actif reçoit LEASE_HELD (renouvellement par heartbeat)", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     expect((await dev.acquire(ticket.key)).status).toBe(200);
     const again = await dev.acquire(ticket.key);
     expect(again.status).toBe(409);
@@ -97,9 +97,9 @@ describe("R1 : prise simultanée du même ticket par deux titulaires", () => {
 describe("incident 3 : l'expiration libère le ticket sans code de reprise", () => {
   it("incident-3-expired-lease-frees-ticket-without-recovery", async () => {
     const world = await worldWithSecondDev();
-    const ticket = await seedTicket(app, world.actors.dev);
-    const first = collaborationFor(app, world.actors.dev);
-    const second = collaborationFor(app, world.dev2);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const first = collaborationFor(app, world.actors.dev, world.projectId);
+    const second = collaborationFor(app, world.dev2, world.projectId);
     const acquired = await first.acquire(ticket.key, { ttlMs: 10 * MINUTE });
     expect(acquired.status).toBe(200);
     expect((await second.acquire(ticket.key)).status).toBe(409);
@@ -108,7 +108,9 @@ describe("incident 3 : l'expiration libère le ticket sans code de reprise", () 
     clock.advance(10 * MINUTE + 1);
 
     expect((await second.getLease(ticket.key)).body).toBeNull();
-    expect((await apiFor(app, world.actors.dev).getTicket(ticket.key)).body.lease).toBeNull();
+    expect(
+      (await apiFor(app, world.actors.dev, world.projectId).getTicket(ticket.key)).body.lease,
+    ).toBeNull();
     const taken = await second.acquire(ticket.key);
     expect(taken.status).toBe(200);
     expect(taken.body.holder.id).toBe(world.dev2.userId);
@@ -124,16 +126,19 @@ describe("incident 3 : l'expiration libère le ticket sans code de reprise", () 
     for (let round = 0; round < 3; round++) {
       const world = await worldWithSecondDev();
       const third = await insertActor(database, world.organizationId, "admin", "admin2");
-      const ticket = await seedTicket(app, world.actors.dev);
+      const ticket = await seedTicket(app, world.actors.dev, world.projectId);
       expect(
-        (await collaborationFor(app, world.actors.dev).acquire(ticket.key, { ttlMs: MINUTE }))
-          .status,
+        (
+          await collaborationFor(app, world.actors.dev, world.projectId).acquire(ticket.key, {
+            ttlMs: MINUTE,
+          })
+        ).status,
       ).toBe(200);
       clock.advance(MINUTE + 1);
 
       const responses = await Promise.all([
-        collaborationFor(app, world.dev2).acquire(ticket.key),
-        collaborationFor(app, third).acquire(ticket.key),
+        collaborationFor(app, world.dev2, world.projectId).acquire(ticket.key),
+        collaborationFor(app, third, world.projectId).acquire(ticket.key),
       ]);
 
       expect(
@@ -149,11 +154,15 @@ describe("incident 3 : l'expiration libère le ticket sans code de reprise", () 
 describe("défaut existant : un bail expiré non libéré n'est pas actif", () => {
   it("ticket.delete n'est plus refusé et ticket.get n'expose pas le bail expiré", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const held = await seedTicket(app, world.actors.dev);
-    await collaborationFor(app, world.actors.dev).acquire(ticket.key, { ttlMs: MINUTE });
-    await collaborationFor(app, world.actors.dev).acquire(held.key, { ttlMs: 60 * MINUTE });
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const held = await seedTicket(app, world.actors.dev, world.projectId);
+    await collaborationFor(app, world.actors.dev, world.projectId).acquire(ticket.key, {
+      ttlMs: MINUTE,
+    });
+    await collaborationFor(app, world.actors.dev, world.projectId).acquire(held.key, {
+      ttlMs: 60 * MINUTE,
+    });
     expect((await dev.deleteTicket(held.key)).status).toBe(409);
 
     clock.advance(MINUTE + 1);

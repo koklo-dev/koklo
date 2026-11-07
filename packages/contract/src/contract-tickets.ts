@@ -4,10 +4,11 @@ import {
   invalidTransitionError,
   validationError,
 } from "./errors.ts";
-import { readErrors, readOneErrors, route, writeErrors, writeOneErrors } from "./route-helpers.ts";
+import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
 import {
   dependencyAddInputSchema,
   dependencyEdgeInputSchema,
+  dependencyEdgeOutputSchema,
   dependencySchema,
   sprintCreateInputSchema,
   sprintKeyInputSchema,
@@ -17,6 +18,7 @@ import {
   ticketCreateInputSchema,
   ticketDetailSchema,
   ticketKeyInputSchema,
+  ticketKeyOutputSchema,
   ticketListInputSchema,
   ticketSchema,
   ticketTransitionInputSchema,
@@ -25,69 +27,69 @@ import {
 import { listOf } from "./schemas-lists.ts";
 
 export const ticket = {
-  create: route("POST", "/tickets")
-    .errors({ ...writeErrors, ...validationError, ...conflictError })
+  create: route("POST", "/projects/{projectId}/tickets")
+    .errors({ ...writeOneErrors, ...validationError, ...conflictError })
     .input(ticketCreateInputSchema)
     .output(ticketSchema),
-  get: route("GET", "/tickets/{key}")
+  get: route("GET", "/projects/{projectId}/tickets/{key}")
     .errors(readOneErrors)
     .input(ticketKeyInputSchema)
     .output(ticketDetailSchema),
-  list: route("GET", "/tickets")
+  list: route("GET", "/projects/{projectId}/tickets")
     .errors(readOneErrors)
     .input(ticketListInputSchema)
     .output(listOf(ticketSchema)),
-  update: route("PATCH", "/tickets/{key}")
+  update: route("PATCH", "/projects/{projectId}/tickets/{key}")
     .errors({ ...writeOneErrors, ...validationError })
     .input(ticketUpdateInputSchema)
     .output(ticketSchema),
-  delete: route("DELETE", "/tickets/{key}")
+  delete: route("DELETE", "/projects/{projectId}/tickets/{key}")
     .errors({ ...writeOneErrors, ...conflictError })
     .input(ticketKeyInputSchema)
-    .output(ticketKeyInputSchema),
-  transition: route("POST", "/tickets/{key}/transition")
+    .output(ticketKeyOutputSchema),
+  transition: route("POST", "/projects/{projectId}/tickets/{key}/transition")
     .errors({ ...writeOneErrors, ...conflictError, ...invalidTransitionError })
     .input(ticketTransitionInputSchema)
     .output(ticketSchema),
 };
 
 export const dependency = {
-  add: route("POST", "/tickets/{key}/dependencies")
+  add: route("POST", "/projects/{projectId}/tickets/{key}/dependencies")
     .errors({ ...writeOneErrors, ...dependencyCycleError })
     .input(dependencyAddInputSchema)
     .output(dependencySchema),
-  remove: route("DELETE", "/tickets/{key}/dependencies/{dependsOn}")
+  remove: route("DELETE", "/projects/{projectId}/tickets/{key}/dependencies/{dependsOn}")
     .errors(writeOneErrors)
     .input(dependencyEdgeInputSchema)
-    .output(dependencyEdgeInputSchema),
-  list: route("GET", "/tickets/{key}/dependencies")
+    .output(dependencyEdgeOutputSchema),
+  list: route("GET", "/projects/{projectId}/tickets/{key}/dependencies")
     .errors(readOneErrors)
     .input(ticketKeyInputSchema)
     .output(dependencySchema.array()),
 };
 
 export const sprint = {
-  create: route("POST", "/sprints")
-    .errors({ ...writeErrors, ...validationError, ...conflictError })
+  create: route("POST", "/projects/{projectId}/sprints")
+    .errors({ ...writeOneErrors, ...validationError, ...conflictError })
     .input(sprintCreateInputSchema)
     .output(sprintSchema),
-  get: route("GET", "/sprints/{key}")
+  get: route("GET", "/projects/{projectId}/sprints/{key}")
     .errors(readOneErrors)
     .input(sprintKeyInputSchema)
     .output(sprintSchema),
-  list: route("GET", "/sprints")
-    .errors(readErrors)
+  list: route("GET", "/projects/{projectId}/sprints")
+    .errors(readOneErrors)
     .input(sprintListInputSchema)
     .output(sprintSchema.array()),
-  update: route("PATCH", "/sprints/{key}")
+  update: route("PATCH", "/projects/{projectId}/sprints/{key}")
     .errors({ ...writeOneErrors, ...validationError })
     .input(sprintUpdateInputSchema)
     .output(sprintSchema),
-  activate: route("POST", "/sprints/{key}/activate")
+  activate: route("POST", "/projects/{projectId}/sprints/{key}/activate")
     .errors({ ...writeOneErrors, ...conflictError })
     .input(sprintKeyInputSchema)
     .output(sprintSchema),
-  close: route("POST", "/sprints/{key}/close")
+  close: route("POST", "/projects/{projectId}/sprints/{key}/close")
     .errors({ ...writeOneErrors, ...conflictError })
     .input(sprintKeyInputSchema)
     .output(sprintSchema),

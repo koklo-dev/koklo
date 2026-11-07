@@ -27,16 +27,18 @@ const CREATE_ALLOWED: Role[] = ["owner", "admin", "dev", "designer", "client"];
 describe("comment.create", () => {
   it.each(CREATE_ALLOWED)("%s peut commenter", async (role) => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const response = await commentsFor(app, world.actors[role]).create(ticket.id);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const response = await commentsFor(app, world.actors[role], world.projectId).create(ticket.id);
     expect(response.status).toBe(200);
   });
 
   it("business reçoit FORBIDDEN (403), sans commentaire ni audit", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
 
-    const response = await commentsFor(app, world.actors.business).create(ticket.id);
+    const response = await commentsFor(app, world.actors.business, world.projectId).create(
+      ticket.id,
+    );
 
     expect(response.status).toBe(403);
     expect(response.body.code).toBe("FORBIDDEN");
@@ -46,8 +48,8 @@ describe("comment.create", () => {
 
   it("sans session : 401 UNAUTHORIZED", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const anonymous = commentsFor(app, undefined);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const anonymous = commentsFor(app, undefined, world.projectId);
     expect((await anonymous.create(ticket.id)).status).toBe(401);
     expect((await anonymous.list(ticket.id)).status).toBe(401);
     expect((await anonymous.remove(ticket.id)).status).toBe(401);
@@ -55,25 +57,28 @@ describe("comment.create", () => {
 
   it("le rôle est relu en base : un designer rétrogradé business est refusé", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     await database.query("UPDATE members SET role = 'business' WHERE id = $1", [
       world.actors.designer.memberId,
     ]);
-    expect((await commentsFor(app, world.actors.designer).create(ticket.id)).status).toBe(403);
+    expect(
+      (await commentsFor(app, world.actors.designer, world.projectId).create(ticket.id)).status,
+    ).toBe(403);
   });
 });
 
 async function commentBy(author: Role) {
   const world = await createWorld(database);
-  const ticket = await seedTicket(app, world.actors.dev);
-  const comment = (await commentsFor(app, world.actors[author]).create(ticket.id)).body;
+  const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+  const comment = (await commentsFor(app, world.actors[author], world.projectId).create(ticket.id))
+    .body;
   return { world, comment };
 }
 
 describe("comment.delete : auteur, owner et admin", () => {
   it.each(CREATE_ALLOWED)("%s supprime son propre commentaire", async (role) => {
     const { world, comment } = await commentBy(role);
-    const response = await commentsFor(app, world.actors[role]).remove(comment.id);
+    const response = await commentsFor(app, world.actors[role], world.projectId).remove(comment.id);
     expect(response.status).toBe(200);
     expect((await commentRows(database, world.organizationId))[0]?.deleted_at).not.toBeNull();
   });
@@ -82,7 +87,9 @@ describe("comment.delete : auteur, owner et admin", () => {
     "%s supprime le commentaire d'autrui (modération)",
     async (role) => {
       const { world, comment } = await commentBy("client");
-      const response = await commentsFor(app, world.actors[role]).remove(comment.id);
+      const response = await commentsFor(app, world.actors[role], world.projectId).remove(
+        comment.id,
+      );
       expect(response.status).toBe(200);
       expect(await auditCount(database, world.organizationId, "comment.delete")).toBe(1);
     },
@@ -93,7 +100,9 @@ describe("comment.delete : auteur, owner et admin", () => {
     async (role) => {
       const { world, comment } = await commentBy("owner");
 
-      const response = await commentsFor(app, world.actors[role]).remove(comment.id);
+      const response = await commentsFor(app, world.actors[role], world.projectId).remove(
+        comment.id,
+      );
 
       expect(response.status).toBe(403);
       expect(response.body.code).toBe("FORBIDDEN");
@@ -106,17 +115,21 @@ describe("comment.delete : auteur, owner et admin", () => {
 describe("comment.delete (suite 2)", () => {
   it("business reçoit FORBIDDEN, même sur le commentaire d'un autre", async () => {
     const { world, comment } = await commentBy("dev");
-    const response = await commentsFor(app, world.actors.business).remove(comment.id);
+    const response = await commentsFor(app, world.actors.business, world.projectId).remove(
+      comment.id,
+    );
     expect(response.status).toBe(403);
     expect((await commentRows(database, world.organizationId))[0]?.deleted_at).toBeNull();
   });
 
   it("404 avant 403 : un commentaire inconnu ou déjà supprimé est NOT_FOUND pour un non-auteur", async () => {
     const { world, comment } = await commentBy("owner");
-    expect((await commentsFor(app, world.actors.owner).remove(comment.id)).status).toBe(200);
+    expect(
+      (await commentsFor(app, world.actors.owner, world.projectId).remove(comment.id)).status,
+    ).toBe(200);
 
-    const deleted = await commentsFor(app, world.actors.dev).remove(comment.id);
-    const unknown = await commentsFor(app, world.actors.dev).remove(
+    const deleted = await commentsFor(app, world.actors.dev, world.projectId).remove(comment.id);
+    const unknown = await commentsFor(app, world.actors.dev, world.projectId).remove(
       "00000000-0000-4000-8000-000000000001",
     );
 
@@ -128,7 +141,7 @@ describe("comment.delete (suite 2)", () => {
   it("l'id d'un commentaire d'une autre organisation répond 404, jamais 403 (pas de fuite d'existence)", async () => {
     const one = await commentBy("owner");
     const two = await createWorld(database);
-    const response = await commentsFor(app, two.actors.dev).remove(one.comment.id);
+    const response = await commentsFor(app, two.actors.dev, two.projectId).remove(one.comment.id);
     expect(response.status).toBe(404);
     expect(response.body.code).toBe("NOT_FOUND");
   });
@@ -137,7 +150,9 @@ describe("comment.delete (suite 2)", () => {
 describe("tous les rôles lisent les commentaires", () => {
   it.each(ROLES)("%s : comment.list répond 200", async (role) => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    expect((await commentsFor(app, world.actors[role]).list(ticket.id)).status).toBe(200);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    expect(
+      (await commentsFor(app, world.actors[role], world.projectId).list(ticket.id)).status,
+    ).toBe(200);
   });
 });

@@ -70,7 +70,7 @@ describe("incident-23-second-import-creates-no-duplicate", () => {
     const scope = scopeOf(world);
     const first = await importerOf(app).run(scope, trapSources(), IMPORT_OPTIONS);
     expect(first.tickets).toMatchObject({ created: 4, rejected: 0 });
-    const api = apiFor(app, world.actors.owner);
+    const api = apiFor(app, world.actors.owner, world.projectId);
     for (const [i, title] of TRAPS.entries()) {
       expect((await api.getTicket(`TK-${700 + i}`)).body.title).toBe(title);
     }

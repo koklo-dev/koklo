@@ -6,8 +6,7 @@ import type { Request } from "express";
 import { AUDIT_READ_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
-import { PROJECT_CONTEXT, type ProjectContext } from "../project/project-context.ts";
-import { inScope } from "../tracker/scope.ts";
+import { inProject } from "../tracker/scope.ts";
 import { AuditService } from "./audit.service.ts";
 
 /** Le journal n'a qu'une lecture, réservée à `AUDIT_READ_ROLES` (immuable, CDC §4.2). */
@@ -15,7 +14,6 @@ import { AuditService } from "./audit.service.ts";
 export class AuditController {
   constructor(
     @Inject(AuditService) private readonly service: AuditService,
-    @Inject(PROJECT_CONTEXT) private readonly project: ProjectContext,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -24,10 +22,10 @@ export class AuditController {
   @Implement(contract.audit.list)
   list(@Req() request: Request) {
     return implement(contract.audit.list).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => this.service.list(scope, input),
         this.access,
       ),

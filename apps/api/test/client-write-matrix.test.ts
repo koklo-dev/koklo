@@ -155,6 +155,47 @@ describe("le client reçoit 403 sur toute autre écriture", () => {
   );
 });
 
+describe("TK-96 : le rôle insuffisant reste 403 quel que soit le projet désigné (aucun oracle)", () => {
+  const PROJECTS = ["lié", "inconnu", "étranger"] as const;
+  const projectFor = (kind: (typeof PROJECTS)[number]) =>
+    kind === "lié"
+      ? scene.p1.projectId
+      : kind === "inconnu"
+        ? "99999999-9999-4999-8999-999999999999"
+        : scene.p2.projectId;
+
+  it.each(DENIED.flatMap((name) => PROJECTS.map((kind) => [name, kind] as const)))(
+    "%s : 403 pour un client, projet %s",
+    async (name, kind) => {
+      const route = denied().find((r) => r.name === name);
+      const method = (route?.method ?? "GET").toLowerCase() as HttpMethod;
+      const path = (route?.path ?? "")
+        .replace("{projectId}", projectFor(kind))
+        .replace(/\{[^}]+\}/g, "11111111-1111-4111-8111-111111111111");
+
+      const res = await send(
+        bench().app,
+        scene.c1.cookie,
+        method,
+        path,
+        method === "get" || method === "delete" ? undefined : {},
+      );
+
+      expect(res.status, `${name} (${kind}) : ${res.text}`).toBe(403);
+      expect(res.body.code).toBe("FORBIDDEN");
+    },
+  );
+
+  it("les procédures de pilotage interdites figurent bien dans la liste (garde contre le vide)", () => {
+    const pilotage = ["ticket.", "dependency.", "sprint.", "lease.", "projectState."];
+    const covered = DENIED.filter((name) => pilotage.some((prefix) => name.startsWith(prefix)));
+    expect(covered.length).toBeGreaterThanOrEqual(14);
+    for (const name of covered) {
+      expect(denied().find((r) => r.name === name)?.path, name).toContain("/projects/{projectId}/");
+    }
+  });
+});
+
 describe("les seules écritures du client : suggérer, retirer, valider, commenter", () => {
   it("suggestion.create et suggestion.withdraw : 200", async () => {
     const api = suggestionApi(bench().app, scene.c1);
@@ -169,8 +210,8 @@ describe("les seules écritures du client : suggérer, retirer, valider, comment
   });
 
   it("comment.create : 200 sur un ticket de son projet", async () => {
-    const ticket = await seedTicket(bench().app, scene.p1.world.actors.owner);
-    const res = await commentsFor(bench().app, scene.c1).create(ticket.id);
+    const ticket = await seedTicket(bench().app, scene.p1.world.actors.owner, scene.p1.projectId);
+    const res = await commentsFor(bench().app, scene.c1, scene.p1.projectId).create(ticket.id);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
   });
 

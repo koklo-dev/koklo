@@ -26,8 +26,8 @@ afterAll(async () => {
 describe("cycle de vie", () => {
   it("acquire pose un bail de 15 minutes par défaut au nom de la session, get le relit", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     const at = clock.now();
 
     const acquired = await dev.acquire(ticket.key);
@@ -50,10 +50,13 @@ describe("cycle de vie", () => {
 
   it("acquire honore ttlMs", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const response = await collaborationFor(app, world.actors.dev).acquire(ticket.key, {
-      ttlMs: 5 * MINUTE,
-    });
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const response = await collaborationFor(app, world.actors.dev, world.projectId).acquire(
+      ticket.key,
+      {
+        ttlMs: 5 * MINUTE,
+      },
+    );
     expect(response.body.ttlMs).toBe(5 * MINUTE);
     expect(Date.parse(response.body.expiresAt) - Date.parse(response.body.acquiredAt)).toBe(
       5 * MINUTE,
@@ -64,8 +67,8 @@ describe("cycle de vie", () => {
 describe("cycle de vie (heartbeat)", () => {
   it("heartbeat repousse expiresAt à now + ttl sans toucher acquiredAt", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     const acquired = (await dev.acquire(ticket.key, { ttlMs: 10 * MINUTE })).body;
 
     clock.advance(6 * MINUTE);
@@ -83,8 +86,8 @@ describe("cycle de vie (heartbeat)", () => {
   it("release libère le bail (released: true) et le ticket redevient prenable", async () => {
     const world = await createWorld(database);
     const other = await insertActor(database, world.organizationId, "dev", "dev2");
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     await dev.acquire(ticket.key);
 
     const released = await dev.release(ticket.key);
@@ -95,20 +98,22 @@ describe("cycle de vie (heartbeat)", () => {
     const rows = await leaseRows(database, ticket.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.released_at).not.toBeNull();
-    expect((await collaborationFor(app, other).acquire(ticket.key)).status).toBe(200);
+    expect((await collaborationFor(app, other, world.projectId).acquire(ticket.key)).status).toBe(
+      200,
+    );
   });
 });
 
 describe("cycle de vie (release)", () => {
   it("release d'un bail déjà libéré ou expiré : NOT_FOUND", async () => {
     const world = await createWorld(database);
-    const dev = collaborationFor(app, world.actors.dev);
-    const first = await seedTicket(app, world.actors.dev);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
+    const first = await seedTicket(app, world.actors.dev, world.projectId);
     await dev.acquire(first.key);
     await dev.release(first.key);
     expect((await dev.release(first.key)).status).toBe(404);
 
-    const second = await seedTicket(app, world.actors.dev);
+    const second = await seedTicket(app, world.actors.dev, world.projectId);
     await dev.acquire(second.key, { ttlMs: MINUTE });
     clock.advance(MINUTE + 1);
     const expired = await dev.release(second.key);
@@ -118,31 +123,35 @@ describe("cycle de vie (release)", () => {
 
   it("get renvoie null sans bail", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const response = await collaborationFor(app, world.actors.dev).getLease(ticket.key);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const response = await collaborationFor(app, world.actors.dev, world.projectId).getLease(
+      ticket.key,
+    );
     expect(response.status).toBe(200);
     expect(response.body).toBeNull();
   });
 
   it("ticket.get reflète le bail pris par lease.acquire", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const acquired = await collaborationFor(app, world.actors.dev).acquire(ticket.key);
-    expect((await apiFor(app, world.actors.dev).getTicket(ticket.key)).body.lease).toEqual(
-      acquired.body,
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const acquired = await collaborationFor(app, world.actors.dev, world.projectId).acquire(
+      ticket.key,
     );
+    expect(
+      (await apiFor(app, world.actors.dev, world.projectId).getTicket(ticket.key)).body.lease,
+    ).toEqual(acquired.body);
   });
 });
 
 describe("erreurs typées", () => {
   it("LEASE_NOT_HOLDER : heartbeat et release par un autre que le titulaire (owner et admin compris)", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await collaborationFor(app, world.actors.dev).acquire(ticket.key);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await collaborationFor(app, world.actors.dev, world.projectId).acquire(ticket.key);
     const holder = { kind: "member", id: world.actors.dev.userId };
 
     for (const role of ["owner", "admin"] as const) {
-      const other = collaborationFor(app, world.actors[role]);
+      const other = collaborationFor(app, world.actors[role], world.projectId);
       for (const response of [await other.heartbeat(ticket.key), await other.release(ticket.key)]) {
         expect(response.status).toBe(403);
         expect(response.body.code).toBe("LEASE_NOT_HOLDER");
@@ -150,14 +159,14 @@ describe("erreurs typées", () => {
       }
     }
     expect(
-      (await collaborationFor(app, world.actors.dev).getLease(ticket.key)).body,
+      (await collaborationFor(app, world.actors.dev, world.projectId).getLease(ticket.key)).body,
     ).not.toBeNull();
   });
 
   it("LEASE_EXPIRED : heartbeat après expiration ou après release, avec expiresAt", async () => {
     const world = await createWorld(database);
-    const dev = collaborationFor(app, world.actors.dev);
-    const expiring = await seedTicket(app, world.actors.dev);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
+    const expiring = await seedTicket(app, world.actors.dev, world.projectId);
     const acquired = await dev.acquire(expiring.key, { ttlMs: MINUTE });
     clock.advance(MINUTE + 1);
     const late = await dev.heartbeat(expiring.key);
@@ -165,7 +174,7 @@ describe("erreurs typées", () => {
     expect(late.body.code).toBe("LEASE_EXPIRED");
     expect(late.body.data).toEqual({ ticket: expiring.key, expiresAt: acquired.body.expiresAt });
 
-    const freed = await seedTicket(app, world.actors.dev);
+    const freed = await seedTicket(app, world.actors.dev, world.projectId);
     await dev.acquire(freed.key);
     await dev.release(freed.key);
     expect((await dev.heartbeat(freed.key)).body.code).toBe("LEASE_EXPIRED");
@@ -175,9 +184,9 @@ describe("erreurs typées", () => {
 describe("erreurs typées (suite 2)", () => {
   it("NOT_FOUND : ticket inconnu ou supprimé, pour acquire, heartbeat, release et get", async () => {
     const world = await createWorld(database);
-    const dev = collaborationFor(app, world.actors.dev);
-    const deleted = await seedTicket(app, world.actors.dev);
-    await apiFor(app, world.actors.dev).deleteTicket(deleted.key);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
+    const deleted = await seedTicket(app, world.actors.dev, world.projectId);
+    await apiFor(app, world.actors.dev, world.projectId).deleteTicket(deleted.key);
     for (const key of ["TK-999", deleted.key]) {
       for (const response of [
         await dev.acquire(key),
@@ -193,8 +202,8 @@ describe("erreurs typées (suite 2)", () => {
 
   it("entrées invalides : aucun bail créé", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = collaborationFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = collaborationFor(app, world.actors.dev, world.projectId);
     for (const over of [
       { branch: "" },
       { worktree: "" },
@@ -210,8 +219,8 @@ describe("erreurs typées (suite 2)", () => {
 
   it("UNAUTHORIZED sans session", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const anonymous = collaborationFor(app, undefined);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const anonymous = collaborationFor(app, undefined, world.projectId);
     for (const response of [
       await anonymous.acquire(ticket.key),
       await anonymous.heartbeat(ticket.key),

@@ -48,31 +48,35 @@ the contract's intent; the matrix actually enforced is in the TK-30 and TK-31 se
 
 | Operation | Method | Path | Roles (intent) | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`) |
 |-----------|--------|------|--------------------|---------------------------------------------------|
-| `ticket.create` | POST | `/tickets` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
-| `ticket.get` | GET | `/tickets/{key}` | read | `NOT_FOUND` |
-| `ticket.list` | GET | `/tickets` | read | none |
-| `ticket.update` | PATCH | `/tickets/{key}` | manage | `FORBIDDEN`, `NOT_FOUND`, `VALIDATION` |
-| `ticket.delete` | DELETE | `/tickets/{key}` | owner, admin | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
-| `ticket.transition` | POST | `/tickets/{key}/transition` | manage (agents and runners by token scope) | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `INVALID_TRANSITION` |
-| `dependency.add` | POST | `/tickets/{key}/dependencies` | manage | `FORBIDDEN`, `NOT_FOUND`, `DEPENDENCY_CYCLE` |
-| `dependency.remove` | DELETE | `/tickets/{key}/dependencies/{dependsOn}` | manage | `FORBIDDEN`, `NOT_FOUND` |
-| `dependency.list` | GET | `/tickets/{key}/dependencies` | read | `NOT_FOUND` |
-| `sprint.create` | POST | `/sprints` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
-| `sprint.get` | GET | `/sprints/{key}` | read | `NOT_FOUND` |
-| `sprint.list` | GET | `/sprints` | read | none |
-| `sprint.update` | PATCH | `/sprints/{key}` | manage | `FORBIDDEN`, `NOT_FOUND`, `VALIDATION` |
-| `sprint.activate` | POST | `/sprints/{key}/activate` | manage | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
-| `sprint.close` | POST | `/sprints/{key}/close` | manage | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
-| `comment.create` | POST | `/comments` | owner, admin, dev, designer, client; agents by token | `FORBIDDEN` |
-| `comment.list` | GET | `/comments` | read | none |
-| `comment.delete` | DELETE | `/comments/{id}` | author, owner, admin | `FORBIDDEN`, `NOT_FOUND` |
-| `projectState.get` | GET | `/project-state` | owner, admin, dev (enforced since TK-31) | none (the `FORBIDDEN` 403 is not typed in the contract) |
-| `projectState.update` | PUT | `/project-state` | owner, admin | `FORBIDDEN`, `VERSION_CONFLICT` |
-| `lease.acquire` | POST | `/tickets/{key}/lease` | owner, admin, dev | `FORBIDDEN`, `NOT_FOUND`, `LEASE_HELD` |
-| `lease.heartbeat` | POST | `/tickets/{key}/lease/heartbeat` | manage, then holder only | `NOT_FOUND`, `LEASE_NOT_HOLDER`, `LEASE_EXPIRED` |
-| `lease.release` | DELETE | `/tickets/{key}/lease` | manage, then holder only (no force mechanism in the contract) | `NOT_FOUND`, `LEASE_NOT_HOLDER` |
-| `lease.get` | GET | `/tickets/{key}/lease` | read | `NOT_FOUND` |
-| `audit.list` | GET | `/audit` | owner, admin | `FORBIDDEN` |
+| `ticket.create` | POST | `/projects/{projectId}/tickets` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
+| `ticket.get` | GET | `/projects/{projectId}/tickets/{key}` | read | `NOT_FOUND` |
+| `ticket.list` | GET | `/projects/{projectId}/tickets` | read | none |
+| `ticket.update` | PATCH | `/projects/{projectId}/tickets/{key}` | manage | `FORBIDDEN`, `NOT_FOUND`, `VALIDATION` |
+| `ticket.delete` | DELETE | `/projects/{projectId}/tickets/{key}` | owner, admin | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `ticket.transition` | POST | `/projects/{projectId}/tickets/{key}/transition` | manage (agents and runners by token scope) | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `INVALID_TRANSITION` |
+| `dependency.add` | POST | `/projects/{projectId}/tickets/{key}/dependencies` | manage | `FORBIDDEN`, `NOT_FOUND`, `DEPENDENCY_CYCLE` |
+| `dependency.remove` | DELETE | `/projects/{projectId}/tickets/{key}/dependencies/{dependsOn}` | manage | `FORBIDDEN`, `NOT_FOUND` |
+| `dependency.list` | GET | `/projects/{projectId}/tickets/{key}/dependencies` | read | `NOT_FOUND` |
+| `sprint.create` | POST | `/projects/{projectId}/sprints` | manage | `FORBIDDEN`, `VALIDATION`, `CONFLICT` |
+| `sprint.get` | GET | `/projects/{projectId}/sprints/{key}` | read | `NOT_FOUND` |
+| `sprint.list` | GET | `/projects/{projectId}/sprints` | read | none |
+| `sprint.update` | PATCH | `/projects/{projectId}/sprints/{key}` | manage | `FORBIDDEN`, `NOT_FOUND`, `VALIDATION` |
+| `sprint.activate` | POST | `/projects/{projectId}/sprints/{key}/activate` | manage | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `sprint.close` | POST | `/projects/{projectId}/sprints/{key}/close` | manage | `FORBIDDEN`, `NOT_FOUND`, `CONFLICT` |
+| `comment.create` | POST | `/projects/{projectId}/comments` | owner, admin, dev, designer, client; agents by token | `FORBIDDEN` |
+| `comment.list` | GET | `/projects/{projectId}/comments` | read | none |
+| `comment.delete` | DELETE | `/projects/{projectId}/comments/{id}` | author, owner, admin | `FORBIDDEN`, `NOT_FOUND` |
+| `projectState.get` | GET | `/projects/{projectId}/project-state` | owner, admin, dev (enforced since TK-31) | none (the `FORBIDDEN` 403 is not typed in the contract) |
+| `projectState.update` | PUT | `/projects/{projectId}/project-state` | owner, admin | `FORBIDDEN`, `VERSION_CONFLICT` |
+| `lease.acquire` | POST | `/projects/{projectId}/tickets/{key}/lease` | owner, admin, dev | `FORBIDDEN`, `NOT_FOUND`, `LEASE_HELD` |
+| `lease.heartbeat` | POST | `/projects/{projectId}/tickets/{key}/lease/heartbeat` | manage, then holder only | `NOT_FOUND`, `LEASE_NOT_HOLDER`, `LEASE_EXPIRED` |
+| `lease.release` | DELETE | `/projects/{projectId}/tickets/{key}/lease` | manage, then holder only (no force mechanism in the contract) | `NOT_FOUND`, `LEASE_NOT_HOLDER` |
+| `lease.get` | GET | `/projects/{projectId}/tickets/{key}/lease` | read | `NOT_FOUND` |
+| `audit.list` | GET | `/projects/{projectId}/audit` | owner, admin | `FORBIDDEN` |
+
+Since 2.0.0 (TK-96) every row above is scoped by the `projectId` path parameter. `audit.list` returns the entries
+of that project (`audit_log.project_id`, set by the server from the request) plus the organization-level entries
+(`project_id` NULL: members, provider keys, project creation, AI calls), never the entries of another project.
 
 `audit` is read-only: the log is immutable (CDC §4.2) and fed by the server. There is no
 `lock.*` group: the **merge and spec-write locks are not delivered on the API side** (no `locks`
@@ -101,8 +105,9 @@ and `audit_log` row (`tracker/audit.ts`) commit or roll back together.
 | `sprint.create` / `update` | `endsOn >= startsOn` (`VALIDATION`, also when only one date changes); `SP-n` from the counter |
 | `sprint.activate` / `close` | `planned -> active -> closed`, no reopening. One active sprint per project: pre-check plus the partial unique index; a concurrent loser (`P2002`) becomes `CONFLICT sprint_already_active` |
 
-### Current project (v1)
-Neither the session nor the contract carries a project, so `PROJECT_CONTEXT`
+### Current project (v1, replaced by an explicit `projectId` since 2.0.0)
+This section describes the behaviour before 2.0.0 (TK-96): the contract now carries `projectId` and the class below is
+removed. Before, neither the session nor the contract carried a project, so `PROJECT_CONTEXT`
 (`project/project-context.ts`) resolves it: `OldestProjectContext` returns the oldest project of
 the session organization (`createdAt`, then `id`); an organization without project gives
 `NOT_FOUND`. The value never comes from the client. An explicit project selection will replace
@@ -1050,8 +1055,8 @@ project of the organization (404), then the member (422).
 roles are scoped like `client`). All project procedures go through `scopeOf` / `inScope` / `inProject`
 (`apps/api/src/tracker/scope.ts`), which call `ProjectAccess.assertAccessible` **before** the work:
 - team roles and business: any project of their organization (no link needed);
-- `client`: only a linked project. The implicit project (`OldestProjectContext`) is the oldest **linked** one;
-  none means `NOT_FOUND`. `project.list` returns the linked projects (`[]` if none, never an error);
+- `client`: only a linked project (TK-96: the project is the explicit `projectId`; the former implicit
+  "oldest linked project" is gone, an unlinked project is `NOT_FOUND`). `project.list` returns the linked projects (`[]` if none, never an error);
 - a role guard (403) always precedes the scoping (404): a client writing a ticket gets `403`, not `404`.
 
 The `NOT_FOUND` is **uniform**: unlinked client, project of another organization, unknown project and missing
@@ -1294,6 +1299,18 @@ statuses) and `pnpm seed:planche` (project "Volume · planche": 248, 65, 47, 60 
 proposals 400, journeys 18, sample rows 1 240) are declared in `packages/db/src/seed-volumes.ts` (question B34).
 
 ## Version history
+- **2.0.0** (TK-96): explicit project. The 25 piloting procedures (`ticket.*`, `dependency.*`, `sprint.*`, `comment.*`,
+  `projectState.*`, `lease.*`, `audit.list`) take `projectId` (uuid, required) as a path parameter and move under
+  `/projects/{projectId}/...` (`/projects/{projectId}/tickets/{key}/lease`, `/projects/{projectId}/audit`, ...); the old
+  root paths (`/tickets`, `/sprints`, `/comments`, `/project-state`, `/audit`) are removed. **Breaking**: required input
+  field and removed paths. `projectState.get` gains an input (`projectId`). Outputs are unchanged (`ticket.delete`,
+  `dependency.remove` and `comment.delete` keep `{ key }`, the edge and `{ id }` through the new `ticketKeyOutputSchema`,
+  `dependencyEdgeOutputSchema` and `commentIdOutputSchema`). Typed `NOT_FOUND` (404) is now declared on `ticket.create`,
+  `sprint.create`, `sprint.list`, `projectState.*` and `audit.list`: an unknown project, a project of another
+  organization or a project not linked to a client answer the same 404 (question B73). The server resolves the project
+  from the input with an access check (`OldestProjectContext` is removed in the API lot). Route and path counts
+  unchanged (64 routes, 47 paths). The fingerprint of 1.1.0 is frozen in `packages/contract/test/contract.test.ts`;
+  0.1.0 to 1.1.0 unchanged. New exported schema `projectScopeShape` and `projectStateInputSchema`.
 - **1.1.0** (TK-95): `llmProviderSchema` has six values (`mistral`, `openrouter`, `openai_compatible` added),
   `llmCredential.set` takes an optional `baseUrl` (input only), typed error `LLM_CAP_REACHED` (409, no `data`) on
   `ai.draftBrief`, `ai.proposeFeatures` and `ai.proposeCriteria`. Additive (B47): no route removed, no required

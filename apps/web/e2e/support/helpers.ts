@@ -44,7 +44,7 @@ export async function setScenario(
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
 
-/** Transitions reçues par le faux API (`POST /tickets/{key}/transition`), dans l'ordre. */
+/** Transitions reçues par le faux API (`POST /projects/{projectId}/tickets/{key}/transition`), dans l'ordre. */
 export async function transitionsSeen(): Promise<Array<{ key: string; to: string }>> {
   return (await fetch(`${STUB}/__transitions`)).json();
 }

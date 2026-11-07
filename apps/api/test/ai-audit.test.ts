@@ -110,7 +110,7 @@ describe("une ligne par appel : action, cible, acteur", () => {
       b.app,
       world.actors.owner.cookie,
       "get",
-      `/audit?action=${AI_ACTIONS.draftBrief}`,
+      `/projects/${world.projectId}/audit?action=${AI_ACTIONS.draftBrief}`,
     );
 
     expect(listed.status, JSON.stringify(listed.body)).toBe(200);
@@ -274,6 +274,7 @@ describe("aucun contenu dans l'audit", () => {
       "id",
       "occurred_at",
       "organization_id",
+      "project_id",
       "target_id",
       "target_kind",
       "ticket_id",

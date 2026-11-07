@@ -525,12 +525,16 @@ model AuditLog {
   targetKind     String         @map("target_kind")
   targetId       String         @map("target_id") @db.Uuid
   ticketId       String?        @map("ticket_id") @db.Uuid
+  /// Projet de l'écriture (TK-96) : posé par le serveur depuis la requête, jamais lu d'une ressource. NULL = écriture
+  /// d'organisation (membre, clé, projet…). Sans clé étrangère ni cascade : le journal est append-only et survit au projet.
+  projectId      String?        @map("project_id") @db.Uuid
   occurredAt     DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([ticketId])
+  @@index([organizationId, projectId, occurredAt(sort: Desc)])
   @@map("audit_log")
 }
 

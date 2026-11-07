@@ -3,7 +3,7 @@ import * as schemas from "../src/schemas.ts";
 import {
   BAD_SPRINT_KEYS,
   BAD_TICKET_KEYS,
-  input,
+  scopedInput as input,
   isValid,
   output,
   proc,

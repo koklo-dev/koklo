@@ -55,7 +55,7 @@ const RESTRICT_VIOLATION = "23001";
 describe("C1a : la base refuse de modifier une entrée produite par l'API", () => {
   it("UPDATE (une ligne puis toutes), DELETE et TRUNCATE sont refusés, les lignes restent intactes", async () => {
     const world = await createWorld(database);
-    await seedTicket(app, world.actors.dev);
+    await seedTicket(app, world.actors.dev, world.projectId);
     const before = await auditRowsFull(database, world.organizationId);
     expect(before.map((r) => r.action)).toEqual(["ticket.create"]);
 
@@ -85,26 +85,27 @@ describe("C1b : aucune route d'écriture sur /audit", () => {
     );
     const onAudit = procedures
       .map((procedure) => procedure["~orpc"].meta["~openapi"])
-      .filter((meta) => meta?.path?.startsWith("/audit"));
-    expect(onAudit).toEqual([{ method: "GET", path: "/audit" }]);
+      .filter((meta) => meta?.path?.endsWith("/audit"));
+    expect(onAudit).toEqual([{ method: "GET", path: "/projects/{projectId}/audit" }]);
   });
 
   it("POST, PUT, PATCH et DELETE sur /audit et /audit/{id} répondent 404 ou 405 et ne modifient rien", async () => {
     const world = await createWorld(database);
-    await seedTicket(app, world.actors.dev);
+    await seedTicket(app, world.actors.dev, world.projectId);
     const before = await auditRowsFull(database, world.organizationId);
     const [target] = before;
     const cookie = world.actors.owner.cookie;
     const server = app.getHttpServer();
+    const audit = `/projects/${world.projectId}/audit`;
 
     const responses = [
-      await send(app, cookie, "post", "/audit", { action: "x" }),
-      await send(app, cookie, "patch", `/audit/${target?.id}`, { action: "x" }),
-      await send(app, cookie, "delete", `/audit/${target?.id}`),
-      await send(app, cookie, "delete", "/audit"),
-      await request(server).put("/audit").set("Cookie", cookie).send({ action: "x" }),
-      await request(server).put(`/audit/${target?.id}`).set("Cookie", cookie).send({}),
-      await send(app, cookie, "post", `/audit/${target?.id}`, {}),
+      await send(app, cookie, "post", audit, { action: "x" }),
+      await send(app, cookie, "patch", `${audit}/${target?.id}`, { action: "x" }),
+      await send(app, cookie, "delete", `${audit}/${target?.id}`),
+      await send(app, cookie, "delete", audit),
+      await request(server).put(audit).set("Cookie", cookie).send({ action: "x" }),
+      await request(server).put(`${audit}/${target?.id}`).set("Cookie", cookie).send({}),
+      await send(app, cookie, "post", `${audit}/${target?.id}`, {}),
     ];
 
     for (const response of responses) {
@@ -169,13 +170,14 @@ describe("C1c : aucun code de l'api ne modifie le journal", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("C1d : atomicité de l'audit avec l'écriture", () => {
   it("comment.create : si l'audit échoue, aucun commentaire n'est créé (500 INTERNAL)", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     await database.query("INSERT INTO audit_fail VALUES ('comment.create')");
 
-    const response = await commentsFor(app, world.actors.dev).create(ticket.id);
+    const response = await commentsFor(app, world.actors.dev, world.projectId).create(ticket.id);
 
     expect(response.status).toBe(500);
     expect(response.body.code).toBe("INTERNAL");
@@ -184,8 +186,8 @@ describe("C1d : atomicité de l'audit avec l'écriture", () => {
 
   it("comment.delete : si l'audit échoue, le commentaire n'est pas supprimé", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const dev = commentsFor(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     const comment = (await dev.create(ticket.id)).body;
     await database.query("INSERT INTO audit_fail VALUES ('comment.delete')");
 
@@ -198,14 +200,16 @@ describe("C1d : atomicité de l'audit avec l'écriture", () => {
 
   it("une écriture refusée (droit, cible, validation) ne laisse aucune entrée de commentaire", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     const before = await auditRowsFull(database, world.organizationId);
 
     const refused = [
-      await commentsFor(app, world.actors.business).create(ticket.id),
-      await commentsFor(app, world.actors.dev).create("pas-un-uuid"),
-      await commentsFor(app, world.actors.dev).create(ticket.id, ""),
-      await commentsFor(app, world.actors.dev).remove("00000000-0000-4000-8000-000000000002"),
+      await commentsFor(app, world.actors.business, world.projectId).create(ticket.id),
+      await commentsFor(app, world.actors.dev, world.projectId).create("pas-un-uuid"),
+      await commentsFor(app, world.actors.dev, world.projectId).create(ticket.id, ""),
+      await commentsFor(app, world.actors.dev, world.projectId).remove(
+        "00000000-0000-4000-8000-000000000002",
+      ),
     ];
 
     expect(refused.map((r) => r.status === 403 || r.status === 404 || r.status === 422)).toEqual([

@@ -223,6 +223,9 @@ const EXPECTED_WRITE_PROCEDURES = [
   "ticket.update",
 ];
 
+/** Groupes dont les écritures portent le projet explicite de la requête (`audit_log.project_id`, TK-96). */
+const PILOTAGE_GROUPS = ["ticket", "dependency", "sprint", "comment", "projectState", "lease"];
+
 // biome-ignore lint/suspicious/noExplicitAny: état hétérogène propre à chaque scénario
 type State = any;
 
@@ -254,11 +257,14 @@ interface Scenario {
   deniedStatuses: number[];
 }
 
-const tickets = (ctx: Ctx, role: Role = "dev") => apiFor(app, ctx.world.actors[role]);
-const collab = (ctx: Ctx, role: Role = "dev") => collaborationFor(app, ctx.world.actors[role]);
-const comments = (ctx: Ctx, role: Role = "dev") => commentsFor(app, ctx.world.actors[role]);
+const tickets = (ctx: Ctx, role: Role = "dev") =>
+  apiFor(app, ctx.world.actors[role], ctx.world.projectId);
+const collab = (ctx: Ctx, role: Role = "dev") =>
+  collaborationFor(app, ctx.world.actors[role], ctx.world.projectId);
+const comments = (ctx: Ctx, role: Role = "dev") =>
+  commentsFor(app, ctx.world.actors[role], ctx.world.projectId);
 const seed = (ctx: Ctx, over: Record<string, unknown> = {}) =>
-  seedTicket(app, ctx.world.actors.dev, over);
+  seedTicket(app, ctx.world.actors.dev, ctx.world.projectId, over);
 
 const ofTicket = (action: string, ticket: { id: string; key: string }): Expected => ({
   action,
@@ -379,7 +385,7 @@ const SCENARIOS: Scenario[] = [
   {
     procedure: "sprint.update",
     role: "dev",
-    prepare: (ctx) => seedSprint(app, ctx.world.actors.dev),
+    prepare: (ctx) => seedSprint(app, ctx.world.actors.dev, ctx.world.projectId),
     call: (ctx, sp) => tickets(ctx).updateSprint(sp.key, { goal: "Autre" }),
     expected: async (_ctx, sp) => ({
       action: "sprint.update",
@@ -393,7 +399,7 @@ const SCENARIOS: Scenario[] = [
   {
     procedure: "sprint.activate",
     role: "dev",
-    prepare: (ctx) => seedSprint(app, ctx.world.actors.dev),
+    prepare: (ctx) => seedSprint(app, ctx.world.actors.dev, ctx.world.projectId),
     call: (ctx, sp) => tickets(ctx).activateSprint(sp.key),
     expected: async (_ctx, sp) => ({
       action: "sprint.activate",
@@ -408,7 +414,7 @@ const SCENARIOS: Scenario[] = [
     procedure: "sprint.close",
     role: "dev",
     prepare: async (ctx) => {
-      const sprint = await seedSprint(app, ctx.world.actors.dev);
+      const sprint = await seedSprint(app, ctx.world.actors.dev, ctx.world.projectId);
       await tickets(ctx).activateSprint(sprint.key);
       return sprint;
     },
@@ -1195,6 +1201,10 @@ async function checkSuccess(scenario: Scenario) {
     actor_id: ctx.world.actors[scenario.role].userId,
   });
   expect(row?.target_id).toMatch(UUID_RE);
+  // TK-96 (C7) : une écriture de pilotage journalise le projet fourni par la requête.
+  if (PILOTAGE_GROUPS.includes(scenario.procedure.split(".")[0] ?? "")) {
+    expect(row?.project_id).toBe(ctx.world.projectId);
+  }
   const last = before.at(-1);
   if (last && row) {
     expect(row.occurred_at.getTime()).toBeGreaterThanOrEqual(last.occurred_at.getTime());
@@ -1208,7 +1218,7 @@ async function checkListed(scenario: Scenario) {
   expect(response.status).toBe(200);
   const expected = await scenario.expected(ctx, state, response);
 
-  const listed = await commentsFor(app, ctx.world.actors.owner).listAudit(
+  const listed = await commentsFor(app, ctx.world.actors.owner, ctx.world.projectId).listAudit(
     `action=${encodeURIComponent(expected.action)}&limit=100`,
   );
   expect(listed.status, JSON.stringify(listed.body)).toBe(200);

@@ -50,9 +50,10 @@ export type KanbanData =
 type TicketPage = { items: TicketOutput[]; nextCursor: string | null; total: number };
 
 /** Une requête par colonne : même clé pour la lecture, le rechargement et le total de l'annonce d'un déplacement. */
-const columnOptions = (sprintKey: string, status: TicketStatus) =>
+const columnOptions = (projectId: string, sprintKey: string, status: TicketStatus) =>
   orpc.ticket.list.infiniteOptions({
     input: (cursor: string | undefined) => ({
+      projectId,
       sprintId: sprintKey,
       status,
       limit: COLUMN_PAGE_SIZE,
@@ -62,8 +63,8 @@ const columnOptions = (sprintKey: string, status: TicketStatus) =>
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 
-function useColumn(sprintKey: string, status: TicketStatus, enabled: boolean) {
-  const query = useInfiniteQuery({ ...columnOptions(sprintKey, status), enabled });
+function useColumn(projectId: string, sprintKey: string, status: TicketStatus, enabled: boolean) {
+  const query = useInfiniteQuery({ ...columnOptions(projectId, sprintKey, status), enabled });
   const { fetchNextPage, hasNextPage } = query;
   const loadMore = useSingleFlight(
     useCallback(
@@ -99,6 +100,7 @@ function columnOf({ query, loadMore }: ColumnQuery): ColumnData {
 }
 
 interface Sources {
+  projects: { data?: readonly { id: string }[]; isError: boolean; error: unknown };
   sprints: { data?: readonly { key: string; goal: string }[]; error: unknown; isError: boolean };
   columns: KanbanColumns;
   /** Au moins une colonne n'a pas encore répondu. */
@@ -111,9 +113,19 @@ function failed(error: unknown, { sprints, redirecting }: Sources): KanbanData {
   return { status: redirecting ? "loading" : "error" };
 }
 
+/** Projet absent, en erreur ou pas encore lu : l'écran s'arrête là, sans lire sprint ni ticket. */
+function withoutProject(sources: Sources): KanbanData | null {
+  const { projects } = sources;
+  if (projects.isError && !projects.data) return failed(projects.error, sources);
+  if (!projects.data) return { status: "loading" };
+  return projects.data.length === 0 ? { status: "no-project" } : null;
+}
+
 /** Ramène les requêtes (sprint actif, une par colonne) à l'un des états de l'écran. */
 function deriveKanbanData(sources: Sources): KanbanData {
   const { sprints, columns, pending } = sources;
+  const stopped = withoutProject(sources);
+  if (stopped) return stopped;
   const sprint = sprints.data?.[0];
   if (sprints.isError && !sprints.data) return failed(sprints.error, sources);
   if (sprints.data && !sprint) return { status: "no-sprint" };
@@ -132,21 +144,29 @@ function deriveKanbanData(sources: Sources): KanbanData {
   };
 }
 
-/** Sprint actif puis une requête de 30 tickets par colonne : jamais le sprint entier. */
+/**
+ * Projet (le premier de `project.list`, en attendant les routes par projet de TK-88), sprint actif de ce projet,
+ * puis une requête de 30 tickets par colonne : jamais le sprint entier.
+ */
 export function useKanbanData() {
   const queryClient = useQueryClient();
-  const sprints = useQuery(orpc.sprint.list.queryOptions({ input: { status: "active" } }));
+  const projects = useQuery(orpc.project.list.queryOptions());
+  const projectId = projects.data?.[0]?.id ?? "";
+  const sprints = useQuery({
+    ...orpc.sprint.list.queryOptions({ input: { projectId, status: "active" } }),
+    enabled: projectId !== "",
+  });
   const sprint = sprints.data?.[0];
   const sprintKey = sprint?.key ?? "";
-  const enabled = sprint !== undefined;
+  const enabled = projectId !== "" && sprint !== undefined;
   const queries = {
-    backlog: useColumn(sprintKey, "backlog", enabled),
-    todo: useColumn(sprintKey, "todo", enabled),
-    in_progress: useColumn(sprintKey, "in_progress", enabled),
-    in_review: useColumn(sprintKey, "in_review", enabled),
-    blocked: useColumn(sprintKey, "blocked", enabled),
-    done: useColumn(sprintKey, "done", enabled),
-    cancelled: useColumn(sprintKey, "cancelled", enabled),
+    backlog: useColumn(projectId, sprintKey, "backlog", enabled),
+    todo: useColumn(projectId, sprintKey, "todo", enabled),
+    in_progress: useColumn(projectId, sprintKey, "in_progress", enabled),
+    in_review: useColumn(projectId, sprintKey, "in_review", enabled),
+    blocked: useColumn(projectId, sprintKey, "blocked", enabled),
+    done: useColumn(projectId, sprintKey, "done", enabled),
+    cancelled: useColumn(projectId, sprintKey, "cancelled", enabled),
   } satisfies Record<TicketStatus, ColumnQuery>;
   const list = STATUS_ORDER.map((status) => queries[status]);
 
@@ -154,7 +174,7 @@ export function useKanbanData() {
     STATUS_ORDER.map((status) => [status, columnOf(queries[status])]),
   ) as KanbanColumns;
   const redirecting = useUnauthorizedRedirect(
-    sprints.error ?? list.find((entry) => entry.query.error)?.query.error,
+    projects.error ?? sprints.error ?? list.find((entry) => entry.query.error)?.query.error,
   );
   const reload = useCallback(
     () => queryClient.invalidateQueries({ queryKey: orpc.ticket.key() }),
@@ -163,17 +183,20 @@ export function useKanbanData() {
   /** Total d'une colonne tel que le serveur vient de le donner (annonce d'un déplacement). */
   const totalOf = useCallback(
     (status: TicketStatus): number | undefined =>
-      queryClient.getQueryData<InfiniteData<TicketPage>>(columnOptions(sprintKey, status).queryKey)
-        ?.pages[0]?.total,
-    [queryClient, sprintKey],
+      queryClient.getQueryData<InfiniteData<TicketPage>>(
+        columnOptions(projectId, sprintKey, status).queryKey,
+      )?.pages[0]?.total,
+    [queryClient, projectId, sprintKey],
   );
   const retry = () => {
-    if (sprints.isError) void sprints.refetch();
+    if (projects.isError) void projects.refetch();
+    else if (sprints.isError) void sprints.refetch();
     else for (const entry of list) if (entry.query.isError) void entry.query.refetch();
   };
   const pending = enabled && list.some((entry) => entry.query.isPending);
   return {
-    data: deriveKanbanData({ sprints, columns, pending, redirecting }),
+    data: deriveKanbanData({ projects, sprints, columns, pending, redirecting }),
+    projectId,
     reload,
     retry,
     totalOf,
