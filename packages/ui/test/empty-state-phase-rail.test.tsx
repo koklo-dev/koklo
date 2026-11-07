@@ -5,6 +5,7 @@ import { Button, EmptyState, PhaseRail } from "../src/index.ts";
 
 /** TK-87 CA2, cas 2.7 et 2.8 (passation 01 §0.3, DESIGN.md v2 §5.1, 02-design §2.3). */
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("EmptyState", () => {
   const props = {
     icon: "lightbulb",
@@ -39,6 +40,45 @@ describe("EmptyState", () => {
   it("sans action : aucun bouton", () => {
     render(<EmptyState {...props} />);
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("TK-139 : écart 10, tuile IconTile 48 décorative", () => {
+    const { container } = render(<EmptyState {...props} />);
+    const root = container.querySelector("[data-slot='empty-state']");
+    expect(root).toHaveClass("gap-2.5");
+    expect(root).toHaveAttribute("data-variant", "framed");
+    const tile = root?.querySelector("[data-slot='icon-tile']");
+    expect(tile).toHaveAttribute("data-size", "48");
+    expect(tile).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("TK-139 : inline sans cadre ni tuile", () => {
+    const { container } = render(<EmptyState {...props} variant="inline" />);
+    const root = container.querySelector("[data-slot='empty-state']");
+    expect(root).toHaveAttribute("data-variant", "inline");
+    expect(root).not.toHaveClass("border", "border-dashed", "bg-surface", "rounded-xl");
+    expect(root?.querySelector("[data-slot='icon-tile']")).toBeNull();
+    expect(root?.querySelector("svg")).toBeNull();
+    expect(screen.getByText(props.title)).toBeVisible();
+  });
+
+  it("TK-139 : une action principale et au plus une secondaire", () => {
+    render(
+      <EmptyState
+        {...props}
+        action={<Button>Commencer le dossier</Button>}
+        secondaryAction={<Button variant="outline">Importer</Button>}
+      />,
+    );
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Importer" })).toBeVisible();
+  });
+
+  it("TK-139 : refuse au type une liste d'actions secondaires", () => {
+    render(
+      // @ts-expect-error une seule action secondaire
+      <EmptyState {...props} secondaryAction={[<Button key="a">A</Button>]} />,
+    );
   });
 
   it("refuse au type une liste d'actions", () => {

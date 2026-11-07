@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { InlineAlert } from "../src/index.ts";
+import { InlineAlert, type InlineAlertVariant } from "../src/index.ts";
 
 /**
  * TK-87 CA2, cas 2.6 (passation 01 §0.3, DESIGN.md v2 §5.1, 02-design §2.3) : 3 variantes et leurs rôles,
@@ -166,6 +166,105 @@ describe("InlineAlert", () => {
         action={{ label: "A", onClick: () => undefined }}
         details={<p>D</p>}
       >
+        x
+      </InlineAlert>,
+    );
+  });
+});
+
+/** TK-139 lot A, cas 5 : tons success et agent, rayon 10, écart 10, actions en boutons. */
+const TONES = [
+  ["neutral", "note"],
+  ["success", "status"],
+  ["agent", "status"],
+  ["warning", "status"],
+  ["error", "alert"],
+] as const satisfies ReadonlyArray<readonly [InlineAlertVariant, string]>;
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("InlineAlert TK-139", () => {
+  it.each(TONES)("ton %s : rôle %s, rayon 10, écart 10", (variant, role) => {
+    render(
+      <InlineAlert variant={variant} icon="check_circle">
+        Message
+      </InlineAlert>,
+    );
+    const alert = screen.getByRole(role);
+    expect(alert).toHaveClass("rounded-card");
+    expect(alert.firstElementChild).toHaveClass("gap-2.5");
+  });
+
+  it("success : jetons --alert-success-*", () => {
+    render(
+      <InlineAlert variant="success" icon="check_circle">
+        Enregistré
+      </InlineAlert>,
+    );
+    expect(screen.getByRole("status")).toHaveClass(
+      "border-alert-success-border",
+      "bg-alert-success",
+      "text-alert-success-foreground",
+    );
+  });
+
+  it("agent : --diff-bg et bordure pointillée --primary", () => {
+    render(
+      <InlineAlert variant="agent" icon="wand_stars">
+        L'agent propose
+      </InlineAlert>,
+    );
+    expect(screen.getByRole("status")).toHaveClass("border-dashed", "border-primary", "bg-diff-bg");
+  });
+
+  it("actions : boutons sm, inherit dans un ton coloré, appelant leur rappel", async () => {
+    const onRetry = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <InlineAlert
+        variant="error"
+        icon="error"
+        actions={[
+          { label: "Réessayer", onClick: onRetry },
+          { label: "Annuler", onClick: onCancel },
+        ]}
+      >
+        Échec
+      </InlineAlert>,
+    );
+    const retry = screen.getByRole("button", { name: "Réessayer" });
+    expect(retry).toHaveClass("h-8", "border-current");
+    await userEvent.click(retry);
+    await userEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("actions dans le ton neutre : bouton contour", () => {
+    render(
+      <InlineAlert
+        variant="neutral"
+        icon="lock"
+        actions={[{ label: "Voir", onClick: () => undefined }]}
+      >
+        x
+      </InlineAlert>,
+    );
+    const button = screen.getByRole("button", { name: "Voir" });
+    expect(button).toHaveClass("h-8");
+    expect(button).not.toHaveClass("border-current");
+  });
+
+  it("refuse au type action et actions ensemble, ou plus de deux actions", () => {
+    const a = { label: "A", onClick: () => undefined };
+    render(
+      // @ts-expect-error action ou actions, jamais les deux
+      <InlineAlert variant="neutral" icon="lock" action={a} actions={[a]}>
+        x
+      </InlineAlert>,
+    );
+    render(
+      // @ts-expect-error au plus deux actions
+      <InlineAlert variant="neutral" icon="lock" actions={[a, a, a]}>
         x
       </InlineAlert>,
     );

@@ -263,3 +263,204 @@ test("S-dev-ui groupe C : champs 40 et 36, désactivé pointillé sans opacité 
   expect(disabled.border).toBe("dashed");
   expect(disabled.opacity).toBe("1");
 });
+
+/** TK-139 : sections « Surfaces et retours » (fiche S-dev-ui §3, captures surfaces-*). Lots A, B et C. */
+const SURFACES = [
+  { key: "a", name: /Surfaces · A/, id: "dev-ui-surf-a" },
+  { key: "b", name: /Superpositions · B/, id: "dev-ui-surf-b" },
+  { key: "c", name: /Onglets et tableaux · C/, id: "dev-ui-surf-c" },
+] as const;
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui surfaces ${viewport.name} (${theme}) : axe sans violation, sans défilement horizontal, captures`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await settle(page);
+      for (const s of SURFACES) {
+        const region = page.getByRole("region", { name: s.name });
+        await region.scrollIntoViewIfNeeded();
+        const results = await new AxeBuilder({ page })
+          .include(`[aria-labelledby='${s.id}']`)
+          .withTags(AXE_TAGS)
+          .analyze();
+        expect(results.violations, s.id).toEqual([]);
+        await expectNoHorizontalScroll(page);
+        if (viewport.suffix === "") {
+          await region.screenshot({ path: `${DIR}/surfaces-${s.key}-${theme}.png` });
+        }
+      }
+      const first = await page.getByRole("region", { name: SURFACES[0].name }).boundingBox();
+      const last = await page
+        .getByRole("region", { name: SURFACES[SURFACES.length - 1]?.name })
+        .boundingBox();
+      if (!first || !last) throw new Error("sections Surfaces introuvables");
+      const scrollY = await page.evaluate(() => window.scrollY);
+      await page.screenshot({
+        path: `${DIR}/surfaces-${theme}${viewport.suffix}.png`,
+        fullPage: true,
+        clip: {
+          x: 0,
+          y: first.y + scrollY,
+          width: viewport.width,
+          height: last.y + scrollY + last.height - (first.y + scrollY),
+        },
+      });
+    });
+  }
+}
+
+test("S-dev-ui surfaces A : composants rendus, InlineAlert aux cinq tons, EmptyState inline sans tuile", async ({
+  page,
+}) => {
+  await open(page, "light");
+  const region = page.getByRole("region", { name: /Surfaces · A/ });
+  for (const variant of ["panel", "inset", "interactive", "proposal", "dashed", "warning"]) {
+    expect(
+      await region.locator(`[data-slot='card'][data-variant='${variant}']`).count(),
+      variant,
+    ).toBe(variant === "interactive" ? 2 : 1);
+  }
+  expect(await region.locator("[data-slot='stat-card']").count()).toBe(4);
+  expect(await region.locator("[data-slot='skeleton-row']").count()).toBe(4);
+  for (const tone of ["neutral", "success", "agent", "warning", "error"]) {
+    expect(
+      await region.locator(`[data-slot='inline-alert'][data-variant='${tone}']`).count(),
+      tone,
+    ).toBeGreaterThan(0);
+  }
+  const inline = region.locator("[data-slot='empty-state'][data-variant='inline']");
+  await expect(inline).toHaveCount(1);
+  await expect(inline.locator("[data-slot='icon-tile']")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Anthropic|OpenAI/);
+});
+
+/** TK-139 lot B : superpositions ouvertes par leur bouton (fiche §3 cas 13, captures overlays-*). */
+const OVERLAYS = [
+  { key: "dialog", trigger: "Ouvrir le dialogue", role: "dialog", name: "Nouveau projet" },
+  {
+    key: "alertdialog",
+    trigger: "Ouvrir le dialogue d'alerte",
+    role: "alertdialog",
+    name: "Supprimer le projet ?",
+  },
+  { key: "sheet", trigger: "Tiroir 540", role: "dialog", name: "Plafond mensuel" },
+] as const;
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    for (const overlay of OVERLAYS) {
+      test(`S-dev-ui superposition ${overlay.key} ${viewport.name} (${theme}) : axe, clavier, capture`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await open(page, theme);
+        await settle(page);
+        const trigger = page.getByRole("button", { name: overlay.trigger, exact: true });
+        await trigger.scrollIntoViewIfNeeded();
+        await trigger.click();
+        const panel = page.getByRole(overlay.role, { name: overlay.name });
+        await expect(panel).toBeVisible();
+        await page.waitForTimeout(400);
+        const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+        expect(results.violations).toEqual([]);
+        await expectNoHorizontalScroll(page);
+        // Pied en ligne à toute largeur (planches 08 et 22) : les deux boutons partagent la même ligne.
+        const tops = await panel
+          .locator("button:visible")
+          .evaluateAll((nodes) =>
+            nodes
+              .filter((node) => /Annuler|Créer le projet|Enregistrer/.test(node.textContent ?? ""))
+              .map((node) => Math.round(node.getBoundingClientRect().top)),
+          );
+        if (overlay.key !== "alertdialog") expect(new Set(tops).size).toBe(1);
+        await page.screenshot({
+          path: `${DIR}/overlays-${overlay.key}-${theme}${viewport.suffix}.png`,
+        });
+        await page.keyboard.press("Escape");
+        await expect(panel).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+      });
+    }
+
+    test(`S-dev-ui superposition toast ${viewport.name} (${theme}) : axe, capture`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await settle(page);
+      const trigger = page.getByRole("button", { name: "Toast d'erreur" });
+      await trigger.scrollIntoViewIfNeeded();
+      // Avant l'hydratation le clic est sans effet : on le rejoue jusqu'à l'apparition du toast.
+      await expect(async () => {
+        await trigger.click();
+        await expect(page.getByText("L'envoi a échoué").first()).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
+      await page.waitForTimeout(400);
+      const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+      expect(results.violations).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      await page.screenshot({ path: `${DIR}/overlays-toast-${theme}${viewport.suffix}.png` });
+    });
+  }
+}
+
+test("S-dev-ui superpositions B : dialogue d'alerte, tiroirs 440 / 540 / 620, F8 et Échap sur un toast", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await open(page, "light");
+  await settle(page);
+  const alertTrigger = page.getByRole("button", { name: "Ouvrir le dialogue d'alerte" });
+  await alertTrigger.click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Annuler" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(alertTrigger).toBeFocused();
+  for (const [name, width] of [
+    ["Tiroir 440", 440],
+    ["Tiroir 540", 540],
+    ["Tiroir 620", 620],
+  ] as const) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await page.waitForTimeout(400);
+    const box = await page.getByRole("dialog", { name: "Plafond mensuel" }).boundingBox();
+    expect(Math.round(box?.width ?? 0), name).toBe(width);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+  await page.getByRole("button", { name: "Toast de succès" }).click();
+  await expect(page.getByText("Projet créé")).toBeVisible();
+  await page.keyboard.press("F8");
+  await expect(page.locator("[aria-label='Notifications (F8)'] ol")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("Projet créé")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Anthropic|OpenAI/);
+});
+
+test("S-dev-ui surfaces C : onglets soulignés (36, trait --primary), tableau encadré défilant dans son cadre, YesNoCell nommées", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page, "light");
+  await settle(page);
+  const region = page.getByRole("region", { name: /Onglets et tableaux · C/ });
+  await region.scrollIntoViewIfNeeded();
+  const link = region.getByRole("link", { name: /Vue d'ensemble/ });
+  expect((await link.boundingBox())?.height).toBe(36);
+  await expect(link).toHaveAttribute("aria-current", "page");
+  const tablist = region.getByRole("tablist", { name: /États des demandes/ });
+  await tablist.getByRole("tab", { name: /Terminées/ }).click();
+  await expect(tablist.getByRole("tab", { name: /Terminées/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const framed = region.getByRole("table", { name: "Membres de l'organisation" });
+  const wrapper = framed.locator("xpath=..");
+  expect(await wrapper.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await expectNoHorizontalScroll(page);
+  expect(await region.getByRole("img", { name: "Oui" }).count()).toBeGreaterThan(0);
+  expect(await region.getByRole("img", { name: "Non" }).count()).toBeGreaterThan(0);
+});

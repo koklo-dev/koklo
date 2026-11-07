@@ -4,20 +4,25 @@ import { cva } from "class-variance-authority";
 import { type HTMLAttributes, type ReactNode, useId, useState } from "react";
 import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
+import { Button } from "./button.tsx";
 
-export type InlineAlertVariant = "neutral" | "warning" | "error";
+export type InlineAlertVariant = "neutral" | "success" | "agent" | "warning" | "error";
 
 /** Rôle dérivé de la variante : information, attente (compte à rebours), échec. */
 const ROLE: Record<InlineAlertVariant, "note" | "status" | "alert"> = {
   neutral: "note",
+  success: "status",
+  agent: "status",
   warning: "status",
   error: "alert",
 };
 
-const inlineAlertVariants = cva("flex min-h-10 flex-col rounded-lg border text-meta", {
+const inlineAlertVariants = cva("flex min-h-10 flex-col rounded-card border text-meta", {
   variants: {
     variant: {
       neutral: "border-alert-neutral-border bg-alert-neutral text-alert-neutral-foreground",
+      success: "border-alert-success-border bg-alert-success text-alert-success-foreground",
+      agent: "border-dashed border-primary bg-diff-bg text-foreground",
       warning: "border-alert-warning-border bg-alert-warning text-alert-warning-foreground",
       error: "border-alert-error-border bg-alert-error text-alert-error-foreground",
     },
@@ -26,7 +31,12 @@ const inlineAlertVariants = cva("flex min-h-10 flex-col rounded-lg border text-m
 
 /** Bouton texte souligné, 600, 28 px de haut (≥ 24 px, 2.5.8), couleur héritée de la variante. */
 const ACTION =
-  "inline-flex h-7 shrink-0 items-center rounded-sm px-1 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "inline-flex h-7 shrink-0 items-center rounded-md px-2.5 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+/** Ton neutre ou agent : le bouton prend le contour ; ton coloré : il hérite de la couleur du texte. */
+const NEUTRAL_TONES: ReadonlySet<InlineAlertVariant> = new Set(["neutral", "agent"]);
+
+export type InlineAlertAction = { label: string; onClick: () => void };
 
 type Common = Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
   variant: InlineAlertVariant;
@@ -37,13 +47,23 @@ type Common = Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
 export type InlineAlertProps = Common &
   (
     | {
-        action?: { label: string; onClick: () => void };
+        action?: InlineAlertAction;
+        actions?: never;
         details?: never;
         detailsLabel?: never;
         defaultOpen?: never;
       }
     | {
         action?: never;
+        /** Un ou deux boutons `sm` (DESIGN.md §5.6), à la place du lien. */
+        actions: [InlineAlertAction] | [InlineAlertAction, InlineAlertAction];
+        details?: never;
+        detailsLabel?: never;
+        defaultOpen?: never;
+      }
+    | {
+        action?: never;
+        actions?: never;
         /** Détail dépliable sous la ligne : « Détails » est alors la seule action. */
         details: ReactNode;
         detailsLabel?: string;
@@ -57,6 +77,7 @@ export function InlineAlert({
   icon,
   children,
   action,
+  actions,
   details,
   detailsLabel = "Détails",
   defaultOpen = false,
@@ -74,13 +95,27 @@ export function InlineAlert({
       className={cn(inlineAlertVariants({ variant }), className)}
       {...props}
     >
-      <div className="flex flex-1 items-start gap-2 py-1.5 pr-2 pl-3">
-        <Icon name={icon} size={18} className="mt-[5px]" />
+      <div className="flex flex-1 items-center gap-2.5 py-1.5 pr-2 pl-3">
+        <Icon name={icon} size={18} className="shrink-0" />
         <div className="min-w-0 flex-1 py-1">{children}</div>
         {action ? (
           <button type="button" className={ACTION} onClick={action.onClick}>
             {action.label}
           </button>
+        ) : null}
+        {actions ? (
+          <span className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions.map((item) => (
+              <Button
+                key={item.label}
+                size="sm"
+                variant={NEUTRAL_TONES.has(variant) ? "outline" : "inherit"}
+                onClick={item.onClick}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </span>
         ) : null}
         {hasDetails ? (
           <button

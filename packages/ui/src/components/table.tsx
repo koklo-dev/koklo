@@ -1,16 +1,71 @@
-import type { ComponentProps } from "react";
+"use client";
+
+import { type ComponentProps, createContext, useContext } from "react";
+import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 
-export function Table({ className, ...props }: ComponentProps<"table">) {
+interface TableStyle {
+  framed: boolean;
+  stickyHeader: boolean;
+}
+
+const TableStyleContext = createContext<TableStyle>({ framed: false, stickyHeader: false });
+
+export type TableProps = ComponentProps<"table"> & {
+  /** Cadre `--border` de rayon 12 : le tableau défile dans son cadre, pas la page. */
+  framed?: boolean;
+  /** Texte de 12 px. */
+  dense?: boolean;
+  /** En-tête collant en haut du cadre. */
+  stickyHeader?: boolean;
+  /** Classes du cadre (hauteur maximale d'un tableau à en-tête collant, par exemple). */
+  frameClassName?: string;
+};
+
+export function Table({
+  className,
+  framed = false,
+  dense = false,
+  stickyHeader = false,
+  frameClassName,
+  ...props
+}: TableProps) {
   return (
-    <div className="relative w-full overflow-auto">
-      <table className={cn("w-full caption-bottom text-sm", className)} {...props} />
-    </div>
+    <TableStyleContext.Provider value={{ framed, stickyHeader }}>
+      {/* Un cadre qui défile doit être atteignable au clavier (WCAG 2.1.1) : tabIndex seulement s'il est encadré. */}
+      <div
+        tabIndex={framed ? 0 : undefined}
+        className={cn(
+          "relative w-full overflow-auto",
+          framed &&
+            "rounded-xl border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          frameClassName,
+        )}
+      >
+        <table
+          className={cn("w-full caption-bottom", dense ? "text-caption" : "text-meta", className)}
+          {...props}
+        />
+      </div>
+    </TableStyleContext.Provider>
   );
 }
 
+const FRAMED_CELL = "px-2 first:pl-4 last:pr-4";
+
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
-  return <thead className={cn("[&_tr]:border-b", className)} {...props} />;
+  const { framed, stickyHeader } = useContext(TableStyleContext);
+  return (
+    <thead
+      className={cn(
+        "[&_tr]:border-b",
+        framed && "bg-surface",
+        stickyHeader && "sticky top-0 z-10 bg-surface",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function TableBody({ className, ...props }: ComponentProps<"tbody">) {
@@ -39,10 +94,12 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
 }
 
 export function TableHead({ className, ...props }: ComponentProps<"th">) {
+  const { framed } = useContext(TableStyleContext);
   return (
     <th
       className={cn(
-        "h-10 px-3 text-left align-middle text-[13px] font-medium text-muted-foreground",
+        "text-left align-middle text-caption font-medium text-muted-foreground",
+        framed ? ["py-2.5", FRAMED_CELL] : "h-10 px-3",
         className,
       )}
       {...props}
@@ -51,9 +108,36 @@ export function TableHead({ className, ...props }: ComponentProps<"th">) {
 }
 
 export function TableCell({ className, ...props }: ComponentProps<"td">) {
-  return <td className={cn("px-3 py-2.5 align-middle", className)} {...props} />;
+  const { framed } = useContext(TableStyleContext);
+  return (
+    <td
+      className={cn("py-2.5 align-middle", framed ? FRAMED_CELL : "px-3", className)}
+      {...props}
+    />
+  );
+}
+
+/** Cellule Oui / Non d'une matrice : coche `--status-validated-fg` ou tiret `--border-strong`, nommée pour les lecteurs d'écran. */
+export function YesNoCell({
+  value,
+  className,
+  ...props
+}: { value: boolean } & ComponentProps<"td">) {
+  return (
+    <TableCell className={cn("text-center", className)} {...props}>
+      <Icon
+        name={value ? "check" : "remove"}
+        size={18}
+        aria-label={value ? "Oui" : "Non"}
+        className={cn(
+          "inline-block",
+          value ? "text-status-validated-foreground" : "text-border-strong",
+        )}
+      />
+    </TableCell>
+  );
 }
 
 export function TableCaption({ className, ...props }: ComponentProps<"caption">) {
-  return <caption className={cn("mt-4 text-[13px] text-muted-foreground", className)} {...props} />;
+  return <caption className={cn("mt-4 text-meta text-muted-foreground", className)} {...props} />;
 }

@@ -2,14 +2,10 @@ import type { ReactNode, Ref } from "react";
 import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import type { ShellLink } from "./app-shell.tsx";
+import { TabsNav, type TabsNavItem } from "./tabs.tsx";
 
-export interface ProjectHeaderTab {
-  label: string;
-  href: string;
-  active?: boolean;
-  /** Compteur en pastille ; absent quand il n'est pas connu. */
-  count?: number;
-}
+/** Onglet d'un en-tête : même forme que `TabsNavItem`. */
+export type ProjectHeaderTab = TabsNavItem;
 
 export interface ProjectHeaderProps {
   project: { name: string; href: string };
@@ -78,41 +74,13 @@ function ShaInfo({ sha }: { sha: NonNullable<ProjectHeaderProps["sha"]> }) {
   );
 }
 
-/** Onglets en liens d'un en-tête (aussi ceux de Réglages) : la ligne repose sur la bordure basse de l'en-tête. */
-export function HeaderTabs({
-  tabs,
-  label,
-  LinkComponent: Link = "a" as unknown as ShellLink,
-}: {
+/** Onglets en liens d'un en-tête (aussi ceux de Réglages) : `Tabs underline` en mode lien, la ligne repose sur la bordure basse de l'en-tête. */
+export function HeaderTabs(props: {
   tabs: ProjectHeaderTab[];
   label: string;
   LinkComponent?: ShellLink;
 }) {
-  return (
-    <nav aria-label={label} className="-mb-4 mt-3">
-      <ul className="flex gap-5 overflow-x-auto">
-        {tabs.map((tab) => (
-          <li key={tab.label} className="shrink-0">
-            <Link
-              href={tab.href}
-              aria-current={tab.active ? "page" : undefined}
-              className={cn(
-                "flex h-9 items-center gap-2 border-b-2 text-body font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                tab.active ? "border-primary font-semibold text-foreground" : "border-transparent",
-              )}
-            >
-              {tab.label}
-              {tab.count === undefined ? null : (
-                <span className="rounded-full bg-secondary px-1.5 text-caption text-secondary-foreground">
-                  {tab.count}
-                </span>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
+  return <TabsNav className="-mb-4 mt-3" {...props} />;
 }
 
 /**

@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.6)
+# Koklo : design (v2.7)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -315,6 +315,24 @@ Mesures normalisées (incohérences I1 à I29 tranchées, questions B143 et B144
 | `Input`, `SearchField`, `Textarea` | `Input` 40 (36 en `sm`), rayon 8, bordure `--border`, fond `--background`, 14, marges 0 12 ; `mono` ; invalide : bordure `--destructive` ; **désactivé : pointillé `--border-strong`, fond `--surface`, texte muted, sans `opacity-50`**. `SearchField` : `search` 18 en tête, libellé `sr-only`. `Textarea` : marges 10 12, interligne 1,5. |
 | `Field`, `Select` | `Field` : libellé 13/600, écart 6, `required` (astérisque `--primary`, « obligatoire »), `optional` (« (facultatif) » 400 muted), aide 12 muted, erreur `role="alert"` 12/500 avec `error` 16. `Select` : déclencheur 40 (36 en `sm`), `keyboard_arrow_down` 18. |
 
+### 5.6 Surfaces et retours d'état (v2.7, TK-139, catalogue §1.3 et §1.4, B152 à B157)
+
+Galerie : `/dev/ui`, sections « Surfaces » (lot A), « Superpositions » (lot B) et « Onglets et tableaux » (lot C). Radix Toast, Dialog, AlertDialog et Tabs viennent de `radix-ui` 1.8.1 (aucune dépendance, pas de Sonner). Tout est en jetons.
+
+| Composant | Mesures et règles |
+|---|---|
+| `Card` | `variant` : `panel` (défaut : rayon 12, bordure `--border`, `--background`, marges 16 / 18), `inset` (rayon 10 `--radius-card`, marges 12 / 14, `--surface`), `interactive` (lien ou bouton entier, focus visible, sélection bordure `--primary`), `proposal` (bordure pointillée `--primary`, `--diff-bg`), `dashed` (bordure pointillée `--border-strong`), `warning` (bordure `--alert-warning-border`). Titre `text-card-title` 15/600, description 13 muted, action à droite. |
+| `StatCard` | `Card panel` : libellé 13 muted avec icône 18, valeur `text-stat`, jauge `ProgressBar` facultative, note 12 muted. Grille d'appel `auto-fit minmax(200px,1fr)`, écart 16. |
+| `ProgressBar` | Piste `--border-strong`, `md` 6 (rayon 3) ou `lg` 8 (rayon 4), remplissage `--primary`, `role="progressbar"`, `aria-valuenow` / `min` / `max`, nom accessible obligatoire. Valeur en texte à côté (jamais seule en couleur). |
+| `InlineAlert` | Rayon 10, écart 10, icône 18. Tons `neutral`, `warning`, `error`, `success` (`--alert-success-*`), `agent` (`--diff-bg`, bordure pointillée `--primary`). Actions : lien souligné (28) ou un à deux `Button sm` (`inherit` dans un ton coloré). `Alert` est déprécié : on migre vers `InlineAlert neutral`. |
+| `EmptyState` | Écart 10. Variantes `framed` (défaut) et `inline` (sans cadre ni tuile, dans une liste). Une action principale plus au plus une secondaire (I20). |
+| `Skeleton`, `SkeletonRow` | Bloc `motion-safe:animate-pulse`. `SkeletonRow` : hauteur 52, pavé 48 × 18 `--secondary` puis barre de 14 à 60, 45, 70 ou 52 %, `aria-hidden`. |
+| `Toast` | Radix Toast, en bas au centre (`bottom` 24), marges 10 / 14, rayon 10, fond `--foreground`, texte `--background`, `--shadow-toast`, icône `check_circle` 18 (`error` pour l'erreur), action « OK » ou « Annuler » soulignée 13/600 (24 de haut, marges 6). Largeur au contenu, jamais étirée (planche 22). Région annoncée : polite (succès, information), assertive (erreur). Durée 5 s (8 s en erreur), suspendue au survol et au focus. Fermeture au clavier. Mouvement réduit respecté. |
+| `Dialog`, `AlertDialog` | Centré, 520 au plus (`calc(100% - 32px)`), rayon 14 `--radius-dialog`, `--raised`, bordure `--border`, `--shadow-dialog`, voile `--overlay` + flou 6 sous `motion-safe`. En-tête : `IconTile 36 primary` facultative, titre `text-dialog-title`, description 13 muted, fermer `IconButton sm`. Corps marges 20 sans marge haute (en-tête 18 / 14), écart 16. Pied `--surface`, bordure haute, boutons en ligne et à droite à toute largeur (planches 08 et 22, pas d'empilement à 375 px), Annuler (`outline`) puis action principale 36. Focus piégé puis rendu, Échap ferme. `AlertDialog` : `role="alertdialog"`, focus initial sur Annuler, le voile ne ferme pas. |
+| `Sheet` | `size` : `detail` 440 (défaut), `form` 540, `wide` 620 ; plein écran sous 640. Voile `--overlay`, `--shadow-sheet`. `SheetHeader` : `IconTile 36 soft`, titre `text-dialog-title`, sous-titre 12, `IdTag`, fermer 32. Corps défilant 16 / 20. `SheetFooter` `--surface`, bordure haute, boutons en ligne à droite. |
+| `Tabs` | `variant="segmented"` (existant) ou `underline` : hauteur 36, écart 20, 14/500, actif 600 et trait de 2 `--primary`, icône 16 et `CountBadge` facultatifs, défilement horizontal sous 768. Mode lien (`nav`, `aria-current="page"`, ex-`HeaderTabs`) ou `tablist` (onglets d'état). `size="sm"` 13 px dans un tiroir. |
+| `Table` | `framed` : cadre `--border`, rayon 12, `overflow:auto`. En-tête `--surface`, `text-caption` 12/500 muted, marges 10 / 16, collant si `stickyHeader`. Lignes séparées en haut. `dense` 12 px. `th scope="row"`, légende `sr-only`. `YesNoCell` : `check` `--status-validated-fg`, `remove` `--border-strong`, centrée, `aria-label` « Oui » / « Non ». |
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -364,3 +382,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 07/11/2026 | v2.2 (TK-88, passation 01 §1, 05 §2, 21 §0) : §5.4 coquille (`AppShell` 256 / 64 px collante, tiroir sous 768 px, groupe SPEC à sept entrées numérotées avec cadenas et sans chevron, `ProjectHeader` à trois lignes avec onglets en liens, palette ⌘K à recherche serveur, pages « Bientôt ») ; `--sidebar` passe sur `--surface` (B29) ; fil d'Ariane v1 retiré |
 | 07/11/2026 | v2.3 (TK-88, finition) : §5.4 pied de barre épinglé, clavier de la palette (focus rendu, première option active, filtrage des pages à la frappe, liste masquée sans option), ombre et défilement visible du kanban, `smart_toy` pour l'Assistant de cadrage ; l'annonce du compte à rebours de S-framing devient `sr-only` (un seul « Réessayez dans N s » à l'écran, règle 5) |
 | 07/11/2026 | v2.6 (TK-138, catalogue des composants, B143 et B144) : §4 tailles 14 et 24, `tone`, correspondances `wand_stars` et `keyboard_arrow_down` ; §5 rayons 10 et 14, hauteurs de boutons et de champs ; §5.1 alertes 10, `EmptyState` à action secondaire ; §5.3 pagination segmentée, pied de liste avec `Spinner` ; §5.4 compteur 11/600, initiales 12/700, navigation des Réglages sur `--secondary`, fil d'Ariane ; §5.5 primitives de base |
+| 07/11/2026 | v2.7 (TK-139, catalogue §1.3 et §1.4, B152 à B157) : §5.6 surfaces et retours d'état (`Card` à 6 variantes, `StatCard`, `ProgressBar`, `InlineAlert` success et agent, `EmptyState inline`, `SkeletonRow`, `Toast`, `Dialog` / `AlertDialog`, `Sheet` 440 / 540 / 620, `Tabs underline`, `Table framed` et `YesNoCell`) ; `Alert` déprécié |

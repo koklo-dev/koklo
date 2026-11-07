@@ -1,7 +1,7 @@
 ---
 id: S-dev-ui
 titre: Galerie des composants (/dev/ui, équipe, hors production)
-version: 1.2
+version: 1.3
 ---
 ## 1. Utilisateurs et objectif
 L'équipe Koklo (développeurs, designer, agents de développement et de revue) et les tests de captures. Ce n'est pas un écran du produit : aucun client ni rôle d'organisation n'y a affaire. Arrivée : adresse saisie `/dev/ui`, ou les tests `apps/web/e2e/dev-ui.spec.ts`.
@@ -56,6 +56,11 @@ Section « Primitives de base » (TK-138, DESIGN.md §5.5, catalogue `docs/refon
 - **B · Pastilles, identifiants, avatars** : `Pill` 3 tailles x 9 tons, avec icône, interactive ; `CountBadge` 5 tons ; `Dot` ; `RolePill` des 6 rôles ; `IdTag` (soft, outline, `sm`, `pill` « Fournisseur · modèle ») ; `ValidationStatus`, `DeliverableStatus`, `LifecycleStatus` recalés ; `Avatar` 5 tailles x 4 tons x rond / tuile ; `IconTile` 5 tailles x 4 tons.
 - **C · Choix et saisie** : `FilterChip` (actif, inactif, compteur, `add`), `OptionChip` ; `SegmentedControl` (2 à 4 segments, `xs`, actif sans violet, mode `radiogroup`) ; `Switch` et `SwitchRow` (éteint, allumé, désactivé) ; `Checkbox` (3 états) ; `RadioGroup` et `RadioCard` (liste et grille, « Recommandé ») ; `Input` 40 et 36 (normal, `mono`, invalide, désactivé), `SearchField`, `Textarea`, `Field` (obligatoire, facultatif, aide, erreur), `Select` 40 et 36.
 
+Sections « Surfaces et retours » (TK-139, DESIGN.md §5.6, catalogue §1.3 et §1.4), en trois groupes livrés par lot, clair et sombre, données fictives, aucun nom de fournisseur d'IA :
+- **A · Surfaces** (région « Surfaces · A », id `dev-ui-surf-a`) : `Card` des 6 variantes avec en-tête et action ; `StatCard` (4 cartes, dont une avec jauge) ; `ProgressBar` 6 et 8 (0, 40, 100 %) ; `InlineAlert` des 5 tons, avec action en lien et en boutons ; `EmptyState` `framed` avec action secondaire, puis `inline` ; `Skeleton` et 4 `SkeletonRow` ; `Alert` déprécié montré une fois, étiqueté « déprécié ».
+- **B · Superpositions** (région « Superpositions · B », id `dev-ui-surf-b`) : trois boutons ouvrent « Nouveau projet » (`Dialog` 520), « Supprimer le projet » (`AlertDialog`) et un tiroir 440 / 540 / 620 (un bouton par taille, `SheetHeader` et `SheetFooter`) ; trois boutons lancent un toast de succès, d'erreur (avec « Annuler ») et d'information. Pour la capture, chaque superposition s'ouvre aussi par un bouton dédié.
+- **C · Onglets et tableaux** (région « Onglets et tableaux · C », id `dev-ui-surf-c`) : `Tabs` `segmented`, `underline` en `tablist` (avec compteur), `underline` en lien (ex-`HeaderTabs`), `underline` `sm` ; `Table` non encadrée (existante), `framed`, `dense`, `stickyHeader` dans un cadre de 240 px de haut, avec `YesNoCell` (matrice de rôles fictive).
+
 Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer le dossier ») ne font rien ; « Détails » déplie réellement.
 
 ## 4. États
@@ -65,6 +70,7 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 - **Thème** : clair (défaut, celui de l'application, décision H-24) ou sombre.
 - **Aperçu ouvert** : `HoverCard` d'une `EntityChip` ouverte au survol ou au focus.
 - **Détails déplié** : `InlineAlert` neutre avec sa zone de détail visible.
+- **Superpositions ouvertes** (TK-139) : dialogue, dialogue d'alerte, tiroir (440, 540, 620) et toast, ouverts par leur bouton ; focus piégé dans le dialogue et le tiroir, Échap ferme et rend le focus au bouton.
 
 ## 5. Interactions et retours
 - Bascule de thème : deux `button` « Clair » (`light_mode`) et « Sombre » (`dark_mode`) dans un groupe nommé « Thème » ; le bouton actif a `aria-pressed="true"`, fond `--primary`, texte `--primary-foreground` ; l'autre transparent, `--muted-foreground`. Elle réutilise `applyTheme` (`apps/web/src/lib/theme.ts`) : même classe `.dark`, même préférence mémorisée que l'application, aucune autre clé de stockage.
@@ -105,7 +111,9 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 | 2 | 2026-11-06 | TK-94 | Section « Listes longues » : `VirtualList` (1 000 lignes simulées), `CountBar`, `ListFooter` (4 états), `EmptyState` de recherche vide, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`, tous états, clair et sombre. Détail : `.workflow/TK-94/02-design.md` |
 | 1.1 | 2026-11-07 | TK-88 | Section « Coquille » (lot B) : barre étendue et repliée, entrée verrouillée avec infobulle, `ProjectHeader` avec onglets, palette ⌘K (résultats, vide, erreur), page « Bientôt », en clair et en sombre. Détail : `.workflow/TK-88/02-design.md` |
 | 1.2 | 2026-11-07 | TK-138 | Section « Primitives de base » en trois groupes A, B, C (jetons, `Icon`, `Button` et famille, `Pill` et famille, `Avatar`, `IconTile`, chips, `SegmentedControl`, `Switch`, `Checkbox`, `RadioGroup`, champs). Actif segmenté neutre sans violet (I5). Détail : `.workflow/TK-138/00-fiche.md` |
+| 1.3 | 2026-11-07 | TK-139 | Sections « Surfaces et retours » A, B, C : `Card`, `StatCard`, `ProgressBar`, `InlineAlert`, `EmptyState`, `Skeleton`, `Toast`, `Dialog`, `AlertDialog`, `Sheet`, `Tabs`, `Table`. Superpositions ouvertes par bouton. Détail : `.workflow/TK-139/00-fiche.md` |
 
 ## 11. Captures (générées par `apps/web/e2e/dev-ui.spec.ts`)
 Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`. TK-94 : `lists-light.png`, `lists-dark.png`, `lists-light-mobile.png`, `lists-dark-mobile.png` (section « Listes longues »).
 TK-138 : `primitives-light.png`, `primitives-dark.png` (pleine section, 1280 px), `primitives-light-mobile.png`, `primitives-dark-mobile.png` (375 px), plus `primitives-a|b|c-<light|dark>.png` par groupe.
+TK-139 : `surfaces-light.png`, `surfaces-dark.png` (sections A, B, C, 1280 px), `surfaces-light-mobile.png`, `surfaces-dark-mobile.png` (375 px), plus `surfaces-a|b|c-<light|dark>.png` par groupe ; `overlays-dialog-<light|dark>.png`, `overlays-sheet-<light|dark>.png`, `overlays-toast-<light|dark>.png` (superposition ouverte, 1280 px) et `overlays-dialog-<light|dark>-mobile.png`, `overlays-sheet-…-mobile.png`, `overlays-toast-…-mobile.png` (375 px).
