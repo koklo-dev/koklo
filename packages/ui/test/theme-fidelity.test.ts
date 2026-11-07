@@ -5,6 +5,15 @@ import { cssPath } from "./helpers/paths.ts";
 /** Variables autorisées en plus de DESIGN.md §2.1 dans theme.css + tentative.css (Q2 de l'analyse). */
 const ALLOWED_EXTENSIONS = [
   "--destructive-foreground",
+  // TK-138 correction 1 : rond d interrupteur blanc dans les deux thèmes (maquette 24:252).
+  "--switch-thumb",
+  // TK-138 (DESIGN.md §5.5) : voile et ombres des surfaces superposées.
+  "--radius-card",
+  "--radius-dialog",
+  "--overlay",
+  "--shadow-dialog",
+  "--shadow-sheet",
+  "--shadow-toast",
   // TK-85 : alias de la barre latérale shadcn, chacun pointe vers un token existant (02-design.md §2).
   "--sidebar",
   "--sidebar-foreground",

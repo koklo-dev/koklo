@@ -25,7 +25,7 @@ export function LifecycleStatus({ stage, className, ...props }: LifecycleStatusP
       aria-label={`Avancement : ${label}, étape ${stage + 1} sur 6`}
       className={cn(
         STATUS_PILL,
-        "gap-1.5",
+        "gap-2 pl-2",
         STATUS_TONE[stage === 5 ? "validated" : "neutral"],
         className,
       )}

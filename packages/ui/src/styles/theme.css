@@ -13,6 +13,7 @@
   --popover: #ffffff;
   --popover-foreground: #14102b;
   --primary-foreground: #ffffff;
+  --switch-thumb: #ffffff;
   --secondary: #eeeaff;
   --secondary-foreground: #43299f;
   --muted: #f7f5ff;
@@ -26,6 +27,13 @@
   /* biome-ignore format: valeur recopiée mot pour mot de DESIGN.md §2.1 (test de fidélité). */
   --shadow-floating: 0 8px 24px rgb(20 16 43 / .12);
   --radius: 0.5rem;
+  --radius-card: 10px;
+  --radius-dialog: 14px;
+  /* TK-138 (DESIGN.md §5.5) : voile des dialogues et ombres des surfaces superposées. */
+  --overlay: rgb(13 11 28 / 0.38);
+  --shadow-dialog: 0 18px 44px rgb(20 16 43 / 0.2);
+  --shadow-sheet: -16px 0 40px rgb(20 16 43 / 0.2);
+  --shadow-toast: 0 8px 24px rgb(20 16 43 / 0.25);
   --sidebar: var(--surface);
   --sidebar-foreground: var(--card-foreground);
   --sidebar-primary: var(--primary);
@@ -46,6 +54,7 @@
   --popover: #1d1838;
   --popover-foreground: #f1efff;
   --primary-foreground: #0d0b1c;
+  --switch-thumb: #ffffff;
   --secondary: #231d4a;
   --secondary-foreground: #cbc1ff;
   --muted: #15122b;
@@ -58,4 +67,9 @@
   --diff-bg: #1a1536;
   /* En sombre, la bordure suffit. */
   --shadow-floating: none;
+  --overlay: rgb(0 0 0 / 0.55);
+  --shadow-dialog: none;
+  --shadow-sheet: none;
+  /* Le toast garde son ombre en sombre. */
+  --shadow-toast: 0 8px 24px rgb(20 16 43 / 0.25);
 }

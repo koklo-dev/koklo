@@ -9,8 +9,9 @@ function svgOf(container: HTMLElement): SVGSVGElement {
   return svg;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Icon (Material Symbols Rounded, SVG)", () => {
-  it.each([16, 18, 20, 22, 28] as const)(
+  it.each([14, 16, 18, 20, 22, 24, 28] as const)(
     "taille %i : width, height et viewBox du jeu 960",
     (size) => {
       const { container } = render(<Icon name="check" size={size} />);
@@ -27,8 +28,8 @@ describe("Icon (Material Symbols Rounded, SVG)", () => {
   });
 
   it("refuse au type une taille hors échelle ou un nom inconnu", () => {
-    // @ts-expect-error 24 n'appartient pas à 16 | 18 | 20 | 22 | 28
-    render(<Icon name="check" size={24} />);
+    // @ts-expect-error 30 n'appartient pas à 14 | 16 | 18 | 20 | 22 | 24 | 28
+    render(<Icon name="check" size={30} />);
     // @ts-expect-error nom hors registre
     render(<Icon name="not_an_icon" />);
   });
@@ -56,5 +57,27 @@ describe("Icon (Material Symbols Rounded, SVG)", () => {
       expect(d(filled.container)).not.toBe("");
     });
     expect(d(filled.container)).not.toBe(d(outline.container));
+  });
+
+  it.each([
+    ["muted", "text-muted-foreground"],
+    ["primary", "text-primary"],
+    ["success", "text-status-validated-foreground"],
+    ["danger", "text-destructive"],
+  ] as const)("tone %s : classe %s ; sans tone, currentColor hérité", (tone, cls) => {
+    const { container } = render(<Icon name="check" tone={tone} />);
+    expect(svgOf(container)).toHaveClass(cls);
+    const plain = render(<Icon name="check" />);
+    expect(svgOf(plain.container).getAttribute("class")).not.toMatch(/text-/);
+  });
+
+  it("refuse au type un ton hors échelle", () => {
+    // @ts-expect-error ton inconnu
+    render(<Icon name="check" tone="warning" />);
+  });
+
+  it("wand_stars et les 20 autres glyphes de TK-138 se chargent", async () => {
+    const { container } = render(<Icon name="wand_stars" />);
+    await waitFor(() => expect(container.querySelector("path")?.getAttribute("d")).toBeTruthy());
   });
 });

@@ -12,6 +12,9 @@
   --alert-neutral-bg: var(--surface);
   --alert-neutral-border: var(--border);
   --alert-neutral-fg: var(--foreground);
+  --alert-success-bg: #f0fdf4;
+  --alert-success-border: #bbf7d0;
+  --alert-success-fg: #14532d;
   --alert-warning-bg: #fffbeb;
   --alert-warning-border: #fcd34d;
   --alert-warning-fg: #78350f;
@@ -31,6 +34,9 @@
   --alert-neutral-bg: var(--raised);
   --alert-neutral-border: var(--border);
   --alert-neutral-fg: var(--foreground);
+  --alert-success-bg: #0f2a1a;
+  --alert-success-border: #14532d;
+  --alert-success-fg: #bbf7d0;
   --alert-warning-bg: #3a2a0c;
   --alert-warning-border: #78350f;
   --alert-warning-fg: #fde68a;

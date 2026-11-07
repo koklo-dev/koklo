@@ -182,8 +182,8 @@ test("S-dev-ui : les 8 composants, HoverCard, les boutons et le désactivé avec
   await expect(disabled).toBeDisabled();
   await expect(disabled).toHaveAccessibleDescription("Toujours avec sa raison à côté");
   await expect(page.getByRole("button", { name: "Action principale" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Secondaire" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Discret" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Secondaire" }).first()).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Discret" }).first()).toBeEnabled();
 });
 
 test("S-dev-ui : le bouton désactivé n'a plus d'opacité réduite et porte le pointillé", async ({
@@ -196,4 +196,70 @@ test("S-dev-ui : le bouton désactivé n'a plus d'opacité réduite et porte le 
   });
   expect(style.opacity).toBe("1");
   expect(style.borderStyle).toBe("dashed");
+});
+
+/** TK-138 : sections « Primitives de base » A, B, C (fiche S-dev-ui, captures primitives-*). */
+const PRIMITIVES = [
+  { key: "a", name: /Primitives de base · A/, id: "dev-ui-prim-a" },
+  { key: "b", name: /Primitives de base · B/, id: "dev-ui-prim-b" },
+  { key: "c", name: /Primitives de base · C/, id: "dev-ui-prim-c" },
+] as const;
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui primitives ${viewport.name} (${theme}) : axe sans violation, sans défilement horizontal, captures`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await settle(page);
+      for (const p of PRIMITIVES) {
+        const region = page.getByRole("region", { name: p.name });
+        await region.scrollIntoViewIfNeeded();
+        const results = await new AxeBuilder({ page })
+          .include(`[aria-labelledby='${p.id}']`)
+          .withTags(AXE_TAGS)
+          .analyze();
+        expect(results.violations, p.id).toEqual([]);
+        await expectNoHorizontalScroll(page);
+        if (viewport.suffix === "") {
+          await region.screenshot({ path: `${DIR}/primitives-${p.key}-${theme}.png` });
+        }
+      }
+      const first = await page.getByRole("region", { name: PRIMITIVES[0].name }).boundingBox();
+      const last = await page.getByRole("region", { name: PRIMITIVES[2].name }).boundingBox();
+      if (!first || !last) throw new Error("sections Primitives introuvables");
+      const scrollY = await page.evaluate(() => window.scrollY);
+      await page.screenshot({
+        path: `${DIR}/primitives-${theme}${viewport.suffix}.png`,
+        fullPage: true,
+        clip: {
+          x: 0,
+          y: first.y + scrollY,
+          width: viewport.width,
+          height: last.y + scrollY + last.height - (first.y + scrollY),
+        },
+      });
+    });
+  }
+}
+
+test("S-dev-ui groupe C : champs 40 et 36, désactivé pointillé sans opacité réduite", async ({
+  page,
+}) => {
+  await open(page, "light");
+  const measure = (name: string) =>
+    page.getByRole("textbox", { name, exact: true }).evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        height: el.getBoundingClientRect().height,
+        opacity: s.opacity,
+        border: s.borderTopStyle,
+      };
+    });
+  expect((await measure("Plafond mensuel")).height).toBe(40);
+  expect((await measure("Plafond compact")).height).toBe(36);
+  const disabled = await measure("Champ désactivé");
+  expect(disabled.border).toBe("dashed");
+  expect(disabled.opacity).toBe("1");
 });
