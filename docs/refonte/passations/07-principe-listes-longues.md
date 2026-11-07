@@ -1,7 +1,7 @@
 # Refonte UI · Principe transversal · Listes longues (pagination et chargement progressif)
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Principe · listes longues**. Le sélecteur en haut à droite montre les 4 schémas ; la colonne de droite reprend les règles ci-dessous. Les planches des lots 3 à 6 ont été mises à jour (compteurs, pieds de liste, pagination, mini-carte, filtres de relecture).
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/12-PrincipeListes.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Principe · listes longues**. Le sélecteur en haut à droite montre les 4 schémas ; la colonne de droite reprend les règles ci-dessous. Les planches des lots 3 à 6 ont été mises à jour (compteurs, pieds de liste, pagination, mini-carte, filtres de relecture).
 > **S'applique à tous les lots (0 à 13).** Toute vue qui affiche des données venant de la base suit un des 4 schémas ci-dessous. Une passation de lot qui ne le précise pas applique ce document par défaut.
 
 ## 0. Règle de base

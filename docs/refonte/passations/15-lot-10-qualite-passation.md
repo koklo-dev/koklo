@@ -1,7 +1,7 @@
 # Refonte UI · Lot 10 · Spec · Qualité : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 10 · Qualité**. Sélecteurs de maquette : Relecture, Liste · équipe, À revoir, Vue client ; Démo / **Volume réel** (référence : 14 fonctionnalités, 44 critères, 70 scénarios).
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/20-Lot10Qualite.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 10 · Qualité**. Sélecteurs de maquette : Relecture, Liste · équipe, À revoir, Vue client ; Démo / **Volume réel** (référence : 14 fonctionnalités, 44 critères, 70 scénarios).
 > À lire avant : `lot-8-technique-passation.md` (§8 : Document façon Idée, en-têtes), `lot-9-design-passation.md`, `principe-listes-longues.md`, `principe-creer-modifier.md`, `principe-proposer-avec-agent.md`.
 
 Ce lot livre **Spec · Qualité** (route `/projects/[id]/spec/quality`) : les scénarios de test reliés aux critères d'acceptation, la couverture, la stratégie de test tirée de la stack, les jeux de données de test et le plan de test. Proposé par l'agent depuis les livrables validés ; **validé par l'équipe** (le client lit et commente). Sa validation termine le cadrage : les 6 livrables validés ouvrent la **Baseline 0** (lot 11).

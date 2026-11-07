@@ -1,7 +1,7 @@
 # Refonte UI · Lot 5 · Spec · Fonctionnel (et socle de l'agent dans la spec) : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 5 · Fonctionnel (tous les états)**. Le sélecteur en pointillés en haut à droite (Prêt, Génération, Relecture, Liste · équipe, Vue client · validation) est propre à la maquette. Les 4 onglets sont cliquables dans chaque état ; en relecture, Accepter / Rejeter fonctionnent ; en vue client, Valider / Demander un changement fonctionnent.
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/10-Lot5Fonctionnel.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 5 · Fonctionnel (tous les états)**. Le sélecteur en pointillés en haut à droite (Prêt, Génération, Relecture, Liste · équipe, Vue client · validation) est propre à la maquette. Les 4 onglets sont cliquables dans chaque état ; en relecture, Accepter / Rejeter fonctionnent ; en vue client, Valider / Demander un changement fonctionnent.
 > À lire avant : `design/refonte/decisions-2026-11-05-spec-sans-brief.md` (pas d'assistant séparé, pas de brief, barre « Spec », dossier figé `idea-vN`).
 > Prérequis : lots 0, 1, 2c, 3.
 

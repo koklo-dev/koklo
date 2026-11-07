@@ -1,7 +1,7 @@
 # Refonte UI · Lot 13 · Réglages : passation à l'agent dev
 
 > Validé par Brice le 06/11/2026 après recette visuelle.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 13 · Réglages**. Sélecteur de maquette : Propriétaire / Développeur / Client.
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/24-Lot13Reglages.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 13 · Réglages**. Sélecteur de maquette : Propriétaire / Développeur / Client.
 > À lire avant : **`decisions-2026-11-06-fournisseurs-ia.md`**, **`decisions-2026-11-06-agents-locaux.md`**, `lot-12-tickets-passation.md`, conception v0.6. Remplace `design/screens/S-organizations.md`, `S-members.md`, `S-ai-settings.md`, `S-github.md`.
 
 Route `/settings/[section]`. Coquille habituelle (barre latérale du projet, Réglages actif) ; en-tête « Réglages » + pastille du rôle + résumé (« Atelier Lumière · 3 projets · 6 membres », pour un client « Vous voyez seulement les réglages de votre compte. »). Sous l'en-tête : navigation secondaire à gauche (240 px), contenu à droite (titre de section + une phrase d'explication).

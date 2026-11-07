@@ -1,7 +1,7 @@
 # Refonte UI · Lot 14 · Sécurité : passation à l'agent dev
 
 > Validé par Brice le 06/11/2026 : la sécurité devient le 5ᵉ livrable de la spec. Le client n'en valide pas le détail : il lit un résumé, repris dans la baseline 0 qu'il valide.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 14 · Sécurité**. Sélecteurs : Relecture, Liste · équipe, À revoir, Vue client ; Démo / Volume réel.
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/15-Lot14Securite.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 14 · Sécurité**. Sélecteurs : Relecture, Liste · équipe, À revoir, Vue client ; Démo / Volume réel.
 > À lire avant : `principe-proposer-avec-agent.md`, `principe-creer-modifier.md`, `lot-10-qualite-passation.md` (même structure), `lot-11-baseline-passation.md`.
 
 ## 0. Ce qui change partout

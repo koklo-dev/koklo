@@ -2,7 +2,9 @@
   "name": "koklo",
   "private": true,
   "packageManager": "pnpm@12.15.0",
-  "engines": { "node": ">=24 <25" },
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "lint": "turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts",
     "typecheck": "turbo run typecheck",
@@ -15,7 +17,8 @@
     "db:rollback": "pnpm --filter @koklo/db rollback",
     "db:seed": "pnpm --filter @koklo/db seed",
     "seed:large": "pnpm --filter @koklo/db seed:large",
-    "seed:planche": "pnpm --filter @koklo/db seed:planche"
+    "seed:planche": "pnpm --filter @koklo/db seed:planche",
+    "maquette": "node packages/config/src/maquette-source.ts"
   },
   "devDependencies": {
     "turbo": "2.11.10"

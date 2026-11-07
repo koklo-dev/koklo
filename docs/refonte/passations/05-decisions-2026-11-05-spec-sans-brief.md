@@ -1,7 +1,7 @@
 # Décisions du 05/11/2026 : agent dans la spec, suppression du brief
 
 > Validé par Brice le 05/11/2026. Ce fichier **complète et corrige** les passations déjà écrites (`lots-0-1-passation.md`, `lot-2-idee-passation.md`, `lot-3-vue-ensemble-passation.md`). En cas de contradiction, ce fichier l'emporte.
-> Maquettes : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm). Planches mises à jour : lots 1, 2, 3, « Principe · agent dans la spec (référence) » et « Lot 5 · Fonctionnel » (référence de la barre latérale à jour).
+> Maquettes : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/05-Lot1Shell.html` ; `docs/refonte/maquettes/06-Lot2Idee.html` ; `docs/refonte/maquettes/07-Lot3Overview.html` ; `docs/refonte/maquettes/09-Lot5Assistant.html` ; `docs/refonte/maquettes/10-Lot5Fonctionnel.html` ; lire le code avec `pnpm maquette <numéro>`). Planches mises à jour : lots 1, 2, 3, « Principe · agent dans la spec (référence) » et « Lot 5 · Fonctionnel » (référence de la barre latérale à jour).
 > Plan : doc « Koklo — Refonte UI/UX et espace Idée : audit et plan » (https://claude.ai/artifact/3LVANUqXWDENdWVbhAiNRS).
 
 ## 1. Les décisions

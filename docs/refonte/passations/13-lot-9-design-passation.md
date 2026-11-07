@@ -1,7 +1,7 @@
 # Refonte UI · Lot 9 · Spec · Design : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle (« le lot capital, celui qui a conduit à tout le projet »).
-> Maquettes de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), trois planches lues dans cet ordre :
+> Maquettes de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/17-Lot9Design.html` ; `docs/refonte/maquettes/18-Lot9aStudio.html` ; `docs/refonte/maquettes/19-Lot9bParcours.html` ; lire le code avec `pnpm maquette <numéro>`), trois planches lues dans cet ordre :
 > 1. **Lot 9 · Design · page du livrable** : stepper Design system → Règles UI/UX → Écrans (inventaire puis conception) → Parcours. Sélecteurs de maquette : Inventaire proposé, Conception, Design system, Règles ; Démo / **Volume réel** (référence).
 > 2. **Lot 9a · Studio d'écran** : un écran (S-creneaux) en conception.
 > 3. **Lot 9b · Parcours jouable** : le parcours P-01 joué écran par écran, équipe et vue client.
