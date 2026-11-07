@@ -1,8 +1,14 @@
 "use client";
 
 import { IconButton } from "@koklo/ui";
-import { useSyncExternalStore } from "react";
-import { applyTheme, type Theme } from "../lib/theme.ts";
+import { useEffect, useSyncExternalStore } from "react";
+import {
+  applyTheme,
+  DARK_QUERY,
+  readTheme,
+  type Theme,
+  type ThemePreference,
+} from "../lib/theme.ts";
 
 const listeners = new Set<() => void>();
 
@@ -16,14 +22,30 @@ function currentTheme(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
+const notify = () => {
+  for (const listener of listeners) listener();
+};
+
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, currentTheme, () => "light" as Theme);
+  const preference = useSyncExternalStore(subscribe, readTheme, () => "light" as ThemePreference);
   const next: Theme = theme === "dark" ? "light" : "dark";
-  const select = (value: Theme) => {
+  const select = (value: ThemePreference) => {
     applyTheme(value);
-    for (const listener of listeners) listener();
+    notify();
   };
-  return { theme, next, toggle: () => select(next), select };
+  // « Système » suit le système en direct : le thème est réappliqué quand la préférence change.
+  useEffect(() => {
+    if (preference !== "system") return;
+    const media = window.matchMedia(DARK_QUERY);
+    const follow = () => {
+      applyTheme("system");
+      notify();
+    };
+    media.addEventListener("change", follow);
+    return () => media.removeEventListener("change", follow);
+  }, [preference]);
+  return { theme, preference, next, toggle: () => select(next), select };
 }
 
 export function ThemeToggle({ className }: { className?: string }) {

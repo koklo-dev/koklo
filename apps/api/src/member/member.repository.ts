@@ -1,4 +1,4 @@
-import type { MemberListOutput, Role } from "@koklo/contract";
+import type { MemberListOutput, MemberPageInput, MemberPageOutput, Role } from "@koklo/contract";
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { CLIENT_ROLE } from "../auth/roles.ts";
@@ -33,27 +33,6 @@ export class MemberRepository {
       email: user.email,
       role: role as Role,
     }));
-  }
-
-  async isMemberByEmail(organizationId: string, email: string): Promise<boolean> {
-    const found = await this.database.client.member.findFirst({
-      where: { organizationId, user: { email: { equals: email, mode: "insensitive" } } },
-      select: { id: true },
-    });
-    return found !== null;
-  }
-
-  async hasLiveInvitation(organizationId: string, email: string): Promise<boolean> {
-    const found = await this.database.client.invitation.findFirst({
-      where: {
-        organizationId,
-        status: "pending",
-        expiresAt: { gt: new Date() },
-        email: { equals: email, mode: "insensitive" },
-      },
-      select: { id: true },
-    });
-    return found !== null;
   }
 
   /**
@@ -102,18 +81,126 @@ export class MemberRepository {
   }
 
   /**
-   * Journalise `member.invite` après la création de l'invitation par Better Auth. Better Auth
-   * écrit avec son propre client : l'audit ne peut pas partager sa transaction (voir
-   * docs/api-contract.md).
+   * Page numérotée des membres (tri stable par ancienneté puis identifiant). Les projets viennent des liens
+   * `project_client_access` de l'organisation (client et business), la dernière activité de la session la plus
+   * récente du compte (B102) ; `null` sans session.
    */
-  recordInvitation(actor: AuditActor, invitationId: string): Promise<void> {
-    return withOrganization(actor.organizationId, () =>
-      this.database.client.$transaction((tx) =>
-        recordAudit(tx, actor, {
-          action: "member.invite",
-          targetKind: "invitation",
-          targetId: invitationId,
-        }),
+  async page(organizationId: string, input: MemberPageInput): Promise<MemberPageOutput> {
+    const page = Number(input.page);
+    const size = Number(input.size);
+    const q = input.q;
+    const where = {
+      organizationId,
+      ...(q
+        ? {
+            user: {
+              OR: [
+                { name: { contains: q, mode: "insensitive" as const } },
+                { email: { contains: q, mode: "insensitive" as const } },
+              ],
+            },
+          }
+        : {}),
+    };
+    const { client } = this.database;
+    const [total, members] = await Promise.all([
+      client.member.count({ where }),
+      client.member.findMany({
+        where,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: (page - 1) * size,
+        take: size,
+        select: {
+          id: true,
+          userId: true,
+          role: true,
+          user: { select: { name: true, email: true } },
+        },
+      }),
+    ]);
+    const userIds = members.map((member) => member.userId);
+    const [projects, activity] = await Promise.all([
+      this.projectsOfUsers(organizationId, userIds),
+      this.lastActivity(userIds),
+    ]);
+    return {
+      items: members.map(({ id, userId, role, user }) => ({
+        id,
+        userId,
+        name: user.name,
+        email: user.email,
+        role: role as Role,
+        projects: projects.get(userId) ?? [],
+        lastActiveAt: activity.get(userId)?.toISOString() ?? null,
+      })),
+      total,
+      totalIsEstimate: false,
+    };
+  }
+
+  private async projectsOfUsers(organizationId: string, userIds: string[]) {
+    const byUser = new Map<string, { id: string; name: string }[]>();
+    const links = await withOrganization(organizationId, () =>
+      this.database.client.projectClientAccess.findMany({
+        where: { userId: { in: userIds } },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { userId: true, project: { select: { id: true, name: true } } },
+      }),
+    );
+    for (const { userId, project } of links) {
+      byUser.set(userId, [...(byUser.get(userId) ?? []), project]);
+    }
+    return byUser;
+  }
+
+  private async lastActivity(userIds: string[]) {
+    const rows = await this.database.client.session.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds } },
+      _max: { updatedAt: true },
+    });
+    return new Map(
+      rows.flatMap((row) =>
+        row._max.updatedAt ? [[row.userId, row._max.updatedAt] as const] : [],
+      ),
+    );
+  }
+
+  /**
+   * Retire le membre dans une transaction sérialisable : `authorize` (qui lève pour refuser) et l'écriture voient le même
+   * état. Ses liens de projet, ses sessions de l'organisation et l'audit `member.remove` partent ensemble ; le compte et ses
+   * autres organisations survivent. `target` est `null` si le membre n'appartient pas à l'organisation.
+   */
+  remove(
+    actor: AuditActor,
+    memberId: string,
+    authorize: (target: MemberRecord | null, ownerCount: number) => void,
+  ): Promise<{ id: string }> {
+    const { organizationId } = actor;
+    return withOrganization(organizationId, () =>
+      this.database.client.$transaction(
+        async (tx) => {
+          const target = await tx.member.findFirst({
+            where: { id: memberId, organizationId },
+            select: { id: true, userId: true, role: true },
+          });
+          const ownerCount = await tx.member.count({ where: { organizationId, role: "owner" } });
+          authorize(target, ownerCount);
+          if (target) {
+            await tx.projectClientAccess.deleteMany({ where: { userId: target.userId } });
+            await tx.session.deleteMany({
+              where: { userId: target.userId, activeOrganizationId: organizationId },
+            });
+            await tx.member.delete({ where: { id: memberId } });
+          }
+          await recordAudit(tx, actor, {
+            action: "member.remove",
+            targetKind: "member",
+            targetId: memberId,
+          });
+          return { id: memberId };
+        },
+        { isolationLevel: "Serializable" },
       ),
     );
   }

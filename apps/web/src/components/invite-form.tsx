@@ -1,15 +1,17 @@
 "use client";
 
-import { type MemberInviteOutput, memberInviteInputSchema, type Role } from "@koklo/contract";
+import { type InvitationListOutput, invitationCreateInputSchema, type Role } from "@koklo/contract";
 import { Alert, AlertDescription, AlertTitle, Button, Card, Icon } from "@koklo/ui";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useRef, useState } from "react";
 import { conflictReason, errorCode } from "../lib/api-error.ts";
 import { fieldErrors, RETRY_LATER } from "../lib/form-errors.ts";
+import { MEMBERS_COPY, needsProjects } from "../lib/members-labels.ts";
 import { orpc } from "../lib/orpc.ts";
 import { invitableRoles, ROLE_LABELS } from "../lib/roles.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FormField } from "./form-field.tsx";
+import { InviteProjectsField } from "./invite-projects-field.tsx";
 import { RoleField } from "./role-field.tsx";
 
 const MESSAGES = {
@@ -20,10 +22,11 @@ const CONFLICTS: Record<string, string> = {
   already_member: "Cette personne fait déjà partie de l'organisation.",
   already_invited: "Cette personne a déjà une invitation en attente.",
 };
+type Invitation = InvitationListOutput[number];
 const longDate = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
 
 /** Confirmation honnête (G3) : l'invitation est créée, l'e-mail part en arrière-plan. */
-function Created({ invitation }: { invitation: MemberInviteOutput }) {
+function Created({ invitation }: { invitation: Invitation }) {
   return (
     <Alert>
       <Icon name="check_circle" size={20} />
@@ -47,31 +50,73 @@ function InviteFailure({ error }: { error: unknown }) {
   return <ErrorNotice title="L'invitation n'a pas pu être créée">{RETRY_LATER}</ErrorNotice>;
 }
 
-function useInviteForm() {
-  const invite = useMutation(orpc.member.invite.mutationOptions());
-  const emailInput = useRef<HTMLInputElement>(null);
-  const roleTrigger = useRef<HTMLButtonElement>(null);
+/** Valide la saisie avec le schéma du contrat ; client et business doivent aussi avoir un projet (B98). */
+function validateInvite(email: string, role: string, projectIds: string[]) {
+  const withProjects = needsProjects(role);
+  const parsed = invitationCreateInputSchema.safeParse({
+    email: email.trim(),
+    role,
+    ...(withProjects ? { projectIds } : {}),
+  });
+  const found = parsed.success ? {} : fieldErrors(parsed.error.issues, MESSAGES);
+  if (parsed.success && withProjects && projectIds.length === 0) {
+    return { found: { projects: MEMBERS_COPY.projectsRequired } };
+  }
+  return parsed.success ? { data: parsed.data, found } : { found };
+}
+
+/** Saisie du formulaire ; toute modification efface la confirmation précédente. */
+function useInviteFields(clearCreated: () => void) {
   const [email, setEmail] = useState("");
   const [memberRole, setMemberRole] = useState("");
+  const [projectIds, setProjectIds] = useState<string[]>([]);
+  const edit =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      clearCreated();
+    };
+  return {
+    email,
+    memberRole,
+    projectIds,
+    setEmail: edit(setEmail),
+    setMemberRole: edit(setMemberRole),
+    setProjectIds: edit(setProjectIds),
+    clear: () => {
+      setEmail("");
+      setMemberRole("");
+      setProjectIds([]);
+    },
+  };
+}
+
+function useInviteForm() {
+  const queryClient = useQueryClient();
+  const invite = useMutation(orpc.invitation.create.mutationOptions());
+  const emailInput = useRef<HTMLInputElement>(null);
+  const roleTrigger = useRef<HTMLButtonElement>(null);
+  const projectsFilter = useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [created, setCreated] = useState<MemberInviteOutput>();
+  const [created, setCreated] = useState<Invitation>();
+  const fields = useInviteFields(() => setCreated(undefined));
 
   function submit(event: FormEvent): void {
     event.preventDefault();
     setCreated(undefined);
-    const parsed = memberInviteInputSchema.safeParse({ email: email.trim(), role: memberRole });
-    const found = parsed.success ? {} : fieldErrors(parsed.error.issues, MESSAGES);
+    const { data, found } = validateInvite(fields.email, fields.memberRole, fields.projectIds);
     setErrors(found);
-    if (!parsed.success) {
-      (found.email ? emailInput : roleTrigger).current?.focus();
+    if (!data) {
+      const firstInvalid = found.email ? emailInput : found.role ? roleTrigger : projectsFilter;
+      firstInvalid.current?.focus();
       return;
     }
-    invite.mutate(parsed.data, {
+    invite.mutate(data, {
       onSuccess: (invitation) => {
         setCreated(invitation);
-        setEmail("");
-        setMemberRole("");
+        fields.clear();
         emailInput.current?.focus();
+        void queryClient.invalidateQueries({ queryKey: orpc.invitation.key() });
       },
       onError: (error) => {
         const conflict = CONFLICTS[conflictReason(error) ?? ""];
@@ -80,22 +125,13 @@ function useInviteForm() {
     });
   }
 
-  /** Toute nouvelle saisie efface la confirmation précédente. */
-  const edit =
-    <T,>(set: (value: T) => void) =>
-    (value: T) => {
-      set(value);
-      setCreated(undefined);
-    };
   const isConflict = invite.isError && CONFLICTS[conflictReason(invite.error) ?? ""] !== undefined;
   return {
+    ...fields,
     submit,
     emailInput,
     roleTrigger,
-    email,
-    setEmail: edit(setEmail),
-    memberRole,
-    setMemberRole: edit(setMemberRole),
+    projectsFilter,
     errors,
     created,
     pending: invite.isPending,
@@ -103,12 +139,12 @@ function useInviteForm() {
   };
 }
 
-/** Invitation d'un membre (e-mail + rôle) ; réservée aux propriétaires et administrateurs. */
+/** Invitation d'un membre (e-mail, rôle, projets) ; réservée aux propriétaires et administrateurs. */
 export function InviteForm({ role }: { role: Role }) {
   const form = useInviteForm();
   return (
     <Card className="flex max-w-xl flex-col gap-4 p-5">
-      <h2 className="text-section-title">Inviter un membre</h2>
+      <h3 className="text-subsection-title">Inviter un membre</h3>
       <form onSubmit={form.submit} noValidate className="flex flex-col gap-4">
         {form.failure ? <InviteFailure error={form.failure.error} /> : null}
         <FormField
@@ -129,6 +165,16 @@ export function InviteForm({ role }: { role: Role }) {
           error={form.errors.role}
           triggerRef={form.roleTrigger}
         />
+        {needsProjects(form.memberRole) ? (
+          <InviteProjectsField
+            selected={form.projectIds}
+            onChange={form.setProjectIds}
+            disabled={form.pending}
+            error={form.errors.projects}
+            focusRef={form.projectsFilter}
+          />
+        ) : null}
+        <p className="text-meta text-muted-foreground">{MEMBERS_COPY.invitePhrase}</p>
         <Button
           type="submit"
           className="h-11 w-full md:h-9 md:w-fit"

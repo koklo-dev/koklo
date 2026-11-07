@@ -1,8 +1,10 @@
 ---
 id: S-members
 titre: Membres et invitation
-version: 1.1
+version: 2
 ---
+> **Remplacée par [S-settings](S-settings.md)** (TK-97) pour tout cet écran.
+
 ## 1. Utilisateurs et objectif
 Membres de l'organisation active (vue équipe). Les propriétaires et administrateurs invitent ; les autres rôles (développeur, designer, client, business) consultent la liste. Arrivée depuis l'entrée « Membres » de la barre latérale. Objectif : inviter quelqu'un avec le bon rôle et voir qui fait partie de l'organisation.
 
@@ -65,3 +67,4 @@ Sous 768 px : carte pleine largeur, bouton « Inviter » pleine largeur, cibles 
 |---|---|---|---|
 | 1 | 2026-10-29 | TK-24 | Création : invitation (e-mail + rôle) et liste des membres, droits par rôle. Détail : `.workflow/TK-24/02-design.md` |
 | 1.1 | 2026-11-07 | TK-88 | Route `/settings/members` (`/members` redirige) sous « Réglages » ; plus d'entrée « Membres » dans la barre. Remplacée par S-settings au lot 13. Détail : `.workflow/TK-88/02-design.md` |
+| 2 | 2026-11-07 | TK-97 | Remplacée par S-settings (Réglages : Général, Membres, Mon compte). Décision B103. |

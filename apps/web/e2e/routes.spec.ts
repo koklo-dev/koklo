@@ -89,11 +89,14 @@ test("pages « Bientôt » : Idée et un livrable, EmptyState sans action, ongle
   await expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible();
 });
 
-test("un client lié garde la coquille sans Réglages ni Assistant de cadrage", async ({ page }) => {
+test("un client lié garde la coquille avec Réglages (Mon compte) mais sans Assistant de cadrage", async ({
+  page,
+}) => {
   await setScenario({ session: true, projects: "data", role: "client" });
   await page.goto(`${PROJECT}/tickets`);
   const bar = page.locator('[data-slot="app-shell-sidebar"]');
   await expect(bar.getByRole("link", { name: /^Tickets/ })).toBeVisible();
-  await expect(bar.getByRole("link", { name: "Réglages" })).toHaveCount(0);
+  // B96 : « Réglages » est visible de tous ; le client n'y trouve que Mon compte.
+  await expect(bar.getByRole("link", { name: "Réglages" })).toHaveCount(1);
   await expect(bar.getByRole("link", { name: "Assistant de cadrage" })).toHaveCount(0);
 });

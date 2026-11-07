@@ -212,7 +212,7 @@ test("S-github : un résultat inconnu n'affiche rien et sa valeur n'est jamais r
   for (const [, , title] of RESULTS) await expect(page.getByText(title)).toHaveCount(0);
 });
 
-test("S-github : un développeur n'a ni l'onglet IA ni un appel d'API, et lit un refus sans action", async ({
+test("S-github : un développeur est redirigé vers Membres : ni lien GitHub ni appel d'API, ni action", async ({
   page,
 }) => {
   const calls: string[] = [];
@@ -220,10 +220,11 @@ test("S-github : un développeur n'a ni l'onglet IA ni un appel d'API, et lit un
     if (request.url().includes("/provider/installations")) calls.push(request.url());
   });
   await open(page, { installations: "data", role: "dev" });
-  await expect(page.getByText(/Cette page est réservée aux propriétaires/)).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/members$/);
   const tabs = page.getByRole("navigation", { name: "Sections des réglages" });
   await expect(tabs.getByRole("link", { name: "Membres" })).toBeVisible();
-  await expect(tabs.getByRole("link", { name: "IA" })).toHaveCount(0);
+  await expect(tabs.getByRole("link", { name: "GitHub" })).toHaveCount(0);
+  await expect(tabs.getByRole("link", { name: "Fournisseurs d'IA" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: INSTALL })).toHaveCount(0);
   expect(calls).toEqual([]);
 });

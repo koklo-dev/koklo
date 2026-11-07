@@ -26,8 +26,15 @@ type ConflictReason =
   | "suggestion_quota"
   | "framing_closed"
   | "suggestion_not_open"
-  | "baseline_not_open";
+  | "baseline_not_open"
+  | "slug_taken"
+  | "already_member"
+  | "already_invited"
+  | "last_owner"
+  | "self_role"
+  | "self_remove";
 
+export const forbidden = () => new ORPCError("FORBIDDEN", { message: "Accès refusé" });
 export const notFound = () => new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });
 /** Une ressource absente ou hors du projet est `NOT_FOUND` (aucune fuite entre projets). */
 export function orNotFound<T>(value: T | null | undefined): T {

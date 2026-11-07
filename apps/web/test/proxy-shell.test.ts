@@ -35,9 +35,11 @@ const GUARDED = [
   `/projects/${ID}/spec/functional`,
   `/projects/${ID}/spec/security`,
   "/settings",
+  "/settings/general",
   "/settings/members",
   "/settings/github",
   "/settings/ai",
+  "/settings/account",
 ];
 
 describe("proxy — routes de la coquille", () => {

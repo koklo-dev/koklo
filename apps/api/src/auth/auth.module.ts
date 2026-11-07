@@ -63,7 +63,7 @@ export class AuthModule {
         { provide: APP_FILTER, useClass: BodyParserErrorFilter },
         ...sessionProviders(config),
       ],
-      exports: [SESSION_RESOLVER, AUTH],
+      exports: [SESSION_RESOLVER, AUTH, InvitationQueue],
     };
   }
 }

@@ -15,11 +15,12 @@ import { ENCRYPTION_KEY, INSTALL_APP } from "./helpers/installations.ts";
 import { collaborationFor, createAppWithClock, leaseRows, ManualClock } from "./helpers/leases.ts";
 import { credentialRows } from "./helpers/llm-credential-routes.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
-import { startQueueBoss } from "./helpers/organizations.ts";
+import { insertActor, startQueueBoss } from "./helpers/organizations.ts";
 import { linkRows, projectClientApi } from "./helpers/project-client.ts";
 import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import { reviewApi } from "./helpers/reviews.ts";
+import { settingsApi } from "./helpers/settings.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import { suggestionApi } from "./helpers/suggestions.ts";
 import {
@@ -138,6 +139,9 @@ function nonGetProcedures(groupNames: readonly string[]): string[] {
 /** Tous les groupes à écriture : organization, member et project se journalisent aussi (audit_log ne requiert que organization_id). */
 const WRITE_GROUPS = [
   "organization",
+  "org",
+  "invitation",
+  "me",
   "member",
   "project",
   "projectClient",
@@ -199,6 +203,9 @@ const EXPECTED_WRITE_PROCEDURES = [
   "dependency.add",
   "dependency.remove",
   "installation.start",
+  "invitation.create",
+  "invitation.resend",
+  "invitation.revoke",
   "lease.acquire",
   "lease.heartbeat",
   "lease.release",
@@ -206,8 +213,13 @@ const EXPECTED_WRITE_PROCEDURES = [
   "llmCredential.remove",
   "llmCredential.set",
   "llmCredential.verify",
+  "me.update",
+  "me.updateNotification",
   "member.invite",
+  "member.remove",
   "member.setRole",
+  "member.updateRole",
+  "org.update",
   "organization.create",
   "project.create",
   "projectClient.add",
@@ -604,6 +616,153 @@ const SCENARIOS: Scenario[] = [
       });
     },
     deniedStatuses: [403],
+  },
+  {
+    // TK-97 : la route d'écriture ajoutée garde l'action historique `member.setRole` (une action par fait).
+    procedure: "member.updateRole",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      settingsApi(app, ctx.world.actors.owner).updateRole(
+        ctx.world.actors.designer.memberId,
+        "business",
+      ),
+    expected: async (ctx) => ({
+      action: "member.setRole",
+      targetKind: "member",
+      targetId: ctx.world.actors.designer.memberId,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      settingsApi(app, ctx.world.actors.owner).updateRole(ctx.world.actors.owner.memberId, "dev"),
+    deniedStatuses: [409],
+  },
+  {
+    procedure: "member.remove",
+    role: "owner",
+    prepare: async (ctx) => insertActor(database, ctx.world.organizationId, "dev", "a-retirer"),
+    call: (ctx, member) => settingsApi(app, ctx.world.actors.owner).remove(member.memberId),
+    expected: async (_ctx, member) => ({
+      action: "member.remove",
+      targetKind: "member",
+      targetId: member.memberId,
+      ticketId: null,
+    }),
+    denied: (ctx, member) => settingsApi(app, ctx.world.actors.dev).remove(member.memberId),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "org.update",
+    role: "owner",
+    prepare: async () => ({ slug: `audit-org-${Date.now()}` }),
+    call: (ctx, state) =>
+      settingsApi(app, ctx.world.actors.owner).orgUpdate({ name: "Nom audité", slug: state.slug }),
+    expected: async (ctx) => ({
+      action: "organization.update",
+      targetKind: "organization",
+      targetId: ctx.world.organizationId,
+      ticketId: null,
+    }),
+    denied: (ctx, state) =>
+      settingsApi(app, ctx.world.actors.dev).orgUpdate({ name: "Refusé", slug: state.slug }),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "invitation.create",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      settingsApi(app, ctx.world.actors.owner).invite({
+        email: `inv-create-${Date.now()}@example.test`,
+        role: "client",
+        projectIds: [ctx.world.projectId],
+      }),
+    expected: async (_ctx, _s, res) => ({
+      action: "member.invite",
+      targetKind: "invitation",
+      targetId: res.body.id,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      settingsApi(app, ctx.world.actors.dev).invite({
+        email: "refus-97@example.test",
+        role: "dev",
+      }),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "invitation.resend",
+    role: "owner",
+    prepare: async (ctx) =>
+      (
+        await settingsApi(app, ctx.world.actors.owner).invite({
+          email: `inv-resend-${Date.now()}@example.test`,
+          role: "dev",
+        })
+      ).body,
+    call: (ctx, invitation) => settingsApi(app, ctx.world.actors.owner).resend(invitation.id),
+    expected: async (_ctx, invitation) => ({
+      action: "invitation.resend",
+      targetKind: "invitation",
+      targetId: invitation.id,
+      ticketId: null,
+    }),
+    denied: (ctx, invitation) => settingsApi(app, ctx.world.actors.dev).resend(invitation.id),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "invitation.revoke",
+    role: "owner",
+    prepare: async (ctx) =>
+      (
+        await settingsApi(app, ctx.world.actors.owner).invite({
+          email: `inv-revoke-${Date.now()}@example.test`,
+          role: "dev",
+        })
+      ).body,
+    call: (ctx, invitation) => settingsApi(app, ctx.world.actors.owner).revoke(invitation.id),
+    expected: async (_ctx, invitation) => ({
+      action: "invitation.revoke",
+      targetKind: "invitation",
+      targetId: invitation.id,
+      ticketId: null,
+    }),
+    denied: (ctx, invitation) => settingsApi(app, ctx.world.actors.dev).revoke(invitation.id),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "me.update",
+    role: "dev",
+    prepare: async () => ({}),
+    call: (ctx) => settingsApi(app, ctx.world.actors.dev).meUpdate({ name: "Nom audité" }),
+    expected: async (ctx) => ({
+      action: "me.update",
+      targetKind: "user",
+      targetId: ctx.world.actors.dev.userId,
+      ticketId: null,
+    }),
+    denied: (ctx) => settingsApi(app, ctx.world.actors.dev).meUpdate({ name: "" }),
+    deniedStatuses: [422],
+  },
+  {
+    procedure: "me.updateNotification",
+    role: "dev",
+    prepare: async () => ({}),
+    call: (ctx) => settingsApi(app, ctx.world.actors.dev).setNotification("weekly_digest", true),
+    expected: async (ctx) => {
+      const [row] = await database.query<{ id: string }>(
+        "SELECT id FROM notification_preferences WHERE organization_id = $1 AND user_id = $2 AND key = 'weekly_digest'",
+        [ctx.world.organizationId, ctx.world.actors.dev.userId],
+      );
+      return {
+        action: "me.notifications.update",
+        targetKind: "notification_preference",
+        targetId: row?.id ?? "",
+        ticketId: null,
+      };
+    },
+    denied: (ctx) => settingsApi(app, ctx.world.actors.dev).setNotification("inconnue", true),
+    deniedStatuses: [422],
   },
   {
     procedure: "projectClient.add",

@@ -49,3 +49,16 @@ export function canListMembers(role: Role | string | undefined): boolean {
     role === "business"
   );
 }
+
+/**
+ * Un gestionnaire agit sur un membre, sauf sur un propriétaire que seul un propriétaire touche (H3).
+ * Le serveur reste l'autorité : ceci évite seulement de proposer une action qu'il refuserait.
+ */
+export function canTouchMember(actor: Role | undefined, target: Role): boolean {
+  return canManage(actor) && (target !== "owner" || actor === "owner");
+}
+
+/** Rôles proposés dans le menu d'un membre : ceux que l'on peut inviter, sauf son rôle actuel. */
+export function assignableRoles(actor: Role | undefined, target: Role): MemberRole[] {
+  return invitableRoles(actor).filter((candidate) => candidate !== target);
+}

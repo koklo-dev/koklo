@@ -132,11 +132,12 @@ model Member {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notifications Notification[]
-  projectAccess ProjectClientAccess[]
-  projectVisits ProjectVisit[]
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications           Notification[]
+  projectAccess           ProjectClientAccess[]
+  projectVisits           ProjectVisit[]
+  notificationPreferences NotificationPreference[]
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -154,9 +155,12 @@ model Invitation {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  inviter      User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User                @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  projects     InvitationProject[]
 
+  // Cible de la clé composite d'invitation_projects (TK-97) : un lien ne peut pas viser une autre organisation.
+  @@unique([organizationId, id])
   @@index([organizationId])
   @@index([inviterId])
   @@map("invitations")
@@ -170,19 +174,20 @@ model Project {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tickets       Ticket[]
-  sprints       Sprint[]
-  state         ProjectState?
-  counters      ProjectCounter[]
-  repos         ProjectRepo[]
-  writeBatches  SpecWriteBatch[]
-  suggestions   Suggestion[]
-  reviews       Review[]
-  baselines     Baseline[]
-  notifications Notification[]
-  clientAccess  ProjectClientAccess[]
-  visits        ProjectVisit[]
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tickets            Ticket[]
+  sprints            Sprint[]
+  state              ProjectState?
+  counters           ProjectCounter[]
+  repos              ProjectRepo[]
+  writeBatches       SpecWriteBatch[]
+  suggestions        Suggestion[]
+  reviews            Review[]
+  baselines          Baseline[]
+  notifications      Notification[]
+  clientAccess       ProjectClientAccess[]
+  visits             ProjectVisit[]
+  invitationProjects InvitationProject[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -1323,4 +1328,40 @@ model ProjectVisit {
   @@unique([projectId, userId])
   @@index([organizationId, userId, visitedAt(sort: Desc)])
   @@map("project_visits")
+}
+
+/// Projets proposés à une invitation client ou business (TK-97, B98). À l'acceptation, un hook Better Auth en fait des
+/// liens `project_client_access` ; la ligne ne donne aucun accès par elle-même.
+model InvitationProject {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  invitationId   String   @map("invitation_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  invitation Invitation @relation(fields: [organizationId, invitationId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  project    Project    @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([invitationId, projectId])
+  @@index([organizationId])
+  @@map("invitation_projects")
+}
+
+/// Préférence d'e-mail d'un membre (TK-97, B101) : absence de ligne = valeur par défaut du contrat. `key` est contrainte par un
+/// CHECK (liste fermée `NOTIFICATION_PREFERENCE_KEYS`, hors Prisma). Une préférence désactivée passe la notification en `skipped`.
+model NotificationPreference {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  key            String
+  enabled        Boolean
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  member Member @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, organizationId, key])
+  @@index([organizationId])
+  @@map("notification_preferences")
 }

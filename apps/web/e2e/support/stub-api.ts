@@ -9,6 +9,8 @@ import {
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 import { handleLlm, type LlmScenario, resetLlm } from "./stub-llm-credential.ts";
+import { resetMembers } from "./stub-members.ts";
+import { handleSettings, resetSettings, type SettingsScenario } from "./stub-settings.ts";
 import { handleShell, resetShell, type ShellScenario } from "./stub-shell.ts";
 import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
 
@@ -34,7 +36,8 @@ type Scenario = {
   FeaturesScenario &
   AiScenario &
   LlmScenario &
-  ShellScenario;
+  ShellScenario &
+  SettingsScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -56,22 +59,6 @@ const ORGANIZATIONS = [
     id: "01900000-0000-7000-8000-0000000000a2",
     name: "Studio Nord",
     slug: "studio-nord",
-    role: "dev",
-  },
-];
-const MEMBERS = [
-  {
-    id: "01900000-0000-7000-8000-0000000000b1",
-    userId: "01900000-0000-7000-8000-0000000000c1",
-    name: "Awa Koné",
-    email: "awa@example.com",
-    role: "owner",
-  },
-  {
-    id: "01900000-0000-7000-8000-0000000000b2",
-    userId: "01900000-0000-7000-8000-0000000000c2",
-    name: "Moussa Diallo",
-    email: "moussa@example.com",
     role: "dev",
   },
 ];
@@ -140,7 +127,6 @@ function invitationEndpoint(path: string): ReturnType<typeof json> | null {
 /** Lectures simples (organisations, membres) ; le reste est inconnu du faux API. */
 function readEndpoint(method: string | undefined, path: string): ReturnType<typeof json> {
   if (method === "GET" && path.endsWith("/organizations")) return json(200, organizations());
-  if (method === "GET" && path.endsWith("/members")) return json(200, MEMBERS);
   return json(404, { code: "NOT_FOUND" });
 }
 
@@ -167,6 +153,8 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetFeatures();
     resetAi();
     resetLlm();
+    resetSettings();
+    resetMembers();
     resetShell(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
@@ -187,6 +175,7 @@ const knownProject = (id: string) => allProjects().some((project) => project.id 
  * puis la coquille (`project.shell|visit|recent`, `search.query`).
  */
 const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
+  handleSettings(req, url, { scenario, send, projects: allProjects }) ||
   handleLlm(req, url, { scenario, send, hold }) ||
   handleAi(req, url, { scenario, knownProject, send, hold }) ||
   handleShell(req, url, { scenario, projects: allProjects, send, hold });

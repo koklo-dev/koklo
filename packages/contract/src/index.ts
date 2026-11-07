@@ -8,17 +8,29 @@ export type {
   HealthInput,
   HealthOutput,
   InstallationOutput,
+  InvitationCreateInput,
+  InvitationListOutput,
+  InvitationOutput,
   LeaseAcquireInput,
   LeaseOutput,
   MemberInviteInput,
   MemberInviteOutput,
   MemberListOutput,
+  MemberPageInput,
+  MemberPageOutput,
+  MemberRemoveOutput,
   MemberRole,
   MemberSetRoleInput,
   MemberSetRoleOutput,
+  MemberUpdateRoleOutput,
+  MeNotificationsOutput,
+  MeOutput,
   OrganizationCreateInput,
   OrganizationCreateOutput,
   OrganizationListOutput,
+  OrgGetOutput,
+  OrgUpdateInput,
+  OrgUpdateOutput,
   ProjectClient,
   ProjectCreateInput,
   ProjectListOutput,
@@ -96,6 +108,7 @@ export * from "./schemas-llm-credential.ts";
 export * from "./schemas-project-client.ts";
 export * from "./schemas-provider.ts";
 export * from "./schemas-review.ts";
+export * from "./schemas-settings.ts";
 export * from "./schemas-shell.ts";
 export * from "./schemas-spec.ts";
 export * from "./schemas-suggestion.ts";

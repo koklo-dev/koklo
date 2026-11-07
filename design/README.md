@@ -49,8 +49,9 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 |---|---|---|
 | [S-login](screens/S-login.md) | 3 | TK-85 (correction) |
 | [S-projects](screens/S-projects.md) | 6.1 | TK-88 |
-| [S-organizations](screens/S-organizations.md) | 1.1 | TK-88 |
-| [S-members](screens/S-members.md) | 1.1 | TK-88 |
+| [S-organizations](screens/S-organizations.md) | 2 (remplacée par S-settings) | TK-97 |
+| [S-members](screens/S-members.md) | 2 (remplacée par S-settings) | TK-97 |
+| [S-settings](screens/S-settings.md) | 1 | TK-97 |
 | [S-accept-invitation](screens/S-accept-invitation.md) | 1 | TK-86 |
 | [S-kanban](screens/S-kanban.md) | 1.6 | TK-88 |
 | [S-github](screens/S-github.md) | 4.1 | TK-88 |

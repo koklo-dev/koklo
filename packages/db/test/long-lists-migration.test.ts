@@ -83,8 +83,8 @@ describe("TK-94 migration long_lists : dossier et contenu", () => {
     expect(down).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE)\b/i);
   });
 
-  it("n'ajoute aucune table : expectedTables est à 44 (TK-88)", () => {
-    expect(expectedTables).toHaveLength(44);
+  it("n'ajoute aucune table : expectedTables est à 46 (TK-97)", () => {
+    expect(expectedTables).toHaveLength(46);
   });
 });
 

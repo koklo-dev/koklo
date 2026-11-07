@@ -19,8 +19,8 @@ export type SpecSlug = (typeof SPEC_SLUGS)[number];
 export const isSpecSlug = (value: string): value is SpecSlug =>
   (SPEC_SLUGS as readonly string[]).includes(value);
 
-/** Sections de Réglages, dans l'ordre des onglets. */
-export const SETTINGS_SECTIONS = ["members", "github", "ai"] as const;
+/** Sections de Réglages, dans l'ordre de la navigation (Organisation puis Vous). */
+export const SETTINGS_SECTIONS = ["general", "members", "ai", "github", "account"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export const isSettingsSection = (value: string): value is SettingsSection =>

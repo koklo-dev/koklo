@@ -1,8 +1,13 @@
-import type { OrganizationListOutput } from "@koklo/contract";
+import type {
+  OrganizationListOutput,
+  OrgGetOutput,
+  OrgUpdateInput,
+  OrgUpdateOutput,
+} from "@koklo/contract";
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
-import { recordAudit } from "../tracker/audit.ts";
+import { type AuditActor, recordAudit } from "../tracker/audit.ts";
 
 /**
  * Organisations et appartenances : modèles hors filtre multi-tenant (racine des organisations,
@@ -74,5 +79,51 @@ export class OrganizationRepository {
       );
       return created;
     });
+  }
+
+  /** Faits de Général : compteurs réels. Le nombre de clés d'IA ne dit rien du fournisseur. */
+  async get(organizationId: string): Promise<OrgGetOutput> {
+    const { client } = this.database;
+    const organization = await client.organization.findUniqueOrThrow({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true, logo: true },
+    });
+    const [memberCount, projectCount, aiProviderCount] = await Promise.all([
+      client.member.count({ where: { organizationId } }),
+      withOrganization(organizationId, () => client.project.count()),
+      withOrganization(organizationId, () => client.llmProviderCredential.count()),
+    ]);
+    return { ...organization, projectCount, memberCount, aiProviderCount };
+  }
+
+  async slugTakenByAnother(organizationId: string, slug: string): Promise<boolean> {
+    const found = await this.database.client.organization.findFirst({
+      where: { slug, id: { not: organizationId } },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
+  /** Nom, slug et audit `organization.update` en UNE transaction ; `onTaken` lève si un autre possède déjà ce slug. */
+  update(actor: AuditActor, input: OrgUpdateInput, onTaken: () => Error): Promise<OrgUpdateOutput> {
+    const { organizationId } = actor;
+    return withOrganization(organizationId, () =>
+      this.database.client.$transaction(async (tx) => {
+        if (await this.slugTakenByAnother(organizationId, input.slug)) {
+          throw onTaken();
+        }
+        const updated = await tx.organization.update({
+          where: { id: organizationId },
+          data: { name: input.name, slug: input.slug },
+          select: { id: true, name: true, slug: true },
+        });
+        await recordAudit(tx, actor, {
+          action: "organization.update",
+          targetKind: "organization",
+          targetId: organizationId,
+        });
+        return updated;
+      }),
+    );
   }
 }

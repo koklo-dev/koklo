@@ -6,6 +6,7 @@ import { llmCredential } from "./contract-llm-credential.ts";
 import { projectClient } from "./contract-project-client.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { review } from "./contract-review.ts";
+import { invitation, me, memberSettings, org } from "./contract-settings.ts";
 import { projectShell, search } from "./contract-shell.ts";
 import { spec, specBatch } from "./contract-spec.ts";
 import { suggestion } from "./contract-suggestion.ts";
@@ -55,6 +56,20 @@ import {
 } from "./schemas.ts";
 import type { projectClientSchema } from "./schemas-project-client.ts";
 import type { installationSchema, repoSchema } from "./schemas-provider.ts";
+import type {
+  invitationCreateInputSchema,
+  invitationListOutputSchema,
+  invitationSchema,
+  memberPageInputSchema,
+  memberPageOutputSchema,
+  memberRemoveOutputSchema,
+  memberUpdateRoleOutputSchema,
+  meNotificationsOutputSchema,
+  meOutputSchema,
+  orgGetOutputSchema,
+  orgUpdateInputSchema,
+  orgUpdateOutputSchema,
+} from "./schemas-settings.ts";
 import type {
   featureDetailSchema,
   featureSummarySchema,
@@ -111,7 +126,11 @@ const projectCreate = route("POST", "/projects")
 export const contract = {
   health,
   organization: { create: organizationCreate, list: organizationList },
-  member: { invite: memberInvite, list: memberList, setRole: memberSetRole },
+  org,
+  invitation,
+  // `invite`, `list`, `setRole` : dépréciées depuis 2.2.0 (B95), retirées à la prochaine majeure ; mêmes services que les routes de `memberSettings`.
+  member: { invite: memberInvite, list: memberList, setRole: memberSetRole, ...memberSettings },
+  me,
   project: { list: projectList, create: projectCreate, ...projectShell },
   projectClient,
   search,
@@ -145,6 +164,18 @@ export type MemberInviteOutput = z.output<typeof memberInviteOutputSchema>;
 export type MemberListOutput = z.output<typeof memberListOutputSchema>;
 export type MemberSetRoleInput = z.input<typeof memberSetRoleInputSchema>;
 export type MemberSetRoleOutput = z.output<typeof memberSetRoleOutputSchema>;
+export type OrgGetOutput = z.output<typeof orgGetOutputSchema>;
+export type OrgUpdateInput = z.input<typeof orgUpdateInputSchema>;
+export type OrgUpdateOutput = z.output<typeof orgUpdateOutputSchema>;
+export type InvitationCreateInput = z.input<typeof invitationCreateInputSchema>;
+export type InvitationOutput = z.output<typeof invitationSchema>;
+export type InvitationListOutput = z.output<typeof invitationListOutputSchema>;
+export type MemberPageInput = z.input<typeof memberPageInputSchema>;
+export type MemberPageOutput = z.output<typeof memberPageOutputSchema>;
+export type MemberUpdateRoleOutput = z.output<typeof memberUpdateRoleOutputSchema>;
+export type MemberRemoveOutput = z.output<typeof memberRemoveOutputSchema>;
+export type MeOutput = z.output<typeof meOutputSchema>;
+export type MeNotificationsOutput = z.output<typeof meNotificationsOutputSchema>;
 export type Role = z.output<typeof roleSchema>;
 export type MemberRole = z.output<typeof memberRoleSchema>;
 export type TicketCreateInput = z.input<typeof ticketCreateInputSchema>;

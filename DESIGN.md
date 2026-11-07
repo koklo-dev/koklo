@@ -285,7 +285,7 @@ Planches : `docs/refonte/maquettes/05-Lot1Shell.html` pour la mise en page, `10-
 
 **Pages « Bientôt »** : `EmptyState` (icône `schedule`, titre « Bientôt », une phrase qui dit ce qui viendra, aucune action) sous un `ProjectHeader` à la ligne 1 et au h1 du livrable ou de l'espace ; jamais de lien mort : seules les entrées disponibles y mènent.
 
-**Réglages** : h1 « Réglages » 24/600 sans `ProjectHeader`, onglets en liens (Membres, GitHub, IA) selon le rôle, les trois écrans existants dessous tels quels.
+**Réglages** (v2.4, TK-97, passation 19 §1, décisions B96 et B97) : h1 « Réglages » 24/600 sans `ProjectHeader` ; sous lui, navigation secondaire de **240 px** (groupes Organisation et Vous, libellé de groupe 11/600 capitales, entrée de 36 px, active sur `--surface` en 600, badge du nombre de membres) et contenu à droite (h2 `text-section-title` + une phrase `--muted-foreground`). Sous 768 px la navigation devient des liens horizontaux défilants. Sections par rôle : voir `design/screens/S-settings.md` ; section interdite -> section par défaut ; bandeau `lock` de lecture seule (`Alert` neutre). Les onglets de TK-88 disparaissent.
 
 Écartées : garder le chevron de repli du groupe Spec (périmé, B2) ; « validés sur 6 » (il y a 7 livrables) ; liste complète des projets dans la carte projet (liste longue : 8 récents + « Tous les projets ») ; recherche locale sur les éléments chargés (B3 : serveur).
 
@@ -334,5 +334,6 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 26/10/2026 | Couleur : Indigo retenu après essai de Forêt, écarté |
 | 06/11/2026 | v2 (TK-87, passation 01 §0) : jetons `--surface`, `--raised`, `--border-strong`, `--diff-bg`, `--shadow-floating` ; couleurs d'alerte ; « Non soumise » ; échelle resserrée (h1 24, h2 16, h3 14) ; 8 composants de statut et signature ; bouton désactivé en pointillés avec raison ; règles d'écran 1 à 7 ; le fournisseur d'IA n'est jamais nommé dans l'interface (B15) |
 | 06/11/2026 | v2.1 (TK-94, passation 07 §0 à §5) : §5.3 listes longues (`VirtualList`, `CountBar`, `ListFooter` à 4 états, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`), annonces et `aria-setsize` / `aria-posinset` |
+| 07/11/2026 | v2.4 (TK-97, passation 19 §1) : §5.4 Réglages à navigation secondaire de 240 px par rôle ; thème Clair / Sombre / Système (B100) |
 | 07/11/2026 | v2.2 (TK-88, passation 01 §1, 05 §2, 21 §0) : §5.4 coquille (`AppShell` 256 / 64 px collante, tiroir sous 768 px, groupe SPEC à sept entrées numérotées avec cadenas et sans chevron, `ProjectHeader` à trois lignes avec onglets en liens, palette ⌘K à recherche serveur, pages « Bientôt ») ; `--sidebar` passe sur `--surface` (B29) ; fil d'Ariane v1 retiré |
 | 07/11/2026 | v2.3 (TK-88, finition) : §5.4 pied de barre épinglé, clavier de la palette (focus rendu, première option active, filtrage des pages à la frappe, liste masquée sans option), ombre et défilement visible du kanban, `smart_toy` pour l'Assistant de cadrage ; l'annonce du compte à rebours de S-framing devient `sr-only` (un seul « Réessayez dans N s » à l'écran, règle 5) |

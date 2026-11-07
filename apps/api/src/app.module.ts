@@ -15,8 +15,10 @@ import { ERROR_STATUS_MAP } from "./error-status.ts";
 import { HealthModule } from "./health/health.module.ts";
 import { validationStatusInterceptor } from "./input-validation.ts";
 import { InstallationModule } from "./installation/installation.module.ts";
+import { InvitationModule } from "./invitation/invitation.module.ts";
 import { LeaseModule } from "./lease/lease.module.ts";
 import { LlmCredentialRoutesModule } from "./llm-credential/llm-credential-routes.module.ts";
+import { MeModule } from "./me/me.module.ts";
 import { MemberModule } from "./member/member.module.ts";
 import { NotificationModule } from "./notification/notification.module.ts";
 import { OpenApiController } from "./openapi/openapi.controller.ts";
@@ -56,6 +58,9 @@ const CLIENT_SPACE_MODULES = [
   ReviewModule,
 ];
 
+/** Réglages (TK-97) : membres, invitations avec projets, compte et préférences. */
+const SETTINGS_MODULES = [MemberModule, InvitationModule, MeModule];
+
 @Module({})
 export class AppModule {
   static forRoot(config: AppConfig, options: AppModuleOptions = {}): DynamicModule {
@@ -89,7 +94,7 @@ export class AppModule {
         }),
         HealthModule,
         OrganizationModule,
-        MemberModule,
+        ...SETTINGS_MODULES,
         ProjectAccessModule,
         ProjectModule,
         ProjectClientModule,

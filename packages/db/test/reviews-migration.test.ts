@@ -151,9 +151,9 @@ describe("TK-51c migration reviews_baselines : dossier et contenu", () => {
     expect(down).not.toMatch(/counter_name/i);
   });
 
-  it("expectedTables contient les deux tables (44 au total avec TK-88)", () => {
+  it("expectedTables contient les deux tables (46 au total avec TK-97)", () => {
     for (const table of REVIEW_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(44);
+    expect(expectedTables).toHaveLength(46);
   });
 });
 
