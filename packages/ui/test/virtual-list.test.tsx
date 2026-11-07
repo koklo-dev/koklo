@@ -97,6 +97,49 @@ describe("VirtualList : fenêtre et sémantique", () => {
     expect(listitems()[0]).toHaveStyle({ height: "44px" });
   });
 
+  it("framed : cadre bordé de rayon 12 sur le conteneur défilant", () => {
+    renderList({ framed: true });
+    const box = document.querySelector("[data-slot='virtual-list']") as HTMLElement;
+    for (const cls of [
+      /rounded-xl/,
+      /\bborder\b/,
+      /border-border/,
+      /overflow-hidden|overflow-y-auto/,
+    ]) {
+      expect(box.className).toMatch(cls);
+    }
+  });
+
+  it("sans framed : aucun cadre", () => {
+    renderList();
+    const box = document.querySelector("[data-slot='virtual-list']") as HTMLElement;
+    expect(box.className).not.toMatch(/rounded-xl/);
+  });
+
+  it("loadingRows={4} : 4 SkeletonRow aria-hidden après les lignes, sans double bordure, aria-busy gardé", () => {
+    renderList({ items: rows(3), total: 3, loadingRows: 4 });
+    const skeletons = [...document.querySelectorAll("[data-slot='skeleton-row']")];
+    expect(skeletons).toHaveLength(4);
+    for (const row of skeletons) expect(row).toHaveAttribute("aria-hidden", "true");
+    const list = screen.getByRole("list");
+    expect(list).toHaveAttribute("aria-busy", "true");
+    expect(
+      list.compareDocumentPosition(skeletons[0] as Element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect((skeletons[0] as HTMLElement).className).toMatch(/border-t/);
+    expect((skeletons[0] as HTMLElement).className).not.toMatch(/first:border-t-0/);
+    expect((skeletons[1] as HTMLElement).className).toMatch(/border-t/);
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("sans loadingRows : aucun squelette ; aria-setsize inchangé avec loadingRows", () => {
+    renderList();
+    expect(document.querySelectorAll("[data-slot='skeleton-row']")).toHaveLength(0);
+    document.body.innerHTML = "";
+    renderList({ loadingRows: 4 });
+    for (const item of listitems()) expect(item).toHaveAttribute("aria-setsize", "1000");
+  });
+
   it("la liste porte aria-busy pendant un rechargement", () => {
     const { again } = renderList();
     expect(screen.getByRole("list")).not.toHaveAttribute("aria-busy", "true");
@@ -115,7 +158,9 @@ describe("VirtualList : fenêtre et sémantique", () => {
 
   it("les lignes sont séparées par --border et survolées en --accent", () => {
     renderList();
-    expect(listitems()[0]?.className).toMatch(/border-b/);
+    expect(listitems()[0]?.className).not.toMatch(/border-[tb]\b/);
+    expect(listitems()[1]?.className).toMatch(/border-t\b/);
+    expect(listitems()[1]?.className).not.toMatch(/border-b\b/);
     expect(listitems()[0]?.className).toMatch(/hover:bg-accent/);
   });
 

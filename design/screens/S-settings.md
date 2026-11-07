@@ -1,7 +1,7 @@
 ---
 id: S-settings
 titre: Réglages (Général, Membres, Mon compte)
-version: 1
+version: 1.2
 ---
 ## 1. Utilisateurs et objectif
 Propriétaire et administrateur (gèrent), développeur, designer et business (Membres en lecture seule, Mon compte), client (Mon compte seul). Arrivée par « Réglages » de la barre. Objectif : gérer l'organisation, ses membres et leurs accès, et ses préférences personnelles. Remplace S-organizations (partie réglages) et S-members ; reprend S-ai-settings et S-github tels quels dans le même cadre (TK-98 et 13c les refondent).
@@ -39,3 +39,4 @@ Visibilité d'un business limitée aux projets choisis (B98). Journal d'audit, A
 |---|---|---|---|
 | 1 | 2026-11-07 | TK-97 | Création : cadre à navigation par rôle, Général, Membres, Mon compte. Décisions B95 à B103. Détail : `.workflow/TK-97/00-fiche.md` |
 | 1.1 | 2026-11-07 | TK-98 | La section Fournisseurs d'IA est refondue dans `S-ai-settings.md` v2 (h2 « Fournisseurs d'IA », B115 levé). Captures de rattrapage de TK-97 : `captures/S-settings/<section>-<rôle>-<thème>.png` (B130) |
+| 1.2 | 2026-11-07 | TK-140 | Bibliothèque : `Pagination` de la liste des membres à boutons 32 bordés en mono et « Lignes par page » segmenté (I21) ; `SecondaryNav` livrée dans `packages/ui` (la navigation locale reste en place jusqu'à TK-141). |

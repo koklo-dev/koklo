@@ -29,6 +29,7 @@ const THEME_PAIRS: ReadonlyArray<readonly [string, string]> = [
   // TK-138 lot C : RadioCard choisie (texte et description sur --diff-bg)
   ["--foreground", "--diff-bg"],
   ["--muted-foreground", "--diff-bg"],
+  ["--foreground", "--secondary"],
 ];
 
 /** Composants d interface (WCAG 1.4.11) : contour de case non cochée (muted) >= 3:1. */
@@ -82,6 +83,24 @@ describe.each([":root", ".dark"] as const)("CA1 (TK-87) - contraste des alertes 
     },
   );
 });
+
+describe.each([":root", ".dark"] as const)(
+  "TK-140 lot A - pied de liste en erreur %s",
+  (selector) => {
+    it("--muted-foreground sur --alert-error >= 4,5:1", () => {
+      const theme = effectiveTheme(selector);
+      const vars = loadBlocks(cssPath.status)[selector] ?? {};
+      const bg = resolveVar(vars["--alert-error-bg"], theme);
+      expect(
+        assertContrast(
+          `${selector} muted/alert-error`,
+          theme["--muted-foreground"] as string,
+          bg as string,
+        ),
+      ).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
+    });
+  },
+);
 
 describe("CA2 - le calcul de contraste échoue sous le seuil", () => {
   it("calcule les valeurs de référence WCAG", () => {

@@ -62,7 +62,7 @@ describe("AppShell sur grand écran", () => {
     expect(sidebar().className).toContain("w-16");
     expect(localStorage.getItem(KEY)).toBe("collapsed");
     expect(announcer()).toHaveTextContent("Barre repliée");
-    await userEvent.click(screen.getByRole("button", { name: "Étendre la barre" }));
+    await userEvent.click(screen.getByRole("button", { name: "Déplier la barre" }));
     expect(sidebar()).toHaveAttribute("data-state", "expanded");
     expect(localStorage.getItem(KEY)).toBe("expanded");
     expect(announcer()).toHaveTextContent("Barre étendue");
@@ -73,7 +73,7 @@ describe("AppShell sur grand écran", () => {
   it("relit l'état mémorisé au montage", async () => {
     localStorage.setItem(KEY, "collapsed");
     render(<Shell />);
-    await screen.findByRole("button", { name: "Étendre la barre" });
+    await screen.findByRole("button", { name: "Déplier la barre" });
     expect(sidebar()).toHaveAttribute("data-state", "collapsed");
   });
 

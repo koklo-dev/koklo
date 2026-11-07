@@ -14,6 +14,8 @@ export interface ProjectHeaderProps {
   page: string;
   title: string;
   summary?: string;
+  /** État du livrable à côté du titre (`ValidationStatus`, `DeliverableStatus`). */
+  status?: ReactNode;
   /** Équipe seulement : SHA de 7 caractères et âge (« il y a 3 min »). */
   sha?: { value: string; age?: string };
   /** Action principale : avant la secondaire dans l'ordre de focus, en dernier visuellement. */
@@ -37,7 +39,7 @@ function Location({
   Link,
 }: Pick<ProjectHeaderProps, "project" | "section" | "page"> & { Link: ShellLink }) {
   const separator = (
-    <span aria-hidden="true" className="mx-1.5">
+    <span aria-hidden="true" className="mx-3">
       /
     </span>
   );
@@ -93,6 +95,7 @@ export function ProjectHeader({
   page,
   title,
   summary,
+  status,
   sha,
   primaryAction,
   secondaryActions,
@@ -114,20 +117,23 @@ export function ProjectHeader({
         <Location project={project} section={section} page={page} Link={Link} />
         {sha ? <ShaInfo sha={sha} /> : null}
       </div>
-      <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <Heading
-            ref={titleRef}
-            id={titleId}
-            tabIndex={-1}
-            className="text-page-title text-foreground focus-visible:outline-none"
-          >
-            {title}
-          </Heading>
-          {summary ? <p className="mt-1 text-meta text-muted-foreground">{summary}</p> : null}
-        </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <Heading
+          ref={titleRef}
+          id={titleId}
+          tabIndex={-1}
+          className="text-page-title text-foreground focus-visible:outline-none"
+        >
+          {title}
+        </Heading>
+        {status}
+        {summary ? (
+          <p className="order-3 -mt-1.5 text-meta text-muted-foreground max-md:basis-full md:order-none md:mt-0 md:basis-auto">
+            {summary}
+          </p>
+        ) : null}
         {hasActions ? (
-          <div className="flex flex-col gap-2 md:flex-row md:items-center [&>*]:max-md:w-full">
+          <div className="order-4 flex flex-col gap-2 max-md:basis-full md:order-none md:ml-auto md:flex-row md:items-center [&>*]:max-md:w-full">
             <div className="order-2 flex flex-col">{primaryAction}</div>
             <div className="order-1 flex flex-col gap-2 md:flex-row">{secondaryActions}</div>
           </div>

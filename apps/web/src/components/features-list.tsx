@@ -152,7 +152,9 @@ export function FeaturesList({
         onActivate={(feature) => onOpen(feature.specId)}
         {...(selected ? { selectedKey: selected } : {})}
         {...(centerOn ? { centerOnKey: centerOn } : {})}
-        className="h-auto max-h-[70vh] rounded-lg border border-border"
+        className="h-auto max-h-[70vh]"
+        framed
+        loadingRows={footer.state === "loading" ? 4 : 0}
         busy={stale}
         hasMore={footer.hasNext}
         isLoadingMore={footer.loading || footerFocused}

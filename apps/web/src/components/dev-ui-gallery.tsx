@@ -1,6 +1,8 @@
 import { SURFACES, TYPE_SCALE } from "./dev-ui-data.ts";
 import { DevUiFrame, DevUiSection } from "./dev-ui-frame.tsx";
 import { DevUiLists } from "./dev-ui-lists.tsx";
+import { DevUiListsB } from "./dev-ui-lists-b.tsx";
+import { DevUiNav } from "./dev-ui-nav.tsx";
 import { DevUiSurfacesB } from "./dev-ui-overlays.tsx";
 import { DevUiPrimitivesA } from "./dev-ui-primitives-a.tsx";
 import { DevUiPrimitivesB } from "./dev-ui-primitives-b.tsx";
@@ -79,7 +81,9 @@ export function DevUiGallery() {
         <DevUiStatuses />
         <DevUiSignature />
         <DevUiLists />
+        <DevUiListsB />
         <DevUiShell />
+        <DevUiNav />
         <DevUiPrimitivesA />
         <DevUiPrimitivesB />
         <DevUiPrimitivesC />

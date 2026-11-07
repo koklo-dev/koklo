@@ -53,17 +53,28 @@ type SpanProps = Omit<HTMLAttributes<HTMLElement>, "children">;
 
 export interface PhaseRailProps extends SpanProps {
   phase: Phase;
-  size?: "default" | "sm";
+  size?: "default" | "sm" | "inline";
   subtitles?: Partial<Record<Phase, string>>;
 }
 
-function PhaseRailMini({ current, className, ...props }: { current: number } & SpanProps) {
+const MINI = {
+  sm: { frame: "h-7 gap-2 rounded-full border px-2.5 text-foreground", bar: "w-3.5" },
+  inline: { frame: "gap-2 text-muted-foreground", bar: "w-3" },
+} as const;
+
+function PhaseRailMini({
+  current,
+  size,
+  className,
+  ...props
+}: { current: number; size: keyof typeof MINI } & SpanProps) {
   return (
     <span
       data-slot="phase-rail"
-      data-size="sm"
+      data-size={size}
       className={cn(
-        "inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-full border px-2.5 text-caption text-foreground",
+        "inline-flex items-center whitespace-nowrap text-caption font-normal",
+        MINI[size].frame,
         className,
       )}
       {...props}
@@ -72,7 +83,7 @@ function PhaseRailMini({ current, className, ...props }: { current: number } & S
         {STEPS.map((step, i) => (
           <span
             key={step.phase}
-            className={cn("h-1 w-3.5 rounded-[2px]", TRACK[stateOf(i, current)])}
+            className={cn("h-1 rounded-[2px]", MINI[size].bar, TRACK[stateOf(i, current)])}
           />
         ))}
       </span>
@@ -141,7 +152,9 @@ export function PhaseRail({
   ...props
 }: PhaseRailProps) {
   const current = STEPS.findIndex((step) => step.phase === phase);
-  if (size === "sm") return <PhaseRailMini current={current} className={className} {...props} />;
+  if (size !== "default") {
+    return <PhaseRailMini current={current} size={size} className={className} {...props} />;
+  }
   return (
     <ol
       data-slot="phase-rail"

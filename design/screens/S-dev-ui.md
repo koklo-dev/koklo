@@ -1,7 +1,7 @@
 ---
 id: S-dev-ui
 titre: Galerie des composants (/dev/ui, équipe, hors production)
-version: 1.3
+version: 1.4
 ---
 ## 1. Utilisateurs et objectif
 L'équipe Koklo (développeurs, designer, agents de développement et de revue) et les tests de captures. Ce n'est pas un écran du produit : aucun client ni rôle d'organisation n'y a affaire. Arrivée : adresse saisie `/dev/ui`, ou les tests `apps/web/e2e/dev-ui.spec.ts`.
@@ -61,6 +61,11 @@ Sections « Surfaces et retours » (TK-139, DESIGN.md §5.6, catalogue §1.3 et 
 - **B · Superpositions** (région « Superpositions · B », id `dev-ui-surf-b`) : trois boutons ouvrent « Nouveau projet » (`Dialog` 520), « Supprimer le projet » (`AlertDialog`) et un tiroir 440 / 540 / 620 (un bouton par taille, `SheetHeader` et `SheetFooter`) ; trois boutons lancent un toast de succès, d'erreur (avec « Annuler ») et d'information. Pour la capture, chaque superposition s'ouvre aussi par un bouton dédié.
 - **C · Onglets et tableaux** (région « Onglets et tableaux · C », id `dev-ui-surf-c`) : `Tabs` `segmented`, `underline` en `tablist` (avec compteur), `underline` en lien (ex-`HeaderTabs`), `underline` `sm` ; `Table` non encadrée (existante), `framed`, `dense`, `stickyHeader` dans un cadre de 240 px de haut, avec `YesNoCell` (matrice de rôles fictive).
 
+Sections « Listes et navigation » (TK-140, DESIGN.md §5.3 et §5.7, catalogue §1.4, planches 12, 05, 10 et 24), clair et sombre, données fictives, aucun nom de fournisseur d'IA :
+- **A · Listes longues** (section « Listes longues » existante, id `dev-ui-lists`, mise à jour) : `VirtualList framed` avec `loadingRows` (4 lignes fantômes) ; `CountBar` y compris « 0 résultat pour « annulation groupée » » ; `ListFooter` aux 4 états (une ligne, `Spinner` en chargement) ; `Pagination` (boutons 32 bordés en mono, « Lignes par page » segmenté, précédent et suivant désactivés sans texte) ; `GroupSection stacked` dans un `ListPanel` (action `done_all`, groupe replié avec son action, rangée « Afficher 20 de plus »).
+- **B · Lignes et en-têtes** (région « Listes · B », id `dev-ui-lists-b`) : `ListPanel` avec titre, « Tout voir » et pied ; `ListRow` (icône d'état, `IdTag`, sous-titre, pastille à droite, valeur mono, actions, sélectionnée, case à cocher, lien) ; `ProjectHeader` avec `status` (résumé en ligne dès `md`) ; `PageHeader` avec et sans fil d'Ariane ; `PhaseRail` `inline` à côté de `sm`.
+- **C · Navigation** (région « Navigation · C », id `dev-ui-nav`) : barre étendue et rail avec `ShellNavGroup` (avec et sans séparateur), `ShellNavItem` avec `count`, bouton « Déplier la barre » ; `SecondaryNav` (groupes Organisation et Vous, entrée active, `CountBadge`), puis sa version horizontale à 375 px.
+
 Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer le dossier ») ne font rien ; « Détails » déplie réellement.
 
 ## 4. États
@@ -70,6 +75,7 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 - **Thème** : clair (défaut, celui de l'application, décision H-24) ou sombre.
 - **Aperçu ouvert** : `HoverCard` d'une `EntityChip` ouverte au survol ou au focus.
 - **Détails déplié** : `InlineAlert` neutre avec sa zone de détail visible.
+- **Listes** (TK-140) : chargement (lignes fantômes + pied), erreur (pied), fin, recherche sans résultat, première et dernière page.
 - **Superpositions ouvertes** (TK-139) : dialogue, dialogue d'alerte, tiroir (440, 540, 620) et toast, ouverts par leur bouton ; focus piégé dans le dialogue et le tiroir, Échap ferme et rend le focus au bouton.
 
 ## 5. Interactions et retours
@@ -112,8 +118,10 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 | 1.1 | 2026-11-07 | TK-88 | Section « Coquille » (lot B) : barre étendue et repliée, entrée verrouillée avec infobulle, `ProjectHeader` avec onglets, palette ⌘K (résultats, vide, erreur), page « Bientôt », en clair et en sombre. Détail : `.workflow/TK-88/02-design.md` |
 | 1.2 | 2026-11-07 | TK-138 | Section « Primitives de base » en trois groupes A, B, C (jetons, `Icon`, `Button` et famille, `Pill` et famille, `Avatar`, `IconTile`, chips, `SegmentedControl`, `Switch`, `Checkbox`, `RadioGroup`, champs). Actif segmenté neutre sans violet (I5). Détail : `.workflow/TK-138/00-fiche.md` |
 | 1.3 | 2026-11-07 | TK-139 | Sections « Surfaces et retours » A, B, C : `Card`, `StatCard`, `ProgressBar`, `InlineAlert`, `EmptyState`, `Skeleton`, `Toast`, `Dialog`, `AlertDialog`, `Sheet`, `Tabs`, `Table`. Superpositions ouvertes par bouton. Détail : `.workflow/TK-139/00-fiche.md` |
+| 1.4 | 2026-11-07 | TK-140 | Sections « Listes · A » (mise à jour), « Listes · B » et « Navigation · C » : `Pagination`, `VirtualList`, `CountBar`, `ListFooter`, `GroupSection`, `ListPanel`, `ListRow`, `ProjectHeader`, `PageHeader`, `PhaseRail inline`, `ShellNavGroup`, `ShellNavItem count`, `SecondaryNav`. Détail : `.workflow/TK-140/00-fiche.md` |
 
 ## 11. Captures (générées par `apps/web/e2e/dev-ui.spec.ts`)
 Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`. TK-94 : `lists-light.png`, `lists-dark.png`, `lists-light-mobile.png`, `lists-dark-mobile.png` (section « Listes longues »).
 TK-138 : `primitives-light.png`, `primitives-dark.png` (pleine section, 1280 px), `primitives-light-mobile.png`, `primitives-dark-mobile.png` (375 px), plus `primitives-a|b|c-<light|dark>.png` par groupe.
 TK-139 : `surfaces-light.png`, `surfaces-dark.png` (sections A, B, C, 1280 px), `surfaces-light-mobile.png`, `surfaces-dark-mobile.png` (375 px), plus `surfaces-a|b|c-<light|dark>.png` par groupe ; `overlays-dialog-<light|dark>.png`, `overlays-sheet-<light|dark>.png`, `overlays-toast-<light|dark>.png` (superposition ouverte, 1280 px) et `overlays-dialog-<light|dark>-mobile.png`, `overlays-sheet-…-mobile.png`, `overlays-toast-…-mobile.png` (375 px).
+TK-140 : `lists-<light|dark>.png` (mise à jour), `lists-<light|dark>-mobile.png`, `lists-b-<light|dark>.png`, `lists-b-<light|dark>-mobile.png`, `nav-<light|dark>.png`, `nav-<light|dark>-mobile.png` (régions A, B et C, 1280 px puis 375 px).

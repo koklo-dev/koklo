@@ -10,6 +10,7 @@ import {
   GroupSection,
   LifecycleStatus,
   ListFooter,
+  ListPanel,
   type PageSize,
   Pagination,
   VirtualList,
@@ -68,7 +69,9 @@ function VirtualDemo() {
         sort="identifiant"
       />
       <VirtualList
-        className="h-[420px] rounded-lg border bg-background"
+        className="h-[420px]"
+        framed
+        loadingRows={loading ? 4 : 0}
         label="Fonctionnalités (exemple)"
         items={items}
         total={LIST_TOTAL}
@@ -107,6 +110,8 @@ function Counts() {
       />
       <DevUiNote>Liste filtrée, tout est chargé</DevUiNote>
       <CountBar total={12} loaded={12} noun={NOUN} filterLabel="5 à valider" />
+      <DevUiNote>Recherche sans résultat</DevUiNote>
+      <CountBar total={0} loaded={0} noun={NOUN} query="annulation groupée" />
       <DevUiNote>Version de colonne (kanban) : le total seul</DevUiNote>
       <CountBar total={142} loaded={30} noun={NOUN} compact />
     </DevUiFrame>
@@ -172,6 +177,7 @@ function Groups() {
         headingLevel={4}
         defaultOpen
         action={{ label: "Accepter les 22 restantes", onClick: noop }}
+        actionIcon="done_all"
         remaining={34}
         onShowMore={noop}
       >
@@ -190,6 +196,49 @@ function Groups() {
       >
         <p className="px-4 py-3 text-meta">Groupe replié.</p>
       </GroupSection>
+    </DevUiFrame>
+  );
+}
+
+function StackedGroups() {
+  return (
+    <DevUiFrame title="GroupSection empilés" wide>
+      <DevUiNote>Groupes dans un seul cadre, séparés par une bordure basse</DevUiNote>
+      <ListPanel label="Groupes de fonctionnalités">
+        <li>
+          <GroupSection
+            variant="stacked"
+            label="Fonctionnalités · Paiement"
+            counts="36 · 30 acceptées · 6 à relire"
+            headingLevel={4}
+            defaultOpen
+            action={{ label: "Accepter les 6 restantes", onClick: noop }}
+            actionIcon="done_all"
+            remaining={28}
+            onShowMore={noop}
+          >
+            <ul>
+              {demoFeatures(4).map((feature) => (
+                <li key={feature.id} className="flex h-11 items-center gap-3 border-t pr-3.5 pl-10">
+                  <FeatureRow feature={feature} />
+                </li>
+              ))}
+            </ul>
+          </GroupSection>
+        </li>
+        <li>
+          <GroupSection
+            variant="stacked"
+            label="Règles métier"
+            counts="58 · 22 acceptées · 12 à relire"
+            headingLevel={4}
+            action={{ label: "Accepter les 12 restantes", onClick: noop }}
+            actionIcon="done_all"
+          >
+            <p className="px-4 py-3 text-meta">Groupe replié.</p>
+          </GroupSection>
+        </li>
+      </ListPanel>
     </DevUiFrame>
   );
 }
@@ -239,19 +288,25 @@ export function DevUiLists() {
       <Counts />
       <Footers />
       <DevUiFrame title="Recherche sans résultat">
-        <EmptyState
-          icon="search_off"
-          title="Aucune fonctionnalité ne correspond à « annulation groupée »"
-          description={`La recherche porte sur les ${formatCount(LIST_TOTAL)} fonctionnalités, pas seulement celles affichées.`}
-          action={
-            <Button variant="outline" onClick={noop}>
-              Effacer la recherche
-            </Button>
-          }
-        />
+        <ListPanel label="Recherche sans résultat">
+          <li>
+            <EmptyState
+              variant="inline"
+              icon="search_off"
+              title="Aucune fonctionnalité ne correspond à « annulation groupée »"
+              description={`La recherche porte sur les ${formatCount(LIST_TOTAL)} fonctionnalités, pas seulement celles affichées.`}
+              action={
+                <Button variant="outline" size="sm" onClick={noop}>
+                  Effacer la recherche
+                </Button>
+              }
+            />
+          </li>
+        </ListPanel>
       </DevUiFrame>
       <Paginations />
       <Groups />
+      <StackedGroups />
       <Diagrams />
     </DevUiSection>
   );

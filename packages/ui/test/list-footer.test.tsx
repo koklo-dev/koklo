@@ -36,15 +36,39 @@ describe("ListFooter", () => {
     expect(footer()).toHaveTextContent("Les 24 suivantes se chargent");
   });
 
-  it("chargement : 4 squelettes, texte, aria-busy, aucune action", () => {
+  it("chargement : Spinner --primary, texte, aria-busy, aucun squelette ni action", () => {
     render(<ListFooter state="loading" pageSize={50} />);
     expect(footer()).toHaveAttribute("aria-busy", "true");
     expect(footer()).toHaveTextContent("Chargement des 50 suivantes…");
-    expect(footer().querySelectorAll("[data-slot='skeleton']")).toHaveLength(4);
-    expect(footer().querySelector("[data-slot='skeleton']")?.className).toMatch(
-      /motion-safe:animate-pulse/,
-    );
+    expect(footer().querySelectorAll("[data-slot='skeleton']")).toHaveLength(0);
+    expect(footer().querySelectorAll("[data-slot='skeleton-row']")).toHaveLength(0);
+    const spinner = footer().querySelector("[data-slot='spinner']") as HTMLElement;
+    expect(spinner.className).toMatch(/text-primary/);
+    expect(spinner.className).toMatch(/motion-safe:animate-spin/);
+    expect(spinner.querySelector("svg")).toHaveAttribute("width", "18");
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("une seule ligne : pas de contenu sur toute la largeur (basis-full)", () => {
+    render(<ListFooter state="loading" pageSize={50} />);
+    expect(footer().innerHTML).not.toMatch(/basis-full/);
+  });
+
+  it("icônes de 18 px", () => {
+    render(<ListFooter state="more" pageSize={50} onLoadMore={() => undefined} />);
+    expect(footer().querySelector("svg")).toHaveAttribute("width", "18");
+  });
+
+  it("erreur : fond --alert-error, icône --alert-error-foreground, texte muted, bouton xs", () => {
+    render(<ListFooter state="error" pageSize={50} loadedCount={50} onRetry={() => undefined} />);
+    const alert = screen.getByRole("alert");
+    expect(alert.className).toMatch(/bg-alert-error/);
+    expect(alert.className).toMatch(/text-muted-foreground/);
+    expect(alert.className).not.toMatch(/text-alert-error-foreground/);
+    expect(alert.querySelector("svg")?.getAttribute("class")).toMatch(
+      /text-alert-error-foreground/,
+    );
+    expect(screen.getByRole("button", { name: "Réessayer" }).className).toMatch(/\bh-7\b/);
   });
 
   it("erreur : role=alert, texte avec N, fond d'alerte, « Réessayer »", async () => {
@@ -55,7 +79,9 @@ describe("ListFooter", () => {
       "Impossible de charger la suite. Les 100 premières restent affichées.",
     );
     expect(footer().className).toMatch(/bg-alert-error/);
-    expect(footer().className).toMatch(/border-alert-error-border/);
+    expect(footer().className).not.toMatch(/border-alert-error-border/);
+    expect(footer().className).toMatch(/border-border/);
+    expect(screen.getByRole("button", { name: "Réessayer" })).toHaveClass("text-foreground");
     await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

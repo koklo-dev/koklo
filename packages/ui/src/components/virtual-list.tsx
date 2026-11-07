@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import { cn } from "../lib/cn.ts";
+import { SkeletonRow } from "./skeleton.tsx";
 
 /** Hauteurs de ligne de DESIGN.md v2.1 §5.3 : 52 px pour les listes, 44 px pour la relecture. */
 export type RowHeight = 52 | 44;
@@ -65,6 +66,10 @@ export interface VirtualListProps<T> {
   onActivate?: (item: T) => void;
   /** Rechargement en cours (`aria-busy`). */
   busy?: boolean;
+  /** Cadre bordé de rayon 12 autour de la zone défilante. */
+  framed?: boolean;
+  /** Lignes fantômes sous les lignes chargées (page suivante en cours). */
+  loadingRows?: number;
   /** Pied de liste, rendu sous la liste dans la zone défilante. */
   footer?: ReactNode;
 }
@@ -268,13 +273,18 @@ function useVirtualListState<T>(props: VirtualListProps<T>) {
  */
 export function VirtualList<T>(props: VirtualListProps<T>) {
   const { items, total, startIndex = 0, getItemKey, renderItem, label, rowHeight = 52 } = props;
+  const loadingRows = props.loadingRows ?? 0;
   const { className, hasMore = false, hasPrevious = false, selectedKey, onActivate } = props;
   const { scroller, listRef, roving, virtualItems, tabKey, height } = useVirtualListState(props);
   return (
     <div
       ref={scroller}
       data-slot="virtual-list"
-      className={cn("h-[520px] overflow-y-auto overscroll-contain", className)}
+      className={cn(
+        "h-[520px] overflow-y-auto overscroll-contain",
+        props.framed && "rounded-xl border border-border bg-background",
+        className,
+      )}
       onScroll={(event) => props.onScrollOffsetChange?.(event.currentTarget.scrollTop)}
     >
       <div className="relative" style={{ height }}>
@@ -283,7 +293,7 @@ export function VirtualList<T>(props: VirtualListProps<T>) {
           // biome-ignore lint/a11y/noRedundantRoles: `list-style: none` retire la sémantique de liste dans Safari / VoiceOver
           role="list"
           aria-label={label}
-          aria-busy={props.busy || undefined}
+          aria-busy={props.busy || loadingRows > 0 || undefined}
           className="absolute inset-0"
         >
           {virtualItems.map((virtual) => {
@@ -315,7 +325,25 @@ export function VirtualList<T>(props: VirtualListProps<T>) {
           <Sentinel which="end" top={LOAD_NEXT_AT * height} height={(1 - LOAD_NEXT_AT) * height} />
         ) : null}
       </div>
+      <LoadingRows count={loadingRows} separated={items.length > 0} />
       {props.footer}
+    </div>
+  );
+}
+
+/** Lignes fantômes de la page suivante : chaque ligne porte sa bordure haute, sauf la toute première de la liste. */
+function LoadingRows({ count, separated }: { count: number; separated: boolean }) {
+  if (count <= 0) return null;
+  const ids = Array.from({ length: count }, (_, row) => `loading-${row}`);
+  return (
+    <div data-slot="loading-rows">
+      {ids.map((id, row) => (
+        <SkeletonRow
+          key={id}
+          index={row}
+          className={cn("border-border", separated ? "border-t" : "border-t first:border-t-0")}
+        />
+      ))}
     </div>
   );
 }
@@ -380,7 +408,8 @@ function Row({
       tabIndex={tabStop ? 0 : -1}
       style={{ height, transform: `translateY(${top}px)` }}
       className={cn(
-        "absolute inset-x-0 top-0 flex items-center gap-3 border-b border-border px-4 outline-none before:absolute before:inset-y-0 before:left-0 before:w-[3px] hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        "absolute inset-x-0 top-0 flex items-center gap-3 border-border px-4 outline-none before:absolute before:inset-y-0 before:left-0 before:w-[3px] hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        position > 1 && "border-t",
         selected && "bg-secondary before:bg-primary",
       )}
       onFocus={handlers.onFocusRow}
