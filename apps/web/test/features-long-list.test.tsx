@@ -210,6 +210,8 @@ describe("Pied de liste : charger la suite (§2.1, §3)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Charger la suite" }));
     await waitFor(() => expect(footer()).toHaveAttribute("data-state", "loading"));
     expect(footer()).toHaveTextContent("Chargement des 50 suivantes…");
+    expect(footer().querySelector("[data-slot='skeleton']")).toBeNull();
+    expect(document.querySelectorAll("[data-slot='skeleton-row']")).toHaveLength(4);
     expect(rowsOf(listbox)[0]).toHaveTextContent("F-001");
   });
 

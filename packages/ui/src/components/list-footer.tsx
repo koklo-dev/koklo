@@ -5,7 +5,7 @@ import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { type CountNoun, formatCount, nounFor } from "../lib/format-count.ts";
 import { Button } from "./button.tsx";
-import { Skeleton } from "./skeleton.tsx";
+import { Spinner } from "./spinner.tsx";
 
 export type ListFooterState = "more" | "loading" | "error" | "end";
 
@@ -36,12 +36,23 @@ export interface ListFooterProps
 
 const FRAME = "border-border bg-surface text-meta text-muted-foreground";
 const COMPACT_FRAME = "rounded-xl border border-dashed border-border-strong text-center";
-const ERROR_FRAME = "border-alert-error-border bg-alert-error text-alert-error-foreground";
+const ERROR_FRAME = "bg-alert-error";
 
-function Message({ icon, children }: { icon?: IconName; children: string }) {
+function Message({
+  icon,
+  iconClassName,
+  spinner = false,
+  children,
+}: {
+  icon?: IconName;
+  iconClassName?: string;
+  spinner?: boolean;
+  children: string;
+}) {
   return (
-    <p className="flex min-w-0 flex-1 items-center gap-2">
-      {icon ? <Icon name={icon} size={20} /> : null}
+    <p className="flex min-w-0 flex-1 items-center gap-2.5">
+      {spinner ? <Spinner size={18} /> : null}
+      {icon ? <Icon name={icon} size={18} className={iconClassName} /> : null}
       <span>{children}</span>
     </p>
   );
@@ -68,29 +79,23 @@ function FullBody({
     return (
       <>
         <Message icon="expand_circle_down">{`Les ${formatCount(pageSize)} suivantes se chargent automatiquement en approchant du bas.`}</Message>
-        <Button variant="outline" size="sm" onClick={onLoadMore}>
+        <Button variant="outline" size="xs" className="text-foreground" onClick={onLoadMore}>
           Charger la suite
         </Button>
       </>
     );
   }
   if (state === "loading") {
-    return (
-      <>
-        <div className="flex basis-full flex-col gap-2">
-          {[0, 1, 2, 3].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </div>
-        <Message>{`Chargement des ${formatCount(pageSize)} suivantes…`}</Message>
-      </>
-    );
+    return <Message spinner>{`Chargement des ${formatCount(pageSize)} suivantes…`}</Message>;
   }
   if (state === "error") {
     return (
       <>
-        <Message icon="error">{`Impossible de charger la suite. ${shownText(loadedCount)}`}</Message>
-        <Button variant="outline" size="sm" onClick={onRetry}>
+        <Message
+          icon="error"
+          iconClassName="text-alert-error-foreground"
+        >{`Impossible de charger la suite. ${shownText(loadedCount)}`}</Message>
+        <Button variant="outline" size="xs" className="text-foreground" onClick={onRetry}>
           Réessayer
         </Button>
       </>

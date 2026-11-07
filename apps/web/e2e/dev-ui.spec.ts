@@ -110,6 +110,91 @@ for (const theme of ["light", "dark"] as Theme[]) {
   }
 }
 
+/** TK-140 lot B : section « Listes · B » (fiche S-dev-ui, captures lists-b-*). */
+const listsB = (page: Page) => page.getByRole("region", { name: "Listes · B" });
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui lists-b ${viewport.name} (${theme}) : axe sans violation, sans défilement horizontal, capture`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await listsB(page).scrollIntoViewIfNeeded();
+      await settle(page);
+      const results = await new AxeBuilder({ page })
+        .include("[aria-labelledby='dev-ui-lists-b']")
+        .withTags(AXE_TAGS)
+        .analyze();
+      expect(results.violations).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      await listsB(page).screenshot({ path: `${DIR}/lists-b-${theme}${viewport.suffix}.png` });
+    });
+  }
+}
+
+test("S-dev-ui lists-b : le résumé du ProjectHeader est sous le titre à 375 px, dans la rangée dès 1280", async ({
+  page,
+}) => {
+  const summary = () => listsB(page).getByText("4 fonctionnalités validées sur 7");
+  const heading = () => listsB(page).getByRole("heading", { name: "Cahier fonctionnel" });
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page, "light");
+  const small = { s: await summary().boundingBox(), h: await heading().boundingBox() };
+  expect(small.s?.y ?? 0).toBeGreaterThan((small.h?.y ?? 0) + (small.h?.height ?? 0) - 1);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await settle(page);
+  const wide = { s: await summary().boundingBox(), h: await heading().boundingBox() };
+  expect(Math.abs((wide.s?.y ?? 0) - (wide.h?.y ?? 0))).toBeLessThan(20);
+});
+
+test("S-dev-ui lists-b : ligne sélectionnable atteignable au clavier", async ({ page }) => {
+  await open(page, "light");
+  const row = listsB(page).getByRole("button", { name: /Réserver un créneau/ });
+  await row.focus();
+  await page.keyboard.press("Enter");
+  await expect(row).toHaveAttribute("aria-current", "true");
+});
+
+/** TK-140 lot C : section « Navigation · C » (fiche S-dev-ui, captures nav-*). */
+const nav = (page: Page) => page.getByRole("region", { name: "Navigation · C" });
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui nav ${viewport.name} (${theme}) : axe sans violation, sans défilement horizontal, capture`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await nav(page).scrollIntoViewIfNeeded();
+      await settle(page);
+      const results = await new AxeBuilder({ page })
+        .include("[aria-labelledby='dev-ui-nav']")
+        .withTags(AXE_TAGS)
+        .analyze();
+      expect(results.violations).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      await nav(page).screenshot({ path: `${DIR}/nav-${theme}${viewport.suffix}.png` });
+    });
+  }
+}
+
+test("S-dev-ui nav : SecondaryNav horizontale défilante à 375 px, verticale de 240 dès 1280", async ({
+  page,
+}) => {
+  const secondary = () => nav(page).getByRole("navigation", { name: "Sections des réglages" });
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page, "light");
+  const small = await secondary().boundingBox();
+  expect(small?.width ?? 0).toBeLessThanOrEqual(375);
+  const first = await secondary().getByRole("link", { name: "Général" }).boundingBox();
+  expect(first?.height ?? 0).toBeGreaterThanOrEqual(44);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await settle(page);
+  const wide = await secondary().boundingBox();
+  expect(Math.round(wide?.width ?? 0)).toBe(240);
+});
+
 test("S-dev-ui GroupSection à 375 px : titre, compteurs et action ne se chevauchent pas", async ({
   page,
 }) => {
@@ -120,7 +205,7 @@ test("S-dev-ui GroupSection à 375 px : titre, compteurs et action ne se chevauc
   const boxes = await Promise.all(
     [
       header.locator("button[aria-expanded] > span").nth(0),
-      header.locator("button[aria-expanded] > span").nth(1),
+      header.locator(":scope > div > span").first(),
       header.getByRole("button", { name: "Accepter les 22 restantes" }),
     ].map((item) => item.boundingBox()),
   );

@@ -10,6 +10,7 @@ import { CountBar } from "../src/index.ts";
  */
 const NOUN = { one: "fonctionnalité", other: "fonctionnalités" };
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("CountBar", () => {
   it("affiche le total du serveur en gras, les chargées et le compteur de filtre", () => {
     render(<CountBar total={1000} loaded={50} noun={NOUN} filterLabel="31 à valider" />);
@@ -46,6 +47,37 @@ describe("CountBar", () => {
     expect(sort.closest("[data-slot='count-bar-sort']")).not.toBeNull();
     expect(sort.parentElement?.className).toMatch(/ml-auto/);
     expect(sort.parentElement?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("le nom est dans le gras ; le nombre garde data-total", () => {
+    render(<CountBar total={248} loaded={50} noun={NOUN} filterLabel="31 à valider" />);
+    const strong = document.querySelector("[data-slot='count-bar'] strong") as HTMLElement;
+    expect(strong).toHaveTextContent("248 fonctionnalités");
+    expect(strong.textContent).not.toMatch(/chargées|valider/);
+    expect(strong.querySelector("[data-total]")).toHaveTextContent(/^248$/);
+  });
+
+  it("tri : « Tri : x » puis l'icône swap_vert après le texte", () => {
+    render(<CountBar total={248} loaded={50} noun={NOUN} sort="identifiant" />);
+    const label = screen.getByText("Tri : identifiant");
+    const icon = label.parentElement?.querySelector("svg") as SVGElement;
+    expect(label.compareDocumentPosition(icon) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("recherche vide : « 0 résultat pour « annulation groupée » », gras sur « 0 résultat »", () => {
+    render(<CountBar total={0} loaded={0} noun={NOUN} query="annulation groupée" />);
+    const bar = document.querySelector("[data-slot='count-bar']") as HTMLElement;
+    expect(bar).toHaveTextContent("0 résultat pour « annulation groupée »");
+    const strong = bar.querySelector("strong") as HTMLElement;
+    expect(strong.textContent).toBe("0 résultat");
+    expect(strong.className).toMatch(/font-semibold/);
+  });
+
+  it("sans query : rendu inchangé ; la région status n'annonce rien de visible", () => {
+    render(<CountBar total={0} loaded={0} noun={NOUN} />);
+    const bar = document.querySelector("[data-slot='count-bar']") as HTMLElement;
+    expect(bar).not.toHaveTextContent("résultat");
+    expect(screen.getByRole("status")).toHaveTextContent("");
   });
 
   it("version compacte (kanban) : le total seul", () => {
@@ -131,5 +163,13 @@ describe("CountBar : région d'état", () => {
     render(<CountBar total={1000} loaded={50} noun={NOUN} sort="identifiant" />);
     expect(status()).not.toHaveTextContent("Tri");
     expect(status().className).toMatch(/sr-only/);
+  });
+});
+
+describe("CountBar : écarts de la planche 12 l.53", () => {
+  it("8 entre le résumé et le tri, 8 entre « Tri » et l'icône", () => {
+    const { container } = render(<CountBar total={3} loaded={3} noun={NOUN} sort="identifiant" />);
+    expect(container.firstElementChild).toHaveClass("gap-x-2");
+    expect(container.querySelector("[data-slot='count-bar-sort']")).toHaveClass("gap-2");
   });
 });

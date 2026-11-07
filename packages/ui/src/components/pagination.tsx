@@ -5,7 +5,7 @@ import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { formatCount } from "../lib/format-count.ts";
 import { Button } from "./button.tsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select.tsx";
+import { SegmentedControl } from "./segmented-control.tsx";
 
 export const PAGE_SIZES = [25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
@@ -39,9 +39,14 @@ export interface PaginationProps
   onSizeChange: (size: PageSize) => void;
 }
 
-const PAGE_BUTTON =
-  "inline-flex h-9 min-w-9 items-center justify-center rounded-md px-2 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors";
-const CURRENT = "bg-primary text-primary-foreground hover:bg-primary/90";
+const SIZE_OPTIONS = PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) }));
+const CELL =
+  "inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 font-mono text-meta";
+const PAGE_BUTTON = cn(
+  CELL,
+  "border border-border bg-background text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors",
+);
+const CURRENT = "border-0 bg-primary text-primary-foreground hover:bg-primary/90";
 
 function rangeText(page: number, size: number, total: number, estimate: boolean): string {
   if (total === 0) return "0 sur 0";
@@ -61,7 +66,7 @@ function Numbers({
   onPageChange: (p: number) => void;
 }) {
   return (
-    <ol className="flex flex-wrap items-center gap-1">
+    <ol className="flex flex-wrap items-center gap-3">
       {pageItems(page, pageCount).map((item, index) =>
         item === "gap" ? (
           <li
@@ -69,7 +74,7 @@ function Numbers({
             key={`gap-${index}`}
             data-slot="pagination-gap"
             aria-hidden="true"
-            className="px-1 text-muted-foreground"
+            className={cn(CELL, "text-muted-foreground")}
           >
             …
           </li>
@@ -88,6 +93,32 @@ function Numbers({
         ),
       )}
     </ol>
+  );
+}
+
+function StepButton({
+  label,
+  icon,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  icon: "chevron_left" | "chevron_right";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  // Une position n'est pas un prérequis manquant : désactivé sans raison visible (B26).
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="w-8 px-0"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={18} />
+    </Button>
   );
 }
 
@@ -111,51 +142,38 @@ export function Pagination({
       aria-label="Pagination"
       data-slot="pagination"
       className={cn(
-        "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-meta",
+        "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t bg-surface px-3.5 py-2.5 text-meta",
         className,
       )}
       {...props}
     >
       <p className="text-muted-foreground">{rangeText(page, size, total, totalIsEstimate)}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Page précédente"
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <span aria-hidden="true">Lignes par page</span>
+          <SegmentedControl
+            size="xs"
+            aria-label="Lignes par page"
+            options={SIZE_OPTIONS}
+            value={String(size)}
+            onValueChange={(value) => onSizeChange(Number(value) as PageSize)}
+          />
+        </span>
+        <StepButton
+          label="Page précédente"
+          icon="chevron_left"
           disabled={first}
-          disabledReason="Première page"
           onClick={() => onPageChange(page - 1)}
-        >
-          <Icon name="chevron_left" size={20} />
-        </Button>
+        />
         {totalIsEstimate ? null : (
           <Numbers page={page} pageCount={pageCount} onPageChange={onPageChange} />
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Page suivante"
+        <StepButton
+          label="Page suivante"
+          icon="chevron_right"
           disabled={last}
-          disabledReason="Dernière page"
           onClick={() => onPageChange(page + 1)}
-        >
-          <Icon name="chevron_right" size={20} />
-        </Button>
-        <Select
-          value={String(size)}
-          onValueChange={(value) => onSizeChange(Number(value) as PageSize)}
-        >
-          <SelectTrigger aria-label="Lignes par page" className="w-20">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PAGE_SIZES.map((option) => (
-              <SelectItem key={option} value={String(option)}>
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </div>
     </nav>
   );

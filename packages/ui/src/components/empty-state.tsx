@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactElement } from "react";
-import type { IconName } from "../icons/icon.tsx";
+import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { IconTile } from "./icon-tile.tsx";
 
@@ -20,7 +20,7 @@ export interface EmptyStateProps
 
 const FRAME: Record<EmptyStateVariant, string> = {
   framed: "rounded-xl border border-dashed border-border-strong bg-surface px-5 py-7",
-  inline: "px-4 py-6",
+  inline: "gap-2 px-6 py-16",
 };
 
 /**
@@ -45,11 +45,22 @@ export function EmptyState({
       className={cn("flex flex-col items-center gap-2.5 text-center", FRAME[variant], className)}
       {...props}
     >
-      {variant === "framed" ? <IconTile icon={icon} size={48} /> : null}
+      {variant === "framed" ? (
+        <IconTile icon={icon} size={48} />
+      ) : (
+        <Icon name={icon} size={28} className="text-muted-foreground" />
+      )}
       <p className="text-subsection-title text-foreground">{title}</p>
-      <p className="max-w-[280px] text-meta text-muted-foreground">{description}</p>
+      <p className={cn("text-meta text-muted-foreground", variant === "framed" && "max-w-[280px]")}>
+        {description}
+      </p>
       {action || secondaryAction ? (
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-center gap-2",
+            variant === "inline" && "mt-1",
+          )}
+        >
           {action}
           {secondaryAction}
         </div>

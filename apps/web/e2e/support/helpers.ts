@@ -98,10 +98,10 @@ export async function hydrated(page: Page): Promise<void> {
   });
 }
 
-/** Barre de la coquille (`AppShell`) et son bouton « Replier la barre » / « Étendre la barre ». */
+/** Barre de la coquille (`AppShell`) et son bouton « Replier la barre » / « Déplier la barre ». */
 export const sidebarOf = (page: Page) => page.locator('[data-slot="app-shell-sidebar"]');
 export const collapseOf = (page: Page) =>
-  page.getByRole("button", { name: /Replier la barre|Étendre la barre/ });
+  page.getByRole("button", { name: /Replier la barre|Déplier la barre/ });
 /** Bouton menu de l'en-tête mobile (sous 768 px) : il ouvre le tiroir. */
 export const menuOf = (page: Page) => page.getByRole("button", { name: "Ouvrir le menu" });
 

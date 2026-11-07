@@ -1,7 +1,7 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1.7
+version: 1.8
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
@@ -206,6 +206,7 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 | 1.7 | 2026-11-06 | TK-94 | Schéma 1.1 des listes longues (DESIGN.md §5.3) : défilement infini par pages de 50 à 80 %, liste virtualisée (52 px), `CountBar` (« 1 000 fonctionnalités · 50 chargées · 31 à valider »), `ListFooter` à 4 états en remplacement de « Afficher plus » (bouton « Charger la suite » en repli clavier), recherche serveur `?q=`, lien direct `?sel=F-nnn` (remplace `?feature=`, ancien lien lu puis réécrit), `EmptyState` de recherche vide, annonces et `aria-setsize` / `aria-posinset`. Détail : `.workflow/TK-94/02-design.md` |
 | 1.8 | 2026-11-06 | TK-94 (lot C) | Écran réécrit sur la liste virtualisée : §3.2 (recherche), §3.3, §4.4 mis à jour. Écarts à la fiche 02-design : avancement et priorité sous le titre sous 768 px et non réduits à des icônes (B40) ; pas de compteur « à valider » (B41) ; avis « hors des filtres » en `note` et conservé après la fermeture de la fiche (B43) ; avis d'écriture affichés en blocs mais annoncés par la région d'état de la `CountBar` (une seule région par écran) ; filtres et recherche : la liste précédente reste affichée pendant le rechargement |
 | 1.7 | 2026-11-07 | TK-88 | Entrée par `/projects/<id>/spec/functional?tab=features` (`/projects/<id>/features` redirige, requête conservée) ; `ProjectHeader` « Cahier fonctionnel » (résumé « N fonctionnalités », « Cadrer avec l'IA » puis « Nouvelle fonctionnalité » à droite, onglets Fonctionnalités / Règles métier / Rôles et permissions / Parcours, trois derniers en « Bientôt ») à la place du fil d'Ariane v1 ; liste, fiche et formulaire inchangés. Détail : `.workflow/TK-88/02-design.md` |
+| 1.8 | 2026-11-07 | TK-140 | Bibliothèque : `VirtualList framed` et `loadingRows` (lignes fantômes pendant le chargement de la suite), `CountBar` (nom en gras, tri puis icône), `ListFooter` d'une ligne (I22), `ProjectHeader` à résumé en ligne. Pas de changement de contenu ; captures régénérées si elles changent. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48d)
 Aucun changement de contrat ni de nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.

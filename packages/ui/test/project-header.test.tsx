@@ -124,4 +124,40 @@ describe("HeaderTabs (aussi utilisé par Réglages)", () => {
     expect(within(nav).getByRole("link", { name: /Membres/ })).toHaveTextContent("4");
     expect(within(nav).getByRole("link", { name: "GitHub" })).not.toHaveAttribute("aria-current");
   });
+
+  it("`status` rendu entre le h1 et le résumé", () => {
+    render(<ProjectHeader {...base} summary="4 sur 7" status={<span>À valider</span>} />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    const status = screen.getByText("À valider");
+    const summary = screen.getByText("4 sur 7");
+    expect(h1.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("le résumé est dans la même rangée que le h1 dès md, sous le titre en dessous", () => {
+    render(<ProjectHeader {...base} summary="4 sur 7" />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    const summary = screen.getByText("4 sur 7");
+    expect(summary.parentElement).toBe(h1.parentElement);
+    const tokens = summary.className.split(/\s+/);
+    expect(tokens).toContain("max-md:basis-full");
+    expect(tokens).not.toContain("basis-full");
+    expect(tokens).toContain("md:basis-auto");
+  });
+
+  it("le séparateur « / » de l'emplacement a une marge de 12 (mx-3)", () => {
+    render(<ProjectHeader {...base} />);
+    const nav = screen.getByRole("navigation", { name: "Emplacement" });
+    for (const sep of nav.querySelectorAll("[aria-hidden='true']")) {
+      expect(sep).toHaveClass("mx-3");
+    }
+  });
+});
+
+describe("ProjectHeader : écart fil / titre (05 l.103)", () => {
+  it("12 entre le fil et la rangée du titre", () => {
+    render(<ProjectHeader {...base} />);
+    const row = screen.getByRole("heading", { level: 1 }).parentElement;
+    expect(row).toHaveClass("mt-3");
+  });
 });

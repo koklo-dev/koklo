@@ -28,8 +28,8 @@ function SkeletonRow({ index = 0, className, ...props }: SkeletonRowProps) {
       className={cn("flex h-[52px] items-center gap-3 px-4", className)}
       {...props}
     >
-      <Skeleton className="h-[18px] w-12 shrink-0 bg-secondary" />
-      <Skeleton className="h-3.5 bg-secondary" style={{ width: `${width}%` }} />
+      <Skeleton className="h-[18px] w-12 shrink-0 bg-surface" />
+      <Skeleton className="h-3.5 bg-surface" style={{ width: `${width}%` }} />
     </div>
   );
 }

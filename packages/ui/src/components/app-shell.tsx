@@ -15,6 +15,7 @@ import {
 import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { useIsMobile } from "../lib/use-mobile.ts";
+import { CountBadge } from "./count-badge.tsx";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet.tsx";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip.tsx";
 
@@ -216,6 +217,8 @@ export interface ShellNavItemProps {
   active?: boolean;
   /** Pastille de compteur (ex. tickets du sprint actif) ; masquée dans le rail. */
   badge?: ReactNode;
+  /** Compteur en `CountBadge` ; dans le rail il rejoint le nom accessible (« Tickets, 12 »). */
+  count?: number;
   LinkComponent?: ShellLink;
 }
 
@@ -226,14 +229,16 @@ export function ShellNavItem({
   label,
   active = false,
   badge,
+  count,
   LinkComponent: Link = "a" as unknown as ShellLink,
 }: ShellNavItemProps) {
   const { collapsed, mobile } = useShell();
+  const accessibleName = count === undefined ? label : `${label}, ${count}`;
   const link = (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      aria-label={collapsed ? label : undefined}
+      aria-label={collapsed ? accessibleName : undefined}
       className={cn(
         ITEM_BASE,
         // 44 px dans le tiroir (cible tactile), 36 px sur la barre.
@@ -249,6 +254,7 @@ export function ShellNavItem({
         className={active ? "text-primary" : "text-muted-foreground"}
       />
       {collapsed ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
+      {collapsed || count === undefined ? null : <CountBadge>{count}</CountBadge>}
       {collapsed ? null : badge}
     </Link>
   );
@@ -267,7 +273,7 @@ export function ShellNavItem({
 export function ShellCollapseButton() {
   const { collapsed, mobile, toggle } = useShell();
   if (mobile) return null;
-  const label = collapsed ? "Étendre la barre" : "Replier la barre";
+  const label = collapsed ? "Déplier la barre" : "Replier la barre";
   return (
     <button
       type="button"
@@ -283,5 +289,36 @@ export function ShellCollapseButton() {
       <Icon name={collapsed ? "left_panel_open" : "left_panel_close"} size={18} />
       {collapsed ? null : <span>{label}</span>}
     </button>
+  );
+}
+
+export interface ShellNavGroupProps {
+  label: string;
+  /** Trait haut et 12 de marge, pour séparer un groupe du précédent. */
+  separator?: boolean;
+  children: ReactNode;
+}
+
+/** Groupe d'entrées : libellé 11/600 capitales, remplacé par un trait de 24 dans le rail. */
+export function ShellNavGroup({ label, separator = false, children }: ShellNavGroupProps) {
+  const { collapsed } = useShell();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: un fieldset impose sa mise en page ; le groupe n'est pas un formulaire
+    <div
+      role="group"
+      aria-label={label}
+      className={cn("flex flex-col gap-0.5", separator && "border-t pt-3")}
+    >
+      {collapsed ? (
+        <span
+          data-slot="shell-nav-group-rule"
+          aria-hidden="true"
+          className="mx-auto my-1.5 block h-px w-6 bg-border"
+        />
+      ) : (
+        <span className="px-2 pb-1 text-group-label text-muted-foreground uppercase">{label}</span>
+      )}
+      {children}
+    </div>
   );
 }

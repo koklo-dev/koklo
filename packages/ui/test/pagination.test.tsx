@@ -84,41 +84,74 @@ describe("Pagination", () => {
     expect(onPageChange.mock.calls.map(([p]) => p)).toEqual([19, 21, 21]);
   });
 
-  it("précédent désactivé en page 1, suivant en dernière page, avec leur raison en texte visible", () => {
+  it("précédent désactivé en page 1, suivant en dernière page, sans texte de raison", () => {
     const { rerender } = render(<Pagination {...base} page={1} />);
     const previous = screen.getByRole("button", { name: "Page précédente" });
     expect(previous).toBeDisabled();
-    // `Button disabledReason` (DESIGN.md v2 §5.2, S-dev-ui §3) : la raison est affichée à côté du bouton, pas réservée aux lecteurs d'écran.
-    expect(previous).toHaveAccessibleDescription("Première page");
-    expect(screen.getByText("Première page")).toBeVisible();
-    expect(screen.getByText("Première page").className).not.toMatch(/sr-only/);
+    expect(previous).not.toHaveAccessibleDescription();
+    expect(screen.queryByText("Première page")).toBeNull();
     expect(screen.queryByText("Dernière page")).toBeNull();
     rerender(<Pagination {...base} page={50} />);
     const next = screen.getByRole("button", { name: "Page suivante" });
     expect(next).toBeDisabled();
-    expect(next).toHaveAccessibleDescription("Dernière page");
-    expect(screen.getByText("Dernière page")).toBeVisible();
-    expect(screen.queryByText("Première page")).toBeNull();
+    expect(next).not.toHaveAccessibleDescription();
+    expect(screen.queryByText("Dernière page")).toBeNull();
+    expect(screen.getByRole("button", { name: "Page précédente" })).toBeEnabled();
   });
 
-  it("estimation sans suite : « Dernière page » reste visible à côté de suivant", () => {
+  it("estimation sans suite : suivant désactivé sans texte de raison", () => {
     render(<Pagination {...base} page={3} totalIsEstimate hasNext={false} />);
-    expect(screen.getByRole("button", { name: "Page suivante" })).toHaveAccessibleDescription(
-      "Dernière page",
-    );
+    expect(screen.getByRole("button", { name: "Page suivante" })).toBeDisabled();
+    expect(screen.queryByText("Dernière page")).toBeNull();
+  });
+
+  it("ordre : plage, Lignes par page, précédent, numéros, suivant", () => {
+    render(<Pagination {...base} page={20} />);
+    const order = within(nav())
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    expect(order.slice(0, 5)).toEqual(["25", "50", "100", "Page précédente", "Page 1"]);
+    expect(order.at(-1)).toBe("Page suivante");
+    expect(nav().firstElementChild).toHaveTextContent("476–500 sur 1 240");
+  });
+
+  it("boutons de 32 px (h-8), numéros mono bordés, courante sur --primary", () => {
+    render(<Pagination {...base} page={20} />);
+    const previous = screen.getByRole("button", { name: "Page précédente" });
+    expect(previous.className).toMatch(/\bh-8\b/);
+    const other = screen.getByRole("button", { name: "Page 19" });
+    for (const cls of [/\bh-8\b/, /\bmin-w-8\b/, /font-mono/, /\bborder\b/, /border-border/]) {
+      expect(other.className).toMatch(cls);
+    }
+    const current = screen.getByRole("button", { name: "Page 20" });
+    expect(current.className).toMatch(/bg-primary/);
+    expect(current.className).toMatch(/font-mono/);
   });
 
   it("la cible tactile fait au moins 24 px (2.5.8)", () => {
     render(<Pagination {...base} page={3} />);
     for (const button of within(nav()).getAllByRole("button")) {
-      expect(button.className).toMatch(/\b(?:size|h)-(?:7|8|9|10)\b|\bmin-w-(?:7|8|9)\b/);
+      expect(button.className).toMatch(/\b(?:size|h)-(?:6|7|8|9|10)\b|\bmin-w-(?:7|8|9)\b/);
     }
   });
 
-  it("taille 25 / 50 / 100 dans un sélecteur nommé", () => {
-    render(<Pagination {...base} page={1} />);
-    const trigger = within(nav()).getByRole("combobox", { name: "Lignes par page" });
-    expect(trigger).toHaveTextContent("25");
+  it("Lignes par page : groupe SegmentedControl xs 25 / 50 / 100, aria-pressed", async () => {
+    const onSizeChange = vi.fn();
+    render(<Pagination {...base} page={1} onSizeChange={onSizeChange} />);
+    const group = within(nav()).getByRole("group", { name: "Lignes par page" });
+    expect(group.querySelector("[data-slot='segmented-control']") ?? group).toBeTruthy();
+    expect(within(group).getByRole("button", { name: "25" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(group).getByRole("button", { name: "50" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(within(group).getByRole("button", { name: "25" }).className).toMatch(/\bh-6\b/);
+    expect(within(nav()).queryByRole("combobox")).toBeNull();
+    await userEvent.click(within(group).getByRole("button", { name: "50" }));
+    expect(onSizeChange).toHaveBeenCalledWith(50);
   });
 
   it("au-delà de 10 000 lignes : « environ 12 000 », précédent / suivant seulement", () => {
@@ -133,5 +166,16 @@ describe("Pagination", () => {
     render(<Pagination {...base} total={0} page={1} />);
     expect(nav()).toHaveTextContent("0 sur 0");
     expect(screen.getByRole("button", { name: "Page suivante" })).toBeDisabled();
+  });
+});
+
+describe("Pagination : écarts de la planche 12 l.84", () => {
+  it("12 entre les enfants et entre les numéros", () => {
+    render(
+      <Pagination page={2} size={25} total={1240} onPageChange={vi.fn()} onSizeChange={vi.fn()} />,
+    );
+    const nav = screen.getByRole("navigation", { name: "Pagination" });
+    expect(nav).toHaveClass("gap-x-3");
+    expect(nav.querySelector("ol")).toHaveClass("gap-3");
   });
 });

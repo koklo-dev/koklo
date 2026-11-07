@@ -58,7 +58,9 @@ describe("EmptyState", () => {
     expect(root).toHaveAttribute("data-variant", "inline");
     expect(root).not.toHaveClass("border", "border-dashed", "bg-surface", "rounded-xl");
     expect(root?.querySelector("[data-slot='icon-tile']")).toBeNull();
-    expect(root?.querySelector("svg")).toBeNull();
+    const icon = root?.querySelector("svg");
+    expect(icon).toHaveAttribute("width", "28");
+    expect(icon).toHaveClass("text-muted-foreground");
     expect(screen.getByText(props.title)).toBeVisible();
   });
 
@@ -163,5 +165,41 @@ describe("PhaseRail miniature (size=sm)", () => {
     const track = container.querySelector("[data-slot='phase-rail'] [aria-hidden='true']");
     expect(track).not.toBeNull();
     expect(track?.children).toHaveLength(4);
+  });
+});
+
+describe("PhaseRail inline (size=inline)", () => {
+  it("span sans bordure ni padding, 12 muted, 4 traits w-3 h-1", () => {
+    const { container } = render(<PhaseRail phase="framing" size="inline" />);
+    const root = container.querySelector("[data-slot='phase-rail']") as HTMLElement;
+    expect(root.tagName).toBe("SPAN");
+    expect(root).toHaveClass("text-caption", "text-muted-foreground");
+    expect(root).not.toHaveClass("border");
+    expect(root.className).not.toMatch(/\bpx-|\bp-|\bh-7\b/);
+    const bars = root.querySelector("[aria-hidden='true']")?.children;
+    expect(bars).toHaveLength(4);
+    for (const bar of Array.from(bars ?? [])) expect(bar).toHaveClass("w-3", "h-1");
+  });
+
+  it("texte « Cadrage · 2 sur 4 » précédé de « Phase : » lu seulement", () => {
+    const { container } = render(<PhaseRail phase="framing" size="inline" />);
+    expect(container.querySelector("[data-slot='phase-rail']")).toHaveTextContent(
+      "Cadrage · 2 sur 4",
+    );
+    expect(screen.getByText(/^Phase\s?:/)).toHaveClass("sr-only");
+  });
+
+  it("`sm` garde w-3.5 et son cadre", () => {
+    const { container } = render(<PhaseRail phase="framing" size="sm" />);
+    const root = container.querySelector("[data-slot='phase-rail']");
+    expect(root).toHaveClass("border");
+    expect(root?.querySelector("[aria-hidden='true']")?.children[0]).toHaveClass("w-3.5");
+  });
+});
+
+describe("PhaseRail inline : texte 12/400 (05 l.51)", () => {
+  it("text-caption font-normal", () => {
+    const { container } = render(<PhaseRail phase="framing" size="inline" />);
+    expect(container.querySelector("[data-slot='phase-rail']")).toHaveClass("font-normal");
   });
 });

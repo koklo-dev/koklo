@@ -15,6 +15,8 @@ export interface CountBarProps extends Omit<HTMLAttributes<HTMLDivElement>, "chi
   filterLabel?: string;
   /** Tri courant, à droite : « identifiant ». */
   sort?: ReactNode;
+  /** Recherche saisie : « 0 résultat pour « x » » remplace le nom de l'objet. */
+  query?: string;
   /** Version de colonne (kanban) : le total seul. */
   compact?: boolean;
   /** Recherche en cours : la barre est atténuée. */
@@ -42,23 +44,34 @@ function useArrivalMessage(total: number, loaded: number, noun: CountNoun): stri
   return message;
 }
 
+const RESULT_NOUN: CountNoun = { one: "résultat", other: "résultats" };
+
 function Summary({
   total,
   loaded,
   noun,
   filterLabel,
-}: Pick<CountBarProps, "total" | "loaded" | "noun" | "filterLabel">) {
+  query,
+}: Pick<CountBarProps, "total" | "loaded" | "noun" | "filterLabel" | "query">) {
   const rest = [
     loaded < total ? `${formatCount(loaded)} ${loadedWord(loaded, noun)}` : "",
     filterLabel ?? "",
   ].filter(Boolean);
+  const searching = query !== undefined && query !== "";
   return (
-    <p>
-      <strong data-total className="font-semibold text-foreground">
-        {formatCount(total)}
-      </strong>
-      {` ${nounFor(total, noun)}`}
-      {rest.map((part) => ` · ${part}`).join("")}
+    // Deux blocs à 8 px (planche 12 l.53) : le total en gras, puis la suite ; l'espace reste pour la lecture.
+    <p className="flex flex-wrap items-baseline gap-x-2">
+      <strong className="font-semibold text-foreground">
+        <span data-total>{formatCount(total)}</span>
+        {` ${nounFor(total, searching ? RESULT_NOUN : noun)}`}
+      </strong>{" "}
+      {searching || rest.length > 0 ? (
+        <span>
+          {[searching ? `pour « ${query} »` : "", ...rest.map((part) => `· ${part}`)]
+            .filter(Boolean)
+            .join(" ")}
+        </span>
+      ) : null}
     </p>
   );
 }
@@ -72,6 +85,7 @@ export function CountBar({
   loaded,
   noun,
   filterLabel,
+  query,
   sort,
   compact = false,
   busy = false,
@@ -85,7 +99,7 @@ export function CountBar({
       data-slot="count-bar"
       aria-busy={busy || undefined}
       className={cn(
-        "flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-muted-foreground motion-safe:transition-opacity",
+        "flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground motion-safe:transition-opacity",
         busy && "opacity-60",
         className,
       )}
@@ -96,12 +110,18 @@ export function CountBar({
           {formatCount(total)}
         </strong>
       ) : (
-        <Summary total={total} loaded={loaded} noun={noun} filterLabel={filterLabel} />
+        <Summary
+          total={total}
+          loaded={loaded}
+          noun={noun}
+          filterLabel={filterLabel}
+          query={query}
+        />
       )}
       {sort && !compact ? (
-        <span data-slot="count-bar-sort" className="ml-auto inline-flex items-center gap-1">
-          <Icon name="swap_vert" size={16} />
+        <span data-slot="count-bar-sort" className="ml-auto inline-flex items-center gap-2">
           <span>Tri : {sort}</span>
+          <Icon name="swap_vert" size={16} />
         </span>
       ) : null}
       <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">

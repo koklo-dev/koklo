@@ -109,22 +109,60 @@ describe("galerie : section « Listes longues » (S-dev-ui §3)", () => {
     expect(navs.some((n) => n.querySelector("[aria-current='page']")?.textContent === "20")).toBe(
       true,
     );
-    // Première et dernière page : précédent / suivant désactivés montrent leur raison en texte visible.
-    expect(text.some((t) => t.includes("Première page"))).toBe(true);
-    expect(text.some((t) => t.includes("Dernière page"))).toBe(true);
+    // Première et dernière page : précédent / suivant désactivés, sans texte de raison (B160).
+    expect(text.some((t) => t.includes("Première page"))).toBe(false);
+    expect(text.some((t) => t.includes("Dernière page"))).toBe(false);
+    const disabled = within(section()).getAllByRole("button", {
+      name: /^Page (précédente|suivante)$/,
+    });
+    expect(disabled.filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(2);
+    for (const nav of navs) {
+      expect(within(nav).getByRole("group", { name: "Lignes par page" })).toBeVisible();
+    }
+  });
+
+  it("CountBar : recherche vide « 0 résultat pour « annulation groupée »»", async () => {
+    await renderGallery();
+    expect(
+      slot("count-bar").some((b) =>
+        plain(b.textContent).includes("0 résultat pour « annulation groupée »"),
+      ),
+    ).toBe(true);
+  });
+
+  it("VirtualList : cadre arrondi et 4 lignes fantômes pendant le chargement", async () => {
+    await renderGallery();
+    const frame = slot("virtual-list")[0] as HTMLElement;
+    expect(frame.className).toMatch(/rounded-xl/);
+    await userEvent.click(
+      within(section()).getAllByRole("button", { name: "Charger la suite" })[0] as HTMLElement,
+    );
+    expect(frame.querySelectorAll("[data-slot='skeleton-row']")).toHaveLength(4);
+  });
+
+  it("GroupSection empilés : bordure basse, action visible repliée", async () => {
+    await renderGallery();
+    const stacked = slot("group-section").filter((g) => /\bborder-b\b/.test(g.className));
+    expect(stacked).toHaveLength(2);
+    const collapsed = stacked.find(
+      (g) => g.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded") === "false",
+    ) as HTMLElement;
+    expect(
+      within(collapsed).getByRole("button", { name: "Accepter les 12 restantes" }),
+    ).toBeVisible();
   });
 
   it("GroupSection : un groupe ouvert avec 8 lignes et « Afficher 20 de plus », un groupe replié", async () => {
     await renderGallery();
     const groups = slot("group-section");
-    expect(groups.length).toBe(2);
+    expect(groups.length).toBe(4);
     const toggles = groups.map((g) =>
       g.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded"),
     );
-    expect(toggles).toEqual(["true", "false"]);
+    expect(toggles).toEqual(["true", "false", "true", "false"]);
     expect(groups[0]?.querySelectorAll("li")).toHaveLength(8);
     expect(
-      within(section()).getByRole("button", {
+      within(groups[0] as HTMLElement).getByRole("button", {
         name: /^Afficher 20 de plus · \d+ restantes dans ce groupe$/,
       }),
     ).toBeVisible();

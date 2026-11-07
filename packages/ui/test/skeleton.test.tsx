@@ -22,11 +22,11 @@ describe("SkeletonRow", () => {
     expect(row.className).not.toMatch(/(^|\s)animate-pulse/);
   });
 
-  it("pavé 48 x 18 en --secondary puis barre de 14", () => {
+  it("pavé 48 x 18 en --surface puis barre de 14", () => {
     const { container } = render(<SkeletonRow />);
     const [tile, bar] = Array.from(container.querySelectorAll("[data-slot='skeleton']"));
-    expect(tile).toHaveClass("h-[18px]", "w-12", "bg-secondary");
-    expect(bar).toHaveClass("h-3.5", "bg-secondary");
+    expect(tile).toHaveClass("h-[18px]", "w-12", "bg-surface");
+    expect(bar).toHaveClass("h-3.5", "bg-surface");
   });
 
   it.each([
