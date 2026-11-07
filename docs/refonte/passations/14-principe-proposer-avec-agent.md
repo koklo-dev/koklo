@@ -1,7 +1,7 @@
 # Principe · « Proposer avec l'agent » (bouton et modale communs)
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquettes : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Principe · Proposer avec l'agent** ; intégré et cliquable sur les lots 5 à 10.
+> Maquettes : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/21-PrincipeAgent.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Principe · Proposer avec l'agent** ; intégré et cliquable sur les lots 5 à 10.
 > S'applique à tous les livrables de la spec. Complète `principe-creer-modifier.md` (l'aide « Décrire en une phrase » du panneau `SpecItemSheet` reste l'équivalent à l'échelle d'un élément).
 
 ## 1. Le bouton `AgentProposeButton`

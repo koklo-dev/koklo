@@ -3,7 +3,7 @@
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
-Date : 26/10/2026 (v0.1) ; **v2 du 06/11/2026 (TK-87, lot 0 de la refonte)**, **v2.1 (TK-94, listes longues)**, **v2.2 du 07/11/2026 (TK-88, lot 1 : coquille de l'application)**, **v2.3 du 07/11/2026 (TK-88, finition : clavier de la palette, pied épinglé, ombre du kanban)**. La v2 reporte la passation `docs/refonte/passations/01-lots-0-1-passation.md` §0.1 à §0.4, validée le 05/11/2026, et la décision B15 (`docs/refonte/questions.md`). En cas de contradiction avec une fiche `design/screens/*.md` antérieure, ce document l'emporte. Maquettes : canevas « Koklo — maquettes » (artefact privé, https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 0 · Fondations v2** (copie : `docs/refonte/maquettes/04-Lot0Fondations.html`). Pour un agent, seul le texte de ce document fait foi.
+Date : 26/10/2026 (v0.1) ; **v2 du 06/11/2026 (TK-87, lot 0 de la refonte)**, **v2.1 (TK-94, listes longues)**, **v2.2 du 07/11/2026 (TK-88, lot 1 : coquille de l'application)**, **v2.3 du 07/11/2026 (TK-88, finition : clavier de la palette, pied épinglé, ombre du kanban)**. La v2 reporte la passation `docs/refonte/passations/01-lots-0-1-passation.md` §0.1 à §0.4, validée le 05/11/2026, et la décision B15 (`docs/refonte/questions.md`). En cas de contradiction avec une fiche `design/screens/*.md` antérieure, ce document l'emporte. Maquettes : toutes dans `docs/refonte/maquettes/` (une page HTML par planche, liste dans `index.html`) ; planche de ce document : **Lot 0 · Fondations v2** (`docs/refonte/maquettes/04-Lot0Fondations.html`). Ce document donne le cadre (jetons, typographie, accessibilité) ; pour un écran couvert par une planche de `docs/refonte/maquettes/`, la planche fait foi (règle du 07/11/2026, `.claude/CLAUDE.md`) : son code se lit avec `pnpm maquette <numéro>`, et un écart entre la planche et ce document se corrige ici.
 
 ## 1. Principes
 
@@ -18,7 +18,7 @@ Date : 26/10/2026 (v0.1) ; **v2 du 06/11/2026 (TK-87, lot 0 de la refonte)**, **
 1. Pas de texte explicatif sauf si l'utilisateur risque une erreur. Une règle se traduit d'abord en état, en icône ou en infobulle.
 2. Une action principale par écran, toujours à droite du titre, dans `ProjectHeader` (lot 1).
 3. Toute page de projet utilise `AppShell` + `ProjectHeader` et les composants de statut du §5.1. **Aucun badge de statut ni de priorité fait main.**
-4. Pas de nouvel écran ni de `Sheet` sans planche validée sur le canevas.
+4. Pas de nouvel écran ni de `Sheet` sans planche validée dans `docs/refonte/maquettes/`.
 5. Un seul message par situation : jamais la même information dans la région d'état et dans une alerte visible en même temps.
 6. **On ne nomme jamais le fournisseur d'IA dans l'interface** (décision B15 du 06/11/2026) : on dit « agent IA » ou « action IA ». Seul l'écran de réglage des clés (Réglages › Fournisseurs d'IA, lot 13) nomme le fournisseur d'une clé.
 7. Aucune couleur en dur hors de `packages/ui/src/styles/*.css` : tout le reste passe par les jetons (garde par glob sur `apps/web/src/**` et `packages/ui/src/components/**`).

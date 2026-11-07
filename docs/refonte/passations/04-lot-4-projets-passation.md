@@ -1,7 +1,7 @@
 # Refonte UI · Lot 4 · Projets et création de projet : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 (planche à valider).
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 4 · Projets et création** (« Nouveau projet » ouvre la boîte de dialogue ; « Créer le projet » montre la carte de création en arrière-plan ; les filtres de phase fonctionnent).
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/08-Lot4Projects.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 4 · Projets et création** (« Nouveau projet » ouvre la boîte de dialogue ; « Créer le projet » montre la carte de création en arrière-plan ; les filtres de phase fonctionnent).
 > Prérequis : lots 0 et 1 (`design/refonte/lots-0-1-passation.md`), lot 2a pour la structure du dossier d'idée (`design/refonte/lot-2-idee-passation.md`), lot 3 pour la phase et la prochaine étape (`design/refonte/lot-3-vue-ensemble-passation.md`).
 
 Refonte de **S-projects** (route `/projects`). L'étape Design passe la fiche `design/screens/S-projects.md` en version 7 à partir de ce document. Tous les états d'erreur existants de S-projects (nom pris, jeton GitHub, aucun compte GitHub, création partielle, reprise) sont conservés ; seule leur forme change (§6).

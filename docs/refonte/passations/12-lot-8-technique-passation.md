@@ -1,7 +1,7 @@
 # Refonte UI · Lot 8 · Spec · Technique : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 8 · Technique (tous les états)**. Sélecteurs propres à la maquette : état (Prêt, Génération, Relecture, Liste · équipe, À revoir, Vue client) et volume (Démo / **Volume réel**, référence). Tout est cliquable : cartes de la stack, « Choisir … », zones et opérations de l'API, Fiche / YAML / Contrat généré, Modifier, « Nouveau… » (panneau commun), sections du Document.
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/14-Lot8Technique.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 8 · Technique (tous les états)**. Sélecteurs propres à la maquette : état (Prêt, Génération, Relecture, Liste · équipe, À revoir, Vue client) et volume (Démo / **Volume réel**, référence). Tout est cliquable : cartes de la stack, « Choisir … », zones et opérations de l'API, Fiche / YAML / Contrat généré, Modifier, « Nouveau… » (panneau commun), sections du Document.
 > À lire avant : `lot-7-architecture-passation.md` (et ses corrections §8 ci-dessous), `principe-listes-longues.md`, `principe-creer-modifier.md`.
 > Prérequis : lot 7, socle `SpecItemSheet`.
 

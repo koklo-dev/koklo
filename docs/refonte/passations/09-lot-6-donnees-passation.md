@@ -1,7 +1,7 @@
 # Refonte UI · Lot 6 · Spec · Données : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 6 · Données (tous les états)**. Le sélecteur en pointillés en haut à droite (Prêt, Génération, Relecture, Liste · équipe, Vue client) est propre à la maquette. Dans chaque état, les onglets, les tables du diagramme, le zoom et le sélecteur Fiche / YAML / Mermaid sont cliquables ; en relecture, Accepter / Rejeter fonctionnent ; en liste, « Valider le modèle » fonctionne.
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/11-Lot6Donnees.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 6 · Données (tous les états)**. Le sélecteur en pointillés en haut à droite (Prêt, Génération, Relecture, Liste · équipe, Vue client) est propre à la maquette. Dans chaque état, les onglets, les tables du diagramme, le zoom et le sélecteur Fiche / YAML / Mermaid sont cliquables ; en relecture, Accepter / Rejeter fonctionnent ; en liste, « Valider le modèle » fonctionne.
 > À lire avant : `design/refonte/decisions-2026-11-05-spec-sans-brief.md` et `design/refonte/lot-5-fonctionnel-passation.md` (socle commun : `ProposalReview`, `SpecCollection`, `proposal.decide`, `spec.deliverables`, validation liée au commit, impact amont).
 > Prérequis : lot 5 (5a à 5c).
 

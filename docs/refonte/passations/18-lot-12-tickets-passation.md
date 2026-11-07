@@ -1,7 +1,7 @@
 # Refonte UI · Lot 12 · Tickets : passation à l'agent dev
 
 > Validé par Brice le 06/11/2026 après recette visuelle.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 12 · Tickets**. Sélecteurs de maquette : Découpage, Sprint en cours, Vue client ; Démo / **Volume réel**.
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/23-Lot12Tickets.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 12 · Tickets**. Sélecteurs de maquette : Découpage, Sprint en cours, Vue client ; Démo / **Volume réel**.
 > À lire avant : **`decisions-2026-11-06-agents-locaux.md`** (les agents tournent en local et remontent par MCP), `lot-11-baseline-passation.md`, `principe-proposer-avec-agent.md`, `principe-creer-modifier.md`, conception v0.6 §8 et §22. Remplace `design/screens/S-kanban.md`.
 
 Route `/projects/[id]/tickets`. Le projet est en phase Itérations : dans la barre latérale les 6 livrables affichent « Figé », Baseline 0 « Posée », Tickets un badge (« À relire » pendant le découpage, sinon l'id du sprint en cours) ; carte de phase « Itérations · 4 sur 4 ».

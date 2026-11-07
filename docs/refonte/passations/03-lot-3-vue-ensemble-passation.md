@@ -1,7 +1,7 @@
 # Refonte UI · Lot 3 · Vue d'ensemble du projet : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 3 · Vue d'ensemble du projet** (le sélecteur en pointillés « Idée / Cadrage / Itérations » sert seulement à montrer les trois phases dans la maquette : il n'existe pas dans le produit).
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/07-Lot3Overview.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 3 · Vue d'ensemble du projet** (le sélecteur en pointillés « Idée / Cadrage / Itérations » sert seulement à montrer les trois phases dans la maquette : il n'existe pas dans le produit).
 > Plan d'ensemble : doc « Koklo — Refonte UI/UX et espace Idée : audit et plan » (https://claude.ai/artifact/3LVANUqXWDENdWVbhAiNRS).
 > Prérequis : lots 0 et 1 livrés (`design/refonte/lots-0-1-passation.md`). Le lot 2 (`design/refonte/lot-2-idee-passation.md`) alimente la phase Idée ; la vue d'ensemble doit fonctionner sans lui (§9).
 

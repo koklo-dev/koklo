@@ -1,7 +1,7 @@
 # Refonte UI · Principe transversal · Créer et modifier un élément de la spec
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Principe · créer et modifier un élément (panneau commun)** : 12 types × 4 modes (Création, Préremplie par l'agent, Modification, Erreurs). Le panneau est aussi branché dans les planches des lots 5 à 8 (boutons « Nouveau… », « Modifier », icône crayon des cartes d'exigence).
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/16-PrincipeEdition.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Principe · créer et modifier un élément (panneau commun)** : 12 types × 4 modes (Création, Préremplie par l'agent, Modification, Erreurs). Le panneau est aussi branché dans les planches des lots 5 à 8 (boutons « Nouveau… », « Modifier », icône crayon des cartes d'exigence).
 > **S'applique aux lots 5 à 13.** Tout bouton « Nouveau… » ou « Modifier » d'un élément de la spec ouvre ce panneau ; aucun bouton sans écran derrière.
 
 ## 1. Composant `SpecItemSheet`

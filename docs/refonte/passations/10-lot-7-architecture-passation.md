@@ -1,7 +1,7 @@
 # Refonte UI · Lot 7 · Spec · Architecture : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 7 · Architecture (tous les états)**. Deux sélecteurs en pointillés propres à la maquette : l'état (Prêt, Génération, Relecture, Liste · équipe, À revoir, Vue client) et le volume (Démo / **Volume réel**, référence d'implémentation). Onglets, zones, composants, zoom, décisions, flux et vues Fiche / YAML / Mermaid sont cliquables ; en relecture, Accepter / Rejeter / Accepter les N fonctionnent ; en liste, « Valider l'architecture » fonctionne.
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 7 · Architecture (tous les états)**. Deux sélecteurs en pointillés propres à la maquette : l'état (Prêt, Génération, Relecture, Liste · équipe, À revoir, Vue client) et le volume (Démo / **Volume réel**, référence d'implémentation). Onglets, zones, composants, zoom, décisions, flux et vues Fiche / YAML / Mermaid sont cliquables ; en relecture, Accepter / Rejeter / Accepter les N fonctionnent ; en liste, « Valider l'architecture » fonctionne.
 > À lire avant : `decisions-2026-11-05-spec-sans-brief.md`, `lot-5-fonctionnel-passation.md` (socle : `ProposalReview`, `SpecCollection`, `SpecDocument`, validation liée au commit, impact amont), `lot-6-donnees-passation.md` (lecteur de diagramme, zoom, Fiche / YAML / Mermaid), `principe-listes-longues.md`, `lots-5-6-volume-reel-passation.md`.
 > Prérequis : lots 5 et 6, ticket « Socle listes longues ».
 

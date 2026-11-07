@@ -1,7 +1,7 @@
 # Refonte UI · Lots 0 et 1 : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026. **Mise à jour du 05/11 (après-midi)** : navigation de projet restructurée autour du groupe « Spec » et des 6 livrables du cadrage (§1.1, §1.2, §1.3, §1.5).
-> Maquettes de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planches **Lot 0 · Fondations v2** et **Lot 1 · Shell projet et navigation**.
+> Maquettes de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/04-Lot0Fondations.html` ; `docs/refonte/maquettes/05-Lot1Shell.html` ; lire le code avec `pnpm maquette <numéro>`), planches **Lot 0 · Fondations v2** et **Lot 1 · Shell projet et navigation**.
 > Plan d'ensemble : doc « Koklo — Refonte UI/UX et espace Idée : audit et plan » (https://claude.ai/artifact/3LVANUqXWDENdWVbhAiNRS).
 
 Ce fichier remplace, pour ces deux lots, toute décision contraire dans `DESIGN.md` v1 et dans les fiches `design/screens/*.md`. L'étape Design du workflow `koklo-delivery` reporte ces décisions dans `DESIGN.md` (v2) puis dans les fiches touchées.

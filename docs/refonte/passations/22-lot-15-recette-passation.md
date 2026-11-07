@@ -2,7 +2,7 @@
 
 > Validé par Brice le 06/11/2026 : Koklo lit les déploiements de GitHub pour outiller la recette (équipe et client), produire un procès-verbal signé, et calculer les indicateurs de livraison.
 > **Hors périmètre : tout l'aspect financier** (jalons, montants, facturation). Koklo se concentre sur la livraison du produit ; il doit servir aussi bien une agence et son client qu'une équipe interne et son commanditaire métier. « Client » désigne celui qui demande et valide le produit, externe ou interne.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 15 · Recette**. Sélecteurs : Équipe · campagne, Vue client, PV signé ; Démo / Volume réel.
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/25-Lot15Recette.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 15 · Recette**. Sélecteurs : Équipe · campagne, Vue client, PV signé ; Démo / Volume réel.
 > À lire avant : `lot-12-tickets-passation.md`, `lot-10-qualite-passation.md` (scénarios, section « Recette avec le client »), `lot-11-baseline-passation.md`, `decisions-2026-11-06-agents-locaux.md`.
 
 ## 0. Principes

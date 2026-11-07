@@ -1,7 +1,7 @@
 # Refonte UI · Lot 11 · Validation et Baseline 0 : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026 après recette visuelle.
-> Maquette : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 11 · Validation et Baseline 0**. Sélecteurs de maquette : Prête, Chez le client, Vue client, Changements, Posée ; Démo / **Volume réel**.
+> Maquette : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/22-Lot11Baseline.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 11 · Validation et Baseline 0**. Sélecteurs de maquette : Prête, Chez le client, Vue client, Changements, Posée ; Démo / **Volume réel**.
 > À lire avant : `lot-3-vue-ensemble-passation.md` (§4 phases, §7.4), `lot-10-qualite-passation.md`, `principe-proposer-avec-agent.md`, conception v0.6 (Review, Release / Baseline).
 
 Ce lot livre la page **Baseline 0** (route `/projects/[id]/baseline`, entrée « Baseline 0 » dans la barre latérale entre Qualité et Tickets, badge d'état). Quand les 6 livrables sont validés, l'équipe soumet la baseline au client ; **le client seul la valide** ; Koklo pose alors le tag `baseline-0` sur le dépôt de spec et le projet passe en phase Itérations.

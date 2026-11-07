@@ -1,7 +1,7 @@
 # Refonte UI · Lot 2 · Espace Idée : passation à l'agent dev
 
 > Validé par Brice le 05/11/2026. **Mise à jour du 05/11 (après-midi)** : pages modulables (ajout par l'humain ou proposé par l'agent, glisser-déposer, structure de cadrage par défaut). Voir §1, §3, §4, §5, §6.1, §6.5, §7.8, §9.
-> Maquette de référence : canevas « Koklo — maquettes » (https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 2 · Espace Idée (éditeur + agent)**.
+> Maquette de référence : canevas « Koklo — maquettes » (copie locale qui fait foi : `docs/refonte/maquettes/06-Lot2Idee.html` ; lire le code avec `pnpm maquette <numéro>`), planche **Lot 2 · Espace Idée (éditeur + agent)**.
 > Plan d'ensemble : doc « Koklo — Refonte UI/UX et espace Idée : audit et plan » (https://claude.ai/artifact/3LVANUqXWDENdWVbhAiNRS).
 > Prérequis : lots 0 et 1 livrés (`design/refonte/lots-0-1-passation.md`).
 
