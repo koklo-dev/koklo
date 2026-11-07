@@ -1,17 +1,19 @@
 "use client";
 
 import { Alert, AlertDescription, Icon } from "@koklo/ui";
-import { useQuery } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
 import { AI_SETTINGS_LABELS as L } from "../lib/ai-settings-labels.ts";
 import { errorCode } from "../lib/api-error.ts";
-import { GENERIC_ERROR } from "../lib/form-errors.ts";
-import { orpc } from "../lib/orpc.ts";
 import { canManage } from "../lib/roles.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
-import { useAiCredentialSession } from "../lib/use-ai-credential-session.ts";
+import { useProviderList, useQualifiedModels } from "../lib/use-ai-providers.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
-import { AiCredentialCard } from "./ai-credential-card.tsx";
-import { ErrorNotice } from "./error-notice.tsx";
+import { AiConsumption } from "./ai-consumption.tsx";
+import { AiProvidersSection } from "./ai-providers-section.tsx";
+import { AiPurposes } from "./ai-purposes.tsx";
+import { AiQueryBoundary } from "./ai-query-boundary.tsx";
+import { AiSendPolicy } from "./ai-send-policy.tsx";
+import { AiUsageModels } from "./ai-usage-models.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
 
 const UNAUTHORIZED = { code: "UNAUTHORIZED" } as const;
@@ -26,50 +28,73 @@ function Restricted() {
   );
 }
 
-/** Liste des clés (une seule carte, Anthropic) et écritures. */
-function Content() {
-  const list = useQuery(orpc.llmCredential.list.queryOptions({ enabled: true }));
-  const session = useAiCredentialSession();
-  const redirecting = useUnauthorizedRedirect(list.error);
-
-  if (session.state.forbidden || errorCode(list.error) === "FORBIDDEN") return <Restricted />;
-  if (list.data) {
-    const item = list.data.items.find((entry) => entry.provider === "anthropic");
-    return <AiCredentialCard item={item} session={session} />;
-  }
-  if (list.isError && !list.isFetching) {
-    if (redirecting) return null;
-    return (
-      <ErrorNotice title={L.loadFailedTitle} onRetry={() => void list.refetch()}>
-        {GENERIC_ERROR}
-      </ErrorNotice>
-    );
-  }
-  return <LoadingStatus label={L.loadingList} rows={1} rowClassName="h-48" />;
+function Announcement({ message }: { message: string }) {
+  return (
+    <p role="status" className="flex min-h-5 items-center gap-1.5 text-sm">
+      {message ? <Icon name="check_circle" size={16} /> : null}
+      {message}
+    </p>
+  );
 }
 
-/** Propriétaires et administrateurs : introduction, puis liste des clés et écritures. */
-function Manager() {
+/** Liste, modèle par usage, secours, à quoi servent les clés, consommation : dans cet ordre (S-ai-settings §3). */
+function Content() {
+  const list = useProviderList();
+  const models = useQualifiedModels();
+  const [message, setMessage] = useState("");
+  const redirecting = useUnauthorizedRedirect(list.error);
+  if (errorCode(list.error) === "FORBIDDEN") return <Restricted />;
+  if (redirecting) return null;
   return (
     <>
-      <p className="max-w-xl text-sm text-muted-foreground">{L.intro}</p>
-      <Content />
+      <Announcement message={message} />
+      <AiQueryBoundary query={list} loading={L.loadingList} failed={L.loadFailedTitle}>
+        {(data) => {
+          const withModels = new Set((models.data?.items ?? []).map((model) => model.provider));
+          return (
+            <>
+              <AiProvidersSection
+                items={data.items}
+                withModels={withModels}
+                announce={setMessage}
+              />
+              {data.items.length > 0 ? (
+                <AiUsageModels items={data.items} announce={setMessage} />
+              ) : null}
+              <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+                <AiPurposes />
+                {data.items.length > 0 ? <AiConsumption announce={setMessage} /> : null}
+              </div>
+            </>
+          );
+        }}
+      </AiQueryBoundary>
     </>
   );
 }
 
 /**
- * Réglages de l'IA (S-ai-settings) : la clé du fournisseur de l'organisation, réservée aux propriétaires et
- * administrateurs. Tant que le rôle est inconnu (fail-closed) : chargement, aucun appel `llmCredential.*`.
+ * Fournisseurs d'IA (S-ai-settings v2) : réservés aux propriétaires et administrateurs. Tant que le rôle est
+ * inconnu (fail-closed) : chargement, aucun appel `ai*`.
  */
 export function AiSettingsPage() {
   const { role, session } = useActiveOrganization();
   // Session perdue ou sans organisation active (page atteinte hors garde) : même redirection que sur une 401.
   useUnauthorizedRedirect(session.data === null ? UNAUTHORIZED : undefined);
-  let body = <LoadingStatus label={L.loadingRole} rows={1} />;
-  if (role) body = canManage(role) ? <Manager /> : <Restricted />;
+  let body: ReactNode = <LoadingStatus label={L.loadingRole} rows={1} />;
+  if (role) {
+    body = canManage(role) ? (
+      <>
+        <p className="max-w-xl text-sm text-muted-foreground">{L.intro}</p>
+        <AiSendPolicy />
+        <Content />
+      </>
+    ) : (
+      <Restricted />
+    );
+  }
   return (
-    <div data-testid="ai-settings-page" className="flex min-w-0 max-w-2xl flex-col gap-6">
+    <div data-testid="ai-settings-page" className="flex min-w-0 max-w-5xl flex-col gap-4">
       <h2 className="text-section-title">{L.title}</h2>
       {body}
     </div>

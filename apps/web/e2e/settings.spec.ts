@@ -25,7 +25,7 @@ const open = async (
     session: true,
     projects: "data",
     role,
-    llm: { list: "absent" },
+    providers: { list: "empty" },
     installations: "data",
   });
   await page.addInitScript((value) => localStorage.setItem("koklo-theme", value), theme);

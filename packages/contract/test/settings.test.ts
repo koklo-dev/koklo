@@ -40,8 +40,8 @@ const ROUTES: [string, string, string][] = [
   ["me.updateNotification", "PUT", "/me/notifications/{key}"],
 ];
 
-describe("contrat 2.2.0 : version et routes", () => {
-  it("est en 2.2.0", () => expect(CONTRACT_VERSION).toBe("2.2.0"));
+describe("contrat 2.3.0 : version et routes", () => {
+  it("est en 2.3.0", () => expect(CONTRACT_VERSION).toBe("2.3.0"));
 
   it.each(ROUTES)("%s : %s %s", (name, method, path) => {
     expect(meta(name)).toMatchObject({ method, path });

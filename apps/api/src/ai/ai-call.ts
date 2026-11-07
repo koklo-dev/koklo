@@ -4,6 +4,7 @@ import {
   type AiResponse,
   type AiUsage,
   type FramedPrompt,
+  type LlmCredential,
   type LlmOutputSpec,
   type LlmProviderId,
   type LlmResponse,
@@ -69,6 +70,28 @@ export interface AiVerifyCall<T> extends AiCallBase<T> {
 }
 
 /**
+ * Test d'une clé AVANT tout enregistrement (écran des fournisseurs, TK-98) : la clé, l'adresse et le
+ * modèle viennent de la saisie, rien n'est lu ni écrit en base (hors la ligne de quota).
+ */
+export interface AiProbeCall<T> extends AiCallBase<T> {
+  readonly provider: LlmProviderId;
+  readonly credential: LlmCredential;
+  /** Adresse déjà normalisée et validée (anti-SSRF) ; `openai_compatible` seul. */
+  readonly baseUrl?: string;
+  /** Modèle saisi, sinon le premier modèle qualifié du fournisseur. */
+  readonly model?: string;
+  readonly entry: () => AuditEntry;
+}
+
+/** Cible d'un appel direct à un adaptateur (sans moteur : fournisseur et clé sont connus). */
+interface DirectTarget {
+  readonly provider: LlmProviderId;
+  readonly model: string;
+  readonly credential: LlmCredential;
+  readonly baseUrl?: string;
+}
+
+/**
  * Pipeline commun des appels au modèle (`02-decisions-54b.md` §4) : refus préalable du moteur (plafond,
  * aucune clé) -> prompt (nonce neuf) -> sémaphore -> quota et audit AVANT l'appel -> appel -> validation.
  * Un refus avant l'audit n'écrit aucune ligne et ne consomme aucun quota. La vie des clés (dernier
@@ -82,7 +105,7 @@ export class AiCallRunner {
     @Inject(AI_PROVIDER) private readonly engine: AiProvider,
     @Inject(AI_ADAPTERS) private readonly adapters: AiAdapterFactory,
     @Inject(AI_CATALOG) private readonly catalog: QualifiedModelCatalog,
-    @Inject(CredentialProbe) private readonly probe: CredentialProbe,
+    @Inject(CredentialProbe) private readonly keys: CredentialProbe,
     @Inject(LlmCredentialService) private readonly credentials: LlmCredentialService,
     @Inject(NONCE_SOURCE) private readonly nonces: NonceSource,
     @Inject(AiLedger) private readonly ledger: AiLedger,
@@ -117,35 +140,72 @@ export class AiCallRunner {
   }
 
   async verify<T>(call: AiVerifyCall<T>): Promise<T> {
-    const { organizationId } = call.actor;
-    const resolved = await this.open(organizationId, call.provider);
-    const adapter = this.adapters(call.provider);
+    const resolved = await this.open(call.actor.organizationId, call.provider);
+    const model = this.modelFor(call.provider, resolved.defaultModel ?? undefined);
+    const target: DirectTarget = {
+      provider: call.provider,
+      model,
+      credential: resolved.credential,
+      ...(resolved.baseUrl === undefined ? {} : { baseUrl: resolved.baseUrl }),
+    };
+    const response = await this.exchange(call, target, call.entry(resolved.credentialId), () =>
+      this.invalidate(call, resolved.revision),
+    );
+    await this.markUsed(call);
+    return this.settle(call, { ...response, provider: call.provider });
+  }
+
+  async probe<T>(call: AiProbeCall<T>): Promise<T> {
+    const target: DirectTarget = {
+      provider: call.provider,
+      model: this.modelFor(call.provider, call.model),
+      credential: call.credential,
+      ...(call.baseUrl === undefined ? {} : { baseUrl: call.baseUrl }),
+    };
+    const response = await this.exchange(call, target, call.entry());
+    return this.settle(call, { ...response, provider: call.provider });
+  }
+
+  /** Modèle demandé, sinon le premier qualifié du fournisseur ; aucun -> `unavailable` (rien d'envoyé). */
+  private modelFor(provider: LlmProviderId, requested: string | undefined): string {
     const model =
-      resolved.defaultModel ??
-      this.catalog.list().find((entry) => entry.provider === call.provider)?.model;
+      requested ?? this.catalog.list().find((entry) => entry.provider === provider)?.model;
     if (model === undefined) throw providerError("unavailable");
+    return model;
+  }
+
+  /**
+   * Un échange direct avec l'adaptateur du fournisseur : prompt -> sémaphore -> quota et audit AVANT
+   * l'appel -> appel. `rejected` s'exécute sur un 401 (invalidation de la clé en base, pour `verify`).
+   */
+  private async exchange(
+    call: AiCallBase<unknown> & { readonly provider: LlmProviderId },
+    target: DirectTarget,
+    entry: AuditEntry,
+    rejected?: () => Promise<void>,
+  ): Promise<LlmResponse> {
+    const { organizationId } = call.actor;
+    const adapter = this.adapters(call.provider);
     const prompt = this.frame(call);
     const release = this.#gate.acquire(organizationId);
     try {
-      await this.ledger.admit(call.actor, call.quota, call.entry(resolved.credentialId));
-      const response = await this.attempt(call, organizationId, async () => {
+      await this.ledger.admit(call.actor, call.quota, entry);
+      return await this.attempt(call, organizationId, async () => {
         try {
           return await adapter.complete({
-            model,
-            credential: resolved.credential,
-            ...(resolved.baseUrl === undefined ? {} : { baseUrl: resolved.baseUrl }),
+            model: target.model,
+            credential: target.credential,
+            ...(target.baseUrl === undefined ? {} : { baseUrl: target.baseUrl }),
             prompt,
             output: call.output,
             budget: AI_BUDGETS[call.purpose],
             trace: { purpose: call.purpose, correlationId: call.correlationId },
           });
         } catch (error) {
-          if (isRejectedKey(error)) await this.invalidate(call, resolved.revision);
+          if (isRejectedKey(error)) await rejected?.();
           throw error;
         }
       });
-      await this.markUsed(call);
-      return this.settle(call, { ...response, provider: call.provider });
     } finally {
       release();
     }
@@ -153,7 +213,7 @@ export class AiCallRunner {
 
   private async open(organizationId: string, provider: LlmProviderId) {
     try {
-      return await this.probe.open(organizationId, provider);
+      return await this.keys.open(organizationId, provider);
     } catch (error) {
       if (error instanceof LlmCredentialUnavailableError) throw unavailableCredential(error.reason);
       throw error;

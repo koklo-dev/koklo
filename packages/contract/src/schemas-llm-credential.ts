@@ -27,7 +27,7 @@ const hasControlCharacter = (value: string): boolean =>
     return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
   });
 
-const apiKeySchema = z
+export const apiKeySchema = z
   .string()
   .max(LLM_API_KEY_MAX_LENGTH, `${LLM_API_KEY_MAX_LENGTH} caractères au plus`)
   .refine((value) => value.trim() !== "", "ne peut pas être vide")

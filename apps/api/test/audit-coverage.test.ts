@@ -158,9 +158,12 @@ const WRITE_GROUPS = [
   "installation",
   "llmCredential",
   "ai",
+  "aiProvider",
+  "aiUsage",
+  "aiSettings",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
-const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace", "search"];
+const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace", "search", "aiModel"];
 /**
  * Groupes du contrat sans implémentation API : plus aucun depuis TK-48a2 (`installation` a rejoint
  * WRITE_GROUPS : `installation.start` est une écriture, `installation.list` une lecture du même groupe,
@@ -198,6 +201,13 @@ const EXPECTED_WRITE_PROCEDURES = [
   "ai.draftBrief",
   "ai.proposeCriteria",
   "ai.proposeFeatures",
+  "aiProvider.add",
+  "aiProvider.remove",
+  "aiProvider.replaceKey",
+  "aiProvider.setPrimary",
+  "aiProvider.verify",
+  "aiSettings.update",
+  "aiUsage.set",
   "comment.create",
   "comment.delete",
   "dependency.add",
@@ -242,6 +252,13 @@ const EXPECTED_WRITE_PROCEDURES = [
   "ticket.transition",
   "ticket.update",
 ];
+
+/**
+ * Exception documentée (TK-98) : tester une clé avant de l'enregistrer consomme le quota `verify`, compté
+ * par une ligne d'audit écrite AVANT l'appel (`llm_credential.verify`). `aiProvider.add` et `replaceKey`
+ * produisent donc deux lignes (quota, puis écriture) ; elles sont vérifiées à part, plus bas.
+ */
+const TWO_ENTRY_PROCEDURES = ["aiProvider.add", "aiProvider.replaceKey"];
 
 /** Groupes dont les écritures portent le projet explicite de la requête (`audit_log.project_id`, TK-96). */
 const PILOTAGE_GROUPS = ["ticket", "dependency", "sprint", "comment", "projectState", "lease"];
@@ -943,6 +960,7 @@ const SCENARIOS: Scenario[] = [
   ...suggestionScenarios(),
   ...reviewScenarios(),
   ...aiScenarios(),
+  ...aiProviderScenarios(),
 ];
 
 /**
@@ -1060,6 +1078,146 @@ function aiScenarios(): Scenario[] {
     },
   ];
 }
+
+/**
+ * TK-98 : écran des fournisseurs. Le modèle simulé répond à toute finalité ; la clé est une sentinelle
+ * factice. Le deuxième fournisseur reçoit un modèle saisi (le catalogue de lancement n'en qualifie qu'un).
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+function aiProviderScenarios(): Scenario[] {
+  const key = makeSentinel();
+  const appOf = async () => (await repoRuntimeOf()).app;
+  const as = async (
+    ctx: Ctx,
+    role: Role,
+    method: "post" | "put" | "patch" | "delete",
+    path: string,
+    body?: Record<string, unknown>,
+  ) => send(await appOf(), ctx.world.actors[role].cookie, method, path, body);
+  const addAll = async (ctx: Ctx, providers: string[]) => {
+    for (const provider of providers) {
+      await as(ctx, "owner", "post", "/ai/providers", {
+        provider,
+        apiKey: key,
+        ...(provider === "anthropic" ? {} : { model: "mon-modele" }),
+      });
+    }
+    const rows = await credentialRows(database, ctx.world.organizationId);
+    return Object.fromEntries(rows.map((row) => [row.provider, row.id]));
+  };
+  const onCredential = (action: string, provider: string) => async (_ctx: Ctx, ids: State) => ({
+    action,
+    targetKind: "llm_credential",
+    targetId: ids[provider],
+    ticketId: null,
+  });
+  const onOrganization = (action: string) => async (ctx: Ctx) => ({
+    action,
+    targetKind: "organization",
+    targetId: ctx.world.organizationId,
+    ticketId: null,
+  });
+  return [
+    {
+      procedure: "aiProvider.verify",
+      role: "owner",
+      prepare: (ctx) => addAll(ctx, ["anthropic"]),
+      call: (ctx) =>
+        as(ctx, "owner", "post", "/ai/providers/anthropic/verify", { provider: "anthropic" }),
+      expected: onCredential("llm_credential.verify", "anthropic"),
+      denied: (ctx) =>
+        as(ctx, "dev", "post", "/ai/providers/anthropic/verify", { provider: "anthropic" }),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "aiProvider.remove",
+      role: "owner",
+      prepare: (ctx) => addAll(ctx, ["anthropic", "openai"]),
+      call: (ctx) => as(ctx, "owner", "delete", "/ai/providers/openai"),
+      expected: onCredential("ai_provider.remove", "openai"),
+      denied: (ctx) => as(ctx, "dev", "delete", "/ai/providers/openai"),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "aiProvider.setPrimary",
+      role: "owner",
+      prepare: (ctx) => addAll(ctx, ["anthropic", "openai"]),
+      call: (ctx) =>
+        as(ctx, "owner", "post", "/ai/providers/openai/primary", { provider: "openai" }),
+      expected: onOrganization("ai_provider.setPrimary"),
+      denied: (ctx) =>
+        as(ctx, "owner", "post", "/ai/providers/google/primary", { provider: "google" }),
+      deniedStatuses: [404],
+    },
+    {
+      procedure: "aiUsage.set",
+      role: "owner",
+      prepare: (ctx) => addAll(ctx, ["anthropic"]),
+      call: (ctx) =>
+        as(ctx, "owner", "put", "/ai/usages/idea_space", { usage: "idea_space", model: null }),
+      expected: onOrganization("ai_settings.update"),
+      denied: (ctx) =>
+        as(ctx, "dev", "put", "/ai/usages/idea_space", { usage: "idea_space", model: null }),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "aiSettings.update",
+      role: "owner",
+      prepare: (ctx) => addAll(ctx, ["anthropic"]),
+      call: (ctx) => as(ctx, "owner", "patch", "/ai/settings", { fallbackEnabled: false }),
+      expected: onOrganization("ai_settings.update"),
+      denied: (ctx) => as(ctx, "owner", "patch", "/ai/settings", { monthlyCapMicroUsd: 0 }),
+      deniedStatuses: [422],
+    },
+  ];
+}
+
+describe("exception documentée : aiProvider.add et replaceKey écrivent le quota puis l'ajout", () => {
+  const send2 = async (
+    ctx: { world: World },
+    method: "post" | "put",
+    path: string,
+    body: Record<string, unknown>,
+  ) => send((await repoRuntimeOf()).app, ctx.world.actors.owner.cookie, method, path, body);
+
+  it("add : llm_credential.verify (organisation) puis ai_provider.add (ligne de la clé), deux entrées exactement", async () => {
+    const ctx = { world: await createWorld(database, { linkedClient: false }) };
+    const before = await auditRowsFull(database, ctx.world.organizationId);
+
+    const res = await send2(ctx, "post", "/ai/providers", {
+      provider: "anthropic",
+      apiKey: makeSentinel(),
+    });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const created = (await auditRowsFull(database, ctx.world.organizationId)).slice(before.length);
+    const [row] = await credentialRows(database, ctx.world.organizationId);
+    expect(created.map((r) => [r.action, r.target_kind, r.target_id])).toEqual([
+      ["llm_credential.verify", "organization", ctx.world.organizationId],
+      ["ai_provider.add", "llm_credential", row?.id],
+    ]);
+    expect(created.every((r) => r.actor_id === ctx.world.actors.owner.userId)).toBe(true);
+  });
+
+  it("replaceKey : mêmes deux entrées, la seconde sur la même ligne de clé", async () => {
+    const ctx = { world: await createWorld(database, { linkedClient: false }) };
+    await send2(ctx, "post", "/ai/providers", { provider: "anthropic", apiKey: makeSentinel() });
+    const before = await auditRowsFull(database, ctx.world.organizationId);
+
+    const res = await send2(ctx, "put", "/ai/providers/anthropic/key", {
+      provider: "anthropic",
+      apiKey: makeSentinel(),
+    });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const created = (await auditRowsFull(database, ctx.world.organizationId)).slice(before.length);
+    const [row] = await credentialRows(database, ctx.world.organizationId);
+    expect(created.map((r) => [r.action, r.target_kind, r.target_id])).toEqual([
+      ["llm_credential.verify", "organization", ctx.world.organizationId],
+      ["ai_provider.replaceKey", "llm_credential", row?.id],
+    ]);
+  });
+});
 
 /**
  * TK-52b : clés BYOK. Application avec porte-clés (celle du banc `repo`) ; la clé est une sentinelle
@@ -1237,12 +1395,12 @@ describe("écritures hors journal (TK-88)", () => {
 });
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 38 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 45 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 
   it("chaque procédure d'écriture du contrat a un scénario", () => {
-    const covered = new Set(SCENARIOS.map((s) => s.procedure));
+    const covered = new Set([...SCENARIOS.map((s) => s.procedure), ...TWO_ENTRY_PROCEDURES]);
     const missing = nonGetProcedures(WRITE_GROUPS).filter((name) => !covered.has(name));
     expect(missing, `procédures d'écriture sans scénario d'audit : ${missing.join(", ")}`).toEqual(
       [],
@@ -1251,7 +1409,9 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
 
   it("aucun scénario ne vise une procédure disparue ou non-écriture", () => {
     const writes = new Set(nonGetProcedures(WRITE_GROUPS));
-    const stale = SCENARIOS.map((s) => s.procedure).filter((name) => !writes.has(name));
+    const stale = [...SCENARIOS.map((s) => s.procedure), ...TWO_ENTRY_PROCEDURES].filter(
+      (name) => !writes.has(name),
+    );
     expect(stale).toEqual([]);
   });
 

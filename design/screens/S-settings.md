@@ -38,3 +38,4 @@ Visibilité d'un business limitée aux projets choisis (B98). Journal d'audit, A
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-11-07 | TK-97 | Création : cadre à navigation par rôle, Général, Membres, Mon compte. Décisions B95 à B103. Détail : `.workflow/TK-97/00-fiche.md` |
+| 1.1 | 2026-11-07 | TK-98 | La section Fournisseurs d'IA est refondue dans `S-ai-settings.md` v2 (h2 « Fournisseurs d'IA », B115 levé). Captures de rattrapage de TK-97 : `captures/S-settings/<section>-<rôle>-<thème>.png` (B130) |

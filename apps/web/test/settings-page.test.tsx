@@ -28,7 +28,7 @@ beforeEach(() => {
   resetWebMocks();
   polyfillRadix();
   procedures.installationList.mockResolvedValue([]);
-  procedures.llmCredentialList.mockResolvedValue({ items: [] });
+  procedures.aiProviderList.mockResolvedValue({ items: [] });
 });
 
 const nav = () => screen.getByRole("navigation", { name: "Sections des réglages" });
@@ -140,7 +140,7 @@ describe("Réglages : section interdite et lecture seule", () => {
     renderWithQuery(<SettingsPage section={section} />);
     await waitFor(() => expect(navigations()).toContain(target));
     expect(procedures.installationList).not.toHaveBeenCalled();
-    expect(procedures.llmCredentialList).not.toHaveBeenCalled();
+    expect(procedures.aiProviderList).not.toHaveBeenCalled();
   });
 
   it("rôle inconnu : aucune redirection tant que organization.list n'a pas répondu", async () => {

@@ -101,6 +101,7 @@ export {
   roleSchema,
 } from "./schemas.ts";
 export * from "./schemas-ai.ts";
+export * from "./schemas-ai-providers.ts";
 export * from "./schemas-client-space.ts";
 export * from "./schemas-collaboration.ts";
 export * from "./schemas-lists.ts";

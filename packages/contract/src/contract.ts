@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { ai } from "./contract-ai.ts";
+import { aiModel, aiProvider, aiSettings, aiUsage } from "./contract-ai-providers.ts";
 import { clientSpace } from "./contract-client-space.ts";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
@@ -147,6 +148,10 @@ export const contract = {
   installation,
   llmCredential,
   ai,
+  aiProvider,
+  aiModel,
+  aiUsage,
+  aiSettings,
   repo,
   spec,
   specBatch,

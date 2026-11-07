@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **0.9.0** (TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.3.0** (TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1378,7 +1378,62 @@ bound to the notification type (`baseline.proposed`, `review.submitted`, `baseli
 settles the notification as `skipped` (reason `preference-off`) and the in-app notification stays. No row means the
 default of the contract (`DEFAULT_NOTIFICATION_PREFERENCES`).
 
+## AI providers (TK-98, contract 2.3.0)
+
+Screen "Fournisseurs d'IA" (`/settings/ai`). **Additive**: `llmCredential.*` stays (the web screen no longer calls it)
+and shares the same services. Four groups, 11 routes under `/ai/...` (no collision with `/projects/{projectId}/ai/...`).
+Rights on **every** route, reads included: `MANAGER_ROLES` (owner, admin) through `SessionGuard` + `RoleGuard`; the role
+is re-read from `members`, the organization and the actor come from the session, never from the input. A developer,
+designer, business or client account gets `403` before any validation or lookup. `OriginGuard` guards the writes (CSRF).
+
+| Procedure | Route | Input -> output |
+|---|---|---|
+| `aiProvider.list` | `GET /ai/providers` | -> `items[{ provider, role: primary / fallback / null, status: verified / unverified / invalid, lastUsedAt?, defaultModel?, intermediary, euEligible, baseUrlRequired }]`; never the key, never the host of `baseUrl` |
+| `aiProvider.add` | `POST /ai/providers` | `{ provider, apiKey, baseUrl?, model? }` -> item. The key is **tested before any write** (B122); `409 already_configured` if a key exists |
+| `aiProvider.verify` | `POST /ai/providers/{provider}/verify` | -> `{ ok, model, checkedAt }` (same service as `llmCredential.verify`); 404 without key |
+| `aiProvider.replaceKey` | `PUT /ai/providers/{provider}/key` | `{ apiKey, baseUrl?, model? }` -> item; tested before the write, the old key stays intact on failure; model and address are kept when not given |
+| `aiProvider.remove` | `DELETE /ai/providers/{provider}` | -> `{ removed: true }`; `VALIDATION` (`field: provider`, `message: is_primary`) on the primary (B124); a removed fallback is detached, its usage rows cascade, past consumption is kept |
+| `aiProvider.setPrimary` | `POST /ai/providers/{provider}/primary` | -> item; swaps with the fallback when it was the fallback; 404 without key, `VALIDATION` on an invalidated key; already primary is a no-op (no audit) |
+| `aiModel.listQualified` | `GET /ai/models` | -> `items[{ provider, model, usages[], economy }]` (the qualified catalog) |
+| `aiUsage.set` | `PUT /ai/usages/{usage}` | `{ provider, model }` or `{ model: null }` -> `{ usage, provider?, model?, isDefault }`; unqualified model or provider without key is `VALIDATION` |
+| `aiUsage.report` | `GET /ai/usage` | `{ month? }` (`YYYY-MM`, current month by default, else `VALIDATION`) -> `{ month, providers[{ provider, calls, inputTokens, outputTokens, costMicroUsd }], totalCostMicroUsd, monthlyCapMicroUsd?, capState: ok / warning / suspended }` |
+| `aiSettings.get` | `GET /ai/settings` | -> `{ fallbackEnabled, monthlyCapMicroUsd?, usages[{ usage, provider?, model?, isDefault }] }` (one row per usage) |
+| `aiSettings.update` | `PATCH /ai/settings` | `{ fallback?: provider / null, fallbackEnabled?, monthlyCapMicroUsd?: int > 0 / null }` -> same output as `get`; one write and one audit line whatever the number of fields |
+
+**Key test (B122).** `AiCallRunner.probe` calls the provider adapter with the key typed, the address (already normalized
+and checked by the anti-SSRF guard) and the model typed, else the first qualified model of the provider, else `502
+LLM_PROVIDER_ERROR { unavailable }` with nothing sent. It reads and writes nothing in the database except the quota
+line (`llm_credential.verify`, 5 per hour per organization, same quota as `verify`) and takes the same concurrency gate.
+Validation of the key, model and address (`LlmCredentialInputError` -> `VALIDATION`) and the missing keyring (`503
+ENCRYPTION_UNAVAILABLE`) are checked **before** the test. A failed test (rejected key, timeout, rate limit, quota) leaves
+no `llm_provider_credentials` row, no setting and no `ai_provider.*` audit line.
+
+**Roles on add (B124).** The first provider becomes primary; the second becomes fallback with the switch off
+(`fallbackEnabled: false`); later ones have no role. Roles are only set by `setPrimary` and `aiSettings.update`.
+
+**Stored model.** `model` follows `LLM_MODEL_PATTERN` (one `/` allowed, OpenRouter). The `default_model` column forbids `/`
+(migration CHECK), so a model with a `/` is used for the test only and is not stored.
+
+**Report field name.** The report state is called `capState` (not `state`): `state` is on the forbidden-names list of the
+no-secrets test of the contract.
+
+**Errors.** `writeErrors` (401, 403, 500), `VALIDATION` (422), `NOT_FOUND` (404), `CONFLICT` (409
+`already_configured`) and, for `add`, `replaceKey` and `verify`, `llmCallErrors` (`ENCRYPTION_UNAVAILABLE` 503,
+`LLM_RATE_LIMITED` 429, `LLM_PROVIDER_ERROR` 502 with a closed `reason`). No message names a provider, a key or an
+address (B15); validation messages are fixed.
+
+**Audit.** One line per write, never the key, the address or the model: `ai_provider.add`, `ai_provider.replaceKey`
+(target `llm_credential`, the key row), `ai_provider.remove` (target `llm_credential`), `ai_provider.setPrimary` and
+`ai_settings.update` (target `organization`). `add` and `replaceKey` also leave the quota line `llm_credential.verify`
+written before the test (documented exception in `audit-coverage.test.ts`: two lines). `client-write-matrix` classes the
+seven writes as denied to a client.
+
 ## Version history
+- **2.3.0** (TK-98, lot A): AI providers. New groups `aiProvider` (`list`, `add`, `verify`, `replaceKey`, `remove`,
+  `setPrimary`), `aiModel` (`listQualified`), `aiUsage` (`set`, `report`) and `aiSettings` (`get`, `update`); 11 routes,
+  92 routes and 69 paths in all. New schemas in `schemas-ai-providers.ts` (`apiKeySchema` is now exported). No migration.
+  **Additive**: no route removed or changed. The fingerprint of 2.2.0 is frozen in
+  `packages/contract/test/contract.test.ts`; 0.1.0 to 2.2.0 unchanged.
 - **2.2.0** (TK-97, lot A): settings. New groups `org` (`get`, `update`), `invitation` (`create`, `list`, `resend`,
   `revoke`) and `me` (`get`, `update`, `getNotifications`, `updateNotification`), and `member.page`, `member.updateRole`,
   `member.remove`; 13 routes, 81 routes and 60 paths in all. New schemas in `schemas-settings.ts`, constants

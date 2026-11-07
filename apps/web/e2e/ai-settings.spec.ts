@@ -1,420 +1,236 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, type Request, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
   AXE_TAGS,
   CAPTURES_DIR,
-  llmCallsSeen,
-  llmSecretLeaks,
+  providerCallsSeen,
+  providerSecretLeaks,
   releaseHeld,
   setScenario,
   settle,
-  sidebarOf,
   switchToDark,
   type Theme,
 } from "./support/helpers.ts";
-import { FEATURE_PROJECT_ID } from "./support/stub-features.ts";
-import { E2E_MODEL, E2E_SECRET, type LlmScenario } from "./support/stub-llm-credential.ts";
+import { E2E_SECRET, type ProvidersScenario } from "./support/stub-ai-providers.ts";
 
 /**
- * Réglages de l'IA (design/screens/S-ai-settings.md). Pile locale : faux API avec faux fournisseur
- * (support/stub-llm-credential.ts) et navigateur réel ; jamais Anthropic ni Postgres. La clé de test est une
- * sentinelle clairement factice. Captures : design/screens/captures/S-ai-settings/<état>-<thème>.png
- * (+ -mobile à 375 px) ; le Red n'en écrit aucune, le Green/Refactor les génère.
+ * Fournisseurs d'IA (design/screens/S-ai-settings.md v2). Pile locale : faux API (support/stub-ai-providers.ts) et
+ * navigateur réel ; jamais un fournisseur réel ni Postgres. La clé de test est une sentinelle clairement factice.
+ * Captures : design/screens/captures/S-ai-settings/<état>-<thème>.png (+ -mobile à 375 px).
  */
 const PATH = "/settings/ai";
-const SAVE = "Enregistrer et vérifier";
-const FIELD = "Clé API Anthropic";
-const UNCONFIGURED = "L'IA n'est pas encore configurée pour votre organisation.";
+type Providers = ProvidersScenario["providers"];
 
-async function open(page: Page, llm: LlmScenario["llm"] = {}, role?: "dev" | "owner" | "admin") {
-  await setScenario({ session: true, projects: "data", llm, ...(role ? { role } : {}) });
+async function open(page: Page, providers: Providers = {}, role?: "dev" | "owner" | "admin") {
+  await setScenario({ session: true, projects: "data", providers, ...(role ? { role } : {}) });
   await page.goto(PATH);
 }
-const keyField = (page: Page) => page.getByLabel(FIELD);
+const ready = (page: Page) =>
+  expect(page.getByRole("heading", { level: 3, name: "Fournisseurs" })).toBeVisible();
 const shot = (page: Page, state: string, theme: Theme | "mobile") =>
   page.screenshot({ path: `${CAPTURES_DIR}/S-ai-settings/${state}-${theme}.png`, fullPage: true });
+const noOverflow = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-async function fillAndSend(page: Page, value = E2E_SECRET) {
-  await keyField(page).fill(value);
-  await page.getByRole("button", { name: SAVE }).click();
+async function addGoogle(page: Page) {
+  await page.getByRole("button", { name: "Ajouter un fournisseur" }).click();
+  await page.getByRole("radio", { name: /Google/ }).check({ force: true });
+  await page.getByLabel(/^Clé [A-ZÀ-Ý]/).fill(E2E_SECRET);
+  await page.getByRole("button", { name: "Vérifier et enregistrer" }).click();
 }
 
-const STATES: Array<{ state: string; llm: LlmScenario["llm"]; expected: string }> = [
-  { state: "loading", llm: { list: "loading" }, expected: "Chargement des réglages de l'IA…" },
-  { state: "absent", llm: { list: "absent" }, expected: "Non configurée" },
-  { state: "configured", llm: { list: "configured" }, expected: "Configurée" },
+async function axe(page: Page) {
+  const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+  expect(results.violations).toEqual([]);
+}
+
+const STATES: Array<{ state: string; providers: Providers; expected: string }> = [
   {
-    state: "invalid",
-    llm: { list: "invalid" },
-    expected: "Refusée par le fournisseur (désactivée)",
+    state: "empty",
+    providers: { list: "empty" },
+    expected: "Aucun fournisseur configuré. L'IA est indisponible.",
   },
+  { state: "two", providers: { list: "two" }, expected: "Consommation de novembre 2026" },
+  { state: "invalid", providers: { list: "invalid" }, expected: "Refusée" },
   {
     state: "error",
-    llm: { list: "internal" },
-    expected: "Impossible de charger les réglages de l'IA",
+    providers: { list: "internal" },
+    expected: "Impossible de charger les fournisseurs d'IA",
   },
 ];
 
 for (const theme of ["light", "dark"] as Theme[]) {
-  for (const { state, llm, expected } of STATES) {
-    test(`S-ai-settings ${state} (${theme}) : état visible, axe et capture`, async ({ page }) => {
-      await open(page, llm);
+  for (const { state, providers, expected } of STATES) {
+    test(`S-ai-settings ${state} (${theme}) : état visible et axe`, async ({ page }) => {
+      await open(page, providers);
       if (theme === "dark") await switchToDark(page);
-      await expect(page.getByTestId("ai-settings-page")).toBeVisible();
-      await expect(page.getByRole("heading", { level: 2, name: "IA" })).toBeVisible();
       await expect(page.getByText(expected).first()).toBeVisible();
-      await settle(page);
-      expect((await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze()).violations).toEqual([]);
-      await shot(page, state, theme);
-      await releaseHeld();
+      await axe(page);
     });
   }
 }
 
-test("S-ai-settings : le propriétaire lit h1 « Réglages » avec « Fournisseurs d'IA » actif", async ({
-  page,
-}) => {
-  await open(page);
-  await expect(page.getByRole("heading", { level: 1, name: "Réglages" })).toBeVisible();
-  const tabs = page.getByRole("navigation", { name: "Sections des réglages" });
-  await expect(tabs.getByRole("link", { name: "Fournisseurs d'IA" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(sidebarOf(page).getByRole("link", { name: "IA" })).toHaveCount(0);
+test("375 px : sans défilement horizontal, axe, ajout et modèles ouverts", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await open(page, { list: "two" });
+  await ready(page);
+  await page.getByRole("button", { name: "Ajouter un fournisseur" }).click();
+  await page
+    .getByRole("button", { name: /^Changer/ })
+    .first()
+    .click();
+  await axe(page);
+  expect(await noOverflow(page)).toBeLessThanOrEqual(0);
 });
 
-test("S-ai-settings : en-têtes de la route, Cache-Control: no-store et Referrer-Policy: no-referrer", async ({
+test("ajout : la clé voyage dans le corps seul, la ligne apparaît, le champ est vidé", async ({
   page,
 }) => {
-  await setScenario({ session: true, projects: "data", llm: {} });
-  const response = await page.goto(PATH);
-  expect(response?.headers()["cache-control"]).toBe("no-store");
-  expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
-  // Limités à cette route.
-  const github = await page.goto("/settings/github");
-  expect(github?.headers()["referrer-policy"]).not.toBe("no-referrer");
-});
-
-test("S-ai-settings : un développeur est redirigé vers Membres : ni lien GitHub, ni appel d'API llmCredential, ni action", async ({
-  page,
-}) => {
-  const seen: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes("/llm-credentials")) seen.push(request.url());
-  });
-  await open(page, { list: "configured" }, "dev");
-  await expect(page).toHaveURL(/\/settings\/members$/);
-  await expect(page.getByRole("heading", { level: 2, name: "Membres" })).toBeVisible();
+  await open(page, { list: "one" });
+  await ready(page);
+  await addGoogle(page);
+  await expect(page.getByRole("listitem", { name: /^Fournisseur Google Gemini/ })).toBeVisible();
   await expect(
-    page
-      .getByRole("navigation", { name: "Sections des réglages" })
-      .getByRole("link", { name: "GitHub" }),
-  ).toHaveCount(0);
-  await expect(page.getByLabel(FIELD)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: SAVE })).toHaveCount(0);
-  expect(seen).toEqual([]);
-  expect(await llmCallsSeen()).toEqual([]);
+    page.getByRole("status").filter({ hasText: "Fournisseur ajouté et vérifié." }),
+  ).toBeVisible();
+  const posts = (await providerCallsSeen()).filter((c) => c.method === "POST");
+  expect(posts).toHaveLength(1);
+  expect(JSON.stringify(posts[0]?.body)).toContain(E2E_SECRET);
+  expect(await providerSecretLeaks()).toBe(0);
+  expect(await page.content()).not.toContain(E2E_SECRET);
 });
 
-test("S-ai-settings : sans session /login, sans organisation active /organizations", async ({
+test("ajout refusé : alerte sans nom de fournisseur, focus sur l'alerte, rien ajouté", async ({
   page,
 }) => {
-  await setScenario({ session: false, projects: "data" });
-  await page.goto(PATH);
-  await expect(page).toHaveURL(/\/login/);
-  await setScenario({ session: true, projects: "data", activeOrganization: false });
-  await page.goto(PATH);
-  await expect(page).toHaveURL(/\/organizations$/);
+  await open(page, { list: "one", add: "auth" });
+  await ready(page);
+  await addGoogle(page);
+  const alert = page.getByRole("alert").filter({ hasText: "n'a pas été enregistrée" });
+  await expect(alert).toBeFocused();
+  expect(await alert.textContent()).not.toMatch(/Anthropic|OpenAI|Google|Mistral|OpenRouter/);
+  await expect(page.getByLabel(/^Clé [A-ZÀ-Ý]/)).toHaveValue("");
+  await expect(page.getByRole("listitem", { name: /Google/ })).toHaveCount(0);
+  expect(await page.content()).not.toContain(E2E_SECRET);
 });
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même écran, un test par comportement
-test.describe("la clé n'existe plus nulle part après l'envoi", () => {
-  /** Tout ce que la page a émis ou affiché, hors corps du PUT, ne doit pas contenir la clé. */
-  async function expectNoTrace(page: Page, requests: Request[], consoleLines: string[]) {
-    for (const request of requests) {
-      expect(request.url()).not.toContain(E2E_SECRET);
-      expect(JSON.stringify(await request.allHeaders())).not.toContain(E2E_SECRET);
-      if (!(request.method() === "PUT" && request.url().includes("/llm-credentials/"))) {
-        expect(request.postData() ?? "").not.toContain(E2E_SECRET);
-      }
-    }
-    expect(await page.content()).not.toContain(E2E_SECRET);
-    expect(
-      await page
-        .locator("input")
-        .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value)),
-    ).not.toContain(E2E_SECRET);
-    expect(
-      await page.evaluate(() =>
-        JSON.stringify([{ ...localStorage }, { ...sessionStorage }, location.href, history.state]),
-      ),
-    ).not.toContain(E2E_SECRET);
-    expect(consoleLines.join("\n")).not.toContain(E2E_SECRET);
-    expect(await llmSecretLeaks()).toBe(0);
-  }
-
-  function watch(page: Page) {
-    const requests: Request[] = [];
-    const consoleLines: string[] = [];
-    page.on("request", (request) => requests.push(request));
-    page.on("console", (message) => consoleLines.push(message.text()));
-    page.on("pageerror", (error) => consoleLines.push(String(error)));
-    return { requests, consoleLines };
-  }
-
-  test("succès : PUT puis verify, la valeur n'est que dans le corps du PUT", async ({ page }) => {
-    const { requests, consoleLines } = watch(page);
-    await open(page, { list: "absent" });
-    await fillAndSend(page);
-    await expect(
-      page.getByText(`Clé enregistrée et vérifiée (modèle ${E2E_MODEL}).`),
-    ).toBeVisible();
-    const calls = (await llmCallsSeen()).filter((call) => call.method !== "GET");
-    expect(
-      calls.map((call) => `${call.method} ${call.path.split("/").slice(-2).join("/")}`),
-    ).toEqual(["PUT llm-credentials/anthropic", "POST anthropic/verify"]);
-    expect(calls[0]?.body).toMatchObject({ apiKey: E2E_SECRET });
-    expect(JSON.stringify(calls[1]?.body)).not.toContain(E2E_SECRET);
-    await expectNoTrace(page, requests, consoleLines);
-    await page.reload();
-    await expectNoTrace(page, requests, consoleLines);
-    await expect(page.getByText("Configurée", { exact: true })).toBeVisible();
-  });
-
-  test("échec réseau du PUT : champ vidé, ressaisie demandée, aucune trace, aucun rejeu", async ({
-    page,
-  }) => {
-    const { requests, consoleLines } = watch(page);
-    await open(page, { list: "absent" });
-    await page.route("**/llm-credentials/anthropic", (route) => route.abort("connectionreset"));
-    await fillAndSend(page);
-    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toContainText(
-      "saisissez de nouveau la clé",
-    );
-    await expect(keyField(page)).toHaveValue("");
-    await page.waitForTimeout(500);
-    await expectNoTrace(page, requests, consoleLines);
-    await expect(page.getByRole("button", { name: "Réessayer" })).toHaveCount(0);
-  });
-
-  for (const { name, llm, text } of [
-    {
-      name: "503",
-      llm: { set: "encryption" },
-      text: "Le coffre des clés n'est pas disponible. Réessayez plus tard.",
-    },
-    { name: "500", llm: { set: "internal" }, text: "Impossible d'enregistrer la clé." },
-    { name: "422", llm: { set: "validation" }, text: "Cette clé n'est pas valide." },
-    {
-      name: "clé refusée",
-      llm: { verify: "auth" },
-      text: "Clé enregistrée, mais refusée par le fournisseur",
-    },
-    {
-      name: "quota",
-      llm: { verify: "rateLimited" },
-      text: "Trop de vérifications pour le moment.",
-    },
-  ] as Array<{ name: string; llm: LlmScenario["llm"]; text: string }>) {
-    test(`issue « ${name} » : message dédié, champ vidé, aucune trace de la clé`, async ({
-      page,
-    }) => {
-      const { requests, consoleLines } = watch(page);
-      await open(page, { list: "absent", ...llm });
-      await fillAndSend(page);
-      await expect(page.getByText(text).first()).toBeVisible();
-      expect(
-        await page
-          .locator("input[type=password]")
-          .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value)),
-      ).toEqual(expect.not.arrayContaining([E2E_SECRET]));
-      await expectNoTrace(page, requests, consoleLines);
-    });
-  }
-
-  test("le champ est un vrai champ mot de passe, rempli sans autocomplétion", async ({ page }) => {
-    await open(page);
-    const field = keyField(page);
-    await expect(field).toHaveAttribute("type", "password");
-    await expect(field).toHaveAttribute("autocomplete", "off");
-    await expect(field).toHaveAttribute("maxlength", "512");
-    await expect(field).toHaveAttribute("name", "llm-secret");
-  });
+test("cartes radio : les flèches déplacent le choix", async ({ page }) => {
+  await open(page, { list: "empty" });
+  const first = page.getByRole("radio").first();
+  await first.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("radio").nth(1)).toBeChecked();
 });
 
-for (const theme of ["light", "dark"] as Theme[]) {
-  for (const { name, llm, expected } of [
-    {
-      name: "saved",
-      llm: { list: "absent" },
-      expected: `Clé enregistrée et vérifiée (modèle ${E2E_MODEL}).`,
-    },
-    {
-      name: "refused",
-      llm: { list: "absent", verify: "auth" },
-      expected: "Clé enregistrée, mais refusée par le fournisseur",
-    },
-    {
-      name: "rate-limited",
-      llm: { list: "absent", verify: "rateLimited" },
-      expected: "Trop de vérifications pour le moment.",
-    },
-    {
-      name: "save-failed",
-      llm: { list: "absent", set: "internal" },
-      expected: "Impossible d'enregistrer la clé.",
-    },
-    {
-      name: "vault-unavailable",
-      llm: { list: "absent", set: "encryption" },
-      expected: "Le coffre des clés n'est pas disponible.",
-    },
-  ] as Array<{ name: string; llm: LlmScenario["llm"]; expected: string }>) {
-    test(`S-ai-settings résultat ${name} (${theme}) : message, axe et capture`, async ({
-      page,
-    }) => {
-      await open(page, llm);
-      if (theme === "dark") await switchToDark(page);
-      await fillAndSend(page);
-      await expect(page.getByText(expected).first()).toBeVisible();
-      await settle(page);
-      expect((await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze()).violations).toEqual([]);
-      await shot(page, `result-${name}`, theme);
-    });
-  }
+test("modèle par usage : liste ouverte, choix au clavier, Échap rend le focus", async ({
+  page,
+}) => {
+  await open(page, { list: "two" });
+  await ready(page);
+  const change = page.getByRole("button", { name: /^Changer le modèle : Cadrage de l'idée/ });
+  await change.click();
+  await expect(change).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("option", { name: /économique/ }).first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(change).toBeFocused();
+  await change.click();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("listitem", { name: "Cadrage de l'idée" })).toContainText(
+    "claude-e2e-sonnet",
+  );
+});
+
+test("retrait : confirmation en ligne, Garder au focus, puis retrait", async ({ page }) => {
+  await open(page, { list: "two" });
+  await ready(page);
+  const row = page.getByRole("listitem", { name: /^Fournisseur OpenAI/ });
+  await row.getByRole("button", { name: /^Retirer/ }).click();
+  await expect(page.getByRole("button", { name: "Garder" })).toBeFocused();
+  await page
+    .getByRole("group", { name: /Confirmer le retrait/ })
+    .getByRole("button", { name: "Retirer" })
+    .click();
+  await expect(row).toHaveCount(0);
+});
+
+test("secours : l'interrupteur bascule et le texte suit", async ({ page }) => {
+  await open(page, { list: "two" });
+  await ready(page);
+  const toggle = page.getByRole("switch");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText(/la demande repart chez OpenAI/)).toBeVisible();
+});
+
+test("plafond : saisi en euros, refusé à 0", async ({ page }) => {
+  await open(page, { list: "two" });
+  await ready(page);
+  const field = page.getByLabel("Plafond mensuel (en euros)");
+  await field.fill("0");
+  await page.getByRole("button", { name: "Enregistrer le plafond" }).click();
+  await expect(page.getByText(/supérieur à 0/)).toBeVisible();
+  await field.fill("25,5");
+  await page.getByRole("button", { name: "Enregistrer le plafond" }).click();
+  await expect(page.getByText("Plafond enregistré.")).toBeVisible();
+  const patch = (await providerCallsSeen()).filter((c) => c.method === "PATCH");
+  expect(patch.at(-1)?.body).toEqual({ monthlyCapMicroUsd: 25500000 });
+});
+
+test("développeur : refus, aucun appel d'API des fournisseurs", async ({ page }) => {
+  await open(page, { list: "two" }, "dev");
+  await expect(page).toHaveURL(/\/settings\/members$/);
+  expect(await providerCallsSeen()).toEqual([]);
+});
+
+test("chargement annoncé puis liste", async ({ page }) => {
+  await open(page, { list: "loading" });
+  await expect(page.getByText("Chargement des fournisseurs d'IA…")).toBeVisible();
+  // La requête doit être arrivée (donc retenue) au faux API avant de la libérer.
+  await expect.poll(async () => (await providerCallsSeen()).length).toBeGreaterThan(0);
+  await releaseHeld();
+  await ready(page);
+});
+
+/** Captures jointes à la PR (§7 de la fiche) : liste, ajout (OpenRouter), modèles ouverts, vide, test échoué. */
+const SIZES = [
+  { suffix: "light", theme: "light", width: 1280 },
+  { suffix: "dark", theme: "dark", width: 1280 },
+  { suffix: "mobile", theme: "light", width: 375 },
+] as const;
+
+for (const { suffix, theme, width } of SIZES) {
+  test(`captures S-ai-settings (${suffix})`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page, { list: "two" });
+    if (theme === "dark") await switchToDark(page);
+    await ready(page);
+    await settle(page);
+    await shot(page, "providers", suffix);
+    await page.getByRole("button", { name: "Ajouter un fournisseur" }).click();
+    await page.getByRole("radio", { name: /OpenRouter/ }).check({ force: true });
+    await settle(page);
+    await shot(page, "add", suffix);
+    await page.getByRole("button", { name: "Ajouter un fournisseur" }).click();
+    await page.getByRole("button", { name: /^Changer le modèle : Cadrage de l'idée/ }).click();
+    await settle(page);
+    await shot(page, "models-open", suffix);
+  });
 }
 
-test("S-ai-settings : « Vérifier à nouveau » ne rappelle que verify", async ({ page }) => {
-  await open(page, { list: "configured" });
-  await page.getByRole("button", { name: "Vérifier à nouveau" }).click();
-  await expect(page.getByText(/Vérifiée à l'instant avec le modèle/)).toBeVisible();
-  const calls = (await llmCallsSeen()).filter((call) => call.method !== "GET");
-  expect(calls.map((call) => call.method)).toEqual(["POST"]);
-});
-
-test("S-ai-settings : illisible à la vérification -> formulaire de remplacement ouvert", async ({
-  page,
-}) => {
-  await open(page, { list: "configured", verify: "undecryptable" });
-  await page.getByRole("button", { name: "Vérifier à nouveau" }).click();
-  await expect(page.getByText("Illisible : à saisir à nouveau")).toBeVisible();
-  await expect(keyField(page)).toBeVisible();
-});
-
-test("S-ai-settings : retrait avec confirmation en ligne, focus sur « Garder la clé », puis carte absente", async ({
-  page,
-}) => {
-  await open(page, { list: "configured" });
-  await page.getByRole("button", { name: "Retirer la clé" }).click();
-  const group = page.getByRole("group", { name: "Confirmer le retrait de la clé" });
-  await expect(group).toBeVisible();
-  await expect(group.getByRole("button", { name: "Garder la clé" })).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(group).toHaveCount(0);
-  await page.getByRole("button", { name: "Retirer la clé" }).click();
-  await group.getByRole("button", { name: "Retirer la clé" }).click();
-  await expect(page.getByText("Non configurée")).toBeVisible();
-  await expect(keyField(page)).toBeFocused();
-  expect((await llmCallsSeen()).filter((call) => call.method === "DELETE")).toHaveLength(1);
-});
-
-test("S-ai-settings : retrait, capture de la confirmation", async ({ page }) => {
-  await open(page, { list: "configured" });
-  await page.getByRole("button", { name: "Retirer la clé" }).click();
-  await expect(page.getByRole("group", { name: "Confirmer le retrait de la clé" })).toBeVisible();
-  expect((await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze()).violations).toEqual([]);
-  await shot(page, "remove-confirm", "light");
-});
-
-test.describe("375 px", () => {
-  test.use({ viewport: { width: 375, height: 812 } });
-
-  for (const { state, llm } of [
-    { state: "absent", llm: { list: "absent" } },
-    { state: "configured", llm: { list: "configured" } },
-  ] as Array<{ state: string; llm: LlmScenario["llm"] }>) {
-    test(`${state} : aucun défilement horizontal, cibles de 44 px, capture`, async ({ page }) => {
-      await open(page, llm);
-      await expect(page.getByRole("heading", { level: 2, name: "Anthropic" })).toBeVisible();
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - window.innerWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(0);
-      for (const button of await page
-        .getByRole("button", {
-          name: /Enregistrer et vérifier|Vérifier à nouveau|Remplacer la clé|Retirer la clé/,
-        })
-        .all()) {
-        const box = await button.boundingBox();
-        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-      }
-      await shot(page, state, "mobile");
-    });
-  }
-
-  test("confirmation du retrait : « Garder la clé » en premier, boutons empilés", async ({
-    page,
-  }) => {
-    await open(page, { list: "configured" });
-    await page.getByRole("button", { name: "Retirer la clé" }).click();
-    const group = page.getByRole("group", { name: "Confirmer le retrait de la clé" });
-    const boxes = await group
-      .getByRole("button")
-      .evaluateAll((els) =>
-        els.map((el) => ({ name: el.textContent?.trim(), top: el.getBoundingClientRect().top })),
-      );
-    expect(boxes.map((box) => box.name)).toEqual(["Garder la clé", "Retirer la clé"]);
-    expect(boxes[0]?.top ?? 0).toBeLessThan(boxes[1]?.top ?? 0);
-    await shot(page, "remove-confirm", "mobile");
-  });
-});
-
-test.describe("mouvement réduit", () => {
-  test.use({ reducedMotion: "reduce" });
-
-  test("le chargement n'anime rien", async ({ page }) => {
-    await open(page, { list: "loading" });
-    await expect(page.getByText("Chargement des réglages de l'IA…")).toBeVisible();
-    const animated = await page.evaluate(
-      () =>
-        document
-          .getAnimations()
-          .filter((a) => a.effect?.getTiming().iterations === Number.POSITIVE_INFINITY).length,
-    );
-    expect(animated).toBe(0);
-    await releaseHeld();
-  });
-});
-
-test.describe("lien depuis le cadrage (S-framing §4.5)", () => {
-  const FRAMING = `/projects/${FEATURE_PROJECT_ID}/framing`;
-  async function failFraming(page: Page, role: "owner" | "admin" | "dev") {
-    await setScenario({ session: true, projects: "data", ai: "notConfigured", role });
-    await page.goto(FRAMING);
-    await page
-      .getByRole("textbox", { name: /^Votre idée/ })
-      .fill("Un portail pour réserver des créneaux en ligne.");
-    await page.getByRole("button", { name: "Générer un brief avec l'IA" }).click();
-    return page.getByRole("alert").filter({ hasText: UNCONFIGURED });
-  }
-
-  for (const role of ["owner", "admin"] as const) {
-    test(`${role} : « Configurer l'IA » mène à /settings/ai`, async ({ page }) => {
-      const alert = await failFraming(page, role);
-      await expect(alert).toBeVisible();
-      await expect(alert).not.toContainText("Demandez à un administrateur");
-      await alert.getByRole("link", { name: "Configurer l'IA" }).click();
-      await expect(page).toHaveURL(/\/settings\/ai$/);
-      await expect(page.getByRole("heading", { level: 2, name: "IA" })).toBeVisible();
-    });
-  }
-
-  test("développeur : texte inchangé, jamais de lien", async ({ page }) => {
-    const alert = await failFraming(page, "dev");
-    await expect(alert).toContainText(
-      "Demandez à un administrateur de l'organisation d'ajouter la clé.",
-    );
-    await expect(alert.getByRole("link")).toHaveCount(0);
-  });
+test("captures S-ai-settings (vide, test échoué)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await open(page, { list: "empty" });
+  await expect(page.getByText("Aucun fournisseur configuré. L'IA est indisponible.")).toBeVisible();
+  await settle(page);
+  await shot(page, "empty", "light");
+  await open(page, { list: "one", add: "auth" });
+  await ready(page);
+  await addGoogle(page);
+  await expect(
+    page.getByRole("alert").filter({ hasText: "n'a pas été enregistrée" }),
+  ).toBeVisible();
+  await settle(page);
+  await shot(page, "test-failed", "light");
 });

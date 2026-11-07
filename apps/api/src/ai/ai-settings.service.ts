@@ -57,6 +57,20 @@ interface SettingsPatch {
   capWarnedMonth?: null;
 }
 
+/** Écriture groupée des réglages (écran) : chaque champ absent n'est pas touché. */
+export interface AiSettingsUpdate extends AiProvidersInput {
+  /** `null` retire le plafond ; entier strictement positif sinon (B62). */
+  readonly monthlyCapMicroUsd?: number | null;
+}
+
+/** Plafond validé (entier strictement positif ou `null`) ; un nouveau plafond rouvre l'alerte du mois. */
+function capPatch(microUsd: number | null): SettingsPatch {
+  if (microUsd !== null && !(Number.isSafeInteger(microUsd) && microUsd > 0)) {
+    throw new AiSettingsInputError("monthlyCap", "entier strictement positif attendu");
+  }
+  return { monthlyCapMicroUsd: microUsd === null ? null : BigInt(microUsd), capWarnedMonth: null };
+}
+
 export interface AiProvidersInput {
   /** `null` efface ; absent ne touche pas. */
   readonly primary?: LlmProviderId | null;
@@ -99,7 +113,68 @@ export class AiSettingsService {
   }
 
   async setProviders(actor: AuditActor, input: AiProvidersInput): Promise<void> {
+    await this.update(actor, input);
+  }
+
+  /** `null` retire le plafond (pas de suspension, A1) ; un nouveau plafond rouvre l'alerte du mois. */
+  async setMonthlyCap(actor: AuditActor, microUsd: number | null): Promise<void> {
+    await this.update(actor, { monthlyCapMicroUsd: microUsd });
+  }
+
+  /**
+   * Écriture groupée de l'écran : tout est validé avant d'écrire, puis UNE écriture et UNE ligne d'audit
+   * (`ai_settings.update`), quel que soit le nombre de champs.
+   */
+  async update(actor: AuditActor, input: AiSettingsUpdate): Promise<void> {
+    const data: SettingsPatch = {};
+    if (input.primary !== undefined || input.fallback !== undefined) {
+      Object.assign(data, await this.providersPatch(actor.organizationId, input));
+    }
+    if (input.fallbackEnabled !== undefined) data.fallbackEnabled = input.fallbackEnabled;
+    if (input.monthlyCapMicroUsd !== undefined) {
+      Object.assign(data, capPatch(input.monthlyCapMicroUsd));
+    }
+    await this.write(actor, (tx) => this.upsertSettings(tx, actor, data));
+  }
+
+  /**
+   * Fournisseur principal choisi à l'écran. S'il était le secours, les deux s'échangent (B124). Déjà
+   * principal : rien n'est écrit ni audité.
+   */
+  async setPrimary(actor: AuditActor, provider: LlmProviderId): Promise<void> {
     const current = await this.routing.load(actor.organizationId);
+    if (!current.availableProviders.includes(provider)) {
+      throw new AiSettingsInputError("primary", "aucune clé valide pour ce fournisseur");
+    }
+    if (current.primary === provider) return;
+    const data: SettingsPatch = { primaryProvider: provider };
+    if (current.fallback === provider) data.fallbackProvider = current.primary ?? null;
+    await this.write(actor, (tx) => this.upsertSettings(tx, actor, data), "ai_provider.setPrimary");
+  }
+
+  /**
+   * Rôle automatique d'un fournisseur qui vient d'être ajouté (B124) : le premier devient principal, le
+   * deuxième secours (interrupteur éteint). Faite dans la foulée de l'ajout, qui porte son propre audit.
+   */
+  async assignNewProvider(actor: AuditActor, provider: LlmProviderId): Promise<void> {
+    const current = await this.routing.load(actor.organizationId);
+    let data: SettingsPatch | undefined;
+    if (current.primary === undefined) data = { primaryProvider: provider };
+    else if (current.fallback === undefined && current.primary !== provider) {
+      data = { fallbackProvider: provider, fallbackEnabled: false };
+    }
+    if (data === undefined) return;
+    const patch = data;
+    await withOrganization(actor.organizationId, () =>
+      this.database.client.$transaction((tx) => this.upsertSettings(tx, actor, patch)),
+    );
+  }
+
+  private async providersPatch(
+    organizationId: string,
+    input: AiProvidersInput,
+  ): Promise<SettingsPatch> {
+    const current = await this.routing.load(organizationId);
     const primary = input.primary === undefined ? current.primary : (input.primary ?? undefined);
     const fallback =
       input.fallback === undefined ? current.fallback : (input.fallback ?? undefined);
@@ -114,24 +189,10 @@ export class AiSettingsService {
     if (primary !== undefined && primary === fallback) {
       throw new AiSettingsInputError("fallback", "le secours doit différer du principal");
     }
-    const data = {
+    return {
       ...(input.primary === undefined ? {} : { primaryProvider: input.primary }),
       ...(input.fallback === undefined ? {} : { fallbackProvider: input.fallback }),
-      ...(input.fallbackEnabled === undefined ? {} : { fallbackEnabled: input.fallbackEnabled }),
     };
-    await this.write(actor, (tx) => this.upsertSettings(tx, actor, data));
-  }
-
-  /** `null` retire le plafond (pas de suspension, A1) ; un nouveau plafond rouvre l'alerte du mois. */
-  async setMonthlyCap(actor: AuditActor, microUsd: number | null): Promise<void> {
-    if (microUsd !== null && !(Number.isSafeInteger(microUsd) && microUsd > 0)) {
-      throw new AiSettingsInputError("monthlyCap", "entier strictement positif attendu");
-    }
-    const data = {
-      monthlyCapMicroUsd: microUsd === null ? null : BigInt(microUsd),
-      capWarnedMonth: null,
-    };
-    await this.write(actor, (tx) => this.upsertSettings(tx, actor, data));
   }
 
   async setUsageModel(actor: AuditActor, usage: AiUsage, choice: AiUsageModel): Promise<void> {
@@ -177,12 +238,16 @@ export class AiSettingsService {
     });
   }
 
-  private write(actor: AuditActor, work: (tx: Tx) => Promise<void>): Promise<void> {
+  private write(
+    actor: AuditActor,
+    work: (tx: Tx) => Promise<void>,
+    action = "ai_settings.update",
+  ): Promise<void> {
     return withOrganization(actor.organizationId, () =>
       this.database.client.$transaction(async (tx) => {
         await work(tx);
         await recordAudit(tx, actor, {
-          action: "ai_settings.update",
+          action,
           targetKind: "organization",
           targetId: actor.organizationId,
         });
