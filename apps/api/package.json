@@ -22,12 +22,12 @@
     "@koklo/llm": "workspace:*",
     "@koklo/observability": "workspace:*",
     "@koklo/schema": "workspace:*",
-    "@nestjs/common": "12.2.0",
-    "@nestjs/core": "12.2.0",
-    "@nestjs/platform-express": "12.2.0",
+    "@nestjs/common": "12.3.3",
+    "@nestjs/core": "12.3.3",
+    "@nestjs/platform-express": "12.3.3",
     "@orpc/nest": "2.0.0-beta.46",
     "@orpc/server": "2.0.0-beta.46",
-    "better-auth": "1.7.14",
+    "better-auth": "1.7.17",
     "express": "5.3.0",
     "nestjs-pino": "5.3.1",
     "pg-boss": "12.38.0",
@@ -38,16 +38,16 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@biomejs/biome": "2.6.5",
     "@koklo/worker": "workspace:*",
-    "@nestjs/testing": "12.2.0",
+    "@nestjs/testing": "12.3.3",
     "@sentry/node": "11.10.0",
     "@types/express": "5.0.6",
     "@types/node": "24.19.2",
     "@types/supertest": "7.2.1",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
     "supertest": "7.3.1",
     "typescript": "7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   }
 }
