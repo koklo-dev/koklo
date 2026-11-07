@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Icon, type IconName, StatusBadge, ValidationStatus } from "../src/index.ts";
+import {
+  DeliverableStatus,
+  Icon,
+  type IconName,
+  LifecycleStatus,
+  StatusBadge,
+  ValidationStatus,
+} from "../src/index.ts";
 
 /**
  * TK-87 CA2, cas 2.2 (passation 01 §0.3, DESIGN.md v2 §2.2 et §5.1, 02-design §2.3) : 4 tonalités,
@@ -129,4 +136,21 @@ describe("StatusBadge : alias déprécié qui délègue à ValidationStatus", ()
       expect(a).toBe(b);
     },
   );
+});
+
+describe("TK-138 lot B : gabarit STATUS_PILL (Pill md)", () => {
+  it("ValidationStatus : h-6, pl-1.5 pr-2.5, gap-1.5", () => {
+    const { container } = render(<ValidationStatus status="validated" />);
+    expect(container.firstElementChild).toHaveClass("h-6", "pl-1.5", "pr-2.5", "gap-1.5");
+  });
+
+  it("DeliverableStatus : même gabarit", () => {
+    const { container } = render(<DeliverableStatus status="todo" />);
+    expect(container.firstElementChild).toHaveClass("h-6", "pl-1.5", "gap-1.5");
+  });
+
+  it("LifecycleStatus : pl-2 gap-2", () => {
+    const { container } = render(<LifecycleStatus stage={2} />);
+    expect(container.firstElementChild).toHaveClass("h-6", "pl-2", "gap-2");
+  });
 });

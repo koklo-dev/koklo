@@ -48,4 +48,27 @@ describe("CA2 : un bouton d'icône sans aria-label échoue", () => {
     expect(buttons.length).toBeGreaterThan(0);
     for (const b of buttons) expect(() => expectAccessibleName(b)).not.toThrow();
   });
+
+  it("default 36 (icône 20) et sm 32 (icône 18, rayon 6)", () => {
+    const { rerender } = render(<IconButton icon="close" aria-label="Fermer" />);
+    const button = () => screen.getByRole("button", { name: "Fermer" });
+    expect(button()).toHaveClass("size-9");
+    expect(button().querySelector("svg")).toHaveAttribute("width", "20");
+    rerender(<IconButton icon="close" size="sm" aria-label="Fermer" />);
+    expect(button()).toHaveClass("size-8", "rounded-md");
+    expect(button().querySelector("svg")).toHaveAttribute("width", "18");
+  });
+
+  it("défaut : ghost, texte muted, sans fond primaire (catalogue l.42)", () => {
+    render(<IconButton icon="close" aria-label="Fermer" />);
+    const button = screen.getByRole("button", { name: "Fermer" });
+    expect(button).toHaveClass("text-muted-foreground");
+    expect(button).not.toHaveClass("bg-primary");
+  });
+
+  it("tone primary : 32, rayon 8, fond primaire (envoi)", () => {
+    render(<IconButton icon="arrow_forward" tone="primary" aria-label="Envoyer" />);
+    const button = screen.getByRole("button", { name: "Envoyer" });
+    expect(button).toHaveClass("size-8", "rounded-lg", "bg-primary", "text-primary-foreground");
+  });
 });

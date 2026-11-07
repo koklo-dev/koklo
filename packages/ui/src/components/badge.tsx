@@ -1,23 +1,37 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { HTMLAttributes } from "react";
 import { cn } from "../lib/cn.ts";
+import { Pill, pillVariants } from "./pill.tsx";
 
-export const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium motion-safe:transition-colors duration-150",
-  {
-    variants: {
-      variant: {
-        default: "border-transparent bg-secondary text-secondary-foreground",
-        outline: "border-border text-foreground",
-        destructive: "border-transparent bg-destructive text-destructive-foreground",
-      },
+/** @deprecated Utiliser `Pill`. Alias conservé pour les écrans non refondus (TK-141). */
+export const badgeVariants = cva("", {
+  variants: {
+    variant: {
+      default: pillVariants({ size: "sm", tone: "soft" }),
+      outline: pillVariants({ size: "sm", tone: "outline" }),
+      destructive: cn(
+        pillVariants({ size: "sm", tone: "soft" }),
+        "bg-destructive text-destructive-foreground",
+      ),
     },
-    defaultVariants: { variant: "default" },
   },
-);
+  defaultVariants: { variant: "default" },
+});
 
-export type BadgeProps = HTMLAttributes<HTMLDivElement> & VariantProps<typeof badgeVariants>;
+export type BadgeProps = HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>;
 
+/** @deprecated Utiliser `Pill` : `default` = ton `soft`, `outline`, `destructive`, taille `sm`. */
 export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  const tone = variant === "outline" ? "outline" : "soft";
+  return (
+    <Pill
+      size="sm"
+      tone={tone}
+      className={cn(
+        variant === "destructive" && "bg-destructive text-destructive-foreground",
+        className,
+      )}
+      {...props}
+    />
+  );
 }

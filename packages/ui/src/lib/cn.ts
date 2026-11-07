@@ -15,6 +15,12 @@ const TEXT_ROLES = [
   "group-label",
   "caption",
   "code",
+  "card-title",
+  "dialog-title",
+  "stat",
+  "count",
+  "code-sm",
+  "settings-title",
 ];
 
 const twMerge = extendTailwindMerge({ extend: { theme: { text: TEXT_ROLES } } });

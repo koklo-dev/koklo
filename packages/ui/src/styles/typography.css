@@ -47,4 +47,25 @@
   --text-code-size: 12px;
   --text-code-weight: 500;
   --text-code-tracking: normal;
+
+  /* TK-138 (DESIGN.md §5.5) */
+  --text-card-title-size: 15px;
+  --text-card-title-weight: 600;
+
+  --text-dialog-title-size: 18px;
+  --text-dialog-title-weight: 600;
+
+  --text-stat-size: 24px;
+  --text-stat-weight: 600;
+  --text-stat-tracking: -0.02em;
+
+  --text-count-size: 11px;
+  --text-count-weight: 600;
+
+  --text-code-sm-font: var(--font-mono);
+  --text-code-sm-size: 11px;
+  --text-code-sm-weight: 500;
+
+  --text-settings-title-size: 20px;
+  --text-settings-title-weight: 600;
 }

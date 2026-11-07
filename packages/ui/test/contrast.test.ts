@@ -26,7 +26,13 @@ const THEME_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ["--foreground", "--raised"],
   ["--muted-foreground", "--surface"],
   ["--muted-foreground", "--raised"],
+  // TK-138 lot C : RadioCard choisie (texte et description sur --diff-bg)
+  ["--foreground", "--diff-bg"],
+  ["--muted-foreground", "--diff-bg"],
 ];
+
+/** Composants d interface (WCAG 1.4.11) : contour de case non cochée (muted) >= 3:1. */
+const UI_PAIRS: ReadonlyArray<readonly [string, string]> = [["--muted-foreground", "--background"]];
 
 const STATUSES: readonly StatusKey[] = ["validated", "pending", "revise"];
 
@@ -38,6 +44,14 @@ describe.each([":root", ".dark"] as const)("CA2 - contraste WCAG AA du thème %s
     expect(
       assertContrast(`${selector} ${fg}/${bg}`, theme[fg] as string, theme[bg] as string),
     ).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
+  });
+
+  it.each(UI_PAIRS)("composant %s sur %s >= 3:1", (fg, bg) => {
+    const theme = effectiveTheme(selector);
+    expect(
+      contrastRatio(theme[fg] as string, theme[bg] as string),
+      `${selector} ${fg}/${bg}`,
+    ).toBeGreaterThanOrEqual(3);
   });
 
   it.each(STATUSES)("statut %s : texte sur fond >= 4,5:1", (status) => {

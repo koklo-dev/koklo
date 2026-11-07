@@ -57,8 +57,8 @@ describe("Textarea, styles", () => {
     render(<Textarea aria-label="Note" className="h-40" />);
     const field = screen.getByRole("textbox", { name: "Note" });
     expect(field).toHaveClass("h-40");
-    expect(field.className).toMatch(/border-input/);
-    expect(field.className).toMatch(/rounded-md/);
+    expect(field.className).toMatch(/border-border/);
+    expect(field.className).toMatch(/rounded-lg/);
   });
 
   it("style l'état invalide avec le token destructive (jamais une couleur brute)", () => {

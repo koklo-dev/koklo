@@ -1,7 +1,7 @@
 ---
 id: S-dev-ui
 titre: Galerie des composants (/dev/ui, équipe, hors production)
-version: 1.1
+version: 1.2
 ---
 ## 1. Utilisateurs et objectif
 L'équipe Koklo (développeurs, designer, agents de développement et de revue) et les tests de captures. Ce n'est pas un écran du produit : aucun client ni rôle d'organisation n'y a affaire. Arrivée : adresse saisie `/dev/ui`, ou les tests `apps/web/e2e/dev-ui.spec.ts`.
@@ -51,6 +51,11 @@ Section « Listes longues » (TK-94, DESIGN.md §5.3), après « EmptyState » e
 - « GroupSection » : un groupe ouvert (« Fonctionnalités · Réservation · 42 · 18 acceptées · 22 à relire », 8 lignes, « Afficher 20 de plus ») et un groupe replié.
 - « DiagramMinimap » et « ZoneNode » : trois zones fictives (« Réservation · 14 tables », « Clients · 9 tables », « Paiement · 7 tables ») et leur mini-carte avec cadre de vue.
 
+Section « Primitives de base » (TK-138, DESIGN.md §5.5, catalogue `docs/refonte/catalogue-composants.md`), en trois groupes livrés par lot, chaque composant dans tous ses tons, tailles et états, clair et sombre (données fictives, aucun nom de fournisseur d'IA) :
+- **A · Jetons, icônes, actions** : jetons ajoutés (`--alert-success-*`, `--overlay`, ombres `dialog` / `sheet` / `toast`, rayons 10 et 14, textes `card-title`, `dialog-title`, `stat`, `count`, `code-sm`, `settings-title`) ; `Icon` aux tailles 14, 16, 18, 20, 22, 24, 28 et aux 4 tons ; `Button` (6 variantes + `dashed`, `inherit`, `link`) aux 4 tailles, avec icône, raccourci, `loading`, `pressed`, `fullWidth`, désactivé avec raison ; `IconButton` 32 et 36, envoi primaire ; `Kbd` ; `Spinner` 16 / 18 / 20.
+- **B · Pastilles, identifiants, avatars** : `Pill` 3 tailles x 9 tons, avec icône, interactive ; `CountBadge` 5 tons ; `Dot` ; `RolePill` des 6 rôles ; `IdTag` (soft, outline, `sm`, `pill` « Fournisseur · modèle ») ; `ValidationStatus`, `DeliverableStatus`, `LifecycleStatus` recalés ; `Avatar` 5 tailles x 4 tons x rond / tuile ; `IconTile` 5 tailles x 4 tons.
+- **C · Choix et saisie** : `FilterChip` (actif, inactif, compteur, `add`), `OptionChip` ; `SegmentedControl` (2 à 4 segments, `xs`, actif sans violet, mode `radiogroup`) ; `Switch` et `SwitchRow` (éteint, allumé, désactivé) ; `Checkbox` (3 états) ; `RadioGroup` et `RadioCard` (liste et grille, « Recommandé ») ; `Input` 40 et 36 (normal, `mono`, invalide, désactivé), `SearchField`, `Textarea`, `Field` (obligatoire, facultatif, aide, erreur), `Select` 40 et 36.
+
 Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer le dossier ») ne font rien ; « Détails » déplie réellement.
 
 ## 4. États
@@ -99,6 +104,8 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 | 1 | 2026-11-06 | TK-87 | Création : galerie autonome des jetons et des 8 composants du lot 0 (DESIGN.md v2), tous états, bascule de thème, 404 en production, captures clair / sombre / 375 px. Détail : `.workflow/TK-87/02-design.md` |
 | 2 | 2026-11-06 | TK-94 | Section « Listes longues » : `VirtualList` (1 000 lignes simulées), `CountBar`, `ListFooter` (4 états), `EmptyState` de recherche vide, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`, tous états, clair et sombre. Détail : `.workflow/TK-94/02-design.md` |
 | 1.1 | 2026-11-07 | TK-88 | Section « Coquille » (lot B) : barre étendue et repliée, entrée verrouillée avec infobulle, `ProjectHeader` avec onglets, palette ⌘K (résultats, vide, erreur), page « Bientôt », en clair et en sombre. Détail : `.workflow/TK-88/02-design.md` |
+| 1.2 | 2026-11-07 | TK-138 | Section « Primitives de base » en trois groupes A, B, C (jetons, `Icon`, `Button` et famille, `Pill` et famille, `Avatar`, `IconTile`, chips, `SegmentedControl`, `Switch`, `Checkbox`, `RadioGroup`, champs). Actif segmenté neutre sans violet (I5). Détail : `.workflow/TK-138/00-fiche.md` |
 
 ## 11. Captures (générées par `apps/web/e2e/dev-ui.spec.ts`)
 Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`. TK-94 : `lists-light.png`, `lists-dark.png`, `lists-light-mobile.png`, `lists-dark-mobile.png` (section « Listes longues »).
+TK-138 : `primitives-light.png`, `primitives-dark.png` (pleine section, 1280 px), `primitives-light-mobile.png`, `primitives-dark-mobile.png` (375 px), plus `primitives-a|b|c-<light|dark>.png` par groupe.

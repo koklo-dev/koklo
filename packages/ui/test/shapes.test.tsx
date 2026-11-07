@@ -53,7 +53,7 @@ describe("formes (02-design.md §2)", () => {
     noShadow(el);
   });
 
-  it("Select trigger : h-9 rounded-md", () => {
+  it("Select trigger : h-10 rounded-lg (TK-138)", () => {
     render(
       <Select>
         <SelectTrigger aria-label="Choix">
@@ -61,7 +61,7 @@ describe("formes (02-design.md §2)", () => {
         </SelectTrigger>
       </Select>,
     );
-    expect(screen.getByRole("combobox")).toHaveClass("h-9", "rounded-md");
+    expect(screen.getByRole("combobox")).toHaveClass("h-10", "rounded-lg");
   });
 
   it("Popover : rounded-xl shadow-floating (flottant, DESIGN.md v2 §2.1)", () => {

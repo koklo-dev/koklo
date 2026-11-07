@@ -2,6 +2,7 @@
 
 import { cva, type VariantProps } from "class-variance-authority";
 import { useMemo } from "react";
+import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 
 import { Label } from "./label.tsx";
@@ -54,7 +55,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-const fieldVariants = cva("group/field flex w-full gap-3 data-[invalid=true]:text-destructive", {
+const fieldVariants = cva("group/field flex w-full gap-1.5", {
   variants: {
     orientation: {
       vertical: ["flex-col [&>*]:w-full [&>.sr-only]:w-auto"],
@@ -101,18 +102,35 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
+function FieldLabel({
+  className,
+  required,
+  optional,
+  children,
+  ...props
+}: React.ComponentProps<typeof Label> & { required?: boolean; optional?: boolean }) {
   return (
     <Label
       data-slot="field-label"
       className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50",
+        "group/field-label peer/field-label flex w-fit gap-2 text-meta font-semibold leading-snug group-data-[disabled=true]/field:text-muted-foreground",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border [&>*]:data-[slot=field]:p-4",
         "has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10",
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+      {required ? (
+        <>
+          <span aria-hidden="true" className="-ml-1 text-primary">
+            *
+          </span>
+          <span className="sr-only">obligatoire</span>
+        </>
+      ) : null}
+      {optional ? <span className="font-normal text-muted-foreground">(facultatif)</span> : null}
+    </Label>
   );
 }
 
@@ -121,7 +139,7 @@ function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="field-label"
       className={cn(
-        "flex w-fit items-center gap-2 text-sm leading-snug font-medium group-data-[disabled=true]/field:opacity-50",
+        "flex w-fit items-center gap-2 text-sm leading-snug font-medium group-data-[disabled=true]/field:text-muted-foreground",
         className,
       )}
       {...props}
@@ -134,7 +152,7 @@ function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="field-description"
       className={cn(
-        "text-sm leading-normal font-normal text-muted-foreground group-has-[[data-orientation=horizontal]]/field:text-balance",
+        "text-caption leading-normal font-normal text-muted-foreground group-has-[[data-orientation=horizontal]]/field:text-balance",
         "last:mt-0 nth-last-2:-mt-1 [[data-variant=legend]+&]:-mt-1.5",
         "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className,
@@ -212,10 +230,14 @@ function FieldError({
     <div
       role="alert"
       data-slot="field-error"
-      className={cn("text-sm font-normal text-destructive", className)}
+      className={cn(
+        "flex items-start gap-1.5 text-caption font-medium text-destructive",
+        className,
+      )}
       {...props}
     >
-      {content}
+      <Icon name="error" size={16} />
+      <div>{content}</div>
     </div>
   );
 }

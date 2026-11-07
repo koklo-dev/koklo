@@ -20,19 +20,21 @@ export function SelectValue(props: ComponentProps<typeof SelectPrimitive.Value>)
 export function SelectTrigger({
   className,
   children,
+  size = "default",
   ...props
-}: ComponentProps<typeof SelectPrimitive.Trigger>) {
+}: ComponentProps<typeof SelectPrimitive.Trigger> & { size?: "default" | "sm" }) {
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm motion-safe:transition-colors duration-150 data-[placeholder]:text-muted-foreground aria-invalid:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&>span]:line-clamp-1",
+        "flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-body motion-safe:transition-colors duration-150 data-[placeholder]:text-muted-foreground aria-invalid:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-dashed disabled:border-border-strong disabled:bg-surface disabled:text-muted-foreground [&>span]:line-clamp-1",
+        size === "sm" ? "h-9" : "h-10",
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <Icon name="unfold_more" size={16} className="text-muted-foreground" />
+        <Icon name="keyboard_arrow_down" size={18} className="text-muted-foreground" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
