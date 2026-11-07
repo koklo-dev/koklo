@@ -12,6 +12,7 @@ export const LLM_TABLE = "llm_provider_credentials";
 
 /** Colonnes exactes de la table : aucune colonne AAD, aucune colonne de clé en clair. */
 export const LLM_COLUMNS = {
+  base_url: "text/YES",
   ciphertext: "bytea/NO",
   created_at: "timestamptz/NO",
   created_by_user_id: "uuid/YES",
@@ -41,6 +42,8 @@ export interface LlmCredentialOverrides {
   nonce?: Buffer;
   keyVersion?: number;
   defaultModel?: string | null;
+  /** Défaut : une adresse https factice pour `openai_compatible`, aucune pour les autres. */
+  baseUrl?: string | null;
   createdByUserId?: string | null;
 }
 
@@ -51,8 +54,8 @@ export async function insertLlmCredential(
   const id = randomUUID();
   await db.query(
     `INSERT INTO llm_provider_credentials (id, organization_id, provider, ciphertext, nonce,
-       key_version, default_model, created_by_user_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())`,
+       key_version, default_model, base_url, created_by_user_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())`,
     [
       id,
       o.organizationId,
@@ -61,6 +64,11 @@ export async function insertLlmCredential(
       o.nonce ?? Buffer.alloc(12, 5),
       o.keyVersion ?? 1,
       o.defaultModel === undefined ? null : o.defaultModel,
+      o.baseUrl !== undefined
+        ? o.baseUrl
+        : o.provider === "openai_compatible"
+          ? "https://llm.example.org/v1"
+          : null,
       o.createdByUserId === undefined ? null : o.createdByUserId,
     ],
   );

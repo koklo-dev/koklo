@@ -25,14 +25,15 @@ export const ANTHROPIC_PRICES: Readonly<Record<string, ModelPrice>> = Object.fre
 });
 
 const prices = Object.values(ANTHROPIC_PRICES);
-const HIGHEST: ModelPrice = {
+/** Maximum composante par composante de la table : tarif des modèles inconnus. */
+export const HIGHEST_PRICE: ModelPrice = {
   inputUsdPerMTok: Math.max(...prices.map((price) => price.inputUsdPerMTok)),
   outputUsdPerMTok: Math.max(...prices.map((price) => price.outputUsdPerMTok)),
 };
 
 /** Prix du modèle ; modèle inconnu = maximum composante par composante de la table. */
 export const priceOf = (model: string): ModelPrice =>
-  Object.hasOwn(ANTHROPIC_PRICES, model) ? (ANTHROPIC_PRICES[model] as ModelPrice) : HIGHEST;
+  Object.hasOwn(ANTHROPIC_PRICES, model) ? (ANTHROPIC_PRICES[model] as ModelPrice) : HIGHEST_PRICE;
 
 /** Majorant du coût en micro-dollars : 1 token <= 1 caractère en entrée, `maxOutputTokens` en sortie. */
 export const costUpperBoundMicroUsd = (

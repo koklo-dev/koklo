@@ -110,9 +110,9 @@ describe("TK-51a migration llm_provider_credentials : dossier et contenu", () =>
     expect(down[1]).toMatch(/^DROP TYPE (?:IF EXISTS )?(?:"public"\.)?"llm_provider"$/i);
   });
 
-  it("expectedTables contient la table (40 au total avec TK-55a)", () => {
+  it("expectedTables contient la table (43 au total avec TK-95)", () => {
     expect(expectedTables).toContain(LLM_TABLE);
-    expect(expectedTables).toHaveLength(40);
+    expect(expectedTables).toHaveLength(43);
   });
 });
 
@@ -131,12 +131,14 @@ afterAll(async () => {
 }, 60_000);
 
 describe("TK-51a migration llm_provider_credentials : up -> (données) -> down -> up", () => {
-  it("deploy sur base vide crée la table et l'enum anthropic, openai, google", async () => {
+  it("deploy sur base vide crée la table et l'enum à six fournisseurs (TK-95)", async () => {
     runPrismaOrThrow(["migrate", "deploy"], db.url);
     afterFirstUp = await inventory(db);
     expect(afterFirstUp.tables).toEqual([...expectedTables].sort());
     expect(afterFirstUp.tables).toContain(LLM_TABLE);
-    expect(afterFirstUp.enums).toContain("llm_provider:anthropic,openai,google");
+    expect(afterFirstUp.enums).toContain(
+      "llm_provider:anthropic,openai,google,mistral,openrouter,openai_compatible",
+    );
   }, 180_000);
 
   it("down.sql ramène exactement à l'état précédent, données des autres tables conservées", async () => {

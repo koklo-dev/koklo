@@ -854,7 +854,9 @@ value).
 Administration command, never an HTTP route. It re-encrypts, with the current key, the rows of
 **both** encrypted tables, across all organizations: `llm_provider_credentials` (BYOK keys, AAD
 `llm:v1:<organization>:<provider>`) and `provider_user_credentials` (user tokens, AAD
-`<user>:<installation>`, ADR 0009). It reads only `DATABASE_URL` and the three `KOKLO_ENCRYPTION_KEY*`
+`<user>:<installation>`, ADR 0009). Since TK-95 the BYOK table holds keys of six providers (the AAD carries the
+provider, so each is rotated with its own data); `base_url` is not a secret and is left untouched, and the AI
+tables (`ai_*`) hold no secret and are not part of the rotation. It reads only `DATABASE_URL` and the three `KOKLO_ENCRYPTION_KEY*`
 variables (not the rest of the api configuration).
 
 ```bash
@@ -1180,6 +1182,38 @@ real GitHub, by hand only. It refuses to start (exit 1, missing variables listed
 organisation; they are deleted at the end only if the test App has the Administration
 (write) permission, otherwise delete them by prefix. Full procedure and App permissions:
 `packages/github/README.md`.
+
+## Manual model qualification (TK-95)
+`pnpm --filter @koklo/llm test:real` runs the per-usage qualification suite (Idea space, Spec
+deliverables, Baseline summary, Ticket breakdown; at least 3 French reference cases per usage, no real
+data) against a **real** model, by hand only, never in CI (it costs a few cents). In CI the same
+suite runs against a fake model (`packages/llm/test/qualification.test.ts`), no network. It refuses to
+start (exit 1, missing variables listed) unless these are set in your shell:
+`KOKLO_LLM_REAL_PROVIDER` (`anthropic | openai | google | mistral | openrouter | openai_compatible`),
+`KOKLO_LLM_REAL_KEY`, `KOKLO_LLM_REAL_MODEL`, plus `KOKLO_LLM_REAL_BASE_URL` for `openai_compatible`.
+Never commit a key. Exit 0 = qualified for the four usages, 2 = at least one usage failed (the report
+on stdout lists the failing case ids and reasons: `schema`, `invalid-json`, `truncated`, `refused`,
+`error`; never the model output). The manual mode uses the minimal contract "a JSON object"; the API
+is meant to plug the Zod schema of each usage into the same runner; only Idea space and Spec deliverables have a schema today (Baseline summary and Ticket breakdown have no caller before their tickets), so that wiring is left to those tickets. At launch only
+`claude-sonnet-5-5` (Anthropic) is qualified for the four usages (question A4).
+
+## AI engine wiring, cap and key guards (TK-95, lot D)
+- **Wiring**: `AiModule` builds `AI_PROVIDER` (the `AiProviderRouter`) on the Prisma ports. Procedures name a usage
+  (`ai.draftBrief` is Idea space, `ai.proposeFeatures` and `ai.proposeCriteria` are Spec deliverables);
+  `llmCredential.verify` has no usage. No file of `apps/api/src/ai` may name a provider, a model or the default model
+  (`ai-engine-wiring.test.ts`); the former `LLM_PROVIDERS` registry and `src/llm` no longer exist.
+- **Order of a call**: engine pre-check (`preflight`: cap, usable key) before the audit line and the quota, so a
+  refusal writes nothing; then audit, call (fallback once, metering at the provider served), key life signals.
+- **Cap**: at 100 % the three proposals answer `LLM_CAP_REACHED` (409, no amount, no provider) before any network
+  call; `llmCredential.verify` is never suspended and not metered. At 80 % one `ai.cap_warning` audit line per
+  organization and month. Concurrent calls can overshoot the cap by at most the calls in flight (semaphore places).
+- **Keys unreachable by code agents** (tests in `ai-engine-wiring.test.ts`): `packages/delivery` imports neither
+  the keys, the resolver nor `@koklo/llm`; `LlmCredentialResolver` is referenced only by the engine's key source,
+  `CredentialProbe` (verify) and the module wiring (allow-list); the full contract has no `/agent` route (a future one
+  fails the test until it is classified there, TK-63).
+- **Qualification in CI**: the launch catalog (`launchCatalog()`) holds only `claude-sonnet-5-5` (Anthropic) for the
+  four usages; the per-usage suite runs against a fake model, real providers only by hand (see above).
+- **Not checked here**: no real provider call, no browser (no screen), no `engineering-rules validate` before ticket closing.
 
 ## Rules gates in CI: `checkBiomeLimits` and `validateEvidence` (TK-71 lot C)
 `@koklo/rules` executes nothing and reads no file: the caller reads, then passes JSON.

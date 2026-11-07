@@ -39,13 +39,27 @@ describe("identité et dépendances de @koklo/llm", () => {
     expect(Object.keys(pkg.exports).sort()).toEqual([".", "./testing"]);
   });
 
-  it("dépend du seul @koklo/domain : aucune dépendance tierce (fetch direct, pas de SDK)", () => {
-    expect(Object.keys(pkg.dependencies)).toEqual(["@koklo/domain"]);
+  it("dépend de @koklo/domain et des sept paquets du SDK, en versions exactes (ADR 0015)", () => {
+    expect(Object.keys(pkg.dependencies).sort()).toEqual([
+      "@ai-sdk/anthropic",
+      "@ai-sdk/google",
+      "@ai-sdk/mistral",
+      "@ai-sdk/openai",
+      "@ai-sdk/openai-compatible",
+      "@koklo/domain",
+      "@openrouter/ai-sdk-provider",
+      "ai",
+    ]);
     expect(pkg.dependencies["@koklo/domain"]).toBe("workspace:*");
+    for (const [name, version] of Object.entries(pkg.dependencies)) {
+      if (name !== "@koklo/domain") {
+        expect(version, name).toMatch(/^\d+\.\d+\.\d+$/);
+      }
+    }
     expect(pkg.peerDependencies).toBeUndefined();
   });
 
-  it("aucun SDK Anthropic n'est déclaré dans le dépôt", () => {
+  it("aucun SDK Anthropic officiel (@anthropic-ai/*) n'est déclaré dans le dépôt", () => {
     for (const dir of ["apps", "packages"].flatMap((g) =>
       readdirSync(resolve(repoRoot, g)).map((n) => resolve(repoRoot, g, n)),
     )) {
@@ -67,8 +81,15 @@ describe("identité et dépendances de @koklo/llm", () => {
     ]);
   });
 
-  it("expose les scripts lint, typecheck, test et build", () => {
-    expect(Object.keys(pkg.scripts).sort()).toEqual(["build", "lint", "test", "typecheck"]);
+  it("expose les scripts lint, typecheck, test, test:real (manuel) et build", () => {
+    expect(Object.keys(pkg.scripts).sort()).toEqual([
+      "build",
+      "lint",
+      "test",
+      "test:real",
+      "typecheck",
+    ]);
+    expect(pkg.scripts["test:real"]).toContain("run-real");
   });
 
   it("porte le tag turbo llm, qui n'autorise que domain et config", () => {
@@ -91,11 +112,26 @@ describe("pureté des sources de production", () => {
     expect(productionSources.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("n'importe que le domaine et des fichiers relatifs", () => {
+  it("n'importe que le domaine, des fichiers relatifs et les sept paquets du SDK", () => {
     for (const file of productionSources) {
       for (const specifier of importsOf(readFileSync(file, "utf8"))) {
-        expect(specifier, file).toMatch(/^(\.\.?\/|@koklo\/domain$)/);
+        expect(specifier, file).toMatch(
+          /^(\.\.?\/|@koklo\/domain$|ai$|@ai-sdk\/(anthropic|openai|google|mistral|openai-compatible)$|@openrouter\/ai-sdk-provider$|node:dns\/promises$)/,
+        );
       }
+    }
+  });
+
+  it("les imports de SDK n'existent que sous src/sdk et src/anthropic ; node:dns que dans le résolveur", () => {
+    for (const file of productionSources) {
+      const source = readFileSync(file, "utf8");
+      const specifiers = importsOf(source);
+      const sdk = specifiers.some((s) => /^(ai|@ai-sdk\/.*|@openrouter\/.*)$/.test(s));
+      expect(sdk && !/\/src\/sdk\//.test(file), file).toBe(false);
+      expect(
+        specifiers.includes("node:dns/promises") && !file.endsWith("src/common/dns-resolver.ts"),
+        file,
+      ).toBe(false);
     }
   });
 
@@ -117,7 +153,7 @@ describe("pureté des sources de production", () => {
         /process\.env/,
         /\bconsole\./,
         /\brequire\s*\(/,
-        /node:/,
+        /node:(?!dns\/promises)/,
         /\bimport\s*\(/,
       ]) {
         expect(code, `${file} contient ${pattern}`).not.toMatch(pattern);
@@ -125,11 +161,16 @@ describe("pureté des sources de production", () => {
     }
   });
 
-  it("une seule URL en dur : celle de constants.ts", () => {
+  it("les URL en dur sont les seules constantes d'adresse des fournisseurs (constants.ts)", () => {
     const withUrl = productionSources.filter((f) =>
       /https?:\/\//.test(readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")),
     );
-    expect(withUrl.map((f) => f.replace(`${pkgDir}/`, ""))).toEqual(["src/anthropic/constants.ts"]);
+    expect(withUrl.map((f) => f.replace(`${pkgDir}/`, ""))).toEqual([
+      "src/common/provider-urls.ts",
+    ]);
+    expect(readFileSync(resolve(pkgDir, "src/sdk/create-model.ts"), "utf8")).not.toMatch(
+      /https?:\/\//,
+    );
   });
 
   it("aucun fichier de plus de 300 lignes", () => {

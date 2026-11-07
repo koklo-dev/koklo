@@ -140,6 +140,7 @@ describe("set : création et remplacement", () => {
     });
     expect(Object.keys(status).sort()).toEqual(
       [
+        "baseUrl",
         "createdAt",
         "defaultModel",
         "id",
@@ -153,6 +154,7 @@ describe("set : création et remplacement", () => {
     expect(status).toMatchObject({
       provider: "anthropic",
       defaultModel: "modele-x",
+      baseUrl: null,
       invalid: false,
       invalidatedAt: null,
       lastUsedAt: null,

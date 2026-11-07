@@ -44,11 +44,15 @@ export class LlmCredentialController {
       guard(requestIdOf(request), errors, () =>
         viaCredential(async () => {
           const { organizationId, userId } = requireSession(request);
-          const { provider, apiKey, defaultModel } = input;
+          const { provider, apiKey, defaultModel, baseUrl } = input;
           const status = await this.service.set(
             organizationId,
             provider,
-            { apiKey, ...(defaultModel === undefined ? {} : { defaultModel }) },
+            {
+              apiKey,
+              ...(defaultModel === undefined ? {} : { defaultModel }),
+              ...(baseUrl === undefined ? {} : { baseUrl }),
+            },
             { organizationId, userId },
           );
           return toStatusOutput(status);

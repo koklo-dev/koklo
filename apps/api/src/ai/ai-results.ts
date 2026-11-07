@@ -1,10 +1,10 @@
 import type { FeatureSummary } from "@koklo/contract";
-import type { LlmResponse } from "@koklo/domain";
+import type { AiResponse } from "@koklo/domain";
 
-/** Fournisseur du registre (la clé, pas `response.provider`), modèle SERVI et consommation ; aucun coût. */
-export function metaOf(provider: "anthropic" | "openai" | "google", response: LlmResponse) {
+/** Fournisseur et modèle réellement SERVIS (secours compris) et consommation ; aucun coût. */
+export function metaOf(response: AiResponse) {
   return {
-    provider,
+    provider: response.provider,
     model: response.model,
     usage: {
       inputTokens: response.usage.inputTokens,

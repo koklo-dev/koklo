@@ -1,26 +1,27 @@
 import { randomUUID } from "node:crypto";
 import {
+  type AiProvider,
+  type AiResponse,
+  type AiUsage,
   type FramedPrompt,
   type LlmOutputSpec,
-  type LlmProvider,
   type LlmProviderId,
   type LlmResponse,
+  type QualifiedModelCatalog,
   UntrustedDelimiterCollisionError,
   validateLlmOutput,
 } from "@koklo/domain";
-import { ANTHROPIC_DEFAULT_MODEL } from "@koklo/llm";
+import { AiCapReachedError, AiNotConfiguredError } from "@koklo/llm";
 import { Inject, Injectable } from "@nestjs/common";
-import { LLM_PROVIDERS, type LlmProviderRegistry } from "../llm/tokens.ts";
-import {
-  LlmCredentialResolver,
-  type ResolvedLlmCredential,
-} from "../llm-credential/llm-credential.resolver.ts";
+import { ORPCError } from "@orpc/server";
+import { CredentialProbe } from "../llm-credential/credential-probe.ts";
 import { LlmCredentialService } from "../llm-credential/llm-credential.service.ts";
 import { LlmCredentialUnavailableError } from "../llm-credential/llm-credential-errors.ts";
 import { requestLogger } from "../request-logger.ts";
 import type { AuditActor, AuditEntry } from "../tracker/audit.ts";
 import { AI_BUDGETS, type AiPurpose } from "./ai-budget.ts";
 import {
+  capReached,
   errorNameOf,
   isRejectedKey,
   outputInvalid,
@@ -31,12 +32,8 @@ import {
 } from "./ai-errors.ts";
 import { ConcurrencyGate } from "./ai-gate.ts";
 import { AiLedger, type QuotaKind } from "./ai-ledger.ts";
+import { AI_ADAPTERS, AI_CATALOG, AI_PROVIDER, type AiAdapterFactory } from "./ai-tokens.ts";
 import { NONCE_SOURCE, type NonceSource } from "./nonce.ts";
-
-/** Modèle servi par défaut, par fournisseur disposant d'un adaptateur (sans `defaultModel` BYOK). */
-const DEFAULT_MODELS: Partial<Record<LlmProviderId, string>> = {
-  anthropic: ANTHROPIC_DEFAULT_MODEL,
-};
 
 const TRACE_ID = /[^A-Za-z0-9._:-]/g;
 const TRACE_ID_MAX = 64;
@@ -45,72 +42,125 @@ const TRACE_ID_MAX = 64;
 export const correlationIdOf = (requestId: string): string =>
   requestId.replace(TRACE_ID, "").slice(0, TRACE_ID_MAX) || randomUUID();
 
-/** Ce qui distingue un appel d'un autre ; le reste du pipeline est commun (`AiCallRunner.run`). */
-export interface AiCall<T> {
+/** Ce qui distingue un appel d'un autre ; le reste du pipeline est commun. */
+interface AiCallBase<T> {
   readonly purpose: AiPurpose;
-  readonly provider: LlmProviderId;
   readonly actor: AuditActor;
   readonly correlationId: string;
   readonly quota: QuotaKind;
   readonly output: LlmOutputSpec;
   /** Cadre le prompt avec le nonce de l'appel ; la collision de délimiteur est levée ici. */
   readonly frame: (nonce: string) => FramedPrompt;
-  /** Ligne d'audit de l'appel ; `credentialId` : la ligne de la clé résolue. */
-  readonly entry: (credentialId: string) => AuditEntry;
   /** Valide la réponse et en tire la sortie de la procédure (jamais appelé si le fournisseur échoue). */
-  readonly settle: (response: LlmResponse) => T;
+  readonly settle: (response: AiResponse) => T;
+}
+
+/** Appel routé par le moteur : l'appelant donne un usage, jamais un fournisseur ni un modèle. */
+export interface AiUsageCall<T> extends AiCallBase<T> {
+  readonly usage: AiUsage;
+  readonly entry: () => AuditEntry;
+}
+
+/** Vérification d'une clé : le fournisseur est nommé (il vient de l'URL), sans usage ni plafond. */
+export interface AiVerifyCall<T> extends AiCallBase<T> {
+  readonly provider: LlmProviderId;
+  /** `credentialId` : la ligne de la clé résolue. */
+  readonly entry: (credentialId: string) => AuditEntry;
 }
 
 /**
- * Pipeline commun des appels au modèle (`02-decisions-54b.md` §4) : clé -> adaptateur -> prompt
- * (nonce neuf) -> sémaphore -> quota et audit AVANT l'appel -> appel -> `markUsed` -> validation.
- * Un refus avant l'audit n'écrit aucune ligne et ne consomme aucun quota.
+ * Pipeline commun des appels au modèle (`02-decisions-54b.md` §4) : refus préalable du moteur (plafond,
+ * aucune clé) -> prompt (nonce neuf) -> sémaphore -> quota et audit AVANT l'appel -> appel -> validation.
+ * Un refus avant l'audit n'écrit aucune ligne et ne consomme aucun quota. La vie des clés (dernier
+ * usage, invalidation sur 401) est signalée par le moteur lui-même (`AiKeyHooks`).
  */
 @Injectable()
 export class AiCallRunner {
   readonly #gate: ConcurrencyGate;
 
   constructor(
-    @Inject(LlmCredentialResolver) private readonly resolver: LlmCredentialResolver,
+    @Inject(AI_PROVIDER) private readonly engine: AiProvider,
+    @Inject(AI_ADAPTERS) private readonly adapters: AiAdapterFactory,
+    @Inject(AI_CATALOG) private readonly catalog: QualifiedModelCatalog,
+    @Inject(CredentialProbe) private readonly probe: CredentialProbe,
     @Inject(LlmCredentialService) private readonly credentials: LlmCredentialService,
-    @Inject(LLM_PROVIDERS) private readonly registry: LlmProviderRegistry,
     @Inject(NONCE_SOURCE) private readonly nonces: NonceSource,
     @Inject(AiLedger) private readonly ledger: AiLedger,
   ) {
     this.#gate = new ConcurrencyGate(ledger.limits.maxConcurrentPerOrg);
   }
 
-  async run<T>(call: AiCall<T>): Promise<T> {
-    const { organizationId } = call.actor;
-    const resolved = await this.resolve(organizationId, call.provider);
-    const adapter = this.registry.get(call.provider);
-    const model = resolved.defaultModel ?? DEFAULT_MODELS[call.provider];
-    if (adapter === undefined || model === undefined) throw providerError("unavailable");
+  async run<T>(call: AiUsageCall<T>): Promise<T> {
+    const { organizationId, userId } = call.actor;
     const prompt = this.frame(call);
+    const request = {
+      organizationId,
+      userId,
+      usage: call.usage,
+      euOnly: false,
+      prompt,
+      output: call.output,
+      budget: AI_BUDGETS[call.purpose],
+      trace: { purpose: call.purpose, correlationId: call.correlationId },
+    };
+    await this.refusals(organizationId, () => this.engine.preflight(request));
     const release = this.#gate.acquire(organizationId);
     try {
-      await this.ledger.admit(call.actor, call.quota, call.entry(resolved.credentialId));
-      const response = await this.complete(call, adapter, { resolved, model, prompt });
-      await this.markUsed(call);
+      await this.ledger.admit(call.actor, call.quota, call.entry());
+      const response = await this.attempt(call, organizationId, () =>
+        this.engine.complete(request),
+      );
       return this.settle(call, response);
     } finally {
       release();
     }
   }
 
-  private async resolve(
-    organizationId: string,
-    provider: LlmProviderId,
-  ): Promise<ResolvedLlmCredential> {
+  async verify<T>(call: AiVerifyCall<T>): Promise<T> {
+    const { organizationId } = call.actor;
+    const resolved = await this.open(organizationId, call.provider);
+    const adapter = this.adapters(call.provider);
+    const model =
+      resolved.defaultModel ??
+      this.catalog.list().find((entry) => entry.provider === call.provider)?.model;
+    if (model === undefined) throw providerError("unavailable");
+    const prompt = this.frame(call);
+    const release = this.#gate.acquire(organizationId);
     try {
-      return await this.resolver.resolve(organizationId, provider);
+      await this.ledger.admit(call.actor, call.quota, call.entry(resolved.credentialId));
+      const response = await this.attempt(call, organizationId, async () => {
+        try {
+          return await adapter.complete({
+            model,
+            credential: resolved.credential,
+            ...(resolved.baseUrl === undefined ? {} : { baseUrl: resolved.baseUrl }),
+            prompt,
+            output: call.output,
+            budget: AI_BUDGETS[call.purpose],
+            trace: { purpose: call.purpose, correlationId: call.correlationId },
+          });
+        } catch (error) {
+          if (isRejectedKey(error)) await this.invalidate(call, resolved.revision);
+          throw error;
+        }
+      });
+      await this.markUsed(call);
+      return this.settle(call, { ...response, provider: call.provider });
+    } finally {
+      release();
+    }
+  }
+
+  private async open(organizationId: string, provider: LlmProviderId) {
+    try {
+      return await this.probe.open(organizationId, provider);
     } catch (error) {
       if (error instanceof LlmCredentialUnavailableError) throw unavailableCredential(error.reason);
       throw error;
     }
   }
 
-  private frame(call: AiCall<unknown>): FramedPrompt {
+  private frame(call: AiCallBase<unknown>): FramedPrompt {
     try {
       return call.frame(this.nonces.next());
     } catch (error) {
@@ -120,27 +170,33 @@ export class AiCallRunner {
     }
   }
 
-  private async complete(
-    call: AiCall<unknown>,
-    adapter: LlmProvider,
-    sent: { resolved: ResolvedLlmCredential; model: string; prompt: FramedPrompt },
-  ): Promise<LlmResponse> {
+  /** Refus du moteur (plafond, aucune clé utilisable) rendus comme erreurs typées du contrat. */
+  private async refusals<R>(organizationId: string, work: () => Promise<R>): Promise<R> {
+    try {
+      return await work();
+    } catch (error) {
+      if (error instanceof AiCapReachedError) throw capReached();
+      if (error instanceof AiNotConfiguredError) {
+        throw unavailableCredential(await this.credentials.unavailabilityOf(organizationId));
+      }
+      throw error;
+    }
+  }
+
+  private async attempt<R extends LlmResponse>(
+    call: AiCallBase<unknown>,
+    organizationId: string,
+    work: () => Promise<R>,
+  ): Promise<R> {
     const started = Date.now();
     try {
-      const response = await adapter.complete({
-        model: sent.model,
-        credential: sent.resolved.credential,
-        prompt: sent.prompt,
-        output: call.output,
-        budget: AI_BUDGETS[call.purpose],
-        trace: { purpose: call.purpose, correlationId: call.correlationId },
-      });
+      const response = await this.refusals(organizationId, work);
       requestLogger().info(
         {
           event: "llm.complete",
           purpose: call.purpose,
           correlationId: call.correlationId,
-          provider: call.provider,
+          provider: response.provider,
           model: response.model,
           durationMs: Date.now() - started,
           inputTokens: response.usage.inputTokens,
@@ -150,14 +206,13 @@ export class AiCallRunner {
       );
       return response;
     } catch (error) {
-      if (isRejectedKey(error)) await this.invalidate(call, sent.resolved.revision);
       this.logFailure(call, error);
-      throw portFailure(error);
+      throw isTypedRefusal(error) ? error : portFailure(error);
     }
   }
 
   /** Compare-and-swap : une clé remplacée pendant l'appel (autre révision) n'est pas invalidée. */
-  private async invalidate(call: AiCall<unknown>, revision: string): Promise<void> {
+  private async invalidate(call: AiVerifyCall<unknown>, revision: string): Promise<void> {
     try {
       await this.credentials.invalidate(
         call.actor.organizationId,
@@ -173,8 +228,8 @@ export class AiCallRunner {
     }
   }
 
-  /** Meilleur effort : un échec est journalisé par nom d'erreur seulement, la réponse est inchangée. */
-  private async markUsed(call: AiCall<unknown>): Promise<void> {
+  /** `verify` ne passe pas par le moteur : sa clé est marquée utilisée ici, au mieux. */
+  private async markUsed(call: AiVerifyCall<unknown>): Promise<void> {
     try {
       await this.credentials.markUsed(call.actor.organizationId, call.provider);
     } catch (error) {
@@ -185,7 +240,7 @@ export class AiCallRunner {
     }
   }
 
-  private settle<T>(call: AiCall<T>, response: LlmResponse): T {
+  private settle<T>(call: AiCallBase<T>, response: AiResponse): T {
     try {
       return call.settle(response);
     } catch (error) {
@@ -194,14 +249,13 @@ export class AiCallRunner {
     }
   }
 
-  private logFailure(call: AiCall<unknown>, error: unknown): void {
+  private logFailure(call: AiCallBase<unknown>, error: unknown): void {
     const status = (error as { status?: unknown }).status;
     requestLogger().warn(
       {
         event: "llm.failed",
         purpose: call.purpose,
         correlationId: call.correlationId,
-        provider: call.provider,
         errorName: errorNameOf(error),
         ...(typeof status === "number" ? { status } : {}),
       },
@@ -209,6 +263,8 @@ export class AiCallRunner {
     );
   }
 }
+
+const isTypedRefusal = (error: unknown): boolean => error instanceof ORPCError;
 
 /** Sortie du modèle : `validateLlmOutput` puis `parse` strict ; toute erreur devient `LLM_OUTPUT_INVALID`. */
 export function validated<T>(response: LlmResponse, parse: (raw: unknown) => T): T {

@@ -6,6 +6,7 @@ import { type LlmProvider, type LlmRequest, type LlmResponse, unvalidated } from
  */
 export const minimalProvider: LlmProvider = {
   id: "fake",
+  stream: async function* () {},
   complete: async (request: LlmRequest): Promise<LlmResponse> => ({
     output: unvalidated(request.output.kind === "text" ? "ok" : { ok: true }),
     stop: "end",

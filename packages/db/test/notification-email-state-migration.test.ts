@@ -131,8 +131,8 @@ describe("TK-58a migration notification_email_state : dossier et contenu", () =>
     expect(down).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE)\b/i);
   });
 
-  it("n'ajoute aucune table : expectedTables reste à 40", () => {
-    expect(expectedTables).toHaveLength(40);
+  it("n'ajoute aucune table : expectedTables est à 43 (TK-95)", () => {
+    expect(expectedTables).toHaveLength(43);
     expect(expectedTables).toContain("notifications");
   });
 });

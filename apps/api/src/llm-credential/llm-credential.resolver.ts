@@ -9,6 +9,8 @@ export interface ResolvedLlmCredential {
   readonly credentialId: string;
   readonly credential: LlmCredential;
   readonly defaultModel: string | undefined;
+  /** Adresse de base du point d'accès compatible (déjà enregistrée sous garde anti-SSRF). */
+  readonly baseUrl: string | undefined;
   /**
    * Révision de la clé stockée (hex du nonce AES-GCM, neuf à chaque `set`) : sert de compare-and-swap
    * à `invalidate` (D7, TK-54b). Sans lien avec la valeur de la clé.
@@ -38,6 +40,7 @@ export class LlmCredentialResolver {
         credentialId: stored.id,
         credential: llmCredential(secret),
         defaultModel: stored.defaultModel ?? undefined,
+        baseUrl: stored.baseUrl ?? undefined,
         revision: stored.revision,
       };
     } catch {

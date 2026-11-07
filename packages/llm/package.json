@@ -17,10 +17,18 @@
     "lint": "biome ci --config-path=../.. .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
+    "test:real": "node scripts/run-real.ts",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@koklo/domain": "workspace:*"
+    "@ai-sdk/anthropic": "4.0.97",
+    "@ai-sdk/google": "4.0.112",
+    "@ai-sdk/mistral": "4.0.80",
+    "@ai-sdk/openai": "4.0.109",
+    "@ai-sdk/openai-compatible": "3.0.85",
+    "@koklo/domain": "workspace:*",
+    "@openrouter/ai-sdk-provider": "3.1.0",
+    "ai": "7.0.163"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",

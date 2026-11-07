@@ -2,11 +2,21 @@ import { z } from "zod";
 import { instantSchema } from "./schemas-tickets.ts";
 
 /**
- * Clés BYOK (0.8.0). Les règles de saisie reproduisent les CHECK SQL de `llm_provider_credentials`
+ * Clés BYOK (0.8.0 ; six fournisseurs et `baseUrl` en entrée depuis 1.1.0). Les règles de saisie reproduisent les CHECK SQL de `llm_provider_credentials`
  * et la règle du domaine : la base n'est jamais le premier validateur. Aucun message ne reprend la
  * valeur refusée, et aucune sortie ne porte la clé ni quoi que ce soit qui en dérive.
  */
-export const llmProviderSchema = z.enum(["anthropic", "openai", "google"]);
+export const llmProviderSchema = z.enum([
+  "anthropic",
+  "openai",
+  "google",
+  "mistral",
+  "openrouter",
+  "openai_compatible",
+]);
+
+/** Adresse de base d'un point d'accès compatible (`openai_compatible` seul) : la garde anti-SSRF est côté serveur. */
+export const LLM_BASE_URL_MAX_LENGTH = 2048;
 
 export const LLM_API_KEY_MAX_LENGTH = 512;
 export const LLM_MODEL_MAX_LENGTH = 100;
@@ -51,6 +61,7 @@ export const llmCredentialSetInputSchema = z.object({
   provider: llmProviderSchema,
   apiKey: apiKeySchema,
   defaultModel: defaultModelSchema.optional(),
+  baseUrl: z.string().min(1).max(LLM_BASE_URL_MAX_LENGTH).optional(),
 });
 
 /** Fournisseur dans le chemin ; l'organisation vient toujours de la session. */

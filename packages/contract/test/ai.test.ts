@@ -76,8 +76,8 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
     }
   });
 
-  it("l'OpenAPI est en 1.0.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues)", async () => {
-    expect((await doc()).info.version).toBe("1.0.0");
+  it("l'OpenAPI est en 1.1.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond)", async () => {
+    expect((await doc()).info.version).toBe("1.1.0");
   });
 
   it("featureCreateSchema est exporté (parité avec specBatch.submit)", () => {
@@ -319,6 +319,19 @@ describe("AI4 erreurs typées", () => {
     expect(map.FORBIDDEN?.status).toBe(403);
     expect(map.NOT_FOUND?.status).toBe(404);
     expect(map.INTERNAL?.status).toBe(500);
+  });
+
+  it.each(AI_ROUTES)(
+    "%s : LLM_CAP_REACHED (409), sans donnée ni nom de fournisseur",
+    async (name) => {
+      const map = errors(name);
+      expect(map.LLM_CAP_REACHED?.status).toBe(409);
+      expect(map.LLM_CAP_REACHED?.data).toBeUndefined();
+    },
+  );
+
+  it("verify n'est jamais suspendu par le plafond : pas de LLM_CAP_REACHED", () => {
+    expect(errors("llmCredential.verify").LLM_CAP_REACHED).toBeUndefined();
   });
 
   it("verify : pas de sortie invalide ni de prompt rejeté, mais clé absente, débit, fournisseur", () => {

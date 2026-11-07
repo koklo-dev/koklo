@@ -1,6 +1,6 @@
 import { FakeLlm } from "@koklo/domain/testing";
 import { ANTHROPIC_DEFAULT_MODEL } from "@koklo/llm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AI_BUDGETS } from "../src/ai/ai-budget.ts";
 import {
   aiApi,
@@ -107,23 +107,26 @@ describe("llmCredential.verify : appel minimal", () => {
     expect((await credentialState(b.database, world.organizationId))?.last_used_at).toBeNull();
   });
 
-  it("un fournisseur sans adaptateur dans le registre (openai en 0.9.0) : 502 unavailable, rien d'envoyé ni d'audité", async () => {
+  it("un fournisseur sans modèle (ni modèle de la clé, ni modèle qualifié au lancement) : 502 unavailable, rien d'envoyé ni d'audité", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    await send(b.app, world.actors.owner.cookie, "put", "/llm-credentials/openai", {
+    const app = await b.makeApp({ defaultRegistry: true });
+    await send(app, world.actors.owner.cookie, "put", "/llm-credentials/openai", {
       provider: "openai",
       apiKey: "FAKE-KEY-NOT-REAL-OPENAI-0801",
     });
-    const fake = FakeLlm.replying("OK");
-    b.use(fake);
+    const network = vi.fn(() => {
+      throw new Error("fetch global interdit en test");
+    });
+    vi.stubGlobal("fetch", network);
 
-    const res = await aiApi(b.app, world.actors.owner).verify("openai");
+    const res = await aiApi(app, world.actors.owner).verify("openai");
 
+    vi.unstubAllGlobals();
     expect(res.status, JSON.stringify(res.body)).toBe(502);
     expect(res.body.code).toBe("LLM_PROVIDER_ERROR");
     expect(res.body.data).toEqual({ reason: "unavailable" });
-    expect(fake.calls).toHaveLength(0);
-    expect(b.provider.keysSeen).toEqual([]);
+    expect(network).not.toHaveBeenCalled();
     expect(await aiAuditRows(b.database, world.organizationId)).toEqual([]);
   });
 

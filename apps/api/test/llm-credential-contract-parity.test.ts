@@ -29,7 +29,7 @@ describe("parité des fournisseurs avec LLM_PROVIDER_IDS", () => {
       for (const provider of LLM_PROVIDER_IDS) {
         expect(accepts(schema, { provider, apiKey: KEY }), provider).toBe(true);
       }
-      for (const provider of ["fake", "", "Anthropic", "mistral"]) {
+      for (const provider of ["fake", "", "Anthropic", "cohere"]) {
         expect(accepts(schema, { provider, apiKey: KEY }), provider).toBe(false);
       }
     },

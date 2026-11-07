@@ -338,9 +338,10 @@ describe("Recherche (§2.1)", () => {
     const empty = await waitFor(() => {
       const found = document.querySelector("[data-slot='empty-state']");
       if (!found) throw new Error("pas d'état vide");
+      // L'état vide peut s'afficher pour une saisie partielle sous charge : on attend le terme complet.
+      expect(found).toHaveTextContent("Aucune fonctionnalité ne correspond à « annulation »");
       return found as HTMLElement;
     });
-    expect(empty).toHaveTextContent("Aucune fonctionnalité ne correspond à « annulation »");
     expect(empty).toHaveTextContent(
       "La recherche porte sur les 1 000 fonctionnalités, pas seulement celles affichées.",
     );

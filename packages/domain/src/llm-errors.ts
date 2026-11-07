@@ -81,6 +81,7 @@ export const INVALID_LLM_REQUEST_REASONS = [
   "temperature",
   "signal",
   "trace",
+  "baseUrl",
 ] as const;
 export type InvalidLlmRequestReason = (typeof INVALID_LLM_REQUEST_REASONS)[number];
 

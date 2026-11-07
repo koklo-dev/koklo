@@ -45,8 +45,8 @@ describe("LC1 surface : exactement list, set, remove, invalidate, verify (0.9.0)
     expect(d.paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("l'OpenAPI est en 1.0.0 (le groupe est apparu en 0.8.0)", async () => {
-    expect((await doc()).info.version).toBe("1.0.0");
+  it("l'OpenAPI est en 1.1.0 (le groupe est apparu en 0.8.0)", async () => {
+    expect((await doc()).info.version).toBe("1.1.0");
   });
 });
 
@@ -90,11 +90,13 @@ describe("LC2 sortie : le statut n'a aucun indice de la clé", () => {
     },
   );
 
-  it("list : { items } d'au plus trois statuts, un par fournisseur", async () => {
+  it("list : { items } d'au plus six statuts, un par fournisseur", async () => {
     expect(await isValid(output("llmCredential.list"), { items: [] })).toBe(true);
     expect(await isValid(output("llmCredential.list"), { items: [STATUS] })).toBe(true);
-    const four = Array.from({ length: 4 }, () => STATUS);
-    expect(await isValid(output("llmCredential.list"), { items: four })).toBe(false);
+    const six = Array.from({ length: 6 }, () => STATUS);
+    expect(await isValid(output("llmCredential.list"), { items: six })).toBe(true);
+    const seven = Array.from({ length: 7 }, () => STATUS);
+    expect(await isValid(output("llmCredential.list"), { items: seven })).toBe(false);
   });
 
   it("remove : { removed: true }", async () => {
@@ -146,15 +148,6 @@ describe("LC3b entrée de set : clé, modèle, fournisseur", () => {
     expect(await set({ defaultModel: "a.b" })).toBe(true);
   });
 
-  it("fournisseur : anthropic, openai, google ; jamais fake ni une valeur libre", async () => {
-    for (const provider of ["anthropic", "openai", "google"]) {
-      expect(await set({ provider }), provider).toBe(true);
-    }
-    for (const provider of ["fake", "", "ANTHROPIC", "mistral", 1]) {
-      expect(await set({ provider }), String(provider)).toBe(false);
-    }
-  });
-
   it.each(["remove", "invalidate"])("%s n'accepte qu'un fournisseur connu", async (name) => {
     const schema = input(`llmCredential.${name}`);
     expect(await isValid(schema, { provider: "openai" })).toBe(true);
@@ -180,6 +173,54 @@ describe("LC3b entrée de set : clé, modèle, fournisseur", () => {
       expect(result.issues?.length).toBeGreaterThan(0);
       expect(JSON.stringify(result.issues)).not.toContain(KEY.slice(0, 16));
     }
+  });
+});
+
+describe("LC3c six fournisseurs et baseUrl (1.1.0)", () => {
+  const set = (over: Record<string, unknown>) =>
+    isValid(input("llmCredential.set"), { provider: "anthropic", apiKey: KEY, ...over });
+
+  it("fournisseur : les six fournisseurs ; jamais fake ni une valeur libre", async () => {
+    for (const provider of [
+      "anthropic",
+      "openai",
+      "google",
+      "mistral",
+      "openrouter",
+      "openai_compatible",
+    ]) {
+      expect(await set({ provider }), provider).toBe(true);
+    }
+    for (const provider of ["fake", "", "ANTHROPIC", "cohere", "openai-compatible", 1]) {
+      expect(await set({ provider }), String(provider)).toBe(false);
+    }
+  });
+
+  it("baseUrl : facultative, texte de 1 à 2048 caractères ; jamais d'objet ni de nombre", async () => {
+    expect(await set({})).toBe(true);
+    expect(await set({ provider: "openai_compatible", baseUrl: "https://llm.exemple.fr/v1" })).toBe(
+      true,
+    );
+    expect(await set({ baseUrl: "h".repeat(2048) })).toBe(true);
+    expect(await set({ baseUrl: "h".repeat(2049) })).toBe(false);
+    expect(await set({ baseUrl: "" })).toBe(false);
+    expect(await set({ baseUrl: 42 })).toBe(false);
+  });
+
+  it("baseUrl n'est qu'une entrée : le statut public ne l'expose pas", async () => {
+    const value = await parsed(output("llmCredential.list"), {
+      items: [
+        {
+          provider: "openai_compatible",
+          configured: true,
+          invalid: false,
+          baseUrl: "https://llm.exemple.fr/v1",
+          createdAt: "2026-11-07T08:00:00.000Z",
+          updatedAt: "2026-11-07T08:00:00.000Z",
+        },
+      ],
+    });
+    expect(JSON.stringify(value)).not.toContain("exemple.fr");
   });
 });
 

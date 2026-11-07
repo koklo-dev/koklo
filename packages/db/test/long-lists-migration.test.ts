@@ -83,8 +83,8 @@ describe("TK-94 migration long_lists : dossier et contenu", () => {
     expect(down).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE)\b/i);
   });
 
-  it("n'ajoute aucune table : expectedTables reste à 40", () => {
-    expect(expectedTables).toHaveLength(40);
+  it("n'ajoute aucune table : expectedTables est à 43 (TK-95)", () => {
+    expect(expectedTables).toHaveLength(43);
   });
 });
 
@@ -210,9 +210,14 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
       );
     }
     const expected = await inventory(baseline);
-    const dir = migration();
-    runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    // Les migrations postérieures (TK-95) sont défaites d'abord, de la plus récente à la plus ancienne.
+    const downs = dirs()
+      .filter((d) => d >= migration())
+      .reverse();
+    for (const dir of downs) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
     expect(await inventory(db)).toEqual(expected);
     const rows = await db.query("SELECT 1 FROM spec_features WHERE snapshot_id = $1", [snapshotId]);
     expect(rows, "les fonctionnalités existantes sont conservées").toHaveLength(4);

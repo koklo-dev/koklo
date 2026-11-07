@@ -11,6 +11,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { AI_TABLES } from "./support/ai-providers-fixtures.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { LONG_LISTS_INDEXES } from "./support/long-lists-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
@@ -108,6 +109,7 @@ async function rollBack(db: TestDatabase): Promise<void> {
 const LATER_OBJECTS: readonly string[] = [
   ...OAUTH_TABLES,
   ...LLM_TABLES,
+  ...AI_TABLES,
   ...SUGGESTION_TABLES,
   ...REVIEW_TABLES,
   ...NOTIFICATION_TABLES,
@@ -148,8 +150,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (40 attendues au total avec TK-55a)", () => {
-    expect(expectedTables).toHaveLength(40);
+  it("cette migration n'ajoute aucune table (43 attendues au total avec TK-95)", () => {
+    expect(expectedTables).toHaveLength(43);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });

@@ -1620,9 +1620,14 @@ flowchart LR
 `apps/api/src/ai` turns the key of the organization and the `@koklo/llm` adapter into three proposals
 (`ai.draftBrief`, `ai.proposeFeatures`, `ai.proposeCriteria`, contract 0.9.0) and into `llmCredential.verify`.
 Nothing a model returns is persisted ([ADR 0015](adr/0015-anthropic-llm-adapter.md), [API contract](api-contract.md#ai-proposals-and-key-verification-tk-54b)).
-- `LlmModule` provides `LLM_PROVIDERS`, a `Map` holding `AnthropicProvider` only (chosen by code, never by
-  configuration; global `fetch` read at each call). Tests replace the token with a `FakeLlm` (the same rule as
-  the fake git provider) and `NONCE_SOURCE` with a deterministic source. A test builds `api` and `worker`
+- Since TK-95 `AiModule` provides `AI_PROVIDER`, the `AiProviderRouter` of `@koklo/llm` plugged on the Prisma ports
+  (`PrismaAiRoutingStore`, `PrismaAiUsageMeter`, `PrismaAiCredentialSource`), on `AuditAiEventSink` (fallback log,
+  `ai.cap_warning` audit line) and on `CredentialKeyHooks` (last use, invalidation on a 401). `AI_ADAPTERS` (one SDK
+  adapter per provider, chosen by code, global `fetch` read at each call) and `AI_CATALOG` (launch catalog) are the
+  only tokens tests replace (a `FakeLlm`, the same rule as the fake git provider), with `NONCE_SOURCE`. `AiCallRunner`
+  knows no provider: a call names a usage; `verify` opens one named key through `CredentialProbe`. Only
+  `PrismaAiCredentialSource` and `CredentialProbe` read `LlmCredentialResolver` (allow-list tested). `AiSettingsService`
+  and `AiUsageReportService` have no route yet (TK-98). A test builds `api` and `worker`
   with `tsc` and checks that no emitted file mentions a fake or a `testing` sub-path.
 - `LlmCredentialModule` gives `LlmCredentialService` and `LlmCredentialResolver` (which now also returns the key
   `revision`, the hex of its AES-GCM nonce); `LlmCredentialRoutesModule` holds the controller, because

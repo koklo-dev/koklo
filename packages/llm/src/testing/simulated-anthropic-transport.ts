@@ -1,4 +1,4 @@
-import type { FetchLike } from "../anthropic/fetch-like.ts";
+import type { FetchLike } from "../common/fetch-like.ts";
 
 const REDACTED = "[redacted]";
 const CHARS_PER_TOKEN = 4;
@@ -170,14 +170,14 @@ export class SimulatedAnthropicTransport {
     } = request.body as {
       max_tokens: number;
       model: string;
-      system: string;
-      messages: { content: string }[];
+      system: string | { text: string }[];
+      messages: { content: string | { text: string }[] }[];
     };
     const limit = maxTokens * CHARS_PER_TOKEN;
     const full = step.text ?? "";
     const cut = full.length > limit;
     const text = cut ? full.slice(0, limit) : full;
-    const inputChars = system.length + (messages[0]?.content.length ?? 0);
+    const inputChars = charsOfText(system) + charsOfText(messages[0]?.content ?? "");
     const body = JSON.stringify({
       id: "msg_simulated",
       type: "message",
@@ -199,6 +199,12 @@ export class SimulatedAnthropicTransport {
     return new Response(padded, { status: 200, headers: { "content-type": "application/json" } });
   }
 }
+
+/** Texte d'un champ `system` ou d'un contenu : chaîne (API directe) ou blocs `text` (SDK). */
+const charsOfText = (field: string | readonly { text: string }[]): number =>
+  typeof field === "string"
+    ? field.length
+    : field.reduce((sum, block) => sum + block.text.length, 0);
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });

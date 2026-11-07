@@ -117,6 +117,9 @@ model Organization {
   providerAuthStates      ProviderAuthState[]
   providerUserCredentials ProviderUserCredential[]
   llmProviderCredentials  LlmProviderCredential[]
+  aiSettings              AiOrganizationSettings?
+  aiUsageModels           AiUsageModel[]
+  aiUsageMonthly          AiUsageMonthly[]
 
   @@map("organizations")
 }
@@ -1015,6 +1018,9 @@ enum LlmProvider {
   anthropic
   openai
   google
+  mistral
+  openrouter
+  openai_compatible
 
   @@map("llm_provider")
 }
@@ -1030,17 +1036,89 @@ model LlmProviderCredential {
   nonce           Bytes
   keyVersion      Int         @default(1) @map("key_version")
   defaultModel    String?     @map("default_model")
+  /// Adresse de base : présente si et seulement si `provider = openai_compatible` (CHECK hors Prisma, https seul).
+  baseUrl         String?     @map("base_url")
   createdByUserId String?     @map("created_by_user_id") @db.Uuid
   lastUsedAt      DateTime?   @map("last_used_at") @db.Timestamptz(3)
   invalidatedAt   DateTime?   @map("invalidated_at") @db.Timestamptz(3)
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  primaryOf    AiOrganizationSettings[] @relation("AiPrimaryCredential")
+  fallbackOf   AiOrganizationSettings[] @relation("AiFallbackCredential")
+  usageModels  AiUsageModel[]
 
   @@unique([organizationId, provider])
   @@index([organizationId])
   @@map("llm_provider_credentials")
+}
+
+/// Usages d'IA du produit (TK-95) : un modèle est choisi par usage.
+enum AiUsage {
+  idea_space
+  spec_deliverables
+  baseline_summary
+  ticket_breakdown
+
+  @@map("ai_usage")
+}
+
+/// Réglages d'IA d'une organisation (TK-95). Le principal et le secours sont des clés enregistrées de
+/// l'organisation (clé étrangère composite, NO ACTION) et diffèrent (CHECK). `monthlyCapMicroUsd` : plafond
+/// mensuel unique en micro-dollars, nul = pas de plafond (A1) ; `capWarnedMonth` : premier jour du mois
+/// pour lequel l'alerte de 80 % a déjà été émise.
+model AiOrganizationSettings {
+  organizationId     String       @id @map("organization_id") @db.Uuid
+  primaryProvider    LlmProvider? @map("primary_provider")
+  fallbackProvider   LlmProvider? @map("fallback_provider")
+  fallbackEnabled    Boolean      @default(true) @map("fallback_enabled")
+  monthlyCapMicroUsd BigInt?      @map("monthly_cap_micro_usd")
+  capWarnedMonth     DateTime?    @map("cap_warned_month") @db.Date
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  primary      LlmProviderCredential? @relation("AiPrimaryCredential", fields: [organizationId, primaryProvider], references: [organizationId, provider], onDelete: NoAction)
+  fallback     LlmProviderCredential? @relation("AiFallbackCredential", fields: [organizationId, fallbackProvider], references: [organizationId, provider], onDelete: NoAction)
+
+  @@map("ai_organization_settings")
+}
+
+/// Modèle choisi pour un usage (TK-95) : le fournisseur doit avoir une clé (cascade au retrait de la clé).
+model AiUsageModel {
+  organizationId String      @map("organization_id") @db.Uuid
+  usage          AiUsage
+  provider       LlmProvider
+  model          String
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credential   LlmProviderCredential @relation(fields: [organizationId, provider], references: [organizationId, provider], onDelete: Cascade)
+
+  @@id([organizationId, usage])
+  @@map("ai_usage_models")
+}
+
+/// Consommation d'IA par organisation, mois UTC (premier jour) et fournisseur (TK-95). Compteurs en
+/// BIGINT bornés par CHECK (>= 0), incrémentés atomiquement. Aucune clé vers les clés : l'historique
+/// survit au retrait d'une clé. Coût en micro-dollars (B18).
+model AiUsageMonthly {
+  organizationId String      @map("organization_id") @db.Uuid
+  month          DateTime    @db.Date
+  provider       LlmProvider
+  calls          Int         @default(0)
+  inputTokens    BigInt      @default(0) @map("input_tokens")
+  outputTokens   BigInt      @default(0) @map("output_tokens")
+  costMicroUsd   BigInt      @default(0) @map("cost_micro_usd")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, month, provider])
+  @@map("ai_usage_monthly")
 }
 
 /// Statut d'une suggestion client (TK-51b).

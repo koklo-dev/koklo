@@ -190,6 +190,38 @@ then the enum). Prisma cannot express the CHECKs: they are written by hand in `m
   `llm:v1:<organization_id>:<provider>`. A ciphertext copied to another organization or provider
   fails to decrypt. No clear key, hint or last-4 column exists.
 
+### AI layer tables (TK-95, lot C)
+Three more tenant tables (`TENANT_MODELS`: `AiOrganizationSettings`, `AiUsageModel`, `AiUsageMonthly`),
+migration `20261107090000_ai_providers` (enum `llm_provider` widened with `mistral`, `openrouter`,
+`openai_compatible`; new enum `ai_usage`; `llm_provider_credentials.base_url`; data migration). `down.sql`
+drops the tables and the enum, deletes the keys of the three added providers and recreates the previous enum.
+- **`llm_provider_credentials.base_url`**: present if and only if `provider = 'openai_compatible'`, `https://`
+  only, 9 to 2048 characters (hand-written CHECK, written with `provider::text` because a value added to an
+  enum cannot be used in the same transaction). Not a secret. Validated by `assertSafeBaseUrl` (anti-SSRF) at
+  registration and again at each resolution.
+- **`ai_organization_settings`** (PK `organization_id`): `primary_provider`, `fallback_provider` (composite
+  foreign keys `(organization_id, provider)` to the keys, `NO ACTION`; CHECK primary is not fallback),
+  `fallback_enabled` (default true), `monthly_cap_micro_usd BIGINT` (null = no cap, otherwise `> 0`),
+  `cap_warned_month DATE` (first day of the month whose 80 % alert was emitted).
+- **`ai_usage_models`** (PK `(organization_id, usage)`): model chosen for each of the four usages; composite
+  foreign key to the keys with `ON DELETE CASCADE` (removing a key removes its usage rows); `model` follows the
+  `default_model` rule.
+- **`ai_usage_monthly`** (PK `(organization_id, month, provider)`): `calls INTEGER`, `input_tokens`,
+  `output_tokens`, `cost_micro_usd` all `BIGINT`, every counter `CHECK >= 0`, `month` is the first day of the
+  UTC month. No foreign key to the keys: the history survives the removal of a key. No generated column.
+- **Data migration**: each existing Anthropic key becomes the organization's Principal; its four usages point
+  to Anthropic with the key's `default_model`, else `claude-sonnet-5-5` (A4). An organization without an
+  Anthropic key gets no row. See questions B61 to B66 for the decisions.
+- **Counters**: `PrismaAiUsageMeter` increments with an upsert (`increment`, atomic in the database) and
+  marks the 80 % alert with a single conditional update; `PrismaAiRoutingStore` reads the settings;
+  `PrismaAiCredentialSource` is the only way from the engine to a decrypted key.
+- **Writes (lot D, no route yet)**: `AiSettingsService` is the only writer of `ai_organization_settings` and
+  `ai_usage_models` (key-holding Principal and Secours, different from each other; cap `null` or a positive safe
+  integer, a new cap clears `cap_warned_month`; a usage model must be in the qualified catalog for that usage and
+  its provider must hold a valid key). Each write adds an `ai_settings.update` audit line (target kind
+  `organization`) in the same transaction. The engine adds `ai.cap_warning` (once per organization and month,
+  signed by the user whose call crossed 80 %). `AiUsageReportService` reads `ai_usage_monthly` for one UTC month.
+
 ### Suggestions table (TK-51b)
 One tenant table (`TENANT_MODELS`: `Suggestion`), migration `20261101100000_suggestions` (additive: two
 enums, one new `counter_name` value, one table; `down.sql` drops the table then the enums, deletes the

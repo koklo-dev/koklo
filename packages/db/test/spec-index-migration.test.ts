@@ -10,6 +10,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { AI_TABLES } from "./support/ai-providers-fixtures.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
@@ -77,6 +78,7 @@ const LATER_TABLES: readonly string[] = [
   ...SPEC_TABLES,
   ...OAUTH_TABLES,
   ...LLM_TABLES,
+  ...AI_TABLES,
   ...SUGGESTION_TABLES,
   ...REVIEW_TABLES,
   ...NOTIFICATION_TABLES,
