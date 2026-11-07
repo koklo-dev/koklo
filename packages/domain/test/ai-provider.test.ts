@@ -80,6 +80,7 @@ describe("TK-95 · forme du port AiProvider", () => {
         throw new Error("non utilisé");
       },
       stream: async function* (): AsyncGenerator<LlmStreamEvent> {},
+      preflight: async () => {},
     };
     // @ts-expect-error une requête d'usage n'a pas de champ `provider`
     const bad: AiRequest = { provider: "anthropic" };
