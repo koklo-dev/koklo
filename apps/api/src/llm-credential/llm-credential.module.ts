@@ -3,6 +3,7 @@ import { CLOCK, type Clock } from "../clock.ts";
 import type { AppConfig } from "../config.ts";
 import { keyRingOf } from "../crypto/key-ring.ts";
 import { APP_CONFIG } from "../database/database.module.ts";
+import { CredentialProbe } from "./credential-probe.ts";
 import { LLM_CREDENTIAL_REPOSITORY } from "./llm-credential.repository.ts";
 import { LlmCredentialResolver } from "./llm-credential.resolver.ts";
 import { LlmCredentialService } from "./llm-credential.service.ts";
@@ -28,7 +29,12 @@ import { PrismaLlmCredentialRepository } from "./prisma-llm-credential.repositor
       useFactory: (repository: PrismaLlmCredentialRepository, config: AppConfig) =>
         new LlmCredentialResolver(repository, keyRingOf(config)),
     },
+    {
+      provide: CredentialProbe,
+      inject: [LlmCredentialResolver],
+      useFactory: (resolver: LlmCredentialResolver) => new CredentialProbe(resolver),
+    },
   ],
-  exports: [LlmCredentialService, LlmCredentialResolver],
+  exports: [LlmCredentialService, LlmCredentialResolver, CredentialProbe],
 })
 export class LlmCredentialModule {}

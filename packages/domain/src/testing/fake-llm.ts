@@ -1,9 +1,10 @@
 import type { LlmBudget } from "../llm-budget.ts";
 import { revealLlmCredential } from "../llm-credential.ts";
+import { InvalidLlmRequestError } from "../llm-errors.ts";
 import { unvalidated } from "../llm-output.ts";
 import type { FramedPrompt } from "../llm-prompt.ts";
-import type { LlmProvider } from "../llm-provider.ts";
-import { LlmAuthError, type LlmProviderError } from "../llm-provider-errors.ts";
+import type { LlmProvider, LlmStreamEvent } from "../llm-provider.ts";
+import { LlmAbortedError, LlmAuthError, type LlmProviderError } from "../llm-provider-errors.ts";
 import {
   assertLlmRequest,
   type LlmOutputSpec,
@@ -69,6 +70,9 @@ const truncated = (reply: unknown, maxOutputTokens: number): [unknown, boolean] 
     : [reply, false];
 };
 
+/** Taille d'un morceau de texte du flux simulé. */
+const STREAM_CHUNK_CHARS = 16;
+
 const charsOf = (reply: unknown): number =>
   typeof reply === "string" ? reply.length : (JSON.stringify(reply) ?? "").length;
 
@@ -116,7 +120,36 @@ export class FakeLlm implements LlmProvider {
   }
 
   async complete(request: LlmRequest): Promise<LlmResponse> {
-    const snapshot = assertLlmRequest(request);
+    return this.#answer(assertLlmRequest(request));
+  }
+
+  /** Flux de texte : morceaux de 16 caractères puis `end` ; mêmes gardes que `complete`, JSON refusé. */
+  async *stream(request: LlmRequest): AsyncGenerator<LlmStreamEvent> {
+    const snapshot = assertLlmRequest(request, "stream");
+    if (snapshot.output.kind !== "text") {
+      throw new InvalidLlmRequestError("output");
+    }
+    const response = await this.#answer(snapshot);
+    const text = String(response.output as unknown);
+    for (let at = 0; at < text.length; at += STREAM_CHUNK_CHARS) {
+      if (snapshot.signal?.aborted) {
+        throw new LlmAbortedError({ operation: "stream", provider: this.id });
+      }
+      yield { type: "text", text: text.slice(at, at + STREAM_CHUNK_CHARS) };
+    }
+    if (snapshot.signal?.aborted) {
+      throw new LlmAbortedError({ operation: "stream", provider: this.id });
+    }
+    yield {
+      type: "end",
+      stop: response.stop,
+      usage: response.usage,
+      provider: response.provider,
+      model: response.model,
+    };
+  }
+
+  async #answer(snapshot: LlmRequest): Promise<LlmResponse> {
     if (this.options.rejectedKeys?.includes(revealLlmCredential(snapshot.credential))) {
       throw new LlmAuthError({ operation: "complete", provider: this.id });
     }

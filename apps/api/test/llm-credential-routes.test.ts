@@ -143,7 +143,7 @@ describe("set : validation (422 VALIDATION, sans la valeur, sans écriture)", ()
     expect(res.status, JSON.stringify(res.body)).toBe(200);
   });
 
-  it.each(["fake", "ANTHROPIC", "mistral"])("fournisseur %s : 422 sur provider", async (name) => {
+  it.each(["fake", "ANTHROPIC", "cohere"])("fournisseur %s : 422 sur provider", async (name) => {
     const { b, world, api } = await owner();
     const res = await api.set(name, { apiKey: secret });
     expect(res.status, JSON.stringify(res.body)).toBe(422);

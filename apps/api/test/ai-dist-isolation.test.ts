@@ -77,8 +77,8 @@ describe("le code livré de l'api", () => {
   it("embarque l'adaptateur de production (la garde ne couvre pas du vide)", () => {
     const sources = [...walk(outputs.api as string)].map((file) => readFileSync(file, "utf8"));
     expect(sources.some((source) => /from "@koklo\/llm"/.test(source))).toBe(true);
-    expect(sources.some((source) => source.includes("AnthropicProvider"))).toBe(true);
-    expect(sources.some((source) => source.includes("LLM_PROVIDERS"))).toBe(true);
+    expect(sources.some((source) => source.includes("createSdkProvider"))).toBe(true);
+    expect(sources.some((source) => source.includes("AI_PROVIDER"))).toBe(true);
   });
 
   it("ne référence ni le faux, ni le transport simulé, ni un sous-chemin testing", () => {

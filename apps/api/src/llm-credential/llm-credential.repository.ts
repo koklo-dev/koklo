@@ -9,6 +9,8 @@ export interface LlmCredentialStatus {
   readonly id: string;
   readonly provider: LlmProviderId;
   readonly defaultModel: string | null;
+  /** Adresse de base d'un point d'accès compatible ; `null` pour tout autre fournisseur. Non secrète. */
+  readonly baseUrl: string | null;
   readonly invalid: boolean;
   readonly invalidatedAt: string | null;
   readonly lastUsedAt: string | null;
@@ -23,6 +25,7 @@ export interface StoredLlmCredential {
   readonly provider: LlmProviderId;
   readonly secret: EncryptedSecret;
   readonly defaultModel: string | null;
+  readonly baseUrl: string | null;
   readonly invalidatedAt: string | null;
   /** Hex du nonce AES-GCM : neuf à chaque `upsert`, inchangé par `markUsed` (compare-and-swap, D7). */
   readonly revision: string;
@@ -32,6 +35,8 @@ export interface UpsertLlmCredential {
   readonly provider: LlmProviderId;
   readonly secret: EncryptedSecret;
   readonly defaultModel: string | null;
+  /** Déjà validée par la garde anti-SSRF ; présente si et seulement si `openai_compatible` (CHECK SQL). */
+  readonly baseUrl?: string | null;
   readonly createdByUserId: string | null;
   /** Instant de l'horloge de l'application (ISO-8601). */
   readonly at: string;
@@ -58,7 +63,11 @@ export interface LlmCredentialRepository {
   ): Promise<UpsertResult>;
   list(organizationId: string): Promise<LlmCredentialStatus[]>;
   find(organizationId: string, provider: LlmProviderId): Promise<StoredLlmCredential | null>;
-  /** `true` si une ligne a été supprimée. */
+  /**
+   * `true` si une ligne a été supprimée. Dans la même transaction, la clé est détachée des réglages
+   * (principal / secours remis à `null`) et ses lignes d'usage partent en cascade ; la consommation
+   * passée est conservée.
+   */
   remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean>;
   /**
    * `null` si absente. Idempotent : une clé déjà invalidée garde son `invalidated_at` et ne

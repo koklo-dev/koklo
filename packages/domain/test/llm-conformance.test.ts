@@ -43,6 +43,7 @@ const fakeSubject = (): LlmConformanceSubject => {
     | undefined;
   const provider: LlmProvider = {
     id: "fake",
+    stream: async function* () {},
     complete: (request: LlmRequest) => {
       const current = armed;
       armed = undefined;
@@ -58,6 +59,7 @@ const fakeSubject = (): LlmConformanceSubject => {
   let made = 0;
   const counting: LlmProvider = {
     id: "fake",
+    stream: async function* () {},
     complete: async (request) => {
       const before = fake.calls.length;
       try {
@@ -123,6 +125,7 @@ describe("suite de conformité : détecte les adaptateurs défectueux", () => {
   it("détecte une clé divulguée dans le message d'une erreur", async () => {
     const leaky = broken((inner) => ({
       id: "fake",
+      stream: async function* () {},
       complete: (request) =>
         inner.complete(request).catch((error: Error) => {
           error.message = `échec avec ${revealLlmCredential(request.credential)}`;
@@ -137,6 +140,7 @@ describe("suite de conformité : détecte les adaptateurs défectueux", () => {
   it("détecte un adaptateur qui ignore le budget", async () => {
     const lax = broken((inner) => ({
       id: "fake",
+      stream: async function* () {},
       complete: (request) =>
         inner.complete({ ...request, budget: { ...request.budget, maxPromptChars: 10 ** 6 } }),
     }));
@@ -148,16 +152,20 @@ describe("suite de conformité : détecte les adaptateurs défectueux", () => {
   it("détecte une sortie déjà validée ou un mauvais modèle servi", async () => {
     const wrong = broken((inner) => ({
       id: "fake",
+      stream: async function* () {},
       complete: async (request) => ({ ...(await inner.complete(request)), model: "autre" }),
     }));
     expect(
       await failureOf("returns text with usage, provider and served model", wrong),
     ).toBeInstanceOf(LlmConformanceFailure);
   });
+});
 
+describe("suite de conformité : détecte les adaptateurs défectueux (suite)", () => {
   it("détecte un adaptateur qui ne mappe pas la clé refusée sur LlmAuthError", async () => {
     const generic = broken((inner) => ({
       id: "fake",
+      stream: async function* () {},
       complete: (request) =>
         inner.complete(request).catch(() => {
           throw new Error("échec générique");
@@ -171,6 +179,7 @@ describe("suite de conformité : détecte les adaptateurs défectueux", () => {
   it("détecte un adaptateur qui ne plafonne pas retryAfterMs", async () => {
     const uncapped = broken((inner) => ({
       id: "fake",
+      stream: async function* () {},
       complete: (request) =>
         inner.complete(request).catch((error: unknown) => {
           if (error instanceof LlmRateLimitedError) {

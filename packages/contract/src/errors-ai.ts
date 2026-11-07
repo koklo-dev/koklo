@@ -12,6 +12,17 @@ export const llmNotConfiguredError = {
   },
 } as const;
 
+/**
+ * Plafond mensuel d'organisation atteint (1.1.0) : les propositions sont suspendues avant tout appel au
+ * fournisseur. Ni montant, ni fournisseur dans l'erreur ; `llmCredential.verify` n'est jamais suspendu.
+ */
+export const llmCapReachedError = {
+  LLM_CAP_REACHED: {
+    status: 409,
+    message: "Le plafond mensuel des actions IA est atteint",
+  },
+} as const;
+
 export const llmRateLimitedError = {
   LLM_RATE_LIMITED: {
     status: 429,

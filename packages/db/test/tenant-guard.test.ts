@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as dbPackage from "../src/index.ts";
 import { schemaPath } from "../src/testing/prisma-cli.ts";
+import { AI_MODELS } from "./support/ai-providers-fixtures.ts";
 import { LLM_MODELS } from "./support/llm-credentials-fixtures.ts";
 import { NOTIFICATION_MODELS } from "./support/notifications-fixtures.ts";
 import { OAUTH_MODELS } from "./support/oauth-fixtures.ts";
@@ -36,7 +37,12 @@ const EXPECTED_TENANT_MODELS = [
   ...REVIEW_MODELS,
   ...NOTIFICATION_MODELS,
   ...PROJECT_CLIENT_MODELS,
+  ...AI_MODELS,
 ];
+
+/** TK-95 : une clé primaire qui commence par organizationId tient lieu d'index (pas de doublon). */
+const LEADING_INDEX =
+  /@@index\(\[organizationId\]\)|@@id\(\[organizationId[,\]]|^\s*organizationId\s.*@id\b/m;
 
 const carriesOrganizationId = (model: SchemaModel) => /^\s*organizationId\s/m.test(model.body);
 
@@ -46,7 +52,7 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d), liaison client-projet (TK-55a)", () => {
+  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d), liaison client-projet (TK-55a), couche d'IA (TK-95)", () => {
     expect([...TENANT_MODELS].sort()).toEqual([...EXPECTED_TENANT_MODELS].sort());
   });
 
@@ -93,12 +99,12 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     }
   });
 
-  it("chaque modèle métier porte organizationId et un @@index([organizationId])", () => {
+  it("chaque modèle métier porte organizationId et un index qui commence par lui (@@index ou clé primaire)", () => {
     const byName = new Map(schemaModels().map((model) => [model.name, model]));
     for (const name of TENANT_MODELS) {
       const model = byName.get(name);
       expect(model && carriesOrganizationId(model), `${name}.organizationId`).toBe(true);
-      expect(model?.body, `${name} index`).toMatch(/@@index\(\[organizationId\]\)/);
+      expect(model?.body, `${name} index`).toMatch(LEADING_INDEX);
     }
   });
 });

@@ -25,9 +25,6 @@ const BRIEF_SCHEMA = jsonSchemaOf(briefOutputSchema);
 const CRITERIA_SCHEMA = jsonSchemaOf(criteriaOutputSchema);
 const FEATURES_SCHEMA = jsonSchemaOf(featuresOutputSchema(DEFAULT_MAX_FEATURES));
 
-/** Le seul fournisseur des propositions en 0.9.0 ; `verify` reçoit le sien en paramètre. */
-const PROPOSAL_PROVIDER = "anthropic" as const;
-
 /**
  * Propositions de l'IA et vérification de clé. Une proposition n'est JAMAIS persistée : ni brief,
  * ni feature, ni lot (CDC §6.3) ; l'humain relit puis soumet à `specBatch.submit`.
@@ -45,11 +42,12 @@ export class AiService {
     await this.transactions.run(scope, async () => undefined);
     return this.runner.run({
       ...this.base(scope, requestId, "brief-draft", "ai.brief.draft"),
+      usage: "idea_space" as const,
       output: { kind: "json", schema: BRIEF_SCHEMA },
       frame: (nonce) => briefPrompt(nonce, input),
       settle: (response) => ({
         brief: validated(response, (raw) => briefOutputSchema.parse(raw)),
-        meta: metaOf(PROPOSAL_PROVIDER, response),
+        meta: metaOf(response),
       }),
     });
   }
@@ -59,6 +57,7 @@ export class AiService {
     const maxFeatures = input.maxFeatures ?? DEFAULT_MAX_FEATURES;
     return this.runner.run({
       ...this.base(scope, requestId, "features-propose", "ai.features.propose"),
+      usage: "spec_deliverables" as const,
       output: { kind: "json", schema: FEATURES_SCHEMA },
       frame: (nonce) => featuresPrompt(nonce, { brief: input.brief, maxFeatures, existing }),
       settle: (response) => {
@@ -68,7 +67,7 @@ export class AiService {
         return {
           features: features.map((feature) => ({ kind: "feature.create" as const, ...feature })),
           duplicates: duplicatesOf(features, existing),
-          meta: metaOf(PROPOSAL_PROVIDER, response),
+          meta: metaOf(response),
         };
       },
     });
@@ -78,6 +77,7 @@ export class AiService {
     const feature = await this.specs.getFeature(scope, input.specId);
     return this.runner.run({
       ...this.base(scope, requestId, "criteria-propose", "ai.criteria.propose"),
+      usage: "spec_deliverables" as const,
       output: { kind: "json", schema: CRITERIA_SCHEMA },
       frame: (nonce) => criteriaPrompt(nonce, feature),
       settle: (response) => ({
@@ -86,18 +86,21 @@ export class AiService {
           specId: feature.specId,
           ...validated(response, (raw) => criteriaOutputSchema.parse(raw)),
         },
-        meta: metaOf(PROPOSAL_PROVIDER, response),
+        meta: metaOf(response),
       }),
     });
   }
 
-  /** Appel minimal (16 tokens, prompt constant) : rien n'est conservé de la réponse. */
+  /**
+   * Appel minimal (16 tokens, prompt constant) : rien n'est conservé de la réponse. Sans usage : le
+   * fournisseur est celui de l'URL, le modèle celui de sa clé ou du catalogue (B46) ; ni plafond ni comptage.
+   */
   verify(
     actor: { organizationId: string; userId: string },
     provider: LlmProviderId,
     requestId: string,
   ) {
-    return this.runner.run({
+    return this.runner.verify({
       purpose: "credential-verify",
       provider,
       actor,
@@ -121,7 +124,6 @@ export class AiService {
   private base(scope: ProjectScope, requestId: string, purpose: AiPurpose, action: string) {
     return {
       purpose,
-      provider: PROPOSAL_PROVIDER,
       actor: { organizationId: scope.organizationId, userId: scope.userId },
       correlationId: correlationIdOf(requestId),
       quota: "ai" as const,

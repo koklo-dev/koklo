@@ -6,6 +6,7 @@ import {
   validationError,
 } from "./errors.ts";
 import {
+  llmCapReachedError,
   llmNotConfiguredError,
   llmOutputInvalidError,
   llmProviderError,
@@ -34,6 +35,7 @@ export const llmCallErrors = {
 
 const proposalErrors = {
   ...llmCallErrors,
+  ...llmCapReachedError,
   ...notFoundError,
   ...llmOutputInvalidError,
   ...promptRejectedError,

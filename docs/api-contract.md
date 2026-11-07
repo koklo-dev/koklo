@@ -891,12 +891,17 @@ from the session, never from the input.
 
 | Operation | Method | Path | Input | Output | Typed errors (besides `INTERNAL`, `UNAUTHORIZED`, `FORBIDDEN`) |
 |-----------|--------|------|-------|--------|---------------------------------------------------------------|
-| `llmCredential.list` | GET | `/llm-credentials` | none | `{ items: Status[] }` (at most 3) | none |
-| `llmCredential.set` | PUT | `/llm-credentials/{provider}` | `{ provider, apiKey, defaultModel? }` | `Status` | `VALIDATION` 422, `ENCRYPTION_UNAVAILABLE` 503 |
+| `llmCredential.list` | GET | `/llm-credentials` | none | `{ items: Status[] }` (at most 6) | none |
+| `llmCredential.set` | PUT | `/llm-credentials/{provider}` | `{ provider, apiKey, defaultModel?, baseUrl? }` | `Status` | `VALIDATION` 422, `ENCRYPTION_UNAVAILABLE` 503 |
 | `llmCredential.remove` | DELETE | `/llm-credentials/{provider}` | `{ provider }` | `{ removed: true }` | `NOT_FOUND` 404, `VALIDATION` 422 |
 | `llmCredential.invalidate` | POST | `/llm-credentials/{provider}/invalidate` | `{ provider }` | `Status` | `NOT_FOUND` 404, `VALIDATION` 422 |
 
-- `provider`: `anthropic`, `openai` or `google` (same literals as the domain and the database enum).
+- `provider`: `anthropic`, `openai`, `google`, `mistral`, `openrouter` or `openai_compatible` (same literals as the
+  domain and the database enum; six since 1.1.0).
+- `baseUrl` (1.1.0, input only, 1 to 2048 characters): required for `openai_compatible` and refused for every other
+  provider (`VALIDATION` on `baseUrl`). The server refuses anything but a public `https` address on port 443
+  (no credentials in the URL, no `localhost`, private, loopback, link-local or cloud-metadata address) at
+  registration and again at each call. The error never repeats the address; the public `Status` never carries it.
 - `apiKey`: 1 to 512 characters, not blank, no control character. `defaultModel`: 1 to 100 code points,
   no `/`, no `..`. These are the CHECK rules of the table, applied before the database; no message ever
   repeats the refused value. A schema refusal is `422 VALIDATION{field, message}` (`field: "provider"`
@@ -955,16 +960,23 @@ key's `defaultModel`, otherwise `ANTHROPIC_DEFAULT_MODEL` of `@koklo/llm`.
 
 ### Order of a call
 1. Session and role guard (401/403). 2. Project in the session organization (and, for `proposeCriteria`, the
-feature in the index: `404 NOT_FOUND`). 3. Key resolved (`LLM_NOT_CONFIGURED`, `ENCRYPTION_UNAVAILABLE`).
+feature in the index: `404 NOT_FOUND`). 3. Engine pre-check, before any audit line or quota (since 1.1.0): monthly cap reached (`LLM_CAP_REACHED`), no usable
+key (`LLM_NOT_CONFIGURED`, `ENCRYPTION_UNAVAILABLE`). The procedure names a **usage**, never a provider or a model:
+`ai.draftBrief` is the usage `idea_space`; `ai.proposeFeatures` and `ai.proposeCriteria` are `spec_deliverables`
+(B46); `llmCredential.verify` has no usage (the provider of the URL, the model of its key or of the catalog,
+neither cap nor metering).
 4. Prompt framed with a **fresh nonce** (a collision is `PROMPT_REJECTED`). 5. Concurrency gate then quota.
 6. **Audit line written before the call**, in its own short transaction (if it fails, the call is not made:
-`500 INTERNAL`). 7. Model call (never inside a transaction). 8. `markUsed` on success (best effort), then the
-output is validated. A refusal before step 6 writes no line and consumes no quota.
+`500 INTERNAL`). 7. Model call (never inside a transaction). 8. Engine: the usage resolves to a provider and a model, one fallback attempt on authentication, rate limit, quota,
+unavailability or timeout, tokens and cost metered at the provider actually served; `meta.provider` is that
+provider. The engine signals the key life (`markUsed` on success, invalidation on an explicit 401 with the key
+revision), then the output is validated. A refusal before step 6 writes no line and consumes no quota.
 
 ### Errors (typed, `data` closed)
 | Code | Status | `data` | When |
 |------|--------|--------|------|
 | `LLM_NOT_CONFIGURED` | 409 | `{ reason: missing \| invalidated \| undecryptable }` | no usable key |
+| `LLM_CAP_REACHED` | 409 | none | monthly cap of the organization reached (`ai.*` only, never `llmCredential.verify`); no amount, no provider (1.1.0) |
 | `ENCRYPTION_UNAVAILABLE` | 503 | none | no key ring configured |
 | `LLM_RATE_LIMITED` | 429 | `{ retryAfterSeconds >= 1 }` | quota, concurrency gate, or the provider's own 429 (capped at 3600) |
 | `LLM_PROVIDER_ERROR` | 502 | `{ reason: auth \| quota \| timeout \| aborted \| budget \| context_too_long \| refused \| model_not_found \| unavailable }` | the provider failed; **any unexpected exception** of the adapter is `unavailable`, never a 500 and never sent to Sentry |
@@ -1282,6 +1294,13 @@ statuses) and `pnpm seed:planche` (project "Volume · planche": 248, 65, 47, 60 
 proposals 400, journeys 18, sample rows 1 240) are declared in `packages/db/src/seed-volumes.ts` (question B34).
 
 ## Version history
+- **1.1.0** (TK-95): `llmProviderSchema` has six values (`mistral`, `openrouter`, `openai_compatible` added),
+  `llmCredential.set` takes an optional `baseUrl` (input only), typed error `LLM_CAP_REACHED` (409, no `data`) on
+  `ai.draftBrief`, `ai.proposeFeatures` and `ai.proposeCriteria`. Additive (B47): no route removed, no required
+  field added, the enum value is read only by the web. Route and path counts unchanged (64 routes, 47 paths). The
+  fingerprint of 1.0.0 is frozen in `packages/contract/test/contract.test.ts`; 0.1.0 to 1.0.0 unchanged. The settings,
+  consumption and model routes (`aiProvider.*`, `aiModel.listQualified`, `aiUsage.*`, `aiSettings.update`) are TK-98;
+  the engine ships `AiSettingsService` and `AiUsageReportService` without a route.
 - **1.0.0** (TK-94): long lists. `spec.listFeatures` and `ticket.list` take `q` and `around` and return
   `previousCursor`, `offset`, `total` and `facets` (required except `facets`); `ticket.list` declares `NOT_FOUND`;
   the page size defaults to 50 on both. New exported schemas `listInputSchema`, `listInputShape`, `listOf`,

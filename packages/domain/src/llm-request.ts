@@ -9,8 +9,12 @@ import type { LlmServingProviderId } from "./llm-provider-id.ts";
 
 /** Trace de journalisation : jamais de contenu (`/^[A-Za-z0-9._:-]{1,64}$/`). */
 export const LLM_TRACE_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
-/** Ni `/` ni `..` : un modèle n'est jamais un chemin (TK-50c). */
-export const LLM_MODEL_PATTERN = /^(?!.*\.\.)[A-Za-z0-9._:-]{1,128}$/;
+/**
+ * Un modèle n'est jamais un chemin (TK-50c) : pas de `..`, pas de `/` initial ou final, au plus un
+ * `/` entre deux segments (`fournisseur/modèle` des intermédiaires, TK-95). Les adaptateurs dont le
+ * modèle entre dans l'URL refusent tout `/`.
+ */
+export const LLM_MODEL_PATTERN = /^(?!.*\.\.)(?=.{1,128}$)[A-Za-z0-9._:-]+(?:\/[A-Za-z0-9._:-]+)?$/;
 
 export interface LlmTrace {
   readonly purpose: string;
@@ -27,6 +31,8 @@ export interface LlmRequest {
   readonly prompt: FramedPrompt;
   readonly output: LlmOutputSpec;
   readonly budget: LlmBudget;
+  /** Adresse de base d'un point d'accès compatible ; contrôlée par l'adaptateur (anti-SSRF). */
+  readonly baseUrl?: string;
   readonly temperature?: number;
   readonly signal?: AbortSignal;
   readonly trace: LlmTrace;
@@ -64,6 +70,13 @@ const isValidOutput = (output: unknown): boolean => {
   return output.kind === "json" && isRecord(output.schema) && !Array.isArray(output.schema);
 };
 
+/** Longueur maximale d'une adresse de base acceptée. */
+export const LLM_BASE_URL_MAX_LENGTH = 2048;
+
+const isValidBaseUrl = (value: unknown): boolean =>
+  value === undefined ||
+  (typeof value === "string" && value.length > 0 && value.length <= LLM_BASE_URL_MAX_LENGTH);
+
 const isValidTemperature = (value: unknown): boolean =>
   value === undefined || (typeof value === "number" && value >= 0 && value <= 2);
 
@@ -87,6 +100,7 @@ const SHAPE_CHECKS: readonly (readonly [
   ["temperature", (r) => isValidTemperature(r.temperature)],
   ["signal", (r) => isValidSignal(r.signal)],
   ["trace", (r) => isValidTrace(r.trace)],
+  ["baseUrl", (r) => isValidBaseUrl(r.baseUrl)],
 ];
 
 /** Lit chaque champ une seule fois (un accesseur ne peut pas répondre autrement à une 2e lecture). */
@@ -108,6 +122,7 @@ const readFields = (request: LlmRequest): LlmRequest => {
           maxCostMicroUsd: budget.maxCostMicroUsd,
         }
       : budget,
+    baseUrl: source.baseUrl,
     temperature: source.temperature,
     signal: source.signal,
     trace: isRecord(trace) ? { purpose: trace.purpose, correlationId: trace.correlationId } : trace,
@@ -138,13 +153,14 @@ const freezeOutput = (output: LlmOutputSpec): LlmOutputSpec => {
 };
 
 const snapshotOf = (read: LlmRequest): LlmRequest => {
-  const { temperature, signal } = read;
+  const { temperature, signal, baseUrl } = read;
   return Object.freeze({
     model: read.model,
     credential: read.credential,
     prompt: read.prompt,
     output: freezeOutput(read.output),
     budget: Object.freeze({ ...read.budget }),
+    ...(baseUrl === undefined ? {} : { baseUrl }),
     ...(temperature === undefined ? {} : { temperature }),
     ...(signal === undefined ? {} : { signal }),
     trace: Object.freeze({ ...read.trace }),
@@ -156,7 +172,10 @@ const snapshotOf = (read: LlmRequest): LlmRequest => {
  * Retourne un instantané gelé en profondeur, chaque champ lu une seule fois : l'adaptateur n'utilise
  * que cet instantané, jamais la requête d'origine (TOCTOU, TK-50c).
  */
-export const assertLlmRequest = (request: LlmRequest): LlmRequest => {
+export const assertLlmRequest = (
+  request: LlmRequest,
+  operation: "complete" | "stream" = "complete",
+): LlmRequest => {
   const read = readFields(request);
   for (const [reason, isValid] of SHAPE_CHECKS) {
     if (!isValid(read)) {
@@ -165,7 +184,7 @@ export const assertLlmRequest = (request: LlmRequest): LlmRequest => {
   }
   assertWithinBudget(read);
   if (read.signal?.aborted) {
-    throw new LlmAbortedError({ operation: "complete" });
+    throw new LlmAbortedError({ operation });
   }
   return snapshotOf(read);
 };

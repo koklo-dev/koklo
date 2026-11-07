@@ -54,12 +54,13 @@ describe("llm_provider_credentials : structure", () => {
     expect(Object.keys(columns).filter((name) => /aad|associated/i.test(name))).toEqual([]);
   });
 
-  it("aucune colonne de clé en clair : seul default_model est du texte, tout le secret est bytea", async () => {
+  it("aucune colonne de clé en clair : seuls default_model et base_url (non secrets) sont du texte, tout le secret est bytea", async () => {
     const rows = await db.query<{ column_name: string; udt_name: string }>(
       `SELECT column_name, udt_name FROM information_schema.columns
        WHERE table_name = '${LLM_TABLE}' AND udt_name IN ('text', 'varchar', 'jsonb', 'json')`,
     );
-    expect(rows.map((r) => r.column_name)).toEqual(["default_model"]);
+    // TK-95 : `base_url` (adresse du point d'accès compatible) est du texte non secret.
+    expect(rows.map((r) => r.column_name).sort()).toEqual(["base_url", "default_model"]);
     const names = Object.keys(LLM_COLUMNS).filter((c) =>
       /(^|_)(api_?key|secret|plain|clear|token|hint|last4|suffix)(_|$)/i.test(c),
     );

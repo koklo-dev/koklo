@@ -41,6 +41,7 @@ describe("constantes du port", () => {
       "temperature",
       "signal",
       "trace",
+      "baseUrl",
     ]);
   });
 });

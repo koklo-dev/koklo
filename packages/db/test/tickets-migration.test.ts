@@ -10,6 +10,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { AI_TABLES } from "./support/ai-providers-fixtures.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
@@ -26,6 +27,7 @@ const initialTables = expectedTables.filter(
     !(SPEC_TABLES as readonly string[]).includes(table) &&
     !(OAUTH_TABLES as readonly string[]).includes(table) &&
     !(LLM_TABLES as readonly string[]).includes(table) &&
+    !(AI_TABLES as readonly string[]).includes(table) &&
     !(SUGGESTION_TABLES as readonly string[]).includes(table) &&
     !(REVIEW_TABLES as readonly string[]).includes(table) &&
     !(NOTIFICATION_TABLES as readonly string[]).includes(table) &&

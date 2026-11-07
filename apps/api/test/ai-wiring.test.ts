@@ -1,13 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { FakeLlm } from "@koklo/domain/testing";
-import { ANTHROPIC_MESSAGES_URL, AnthropicProvider } from "@koklo/llm";
+import { ANTHROPIC_MESSAGES_URL } from "@koklo/llm";
 import { SimulatedAnthropicTransport } from "@koklo/llm/testing";
-import { Test } from "@nestjs/testing";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppModule } from "../src/app.module.ts";
 import { loadConfig } from "../src/config.ts";
-import { LLM_PROVIDERS, type LlmProviderRegistry } from "../src/llm/tokens.ts";
 import {
   aiApi,
   BRIEF_REPLY,
@@ -15,11 +12,10 @@ import {
   installAiBench,
   keyedWorld,
 } from "./helpers/ai-bench.ts";
-import { configFor, UNREACHABLE_DATABASE_URL } from "./helpers/app.ts";
 
 /**
- * TK-54b : câblage du registre `LLM_PROVIDERS`. Production : l'adaptateur Anthropic seul, choisi
- * par le code (jamais par la configuration) ; le faux n'est sélectionnable par AUCUNE configuration
+ * TK-54b, repris par TK-95 : câblage du moteur `AI_PROVIDER` (voir `ai-engine-wiring.test.ts`). Les adaptateurs sont
+ * choisis par le code (jamais par la configuration) ; le faux n'est sélectionnable par AUCUNE configuration
  * (même règle que le faux git : seuls les tests le placent, par `overrideProvider`). Aucun réseau
  * en test : `fetch` global est remplacé par un transport simulé ou par une fonction qui lève.
  */
@@ -34,36 +30,7 @@ const ENV = {
   GITHUB_CLIENT_SECRET: "secret",
 };
 
-async function registryOf(appEnv: "development" | "test" | "staging" | "production") {
-  const moduleRef = await Test.createTestingModule({
-    imports: [
-      AppModule.forRoot({ ...configFor({ databaseUrl: UNREACHABLE_DATABASE_URL, appEnv }) }),
-    ],
-  }).compile();
-  try {
-    return moduleRef.get<LlmProviderRegistry>(LLM_PROVIDERS, { strict: false });
-  } finally {
-    await moduleRef.close();
-  }
-}
-
-describe("registre de production", () => {
-  it.each(["development", "test", "staging", "production"] as const)(
-    "%s : exactement l'adaptateur Anthropic, jamais le faux",
-    async (appEnv) => {
-      const registry = await registryOf(appEnv);
-
-      expect([...registry.keys()]).toEqual(["anthropic"]);
-      const provider = registry.get("anthropic");
-      expect(provider).toBeInstanceOf(AnthropicProvider);
-      expect(provider?.id).toBe("anthropic");
-      for (const candidate of registry.values()) {
-        expect(candidate).not.toBeInstanceOf(FakeLlm);
-        expect(candidate.id).not.toBe("fake");
-      }
-    },
-  );
-
+describe("câblage de production : voir ai-engine-wiring.test.ts", () => {
   it("aucune variable d'environnement ne choisit le fournisseur (AI_PROVIDER, LLM_PROVIDER, LLM_PROVIDERS, USE_FAKE_LLM)", () => {
     const config = loadConfig({
       ...ENV,
@@ -97,10 +64,8 @@ describe("source : le faux et le transport simulé n'entrent pas dans le code de
           : [],
     );
 
-  it("src/llm et src/ai existent, et ne mentionnent ni FakeLlm, ni SimulatedAnthropicTransport, ni un import */testing", () => {
-    const sources = ["../src/llm", "../src/ai"].flatMap((dir) =>
-      files(resolve(import.meta.dirname, dir)),
-    );
+  it("src/ai existe, et ne mentionne ni FakeLlm, ni SimulatedAnthropicTransport, ni un import */testing", () => {
+    const sources = ["../src/ai"].flatMap((dir) => files(resolve(import.meta.dirname, dir)));
     expect(sources.length).toBeGreaterThanOrEqual(4);
     for (const file of sources) {
       const code = strip(readFileSync(file, "utf8"));
@@ -108,12 +73,12 @@ describe("source : le faux et le transport simulé n'entrent pas dans le code de
     }
   });
 
-  it("le module llm importe l'adaptateur Anthropic de @koklo/llm", () => {
-    const code = files(resolve(import.meta.dirname, "../src/llm"))
+  it("le module ai importe les adaptateurs du SDK de @koklo/llm", () => {
+    const code = files(resolve(import.meta.dirname, "../src/ai"))
       .map((file) => strip(readFileSync(file, "utf8")))
       .join("\n");
     expect(code).toMatch(/from "@koklo\/llm"/);
-    expect(code).toContain("AnthropicProvider");
+    expect(code).toContain("createSdkProvider");
   });
 });
 

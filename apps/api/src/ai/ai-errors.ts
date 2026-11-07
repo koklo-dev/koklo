@@ -29,6 +29,9 @@ export type ProviderErrorReason =
 export const providerError = (reason: ProviderErrorReason) =>
   new ORPCError("LLM_PROVIDER_ERROR", { data: { reason } });
 
+/** Plafond mensuel atteint : ni montant, ni fournisseur (1.1.0). */
+export const capReached = () => new ORPCError("LLM_CAP_REACHED");
+
 export const outputInvalid = () => new ORPCError("LLM_OUTPUT_INVALID");
 
 export const promptRejected = (rank: number) =>

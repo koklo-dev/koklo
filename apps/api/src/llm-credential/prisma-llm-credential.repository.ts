@@ -20,6 +20,7 @@ interface Row {
   id: string;
   provider: LlmProviderId;
   defaultModel: string | null;
+  baseUrl: string | null;
   invalidatedAt: Date | null;
   lastUsedAt: Date | null;
   createdAt: Date;
@@ -32,6 +33,7 @@ function statusOf(row: Row): LlmCredentialStatus {
     id: row.id,
     provider: row.provider,
     defaultModel: row.defaultModel,
+    baseUrl: row.baseUrl,
     invalid: row.invalidatedAt !== null,
     invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
@@ -66,6 +68,22 @@ async function audit(
     action: `llm_credential.${action}`,
     targetKind: "llm_credential",
     targetId,
+  });
+}
+
+/**
+ * Retirer une clé la détache des réglages d'IA (la clé étrangère `NO ACTION` ne laisse jamais un
+ * principal ou un secours sans clé) : le moteur retombe alors sur la seule clé restante ou sur Anthropic.
+ * Ses lignes d'usage partent en cascade. Sous `withOrganization`, le filtre d'organisation est posé.
+ */
+async function detachFromSettings(tx: Tx, provider: LlmProviderId): Promise<void> {
+  await tx.aiOrganizationSettings.updateMany({
+    where: { primaryProvider: provider },
+    data: { primaryProvider: null },
+  });
+  await tx.aiOrganizationSettings.updateMany({
+    where: { fallbackProvider: provider },
+    data: { fallbackProvider: null },
   });
 }
 
@@ -106,6 +124,7 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
       nonce: new Uint8Array(input.secret.nonce),
       keyVersion: input.secret.keyVersion,
       defaultModel: input.defaultModel,
+      baseUrl: input.baseUrl ?? null,
     };
     return this.transaction(organizationId, async (tx) => {
       const existing = await tx.llmProviderCredential.findFirst({
@@ -151,6 +170,7 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
           keyVersion: row.keyVersion,
         },
         defaultModel: row.defaultModel,
+        baseUrl: row.baseUrl,
         invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
         revision: revisionOf(row.nonce),
       };
@@ -161,6 +181,7 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
     return this.transaction(organizationId, async (tx) => {
       const row = await tx.llmProviderCredential.findFirst({ where: { provider } });
       if (row === null) return false;
+      await detachFromSettings(tx, provider);
       const { count } = await tx.llmProviderCredential.deleteMany({ where: { id: row.id } });
       if (count === 0) return false;
       await audit(tx, actor, "delete", row.id);

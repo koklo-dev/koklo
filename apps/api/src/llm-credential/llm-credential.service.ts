@@ -1,15 +1,26 @@
-import type { LlmProviderId } from "@koklo/domain";
-import { LLM_CREDENTIAL_MAX_LENGTH, llmCredential } from "@koklo/domain";
+import {
+  LLM_CREDENTIAL_MAX_LENGTH,
+  type LlmProviderId,
+  llmCredential,
+  llmProviderTraits,
+} from "@koklo/domain";
+import { assertSafeBaseUrl, UnsafeBaseUrlError } from "@koklo/llm";
 import { type Clock, systemClock } from "../clock.ts";
 import type { TokenCipher } from "../crypto/token-cipher.ts";
 import type { AuditActor } from "../tracker/audit.ts";
 import type { LlmCredentialRepository, LlmCredentialStatus } from "./llm-credential.repository.ts";
 import { llmCredentialAad } from "./llm-credential-aad.ts";
-import { EncryptionUnavailableError, LlmCredentialInputError } from "./llm-credential-errors.ts";
+import {
+  EncryptionUnavailableError,
+  LlmCredentialInputError,
+  type LlmCredentialUnavailableReason,
+} from "./llm-credential-errors.ts";
 
 export interface SetLlmCredentialInput {
   readonly apiKey: string;
   readonly defaultModel?: string;
+  /** Obligatoire pour `openai_compatible`, refusée pour tout autre fournisseur. */
+  readonly baseUrl?: string;
   readonly createdByUserId?: string;
 }
 
@@ -40,6 +51,27 @@ function assertModel(model: string): void {
 }
 
 /**
+ * Adresse de base : réservée au fournisseur qui l'exige, passée par la garde anti-SSRF (https seul, ni
+ * adresse privée ni nom local). Rend la forme normalisée. Le message ne reprend jamais l'adresse saisie.
+ */
+function normalizedBaseUrl(provider: LlmProviderId, baseUrl: string | undefined): string | null {
+  const required = llmProviderTraits(provider).baseUrlRequired;
+  if (!required) {
+    if (baseUrl === undefined) return null;
+    throw new LlmCredentialInputError("baseUrl", "non applicable à ce fournisseur");
+  }
+  if (baseUrl === undefined) throw new LlmCredentialInputError("baseUrl", "adresse obligatoire");
+  try {
+    return assertSafeBaseUrl(baseUrl).toString();
+  } catch (error) {
+    if (error instanceof UnsafeBaseUrlError) {
+      throw new LlmCredentialInputError("baseUrl", "adresse https publique obligatoire");
+    }
+    throw error;
+  }
+}
+
+/**
  * Gestion des clés BYOK d'une organisation. `cipher` null : aucun porte-clés configuré, `set` lève
  * `EncryptionUnavailableError` avant tout accès ; `list`, `remove` et `invalidate` fonctionnent.
  */
@@ -60,12 +92,14 @@ export class LlmCredentialService {
     if (this.cipher === null) throw new EncryptionUnavailableError();
     assertApiKey(input.apiKey);
     if (input.defaultModel !== undefined) assertModel(input.defaultModel);
+    const baseUrl = normalizedBaseUrl(provider, input.baseUrl);
     const { status } = await this.repository.upsert(
       organizationId,
       {
         provider,
         secret: this.cipher.encrypt(input.apiKey, llmCredentialAad(organizationId, provider)),
         defaultModel: input.defaultModel ?? null,
+        baseUrl,
         createdByUserId: input.createdByUserId ?? actor?.userId ?? null,
         at: this.clock.now(),
       },
@@ -76,6 +110,18 @@ export class LlmCredentialService {
 
   list(organizationId: string): Promise<LlmCredentialStatus[]> {
     return this.repository.list(organizationId);
+  }
+
+  /**
+   * Pourquoi le moteur n'a trouvé aucune clé utilisable : aucune clé (`missing`), toutes invalidées
+   * (`invalidated`), pas de porte-clés (`no-encryption-key`), sinon une clé valide illisible (`undecryptable`).
+   * Diagnostic seulement : ne déchiffre rien.
+   */
+  async unavailabilityOf(organizationId: string): Promise<LlmCredentialUnavailableReason> {
+    const statuses = await this.repository.list(organizationId);
+    if (statuses.length === 0) return "missing";
+    if (statuses.every((status) => status.invalid)) return "invalidated";
+    return this.cipher === null ? "no-encryption-key" : "undecryptable";
   }
 
   remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean> {

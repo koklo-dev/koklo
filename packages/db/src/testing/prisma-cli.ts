@@ -55,6 +55,10 @@ export const expectedTables = [
   "notifications",
   // TK-55a : liaison client <-> projet (cloisonnement par projet).
   "project_client_access",
+  // TK-95 : réglages d'IA, modèle par usage, consommation mensuelle par fournisseur.
+  "ai_organization_settings",
+  "ai_usage_models",
+  "ai_usage_monthly",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
@@ -66,6 +70,8 @@ export const compositeKeyTables: readonly string[] = [
   "spec_heads",
   "spec_feature_tables",
   "spec_feature_endpoints",
+  "ai_usage_models",
+  "ai_usage_monthly",
 ];
 
 /** Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et `audit_log` (jamais modifiée). */

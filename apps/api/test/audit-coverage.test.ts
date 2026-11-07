@@ -6,8 +6,8 @@ import { CaptureMailSender, startWorker, type Worker } from "@koklo/worker";
 import type { INestApplication } from "@nestjs/common";
 import type { PgBoss } from "pg-boss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { AI_ADAPTERS } from "../src/ai/ai-tokens.ts";
 import { NONCE_SOURCE } from "../src/ai/nonce.ts";
-import { LLM_PROVIDERS } from "../src/llm/tokens.ts";
 import { AI_ROUTES, PurposeLlm } from "./helpers/ai-bench.ts";
 import { createSeededDatabase } from "./helpers/app.ts";
 import { auditRowsFull, commentsFor, UUID_RE } from "./helpers/comments.ts";
@@ -71,14 +71,14 @@ function repoRuntimeOf() {
 }
 
 /**
- * TK-54b : modèle simulé des scénarios ai.* (réponse valide par finalité), sous le jeton `LLM_PROVIDERS`
+ * TK-54b : modèle simulé des scénarios ai.* (réponse valide par finalité), sous le jeton `AI_ADAPTERS`
  * et un nonce déterministe ; le faux n'est jamais choisi par la configuration.
  */
 function aiOverrides() {
   return (builder: import("@nestjs/testing").TestingModuleBuilder) => {
     return builder
-      .overrideProvider(LLM_PROVIDERS)
-      .useValue(new Map([["anthropic", new PurposeLlm()]]))
+      .overrideProvider(AI_ADAPTERS)
+      .useValue(() => new PurposeLlm())
       .overrideProvider(NONCE_SOURCE)
       .useValue({ next: () => "c".repeat(48) });
   };

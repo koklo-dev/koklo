@@ -4,7 +4,7 @@ status: proposed
 last_reviewed: 2026-11-01
 covers_commit: 97b505c
 ---
-# 0015 — Adaptateur Anthropic : `fetch` direct dans `@koklo/llm`, sans SDK
+# 0015 — Adaptateurs LLM dans `@koklo/llm` : `fetch` direct (TK-54), puis Vercel AI SDK (TK-95)
 
 - **Statut** : proposé (TK-54, sous-lot 54a ; ticket `safe` ; devient effectif à la fusion de la PR TK-54)
 - **Date** : 2026-11-01
@@ -120,3 +120,103 @@ fonction qui lève : aucun appel réseau n'est possible en test.
 ## Preuves
 `pnpm --filter @koklo/llm test` (188 tests, dont `runLlmConformance` sur l'adaptateur et les tests de
 non-fuite, d'isolation et de pureté), `pnpm --filter @koklo/domain test`, `pnpm --filter @koklo/config test`.
+
+## Complément TK-95 (lot A) : six fournisseurs par le Vercel AI SDK
+
+> Ce complément **remplace** l'option A (« sans SDK ») pour l'adaptateur : le choix de TK-54 valait pour un
+> seul fournisseur ; il y en a désormais six (passation 20), et maintenir six formats de requête, de flux
+> et d'erreur à la main coûte plus cher que la surface de supply chain, que la garde ci-dessous borne.
+> Les garanties de l'option A (clé BYOK jamais fuitée, pas de redirection, corps plafonné, aucun retry,
+> aucune lecture d'environnement, erreurs typées sans message) sont **conservées** et testées contre
+> chaque adaptateur.
+
+### Dépendances (`skill dependency-selection`, 2026-11-07)
+Versions exactes, résolues au registre, déclarées **dans `packages/llm` seul** :
+
+| Paquet | Version | Rôle |
+|---|---|---|
+| `ai` | 7.0.163 | `generateText`, `streamText`, `Output.object` |
+| `@ai-sdk/anthropic` | 4.0.97 | Anthropic |
+| `@ai-sdk/openai` | 4.0.109 | OpenAI (API « chat completions », pas « responses ») |
+| `@ai-sdk/google` | 4.0.112 | Google |
+| `@ai-sdk/mistral` | 4.0.80 | Mistral |
+| `@ai-sdk/openai-compatible` | 3.0.85 | point d'accès compatible (adresse saisie) |
+| `@openrouter/ai-sdk-provider` | 3.1.0 | OpenRouter (intermédiaire) |
+
+- Les dernières versions (`ai` 7.0.164, `@ai-sdk/anthropic` 4.0.98, `@ai-sdk/openai` 4.0.110, `@ai-sdk/google`
+  4.0.113, `@ai-sdk/openai-compatible` 3.0.86) datent de moins de 24 h : la politique d'ancienneté de pnpm
+  les refuse, aucune exception n'est ajoutée (question B51). Pas de pré-version.
+- Documentation : types livrés des paquets installés (API v7 : `generateText` / `streamText` avec
+  `Output.object({ schema: jsonSchema(...) })`, `maxRetries`, `abortSignal`, `fetch` des fabriques) et
+  documentation Context7 de `vercel/ai`. `generateObject` n'est pas utilisé : la sortie structurée passe par
+  `Output.object` avec `jsonSchema`, **sans validateur** (le port rend toujours `Unvalidated`, B45).
+- Vulnérabilités : `pnpm audit --prod` ne signale rien sur ces paquets (deux avis modérés préexistants,
+  `minimatch` via Sentry) ; OSV (`cve-mcp`) interrogé pour chaque paquet et version.
+- Garde de source : `packages/config/test/ai-sdk-import-guard.test.ts` interdit toute dépendance et tout import
+  de `ai`, `@ai-sdk/*`, `@openrouter/*`, `@anthropic-ai/*` hors `packages/llm` ; `package-purity.test.ts`
+  impose exactement ces sept paquets plus `@koklo/domain`, en versions exactes.
+
+### Ce qui change
+- **Port** : `LlmProvider.stream(request)` rend des événements `text` puis un `end` (arrêt, jetons, fournisseur,
+  modèle) ; mêmes gardes que `complete` ; sortie JSON refusée en flux. Six identifiants, quatre usages
+  (`idea_space`, `spec_deliverables`, `baseline_summary`, `ticket_breakdown`), traits des fournisseurs
+  (`intermediary`, `euEligible`, `baseUrlRequired`), types et ports de l'`AiProvider` (domaine pur).
+- **`src/common`** : `fetch` donné au SDK (`redirect: "error"`, corps plafonné à 1 048 576 o, taille annoncée
+  refusée sans lecture, flux coupé au plafond, succès comme erreur), correspondance statut -> erreur typée
+  (+ « quota épuisé » en 429 et « contexte trop long » multi-fournisseurs), diagnostic avec le fournisseur et
+  l'opération, tarifs par fournisseur (Anthropic : table de TK-54 ; compatible : 0, B48 ; autres : pire tarif
+  connu, B52), majorant de coût avant l'appel, coût réel en micro-dollars.
+- **`src/sdk`** : une fabrique par fournisseur ; **clé et adresse toujours passées** (le SDK lit sinon
+  `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `*_API_KEY`), `maxRetries: 0`, avertissements du SDK coupés.
+  Toute erreur du SDK est ramenée aux erreurs typées du port : ni message, ni URL, ni en-tête, ni corps.
+- **Anti-SSRF** (`baseUrl`, réservée à `openai_compatible`, refusée ailleurs) : `https` seul, ni identifiants,
+  port 443, ni `localhost` / `*.localhost` / `*.local` / `*.internal`, ni littéral IP privé, bouclage, lien
+  local, métadonnées cloud, `0.0.0.0` (les écritures décimale, octale, hexadécimale et IPv4 mappée sont
+  normalisées par `URL`), nom résolu vers une adresse privée (contrôle à chaque appel), pas de redirection.
+  La même fonction (`assertSafeBaseUrl`) sert à l'enregistrement (lot D). Seule une option injectée par le code
+  autorise `http://127.0.0.1` pour un faux serveur de test, jamais l'environnement. Limite : B53.
+- **Modèle** : au plus un `/` (`fournisseur/modèle`) ; refusé par les adaptateurs dont le modèle est dans l'URL (B50).
+- **Qualification** : `src/qualification` (jeu de dossiers en français, exécuteur, catalogue). CI : faux modèle,
+  aucun réseau. Mode manuel : `pnpm --filter @koklo/llm test:real` (voir `quality-and-operations.md`).
+- `AnthropicProvider` reste exporté (même constructeur `{ fetch }`) : c'est le SDK avec les garanties communes.
+  L'ancien `fetch` direct, la construction du corps et l'analyse de la réponse d'Anthropic sont supprimés
+  (pas de double chemin) ; la suite de conformité du domaine, inchangée, passe contre le nouvel adaptateur.
+
+### Limites assumées (lot A)
+- Aucun appel réel à un fournisseur n'a été fait : les formats sont ceux des paquets installés, vérifiés contre
+  des réponses simulées au format de chaque API (NEEDS-HUMAN : `test:real` avec une clé de test).
+- Le SDK ne rend pas le modèle servi de Google, et Mistral n'a pas de raison d'arrêt « filtre de contenu » (B55).
+- La requête envoyée par le SDK diffère de celle de TK-54 (`system` et `content` en blocs, `user-agent`) ;
+  `anthropic-request.test.ts` et `anthropic-response.test.ts`, qui figeaient l'ancien corps, sont supprimés.
+
+## Complément TK-95 (lot C) : base, clés et compteurs
+
+- **Base** : migration `20261107090000_ai_providers` (voir `docs/domain-model.md`). Aucune dépendance nouvelle à ce
+  lot. L'enum `llm_provider` passe à six valeurs ; l'adresse de base (`base_url`) est réservée à
+  `openai_compatible` par un CHECK et par le service de clés (garde anti-SSRF à l'enregistrement, rejouée à la
+  résolution). Les clés des six fournisseurs restent chiffrées par le même chiffrement (AAD
+  `llm:v1:<organisation>:<fournisseur>`), la rotation de la clé maître les couvre sans changement de code.
+- **Compteurs** : jetons, appels et coût en micro-dollars par (organisation, mois UTC, fournisseur), `BIGINT`
+  bornés par CHECK, incrémentés atomiquement (`upsert` avec `increment`), jamais lus ni écrits en SQL brut
+  (le client tenant le refuse). Le plafond mensuel et le marqueur d'alerte sont dans
+  `ai_organization_settings` ; le marqueur est posé par une écriture conditionnelle (une seule alerte par mois).
+- **Clés** : une clé retirée est détachée des réglages dans la même transaction (B61) ; l'historique de
+  consommation reste. Une clé d'organisation n'est lue que par `PrismaAiCredentialSource` (moteur) et le service
+  de clés.
+- **Limites** : les routes (`aiProvider.*`, `aiUsage.*`) et le contrat 1.1.0 relèvent du lot D et de TK-98.
+
+## Complément TK-95 (lot D) : câblage de l'API, contrat 1.1.0, retrait des fuites
+
+- **Câblage** : le jeton `AI_PROVIDER` (le moteur de `@koklo/llm` sur les ports Prisma) remplace `LLM_PROVIDERS` ;
+  `AiCallRunner` ne connaît plus de fournisseur (un appel nomme un usage). Les constantes `DEFAULT_MODELS`,
+  `PROPOSAL_PROVIDER`, le type de fournisseur de `metaOf` et `llm.module.ts` sont supprimés (test de garde sur
+  `apps/api/src/ai`). `meta.provider` est le fournisseur réellement servi.
+- **Vie des clés par le moteur** : la bascule rend inutilisable le suivi « une clé par appel » de l'exécuteur ; le moteur
+  signale donc lui-même le dernier usage et le rejet (401 explicite, avec la révision de la clé : compare-and-swap)
+  par `AiKeyHooks`, meilleur effort. `AiProvider.preflight` refuse (plafond, aucune clé) avant l'audit et le quota.
+- **Contrat 1.1.0 (additif, B47)** : six fournisseurs, `baseUrl` en entrée de `llmCredential.set`, erreur
+  `LLM_CAP_REACHED` (409, sans donnée) sur les trois propositions. `llmCredential.verify` n'est ni suspendu ni compté.
+- **Clés et agents de code** : le résolveur n'est lu que par la source de clés du moteur et `CredentialProbe` (liste
+  blanche testée) ; `packages/delivery` n'importe ni les clés ni `@koklo/llm`.
+- **Limites** : `verify` ne compte pas ses 16 jetons ; le dépassement concurrent du plafond est borné par les appels
+  en vol ; aucune route de réglages (TK-98).

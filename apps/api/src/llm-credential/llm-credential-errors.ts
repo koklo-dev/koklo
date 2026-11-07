@@ -34,9 +34,9 @@ export class EncryptionUnavailableError extends Error {
 
 /** Entrée refusée avant tout accès à la base ; ne reprend jamais la valeur. */
 export class LlmCredentialInputError extends Error {
-  readonly field: "apiKey" | "defaultModel";
+  readonly field: "apiKey" | "defaultModel" | "baseUrl";
   readonly reason: string;
-  constructor(field: "apiKey" | "defaultModel", reason: string) {
+  constructor(field: "apiKey" | "defaultModel" | "baseUrl", reason: string) {
     super(`Entrée invalide (${field}: ${reason})`);
     this.name = "LlmCredentialInputError";
     this.field = field;

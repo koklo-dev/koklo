@@ -92,6 +92,7 @@ const subjectWith = (knobs: Knobs = {}): Subject => {
   let armed: LlmFailureTrigger | undefined;
   const provider: LlmProvider = {
     id: "fake",
+    stream: async function* () {},
     complete: async (request: LlmRequest): Promise<LlmResponse> => {
       const snapshot = assertLlmRequest(request);
       made += 1 + (knobs.retries ?? 0);

@@ -153,7 +153,7 @@ describe("TK-50c : durcissement de la requête", () => {
     expect(reasonOf(makeRequest({ signal: new AbortController().signal }))).toBe("ok");
   });
 
-  it.each(["a/b", "../x", "claude..x", "x..", "/abs", "a//b"])("refuse le modèle %s", (model) => {
+  it.each(["a/b/c", "../x", "claude..x", "x..", "/abs", "a//b"])("refuse le modèle %s", (model) => {
     expect(reasonOf(makeRequest({ model }))).toBe("model");
   });
 

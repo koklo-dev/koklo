@@ -40,6 +40,9 @@ export const TENANT_MODELS: readonly string[] = [
   "Baseline",
   "ProjectClientAccess",
   "Notification",
+  "AiOrganizationSettings",
+  "AiUsageModel",
+  "AiUsageMonthly",
 ];
 
 /** Modèles portant (ou non) `organizationId` mais hors filtre, avec la raison de l'exclusion. */

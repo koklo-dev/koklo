@@ -70,7 +70,14 @@ describe("LlmProvider : forme du port", () => {
 
 describe("fournisseurs : liste fermée", () => {
   it("fixe les fournisseurs BYOK, sans le faux", () => {
-    expect([...LLM_PROVIDER_IDS]).toEqual(["anthropic", "openai", "google"]);
+    expect([...LLM_PROVIDER_IDS]).toEqual([
+      "anthropic",
+      "openai",
+      "google",
+      "mistral",
+      "openrouter",
+      "openai_compatible",
+    ]);
     expect(LLM_TEST_PROVIDER_ID).toBe("fake");
     expect(Object.isFrozen(LLM_PROVIDER_IDS) || Array.isArray(LLM_PROVIDER_IDS)).toBe(true);
   });

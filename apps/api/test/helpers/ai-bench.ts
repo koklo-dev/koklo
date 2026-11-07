@@ -3,16 +3,19 @@ import type { Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
 import {
   type LlmProvider,
+  type LlmProviderId,
   type LlmRequest,
   type LlmResponse,
+  type LlmStreamEvent,
+  type QualifiedModel,
   revealLlmCredential,
 } from "@koklo/domain";
 import { FakeLlm } from "@koklo/domain/testing";
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import type { AiLimits } from "../../src/ai/ai-budget.ts";
+import { AI_ADAPTERS, AI_CATALOG } from "../../src/ai/ai-tokens.ts";
 import { NONCE_SOURCE, type NonceSource } from "../../src/ai/nonce.ts";
-import { LLM_PROVIDERS } from "../../src/llm/tokens.ts";
 import { createSeededDatabase } from "./app.ts";
 import { ENCRYPTION_KEY } from "./installations.ts";
 import { ManualClock } from "./leases.ts";
@@ -30,12 +33,27 @@ import { createWorld, send, type World } from "./tickets.ts";
 /**
  * Banc des tests `ai.*` et `llmCredential.verify` (TK-54b, contrat 0.9.0). Contrat attendu de la
  * production :
- *  - jeton `LLM_PROVIDERS` (`src/llm/tokens.ts`, `Map<LlmProviderId, LlmProvider>`) et jeton
- *    `NONCE_SOURCE` (`src/ai/nonce.ts`, `{ next(): string }`), surchargés ici par `overrideProvider` ;
+ *  - jetons `AI_ADAPTERS` (fabrique d'adaptateur par fournisseur) et `AI_CATALOG` (modèles qualifiés), et
+ *    `NONCE_SOURCE` (`src/ai/nonce.ts`, `{ next(): string }`), surchargés ici par `overrideProvider` ; le
+ *    moteur `AI_PROVIDER` et ses ports Prisma sont ceux de la production (TK-95) ;
  *  - `AppConfig.ai?: Partial<AiLimits>` ; routes `POST /projects/{projectId}/ai/{brief|features|criteria}`
  *    et `POST /llm-credentials/{provider}/verify` ;
- *  - AUCUN réseau : le fournisseur est un `FakeLlm` (ou un double de test) placé sous la clé `anthropic`.
+ *  - AUCUN réseau : l'adaptateur est un `FakeLlm` (ou un double de test), le même pour tout fournisseur
+ *    sauf ceux déclarés par `useFor`.
  */
+
+/** Double de test : le flux est facultatif (les doubles écrits avant TK-95 n'en ont pas). */
+export type TestLlm = Pick<LlmProvider, "id" | "complete"> & Partial<Pick<LlmProvider, "stream">>;
+
+/** Modèle qualifié par fournisseur pour les quatre usages : permet la bascule de secours dans les tests. */
+export const TEST_CATALOG: readonly QualifiedModel[] = (
+  ["anthropic", "openai", "google", "mistral", "openrouter", "openai_compatible"] as const
+).map((provider) => ({
+  provider,
+  model: provider === "anthropic" ? "claude-sonnet-5-5" : `${provider}-qualifie`.replace("_", "-"),
+  usages: ["idea_space", "spec_deliverables", "baseline_summary", "ticket_breakdown"],
+  economy: false,
+}));
 export const PROVIDER = "anthropic";
 export const AI_ROUTES = {
   draftBrief: (projectId: string) => `/projects/${projectId}/ai/brief`,
@@ -84,13 +102,38 @@ export class ScriptedNonces implements NonceSource {
 /** Fournisseur enregistré sous la clé `anthropic` : délègue au double courant du test. */
 export class SwitchableProvider implements LlmProvider {
   readonly id = "anthropic" as const;
-  target: LlmProvider = new FakeLlm();
+  target: TestLlm = new FakeLlm();
+  /** Doubles propres à un fournisseur (bascule de secours) ; les autres utilisent `target`. */
+  readonly byProvider = new Map<LlmProviderId, TestLlm>();
   /** Clés (déchiffrées) reçues par le double : seule trace de ce que le service a révélé. */
   keysSeen: string[] = [];
 
   complete(request: LlmRequest): Promise<LlmResponse> {
     this.keysSeen.push(revealLlmCredential(request.credential));
     return this.target.complete(request);
+  }
+
+  stream(request: LlmRequest): AsyncIterable<LlmStreamEvent> {
+    this.keysSeen.push(revealLlmCredential(request.credential));
+    if (this.target.stream === undefined) throw new Error("flux non simulé");
+    return this.target.stream(request);
+  }
+
+  /** Adaptateur du fournisseur demandé : son double, sinon le double courant. */
+  forProvider(id: LlmProviderId): LlmProvider {
+    const own = this.byProvider.get(id);
+    if (own === undefined) return this;
+    return {
+      id: this.id,
+      complete: (request) => {
+        this.keysSeen.push(revealLlmCredential(request.credential));
+        return own.complete(request);
+      },
+      stream: (request) => {
+        if (own.stream === undefined) throw new Error("flux non simulé");
+        return own.stream(request);
+      },
+    };
   }
 }
 
@@ -108,6 +151,10 @@ export class GatedLlm implements LlmProvider {
     this.gate = new Promise((resolve) => {
       this.open = resolve;
     });
+  }
+
+  stream(request: LlmRequest): AsyncIterable<LlmStreamEvent> {
+    return this.inner.stream(request);
   }
 
   async complete(request: LlmRequest): Promise<LlmResponse> {
@@ -148,6 +195,10 @@ export class PurposeLlm implements LlmProvider {
     const reply = replies[request.trace.purpose];
     return FakeLlm.replying(reply).complete(request);
   }
+
+  stream(request: LlmRequest): AsyncIterable<LlmStreamEvent> {
+    return FakeLlm.replying("flux").stream(request);
+  }
 }
 
 export interface AiBench extends RepoBench {
@@ -158,14 +209,16 @@ export interface AiBench extends RepoBench {
   /** Application sans porte-clés (`KOKLO_ENCRYPTION_KEY` absente). */
   appWithoutKey: INestApplication;
   /** Remplace le double courant ; remis à un `FakeLlm` neuf avant chaque test. */
-  use(provider: LlmProvider): void;
+  use(provider: TestLlm): void;
+  /** Double propre à un fournisseur ; remis à zéro avant chaque test. */
+  useFor(id: LlmProviderId, provider: TestLlm): void;
   /** Application supplémentaire sur la même base (limites resserrées, autre clé), fermée en fin de fichier. */
   makeApp(over?: {
     limits?: Partial<AiLimits>;
     encryptionKey?: Buffer | null;
     clock?: ManualClock;
     logStream?: { write: (line: string) => void };
-    /** Ne surcharge pas `LLM_PROVIDERS` : câblage de production. */
+    /** Ne surcharge pas `AI_ADAPTERS` ni `AI_CATALOG` : câblage de production. */
     defaultRegistry?: boolean;
   }): Promise<INestApplication>;
 }
@@ -200,10 +253,14 @@ export function installAiBench(hooks: {
         config: { ai: { ...WIDE_LIMITS, ...(over.limits ?? {}) } },
         configure: (builder) => {
           const withNonces = builder.overrideProvider(NONCE_SOURCE).useValue(nonces);
-          // `defaultRegistry` : le registre de production (adaptateur Anthropic, `fetch` global).
+          // `defaultRegistry` : les adaptateurs de production (SDK, `fetch` global) et le catalogue de lancement.
           return over.defaultRegistry
             ? withNonces
-            : withNonces.overrideProvider(LLM_PROVIDERS).useValue(new Map([[PROVIDER, provider]]));
+            : withNonces
+                .overrideProvider(AI_ADAPTERS)
+                .useValue((id: LlmProviderId) => provider.forProvider(id))
+                .overrideProvider(AI_CATALOG)
+                .useValue({ list: () => TEST_CATALOG });
         },
       });
     const app = await build();
@@ -220,6 +277,9 @@ export function installAiBench(hooks: {
       lines,
       use: (next) => {
         provider.target = next;
+      },
+      useFor: (id, next) => {
+        provider.byProvider.set(id, next);
       },
       makeApp: async (over) => {
         const created = await build(over);
@@ -239,6 +299,7 @@ export function installAiBench(hooks: {
     bench.harness.reset();
     bench.provider.target = new FakeLlm();
     bench.provider.keysSeen = [];
+    bench.provider.byProvider.clear();
     bench.nonces.reset();
     bench.lines.length = 0;
     await bench.database.query("DELETE FROM audit_fail");
