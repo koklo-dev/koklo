@@ -253,10 +253,10 @@ describe("Succès (§3.7)", () => {
     expect(liveText()).toContain("2 fonctionnalités créées.");
     expect(screen.getByRole("link", { name: "Voir la liste" })).toHaveAttribute(
       "href",
-      `/projects/${PROJECT_ID}/features`,
+      `/projects/${PROJECT_ID}/spec/functional?tab=features`,
     );
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Cadrage", level: 1 })).toHaveFocus(),
+      expect(screen.getByRole("heading", { name: "Assistant de cadrage", level: 1 })).toHaveFocus(),
     );
   });
 

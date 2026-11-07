@@ -130,7 +130,7 @@ const keysIn = (status: Status) =>
     .map((el) => el.getAttribute("data-testid")?.replace("kanban-card-", ""));
 
 async function renderBoard() {
-  renderWithQuery(<KanbanPage />);
+  renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
   await screen.findByTestId("kanban-board");
 }
 
@@ -201,10 +201,15 @@ describe("KanbanPage — colonnes et compteurs (C1)", () => {
     expect(scroller).toContainElement(column("cancelled"));
   });
 
-  it("le sous-titre donne le sprint, son objectif et le nombre de tickets", async () => {
+  it("l'en-tête de projet donne « Tickets » et le résumé du sprint, de son objectif et des tickets (TK-88)", async () => {
     await renderBoard();
-    expect(screen.getByText("Sprint SP-7 · Rendre le kanban utilisable")).toBeInTheDocument();
-    expect(screen.getByText("10 tickets")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Tickets" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Sprint SP-7 · Rendre le kanban utilisable · 10 tickets"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Emplacement" })).toHaveTextContent(
+      "Portail de réservation",
+    );
   });
 
   // TK-94, B42 : une colonne est paginée par le serveur, qui la trie par priorité décroissante ; un tri sur les
@@ -216,10 +221,10 @@ describe("KanbanPage — colonnes et compteurs (C1)", () => {
   });
 });
 
-describe("KanbanPage — projet explicite (TK-96)", () => {
-  it("charge le projet puis le sprint actif puis ses tickets, tous avec projectId (TK-96)", async () => {
+describe("KanbanPage — projet de l'URL (TK-88, B75)", () => {
+  it("lit le sprint actif puis ses tickets du projet de l'URL, sans lire project.list", async () => {
     await renderBoard();
-    expect(procedures.projectList).toHaveBeenCalled();
+    expect(procedures.projectList).not.toHaveBeenCalled();
     expect(procedures.sprintList).toHaveBeenCalledWith({ projectId: PROJECT_ID, status: "active" });
     expect(procedures.ticketList).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: PROJECT_ID, sprintId: "SP-7" }),
@@ -228,19 +233,35 @@ describe("KanbanPage — projet explicite (TK-96)", () => {
       expect(call[0]).toHaveProperty("projectId", PROJECT_ID);
   });
 
-  it("sans projet (project.list vide) : « Aucun projet », ni sprint.list ni ticket.list (TK-96)", async () => {
-    procedures.projectList.mockResolvedValue([]);
-    renderWithQuery(<KanbanPage />);
-    await screen.findByTestId("kanban-no-project");
-    expect(procedures.sprintList).not.toHaveBeenCalled();
-    expect(procedures.ticketList).not.toHaveBeenCalled();
+  it("un autre projet dans l'URL : ses sprints et ses tickets, pas ceux du premier projet", async () => {
+    const other = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02";
+    renderWithQuery(<KanbanPage projectId={other} />);
+    await screen.findByTestId("kanban-board");
+    expect(procedures.sprintList).toHaveBeenCalledWith({ projectId: other, status: "active" });
+    expect(procedures.sprintList).not.toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: PROJECT_ID }),
+    );
   });
 
-  it("project.list en erreur : état d'erreur, aucun appel de sprint ni de ticket (TK-96)", async () => {
-    procedures.projectList.mockRejectedValue(new Error("boom"));
-    renderWithQuery(<KanbanPage />);
+  it("projet inaccessible (sprint.list NOT_FOUND) : « Projet introuvable » avec lien vers /projects", async () => {
+    procedures.sprintList.mockImplementation(() => Promise.reject(apiError("NOT_FOUND")));
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
+    const missing = await screen.findByTestId("kanban-no-project");
+    expect(
+      within(missing).getByRole("heading", { name: "Projet introuvable" }),
+    ).toBeInTheDocument();
+    expect(within(missing).getByRole("link", { name: "Voir les projets" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+    expect(procedures.ticketList).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("kanban-error")).not.toBeInTheDocument();
+  });
+
+  it("sprint.list en erreur : état d'erreur, aucun appel de ticket", async () => {
+    procedures.sprintList.mockRejectedValue(new Error("boom"));
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     await screen.findByTestId("kanban-error");
-    expect(procedures.sprintList).not.toHaveBeenCalled();
     expect(procedures.ticketList).not.toHaveBeenCalled();
   });
 });
@@ -304,7 +325,7 @@ describe("KanbanPage — cartes (C2)", () => {
 describe("KanbanPage — états (C3)", () => {
   it("chargement : zone status aria-busy « Chargement du kanban… »", () => {
     procedures.sprintList.mockReturnValue(new Promise(() => undefined));
-    renderWithQuery(<KanbanPage />);
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     const loading = screen.getByTestId("kanban-loading");
     expect(loading).toHaveAttribute("role", "status");
     expect(loading).toHaveAttribute("aria-busy", "true");
@@ -313,7 +334,7 @@ describe("KanbanPage — états (C3)", () => {
 
   it("erreur de chargement : alerte + « Réessayer » qui relance et affiche le tableau", async () => {
     procedures.sprintList.mockRejectedValueOnce(new Error("boom"));
-    renderWithQuery(<KanbanPage />);
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     const error = await screen.findByTestId("kanban-error");
     expect(within(error).getByRole("alert")).toHaveTextContent("Impossible de charger le kanban");
     expect(error).toHaveTextContent(
@@ -327,13 +348,13 @@ describe("KanbanPage — états (C3)", () => {
 
   it("erreur sur les tickets : même état d'erreur", async () => {
     procedures.ticketList.mockRejectedValue(new Error("boom"));
-    renderWithQuery(<KanbanPage />);
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     expect(await screen.findByTestId("kanban-error")).toBeInTheDocument();
   });
 
   it("aucun sprint actif : carte dédiée, pas de colonnes, pas d'appel aux tickets", async () => {
     procedures.sprintList.mockResolvedValue([]);
-    renderWithQuery(<KanbanPage />);
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     const empty = await screen.findByTestId("kanban-no-sprint");
     expect(within(empty).getByRole("heading", { name: "Aucun sprint actif" })).toBeInTheDocument();
     expect(empty).toHaveTextContent(
@@ -363,24 +384,10 @@ describe("KanbanPage — états (C3)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("NOT_FOUND (organisation sans projet) : « Aucun projet pour le moment » et lien vers /projects", async () => {
-    procedures.sprintList.mockImplementation(() => Promise.reject(apiError("NOT_FOUND")));
-    renderWithQuery(<KanbanPage />);
-    const empty = await screen.findByTestId("kanban-no-project");
-    expect(
-      within(empty).getByRole("heading", { name: "Aucun projet pour le moment" }),
-    ).toBeInTheDocument();
-    expect(within(empty).getByRole("link", { name: "Voir les projets" })).toHaveAttribute(
-      "href",
-      "/projects",
-    );
-    expect(screen.queryByTestId("kanban-error")).not.toBeInTheDocument();
-  });
-
   it("UNAUTHORIZED sans session : redirige vers /login, sans message", async () => {
     getSession.mockResolvedValue(NO_SESSION);
     procedures.sprintList.mockImplementation(() => Promise.reject(apiError("UNAUTHORIZED")));
-    renderWithQuery(<KanbanPage />);
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     await waitFor(() => expect(navigations()).toContain("/login"));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

@@ -1063,7 +1063,7 @@ client sees an empty `project.list`, a 404 on project resources (`ticket.list`) 
 `projectClient.add` sees only its project in `project.list` (a second project of the same organization stays
 invisible), resolves its project resources (`ticket.list` 200), still gets 403 on `spec.*` (both projects) and
 has no "Nouvelle fonctionnalité" button; T8 install through the fake OAuth (`installation.start` state, callback
-`code=fake-code-e2e-link-1` from the launcher pool, 303 to `/github?result=installed`, account listed, replay =
+`code=fake-code-e2e-link-1` from the launcher pool, 303 to `/settings/github?result=installed`, account listed, replay =
 `invalid_state`). The pool `e2e-link-1..3` is single use per run: the database is new at every `pnpm e2e`.
 The "Terminé" step badges of the creation panel are not asserted: the panel closes on full success (the stub
 suite `apps/web/e2e/project-create.spec.ts` covers them). Run three times in a row on ports 54339/3290/3291:
@@ -1152,7 +1152,7 @@ the shadcn CLI 4.23.0** (`npx shadcn@latest add sidebar-07` then `add login-05 -
 `apps/web`, configured by `apps/web/components.json`). Block files are kept faithful to the CLI output:
 `app-sidebar`, `nav-main`, `nav-projects`, `nav-user`, `team-switcher`, `login-form` in
 `apps/web/src/components`, and `sidebar`, `breadcrumb`, `collapsible`, `field`, `label` in
-`packages/ui/src/components`. The shell is mounted by `apps/web/src/app/projects/layout.tsx`.
+`packages/ui/src/components`. The shell was replaced by `AppShell` (TK-88): it is mounted by `apps/web/src/app/(shell)/layout.tsx` (`ShellFrame`); see architecture, "Web: application shell".
 Only imports, tokens, icons (`Icon`, Material Symbols Rounded) and French copy differ from the blocks.
 Screen contracts: `design/screens/S-login.md` and `design/screens/S-projects.md`.
 

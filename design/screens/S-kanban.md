@@ -1,7 +1,7 @@
 ---
 id: S-kanban
 titre: Kanban des tickets du sprint actif
-version: 1.1
+version: 1.5
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (owner, admin, dev, designer) : voit où en est chaque ticket du sprint actif et le fait avancer d'un statut à l'autre. Arrive depuis la barre latérale (« Kanban »).
@@ -118,3 +118,5 @@ Un seul message d'erreur de déplacement à la fois (le dernier remplace le pré
 | 1.2 | 2026-11-06 | TK-94 | Plus de chargement complet : 30 cartes par colonne puis suite en défilant dans la colonne (sentinelle à 80 %, « Charger la suite » en repli), compteur de colonne = total du serveur, pied de colonne (suite, chargement, erreur, fin), annonce des cartes reçues. Détail : `.workflow/TK-94/02-design.md` |
 | 1.3 | 2026-11-06 | TK-94 (lot C) | Écran branché sur les colonnes paginées (§3). Écarts : le total de colonne reste un `Badge` et non une `CountBar` compacte, pour ne pas multiplier les régions d'état (B44) ; ordre du serveur dans les colonnes (B42, ordre de création) ; annonce d'un déplacement « TK-12 déplacé vers Terminé · Terminé : 143 » |
 | 1.4 | 2026-11-06 | TK-94 (B42) | Décision de Brice : les colonnes gardent le tri par priorité (critique, haute, moyenne, basse), puis le numéro de la clé ; il est fait côté serveur (ordre par défaut de `ticket.list`, pas de `sort`), le web affiche l'ordre reçu sans tri local |
+| 1.5 | 2026-11-07 | TK-88 | Route `/projects/<id>/tickets` (`/kanban` redirige vers le dernier projet ouvert) ; projet de l'URL (plus de « premier projet », B75) ; `ProjectHeader` « Tickets » (résumé du sprint) à la place du h1 « Kanban » ; défilement horizontal visible et ombre de bord à droite (correctif 1.6). Détail : `.workflow/TK-88/02-design.md` |
+| 1.6 | 2026-11-07 | TK-88 (finition) | Région des colonnes (`KanbanScroller`) : barre de défilement fine visible (`--border-strong`) et ombre de 24 px sur chaque bord qui cache des colonnes, à 375 px (passation 01 §1.6, B93). Captures `design/screens/captures/S-kanban/shell-*.png` |

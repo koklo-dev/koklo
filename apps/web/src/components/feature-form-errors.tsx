@@ -9,6 +9,7 @@ import {
 } from "../lib/feature-errors.ts";
 import type { FormIssue } from "../lib/feature-form.ts";
 import { FIELD_LABELS, fieldId, focusIdOf } from "../lib/feature-form-ids.ts";
+import { settingsPath } from "../lib/shell-routes.ts";
 import { fieldOfIssue } from "../lib/spec-issues.ts";
 
 interface SummaryProps {
@@ -91,7 +92,7 @@ const HANDLER_OF: Partial<
   close: "onClose",
 };
 const LINKS: Partial<Record<SaveErrorAction, string>> = {
-  github: "/github",
+  github: settingsPath("github"),
   projects: "/projects",
 };
 
@@ -102,7 +103,7 @@ function TextWithLink({ view }: { view: SaveErrorView }) {
   return (
     <p>
       {view.text.slice(0, at)}
-      <a href="/github" className="font-medium underline underline-offset-4">
+      <a href={settingsPath("github")} className="font-medium underline underline-offset-4">
         {GITHUB_STATUS_LINK}
       </a>
     </p>

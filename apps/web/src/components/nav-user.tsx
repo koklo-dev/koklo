@@ -6,49 +6,40 @@ import {
   AvatarImage,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icon,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
+  useShell,
 } from "@koklo/ui";
 import { useRouter } from "next/navigation";
 import { authClient } from "../lib/auth-client.ts";
 import { endFeatureSession } from "../lib/feature-draft.ts";
-import { useTheme } from "./theme-toggle.tsx";
+import { initialsOf } from "./sidebar-organization.tsx";
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
+/** Identité du pied de la barre (avatar, nom, e-mail) et menu de déconnexion. Le thème a son propre bouton. */
 export function NavUser() {
-  const { isMobile } = useSidebar();
+  const { collapsed, mobile } = useShell();
   const router = useRouter();
   const { data: session } = authClient.useSession();
-  const { theme, next, toggle } = useTheme();
   const user = session?.user;
   if (!user) return null;
 
   const identity = (
     <>
-      <Avatar className="h-8 w-8 rounded-lg">
+      <Avatar className="size-8 rounded-lg">
         {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-        <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
+        <AvatarFallback className="rounded-lg bg-secondary text-caption font-medium text-secondary-foreground">
+          {initialsOf(user.name)}
+        </AvatarFallback>
       </Avatar>
-      <div className="grid flex-1 text-left text-sm leading-tight">
-        <span className="truncate font-medium">{user.name}</span>
-        <span className="truncate text-xs">{user.email}</span>
-      </div>
+      {collapsed ? null : (
+        <span className="grid min-w-0 flex-1 text-left leading-tight">
+          <span className="truncate text-meta font-medium">{user.name}</span>
+          <span className="truncate text-caption text-muted-foreground">{user.email}</span>
+        </span>
+      )}
     </>
   );
 
@@ -59,47 +50,42 @@ export function NavUser() {
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              {identity}
-              {/* Nom accessible = texte visible + rôle (WCAG 2.5.3 « Label in Name ») : pas d'aria-label
-                  qui remplacerait l'identité affichée. */}
-              <span className="sr-only">Menu utilisateur</span>
-              <Icon name="unfold_more" size={16} className="ml-auto" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side={isMobile ? "bottom" : "right"}
-            align="end"
-            sideOffset={4}
-          >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                {identity}
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={toggle}>
-                <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} size={20} />
-                {next === "dark" ? "Passer au thème sombre" : "Passer au thème clair"}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void signOut()}>
-              <Icon name="logout" size={20} />
-              Se déconnecter
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
+        >
+          {identity}
+          {/* Nom accessible = texte visible + libellé (WCAG 2.5.3 « Label in Name »), sans aria-label qui le remplacerait. */}
+          <span className="sr-only">Menu utilisateur</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="min-w-56 rounded-lg"
+        side={mobile ? "top" : "right"}
+        align="end"
+        sideOffset={4}
+      >
+        <DropdownMenuLabel className="p-0 font-normal">
+          <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+            <Avatar className="size-8 rounded-lg">
+              <AvatarFallback className="rounded-lg bg-secondary text-caption font-medium text-secondary-foreground">
+                {initialsOf(user.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="grid min-w-0 flex-1 leading-tight">
+              <span className="truncate font-medium">{user.name}</span>
+              <span className="truncate text-xs">{user.email}</span>
+            </span>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void signOut()}>
+          <Icon name="logout" size={20} />
+          Se déconnecter
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

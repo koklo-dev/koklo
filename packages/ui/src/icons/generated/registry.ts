@@ -63,6 +63,10 @@ export const iconLoaders = {
   arrow_upward: () => import("./arrow_upward.ts"),
   swap_vert: () => import("./swap_vert.ts"),
   fit_screen: () => import("./fit_screen.ts"),
+  menu: () => import("./menu.ts"),
+  space_dashboard: () => import("./space_dashboard.ts"),
+  shield: () => import("./shield.ts"),
+  folder_open: () => import("./folder_open.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

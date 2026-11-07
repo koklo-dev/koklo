@@ -62,7 +62,7 @@ test("C1 : l'invité connecté accepte, rejoint l'organisation avec le rôle et 
   expect(await readInvitationStatus(id)).toBe("accepted");
   expect(await readMembership(user.userId)).toEqual({ role: "dev", count: 1 });
 
-  // C1.c : un administrateur voit l'invité dans /members avec le rôle.
+  // C1.c : un administrateur voit l'invité dans /settings/members avec le rôle.
   const admin = await page.context().browser()?.newContext({ baseURL });
   if (!admin) throw new Error("contexte admin indisponible");
   try {
@@ -70,7 +70,7 @@ test("C1 : l'invité connecté accepte, rejoint l'organisation avec le rôle et 
     await admin.addCookies([
       { name: SESSION_COOKIE, value: await createAdminSessionCookie(), url: baseURL as string },
     ]);
-    await adminPage.goto("/members");
+    await adminPage.goto("/settings/members");
     const row = adminPage.getByRole("row", { name: new RegExp(user.email) });
     await expect(row).toBeVisible();
     await expect(row).toContainText("Développeur");

@@ -14,6 +14,7 @@ import {
 import { type Ref, useId } from "react";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { ownerKindLabel } from "../lib/github-labels.ts";
+import { settingsPath } from "../lib/shell-routes.ts";
 import type { AccountsStatus, GithubAccount } from "../lib/use-github-accounts.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
@@ -44,7 +45,7 @@ function NoAccount({ projectExists }: { projectExists: boolean }) {
             ? "Aucun compte GitHub n'est relié. Reliez GitHub pour que Koklo crée le dépôt de spec de ce projet."
             : "Aucun compte GitHub n'est relié. Le projet sera créé sans dépôt de spec. Vous pourrez relier GitHub ensuite."}
         </p>
-        <a href="/github" className="font-medium underline underline-offset-4">
+        <a href={settingsPath("github")} className="font-medium underline underline-offset-4">
           Relier GitHub
         </a>
       </AlertDescription>

@@ -9,6 +9,7 @@ import {
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 import { handleLlm, type LlmScenario, resetLlm } from "./stub-llm-credential.ts";
+import { handleShell, resetShell, type ShellScenario } from "./stub-shell.ts";
 import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
 
 /**
@@ -32,7 +33,8 @@ type Scenario = {
   SpecRepoScenario &
   FeaturesScenario &
   AiScenario &
-  LlmScenario;
+  LlmScenario &
+  ShellScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
 const held: Array<() => void> = [];
@@ -165,6 +167,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetFeatures();
     resetAi();
     resetLlm();
+    resetShell(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
   });
@@ -176,13 +179,17 @@ const expireSession = () => {
   scenario.session = false;
 };
 
-const knownProject = (id: string) =>
-  [...PROJECTS, ...createdProjects].some((project) => project.id === id);
+const allProjects = () => [...PROJECTS, ...createdProjects];
+const knownProject = (id: string) => allProjects().some((project) => project.id === id);
 
-/** Appels à l'IA (`ai.*`) et réglages de la clé (`llmCredential.*`) : même modèle simulé, jamais de fournisseur réel. */
+/**
+ * Appels à l'IA (`ai.*`), réglages de la clé (`llmCredential.*`) : même modèle simulé, jamais de fournisseur réel ;
+ * puis la coquille (`project.shell|visit|recent`, `search.query`).
+ */
 const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
   handleLlm(req, url, { scenario, send, hold }) ||
-  handleAi(req, url, { scenario, knownProject, send, hold });
+  handleAi(req, url, { scenario, knownProject, send, hold }) ||
+  handleShell(req, url, { scenario, projects: allProjects, send, hold });
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://stub");

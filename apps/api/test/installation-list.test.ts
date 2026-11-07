@@ -119,7 +119,7 @@ describe("installation.list : userAuthorization de l'appelant", () => {
     const s = await installScene(b);
     const state = await startState(b, s.owner);
     const res = await callback(b.app, s.owner.cookie, githubReturn(s, state));
-    expect(res.headers.location).toBe("/github?result=installed");
+    expect(res.headers.location).toBe("/settings/github?result=installed");
     return { b, s };
   }
 

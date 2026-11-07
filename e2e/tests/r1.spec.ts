@@ -165,7 +165,7 @@ test("R1 : le kanban déplace C, refuse B tant que A n'est pas terminé, puis l'
   context,
 }) => {
   await context.addCookies([{ name: SESSION_COOKIE, value: workspace.owner.cookie, url: baseURL }]);
-  await page.goto("/kanban");
+  await page.goto(`/projects/${workspace.projectId}/tickets`);
   await expect(page.getByTestId("kanban-board")).toBeVisible();
   await expect(page.getByText(`Sprint ${sprintKey} · Livrer R1`)).toBeVisible();
   await expect(column(page, "todo").getByTestId(`kanban-card-${keyA}`)).toBeVisible();

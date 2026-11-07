@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { criteriaLabel, priorityLabel } from "../lib/feature-labels.ts";
 import { plural } from "../lib/features-region.ts";
 import { DESIGNER_TEXT } from "../lib/framing-labels.ts";
+import { featuresPath } from "../lib/shell-routes.ts";
 import type { FramingModel } from "../lib/use-framing-page.ts";
 import { AiSendPolicy } from "./ai-send-policy.tsx";
 
@@ -16,7 +17,7 @@ function DesignerNotice({ projectId }: { projectId: string }) {
       <div className="flex flex-col items-start gap-2">
         <p>{DESIGNER_TEXT}</p>
         <Button asChild variant="outline" className="h-11 md:h-9">
-          <a href={`/projects/${projectId}/features`}>Ouvrir les fonctionnalités</a>
+          <a href={featuresPath(projectId)}>Ouvrir les fonctionnalités</a>
         </Button>
       </div>
     </Alert>

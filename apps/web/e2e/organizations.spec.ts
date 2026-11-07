@@ -52,11 +52,11 @@ const SHOTS: Shot[] = [
   {
     screen: "S-members",
     state: "data",
-    path: "/members",
+    path: "/settings/members",
     scenario: { session: true, projects: "data" },
     ready: async (page) => {
       await expect(page.getByTestId("members-page")).toBeVisible();
-      await expect(page.getByRole("heading", { level: 1, name: "Membres" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Réglages" })).toBeVisible();
       await expect(page.getByText("Awa Koné")).toBeVisible();
     },
   },

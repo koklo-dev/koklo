@@ -91,7 +91,7 @@ describe("Panneau de création — accessibilité et vocabulaire (§7.1)", () =>
     const sheet = await openReadySheet();
     const link = within(sheet).getByRole("link", { name: "Relier GitHub" });
     expect(link.tagName).toBe("A");
-    expect(link).toHaveAttribute("href", "/github");
+    expect(link).toHaveAttribute("href", "/settings/github");
   });
 
   it.each([

@@ -36,6 +36,11 @@ export const procedures = {
   memberInvite: vi.fn(),
   projectList: vi.fn(),
   projectCreate: vi.fn(),
+  // TK-88 : coquille (contrat 2.1.0) — agrégat du projet, visites, récents, recherche ⌘K
+  projectShell: vi.fn(),
+  projectVisit: vi.fn(),
+  projectRecent: vi.fn(),
+  searchQuery: vi.fn(),
   sprintList: vi.fn(),
   ticketList: vi.fn(),
   ticketTransition: vi.fn(),
@@ -137,6 +142,14 @@ export const orpc = {
   project: {
     list: query(["project", "list"], procedures.projectList),
     create: mutation(procedures.projectCreate),
+    key: () => ["project"],
+    shell: queryFull(["project", "shell"], procedures.projectShell),
+    visit: mutationWithOptions(procedures.projectVisit),
+    recent: queryFull(["project", "recent"], procedures.projectRecent),
+  },
+  search: {
+    key: () => ["search"],
+    query: queryFull(["search", "query"], procedures.searchQuery),
   },
   sprint: {
     key: () => ["sprint"],
@@ -208,6 +221,34 @@ export const organization = (over: Record<string, unknown> = {}) => ({
 export const apiError = (code: string, data?: unknown) =>
   Object.assign(new Error(code), { code, ...(data === undefined ? {} : { data }) });
 
+export const PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
+
+const DELIVERABLE_KEYS = [
+  "functional",
+  "data",
+  "architecture",
+  "technical",
+  "security",
+  "design",
+  "quality",
+] as const;
+const AVAILABLE = new Set<string>(["functional", "data", "design"]);
+
+/** Sortie de `project.shell` : Fonctionnel, Données et Design disponibles, les autres verrouillés (B77). */
+export const projectShell = (over: Record<string, unknown> = {}) => ({
+  id: PROJECT_ID,
+  name: "Portail de réservation",
+  phase: "framing",
+  deliverables: DELIVERABLE_KEYS.map((key) => ({
+    key,
+    available: AVAILABLE.has(key),
+    after: AVAILABLE.has(key) ? null : "l'architecture",
+  })),
+  validatedCount: 0,
+  ticketCount: 12,
+  ...over,
+});
+
 export const sessionWith = (activeOrganizationId: string | null) => ({
   data: {
     user: { id: "u1", name: "Awa Koné", email: "awa@example.com", image: null },
@@ -238,6 +279,10 @@ export function resetWebMocks(): void {
   procedures.organizationList.mockResolvedValue([organization()]);
   procedures.projectList.mockResolvedValue([]);
   procedures.memberList.mockResolvedValue([]);
+  procedures.projectShell.mockResolvedValue(projectShell());
+  procedures.projectVisit.mockResolvedValue({ visitedAt: "2026-11-07T10:00:00.000Z" });
+  procedures.projectRecent.mockResolvedValue([]);
+  procedures.searchQuery.mockResolvedValue({ items: [], total: 0, nextCursor: null });
 }
 
 /** Chemins vers lesquels le composant a navigué (push ou replace). */

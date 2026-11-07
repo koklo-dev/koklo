@@ -7,7 +7,7 @@ const web = join(import.meta.dirname, "..");
 const components = join(web, "src/components");
 
 describe("cas 1 : fichiers des blocs dans apps/web", () => {
-  it.each(["app-sidebar", "nav-main", "nav-projects", "nav-user", "team-switcher", "login-form"])(
+  it.each(["app-sidebar", "nav-user", "sidebar-organization", "login-form"])(
     "%s.tsx est généré",
     (name) => {
       expect(existsSync(join(components, `${name}.tsx`)), `${name}.tsx absent`).toBe(true);
@@ -23,12 +23,24 @@ describe("cas 1 : fichiers des blocs dans apps/web", () => {
     expect(cfg.iconLibrary).toBe("material-symbols");
   });
 
+  it("les blocs v1 remplacés par la coquille (nav-main, nav-projects, team-switcher, app-frame) sont supprimés", () => {
+    for (const name of [
+      "nav-main",
+      "nav-projects",
+      "team-switcher",
+      "app-frame",
+      "projects-frame",
+    ]) {
+      expect(existsSync(join(components, `${name}.tsx`)), `${name}.tsx présent`).toBe(false);
+    }
+  });
+
   it("l'ancien assemblage manuel (app-shell, login-card) est supprimé", () => {
     expect(existsSync(join(components, "app-shell.tsx"))).toBe(false);
     expect(existsSync(join(components, "login-card.tsx"))).toBe(false);
   });
 
-  it("le layout /projects existe (sidebar-07 en layout)", () => {
-    expect(existsSync(join(web, "src/app/projects/layout.tsx"))).toBe(true);
+  it("la coquille est un layout partagé du groupe de routes (shell)", () => {
+    expect(existsSync(join(web, "src/app/(shell)/layout.tsx"))).toBe(true);
   });
 });

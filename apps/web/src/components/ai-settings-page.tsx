@@ -70,7 +70,7 @@ export function AiSettingsPage() {
   if (role) body = canManage(role) ? <Manager /> : <Restricted />;
   return (
     <div data-testid="ai-settings-page" className="flex min-w-0 max-w-2xl flex-col gap-6">
-      <h1 className="text-page-title">{L.title}</h1>
+      <h2 className="text-section-title">{L.title}</h2>
       {body}
     </div>
   );

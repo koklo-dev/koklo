@@ -61,7 +61,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
       await open(page, llm);
       if (theme === "dark") await switchToDark(page);
       await expect(page.getByTestId("ai-settings-page")).toBeVisible();
-      await expect(page.getByRole("heading", { level: 1, name: "IA" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: "IA" })).toBeVisible();
       await expect(page.getByText(expected).first()).toBeVisible();
       await settle(page);
       expect((await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze()).violations).toEqual([]);
@@ -71,17 +71,14 @@ for (const theme of ["light", "dark"] as Theme[]) {
   }
 }
 
-test("S-ai-settings : le propriétaire voit l'entrée « IA » active et le fil d'Ariane « Koklo > Réglages > IA »", async ({
+test("S-ai-settings : le propriétaire lit h1 « Réglages » avec l'onglet « IA » actif", async ({
   page,
 }) => {
   await open(page);
-  await expect(sidebarOf(page).getByRole("link", { name: "IA" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  const crumbs = page.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i });
-  await expect(crumbs).toContainText("Réglages");
-  await expect(crumbs.getByRole("link", { name: "Réglages" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Réglages" })).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "Sections des réglages" });
+  await expect(tabs.getByRole("link", { name: "IA" })).toHaveAttribute("aria-current", "page");
+  await expect(sidebarOf(page).getByRole("link", { name: "IA" })).toHaveCount(0);
 });
 
 test("S-ai-settings : en-têtes de la route, Cache-Control: no-store et Referrer-Policy: no-referrer", async ({
@@ -92,11 +89,11 @@ test("S-ai-settings : en-têtes de la route, Cache-Control: no-store et Referrer
   expect(response?.headers()["cache-control"]).toBe("no-store");
   expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
   // Limités à cette route.
-  const github = await page.goto("/github");
+  const github = await page.goto("/settings/github");
   expect(github?.headers()["referrer-policy"]).not.toBe("no-referrer");
 });
 
-test("S-ai-settings : un développeur n'a ni entrée, ni appel d'API llmCredential, et lit un refus sans action", async ({
+test("S-ai-settings : un développeur n'a ni onglet GitHub, ni appel d'API llmCredential, et lit un refus sans action", async ({
   page,
 }) => {
   const seen: string[] = [];
@@ -105,7 +102,11 @@ test("S-ai-settings : un développeur n'a ni entrée, ni appel d'API llmCredenti
   });
   await open(page, { list: "configured" }, "dev");
   await expect(page.getByText(/Cette page est réservée aux propriétaires/)).toBeVisible();
-  await expect(sidebarOf(page).getByRole("link", { name: "IA" })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Sections des réglages" })
+      .getByRole("link", { name: "GitHub" }),
+  ).toHaveCount(0);
   await expect(page.getByLabel(FIELD)).toHaveCount(0);
   await expect(page.getByRole("button", { name: SAVE })).toHaveCount(0);
   expect(seen).toEqual([]);
@@ -401,7 +402,7 @@ test.describe("lien depuis le cadrage (S-framing §4.5)", () => {
       await expect(alert).not.toContainText("Demandez à un administrateur");
       await alert.getByRole("link", { name: "Configurer l'IA" }).click();
       await expect(page).toHaveURL(/\/settings\/ai$/);
-      await expect(page.getByRole("heading", { level: 1, name: "IA" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: "IA" })).toBeVisible();
     });
   }
 

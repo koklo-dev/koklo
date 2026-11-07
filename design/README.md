@@ -48,14 +48,15 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | Écran | Version | Dernier ticket |
 |---|---|---|
 | [S-login](screens/S-login.md) | 3 | TK-85 (correction) |
-| [S-projects](screens/S-projects.md) | 6 | TK-48 (48d) |
-| [S-organizations](screens/S-organizations.md) | 1 | TK-24 |
-| [S-members](screens/S-members.md) | 1 | TK-24 |
+| [S-projects](screens/S-projects.md) | 6.1 | TK-88 |
+| [S-organizations](screens/S-organizations.md) | 1.1 | TK-88 |
+| [S-members](screens/S-members.md) | 1.1 | TK-88 |
 | [S-accept-invitation](screens/S-accept-invitation.md) | 1 | TK-86 |
-| [S-kanban](screens/S-kanban.md) | 1.1 | TK-87 |
-| [S-github](screens/S-github.md) | 4 | TK-87 |
-| [S-features](screens/S-features.md) | 1.6 | TK-87 |
-| [S-framing](screens/S-framing.md) | 2.2 | TK-87 |
-| [S-ai-settings](screens/S-ai-settings.md) | 1.1 | TK-87 |
+| [S-kanban](screens/S-kanban.md) | 1.6 | TK-88 |
+| [S-github](screens/S-github.md) | 4.1 | TK-88 |
+| [S-features](screens/S-features.md) | 1.7 | TK-88 |
+| [S-framing](screens/S-framing.md) | 2.4 | TK-88 |
+| [S-ai-settings](screens/S-ai-settings.md) | 1.2 | TK-88 |
 | [S-feature-form](screens/S-feature-form.md) | 1.3 | TK-48 (48e) |
-| [S-dev-ui](screens/S-dev-ui.md) | 1 | TK-87 |
+| [S-dev-ui](screens/S-dev-ui.md) | 1.1 | TK-88 |
+| [S-app-shell](screens/S-app-shell.md) | 2 | TK-88 |

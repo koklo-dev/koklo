@@ -22,7 +22,6 @@ describe("guardedPathFor", () => {
   });
 
   it.each([
-    `/projects/${ID}`,
     `/projects/${ID}/`,
     `/projects/${ID}/features/`,
     `/projects/${ID}/features/x`,
@@ -30,7 +29,6 @@ describe("guardedPathFor", () => {
     `/projects/${ID}/other`,
     "/projects//features",
     "/projects/a/b/features",
-    "/projects/features",
     "/projects/",
     "/projectsx",
     "/api/orpc/projects",

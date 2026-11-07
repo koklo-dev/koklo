@@ -137,7 +137,7 @@ describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
   it("spec qui n'est plus prête : pas de formulaire de modification, donc pas de suppression", async () => {
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
     renderFeatures({ search: "?edit=F-001" });
-    await findNamed("heading", /Fonctionnalités/, { level: 1 });
+    await findNamed("heading", /Cahier fonctionnel/, { level: 1 });
     expect(deleteButton()).toBeNull();
   });
 });

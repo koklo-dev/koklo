@@ -1,13 +1,12 @@
-import type { Metadata } from "next";
-import { KanbanPage } from "../../components/kanban-page.tsx";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { lastProjectPath } from "../../lib/last-project.ts";
+import { readRuntimeConfig } from "../../lib/runtime-config.ts";
 
-export const metadata: Metadata = { title: "Kanban · Koklo" };
-
-export default function Page() {
-  return (
-    <>
-      <h1 className="mb-2 text-page-title">Kanban</h1>
-      <KanbanPage />
-    </>
-  );
+/** Ancien `/kanban` : les tickets du dernier projet ouvert, sinon la liste des projets. */
+export default async function Page(): Promise<never> {
+  // `headers()` d'abord : la page est dynamique (jamais préparée au build, où la configuration d'exécution n'existe pas).
+  const cookie = (await headers()).get("cookie");
+  const { apiUrl } = readRuntimeConfig(process.env);
+  redirect(await lastProjectPath(apiUrl, cookie, "/tickets"));
 }

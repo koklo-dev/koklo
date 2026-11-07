@@ -7,6 +7,7 @@ export { SESSION_COOKIE };
 export const SEED = {
   organization: "01900000-0000-7000-8000-000000000001",
   adminUser: "01900000-0000-7000-8000-000000000002",
+  project: "01900000-0000-7000-8000-000000000006",
   projectName: "Projet de démo",
 } as const;
 

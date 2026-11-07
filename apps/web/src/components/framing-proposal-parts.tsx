@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 import { stepLabel } from "../lib/feature-labels.ts";
 import type { ProposalStatus, ProposedFeature } from "../lib/framing-types.ts";
+import { featuresPath } from "../lib/shell-routes.ts";
 
 /** Description repliée à 3 lignes au-delà de 3 retours à la ligne ou d'une longueur qui dépasse 3 lignes. */
 const isLong = (text: string): boolean => text.split("\n").length > 3 || text.length > 240;
@@ -89,10 +90,7 @@ export function Duplicate({ projectId, specId }: { projectId: string; specId: st
     <p className="flex flex-wrap items-center gap-x-2 text-meta">
       <Icon name="warning" size={16} />
       <span>{`Titre déjà présent : ${specId}`}</span>
-      <a
-        href={`/projects/${projectId}/features?sel=${specId}`}
-        className="underline underline-offset-4"
-      >
+      <a href={featuresPath(projectId, `sel=${specId}`)} className="underline underline-offset-4">
         {`Voir ${specId}`}
       </a>
     </p>

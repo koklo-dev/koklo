@@ -45,7 +45,7 @@ describe("rôle connu et autorisé", () => {
       serveAiSettings(role);
       renderAiSettings();
       expect(await findNamed("heading", "Anthropic", { level: 2 })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { level: 1, name: "IA" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name: "IA" })).toBeInTheDocument();
       expect(screen.getByTestId("ai-settings-page")).toBeInTheDocument();
       expect(procedures.llmCredentialList).toHaveBeenCalled();
       expect(screen.queryByText(RESTRICTED)).not.toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("non-admin : vue refusée, zéro appel d'API", () => {
   it.each(["dev", "designer", "client", "business"])("%s", async (role) => {
     serveAiSettings(role);
     renderAiSettings();
-    const note = await findNamed("heading", "IA", { level: 1 });
+    const note = await findNamed("heading", "IA", { level: 2 });
     expect(note).toBeInTheDocument();
     expect(await screen.findByText(RESTRICTED)).toBeInTheDocument();
     // Alerte neutre avec icône, jamais un champ, un bouton ou la carte du fournisseur.

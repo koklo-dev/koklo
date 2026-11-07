@@ -5,9 +5,9 @@ import { assertContrast, WCAG_AA_TEXT } from "./helpers/contrast.ts";
 import { effectiveTheme, loadBlocks } from "./helpers/css.ts";
 import { cssPath, stylesDir } from "./helpers/paths.ts";
 
-/** Mapping décidé par 02-design.md §2 : chaque --sidebar-* pointe vers un token existant. */
+/** Mapping décidé par 02-design.md §2, --sidebar sur --surface depuis TK-88 (B29) : chaque --sidebar-* pointe vers un token existant. */
 const MAPPING: Record<string, string> = {
-  "--sidebar": "var(--card)",
+  "--sidebar": "var(--surface)",
   "--sidebar-foreground": "var(--card-foreground)",
   "--sidebar-primary": "var(--primary)",
   "--sidebar-primary-foreground": "var(--primary-foreground)",
@@ -59,7 +59,8 @@ describe("T2.4 : variables --sidebar-* dans theme.css", () => {
 describe.each([":root", ".dark"] as const)("T2.4 : contraste AA des paires sidebar (%s)", (sel) => {
   const theme = effectiveTheme(sel);
   it.each([
-    ["--card-foreground", "--card"],
+    ["--card-foreground", "--surface"],
+    ["--muted-foreground", "--surface"],
     ["--accent-foreground", "--accent"],
   ])("--sidebar-foreground / accent via %s sur %s >= 4,5:1", (fg, bg) => {
     expect(

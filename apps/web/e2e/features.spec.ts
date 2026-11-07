@@ -27,7 +27,8 @@ import {
  * Captures dans design/screens/captures/S-features/<état>-<thème>.png (+ -mobile à 375 px).
  */
 /** Même référentiel que les autres specs : WCAG A/AA (les règles « best-practice » visent un autre périmètre). */
-const PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
+const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/functional`;
+const OTHER_PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b03";
 /** Les lignes de la liste des fonctionnalités (pas les éléments de liste du gabarit). */
 const rows = (page: Page) =>
   page.getByRole("list", { name: "Fonctionnalités" }).getByRole("listitem");
@@ -101,7 +102,7 @@ const STATES: State[] = [
   },
   {
     name: "not-found",
-    path: `/projects/${UNKNOWN_PROJECT_ID}/features`,
+    path: `/projects/${UNKNOWN_PROJECT_ID}/spec/functional`,
     visible: heading("Projet introuvable"),
   },
   {
@@ -160,7 +161,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
       await arrive(page, state, theme);
       // `includeHidden` : sous une fiche modale, le reste de la page est volontairement masqué aux lecteurs d'écran.
       await expect(
-        page.getByRole("heading", { level: 1, name: "Fonctionnalités", includeHidden: true }),
+        page.getByRole("heading", { level: 1, name: "Cahier fonctionnel", includeHidden: true }),
       ).toBeVisible();
       await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^((?!dark).)*$/);
       await capture(page, state.name, theme);
@@ -171,23 +172,30 @@ for (const theme of ["light", "dark"] as Theme[]) {
   }
 }
 
-test("S-features : accès depuis la liste des projets et la barre latérale", async ({ page }) => {
+test("S-features : accès depuis la liste des projets, l'en-tête de projet et la carte projet", async ({
+  page,
+}) => {
   await setScenario({ session: true, projects: "data" });
   await page.goto("/projects");
   await page.getByRole("link", { name: /^Atelier Lumière\s?:\s?fonctionnalités$/ }).click();
-  await expect(page).toHaveURL(new RegExp(`${PATH}$`));
-  const current = sidebarOf(page).getByRole("link", { name: /Atelier Lumière/ });
-  await expect(current).toHaveAttribute("aria-current", "page");
-  await expect(
-    sidebarOf(page).getByRole("link", { name: /Portail partenaires/ }),
-  ).not.toHaveAttribute("aria-current", "page");
-  await sidebarOf(page)
-    .getByRole("link", { name: /Portail partenaires/ })
-    .click();
-  await expect(page).toHaveURL(/\/projects\/7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b03\/features$/);
-  const crumbs = page.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i });
-  await expect(crumbs).toContainText("Portail partenaires");
-  await expect(crumbs.getByRole("link", { name: "Projets" })).toHaveAttribute("href", "/projects");
+  await expect(page).toHaveURL(new RegExp(`${PATH}\\?tab=features$`));
+  await expect(sidebarOf(page).getByRole("link", { name: "Fonctionnel" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const location = page.getByRole("navigation", { name: "Emplacement" });
+  await expect(location.getByRole("link", { name: "Atelier Lumière" })).toHaveAttribute(
+    "href",
+    `/projects/${FEATURE_PROJECT_ID}`,
+  );
+  await expect(location).toContainText("Spec");
+  await expect(page.getByRole("navigation", { name: /fil d'ariane|breadcrumb/i })).toHaveCount(0);
+  // Un second projet : la carte projet liste les deux projets ouverts, le premier y ramène.
+  await page.goto(`/projects/${OTHER_PROJECT_ID}/spec/functional`);
+  await sidebarOf(page).getByRole("button", { name: /Phase/ }).click();
+  await expect(page.getByRole("menuitem", { name: "Portail partenaires" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Atelier Lumière" }).click();
+  await expect(page).toHaveURL(new RegExp(`${PATH}\\?tab=features$`));
 });
 
 test("S-features : la route dynamique est gardée (sans session /login, sans organisation /organizations)", async ({
@@ -351,13 +359,15 @@ test("S-features : AC-48-28, la vue client ne montre aucun terme git, chemin ni 
 test("S-features : l'équipe voit la version et le fichier", async ({ page }) => {
   await setScenario({ session: true, projects: "data", role: "dev" });
   await page.goto(PATH);
-  await expect(page.getByLabel("Version de la spec a1b2c3d").first()).toBeVisible();
+  // Équipe : SHA de 7 caractères et âge de la spec dans l'en-tête de projet.
+  await expect(page.getByText("a1b2c3d").first()).toBeVisible();
+  await expect(page.getByText(/spec à jour/)).toBeVisible();
   await openFiche(page);
   await expect(page.getByText(".koklo/features/F-001.yaml")).toBeVisible();
   await expect(page.getByText("Tables")).toBeVisible();
 });
 
-test("S-features : liens d'erreur de la fiche (owner : /github ; dev : texte seul)", async ({
+test("S-features : liens d'erreur de la fiche (owner : /settings/github ; dev : texte seul)", async ({
   page,
 }) => {
   await setScenario({ session: true, projects: "data", feature: "authExpired", role: "owner" });
@@ -365,7 +375,7 @@ test("S-features : liens d'erreur de la fiche (owner : /github ; dev : texte seu
   await openFiche(page);
   await expect(page.getByRole("link", { name: "Ouvrir la page GitHub" })).toHaveAttribute(
     "href",
-    "/github",
+    "/settings/github",
   );
   await setScenario({ session: true, projects: "data", feature: "authExpired", role: "dev" });
   await page.goto(PATH);

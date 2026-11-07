@@ -122,10 +122,13 @@ describe("proxy", () => {
       expect(response.headers.get("x-middleware-next")).toBe("1");
     });
 
-    it("laisse passer /members avec session et organisation active", async () => {
+    it("redirige /members vers /settings/members avec session et organisation active (TK-88)", async () => {
       withSession(true, true);
       const response = await call("/members");
-      expect(response.headers.get("x-middleware-next")).toBe("1");
+      expect(response.status).toBe(307);
+      expect(new URL(response.headers.get("location") as string).pathname).toBe(
+        "/settings/members",
+      );
     });
 
     it("garde aussi /organizations et /members dans le matcher du proxy", async () => {
@@ -153,10 +156,11 @@ describe("proxy", () => {
       expect(await target("/github")).toBe("/organizations");
     });
 
-    it("laisse passer /github?result=installed avec session et organisation active", async () => {
+    it("redirige /github?result=installed vers /settings/github?result=installed (TK-88)", async () => {
       withSession(true, true);
       const response = await call("/github?result=installed");
-      expect(response.headers.get("x-middleware-next")).toBe("1");
+      const location = new URL(response.headers.get("location") as string);
+      expect(`${location.pathname}${location.search}`).toBe("/settings/github?result=installed");
     });
 
     it("est dans le matcher, sans retirer le relais du callback GitHub", async () => {

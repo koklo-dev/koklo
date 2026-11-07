@@ -12,7 +12,7 @@ import {
 import { FAKE_GITHUB_URL, type GithubScenario } from "./support/stub-github.ts";
 
 /**
- * TK-48b, écran /github. Pile locale : faux API (support/stub-github.ts) et navigateur réel.
+ * TK-48b, écran /settings/github. Pile locale : faux API (support/stub-github.ts) et navigateur réel.
  * Aucune requête ne part vers github.com : toute navigation vers cet hôte est interceptée et remplie
  * par un faux fournisseur (`fakeGithub`), jamais laissée sortir.
  */
@@ -32,7 +32,7 @@ const open = async (
   scenario: GithubScenario & { role?: "dev" | "owner" },
 ) => {
   await setScenario({ session: true, projects: "data", ...scenario });
-  await page.goto("/github");
+  await page.goto("/settings/github");
 };
 
 const STATES: Array<{ state: string; scenario: GithubScenario; testId: RegExp | string }> = [
@@ -48,7 +48,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
       await open(page, scenario);
       if (theme === "dark") await switchToDark(page);
       await expect(page.getByTestId("github-page")).toBeVisible();
-      await expect(page.getByRole("heading", { level: 1, name: "GitHub" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: "GitHub" })).toBeVisible();
       const expected = {
         loading: "Chargement des installations GitHub…",
         empty: "Aucune application GitHub installée",
@@ -66,15 +66,18 @@ for (const theme of ["light", "dark"] as Theme[]) {
   }
 }
 
-test("S-github : le propriétaire voit l'entrée « GitHub » active dans la navigation et le fil d'Ariane", async ({
+test("S-github : le propriétaire lit h1 « Réglages », l'onglet « GitHub » actif et « Réglages » dans la barre", async ({
   page,
 }) => {
   await open(page, { installations: "empty" });
-  const link = sidebarOf(page).getByRole("link", { name: "GitHub" });
-  await expect(link).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i })).toContainText(
-    "GitHub",
+  await expect(page.getByRole("heading", { level: 1, name: "Réglages" })).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "Sections des réglages" });
+  await expect(tabs.getByRole("link", { name: "GitHub" })).toHaveAttribute("aria-current", "page");
+  await expect(sidebarOf(page).getByRole("link", { name: "Réglages" })).toHaveAttribute(
+    "aria-current",
+    "page",
   );
+  await expect(sidebarOf(page).getByRole("link", { name: "GitHub" })).toHaveCount(0);
 });
 
 test("S-github : liste, un statut = icône + texte, actions « Autoriser » / « Réautoriser »", async ({
@@ -135,7 +138,7 @@ test("S-github : une URL reçue hors github.com est refusée, aucune navigation"
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toContainText(
     "Impossible de lancer l'installation",
   );
-  await expect(page).toHaveURL(/\/github$/);
+  await expect(page).toHaveURL(/\/settings\/github$/);
   expect(reached).toEqual([]);
   await expect(page.getByRole("button", { name: INSTALL })).toBeEnabled();
 });
@@ -182,10 +185,10 @@ for (const theme of ["light", "dark"] as Theme[]) {
       ),
       async ({ page }) => {
         await setScenario({ session: true, projects: "data", installations: "data" });
-        await page.goto(`/github?result=${result}`);
+        await page.goto(`/settings/github?result=${result}`);
         if (theme === "dark") await switchToDark(page);
         await expect(page.getByRole(role).filter({ hasText: title })).toBeVisible();
-        await expect(page).toHaveURL(/\/github$/);
+        await expect(page).toHaveURL(/\/settings\/github$/);
         await settle(page);
         await page.screenshot({
           path: `${CAPTURES_DIR}/S-github/result-${result}-${theme}.png`,
@@ -203,13 +206,13 @@ test("S-github : un résultat inconnu n'affiche rien et sa valeur n'est jamais r
   page,
 }) => {
   await setScenario({ session: true, projects: "data", installations: "data" });
-  await page.goto("/github?result=%3Cimg%20src%3Dx%3E");
+  await page.goto("/settings/github?result=%3Cimg%20src%3Dx%3E");
   await expect(page.getByRole("heading", { level: 2, name: "acme-corp" })).toBeVisible();
   await expect(page.getByText("<img")).toHaveCount(0);
   for (const [, , title] of RESULTS) await expect(page.getByText(title)).toHaveCount(0);
 });
 
-test("S-github : un développeur n'a ni l'entrée de navigation ni un appel d'API, et lit un refus sans action", async ({
+test("S-github : un développeur n'a ni l'onglet IA ni un appel d'API, et lit un refus sans action", async ({
   page,
 }) => {
   const calls: string[] = [];
@@ -218,15 +221,16 @@ test("S-github : un développeur n'a ni l'entrée de navigation ni un appel d'AP
   });
   await open(page, { installations: "data", role: "dev" });
   await expect(page.getByText(/Cette page est réservée aux propriétaires/)).toBeVisible();
-  await expect(sidebarOf(page).getByRole("link", { name: "Membres" })).toBeVisible();
-  await expect(sidebarOf(page).getByRole("link", { name: "GitHub" })).toHaveCount(0);
+  const tabs = page.getByRole("navigation", { name: "Sections des réglages" });
+  await expect(tabs.getByRole("link", { name: "Membres" })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "IA" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: INSTALL })).toHaveCount(0);
   expect(calls).toEqual([]);
 });
 
 test("S-github : sans session, /github renvoie vers /login", async ({ page }) => {
   await setScenario({ session: false, projects: "data" });
-  await page.goto("/github");
+  await page.goto("/settings/github");
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -234,7 +238,7 @@ test("S-github : sans organisation active, /github renvoie vers /organizations",
   page,
 }) => {
   await setScenario({ session: true, projects: "data", activeOrganization: false });
-  await page.goto("/github");
+  await page.goto("/settings/github");
   await expect(page).toHaveURL(/\/organizations$/);
 });
 

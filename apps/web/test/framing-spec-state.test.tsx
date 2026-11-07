@@ -74,7 +74,7 @@ describe("Spec non prête (§4.10)", () => {
     expect(await screen.findByText("Le projet n'a pas encore de spec.")).toBeVisible();
     expect(screen.getByRole("link", { name: "Voir les fonctionnalités" })).toHaveAttribute(
       "href",
-      `/projects/${PROJECT_ID}/features`,
+      `/projects/${PROJECT_ID}/spec/functional?tab=features`,
     );
   });
 
@@ -130,7 +130,7 @@ describe("Designer (§4.11)", () => {
     expect(screen.getByText(MESSAGE)).toBeVisible();
     expect(screen.getByRole("link", { name: "Ouvrir les fonctionnalités" })).toHaveAttribute(
       "href",
-      `/projects/${PROJECT_ID}/features`,
+      `/projects/${PROJECT_ID}/spec/functional?tab=features`,
     );
     expect(screen.queryByRole("button", { name: SAVE })).not.toBeInTheDocument();
     expect(submits()).toHaveLength(0);

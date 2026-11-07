@@ -10,8 +10,8 @@ import { describe, expect, it } from "vitest";
 const src = join(import.meta.dirname, "../src");
 
 const FILES = [
-  "app/settings/ai/page.tsx",
-  "app/settings/ai/layout.tsx",
+  "app/(shell)/settings/[section]/page.tsx",
+  "components/settings-page.tsx",
   "components/ai-settings-page.tsx",
   "components/ai-credential-card.tsx",
   "components/ai-credential-form.tsx",

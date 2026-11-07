@@ -2,6 +2,7 @@ import { Alert, AlertDescription, Icon } from "@koklo/ui";
 import { useEffect, useId, useRef } from "react";
 import type { PendingResume } from "../lib/creation-types.ts";
 import { RETRY_LATER } from "../lib/form-errors.ts";
+import { settingsPath } from "../lib/shell-routes.ts";
 import type { CreationPanel } from "../lib/use-creation-panel.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FormField } from "./form-field.tsx";
@@ -35,7 +36,7 @@ function NoRepoNotice({ name }: { name: string }) {
           Projet « {name} » créé, sans dépôt de spec. Reliez GitHub pour que Koklo puisse en créer
           un.
         </p>
-        <a href="/github" className="font-medium underline underline-offset-4">
+        <a href={settingsPath("github")} className="font-medium underline underline-offset-4">
           Relier GitHub
         </a>
       </AlertDescription>

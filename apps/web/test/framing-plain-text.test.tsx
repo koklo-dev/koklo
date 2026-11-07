@@ -82,7 +82,9 @@ function expectInert(root: HTMLElement, allowedHrefs: RegExp[] = []) {
   }
   expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
 }
-const ALLOWED = [/^\/projects(\/[0-9a-f-]{36}\/features(\?sel=F-\d{3})?)?$/];
+const ALLOWED = [
+  /^\/projects(\/[0-9a-f-]{36}(\/spec\/functional\?tab=features(&sel=F-\d{3})?)?)?$/,
+];
 
 describe("Propositions hostiles", () => {
   beforeEach(() => {
@@ -118,7 +120,7 @@ describe("Propositions hostiles", () => {
     const hrefs = Array.from(card(HOSTILE_TITLE).querySelectorAll("a[href]")).map((a) =>
       a.getAttribute("href"),
     );
-    expect(hrefs).toEqual([`/projects/${PROJECT_ID}/features?sel=F-003`]);
+    expect(hrefs).toEqual([`/projects/${PROJECT_ID}/spec/functional?tab=features&sel=F-003`]);
   });
 
   it("le récapitulatif de confirmation affiche les titres hostiles en texte brut", async () => {

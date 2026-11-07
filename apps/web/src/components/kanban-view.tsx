@@ -1,12 +1,14 @@
-import { Button, Card, Icon } from "@koklo/ui";
+import { Card, Icon } from "@koklo/ui";
 import type { ReactNode } from "react";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import type { FailureNotice } from "../lib/kanban-failure.ts";
 import { STATUS_ORDER } from "../lib/ticket-labels.ts";
 import type { KanbanData } from "../lib/use-kanban-data.ts";
 import { ErrorNotice } from "./error-notice.tsx";
+import { ProjectNotFound } from "./features-empty.tsx";
 import { KanbanColumn } from "./kanban-column.tsx";
 import { KanbanNotice } from "./kanban-notice.tsx";
+import { KanbanScroller } from "./kanban-scroller.tsx";
 import type { KanbanInteraction } from "./kanban-types.ts";
 
 export interface KanbanViewProps {
@@ -59,7 +61,7 @@ function CenteredCard({
   children,
 }: {
   testId: string;
-  icon: "checklist" | "account_tree";
+  icon: "checklist";
   title: string;
   children: ReactNode;
 }) {
@@ -81,10 +83,6 @@ function Header({
 }) {
   return (
     <div className="flex flex-col gap-1 text-meta text-muted-foreground">
-      <div className="flex flex-wrap gap-x-3">
-        <p>{`Sprint ${data.sprintKey} · ${data.goal}`}</p>
-        <p>{data.total === 1 ? "1 ticket" : `${data.total} tickets`}</p>
-      </div>
       {readOnly ? (
         <p className="flex items-center gap-1">
           <Icon name="lock" size={16} />
@@ -115,12 +113,7 @@ function Board({
       {notice ? (
         <KanbanNotice notice={notice} onAction={onNoticeAction} onClose={onNoticeClose} />
       ) : null}
-      <section
-        aria-label="Colonnes du kanban"
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante atteignable au clavier (axe scrollable-region-focusable)
-        tabIndex={0}
-        className="flex snap-x snap-proximity gap-4 overflow-x-auto pb-2 md:snap-none"
-      >
+      <KanbanScroller>
         {STATUS_ORDER.map((status) => (
           <KanbanColumn
             key={status}
@@ -129,7 +122,7 @@ function Board({
             interaction={interaction}
           />
         ))}
-      </section>
+      </KanbanScroller>
     </div>
   );
 }
@@ -158,15 +151,9 @@ export function KanbanView({ data, onRetry, ...board }: KanbanViewProps) {
       );
     case "no-project":
       return (
-        <CenteredCard
-          testId="kanban-no-project"
-          icon="account_tree"
-          title="Aucun projet pour le moment"
-        >
-          <Button asChild variant="outline" className="h-11 md:h-9">
-            <a href="/projects">Voir les projets</a>
-          </Button>
-        </CenteredCard>
+        <div data-testid="kanban-no-project">
+          <ProjectNotFound />
+        </div>
       );
     case "ready":
       return <Board data={data} {...board} />;

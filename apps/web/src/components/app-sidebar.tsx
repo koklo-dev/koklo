@@ -1,52 +1,45 @@
 "use client";
 
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@koklo/ui";
+import { useShell } from "@koklo/ui";
 import { usePathname } from "next/navigation";
-import type * as React from "react";
-import { canListMembers, canManage } from "../lib/roles.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
-import { NavMain } from "./nav-main.tsx";
-import { NavProjects } from "./nav-projects.tsx";
-import { NavUser } from "./nav-user.tsx";
-import { TeamSwitcher } from "./team-switcher.tsx";
+import { SidebarFooter } from "./sidebar-footer.tsx";
+import { OrganizationNav, ProjectNav } from "./sidebar-nav.tsx";
+import { SidebarOrganization } from "./sidebar-organization.tsx";
+import { SidebarSearch } from "./sidebar-search.tsx";
 
-const PROJECTS_ENTRY = { title: "Projets", url: "/projects", icon: "account_tree" } as const;
-const KANBAN_ENTRY = { title: "Kanban", url: "/kanban", icon: "checklist" } as const;
-/** Réservée à l'équipe (`member.list` répond 403 au client) ; absente tant que le rôle est inconnu (fail-closed). */
-const MEMBERS_ENTRY = { title: "Membres", url: "/members", icon: "person" } as const;
-
-/** Réservée aux propriétaires et administrateurs ; tant que le rôle est inconnu, elle n'est pas rendue. */
-const GITHUB_ENTRY = { title: "GitHub", url: "/github", icon: "link" } as const;
-
-/** Réglages de l'IA (clé du fournisseur) : mêmes règles que GitHub, propriétaires et administrateurs seulement. */
-const AI_ENTRY = { title: "IA", url: "/settings/ai", icon: "smart_toy" } as const;
-
-function Navigation() {
+/**
+ * Contenu de la barre (DESIGN.md §5.4), de haut en bas : organisation, recherche, groupe Projet (si une page de
+ * projet est ouverte), groupe Organisation, pied. Le rôle vient de `organization.list` croisé avec la session.
+ */
+export function AppSidebar({
+  projectId,
+  onOpenSearch,
+}: {
+  projectId: string | null;
+  onOpenSearch: () => void;
+}) {
   const pathname = usePathname();
   const { role } = useActiveOrganization();
-  const entries = [
-    PROJECTS_ENTRY,
-    KANBAN_ENTRY,
-    ...(canListMembers(role) ? [MEMBERS_ENTRY] : []),
-    ...(canManage(role) ? [GITHUB_ENTRY, AI_ENTRY] : []),
-  ];
-  return <NavMain items={entries.map((item) => ({ ...item, isActive: pathname === item.url }))} />;
-}
-
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { mobile } = useShell();
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <TeamSwitcher />
-      </SidebarHeader>
-      <SidebarContent>
-        <Navigation />
-        <NavProjects />
-      </SidebarContent>
-      <SidebarFooter>
-        <NavUser />
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
+    <nav aria-label="Navigation principale" className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+      {/* Seule cette zone défile : le pied reste en bas de la barre, même sur un écran bas. */}
+      <div
+        data-slot="sidebar-scroll"
+        className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 [@media(max-height:900px)]:gap-3 overflow-y-auto px-1"
+      >
+        <div className="flex flex-col gap-3">
+          {/* Dans le tiroir, le bouton de fermeture du panneau occupe le coin haut droit. */}
+          <div className={mobile ? "pr-9" : undefined}>
+            <SidebarOrganization />
+          </div>
+          <SidebarSearch onOpen={onOpenSearch} />
+        </div>
+        {projectId ? <ProjectNav projectId={projectId} pathname={pathname} role={role} /> : null}
+        <OrganizationNav pathname={pathname} role={role} />
+      </div>
+      <SidebarFooter />
+    </nav>
   );
 }

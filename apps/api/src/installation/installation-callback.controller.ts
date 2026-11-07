@@ -8,7 +8,7 @@ import {
 } from "./installation-callback.service.ts";
 
 /** Cible fixe du navigateur : relative, sans aucune valeur reçue (pas de redirection ouverte). */
-const redirectTo = (outcome: CallbackOutcome) => `/github?result=${outcome}`;
+const redirectTo = (outcome: CallbackOutcome) => `/settings/github?result=${outcome}`;
 
 /**
  * Callback GitHub : redirection navigateur, hors oRPC et absente d'OpenAPI. Elle répond toujours

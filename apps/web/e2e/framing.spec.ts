@@ -23,7 +23,7 @@ import { FEATURE_PROJECT_ID, UNKNOWN_PROJECT_ID } from "./support/stub-features.
  * le Red n'en écrit aucune, le Green/Refactor les génère.
  */
 const PATH = `/projects/${FEATURE_PROJECT_ID}/framing`;
-const FEATURES_PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
+const FEATURES_PATH = `/projects/${FEATURE_PROJECT_ID}/spec/functional`;
 const IDEA = "Un portail pour réserver des créneaux en ligne.";
 const T1 = "Réserver un créneau";
 const T2 = "Annuler une réservation";
@@ -256,7 +256,7 @@ async function arrive(page: Page, state: State, theme: Theme): Promise<void> {
   });
   await page.goto(PATH);
   if (theme === "dark") await switchToDark(page);
-  await expect(page.getByRole("heading", { name: "Cadrage", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Assistant de cadrage", level: 1 })).toBeVisible();
   await state.reach(page);
   await state.visible(page);
 }
@@ -353,7 +353,7 @@ test("S-framing : parcours complet idée -> brief -> propositions -> accepter, r
   expect(submits).toHaveLength(1);
   expect((submits[0]?.operations ?? []).map((op) => op.title)).toEqual([T1, "Annuler (édité)"]);
   await page.getByRole("link", { name: "Voir la liste" }).click();
-  await expect(page).toHaveURL(new RegExp(`${FEATURES_PATH}$`));
+  await expect(page).toHaveURL(new RegExp(`${FEATURES_PATH}\\?tab=features$`));
   await expect(page.getByRole("link", { name: T1 })).toBeVisible();
   const calls = await aiCallsSeen();
   expect(calls.map((call) => call.kind)).toEqual(["brief", "features"]);
@@ -378,7 +378,7 @@ for (const role of ["client", "business"] as KanbanRole[]) {
   }) => {
     await scenario({ role });
     await page.goto(FEATURES_PATH);
-    await expect(page.getByRole("heading", { name: "Fonctionnalités", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Cahier fonctionnel", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Cadrer avec l'IA" })).toHaveCount(0);
     await page.goto(PATH);
     await expect(
@@ -399,7 +399,7 @@ test("S-framing : l'équipe voit le bouton « Cadrer avec l'IA » sur la liste, 
   await page.goto(FEATURES_PATH);
   await page.getByRole("link", { name: "Cadrer avec l'IA" }).first().click();
   await expect(page).toHaveURL(new RegExp(`${PATH}$`));
-  await expect(page.getByRole("heading", { name: "Cadrage", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Assistant de cadrage", level: 1 })).toBeVisible();
 });
 
 test("S-framing : designer, enregistrement impossible sans écran lié (message permanent)", async ({
@@ -433,7 +433,9 @@ test("S-framing : texte hostile rendu littéralement, aucun lien ni script issu 
     .locator("main a[href]")
     .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
   for (const href of hrefs)
-    expect(href).toMatch(/^\/projects(\/[0-9a-f-]{36}\/(features|framing)(\?sel=F-\d{3})?)?$/);
+    expect(href).toMatch(
+      /^\/projects(\/[0-9a-f-]{36}(\/(spec\/functional|framing))?(\?tab=features(&sel=F-\d{3})?)?)?$/,
+    );
   expect(
     await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
   ).toBeUndefined();
@@ -463,6 +465,29 @@ test("S-framing : limite atteinte, compte à rebours, saisie conservée", async 
   await expect(page.locator("#framing-error")).toContainText(/Réessayez dans (30|29|28) s\./);
   await expect(generate(page)).toBeDisabled();
   await expect(page.getByRole("textbox", { name: /^Votre idée/ })).toHaveValue(IDEA);
+});
+
+test("S-framing : « Réessayez dans N s » n'est visible qu'une fois (règle 5), la région d'état l'annonce", async ({
+  page,
+}) => {
+  await scenario({ ai: "rateLimited" });
+  await page.goto(PATH);
+  await writeIdea(page);
+  await generate(page).click();
+  await expect(page.locator("#framing-error")).toContainText(/Réessayez dans \d+ s\./);
+  // Playwright compte les éléments `sr-only` comme visibles : on compte ceux qu'une personne voit à l'écran.
+  const onScreen = await page.evaluate(
+    () =>
+      Array.from(document.body.querySelectorAll("*")).filter(
+        (node) =>
+          !node.closest(".sr-only") &&
+          Array.from(node.childNodes).some(
+            (child) => child.nodeType === 3 && /Réessayez dans \d+ s/.test(child.textContent ?? ""),
+          ),
+      ).length,
+  );
+  expect(onScreen).toBe(1);
+  await expect(page.getByRole("status")).toContainText(/Réessayez dans \d+ s/);
 });
 
 test("S-framing : collision de délimiteur, sans écho, focus dans le champ", async ({ page }) => {

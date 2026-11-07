@@ -41,12 +41,12 @@ beforeEach(() => {
 });
 
 describe("repères et libellés", () => {
-  it("h1 unique « IA », h2 « Anthropic », data-testid, aucun autre h2", async () => {
+  it("h2 « IA » puis h2 « Anthropic », data-testid, aucun h1 (celui de la page est « Réglages »)", async () => {
     await openAiSettings([]);
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
     const h2s = screen.getAllByRole("heading", { level: 2 });
-    expect(h2s.map((h) => h.textContent)).toEqual(["Anthropic"]);
-    expect(screen.getByTestId("ai-settings-page")).toContainElement(h2s[0] as HTMLElement);
+    expect(h2s.map((h) => h.textContent)).toEqual(["IA", "Anthropic"]);
+    expect(screen.getByTestId("ai-settings-page")).toContainElement(h2s[1] as HTMLElement);
   });
 
   it("le champ de clé a un libellé visible et une aide reliée par aria-describedby", async () => {

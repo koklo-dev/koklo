@@ -67,10 +67,10 @@ test("G1 : session sans organisation active ne boucle pas entre /login et /proje
   expect(visited.length).toBeLessThan(8);
 });
 
-test("C1.d : sans session, /projects, /members et /organizations redirigent vers /login", async ({
+test("C1.d : sans session, /projects, /members, /settings/members et /organizations redirigent vers /login", async ({
   page,
 }) => {
-  for (const path of ["/projects", "/members", "/organizations"]) {
+  for (const path of ["/projects", "/members", "/settings/members", "/organizations"]) {
     await page.goto(path);
     await expect(page, `${path} sans session`).toHaveURL(/\/login$/);
   }

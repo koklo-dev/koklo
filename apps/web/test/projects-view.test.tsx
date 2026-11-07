@@ -85,14 +85,14 @@ describe("ProjectsView — erreur", () => {
 });
 
 describe("ProjectsView — lien vers les fonctionnalités (TK-48d)", () => {
-  it("chaque nom est un vrai lien vers /projects/<id>/features", () => {
+  it("chaque nom est un vrai lien vers le cahier fonctionnel du projet", () => {
     render(<ProjectsView state={{ status: "success", projects }} onRetry={noop} />);
     for (const project of projects) {
       const link = screen.getByRole("link", {
         name: new RegExp(`^${project.name}\\s?:\\s?fonctionnalités$`),
       });
       expect(link.tagName).toBe("A");
-      expect(link).toHaveAttribute("href", `/projects/${project.id}/features`);
+      expect(link).toHaveAttribute("href", `/projects/${project.id}/spec/functional?tab=features`);
       expect(link).toHaveTextContent(project.name);
     }
     expect(screen.getAllByRole("link")).toHaveLength(projects.length);

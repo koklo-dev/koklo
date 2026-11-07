@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { createAdminSessionCookie, SESSION_COOKIE } from "../support/session.ts";
+import { createAdminSessionCookie, SEED, SESSION_COOKIE } from "../support/session.ts";
 
 test.beforeEach(async ({ context, baseURL }) => {
   const value = await createAdminSessionCookie();
   await context.addCookies([{ name: SESSION_COOKIE, value, url: baseURL as string }]);
 });
+
+/** Tickets du projet de démo : le kanban vit sous `/projects/<id>/tickets` (TK-88). */
+const TICKETS = `/projects/${SEED.project}/tickets`;
 
 const column = (page: import("@playwright/test").Page, status: string) =>
   page.getByTestId(`kanban-column-${status}`);
@@ -12,7 +15,7 @@ const column = (page: import("@playwright/test").Page, status: string) =>
 test("kanban : le sprint actif du seed est réparti dans les 7 colonnes (vrai API)", async ({
   page,
 }) => {
-  await page.goto("/kanban");
+  await page.goto(TICKETS);
   await expect(page.getByTestId("kanban-board")).toBeVisible();
   await expect(page.getByText(/^Sprint SP-1 · /)).toBeVisible();
   await expect(page.getByRole("heading", { level: 2 })).toHaveText([
@@ -33,7 +36,7 @@ test("kanban : le sprint actif du seed est réparti dans les 7 colonnes (vrai AP
 test("kanban : « Déplacer » fait passer TK-6 de « Backlog » à « À faire », et le serveur le garde", async ({
   page,
 }) => {
-  await page.goto("/kanban");
+  await page.goto(TICKETS);
   await page.getByRole("button", { name: "Déplacer TK-6" }).click();
   await page.getByRole("menuitem", { name: "À faire" }).click();
   await expect(column(page, "todo").getByTestId("kanban-card-TK-6")).toBeVisible();
@@ -48,7 +51,7 @@ test("kanban : « Déplacer » fait passer TK-6 de « Backlog » à « À faire 
 test("kanban : une transition interdite par le serveur est refusée avec départ et arrivée", async ({
   page,
 }) => {
-  await page.goto("/kanban");
+  await page.goto(TICKETS);
   await page.getByRole("button", { name: "Déplacer TK-5" }).click();
   await page.getByRole("menuitem", { name: "Terminé" }).click();
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toContainText(
@@ -61,4 +64,15 @@ test("kanban : sans session, /kanban redirige vers /login", async ({ page, conte
   await context.clearCookies();
   await page.goto("/kanban");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("kanban : /kanban ouvre les tickets du dernier projet ouvert (vrai API)", async ({ page }) => {
+  await page.goto(`/projects/${SEED.project}/tickets`);
+  await expect(page.getByTestId("kanban-board")).toBeVisible();
+  // L'ouverture du projet a été enregistrée (project.visit) : /kanban la relit côté serveur.
+  await expect(async () => {
+    await page.goto("/kanban");
+    await expect(page).toHaveURL(new RegExp(`/projects/${SEED.project}/tickets$`));
+  }).toPass({ timeout: 10_000 });
+  await expect(page.getByTestId("kanban-board")).toBeVisible();
 });

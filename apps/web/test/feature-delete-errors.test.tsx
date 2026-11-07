@@ -113,7 +113,7 @@ describe("Table des échecs de submit, appliquée à la suppression", () => {
     expect(alert).toHaveTextContent("Rien n'a été écrit. Réessayez dans un instant.");
     expect(
       within(alert).getByRole("link", { name: "Vérifier l'état de l'application GitHub" }),
-    ).toHaveAttribute("href", "/github");
+    ).toHaveAttribute("href", "/settings/github");
   });
 
   it("503, développeur : même texte, sans lien", async () => {
@@ -134,7 +134,7 @@ describe("Table des échecs de submit, appliquée à la suppression", () => {
     const { alert } = await failWith(apiError("PROVIDER_AUTH_EXPIRED", EXPIRED), "owner");
     expect(within(alert).getByRole("link", { name: "Ouvrir la page GitHub" })).toHaveAttribute(
       "href",
-      "/github",
+      "/settings/github",
     );
     expect(within(alert).queryByRole("button", { name: "Réessayer" })).toBeNull();
   });

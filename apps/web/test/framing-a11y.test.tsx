@@ -2,8 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import FramingLayout from "../src/app/projects/[projectId]/framing/layout.tsx";
-import * as route from "../src/app/projects/[projectId]/framing/page.tsx";
+import * as route from "../src/app/(shell)/projects/[projectId]/framing/page.tsx";
+import { ShellFrame } from "../src/components/shell-frame.tsx";
 import { PROJECT_ID } from "./support/features.tsx";
 import {
   accept,
@@ -58,16 +58,16 @@ beforeEach(() => {
 const client = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 describe("Route /projects/[projectId]/framing", () => {
-  it("titre de page « Cadrage · Koklo »", () => {
+  it("titre de page « Assistant de cadrage · Koklo »", () => {
     const { metadata } = route as { metadata?: { title?: string } };
-    expect(metadata?.title).toBe("Cadrage · Koklo");
+    expect(metadata?.title).toBe("Assistant de cadrage · Koklo");
   });
 
   it("la page rend l'écran du projet de l'adresse (params asynchrones)", async () => {
     setUrl(`/projects/${PROJECT_ID}/framing`);
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
-    expect(await findNamed("heading", "Cadrage", { level: 1 })).toBeInTheDocument();
+    expect(await findNamed("heading", "Assistant de cadrage", { level: 1 })).toBeInTheDocument();
     expect(procedures.specHead.mock.calls[0]?.[0]).toMatchObject({ projectId: PROJECT_ID });
   });
 
@@ -77,13 +77,13 @@ describe("Route /projects/[projectId]/framing", () => {
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(
       <QueryClientProvider client={client()}>
-        <FramingLayout>{element}</FramingLayout>
+        <ShellFrame>{element}</ShellFrame>
       </QueryClientProvider>,
     );
-    await findNamed("heading", "Cadrage", { level: 1 });
+    await findNamed("heading", "Assistant de cadrage", { level: 1 });
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(document.querySelector('[data-slot="sidebar"]')).not.toBeNull();
+    expect(screen.getByRole("navigation", { name: "Navigation principale" })).toBeInTheDocument();
   });
 });
 

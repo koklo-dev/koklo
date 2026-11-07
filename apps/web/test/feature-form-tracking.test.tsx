@@ -371,7 +371,7 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
     await advance(5 * SECOND);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 1, name: "Cahier fonctionnel" })).toHaveFocus(),
     );
     expect(liveText()).toContain("Elle n'apparaît pas avec les filtres actuels.");
   });
@@ -389,7 +389,7 @@ describe("Succès : attente de l'index puis retour à la liste (§4.5, §5.6)", 
     await advance(5 * SECOND);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 1, name: "Cahier fonctionnel" })).toHaveFocus(),
     );
     expect(liveText()).toContain("Utilisez « Charger la suite » pour la voir.");
   });

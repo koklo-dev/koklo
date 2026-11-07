@@ -16,7 +16,7 @@ import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { LONG_LISTS_INDEXES } from "./support/long-lists-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
-import { PROJECT_CLIENT_TABLES } from "./support/project-client-fixtures.ts";
+import { PROJECT_CLIENT_TABLES, PROJECT_VISIT_TABLES } from "./support/project-client-fixtures.ts";
 import { REVIEW_TABLES } from "./support/reviews-fixtures.ts";
 import { insertDelivery } from "./support/spec-fixtures.ts";
 import { SUGGESTION_TABLES } from "./support/suggestions-fixtures.ts";
@@ -114,6 +114,7 @@ const LATER_OBJECTS: readonly string[] = [
   ...REVIEW_TABLES,
   ...NOTIFICATION_TABLES,
   ...PROJECT_CLIENT_TABLES,
+  ...PROJECT_VISIT_TABLES,
   ...LONG_LISTS_INDEXES,
   // TK-96 : index de audit_log.project_id.
   "audit_log_organization_id_project_id_occurred_at_idx",
@@ -152,8 +153,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (43 attendues au total avec TK-95)", () => {
-    expect(expectedTables).toHaveLength(43);
+  it("cette migration n'ajoute aucune table (44 attendues au total avec TK-88)", () => {
+    expect(expectedTables).toHaveLength(44);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });

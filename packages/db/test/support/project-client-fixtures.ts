@@ -11,6 +11,9 @@ import { insertUser } from "./oauth-fixtures.ts";
 export const PROJECT_CLIENT_TABLES = ["project_client_access"] as const;
 export const PROJECT_CLIENT_MODELS = ["ProjectClientAccess"] as const;
 
+/** Table ajoutée par TK-88 : dernier projet ouvert par membre (carte projet de la coquille). */
+export const PROJECT_VISIT_TABLES = ["project_visits"] as const;
+
 export const PROJECT_CLIENT_SUFFIX = "_project_client_access";
 export const PROJECT_CLIENT_MIGRATION = "20261102090000_project_client_access";
 

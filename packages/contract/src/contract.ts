@@ -6,6 +6,7 @@ import { llmCredential } from "./contract-llm-credential.ts";
 import { projectClient } from "./contract-project-client.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { review } from "./contract-review.ts";
+import { projectShell, search } from "./contract-shell.ts";
 import { spec, specBatch } from "./contract-spec.ts";
 import { suggestion } from "./contract-suggestion.ts";
 import { dependency, sprint, ticket } from "./contract-tickets.ts";
@@ -111,8 +112,9 @@ export const contract = {
   health,
   organization: { create: organizationCreate, list: organizationList },
   member: { invite: memberInvite, list: memberList, setRole: memberSetRole },
-  project: { list: projectList, create: projectCreate },
+  project: { list: projectList, create: projectCreate, ...projectShell },
   projectClient,
+  search,
   clientSpace,
   suggestion,
   review,

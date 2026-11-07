@@ -45,7 +45,7 @@ interface Batch {
 }
 
 const slugOf = (n: string): string => `${n}-${randomUUID().slice(0, 8)}`;
-const featuresPath = (projectId: string): string => `/projects/${projectId}/features`;
+const featuresPath = (projectId: string): string => `/projects/${projectId}/spec/functional`;
 const pushTo = (
   api: APIRequestContext,
   workspace: R2Workspace,
@@ -450,10 +450,10 @@ test("T8 installer l'App par OAuth factice relie le compte, le rejeu est refusé
   expect(
     new URL(done.headers().location as string, baseURL).pathname +
       new URL(done.headers().location as string, baseURL).search,
-  ).toBe("/github?result=installed");
+  ).toBe("/settings/github?result=installed");
 
   await signIn(page, workspace.owner);
-  await page.goto("/github?result=installed");
+  await page.goto("/settings/github?result=installed");
   await expect(page.getByText("Application GitHub installée")).toBeVisible();
   await expect(page.getByRole("heading", { name: "e2e-link-org-1" })).toBeVisible();
 

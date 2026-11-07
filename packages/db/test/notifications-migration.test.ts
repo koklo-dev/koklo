@@ -124,9 +124,9 @@ describe("TK-51d migration notifications : dossier et contenu", () => {
     expect(down).not.toMatch(/counter_name/i);
   });
 
-  it("expectedTables contient la table (43 au total avec TK-95)", () => {
+  it("expectedTables contient la table (44 au total avec TK-88)", () => {
     for (const table of NOTIFICATION_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(43);
+    expect(expectedTables).toHaveLength(44);
   });
 });
 

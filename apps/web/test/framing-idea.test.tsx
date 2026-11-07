@@ -49,11 +49,13 @@ beforeEach(() => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Gabarit et état initial (§3.1, §4.2)", () => {
-  it("h1 « Cadrage », nom du projet, phrase d'aide, h2 « 1. Votre idée » seul", async () => {
+  it("h1 « Assistant de cadrage », nom du projet, phrase d'aide, h2 « 1. Votre idée » seul", async () => {
     await openFraming();
-    expect(screen.getByRole("heading", { name: "Cadrage", level: 1 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Assistant de cadrage", level: 1 })).toBeVisible();
     await findNamed("heading", /^1\. Votre idée/, { level: 2 });
-    expect(screen.getByText("Alpha")).toBeVisible();
+    expect(
+      within(screen.getByRole("navigation", { name: "Emplacement" })).getByText("Alpha"),
+    ).toBeVisible();
     expect(
       screen.getByText(
         "L'IA propose, vous décidez. Rien n'est enregistré dans la spec avant votre confirmation.",
@@ -63,15 +65,18 @@ describe("Gabarit et état initial (§3.1, §4.2)", () => {
     expect(screen.queryByRole("heading", { name: /^3\./ })).not.toBeInTheDocument();
   });
 
-  it("fil d'Ariane Koklo > Projets > Alpha > Cadrage, dernier maillon aria-current=page", async () => {
+  it("emplacement Alpha / Assistant de cadrage (page courante), plus de fil d'Ariane v1", async () => {
     await openFraming();
-    const crumbs = screen.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i });
-    expect(crumbs).toHaveTextContent(/Koklo.*Projets.*Alpha.*Cadrage/);
-    expect(within(crumbs).getByRole("link", { name: "Projets" })).toHaveAttribute(
+    expect(screen.queryByRole("navigation", { name: /breadcrumb|fil d'ariane/i })).toBeNull();
+    const location = screen.getByRole("navigation", { name: "Emplacement" });
+    expect(within(location).getByRole("link", { name: "Alpha" })).toHaveAttribute(
       "href",
-      "/projects",
+      `/projects/${PROJECT_ID}`,
     );
-    expect(within(crumbs).getByText("Cadrage")).toHaveAttribute("aria-current", "page");
+    expect(within(location).getByText("Assistant de cadrage")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   it("aucune requête ai.* ni specBatch.submit à l'ouverture", async () => {

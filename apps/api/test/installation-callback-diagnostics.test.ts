@@ -222,7 +222,7 @@ describe("liste blanche des codes OAuth et absence de fuite", () => {
         ),
       ),
     );
-    expect(res.headers.location).toBe("/github?result=provider_error");
+    expect(res.headers.location).toBe("/settings/github?result=provider_error");
     const haystack = `${b.lines.join("\n")}${res.text}${JSON.stringify(res.headers)}`;
     for (const secret of [
       CANARY,

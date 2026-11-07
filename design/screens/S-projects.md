@@ -1,7 +1,7 @@
 ---
 id: S-projects
 titre: Liste des projets
-version: 6
+version: 6.1
 ---
 ## 1. Utilisateurs et objectif
 Personne connectée (vue équipe d'abord). Elle arrive après la connexion (`/projects`). Objectif : voir les projets auxquels elle a accès. Cet écran décrit aussi le **gabarit d'application** réutilisé par les écrans suivants.
@@ -207,6 +207,7 @@ Panneau de création (48c) : sous 768 px le `Sheet` passe en pleine largeur, les
 | 5 | 2026-10-31 | TK-48 (48c) | Création de projet en deux étapes visibles (projet puis dépôt de spec), choix du compte GitHub, échec partiel avec « Réessayer » sur `createSpec` seul, « Autoriser Koklo », erreurs typées du fournisseur, relier un dépôt existant, notice de reprise. Détail : `.workflow/TK-48/02-design-48c.md` |
 | 6 | 2026-10-31 | TK-48 (48d) | Lignes de la liste et groupe « Projets » de la barre latérale deviennent des liens vers les fonctionnalités du projet (S-features) ; le projet sans dépôt de spec se reprend depuis cette page (panneau de création réutilisé en place, étape 2). Détail : `.workflow/TK-48/02-design-48d.md` |
 | 5.1 | 2026-10-31 | TK-48 (48c, refactor) | Aucun changement d'écran : captures régénérées par les e2e, tests unitaires ajoutés (redirection `/login`, clic hors panneau, mouvement réduit). |
+| 6.1 | 2026-11-07 | TK-88 | Sans liste de projets dans la barre : la carte projet de la barre propose les 8 récents et « Tous les projets » ; chaque ligne mène à `/projects/<id>` (redirige vers Spec · Fonctionnel) ; `/` ouvre le dernier projet. Rendu dans `AppShell` avec un h1 simple. Détail : `.workflow/TK-88/02-design.md` |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48c)
 Fichiers (`apps/web/src`, chacun <= 300 lignes, refactor actif de `project-create-sheet.tsx`, 128 lignes aujourd'hui, à scinder)

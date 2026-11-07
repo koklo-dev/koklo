@@ -28,9 +28,11 @@ const GROUPS: Record<string, string[]> = {
   review: ["list", "submit"],
   specBatch: ["get", "submit"],
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
+  project: ["create", "list", "recent", "shell", "visit"],
+  search: ["query"],
 };
 
-describe("R1 routeur : 21 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a : +1, TK-55b : +1, TK-55c : +1, TK-55d : +1), 56 procédures", () => {
+describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a : +1, TK-55b : +1, TK-55c : +1, TK-55d : +1, TK-88 : +1), 60 procédures", () => {
   it("expose health, organization, member, project, les 7 groupes de TK-29 et les 4 de TK-42", () => {
     expect(Object.keys(contract).sort()).toEqual(
       [
@@ -50,6 +52,7 @@ describe("R1 routeur : 21 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
         "projectState",
         "repo",
         "review",
+        "search",
         "spec",
         "specBatch",
         "sprint",
@@ -142,7 +145,13 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/spec/batches",
     "GET /projects/{projectId}/spec/batches/{batchId}",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c et les 2 de TK-55d sont présentes (64 routes)", async () => {
+  const SHELL_PAIRS = [
+    "GET /projects/{projectId}/shell",
+    "POST /projects/{projectId}/visit",
+    "GET /project-visits",
+    "GET /search",
+  ];
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d et les 4 de TK-88 sont présentes (68 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -156,10 +165,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...CLIENT_SPACE_PAIRS,
       ...SUGGESTION_PAIRS,
       ...REVIEW_PAIRS,
+      ...SHELL_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(64);
+    expect(pairs).toHaveLength(68);
   });
 });
 

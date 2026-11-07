@@ -261,7 +261,7 @@ describe("Succès : la fonctionnalité disparaît de la liste relue (§4.5, §5.
     await catchUp();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toHaveFocus(),
+      expect(screen.getByRole("heading", { level: 1, name: "Cahier fonctionnel" })).toHaveFocus(),
     );
   });
 
