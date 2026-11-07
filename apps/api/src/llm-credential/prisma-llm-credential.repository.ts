@@ -62,10 +62,11 @@ async function audit(
   actor: AuditActor | undefined,
   action: AuditAction,
   targetId: string,
+  override?: string,
 ): Promise<void> {
   if (actor === undefined) return;
   await recordAudit(tx, actor, {
-    action: `llm_credential.${action}`,
+    action: override ?? `llm_credential.${action}`,
     targetKind: "llm_credential",
     targetId,
   });
@@ -145,7 +146,7 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
         update: { ...sealed, invalidatedAt: null, lastUsedAt: null, updatedAt: at },
       });
       const created = existing === null;
-      await audit(tx, actor, created ? "create" : "replace", row.id);
+      await audit(tx, actor, created ? "create" : "replace", row.id, input.auditAction);
       return { status: statusOf(row), created };
     });
   }
@@ -177,14 +178,19 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
     });
   }
 
-  remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean> {
+  remove(
+    organizationId: string,
+    provider: LlmProviderId,
+    actor?: AuditActor,
+    auditAction?: string,
+  ): Promise<boolean> {
     return this.transaction(organizationId, async (tx) => {
       const row = await tx.llmProviderCredential.findFirst({ where: { provider } });
       if (row === null) return false;
       await detachFromSettings(tx, provider);
       const { count } = await tx.llmProviderCredential.deleteMany({ where: { id: row.id } });
       if (count === 0) return false;
-      await audit(tx, actor, "delete", row.id);
+      await audit(tx, actor, "delete", row.id, auditAction);
       return true;
     });
   }

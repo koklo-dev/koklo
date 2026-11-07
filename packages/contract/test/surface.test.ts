@@ -21,6 +21,10 @@ const GROUPS: Record<string, string[]> = {
   installation: ["list", "start"],
   llmCredential: ["invalidate", "list", "remove", "set", "verify"],
   ai: ["draftBrief", "proposeCriteria", "proposeFeatures"],
+  aiProvider: ["add", "list", "remove", "replaceKey", "setPrimary", "verify"],
+  aiModel: ["listQualified"],
+  aiUsage: ["report", "set"],
+  aiSettings: ["get", "update"],
   projectClient: ["add", "list", "remove"],
   clientSpace: ["feature", "features", "projects"],
   repo: ["createSpec", "link", "list"],
@@ -40,6 +44,10 @@ describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
     expect(Object.keys(contract).sort()).toEqual(
       [
         "ai",
+        "aiModel",
+        "aiProvider",
+        "aiSettings",
+        "aiUsage",
         "audit",
         "clientSpace",
         "comment",
@@ -166,13 +174,26 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /me/notifications",
     "PUT /me/notifications/{key}",
   ];
+  const AI_PROVIDER_PAIRS = [
+    "GET /ai/providers",
+    "POST /ai/providers",
+    "POST /ai/providers/{provider}/verify",
+    "PUT /ai/providers/{provider}/key",
+    "DELETE /ai/providers/{provider}",
+    "POST /ai/providers/{provider}/primary",
+    "GET /ai/models",
+    "PUT /ai/usages/{usage}",
+    "GET /ai/usage",
+    "GET /ai/settings",
+    "PATCH /ai/settings",
+  ];
   const SHELL_PAIRS = [
     "GET /projects/{projectId}/shell",
     "POST /projects/{projectId}/visit",
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 et les 13 de TK-97 sont présentes (81 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 et les 11 de TK-98 sont présentes (92 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -188,10 +209,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...REVIEW_PAIRS,
       ...SHELL_PAIRS,
       ...SETTINGS_PAIRS,
+      ...AI_PROVIDER_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(81);
+    expect(pairs).toHaveLength(92);
   });
 });
 

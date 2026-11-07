@@ -16,6 +16,9 @@ import { AiCallRunner } from "./ai-call.ts";
 import { AuditAiEventSink } from "./ai-event-sink.ts";
 import { CredentialKeyHooks } from "./ai-key-hooks.ts";
 import { AiLedger } from "./ai-ledger.ts";
+import { AiProvidersController } from "./ai-providers.controller.ts";
+import { AiProvidersService } from "./ai-providers.service.ts";
+import { AiSettingsController } from "./ai-settings.controller.ts";
 import { AiSettingsService } from "./ai-settings.service.ts";
 import {
   AI_ADAPTERS,
@@ -50,17 +53,18 @@ function sdkAdapters(): AiAdapterFactory {
 /**
  * Propositions de l'IA. `AI_PROVIDER` est le moteur du paquet `@koklo/llm` branché sur les ports Prisma
  * (réglages, compteur mensuel, clés), l'audit et la vie des clés ; le nonce vient de `randomNonceSource`
- * (les tests le remplacent). `AiService` est exporté pour `llmCredential.verify`. `AiSettingsService` et
- * `AiUsageReportService` n'ont pas de route (TK-98).
+ * (les tests le remplacent). `AiService` est exporté pour `llmCredential.verify`. `AiProvidersService`,
+ * `AiSettingsService` et `AiUsageReportService` servent les routes `/ai/...` (TK-98).
  */
 @Module({
   imports: [LlmCredentialModule, SpecReadModule, TrackerModule],
-  controllers: [AiController],
+  controllers: [AiController, AiProvidersController, AiSettingsController],
   providers: [
     AiService,
     AiCallRunner,
     AiLedger,
     AiSettingsService,
+    AiProvidersService,
     AiUsageReportService,
     PrismaAiRoutingStore,
     PrismaAiUsageMeter,

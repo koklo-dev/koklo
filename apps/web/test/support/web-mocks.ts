@@ -65,11 +65,18 @@ export const procedures = {
   // TK-59 : propositions de l'IA (contrat 0.9.0), jamais d'appel réel
   aiDraftBrief: vi.fn(),
   aiProposeFeatures: vi.fn(),
-  // Réglages IA (contrat 0.9.0) : list / set / verify / remove, jamais d'appel réel
-  llmCredentialList: vi.fn(),
-  llmCredentialSet: vi.fn(),
-  llmCredentialVerify: vi.fn(),
-  llmCredentialRemove: vi.fn(),
+  // Fournisseurs d'IA (contrat 2.3.0, TK-98) : jamais d'appel réel
+  aiProviderList: vi.fn(),
+  aiProviderAdd: vi.fn(),
+  aiProviderVerify: vi.fn(),
+  aiProviderReplaceKey: vi.fn(),
+  aiProviderRemove: vi.fn(),
+  aiProviderSetPrimary: vi.fn(),
+  aiModelListQualified: vi.fn(),
+  aiUsageSet: vi.fn(),
+  aiUsageReport: vi.fn(),
+  aiSettingsGet: vi.fn(),
+  aiSettingsUpdate: vi.fn(),
   // TK-97 (contrat 2.2.0) : Général (org.get / org.update) et Mon compte (me.*)
   orgGet: vi.fn(),
   orgUpdate: vi.fn(),
@@ -213,13 +220,29 @@ export const orpc = {
     draftBrief: mutation(procedures.aiDraftBrief),
     proposeFeatures: mutation(procedures.aiProposeFeatures),
   },
-  llmCredential: {
-    key: () => ["llmCredential"],
-    list: queryFull(["llmCredential", "list"], procedures.llmCredentialList),
-    // Les options (`gcTime`, `retry`...) sont transmises telles quelles, comme le client oRPC réel.
-    set: mutationWithOptions(procedures.llmCredentialSet),
-    verify: mutationWithOptions(procedures.llmCredentialVerify),
-    remove: mutationWithOptions(procedures.llmCredentialRemove),
+  // Les options (`gcTime`, `retry`...) sont transmises telles quelles, comme le client oRPC réel.
+  aiProvider: {
+    key: () => ["aiProvider"],
+    list: queryFull(["aiProvider", "list"], procedures.aiProviderList),
+    add: mutationWithOptions(procedures.aiProviderAdd),
+    verify: mutationWithOptions(procedures.aiProviderVerify),
+    replaceKey: mutationWithOptions(procedures.aiProviderReplaceKey),
+    remove: mutationWithOptions(procedures.aiProviderRemove),
+    setPrimary: mutationWithOptions(procedures.aiProviderSetPrimary),
+  },
+  aiModel: {
+    key: () => ["aiModel"],
+    listQualified: queryFull(["aiModel", "listQualified"], procedures.aiModelListQualified),
+  },
+  aiUsage: {
+    key: () => ["aiUsage"],
+    set: mutationWithOptions(procedures.aiUsageSet),
+    report: queryFull(["aiUsage", "report"], procedures.aiUsageReport),
+  },
+  aiSettings: {
+    key: () => ["aiSettings"],
+    get: queryFull(["aiSettings", "get"], procedures.aiSettingsGet),
+    update: mutationWithOptions(procedures.aiSettingsUpdate),
   },
   org: {
     key: () => ["org"],

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { type AiScenario, handleAi, resetAi } from "./stub-ai.ts";
+import { handleProviders, type ProvidersScenario, resetProviders } from "./stub-ai-providers.ts";
 import {
   type FeaturesScenario,
   handleFeatures,
@@ -8,7 +9,6 @@ import {
 } from "./stub-features.ts";
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
-import { handleLlm, type LlmScenario, resetLlm } from "./stub-llm-credential.ts";
 import { resetMembers } from "./stub-members.ts";
 import { handleSettings, resetSettings, type SettingsScenario } from "./stub-settings.ts";
 import { handleShell, resetShell, type ShellScenario } from "./stub-shell.ts";
@@ -35,7 +35,7 @@ type Scenario = {
   SpecRepoScenario &
   FeaturesScenario &
   AiScenario &
-  LlmScenario &
+  ProvidersScenario &
   ShellScenario &
   SettingsScenario;
 
@@ -152,7 +152,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetSpecRepo();
     resetFeatures();
     resetAi();
-    resetLlm();
+    resetProviders();
     resetSettings();
     resetMembers();
     resetShell(scenario);
@@ -171,12 +171,12 @@ const allProjects = () => [...PROJECTS, ...createdProjects];
 const knownProject = (id: string) => allProjects().some((project) => project.id === id);
 
 /**
- * Appels à l'IA (`ai.*`), réglages de la clé (`llmCredential.*`) : même modèle simulé, jamais de fournisseur réel ;
+ * Appels à l'IA (`ai.*`), fournisseurs d'IA (`aiProvider.*`, `aiSettings.*`...) : même modèle simulé, jamais de fournisseur réel ;
  * puis la coquille (`project.shell|visit|recent`, `search.query`).
  */
 const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
   handleSettings(req, url, { scenario, send, projects: allProjects }) ||
-  handleLlm(req, url, { scenario, send, hold }) ||
+  handleProviders(req, url, { scenario, send, hold }) ||
   handleAi(req, url, { scenario, knownProject, send, hold }) ||
   handleShell(req, url, { scenario, projects: allProjects, send, hold });
 

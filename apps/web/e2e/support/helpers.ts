@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import type { AiScenario } from "./stub-ai.ts";
+import type { ProvidersScenario } from "./stub-ai-providers.ts";
 import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
 import type {
@@ -8,7 +9,6 @@ import type {
   KanbanRole,
   TransitionMode as KanbanTransition,
 } from "./stub-kanban.ts";
-import type { LlmScenario } from "./stub-llm-credential.ts";
 import type { SettingsScenario } from "./stub-settings.ts";
 import type { ShellScenario } from "./stub-shell.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
@@ -41,7 +41,7 @@ export async function setScenario(
     SpecRepoScenario &
     FeaturesScenario &
     AiScenario &
-    LlmScenario &
+    ProvidersScenario &
     ShellScenario &
     Pick<SettingsScenario, "members">,
 ): Promise<void> {
@@ -140,14 +140,14 @@ export interface AiCall {
 export const aiCallsSeen = async (): Promise<AiCall[]> =>
   (await fetch(`${STUB}/__ai-calls`)).json();
 
-/** Appels `llmCredential.*` reçus par le faux API (le corps du PUT porte la clé), dans l'ordre. */
-export interface LlmCall {
+/** Appels des fournisseurs d'IA reçus par le faux API (le corps de l'ajout porte la clé), dans l'ordre. */
+export interface ProviderCall {
   method: string;
   path: string;
   body: unknown;
 }
-export const llmCallsSeen = async (): Promise<LlmCall[]> =>
-  (await fetch(`${STUB}/__llm-calls`)).json();
+export const providerCallsSeen = async (): Promise<ProviderCall[]> =>
+  (await fetch(`${STUB}/__ai-provider-calls`)).json();
 /** Nombre de requêtes dont l'URL, la query ou un en-tête (hors corps) contenait la clé de test. */
-export const llmSecretLeaks = async (): Promise<number> =>
-  ((await (await fetch(`${STUB}/__llm-secret-leaks`)).json()) as { leaks: number }).leaks;
+export const providerSecretLeaks = async (): Promise<number> =>
+  ((await (await fetch(`${STUB}/__ai-provider-leaks`)).json()) as { leaks: number }).leaks;

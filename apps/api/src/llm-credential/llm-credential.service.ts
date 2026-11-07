@@ -22,6 +22,8 @@ export interface SetLlmCredentialInput {
   /** Obligatoire pour `openai_compatible`, refusée pour tout autre fournisseur. */
   readonly baseUrl?: string;
   readonly createdByUserId?: string;
+  /** Action d'audit propre à l'appelant (`ai_provider.add`…), à la place de `llm_credential.*`. */
+  readonly auditAction?: string;
 }
 
 /** Même borne que le CHECK SQL de `default_model`, comptée en points de code (`char_length`). */
@@ -54,7 +56,10 @@ function assertModel(model: string): void {
  * Adresse de base : réservée au fournisseur qui l'exige, passée par la garde anti-SSRF (https seul, ni
  * adresse privée ni nom local). Rend la forme normalisée. Le message ne reprend jamais l'adresse saisie.
  */
-function normalizedBaseUrl(provider: LlmProviderId, baseUrl: string | undefined): string | null {
+export function normalizedBaseUrl(
+  provider: LlmProviderId,
+  baseUrl: string | undefined,
+): string | null {
   const required = llmProviderTraits(provider).baseUrlRequired;
   if (!required) {
     if (baseUrl === undefined) return null;
@@ -69,6 +74,16 @@ function normalizedBaseUrl(provider: LlmProviderId, baseUrl: string | undefined)
     }
     throw error;
   }
+}
+
+/** Valide clé, modèle et adresse (mêmes règles que `set`) ; rend l'adresse normalisée (ou `null`). */
+export function checkedCredentialInput(
+  provider: LlmProviderId,
+  input: Pick<SetLlmCredentialInput, "apiKey" | "defaultModel" | "baseUrl">,
+): string | null {
+  assertApiKey(input.apiKey);
+  if (input.defaultModel !== undefined) assertModel(input.defaultModel);
+  return normalizedBaseUrl(provider, input.baseUrl);
 }
 
 /**
@@ -90,9 +105,7 @@ export class LlmCredentialService {
     actor?: AuditActor,
   ): Promise<LlmCredentialStatus> {
     if (this.cipher === null) throw new EncryptionUnavailableError();
-    assertApiKey(input.apiKey);
-    if (input.defaultModel !== undefined) assertModel(input.defaultModel);
-    const baseUrl = normalizedBaseUrl(provider, input.baseUrl);
+    const baseUrl = checkedCredentialInput(provider, input);
     const { status } = await this.repository.upsert(
       organizationId,
       {
@@ -101,6 +114,7 @@ export class LlmCredentialService {
         defaultModel: input.defaultModel ?? null,
         baseUrl,
         createdByUserId: input.createdByUserId ?? actor?.userId ?? null,
+        ...(input.auditAction === undefined ? {} : { auditAction: input.auditAction }),
         at: this.clock.now(),
       },
       actor,
@@ -124,8 +138,18 @@ export class LlmCredentialService {
     return this.cipher === null ? "no-encryption-key" : "undecryptable";
   }
 
-  remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean> {
-    return this.repository.remove(organizationId, provider, actor);
+  remove(
+    organizationId: string,
+    provider: LlmProviderId,
+    actor?: AuditActor,
+    auditAction?: string,
+  ): Promise<boolean> {
+    return this.repository.remove(organizationId, provider, actor, auditAction);
+  }
+
+  /** Lève `EncryptionUnavailableError` sans porte-clés : permet de refuser AVANT un test de clé. */
+  assertCanStore(): void {
+    if (this.cipher === null) throw new EncryptionUnavailableError();
   }
 
   invalidate(

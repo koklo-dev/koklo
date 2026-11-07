@@ -38,6 +38,8 @@ export interface UpsertLlmCredential {
   /** Déjà validée par la garde anti-SSRF ; présente si et seulement si `openai_compatible` (CHECK SQL). */
   readonly baseUrl?: string | null;
   readonly createdByUserId: string | null;
+  /** Action d'audit à la place de `llm_credential.create|replace` (écran des fournisseurs, TK-98). */
+  readonly auditAction?: string;
   /** Instant de l'horloge de l'application (ISO-8601). */
   readonly at: string;
 }
@@ -68,7 +70,12 @@ export interface LlmCredentialRepository {
    * (principal / secours remis à `null`) et ses lignes d'usage partent en cascade ; la consommation
    * passée est conservée.
    */
-  remove(organizationId: string, provider: LlmProviderId, actor?: AuditActor): Promise<boolean>;
+  remove(
+    organizationId: string,
+    provider: LlmProviderId,
+    actor?: AuditActor,
+    auditAction?: string,
+  ): Promise<boolean>;
   /**
    * `null` si absente. Idempotent : une clé déjà invalidée garde son `invalidated_at` et ne
    * journalise rien. Avec `expectedRevision` (compare-and-swap, D7), l'invalidation ne s'applique

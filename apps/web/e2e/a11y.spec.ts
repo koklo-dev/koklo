@@ -8,8 +8,8 @@ import {
   setScenario,
   switchToDark,
 } from "./support/helpers.ts";
+import type { ProvidersScenario } from "./support/stub-ai-providers.ts";
 import { FEATURE_PROJECT_ID } from "./support/stub-features.ts";
-import type { LlmScenario } from "./support/stub-llm-credential.ts";
 
 type Page = {
   name: string;
@@ -21,7 +21,7 @@ type Page = {
   board?: KanbanBoard;
   role?: KanbanRole;
   installations?: "loading" | "empty" | "data" | "internal";
-  llm?: LlmScenario["llm"];
+  providers?: ProvidersScenario["providers"];
 };
 
 const PAGES: readonly Page[] = [
@@ -141,41 +141,62 @@ const PAGES: readonly Page[] = [
     projects: "data",
     role: "dev",
   },
-  // Réglages de l'IA (S-ai-settings §7) : axe sans violation sur chaque état, clair et sombre
+  // Fournisseurs d'IA (S-ai-settings §7) : axe sans violation sur chaque état, clair et sombre
+  {
+    name: "ai-settings empty",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    providers: { list: "empty" },
+  },
+  {
+    name: "ai-settings two providers",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    providers: { list: "two" },
+  },
+  {
+    name: "ai-settings three providers",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    providers: { list: "three" },
+  },
+  {
+    name: "ai-settings invalid key",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    providers: { list: "invalid" },
+  },
+  {
+    name: "ai-settings cap warning",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    providers: { list: "two", report: "warning" },
+  },
+  {
+    name: "ai-settings cap suspended",
+    path: "/settings/ai",
+    session: true,
+    projects: "data",
+    providers: { list: "two", report: "suspended" },
+  },
   {
     name: "ai-settings loading",
     path: "/settings/ai",
     session: true,
     projects: "data",
-    llm: { list: "loading" },
-  },
-  {
-    name: "ai-settings absent",
-    path: "/settings/ai",
-    session: true,
-    projects: "data",
-    llm: { list: "absent" },
-  },
-  {
-    name: "ai-settings configured",
-    path: "/settings/ai",
-    session: true,
-    projects: "data",
-    llm: { list: "configured" },
-  },
-  {
-    name: "ai-settings invalid",
-    path: "/settings/ai",
-    session: true,
-    projects: "data",
-    llm: { list: "invalid" },
+    providers: { list: "loading" },
   },
   {
     name: "ai-settings error",
     path: "/settings/ai",
     session: true,
     projects: "data",
-    llm: { list: "internal" },
+    providers: { list: "internal" },
   },
   {
     name: "ai-settings non-admin",
@@ -221,7 +242,7 @@ for (const theme of ["light", "dark"] as const) {
     board,
     role,
     installations,
-    llm,
+    providers,
   } of PAGES) {
     test(`axe WCAG AA sans violation : ${name} (${theme})`, async ({ page }) => {
       await setScenario({
@@ -232,11 +253,13 @@ for (const theme of ["light", "dark"] as const) {
         ...(board ? { board } : {}),
         ...(role ? { role } : {}),
         ...(installations ? { installations } : {}),
-        ...(llm ? { llm } : {}),
+        ...(providers ? { providers } : {}),
       });
       await page.goto(path);
       if (theme === "dark") await switchToDark(page);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      // Les transitions de couleur de la bascule de thème faussent le contraste : on attend leur fin.
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
       const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
       expect(results.violations).toEqual([]);
       await releaseHeld();
