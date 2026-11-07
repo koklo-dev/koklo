@@ -1,8 +1,10 @@
 ---
 id: S-organizations
 titre: Choisir ou créer une organisation
-version: 1.1
+version: 2
 ---
+> **Remplacée par [S-settings](S-settings.md)** (TK-97) pour la partie réglages d'organisation ; l'écran « choisir ou créer » (/organizations, B83) reste décrit ci-dessous.
+
 ## 1. Utilisateurs et objectif
 Toute personne connectée (vue équipe) **sans organisation active** : premier login, ou nouvelle session dont l'organisation n'est pas encore choisie. Aussi toute personne active qui veut créer une autre organisation ou en changer (depuis le menu du TeamSwitcher). Objectif : arriver dans une organisation, sinon en créer une. Ce rôle de porte d'entrée résout la lacune G1 : « connecté mais sans organisation » n'est plus une erreur d'autorisation, c'est un écran.
 
@@ -69,3 +71,4 @@ Sous 768 px : carte pleine largeur moins deux marges de 16 px, boutons pleine la
 |---|---|---|---|
 | 1 | 2026-10-29 | TK-24 | Création : porte d'entrée sans organisation active (G1), création, choix et activation automatique. Détail : `.workflow/TK-24/02-design.md` |
 | 1.1 | 2026-11-07 | TK-88 | Reste hors coquille (aucune organisation active) ; le sélecteur d'organisation de la barre y mène (« Créer une organisation »). Remplacée par S-settings au lot 13. Détail : `.workflow/TK-88/02-design.md` |
+| 2 | 2026-11-07 | TK-97 | Remplacée par S-settings (Réglages : Général, Membres, Mon compte). Décision B103. |

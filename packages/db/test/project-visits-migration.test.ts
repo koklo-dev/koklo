@@ -57,9 +57,9 @@ describe("TK-88 migration project_visits : dossier et contenu", () => {
     expect(down).not.toMatch(/DROP\s+(?:TYPE|FUNCTION|TRIGGER)/i);
   });
 
-  it("expectedTables contient la table (44 au total)", () => {
+  it("expectedTables contient la table (46 au total)", () => {
     expect(expectedTables).toContain(TABLE);
-    expect(expectedTables).toHaveLength(44);
+    expect(expectedTables).toHaveLength(46);
   });
 
   it("le modèle ProjectVisit est un modèle d'organisation", () => {
@@ -174,11 +174,13 @@ describe("TK-88 migration project_visits : up, down, up", () => {
     const scope = await notificationScope(db, "visits-cycle");
     await insertVisit(db, scope);
 
-    runPrismaOrThrow(
-      ["db", "execute", "--file", join(migrationsDir, migration(), "down.sql")],
-      db.url,
-    );
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [migration()]);
+    // Les migrations postérieures (TK-97) sont défaites d'abord, de la plus récente à la plus ancienne.
+    for (const dir of dirs()
+      .filter((d) => d >= migration())
+      .reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     expect(await inventory(db)).toEqual(expected);
     expect(await db.query("SELECT 1 FROM projects WHERE id = $1", [scope.projectId])).toHaveLength(

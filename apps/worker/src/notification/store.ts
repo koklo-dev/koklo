@@ -4,6 +4,7 @@ import {
   type EmailState,
   type NotificationSubjectKind,
   type NotificationType,
+  PREFERENCE_KEY_OF_TYPE,
 } from "./types.ts";
 
 /** Notification prête à être rendue, avec les faits du destinataire relus à l'envoi. */
@@ -22,7 +23,11 @@ export interface NotificationEmailContext {
   readonly createdAt: Date;
 }
 
-export type SkipReason = "already-read" | "unverified-recipient" | "type-not-emailed";
+export type SkipReason =
+  | "already-read"
+  | "unverified-recipient"
+  | "type-not-emailed"
+  | "preference-off";
 
 export type ClaimResult =
   | { readonly kind: "ready"; readonly context: NotificationEmailContext }
@@ -47,6 +52,7 @@ interface ContextRow {
   project_id: string | null;
   organization_id: string;
   organization_name: string;
+  recipient_user_id: string;
   recipient_email: string;
   recipient_email_verified: boolean;
   read_at: Date | null;
@@ -79,6 +85,21 @@ function skipReason(context: NotificationEmailContext): SkipReason | undefined {
     return "already-read";
   }
   return context.recipientEmailVerified ? undefined : "unverified-recipient";
+}
+
+type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+
+/** `true` si le destinataire a désactivé l'e-mail de ce type (B101) ; sans clé ni ligne, l'e-mail part. */
+async function preferenceIsOff(tx: Tx, row: ContextRow): Promise<boolean> {
+  const key = PREFERENCE_KEY_OF_TYPE[row.type];
+  if (key === undefined) {
+    return false;
+  }
+  const [preference] = await tx.$queryRaw<{ enabled: boolean }[]>`
+    SELECT enabled FROM notification_preferences
+    WHERE user_id = ${row.recipient_user_id}::uuid
+      AND organization_id = ${row.organization_id}::uuid AND key = ${key}`;
+  return preference?.enabled === false;
 }
 
 /** Requêtes SQL brutes par le client brut (balayage inter-organisations, sans isolation de tenant). */
@@ -128,7 +149,7 @@ export class NotificationEmailStore {
     return this.raw.$transaction(async (tx) => {
       const [row] = await tx.$queryRaw<ContextRow[]>`
         SELECT n.id, n.type, n.subject_kind, n.subject_ref, n.project_id, n.organization_id,
-               o.name AS organization_name, u.email AS recipient_email,
+               o.name AS organization_name, n.recipient_user_id, u.email AS recipient_email,
                u.email_verified AS recipient_email_verified, n.read_at, n.email_state, n.created_at
         FROM notifications n
         JOIN users u ON u.id = n.recipient_user_id
@@ -142,7 +163,8 @@ export class NotificationEmailStore {
         return { kind: "settled" };
       }
       const context = toContext(row);
-      const reason = skipReason(context);
+      const reason =
+        skipReason(context) ?? ((await preferenceIsOff(tx, row)) ? "preference-off" : undefined);
       if (reason === undefined) {
         return { kind: "ready", context };
       }

@@ -71,13 +71,16 @@ for (const theme of ["light", "dark"] as Theme[]) {
   }
 }
 
-test("S-ai-settings : le propriétaire lit h1 « Réglages » avec l'onglet « IA » actif", async ({
+test("S-ai-settings : le propriétaire lit h1 « Réglages » avec « Fournisseurs d'IA » actif", async ({
   page,
 }) => {
   await open(page);
   await expect(page.getByRole("heading", { level: 1, name: "Réglages" })).toBeVisible();
   const tabs = page.getByRole("navigation", { name: "Sections des réglages" });
-  await expect(tabs.getByRole("link", { name: "IA" })).toHaveAttribute("aria-current", "page");
+  await expect(tabs.getByRole("link", { name: "Fournisseurs d'IA" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(sidebarOf(page).getByRole("link", { name: "IA" })).toHaveCount(0);
 });
 
@@ -93,7 +96,7 @@ test("S-ai-settings : en-têtes de la route, Cache-Control: no-store et Referrer
   expect(github?.headers()["referrer-policy"]).not.toBe("no-referrer");
 });
 
-test("S-ai-settings : un développeur n'a ni onglet GitHub, ni appel d'API llmCredential, et lit un refus sans action", async ({
+test("S-ai-settings : un développeur est redirigé vers Membres : ni lien GitHub, ni appel d'API llmCredential, ni action", async ({
   page,
 }) => {
   const seen: string[] = [];
@@ -101,7 +104,8 @@ test("S-ai-settings : un développeur n'a ni onglet GitHub, ni appel d'API llmCr
     if (request.url().includes("/llm-credentials")) seen.push(request.url());
   });
   await open(page, { list: "configured" }, "dev");
-  await expect(page.getByText(/Cette page est réservée aux propriétaires/)).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/members$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Membres" })).toBeVisible();
   await expect(
     page
       .getByRole("navigation", { name: "Sections des réglages" })

@@ -9,6 +9,7 @@ import type {
   TransitionMode as KanbanTransition,
 } from "./stub-kanban.ts";
 import type { LlmScenario } from "./stub-llm-credential.ts";
+import type { SettingsScenario } from "./stub-settings.ts";
 import type { ShellScenario } from "./stub-shell.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
 
@@ -41,7 +42,8 @@ export async function setScenario(
     FeaturesScenario &
     AiScenario &
     LlmScenario &
-    ShellScenario,
+    ShellScenario &
+    Pick<SettingsScenario, "members">,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }

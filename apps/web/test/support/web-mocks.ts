@@ -32,8 +32,14 @@ export const authClient = {
 export const procedures = {
   organizationList: vi.fn(),
   organizationCreate: vi.fn(),
-  memberList: vi.fn(),
-  memberInvite: vi.fn(),
+  // TK-97 (contrat 2.2.0) : Membres (tableau paginé, rôle, retrait) et invitations
+  memberPage: vi.fn(),
+  memberUpdateRole: vi.fn(),
+  memberRemove: vi.fn(),
+  invitationList: vi.fn(),
+  invitationCreate: vi.fn(),
+  invitationResend: vi.fn(),
+  invitationRevoke: vi.fn(),
   projectList: vi.fn(),
   projectCreate: vi.fn(),
   // TK-88 : coquille (contrat 2.1.0) — agrégat du projet, visites, récents, recherche ⌘K
@@ -64,6 +70,13 @@ export const procedures = {
   llmCredentialSet: vi.fn(),
   llmCredentialVerify: vi.fn(),
   llmCredentialRemove: vi.fn(),
+  // TK-97 (contrat 2.2.0) : Général (org.get / org.update) et Mon compte (me.*)
+  orgGet: vi.fn(),
+  orgUpdate: vi.fn(),
+  meGet: vi.fn(),
+  meUpdate: vi.fn(),
+  meGetNotifications: vi.fn(),
+  meUpdateNotification: vi.fn(),
 };
 
 const query = (name: string[], queryFn: ReturnType<typeof vi.fn>) => ({
@@ -136,8 +149,17 @@ export const orpc = {
     create: mutation(procedures.organizationCreate),
   },
   member: {
-    list: query(["member", "list"], procedures.memberList),
-    invite: mutation(procedures.memberInvite),
+    key: () => ["member"],
+    page: queryFull(["member", "page"], procedures.memberPage),
+    updateRole: mutationWithOptions(procedures.memberUpdateRole),
+    remove: mutationWithOptions(procedures.memberRemove),
+  },
+  invitation: {
+    key: () => ["invitation"],
+    list: queryFull(["invitation", "list"], procedures.invitationList),
+    create: mutationWithOptions(procedures.invitationCreate),
+    resend: mutationWithOptions(procedures.invitationResend),
+    revoke: mutationWithOptions(procedures.invitationRevoke),
   },
   project: {
     list: query(["project", "list"], procedures.projectList),
@@ -199,6 +221,18 @@ export const orpc = {
     verify: mutationWithOptions(procedures.llmCredentialVerify),
     remove: mutationWithOptions(procedures.llmCredentialRemove),
   },
+  org: {
+    key: () => ["org"],
+    get: queryFull(["org", "get"], procedures.orgGet),
+    update: mutationWithOptions(procedures.orgUpdate),
+  },
+  me: {
+    key: () => ["me"],
+    get: queryFull(["me", "get"], procedures.meGet),
+    update: mutationWithOptions(procedures.meUpdate),
+    getNotifications: queryFull(["me", "getNotifications"], procedures.meGetNotifications),
+    updateNotification: mutationWithOptions(procedures.meUpdateNotification),
+  },
   ticket: {
     key: () => ["ticket"],
     list: queryFull(["ticket", "list"], procedures.ticketList),
@@ -249,6 +283,42 @@ export const projectShell = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+/** Sortie de `org.get` (contrat 2.2.0). */
+export const orgSummary = (over: Record<string, unknown> = {}) => ({
+  id: ORG_ID,
+  name: "Atelier Lumière",
+  slug: "atelier-lumiere",
+  logo: null,
+  projectCount: 3,
+  memberCount: 5,
+  aiProviderCount: 1,
+  ...over,
+});
+
+/** Sortie de `me.get`. */
+export const meSummary = (over: Record<string, unknown> = {}) => ({
+  id: "01900000-0000-7000-8000-0000000000c1",
+  name: "Awa Koné",
+  email: "awa@example.com",
+  role: "owner",
+  ...over,
+});
+
+const TEAM_KEYS = [
+  "client_validation",
+  "pr_to_review",
+  "agent_silent",
+  "ai_budget",
+  "weekly_digest",
+];
+const CLIENT_KEYS = ["deliverable_to_validate", "feature_ready", "comment_reply"];
+
+/** Sortie de `me.getNotifications` : toutes les clés du contrat, tout activé sauf le résumé de la semaine. */
+export const notificationsFor = (role: string) =>
+  [...TEAM_KEYS, ...CLIENT_KEYS]
+    .map((key) => ({ key, enabled: key !== "weekly_digest" }))
+    .filter(({ key }) => (role === "client" ? CLIENT_KEYS : TEAM_KEYS).includes(key));
+
 export const sessionWith = (activeOrganizationId: string | null) => ({
   data: {
     user: { id: "u1", name: "Awa Koné", email: "awa@example.com", image: null },
@@ -278,11 +348,15 @@ export function resetWebMocks(): void {
   getSession.mockResolvedValue(sessionWith(ORG_ID));
   procedures.organizationList.mockResolvedValue([organization()]);
   procedures.projectList.mockResolvedValue([]);
-  procedures.memberList.mockResolvedValue([]);
+  procedures.memberPage.mockResolvedValue({ items: [], total: 0, totalIsEstimate: false });
+  procedures.invitationList.mockResolvedValue([]);
   procedures.projectShell.mockResolvedValue(projectShell());
   procedures.projectVisit.mockResolvedValue({ visitedAt: "2026-11-07T10:00:00.000Z" });
   procedures.projectRecent.mockResolvedValue([]);
   procedures.searchQuery.mockResolvedValue({ items: [], total: 0, nextCursor: null });
+  procedures.orgGet.mockResolvedValue(orgSummary());
+  procedures.meGet.mockResolvedValue(meSummary());
+  procedures.meGetNotifications.mockResolvedValue(notificationsFor("owner"));
 }
 
 /** Chemins vers lesquels le composant a navigué (push ou replace). */

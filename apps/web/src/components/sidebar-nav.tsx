@@ -2,7 +2,8 @@
 
 import type { Role } from "@koklo/contract";
 import { ShellNavItem, type SpecKey, SpecNav, useShell } from "@koklo/ui";
-import { canListMembers, canManage, canWriteSpec } from "../lib/roles.ts";
+import { canManage, canWriteSpec } from "../lib/roles.ts";
+import { defaultSection } from "../lib/settings-sections.ts";
 import {
   activeSpecSlug,
   framingPath,
@@ -106,7 +107,7 @@ export function ProjectNav({
   );
 }
 
-/** Groupe « Organisation » : Tous les projets et, selon le rôle, Réglages (jamais pour un client ni un rôle inconnu). */
+/** Groupe « Organisation » : Tous les projets et, selon le rôle, Réglages (visible de tous : la section d'arrivée dépend du rôle). */
 export function OrganizationNav({ pathname, role }: { pathname: string; role: Role | undefined }) {
   return (
     <div className="flex flex-col gap-1">
@@ -119,15 +120,13 @@ export function OrganizationNav({ pathname, role }: { pathname: string; role: Ro
           active={pathname === PROJECTS_PATH}
           LinkComponent={ShellLink}
         />
-        {canListMembers(role) ? (
-          <ShellNavItem
-            href={settingsPath("members")}
-            icon="settings"
-            label="Réglages"
-            active={pathname.startsWith("/settings")}
-            LinkComponent={ShellLink}
-          />
-        ) : null}
+        <ShellNavItem
+          href={settingsPath(defaultSection(role))}
+          icon="settings"
+          label="Réglages"
+          active={pathname.startsWith("/settings")}
+          LinkComponent={ShellLink}
+        />
       </div>
     </div>
   );

@@ -80,11 +80,13 @@ describe("page d'organisation (/projects)", () => {
     asRole("owner");
     renderFrame("/projects");
     await within(nav()).findByRole("link", { name: "Réglages" });
-    expect(linkHrefs()).toEqual(
-      expect.arrayContaining([
-        ["Tous les projets", "/projects"],
-        ["Réglages", "/settings/members"],
-      ]),
+    await waitFor(() =>
+      expect(linkHrefs()).toEqual(
+        expect.arrayContaining([
+          ["Tous les projets", "/projects"],
+          ["Réglages", "/settings/members"],
+        ]),
+      ),
     );
     expect(within(nav()).getByRole("link", { name: "Tous les projets" })).toHaveAttribute(
       "aria-current",
@@ -257,11 +259,14 @@ describe("carte projet : projets récents (C9)", () => {
 });
 
 describe("droits (C8, C12, B82)", () => {
-  it("client : ni Réglages ni Assistant de cadrage, mais la carte, SPEC et Tickets", async () => {
+  it("client : Réglages (vers Mon compte) sans Assistant de cadrage, avec la carte, SPEC et Tickets", async () => {
     asRole("client");
     renderFrame(SPEC);
     await within(nav()).findByRole("link", { name: /Tickets/ });
-    expect(within(nav()).queryByRole("link", { name: "Réglages" })).toBeNull();
+    expect(within(nav()).getByRole("link", { name: "Réglages" })).toHaveAttribute(
+      "href",
+      "/settings/account",
+    );
     expect(within(nav()).queryByRole("link", { name: "Assistant de cadrage" })).toBeNull();
     expect(
       within(nav()).getByRole("button", { name: /Portail de réservation/ }),
@@ -269,11 +274,14 @@ describe("droits (C8, C12, B82)", () => {
     expect(within(nav()).getByRole("link", { name: "Fonctionnel" })).toBeInTheDocument();
   });
 
-  it("rôle inconnu (organization.list pas encore lu) : sans Réglages ni Assistant de cadrage", async () => {
+  it("rôle inconnu (organization.list pas encore lu) : Réglages vers Mon compte, sans Assistant de cadrage", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));
     renderFrame(SPEC);
     await within(nav()).findByRole("link", { name: /Tickets/ });
-    expect(within(nav()).queryByRole("link", { name: "Réglages" })).toBeNull();
+    expect(within(nav()).getByRole("link", { name: "Réglages" })).toHaveAttribute(
+      "href",
+      "/settings/account",
+    );
     expect(within(nav()).queryByRole("link", { name: "Assistant de cadrage" })).toBeNull();
   });
 

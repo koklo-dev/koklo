@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { magicLink, organization } from "better-auth/plugins";
 import type { AppConfig } from "../config.ts";
 import type { EnqueueInvitation } from "../organization/invitation-queue.ts";
+import { createAcceptanceHook } from "./invitation-links.ts";
 import type { EnqueueMagicLink } from "./magic-link-queue.ts";
 import { organizationAccessControl, organizationRoles } from "./roles.ts";
 
@@ -50,6 +51,8 @@ export function createAuth(
         // Une invitation pending (même expirée) est remplacée ; les doublons vivants sont refusés
         // en amont par le service (409 already_invited).
         cancelPendingInvitationsOnReInvite: true,
+        // TK-97 (B98) : à l'acceptation, les projets proposés deviennent des liens client <-> projet.
+        organizationHooks: { afterAcceptInvitation: createAcceptanceHook(prisma) },
         sendInvitationEmail: ({ id, email, role, organization, inviter }) =>
           enqueueInvitation({
             email,

@@ -19,7 +19,9 @@ export interface AuditEntry {
     | "llm_credential"
     | "project_client"
     | "suggestion"
-    | "review";
+    | "review"
+    | "user"
+    | "notification_preference";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;

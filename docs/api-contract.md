@@ -1342,7 +1342,50 @@ the shell pages (Idée, Spec, Tickets, Tous les projets, Réglages; locked deliv
 person types. Opening a `feature` goes to `/projects/{projectId}/spec/functional?tab=features&sel=F-nnn`, a `ticket` to
 `/projects/{projectId}/tickets`, a `project` to `/projects/{projectId}`. No contract change: the lot adds no route.
 
+## Settings (TK-97, contract 2.2.0)
+
+Settings screens (General, Members, My account). **Additive** (question B95): `member.invite`, `member.setRole` and
+`member.list` stay, deprecated, and delegate to the same services (same rights, same audit); they are removed at the
+next major. They keep their 2.1.0 behaviour (B106): `member.invite` leaves projects optional, `member.setRole` allows
+changing one's own role. Flat names inside the `me` group (B104).
+
+| Procedure | Route | Rights (server side, role re-read from `members`) |
+|---|---|---|
+| `org.get` | `GET /organization` | owner, admin, dev, designer, business (client: 403) |
+| `org.update` | `PATCH /organization` | owner, admin; `CONFLICT slug_taken` |
+| `invitation.create` | `POST /invitations` | owner, admin; only an owner invites an admin (H3); `projectIds` required for client and business, refused otherwise (`VALIDATION`), unknown or foreign project is 404; `already_member`, `already_invited` |
+| `invitation.list` | `GET /invitations` | owner, admin; live `pending` invitations only, with their projects |
+| `invitation.resend` | `POST /invitations/{invitationId}/resend` | owner, admin; 404 unless live and `pending`; enqueues the `send-invitation` job again |
+| `invitation.revoke` | `DELETE /invitations/{invitationId}` | owner, admin; `pending` becomes `canceled`, 404 otherwise |
+| `member.page` | `GET /members/page` | same roles as `member.list` (client: 403); numbered pages (schema 1.2: `page`, `size` 25/50/100, `q`), real `total`, `projects` (links of client and business), `lastActiveAt` (most recent session of the account, B102) |
+| `member.updateRole` | `PATCH /members/{memberId}` | owner, admin; never on oneself (`self_role`); H3; leaving `client` purges the project links in the same transaction |
+| `member.remove` | `DELETE /members/{memberId}` | owner, admin; never oneself (`self_remove`); H3; deletes the project links and the sessions of the account active on this organization, with the audit, in one serializable transaction |
+| `me.get`, `me.update` | `GET /me`, `PATCH /me` | any session with an organization, client included; `me.update` changes the name only (1 to 80 characters), never the e-mail |
+| `me.getNotifications`, `me.updateNotification` | `GET /me/notifications`, `PUT /me/notifications/{key}` | same; the closed key list is `NOTIFICATION_PREFERENCE_KEYS` (8 keys, B101, B107) and the `notification_preferences_key_check` constraint |
+
+**Invitation projects (B98).** `invitation_projects` stores the projects proposed to an invitation. The Better Auth hook
+`organizationHooks.afterAcceptInvitation` creates the `project_client_access` links (client and business) in one
+transaction. If it fails the acceptance is undone (member deleted, invitation `pending` again), never a partial access
+(B109). A client invited on P1 only sees P1 and gets the uniform 404 on any other project.
+
+**Audit (B105).** One entry per write: `member.invite` (`invitation.create`), `invitation.resend`, `invitation.revoke`,
+`organization.update`, `member.setRole` (`member.updateRole`), `member.remove`, `me.update` (target `user`),
+`me.notifications.update` (target `notification_preference`). `client-write-matrix` classes the six management writes
+as denied to a client and `me.update` / `me.updateNotification` as allowed (personal preference).
+
+**E-mail preferences in the worker (B101, B107).** `claimForSend` reads the preference of the recipient for the key
+bound to the notification type (`baseline.proposed`, `review.submitted`, `baseline.validated`); a disabled preference
+settles the notification as `skipped` (reason `preference-off`) and the in-app notification stays. No row means the
+default of the contract (`DEFAULT_NOTIFICATION_PREFERENCES`).
+
 ## Version history
+- **2.2.0** (TK-97, lot A): settings. New groups `org` (`get`, `update`), `invitation` (`create`, `list`, `resend`,
+  `revoke`) and `me` (`get`, `update`, `getNotifications`, `updateNotification`), and `member.page`, `member.updateRole`,
+  `member.remove`; 13 routes, 81 routes and 60 paths in all. New schemas in `schemas-settings.ts`, constants
+  `NOTIFICATION_PREFERENCE_KEYS`, `DEFAULT_NOTIFICATION_PREFERENCES`, `INVITATION_PROJECTS_MAX`. New tables
+  `invitation_projects` and `notification_preferences` (migration `20261107170000_settings`, with `down.sql`).
+  **Additive**: no route removed or changed; `member.invite`, `member.setRole` and `member.list` deprecated. The
+  fingerprint of 2.1.0 is frozen in `packages/contract/test/contract.test.ts`; 0.1.0 to 2.1.0 unchanged.
 - **2.1.0** (TK-88): application shell. New routes `project.shell` (`GET /projects/{projectId}/shell`), `project.visit`
   (`POST /projects/{projectId}/visit`), `project.recent` (`GET /project-visits`) and the group `search` with
   `search.query` (`GET /search`); 4 routes, 68 routes and 51 paths in all. New schemas `projectShellSchema`,

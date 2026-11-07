@@ -138,14 +138,17 @@ describe("Réglages (C7)", () => {
     expect(() => Page()).toThrow("NEXT_REDIRECT:/settings/members");
   });
 
-  it.each(["members", "github", "ai"])("/settings/%s rend la section", async (section) => {
-    const { default: Page } = await import("../src/app/(shell)/settings/[section]/page.tsx");
-    const element = await Page({
-      ...params({ section }),
-      searchParams: Promise.resolve({ result: "installed" }),
-    });
-    expect(element).toMatchObject({ props: { section } });
-  });
+  it.each(["general", "members", "github", "ai", "account"])(
+    "/settings/%s rend la section",
+    async (section) => {
+      const { default: Page } = await import("../src/app/(shell)/settings/[section]/page.tsx");
+      const element = await Page({
+        ...params({ section }),
+        searchParams: Promise.resolve({ result: "installed" }),
+      });
+      expect(element).toMatchObject({ props: { section } });
+    },
+  );
 
   it("/settings/github transmet le résultat connu du retour GitHub, ignore le reste", async () => {
     const { default: Page } = await import("../src/app/(shell)/settings/[section]/page.tsx");
@@ -174,7 +177,10 @@ describe("Réglages (C7)", () => {
       title: "Membres · Réglages · Koklo",
     });
     expect(await generateMetadata(params({ section: "ai" }))).toMatchObject({
-      title: "IA · Réglages · Koklo",
+      title: "Fournisseurs d'IA · Réglages · Koklo",
+    });
+    expect(await generateMetadata(params({ section: "account" }))).toMatchObject({
+      title: "Mon compte · Réglages · Koklo",
     });
   });
 });

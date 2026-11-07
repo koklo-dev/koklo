@@ -15,6 +15,9 @@ import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
  */
 const ALLOWED = [
   "comment.create",
+  // TK-97 : préférences personnelles (nom, e-mails), ouvertes à toute session, client compris.
+  "me.update",
+  "me.updateNotification",
   // TK-88 : préférence personnelle (dernier projet ouvert), tout rôle ayant accès au projet.
   "project.visit",
   "review.submit",
@@ -37,8 +40,14 @@ const DENIED = [
   "llmCredential.remove",
   "llmCredential.set",
   "llmCredential.verify",
+  "invitation.create",
+  "invitation.resend",
+  "invitation.revoke",
   "member.invite",
+  "member.remove",
   "member.setRole",
+  "member.updateRole",
+  "org.update",
   // TK-55 (décision du 2026-11-06) : un compte qui n'est que client ne crée pas d'organisation.
   "organization.create",
   "project.create",
@@ -99,9 +108,11 @@ describe("classement exhaustif des écritures du contrat", () => {
     expect(routes().find((r) => r.name === "review.list")?.method).toBe("GET");
   });
 
-  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter et mémoriser son dernier projet", () => {
+  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter, mémoriser son dernier projet et régler son compte", () => {
     expect(ALLOWED).toEqual([
       "comment.create",
+      "me.update",
+      "me.updateNotification",
       "project.visit",
       "review.submit",
       "suggestion.create",
@@ -228,6 +239,20 @@ describe("les seules écritures du client : suggérer, retirer, valider, comment
       [scene.c1.userId],
     );
     expect(rows).toEqual([{ project_id: scene.p1.projectId }]);
+  });
+
+  it("me.update et me.updateNotification : 200 pour un client (préférence personnelle)", async () => {
+    const body = { name: "Client Renommé" };
+    const name = await send(bench().app, scene.c1.cookie, "patch", "/me", body);
+    expect(name.status, JSON.stringify(name.body)).toBe(200);
+    const pref = await send(
+      bench().app,
+      scene.c1.cookie,
+      "put",
+      "/me/notifications/comment_reply",
+      { enabled: false },
+    );
+    expect(pref.status, JSON.stringify(pref.body)).toBe(200);
   });
 
   it("comment.create : 200 sur un ticket de son projet", async () => {

@@ -139,3 +139,15 @@ export const REVIEW_READ_ROLES = STAFF_ROLES;
 
 /** Notifiés d'une validation (`review.submitted`, `baseline.validated`) : l'équipe qui agit, pas le business. */
 export const REVIEW_NOTIFIED_ROLES = ["owner", "admin", "dev", "designer"] as const;
+
+/**
+ * Lire l'organisation (`org.get`, TK-97) : nom, slug et compteurs de Général. Fermé au client (lié ou non),
+ * comme la liste des membres ; un rôle absent ou inconnu est refusé (403).
+ */
+export const ORG_READ_ROLES = STAFF_ROLES;
+
+/**
+ * Rôles dont l'invitation porte des projets (B98) : obligatoires pour eux, refusés aux autres. À l'acceptation,
+ * un lien `project_client_access` est créé par projet. Le cloisonnement serveur ne change que pour le client.
+ */
+export const PROJECT_INVITATION_ROLES = [CLIENT_ROLE, "business"] as const;

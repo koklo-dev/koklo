@@ -13,6 +13,8 @@ export const PROJECT_CLIENT_MODELS = ["ProjectClientAccess"] as const;
 
 /** Table ajoutée par TK-88 : dernier projet ouvert par membre (carte projet de la coquille). */
 export const PROJECT_VISIT_TABLES = ["project_visits"] as const;
+/** TK-97 : projets proposés à une invitation, préférences d'e-mail. */
+export const SETTINGS_TABLES = ["invitation_projects", "notification_preferences"] as const;
 
 export const PROJECT_CLIENT_SUFFIX = "_project_client_access";
 export const PROJECT_CLIENT_MIGRATION = "20261102090000_project_client_access";

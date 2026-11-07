@@ -61,6 +61,9 @@ export const expectedTables = [
   "ai_usage_monthly",
   // TK-88 : dernier projet ouvert par membre (carte projet, redirection de `/`).
   "project_visits",
+  // TK-97 : projets proposés à une invitation, préférences d'e-mail.
+  "invitation_projects",
+  "notification_preferences",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */

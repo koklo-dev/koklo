@@ -30,6 +30,9 @@ const GROUPS: Record<string, string[]> = {
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
   project: ["create", "list", "recent", "shell", "visit"],
   search: ["query"],
+  org: ["get", "update"],
+  invitation: ["create", "list", "resend", "revoke"],
+  me: ["get", "getNotifications", "update", "updateNotification"],
 };
 
 describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a : +1, TK-55b : +1, TK-55c : +1, TK-55d : +1, TK-88 : +1), 60 procédures", () => {
@@ -43,9 +46,12 @@ describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
         "dependency",
         "health",
         "installation",
+        "invitation",
         "lease",
         "llmCredential",
+        "me",
         "member",
+        "org",
         "organization",
         "project",
         "projectClient",
@@ -145,13 +151,28 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/spec/batches",
     "GET /projects/{projectId}/spec/batches/{batchId}",
   ];
+  const SETTINGS_PAIRS = [
+    "GET /organization",
+    "PATCH /organization",
+    "POST /invitations",
+    "GET /invitations",
+    "POST /invitations/{invitationId}/resend",
+    "DELETE /invitations/{invitationId}",
+    "GET /members/page",
+    "PATCH /members/{memberId}",
+    "DELETE /members/{memberId}",
+    "GET /me",
+    "PATCH /me",
+    "GET /me/notifications",
+    "PUT /me/notifications/{key}",
+  ];
   const SHELL_PAIRS = [
     "GET /projects/{projectId}/shell",
     "POST /projects/{projectId}/visit",
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d et les 4 de TK-88 sont présentes (68 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 et les 13 de TK-97 sont présentes (81 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -166,10 +187,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...SUGGESTION_PAIRS,
       ...REVIEW_PAIRS,
       ...SHELL_PAIRS,
+      ...SETTINGS_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(68);
+    expect(pairs).toHaveLength(81);
   });
 });
 

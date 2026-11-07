@@ -2,24 +2,21 @@ import type {
   MemberInviteInput,
   MemberInviteOutput,
   MemberListOutput,
+  MemberPageInput,
+  MemberPageOutput,
+  MemberRemoveOutput,
   MemberRole,
   MemberSetRoleOutput,
 } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
-import { ORPCError } from "@orpc/server";
-import { AUTH } from "../auth/auth.tokens.ts";
-import type { Auth } from "../auth/auth.ts";
 import type { AuthSession } from "../auth/session.ts";
-import { MemberRepository } from "./member.repository.ts";
-
-const conflict = (reason: "already_member" | "already_invited" | "last_owner") =>
-  new ORPCError("CONFLICT", { data: { reason } });
-const forbidden = () => new ORPCError("FORBIDDEN", { message: "Accès refusé" });
-const notFound = () => new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });
+import { InvitationService } from "../invitation/invitation.service.ts";
+import { conflict, forbidden, notFound } from "../tracker/api-errors.ts";
+import { type MemberRecord, MemberRepository } from "./member.repository.ts";
 
 /**
- * H3 : seul un owner touche un owner ou nomme un admin (invitation comprise). Le rôle de
- * l'appelant vient de la session (table `members`), jamais de l'entrée.
+ * H3 : seul un owner touche un owner ou nomme un admin. Le rôle de l'appelant vient de la session
+ * (table `members`), jamais de l'entrée.
  */
 function assertMayGrant(actorRole: string | undefined, newRole: MemberRole, targetRole?: string) {
   const touchesPrivileged = newRole === "admin" || targetRole === "owner";
@@ -28,56 +25,84 @@ function assertMayGrant(actorRole: string | undefined, newRole: MemberRole, targ
   }
 }
 
+/** Refus communs à `updateRole` et `remove` : membre inconnu, soi-même (`selfReason`), H3. */
+function assertMayTouch(
+  session: AuthSession,
+  target: MemberRecord | null,
+  newRole: MemberRole,
+  selfReason: "self_role" | "self_remove" | null,
+): MemberRecord {
+  if (!target) {
+    throw notFound();
+  }
+  if (selfReason && target.userId === session.userId) {
+    throw conflict(selfReason);
+  }
+  assertMayGrant(session.role, newRole, target.role);
+  return target;
+}
+
 @Injectable()
 export class MemberService {
   constructor(
     @Inject(MemberRepository) private readonly repository: MemberRepository,
-    @Inject(AUTH) private readonly auth: Auth,
+    @Inject(InvitationService) private readonly invitations: InvitationService,
   ) {}
 
   list(session: AuthSession): Promise<MemberListOutput> {
     return this.repository.list(session.organizationId);
   }
 
-  async invite(
+  page(session: AuthSession, input: MemberPageInput): Promise<MemberPageOutput> {
+    return this.repository.page(session.organizationId, input);
+  }
+
+  /** Dépréciée (2.2.0) : délègue à `invitation.create`, mêmes droits et même audit ; les projets restent facultatifs. */
+  invite(
     session: AuthSession,
     input: MemberInviteInput,
     headers: Headers,
   ): Promise<MemberInviteOutput> {
-    assertMayGrant(session.role, input.role);
-    const { organizationId } = session;
-    if (await this.repository.isMemberByEmail(organizationId, input.email)) {
-      throw conflict("already_member");
-    }
-    if (await this.repository.hasLiveInvitation(organizationId, input.email)) {
-      throw conflict("already_invited");
-    }
-    // Crée l'invitation puis remet le job d'envoi au worker (callback `sendInvitationEmail`).
-    const invitation = await this.auth.api.createInvitation({
-      body: { email: input.email, role: input.role, organizationId },
-      headers,
-    });
-    await this.repository.recordInvitation(session, invitation.id);
-    return {
-      id: invitation.id,
-      email: invitation.email,
-      role: input.role,
-      status: "pending",
-      expiresAt: invitation.expiresAt.toISOString(),
-    };
+    return this.invitations.create(session, input, headers, { requireProjects: false });
   }
 
+  /** Dépréciée (2.2.0) : conserve son comportement (le changement de rôle sur soi y reste possible). */
   async setRole(
     session: AuthSession,
     memberId: string,
     role: MemberRole,
   ): Promise<MemberSetRoleOutput> {
-    const updated = await this.repository.setRole(session, memberId, role, (target, ownerCount) => {
-      if (!target) {
-        throw notFound();
+    return this.change(session, memberId, role, null);
+  }
+
+  /** Jamais sur soi (`self_role`) ; H3 ; le dernier propriétaire reste. */
+  updateRole(
+    session: AuthSession,
+    memberId: string,
+    role: MemberRole,
+  ): Promise<MemberSetRoleOutput> {
+    return this.change(session, memberId, role, "self_role");
+  }
+
+  /** Jamais soi-même (`self_remove`) ni un propriétaire sans l'être ; le dernier propriétaire reste. */
+  remove(session: AuthSession, memberId: string): Promise<MemberRemoveOutput> {
+    return this.repository.remove(session, memberId, (target, ownerCount) => {
+      const found = assertMayTouch(session, target, "dev", "self_remove");
+      if (found.role === "owner" && ownerCount <= 1) {
+        throw conflict("last_owner");
       }
-      assertMayGrant(session.role, role, target.role);
-      if (target.role === "owner" && ownerCount <= 1) {
+    });
+  }
+
+  private async change(
+    session: AuthSession,
+    memberId: string,
+    role: MemberRole,
+    selfReason: "self_role" | null,
+  ): Promise<MemberSetRoleOutput> {
+    const updated = await this.repository.setRole(session, memberId, role, (target, ownerCount) => {
+      const found = assertMayTouch(session, target, role, selfReason);
+      if (found.role === "owner" && ownerCount <= 1) {
         throw conflict("last_owner");
       }
     });
