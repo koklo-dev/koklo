@@ -6,8 +6,7 @@ import type { Request } from "express";
 import { PROJECT_STATE_READ_ROLES, PROJECT_STATE_WRITE_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
-import { PROJECT_CONTEXT, type ProjectContext } from "../project/project-context.ts";
-import { inScope } from "../tracker/scope.ts";
+import { inProject } from "../tracker/scope.ts";
 import { ProjectStateService } from "./project-state.service.ts";
 
 /** Le contenu porte politique de merge et réglages : lecture et écriture sont restreintes par rôle. */
@@ -15,7 +14,6 @@ import { ProjectStateService } from "./project-state.service.ts";
 export class ProjectStateController {
   constructor(
     @Inject(ProjectStateService) private readonly service: ProjectStateService,
-    @Inject(PROJECT_CONTEXT) private readonly project: ProjectContext,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -23,8 +21,8 @@ export class ProjectStateController {
   @Roles(...PROJECT_STATE_READ_ROLES)
   @Implement(contract.projectState.get)
   get(@Req() request: Request) {
-    return implement(contract.projectState.get).handler(({ errors }) =>
-      inScope(request, this.project, errors, (scope) => this.service.get(scope), this.access),
+    return implement(contract.projectState.get).handler(({ input, errors }) =>
+      inProject(request, errors, input.projectId, (scope) => this.service.get(scope), this.access),
     );
   }
 
@@ -33,10 +31,10 @@ export class ProjectStateController {
   @Implement(contract.projectState.update)
   update(@Req() request: Request) {
     return implement(contract.projectState.update).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => this.service.update(scope, input),
         this.access,
       ),

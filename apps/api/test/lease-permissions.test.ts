@@ -27,16 +27,20 @@ const ACQUIRE_DENIED: Role[] = ["designer", "client", "business"];
 describe("lease.acquire", () => {
   it.each(ACQUIRE_ALLOWED)("%s peut prendre un bail", async (role) => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const response = await collaborationFor(app, world.actors[role]).acquire(ticket.key);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const response = await collaborationFor(app, world.actors[role], world.projectId).acquire(
+      ticket.key,
+    );
     expect(response.status).toBe(200);
     expect(response.body.holder).toEqual({ kind: "member", id: world.actors[role].userId });
   });
 
   it.each(ACQUIRE_DENIED)("%s reçoit FORBIDDEN, sans bail ni audit", async (role) => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    const response = await collaborationFor(app, world.actors[role]).acquire(ticket.key);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    const response = await collaborationFor(app, world.actors[role], world.projectId).acquire(
+      ticket.key,
+    );
     expect(response.status).toBe(403);
     expect(response.body.code).toBe("FORBIDDEN");
     expect(await count(database, "leases", "organization_id = $1", [world.organizationId])).toBe(0);
@@ -45,9 +49,9 @@ describe("lease.acquire", () => {
 
   it.each(["client", "business"] as const)("%s ne peut ni battre ni libérer", async (role) => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await collaborationFor(app, world.actors.dev).acquire(ticket.key);
-    const api = collaborationFor(app, world.actors[role]);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await collaborationFor(app, world.actors.dev, world.projectId).acquire(ticket.key);
+    const api = collaborationFor(app, world.actors[role], world.projectId);
     expect((await api.heartbeat(ticket.key)).status).toBe(403);
     expect((await api.release(ticket.key)).status).toBe(403);
   });
@@ -56,17 +60,21 @@ describe("lease.acquire", () => {
 describe("lease.get : worktree masqué hors rôles d'écriture", () => {
   it("tous les rôles lisent le bail ; client et business reçoivent worktree vide", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await collaborationFor(app, world.actors.dev).acquire(ticket.key, {
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await collaborationFor(app, world.actors.dev, world.projectId).acquire(ticket.key, {
       worktree: "/srv/worktrees/secret-tree",
     });
     for (const role of ["owner", "admin", "dev", "designer"] as const) {
-      const response = await collaborationFor(app, world.actors[role]).getLease(ticket.key);
+      const response = await collaborationFor(app, world.actors[role], world.projectId).getLease(
+        ticket.key,
+      );
       expect(response.status).toBe(200);
       expect(response.body.worktree).toBe("/srv/worktrees/secret-tree");
     }
     for (const role of ["client", "business"] as const) {
-      const response = await collaborationFor(app, world.actors[role]).getLease(ticket.key);
+      const response = await collaborationFor(app, world.actors[role], world.projectId).getLease(
+        ticket.key,
+      );
       expect(response.status).toBe(200);
       expect(response.body.worktree).toBe("");
       expect(response.body.branch).toBe("feat/tk-x");
@@ -78,7 +86,7 @@ describe("lease.get : worktree masqué hors rôles d'écriture", () => {
 describe("projectState", () => {
   it.each(["owner", "admin", "dev"] as const)("%s lit l'état de projet", async (role) => {
     const world = await createWorld(database);
-    const response = await collaborationFor(app, world.actors[role]).getState();
+    const response = await collaborationFor(app, world.actors[role], world.projectId).getState();
     expect(response.status).toBe(200);
   });
 
@@ -86,7 +94,7 @@ describe("projectState", () => {
     "%s ne lit pas l'état (FORBIDDEN)",
     async (role) => {
       const world = await createWorld(database);
-      const response = await collaborationFor(app, world.actors[role]).getState();
+      const response = await collaborationFor(app, world.actors[role], world.projectId).getState();
       expect(response.status).toBe(403);
       expect(response.body.code).toBe("FORBIDDEN");
     },
@@ -94,7 +102,7 @@ describe("projectState", () => {
 
   it.each(["owner", "admin"] as const)("%s écrit l'état", async (role) => {
     const world = await createWorld(database);
-    const api = collaborationFor(app, world.actors[role]);
+    const api = collaborationFor(app, world.actors[role], world.projectId);
     const current = (await api.getState()).body;
     const response = await api.updateState(current.version, { mergePolicy: "owner" });
     expect(response.status).toBe(200);
@@ -104,11 +112,14 @@ describe("projectState", () => {
     "%s ne peut pas écrire l'état : FORBIDDEN, aucune écriture, aucun audit",
     async (role) => {
       const world = await createWorld(database);
-      const owner = collaborationFor(app, world.actors.owner);
+      const owner = collaborationFor(app, world.actors.owner, world.projectId);
       const before = (await owner.getState()).body;
-      const response = await collaborationFor(app, world.actors[role]).updateState(before.version, {
-        pirate: true,
-      });
+      const response = await collaborationFor(app, world.actors[role], world.projectId).updateState(
+        before.version,
+        {
+          pirate: true,
+        },
+      );
       expect(response.status).toBe(403);
       expect(response.body.code).toBe("FORBIDDEN");
       expect((await owner.getState()).body).toEqual(before);

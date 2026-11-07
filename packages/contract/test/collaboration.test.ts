@@ -5,7 +5,7 @@ import {
   BAD_TICKET_KEYS,
   comment,
   INSTANT,
-  input,
+  scopedInput as input,
   isValid,
   lease,
   output,

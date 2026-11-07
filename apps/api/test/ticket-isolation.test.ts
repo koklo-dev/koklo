@@ -5,7 +5,6 @@ import { createApp, createSeededDatabase } from "./helpers/app.ts";
 import { count } from "./helpers/organizations.ts";
 import {
   apiFor,
-  createAppForProject,
   createWorld,
   insertProject,
   seedSprint,
@@ -19,7 +18,6 @@ import {
  */
 let database: TestDatabase;
 let app: INestApplication;
-const apps: INestApplication[] = [];
 
 beforeAll(async () => {
   database = await createSeededDatabase();
@@ -27,7 +25,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await Promise.all([app, ...apps].map((a) => a?.close()));
+  await app?.close();
   await database?.dispose();
 });
 
@@ -35,11 +33,14 @@ describe("entre organisations", () => {
   it("les mêmes clés coexistent et aucune ressource ne fuit d'une organisation à l'autre", async () => {
     const one = await createWorld(database);
     const two = await createWorld(database);
-    const a = apiFor(app, one.actors.dev);
-    const b = apiFor(app, two.actors.dev);
-    await seedSprint(app, one.actors.dev);
-    await seedTicket(app, one.actors.dev, { title: "Secret de A", sprintId: "SP-1" });
-    await seedTicket(app, two.actors.dev, { title: "Ticket de B" });
+    const a = apiFor(app, one.actors.dev, one.projectId);
+    const b = apiFor(app, two.actors.dev, two.projectId);
+    await seedSprint(app, one.actors.dev, one.projectId);
+    await seedTicket(app, one.actors.dev, one.projectId, {
+      title: "Secret de A",
+      sprintId: "SP-1",
+    });
+    await seedTicket(app, two.actors.dev, two.projectId, { title: "Ticket de B" });
 
     expect((await a.getTicket("TK-1")).body.title).toBe("Secret de A");
     expect((await b.getTicket("TK-1")).body.title).toBe("Ticket de B");
@@ -69,11 +70,11 @@ describe("entre organisations (suite 2)", () => {
   it("un utilisateur d'une autre organisation ne peut ni modifier, ni supprimer, ni lier un ticket", async () => {
     const one = await createWorld(database);
     const two = await createWorld(database);
-    await seedTicket(app, one.actors.dev, { title: "Intact" });
-    await seedTicket(app, one.actors.dev);
+    await seedTicket(app, one.actors.dev, one.projectId, { title: "Intact" });
+    await seedTicket(app, one.actors.dev, one.projectId);
     // B possède aussi un TK-1 et un TK-2 : ses écritures ne touchent que les siens.
-    await seedTicket(app, two.actors.dev, { title: "B1" });
-    const b = apiFor(app, two.actors.dev);
+    await seedTicket(app, two.actors.dev, two.projectId, { title: "B1" });
+    const b = apiFor(app, two.actors.dev, two.projectId);
     expect((await b.updateTicket("TK-9", { title: "x" })).status).toBe(404);
     expect((await b.deleteTicket("TK-2")).status).toBe(404);
     expect((await b.addDependency("TK-1", "TK-2")).status).toBe(404);
@@ -97,31 +98,30 @@ describe("entre projets d'une même organisation", () => {
       "Second",
       "2026-06-01T00:00:00.000Z",
     );
-    const appFirst = app; // contexte v1 : le plus ancien projet
-    const appSecond = await createAppForProject(database.url, secondProject);
-    apps.push(appSecond);
 
-    await seedTicket(appFirst, world.actors.dev, { title: "Premier projet" });
-    await seedTicket(appFirst, world.actors.dev, { title: "Premier projet bis" });
-    await seedSprint(appFirst, world.actors.dev);
-    // Même cookie, autre projet courant.
-    expect((await apiFor(appSecond, world.actors.dev).getTicket("TK-1")).status).toBe(404);
-    expect((await apiFor(appSecond, world.actors.dev).getSprint("SP-1")).status).toBe(404);
-    expect((await apiFor(appSecond, world.actors.dev).listTickets()).body.items).toEqual([]);
+    await seedTicket(app, world.actors.dev, world.projectId, { title: "Premier projet" });
+    await seedTicket(app, world.actors.dev, world.projectId, { title: "Premier projet bis" });
+    await seedSprint(app, world.actors.dev, world.projectId);
+    // Même cookie, autre projet désigné.
+    expect((await apiFor(app, world.actors.dev, secondProject).getTicket("TK-1")).status).toBe(404);
+    expect((await apiFor(app, world.actors.dev, secondProject).getSprint("SP-1")).status).toBe(404);
+    expect((await apiFor(app, world.actors.dev, secondProject).listTickets()).body.items).toEqual(
+      [],
+    );
 
-    const second = await apiFor(appSecond, world.actors.dev).createTicket({
+    const second = await apiFor(app, world.actors.dev, secondProject).createTicket({
       title: "Second projet",
     });
     expect(second.body.key).toBe("TK-1");
-    expect((await apiFor(appFirst, world.actors.dev).getTicket("TK-1")).body.title).toBe(
-      "Premier projet",
-    );
+    expect(
+      (await apiFor(app, world.actors.dev, world.projectId).getTicket("TK-1")).body.title,
+    ).toBe("Premier projet");
 
     // TK-2 n'existe que dans le premier projet : le second ne peut pas en dépendre.
-    const cross = await apiFor(appSecond, world.actors.dev).addDependency("TK-1", "TK-2");
+    const cross = await apiFor(app, world.actors.dev, secondProject).addDependency("TK-1", "TK-2");
     expect(cross.status).toBe(404);
     expect(cross.body.code).toBe("NOT_FOUND");
-    const crossSprint = await apiFor(appSecond, world.actors.dev).createTicket({
+    const crossSprint = await apiFor(app, world.actors.dev, secondProject).createTicket({
       sprintId: "SP-1",
     });
     expect(crossSprint.status).toBe(422);
@@ -140,11 +140,11 @@ describe("entre projets d'une même organisation (suite 2)", () => {
       "Second",
       "2026-06-01T00:00:00.000Z",
     );
-    const appSecond = await createAppForProject(database.url, secondProject);
-    apps.push(appSecond);
-    const foreign = await seedTicket(app, world.actors.dev, { labels: ["intact"] });
+    const foreign = await seedTicket(app, world.actors.dev, world.projectId, {
+      labels: ["intact"],
+    });
 
-    const attempt = await apiFor(appSecond, world.actors.dev).updateTicket(foreign.key, {
+    const attempt = await apiFor(app, world.actors.dev, secondProject).updateTicket(foreign.key, {
       labels: ["pirate"],
       linkedFeatures: ["F-pirate"],
     });
@@ -167,10 +167,8 @@ describe("entre projets d'une même organisation (suite 3)", () => {
   it("défense en profondeur : un projet d'une autre organisation n'accepte aucune écriture", async () => {
     const mine = await createWorld(database);
     const theirs = await createWorld(database);
-    // Le contexte est (volontairement) mal configuré : il désigne le projet d'une autre organisation.
-    const confused = await createAppForProject(database.url, theirs.projectId);
-    apps.push(confused);
-    const api = apiFor(confused, mine.actors.dev);
+    // Le membre désigne explicitement le projet d'une autre organisation.
+    const api = apiFor(app, mine.actors.dev, theirs.projectId);
 
     const created = await api.createTicket();
     expect(created.status).toBe(404);

@@ -440,7 +440,7 @@ test.describe("Kanban : sans chargement complet", () => {
     expect(reads).toHaveLength(7);
     for (const read of reads) {
       expect(read).toContain("limit=30");
-      expect(read).toMatch(/status=/);
+      expect(read).toMatch(/^\/projects\/[0-9a-f-]{36}\/tickets\?.*status=/);
       expect(read).not.toContain("cursor=");
     }
   });

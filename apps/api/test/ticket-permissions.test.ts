@@ -39,8 +39,9 @@ interface Procedure {
 }
 
 const dev = () => world.actors.dev;
-const freshTicket = async (status = "todo") => (await seedTicket(app, dev(), { status })).key;
-const freshSprint = async () => (await seedSprint(app, dev())).key;
+const freshTicket = async (status = "todo") =>
+  (await seedTicket(app, dev(), world.projectId, { status })).key;
+const freshSprint = async () => (await seedSprint(app, dev(), world.projectId)).key;
 
 const procedures: Procedure[] = [
   { name: "ticket.get", write: false, run: async (api) => api.getTicket(await freshTicket()) },
@@ -74,7 +75,7 @@ const procedures: Procedure[] = [
     write: true,
     run: async (api) => {
       const [a, b] = [await freshTicket(), await freshTicket()];
-      await apiFor(app, dev()).addDependency(a, b);
+      await apiFor(app, dev(), world.projectId).addDependency(a, b);
       return api.removeDependency(a, b);
     },
   },
@@ -106,7 +107,7 @@ const procedures: Procedure[] = [
         [world.projectId],
       );
       const key = await freshSprint();
-      expect((await apiFor(app, dev()).activateSprint(key)).status).toBe(200);
+      expect((await apiFor(app, dev(), world.projectId).activateSprint(key)).status).toBe(200);
       return api.closeSprint(key);
     },
   },
@@ -119,7 +120,7 @@ describe("matrice de rôles", () => {
     for (const role of ROLES) {
       const allowed = !procedure.write || WRITERS.includes(role);
       it(`${procedure.name} : ${role} -> ${allowed ? "autorisé" : "403 FORBIDDEN"}`, async () => {
-        const result = await procedure.run(apiFor(app, world.actors[role]));
+        const result = await procedure.run(apiFor(app, world.actors[role], world.projectId));
         if (allowed) {
           expect(result.status).toBe(200);
         } else {
@@ -140,7 +141,7 @@ describe("écriture refusée : aucune écriture, aucun audit", () => {
       audit: await count(database, "audit_log", "organization_id = $1", [isolated.organizationId]),
     };
     for (const role of ["client", "business"] as const) {
-      const api = apiFor(app, isolated.actors[role]);
+      const api = apiFor(app, isolated.actors[role], isolated.projectId);
       expect((await api.createTicket()).status).toBe(403);
       expect((await api.createSprint()).status).toBe(403);
     }
@@ -157,8 +158,10 @@ describe("écriture refusée : aucune écriture, aucun audit", () => {
 
   it("un client ne peut ni supprimer ni transitionner un ticket existant", async () => {
     const isolated = await createWorld(database);
-    const ticket = await seedTicket(app, isolated.actors.dev, { status: "todo" });
-    const client = apiFor(app, isolated.actors.client);
+    const ticket = await seedTicket(app, isolated.actors.dev, isolated.projectId, {
+      status: "todo",
+    });
+    const client = apiFor(app, isolated.actors.client, isolated.projectId);
     expect((await client.deleteTicket(ticket.key)).status).toBe(403);
     expect((await client.transition(ticket.key, "in_progress")).status).toBe(403);
     const row = await ticketRow(database, isolated.organizationId, ticket.key);
@@ -170,7 +173,7 @@ describe("écriture refusée : aucune écriture, aucun audit", () => {
 describe("rôle relu en base à chaque requête", () => {
   it("un dev rétrogradé en client perd aussitôt l'écriture, sans nouvelle session", async () => {
     const isolated = await createWorld(database);
-    const api = apiFor(app, isolated.actors.dev);
+    const api = apiFor(app, isolated.actors.dev, isolated.projectId);
     expect((await api.createTicket()).status).toBe(200);
     await database.query("UPDATE members SET role = 'client' WHERE id = $1", [
       isolated.actors.dev.memberId,
@@ -186,7 +189,7 @@ describe("rôle relu en base à chaque requête", () => {
 describe("sans session : 401 UNAUTHORIZED", () => {
   for (const procedure of procedures) {
     it(`${procedure.name} sans cookie -> 401`, async () => {
-      const result = await procedure.run(apiFor(app, undefined));
+      const result = await procedure.run(apiFor(app, undefined, world.projectId));
       expect(result.status).toBe(401);
       expect(result.body.code).toBe("UNAUTHORIZED");
     });

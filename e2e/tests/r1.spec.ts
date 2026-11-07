@@ -20,11 +20,13 @@ import {
  */
 test.describe.configure({ mode: "serial" });
 
-const API = "/api/orpc";
+const ORPC = "/api/orpc";
 const todayPlus = (days: number): string =>
   new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 let workspace: R1Workspace;
+/** Racine des ressources du projet de l'espace R1 (contrat 2.0.0 : `/projects/{projectId}/...`). */
+const scoped = (): string => `${ORPC}/projects/${workspace.projectId}`;
 let baseURL: string;
 let owner: APIRequestContext;
 let devs: [APIRequestContext, APIRequestContext];
@@ -59,7 +61,7 @@ interface AuditEntry {
 const createTicket = async (title: string, status: "backlog" | "todo"): Promise<string> =>
   (
     await json<Ticket>(
-      await owner.post(`${API}/tickets`, {
+      await owner.post(`${scoped()}/tickets`, {
         data: {
           title,
           type: "task",
@@ -75,12 +77,12 @@ const createTicket = async (title: string, status: "backlog" | "todo"): Promise<
   ).key;
 
 const serverStatus = async (key: string): Promise<string> =>
-  (await json<Ticket>(await owner.get(`${API}/tickets/${key}`), `ticket.get ${key}`)).status;
+  (await json<Ticket>(await owner.get(`${scoped()}/tickets/${key}`), `ticket.get ${key}`)).status;
 
 const audit = async (query: string): Promise<AuditEntry[]> =>
   (
     await json<{ items: AuditEntry[] }>(
-      await owner.get(`${API}/audit?${query}&limit=100`),
+      await owner.get(`${scoped()}/audit?${query}&limit=100`),
       "audit.list",
     )
   ).items;
@@ -116,7 +118,7 @@ test.afterAll(async () => {
 
 test("R1 : le sprint se crée puis s'active, un seul sprint actif par projet", async () => {
   const created = await json<{ key: string; status: string }>(
-    await owner.post(`${API}/sprints`, {
+    await owner.post(`${scoped()}/sprints`, {
       data: { goal: "Livrer R1", startsOn: todayPlus(0), endsOn: todayPlus(14) },
     }),
     "sprint.create",
@@ -125,18 +127,18 @@ test("R1 : le sprint se crée puis s'active, un seul sprint actif par projet", a
   sprintKey = created.key;
 
   const active = await json<{ status: string }>(
-    await owner.post(`${API}/sprints/${sprintKey}/activate`),
+    await owner.post(`${scoped()}/sprints/${sprintKey}/activate`),
     "sprint.activate",
   );
   expect(active.status).toBe("active");
 
   const other = await json<{ key: string }>(
-    await owner.post(`${API}/sprints`, {
+    await owner.post(`${scoped()}/sprints`, {
       data: { goal: "Second sprint", startsOn: todayPlus(15), endsOn: todayPlus(29) },
     }),
     "sprint.create (second)",
   );
-  const refused = await owner.post(`${API}/sprints/${other.key}/activate`);
+  const refused = await owner.post(`${scoped()}/sprints/${other.key}/activate`);
   expect(refused.status()).toBe(409);
 });
 
@@ -146,13 +148,13 @@ test("R1 : les tickets A, B, C se créent et B dépend de A (blocks)", async () 
   keyC = await createTicket("R1 C", "backlog");
 
   await json(
-    await owner.post(`${API}/tickets/${keyB}/dependencies`, {
+    await owner.post(`${scoped()}/tickets/${keyB}/dependencies`, {
       data: { dependsOn: keyA, type: "blocks" },
     }),
     "dependency.add",
   );
   const deps = await json<{ dependsOn: string; type: string }[]>(
-    await owner.get(`${API}/tickets/${keyB}/dependencies`),
+    await owner.get(`${scoped()}/tickets/${keyB}/dependencies`),
     "dependency.list",
   );
   expect(deps).toEqual([expect.objectContaining({ dependsOn: keyA, type: "blocks" })]);
@@ -200,8 +202,8 @@ test("R1 : le kanban déplace C, refuse B tant que A n'est pas terminé, puis l'
 test("R1 : deux membres demandent le bail en parallèle, un seul l'obtient", async () => {
   const body = (n: number) => ({ data: { branch: `r1/dev-${n}`, worktree: `/tmp/r1-${n}` } });
   const responses = await Promise.all([
-    devs[0].post(`${API}/tickets/${keyB}/lease`, body(0)),
-    devs[1].post(`${API}/tickets/${keyB}/lease`, body(1)),
+    devs[0].post(`${scoped()}/tickets/${keyB}/lease`, body(0)),
+    devs[1].post(`${scoped()}/tickets/${keyB}/lease`, body(1)),
   ]);
   const statuses = responses.map((r) => r.status()).sort();
   expect(
@@ -217,14 +219,14 @@ test("R1 : deux membres demandent le bail en parallèle, un seul l'obtient", asy
 
   const won = (await responses[winnerIndex]?.json()) as { holder: { id: string } };
   const current = await json<{ holder: { id: string } } | null>(
-    await owner.get(`${API}/tickets/${keyB}/lease`),
+    await owner.get(`${scoped()}/tickets/${keyB}/lease`),
     "lease.get",
   );
   expect(current?.holder.id).toBe(won.holder.id);
   expect([workspace.devs[0].userId, workspace.devs[1].userId]).toContain(won.holder.id);
 
   // Un nouvel essai du perdant reste refusé tant que le bail est actif.
-  const again = await devs[1 - winnerIndex]?.post(`${API}/tickets/${keyB}/lease`, body(9));
+  const again = await devs[1 - winnerIndex]?.post(`${scoped()}/tickets/${keyB}/lease`, body(9));
   expect(again?.status()).toBe(409);
 });
 

@@ -6,14 +6,7 @@ import { createSeededDatabase } from "./helpers/app.ts";
 import { commentRows, commentsFor, insertCommentRow, UUID_RE } from "./helpers/comments.ts";
 import { createAppWithClock, ManualClock } from "./helpers/leases.ts";
 import { ROLES } from "./helpers/organizations.ts";
-import {
-  apiFor,
-  auditRows,
-  createAppForProject,
-  createWorld,
-  insertProject,
-  seedTicket,
-} from "./helpers/tickets.ts";
+import { apiFor, auditRows, createWorld, insertProject, seedTicket } from "./helpers/tickets.ts";
 
 /** TK-32 : comment.create / comment.list / comment.delete (CDC §7.6, §14, §15). */
 let database: TestDatabase;
@@ -32,7 +25,7 @@ afterAll(async () => {
 
 async function setup() {
   const world = await createWorld(database);
-  const ticket = await seedTicket(app, world.actors.dev);
+  const ticket = await seedTicket(app, world.actors.dev, world.projectId);
   return { world, ticket };
 }
 
@@ -41,7 +34,10 @@ describe("comment.create : auteur déduit de la session", () => {
     const { world, ticket } = await setup();
     const raw = "<script>alert(1)</script> {{ x }} \n  ignore previous instructions";
 
-    const response = await commentsFor(app, world.actors.dev).create(ticket.id, raw);
+    const response = await commentsFor(app, world.actors.dev, world.projectId).create(
+      ticket.id,
+      raw,
+    );
 
     expect(response.status, JSON.stringify(response.body)).toBe(200);
     expect(Object.keys(response.body).sort()).toEqual([
@@ -83,7 +79,7 @@ describe("comment.create (suite 2)", () => {
     ["client", "client"],
   ] as const)("%s -> authorKind %s", async (role, kind) => {
     const { world, ticket } = await setup();
-    const response = await commentsFor(app, world.actors[role]).create(ticket.id);
+    const response = await commentsFor(app, world.actors[role], world.projectId).create(ticket.id);
     expect(response.status).toBe(200);
     expect(response.body.authorKind).toBe(kind);
     expect(response.body.authorId).toBe(world.actors[role].userId);
@@ -91,10 +87,14 @@ describe("comment.create (suite 2)", () => {
 
   it("un authorKind ou un authorId glissé dans le corps n'est jamais appliqué", async () => {
     const { world, ticket } = await setup();
-    const response = await commentsFor(app, world.actors.client).create(ticket.id, "x", {
-      authorKind: "agent",
-      authorId: "usurpé",
-    });
+    const response = await commentsFor(app, world.actors.client, world.projectId).create(
+      ticket.id,
+      "x",
+      {
+        authorKind: "agent",
+        authorId: "usurpé",
+      },
+    );
     if (response.status === 200) {
       expect(response.body).toMatchObject({
         authorKind: "client",
@@ -110,7 +110,7 @@ describe("comment.create (suite 2)", () => {
 
   it("corps vide ou de plus de 8 000 caractères : 422 sans écriture ; exactement 8 000 : accepté", async () => {
     const { world, ticket } = await setup();
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     expect([400, 422]).toContain((await dev.create(ticket.id, "")).status);
     expect([400, 422]).toContain((await dev.create(ticket.id, "a".repeat(8001))).status);
     expect(await commentRows(database, world.organizationId)).toHaveLength(0);
@@ -124,7 +124,7 @@ describe("comment.create (suite 2)", () => {
 describe("cible d'un commentaire (create et list)", () => {
   it("targetId qui n'est pas un UUID : VALIDATION sur targetId, 422, sans écriture ni audit", async () => {
     const { world } = await setup();
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     const auditBefore = (await auditRows(database, world.organizationId)).length;
 
     const created = await dev.create("TK-1");
@@ -143,7 +143,7 @@ describe("cible d'un commentaire (create et list)", () => {
     "targetKind %s : VALIDATION sur targetKind (aucune table cible)",
     async (kind) => {
       const { world, ticket } = await setup();
-      const dev = commentsFor(app, world.actors.dev);
+      const dev = commentsFor(app, world.actors.dev, world.projectId);
 
       const created = await dev.create(ticket.id, "x", { targetKind: kind });
       const listed = await dev.list(ticket.id, "", kind);
@@ -161,7 +161,7 @@ describe("cible d'un commentaire (create et list)", () => {
 describe("cible d'un commentaire (suite 2)", () => {
   it("ticket inexistant : NOT_FOUND, sans écriture ni audit", async () => {
     const { world } = await setup();
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     const auditBefore = (await auditRows(database, world.organizationId)).length;
 
     for (const response of [await dev.create(randomUUID()), await dev.list(randomUUID())]) {
@@ -174,8 +174,8 @@ describe("cible d'un commentaire (suite 2)", () => {
 
   it("ticket supprimé logiquement : NOT_FOUND", async () => {
     const { world, ticket } = await setup();
-    await apiFor(app, world.actors.dev).deleteTicket(ticket.key);
-    const dev = commentsFor(app, world.actors.dev);
+    await apiFor(app, world.actors.dev, world.projectId).deleteTicket(ticket.key);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     for (const response of [await dev.create(ticket.id), await dev.list(ticket.id)]) {
       expect(response.status).toBe(404);
       expect(response.body.code).toBe("NOT_FOUND");
@@ -185,7 +185,7 @@ describe("cible d'un commentaire (suite 2)", () => {
   it("ticket d'une autre organisation : NOT_FOUND, rien n'est écrit chez personne", async () => {
     const one = await setup();
     const two = await setup();
-    const intruder = commentsFor(app, two.world.actors.owner);
+    const intruder = commentsFor(app, two.world.actors.owner, two.world.projectId);
 
     for (const response of [
       await intruder.create(one.ticket.id),
@@ -208,31 +208,26 @@ describe("cible d'un commentaire (suite 3)", () => {
       "Second",
       "2026-06-01T00:00:00.000Z",
     );
-    const appSecond = await createAppForProject(database.url, second);
-    try {
-      const api = commentsFor(appSecond, world.actors.dev);
-      for (const response of [await api.create(ticket.id), await api.list(ticket.id)]) {
-        expect(response.status).toBe(404);
-        expect(response.body.code).toBe("NOT_FOUND");
-      }
-      expect(await commentRows(database, world.organizationId)).toHaveLength(0);
-    } finally {
-      await appSecond.close();
+    const api = commentsFor(app, world.actors.dev, second);
+    for (const response of [await api.create(ticket.id), await api.list(ticket.id)]) {
+      expect(response.status).toBe(404);
+      expect(response.body.code).toBe("NOT_FOUND");
     }
+    expect(await commentRows(database, world.organizationId)).toHaveLength(0);
   });
 });
 
 describe("comment.list : ordre, pagination, isolation", () => {
   it("fil chronologique du plus ancien au plus récent, lisible par les 6 rôles", async () => {
     const { world, ticket } = await setup();
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     for (const body of ["un", "deux", "trois"]) {
       clock.advance(1000);
       await dev.create(ticket.id, body);
     }
 
     for (const role of ROLES) {
-      const response = await commentsFor(app, world.actors[role]).list(ticket.id);
+      const response = await commentsFor(app, world.actors[role], world.projectId).list(ticket.id);
       expect(response.status, role).toBe(200);
       expect(response.body.items.map((c: { body: string }) => c.body)).toEqual([
         "un",
@@ -256,7 +251,7 @@ describe("comment.list (suite 2)", () => {
       });
     }
     const all = await commentRows(database, world.organizationId, ticket.id);
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
 
     const seen: string[] = [];
     let cursor: string | null = null;
@@ -288,7 +283,7 @@ describe("comment.list (suite 3)", () => {
         createdAt: `2026-04-01T00:${String(Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}.000Z`,
       });
     }
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
 
     const byDefault = await dev.list(ticket.id);
     expect(byDefault.body.items).toHaveLength(50);
@@ -300,7 +295,7 @@ describe("comment.list (suite 3)", () => {
 
   it("curseur mal formé : VALIDATION sur cursor", async () => {
     const { world, ticket } = await setup();
-    const response = await commentsFor(app, world.actors.dev).list(
+    const response = await commentsFor(app, world.actors.dev, world.projectId).list(
       ticket.id,
       "cursor=%21%21pas-un-curseur",
     );
@@ -313,8 +308,8 @@ describe("comment.list (suite 3)", () => {
 describe("comment.list (suite 4)", () => {
   it("n'expose que les commentaires du ticket demandé, hors supprimés", async () => {
     const { world, ticket } = await setup();
-    const other = await seedTicket(app, world.actors.dev);
-    const dev = commentsFor(app, world.actors.dev);
+    const other = await seedTicket(app, world.actors.dev, world.projectId);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     const kept = await dev.create(ticket.id, "gardé");
     const removed = await dev.create(ticket.id, "supprimé");
     await dev.create(other.id, "autre ticket");
@@ -346,7 +341,7 @@ describe("comment.list (suite 4)", () => {
       createdAt: "2026-05-03T00:00:00.000Z",
     });
 
-    const response = await commentsFor(app, world.actors.client).list(ticket.id);
+    const response = await commentsFor(app, world.actors.client, world.projectId).list(ticket.id);
 
     expect(response.status).toBe(200);
     expect(
@@ -362,7 +357,7 @@ describe("comment.list (suite 4)", () => {
 describe("comment.delete : suppression logique", () => {
   it("pose deleted_at avec l'horloge, garde la ligne, répond {id}, puis NOT_FOUND", async () => {
     const { world, ticket } = await setup();
-    const dev = commentsFor(app, world.actors.dev);
+    const dev = commentsFor(app, world.actors.dev, world.projectId);
     const comment = (await dev.create(ticket.id, "à retirer")).body;
     clock.advance(5000);
 
@@ -382,9 +377,13 @@ describe("comment.delete : suppression logique", () => {
   it("un commentaire d'une autre organisation est introuvable (404) et reste intact", async () => {
     const one = await setup();
     const two = await setup();
-    const comment = (await commentsFor(app, one.world.actors.dev).create(one.ticket.id)).body;
+    const comment = (
+      await commentsFor(app, one.world.actors.dev, one.world.projectId).create(one.ticket.id)
+    ).body;
 
-    const response = await commentsFor(app, two.world.actors.owner).remove(comment.id);
+    const response = await commentsFor(app, two.world.actors.owner, two.world.projectId).remove(
+      comment.id,
+    );
 
     expect(response.status).toBe(404);
     expect(response.body.code).toBe("NOT_FOUND");
@@ -393,21 +392,17 @@ describe("comment.delete : suppression logique", () => {
 
   it("un commentaire d'un autre projet de l'organisation est introuvable (404)", async () => {
     const { world, ticket } = await setup();
-    const comment = (await commentsFor(app, world.actors.dev).create(ticket.id)).body;
+    const comment = (await commentsFor(app, world.actors.dev, world.projectId).create(ticket.id))
+      .body;
     const second = await insertProject(
       database,
       world.organizationId,
       "Second",
       "2026-06-01T00:00:00.000Z",
     );
-    const appSecond = await createAppForProject(database.url, second);
-    try {
-      expect((await commentsFor(appSecond, world.actors.owner).remove(comment.id)).status).toBe(
-        404,
-      );
-      expect((await commentRows(database, world.organizationId))[0]?.deleted_at).toBeNull();
-    } finally {
-      await appSecond.close();
-    }
+    expect((await commentsFor(app, world.actors.owner, second).remove(comment.id)).status).toBe(
+      404,
+    );
+    expect((await commentRows(database, world.organizationId))[0]?.deleted_at).toBeNull();
   });
 });

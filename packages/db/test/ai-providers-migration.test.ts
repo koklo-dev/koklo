@@ -198,11 +198,13 @@ describe("TK-95 migration ai_providers : up -> down -> up", () => {
     const expected = await inventory(applyEarlierMigrations(baseline));
     await seedNewProviderKeys(db);
 
-    runPrismaOrThrow(
-      ["db", "execute", "--file", join(migrationsDir, migration(), "down.sql")],
-      db.url,
-    );
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [migration()]);
+    // Les migrations postérieures (TK-96) sont défaites d'abord, de la plus récente à la plus ancienne.
+    for (const dir of dirs()
+      .filter((d) => d >= migration())
+      .reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     expect(await inventory(db)).toEqual(expected);
     const kept = await db.query<{ provider: string }>(

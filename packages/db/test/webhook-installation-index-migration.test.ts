@@ -115,6 +115,8 @@ const LATER_OBJECTS: readonly string[] = [
   ...NOTIFICATION_TABLES,
   ...PROJECT_CLIENT_TABLES,
   ...LONG_LISTS_INDEXES,
+  // TK-96 : index de audit_log.project_id.
+  "audit_log_organization_id_project_id_occurred_at_idx",
 ];
 
 const deliveriesOf = (db: TestDatabase) =>

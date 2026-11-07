@@ -27,7 +27,7 @@ const ids = (response: { body: { items: { id: string }[] } }) =>
 describe("audit.list : rôles", () => {
   it.each(["owner", "admin"] as const)("%s lit le journal", async (role) => {
     const world = await createWorld(database);
-    const response = await commentsFor(app, world.actors[role]).listAudit();
+    const response = await commentsFor(app, world.actors[role], world.projectId).listAudit();
     expect(response.status, JSON.stringify(response.body)).toBe(200);
     expect(response.body).toEqual({ items: [], nextCursor: null });
   });
@@ -39,7 +39,7 @@ describe("audit.list : rôles", () => {
       await insertAuditRow(database, world.organizationId, {
         occurredAt: "2026-02-01T00:00:00.000Z",
       });
-      const response = await commentsFor(app, world.actors[role]).listAudit();
+      const response = await commentsFor(app, world.actors[role], world.projectId).listAudit();
       expect(response.status).toBe(403);
       expect(response.body.code).toBe("FORBIDDEN");
       expect(response.body.items).toBeUndefined();
@@ -47,7 +47,7 @@ describe("audit.list : rôles", () => {
   );
 
   it("sans session : 401 UNAUTHORIZED", async () => {
-    expect((await commentsFor(app, undefined).listAudit()).status).toBe(401);
+    expect((await commentsFor(app, undefined, randomUUID()).listAudit()).status).toBe(401);
   });
 });
 
@@ -70,7 +70,7 @@ describe("audit.list : tri, sortie, lecture sans effet", () => {
       .sort((a, b) => b.occurred_at.getTime() - a.occurred_at.getTime() || (a.id < b.id ? 1 : -1))
       .map((r) => r.id);
 
-    const response = await commentsFor(app, world.actors.owner).listAudit();
+    const response = await commentsFor(app, world.actors.owner, world.projectId).listAudit();
 
     expect(ids(response)).toEqual(expected);
     expect(ids(response)[0]).toBe(created[3]);
@@ -80,8 +80,8 @@ describe("audit.list : tri, sortie, lecture sans effet", () => {
 describe("audit.list : sortie", () => {
   it("champs conformes à auditEntrySchema : NULL omis, ticketKey résolu même pour un ticket supprimé", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await apiFor(app, world.actors.dev).deleteTicket(ticket.key);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await apiFor(app, world.actors.dev, world.projectId).deleteTicket(ticket.key);
     await insertAuditRow(database, world.organizationId, {
       actorKind: "agent",
       actorId: "agent-1",
@@ -96,7 +96,9 @@ describe("audit.list : sortie", () => {
       occurredAt: "2026-02-04T00:00:00.000Z",
     });
 
-    const response = await commentsFor(app, world.actors.admin).listAudit("limit=100");
+    const response = await commentsFor(app, world.actors.admin, world.projectId).listAudit(
+      "limit=100",
+    );
 
     const withToken = response.body.items.find((e: { tokenId?: string }) => e.tokenId === "tok-9");
     expect(withToken).toEqual({
@@ -125,11 +127,16 @@ describe("audit.list : sortie", () => {
 describe("audit.list : confidentialité", () => {
   it("n'expose jamais le corps d'un commentaire et ne lit rien dans la base", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await commentsFor(app, world.actors.dev).create(ticket.id, "SECRET-DU-COMMENTAIRE");
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await commentsFor(app, world.actors.dev, world.projectId).create(
+      ticket.id,
+      "SECRET-DU-COMMENTAIRE",
+    );
     const before = await auditRowsFull(database, world.organizationId);
 
-    const response = await commentsFor(app, world.actors.owner).listAudit("limit=100");
+    const response = await commentsFor(app, world.actors.owner, world.projectId).listAudit(
+      "limit=100",
+    );
 
     expect(response.status).toBe(200);
     expect(JSON.stringify(response.body)).not.toContain("SECRET-DU-COMMENTAIRE");
@@ -139,8 +146,8 @@ describe("audit.list : confidentialité", () => {
 
 async function fixture() {
   const world = await createWorld(database);
-  const a = await seedTicket(app, world.actors.dev);
-  const b = await seedTicket(app, world.actors.dev);
+  const a = await seedTicket(app, world.actors.dev, world.projectId);
+  const b = await seedTicket(app, world.actors.dev, world.projectId);
   const row = (over: Parameters<typeof insertAuditRow>[2]) =>
     insertAuditRow(database, world.organizationId, over);
   const e1 = await row({
@@ -166,7 +173,7 @@ async function fixture() {
     action: "x.beta",
     occurredAt: "2026-03-04T00:00:00.000Z",
   });
-  const owner = commentsFor(app, world.actors.owner);
+  const owner = commentsFor(app, world.actors.owner, world.projectId);
   const filtered = async (query: string) =>
     (await owner.listAudit(`${query}&limit=100`)).body.items
       .map((e: { id: string }) => e.id)
@@ -232,7 +239,7 @@ describe("audit.list : pagination et isolation", () => {
         occurredAt: new Date(Date.UTC(2026, 5, 1, 0, 0, Math.floor(i / 3))).toISOString(),
       });
     }
-    const owner = commentsFor(app, world.actors.owner);
+    const owner = commentsFor(app, world.actors.owner, world.projectId);
 
     const byDefault = await owner.listAudit();
     expect(byDefault.body.items).toHaveLength(50);
@@ -259,7 +266,7 @@ describe("audit.list : pagination (suite 2)", () => {
     const expected = [...all]
       .sort((a, b) => b.occurred_at.getTime() - a.occurred_at.getTime() || (a.id < b.id ? 1 : -1))
       .map((r) => r.id);
-    const owner = commentsFor(app, world.actors.owner);
+    const owner = commentsFor(app, world.actors.owner, world.projectId);
 
     const seen: string[] = [];
     let cursor: string | null = null;
@@ -289,10 +296,14 @@ describe("audit.list : pagination (suite 2)", () => {
       occurredAt: "2026-08-02T00:00:00.000Z",
     });
 
-    const seenByTwo = await commentsFor(app, two.actors.owner).listAudit("limit=100");
+    const seenByTwo = await commentsFor(app, two.actors.owner, two.projectId).listAudit(
+      "limit=100",
+    );
 
     expect(ids(seenByTwo)).not.toContain(secret);
     expect(JSON.stringify(seenByTwo.body)).not.toContain("secret.action");
-    expect(ids(await commentsFor(app, one.actors.owner).listAudit())).toContain(secret);
+    expect(ids(await commentsFor(app, one.actors.owner, one.projectId).listAudit())).toContain(
+      secret,
+    );
   });
 });

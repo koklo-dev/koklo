@@ -138,8 +138,8 @@ describe("ordre : tous les tickets d'abord, puis les dépendances (suite 3)", ()
 describe("conflits rapportés, jamais de 500", () => {
   it("clé déjà en base avec un autre titre (projet de démo) : conflit, rien de modifié, import continué", async () => {
     const world = await createWorld(database);
-    await seedSprint(app, world.actors.owner);
-    await seedTicket(app, world.actors.owner, { title: "Sans rapport" });
+    await seedSprint(app, world.actors.owner, world.projectId);
+    await seedTicket(app, world.actors.owner, world.projectId, { title: "Sans rapport" });
     const before = await tableCounts(database, world.organizationId);
 
     const report = await importerOf(app).run(scopeOf(world), fixtureSources(), IMPORT_OPTIONS);
@@ -161,8 +161,12 @@ describe("conflits rapportés, jamais de 500", () => {
 
   it("clé occupée par un ticket supprimé : conflit, jamais ressuscité", async () => {
     const world = await createWorld(database);
-    const ticket = await seedTicket(app, world.actors.owner, { title: "À supprimer" });
-    expect((await apiFor(app, world.actors.owner).deleteTicket(ticket.key)).status).toBe(200);
+    const ticket = await seedTicket(app, world.actors.owner, world.projectId, {
+      title: "À supprimer",
+    });
+    expect(
+      (await apiFor(app, world.actors.owner, world.projectId).deleteTicket(ticket.key)).status,
+    ).toBe(200);
 
     const report = await importerOf(app).run(scopeOf(world), fixtureSources(), IMPORT_OPTIONS);
 

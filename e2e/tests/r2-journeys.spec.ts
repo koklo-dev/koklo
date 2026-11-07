@@ -389,8 +389,8 @@ test("T7b un client non lié ne voit aucun projet : 404 uniforme, 403 sur la spe
 
   const client = await apiAs(baseURL, workspace.client);
   expect(await json<unknown[]>(await client.get(`${ORPC}/projects`))).toEqual([]);
-  // Sans lien, les ressources du projet (résolues par l'organisation) sont un 404 uniforme.
-  expect(await statusOf(client, `${ORPC}/tickets`)).toBe(404);
+  // Sans lien, les ressources du projet (désigné par `projectId`) sont un 404 uniforme.
+  expect(await statusOf(client, `${ORPC}/projects/${projectId}/tickets`)).toBe(404);
   // spec.* est fermé au rôle client (D7) : le garde de rôle (403) précède le cloisonnement (404).
   expect(await statusOf(client, `${ORPC}/projects/${projectId}/spec`)).toBe(403);
   const probe = specBatchProbe(projectId);
@@ -410,8 +410,9 @@ test("T7c un client lié voit son projet seulement, sans la spec ni le formulair
   const client = await apiAs(baseURL, workspace.client);
   const visible = await json<{ id: string }[]>(await client.get(`${ORPC}/projects`));
   expect(visible.map((project) => project.id)).toEqual([mine.projectId]);
-  // Lié, ses ressources de projet se résolvent ; le second projet de l'organisation reste invisible.
-  expect(await statusOf(client, `${ORPC}/tickets`)).toBe(200);
+  // Lié, ses ressources de projet se résolvent ; le second projet de l'organisation reste invisible (404).
+  expect(await statusOf(client, `${ORPC}/projects/${mine.projectId}/tickets`)).toBe(200);
+  expect(await statusOf(client, `${ORPC}/projects/${other.projectId}/tickets`)).toBe(404);
 
   // Lié ou non, la spec reste fermée au client (D7) : lecture et écriture, 403.
   expect(await statusOf(client, `${ORPC}/projects/${mine.projectId}/spec`)).toBe(403);

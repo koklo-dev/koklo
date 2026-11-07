@@ -26,12 +26,14 @@ export interface AuditEntry {
 }
 
 /**
- * Qui journalise et dans quelle organisation : un `ProjectScope` en est une instance, mais une
- * écriture hors projet (organisation, membre, invitation, projet) n'a pas de projet courant.
+ * Qui journalise et dans quelle organisation : un `ProjectScope` en est une instance (il porte le
+ * projet de la requête, TK-96), mais une écriture hors projet (organisation, membre, invitation,
+ * projet) n'a pas de projet : l'entrée est alors d'organisation (`project_id` NULL).
  */
 export interface AuditActor {
   organizationId: string;
   userId: string;
+  projectId?: string;
 }
 
 /**
@@ -49,6 +51,7 @@ export async function recordAudit(tx: Tx, actor: AuditActor, entry: AuditEntry):
       targetKind: entry.targetKind,
       targetId: entry.targetId,
       ticketId: entry.ticketId ?? null,
+      projectId: actor.projectId ?? null,
     },
   });
 }

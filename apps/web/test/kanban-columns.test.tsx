@@ -73,7 +73,15 @@ const bigBoard = (): Ticket[] => [
   ticket(3000, "done"),
 ];
 
-type Input = { status?: string; sprintId?: string; limit?: number; cursor?: string };
+const PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
+
+type Input = {
+  projectId?: string;
+  status?: string;
+  sprintId?: string;
+  limit?: number;
+  cursor?: string;
+};
 const calls = (): Input[] => procedures.ticketList.mock.calls.map((call) => call[0] as Input);
 const callsFor = (status: string): Input[] => calls().filter((input) => input.status === status);
 
@@ -88,6 +96,7 @@ beforeEach(() => {
   board = bigBoard();
   getSession.mockResolvedValue(sessionWith(ORG_ID));
   procedures.organizationList.mockResolvedValue([organization({ role: "owner" })]);
+  procedures.projectList.mockResolvedValue([{ id: PROJECT_ID, name: "Atelier Lumière" }]);
   procedures.sprintList.mockResolvedValue([SPRINT]);
   procedures.ticketList.mockImplementation(async (input: Input) => listFor(board, input));
   procedures.ticketTransition.mockImplementation(async (input: { key: string; to: string }) => {
@@ -109,7 +118,8 @@ describe("Requêtes par colonne (T22)", () => {
     await renderBoard();
     const first = calls().filter((input) => input.cursor === undefined);
     expect(first.map((input) => input.status).sort()).toEqual([...STATUSES].sort());
-    for (const input of first) expect(input).toMatchObject({ sprintId: "SP-7", limit: 30 });
+    for (const input of first)
+      expect(input).toMatchObject({ projectId: PROJECT_ID, sprintId: "SP-7", limit: 30 });
   });
 
   it("aucune requête n'enchaîne les pages : 142 tickets à faire, une seule page lue", async () => {
@@ -197,6 +207,8 @@ describe("Pied de colonne", () => {
     expect(cardsIn("todo")).toBe(30);
     expect(cardsIn("in_progress")).toBe(3);
     expect(within(column("in_progress")).queryByRole("alert")).toBeNull();
+    // La garde de useSingleFlight se lève deux images après l'échec : « Réessayer » avant ce délai est ignoré.
+    await new Promise((resolve) => setTimeout(resolve, 150));
     await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
     await waitFor(() => expect(cardsIn("todo")).toBe(60));
     expect(callsFor("todo").at(-1)).toMatchObject({ cursor: "30" });

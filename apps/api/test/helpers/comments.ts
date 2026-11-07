@@ -1,25 +1,30 @@
 import { randomUUID } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
-import { send } from "./tickets.ts";
+import { projectPath, send } from "./tickets.ts";
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Client des procédures comment.* et audit.list du contrat 0.4.0 (HTTP réel). */
-export function commentsFor(app: INestApplication, actor: { cookie: string } | undefined) {
+/** Client des procédures comment.* et audit.list du contrat 2.0.0 (HTTP réel). */
+export function commentsFor(
+  app: INestApplication,
+  actor: { cookie: string } | undefined,
+  projectId: string,
+) {
   const cookie = actor?.cookie;
+  const at = (suffix: string) => projectPath(projectId, suffix);
   return {
     create: (targetId: string, body = "Un commentaire", over: Record<string, unknown> = {}) =>
-      send(app, cookie, "post", "/comments", { targetKind: "ticket", targetId, body, ...over }),
+      send(app, cookie, "post", at("/comments"), { targetKind: "ticket", targetId, body, ...over }),
     list: (targetId: string, query = "", targetKind = "ticket") =>
       send(
         app,
         cookie,
         "get",
-        `/comments?targetKind=${targetKind}&targetId=${targetId}${query ? `&${query}` : ""}`,
+        at(`/comments?targetKind=${targetKind}&targetId=${targetId}${query ? `&${query}` : ""}`),
       ),
-    remove: (id: string) => send(app, cookie, "delete", `/comments/${id}`),
-    listAudit: (query = "") => send(app, cookie, "get", `/audit${query ? `?${query}` : ""}`),
+    remove: (id: string) => send(app, cookie, "delete", at(`/comments/${id}`)),
+    listAudit: (query = "") => send(app, cookie, "get", at(`/audit${query ? `?${query}` : ""}`)),
   };
 }
 
@@ -86,6 +91,7 @@ export interface AuditRowFull {
   ticket_id: string | null;
   actor_kind: string;
   actor_id: string | null;
+  project_id: string | null;
   occurred_at: Date;
 }
 
@@ -94,7 +100,7 @@ export function auditRowsFull(
   organizationId: string,
 ): Promise<AuditRowFull[]> {
   return database.query<AuditRowFull>(
-    `SELECT id, action, target_kind, target_id, ticket_id, actor_kind, actor_id, occurred_at
+    `SELECT id, action, target_kind, target_id, ticket_id, actor_kind, actor_id, project_id, occurred_at
        FROM audit_log WHERE organization_id = $1 ORDER BY occurred_at, id`,
     [organizationId],
   );

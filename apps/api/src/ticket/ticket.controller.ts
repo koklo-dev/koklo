@@ -6,8 +6,7 @@ import type { Request } from "express";
 import { TICKET_WRITE_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
-import { PROJECT_CONTEXT, type ProjectContext } from "../project/project-context.ts";
-import { inScope } from "../tracker/scope.ts";
+import { inProject } from "../tracker/scope.ts";
 import { TicketService } from "./ticket.service.ts";
 
 /** Lecture ouverte à tout rôle ; écritures : `TICKET_WRITE_ROLES` (CDC §14), rôle relu en base. */
@@ -15,7 +14,6 @@ import { TicketService } from "./ticket.service.ts";
 export class TicketController {
   constructor(
     @Inject(TicketService) private readonly service: TicketService,
-    @Inject(PROJECT_CONTEXT) private readonly project: ProjectContext,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -24,10 +22,10 @@ export class TicketController {
   @Implement(contract.ticket.create)
   create(@Req() request: Request) {
     return implement(contract.ticket.create).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => this.service.create(scope, input),
         this.access,
       ),
@@ -38,10 +36,10 @@ export class TicketController {
   @Implement(contract.ticket.get)
   get(@Req() request: Request) {
     return implement(contract.ticket.get).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => this.service.get(scope, input.key, requireSession(request).role),
         this.access,
       ),
@@ -52,12 +50,12 @@ export class TicketController {
   @Implement(contract.ticket.list)
   list(@Req() request: Request) {
     return implement(contract.ticket.list).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => {
-          const { limit, cursor, around, q, sprintId, ...filter } = input;
+          const { projectId: _, limit, cursor, around, q, sprintId, ...filter } = input;
           return this.service.list(scope, {
             filter: { ...filter, sprintKey: sprintId },
             q,
@@ -75,14 +73,15 @@ export class TicketController {
   @Roles(...TICKET_WRITE_ROLES)
   @Implement(contract.ticket.update)
   update(@Req() request: Request) {
-    return implement(contract.ticket.update).handler(({ input: { key, ...fields }, errors }) =>
-      inScope(
-        request,
-        this.project,
-        errors,
-        (scope) => this.service.update(scope, key, fields),
-        this.access,
-      ),
+    return implement(contract.ticket.update).handler(
+      ({ input: { projectId, key, ...fields }, errors }) =>
+        inProject(
+          request,
+          errors,
+          projectId,
+          (scope) => this.service.update(scope, key, fields),
+          this.access,
+        ),
     );
   }
 
@@ -91,10 +90,10 @@ export class TicketController {
   @Implement(contract.ticket.delete)
   delete(@Req() request: Request) {
     return implement(contract.ticket.delete).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => this.service.delete(scope, input.key),
         this.access,
       ),
@@ -106,10 +105,10 @@ export class TicketController {
   @Implement(contract.ticket.transition)
   transition(@Req() request: Request) {
     return implement(contract.ticket.transition).handler(({ input, errors }) =>
-      inScope(
+      inProject(
         request,
-        this.project,
         errors,
+        input.projectId,
         (scope) => this.service.transition(scope, input),
         this.access,
       ),

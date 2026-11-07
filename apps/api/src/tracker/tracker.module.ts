@@ -1,15 +1,10 @@
 import { Module } from "@nestjs/common";
-import { OldestProjectContext, PROJECT_CONTEXT } from "../project/project-context.ts";
 import { FullTextSearch } from "./full-text-search.ts";
 import { ProjectTransactions } from "./project-transactions.ts";
 
-/** Briques communes aux modules ticket et sprint : projet courant et transactions de projet. */
+/** Briques communes aux modules ticket et sprint : transactions de projet et recherche plein texte. */
 @Module({
-  providers: [
-    ProjectTransactions,
-    FullTextSearch,
-    { provide: PROJECT_CONTEXT, useClass: OldestProjectContext },
-  ],
-  exports: [ProjectTransactions, FullTextSearch, PROJECT_CONTEXT],
+  providers: [ProjectTransactions, FullTextSearch],
+  exports: [ProjectTransactions, FullTextSearch],
 })
 export class TrackerModule {}

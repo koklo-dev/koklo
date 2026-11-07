@@ -48,7 +48,7 @@ afterAll(async () => {
 describe("audit des écritures", () => {
   it("chaque procédure d'écriture ajoute exactement une ligne, dans l'ordre, avec acteur et cible", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
 
     const sprint = (await dev.createSprint()).body;
     await dev.createSprint();
@@ -100,9 +100,9 @@ describe("audit des écritures", () => {
 describe("audit des écritures (suite 2)", () => {
   it("les lectures et les écritures refusées n'écrivent rien", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const ticket = await seedTicket(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
     const before = await count(database, "audit_log", "organization_id = $1", [
       world.organizationId,
     ]);
@@ -115,7 +115,9 @@ describe("audit des écritures (suite 2)", () => {
     expect((await dev.transition(ticket.key, "done")).status).toBe(409);
     expect((await dev.closeSprint("SP-1")).status).toBe(409);
     expect((await dev.updateTicket("TK-99", { title: "x" })).status).toBe(404);
-    expect((await apiFor(app, world.actors.client).createTicket()).status).toBe(403);
+    expect((await apiFor(app, world.actors.client, world.projectId).createTicket()).status).toBe(
+      403,
+    );
 
     expect(await count(database, "audit_log", "organization_id = $1", [world.organizationId])).toBe(
       before,
@@ -125,7 +127,7 @@ describe("audit des écritures (suite 2)", () => {
   it("un échec de l'audit annule l'écriture de ticket.create", async () => {
     const world = await createWorld(database);
     await database.query("INSERT INTO audit_fail VALUES ('ticket.create')");
-    const response = await apiFor(app, world.actors.dev).createTicket();
+    const response = await apiFor(app, world.actors.dev, world.projectId).createTicket();
     expect(response.status).toBe(500);
     expect(response.body.code).toBe("INTERNAL");
     expect(await count(database, "tickets", "organization_id = $1", [world.organizationId])).toBe(
@@ -140,8 +142,11 @@ describe("audit des écritures (suite 2)", () => {
 describe("audit des écritures (suite 3)", () => {
   it("un échec de l'audit annule ticket.update, ticket.transition et ticket.delete", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const ticket = await seedTicket(app, world.actors.dev, { title: "Avant", labels: ["x"] });
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId, {
+      title: "Avant",
+      labels: ["x"],
+    });
     await database.query(
       "INSERT INTO audit_fail VALUES ('ticket.update'), ('ticket.transition'), ('ticket.delete')",
     );
@@ -165,10 +170,10 @@ describe("audit des écritures (suite 3)", () => {
 describe("audit des écritures (suite 4)", () => {
   it("un échec de l'audit annule dependency.add, sprint.create et sprint.activate", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    const a = await seedTicket(app, world.actors.dev);
-    const b = await seedTicket(app, world.actors.dev);
-    const planned = await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    const a = await seedTicket(app, world.actors.dev, world.projectId);
+    const b = await seedTicket(app, world.actors.dev, world.projectId);
+    const planned = await seedSprint(app, world.actors.dev, world.projectId);
     await database.query(
       "INSERT INTO audit_fail VALUES ('dependency.add'), ('sprint.create'), ('sprint.activate')",
     );

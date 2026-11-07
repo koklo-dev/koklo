@@ -19,6 +19,7 @@ export interface FocusRequest {
  * Terminé · Terminé : 143 ». Garde aussi le refus à afficher et le focus à rendre.
  */
 export function useTicketMove(
+  projectId: string,
   reload: () => Promise<unknown>,
   totalOf: (status: TicketStatus) => number | undefined,
 ) {
@@ -35,7 +36,7 @@ export function useTicketMove(
       setFailure(null);
       setAnnouncement(`Déplacement de ${key} vers ${label}…`);
       try {
-        await mutateAsync({ key, to });
+        await mutateAsync({ projectId, key, to });
         await reload();
         const total = totalOf(to);
         setAnnouncement(
@@ -50,7 +51,7 @@ export function useTicketMove(
         setFocus({ key });
       }
     },
-    [mutateAsync, reload, totalOf],
+    [mutateAsync, projectId, reload, totalOf],
   );
 
   return {

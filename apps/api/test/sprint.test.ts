@@ -23,7 +23,7 @@ afterAll(async () => {
 describe("sprint.create / get / list / update", () => {
   it("crée SP-1 puis SP-2 en planned, conformes à sprintSchema, definitionOfDone vide par défaut", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
     const first = await dev.createSprint({ goal: "Premier" });
     const second = await dev.createSprint({ goal: "Second", definitionOfDone: "Tout est vert" });
     expect(first.status).toBe(200);
@@ -41,7 +41,7 @@ describe("sprint.create / get / list / update", () => {
 
   it("refuse des dates incohérentes sans rien écrire", async () => {
     const world = await createWorld(database);
-    const response = await apiFor(app, world.actors.dev).createSprint({
+    const response = await apiFor(app, world.actors.dev, world.projectId).createSprint({
       startsOn: "2026-11-13",
       endsOn: "2026-11-02",
     });
@@ -55,9 +55,9 @@ describe("sprint.create / get / list / update", () => {
 describe("sprint.create / get / list / update (suite 2)", () => {
   it("get, list et filtre par statut ; clé inconnue NOT_FOUND", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
     await dev.activateSprint("SP-2");
 
     expect((await dev.getSprint("SP-1")).body).toMatchObject({ key: "SP-1", status: "planned" });
@@ -74,8 +74,8 @@ describe("sprint.create / get / list / update (suite 2)", () => {
 
   it("update modifie les champs fournis, jamais le statut", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
     const updated = await dev.updateSprint("SP-1", { goal: "Nouveau but" });
     expect(updated.status).toBe(200);
     expect(updated.body).toMatchObject({ key: "SP-1", goal: "Nouveau but", status: "planned" });
@@ -93,9 +93,9 @@ describe("sprint.create / get / list / update (suite 2)", () => {
 describe("un seul sprint actif par projet", () => {
   it("refuse un second sprint actif avec CONFLICT sprint_already_active", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
     expect((await dev.activateSprint("SP-1")).status).toBe(200);
 
     const second = await dev.activateSprint("SP-2");
@@ -112,9 +112,9 @@ describe("un seul sprint actif par projet", () => {
 
   it("deux activations concurrentes : une seule réussit, l'autre est un CONFLICT (jamais INTERNAL)", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
 
     const [a, b] = await Promise.all([dev.activateSprint("SP-1"), dev.activateSprint("SP-2")]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
@@ -133,17 +133,21 @@ describe("un seul sprint actif par projet (suite 2)", () => {
   it("un sprint actif d'une autre organisation ne bloque pas l'activation", async () => {
     const one = await createWorld(database);
     const two = await createWorld(database);
-    await seedSprint(app, one.actors.dev);
-    await seedSprint(app, two.actors.dev);
-    expect((await apiFor(app, one.actors.dev).activateSprint("SP-1")).status).toBe(200);
-    expect((await apiFor(app, two.actors.dev).activateSprint("SP-1")).status).toBe(200);
+    await seedSprint(app, one.actors.dev, one.projectId);
+    await seedSprint(app, two.actors.dev, two.projectId);
+    expect((await apiFor(app, one.actors.dev, one.projectId).activateSprint("SP-1")).status).toBe(
+      200,
+    );
+    expect((await apiFor(app, two.actors.dev, two.projectId).activateSprint("SP-1")).status).toBe(
+      200,
+    );
   });
 
   it("un sprint clos libère la place pour un autre", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
     await dev.activateSprint("SP-1");
     expect((await dev.closeSprint("SP-1")).body).toMatchObject({ key: "SP-1", status: "closed" });
     expect((await dev.activateSprint("SP-2")).status).toBe(200);
@@ -153,8 +157,8 @@ describe("un seul sprint actif par projet (suite 2)", () => {
 describe("cycle de vie : planned -> active -> closed, sans réouverture", () => {
   it("activate exige planned, close exige active", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
 
     const earlyClose = await dev.closeSprint("SP-1");
     expect(earlyClose.status).toBe(409);
@@ -178,10 +182,10 @@ describe("cycle de vie : planned -> active -> closed, sans réouverture", () => 
 describe("cycle de vie : planned -> active -> closed, sans réouverture (suite 2)", () => {
   it("un sprint closed n'accepte plus de ticket (create et update), planned et active oui", async () => {
     const world = await createWorld(database);
-    const dev = apiFor(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
-    await seedSprint(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
+    await seedSprint(app, world.actors.dev, world.projectId);
     await dev.activateSprint("SP-2");
     await dev.closeSprint("SP-2");
 
@@ -195,7 +199,7 @@ describe("cycle de vie : planned -> active -> closed, sans réouverture (suite 2
     expect(refused.body.code).toBe("VALIDATION");
     expect(refused.body.data.field).toBe("sprintId");
 
-    const ticket = await seedTicket(app, world.actors.dev);
+    const ticket = await seedTicket(app, world.actors.dev, world.projectId);
     const moved = await dev.updateTicket(ticket.key, { sprintId: "SP-2" });
     expect(moved.status).toBe(422);
     expect(moved.body.data.field).toBe("sprintId");

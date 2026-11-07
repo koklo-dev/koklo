@@ -104,31 +104,31 @@ const LLM_PAIRS = [
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: tableau des paires de routes attendues
 describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => {
   const PAIRS = [
-    "POST /tickets",
-    "GET /tickets/{key}",
-    "GET /tickets",
-    "PATCH /tickets/{key}",
-    "DELETE /tickets/{key}",
-    "POST /tickets/{key}/transition",
-    "POST /tickets/{key}/dependencies",
-    "DELETE /tickets/{key}/dependencies/{dependsOn}",
-    "GET /tickets/{key}/dependencies",
-    "POST /sprints",
-    "GET /sprints/{key}",
-    "GET /sprints",
-    "PATCH /sprints/{key}",
-    "POST /sprints/{key}/activate",
-    "POST /sprints/{key}/close",
-    "POST /comments",
-    "GET /comments",
-    "DELETE /comments/{id}",
-    "GET /project-state",
-    "PUT /project-state",
-    "POST /tickets/{key}/lease",
-    "POST /tickets/{key}/lease/heartbeat",
-    "DELETE /tickets/{key}/lease",
-    "GET /tickets/{key}/lease",
-    "GET /audit",
+    "POST /projects/{projectId}/tickets",
+    "GET /projects/{projectId}/tickets/{key}",
+    "GET /projects/{projectId}/tickets",
+    "PATCH /projects/{projectId}/tickets/{key}",
+    "DELETE /projects/{projectId}/tickets/{key}",
+    "POST /projects/{projectId}/tickets/{key}/transition",
+    "POST /projects/{projectId}/tickets/{key}/dependencies",
+    "DELETE /projects/{projectId}/tickets/{key}/dependencies/{dependsOn}",
+    "GET /projects/{projectId}/tickets/{key}/dependencies",
+    "POST /projects/{projectId}/sprints",
+    "GET /projects/{projectId}/sprints/{key}",
+    "GET /projects/{projectId}/sprints",
+    "PATCH /projects/{projectId}/sprints/{key}",
+    "POST /projects/{projectId}/sprints/{key}/activate",
+    "POST /projects/{projectId}/sprints/{key}/close",
+    "POST /projects/{projectId}/comments",
+    "GET /projects/{projectId}/comments",
+    "DELETE /projects/{projectId}/comments/{id}",
+    "GET /projects/{projectId}/project-state",
+    "PUT /projects/{projectId}/project-state",
+    "POST /projects/{projectId}/tickets/{key}/lease",
+    "POST /projects/{projectId}/tickets/{key}/lease/heartbeat",
+    "DELETE /projects/{projectId}/tickets/{key}/lease",
+    "GET /projects/{projectId}/tickets/{key}/lease",
+    "GET /projects/{projectId}/audit",
   ];
   const NEW_PAIRS = [
     "GET /provider/installations",
@@ -165,28 +165,32 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
 
 describe("R3 OpenAPI : réponses d'erreur par route", () => {
   const EXPECTED: [string, string, string[]][] = [
-    ["/tickets", "post", ["401", "403", "422", "500"]],
-    ["/tickets/{key}", "get", ["401", "404", "500"]],
-    ["/tickets", "get", ["401", "500"]],
-    ["/tickets/{key}", "patch", ["401", "403", "404", "422", "500"]],
-    ["/tickets/{key}", "delete", ["401", "403", "404", "409", "500"]],
-    ["/tickets/{key}/transition", "post", ["401", "403", "404", "409", "500"]],
-    ["/tickets/{key}/dependencies", "post", ["401", "403", "404", "409", "500"]],
-    ["/sprints", "post", ["401", "403", "422", "500"]],
-    ["/sprints/{key}/activate", "post", ["401", "403", "404", "409", "500"]],
-    ["/project-state", "put", ["401", "403", "409", "500"]],
-    ["/tickets/{key}/lease", "post", ["401", "403", "404", "409", "500"]],
-    ["/tickets/{key}/lease/heartbeat", "post", ["403", "404", "409", "500"]],
-    ["/tickets/{key}/lease", "delete", ["403", "404", "500"]],
-    ["/audit", "get", ["401", "403", "500"]],
+    ["/projects/{projectId}/tickets", "post", ["401", "403", "404", "422", "500"]],
+    ["/projects/{projectId}/tickets/{key}", "get", ["401", "404", "500"]],
+    ["/projects/{projectId}/tickets", "get", ["401", "500"]],
+    ["/projects/{projectId}/tickets/{key}", "patch", ["401", "403", "404", "422", "500"]],
+    ["/projects/{projectId}/tickets/{key}", "delete", ["401", "403", "404", "409", "500"]],
+    ["/projects/{projectId}/tickets/{key}/transition", "post", ["401", "403", "404", "409", "500"]],
+    [
+      "/projects/{projectId}/tickets/{key}/dependencies",
+      "post",
+      ["401", "403", "404", "409", "500"],
+    ],
+    ["/projects/{projectId}/sprints", "post", ["401", "403", "404", "422", "500"]],
+    ["/projects/{projectId}/sprints/{key}/activate", "post", ["401", "403", "404", "409", "500"]],
+    ["/projects/{projectId}/project-state", "put", ["401", "403", "404", "409", "500"]],
+    ["/projects/{projectId}/tickets/{key}/lease", "post", ["401", "403", "404", "409", "500"]],
+    ["/projects/{projectId}/tickets/{key}/lease/heartbeat", "post", ["403", "404", "409", "500"]],
+    ["/projects/{projectId}/tickets/{key}/lease", "delete", ["403", "404", "500"]],
+    ["/projects/{projectId}/audit", "get", ["401", "403", "404", "500"]],
   ];
   it.each(EXPECTED)("%s %s expose ses réponses", async (path, method, codes) => {
     expect(statuses(await doc(), path, method)).toEqual(expect.arrayContaining(codes));
   });
   it("les lectures ouvertes à tous n'ont pas de 403", async () => {
     const d = await doc();
-    expect(statuses(d, "/tickets", "get")).not.toContain("403");
-    expect(statuses(d, "/sprints", "get")).not.toContain("403");
+    expect(statuses(d, "/projects/{projectId}/tickets", "get")).not.toContain("403");
+    expect(statuses(d, "/projects/{projectId}/sprints", "get")).not.toContain("403");
   });
 });
 
@@ -240,6 +244,7 @@ describe("R5 index : schémas et types exportés", () => {
   it("types d'entrée, de sortie et d'énumération", () => {
     expectTypeOf<api.TicketCreateInput>().toHaveProperty("title");
     expectTypeOf<api.TicketTransitionInput>().toEqualTypeOf<{
+      projectId: string;
       key: string;
       to: api.TicketStatus;
     }>();

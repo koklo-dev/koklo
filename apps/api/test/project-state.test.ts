@@ -24,7 +24,7 @@ afterAll(async () => {
 describe("projectState.get", () => {
   it("crée la ligne à la demande en version 1 avec un contenu vide, une seule fois", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     expect(await count(database, "project_states", "project_id = $1", [world.projectId])).toBe(0);
 
     const first = await owner.getState();
@@ -38,7 +38,7 @@ describe("projectState.get", () => {
 
   it("des lectures simultanées sur un projet sans ligne réussissent toutes et ne créent qu'une ligne", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     const responses = await Promise.all([owner.getState(), owner.getState(), owner.getState()]);
     expect(responses.map((r) => r.status)).toEqual([200, 200, 200]);
     expect(await count(database, "project_states", "project_id = $1", [world.projectId])).toBe(1);
@@ -48,7 +48,7 @@ describe("projectState.get", () => {
 describe("projectState.update", () => {
   it("avec la bonne version : contenu remplacé, version + 1", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     const { version } = (await owner.getState()).body;
 
     const updated = await owner.updateState(version, { mergePolicy: "owner", repos: ["a"] });
@@ -60,7 +60,7 @@ describe("projectState.update", () => {
 
   it("version périmée : VERSION_CONFLICT avec l'état courant, rien n'est écrit", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     await owner.updateState(1, { a: 1 });
 
     const stale = await owner.updateState(1, { a: 2 });
@@ -75,7 +75,7 @@ describe("projectState.update", () => {
 describe("projectState.update (suite 2)", () => {
   it("update sur un projet sans ligne : expectedVersion 1 crée puis écrit (version 2), autre version en conflit", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     const conflict = await owner.updateState(5, { a: 1 });
     expect(conflict.status).toBe(409);
     expect(conflict.body.data.current.version).toBe(1);
@@ -87,8 +87,8 @@ describe("projectState.update (suite 2)", () => {
   it("deux updates simultanés avec la même version : un 200, un VERSION_CONFLICT portant l'état gagnant", async () => {
     for (let round = 0; round < 5; round++) {
       const world = await createWorld(database);
-      const owner = collaborationFor(app, world.actors.owner);
-      const admin = collaborationFor(app, world.actors.admin);
+      const owner = collaborationFor(app, world.actors.owner, world.projectId);
+      const admin = collaborationFor(app, world.actors.admin, world.projectId);
       await owner.getState();
 
       const responses = await Promise.all([
@@ -111,7 +111,7 @@ describe("projectState.update (suite 2)", () => {
 
   it("entrées invalides : version < 1 ou contenu non objet", async () => {
     const world = await createWorld(database);
-    const owner = collaborationFor(app, world.actors.owner);
+    const owner = collaborationFor(app, world.actors.owner, world.projectId);
     for (const response of [
       await owner.updateState(0, {}),
       await owner.updateState(1, "texte" as unknown as Record<string, unknown>),

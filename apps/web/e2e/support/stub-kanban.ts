@@ -1,7 +1,9 @@
 import type { IncomingMessage } from "node:http";
 
 /**
- * Faux API du kanban (TK-35) : sprint.list, ticket.list et ticket.transition, sans Postgres.
+ * Faux API du kanban (TK-35) : sprint.list, ticket.list et ticket.transition, sans Postgres. Contrat 2.0.0
+ * (TK-96) : chaque appel passe par `/projects/{projectId}/...` ; un projet inconnu du faux API répond 404, et les
+ * anciens chemins sans projet ne sont pas pris en charge.
  * Piloté par le scénario : `board` (sprint.list / ticket.list) et `transition` (ticket.transition).
  * Le stub garde l'état des tickets : une transition acceptée est visible à la lecture suivante.
  */
@@ -203,6 +205,54 @@ export function transitionResponse(mode: TransitionMode, key: string, to: string
 
 type Send = (reply: Reply) => void;
 
+/** `/projects/{projectId}/sprints|tickets...` : seule forme du contrat 2.0.0 ; le reste du chemin suit l'identifiant. */
+const PROJECT_ROUTE = /^\/projects\/([^/]+)(\/(?:sprints|tickets)(?:\/.*)?)$/;
+
+/** Dépendances du routeur : le test des projets connus du faux API. */
+export interface KanbanRouting {
+  knownProject: (id: string) => boolean;
+}
+
+const transitionsIfAsked = (path: string) => (path === "/__transitions" ? transitions : null);
+
+/** Lit le corps JSON d'une requête POST, puis répond avec `answer`. */
+function withBody(req: IncomingMessage, answer: (body: { to: string }) => void): void {
+  let raw = "";
+  req.on("data", (chunk) => {
+    raw += chunk;
+  });
+  req.on("end", () => answer(JSON.parse(raw || "{}") as { to: string }));
+}
+
+interface Handlers {
+  scenario: KanbanScenario;
+  send: Send;
+  hold: (release: () => void) => void;
+  expireSession: () => void;
+}
+
+/** Sprints, tickets et transition d'un projet connu ; `path` suit `/projects/{projectId}`. */
+function handleProjectRoute(req: IncomingMessage, url: URL, path: string, h: Handlers): boolean {
+  const board = h.scenario.board ?? "data";
+  if (req.method === "GET" && path === "/sprints") {
+    if (board === "unauthorized") h.expireSession();
+    if (board === "loading") h.hold(() => h.send(sprintsResponse("data")));
+    else h.send(sprintsResponse(board));
+    return true;
+  }
+  if (req.method === "GET" && path === "/tickets") {
+    reads.push(`${url.pathname}${url.search}`);
+    h.send(ticketsResponse(board, url.searchParams));
+    return true;
+  }
+  const move = /^\/tickets\/(TK-[1-9][0-9]*)\/transition$/.exec(path);
+  if (req.method !== "POST" || !move) return false;
+  withBody(req, ({ to }) =>
+    h.send(transitionResponse(h.scenario.transition ?? "ok", move[1] as string, to)),
+  );
+  return true;
+}
+
 /**
  * Route les appels du kanban ; renvoie true quand la requête a été prise en charge.
  * `hold` retient une réponse jusqu'à POST /__release ; `expireSession` simule une session expirée.
@@ -214,37 +264,18 @@ export function handleKanban(
   send: Send,
   hold: (release: () => void) => void,
   expireSession: () => void,
+  routing: KanbanRouting,
 ): boolean {
-  const path = url.pathname;
-  const board = scenario.board ?? "data";
-  if (path === "/__ticket-reads") {
-    send(reply(200, reads));
+  const inspect = url.pathname === "/__ticket-reads" ? reads : transitionsIfAsked(url.pathname);
+  if (inspect) {
+    send(reply(200, inspect));
     return true;
   }
-  if (path === "/__transitions") {
-    send(reply(200, transitions));
+  const route = PROJECT_ROUTE.exec(url.pathname);
+  if (!route) return false;
+  if (!routing.knownProject(route[1] as string)) {
+    send(reply(404, { defined: true, code: "NOT_FOUND", message: "Not found" }));
     return true;
   }
-  if (req.method === "GET" && path.endsWith("/sprints")) {
-    if (board === "unauthorized") expireSession();
-    if (board === "loading") hold(() => send(sprintsResponse("data")));
-    else send(sprintsResponse(board));
-    return true;
-  }
-  if (req.method === "GET" && path.endsWith("/tickets")) {
-    reads.push(`${path}${url.search}`);
-    send(ticketsResponse(board, url.searchParams));
-    return true;
-  }
-  const move = /\/tickets\/(TK-[1-9][0-9]*)\/transition$/.exec(path);
-  if (req.method !== "POST" || !move) return false;
-  let raw = "";
-  req.on("data", (chunk) => {
-    raw += chunk;
-  });
-  req.on("end", () => {
-    const { to } = JSON.parse(raw || "{}") as { to: string };
-    send(transitionResponse(scenario.transition ?? "ok", move[1] as string, to));
-  });
-  return true;
+  return handleProjectRoute(req, url, route[2] as string, { scenario, send, hold, expireSession });
 }

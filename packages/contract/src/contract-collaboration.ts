@@ -5,17 +5,19 @@ import {
   validationError,
   versionConflictError,
 } from "./errors.ts";
-import { readOneErrors, route, writeErrors, writeOneErrors } from "./route-helpers.ts";
+import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
 import {
   auditEntrySchema,
   auditListInputSchema,
   commentCreateInputSchema,
   commentIdInputSchema,
+  commentIdOutputSchema,
   commentListInputSchema,
   commentSchema,
   leaseAcquireInputSchema,
   leaseSchema,
   pageOf,
+  projectStateInputSchema,
   projectStateSchema,
   projectStateUpdateInputSchema,
   ticketKeyInputSchema,
@@ -25,24 +27,27 @@ import {
 const commentErrors = { ...writeOneErrors, ...validationError } as const;
 
 const comment = {
-  create: route("POST", "/comments")
+  create: route("POST", "/projects/{projectId}/comments")
     .errors(commentErrors)
     .input(commentCreateInputSchema)
     .output(commentSchema),
-  list: route("GET", "/comments")
+  list: route("GET", "/projects/{projectId}/comments")
     .errors(commentErrors)
     .input(commentListInputSchema)
     .output(pageOf(commentSchema)),
-  delete: route("DELETE", "/comments/{id}")
+  delete: route("DELETE", "/projects/{projectId}/comments/{id}")
     .errors(writeOneErrors)
     .input(commentIdInputSchema)
-    .output(commentIdInputSchema),
+    .output(commentIdOutputSchema),
 };
 
 const projectState = {
-  get: route("GET", "/project-state").errors(writeErrors).output(projectStateSchema),
-  update: route("PUT", "/project-state")
-    .errors({ ...writeErrors, ...versionConflictError })
+  get: route("GET", "/projects/{projectId}/project-state")
+    .errors(writeOneErrors)
+    .input(projectStateInputSchema)
+    .output(projectStateSchema),
+  update: route("PUT", "/projects/{projectId}/project-state")
+    .errors({ ...writeOneErrors, ...versionConflictError })
     .input(projectStateUpdateInputSchema)
     .output(projectStateSchema),
 };
@@ -51,19 +56,19 @@ const projectState = {
 const holderErrors = { ...readOneErrors, ...leaseNotHolderError } as const;
 
 const lease = {
-  acquire: route("POST", "/tickets/{key}/lease")
+  acquire: route("POST", "/projects/{projectId}/tickets/{key}/lease")
     .errors({ ...writeOneErrors, ...leaseHeldError })
     .input(leaseAcquireInputSchema)
     .output(leaseSchema),
-  heartbeat: route("POST", "/tickets/{key}/lease/heartbeat")
+  heartbeat: route("POST", "/projects/{projectId}/tickets/{key}/lease/heartbeat")
     .errors({ ...holderErrors, ...leaseExpiredError })
     .input(ticketKeyInputSchema)
     .output(leaseSchema),
-  release: route("DELETE", "/tickets/{key}/lease")
+  release: route("DELETE", "/projects/{projectId}/tickets/{key}/lease")
     .errors(holderErrors)
     .input(ticketKeyInputSchema)
     .output(leaseSchema),
-  get: route("GET", "/tickets/{key}/lease")
+  get: route("GET", "/projects/{projectId}/tickets/{key}/lease")
     .errors(readOneErrors)
     .input(ticketKeyInputSchema)
     .output(leaseSchema.nullable()),
@@ -71,8 +76,8 @@ const lease = {
 
 /** Lecture seule : le journal est immuable et alimenté par le serveur (CDC §4.2). */
 const audit = {
-  list: route("GET", "/audit")
-    .errors(writeErrors)
+  list: route("GET", "/projects/{projectId}/audit")
+    .errors(writeOneErrors)
     .input(auditListInputSchema)
     .output(pageOf(auditEntrySchema)),
 };

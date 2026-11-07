@@ -4,7 +4,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../src/app.module.ts";
 import { configFor } from "./app.ts";
-import { send } from "./tickets.ts";
+import { projectPath, send } from "./tickets.ts";
 
 /** Horloge de test (port CLOCK de TK-31) : instant ISO UTC contrôlé, jamais d'attente réelle. */
 export class ManualClock {
@@ -41,19 +41,28 @@ export async function createAppWithClock(
 
 export const LEASE_DEFAULTS = { branch: "feat/tk-x", worktree: "/srv/worktrees/tk-x" } as const;
 
-/** Client des procédures lease.* et projectState.* du contrat 0.4.0 (HTTP réel). */
-export function collaborationFor(app: INestApplication, actor: { cookie: string } | undefined) {
+/** Client des procédures lease.* et projectState.* du contrat 2.0.0 (HTTP réel). */
+export function collaborationFor(
+  app: INestApplication,
+  actor: { cookie: string } | undefined,
+  projectId: string,
+) {
   const cookie = actor?.cookie;
+  const at = (suffix: string) => projectPath(projectId, suffix);
   return {
     acquire: (key: string, over: Record<string, unknown> = {}) =>
-      send(app, cookie, "post", `/tickets/${key}/lease`, { key, ...LEASE_DEFAULTS, ...over }),
+      send(app, cookie, "post", at(`/tickets/${key}/lease`), {
+        key,
+        ...LEASE_DEFAULTS,
+        ...over,
+      }),
     heartbeat: (key: string) =>
-      send(app, cookie, "post", `/tickets/${key}/lease/heartbeat`, { key }),
-    release: (key: string) => send(app, cookie, "delete", `/tickets/${key}/lease`),
-    getLease: (key: string) => send(app, cookie, "get", `/tickets/${key}/lease`),
-    getState: () => send(app, cookie, "get", "/project-state"),
+      send(app, cookie, "post", at(`/tickets/${key}/lease/heartbeat`), { key }),
+    release: (key: string) => send(app, cookie, "delete", at(`/tickets/${key}/lease`)),
+    getLease: (key: string) => send(app, cookie, "get", at(`/tickets/${key}/lease`)),
+    getState: () => send(app, cookie, "get", at("/project-state")),
     updateState: (expectedVersion: number, content: Record<string, unknown>) =>
-      put(app, cookie, "/project-state", { expectedVersion, content }),
+      put(app, cookie, at("/project-state"), { expectedVersion, content }),
   };
 }
 

@@ -136,7 +136,7 @@ describe("audit des clés BYOK : restitution et absence de valeur", () => {
     await llmApi(b.app, world.actors.owner).set(PROVIDER, { apiKey: secret });
     const { default: request } = await import("supertest");
     const res = await request(b.app.getHttpServer())
-      .get("/audit?action=llm_credential.create&limit=100")
+      .get(`/projects/${world.projectId}/audit?action=llm_credential.create&limit=100`)
       .set("Cookie", world.actors.owner.cookie);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.items).toHaveLength(1);

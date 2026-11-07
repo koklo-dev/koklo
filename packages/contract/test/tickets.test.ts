@@ -4,7 +4,7 @@ import {
   BAD_SPRINT_KEYS,
   BAD_TICKET_KEYS,
   INSTANT,
-  input,
+  scopedInput as input,
   isValid,
   output,
   PACKAGES,
@@ -138,9 +138,10 @@ describe("T3 ticket.create : entrée", () => {
     expect(await isValid(i(), { ...create, assignee: "alice" })).toBe(false);
     expect(await isValid(i(), { ...create, assignee: { kind: "robot", id: UUID } })).toBe(false);
   });
-  it("ne conserve jamais l'organisation ni le projet (déduits de la session)", async () => {
+  it("ne conserve jamais l'organisation (déduite de la session) mais garde le projet explicite (TK-96)", async () => {
     const value = await parsed(i(), { ...create, organizationId: UUID, projectId: UUID });
-    expect(value === undefined || !("organizationId" in value || "projectId" in value)).toBe(true);
+    expect(value === undefined || !("organizationId" in value)).toBe(true);
+    expect(value?.projectId).toBe(UUID);
   });
 });
 

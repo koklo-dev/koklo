@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { instantSchema, pageInputSchema, ticketKeySchema } from "./schemas-tickets.ts";
+import {
+  instantSchema,
+  pageInputSchema,
+  projectScopeShape,
+  ticketKeySchema,
+} from "./schemas-tickets.ts";
 
 export const commentTargetKindSchema = z.enum(["ticket", "feature", "screen", "change_request"]);
 export const commentAuthorKindSchema = z.enum(["human", "agent", "client", "system"]);
@@ -21,28 +26,38 @@ export const commentSchema = z.object({
 
 /** L'auteur est déduit du jeton : il n'est jamais lu dans l'entrée. */
 export const commentCreateInputSchema = z.object({
+  ...projectScopeShape,
   targetKind: commentTargetKindSchema,
   targetId: z.uuid(),
   body: z.string().min(1).max(COMMENT_BODY_MAX),
 });
 export const commentListInputSchema = z.object({
+  ...projectScopeShape,
   targetKind: commentTargetKindSchema,
   targetId: z.uuid(),
   ...pageInputSchema,
 });
-export const commentIdInputSchema = z.object({ id: z.uuid() });
+/** Sortie de `comment.delete` : l'identifiant seul, sans le projet. */
+export const commentIdOutputSchema = z.object({ id: z.uuid() });
+export const commentIdInputSchema = z.object({
+  ...projectScopeShape,
+  ...commentIdOutputSchema.shape,
+});
 
 export const projectStateSchema = z.object({
   version: z.number().int().min(1),
   content: z.record(z.string(), z.unknown()),
 });
+export const projectStateInputSchema = z.object(projectScopeShape);
 export const projectStateUpdateInputSchema = z.object({
+  ...projectScopeShape,
   expectedVersion: z.number().int().min(1),
   content: z.record(z.string(), z.unknown()),
 });
 
 /** Le titulaire du bail est déduit du jeton : il n'est jamais lu dans l'entrée. */
 export const leaseAcquireInputSchema = z.object({
+  ...projectScopeShape,
   key: ticketKeySchema,
   branch: z.string().min(1),
   worktree: z.string().min(1),
@@ -61,6 +76,7 @@ export const auditEntrySchema = z.object({
   occurredAt: instantSchema,
 });
 export const auditListInputSchema = z.object({
+  ...projectScopeShape,
   ticketKey: ticketKeySchema.optional(),
   actorKind: auditActorKindSchema.optional(),
   action: z.string().min(1).optional(),

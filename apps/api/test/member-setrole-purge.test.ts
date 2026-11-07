@@ -41,6 +41,7 @@ async function linkedClient(label: string, projects = [scene.projects.p1, scene.
   return actor;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("sortie du rôle client : les liens sont supprimés", () => {
   it.each(["dev", "designer", "business", "admin"])(
     "client -> %s : tous les liens du membre disparaissent",
@@ -60,7 +61,9 @@ describe("sortie du rôle client : les liens sont supprimés", () => {
     const back = await setRole(actor.memberId, "client");
     expect(back.status).toBe(200);
     expect((await send(app, actor.cookie, "get", "/projects")).body).toEqual([]);
-    expect((await send(app, actor.cookie, "get", "/tickets")).status).toBe(404);
+    expect(
+      (await send(app, actor.cookie, "get", `/projects/${scene.projects.p1}/tickets`)).status,
+    ).toBe(404);
   });
 
   it("les liens des autres clients et ceux du même utilisateur dans une autre organisation survivent", async () => {

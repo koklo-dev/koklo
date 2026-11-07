@@ -49,7 +49,8 @@ async function median(call: () => Promise<{ status: number }>): Promise<number> 
 
 const features = (query: string) => () =>
   specReadApi(app, world.actors.dev).list(world.projectId, query);
-const tickets = (query: string) => () => apiFor(app, world.actors.dev).listTickets(query);
+const tickets = (query: string) => () =>
+  apiFor(app, world.actors.dev, world.projectId).listTickets(query);
 
 describe("première page < 300 ms côté serveur sur seed:large", () => {
   it.each([

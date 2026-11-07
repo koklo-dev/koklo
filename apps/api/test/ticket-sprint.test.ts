@@ -30,7 +30,7 @@ async function statusOf(key: string) {
 
 describe("critère d'acceptation : transitions bloquées par les dépendances", () => {
   it("le sprint SP-1 et trois tickets chaînés refusent puis acceptent in_progress selon les dépendances", async () => {
-    const dev = apiFor(app, world.actors.dev);
+    const dev = apiFor(app, world.actors.dev, world.projectId);
 
     // 1. Sprint SP-1 planned, puis activé.
     const sprint = await dev.createSprint({ goal: "Livrer la chaîne" });

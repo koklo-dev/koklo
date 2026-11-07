@@ -22,10 +22,12 @@ afterAll(async () => {
 
 async function chain(size: number) {
   const world = await createWorld(database);
-  const dev = apiFor(app, world.actors.dev);
+  const dev = apiFor(app, world.actors.dev, world.projectId);
   const keys: string[] = [];
   for (let i = 0; i < size; i++) {
-    keys.push((await seedTicket(app, world.actors.dev, { status: "backlog" })).key);
+    keys.push(
+      (await seedTicket(app, world.actors.dev, world.projectId, { status: "backlog" })).key,
+    );
   }
   return { world, dev, keys };
 }
