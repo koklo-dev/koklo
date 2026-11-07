@@ -27,6 +27,14 @@ const readdirSyncSafe = (dir: string): Dirent[] => {
   }
 };
 
+const readdirSyncFlat = (dir: string): Dirent[] => {
+  try {
+    return readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+};
+
 const reasonOf = (request: Parameters<typeof assertLlmRequest>[0]): string => {
   try {
     assertLlmRequest(request);
@@ -180,9 +188,14 @@ describe("TK-50c : surrogates isolés neutralisés (toWellFormed)", () => {
 });
 
 describe("TK-50c : revealUntrusted reste interne au cadrage", () => {
-  const roots = ["packages", "apps"].map((dir) =>
-    resolve(import.meta.dirname, "..", "..", "..", dir),
-  );
+  // Seuls les dossiers `src` de chaque paquet sont parcourus : une lecture récursive depuis la
+  // racine traverserait `node_modules` et les sorties de build, et dépasserait le délai en CI.
+  const roots = ["packages", "apps"].flatMap((dir) => {
+    const base = resolve(import.meta.dirname, "..", "..", "..", dir);
+    return readdirSyncFlat(base)
+      .filter((e) => e.isDirectory())
+      .map((e) => resolve(base, e.name, "src"));
+  });
   const allowed = new Set(["untrusted.ts", "llm-prompt.ts"]);
 
   const sources = (dir: string): string[] =>
