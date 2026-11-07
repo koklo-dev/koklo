@@ -35,7 +35,7 @@ describe("serializeResponse (TK-48a2 : une redirection ne laisse pas sa cible au
     expect(
       serializeResponse({
         statusCode: 303,
-        headers: { Location: "/github?result=installed", "cache-control": "no-store" },
+        headers: { Location: "/settings/github?result=installed", "cache-control": "no-store" },
       }),
     ).toEqual({
       statusCode: 303,

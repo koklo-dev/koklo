@@ -18,3 +18,18 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
 }
+
+// jsdom n'implémente ni ResizeObserver ni scrollIntoView ni la capture de pointeur : requis par Radix et cmdk.
+if (typeof Element !== "undefined") {
+  Object.assign(Element.prototype, {
+    hasPointerCapture: () => false,
+    setPointerCapture: () => undefined,
+    releasePointerCapture: () => undefined,
+    scrollIntoView: () => undefined,
+  });
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

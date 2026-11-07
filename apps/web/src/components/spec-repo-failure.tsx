@@ -1,5 +1,6 @@
 import { Alert, AlertDescription, AlertTitle, Icon } from "@koklo/ui";
 import type { StartFailure } from "../lib/github-start-error.ts";
+import { settingsPath } from "../lib/shell-routes.ts";
 import type { SpecRepoErrorView } from "../lib/spec-repo-errors.ts";
 
 export const PARTIAL_TITLE = "Projet créé, dépôt de spec non créé";
@@ -19,7 +20,7 @@ export function SpecRepoFailure({ view, authFailure }: FailureProps) {
       <AlertDescription className="flex flex-col items-start gap-3">
         <p>{view.text}</p>
         {view.githubLink ? (
-          <a href="/github" className="font-medium underline underline-offset-4">
+          <a href={settingsPath("github")} className="font-medium underline underline-offset-4">
             Ouvrir la page GitHub
           </a>
         ) : null}

@@ -1,9 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import ProjectsRoute from "../src/app/(shell)/projects/page.tsx";
 import RootLayout, { metadata } from "../src/app/layout.tsx";
 import LoginPage from "../src/app/login/page.tsx";
-import ProjectsRoute from "../src/app/projects/page.tsx";
 import { THEME_INIT_SCRIPT } from "../src/lib/theme.ts";
 
 vi.mock("next/navigation", () => ({
@@ -38,7 +38,7 @@ describe("page /login", () => {
 });
 
 describe("page /projects", () => {
-  it("rend le titre h1 et la vue projets (le gabarit sidebar vit dans le layout)", () => {
+  it("rend le titre h1 et la vue projets (la coquille vit dans le layout du groupe (shell))", () => {
     render(<ProjectsRoute />);
     expect(screen.getByRole("heading", { level: 1, name: "Projets" })).toBeInTheDocument();
     expect(screen.getByText("liste")).toBeInTheDocument();

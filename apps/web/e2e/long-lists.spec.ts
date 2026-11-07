@@ -21,7 +21,8 @@ import { type BoardMode, largeTodoKeys } from "./support/stub-kanban.ts";
  * Pile locale : faux API (support/stub-features.ts, stub-kanban.ts). Captures dans
  * design/screens/captures/S-features/ et S-kanban/, en clair, en sombre et à 375 px.
  */
-const PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
+const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/functional`;
+const KANBAN = `/projects/${FEATURE_PROJECT_ID}/tickets`;
 const VIEWPORTS = [
   { name: "", width: 1280, height: 800 },
   { name: "-mobile", width: 375, height: 800 },
@@ -412,7 +413,7 @@ for (const viewport of VIEWPORTS) {
       }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await setScenario({ session: true, projects: "data", board: view.board });
-        await page.goto("/kanban");
+        await page.goto(KANBAN);
         if (theme === "dark") await switchToDark(page);
         await expect(page.getByTestId("kanban-board")).toBeVisible();
         await view.visible(page);
@@ -428,7 +429,7 @@ for (const viewport of VIEWPORTS) {
 test.describe("Kanban : sans chargement complet", () => {
   test.beforeEach(async ({ page }) => {
     await setScenario({ session: true, projects: "data", board: "large" });
-    await page.goto("/kanban");
+    await page.goto(KANBAN);
     await expect(cards(page, "todo")).toHaveCount(30);
   });
 
@@ -493,7 +494,7 @@ test("B42 : l'ordre par priorité du serveur se poursuit d'une page à l'autre, 
   page,
 }) => {
   await setScenario({ session: true, projects: "data", board: "large" });
-  await page.goto("/kanban");
+  await page.goto(KANBAN);
   await expect(cards(page, "todo")).toHaveCount(30);
   const keysOf = () =>
     cards(page, "todo").evaluateAll((nodes) =>

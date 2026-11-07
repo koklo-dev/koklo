@@ -79,7 +79,7 @@ export function renderFraming(projectId = PROJECT_ID) {
 /** Rend la page et attend l'étape 1 (champ « Votre idée »). */
 export async function openFraming(projectId = PROJECT_ID) {
   const view = renderFraming(projectId);
-  await findNamed("heading", "Cadrage", { level: 1 });
+  await findNamed("heading", "Assistant de cadrage", { level: 1 });
   await ideaField();
   return view;
 }

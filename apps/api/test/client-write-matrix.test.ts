@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { commentsFor } from "./helpers/comments.ts";
 import { installBench } from "./helpers/repo-scene.ts";
 import { createReviewScene, type ReviewScene, reviewApi } from "./helpers/reviews.ts";
+import { shellApi } from "./helpers/shell.ts";
 import { suggestionApi } from "./helpers/suggestions.ts";
 import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
 
@@ -12,7 +13,14 @@ import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
  * classées : une route d'écriture ajoutée sans classement fait échouer le test. Le client lié ne peut
  * que suggérer (create, withdraw), valider (review.submit) et commenter ; tout le reste est 403.
  */
-const ALLOWED = ["comment.create", "review.submit", "suggestion.create", "suggestion.withdraw"];
+const ALLOWED = [
+  "comment.create",
+  // TK-88 : préférence personnelle (dernier projet ouvert), tout rôle ayant accès au projet.
+  "project.visit",
+  "review.submit",
+  "suggestion.create",
+  "suggestion.withdraw",
+];
 /** Suppression de SON propre commentaire : droit d'auteur vérifié dans le service (comment-permissions). */
 const OWN_ONLY = ["comment.delete"];
 const DENIED = [
@@ -91,9 +99,10 @@ describe("classement exhaustif des écritures du contrat", () => {
     expect(routes().find((r) => r.name === "review.list")?.method).toBe("GET");
   });
 
-  it("les écritures autorisées au client sont exactement suggérer, retirer, valider et commenter", () => {
+  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter et mémoriser son dernier projet", () => {
     expect(ALLOWED).toEqual([
       "comment.create",
+      "project.visit",
       "review.submit",
       "suggestion.create",
       "suggestion.withdraw",
@@ -207,6 +216,18 @@ describe("les seules écritures du client : suggérer, retirer, valider, comment
   it("review.submit : 200", async () => {
     const res = await reviewApi(bench().app, scene.c1).submit(scene.p1.projectId, scene.headP1);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
+  });
+
+  it("project.visit : 200 sur son projet, 404 sur un projet non lié (rien n'est écrit)", async () => {
+    const api = shellApi(bench().app, scene.c1);
+    const own = await api.visit(scene.p1.projectId);
+    expect(own.status, JSON.stringify(own.body)).toBe(200);
+    expect((await api.visit(scene.p2.projectId)).status).toBe(404);
+    const rows = await bench().database.query(
+      "SELECT project_id FROM project_visits WHERE user_id = $1",
+      [scene.c1.userId],
+    );
+    expect(rows).toEqual([{ project_id: scene.p1.projectId }]);
   });
 
   it("comment.create : 200 sur un ticket de son projet", async () => {

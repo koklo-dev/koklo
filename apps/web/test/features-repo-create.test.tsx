@@ -202,7 +202,7 @@ describe("Erreurs de 48c rendues dans le panneau", () => {
     expect(await within(dialog).findByText(/Aucun compte GitHub n'est relié/)).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Relier GitHub" })).toHaveAttribute(
       "href",
-      "/github",
+      "/settings/github",
     );
     // le projet existe déjà : le texte de la création complète (« Le projet sera créé… ») est faux ici
     expect(visibleText(dialog)).not.toMatch(/Le projet sera créé/);

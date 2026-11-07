@@ -18,9 +18,9 @@ type Screen = {
 const SCREENS: readonly Screen[] = [
   { name: "login", path: "/login", session: false },
   { name: "projects", path: "/projects", session: true },
-  { name: "kanban", path: "/kanban", session: true },
-  { name: "members", path: "/members", session: true },
-  { name: "github", path: "/github", session: true },
+  { name: "kanban", path: `/projects/${FEATURE_PROJECT_ID}/tickets`, session: true },
+  { name: "members", path: "/settings/members", session: true },
+  { name: "github", path: "/settings/github", session: true },
   { name: "settings/ai", path: "/settings/ai", session: true },
   {
     name: "organizations",
@@ -36,7 +36,7 @@ const SCREENS: readonly Screen[] = [
     activeOrganization: false,
     invitation: "ready",
   },
-  { name: "features", path: `/projects/${FEATURE_PROJECT_ID}/features`, session: true },
+  { name: "features", path: `/projects/${FEATURE_PROJECT_ID}/spec/functional`, session: true },
   { name: "framing", path: `/projects/${FEATURE_PROJECT_ID}/framing`, session: true },
 ];
 

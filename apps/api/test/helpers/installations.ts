@@ -14,7 +14,7 @@ import { createWorld, send, type World } from "./tickets.ts";
  * Banc des tests d'installation (TK-48a2). Contrat attendu de la production :
  *  - `installation.list` / `installation.start` (contrat 0.7.0), owner/admin ;
  *  - `GET /api/github/callback` : route Nest brute, hors oRPC et hors OpenAPI, session par cookie ;
- *    toute réponse est `303` vers `/github?result=<outcome>` (jamais d'écho d'une entrée) ;
+ *    toute réponse est `303` vers `/settings/github?result=<outcome>` (jamais d'écho d'une entrée) ;
  *  - `redirect_uri` transmis à GitHub = `<BETTER_AUTH_URL>/api/github/callback` ;
  *  - `installation.start` sans identifiants client, sans clé de chiffrement ou sans fournisseur :
  *    503 `PROVIDER_UNAVAILABLE` ; au plus 20 états non consommés et non expirés par utilisateur
@@ -226,7 +226,7 @@ export function expectOutcome(
   outcome: Outcome,
 ) {
   expect(res.status).toBe(303);
-  expect(res.headers.location).toBe(`/github?result=${outcome}`);
+  expect(res.headers.location).toBe(`/settings/github?result=${outcome}`);
 }
 
 export interface InstallationRow {

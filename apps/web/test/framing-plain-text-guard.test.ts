@@ -10,8 +10,7 @@ const src = join(import.meta.dirname, "../src");
 
 /** Fichiers du lot 59 (noms fixés dans .workflow/TK-59/02-decisions.md). */
 const FRAMING_FILES = [
-  "app/projects/[projectId]/framing/page.tsx",
-  "app/projects/[projectId]/framing/layout.tsx",
+  "app/(shell)/projects/[projectId]/framing/page.tsx",
   "components/framing-page.tsx",
   "components/ai-send-policy.tsx",
   "components/ai-error-notice.tsx",

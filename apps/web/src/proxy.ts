@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { guardedPathFor, resolveAccess } from "./lib/auth-guard.ts";
+import { legacyRedirect } from "./lib/legacy-routes.ts";
 import { loginPathFor } from "./lib/next-path.ts";
 import { ORPC_PREFIX } from "./lib/orpc-prefix.ts";
 import { readRuntimeConfig } from "./lib/runtime-config.ts";
@@ -14,9 +15,11 @@ const GITHUB_CALLBACK_PATH = "/api/github/callback";
  * - `/api/auth/*` et `/api/orpc/*` sont relayés vers `API_INTERNAL_URL` (même origine pour le navigateur) ;
  * - `/api/webhooks/github` est relayé tel quel, sans session (livraisons signées de GitHub) ;
  * - `/api/github/callback` est relayé tel quel avec le cookie de session, sans lecture de session ici :
- *   l'API arbitre (session absente ou état invalide = `/github?result=invalid_state`, jamais `/login`) ;
- * - `/login`, `/projects`, `/projects/<id>/features`, `/projects/<id>/framing`, `/kanban`, `/members`, `/github`, `/settings/ai` et `/organizations` sont gardés
- *   selon la session et l'organisation active ;
+ *   l'API arbitre (session absente ou état invalide = `/settings/github?result=invalid_state`, jamais `/login`) ;
+ * - `/login`, `/projects`, les pages d'un projet (`/projects/<id>`, `idea`, `framing`, `tickets`, `spec/<livrable>`),
+ *   `/kanban`, `/settings` et ses sections, et `/organizations` sont gardés selon la session et l'organisation active ;
+ * - une fois la garde passée, les anciens chemins (`/projects/<id>/features`, `/members`, `/github`) sont redirigés
+ *   en 307 vers la coquille avec toute la requête (jamais avant la garde : pas de redirection vers une page protégée) ;
  * - `/accept-invitation/<id>` exige une session (sinon `/login?next=…`) mais jamais d'organisation active,
  *   et n'est jamais mis en cache.
  */
@@ -49,15 +52,16 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     path,
     ...(await readSession(apiUrl, request.headers.get("cookie"))),
   });
-  if (!target) return NextResponse.next();
-  return redirectTo(request, target);
+  if (target) return redirectTo(request, target);
+  const legacy = legacyRedirect(pathname, search);
+  return legacy ? redirectTo(request, legacy) : NextResponse.next();
 }
 
 function redirectTo(request: NextRequest, target: string): NextResponse {
   const destination = request.nextUrl.clone();
-  const [pathname = "/", query = ""] = target.split("?");
-  destination.pathname = pathname;
-  destination.search = query;
+  const at = target.indexOf("?");
+  destination.pathname = at === -1 ? target : target.slice(0, at);
+  destination.search = at === -1 ? "" : target.slice(at);
   return NextResponse.redirect(destination);
 }
 
@@ -70,11 +74,18 @@ export const config = {
   matcher: [
     "/login",
     "/projects",
-    "/projects/:projectId/features",
+    "/projects/:projectId",
+    "/projects/:projectId/idea",
     "/projects/:projectId/framing",
+    "/projects/:projectId/tickets",
+    "/projects/:projectId/features",
+    "/projects/:projectId/spec/:slug",
     "/kanban",
     "/members",
     "/github",
+    "/settings",
+    "/settings/members",
+    "/settings/github",
     "/settings/ai",
     "/organizations",
     "/accept-invitation/:id",

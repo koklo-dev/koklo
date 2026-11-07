@@ -31,6 +31,7 @@ import { requestIdFrom } from "./request-context.ts";
 import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest, serializeResponse } from "./request-serializer.ts";
 import { ReviewModule } from "./review/review.module.ts";
+import { SearchModule } from "./search/search.module.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SpecReadModule } from "./spec-read/spec-read.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
@@ -106,6 +107,7 @@ export class AppModule {
         AiModule,
         SpecBatchModule,
         SpecReadModule,
+        SearchModule,
         ...CLIENT_SPACE_MODULES,
         WebhookModule,
       ],

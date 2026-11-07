@@ -37,7 +37,6 @@ function regionTextOf(parts: {
   return [
     parts.gate === "loading" ? CHECKING_TEXT : "",
     parts.call.pending ? BUSY_TEXT : "",
-    parts.call.announcement,
     counterAnnouncement(parts.idea.length),
     parts.notice,
     parts.counts,
@@ -110,6 +109,8 @@ export function useFramingPage(projectId: string) {
       () => validateIdea(state.idea, state.clarifications),
       [state.idea, state.clarifications],
     ),
+    // Annonce du compte à rebours : réservée aux lecteurs d'écran, l'alerte porte déjà le même texte à l'écran.
+    announcement: call.announcement,
     regionText: regionTextOf({
       gate,
       call,

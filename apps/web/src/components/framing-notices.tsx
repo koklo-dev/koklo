@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Icon } from "@koklo/ui";
 import { useEffect, useRef } from "react";
 import { NO_SPEC_TEXT, NOT_READY_TEXT, SPEC_FAILED_TEXT } from "../lib/framing-labels.ts";
+import { featuresPath } from "../lib/shell-routes.ts";
 import type { SpecGate } from "../lib/use-framing-access.ts";
 import type { FramingModel } from "../lib/use-framing-page.ts";
 
@@ -13,7 +14,7 @@ export function FramingForbidden({ projectId }: { projectId: string }) {
         Le cadrage assisté n'est pas disponible pour votre rôle.
       </h2>
       <Button asChild variant="outline" className="h-11 md:h-9">
-        <a href={`/projects/${projectId}/features`}>Voir les fonctionnalités du projet</a>
+        <a href={featuresPath(projectId)}>Voir les fonctionnalités du projet</a>
       </Button>
     </Card>
   );
@@ -33,7 +34,7 @@ export function SpecNotice({ page }: { page: FramingModel }) {
   const action =
     spec.kind === "missing" ? (
       <Button asChild variant="outline" className="h-11 md:h-9">
-        <a href={`/projects/${page.projectId}/features`}>Voir les fonctionnalités</a>
+        <a href={featuresPath(page.projectId)}>Voir les fonctionnalités</a>
       </Button>
     ) : (
       <Button type="button" variant="outline" className="h-11 md:h-9" onClick={page.access.refresh}>

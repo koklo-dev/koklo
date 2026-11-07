@@ -87,7 +87,7 @@ describe("Bouton « Cadrer avec l'IA » sur la liste des fonctionnalités (S-fea
   it("pas de bouton quand la spec n'est pas lue (en préparation)", async () => {
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
     renderFeatures();
-    await findNamed("heading", "Fonctionnalités", { level: 1 });
+    await findNamed("heading", "Cahier fonctionnel", { level: 1 });
     expect(screen.queryByText(FRAME_BUTTON)).not.toBeInTheDocument();
   });
 });
@@ -103,7 +103,7 @@ describe("Adresse directe pour client et business (§4.12)", () => {
       ).toBeVisible();
       expect(
         screen.getByRole("link", { name: "Voir les fonctionnalités du projet" }),
-      ).toHaveAttribute("href", `/projects/${PROJECT_ID}/features`);
+      ).toHaveAttribute("href", `/projects/${PROJECT_ID}/spec/functional?tab=features`);
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /IA|Générer|Proposer/ })).not.toBeInTheDocument();
       expect(aiCallCount()).toBe(0);

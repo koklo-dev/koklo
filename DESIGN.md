@@ -1,9 +1,9 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2)
+# Koklo : design (v2.3)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
-Date : 26/10/2026 (v0.1) ; **v2 du 06/11/2026 (TK-87, lot 0 de la refonte)**. La v2 reporte la passation `docs/refonte/passations/01-lots-0-1-passation.md` §0.1 à §0.4, validée le 05/11/2026, et la décision B15 (`docs/refonte/questions.md`). En cas de contradiction avec une fiche `design/screens/*.md` antérieure, ce document l'emporte. Maquettes : canevas « Koklo — maquettes » (artefact privé, https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 0 · Fondations v2** (copie : `docs/refonte/maquettes/04-Lot0Fondations.html`). Pour un agent, seul le texte de ce document fait foi.
+Date : 26/10/2026 (v0.1) ; **v2 du 06/11/2026 (TK-87, lot 0 de la refonte)**, **v2.1 (TK-94, listes longues)**, **v2.2 du 07/11/2026 (TK-88, lot 1 : coquille de l'application)**, **v2.3 du 07/11/2026 (TK-88, finition : clavier de la palette, pied épinglé, ombre du kanban)**. La v2 reporte la passation `docs/refonte/passations/01-lots-0-1-passation.md` §0.1 à §0.4, validée le 05/11/2026, et la décision B15 (`docs/refonte/questions.md`). En cas de contradiction avec une fiche `design/screens/*.md` antérieure, ce document l'emporte. Maquettes : canevas « Koklo — maquettes » (artefact privé, https://claude.ai/artifact/F6nuypdhrWp1Y7x8QwRiFm), planche **Lot 0 · Fondations v2** (copie : `docs/refonte/maquettes/04-Lot0Fondations.html`). Pour un agent, seul le texte de ce document fait foi.
 
 ## 1. Principes
 
@@ -87,7 +87,7 @@ v2 : trois niveaux de surface (`--background`, `--surface`, `--raised`), une bor
 ```
 
 Usage (retenu) :
-- Barre latérale sur `--surface`, contenu sur `--background`, éléments flottants (popover, menu, liste de `Select`, `Sheet`, infobulle, `HoverCard`) sur `--raised` avec `--shadow-floating` et une bordure `--border`. Aucun `shadow-md` ni `rgb(` dans un composant : le jeton seul. L'infobulle n'est plus inversée (fond `--foreground` en v1) : elle suit les autres éléments flottants, sur tous les écrans. Le passage de la barre latérale sur `--surface` se fait avec `AppShell` (lot 1, questions.md B29).
+- Barre latérale sur `--surface`, contenu sur `--background`, éléments flottants (popover, menu, liste de `Select`, `Sheet`, infobulle, `HoverCard`) sur `--raised` avec `--shadow-floating` et une bordure `--border`. Aucun `shadow-md` ni `rgb(` dans un composant : le jeton seul. L'infobulle n'est plus inversée (fond `--foreground` en v1) : elle suit les autres éléments flottants, sur tous les écrans. La barre latérale est sur `--surface` depuis `AppShell` (v2.2, TK-88 ; questions.md B29) : dans `theme.css`, `--sidebar` passe de `var(--card)` à `var(--surface)` (le test `sidebar-tokens` suit) ; l'élément actif passe en `--background` avec un contour `--border` (§5.4), pas en `--accent`.
 - `--primary` **uniquement** pour : action principale, élément de navigation actif (icône), fil de phase, sélection.
 - `--border-strong` pour les pointillés (désactivé, `EmptyState`, filtres en puces), les crans et barres non atteints. Ce sont des repères décoratifs : le sens est toujours porté par un texte (contraste 1,5 à 1,8:1, non soumis à 1.4.11).
 
@@ -177,7 +177,7 @@ Mise en œuvre :
 - Rayons : boutons et champs **6 px**, puces d'entité **6 px**, alertes **8 px**, cartes **8–10 px**, aperçus **10 px**, panneaux et cadres (`EmptyState`, tableaux) **12 px**, pastilles de statut **pastille complète**. `--radius: 0.5rem` côté shadcn.
 - Hauteurs : boutons et champs **36 px** (desktop). Cibles tactiles de **44 px** à prévoir en mobile (**à faire**) ; minimum WCAG 2.2 (2.5.8) de 24 px partout.
 - Bordures d'un pixel en `--border` plutôt que des ombres ; `--shadow-floating` réservée aux éléments flottants.
-- Mise en page : barre latérale de **248 px** (256 px au lot 1), panneau de détail de **380 à 440 px**, marge de page **32 px**. Les écrans « page » s'empilent sur mobile.
+- Mise en page : barre latérale de **256 px** (rail replié de **64 px**, §5.4), panneau de détail de **380 à 440 px**, marge de page **32 px**. Les écrans « page » s'empilent sur mobile.
 - Composants shadcn/ui prévus : `Table`, `Badge`, `Tabs`, `Button`, `Sheet`, `Card`, `Accordion`, `Alert`, `Select`, `Popover`, `HoverCard`, `Resizable`, `Avatar`, `DropdownMenu`.
 
 ### 5.1 Composants de statut et composants signature (v2, `packages/ui`, retenu)
@@ -254,6 +254,41 @@ Annonces et accessibilité (passation 07 §5) : arrivée d'une page annoncée en
 
 Écartées : pagination classique « Page 1, 2, 3 » pour les fonctionnalités (perd la position et le retour arrière), bouton « Afficher plus » seul (déjà en v1, jugé lent pour 1 000 éléments), tableau HTML virtualisé (la sémantique de table avec lignes absentes du DOM est mal lue par les lecteurs d'écran ; la liste avec `aria-setsize` est retenue par la passation).
 
+### 5.4 Coquille de l'application (v2.3, TK-88, passation 01 §1, décision 05 §2 « Lot 1 », 21 §0, retenu)
+
+Planches : `docs/refonte/maquettes/05-Lot1Shell.html` pour la mise en page, `10-Lot5Fonctionnel.html` pour la barre (la 05 est périmée sur « Spec 2/6 », le chevron et l'ordre : questions.md B2). Fiche : `design/screens/S-app-shell.md`.
+
+**`AppShell`** : barre latérale à gauche, contenu à droite sur `--background`.
+- Barre **collante pleine hauteur** (`position: sticky; top: 0; height: 100dvh`), **pied épinglé en bas** (« Replier la barre », identité, thème : v2.3) et seule la navigation au-dessus défile (sur un écran de moins de 900 px de haut, le groupe Organisation passe sous le pli et se rejoint par défilement ou au clavier ; B90), fond `--surface` (jeton `--sidebar`), bordure droite 1 px `--border`. Largeur **256 px** étendue, **64 px** repliée (icônes seules, `aria-label` et infobulle). État mémorisé en `localStorage` (try/catch ; sans stockage : étendue), plus de cookie. Raccourci `Ctrl B` / `⌘ B` conservé.
+- Sous **768 px** : pas de barre, un en-tête de 56 px avec un bouton menu de 44 px (nom « Ouvrir le menu ») qui ouvre un tiroir `Sheet` à gauche de 288 px ; Échap ferme et rend le focus au bouton ; le tiroir se ferme après une navigation.
+- Contenu, de haut en bas (marges internes 12 px, écart de groupe 16 px) : **sélecteur d'organisation** (tuile de 32 px, initiales 12/600 `--primary-foreground` sur `--primary`, rayon 8 ; nom 14/600 ; « Organisation · <rôle> » 12 px `--muted-foreground` ; `unfold_more`) ; **recherche** (bouton de 34 px, bordure `--border`, fond `--background`, rayon 6, icône `search`, « Rechercher », `⌘K` ou `Ctrl K` en mono 11 px dans une puce) ; groupe **Projet** (libellé 11/600 capitales +0,06 em `--muted-foreground`) : carte projet puis navigation ; groupe **Organisation** : Tous les projets (`folder_open`), Réglages (`settings`) ; **pied** : « Replier la barre » (`left_panel_close`, discret, 13 px) puis identité (avatar 32 px, nom 13/500, e-mail 12 px) et bouton de thème (`dark_mode` / `light_mode`, 36 px).
+- **Carte projet** : bouton de 64 px, bordure `--border`, fond `--background`, rayon 10 ; nom 14/600, `PhaseRail size="sm"`, `unfold_more`. Menu : « Récents » (8 au plus), « Tous les projets », « Créer un projet » (propriétaire et administrateur).
+- **Navigation du projet**, dans l'ordre : Vue d'ensemble (`space_dashboard`), Idée (`lightbulb`), Assistant de cadrage (`smart_toy` : `auto_awesome` n'existe pas dans le jeu d'icônes ; jusqu'au lot 5), groupe SPEC, Tickets (`view_kanban`, compteur du sprint actif en pastille `--secondary` quand il existe). Entrées de premier niveau : 36 px, 14/400, icône 20 px ; sous-entrées de la spec : 32 px, 13 px, icône 18 px, écart de 1 px. **Hauteur basse** (`@media (max-height: 900px)`) : entrées de premier niveau 32 px (36 px dans le tiroir, au lieu de 44 px), sous-entrées de la spec 28 px, carte projet 56 px, tuile d'organisation 40 px, écart de groupe 12 px, afin que Organisation et le pied tiennent sans défilement dès 800 px de haut (cible minimale WCAG 2.5.8 de 24 px respectée).
+- **Entrée active** : fond `--background`, contour 1 px `--border`, texte 600, icône pleine (FILL 1) en `--primary`, `aria-current="page"`. Survol : fond `--accent`. Focus : anneau de 2 px `--ring` (`focus-visible` seulement).
+
+**Groupe SPEC** (sept livrables, décision 21 §0) : en-tête **« SPEC »** 11/600 capitales +0,06 em `--muted-foreground`, compteur mono 12/500 « 0/7 » à droite (validés sur sept), **sans chevron** et sans repli. Sous-entrées numérotées : numéro mono 11 px `--muted-foreground`, icône, libellé. Ordre : 1 Fonctionnel (`task_alt`), 2 Données (`database`), 3 Architecture (`account_tree`), 4 Technique (`terminal`), 5 Sécurité (`shield`), 6 Design (`palette`), 7 Qualité (`fact_check`).
+- **Disponible** : un vrai lien. Pas de pastille de statut tant que `spec.deliverables` n'existe pas (TK-100) ; `DeliverableStatus compact` s'y branchera.
+- **Verrouillé** : une seule ligne, libellé `--muted-foreground`, icône `lock` de 14 px en `--border-strong` à droite (elle ne porte pas le sens). Élément `button` `aria-disabled="true"`, focalisable, qui ne navigue pas ; sa condition (« Disponible après les données ») est dans l'infobulle (ouverte au focus et au survol) **et** dans le nom accessible (« Données, disponible après le fonctionnel »).
+- **Rail replié** : l'en-tête devient un trait de 24 px `--border-strong` ; les sous-entrées restent des icônes de 36 px avec `aria-label` « Spec · Fonctionnel » (ou la condition pour une entrée verrouillée).
+
+**`ProjectHeader`** : en haut de chaque page de projet, fond `--background`, bordure basse 1 px `--border`, marges 20 / 32 / 16 px (16 px de côté sous 768 px).
+- Ligne 1, 13 px `--muted-foreground` : `nav` « Emplacement » en liste ordonnée : nom du projet (lien vers `/projects/<id>`, `--foreground` 500), « / », section (« Spec »), « / », page (`aria-current="page"`). À droite, pour l'équipe : icône `commit`, SHA de 7 caractères en mono, « spec à jour il y a N min ». Sans lecture de spec (client, spec en échec) : rien, sans trou.
+- Ligne 2 : h1 24/600 −0,02 em (pour un livrable, son nom : « Cahier fonctionnel ») ; pour un livrable, la pastille de validation et un résumé de 13 px (« 7 fonctionnalités ») ; à droite, actions secondaires puis **l'action principale** (règle 2). Le résumé passe sous le titre sous 768 px.
+- Ligne 3 (facultative) : onglets en liens dans une `nav` nommée, 36 px, 14/500 ; actif en 600 souligné de 2 px `--primary` et `aria-current="page"` ; compteur en pastille `--secondary` quand il est connu ; les onglets reposent sur la bordure basse. Défilement horizontal interne sous 768 px (sans défilement de la page).
+- Remplace le fil d'Ariane v1 « Koklo > Projets > X > Page ». Une page d'organisation (Projets, Réglages) porte un h1 simple sans `ProjectHeader`.
+
+**`CommandPalette`** (`⌘K`) : boîte de dialogue de 560 px au plus, `--raised`, bordure `--border`, rayon 12, `--shadow-floating`, centrée à 15 % de la hauteur ; champ de recherche 48 px (icône `search`, placeholder « Rechercher un projet, une fonctionnalité, un ticket »), liste de 20 résultats au plus, groupes « Pages », « Projets », « Fonctionnalités », « Tickets » (libellé 11/600 capitales) ; ligne de 44 px : type et identifiant en mono (comme `EntityChip`, sans lien) puis titre ; option active : fond `--secondary` et `aria-selected`. Pied : « ↑ ↓ pour naviguer · ↵ pour ouvrir · Échap pour fermer » en 12 px. États : chargement (`aria-busy`, lignes squelettes), vide (« Aucun résultat pour « … » » + « La recherche porte sur tout le projet, pas seulement sur ce qui est affiché. »), erreur (« La recherche a échoué. Réessayez. » + « Réessayer »), total (« 134 résultats · 20 affichés » quand le serveur en a plus). Recherche **serveur**, anti-rebond de 200 ms. Sous 768 px : largeur de l'écran moins 32 px, ancrée en haut.
+
+**Clavier de la palette** (v2.3) : `Ctrl K` / `⌘ K` ouvre la palette partout, y compris dans un champ (la saisie du champ n'est pas touchée) ; Échap ferme et **rend le focus à l'élément qui l'avait** ; la **première option est toujours l'option active** quand les résultats changent ; les pages se filtrent **à la frappe**, le serveur est interrogé 200 ms après la dernière frappe (la requête précédente est annulée) ; « Tapez pour rechercher. » ne vaut que champ vide ; sans option (aucun résultat, erreur) la liste est masquée plutôt qu'un `listbox` vide (axe `aria-required-children`).
+
+**Kanban à 375 px** (v2.3) : la région des colonnes garde une barre de défilement fine (`scrollbar-width: thin`, couleur `--border-strong`) et une ombre de 24 px sur chaque bord qui cache encore des colonnes (`--foreground` à 16 %, décorative, `pointer-events: none`).
+
+**Pages « Bientôt »** : `EmptyState` (icône `schedule`, titre « Bientôt », une phrase qui dit ce qui viendra, aucune action) sous un `ProjectHeader` à la ligne 1 et au h1 du livrable ou de l'espace ; jamais de lien mort : seules les entrées disponibles y mènent.
+
+**Réglages** : h1 « Réglages » 24/600 sans `ProjectHeader`, onglets en liens (Membres, GitHub, IA) selon le rôle, les trois écrans existants dessous tels quels.
+
+Écartées : garder le chevron de repli du groupe Spec (périmé, B2) ; « validés sur 6 » (il y a 7 livrables) ; liste complète des projets dans la carte projet (liste longue : 8 récents + « Tous les projets ») ; recherche locale sur les éléments chargés (B3 : serveur).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -263,6 +298,7 @@ Annonces et accessibilité (passation 07 §5) : arrivée d'une page annoncée en
 | Change request et impact | Maquetté, **base neutre à reprendre en Indigo** |
 | Kanban des tickets | Proposé, non maquetté |
 | Fondations v2 (jetons, statuts, composants signature) | Planche « Lot 0 · Fondations v2 », clair et sombre ; galerie `/dev/ui` |
+| Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
 Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/maquettes/` (planches 05 à 25).
 
@@ -298,3 +334,5 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 26/10/2026 | Couleur : Indigo retenu après essai de Forêt, écarté |
 | 06/11/2026 | v2 (TK-87, passation 01 §0) : jetons `--surface`, `--raised`, `--border-strong`, `--diff-bg`, `--shadow-floating` ; couleurs d'alerte ; « Non soumise » ; échelle resserrée (h1 24, h2 16, h3 14) ; 8 composants de statut et signature ; bouton désactivé en pointillés avec raison ; règles d'écran 1 à 7 ; le fournisseur d'IA n'est jamais nommé dans l'interface (B15) |
 | 06/11/2026 | v2.1 (TK-94, passation 07 §0 à §5) : §5.3 listes longues (`VirtualList`, `CountBar`, `ListFooter` à 4 états, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`), annonces et `aria-setsize` / `aria-posinset` |
+| 07/11/2026 | v2.2 (TK-88, passation 01 §1, 05 §2, 21 §0) : §5.4 coquille (`AppShell` 256 / 64 px collante, tiroir sous 768 px, groupe SPEC à sept entrées numérotées avec cadenas et sans chevron, `ProjectHeader` à trois lignes avec onglets en liens, palette ⌘K à recherche serveur, pages « Bientôt ») ; `--sidebar` passe sur `--surface` (B29) ; fil d'Ariane v1 retiré |
+| 07/11/2026 | v2.3 (TK-88, finition) : §5.4 pied de barre épinglé, clavier de la palette (focus rendu, première option active, filtrage des pages à la frappe, liste masquée sans option), ombre et défilement visible du kanban, `smart_toy` pour l'Assistant de cadrage ; l'annonce du compte à rebours de S-framing devient `sr-only` (un seul « Réessayez dans N s » à l'écran, règle 5) |

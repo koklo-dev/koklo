@@ -12,6 +12,7 @@ import {
 } from "@koklo/ui";
 import type { Ref } from "react";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
+import { featuresPath } from "../lib/shell-routes.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
 
@@ -96,7 +97,7 @@ function Projects({
             <TableRow key={project.id}>
               <TableCell>
                 <a
-                  href={`/projects/${project.id}/features`}
+                  href={featuresPath(project.id)}
                   className="font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {project.name}

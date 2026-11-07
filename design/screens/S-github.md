@@ -1,19 +1,19 @@
 ---
 id: S-github
 titre: Application GitHub (installation et autorisation)
-version: 4
+version: 4.1
 ---
 ## 1. Utilisateurs et objectif
-Propriétaires et administrateurs de l'organisation active (vue équipe, vision §14). Les autres rôles (développeur, designer, client, business) n'ont pas cette page : l'entrée est absente de la navigation et un accès direct affiche un message sans action. Arrivée : entrée « GitHub » de la barre latérale, ou retour de GitHub après une installation (`/github?result=…`), ou lien depuis la création de projet (48c).
+Propriétaires et administrateurs de l'organisation active (vue équipe, vision §14). Les autres rôles (développeur, designer, client, business) n'ont pas cette page : l'onglet est absent de Réglages et un accès direct affiche un message sans action. Arrivée : onglet « GitHub » de Réglages (`/settings/github`), ou retour de GitHub après une installation (`/settings/github?result=…`), ou lien depuis la création de projet (48c).
 
 Objectif : relier Koklo à un compte GitHub (personnel ou organisation GitHub) pour que Koklo puisse créer le dépôt de spécification des projets et y enregistrer les fonctionnalités. Deux gestes distincts, à expliquer simplement :
 - **Installer** l'application GitHub : choisir le compte et les dépôts auxquels Koklo a accès (se fait sur GitHub).
 - **Autoriser** Koklo : confirmer que l'on agit en son nom sur ce compte (nécessaire pour créer un dépôt). Se refait si l'autorisation a expiré.
 
 ## 2. Tâches et parcours
-- Principale : « Installer l'application GitHub » -> `installation.start` -> navigateur redirigé vers l'URL reçue (GitHub) -> GitHub renvoie vers l'API qui redirige en 303 vers `/github?result=<résultat>` -> message de résultat + liste rafraîchie.
+- Principale : « Installer l'application GitHub » -> `installation.start` -> navigateur redirigé vers l'URL reçue (GitHub) -> GitHub renvoie vers l'API qui redirige en 303 vers `/settings/github?result=<résultat>` -> message de résultat + liste rafraîchie.
 - Secondaire : « Autoriser » / « Réautoriser » sur une ligne (`installation.start` avec `installationId`), même mécanique de redirection ; consulter l'état des installations ; réessayer le chargement.
-- Entrées : `/github` (navigation), retour de callback. Sans session : `/login` ; session sans organisation active : `/organizations` (même règle que `/members`).
+- Entrées : `/settings/github` (Réglages ; l'ancien `/github` est redirigé en 307 avec sa requête), retour de callback. Sans session : `/login` ; session sans organisation active : `/organizations` (même règle que `/members`).
 - Sorties : GitHub (installation, autorisation). Aucune autre page. Le lien vers la création de projet n'est pas ajouté ici (hors lot).
 - Gabarit : S-projects / S-members (sidebar-07), entrée « GitHub » (icône `link`, `aria-current="page"`), fil d'Ariane « Koklo > GitHub ».
 - Navigation : entrée « GitHub » placée après « Membres », visible seulement si le rôle est owner/admin. Tant que le rôle n'est pas connu, l'entrée n'est pas rendue (évite un faux affichage, même principe que le formulaire de S-members).
@@ -75,7 +75,7 @@ v2 (TK-87) : un seul composant, `ValidationStatus` (DESIGN.md v2 §5.1), avec le
 
   Reprise de création de projet (48c) : si un marqueur de reprise valide existe dans `sessionStorage` (posé par « Autoriser Koklo » de S-projects) et que `result` vaut `installed`, le message ajoute un lien « Reprendre la création du projet « <nom> » » vers `/projects`. Aucun autre résultat n'affiche ce lien ; le marqueur n'est jamais lu pour autre chose.
 
-  Comportement : à la lecture de `result`, le message est conservé dans l'état de la page puis le paramètre est retiré de l'URL (`/github`, sans nouvelle entrée d'historique) : un rechargement ne rejoue pas le message. Le message disparaît au prochain clic d'action (pas de minuterie). La liste est rechargée dans tous les cas (surtout `installed`).
+  Comportement : à la lecture de `result`, le message est conservé dans l'état de la page puis le paramètre est retiré de l'URL (`/settings/github`, sans nouvelle entrée d'historique) : un rechargement ne rejoue pas le message. Le message disparaît au prochain clic d'action (pas de minuterie). La liste est rechargée dans tous les cas (surtout `installed`).
 
 ## 5. Interactions et retours
 - « Installer l'application GitHub » : `installation.start({})` ; au succès, la page navigue vers `url` (aucune URL n'est construite côté web, aucune requête vers GitHub ; vérification `https` + hôte `github.com` avant de naviguer). L'URL n'est jamais journalisée ni affichée.
@@ -123,6 +123,7 @@ Sous 768 px : le h1 et le bouton « Installer l'application GitHub » s'empilent
 | 3 | 2026-10-31 | TK-48 (48c) | Lien de reprise « Reprendre la création du projet » après `installed` quand un marqueur de création de projet existe (voir S-projects §5.1). |
 | 3.1 | 2026-10-31 | TK-48 (48c, refactor) | Lien de reprise vérifié en e2e (`project-create.spec.ts`, retour `?result=installed`, puis notice et reprise) ; aucun changement d'écran. |
 | 4 | 2026-11-06 | TK-87 | Lot 0 : statuts d'installation et d'autorisation en `ValidationStatus` (Suspendue et Désinstallée en tonalité Non soumise avec `block` / `cancel`, B25) à la place de `StatusBadge` et des `Badge` outline ; h1 24 px (échelle v2) ; bouton désactivé en pointillés. Détail : `.workflow/TK-87/02-design.md` |
+| 4.1 | 2026-11-07 | TK-88 | Route `/settings/github` (`/github` redirige, `?result=` conservé, le callback de l'API vise la nouvelle route) ; rendu sous « Réglages » avec onglets en liens, sans entrée propre dans la barre. États et textes inchangés. Détail : `.workflow/TK-88/02-design.md` |
 
 ## 11. Plan d'implémentation web (brief développeur)
 Routes et garde

@@ -44,7 +44,7 @@ describe("redirection ouverte impossible", () => {
     for (const res of [ok, refused, anonymous]) {
       expect(res.status).toBe(303);
       expect(res.headers.location).toMatch(
-        /^\/github\?result=(installed|denied|invalid_state|already_linked|not_owner|provider_error)$/,
+        /^\/settings\/github\?result=(installed|denied|invalid_state|already_linked|not_owner|provider_error)$/,
       );
       expect(res.text).not.toMatch(/evil|script|javascript/);
     }
@@ -54,7 +54,7 @@ describe("redirection ouverte impossible", () => {
     const b = bench();
     const s = await installScene(b);
     const res = await callback(b.app, s.owner.cookie, { state: "x", host: "evil.example" });
-    expect(res.headers.location?.startsWith("/github?")).toBe(true);
+    expect(res.headers.location?.startsWith("/settings/github?")).toBe(true);
     expect(res.headers.location).not.toMatch(/^[a-z]+:|^\/\//i);
   });
 
@@ -64,7 +64,7 @@ describe("redirection ouverte impossible", () => {
     const res = await callback(b.app, s.owner.cookie, { state: "x" })
       .set("X-Forwarded-Host", "evil.example")
       .set("Host", "evil.example");
-    expect(res.headers.location).toBe("/github?result=invalid_state");
+    expect(res.headers.location).toBe("/settings/github?result=invalid_state");
   });
 });
 
@@ -101,7 +101,7 @@ describe("aucun secret en clair", () => {
 
   it("succès : ni journaux, ni corps, ni en-têtes de la réponse", async () => {
     const ctx = await leakCase();
-    expect(ctx.res.headers.location).toBe("/github?result=installed");
+    expect(ctx.res.headers.location).toBe("/settings/github?result=installed");
     const haystack = ctx.b.lines.join("\n") + ctx.res.text + JSON.stringify(ctx.res.headers);
     for (const secret of secrets(ctx)) expect(haystack, secret).not.toContain(secret);
   });
@@ -146,7 +146,7 @@ describe("aucun secret en clair", () => {
       code: `fake-code-${s.login}`,
       state,
     });
-    expect(failed.headers.location).toBe("/github?result=provider_error");
+    expect(failed.headers.location).toBe("/settings/github?result=provider_error");
     const haystack =
       bad.lines.join("\n") +
       failed.text +

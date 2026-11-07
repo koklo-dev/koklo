@@ -119,11 +119,19 @@ afterAll(async () => {
 type Procedure = { "~orpc": { meta: { "~openapi"?: { method?: string } } } };
 const groups = contract as unknown as Record<string, Record<string, Procedure>>;
 
+/**
+ * Écritures volontairement hors journal : une préférence personnelle, sans effet sur les données ni les droits
+ * (TK-88, B80). `project.visit` mémorise le dernier projet ouvert ; journaliser chaque ouverture noierait l'audit.
+ * Liste fermée : toute autre écriture doit avoir son scénario.
+ */
+const UNAUDITED_PREFERENCES = ["project.visit"];
+
 function nonGetProcedures(groupNames: readonly string[]): string[] {
   return groupNames.flatMap((group) =>
     Object.entries(groups[group] ?? {})
       .filter(([, procedure]) => procedure["~orpc"].meta["~openapi"]?.method !== "GET")
-      .map(([name]) => `${group}.${name}`),
+      .map(([name]) => `${group}.${name}`)
+      .filter((name) => !UNAUDITED_PREFERENCES.includes(name)),
   );
 }
 
@@ -148,7 +156,7 @@ const WRITE_GROUPS = [
   "ai",
 ];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
-const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace"];
+const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace", "search"];
 /**
  * Groupes du contrat sans implémentation API : plus aucun depuis TK-48a2 (`installation` a rejoint
  * WRITE_GROUPS : `installation.start` est une écriture, `installation.list` une lecture du même groupe,
@@ -1061,6 +1069,13 @@ function llmCredentialScenarios(): Scenario[] {
     },
   ];
 }
+
+describe("écritures hors journal (TK-88)", () => {
+  it("la seule est la préférence project.visit, qui existe bel et bien", () => {
+    expect(UNAUDITED_PREFERENCES).toEqual(["project.visit"]);
+    expect(groups.project?.visit?.["~orpc"].meta["~openapi"]?.method).toBe("POST");
+  });
+});
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
   it("les procédures non-GET des groupes sont exactement les 38 attendues", () => {

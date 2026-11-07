@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { type RefObject, useCallback } from "react";
 import { withFeaturesUrl } from "./features-url.ts";
 import { orpc } from "./orpc.ts";
+import { featuresPath } from "./shell-routes.ts";
 import type { useFeaturesUrl } from "./use-features-url.ts";
 
 /** Fiche ouverte par `?feature=` : lien partageable d'une ligne, retour du focus, relecture si elle a disparu. */
@@ -15,7 +16,7 @@ export function useFeatureSheet(
   const queryClient = useQueryClient();
   return {
     hrefFor: (specId: string) =>
-      `/projects/${projectId}/features${withFeaturesUrl(`?${url.search}`, { feature: specId })}`,
+      featuresPath(projectId, withFeaturesUrl(`?${url.search}`, { feature: specId })),
     returnFocus: useCallback(
       (specId: string) => {
         // « Modifier » remplace la fiche par le formulaire, qui prend le focus.

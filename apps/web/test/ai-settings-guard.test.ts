@@ -34,7 +34,6 @@ const toRegExp = (pattern: string) =>
 const matched = (path: string) => config.matcher.filter((pattern) => toRegExp(pattern).test(path));
 
 const NEIGHBOURS = [
-  "/settings",
   "/settings/",
   "/settings/ai/",
   "/settings/ai/x",

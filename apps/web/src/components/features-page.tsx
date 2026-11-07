@@ -1,9 +1,12 @@
 "use client";
 
-import { Alert, AlertDescription, CountBar, Icon, InlineAlert } from "@koklo/ui";
+import { Alert, AlertDescription, CountBar, EmptyState, Icon, InlineAlert } from "@koklo/ui";
+import { useSearchParams } from "next/navigation";
+import { readFeaturesTab } from "../lib/features-tab.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { canManage } from "../lib/roles.ts";
 import { type FeaturesPageModel, useFeaturesPage } from "../lib/use-features-page.ts";
+import { useProjectShell } from "../lib/use-project-shell.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FeatureFormSheet } from "./feature-form-sheet.tsx";
 import { FeatureSheet } from "./feature-sheet.tsx";
@@ -11,6 +14,7 @@ import { FeaturesEmpty, FeaturesEmptyFiltered, ProjectNotFound } from "./feature
 import { FeaturesFilters } from "./features-filters.tsx";
 import { FeaturesHeader } from "./features-header.tsx";
 import { FeaturesList } from "./features-list.tsx";
+import { PageBody } from "./page-body.tsx";
 import { WriteFailure, WriteNotice } from "./saved-notice.tsx";
 import { SpecIndexFailed } from "./spec-index-failed.tsx";
 import { SpecPreparing } from "./spec-preparing.tsx";
@@ -39,31 +43,14 @@ function Skeleton() {
   );
 }
 
-/** Ligne de version : l'équipe lit le court identifiant, le client une simple date de mise à jour. */
-function VersionLine({
-  head,
-  team,
-}: {
-  head: { commitSha: string; indexedAt: string };
-  team: boolean;
-}) {
-  const date = new Date(head.indexedAt).toLocaleDateString("fr-FR", {
+/** Le client lit une simple date de mise à jour ; l'équipe lit l'identifiant de la spec dans l'en-tête de projet. */
+function UpdatedLine({ indexedAt }: { indexedAt: string }) {
+  const date = new Date(indexedAt).toLocaleDateString("fr-FR", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
-  if (!team) return <p className="text-xs text-muted-foreground">Mise à jour le {date}</p>;
-  const short = head.commitSha.slice(0, 7);
-  return (
-    <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-      <Icon name="commit" size={16} />
-      Version de la spec
-      <span role="img" aria-label={`Version de la spec ${short}`} className="font-mono">
-        {short}
-      </span>{" "}
-      · indexée le {date}
-    </p>
-  );
+  return <p className="text-xs text-muted-foreground">Mise à jour le {date}</p>;
 }
 
 function BuildingNotice() {
@@ -234,54 +221,108 @@ function FormSheet({ page }: { page: FeaturesPageModel }) {
   );
 }
 
-/** Écran « Fonctionnalités » d'un projet, en lecture seule (design/screens/S-features.md). */
-export function FeaturesPage({ projectId }: { projectId: string }) {
+/** Corps de l'onglet Fonctionnalités : liste, filtres, fiche et formulaire (design/screens/S-features.md). */
+function FeaturesTab({ projectId }: { projectId: string }) {
   const page = useFeaturesPage(projectId);
   const { head, projectName } = page.data;
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <FeaturesHeader
         projectId={projectId}
         name={projectName}
         titleRef={page.titleRef}
         onCreate={page.form.canWrite ? page.form.openCreate : undefined}
+        tab="features"
+        head={head ?? undefined}
+        team={page.team}
       />
-      {page.showVersion && head ? <VersionLine head={head} team={page.team} /> : null}
-      <div
-        // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau ; avec la
-        // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
-        role={page.form.open || page.region.countBar ? undefined : "status"}
-        aria-busy={page.region.busy || undefined}
-        className="text-[13px] text-muted-foreground empty:hidden"
-      >
-        {page.form.open ? null : (
-          <>
-            {page.region.countBar ? null : page.region.text}
-            <WriteNotice
-              write={page.write}
-              role={page.data.role}
-              hrefFor={page.sheet.hrefFor}
-              onOpen={page.url.openFeature}
+      <PageBody>
+        <div className="flex flex-col gap-4">
+          {page.showVersion && head && !page.team ? (
+            <UpdatedLine indexedAt={head.indexedAt} />
+          ) : null}
+          <div
+            // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau ; avec la
+            // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
+            role={page.form.open || page.region.countBar ? undefined : "status"}
+            aria-busy={page.region.busy || undefined}
+            className="text-[13px] text-muted-foreground empty:hidden"
+          >
+            {page.form.open ? null : (
+              <>
+                {page.region.countBar ? null : page.region.text}
+                <WriteNotice
+                  write={page.write}
+                  role={page.data.role}
+                  hrefFor={page.sheet.hrefFor}
+                  onOpen={page.url.openFeature}
+                />
+              </>
+            )}
+          </div>
+          {page.form.open ? null : (
+            <WriteFailure write={page.write} role={page.data.role} onReopen={page.reopenDraft} />
+          )}
+          {page.showFilters ? (
+            <FeaturesFilters
+              status={page.url.status}
+              priority={page.url.priority}
+              onChange={page.filters.onChange}
+              onClear={page.filters.onClear}
+              statusRef={page.filters.statusRef}
+              search={page.search}
             />
-          </>
-        )}
-      </div>
-      {page.form.open ? null : (
-        <WriteFailure write={page.write} role={page.data.role} onReopen={page.reopenDraft} />
-      )}
-      {page.showFilters ? (
-        <FeaturesFilters
-          status={page.url.status}
-          priority={page.url.priority}
-          onChange={page.filters.onChange}
-          onClear={page.filters.onClear}
-          statusRef={page.filters.statusRef}
-          search={page.search}
+          ) : null}
+          <Body page={page} />
+          <Sheet page={page} />
+          <FormSheet page={page} />
+        </div>
+      </PageBody>
+    </>
+  );
+}
+
+const SOON_TABS = {
+  rules: "Les règles métier arrivent dans une prochaine version.",
+  roles: "Les rôles et permissions arrivent dans une prochaine version.",
+  flows: "Les parcours arrivent dans une prochaine version.",
+} as const;
+
+/** Onglets pas encore livrés : l'en-tête reste, le corps est un `EmptyState` « Bientôt » (aucune lecture de spec). */
+function SoonTab({ projectId, tab }: { projectId: string; tab: keyof typeof SOON_TABS }) {
+  const shell = useProjectShell(projectId);
+  return (
+    <>
+      <FeaturesHeader
+        projectId={projectId}
+        name={shell.data?.name}
+        titleRef={null}
+        onCreate={undefined}
+        tab={tab}
+        head={undefined}
+        team={false}
+      />
+      <PageBody>
+        <EmptyState
+          icon="schedule"
+          title="Bientôt"
+          description={SOON_TABS[tab]}
+          className="mx-auto max-w-xl"
         />
-      ) : null}
-      <Body page={page} />
-      <Sheet page={page} />
-      <FormSheet page={page} />
-    </div>
+      </PageBody>
+    </>
+  );
+}
+
+/**
+ * Cahier fonctionnel d'un projet (`/projects/<id>/spec/functional?tab=`) : l'onglet Fonctionnalités est l'écran
+ * en lecture et en écriture ; les trois autres sont « Bientôt ». Un `tab` inconnu ouvre les fonctionnalités.
+ */
+export function FeaturesPage({ projectId }: { projectId: string }) {
+  const tab = readFeaturesTab(useSearchParams().toString());
+  return tab === "features" ? (
+    <FeaturesTab projectId={projectId} />
+  ) : (
+    <SoonTab projectId={projectId} tab={tab} />
   );
 }

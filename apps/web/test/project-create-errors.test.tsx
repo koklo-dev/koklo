@@ -155,7 +155,7 @@ describe("Erreurs typées de repo.createSpec (AC-48-21)", () => {
     );
     expect(within(sheet).getByRole("link", { name: "Ouvrir la page GitHub" })).toHaveAttribute(
       "href",
-      "/github",
+      "/settings/github",
     );
   });
 

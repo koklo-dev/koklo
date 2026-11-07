@@ -322,7 +322,7 @@ describe("Fermeture (sans confirmation, brouillon gardé)", () => {
     const panel = await openCreate();
     await userEvent.click(panel.getByRole("button", { name: "Fermer" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?tab=features");
     expect(screen.getByRole("button", { name: NEW_BUTTON })).toHaveFocus();
   });
 

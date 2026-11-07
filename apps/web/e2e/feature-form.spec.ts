@@ -20,7 +20,7 @@ import { FEATURE_PROJECT_ID } from "./support/stub-features.ts";
  * 375 px) et les parcours du bloc « Suppression (48e-2) » en fin de fichier. Captures dans design/screens/captures/S-feature-form/<état>-<thème>.png (+ -mobile à 375 px) ; le Red n'en
  * écrit aucune, le Green/Refactor les génère.
  */
-const PATH = `/projects/${FEATURE_PROJECT_ID}/features`;
+const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/functional`;
 const TITLE = "Notifications par e-mail";
 const KEY_PATTERN = /^feature-[A-Za-z0-9-]+$/;
 const dialogOf = (page: Page) => page.getByRole("dialog");
@@ -698,7 +698,7 @@ test.describe("Suppression (48e-2)", () => {
     await expect(page).not.toHaveURL(/edit=/);
     await expect(page.getByRole("link", { name: "Connexion par e-mail" })).toHaveCount(0);
     await expect(rows(page)).toHaveCount(2);
-    await expect(page.getByRole("heading", { level: 1, name: "Fonctionnalités" })).toBeFocused();
+    await expect(page.getByRole("heading", { level: 1, name: "Cahier fonctionnel" })).toBeFocused();
     await expect(page.getByRole("status")).toHaveCount(1);
     const submits = await submitsSeen();
     expect(submits).toHaveLength(1);

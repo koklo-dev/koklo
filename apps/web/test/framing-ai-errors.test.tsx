@@ -158,6 +158,7 @@ describe("LLM_PROVIDER_ERROR (502, §4.7)", () => {
   );
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("LLM_RATE_LIMITED (429) : compte à rebours par palier (§4.6)", () => {
   /**
    * Minuteurs simulés AVANT l'échec : le décompte naît sous l'horloge simulée et `tick` le pilote. Elle avance aussi
@@ -184,6 +185,19 @@ describe("LLM_RATE_LIMITED (429) : compte à rebours par palier (§4.6)", () => 
     await tick(3000);
     expect(alert).toHaveTextContent("Réessayez dans 26 s.");
     expect(liveText()).not.toMatch(/2[6-9] s/);
+  });
+
+  it("« Réessayez dans 30 s » n'est visible qu'une fois (règle 5) : la région d'état le porte pour les lecteurs d'écran seulement", async () => {
+    await limited(30);
+    const visible = Array.from(document.body.querySelectorAll("*")).filter(
+      (node) =>
+        !node.closest(".sr-only") &&
+        Array.from(node.childNodes).some(
+          (child) => child.nodeType === 3 && /Réessayez dans 30 s/.test(child.textContent ?? ""),
+        ),
+    );
+    expect(visible).toHaveLength(1);
+    expect(liveText()).toMatch(/Réessayez dans 30 s/);
   });
 
   it("annonce par palier de 15 s dans la région d'état, puis « Vous pouvez réessayer. » à l'échéance", async () => {

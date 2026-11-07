@@ -1095,7 +1095,7 @@ arbitrates single use and expiry.
 
 ### `GET /api/github/callback` (Callback URL of the App, outside the contract)
 Raw Nest route relayed by the web with the session cookie. It always answers `303` with
-`Location: /github?result=<outcome>` (fixed relative target, no received value ever echoed),
+`Location: /settings/github?result=<outcome>` (fixed relative target, since contract 2.1.0 / TK-88: Settings hold the GitHub screen; the old `/github` path is redirected by the web proxy with its query, no received value ever echoed),
 `Cache-Control: no-store`, no cookie; the request log keeps the path only and masks `Location`.
 Evaluation order: session; configuration; query shape; signed state bound to the session user; atomic
 consumption of the state (`UPDATE ... WHERE consumed_at IS NULL AND expires_at > now RETURNING`);
@@ -1298,7 +1298,58 @@ statuses) and `pnpm seed:planche` (project "Volume · planche": 248, 65, 47, 60 
 `NODE_ENV=production`, the demo project is untouched. Volumes of models that do not exist yet (rules 300 and 86,
 proposals 400, journeys 18, sample rows 1 240) are declared in `packages/db/src/seed-volumes.ts` (question B34).
 
+## Application shell (TK-88)
+
+Contract 2.1.0 (additive). Four read or personal-preference routes feed the application shell (sidebar, project
+card, `SPEC N/7` group, command palette). Every one is open to any role that can reach the project: an unknown
+project, a project of another organization and a project not linked to a client answer the same `404 NOT_FOUND`
+(never `403`, question B73). Nothing here exposes spec content.
+
+| Operation | Method | Path | Typed errors (besides `INTERNAL`) |
+|-----------|--------|------|-----------------------------------|
+| `project.shell` | GET | `/projects/{projectId}/shell` | `UNAUTHORIZED`, `NOT_FOUND` |
+| `project.visit` | POST | `/projects/{projectId}/visit` | `UNAUTHORIZED`, `NOT_FOUND` |
+| `project.recent` | GET | `/project-visits` | `UNAUTHORIZED` |
+| `search.query` | GET | `/search?q=&projectId=` | `UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION` |
+
+- **`project.shell`** returns `{ id, name, phase, deliverables, validatedCount, ticketCount }`. `phase` is derived on
+  the server: `idea` without any indexed feature, `framing` with features and no `validated` or `tagged` baseline,
+  `iterations` otherwise. `deliverables` always has seven entries `{ key, available, after }` in the writing order
+  `functional, data, architecture, technical, security, design, quality`. Until `spec.deliverables` (TK-100) exists,
+  availability is derived from the spec index (question B77): Functional is always available, Data and Design open as
+  soon as one feature is indexed, the other four stay locked; `after` names what opens an entry (`null` for
+  Functional). `validatedCount` is `0` for now. `ticketCount` counts the tickets of the active sprint (`null` without
+  an active sprint, `0` for an active sprint with no ticket; deleted tickets never count).
+- **`project.visit`** upserts the caller's visit (`project_visits`, one row per member and project, unique
+  `(project_id, user_id)`) and answers `{ visitedAt }`. It is a personal preference, not an audited action: it grants
+  nothing, the access to the project is checked again on every read. `client-write-matrix.test.ts` classes it as
+  `ALLOWED` for the client role.
+- **`project.recent`** returns at most 8 `{ id, name, visitedAt }`, most recent first, restricted to the projects the
+  caller can still reach (a client whose link was removed no longer sees the project; the visit row survives).
+- **`search.query`** takes `q` (1 to 200 characters) and an optional `projectId`, and answers `listOf(searchResult)`:
+  at most 20 items, `total` is the real total, `nextCursor` and `previousCursor` are always `null`, `offset` is `0`.
+  Items are discriminated by `kind`: `project` (organization projects the caller can reach, matched on the name), then,
+  with a current project, `feature` (`F-nnn`, title; staff roles only, a client never receives a feature or any spec
+  content, even by exact identifier) and `ticket` (`TK-n`, title, status; deleted tickets excluded). Features and
+  tickets use the full-text search of the long-list base (TK-94) plus an exact identifier match; project names use a
+  case-insensitive substring match with `LIKE` wildcards escaped. A malformed `q` or `projectId` is `VALIDATION` (422).
+
+**Client behaviour (command palette, TK-88 lot D).** The web palette (`⌘K` / `Ctrl K`) calls `search.query` 200 ms after
+the last keystroke, with the current project when a project page is open; a newer keystroke cancels the request still
+in flight (the TanStack Query signal is passed to the client). It shows the 20 items returned, grouped by `kind`, and
+announces `total` (« 134 résultats · 20 affichés ») when it is larger. It never filters the server answer locally: only
+the shell pages (Idée, Spec, Tickets, Tous les projets, Réglages; locked deliverables never appear) are filtered as the
+person types. Opening a `feature` goes to `/projects/{projectId}/spec/functional?tab=features&sel=F-nnn`, a `ticket` to
+`/projects/{projectId}/tickets`, a `project` to `/projects/{projectId}`. No contract change: the lot adds no route.
+
 ## Version history
+- **2.1.0** (TK-88): application shell. New routes `project.shell` (`GET /projects/{projectId}/shell`), `project.visit`
+  (`POST /projects/{projectId}/visit`), `project.recent` (`GET /project-visits`) and the group `search` with
+  `search.query` (`GET /search`); 4 routes, 68 routes and 51 paths in all. New schemas `projectShellSchema`,
+  `deliverableAvailabilitySchema`, `projectRecentSchema`, `searchResultSchema` and their inputs, constants
+  `DELIVERABLE_KEYS`, `RECENT_PROJECTS_MAX`, `SEARCH_RESULTS_MAX`. New table `project_visits` (migration
+  `20261107150000_project_visits`, with `down.sql`). **Additive**: no route removed or changed. The fingerprint of
+  2.0.0 is frozen in `packages/contract/test/contract.test.ts`; 0.1.0 to 2.0.0 unchanged.
 - **2.0.0** (TK-96): explicit project. The 25 piloting procedures (`ticket.*`, `dependency.*`, `sprint.*`, `comment.*`,
   `projectState.*`, `lease.*`, `audit.list`) take `projectId` (uuid, required) as a path parameter and move under
   `/projects/{projectId}/...` (`/projects/{projectId}/tickets/{key}/lease`, `/projects/{projectId}/audit`, ...); the old

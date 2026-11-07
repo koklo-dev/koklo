@@ -47,7 +47,7 @@ describe("chargement et erreur de list (§4.1)", () => {
     renderAiSettings();
     const label = await screen.findByText("Chargement des réglages de l'IA…");
     expect(label.closest("[role=status]")).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByRole("heading", { level: 1, name: "IA" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "IA" })).toBeInTheDocument();
     expect(screen.queryByLabelText(KEY_FIELD)).not.toBeInTheDocument();
   });
 
@@ -68,10 +68,10 @@ describe("chargement et erreur de list (§4.1)", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("page : structure et politique d'envoi (§3)", () => {
-  it("h1 « IA », introduction, une seule carte « Anthropic », aucune carte OpenAI ni Google", async () => {
+  it("h2 « IA » (le h1 est celui de Réglages), introduction, une seule carte « Anthropic », aucune carte OpenAI ni Google", async () => {
     await openAiSettings([]);
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole("heading", { level: 1, name: "IA" })).toBeInTheDocument();
+    expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+    expect(screen.getByRole("heading", { level: 2, name: "IA" })).toBeInTheDocument();
     expect(
       screen.getByText(
         "Koklo utilise le compte d'IA de votre organisation pour le cadrage assisté. Vous fournissez votre propre clé : elle est facturée par le fournisseur, pas par Koklo.",

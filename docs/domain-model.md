@@ -333,6 +333,18 @@ gap where a `client` saw every project of its organization ([ADR 0016](adr/0016-
 - **Reading rule (fail-closed)**: only `owner`, `admin`, `dev`, `designer` and `business` see the whole
   organization; any other role, absent included, sees only the projects it is linked to.
 
+### Last opened project table (TK-88)
+One tenant table (`TENANT_MODELS`: `ProjectVisit`), migration `20261107150000_project_visits` (additive: a single
+`CREATE TABLE`, no enum, function, trigger or generated column; `down.sql` is one `DROP TABLE`). It remembers the last
+project a member opened, to fill the project card of the application shell and to redirect `/` and `/kanban` (question B80).
+- **`project_visits`**: `id`, `organization_id`, `project_id`, `user_id`, `visited_at`, `created_at`, `updated_at`.
+- **Keys**: `(organization_id, project_id)` references `projects(organization_id, id)` and
+  `(organization_id, user_id)` references `members(organization_id, user_id)`, both `ON DELETE CASCADE`.
+- **Uniqueness and indexes**: `UNIQUE (project_id, user_id)` (one row per member and project, refreshed by an upsert),
+  index `(organization_id, user_id, visited_at DESC)` serving `project.recent` (8 rows at most).
+- **Not a right**: a visit grants nothing. `project.recent` re-checks access on every read (organization, client link),
+  so a row may outlive the access that created it without leaking the project.
+
 ### TK-51 summary: BYOK, suggestions, reviews, notifications
 Five tables over four additive and reversible migrations, each with a `down.sql` that returns to the
 previous state (data of the dropped tables is lost by design):

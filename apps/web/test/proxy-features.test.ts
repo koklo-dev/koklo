@@ -41,11 +41,12 @@ describe("proxy — /projects/<projectId>/features", () => {
     expect(redirectedTo(await call(FEATURES))).toBe("/organizations");
   });
 
-  it("laisse passer avec session et organisation active", async () => {
+  it("avec session et organisation active, redirige en 307 vers le cahier fonctionnel (TK-88, B78)", async () => {
     withSession(true, true);
     const response = await call(FEATURES);
-    expect(response.headers.get("x-middleware-next")).toBe("1");
-    expect(response.headers.get("location")).toBeNull();
+    expect(response.status).toBe(307);
+    expect(redirectedTo(response)).toBe(`/projects/${ID}/spec/functional`);
+    expect(new URL(response.headers.get("location") as string).search).toBe("?tab=features");
   });
 
   it("garde aussi un identifiant qui n'est pas un uuid", async () => {
@@ -53,7 +54,7 @@ describe("proxy — /projects/<projectId>/features", () => {
     expect(redirectedTo(await call("/projects/pas-un-uuid/features"))).toBe("/login");
   });
 
-  it.each([`/projects/${ID}`, `/projects/${ID}/features/x`, `/projects/${ID}/other`])(
+  it.each([`/projects/${ID}/features/x`, `/projects/${ID}/other`])(
     "chemin voisin %s : pas de lecture de session ni de redirection (404 Next)",
     async (path) => {
       withSession(false);
@@ -77,14 +78,12 @@ describe("matcher du proxy — route dynamique", () => {
     ).toBe(true);
   });
 
-  it.each([
-    `/projects/${ID}`,
-    `/projects/${ID}/features/x`,
-    `/projects/${ID}/other`,
-    "/projects/a/b/features",
-  ])("ne couvre pas le chemin voisin %s", (path) => {
-    expect(matched(path)).toEqual([]);
-  });
+  it.each([`/projects/${ID}/features/x`, `/projects/${ID}/other`, "/projects/a/b/features"])(
+    "ne couvre pas le chemin voisin %s",
+    (path) => {
+      expect(matched(path)).toEqual([]);
+    },
+  );
 
   it("n'affaiblit pas les entrées existantes", () => {
     expect(config.matcher).toEqual(

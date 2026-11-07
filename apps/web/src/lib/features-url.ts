@@ -75,3 +75,11 @@ export function withFeaturesUrl(search: string, patch: FeaturesUrlPatch): string
   const query = params.toString();
   return query ? `?${query}` : "";
 }
+
+/** Met `tab=features` en tête de la requête (l'écran vit sous `?tab=`) ; le reste est conservé tel quel. */
+export function withFeaturesTab(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete("tab");
+  const rest = params.toString();
+  return `?tab=features${rest ? `&${rest}` : ""}`;
+}

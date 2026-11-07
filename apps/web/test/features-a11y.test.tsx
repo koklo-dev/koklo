@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import FeaturesLayout from "../src/app/projects/[projectId]/features/layout.tsx";
-import * as route from "../src/app/projects/[projectId]/features/page.tsx";
+import * as route from "../src/app/(shell)/projects/[projectId]/spec/functional/page.tsx";
+import { ShellFrame } from "../src/components/shell-frame.tsx";
 import {
   FEATURES,
   findList,
@@ -52,22 +52,22 @@ beforeEach(() => {
 const client = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 describe("Route /projects/[projectId]/features", () => {
-  it("la page déclare le titre « Fonctionnalités · Koklo »", () => {
+  it("la page déclare le titre « Cahier fonctionnel · Koklo »", () => {
     const { metadata } = route as { metadata?: { title?: string } };
-    expect(metadata?.title).toBe("Fonctionnalités · Koklo");
+    expect(metadata?.title).toBe("Cahier fonctionnel · Koklo");
   });
 
   it("la page rend l'écran du projet de l'adresse (params asynchrones)", async () => {
-    setUrl(`/projects/${PROJECT_ID}/features`);
+    setUrl(`/projects/${PROJECT_ID}/spec/functional?tab=features`);
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
-    expect(await findNamed("heading", "Fonctionnalités", { level: 1 })).toBeInTheDocument();
+    expect(await findNamed("heading", "Cahier fonctionnel", { level: 1 })).toBeInTheDocument();
     await findList();
     expect(procedures.specHead.mock.calls[0]?.[0]).toMatchObject({ projectId: PROJECT_ID });
   });
 
   it("un projectId qui n'est pas un uuid arrive jusqu'à l'écran « Projet introuvable » sans appel de spec", async () => {
-    setUrl("/projects/pas-un-uuid/features");
+    setUrl("/projects/pas-un-uuid/spec/functional?tab=features");
     const element = await route.default({ params: Promise.resolve({ projectId: "pas-un-uuid" }) });
     render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
     expect(await findNamed("heading", "Projet introuvable")).toBeInTheDocument();
@@ -77,35 +77,35 @@ describe("Route /projects/[projectId]/features", () => {
 
 describe("Gabarit de la route", () => {
   async function renderFramed() {
-    pathname.current = `/projects/${PROJECT_ID}/features`;
-    setUrl(`/projects/${PROJECT_ID}/features`);
+    pathname.current = `/projects/${PROJECT_ID}/spec/functional`;
+    setUrl(`/projects/${PROJECT_ID}/spec/functional?tab=features`);
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(
       <QueryClientProvider client={client()}>
-        <FeaturesLayout>{element}</FeaturesLayout>
+        <ShellFrame>{element}</ShellFrame>
       </QueryClientProvider>,
     );
     await findList();
   }
 
-  it("un seul main, un seul h1, un seul fil d'Ariane (Koklo > Projets > nom > Fonctionnalités)", async () => {
+  it("un seul main, un seul h1, un seul emplacement (Alpha / Spec / Fonctionnel), aucun fil d'Ariane v1", async () => {
     await renderFramed();
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    const crumbs = screen.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i });
-    expect(crumbs).toHaveTextContent(/Koklo.*Projets.*Alpha.*Fonctionnalités/);
-    expect(within(crumbs).getByRole("link", { name: "Projets" })).toHaveAttribute(
+    expect(screen.queryByRole("navigation", { name: /breadcrumb|fil d'ariane/i })).toBeNull();
+    const location = screen.getByRole("navigation", { name: "Emplacement" });
+    expect(location).toHaveTextContent(/Alpha.*Spec.*Fonctionnel/);
+    expect(within(location).getByRole("link", { name: "Alpha" })).toHaveAttribute(
       "href",
-      "/projects",
+      `/projects/${PROJECT_ID}`,
     );
   });
 
-  it("la barre latérale est présente et l'entrée du projet courant est en aria-current=page", async () => {
+  it("la barre est présente et le livrable Fonctionnel est en aria-current=page", async () => {
     await renderFramed();
-    const sidebar = document.querySelector('[data-slot="sidebar"]') as HTMLElement;
-    expect(sidebar).not.toBeNull();
-    const current = await findNamed("link", /Alpha/, { scope: within(sidebar) });
-    expect(current).toHaveAttribute("href", `/projects/${PROJECT_ID}/features`);
+    const bar = screen.getByRole("navigation", { name: "Navigation principale" });
+    const current = await findNamed("link", "Fonctionnel", { scope: within(bar) });
+    expect(current).toHaveAttribute("href", `/projects/${PROJECT_ID}/spec/functional`);
     expect(current).toHaveAttribute("aria-current", "page");
   });
 });

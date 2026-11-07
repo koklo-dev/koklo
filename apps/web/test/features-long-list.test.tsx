@@ -109,7 +109,7 @@ describe("Liste virtualisée (§5)", () => {
     const row = rowsOf(listbox)[0] as HTMLElement;
     expect(within(row).getByText("F-001").className).toMatch(/font-mono/);
     const link = within(row).getByRole("link", { name: "Fonctionnalité numéro 1" });
-    expect(link.getAttribute("href")).toMatch(/\?sel=F-001$/);
+    expect(link.getAttribute("href")).toMatch(/\?tab=features&sel=F-001$/);
     expect(link).toHaveAttribute("title", "Fonctionnalité numéro 1");
     expect(link).toHaveAttribute("data-feature-link", "F-001");
   });

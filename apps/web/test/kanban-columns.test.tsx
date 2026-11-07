@@ -108,7 +108,7 @@ beforeEach(() => {
 });
 
 async function renderBoard() {
-  renderWithQuery(<KanbanPage />);
+  renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
   await screen.findByTestId("kanban-board");
   await waitFor(() => expect(cardsIn("todo")).toBeGreaterThan(0));
 }
@@ -146,7 +146,7 @@ describe("Totaux du serveur", () => {
 
   it("le sous-titre additionne les totaux des colonnes (146), pas les cartes montées", async () => {
     await renderBoard();
-    expect(screen.getByText("146 tickets")).toBeInTheDocument();
+    expect(screen.getByText(/ · 146 tickets$/)).toBeInTheDocument();
   });
 });
 
@@ -281,7 +281,7 @@ describe("Erreur sur une colonne", () => {
 
   it("toutes les colonnes échouent : l'état d'erreur de l'écran, comme avant", async () => {
     procedures.ticketList.mockImplementation(() => Promise.reject(apiError("INTERNAL")));
-    renderWithQuery(<KanbanPage />);
+    renderWithQuery(<KanbanPage projectId={PROJECT_ID} />);
     const alert = await findRole("alert");
     expect(alert).toHaveTextContent("Impossible de charger le kanban");
     expect(within(alert).getByRole("button", { name: "Réessayer" })).toBeInTheDocument();

@@ -111,7 +111,7 @@ export function MembersPage() {
 
   return (
     <div data-testid="members-page" className="flex flex-col gap-6">
-      <h1 className="text-page-title">Membres</h1>
+      <h2 className="text-section-title">Membres</h2>
       {invitation}
       {list}
     </div>

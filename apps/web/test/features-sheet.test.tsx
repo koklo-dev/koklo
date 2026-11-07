@@ -96,12 +96,13 @@ describe("Ouverture et fermeture", () => {
     await userEvent.click(titleLink(TITLE));
     await sheet();
     expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      tab: "features",
       status: "brouillon",
       sel: "F-001",
     });
     await userEvent.click(screen.getByRole("button", { name: "Fermer" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(window.location.search).toBe("?status=brouillon");
+    expect(window.location.search).toBe("?tab=features&status=brouillon");
   });
 
   it("« Fermer » retire le paramètre et rend le focus au lien de la ligne d'origine", async () => {
@@ -111,7 +112,7 @@ describe("Ouverture et fermeture", () => {
     await sheet();
     await userEvent.click(screen.getByRole("button", { name: "Fermer" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?tab=features");
     expect(titleLink(TITLE)).toHaveFocus();
   });
 
@@ -130,7 +131,7 @@ describe("Ouverture et fermeture", () => {
     const dialog = await sheet();
     await userEvent.click(within(dialog).getByRole("button", { name: "Fermer la fiche" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?tab=features");
   });
 
   it("le focus initial est sur le titre de la fiche (on lit d'abord), pas sur « Fermer »", async () => {

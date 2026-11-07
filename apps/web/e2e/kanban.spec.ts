@@ -10,7 +10,9 @@ import {
   type Theme,
   transitionsSeen,
 } from "./support/helpers.ts";
+import { FEATURE_PROJECT_ID } from "./support/stub-features.ts";
 
+const KANBAN = `/projects/${FEATURE_PROJECT_ID}/tickets`;
 const column = (page: Page, status: string) => page.getByTestId(`kanban-column-${status}`);
 /** Le message du tableau : exclut l'annonceur de route de Next, qui a aussi le rôle alert (et est vide). */
 const alertOf = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
@@ -19,7 +21,7 @@ const card = (page: Page, key: string) => page.getByTestId(`kanban-card-${key}`)
 type Scenario = Parameters<typeof setScenario>[0];
 const open = async (page: Page, scenario: Partial<Scenario> = {}) => {
   await setScenario({ session: true, projects: "data", board: "data", ...scenario });
-  await page.goto("/kanban");
+  await page.goto(KANBAN);
 };
 
 /** Atteint un contrôle uniquement avec la touche Tab (ordre de focus réel). */
@@ -187,7 +189,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
       await open(page, { board });
       if (theme === "dark") await switchToDark(page);
       await expect(page.getByTestId(testId)).toBeVisible();
-      await expect(page.getByRole("heading", { level: 1, name: "Kanban" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Tickets" })).toBeVisible();
       await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^((?!dark).)*$/);
       await settle(page);
       await page.screenshot({
@@ -212,7 +214,7 @@ test("E5 : 7 colonnes dans l'ordre, cartes dans l'ordre du serveur, défilement 
     "Terminé",
     "Annulé",
   ]);
-  await expect(sidebarOf(page).getByRole("link", { name: "Kanban" })).toHaveAttribute(
+  await expect(sidebarOf(page).getByRole("link", { name: /^Tickets/ })).toHaveAttribute(
     "aria-current",
     "page",
   );

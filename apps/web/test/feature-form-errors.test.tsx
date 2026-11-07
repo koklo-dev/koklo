@@ -142,7 +142,7 @@ describe("Table des échecs de submit", () => {
       expect(alert).toHaveTextContent("Rien n'a été écrit. Réessayez dans un instant.");
       expect(
         within(alert).getByRole("link", { name: "Vérifier l'état de l'application GitHub" }),
-      ).toHaveAttribute("href", "/github");
+      ).toHaveAttribute("href", "/settings/github");
       expect(within(alert).getByRole("button", { name: "Réessayer" })).toBeVisible();
     },
   );
@@ -176,7 +176,7 @@ describe("Table des échecs de submit", () => {
       );
       expect(within(alert).getByRole("link", { name: "Ouvrir la page GitHub" })).toHaveAttribute(
         "href",
-        "/github",
+        "/settings/github",
       );
       expect(within(alert).queryByRole("button", { name: "Réessayer" })).toBeNull();
     },

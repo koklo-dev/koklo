@@ -298,7 +298,7 @@ describe("Création de projet — sans compte GitHub (AC-48-22)", () => {
     );
     expect(within(sheet).getByRole("link", { name: "Relier GitHub" })).toHaveAttribute(
       "href",
-      "/github",
+      "/settings/github",
     );
     expect(within(sheet).queryByRole("combobox")).not.toBeInTheDocument();
     expect(within(sheet).queryByLabelText("Nom du dépôt (facultatif)")).not.toBeInTheDocument();
@@ -319,7 +319,7 @@ describe("Création de projet — sans compte GitHub (AC-48-22)", () => {
     expect(stepItem(sheet, 1)).toHaveTextContent("Non créé : aucun compte GitHub relié");
     expect(within(sheet).getByRole("link", { name: "Relier GitHub" })).toHaveAttribute(
       "href",
-      "/github",
+      "/settings/github",
     );
     expect(within(sheet).getByRole("button", { name: "Fermer" })).toBeEnabled();
     expect(document.activeElement).toBeInstanceOf(HTMLElement);

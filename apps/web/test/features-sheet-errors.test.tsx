@@ -77,7 +77,7 @@ describe("PROVIDER_UNAVAILABLE (503)", () => {
       expect(alert).toHaveTextContent("Vérifiez l'état de l'application GitHub");
       expect(within(alert).getByRole("link", { name: /GitHub/ })).toHaveAttribute(
         "href",
-        "/github",
+        "/settings/github",
       );
     },
   );
@@ -111,7 +111,7 @@ describe("PROVIDER_AUTH_EXPIRED (403, l'« accès refusé » côté fournisseur)
       );
       const link = within(alert).getByRole("link", { name: "Ouvrir la page GitHub" });
       expect(link.tagName).toBe("A");
-      expect(link).toHaveAttribute("href", "/github");
+      expect(link).toHaveAttribute("href", "/settings/github");
     },
   );
 
@@ -145,7 +145,7 @@ describe("NOT_FOUND (la fonctionnalité a disparu de la spec)", () => {
       within(dialog).getAllByRole("button", { name: "Fermer" })[0] as HTMLElement,
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?tab=features");
   });
 });
 

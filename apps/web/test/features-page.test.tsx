@@ -90,38 +90,54 @@ describe("Chargement (§4.1)", () => {
 
   it("le titre de page est déjà là", async () => {
     renderFeatures();
-    expect(await findNamed("heading", "Fonctionnalités", { level: 1 })).toBeVisible();
+    expect(await findNamed("heading", "Cahier fonctionnel", { level: 1 })).toBeVisible();
   });
 });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("En-tête (§3.1)", () => {
-  it("h1 unique « Fonctionnalités » et sous-titre : le nom du projet", async () => {
+  it("h1 unique « Cahier fonctionnel » et, dans l'emplacement, le nom du projet", async () => {
     renderFeatures();
     await findList();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Fonctionnalités");
-    // le nom du projet figure aussi dans le fil d'Ariane : on vise le sous-titre
-    expect(await screen.findByText("Alpha", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Cahier fonctionnel");
+    const location = screen.getByRole("navigation", { name: "Emplacement" });
+    expect(await within(location).findByRole("link", { name: "Alpha" })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}`,
+    );
   });
 
-  it("pendant le chargement du nom, le sous-titre est « Projet »", async () => {
+  it("pendant le chargement du nom, l'emplacement dit « Projet »", async () => {
     procedures.projectList.mockImplementation(neverResolves);
     renderFeatures();
     await findList();
-    expect(screen.getByText("Projet")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Emplacement" })).getByRole("link", {
+        name: "Projet",
+      }),
+    ).toBeInTheDocument();
   });
 
-  it("fil d'Ariane nommé : Projets (lien) > nom du projet > Fonctionnalités (page courante)", async () => {
+  it("emplacement nommé : projet (lien) / Spec / Fonctionnel (page courante), plus de fil d'Ariane v1", async () => {
     renderFeatures();
     await findList();
-    const crumbs = screen.getByRole("navigation", { name: /fil d'ariane|breadcrumb/i });
-    expect(within(crumbs).getByRole("link", { name: "Projets" })).toHaveAttribute(
-      "href",
-      "/projects",
-    );
-    expect(crumbs).toHaveTextContent("Alpha");
-    expect(within(crumbs).getByText("Fonctionnalités")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("navigation", { name: /fil d'ariane|breadcrumb/i })).toBeNull();
+    const location = screen.getByRole("navigation", { name: "Emplacement" });
+    expect(location).toHaveTextContent(/Alpha.*Spec.*Fonctionnel/);
+    expect(within(location).getByText("Fonctionnel")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("onglets en liens : Fonctionnalités (compteur de spec.head), les trois autres sans compteur", async () => {
+    renderFeatures();
+    await findList();
+    const tabs = screen.getByRole("navigation", { name: "Onglets du cahier fonctionnel" });
+    expect(within(tabs).getByRole("link", { name: /^Fonctionnalités/ })).toHaveTextContent("3");
+    expect(
+      within(tabs)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Fonctionnalités3", "Règles métier", "Rôles et permissions", "Parcours"]);
   });
 
   it("compteur sans filtre : N fonctionnalités (spec.head.counts.features), au singulier à 1", async () => {
@@ -143,17 +159,17 @@ describe("En-tête (§3.1)", () => {
   });
 
   it.each(TEAM)(
-    "%s : version de la spec (7 caractères, mono) et date d'indexation",
+    "%s : SHA de 7 caractères en mono et âge de la spec dans l'en-tête",
     async (role) => {
       serve(role);
       renderFeatures();
       await findList();
-      const version = screen.getByLabelText(`Version de la spec ${SHORT_SHA}`);
-      expect(version).toHaveTextContent(SHORT_SHA);
-      expect(version.className).toMatch(/font-mono/);
-      expect(visibleText()).toContain("Version de la spec");
-      expect(visibleText()).toMatch(/indexée le 30 octobre 2026/);
+      const sha = screen.getByText(SHORT_SHA);
+      expect(sha.className).toMatch(/font-mono/);
+      expect(visibleText()).toMatch(/spec à jour il y a/);
       expect(visibleText()).not.toContain("a1b2c3d4e5f6");
+      expect(visibleText()).not.toMatch(/Version de la spec|indexée le/);
+      expect(visibleText()).toContain("3 fonctionnalités");
     },
   );
 
@@ -162,15 +178,16 @@ describe("En-tête (§3.1)", () => {
     renderFeatures();
     await findList();
     expect(visibleText()).toMatch(/Mise à jour le 30 octobre 2026/);
-    expect(visibleText()).not.toMatch(/a1b2c3d|Version de la spec|indexée/i);
+    expect(visibleText()).not.toMatch(/a1b2c3d|Version de la spec|indexée|spec à jour/i);
     expect(screen.queryByLabelText(/Version de la spec/)).not.toBeInTheDocument();
+    expect(screen.queryByText("3 fonctionnalités")).not.toBeInTheDocument();
   });
 
   it("la ligne de version est absente tant que spec.head n'a pas répondu", async () => {
     procedures.specHead.mockImplementation(neverResolves);
     renderFeatures();
     await findRole("status");
-    expect(visibleText()).not.toMatch(/Version de la spec|Mise à jour le/);
+    expect(visibleText()).not.toMatch(/spec à jour|Mise à jour le/);
   });
 });
 
@@ -215,7 +232,7 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(id.className).toMatch(/font-mono/);
     const link = within(row).getByRole("link", { name: "Connexion par e-mail" });
     expect(link.tagName).toBe("A");
-    expect(link.getAttribute("href")).toMatch(/\?sel=F-001$/);
+    expect(link.getAttribute("href")).toMatch(/\?tab=features&sel=F-001$/);
     expect(link).toHaveAttribute("title", "Connexion par e-mail");
   });
 
@@ -404,6 +421,7 @@ describe("Filtres (§3.2)", () => {
       }),
     );
     expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      tab: "features",
       priority: "must",
       status: "adoptee",
     });
@@ -454,7 +472,7 @@ describe("Filtres (§3.2)", () => {
       expect(inputsOf(procedures.specListFeatures).at(-1)).not.toHaveProperty("status"),
     );
     expect(inputsOf(procedures.specListFeatures).at(-1)).not.toHaveProperty("priority");
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?tab=features");
     expect(statusSelect()).toHaveFocus();
     expect(screen.queryByRole("button", { name: "Effacer les filtres" })).not.toBeInTheDocument();
   });
@@ -530,7 +548,7 @@ describe("Vide filtré (§4.4)", () => {
       screen.getAllByRole("button", { name: "Effacer les filtres" })[0] as HTMLElement,
     );
     await findList();
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?tab=features");
     expect(screen.getByRole("combobox", { name: "Statut" })).toHaveFocus();
   });
 });

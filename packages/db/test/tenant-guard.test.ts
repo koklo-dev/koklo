@@ -38,11 +38,15 @@ const EXPECTED_TENANT_MODELS = [
   ...NOTIFICATION_MODELS,
   ...PROJECT_CLIENT_MODELS,
   ...AI_MODELS,
+  "ProjectVisit",
 ];
 
-/** TK-95 : une clé primaire qui commence par organizationId tient lieu d'index (pas de doublon). */
+/**
+ * Un index qui commence par organizationId suffit : `@@index([organizationId])`, une clé primaire (TK-95, pas
+ * de doublon) ou un index composite (TK-88, `project_visits` : organizationId, userId, visitedAt).
+ */
 const LEADING_INDEX =
-  /@@index\(\[organizationId\]\)|@@id\(\[organizationId[,\]]|^\s*organizationId\s.*@id\b/m;
+  /@@index\(\[organizationId[,\]]|@@id\(\[organizationId[,\]]|^\s*organizationId\s.*@id\b/m;
 
 const carriesOrganizationId = (model: SchemaModel) => /^\s*organizationId\s/m.test(model.body);
 
@@ -52,7 +56,7 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d), liaison client-projet (TK-55a), couche d'IA (TK-95)", () => {
+  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d), liaison client-projet (TK-55a), couche d'IA (TK-95), visites de projet (TK-88)", () => {
     expect([...TENANT_MODELS].sort()).toEqual([...EXPECTED_TENANT_MODELS].sort());
   });
 

@@ -51,7 +51,7 @@ describe("S-github — chargement, vide, erreur (AC-48-14)", () => {
     const label = await screen.findByText("Chargement des installations GitHub…");
     expect(label.closest("[role=status]")).toHaveAttribute("aria-busy", "true");
     expect(await findNamed("button", INSTALL_BUTTON)).toBeEnabled();
-    expect(screen.getByRole("heading", { level: 1, name: "GitHub" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "GitHub" })).toBeInTheDocument();
     expect(screen.getByTestId("github-page")).toBeInTheDocument();
   });
 
@@ -247,7 +247,7 @@ describe("S-github — droits selon le rôle (AC-48-17)", () => {
         "Cette page est réservée aux propriétaires et aux administrateurs. Demandez à l'un d'eux de relier GitHub.",
       );
       expect(notice).toBeInTheDocument();
-      expect(screen.getByRole("heading", { level: 1, name: "GitHub" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name: "GitHub" })).toBeInTheDocument();
       expect(screen.queryAllByRole("button")).toHaveLength(0);
       // Laisse passer d'éventuelles requêtes tardives avant d'affirmer l'absence d'appel.
       await new Promise((resolve) => setTimeout(resolve, 50));

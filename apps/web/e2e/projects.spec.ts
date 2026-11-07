@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   CAPTURES_DIR,
+  menuOf,
   type ProjectsState,
   releaseHeld,
   setScenario,
@@ -8,7 +9,6 @@ import {
   sidebarOf,
   switchToDark,
   type Theme,
-  triggerOf,
 } from "./support/helpers.ts";
 
 const STATES: Array<{
@@ -46,16 +46,14 @@ test("S-projects : le gabarit expose la navigation, le titre et aucun panneau de
 }) => {
   await setScenario({ session: true, projects: "data" });
   await page.goto("/projects");
-  await expect(sidebarOf(page).getByRole("link", { name: "Projets" })).toHaveAttribute(
+  await expect(sidebarOf(page).getByRole("link", { name: "Tous les projets" })).toHaveAttribute(
     "aria-current",
     "page",
   );
   await expect(sidebarOf(page).getByText("Test", { exact: true })).toBeVisible();
   await expect(sidebarOf(page).getByText("test@example.com")).toBeVisible();
-  await expect(page.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i })).toContainText(
-    "Projets",
-  );
-  await expect(page.getByRole("complementary")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: /breadcrumb|fil d'ariane/i })).toHaveCount(0);
+  await expect(page.locator('aside:not([data-slot="app-shell-sidebar"])')).toHaveCount(0);
   await expect(page.getByRole("row")).toHaveCount(4);
 });
 
@@ -84,8 +82,7 @@ test("thème : le choix persiste après rechargement, sans flash (classe dark d�
   await switchToDark(page);
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.getByRole("button", { name: "Menu utilisateur" }).click();
-  await expect(page.getByRole("menuitem", { name: "Passer au thème clair" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Passer au thème clair" })).toBeVisible();
 });
 
 test("thème : clair par défaut même si le système préfère le sombre", async ({ page }) => {
@@ -104,7 +101,7 @@ test("mobile 375 px : pas de défilement horizontal, cibles de 44 px", async ({ 
   );
   expect(overflow).toBe(false);
   // TK-85 : la sidebar est une Sheet sous 768 px : on l'ouvre, puis on mesure le menu utilisateur.
-  await triggerOf(page).click();
+  await menuOf(page).click();
   const toggle = page.getByRole("dialog").getByRole("button", { name: "Menu utilisateur" });
   // La Sheet entre en 150 ms (échelle 0,97 → 1) : on mesure une fois la taille stabilisée.
   await expect

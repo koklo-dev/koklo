@@ -228,7 +228,7 @@ test.describe("parcours (AC-48-19 à AC-48-22)", () => {
     });
   });
 
-  test("sans compte GitHub : projet créé, aucun createSpec, lien vers /github", async ({
+  test("sans compte GitHub : projet créé, aucun createSpec, lien vers /settings/github", async ({
     page,
   }) => {
     await open(page, { installations: "empty" });
@@ -238,7 +238,7 @@ test.describe("parcours (AC-48-19 à AC-48-22)", () => {
     expect(await specRepoCallsSeen()).toEqual([]);
     await expect(dialogOf(page).getByRole("link", { name: "Relier GitHub" })).toHaveAttribute(
       "href",
-      "/github",
+      "/settings/github",
     );
     await expect(stepOf(page, 1)).toContainText("Non créé : aucun compte GitHub relié");
   });
@@ -339,7 +339,7 @@ test.describe("autorisation et reprise (AC-48-21)", () => {
       specRepo: "ok",
       keepProjects: true,
     });
-    await page.goto("/github?result=installed");
+    await page.goto("/settings/github?result=installed");
     const resume = page.getByRole("link", { name: `Reprendre la création du projet « ${NAME} »` });
     await expect(resume).toHaveAttribute("href", "/projects");
     await resume.click();

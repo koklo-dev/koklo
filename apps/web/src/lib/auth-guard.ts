@@ -1,43 +1,47 @@
+import { SETTINGS_SECTIONS, SPEC_SLUGS } from "./shell-routes.ts";
+
 export type GuardedPath =
   | "/login"
   | "/projects"
   | "/kanban"
   | "/members"
   | "/github"
-  | "/settings/ai"
+  | "/settings"
+  | `/settings/${string}`
   | "/organizations";
 
-/** Page d'un projet (TK-48d) : chemin dynamique, un seul segment `projectId`. */
-export type ProjectFeaturesPath = `/projects/${string}/features`;
-/** Cadrage assisté d'un projet (TK-59) : gardé comme la liste des fonctionnalités. */
-export type ProjectFramingPath = `/projects/${string}/framing`;
-export type ProjectPath = ProjectFeaturesPath | ProjectFramingPath;
+/** Pages d'un projet : `/projects/<un segment>` et ses sous-pages connues (TK-48d, TK-59, TK-88). */
+export type ProjectPath = `/projects/${string}`;
 
-const EXACT_PATHS: readonly GuardedPath[] = [
+const EXACT_PATHS: readonly string[] = [
   "/login",
   "/projects",
   "/kanban",
   "/members",
   "/github",
-  "/settings/ai",
+  "/settings",
+  ...SETTINGS_SECTIONS.map((section) => `/settings/${section}`),
   "/organizations",
 ];
-/** `/projects/<un segment>/features` ou `/framing` : jamais de sous-chemin ni de barre oblique finale. */
-const PROJECT_PAGE = /^\/projects\/[^/]+\/(?:features|framing)$/;
+/**
+ * `/projects/<un segment>`, `…/idea`, `…/framing`, `…/tickets`, `…/features` (ancien chemin, redirigé) ou
+ * `…/spec/<livrable>` : jamais de sous-chemin inconnu ni de barre oblique finale.
+ */
+const PROJECT_PAGE = new RegExp(
+  `^/projects/[^/]+(?:/(?:idea|framing|tickets|features)|/spec/(?:${SPEC_SLUGS.join("|")}))?$`,
+);
 
 /**
- * Résout un chemin de requête en page gardée : les chemins exacts de `GuardedPath`, puis
- * `/projects/<un segment>/features` et `/projects/<un segment>/framing`. Tout autre chemin
- * (`/projects/<id>`, `/projects/<id>/features/x`) : null.
+ * Résout un chemin de requête en page gardée : les chemins exacts de `GuardedPath`, puis les pages d'un projet.
+ * Tout autre chemin (`/projects/<id>/other`, `/settings/inconnue`) : null, c'est un 404 de Next.
  */
 export function guardedPathFor(pathname: string): GuardedPath | ProjectPath | null {
-  const exact = EXACT_PATHS.find((path) => path === pathname);
-  if (exact) return exact;
+  if (EXACT_PATHS.includes(pathname)) return pathname as GuardedPath;
   return PROJECT_PAGE.test(pathname) ? (pathname as ProjectPath) : null;
 }
 
-/** Destinations de redirection possibles (jamais /kanban, /github ni /settings/ai : on y entre, on n'y renvoie pas). */
-export type RedirectPath = Exclude<GuardedPath, "/kanban" | "/github" | "/settings/ai">;
+/** Destinations de redirection possibles : on y renvoie, on ne renvoie jamais vers une page de la coquille. */
+export type RedirectPath = "/login" | "/projects" | "/organizations";
 
 export interface AccessInput {
   path: GuardedPath | ProjectPath;

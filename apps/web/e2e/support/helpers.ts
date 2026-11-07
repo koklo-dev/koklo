@@ -9,6 +9,7 @@ import type {
   TransitionMode as KanbanTransition,
 } from "./stub-kanban.ts";
 import type { LlmScenario } from "./stub-llm-credential.ts";
+import type { ShellScenario } from "./stub-shell.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
 
 /** Jeux de règles axe communs à toutes les specs (WCAG 2.0 à 2.2, A et AA) : un écran ne peut
@@ -39,7 +40,8 @@ export async function setScenario(
     SpecRepoScenario &
     FeaturesScenario &
     AiScenario &
-    LlmScenario,
+    LlmScenario &
+    ShellScenario,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
 }
@@ -72,36 +74,34 @@ export async function releaseHeld(): Promise<void> {
 }
 
 /**
- * Le thème par défaut est clair ; le sombre s'obtient par la bascule, comme pour une vraie personne.
- * Sur /login la bascule est un bouton ; dans le gabarit (TK-85) elle vit dans le menu « Menu utilisateur ».
+ * Le thème par défaut est clair ; le sombre s'obtient par la bascule, comme pour une vraie personne : le bouton de
+ * thème du pied de la barre (ou de l'en-tête mobile) et de `/login`.
  */
 export async function switchToDark(page: Page): Promise<void> {
   // Avant l'hydratation le clic est sans effet : on le rejoue jusqu'à ce que la classe `dark` soit posée.
   await expect(async () => {
-    const userMenu = page.getByRole("button", { name: "Menu utilisateur" });
-    const trigger = page.locator('[data-sidebar="trigger"]').first();
-    // Sous 768 px la barre latérale est un panneau : on l'ouvre pour atteindre le menu, puis on le referme.
-    const drawer = !(await userMenu.count()) && (await trigger.isVisible());
-    if (drawer) await trigger.click({ timeout: 2_000 });
-    if (await userMenu.count()) {
-      await userMenu.first().click({ timeout: 2_000 });
-      await page
-        .getByRole("menuitem", { name: "Passer au thème sombre" })
-        .click({ timeout: 2_000 });
-    } else {
-      await page
-        .getByRole("button", { name: "Passer au thème sombre" })
-        .first()
-        .click({ timeout: 2_000 });
-    }
+    await page
+      .getByRole("button", { name: "Passer au thème sombre" })
+      .first()
+      .click({ timeout: 2_000 });
     await expect(page.locator("html")).toHaveClass(/dark/, { timeout: 1_000 });
-    if (drawer) await page.keyboard.press("Escape");
   }).toPass({ timeout: 20_000 });
 }
 
-/** Barre latérale du gabarit (bloc sidebar-07) et son bouton de repli. */
-export const sidebarOf = (page: Page) => page.locator('[data-slot="sidebar"]');
-export const triggerOf = (page: Page) => page.locator('[data-sidebar="trigger"]');
+/** Attend l'hydratation de React (il pose `__reactFiber$…` sur les nœuds qu'il possède) : avant, un raccourci est sans effet. */
+export async function hydrated(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const bar = document.querySelector('[data-slot="app-shell-sidebar"], main');
+    return bar !== null && Object.keys(bar).some((key) => key.startsWith("__reactFiber"));
+  });
+}
+
+/** Barre de la coquille (`AppShell`) et son bouton « Replier la barre » / « Étendre la barre ». */
+export const sidebarOf = (page: Page) => page.locator('[data-slot="app-shell-sidebar"]');
+export const collapseOf = (page: Page) =>
+  page.getByRole("button", { name: /Replier la barre|Étendre la barre/ });
+/** Bouton menu de l'en-tête mobile (sous 768 px) : il ouvre le tiroir. */
+export const menuOf = (page: Page) => page.getByRole("button", { name: "Ouvrir le menu" });
 
 /** Attend la fin des transitions CSS (bascule de thème) ; une animation annulée en cours de route ne fait pas échouer. */
 export async function settle(page: Page): Promise<void> {

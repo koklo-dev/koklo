@@ -152,7 +152,7 @@ export interface RenderOptions {
 
 export function renderFeatures({ projectId = PROJECT_ID, search = "" }: RenderOptions = {}) {
   const query = search && !search.startsWith("?") ? `?${search}` : search;
-  setUrl(`/projects/${projectId}/features${query}`);
+  setUrl(`/projects/${projectId}/spec/functional${query}`);
   return renderWithQuery(<FeaturesPage projectId={projectId} />);
 }
 

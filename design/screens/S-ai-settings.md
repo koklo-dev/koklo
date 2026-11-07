@@ -1,7 +1,7 @@
 ---
 id: S-ai-settings
 titre: Réglages de l'IA (clé du fournisseur de l'organisation)
-version: 1.1
+version: 1.2
 ---
 ## 1. Utilisateurs et objectif
 Propriétaires et administrateurs de l'organisation active (vue équipe, vision §14 « fournisseurs, clés BYOK : propriétaire/admin seulement »). Les autres rôles (développeur, designer, client, business) n'ont pas cette page : l'entrée est absente de la navigation et un accès direct affiche un message sans action ni appel d'API. Arrivée : entrée « IA » de la barre latérale, ou lien « Configurer l'IA » de l'écran de cadrage (S-framing §4.5) pour owner/admin.
@@ -147,6 +147,7 @@ Sous 768 px (375 px testé) : marge 16 px ; h1 puis carte pleine largeur ; champ
 |---|---|---|---|
 | 1 | 2026-11-02 | Web : réglages IA (clé BYOK) | Création : route `/settings/ai`, owner/admin, Anthropic seul, « Enregistrer et vérifier » (set puis verify), états absente / configurée / invalide / illisible / en cours / échec réseau / quota 5 par heure / non-admin, remplacement et retrait avec confirmation, clé jamais réaffichée. Détail : `.workflow/AI-SETTINGS/02-design.md` |
 | 1.1 | 2026-11-06 | TK-87 | Lot 0 : bloc d'envoi en `InlineAlert` neutre + « Détails » (S-framing §3.2 v2), sans nom de fournisseur dans le bloc (B15) ; la ligne « Votre clé est chiffrée… » reste hors du bloc, inchangée ; h1 et h2 à l'échelle v2. Les libellés « Anthropic » de la carte (nom du fournisseur de la clé) et ses `Badge` d'état restent jusqu'à TK-98 (B30). Détail : `.workflow/TK-87/02-design.md` |
+| 1.2 | 2026-11-07 | TK-88 | Route `/settings/ai` inchangée, rendue sous « Réglages » (onglets en liens, plus d'entrée « IA » dans la barre). États et textes inchangés. Détail : `.workflow/TK-88/02-design.md` |
 
 ## 11. Plan d'implémentation web (brief développeur)
 Aucun changement de contrat ni de dépendance.

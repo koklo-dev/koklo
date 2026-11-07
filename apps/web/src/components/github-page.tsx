@@ -15,6 +15,7 @@ import {
 import type { StartFailure } from "../lib/github-start-error.ts";
 import { orpc } from "../lib/orpc.ts";
 import { canManage } from "../lib/roles.ts";
+import { settingsPath } from "../lib/shell-routes.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { NEW_INSTALLATION, useStartInstallation } from "../lib/use-start-installation.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
@@ -29,7 +30,7 @@ const isKnownOutcome = (value: unknown): value is InstallationCallbackOutcome =>
   typeof value === "string" && Object.hasOwn(RESULT_NOTICES, value);
 
 function Title() {
-  return <h1 className="text-page-title">GitHub</h1>;
+  return <h2 className="text-section-title">GitHub</h2>;
 }
 
 /** Liste, vide, chargement ou erreur selon la requête des installations. */
@@ -91,7 +92,7 @@ function GithubManager({ result }: { result: InstallationCallbackOutcome | undef
   useEffect(() => {
     if (!isKnownOutcome(result)) return;
     setOutcome(result);
-    router.replace("/github", { scroll: false });
+    router.replace(settingsPath("github"), { scroll: false });
   }, [result, router]);
 
   const { active, run } = useStartInstallation((next) => {

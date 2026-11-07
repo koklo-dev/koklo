@@ -90,7 +90,7 @@ describe("S-github — retour de GitHub ?result= (AC-48-16)", () => {
     async (outcome, _role, title) => {
       renderWithQuery(<GithubPage result={outcome} />);
       await screen.findByText(title);
-      expect(router.replace).toHaveBeenCalledWith("/github", { scroll: false });
+      expect(router.replace).toHaveBeenCalledWith("/settings/github", { scroll: false });
       expect(router.push).not.toHaveBeenCalled();
     },
   );

@@ -92,7 +92,7 @@ describe("S-members — liste", () => {
     const row = screen.getByText("Moussa Diallo").closest("tr") as HTMLElement;
     expect(within(row).getByText("moussa@example.com")).toBeInTheDocument();
     expect(within(row).getByText("Développeur")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "Membres" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Membres" })).toBeInTheDocument();
     expect(screen.getByText("2 membres")).toBeInTheDocument();
     expect(screen.getByTestId("members-page")).toBeInTheDocument();
   });

@@ -26,7 +26,7 @@
   /* biome-ignore format: valeur recopiée mot pour mot de DESIGN.md §2.1 (test de fidélité). */
   --shadow-floating: 0 8px 24px rgb(20 16 43 / .12);
   --radius: 0.5rem;
-  --sidebar: var(--card);
+  --sidebar: var(--surface);
   --sidebar-foreground: var(--card-foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);

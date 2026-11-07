@@ -28,7 +28,7 @@ async function install(over: Record<string, string | undefined> = {}, ownerKind?
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("callback nominal", () => {
-  it("303 vers /github?result=installed", async () => {
+  it("303 vers /settings/github?result=installed", async () => {
     const { res } = await install();
     expectOutcome(res, "installed");
     expect(res.headers["cache-control"]).toMatch(/no-store/);
@@ -245,7 +245,10 @@ describe("callback : atomicité", () => {
       callback(b.app, s.owner.cookie, githubReturn(s, state)),
     ]);
     const outcomes = [one.headers.location, two.headers.location].sort();
-    expect(outcomes).toEqual(["/github?result=installed", "/github?result=invalid_state"]);
+    expect(outcomes).toEqual([
+      "/settings/github?result=installed",
+      "/settings/github?result=invalid_state",
+    ]);
     expect(await installationRows(b.database, s.world.organizationId)).toHaveLength(1);
     expect(await credentialRows(b.database, s.world.organizationId)).toHaveLength(1);
     expect(b.harness.callsOf("exchangeUserCode")).toHaveLength(1);

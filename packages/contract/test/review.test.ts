@@ -62,9 +62,9 @@ describe("RV1 surface : exactement list et submit", () => {
     expect(Object.keys(d.paths[COLLECTION] ?? {}).sort()).toEqual(["get", "post"]);
   });
 
-  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 2.0.0 (TK-94, projet explicite TK-96)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.0.0");
-    expect((await doc()).info.version).toBe("2.0.0");
+  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 2.1.0 (TK-94, projet explicite TK-96)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.1.0");
+    expect((await doc()).info.version).toBe("2.1.0");
   });
 });
 

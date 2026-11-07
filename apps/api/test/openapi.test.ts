@@ -34,6 +34,7 @@ describe("GET /openapi.json (C3.1)", () => {
       "/members/invitations",
       "/members/{memberId}/role",
       "/organizations",
+      "/project-visits",
       "/projects",
       "/projects/{projectId}/ai/brief",
       "/projects/{projectId}/ai/criteria",
@@ -46,6 +47,7 @@ describe("GET /openapi.json (C3.1)", () => {
       "/projects/{projectId}/project-state",
       "/projects/{projectId}/repos",
       "/projects/{projectId}/reviews",
+      "/projects/{projectId}/shell",
       "/projects/{projectId}/spec",
       "/projects/{projectId}/spec-repo",
       "/projects/{projectId}/spec/batches",
@@ -67,8 +69,10 @@ describe("GET /openapi.json (C3.1)", () => {
       "/projects/{projectId}/tickets/{key}/lease",
       "/projects/{projectId}/tickets/{key}/lease/heartbeat",
       "/projects/{projectId}/tickets/{key}/transition",
+      "/projects/{projectId}/visit",
       "/provider/installations",
       "/provider/installations/start",
+      "/search",
     ]);
   });
 });

@@ -1,6 +1,7 @@
 import type { Role } from "@koklo/contract";
 import { Alert, AlertDescription, AlertTitle, Button, Icon } from "@koklo/ui";
 import { canReadRepos } from "../lib/roles.ts";
+import { settingsPath } from "../lib/shell-routes.ts";
 import { type FeatureErrorView, GITHUB_CHECK } from "../lib/spec-errors.ts";
 import { SpecIndexFailed } from "./spec-index-failed.tsx";
 
@@ -16,7 +17,7 @@ function GithubLink({ view }: { view: FeatureErrorView }) {
     return (
       <>
         <p>{view.text}</p>
-        <a href="/github" className="font-medium underline underline-offset-4">
+        <a href={settingsPath("github")} className="font-medium underline underline-offset-4">
           Ouvrir la page GitHub
         </a>
       </>
@@ -27,7 +28,7 @@ function GithubLink({ view }: { view: FeatureErrorView }) {
   return (
     <p>
       {before}{" "}
-      <a href="/github" className="font-medium underline underline-offset-4">
+      <a href={settingsPath("github")} className="font-medium underline underline-offset-4">
         {GITHUB_CHECK}
       </a>
     </p>

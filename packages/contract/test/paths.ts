@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 2.0.0 (64 routes, 47 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 2.1.0 (68 routes, 51 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /llm-credentials/{provider}",
   "DELETE /projects/{projectId}/clients/{memberId}",
@@ -13,6 +13,7 @@ export const ALL_PAIRS: string[] = [
   "GET /llm-credentials",
   "GET /members",
   "GET /organizations",
+  "GET /project-visits",
   "GET /projects",
   "GET /projects/{projectId}/audit",
   "GET /projects/{projectId}/clients",
@@ -20,6 +21,7 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/project-state",
   "GET /projects/{projectId}/repos",
   "GET /projects/{projectId}/reviews",
+  "GET /projects/{projectId}/shell",
   "GET /projects/{projectId}/spec",
   "GET /projects/{projectId}/spec/batches/{batchId}",
   "GET /projects/{projectId}/spec/features",
@@ -32,6 +34,7 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/tickets/{key}/dependencies",
   "GET /projects/{projectId}/tickets/{key}/lease",
   "GET /provider/installations",
+  "GET /search",
   "PATCH /members/{memberId}/role",
   "PATCH /projects/{projectId}/sprints/{key}",
   "PATCH /projects/{projectId}/tickets/{key}",
@@ -61,6 +64,7 @@ export const ALL_PAIRS: string[] = [
   "POST /projects/{projectId}/tickets/{key}/lease",
   "POST /projects/{projectId}/tickets/{key}/lease/heartbeat",
   "POST /projects/{projectId}/tickets/{key}/transition",
+  "POST /projects/{projectId}/visit",
   "POST /provider/installations/start",
   "PUT /llm-credentials/{provider}",
   "PUT /projects/{projectId}/project-state",
@@ -79,6 +83,7 @@ export const ALL_PATHS: string[] = [
   "/members/invitations",
   "/members/{memberId}/role",
   "/organizations",
+  "/project-visits",
   "/projects",
   "/projects/{projectId}/ai/brief",
   "/projects/{projectId}/ai/criteria",
@@ -91,6 +96,7 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/project-state",
   "/projects/{projectId}/repos",
   "/projects/{projectId}/reviews",
+  "/projects/{projectId}/shell",
   "/projects/{projectId}/spec",
   "/projects/{projectId}/spec-repo",
   "/projects/{projectId}/spec/batches",
@@ -112,6 +118,8 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/tickets/{key}/lease",
   "/projects/{projectId}/tickets/{key}/lease/heartbeat",
   "/projects/{projectId}/tickets/{key}/transition",
+  "/projects/{projectId}/visit",
   "/provider/installations",
   "/provider/installations/start",
+  "/search",
 ];

@@ -2,11 +2,16 @@
 
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo } from "react";
-import { type FeaturesUrlPatch, readFeaturesUrl, withFeaturesUrl } from "./features-url.ts";
+import {
+  type FeaturesUrlPatch,
+  readFeaturesUrl,
+  withFeaturesTab,
+  withFeaturesUrl,
+} from "./features-url.ts";
 
 function write(patch: FeaturesUrlPatch, mode: "push" | "replace"): void {
   const { pathname, search } = window.location;
-  const url = `${pathname}${withFeaturesUrl(search, patch)}`;
+  const url = `${pathname}${withFeaturesTab(withFeaturesUrl(search, patch))}`;
   if (mode === "push") window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
 }
@@ -21,7 +26,9 @@ export function useFeaturesUrl() {
   const state = useMemo(() => readFeaturesUrl(search), [search]);
   useEffect(() => {
     if (new URLSearchParams(search).has("feature") && state.feature) {
-      write({ feature: state.feature }, "replace");
+      const feature = state.feature;
+      // Après les effets du routeur : réécrit trop tôt, l'entrée d'historique perdrait l'état de Next et « Retour » ne la relirait pas.
+      queueMicrotask(() => write({ feature }, "replace"));
     }
   }, [search, state.feature]);
   return {

@@ -1675,6 +1675,52 @@ sequenceDiagram
   adapter is `LLM_PROVIDER_ERROR{unavailable}` (logged by name only, not sent to Sentry). The log of a call
   (`llm.complete` / `llm.failed`) carries counters and names, never a prompt, an output, a key or a nonce.
 
+### Web: application shell (TK-88, lot C)
+`apps/web` only on top of contract 2.1.0 (`project.shell`, `project.visit`, `project.recent`, `search.query`; lot A). This
+section supersedes the frame descriptions above (`AppFrame`, `ProjectsFrame`, `Crumbs`, `nav-main`, `nav-projects` and the
+`team-switcher` no longer exist). Screen sheet: `design/screens/S-app-shell.md`; visual rules: `DESIGN.md` §5.4; decision
+record for `cmdk`: [ADR 0018](adr/0018-cmdk.md).
+
+| Route | Page | Guard (`resolveAccess`) |
+|-------|------|-------------------------|
+| `/` | server page: redirect to the last opened project (`lib/last-project.ts` reads `project.recent` with the request cookie), else `/projects` | none (the destination is guarded) |
+| `/kanban` | same, to `/projects/<id>/tickets` | session + active organization |
+| `/projects` | `ProjectsPage` | session + active organization |
+| `/projects/<id>` | redirect to `/projects/<id>/spec/functional?tab=features` (overview: lot 3) | idem |
+| `/projects/<id>/spec/functional?tab=features\|rules\|roles\|flows` | `FeaturesPage` (`FeaturesHeader` = `ProjectHeader` with tabs; the last three tabs are `EmptyState` "Bientôt") | idem |
+| `/projects/<id>/spec/{data,architecture,technical,security,design,quality}`, `/projects/<id>/idea` | `SoonPage` | idem; an unknown livrable is a 404 |
+| `/projects/<id>/framing` | `FramingPage` (`FramingHeader` = `ProjectHeader`) | idem |
+| `/projects/<id>/tickets` | `KanbanPage` for the project of the URL (the "first project" of TK-96 is gone) | idem |
+| `/settings` → `/settings/{members,github,ai}` | `SettingsPage` (h1 "Réglages", tabs as links by role, the three screens below, their titles now h2) | idem; an unknown section is a 404 |
+
+- **One shell, mounted once**: all connected pages live in the route group `app/(shell)`; its `layout.tsx` renders `ShellFrame`
+  (`AppShell` of `@koklo/ui`, `AppSidebar`, `ShellPalette`, one `main`). It reads the project from the URL
+  (`projectIdFromPath`, uuid only), calls `project.shell` once (shared by the project card, the SPEC group, the Tickets badge and
+  the mobile title through React Query) and `project.visit` once per opened project (failures are silent). Role-dependent
+  entries: "Réglages" needs `canListMembers`, "Assistant de cadrage" needs `canWriteSpec`; an unknown role sees neither
+  (fail-closed). `project.shell` failing locks every SPEC entry, the rest of the navigation stays.
+- **Guards** (`lib/auth-guard.ts`, `proxy.ts`): the guard knows `/projects/<id>`, `idea`, `framing`, `tickets`, `features` (legacy),
+  `spec/<livrable>`, `/settings` and its three sections; any other sub-path is not guarded and ends in a 404. The matcher lists the
+  settings sections one by one (no wildcard). After the guard has passed, the legacy paths `/projects/<id>/features`, `/members`
+  and `/github` are redirected with a 307 and the whole query kept (`lib/legacy-routes.ts`); without a session the guard answers
+  first, so a redirect never leads to a protected page.
+- **Links**: `lib/shell-routes.ts` is the only place that builds addresses (`featuresPath` always writes `tab=features`).
+  The shell uses `next/link` without prefetch (`ShellLink`); in-screen links stay `<a>` until their screens are reworked.
+- **GitHub return**: the API callback redirects to `/settings/github?result=<outcome>`; the screen reads it, shows it, then cleans
+  the URL on the same path.
+
+```mermaid
+flowchart LR
+  req[Request] --> proxy["proxy.ts: guardedPathFor + resolveAccess"]
+  proxy -->|no session| login["/login"]
+  proxy -->|no organization| orgs["/organizations"]
+  proxy -->|legacy path| legacy["legacyRedirect: 307, query kept"]
+  proxy -->|ok| shell["(shell)/layout: ShellFrame"]
+  shell --> sidebar["AppSidebar: project.shell, organization.list"]
+  shell --> palette["ShellPalette: search.query, 200 ms debounce"]
+  shell --> page["page: ProjectHeader + PageBody"]
+```
+
 ## 5. Runtime views
 TO DOCUMENT — the two or three flows worth a sequence diagram (the critical
 path, the failure path).

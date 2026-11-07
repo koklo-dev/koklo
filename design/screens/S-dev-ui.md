@@ -1,7 +1,7 @@
 ---
 id: S-dev-ui
 titre: Galerie des composants (/dev/ui, équipe, hors production)
-version: 2
+version: 1.1
 ---
 ## 1. Utilisateurs et objectif
 L'équipe Koklo (développeurs, designer, agents de développement et de revue) et les tests de captures. Ce n'est pas un écran du produit : aucun client ni rôle d'organisation n'y a affaire. Arrivée : adresse saisie `/dev/ui`, ou les tests `apps/web/e2e/dev-ui.spec.ts`.
@@ -98,6 +98,7 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 |---|---|---|---|
 | 1 | 2026-11-06 | TK-87 | Création : galerie autonome des jetons et des 8 composants du lot 0 (DESIGN.md v2), tous états, bascule de thème, 404 en production, captures clair / sombre / 375 px. Détail : `.workflow/TK-87/02-design.md` |
 | 2 | 2026-11-06 | TK-94 | Section « Listes longues » : `VirtualList` (1 000 lignes simulées), `CountBar`, `ListFooter` (4 états), `EmptyState` de recherche vide, `Pagination`, `GroupSection`, `DiagramMinimap`, `ZoneNode`, tous états, clair et sombre. Détail : `.workflow/TK-94/02-design.md` |
+| 1.1 | 2026-11-07 | TK-88 | Section « Coquille » (lot B) : barre étendue et repliée, entrée verrouillée avec infobulle, `ProjectHeader` avec onglets, palette ⌘K (résultats, vide, erreur), page « Bientôt », en clair et en sombre. Détail : `.workflow/TK-88/02-design.md` |
 
 ## 11. Captures (générées par `apps/web/e2e/dev-ui.spec.ts`)
 Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`. TK-94 : `lists-light.png`, `lists-dark.png`, `lists-light-mobile.png`, `lists-dark-mobile.png` (section « Listes longues »).
