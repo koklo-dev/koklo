@@ -18,7 +18,7 @@
     "@koklo/ui": "workspace:*",
     "@orpc/client": "2.0.0-beta.46",
     "@orpc/contract": "2.0.0-beta.46",
-    "@orpc/openapi": "2.0.0-beta.46",
+    "@orpc/openapi": "2.0.0-beta.48",
     "@orpc/tanstack-query": "2.0.0-beta.46",
     "@tanstack/react-query": "5.105.0",
     "better-auth": "1.7.14",
