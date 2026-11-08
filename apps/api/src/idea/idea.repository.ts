@@ -1,5 +1,6 @@
 import type { IdeaPageStatus } from "@koklo/domain";
 import type { ProjectScope } from "../tracker/scope.ts";
+import type { IdeaProposalRecord } from "./idea-proposal.repository.ts";
 
 export const IDEA_REPOSITORY = Symbol("IDEA_REPOSITORY");
 
@@ -25,6 +26,9 @@ export interface IdeaPageRecord {
   deletedAt: Date | null;
   /** Absent des listes : aucune requête de liste ne charge le contenu. */
   contentMd?: string;
+  /** Propositions en attente sur la page : leur nombre (liste) ou leur détail (`get`) ; absent ailleurs. */
+  pendingProposals?: number;
+  proposals?: IdeaProposalRecord[];
 }
 
 export interface IdeaListing {
@@ -33,6 +37,8 @@ export interface IdeaListing {
   /** Le dépôt de spec existe : « Enregistrer une version » est possible (le fournisseur est vérifié par le service). */
   hasSpecRepo: boolean;
   lastPublication: { commitSha: string; publishedAt: Date } | null;
+  /** Propositions de page (`create_page`) en attente : elles n'ont pas encore de page. */
+  pendingPageProposals: IdeaProposalRecord[];
 }
 
 export interface IdeaActor {

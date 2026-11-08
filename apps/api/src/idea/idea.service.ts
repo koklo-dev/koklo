@@ -1,6 +1,7 @@
 import type {
   IdeaListOutput,
   IdeaPage,
+  IdeaPageDetail,
   IdeaPageSummary,
   IdeaPresenceOutput,
 } from "@koklo/contract";
@@ -11,27 +12,9 @@ import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
 import { SpecBatchService } from "../spec-batch/spec-batch.service.ts";
 import { viaDomain } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
-import { IDEA_REPOSITORY, type IdeaPageRecord, type IdeaRepository } from "./idea.repository.ts";
+import { IDEA_REPOSITORY, type IdeaRepository } from "./idea.repository.ts";
 import { buildIdeaBatch } from "./idea-batch.ts";
-
-const summaryOf = (record: IdeaPageRecord): IdeaPageSummary => ({
-  id: record.id,
-  slug: record.slug,
-  title: record.title,
-  position: record.position,
-  required: record.required,
-  origin: record.origin,
-  status: record.status,
-  version: record.version,
-  updatedAt: record.updatedAt.toISOString(),
-  updatedBy: record.updatedBy,
-  deletedAt: record.deletedAt?.toISOString() ?? null,
-});
-
-const pageOf = (record: IdeaPageRecord): IdeaPage => ({
-  ...summaryOf(record),
-  contentMd: record.contentMd ?? "",
-});
+import { pageOf, proposalOf, summaryOf } from "./idea-views.ts";
 
 /** Deux initiales au plus, en majuscules, depuis les premiers mots du nom. */
 export function initialsOf(name: string): string {
@@ -68,7 +51,10 @@ export class IdeaService {
   async list(scope: ProjectScope): Promise<IdeaListOutput> {
     const listing = await this.repository.list(scope, this.now());
     return {
-      pages: listing.pages.map(summaryOf),
+      pages: listing.pages.map((record) => ({
+        ...summaryOf(record),
+        pendingProposals: record.pendingProposals ?? 0,
+      })),
       trash: listing.trash.map(summaryOf),
       total: listing.pages.length,
       publication: {
@@ -78,11 +64,13 @@ export class IdeaService {
           publishedAt: listing.lastPublication.publishedAt.toISOString(),
         },
       },
+      pendingPageProposals: listing.pendingPageProposals.map(proposalOf),
     };
   }
 
-  async get(scope: ProjectScope, pageId: string): Promise<IdeaPage> {
-    return pageOf(await this.repository.get(scope, pageId, this.now()));
+  async get(scope: ProjectScope, pageId: string): Promise<IdeaPageDetail> {
+    const record = await this.repository.get(scope, pageId, this.now());
+    return { ...pageOf(record), proposals: (record.proposals ?? []).map(proposalOf) };
   }
 
   async save(

@@ -4,10 +4,8 @@ import {
   IDEA_TRASH_DAYS,
   type IdeaPageStatus,
   ideaPageStatusAfterSave,
-  ideaSlugOf,
   isIdeaReorderComplete,
   isIdeaRestorable,
-  uniqueIdeaSlug,
 } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
@@ -32,12 +30,16 @@ import {
   contribute,
   FULL,
   findPage,
+  insertPageRow,
   oneRecord,
   recordsOf,
   SUMMARY,
 } from "./prisma-idea-helpers.ts";
+import { PROPOSAL, proposalRecord, staleProposalsOf } from "./prisma-idea-proposal-helpers.ts";
 
 const DAY_MS = 86_400_000;
+/** Plus de propositions en attente que l'arborescence n'en montre : le surplus attend sa décision. */
+const PENDING_PROPOSALS_MAX = 200;
 
 @Injectable()
 export class PrismaIdeaRepository implements IdeaRepository {
@@ -68,11 +70,23 @@ export class PrismaIdeaRepository implements IdeaRepository {
         }),
       ]);
       const records = await recordsOf(tx, scope, [...pages, ...trash]);
+      const pending = (
+        await tx.ideaProposal.findMany({
+          where: { projectId: scope.projectId, status: "pending" },
+          select: PROPOSAL,
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: PENDING_PROPOSALS_MAX,
+        })
+      ).map(proposalRecord);
       return {
-        pages: records.slice(0, pages.length),
+        pages: records.slice(0, pages.length).map((record) => ({
+          ...record,
+          pendingProposals: pending.filter((proposal) => proposal.pageId === record.id).length,
+        })),
         trash: records.slice(pages.length),
         hasSpecRepo: repo !== null,
         lastPublication: last,
+        pendingPageProposals: pending.filter((proposal) => proposal.op === "create_page"),
       };
     });
   }
@@ -81,7 +95,12 @@ export class PrismaIdeaRepository implements IdeaRepository {
     return this.transactions.run(scope, async (tx) => {
       const row = await findPage(tx, scope, pageId, false);
       if (row.deletedAt && !isIdeaRestorable(row.deletedAt, now)) throw notFound();
-      return oneRecord(tx, scope, row);
+      const proposals = await tx.ideaProposal.findMany({
+        where: { projectId: scope.projectId, pageId, status: "pending" },
+        select: PROPOSAL,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+      return { ...(await oneRecord(tx, scope, row)), proposals: proposals.map(proposalRecord) };
     });
   }
 
@@ -111,6 +130,7 @@ export class PrismaIdeaRepository implements IdeaRepository {
         const latest = await findPage(tx, scope, pageId, true);
         throw new ORPCError("CONFLICT", { data: { currentVersion: latest.version } });
       }
+      await staleProposalsOf(tx, scope.projectId, pageId);
       await contribute(tx, scope, pageId, actor.now);
       await audit(tx, scope, "idea.page.save", pageId);
       return oneRecord(tx, scope, await findPage(tx, scope, pageId, true));
@@ -158,38 +178,13 @@ export class PrismaIdeaRepository implements IdeaRepository {
     input: { title: string; afterPageId?: string | undefined },
   ): Promise<IdeaPageRecord> {
     return this.transactions.run(scope, async (tx) => {
-      const active = await activeOf(tx, scope);
-      if (active.length >= IDEA_PAGE_LIMIT) {
-        throw validation("title", `Le dossier compte déjà ${IDEA_PAGE_LIMIT} pages.`);
-      }
-      const after = input.afterPageId
-        ? active.findIndex((row) => row.id === input.afterPageId)
-        : active.length - 1;
-      if (after < 0 && input.afterPageId) throw validation("afterPageId", "Page inconnue.");
-      const slugs = await tx.ideaPage.findMany({
-        where: { projectId: scope.projectId },
-        select: { slug: true },
-      });
-      const created = await tx.ideaPage.create({
-        data: {
-          organizationId: scope.organizationId,
-          projectId: scope.projectId,
-          slug: uniqueIdeaSlug(
-            ideaSlugOf(input.title),
-            slugs.map((s) => s.slug),
-          ),
-          title: input.title,
-          position: after + 1,
-          origin: "user",
-          status: "empty",
-          updatedBy: scope.userId,
-        },
-        select: FULL,
-      });
-      const order = [...active.slice(0, after + 1), created, ...active.slice(after + 1)];
-      await applyOrder(tx, order);
-      await contribute(tx, scope, created.id, actor.now);
-      await audit(tx, scope, "idea.page.create", created.id);
+      const created = await insertPageRow(
+        tx,
+        scope,
+        actor.now,
+        { ...input, origin: "user", field: "title" },
+        "idea.page.create",
+      );
       return oneRecord(tx, scope, await findPage(tx, scope, created.id, true));
     });
   }
@@ -240,6 +235,7 @@ export class PrismaIdeaRepository implements IdeaRepository {
         tx,
         (await activeOf(tx, scope)).filter((row) => row.id !== pageId),
       );
+      await staleProposalsOf(tx, scope.projectId, pageId);
       await audit(tx, scope, "idea.page.delete", pageId);
       return oneRecord(tx, scope, await findPage(tx, scope, pageId, false));
     });

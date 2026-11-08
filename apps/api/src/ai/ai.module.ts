@@ -101,6 +101,6 @@ function sdkAdapters(): AiAdapterFactory {
         new AiProviderRouter({ routing, credentials, meter, catalog, events, providerFor, keys }),
     },
   ],
-  exports: [AiService, AiSettingsService, AiUsageReportService],
+  exports: [AiService, AiCallRunner, PrismaAiRoutingStore, AiSettingsService, AiUsageReportService],
 })
 export class AiModule {}

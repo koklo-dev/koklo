@@ -1,5 +1,11 @@
-import type { IdeaPageStatus } from "@koklo/domain";
-import { notFound } from "../tracker/api-errors.ts";
+import {
+  IDEA_PAGE_LIMIT,
+  type IdeaPageStatus,
+  ideaPageStatusAfterSave,
+  ideaSlugOf,
+  uniqueIdeaSlug,
+} from "@koklo/domain";
+import { notFound, validation } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import type { Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -147,4 +153,65 @@ export async function findPage(
   });
   if (!row) throw notFound();
   return row;
+}
+
+export interface NewPage {
+  title: string;
+  afterPageId?: string | undefined;
+  origin: "user" | "agent";
+  contentMd?: string;
+  /** Champ de l'erreur quand le dossier est plein. */
+  field: string;
+}
+
+/**
+ * Insère une page active après `afterPageId` (sinon à la fin), recalcule les positions, ajoute le contributeur et
+ * journalise `auditAction`. Partagé par la création humaine et l'acceptation d'une page proposée par l'agent.
+ * Une collision de slug (création simultanée) lève l'erreur d'unicité : l'appelant réessaie.
+ */
+export async function insertPageRow(
+  tx: Tx,
+  scope: ProjectScope,
+  now: Date,
+  input: NewPage,
+  auditAction: string,
+): Promise<Row> {
+  const active = await activeOf(tx, scope);
+  if (active.length >= IDEA_PAGE_LIMIT) {
+    throw validation(input.field, `Le dossier compte déjà ${IDEA_PAGE_LIMIT} pages.`);
+  }
+  const found = input.afterPageId
+    ? active.findIndex((row) => row.id === input.afterPageId)
+    : active.length - 1;
+  if (found < 0 && input.afterPageId && input.origin === "user") {
+    throw validation("afterPageId", "Page inconnue.");
+  }
+  // Une page de repère disparue (proposition de l'agent) : la page va à la fin.
+  const insertAt = found < 0 ? active.length : found + 1;
+  const slugs = await tx.ideaPage.findMany({
+    where: { projectId: scope.projectId },
+    select: { slug: true },
+  });
+  const contentMd = input.contentMd ?? "";
+  const created = await tx.ideaPage.create({
+    data: {
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+      slug: uniqueIdeaSlug(
+        ideaSlugOf(input.title),
+        slugs.map((s) => s.slug),
+      ),
+      title: input.title,
+      position: insertAt,
+      origin: input.origin,
+      status: ideaPageStatusAfterSave("empty", contentMd),
+      contentMd,
+      updatedBy: scope.userId,
+    },
+    select: FULL,
+  });
+  await applyOrder(tx, [...active.slice(0, insertAt), created, ...active.slice(insertAt)]);
+  await contribute(tx, scope, created.id, now);
+  await audit(tx, scope, auditAction, created.id);
+  return created;
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   type AiProvider,
+  type AiRequest,
   type AiResponse,
   type AiUsage,
   type FramedPrompt,
@@ -8,6 +9,9 @@ import {
   type LlmOutputSpec,
   type LlmProviderId,
   type LlmResponse,
+  type LlmServingProviderId,
+  type LlmStopReason,
+  type LlmUsage,
   type QualifiedModelCatalog,
   UntrustedDelimiterCollisionError,
   validateLlmOutput,
@@ -60,6 +64,23 @@ interface AiCallBase<T> {
 export interface AiUsageCall<T> extends AiCallBase<T> {
   readonly usage: AiUsage;
   readonly entry: () => AuditEntry;
+  /** Interrompt l'appel (annulation du client) ; le moteur le transmet à l'adaptateur. */
+  readonly signal?: AbortSignal;
+  /** L'appelant tient déjà un verrou exclusif en base : pas de sémaphore de processus (TK-90, B221). */
+  readonly exclusive?: true;
+  /** Un appel précédent du même échange a déjà été admis : ni quota, ni ligne d'audit en plus (TK-90, B220). */
+  readonly admitted?: true;
+}
+
+/** Appel en flux de texte : mêmes refus, quota et audit qu'un appel `run`, sans `output` ni `settle`. */
+export type AiStreamCall = Omit<AiUsageCall<never>, "output" | "settle">;
+
+/** Fin d'un flux : ce que le fournisseur a réellement servi. */
+export interface AiStreamEnd {
+  readonly stop: LlmStopReason;
+  readonly usage: LlmUsage;
+  readonly provider: LlmServingProviderId;
+  readonly model: string;
 }
 
 /** Vérification d'une clé : le fournisseur est nommé (il vient de l'URL), sans usage ni plafond. */
@@ -114,22 +135,12 @@ export class AiCallRunner {
   }
 
   async run<T>(call: AiUsageCall<T>): Promise<T> {
-    const { organizationId, userId } = call.actor;
-    const prompt = this.frame(call);
-    const request = {
-      organizationId,
-      userId,
-      usage: call.usage,
-      euOnly: false,
-      prompt,
-      output: call.output,
-      budget: AI_BUDGETS[call.purpose],
-      trace: { purpose: call.purpose, correlationId: call.correlationId },
-    };
+    const { organizationId } = call.actor;
+    const request = this.requestOf(call, call.output);
     await this.refusals(organizationId, () => this.engine.preflight(request));
-    const release = this.#gate.acquire(organizationId);
+    const release = call.exclusive ? () => undefined : this.#gate.acquire(organizationId);
     try {
-      await this.ledger.admit(call.actor, call.quota, call.entry());
+      if (!call.admitted) await this.ledger.admit(call.actor, call.quota, call.entry());
       const response = await this.attempt(call, organizationId, () =>
         this.engine.complete(request),
       );
@@ -137,6 +148,18 @@ export class AiCallRunner {
     } finally {
       release();
     }
+  }
+
+  /**
+   * Flux de texte (TK-90) : cadrage, refus du moteur, quota et audit AVANT l'appel (donc en vraies erreurs), puis le
+   * texte morceau par morceau ; la fin rend l'arrêt, l'usage et le modèle servi. Pas de sémaphore de processus :
+   * l'appelant tient un verrou en base. Les erreurs du milieu du flux sont les mêmes erreurs typées.
+   */
+  async stream(call: AiStreamCall): Promise<AsyncGenerator<string, AiStreamEnd | undefined>> {
+    const request = this.requestOf(call, { kind: "text" });
+    await this.refusals(call.actor.organizationId, () => this.engine.preflight(request));
+    if (!call.admitted) await this.ledger.admit(call.actor, call.quota, call.entry());
+    return this.relay(call, request);
   }
 
   async verify<T>(call: AiVerifyCall<T>): Promise<T> {
@@ -164,6 +187,50 @@ export class AiCallRunner {
     };
     const response = await this.exchange(call, target, call.entry());
     return this.settle(call, { ...response, provider: call.provider });
+  }
+
+  private requestOf(
+    call: Pick<
+      AiUsageCall<unknown>,
+      "actor" | "usage" | "purpose" | "correlationId" | "frame" | "signal"
+    >,
+    output: LlmOutputSpec,
+  ): AiRequest {
+    return {
+      organizationId: call.actor.organizationId,
+      userId: call.actor.userId,
+      usage: call.usage,
+      euOnly: false,
+      prompt: this.frame(call),
+      output,
+      budget: AI_BUDGETS[call.purpose],
+      trace: { purpose: call.purpose, correlationId: call.correlationId },
+      ...(call.signal === undefined ? {} : { signal: call.signal }),
+    };
+  }
+
+  private async *relay(
+    call: AiStreamCall,
+    request: AiRequest,
+  ): AsyncGenerator<string, AiStreamEnd | undefined> {
+    let end: AiStreamEnd | undefined;
+    try {
+      for await (const event of this.engine.stream(request)) {
+        if (event.type === "text") yield event.text;
+        else
+          end = {
+            stop: event.stop,
+            usage: event.usage,
+            provider: event.provider,
+            model: event.model,
+          };
+      }
+    } catch (error) {
+      this.logFailure(call, error);
+      throw await this.translated(call.actor.organizationId, error);
+    }
+    if (end?.stop === "refusal") throw providerError("refused");
+    return end;
   }
 
   /** Modèle demandé, sinon le premier qualifié du fournisseur ; aucun -> `unavailable` (rien d'envoyé). */
@@ -220,7 +287,7 @@ export class AiCallRunner {
     }
   }
 
-  private frame(call: AiCallBase<unknown>): FramedPrompt {
+  private frame(call: Pick<AiCallBase<unknown>, "frame">): FramedPrompt {
     try {
       return call.frame(this.nonces.next());
     } catch (error) {
@@ -235,12 +302,22 @@ export class AiCallRunner {
     try {
       return await work();
     } catch (error) {
-      if (error instanceof AiCapReachedError) throw capReached();
-      if (error instanceof AiNotConfiguredError) {
-        throw unavailableCredential(await this.credentials.unavailabilityOf(organizationId));
-      }
-      throw error;
+      throw await this.refusalOf(organizationId, error);
     }
+  }
+
+  private async refusalOf(organizationId: string, error: unknown): Promise<unknown> {
+    if (error instanceof AiCapReachedError) return capReached();
+    if (error instanceof AiNotConfiguredError) {
+      return unavailableCredential(await this.credentials.unavailabilityOf(organizationId));
+    }
+    return error;
+  }
+
+  /** Erreur du flux vers l'erreur typée du contrat : refus du moteur, sinon erreur du port. */
+  private async translated(organizationId: string, error: unknown): Promise<unknown> {
+    const refusal = await this.refusalOf(organizationId, error);
+    return isTypedRefusal(refusal) ? refusal : portFailure(refusal);
   }
 
   private async attempt<R extends LlmResponse>(
@@ -309,7 +386,10 @@ export class AiCallRunner {
     }
   }
 
-  private logFailure(call: AiCallBase<unknown>, error: unknown): void {
+  private logFailure(
+    call: Pick<AiCallBase<unknown>, "purpose" | "correlationId">,
+    error: unknown,
+  ): void {
     const status = (error as { status?: unknown }).status;
     requestLogger().warn(
       {
