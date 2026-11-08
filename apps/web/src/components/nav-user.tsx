@@ -28,11 +28,9 @@ export function NavUser() {
 
   const identity = (
     <>
-      <Avatar className="size-8 rounded-lg">
+      <Avatar size={32} tone="soft">
         {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-        <AvatarFallback className="rounded-lg bg-secondary text-caption font-medium text-secondary-foreground">
-          {initialsOf(user.name)}
-        </AvatarFallback>
+        <AvatarFallback>{initialsOf(user.name)}</AvatarFallback>
       </Avatar>
       {collapsed ? null : (
         <span className="grid min-w-0 flex-1 text-left leading-tight">
@@ -69,10 +67,8 @@ export function NavUser() {
       >
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar className="size-8 rounded-lg">
-              <AvatarFallback className="rounded-lg bg-secondary text-caption font-medium text-secondary-foreground">
-                {initialsOf(user.name)}
-              </AvatarFallback>
+            <Avatar size={32} tone="soft">
+              <AvatarFallback>{initialsOf(user.name)}</AvatarFallback>
             </Avatar>
             <span className="grid min-w-0 flex-1 leading-tight">
               <span className="truncate font-medium">{user.name}</span>

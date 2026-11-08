@@ -1,7 +1,7 @@
 "use client";
 
 import type { FeatureSummary } from "@koklo/contract";
-import { CountBar, ListFooter, VirtualList } from "@koklo/ui";
+import { CountBar, IdTag, ListFooter, ListRow, VirtualList } from "@koklo/ui";
 import { type MouseEvent, type RefObject, useEffect, useRef, useState } from "react";
 import { criteriaLabel } from "../lib/feature-labels.ts";
 import { PAGE_SIZE } from "../lib/use-features.ts";
@@ -24,23 +24,23 @@ function plainClick(event: MouseEvent): boolean {
 }
 
 /**
- * Une ligne de 52 px : identifiant, titre en lien, avancement, priorité, critères. Sous 768 px, avancement et priorité
- * passent sous le titre. Le lien sort de la tabulation (une seule entrée dans la liste, flèches entre les lignes) ;
- * Entrée ou Espace sur la ligne ouvre la fiche comme lui.
+ * Contenu d'une ligne de 52 px (`ListRow as="div"` : l'`li` est celui de `VirtualList`) : `IdTag`, titre en lien,
+ * sous-titre « N critères », puis priorité avant avancement. Sous 768 px, priorité et avancement passent sous le
+ * titre. Le lien sort de la tabulation (une seule entrée dans la liste, flèches entre les lignes) ; Entrée ou Espace
+ * sur la ligne ouvre la fiche comme lui.
  */
 function FeatureRow({ feature, href, onOpen }: RowProps) {
   return (
-    <>
-      <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">
-        {feature.specId}
-      </span>
-      <div className="min-w-0 flex-1">
+    <ListRow
+      as="div"
+      leading={<IdTag className="shrink-0">{feature.specId}</IdTag>}
+      title={
         <a
           href={href}
           tabIndex={-1}
           title={feature.title}
           data-feature-link={feature.specId}
-          className="block truncate text-sm font-medium underline-offset-4 after:absolute after:inset-0 hover:underline focus-visible:outline-none"
+          className="block truncate underline-offset-4 after:absolute after:inset-0 hover:underline focus-visible:outline-none"
           onClick={(event) => {
             event.stopPropagation();
             if (!plainClick(event)) return;
@@ -50,19 +50,23 @@ function FeatureRow({ feature, href, onOpen }: RowProps) {
         >
           {feature.title}
         </a>
-        <p className="flex items-center gap-x-2 text-meta text-muted-foreground md:hidden">
+      }
+      subtitle={
+        <>
+          <span>{criteriaLabel(feature.criteriaCount)}</span>
+          <span className="flex items-center gap-x-2 md:hidden">
+            <FeaturePriority priority={feature.priority} barsOnly />
+            <FeatureLifecycle feature={feature} />
+          </span>
+        </>
+      }
+      trailing={
+        <div className="hidden shrink-0 items-center gap-4 md:flex">
+          <FeaturePriority priority={feature.priority} barsOnly />
           <FeatureLifecycle feature={feature} />
-          <FeaturePriority priority={feature.priority} />
-        </p>
-      </div>
-      <div className="hidden shrink-0 items-center gap-4 md:flex">
-        <FeatureLifecycle feature={feature} />
-        <FeaturePriority priority={feature.priority} />
-        <span className="w-20 text-right text-meta text-muted-foreground">
-          {criteriaLabel(feature.criteriaCount)}
-        </span>
-      </div>
-    </>
+        </div>
+      }
+    />
   );
 }
 

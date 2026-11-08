@@ -282,7 +282,7 @@ export function ShellCollapseButton() {
       title={collapsed ? label : undefined}
       className={cn(
         ITEM_BASE,
-        "h-8 [@media(max-height:900px)]:h-7 text-meta text-muted-foreground",
+        "h-8.5 [@media(max-height:900px)]:h-7 text-meta text-muted-foreground",
         collapsed && "justify-center px-0",
       )}
     >

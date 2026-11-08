@@ -3,7 +3,7 @@
 import { type InvitationListOutput, invitationCreateInputSchema, type Role } from "@koklo/contract";
 import { Alert, AlertDescription, AlertTitle, Button, Card, Icon } from "@koklo/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useId, useRef, useState } from "react";
 import { conflictReason, errorCode } from "../lib/api-error.ts";
 import { fieldErrors, RETRY_LATER } from "../lib/form-errors.ts";
 import { MEMBERS_COPY, needsProjects } from "../lib/members-labels.ts";
@@ -142,49 +142,69 @@ function useInviteForm() {
 /** Invitation d'un membre (e-mail, rôle, projets) ; réservée aux propriétaires et administrateurs. */
 export function InviteForm({ role }: { role: Role }) {
   const form = useInviteForm();
+  const titleId = useId();
   return (
-    <Card className="flex max-w-xl flex-col gap-4 p-5">
-      <h3 className="text-subsection-title">Inviter un membre</h3>
-      <form onSubmit={form.submit} noValidate className="flex flex-col gap-4">
-        {form.failure ? <InviteFailure error={form.failure.error} /> : null}
-        <FormField
-          ref={form.emailInput}
-          type="email"
-          label="Adresse e-mail"
-          value={form.email}
-          onChange={(event) => form.setEmail(event.target.value)}
-          readOnly={form.pending}
-          error={form.errors.email}
-          autoComplete="off"
-        />
-        <RoleField
-          roles={invitableRoles(role)}
-          value={form.memberRole}
-          onValueChange={form.setMemberRole}
-          disabled={form.pending}
-          error={form.errors.role}
-          triggerRef={form.roleTrigger}
-        />
-        {needsProjects(form.memberRole) ? (
-          <InviteProjectsField
-            selected={form.projectIds}
-            onChange={form.setProjectIds}
+    <Card asChild className="flex flex-col gap-3 px-[18px] py-4">
+      <section aria-labelledby={titleId}>
+        <h3 id={titleId} className="sr-only">
+          Inviter un membre
+        </h3>
+        <form onSubmit={form.submit} noValidate className="flex flex-wrap items-end gap-3">
+          {form.failure ? (
+            <div className="basis-full">
+              <InviteFailure error={form.failure.error} />
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-[2_1_16rem]">
+            <FormField
+              ref={form.emailInput}
+              type="email"
+              label="Adresse e-mail"
+              value={form.email}
+              onChange={(event) => form.setEmail(event.target.value)}
+              readOnly={form.pending}
+              error={form.errors.email}
+              autoComplete="off"
+              placeholder="prenom@exemple.fr"
+            />
+          </div>
+          <div className="min-w-0 flex-[1_1_11rem]">
+            <RoleField
+              roles={invitableRoles(role)}
+              value={form.memberRole}
+              onValueChange={form.setMemberRole}
+              disabled={form.pending}
+              error={form.errors.role}
+              triggerRef={form.roleTrigger}
+            />
+          </div>
+          {needsProjects(form.memberRole) ? (
+            <div className="min-w-0 flex-[2_1_16rem]">
+              <InviteProjectsField
+                selected={form.projectIds}
+                onChange={form.setProjectIds}
+                disabled={form.pending}
+                error={form.errors.projects}
+                focusRef={form.projectsFilter}
+              />
+            </div>
+          ) : null}
+          <Button
+            type="submit"
+            size="lg"
+            icon="person_add"
+            className="max-md:h-11 max-md:w-full"
             disabled={form.pending}
-            error={form.errors.projects}
-            focusRef={form.projectsFilter}
-          />
-        ) : null}
-        <p className="text-meta text-muted-foreground">{MEMBERS_COPY.invitePhrase}</p>
-        <Button
-          type="submit"
-          className="h-11 w-full md:h-9 md:w-fit"
-          disabled={form.pending}
-          aria-busy={form.pending}
-        >
-          {form.pending ? "Invitation…" : "Inviter"}
-        </Button>
-      </form>
-      {form.created ? <Created invitation={form.created} /> : null}
+            aria-busy={form.pending}
+          >
+            {form.pending ? "Invitation…" : "Inviter"}
+          </Button>
+          <p className="basis-full text-caption text-muted-foreground">
+            {MEMBERS_COPY.invitePhrase}
+          </p>
+        </form>
+        {form.created ? <Created invitation={form.created} /> : null}
+      </section>
     </Card>
   );
 }

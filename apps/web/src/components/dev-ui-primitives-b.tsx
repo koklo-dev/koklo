@@ -85,12 +85,21 @@ function CountersFrame() {
   );
 }
 
+/** En-tête de Réglages : `badge` pour l'équipe, `person` pour le client. */
+const WITH_ICON = [
+  ["owner", "badge"],
+  ["client", "person"],
+] as const;
+
 function RolesFrame() {
   return (
     <DevUiFrame title="Rôles et identifiants">
       <DevUiRow>
         {ROLES.map((role: Role) => (
           <RolePill key={role} role={role} />
+        ))}
+        {WITH_ICON.map(([role, icon]) => (
+          <RolePill key={role} role={role} icon={icon} />
         ))}
       </DevUiRow>
       <DevUiRow>

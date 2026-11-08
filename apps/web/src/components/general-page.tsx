@@ -1,15 +1,18 @@
 "use client";
 
 import { type OrgGetOutput, orgUpdateInputSchema } from "@koklo/contract";
-import { Alert, AlertDescription, Avatar, AvatarFallback, Button, Icon } from "@koklo/ui";
+import { Avatar, AvatarFallback, Button, Card, InlineAlert, StatCard } from "@koklo/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useRef, useState } from "react";
 import { conflictReason } from "../lib/api-error.ts";
 import { fieldErrors, GENERIC_ERROR, NAME_TOO_LONG } from "../lib/form-errors.ts";
+import { initialsOf } from "../lib/initials.ts";
 import { orpc } from "../lib/orpc.ts";
+import { SETTINGS_TITLES } from "../lib/settings-sections.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FormField } from "./form-field.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
+import { SectionHeading } from "./section-heading.tsx";
 
 const SLUG_INVALID = "Utilisez 2 à 48 lettres minuscules, chiffres ou tirets.";
 const SLUG_TAKEN = "Cette adresse est déjà utilisée.";
@@ -22,14 +25,6 @@ const MESSAGES = {
   slug: { default: SLUG_INVALID },
 };
 
-const initials = (name: string): string =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("");
-
 function Figures({ org }: { org: OrgGetOutput }) {
   const figures = [
     ["Projets", org.projectCount],
@@ -39,9 +34,8 @@ function Figures({ org }: { org: OrgGetOutput }) {
   return (
     <ul aria-label="Chiffres de l'organisation" className="grid gap-3 md:grid-cols-3">
       {figures.map(([label, value]) => (
-        <li key={label} className="flex flex-col gap-1 rounded-lg border bg-card p-4">
-          <span className="text-meta text-muted-foreground">{label}</span>
-          <span className="text-section-title">{value}</span>
+        <li key={label}>
+          <StatCard label={label} value={String(value)} />
         </li>
       ))}
     </ul>
@@ -100,49 +94,58 @@ function useOrganizationSettings(org: OrgGetOutput) {
 function OrganizationForm({ org }: { org: OrgGetOutput }) {
   const form = useOrganizationSettings(org);
   return (
-    <form onSubmit={form.submit} noValidate className="flex max-w-xl flex-col gap-4">
-      <Avatar className="size-14" aria-hidden="true">
-        <AvatarFallback className="text-base">{initials(form.name || org.name)}</AvatarFallback>
-      </Avatar>
-      {form.failed ? (
-        <ErrorNotice title="Impossible d'enregistrer">{GENERIC_ERROR}</ErrorNotice>
-      ) : null}
-      <FormField
-        ref={form.nameInput}
-        label="Nom de l'organisation"
-        value={form.name}
-        onChange={(event) => form.setName(event.target.value)}
-        readOnly={form.busy}
-        error={form.errors.name}
-        autoComplete="organization"
-      />
-      <FormField
-        ref={form.slugInput}
-        label="Adresse"
-        hint="Lettres minuscules, chiffres et tirets."
-        value={form.slug}
-        onChange={(event) => form.setSlug(event.target.value)}
-        readOnly={form.busy}
-        error={form.errors.slug}
-        className="font-mono"
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <Button
-        type="submit"
-        className="h-11 w-full md:h-9 md:w-fit"
-        disabled={form.busy}
-        aria-busy={form.busy}
-      >
-        {form.busy ? "Enregistrement…" : "Enregistrer"}
-      </Button>
-      {form.saved ? (
-        <Alert role="status">
-          <Icon name="check_circle" size={20} />
-          <AlertDescription>Modifications enregistrées</AlertDescription>
-        </Alert>
-      ) : null}
-    </form>
+    <Card asChild>
+      <form onSubmit={form.submit} noValidate className="flex flex-wrap items-end gap-3.5">
+        {form.failed ? (
+          <div className="basis-full">
+            <ErrorNotice title="Impossible d'enregistrer">{GENERIC_ERROR}</ErrorNotice>
+          </div>
+        ) : null}
+        <Avatar size={56} shape="tile" tone="agent" aria-hidden="true">
+          <AvatarFallback>{initialsOf(form.name || org.name)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-[1_1_16rem]">
+          <FormField
+            ref={form.nameInput}
+            label="Nom de l'organisation"
+            value={form.name}
+            onChange={(event) => form.setName(event.target.value)}
+            readOnly={form.busy}
+            error={form.errors.name}
+            autoComplete="organization"
+          />
+        </div>
+        <div className="min-w-0 flex-[1_1_12rem]">
+          <FormField
+            ref={form.slugInput}
+            label="Adresse"
+            value={form.slug}
+            onChange={(event) => form.setSlug(event.target.value)}
+            readOnly={form.busy}
+            error={form.errors.slug}
+            className="font-mono"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <Button
+          type="submit"
+          className="max-md:h-11 max-md:w-full"
+          disabled={form.busy}
+          aria-busy={form.busy}
+        >
+          {form.busy ? "Enregistrement…" : "Enregistrer"}
+        </Button>
+        <p className="basis-full text-caption text-muted-foreground">
+          L'adresse : lettres minuscules, chiffres et tirets.
+        </p>
+        {form.saved ? (
+          <InlineAlert variant="success" icon="check_circle" className="basis-full">
+            Modifications enregistrées
+          </InlineAlert>
+        ) : null}
+      </form>
+    </Card>
   );
 }
 
@@ -153,8 +156,8 @@ export function GeneralPage() {
   if (org.data) {
     body = (
       <>
-        <Figures org={org.data} />
         <OrganizationForm org={org.data} />
+        <Figures org={org.data} />
       </>
     );
   } else if (org.isError && !org.isFetching) {
@@ -165,13 +168,11 @@ export function GeneralPage() {
     );
   }
   return (
-    <div data-testid="general-page" className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-section-title">Général</h2>
-        <p className="text-meta text-muted-foreground">
-          Le nom et l'adresse de votre organisation.
-        </p>
-      </div>
+    <div data-testid="general-page" className="flex flex-col gap-5">
+      <SectionHeading
+        title={SETTINGS_TITLES.general}
+        description="Le nom et l'adresse de votre espace. Un freelance a en général une organisation ; une agence peut en avoir plusieurs."
+      />
       {body}
     </div>
   );

@@ -102,3 +102,4 @@ Planche 10 (barre) et 05 (mise en page, 1600 × 960 ; captures à 1280 × 800).
 | Tiroir 375 px | — (05 à largeur de bureau) | 288 px, mêmes entrées, pied épinglé ; proportions seules comparables | conforme |
 | Palette | — (DESIGN.md §5.4) | groupes, option active, total, états | conforme à §5.4 |
 | 3 | 2026-11-07 | TK-88 (correction 1) | Barre resserrée sous 900 px de haut (`@media (max-height: 900px)`) : entrées 32 px (36 px dans le tiroir), sous-entrées SPEC 28 px, carte projet 56 px, tuile d'organisation 40 px, écart de groupe 12 px ; Organisation visible à 800 px et à 812 px. B94 |
+| 2.2 | 2026-11-08 | TK-141 | Reprise sur les bases (planches 05, 10, 12) : `ShellNavGroup` avec trait avant Organisation, `ShellNavItem count` à la place de `TicketCount`, carte projet absente du rail replié, `PhaseRail inline`, `Kbd` du champ Rechercher, trait du pied sous « Replier la barre ». Détail : `.workflow/TK-141/00-fiche.md` |

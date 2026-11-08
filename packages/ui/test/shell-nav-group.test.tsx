@@ -93,4 +93,9 @@ describe("ShellCollapseButton", () => {
       document.querySelector('[data-slot="shell-announcer"]') as HTMLElement,
     ).toHaveTextContent("Barre étendue");
   });
+
+  it("TK-141 : bouton de 34 px (planche 05, footBtn)", () => {
+    render(<Shell />);
+    expect(screen.getByRole("button", { name: "Replier la barre" })).toHaveClass("h-8.5");
+  });
 });

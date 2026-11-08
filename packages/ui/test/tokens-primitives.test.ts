@@ -109,6 +109,7 @@ const ICONS = [
   "speed",
   "description",
   "subdirectory_arrow_right",
+  "group", // TK-141 : navigation Réglages
 ] as const;
 
 describe("icônes de TK-138 générées", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { ToastProvider } from "@koklo/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
@@ -10,5 +11,9 @@ export function Providers({ children }: { children: ReactNode }) {
         defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
       }),
   );
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <ToastProvider>{children}</ToastProvider>
+    </QueryClientProvider>
+  );
 }

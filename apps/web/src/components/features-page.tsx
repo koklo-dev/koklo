@@ -1,6 +1,14 @@
 "use client";
 
-import { Alert, AlertDescription, CountBar, EmptyState, Icon, InlineAlert } from "@koklo/ui";
+import {
+  Alert,
+  AlertDescription,
+  CountBar,
+  EmptyState,
+  Icon,
+  InlineAlert,
+  VirtualList,
+} from "@koklo/ui";
 import { useSearchParams } from "next/navigation";
 import { readFeaturesTab } from "../lib/features-tab.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
@@ -20,25 +28,20 @@ import { SpecIndexFailed } from "./spec-index-failed.tsx";
 import { SpecPreparing } from "./spec-preparing.tsx";
 import { SpecRepoMissing } from "./spec-repo-missing.tsx";
 
-/** Huit lignes de 52 px comme celles de la liste : la mise en page ne bouge pas quand les données arrivent. */
+/** Huit lignes de 52 px comme celles de la liste, dans le même cadre : la mise en page ne bouge pas à l'arrivée. */
 function Skeleton() {
   return (
-    <div
-      data-testid="features-skeleton"
-      aria-hidden="true"
-      aria-busy="true"
-      className="flex flex-col overflow-hidden rounded-lg border border-border"
-    >
-      {Array.from({ length: 8 }, (_, row) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: squelettes statiques, sans identité
-          key={row}
-          className="flex h-[52px] items-center gap-3 border-b border-border px-4 last:border-b-0"
-        >
-          <div className="h-4 w-14 rounded-sm bg-muted motion-safe:animate-pulse" />
-          <div className="h-4 flex-1 rounded-sm bg-muted motion-safe:animate-pulse" />
-        </div>
-      ))}
+    <div data-testid="features-skeleton" aria-hidden="true" aria-busy="true">
+      <VirtualList
+        label="Chargement des fonctionnalités"
+        items={[]}
+        total={0}
+        getItemKey={() => ""}
+        renderItem={() => null}
+        className="h-auto"
+        framed
+        loadingRows={8}
+      />
     </div>
   );
 }
@@ -118,6 +121,8 @@ function NoResults({ page }: { page: FeaturesPageModel }) {
           total={0}
           loaded={0}
           noun={{ one: "fonctionnalité", other: "fonctionnalités" }}
+          sort="identifiant"
+          {...(page.url.q ? { query: page.url.q } : {})}
           busy={page.data.features.stale}
           {...(page.region.countText ? { announcement: page.region.countText } : {})}
         />
@@ -246,7 +251,7 @@ function FeaturesTab({ projectId }: { projectId: string }) {
             // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
             role={page.form.open || page.region.countBar ? undefined : "status"}
             aria-busy={page.region.busy || undefined}
-            className="text-[13px] text-muted-foreground empty:hidden"
+            className="text-meta text-muted-foreground empty:hidden"
           >
             {page.form.open ? null : (
               <>

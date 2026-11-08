@@ -46,3 +46,4 @@ A5 (règle « données en UE » par fournisseur, attribut de projet) ; taux rée
 
 ## Correction 1 (TK-98, revue de fidélité à la maquette 24)
 Sections en cartes bordées (Fournisseurs, Modèle par usage avec secours en pied, À quoi servent ces clés et Consommation côte à côte dès `lg`) ; « Ajouter un fournisseur » primaire en tête de la carte Fournisseurs ; lignes avec pastilles Principal / Vérifiée / Intermédiaire et actions à droite ; modèles en liste à lignes avec pastille mono ; ajout : « Choisir un fournisseur », cartes radio avec description sur 2 colonnes, champ « Clé <nom> ». Décisions : B140 à B142.
+| 2.1 | 2026-11-08 | TK-141 | Reprise sur la planche 24 : `Pill sm` (Vérifiée en ton succès, B141 révisée par B171), boutons `sm`, `IdTag pill`, `OptionChip`, `Switch`, `ProgressBar`, `Card panel`, `Toast` à la place de `role=status`, h2 20 px. Détail : `.workflow/TK-141/00-fiche.md` |

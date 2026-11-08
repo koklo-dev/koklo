@@ -75,15 +75,13 @@ describe("lignes", () => {
 });
 
 describe("actions", () => {
-  it("Vérifier : aiProvider.verify avec le fournisseur, annonce role=status", async () => {
+  it("Vérifier : aiProvider.verify avec le fournisseur, annonce en toast", async () => {
     await openProviders([PRIMARY, SECOND]);
     await userEvent.click(inRow(/Anthropic/).getByRole("button", { name: /Vérifier/ }));
     await waitFor(() =>
       expect(calls(procedures.aiProviderVerify)).toEqual([{ provider: "anthropic" }]),
     );
-    expect(screen.getAllByRole("status").some((el) => /vérifiée/i.test(el.textContent ?? ""))).toBe(
-      true,
-    );
+    expect((await screen.findByText("Clé vérifiée.")).closest("[data-slot=toast]")).not.toBeNull();
   });
   it("Mettre en principal : confirmation courte puis aiProvider.setPrimary", async () => {
     await openProviders([PRIMARY, SECOND]);

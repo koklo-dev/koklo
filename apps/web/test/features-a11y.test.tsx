@@ -174,20 +174,26 @@ describe("Accessibilité de la liste (§7)", () => {
 describe("Mobile 375 px (§6)", () => {
   beforeEach(() => setViewport(375));
 
-  it("ligne méta md:hidden sous le titre : LifecycleStatus, PriorityIndicator et critères (TK-87)", async () => {
+  it("sous le titre : critères en sous-titre, puis priorité et avancement en md:hidden (TK-87, TK-141)", async () => {
     renderFeatures();
     const table = await findList();
-    // La ligne de 52 px garde l'identifiant et le titre ; avancement et priorité passent sous le titre.
-    const meta = Array.from(table.querySelectorAll<HTMLElement>("p")).filter(
-      (el) => /\bmd:hidden\b/.test(el.className) && /Indispensable/.test(el.textContent ?? ""),
+    // La ligne de 52 px garde l'identifiant et le titre ; priorité puis avancement passent sous le titre.
+    const meta = Array.from(table.querySelectorAll<HTMLElement>("span")).filter(
+      (el) =>
+        /\bmd:hidden\b/.test(el.className) &&
+        el.querySelector("[data-slot='priority-indicator'][aria-label='Indispensable']") !== null,
     );
     expect(meta.length).toBeGreaterThan(0);
     const first = meta[0] as HTMLElement;
     expect(first.querySelector("[data-slot='lifecycle-status']")).not.toBeNull();
     expect(first.querySelector("[data-slot='priority-indicator']")).not.toBeNull();
-    // Les cellules d'écran large (md:flex) portent la même information, plus les critères.
+    // Le sous-titre « N critères » est visible à toute taille ; les cellules d'écran large (md:flex) portent la même
+    // information de priorité et d'avancement.
+    expect(first.parentElement).toHaveTextContent("3 critères");
     const wide = Array.from(table.querySelectorAll<HTMLElement>("div")).filter(
-      (el) => /\bmd:flex\b/.test(el.className) && /3 critères/.test(el.textContent ?? ""),
+      (el) =>
+        /\bmd:flex\b/.test(el.className) &&
+        el.querySelector("[data-slot='priority-indicator'][aria-label='Indispensable']") !== null,
     );
     expect(wide.length).toBeGreaterThan(0);
   });

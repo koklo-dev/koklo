@@ -99,7 +99,8 @@ test("développeur : lecture seule, matrice visible, aucune action", async ({ pa
   await expect(page.getByRole("button", { name: /Actions pour|Inviter/ })).toHaveCount(0);
   await expect(page.getByText(/Invitations en attente/)).toHaveCount(0);
   await page.getByText("Ce que chaque rôle peut faire").click();
-  await expect(page.getByRole("cell", { name: "Développeur : oui" }).first()).toBeVisible();
+  const table = page.getByRole("table", { name: "Ce que chaque rôle peut faire" });
+  await expect(table.getByLabel("Oui").first()).toBeVisible();
 });
 
 for (const theme of ["light", "dark"] as Theme[]) {

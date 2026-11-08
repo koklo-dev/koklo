@@ -101,6 +101,22 @@ const PRIORITIES = [
 ] as const;
 
 describe("PriorityIndicator", () => {
+  it("barsOnly : barres de 4 px (6, 10, 14), actives en --primary, libellé en nom accessible", () => {
+    const { container } = render(<PriorityIndicator level={2} label="Importante" barsOnly />);
+    const el = root(container, "priority-indicator");
+    expect(el).toHaveAttribute("role", "img");
+    expect(el).toHaveAttribute("aria-label", "Importante");
+    expect(screen.queryByText("Importante")).toBeNull();
+    const bars = [...(el?.querySelectorAll("[data-active]") ?? [])];
+    expect(bars.map((b) => b.className.match(/\bh-[\d.]+\b/)?.[0])).toEqual([
+      "h-1.5",
+      "h-2.5",
+      "h-3.5",
+    ]);
+    expect(bars.every((b) => b.classList.contains("w-1"))).toBe(true);
+    expect(bars.map((b) => b.classList.contains("bg-primary"))).toEqual([true, true, false]);
+  });
+
   it.each(PRIORITIES)("niveau %i : libellé « %s » toujours rendu", (level, label) => {
     const { container } = render(<PriorityIndicator level={level} label={label} />);
     const el = root(container, "priority-indicator");

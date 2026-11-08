@@ -1,13 +1,13 @@
 "use client";
 
-import { Alert, AlertDescription, Badge, Icon } from "@koklo/ui";
+import { PageHeader, RolePill } from "@koklo/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import type { InstallationCallbackOutcome } from "../lib/github-labels.ts";
 import { orpc } from "../lib/orpc.ts";
-import { ROLE_LABELS } from "../lib/roles.ts";
-import { canOpenSection, defaultSection, isReadOnlySection } from "../lib/settings-sections.ts";
+import { pillRole } from "../lib/roles.ts";
+import { canOpenSection, defaultSection, SETTINGS_TITLES } from "../lib/settings-sections.ts";
 import { type SettingsSection, settingsPath } from "../lib/shell-routes.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { AccountPage } from "./account-page.tsx";
@@ -19,8 +19,6 @@ import { MembersPage } from "./members-page.tsx";
 import { PageBody } from "./page-body.tsx";
 import { SettingsNav } from "./settings-nav.tsx";
 
-const READ_ONLY =
-  "Lecture seule : seuls les propriétaires et les administrateurs modifient cette section.";
 const CLIENT_SUMMARY = "Vous voyez seulement les réglages de votre compte.";
 
 const plural = (count: number, one: string, many: string): string =>
@@ -56,6 +54,12 @@ function useSummary(hasOrganizationAccess: boolean) {
   return { text, memberCount: org.data?.memberCount };
 }
 
+/** Premier segment du fil : l'organisation ; pour le client (sans `org.get`), son propre nom. */
+function useCrumbOrigin(organization: string | undefined, isClient: boolean) {
+  const me = useQuery({ ...orpc.me.get.queryOptions(), enabled: isClient });
+  return isClient ? me.data?.name : organization;
+}
+
 /** Au changement de section, le focus passe au h2 de la nouvelle section (pas au premier rendu). */
 function useFocusSectionHeading(section: SettingsSection) {
   const content = useRef<HTMLDivElement>(null);
@@ -85,7 +89,7 @@ export function SettingsPage({
   githubResult?: InstallationCallbackOutcome;
 }) {
   const router = useRouter();
-  const { role, organizations, session } = useActiveOrganization();
+  const { role, organizations, session, active } = useActiveOrganization();
   const roleKnown = !organizations.isPending && !session.isPending;
   const allowed = canOpenSection(section, role);
   const summary = useSummary(roleKnown && role !== undefined && role !== "client");
@@ -95,37 +99,36 @@ export function SettingsPage({
     if (redirectTo) router.replace(redirectTo);
   }, [redirectTo, router]);
 
+  const origin = useCrumbOrigin(active?.name, role === "client");
+  const summaryText = role === "client" ? CLIENT_SUMMARY : summary.text;
+
   return (
     <>
-      <div className="border-b bg-background px-4 pb-4 pt-5 md:px-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 tabIndex={-1} className="text-page-title focus-visible:outline-none">
-            Réglages
-          </h1>
-          {role ? (
-            <Badge variant="outline" data-testid="settings-role">
-              {ROLE_LABELS[role]}
-            </Badge>
-          ) : null}
-        </div>
-        <p className="mt-1 text-meta text-muted-foreground">
-          {role === "client" ? CLIENT_SUMMARY : summary.text}
-        </p>
-      </div>
+      <PageHeader
+        title="Réglages"
+        breadcrumb={
+          origin
+            ? [{ label: origin }, { label: "Réglages" }, { label: SETTINGS_TITLES[section] }]
+            : undefined
+        }
+        status={
+          role ? (
+            <RolePill
+              role={pillRole(role)}
+              tone={role === "client" ? "warning" : "soft"}
+              icon={role === "client" ? "person" : "badge"}
+              data-testid="settings-role"
+            />
+          ) : undefined
+        }
+        {...(summaryText ? { summary: summaryText } : {})}
+      />
       <div className="flex flex-col md:flex-row">
         <SettingsNav section={section} role={role} memberCount={summary.memberCount} />
         <div ref={content} className="min-w-0 flex-1">
           <PageBody>
             {roleKnown && allowed ? (
-              <div className="flex flex-col gap-6">
-                {isReadOnlySection(section, role) ? (
-                  <Alert className="max-w-xl">
-                    <Icon name="lock" size={20} />
-                    <AlertDescription>{READ_ONLY}</AlertDescription>
-                  </Alert>
-                ) : null}
-                <SectionBody section={section} githubResult={githubResult} />
-              </div>
+              <SectionBody section={section} githubResult={githubResult} />
             ) : (
               <LoadingStatus label="Chargement des réglages…" />
             )}

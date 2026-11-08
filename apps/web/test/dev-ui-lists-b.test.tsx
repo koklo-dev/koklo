@@ -15,6 +15,15 @@ describe("galerie /dev/ui : section Listes · B", () => {
     expect(within(region).getAllByText("Cadrage · 2 sur 4").length).toBeGreaterThan(0);
   });
 
+  it("ListRow as=div : contenu de ligne dans l'li d'un hôte, sans second li", () => {
+    render(<DevUiListsB />);
+    const host = screen.getByTestId("list-row-div-host");
+    expect(host.tagName).toBe("LI");
+    const row = host.querySelector("[data-slot='list-row']");
+    expect(row?.tagName).toBe("DIV");
+    expect(host.querySelectorAll("li")).toHaveLength(0);
+  });
+
   it("choisir une ligne déplace aria-current", async () => {
     render(<DevUiListsB />);
     const user = userEvent.setup();

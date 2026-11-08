@@ -91,7 +91,7 @@ test("ajout : la clé voyage dans le corps seul, la ligne apparaît, le champ es
   await addGoogle(page);
   await expect(page.getByRole("listitem", { name: /^Fournisseur Google Gemini/ })).toBeVisible();
   await expect(
-    page.getByRole("status").filter({ hasText: "Fournisseur ajouté et vérifié." }),
+    page.locator("[data-slot=toast-title]").filter({ hasText: "Fournisseur ajouté et vérifié." }),
   ).toBeVisible();
   const posts = (await providerCallsSeen()).filter((c) => c.method === "POST");
   expect(posts).toHaveLength(1);
@@ -118,8 +118,10 @@ test("cartes radio : les flèches déplacent le choix", async ({ page }) => {
   await open(page, { list: "empty" });
   const first = page.getByRole("radio").first();
   await first.focus();
-  await page.keyboard.press("ArrowRight");
+  // Radix déplace le focus au tick suivant puis coche si la flèche est encore enfoncée : on la garde le temps du test.
+  await page.keyboard.down("ArrowRight");
   await expect(page.getByRole("radio").nth(1)).toBeChecked();
+  await page.keyboard.up("ArrowRight");
 });
 
 test("modèle par usage : liste ouverte, choix au clavier, Échap rend le focus", async ({
@@ -167,13 +169,15 @@ test("secours : l'interrupteur bascule et le texte suit", async ({ page }) => {
 test("plafond : saisi en euros, refusé à 0", async ({ page }) => {
   await open(page, { list: "two" });
   await ready(page);
-  const field = page.getByLabel("Plafond mensuel (en euros)");
+  const field = page.getByLabel("Plafond mensuel, tous fournisseurs");
   await field.fill("0");
   await page.getByRole("button", { name: "Enregistrer le plafond" }).click();
   await expect(page.getByText(/supérieur à 0/)).toBeVisible();
   await field.fill("25,5");
   await page.getByRole("button", { name: "Enregistrer le plafond" }).click();
-  await expect(page.getByText("Plafond enregistré.")).toBeVisible();
+  await expect(
+    page.locator("[data-slot=toast-title]", { hasText: "Plafond enregistré." }),
+  ).toBeVisible();
   const patch = (await providerCallsSeen()).filter((c) => c.method === "PATCH");
   expect(patch.at(-1)?.body).toEqual({ monthlyCapMicroUsd: 25500000 });
 });

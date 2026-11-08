@@ -1,6 +1,6 @@
 "use client";
 
-import { ShellCollapseButton, useShell } from "@koklo/ui";
+import { cn, ShellCollapseButton, useShell } from "@koklo/ui";
 import { NavUser } from "./nav-user.tsx";
 import { ThemeToggle } from "./theme-toggle.tsx";
 
@@ -8,11 +8,16 @@ import { ThemeToggle } from "./theme-toggle.tsx";
 export function SidebarFooter() {
   const { collapsed } = useShell();
   return (
-    <div className="flex shrink-0 flex-col gap-2 border-t border-sidebar-border pt-3">
+    <div className="flex shrink-0 flex-col gap-1.5">
       <ShellCollapseButton />
-      <div className={collapsed ? "flex flex-col items-center gap-1" : "flex items-center gap-1"}>
+      <div
+        className={cn(
+          "border-t border-sidebar-border pt-2",
+          collapsed ? "flex flex-col items-center gap-1" : "flex items-center gap-1",
+        )}
+      >
         <NavUser />
-        <ThemeToggle className="shrink-0" />
+        {collapsed ? null : <ThemeToggle className="shrink-0" />}
       </div>
     </div>
   );

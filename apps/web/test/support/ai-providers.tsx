@@ -1,3 +1,4 @@
+import { ToastProvider } from "@koklo/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -83,7 +84,9 @@ export function renderAiSettings() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <AiSettingsPage />
+      <ToastProvider>
+        <AiSettingsPage />
+      </ToastProvider>
     </QueryClientProvider>,
   );
   return { client, ...view };

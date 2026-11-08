@@ -43,15 +43,17 @@ describe("CA5 (5.2) : h2, h3 et titres de Sheet sur l'échelle v2", () => {
   /**
    * Retour de revue TK-87 (tour 1) : h2 de section en text-section-title, h3 de carte ou de groupe
    * en text-subsection-title, titres de Sheet en text-section-title (DESIGN.md §3, 02-design §2.4).
+   * TK-141 : le h2 de section de Réglages peut être en text-settings-title (20/600, DESIGN I19) ;
+   * le h3 d'un formulaire dont le titre est lu seulement par les lecteurs d'écran est en sr-only.
    * Seule exception : l'en-tête de colonne du kanban, un h2 en 14/600 (S-kanban « En-tête de colonne »).
    */
   const HEADING_RULES: { tag: RegExp; utility: string; except?: string[] }[] = [
     {
       tag: /<h2\b[^>]*>/gs,
-      utility: "text-section-title",
+      utility: "text-(?:section|settings)-title",
       except: ["components/kanban-column.tsx"],
     },
-    { tag: /<h3\b[^>]*>/gs, utility: "text-subsection-title" },
+    { tag: /<h3\b[^>]*>/gs, utility: "(?:text-subsection-title|sr-only)" },
     { tag: /<SheetTitle\b[^>]*\bclassName=[^>]*>/gs, utility: "text-section-title" },
   ];
 

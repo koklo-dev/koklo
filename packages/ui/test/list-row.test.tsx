@@ -91,6 +91,26 @@ describe("ListRow", () => {
     expect(screen.getByRole("listitem")).not.toHaveClass("py-3");
   });
 
+  it('`as="div"` : contenu de ligne sans li ni bordure ni marge, pour un hôte qui pose déjà son li (VirtualList)', () => {
+    render(
+      <ul>
+        <li data-testid="host">
+          <ListRow
+            as="div"
+            title="Dans l'hôte"
+            subtitle="2 critères"
+            leading={<span>F-001</span>}
+          />
+        </li>
+      </ul>,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    const row = screen.getByText("Dans l'hôte").closest("[data-slot='list-row']") as HTMLElement;
+    expect(row.tagName).toBe("DIV");
+    expect(row).not.toHaveClass("border-t", "px-4");
+    expect(screen.getByText("2 critères")).toHaveClass("text-caption", "text-muted-foreground");
+  });
+
   it("`leading` avant le titre, `trailing` après", () => {
     render(
       <ListPanel title="L">

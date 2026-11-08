@@ -1,13 +1,13 @@
 "use client";
 
 import type { InvitationListOutput } from "@koklo/contract";
-import { Badge, Button } from "@koklo/ui";
+import { Button, Card, Icon, RolePill } from "@koklo/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { formatShortDate, MEMBERS_COPY } from "../lib/members-labels.ts";
 import { orpc } from "../lib/orpc.ts";
-import { ROLE_LABELS } from "../lib/roles.ts";
+import { pillRole } from "../lib/roles.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
 
@@ -16,7 +16,7 @@ type Invitation = InvitationListOutput[number];
 function Meta({ invitation }: { invitation: Invitation }) {
   const projects = invitation.projects.map((project) => project.name).join(", ");
   return (
-    <span className="text-meta text-muted-foreground">
+    <span className="text-caption text-muted-foreground">
       {`Invitée par ${invitation.invitedBy} · expire le ${formatShortDate(invitation.expiresAt)}`}
       {projects ? ` · ${projects}` : ""}
     </span>
@@ -32,37 +32,44 @@ interface RowProps {
 
 function PendingRow({ invitation, busy, onResend, onRevoke }: RowProps) {
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-dashed border-border-strong p-3">
-      <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-        <span className="flex flex-wrap items-center gap-2 font-medium">
-          <span className="break-all">{invitation.email}</span>
-          <Badge variant="outline">{ROLE_LABELS[invitation.role]}</Badge>
-        </span>
-        <Meta invitation={invitation} />
-      </div>
-      <div className="flex w-full gap-2 md:w-auto">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 flex-1 md:h-9 md:flex-none"
-          disabled={busy}
-          aria-label={`Renvoyer l'invitation à ${invitation.email}`}
-          onClick={() => onResend(invitation)}
-        >
-          Renvoyer
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-11 flex-1 md:h-9 md:flex-none"
-          disabled={busy}
-          aria-label={`Annuler l'invitation à ${invitation.email}`}
-          onClick={() => onRevoke(invitation)}
-        >
-          Annuler
-        </Button>
-      </div>
-    </li>
+    <Card
+      asChild
+      variant="dashed"
+      className="flex flex-wrap items-center gap-x-3.5 gap-y-2 px-3.5 py-2.5"
+    >
+      <li>
+        <Icon name="schedule_send" size={18} tone="muted" />
+        <div className="flex min-w-0 flex-1 basis-60 flex-col">
+          <span className="break-all font-semibold">{invitation.email}</span>
+          <Meta invitation={invitation} />
+        </div>
+        <RolePill role={pillRole(invitation.role)} />
+        <div className="flex w-full gap-2 md:w-auto">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="max-md:h-11 max-md:flex-1"
+            disabled={busy}
+            aria-label={`Renvoyer l'invitation à ${invitation.email}`}
+            onClick={() => onResend(invitation)}
+          >
+            Renvoyer
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="max-md:h-11 max-md:flex-1"
+            disabled={busy}
+            aria-label={`Annuler l'invitation à ${invitation.email}`}
+            onClick={() => onRevoke(invitation)}
+          >
+            Annuler
+          </Button>
+        </div>
+      </li>
+    </Card>
   );
 }
 

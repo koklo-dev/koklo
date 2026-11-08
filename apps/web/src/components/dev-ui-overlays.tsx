@@ -34,7 +34,6 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  ToastProvider,
   useToast,
 } from "@koklo/ui";
 import { DevUiFrame, DevUiNote, DevUiRow, DevUiSection } from "./dev-ui-frame.tsx";
@@ -220,13 +219,12 @@ function ToastFrame() {
 /** Section « Superpositions · B » : dialogues, tiroirs et toasts ouverts par bouton (S-dev-ui, TK-139). */
 export function DevUiSurfacesB() {
   return (
-    <ToastProvider>
-      <DevUiSection id="dev-ui-surf-b" title="Superpositions · B : dialogues, tiroirs et toasts">
-        <DialogFrame />
-        <AlertDialogFrame />
-        <SheetFrame />
-        <ToastFrame />
-      </DevUiSection>
-    </ToastProvider>
+    // Le `ToastProvider` est celui de `providers.tsx` (TK-141) : un second doublerait la région F8.
+    <DevUiSection id="dev-ui-surf-b" title="Superpositions · B : dialogues, tiroirs et toasts">
+      <DialogFrame />
+      <AlertDialogFrame />
+      <SheetFrame />
+      <ToastFrame />
+    </DevUiSection>
   );
 }

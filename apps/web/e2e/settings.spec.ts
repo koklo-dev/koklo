@@ -112,12 +112,12 @@ test("Mon compte : thème Système suit le système et survit au rechargement sa
   await page.emulateMedia({ colorScheme: "dark" });
   await open(page, "owner", "/settings/account");
   await expect(page.locator("html")).not.toHaveClass(/dark/);
-  await page.locator("label", { hasText: "Système" }).click();
+  await page.getByRole("radio", { name: "Système" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.addInitScript(() => localStorage.setItem("koklo-theme", "system"));
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.locator("label", { hasText: "Clair" }).click();
+  await page.getByRole("radio", { name: "Clair" }).click();
   await expect(page.locator("html")).not.toHaveClass(/dark/);
 });
 

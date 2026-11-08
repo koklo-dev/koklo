@@ -1,4 +1,5 @@
 import type { Role } from "@koklo/contract";
+import type { IconName } from "@koklo/ui";
 import { canListMembers, canManage } from "./roles.ts";
 import { SETTINGS_SECTIONS, type SettingsSection } from "./shell-routes.ts";
 
@@ -8,6 +9,21 @@ export const SETTINGS_LABELS: Record<SettingsSection, string> = {
   ai: "Fournisseurs d'IA",
   github: "GitHub",
   account: "Mon compte",
+};
+
+/** Titre (h2 et fil d'Ariane) de chaque section : celui de la planche 24, « Organisation » pour Général. */
+export const SETTINGS_TITLES: Record<SettingsSection, string> = {
+  ...SETTINGS_LABELS,
+  general: "Organisation",
+};
+
+/** Icône de chaque section dans la navigation secondaire (planche 24). */
+export const SETTINGS_ICONS: Record<SettingsSection, IconName> = {
+  general: "apartment",
+  members: "group",
+  ai: "key",
+  github: "link",
+  account: "person",
 };
 
 /** Groupes de la navigation secondaire : l'organisation, puis la personne. */

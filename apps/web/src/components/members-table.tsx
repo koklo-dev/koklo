@@ -2,7 +2,7 @@ import type { Role } from "@koklo/contract";
 import {
   Avatar,
   AvatarFallback,
-  Badge,
+  RolePill,
   Table,
   TableBody,
   TableCaption,
@@ -11,17 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from "@koklo/ui";
+import { initialsOf } from "../lib/initials.ts";
 import { formatShortDate, MEMBERS_COPY } from "../lib/members-labels.ts";
-import { canTouchMember, ROLE_LABELS } from "../lib/roles.ts";
+import { canTouchMember, pillRole } from "../lib/roles.ts";
 import { MemberActions, type MemberRow } from "./member-actions.tsx";
-
-const initialsOf = (name: string): string =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
 
 interface MembersTableProps {
   rows: MemberRow[];
@@ -35,12 +28,12 @@ interface MembersTableProps {
 function Identity({ member }: { member: MemberRow }) {
   return (
     <div className="flex items-center gap-3">
-      <Avatar aria-hidden="true">
+      <Avatar size={32} tone={member.role === "client" ? "warning" : "soft"} aria-hidden="true">
         <AvatarFallback>{initialsOf(member.name)}</AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-col">
-        <span className="font-medium">{member.name}</span>
-        <span className="break-all text-meta text-muted-foreground">{member.email}</span>
+        <span className="font-semibold">{member.name}</span>
+        <span className="break-all text-caption text-muted-foreground">{member.email}</span>
       </div>
     </div>
   );
@@ -87,7 +80,7 @@ function MemberTableRow({ member, manage, ...menu }: RowProps) {
         <Identity member={member} />
       </TableCell>
       <TableCell className={STACKED}>
-        <Badge variant="outline">{ROLE_LABELS[member.role]}</Badge>
+        <RolePill role={pillRole(member.role)} />
       </TableCell>
       <TableCell className={STACKED}>
         <Label>Projets : </Label>
@@ -109,7 +102,7 @@ function MemberTableRow({ member, manage, ...menu }: RowProps) {
 /** Tableau des membres : en-tête masqué sous 768 px, où les lignes s'empilent. */
 export function MembersTable({ rows, manage, ...menu }: MembersTableProps) {
   return (
-    <Table>
+    <Table framed>
       <TableCaption className="sr-only">Liste des membres</TableCaption>
       <TableHeader className="max-md:sr-only">
         <TableRow>
@@ -117,7 +110,11 @@ export function MembersTable({ rows, manage, ...menu }: MembersTableProps) {
           <TableHead>Rôle</TableHead>
           <TableHead>Projets</TableHead>
           <TableHead>Dernière activité</TableHead>
-          {manage ? <TableHead className="w-12 text-right">Actions</TableHead> : null}
+          {manage ? (
+            <TableHead className="w-12 text-right">
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          ) : null}
         </TableRow>
       </TableHeader>
       <TableBody>

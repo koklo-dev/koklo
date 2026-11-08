@@ -14,6 +14,19 @@ export function FeatureLifecycle({
   return <LifecycleStatus stage={lifecycleStage(feature)} />;
 }
 
-export function FeaturePriority({ priority }: { priority: string }) {
-  return <PriorityIndicator level={priorityLevel(priority)} label={priorityLabel(priority)} />;
+/** `barsOnly` : la ligne de liste n'affiche que les barres (planche 12), le libellé devient leur nom accessible. */
+export function FeaturePriority({
+  priority,
+  barsOnly = false,
+}: {
+  priority: string;
+  barsOnly?: boolean;
+}) {
+  return (
+    <PriorityIndicator
+      level={priorityLevel(priority)}
+      label={priorityLabel(priority)}
+      barsOnly={barsOnly}
+    />
+  );
 }

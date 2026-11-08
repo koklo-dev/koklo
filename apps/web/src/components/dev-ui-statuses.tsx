@@ -68,6 +68,12 @@ export function DevUiStatuses() {
             <PriorityIndicator key={p.label} {...p} />
           ))}
         </DevUiRow>
+        <DevUiNote>Barres seules (ligne de liste), libellé en nom accessible</DevUiNote>
+        <DevUiRow>
+          {FEATURE_PRIORITIES.map((p) => (
+            <PriorityIndicator key={p.label} {...p} barsOnly />
+          ))}
+        </DevUiRow>
         <DevUiNote>Tickets</DevUiNote>
         <DevUiRow>
           {TICKET_PRIORITIES.map((p) => (

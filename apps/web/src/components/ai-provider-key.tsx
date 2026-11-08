@@ -128,6 +128,38 @@ function useKeySubmit(props: Props, refs: Refs, needsBaseUrl: boolean, needsMode
   return { busy, error, submit };
 }
 
+function KeyActions({
+  busy,
+  label,
+  onCancel,
+}: {
+  busy: boolean;
+  label: string;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 md:flex-row">
+      <Button
+        type="submit"
+        aria-busy={busy}
+        disabled={busy}
+        className="h-11 w-full md:h-9 md:w-auto"
+      >
+        {busy ? L.testing : label}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        disabled={busy}
+        className="h-11 w-full md:h-9 md:w-auto"
+        onClick={onCancel}
+      >
+        {L.cancel}
+      </Button>
+    </div>
+  );
+}
+
 /** Formulaire de clé : champs non contrôlés (clé, adresse, modèle), alerte d'échec, boutons 44 px sous 768 px. */
 export function ProviderKeyForm(props: Props) {
   const { provider, mode, hasModels, onCancel } = props;
@@ -164,25 +196,11 @@ export function ProviderKeyForm(props: Props) {
         </Alert>
       ) : null}
       {busy ? <p className="sr-only">{L.testingStatus}</p> : null}
-      <div className="flex flex-col gap-2 md:flex-row">
-        <Button
-          type="submit"
-          aria-busy={busy}
-          disabled={busy}
-          className="h-11 w-full md:h-9 md:w-auto"
-        >
-          {busy ? L.testing : mode === "add" ? L.submitAdd : L.submitReplace}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          className="h-11 w-full md:h-9 md:w-auto"
-          onClick={onCancel}
-        >
-          {L.cancel}
-        </Button>
-      </div>
+      <KeyActions
+        busy={busy}
+        label={mode === "add" ? L.submitAdd : L.submitReplace}
+        onCancel={onCancel}
+      />
     </form>
   );
 }

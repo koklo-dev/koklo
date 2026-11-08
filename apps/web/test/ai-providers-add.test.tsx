@@ -105,9 +105,9 @@ describe("envoi", () => {
       model: "mistral-test",
     });
     expect(await screen.findByRole("listitem", { name: /Mistral/ })).toBeInTheDocument();
-    expect(screen.getAllByRole("status").some((el) => /ajouté/.test(el.textContent ?? ""))).toBe(
-      true,
-    );
+    expect(
+      (await screen.findByText("Fournisseur ajouté et vérifié.")).closest("[data-slot=toast]"),
+    ).not.toBeNull();
     for (const text of surfaces())
       for (const part of SECRET_FRAGMENTS) expect(text).not.toContain(part);
   });

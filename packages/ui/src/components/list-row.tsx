@@ -70,6 +70,11 @@ export function ListPanel({
 }
 
 export interface ListRowProps {
+  /**
+   * `li` (défaut) : ligne d'un `ListPanel`. `div` : contenu de ligne seul, sans bordure ni marge, pour un hôte qui
+   * pose déjà son `li` (`VirtualList`).
+   */
+  as?: "li" | "div";
   title: ReactNode;
   subtitle?: ReactNode;
   /** Icône d'état ou identifiant en tête. */
@@ -88,8 +93,9 @@ export interface ListRowProps {
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
-/** Ligne d'un `ListPanel` : lien (`href`), bouton (`onSelect`) ou statique. */
+/** Ligne d'un `ListPanel` (ou, avec `as="div"`, contenu d'une ligne de `VirtualList`) : lien, bouton ou statique. */
 export function ListRow({
+  as: Tag = "li",
   title,
   subtitle,
   leading,
@@ -116,12 +122,14 @@ export function ListRow({
   );
   const main = cn("flex min-w-0 flex-1 items-center gap-3 self-stretch", FOCUS);
   const current = selected ? ("true" as const) : undefined;
+  const inPanel = Tag === "li";
   return (
-    <li
+    <Tag
       data-slot="list-row"
       className={cn(
-        "flex items-center gap-3 border-t px-4 first:border-t-0",
-        fixedHeight ? "h-[52px]" : "py-3",
+        "flex items-center gap-3",
+        inPanel ? "border-t px-4 first:border-t-0" : "min-w-0 flex-1",
+        fixedHeight ? "h-[52px]" : inPanel && "py-3",
         selected && "bg-secondary",
         className,
       )}
@@ -140,6 +148,6 @@ export function ListRow({
         </div>
       )}
       {trailing}
-    </li>
+    </Tag>
   );
 }

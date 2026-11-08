@@ -23,9 +23,18 @@ export const PROVIDER_ORDER: readonly ProviderId[] = [
 
 export const providerName = (id: ProviderId): string => PROVIDER_NAMES[id];
 
-/** Initiales de la pastille ronde (décoratives, masquées aux lecteurs d'écran). */
-export const providerInitials = (id: ProviderId): string =>
-  id === "openai_compatible" ? "CO" : PROVIDER_NAMES[id].slice(0, 2).toUpperCase();
+const INITIALS_OVERRIDE: Partial<Record<ProviderId, string>> = {
+  openrouter: "OR",
+  openai_compatible: "{}",
+};
+
+/** Initiales de la tuile, en casse mixte (« An », « Op ») comme la maquette ; décoratives, masquées aux lecteurs d'écran. */
+export const providerInitials = (id: ProviderId): string => {
+  const name = PROVIDER_NAMES[id];
+  return (
+    INITIALS_OVERRIDE[id] ?? `${name.slice(0, 1).toUpperCase()}${name.slice(1, 2).toLowerCase()}`
+  );
+};
 
 /** Description d'une ligne de la grille d'ajout (maquette 24). */
 export const PROVIDER_DESCRIPTIONS: Record<ProviderId, string> = {

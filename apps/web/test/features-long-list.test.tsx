@@ -118,7 +118,10 @@ describe("Liste virtualisée (§5)", () => {
     procedures.specHead.mockImplementation(neverResolves);
     renderFeatures();
     const skeleton = await screen.findByTestId("features-skeleton");
-    expect(skeleton.children).toHaveLength(8);
+    expect(skeleton.querySelector("[data-slot='loading-rows']")?.children).toHaveLength(8);
+    // TK-141 A6 : le cadre est celui de VirtualList framed (rayon 12), pas un cadre local.
+    const framed = skeleton.querySelector("[data-slot='virtual-list']") as HTMLElement;
+    expect(framed.className).toMatch(/rounded-xl.*border|border.*rounded-xl/);
     const region = await findRole("status");
     expect(region).toHaveAttribute("aria-busy", "true");
     expect(region).toHaveTextContent("Chargement des fonctionnalités…");
@@ -332,6 +335,23 @@ describe("Recherche (§2.1)", () => {
     );
   });
 
+  it("TK-141 A6 : recherche vide en EmptyState inline, barre de compte « 0 résultat pour « q » »", async () => {
+    renderFeatures();
+    await findList();
+    procedures.specListFeatures.mockResolvedValue(list([], { total: 0 }));
+    await type("annulation");
+    const empty = await waitFor(() => {
+      const found = document.querySelector("[data-slot='empty-state']");
+      if (!found) throw new Error("pas d'état vide");
+      expect(found).toHaveTextContent("Aucune fonctionnalité ne correspond à « annulation »");
+      return found as HTMLElement;
+    });
+    expect(empty).toHaveAttribute("data-variant", "inline");
+    expect(empty.querySelector("svg[data-icon='search_off']")).not.toBeNull();
+    const bar = document.querySelector("[data-slot='count-bar']") as HTMLElement;
+    expect(bar).toHaveTextContent("0 résultat pour « annulation »");
+  });
+
   it("recherche vide : EmptyState, texte de la passation, action « Effacer la recherche »", async () => {
     renderFeatures();
     await findList();
@@ -349,6 +369,14 @@ describe("Recherche (§2.1)", () => {
     );
     await waitFor(() => expect(status()).toHaveTextContent("Aucun résultat pour « annulation »"));
     expect(screen.queryByRole("list", { name: "Fonctionnalités" })).toBeNull();
+    // TK-141 correction 1 (planche 12) : l'état vide est dans le cadre de la liste, le tri reste annoncé, bouton de 32.
+    expect(empty).toHaveClass("rounded-xl", "border", "border-border");
+    expect(document.querySelector("[data-slot='count-bar-sort']")).toHaveTextContent(
+      "Tri : identifiant",
+    );
+    expect(
+      within(empty as HTMLElement).getByRole("button", { name: "Effacer la recherche" }),
+    ).toHaveClass("h-8");
   });
 
   it("« Effacer la recherche » vide le champ, retire ?q= et rend la liste", async () => {

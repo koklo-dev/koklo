@@ -287,6 +287,8 @@ test.describe("clavier : ordre de focus, noms accessibles, états (D5)", () => {
         .map((el) => el.outerHTML.slice(0, 80)),
     );
     expect(unnamed).toEqual([]);
+    // TK-141 A3 : la carte projet disparaît du rail ; une seule icône folder_open (Tous les projets).
+    await expect(sidebarOf(page).locator("svg[data-icon='folder_open']")).toHaveCount(1);
     const lock = sidebarOf(page).getByRole("button", {
       name: "Architecture, disponible après les données",
     });
