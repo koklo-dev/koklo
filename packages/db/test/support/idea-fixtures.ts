@@ -2,21 +2,47 @@ import { randomUUID } from "node:crypto";
 import type { TestDatabase } from "../../src/testing/test-database.ts";
 import type { Scope } from "./ticket-fixtures.ts";
 
-/** Tables et modèles ajoutés par TK-89 (espace Idée). */
-export const IDEA_TABLES = [
+/** Tables et modèles ajoutés par TK-89 (espace Idée : pages, publications, contributeurs, présence). */
+export const IDEA_BASE_TABLES = [
   "idea_pages",
   "idea_publications",
   "idea_page_contributors",
   "idea_presence",
 ] as const;
-export const IDEA_MODELS = [
+export const IDEA_BASE_MODELS = [
   "IdeaPage",
   "IdeaPublication",
   "IdeaPageContributor",
   "IdeaPresence",
 ] as const;
-/** Types créés par la migration (absents des bases de référence des migrations antérieures). */
-export const IDEA_ENUMS = ["idea_page_status", "idea_page_origin"] as const;
+export const IDEA_BASE_ENUMS = ["idea_page_status", "idea_page_origin"] as const;
+
+/** Tables, modèles et types ajoutés par TK-90 (agent : propositions, messages, verrou, manques). */
+export const IDEA_AGENT_TABLES = [
+  "idea_proposals",
+  "idea_messages",
+  "idea_ai_locks",
+  "idea_gap_runs",
+] as const;
+export const IDEA_AGENT_MODELS = [
+  "IdeaProposal",
+  "IdeaMessage",
+  "IdeaAiLock",
+  "IdeaGapRun",
+] as const;
+export const IDEA_AGENT_ENUMS = [
+  "idea_proposal_op",
+  "idea_proposal_status",
+  "idea_message_mode",
+  "idea_message_author",
+] as const;
+export const IDEA_AGENT_SUFFIX = "_idea_agent";
+
+/** Tout l'espace Idée : les migrations antérieures à `*_idea` ne le contiennent pas. */
+export const IDEA_TABLES = [...IDEA_BASE_TABLES, ...IDEA_AGENT_TABLES] as const;
+export const IDEA_MODELS = [...IDEA_BASE_MODELS, ...IDEA_AGENT_MODELS] as const;
+/** Types créés par les migrations de l'espace Idée (absents des bases de référence antérieures). */
+export const IDEA_ENUMS = [...IDEA_BASE_ENUMS, ...IDEA_AGENT_ENUMS] as const;
 /** Inventaire d'enums (`nom:valeurs` ou `nom`) sans ceux de l'espace Idée. */
 export const withoutIdeaEnums = (enums: readonly string[]): string[] =>
   enums.filter(

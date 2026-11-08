@@ -69,6 +69,10 @@ export const expectedTables = [
   "idea_publications",
   "idea_page_contributors",
   "idea_presence",
+  "idea_proposals",
+  "idea_messages",
+  "idea_ai_locks",
+  "idea_gap_runs",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
@@ -82,6 +86,7 @@ export const compositeKeyTables: readonly string[] = [
   "spec_feature_endpoints",
   "ai_usage_models",
   "ai_usage_monthly",
+  "idea_ai_locks",
 ];
 
 /** Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et `audit_log` (jamais modifiée). */

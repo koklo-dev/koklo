@@ -10,6 +10,7 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
+import { IDEA_AGENT_ENUMS } from "./support/idea-fixtures.ts";
 import {
   CREDENTIALS_SUFFIX,
   insertCredential,
@@ -123,9 +124,9 @@ describe("TK-48a1 migrations : dossiers et contenu", () => {
     );
   });
 
-  it("expectedTables contient les deux tables (50 au total avec TK-97)", () => {
+  it("expectedTables contient les deux tables (54 au total avec TK-90)", () => {
     for (const table of OAUTH_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(50);
+    expect(expectedTables).toHaveLength(54);
   });
 });
 
@@ -139,6 +140,7 @@ const LATER_ENUMS = [
   "ai_usage",
   "idea_page_origin",
   "idea_page_status",
+  ...IDEA_AGENT_ENUMS,
 ];
 
 let db: TestDatabase;

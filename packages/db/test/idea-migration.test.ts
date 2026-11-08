@@ -10,7 +10,13 @@ import {
   schemaPath,
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
-import { IDEA_SUFFIX, IDEA_TABLES, IDEA_TEMPLATE_SQL } from "./support/idea-fixtures.ts";
+import {
+  IDEA_AGENT_SUFFIX,
+  IDEA_AGENT_TABLES,
+  IDEA_BASE_TABLES,
+  IDEA_SUFFIX,
+  IDEA_TEMPLATE_SQL,
+} from "./support/idea-fixtures.ts";
 import { insertScope } from "./support/ticket-fixtures.ts";
 
 /**
@@ -38,7 +44,7 @@ describe("TK-89 migration idea : dossier et contenu", () => {
     const up = code(sqlOf("migration.sql"));
     expect(up.match(/CREATE\s+TABLE/gi)).toHaveLength(4);
     expect(up.match(/CREATE\s+TYPE/gi)).toHaveLength(2);
-    for (const table of IDEA_TABLES) expect(up).toContain(`CREATE TABLE "${table}"`);
+    for (const table of IDEA_BASE_TABLES) expect(up).toContain(`CREATE TABLE "${table}"`);
     expect(up).not.toMatch(/\bDROP\b|CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION|CREATE\s+TRIGGER/i);
     expect(up).toMatch(/INSERT INTO "idea_pages"/);
     expect(up).toMatch(/gen_random_uuid\(\)/);
@@ -46,15 +52,15 @@ describe("TK-89 migration idea : dossier et contenu", () => {
 
   it("down.sql retire les quatre tables puis les deux enums", () => {
     const down = code(sqlOf("down.sql"));
-    for (const table of IDEA_TABLES) expect(down).toContain(`DROP TABLE "public"."${table}"`);
+    for (const table of IDEA_BASE_TABLES) expect(down).toContain(`DROP TABLE "public"."${table}"`);
     expect(down).toContain('DROP TYPE "public"."idea_page_status"');
     expect(down).toContain('DROP TYPE "public"."idea_page_origin"');
     expect(down.search(/DROP TABLE/i)).toBeLessThan(down.search(/DROP TYPE/i));
   });
 
-  it("expectedTables contient les quatre tables (50 au total)", () => {
-    for (const table of IDEA_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(50);
+  it("expectedTables contient les quatre tables (54 au total avec TK-90)", () => {
+    for (const table of IDEA_BASE_TABLES) expect(expectedTables).toContain(table);
+    expect(expectedTables).toHaveLength(54);
   });
 });
 
@@ -122,21 +128,27 @@ describe("TK-89 migration idea : pages des projets existants", () => {
         expect(row.organization_id).toBe(scope.organizationId);
       }
     }
-    expect(await tables()).toEqual([...expectedTables].sort());
+    expect(await tables()).toEqual(
+      expectedTables.filter((t) => !(IDEA_AGENT_TABLES as readonly string[]).includes(t)).sort(),
+    );
   }, 180_000);
 
   it("down.sql retire les tables, up les recrée avec les pages (rejouable)", async () => {
     apply(db, migration(), "down.sql");
     const afterDown = await tables();
-    for (const table of IDEA_TABLES) expect(afterDown).not.toContain(table);
-    expect(afterDown).toHaveLength(expectedTables.length - IDEA_TABLES.length);
+    for (const table of IDEA_BASE_TABLES) expect(afterDown).not.toContain(table);
+    expect(afterDown).toHaveLength(
+      expectedTables.length - IDEA_BASE_TABLES.length - IDEA_AGENT_TABLES.length,
+    );
 
     apply(db, migration(), "migration.sql");
     const count = await db.query<{ n: string }>("SELECT count(*)::text AS n FROM idea_pages");
     expect(count[0]?.n).toBe("20");
   }, 180_000);
 
-  it("migrate diff entre la base et schema.prisma est vide (code 0)", () => {
+  it("migrate diff entre la base et schema.prisma est vide (code 0), l'agent (TK-90) appliqué", () => {
+    // La base s'arrête à `*_idea` : le schéma courant porte aussi les tables de l'agent, de la migration suivante.
+    apply(db, dirs().find((dir) => dir.endsWith(IDEA_AGENT_SUFFIX)) as string, "migration.sql");
     const diff = ["migrate", "diff", "--from-config-datasource", "--to-schema", schemaPath];
     const { status, output } = runPrisma([...diff, "--exit-code"], db.url);
     expect(status, output).toBe(0);

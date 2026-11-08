@@ -50,6 +50,10 @@ export const TENANT_MODELS: readonly string[] = [
   "IdeaPublication",
   "IdeaPageContributor",
   "IdeaPresence",
+  "IdeaMessage",
+  "IdeaProposal",
+  "IdeaAiLock",
+  "IdeaGapRun",
 ];
 
 /** Modèles portant (ou non) `organizationId` mais hors filtre, avec la raison de l'exclusion. */
