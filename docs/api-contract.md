@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.4.0** (TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.5.0** (TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1429,6 +1429,13 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.5.0** (TK-90, lot A): idea space agent. New sub-groups `idea.proposal` (`decide`, `undo`), `idea.message`
+  (`list`) and `idea.agent` (`status`) plus `ai.ideaChat` (event stream) and `ai.ideaGaps`; 6 routes, 109 routes and
+  83 paths in all. **Additive** to `idea.list` (each page gains `pendingProposals`, the listing gains
+  `pendingPageProposals`) and `idea.get` (the page gains its pending `proposals`); no route removed, no input changed.
+  New tables `idea_proposals`, `idea_messages`, `idea_ai_locks`, `idea_gap_runs` (migration
+  `20261108120000_idea_agent`, with `down.sql`). The fingerprint of 2.4.0 is frozen in
+  `packages/contract/test/contract.test.ts`. See "Idea agent (TK-90)".
 - **2.4.0** (TK-89, lot A): idea space. New group `idea` (`list`, `get`, `save`, `setStatus`, `publish`, `presence`)
   and sub-group `idea.page` (`create`, `rename`, `reorder`, `delete`, `restore`); 11 routes under
   `/projects/{projectId}/idea`, 103 routes and 77 paths in all. `save` answers a stale `baseVersion` with
@@ -1515,3 +1522,22 @@ seven writes as denied to a client.
   `LEASE_NOT_HOLDER`, `VALIDATION`; `CONFLICT.reason` extended. Backward compatible
   (pre-1.0 addition); the frozen fingerprint of 0.3.0 is unchanged.
 - 0.3.0 (TK-21): organisations, members, projects.
+
+## Idea agent (TK-90)
+
+The agent never changes a page: it writes a message and **proposals**; only `idea.proposal.decide` by a human does.
+
+| Procedure | Route | Roles | Notes |
+|---|---|---|---|
+| `idea.proposal.decide` | `POST /projects/{projectId}/idea/proposals/{proposalId}/decision` | owner, admin, dev, designer, client | `accept` applies the operation (`insert_after`, `replace`, `append`, `create_page`) and bumps `version` in one transaction; `contentMd` (optional) replaces the agent's text ("Modifier"). Stale page version: `409 CONFLICT` + `data.currentVersion`, the proposal becomes `stale`, the page is untouched. A stale proposal can still be rejected (`reject` succeeds, status `rejected`, audited: B253); accepting it stays `409 CONFLICT`. Already decided: `422 VALIDATION`. |
+| `idea.proposal.undo` | `POST .../proposals/{proposalId}/undo` | same | A rejection becomes `pending` again. An acceptance restores the previous content under a **new** version if the page still has the version the acceptance produced (else `409`), and the proposal is `pending` again, rebased. A page added by the agent cannot be undone (`422`: the 30-day trash plays that role). |
+| `idea.message.list` | `GET .../idea/messages` | six read roles | Cursor list (50 newest first, `nextCursor` for older ones). `author` is `{ name, isClient }`, `null` for the agent; never a user id or e-mail. |
+| `idea.agent.status` | `GET .../idea/agent` | six read roles | `{ configured, canConfigure }`: the client does not read `aiProvider.list`. `canConfigure` is owner or admin. |
+| `ai.ideaChat` | `POST /projects/{projectId}/ai/idea/chat` | owner, admin, dev, designer, client | Server-sent events: `{type:"text"}` pieces, then `{type:"proposals"}` (only for Develop, Simplify, Make a page, and in interview mode from the 2nd human answer on the page since the last proposal), then `{type:"done", messageId, nextQuestion?}`. Refusals before the first byte are HTTP errors (`FORBIDDEN`, `NOT_FOUND`, `PROMPT_REJECTED`, `LLM_NOT_CONFIGURED`, `LLM_CAP_REACHED`, `LLM_RATE_LIMITED`); later ones are `error` events with the same code. |
+| `ai.ideaGaps` | `POST .../ai/idea/gaps` | same | At most 4 items `{ pageId \| null, suggestedPageTitle \| null, text }`; a result younger than 30 s is returned as is (`cached: true`, no model call, no quota). |
+
+- **Anchors**: Markdown has no block id; `anchorBlockIndex` and `rangeEnd` are the rank of top-level blocks in `contentMd` at `baseVersion` (a fenced code block stays one block). Any version change makes pending proposals of the page `stale` (`idea.save`, `idea.page.delete`, another acceptance).
+- **One AI call at a time** per user and project, by a row in `idea_ai_locks` (120 s, taken over when expired): a second call is `429 LLM_RATE_LIMITED` (`retryAfterSeconds: 5`). The hourly quota still applies: one message is one admission (audit row `ai.idea.chat`, even when a second JSON call writes the proposals; `ai.idea.gaps` for the gaps).
+- **Output is hostile data**: message, proposal text, title, rationale and gaps pass the `isSafeText` policy (no link, tag, image, control or direction character) before anything is stored (`LLM_OUTPUT_INVALID`). A proposal needs `title` (`create_page`) or an anchor on an existing block (`insert_after`, `replace`).
+- **What reaches the model**: page titles and content, the thread (authors are "l'équipe" or "le client"), the selection and the message. Never an e-mail, a name, an id of a user, organization, project or page, a repository, or a key. `euOnly` is `false` until TK-93 adds the per-project switch.
+- **Audit**: `idea.proposal.accept`, `idea.proposal.reject`, `idea.proposal.undo` (on the page, or on the project for a rejected page proposal).

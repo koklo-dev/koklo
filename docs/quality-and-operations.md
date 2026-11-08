@@ -1268,3 +1268,12 @@ is meant to plug the Zod schema of each usage into the same runner; only Idea sp
 - **Out of scope**: sleeping until `resumeAt`, the loop and the persistence of the serialised state
   belong to TK-75. The Claude Code adapter (`classify.ts`) is wired on `detectQuota` (lot 74c): auth first,
   then quota, only on the failure path.
+
+## Idea agent: operation and tests (TK-90)
+
+- **Concurrency**: one AI call at a time per user and project, held by a row in `idea_ai_locks` (120 s, taken over once expired). A second call gets `429 LLM_RATE_LIMITED` (`retryAfterSeconds: 5`); the lock is released on success, failure and cancellation. The hourly quota of the organization still applies.
+- **Rule**: the agent never writes a page. Only `idea.proposal.decide` by a human applies a proposal, with `version` + 1 in one transaction (an integration test compares page content, version and page count before and after `ai.ideaChat`).
+- **Hostile output**: every text from the model goes through `isSafeText` before storage; a failure is `LLM_OUTPUT_INVALID` and nothing is stored.
+- **Gaps**: `ai.ideaGaps` returns a result younger than 30 s without calling the model (`cached: true`).
+- **Rollback**: `packages/db/prisma/migrations/20261108120000_idea_agent/down.sql`.
+- **Gates**: full web Playwright (`apps/web`, `--workers=1`, about 20 min) rewrites every capture; sort them with `docs/refonte/outils/trier-captures.py`. The real-stack journey is `e2e/tests/idea.spec.ts`.

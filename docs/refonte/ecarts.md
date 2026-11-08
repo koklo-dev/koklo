@@ -378,3 +378,14 @@ Tests à réécrire avec ces retraits :
 | Composition de règles et dérogations | `packages/rules/` | Moteur de règles UI (composition), `koklo/policy` |
 | Chiffrement des clés | `apps/api/src/crypto/*`, `llm-credential-aad.ts` | Fournisseurs multiples, jetons |
 | Notifications | `apps/api/src/notification/`, `apps/worker/src/jobs/send-notification-email.ts` | Relances, « Sans nouvelles », PV |
+
+## Écarts à la maquette 06 décidés en TK-90 (08/11/2026)
+
+| Maquette | Rendu | Raison |
+|---|---|---|
+| Aside sous 1024 px non prévu, pas de repli | Panneau sous le document, pleine largeur (B241) | 375 px sans défilement horizontal, un seul chemin au clavier |
+| « Envoyé à Anthropic avec la clé de l'organisation » (l.215) | « Envoyé au fournisseur d'IA de l'organisation, avec sa clé. » + « Détails » (B228) | Jamais le nom du fournisseur dans l'interface |
+| Icône `auto_awesome` | `wand_stars` (B230) | `auto_awesome` absente du jeu d'icônes |
+| Bulle d'agent avec lien vers le document | Pas de lien (B242) | Aucun type « page » dans `EntityChip` |
+| Carte « Ce qui manque encore » toujours présente | Après « Voir ce qui manque » (B243) | Un appel du modèle consomme le quota |
+

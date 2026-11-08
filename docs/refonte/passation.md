@@ -62,6 +62,16 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
    `sensitive`) et revue visuelle → un tour de correction). `notes` : périmètre des lots, dépendances autorisées,
    hors périmètre. Coupure réseau : relancer avec `resumeFromRunId` et les mêmes `args` (les agents finis sont rejoués
    depuis le cache).
+   - `args` est un **objet complet**, jamais `"TK-NN"` : `ui` (booléen) vaut `true` dès que la ligne du ticket a une
+     « Maquette : », sinon l'analyse saute l'inventaire de la maquette et la revue visuelle n'a pas lieu (TK-90 : branche
+     `undefined`, travail fait sur `develop`, 13 écarts trouvés après coup). Le script refuse désormais un `args` incomplet.
+   - Créer la branche **avant** le lancement.
+   - Ticket qui réunit base + contrat + flux + plusieurs composants + écran : proposer de le scinder en deux tickets
+     (serveur, puis écran) plutôt qu'un seul workflow de 3 h.
+   - Corrections après une revue visuelle (leçon de TK-90, 6 tours) : chaque demande de correction exige aussi de
+     vérifier le clavier, Échap, le focus et l'axe de l'élément touché, et de relancer le spec e2e complet de l'écran,
+     pas seulement le point corrigé (F1 → F14 → F15/F16 → F17 : chaque correctif a créé l'écart suivant). Après deux
+     tours ciblés, faire une revue finale large de l'élément au lieu d'un nouveau tour étroit.
 3. Repasser derrière le workflow, ce que les revues laissent passer :
    - style recopié dans `apps/web` au lieu d'un composant `packages/ui` ;
    - test qui ne prouve pas le critère (ex. aller-retour testé sur des pages vides) ;
