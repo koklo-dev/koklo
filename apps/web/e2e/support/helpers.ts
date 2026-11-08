@@ -4,6 +4,7 @@ import type { AiScenario } from "./stub-ai.ts";
 import type { ProvidersScenario } from "./stub-ai-providers.ts";
 import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
+import type { IdeaScenario } from "./stub-idea-agent.ts";
 import type {
   BoardMode as KanbanBoard,
   KanbanRole,
@@ -43,6 +44,7 @@ export async function setScenario(
     AiScenario &
     ProvidersScenario &
     ShellScenario &
+    IdeaScenario &
     Pick<SettingsScenario, "members">,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
@@ -151,3 +153,12 @@ export const providerCallsSeen = async (): Promise<ProviderCall[]> =>
 /** Nombre de requêtes dont l'URL, la query ou un en-tête (hors corps) contenait la clé de test. */
 export const providerSecretLeaks = async (): Promise<number> =>
   ((await (await fetch(`${STUB}/__ai-provider-leaks`)).json()) as { leaks: number }).leaks;
+
+/** Messages reçus par `ai.ideaChat` du faux API (TK-90), dans l'ordre. */
+export const ideaChatsSeen = async (): Promise<Array<Record<string, unknown>>> =>
+  (await fetch(`${STUB}/__idea-chats`)).json();
+
+/** Libère le flux de l'agent retenu par le mode `streaming`. */
+export async function releaseIdeaStream(): Promise<void> {
+  await fetch(`${STUB}/__release-idea`, { method: "POST" });
+}
