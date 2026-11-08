@@ -19,6 +19,7 @@ const baseVariants = cva(
         dashed:
           "border border-dashed border-border-strong bg-transparent hover:bg-accent hover:text-accent-foreground",
         inherit: "border border-current bg-transparent font-semibold hover:bg-current/10",
+        text: "bg-transparent text-meta text-foreground underline underline-offset-4 hover:bg-current/10",
         link: "bg-transparent px-2.5 font-semibold text-inherit underline underline-offset-4 hover:bg-current/10",
       },
       size: {
@@ -31,6 +32,7 @@ const baseVariants = cva(
     },
     compoundVariants: [
       { variant: "link", class: "h-7 px-2.5 text-meta" },
+      { variant: "text", class: "h-[26px] px-2 text-meta" },
       { variant: "ghost", size: "default", class: "px-3" },
     ],
     defaultVariants: { variant: "default", size: "default" },

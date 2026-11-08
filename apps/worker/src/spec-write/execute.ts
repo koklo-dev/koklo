@@ -9,7 +9,7 @@ import {
 import { readSpecFiles } from "../spec-read/read-spec.ts";
 import { RECOVERY_WINDOW } from "./constants.ts";
 import { buildCommitMessage, hasOpsTrailer } from "./message.ts";
-import { withSpecPath } from "./paths.ts";
+import { relativeToSpec, withSpecPath } from "./paths.ts";
 import { planBatch } from "./plan.ts";
 import { type BatchAuthor, conflicted, failed, type LoadedBatch, type Outcome } from "./types.ts";
 
@@ -18,6 +18,8 @@ interface Target {
   readonly auth: GitAuth;
   readonly repo: RepoRef;
   readonly batch: LoadedBatch;
+  /** Contributeurs d'une publication d'idée, en plus de l'auteur de la session. */
+  readonly coAuthors: readonly BatchAuthor[];
   /** Appelé juste avant `writeCommit` : à partir de là, une écriture a pu partir. */
   readonly beforeWrite: () => Promise<void>;
 }
@@ -58,7 +60,11 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
     listing,
     specPath: batch.repo.specPath,
   });
-  const plan = planBatch(batch, files);
+  const treePaths = listing.files.flatMap((file) => {
+    const path = relativeToSpec(batch.repo.specPath, file.path);
+    return path === undefined ? [] : [path];
+  });
+  const plan = planBatch(batch, files, treePaths);
   if ("outcome" in plan) return plan.outcome;
   await target.beforeWrite();
   const commit = await provider.writeCommit({
@@ -72,6 +78,7 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
       message: batch.message,
       operations: batch.operations,
       author,
+      coAuthors: target.coAuthors,
     }),
     expectedHeadSha: listing.ref,
   });
@@ -95,13 +102,14 @@ export async function executeBatch(
   batch: LoadedBatch,
   author: BatchAuthor | null,
   beforeWrite: () => Promise<void>,
+  coAuthors: readonly BatchAuthor[] = [],
 ): Promise<Outcome> {
   const { externalId, ownerKind, ownerLogin } = batch.installation;
   const auth = await provider.authenticate({
     installation: { id: externalId, owner: { kind: ownerKind, login: ownerLogin } },
   });
   const repo = { owner: { kind: ownerKind, login: batch.repo.ownerLogin }, name: batch.repo.name };
-  const target: Target = { provider, auth, repo, batch, beforeWrite };
+  const target: Target = { provider, auth, repo, batch, coAuthors, beforeWrite };
   const recovered = await recover(target);
   if (recovered) return recovered;
   try {

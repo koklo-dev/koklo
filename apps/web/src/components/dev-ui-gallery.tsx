@@ -1,5 +1,6 @@
 import { SURFACES, TYPE_SCALE } from "./dev-ui-data.ts";
 import { DevUiFrame, DevUiSection } from "./dev-ui-frame.tsx";
+import { DevUiIdea } from "./dev-ui-idea.tsx";
 import { DevUiLists } from "./dev-ui-lists.tsx";
 import { DevUiListsB } from "./dev-ui-lists-b.tsx";
 import { DevUiNav } from "./dev-ui-nav.tsx";
@@ -90,6 +91,7 @@ export function DevUiGallery() {
         <DevUiSurfacesA />
         <DevUiSurfacesB />
         <DevUiSurfacesC />
+        <DevUiIdea />
       </main>
     </div>
   );

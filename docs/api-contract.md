@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.3.0** (TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.4.0** (TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1429,6 +1429,17 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.4.0** (TK-89, lot A): idea space. New group `idea` (`list`, `get`, `save`, `setStatus`, `publish`, `presence`)
+  and sub-group `idea.page` (`create`, `rename`, `reorder`, `delete`, `restore`); 11 routes under
+  `/projects/{projectId}/idea`, 103 routes and 77 paths in all. `save` answers a stale `baseVersion` with
+  `CONFLICT` and `data.currentVersion` (`ideaConflictError`); `page.delete` of a required page is `FORBIDDEN` with
+  reason `required_page`. Reading: the six roles (a client only on linked projects); writing: owner, admin, dev,
+  designer and client (business reads only); `publish`: owner, admin, dev, designer, and it only registers a batch on
+  the `cadrage` branch (operations `idea.page.write`, `idea.page.delete`, `idea.index.write`), tracked by
+  `specBatch.get` whose `results[].kind` now also lists these three kinds. New tables `idea_pages`,
+  `idea_publications`, `idea_page_contributors`, `idea_presence` (migration `20261108090000_idea`, with `down.sql`,
+  10 empty template pages per existing project). **Additive**: no route removed or changed; `specBatch.submit` input
+  unchanged. The fingerprint of 2.3.0 is frozen in `packages/contract/test/contract.test.ts`.
 - **2.3.0** (TK-98, lot A): AI providers. New groups `aiProvider` (`list`, `add`, `verify`, `replaceKey`, `remove`,
   `setPrimary`), `aiModel` (`listQualified`), `aiUsage` (`set`, `report`) and `aiSettings` (`get`, `update`); 11 routes,
   92 routes and 69 paths in all. New schemas in `schemas-ai-providers.ts` (`apiKeySchema` is now exported). No migration.

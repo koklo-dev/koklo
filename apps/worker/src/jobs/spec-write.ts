@@ -61,8 +61,14 @@ async function attemptBatch(
   if (deps.provider === null) return failed("PROVIDER_UNAVAILABLE");
   try {
     const { store } = deps;
-    return await executeBatch(deps.provider, batch, await store.author(batch), () =>
-      store.markCommitting(batch),
+    const author = await store.author(batch);
+    const coAuthors = await store.coAuthors(batch);
+    return await executeBatch(
+      deps.provider,
+      batch,
+      author,
+      () => store.markCommitting(batch),
+      coAuthors,
     );
   } catch (error) {
     const failure = classify(error);

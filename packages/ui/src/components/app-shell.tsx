@@ -42,11 +42,13 @@ export function useShell(): ShellState {
 
 const DEFAULT_KEY = "koklo.sidebar";
 
-function readStored(key: string): boolean {
+/** `null` : aucune valeur mémorisée, c'est alors `defaultCollapsed` qui décide. */
+function readStored(key: string): boolean | null {
   try {
-    return window.localStorage.getItem(key) === "collapsed";
+    const value = window.localStorage.getItem(key);
+    return value === null ? null : value === "collapsed";
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -58,10 +60,13 @@ function writeStored(key: string, collapsed: boolean): void {
   }
 }
 
-function useCollapsed(storageKey: string) {
+function useCollapsed(storageKey: string, defaultCollapsed: boolean) {
   const [collapsed, setCollapsed] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  useEffect(() => setCollapsed(readStored(storageKey)), [storageKey]);
+  useEffect(
+    () => setCollapsed(readStored(storageKey) ?? defaultCollapsed),
+    [storageKey, defaultCollapsed],
+  );
   const toggle = useCallback(() => {
     setCollapsed((current) => {
       writeStored(storageKey, !current);
@@ -93,6 +98,8 @@ export interface AppShellProps {
   /** Boutons d'icône de 44 px à droite de l'en-tête mobile (thème, recherche). */
   mobileActions?: ReactNode;
   storageKey?: string;
+  /** Rail de 64 px tant que le choix n'est pas mémorisé (la valeur mémorisée reste prioritaire). */
+  defaultCollapsed?: boolean;
   children: ReactNode;
 }
 
@@ -101,7 +108,7 @@ function MobileShell({
   mobileTitle,
   mobileActions,
   children,
-}: Omit<AppShellProps, "storageKey">) {
+}: Omit<AppShellProps, "storageKey" | "defaultCollapsed">) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const value = useMemo<ShellState>(
@@ -157,8 +164,12 @@ function DesktopShell({
   sidebar,
   children,
   storageKey,
-}: Pick<AppShellProps, "sidebar" | "children"> & { storageKey: string }) {
-  const { collapsed, announcement, toggle } = useCollapsed(storageKey);
+  defaultCollapsed,
+}: Pick<AppShellProps, "sidebar" | "children"> & {
+  storageKey: string;
+  defaultCollapsed: boolean;
+}) {
+  const { collapsed, announcement, toggle } = useCollapsed(storageKey, defaultCollapsed);
   useCollapseShortcut(true, toggle);
   const value = useMemo<ShellState>(
     () => ({ collapsed, mobile: false, toggle }),
@@ -189,7 +200,12 @@ function DesktopShell({
  * Coquille de l'application (DESIGN.md v2.2 §5.4) : barre collante de 256 px (rail de 64 px, état en
  * `localStorage`, jamais en cookie) ou, sous 768 px, en-tête de 56 px et tiroir de 288 px.
  */
-export function AppShell({ storageKey = DEFAULT_KEY, children, ...props }: AppShellProps) {
+export function AppShell({
+  storageKey = DEFAULT_KEY,
+  defaultCollapsed = false,
+  children,
+  ...props
+}: AppShellProps) {
   const mobile = useIsMobile();
   return (
     <TooltipProvider>
@@ -197,7 +213,11 @@ export function AppShell({ storageKey = DEFAULT_KEY, children, ...props }: AppSh
         {mobile ? (
           <MobileShell {...props}>{children}</MobileShell>
         ) : (
-          <DesktopShell sidebar={props.sidebar} storageKey={storageKey}>
+          <DesktopShell
+            sidebar={props.sidebar}
+            storageKey={storageKey}
+            defaultCollapsed={defaultCollapsed}
+          >
             {children}
           </DesktopShell>
         )}

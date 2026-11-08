@@ -3,6 +3,7 @@ import { ai } from "./contract-ai.ts";
 import { aiModel, aiProvider, aiSettings, aiUsage } from "./contract-ai-providers.ts";
 import { clientSpace } from "./contract-client-space.ts";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
+import { idea } from "./contract-idea.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
 import { projectClient } from "./contract-project-client.ts";
 import { installation, repo } from "./contract-provider.ts";
@@ -55,6 +56,12 @@ import {
   projectSchema,
   type roleSchema,
 } from "./schemas.ts";
+import type {
+  ideaListOutputSchema,
+  ideaPageSchema,
+  ideaPageSummarySchema,
+  ideaPresenceOutputSchema,
+} from "./schemas-idea.ts";
 import type { projectClientSchema } from "./schemas-project-client.ts";
 import type { installationSchema, repoSchema } from "./schemas-provider.ts";
 import type {
@@ -137,6 +144,7 @@ export const contract = {
   search,
   clientSpace,
   suggestion,
+  idea,
   review,
   ticket,
   dependency,
@@ -208,3 +216,7 @@ export type SpecBatchSubmitInput = z.input<typeof specBatchSubmitInputSchema>;
 export type SpecBatchOutput = z.output<typeof specBatchSchema>;
 export type ValidationReport = z.output<typeof validationReportSchema>;
 export type ProjectClient = z.output<typeof projectClientSchema>;
+export type IdeaPage = z.output<typeof ideaPageSchema>;
+export type IdeaPageSummary = z.output<typeof ideaPageSummarySchema>;
+export type IdeaListOutput = z.output<typeof ideaListOutputSchema>;
+export type IdeaPresenceOutput = z.output<typeof ideaPresenceOutputSchema>;

@@ -65,12 +65,9 @@ test("/ et /kanban ouvrent le dernier projet ouvert, sinon la liste des projets"
   await expect(page.getByRole("heading", { level: 1, name: "Tickets" })).toBeVisible();
 });
 
-test("pages « Bientôt » : Idée et un livrable, EmptyState sans action, onglet du cahier", async ({
+test("pages « Bientôt » : un livrable, EmptyState sans action, onglet du cahier", async ({
   page,
 }) => {
-  await page.goto(`${PROJECT}/idea`);
-  await expect(page.getByRole("heading", { level: 1, name: "Idée" })).toBeVisible();
-  await expect(page.getByText("L'espace Idée arrive dans une prochaine version.")).toBeVisible();
   await page.goto(`${PROJECT}/spec/data`);
   await expect(page.getByRole("heading", { level: 1, name: "Données" })).toBeVisible();
   await expect(page.getByText("Bientôt")).toBeVisible();

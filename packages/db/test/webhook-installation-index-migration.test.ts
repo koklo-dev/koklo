@@ -12,6 +12,7 @@ import {
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { AI_TABLES } from "./support/ai-providers-fixtures.ts";
+import { IDEA_ENUMS, IDEA_TABLES } from "./support/idea-fixtures.ts";
 import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { LONG_LISTS_INDEXES } from "./support/long-lists-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
@@ -120,6 +121,8 @@ const LATER_OBJECTS: readonly string[] = [
   ...PROJECT_CLIENT_TABLES,
   ...PROJECT_VISIT_TABLES,
   ...SETTINGS_TABLES,
+  ...IDEA_TABLES,
+  ...IDEA_ENUMS,
   ...LONG_LISTS_INDEXES,
   // TK-96 : index de audit_log.project_id.
   "audit_log_organization_id_project_id_occurred_at_idx",
@@ -160,8 +163,8 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
     );
   });
 
-  it("cette migration n'ajoute aucune table (46 attendues au total avec TK-97)", () => {
-    expect(expectedTables).toHaveLength(46);
+  it("cette migration n'ajoute aucune table (50 attendues au total avec TK-97)", () => {
+    expect(expectedTables).toHaveLength(50);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });

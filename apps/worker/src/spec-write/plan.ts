@@ -8,7 +8,8 @@ import {
   type SpecFile,
 } from "@koklo/schema";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
-import { featureIdOfPath, featurePathOf } from "./paths.ts";
+import { featureIdOfPath, featurePathOf, isIdeaKind } from "./paths.ts";
+import { planIdeaBatch } from "./plan-idea.ts";
 import { newIssues, toStoredReport } from "./report.ts";
 import {
   type BatchOperation,
@@ -152,7 +153,11 @@ const toFiles = (files: Map<string, string>): SpecFile[] =>
 export function planBatch(
   batch: Pick<LoadedBatch, "operations" | "authorRole">,
   files: readonly SpecFile[],
+  treePaths: readonly string[] = files.map((file) => file.path),
 ): Plan {
+  if (batch.operations.some((operation) => isIdeaKind(operation.kind))) {
+    return planIdeaBatch(batch.operations, treePaths);
+  }
   const index = featureIndex(files);
   const conflict = conflictOf(batch.operations, index);
   if (conflict) return { outcome: conflict };

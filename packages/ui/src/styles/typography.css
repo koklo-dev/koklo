@@ -68,4 +68,10 @@
 
   --text-settings-title-size: 20px;
   --text-settings-title-weight: 600;
+
+  /* Document de l'espace Idée (TK-89, maquette 06) : titre de page, intertitre, corps. */
+  --text-prose-title-size: 28px;
+  --text-prose-heading-size: 18px;
+  --text-prose-body-size: 15px;
+  --text-prose-body-leading: 1.65;
 }

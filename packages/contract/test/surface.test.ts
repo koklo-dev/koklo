@@ -32,6 +32,7 @@ const GROUPS: Record<string, string[]> = {
   review: ["list", "submit"],
   specBatch: ["get", "submit"],
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
+  idea: ["get", "list", "page", "presence", "publish", "save", "setStatus"],
   project: ["create", "list", "recent", "shell", "visit"],
   search: ["query"],
   org: ["get", "update"],
@@ -53,6 +54,7 @@ describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
         "comment",
         "dependency",
         "health",
+        "idea",
         "installation",
         "invitation",
         "lease",
@@ -97,6 +99,20 @@ const SUGGESTION_PAIRS = [
   "POST /projects/{projectId}/suggestions/{id}/withdraw",
   "POST /projects/{projectId}/suggestions/{id}/accept",
   "POST /projects/{projectId}/suggestions/{id}/reject",
+];
+
+const IDEA_PAIRS = [
+  "GET /projects/{projectId}/idea/pages",
+  "POST /projects/{projectId}/idea/pages",
+  "PUT /projects/{projectId}/idea/pages/order",
+  "GET /projects/{projectId}/idea/pages/{pageId}",
+  "PATCH /projects/{projectId}/idea/pages/{pageId}",
+  "DELETE /projects/{projectId}/idea/pages/{pageId}",
+  "PUT /projects/{projectId}/idea/pages/{pageId}/content",
+  "POST /projects/{projectId}/idea/pages/{pageId}/restore",
+  "POST /projects/{projectId}/idea/pages/{pageId}/status",
+  "POST /projects/{projectId}/idea/presence",
+  "POST /projects/{projectId}/idea/publish",
 ];
 
 const REVIEW_PAIRS = ["GET /projects/{projectId}/reviews", "POST /projects/{projectId}/reviews"];
@@ -193,7 +209,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 et les 11 de TK-98 sont présentes (92 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 et les 11 de TK-89 sont présentes (103 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -210,10 +226,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...SHELL_PAIRS,
       ...SETTINGS_PAIRS,
       ...AI_PROVIDER_PAIRS,
+      ...IDEA_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(92);
+    expect(pairs).toHaveLength(103);
   });
 });
 

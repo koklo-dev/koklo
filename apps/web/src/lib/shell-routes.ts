@@ -57,3 +57,7 @@ export function activeSpecSlug(pathname: string): SpecSlug | undefined {
   const slug = /^\/projects\/[^/]+\/spec\/([^/]+)\/?$/.exec(pathname)?.[1];
   return slug && isSpecSlug(slug) ? slug : undefined;
 }
+
+/** Espace Idée (`/projects/<id>/idea`) : le rail de la barre y est replié par défaut (TK-89, décision 10). */
+export const isIdeaPath = (pathname: string): boolean =>
+  /^\/projects\/[^/]+\/idea\/?$/.test(pathname);

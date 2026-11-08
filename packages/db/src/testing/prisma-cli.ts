@@ -64,6 +64,11 @@ export const expectedTables = [
   // TK-97 : projets proposés à une invitation, préférences d'e-mail.
   "invitation_projects",
   "notification_preferences",
+  // TK-89 : espace Idée (pages, publications, contributeurs, présence).
+  "idea_pages",
+  "idea_publications",
+  "idea_page_contributors",
+  "idea_presence",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */

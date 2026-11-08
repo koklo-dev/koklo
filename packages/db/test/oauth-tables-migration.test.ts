@@ -123,9 +123,9 @@ describe("TK-48a1 migrations : dossiers et contenu", () => {
     );
   });
 
-  it("expectedTables contient les deux tables (46 au total avec TK-97)", () => {
+  it("expectedTables contient les deux tables (50 au total avec TK-97)", () => {
     for (const table of OAUTH_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(46);
+    expect(expectedTables).toHaveLength(50);
   });
 });
 
@@ -137,6 +137,8 @@ const LATER_ENUMS = [
   "review_status",
   "baseline_status",
   "ai_usage",
+  "idea_page_origin",
+  "idea_page_status",
 ];
 
 let db: TestDatabase;

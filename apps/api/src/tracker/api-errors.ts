@@ -1,6 +1,7 @@
 import {
   CounterLimitReachedError,
   DependencyCycleError,
+  InvalidIdeaError,
   InvalidLeaseError,
   InvalidProjectStateVersionError,
   InvalidSensitivityError,
@@ -58,6 +59,7 @@ export function toApiError(error: unknown): unknown {
   if (error instanceof InvalidTicketError) return validation(error.field, error.message);
   if (error instanceof TicketPackageError) return validation("pkg", error.message);
   if (error instanceof InvalidSensitivityError) return validation("sensitivity", error.message);
+  if (error instanceof InvalidIdeaError) return validation(error.field, error.message);
   if (error instanceof CounterLimitReachedError) return conflict("counter_limit_reached");
   if (error instanceof InvalidTicketTransitionError) {
     return invalidTransition(String(error.from), String(error.to));

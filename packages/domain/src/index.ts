@@ -15,6 +15,7 @@ export * from "./git-repo.ts";
 export * from "./git-user-installation.ts";
 export * from "./git-webhook.ts";
 export * from "./git-webhook-payload.ts";
+export * from "./idea.ts";
 export * from "./lease.ts";
 export * from "./llm-budget.ts";
 export * from "./llm-credential.ts";

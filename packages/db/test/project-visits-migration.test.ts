@@ -57,9 +57,9 @@ describe("TK-88 migration project_visits : dossier et contenu", () => {
     expect(down).not.toMatch(/DROP\s+(?:TYPE|FUNCTION|TRIGGER)/i);
   });
 
-  it("expectedTables contient la table (46 au total)", () => {
+  it("expectedTables contient la table (50 au total)", () => {
     expect(expectedTables).toContain(TABLE);
-    expect(expectedTables).toHaveLength(46);
+    expect(expectedTables).toHaveLength(50);
   });
 
   it("le modèle ProjectVisit est un modèle d'organisation", () => {

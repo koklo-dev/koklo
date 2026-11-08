@@ -14,5 +14,7 @@ import { SpecWriteQueue } from "./spec-write.queue.ts";
     SpecWriteQueue,
     { provide: SPEC_BATCH_REPOSITORY, useClass: PrismaSpecBatchRepository },
   ],
+  // `IdeaModule` (TK-89) enregistre ses lots de publication par ce service.
+  exports: [SpecBatchService],
 })
 export class SpecBatchModule {}

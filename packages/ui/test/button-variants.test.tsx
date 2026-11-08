@@ -55,6 +55,15 @@ describe("Button : variantes", () => {
     expect(cls).not.toContain("h-9");
   });
 
+  it("text : lien texte de 26 px, 13/500, marges 8, couleur --text (maquette 06)", () => {
+    const cls = classes(buttonVariants({ variant: "text" }));
+    expect(cls).toContain("h-[26px]");
+    expect(cls).toContain("px-2");
+    expect(cls).toContain("text-foreground");
+    expect(cls).toContain("underline");
+    expect(cls).not.toContain("font-semibold");
+  });
+
   it("link : marges 10 et texte 13 l'emportent sur la taille ; ghost default marges 12", () => {
     const link = classes(buttonVariants({ variant: "link" }));
     expect(link).toContain("px-2.5");

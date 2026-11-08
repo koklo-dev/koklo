@@ -18,6 +18,8 @@ export interface ProjectHeaderProps {
   status?: ReactNode;
   /** Équipe seulement : SHA de 7 caractères et âge (« il y a 3 min »). */
   sha?: { value: string; age?: string };
+  /** Information à droite de l'emplacement (ex. état d'enregistrement) ; remplace `sha` quand les deux sont donnés. */
+  meta?: ReactNode;
   /** Action principale : avant la secondaire dans l'ordre de focus, en dernier visuellement. */
   primaryAction?: ReactNode;
   secondaryActions?: ReactNode;
@@ -97,6 +99,7 @@ export function ProjectHeader({
   summary,
   status,
   sha,
+  meta,
   primaryAction,
   secondaryActions,
   tabs,
@@ -115,7 +118,7 @@ export function ProjectHeader({
     >
       <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between md:gap-4">
         <Location project={project} section={section} page={page} Link={Link} />
-        {sha ? <ShaInfo sha={sha} /> : null}
+        {meta ?? (sha ? <ShaInfo sha={sha} /> : null)}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3">
         <Heading

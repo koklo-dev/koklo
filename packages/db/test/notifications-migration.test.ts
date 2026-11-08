@@ -11,6 +11,7 @@ import {
 } from "../src/testing/prisma-cli.ts";
 import { createTestDatabase, type TestDatabase } from "../src/testing/test-database.ts";
 import { withoutAiEnums } from "./support/ai-providers-fixtures.ts";
+import { withoutIdeaEnums } from "./support/idea-fixtures.ts";
 import {
   insertNotification,
   NOTIFICATION_MIGRATION,
@@ -124,9 +125,9 @@ describe("TK-51d migration notifications : dossier et contenu", () => {
     expect(down).not.toMatch(/counter_name/i);
   });
 
-  it("expectedTables contient la table (46 au total avec TK-97)", () => {
+  it("expectedTables contient la table (50 au total avec TK-97)", () => {
     for (const table of NOTIFICATION_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(46);
+    expect(expectedTables).toHaveLength(50);
   });
 });
 
@@ -151,7 +152,7 @@ describe("TK-51d migration notifications : up -> (données) -> down -> up", () =
     expect(afterFirstUp.tables).toEqual([...expectedTables].sort());
     for (const table of NOTIFICATION_TABLES) expect(afterFirstUp.tables).toContain(table);
     const earlier = await inventory(await applyEarlierMigrations(baseline));
-    expect(withoutAiEnums(afterFirstUp.enums)).toEqual(earlier.enums);
+    expect(withoutIdeaEnums(withoutAiEnums(afterFirstUp.enums))).toEqual(earlier.enums);
     expect(afterFirstUp.functions).toEqual(earlier.functions);
     expect(afterFirstUp.triggers).toEqual(earlier.triggers);
   }, 180_000);

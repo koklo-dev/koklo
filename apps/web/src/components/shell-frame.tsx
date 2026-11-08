@@ -4,7 +4,7 @@ import { AppShell, IconButton } from "@koklo/ui";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { canListMembers } from "../lib/roles.ts";
-import { isSpecSlug, projectIdFromPath, type SpecSlug } from "../lib/shell-routes.ts";
+import { isIdeaPath, isSpecSlug, projectIdFromPath, type SpecSlug } from "../lib/shell-routes.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { useProjectShell, useProjectVisit } from "../lib/use-project-shell.ts";
 import { AppSidebar } from "./app-sidebar.tsx";
@@ -17,7 +17,8 @@ import { ThemeToggle } from "./theme-toggle.tsx";
  * projet enregistre sa visite une fois (`project.visit`).
  */
 export function ShellFrame({ children }: { children: ReactNode }) {
-  const projectId = projectIdFromPath(usePathname());
+  const pathname = usePathname();
+  const projectId = projectIdFromPath(pathname);
   const shell = useProjectShell(projectId);
   useProjectVisit(projectId);
   const { role } = useActiveOrganization();
@@ -34,6 +35,7 @@ export function ShellFrame({ children }: { children: ReactNode }) {
 
   return (
     <AppShell
+      defaultCollapsed={isIdeaPath(pathname)}
       sidebar={<AppSidebar projectId={projectId} onOpenSearch={openSearch} />}
       mobileTitle={shell.data?.name ?? "Koklo"}
       mobileActions={

@@ -6,11 +6,8 @@ import { useProjectShell } from "../lib/use-project-shell.ts";
 import { PageBody } from "./page-body.tsx";
 import { ShellLink } from "./shell-link.tsx";
 
-type SoonSlug = "idea" | SpecSlug;
-
 /** Titre du livrable et phrase de la page « Bientôt » (DESIGN.md §5.4) : aucune promesse de date, aucune action. */
-const SOON: Record<SoonSlug, { title: string; sentence: string }> = {
-  idea: { title: "Idée", sentence: "L'espace Idée arrive dans une prochaine version." },
+const SOON: Record<SpecSlug, { title: string; sentence: string }> = {
   functional: {
     title: "Fonctionnel",
     sentence: "Le cahier fonctionnel arrive dans une prochaine version.",
@@ -35,15 +32,15 @@ const SOON: Record<SoonSlug, { title: string; sentence: string }> = {
   },
 };
 
-/** Page d'un livrable ou de l'espace Idée pas encore livré : en-tête de projet, puis `EmptyState` « Bientôt ». */
-export function SoonPage({ projectId, slug }: { projectId: string; slug: SoonSlug }) {
+/** Page d'un livrable pas encore livré : en-tête de projet, puis `EmptyState` « Bientôt ». */
+export function SoonPage({ projectId, slug }: { projectId: string; slug: SpecSlug }) {
   const shell = useProjectShell(projectId);
   const { title, sentence } = SOON[slug];
   return (
     <>
       <ProjectHeader
         project={{ name: shell.data?.name ?? "Projet", href: projectPath(projectId) }}
-        {...(slug === "idea" ? {} : { section: "Spec" })}
+        section="Spec"
         page={title}
         title={title}
         LinkComponent={ShellLink}

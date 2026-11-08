@@ -1,6 +1,7 @@
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
+import { IDEA_TEMPLATE } from "../idea/idea-template.ts";
 import { type AuditActor, recordAudit } from "../tracker/audit.ts";
 import type { ProjectRecord, ProjectRepository } from "./project.repository.ts";
 
@@ -25,6 +26,20 @@ export class PrismaProjectRepository implements ProjectRepository {
         const project = await tx.project.create({
           data: { name, organizationId: actor.organizationId },
           select: { id: true, name: true, organizationId: true, createdAt: true },
+        });
+        // Gabarit « cadrage par défaut » (TK-89) : les 10 pages naissent avec le projet, ou pas du tout.
+        await tx.ideaPage.createMany({
+          data: IDEA_TEMPLATE.map((entry, position) => ({
+            organizationId: actor.organizationId,
+            projectId: project.id,
+            slug: entry.slug,
+            title: entry.title,
+            position,
+            required: entry.required,
+            origin: "template" as const,
+            templateKey: entry.slug,
+            status: "empty" as const,
+          })),
         });
         await recordAudit(tx, actor, {
           action: "project.create",
