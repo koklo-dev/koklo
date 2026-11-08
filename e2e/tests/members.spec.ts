@@ -33,6 +33,6 @@ test("C2 : la matrice des rôles montre neuf actions pour six rôles", async ({ 
   await page.context().addCookies([{ name: SESSION_COOKIE, value, url: baseURL as string }]);
   await page.goto("/settings/members");
   await page.getByText("Ce que chaque rôle peut faire").click();
-  const region = page.getByRole("region", { name: "Ce que chaque rôle peut faire" });
-  await expect(region.getByRole("cell", { name: /: (oui|non)$/ })).toHaveCount(54);
+  const table = page.getByRole("table", { name: "Ce que chaque rôle peut faire" });
+  await expect(table.getByLabel(/^(Oui|Non)$/)).toHaveCount(54);
 });
