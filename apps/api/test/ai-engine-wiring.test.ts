@@ -140,19 +140,19 @@ describe("clés d'IA de l'organisation : inaccessibles aux agents de code", () =
   it("aucune route à jeton d'agent dans le contrat ; toute route /agent future doit être classée ici", () => {
     const AGENT_ROUTES_CLASSIFIED: string[] = [];
     const found: string[] = [];
-    for (const [group, node] of Object.entries(contract as unknown as Record<string, object>)) {
-      const entries =
-        "~orpc" in node
-          ? [[group, node]]
-          : Object.entries(node).map(([name, procedure]) => [`${group}.${name}`, procedure]);
-      for (const [name, procedure] of entries as [
-        string,
-        { "~orpc": { meta: { "~openapi"?: { path?: string } } } },
-      ][]) {
-        const path = procedure["~orpc"].meta["~openapi"]?.path ?? "";
-        if (/^\/agent/.test(path) || /^agent/i.test(name)) found.push(name);
+    // Parcours récursif : un groupe peut contenir des sous-groupes (ex. `idea.page`).
+    const visit = (name: string, node: object): void => {
+      if ("~orpc" in node) {
+        const meta = (node as { "~orpc": { meta: { "~openapi"?: { path?: string } } } })["~orpc"]
+          .meta;
+        const path = meta["~openapi"]?.path ?? "";
+        const leaf = name.split(".").at(-1) ?? "";
+        if (/^\/agent/.test(path) || /^agent/i.test(name) || /^agent/i.test(leaf)) found.push(name);
+        return;
       }
-    }
+      for (const [key, child] of Object.entries(node)) visit(name ? `${name}.${key}` : key, child);
+    };
+    visit("", contract as unknown as object);
     expect(found.sort()).toEqual(AGENT_ROUTES_CLASSIFIED);
   });
 });
