@@ -4,11 +4,22 @@ import { generateOpenApi } from "../src/index.ts";
 import { errors, input, isValid, output, proc, UUID, UUID2 } from "./support.ts";
 
 /**
- * TK-89 lot A (contrat 2.4.0, additif) : groupe `idea` (list, get, save, setStatus, publish, presence)
+ * TK-89 lot A (contrat 2.4.0 puis 2.5.0, additif) : groupe `idea` (list, get, save, setStatus, publish, presence)
  * et sous-groupe `idea.page` (create, rename, reorder, delete, restore). `CONFLICT` de `save` porte
  * `data.currentVersion`. Aucune sortie ne porte d'identifiant d'utilisateur ni d'e-mail.
  */
-const TOP = ["get", "list", "page", "presence", "publish", "save", "setStatus"];
+const TOP = [
+  "agent",
+  "get",
+  "list",
+  "message",
+  "page",
+  "presence",
+  "proposal",
+  "publish",
+  "save",
+  "setStatus",
+];
 const PAGE = ["create", "delete", "rename", "reorder", "restore"];
 const BASE = "/projects/{projectId}/idea";
 const ROUTES = [
@@ -57,9 +68,9 @@ describe("idea : surface", () => {
     expect((await doc()).paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("le contrat courant est 2.4.0 (additif : version mineure)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.4.0");
-    expect((await doc()).info.version).toBe("2.4.0");
+  it("le contrat courant est 2.5.0 (additif : version mineure)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.5.0");
+    expect((await doc()).info.version).toBe("2.5.0");
   });
 });
 
@@ -148,10 +159,11 @@ describe("idea : entrées", () => {
 describe("idea : sorties", () => {
   it("list : pages actives, corbeille, total réel, publication ; jamais de contenu", async () => {
     const out = {
-      pages: [SUMMARY],
+      pages: [{ ...SUMMARY, pendingProposals: 0 }],
       trash: [{ ...SUMMARY, deletedAt: INSTANT, required: false }],
       total: 1,
       publication: { available: true, last: { commitSha: "a".repeat(40), publishedAt: INSTANT } },
+      pendingPageProposals: [],
     };
     expect(await isValid(output("idea.list"), out)).toBe(true);
     expect(
@@ -164,9 +176,8 @@ describe("idea : sorties", () => {
     expect(Object.keys(parsedPages.value.pages[0] ?? {})).not.toContain("contentMd");
   });
 
-  it("get, save, setStatus, create, rename, restore rendent la page complète", async () => {
+  it("save, setStatus, create, rename, restore rendent la page complète (get y ajoute ses propositions)", async () => {
     for (const name of [
-      "idea.get",
       "idea.save",
       "idea.setStatus",
       "idea.page.create",
@@ -181,6 +192,7 @@ describe("idea : sorties", () => {
   it("l'auteur d'une modification n'est jamais un identifiant ni un e-mail", async () => {
     const parsed = (await output("idea.get")?.["~standard"].validate({
       ...PAGE_OUT,
+      proposals: [],
       updatedBy: { name: "Awa", isClient: false, userId: UUID, email: "a@b.fr" },
     })) as { value: { updatedBy: Record<string, unknown> } };
     expect(Object.keys(parsed.value.updatedBy).sort()).toEqual(["isClient", "name"]);

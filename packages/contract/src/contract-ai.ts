@@ -1,3 +1,4 @@
+import { eventIterator } from "@orpc/contract";
 import {
   encryptionUnavailableError,
   notFoundError,
@@ -17,6 +18,10 @@ import { route, writeErrors } from "./route-helpers.ts";
 import {
   aiDraftBriefInputSchema,
   aiDraftBriefOutputSchema,
+  aiIdeaChatEventSchema,
+  aiIdeaChatInputSchema,
+  aiIdeaGapsInputSchema,
+  aiIdeaGapsOutputSchema,
   aiProposeCriteriaInputSchema,
   aiProposeCriteriaOutputSchema,
   aiProposeFeaturesInputSchema,
@@ -59,4 +64,17 @@ export const ai = {
     .errors({ ...proposalErrors, ...providerErrors, ...specIndexFailedError })
     .input(aiProposeCriteriaInputSchema)
     .output(aiProposeCriteriaOutputSchema),
+  /**
+   * Agent de l'espace Idée (TK-90, 2.5.0) : le message est streamé (SSE), les propositions suivent. Les refus
+   * d'avant le flux (droit, verrou, clé, plafond) sont de vraies erreurs HTTP ; ceux du milieu du flux, des
+   * évènements d'erreur de même code. L'agent ne modifie jamais une page : voir `idea.proposal.decide`.
+   */
+  ideaChat: route("POST", "/projects/{projectId}/ai/idea/chat")
+    .errors(proposalErrors)
+    .input(aiIdeaChatInputSchema)
+    .output(eventIterator(aiIdeaChatEventSchema)),
+  ideaGaps: route("POST", "/projects/{projectId}/ai/idea/gaps")
+    .errors(proposalErrors)
+    .input(aiIdeaGapsInputSchema)
+    .output(aiIdeaGapsOutputSchema),
 };

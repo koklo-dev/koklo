@@ -58,9 +58,13 @@ import {
 } from "./schemas.ts";
 import type {
   ideaListOutputSchema,
+  ideaMessageSchema,
+  ideaPageDetailSchema,
   ideaPageSchema,
   ideaPageSummarySchema,
   ideaPresenceOutputSchema,
+  ideaProposalOutputSchema,
+  ideaProposalSchema,
 } from "./schemas-idea.ts";
 import type { projectClientSchema } from "./schemas-project-client.ts";
 import type { installationSchema, repoSchema } from "./schemas-provider.ts";
@@ -220,3 +224,7 @@ export type IdeaPage = z.output<typeof ideaPageSchema>;
 export type IdeaPageSummary = z.output<typeof ideaPageSummarySchema>;
 export type IdeaListOutput = z.output<typeof ideaListOutputSchema>;
 export type IdeaPresenceOutput = z.output<typeof ideaPresenceOutputSchema>;
+export type IdeaPageDetail = z.output<typeof ideaPageDetailSchema>;
+export type IdeaProposal = z.output<typeof ideaProposalSchema>;
+export type IdeaProposalOutput = z.output<typeof ideaProposalOutputSchema>;
+export type IdeaMessage = z.output<typeof ideaMessageSchema>;

@@ -20,7 +20,7 @@ const GROUPS: Record<string, string[]> = {
   audit: ["list"],
   installation: ["list", "start"],
   llmCredential: ["invalidate", "list", "remove", "set", "verify"],
-  ai: ["draftBrief", "proposeCriteria", "proposeFeatures"],
+  ai: ["draftBrief", "ideaChat", "ideaGaps", "proposeCriteria", "proposeFeatures"],
   aiProvider: ["add", "list", "remove", "replaceKey", "setPrimary", "verify"],
   aiModel: ["listQualified"],
   aiUsage: ["report", "set"],
@@ -32,7 +32,18 @@ const GROUPS: Record<string, string[]> = {
   review: ["list", "submit"],
   specBatch: ["get", "submit"],
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
-  idea: ["get", "list", "page", "presence", "publish", "save", "setStatus"],
+  idea: [
+    "agent",
+    "get",
+    "list",
+    "message",
+    "page",
+    "presence",
+    "proposal",
+    "publish",
+    "save",
+    "setStatus",
+  ],
   project: ["create", "list", "recent", "shell", "visit"],
   search: ["query"],
   org: ["get", "update"],
@@ -87,6 +98,8 @@ describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
 });
 
 const AI_PAIRS = [
+  "POST /projects/{projectId}/ai/idea/chat",
+  "POST /projects/{projectId}/ai/idea/gaps",
   "POST /projects/{projectId}/ai/brief",
   "POST /projects/{projectId}/ai/features",
   "POST /projects/{projectId}/ai/criteria",
@@ -113,6 +126,10 @@ const IDEA_PAIRS = [
   "POST /projects/{projectId}/idea/pages/{pageId}/status",
   "POST /projects/{projectId}/idea/presence",
   "POST /projects/{projectId}/idea/publish",
+  "GET /projects/{projectId}/idea/agent",
+  "GET /projects/{projectId}/idea/messages",
+  "POST /projects/{projectId}/idea/proposals/{proposalId}/decision",
+  "POST /projects/{projectId}/idea/proposals/{proposalId}/undo",
 ];
 
 const REVIEW_PAIRS = ["GET /projects/{projectId}/reviews", "POST /projects/{projectId}/reviews"];
@@ -209,7 +226,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 et les 11 de TK-89 sont présentes (103 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 sont présentes (109 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -230,7 +247,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(103);
+    expect(pairs).toHaveLength(109);
   });
 });
 
