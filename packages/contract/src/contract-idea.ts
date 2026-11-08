@@ -10,10 +10,15 @@ import {
 } from "./errors.ts";
 import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
 import {
+  ideaAgentStatusInputSchema,
+  ideaAgentStatusOutputSchema,
   ideaGetInputSchema,
   ideaListInputSchema,
   ideaListOutputSchema,
+  ideaMessageListInputSchema,
+  ideaMessageListOutputSchema,
   ideaPageCreateInputSchema,
+  ideaPageDetailSchema,
   ideaPageRefInputSchema,
   ideaPageRenameInputSchema,
   ideaPageReorderInputSchema,
@@ -22,6 +27,9 @@ import {
   ideaPageSummarySchema,
   ideaPresenceInputSchema,
   ideaPresenceOutputSchema,
+  ideaProposalDecideInputSchema,
+  ideaProposalOutputSchema,
+  ideaProposalRefInputSchema,
   ideaPublishInputSchema,
   ideaPublishOutputSchema,
   ideaSaveInputSchema,
@@ -64,7 +72,22 @@ const page = {
 };
 
 /**
- * Espace Idée (TK-89, contrat 2.4.0) : le client rédige sans publier, le business lit. Un projet ou
+ * Propositions de l'agent (TK-90, contrat 2.5.0) : une décision humaine, jamais l'agent. Une version de page dépassée
+ * est un CONFLICT + `currentVersion` (la proposition devient périmée) ; une proposition d'un autre projet, NOT_FOUND.
+ */
+const proposal = {
+  decide: route("POST", `${BASE}/proposals/{proposalId}/decision`)
+    .errors({ ...writeErrors, ...notFoundError, ...ideaConflictError })
+    .input(ideaProposalDecideInputSchema)
+    .output(ideaProposalOutputSchema),
+  undo: route("POST", `${BASE}/proposals/{proposalId}/undo`)
+    .errors({ ...writeErrors, ...notFoundError, ...ideaConflictError })
+    .input(ideaProposalRefInputSchema)
+    .output(ideaProposalOutputSchema),
+};
+
+/**
+ * Espace Idée (TK-89, contrat 2.4.0 ; agent TK-90, 2.5.0) : le client rédige sans publier, le business lit. Un projet ou
  * une page hors périmètre est un NOT_FOUND uniforme ; `save` périmé rend CONFLICT + `currentVersion`.
  */
 export const idea = {
@@ -72,7 +95,10 @@ export const idea = {
     .errors(readOneErrors)
     .input(ideaListInputSchema)
     .output(ideaListOutputSchema),
-  get: route("GET", PAGE).errors(readOneErrors).input(ideaGetInputSchema).output(ideaPageSchema),
+  get: route("GET", PAGE)
+    .errors(readOneErrors)
+    .input(ideaGetInputSchema)
+    .output(ideaPageDetailSchema),
   save: route("PUT", `${PAGE}/content`)
     .errors({ ...writeErrors, ...ideaConflictError })
     .input(ideaSaveInputSchema)
@@ -89,5 +115,19 @@ export const idea = {
     .errors(writeOneErrors)
     .input(ideaPresenceInputSchema)
     .output(ideaPresenceOutputSchema),
+  message: {
+    list: route("GET", `${BASE}/messages`)
+      .errors({ ...readOneErrors, ...validationError })
+      .input(ideaMessageListInputSchema)
+      .output(ideaMessageListOutputSchema),
+  },
+  /** État de l'agent pour les rôles de lecture de l'espace Idée : le client ne lit pas `aiProvider.list`. */
+  agent: {
+    status: route("GET", `${BASE}/agent`)
+      .errors(readOneErrors)
+      .input(ideaAgentStatusInputSchema)
+      .output(ideaAgentStatusOutputSchema),
+  },
+  proposal,
   page,
 };

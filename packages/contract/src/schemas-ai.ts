@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IDEA_MESSAGE_MAX, ideaProposalSchema } from "./schemas-idea.ts";
 import { llmProviderSchema } from "./schemas-llm-credential.ts";
 import { featureIdSchema, featurePrioritySchema, stepTypeSchema } from "./schemas-spec.ts";
 import { instantSchema } from "./schemas-tickets.ts";
@@ -103,3 +104,52 @@ export const llmCredentialVerifyOutputSchema = z.object({
 export type AiDraftBriefInput = z.input<typeof aiDraftBriefInputSchema>;
 export type AiProposeFeaturesInput = z.input<typeof aiProposeFeaturesInputSchema>;
 export type AiProposeCriteriaInput = z.input<typeof aiProposeCriteriaInputSchema>;
+
+/** Actions sur la sélection de l'éditeur (TK-90) : le serveur en tire la consigne, jamais le client. */
+export const aiIdeaActionSchema = z.enum([
+  "develop",
+  "challenge",
+  "simplify",
+  "find_gaps",
+  "make_page",
+]);
+
+/** Message à l'agent de l'espace Idée : `pageId` est la page de contexte, `selection` le passage visé. */
+export const aiIdeaChatInputSchema = z.object({
+  projectId: z.uuid(),
+  pageId: z.uuid().optional(),
+  mode: z.enum(["interview", "free"]),
+  text: nonBlank(IDEA_MESSAGE_MAX),
+  action: aiIdeaActionSchema.optional(),
+  selection: z.string().max(IDEA_MESSAGE_MAX).optional(),
+});
+
+/** Évènements du flux : le texte arrive par morceaux, puis les propositions, puis la fin (`done`). */
+export const aiIdeaChatEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), text: z.string() }),
+  z.object({ type: z.literal("proposals"), proposals: z.array(ideaProposalSchema) }),
+  z.object({
+    type: z.literal("done"),
+    messageId: z.uuid(),
+    nextQuestion: z.string().optional(),
+  }),
+]);
+
+export const AI_IDEA_GAPS_MAX = 4;
+export const aiIdeaGapsInputSchema = z.object({ projectId: z.uuid() });
+/** Un manque : une page existante (`pageId`) ou une page à créer (`suggestedPageTitle`). */
+export const aiIdeaGapSchema = z.object({
+  pageId: z.uuid().nullable(),
+  suggestedPageTitle: z.string().min(1).max(120).nullable(),
+  text: z.string().min(1).max(200),
+});
+export const aiIdeaGapsOutputSchema = z.object({
+  items: z.array(aiIdeaGapSchema).max(AI_IDEA_GAPS_MAX),
+  computedAt: instantSchema,
+  /** Vrai si le résultat date de moins de 30 s : aucun appel au modèle. */
+  cached: z.boolean(),
+});
+
+export type AiIdeaChatInput = z.input<typeof aiIdeaChatInputSchema>;
+export type AiIdeaChatEvent = z.output<typeof aiIdeaChatEventSchema>;
+export type AiIdeaGapsOutput = z.output<typeof aiIdeaGapsOutputSchema>;
