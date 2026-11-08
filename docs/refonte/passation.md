@@ -14,13 +14,12 @@ last_reviewed: 2026-11-08
 | --- | --- | --- |
 | 018 | TK-87, TK-88, TK-94, TK-95, TK-96 | ✅ fusionnés |
 | 019 | TK-97, TK-138 à TK-142 | ✅ fusionnés (bibliothèque fidèle aux maquettes, reprise des écrans, axe en CI) |
-| 019 | TK-98 (fournisseurs d'IA) | 🟡 fusionné, critère 1 partiel : attend la réponse de l'utilisateur à **A5** (projets « données en UE ») |
+| 019 | TK-98 (fournisseurs d'IA) | 🟡 fusionné, critère 1 partiel : A5 tranchée (interrupteur « données en UE » par projet), réalisée avec TK-93 qui complète le critère |
 | 020 | TK-89 (espace Idée : pages, éditeur, publication, droits) | ✅ fusionné (PR #150, `e8c2247`) |
 | 020 | TK-90 (panneau de l'agent, propositions) puis TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | à faire, dans cet ordre |
 | 021 | TK-92 (vue d'ensemble) puis TK-93 (projets en cartes, création en une étape) | à faire |
 
-Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, A5, B16
-(`questions.md`).
+Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
 ## Règles de l'utilisateur (ne pas redemander)
 
@@ -34,6 +33,8 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - Incohérences entre planches : valeur majoritaire des planches récentes (B143) ; choix de l'utilisateur B144
   (segmenté actif neutre sans violet, titres des Réglages à 20 px, `wand_stars` pour les actions de l'agent,
   `smart_toy` pour l'Assistant).
+- Données en UE (A5, 2026-11-08) : interrupteur par projet « Les données de ce projet restent dans l'UE » (owner,
+  admin) ; activé, OpenRouter n'est jamais appelé pour ce projet. Livré avec TK-93, qui complète le critère 1 de TK-98.
 - Découpage de l'espace Idée : TK-89 n'affiche ni agent, ni Synthèse, ni jauge, ni « Passer au cadrage » (pas de bouton
   mort) ; ils arrivent avec TK-90 et TK-91. L'Assistant de cadrage actuel et le brief sont retirés au sprint 022.
 - Tout en français ; jamais le nom du fournisseur d'IA dans l'interface ; aucune donnée réelle ni secret ; WCAG 2.2 AA,
@@ -46,8 +47,8 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
   ce qu'il faut savoir est ici, dans le vault (sprints) et dans `questions.md`.
 - **Workflow seulement pour les gros tickets** (base + contrat + écran). Petit ticket (correctif, composant, test) :
   directement, sans workflow, ou un seul agent Sonnet.
-- Sous-agents en Sonnet par défaut (`/config`, modèle des sous-agents). Revue visuelle : Opus jusqu'à décision
-  contraire de l'utilisateur (question posée le 2026-11-08 : Sonnet partout, ou Opus pour les écrans neufs seulement).
+- Sous-agents en Sonnet par défaut (`/config`, modèle des sous-agents). **Revue visuelle : toujours Opus** (choix de
+  l'utilisateur le 2026-11-08).
 - Sorties de commandes toujours tronquées (`| tail -40`, `grep` ciblé) ; ne pas relire un fichier déjà lu.
 - **Relancer `pnpm lint` après chaque correction, même d'une ligne**, avant de pousser : chaque tour de CI coûte
   30 minutes (deux tours perdus sur TK-89).
