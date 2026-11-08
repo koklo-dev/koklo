@@ -191,6 +191,9 @@ export class PurposeLlm implements LlmProvider {
       "features-propose": featuresReply(),
       "criteria-propose": criteriaReply(),
       "credential-verify": "OK",
+      "idea-chat": "Pour qui est ce produit ?",
+      "idea-propose": { proposals: [] },
+      "idea-gaps": { items: [] },
     };
     const reply = replies[request.trace.purpose];
     return FakeLlm.replying(reply).complete(request);

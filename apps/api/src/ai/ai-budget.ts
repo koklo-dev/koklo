@@ -5,7 +5,10 @@ export type AiPurpose =
   | "brief-draft"
   | "features-propose"
   | "criteria-propose"
-  | "credential-verify";
+  | "credential-verify"
+  | "idea-chat"
+  | "idea-propose"
+  | "idea-gaps";
 
 /** Plafonds par défaut du quota (D8, à valider par l'humain) ; réglables par `AppConfig.ai`. */
 export interface AiLimits {
@@ -30,6 +33,8 @@ export const AI_LIMIT_DEFAULTS: AiLimits = {
 export const AI_WINDOW_SECONDS = 3600;
 
 const COMMON = { maxPromptChars: 60_000, maxCostMicroUsd: 500_000 } as const;
+/** Espace Idée (TK-90) : le dossier entier (pages, fil, sélection) part avec chaque appel, d'où un prompt plus large. */
+const IDEA = { maxPromptChars: 100_000, maxCostMicroUsd: 500_000 } as const;
 
 /** Budget serveur par appel : jamais lu de l'entrée, toujours sous les plafonds du domaine. */
 export const AI_BUDGETS: Readonly<Record<AiPurpose, LlmBudget>> = {
@@ -37,6 +42,9 @@ export const AI_BUDGETS: Readonly<Record<AiPurpose, LlmBudget>> = {
   "brief-draft": { maxOutputTokens: 1500, timeoutMs: 60_000, ...COMMON },
   "criteria-propose": { maxOutputTokens: 1500, timeoutMs: 60_000, ...COMMON },
   "credential-verify": { maxOutputTokens: 16, timeoutMs: 15_000, ...COMMON },
+  "idea-chat": { maxOutputTokens: 1200, timeoutMs: 90_000, ...IDEA },
+  "idea-propose": { maxOutputTokens: 6000, timeoutMs: 90_000, ...IDEA },
+  "idea-gaps": { maxOutputTokens: 800, timeoutMs: 60_000, ...IDEA },
 };
 
 /** Nombre maximal de features existantes (lignes) transmises au modèle comme contexte. */

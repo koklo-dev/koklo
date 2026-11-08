@@ -74,6 +74,43 @@ const briefSchema = z
   })
   .strict();
 
+const IDEA_PROPOSALS_MAX = 3;
+const IDEA_CONTENT_TOTAL_MAX = 50_000;
+const ideaProposalSchema = z
+  .object({
+    op: z.enum(["insert_after", "replace", "append", "create_page"]),
+    anchorBlockIndex: z.number().int().min(0).nullable(),
+    rangeEnd: z.number().int().min(0).nullable(),
+    title: safeText({ min: 1, max: 120 }).nullable(),
+    contentMd: safeText({ min: 1, max: IDEA_CONTENT_TOTAL_MAX, multiline: true }),
+    rationale: safeText({ min: 1, max: 200 }),
+  })
+  .strict();
+
+/** Propositions de l'agent : texte filtré par la politique de contenu, 50 000 caractères au total (B223). */
+export const ideaProposalsOutputSchema = z
+  .object({ proposals: z.array(ideaProposalSchema).max(IDEA_PROPOSALS_MAX) })
+  .strict()
+  .refine(
+    ({ proposals }) =>
+      proposals.reduce((sum, proposal) => sum + proposal.contentMd.length, 0) <=
+      IDEA_CONTENT_TOTAL_MAX,
+    "contenu total",
+  );
+
+/** Manques du dossier : la page est un titre (existante ou à créer), jamais un identifiant. */
+export const ideaGapsOutputSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({ page: safeText({ min: 1, max: 120 }), text: safeText({ min: 1, max: 200 }) })
+          .strict(),
+      )
+      .max(10),
+  })
+  .strict();
+
 /** `maxFeatures` : borne appliquée à la sortie (le modèle la connaît, mais ne la fait pas respecter). */
 export const featuresOutputSchema = (maxFeatures: number) =>
   z.object({ features: z.array(featureSchema).min(1).max(maxFeatures) }).strict();

@@ -1,6 +1,7 @@
 import { contract } from "@koklo/contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { commentsFor } from "./helpers/comments.ts";
+import { insertActor } from "./helpers/organizations.ts";
 import { installBench } from "./helpers/repo-scene.ts";
 import { createReviewScene, type ReviewScene, reviewApi } from "./helpers/reviews.ts";
 import { shellApi } from "./helpers/shell.ts";
@@ -14,6 +15,9 @@ import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
  * que suggérer (create, withdraw), valider (review.submit) et commenter ; tout le reste est 403.
  */
 const ALLOWED = [
+  // TK-90 (contrat 2.5.0) : le client dialogue avec l'agent et décide de ses propositions (mêmes droits que l'éditeur).
+  "ai.ideaChat",
+  "ai.ideaGaps",
   "comment.create",
   // TK-89 (contrat 2.4.0) : le client rédige le dossier d'idée sans le publier (décision 1).
   "idea.page.create",
@@ -22,6 +26,8 @@ const ALLOWED = [
   "idea.page.reorder",
   "idea.page.restore",
   "idea.presence",
+  "idea.proposal.decide",
+  "idea.proposal.undo",
   "idea.save",
   "idea.setStatus",
   // TK-97 : préférences personnelles (nom, e-mails), ouvertes à toute session, client compris.
@@ -127,8 +133,10 @@ describe("classement exhaustif des écritures du contrat", () => {
     expect(routes().find((r) => r.name === "review.list")?.method).toBe("GET");
   });
 
-  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter, rédiger le dossier d'idée, mémoriser son dernier projet et régler son compte", () => {
+  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter, rédiger le dossier d'idée et dialoguer avec son agent, mémoriser son dernier projet et régler son compte", () => {
     expect(ALLOWED).toEqual([
+      "ai.ideaChat",
+      "ai.ideaGaps",
       "comment.create",
       "idea.page.create",
       "idea.page.delete",
@@ -136,6 +144,8 @@ describe("classement exhaustif des écritures du contrat", () => {
       "idea.page.reorder",
       "idea.page.restore",
       "idea.presence",
+      "idea.proposal.decide",
+      "idea.proposal.undo",
       "idea.save",
       "idea.setStatus",
       "me.update",
@@ -293,4 +303,32 @@ describe("les seules écritures du client : suggérer, retirer, valider, comment
     const created = await api.create(scene.p1.projectId);
     expect((await api.accept(scene.p1.projectId, created.body.id)).status).toBe(403);
   });
+});
+
+describe("TK-90 : l'agent de l'espace Idée suit les droits de l'éditeur (le business lit seulement)", () => {
+  const AGENT_WRITES = ["ai.ideaChat", "ai.ideaGaps", "idea.proposal.decide", "idea.proposal.undo"];
+
+  it("ces quatre procédures sont des écritures du contrat, autorisées au client", () => {
+    const names = writes().map((r) => r.name);
+    for (const name of AGENT_WRITES) {
+      expect(names).toContain(name);
+      expect(ALLOWED).toContain(name);
+    }
+  });
+
+  it.each(AGENT_WRITES)(
+    "%s : 403 FORBIDDEN pour le business, quel que soit le projet",
+    async (name) => {
+      const route = routes().find((r) => r.name === name);
+      const business = await insertActor(bench().database, scene.p1.organizationId, "business");
+      for (const projectId of [scene.p1.projectId, scene.p2.projectId]) {
+        const path = (route?.path ?? "")
+          .replace("{projectId}", projectId)
+          .replace(/\{[^}]+\}/g, "11111111-1111-4111-8111-111111111111");
+        const res = await send(bench().app, business.cookie, "post", path, {});
+        expect(res.status, `${name} : ${res.text}`).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
+      }
+    },
+  );
 });

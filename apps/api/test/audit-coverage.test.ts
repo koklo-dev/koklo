@@ -204,6 +204,8 @@ const STANDALONE_PROCEDURES = ["health"];
 
 const EXPECTED_WRITE_PROCEDURES = [
   "ai.draftBrief",
+  "ai.ideaChat",
+  "ai.ideaGaps",
   "ai.proposeCriteria",
   "ai.proposeFeatures",
   "aiProvider.add",
@@ -1012,6 +1014,23 @@ function aiScenarios(): Scenario[] {
       },
       deniedStatuses: [403],
     },
+    ...(["ideaChat", "ideaGaps"] as const).map((name): Scenario => {
+      const route = (projectId: string) =>
+        `/projects/${projectId}/ai/idea/${name === "ideaChat" ? "chat" : "gaps"}`;
+      const body = (projectId: string) =>
+        name === "ideaChat" ? { projectId, mode: "free", text: "Bonjour" } : { projectId };
+      return {
+        procedure: `ai.${name}`,
+        role: "dev",
+        prepare: keyed,
+        call: (ctx) => call(ctx, "dev", route(ctx.world.projectId), body(ctx.world.projectId)),
+        expected: onProject(name === "ideaChat" ? "ai.idea.chat" : "ai.idea.gaps"),
+        // TK-90 : le business lit l'espace Idée sans dialoguer avec l'agent.
+        denied: (ctx) =>
+          call(ctx, "business", route(ctx.world.projectId), body(ctx.world.projectId)),
+        deniedStatuses: [403],
+      };
+    }),
     {
       procedure: "ai.proposeFeatures",
       role: "dev",
@@ -1400,7 +1419,7 @@ describe("écritures hors journal (TK-88)", () => {
 });
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 45 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 47 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 

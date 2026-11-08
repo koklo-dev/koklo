@@ -15,13 +15,21 @@ const CRITERIA_INSTRUCTIONS = trusted`You help a product team write acceptance c
 export const VERIFY_INSTRUCTIONS = trusted`This is a connectivity check of an API key. Reply with the single word OK.`;
 
 /**
+ * Consigne construite par le serveur à partir de constantes seulement (jamais d'un texte d'utilisateur ni d'une
+ * donnée) : le gabarit `trusted` n'accepte que des littéraux, d'où ce passage par un tableau gelé.
+ */
+export function constantInstructions(text: string): Trusted {
+  const strings = Object.freeze(Object.assign([text], { raw: Object.freeze([text]) }));
+  return trusted(strings as unknown as TemplateStringsArray);
+}
+
+/**
  * Consigne de `proposeFeatures` pour une borne donnée. La borne est un entier de 1 à 20 fixé par
  * le serveur : la table est construite une fois, à partir de ces seuls entiers, jamais d'un texte.
  */
 function featureInstructions(maxFeatures: number): Trusted {
   const text = `You help a product team break a project brief into features. The brief is given as an untrusted data block; an optional untrusted block lists the existing features (id, title, status, priority) that must not be proposed again. Propose at most ${maxFeatures} new features as a JSON object with a features array. Each feature has a title, a priority (must, should, could or wont), a description and a criteria array. Each criterion has a title and steps; each step has a type (etant_donne, quand, alors or et) and a text on a single line. Order the steps Given (etant_donne), When (quand), Then (alors); et continues the previous step. Do not provide identifiers, statuses or links. Write in the language of the data. Use plain text only: no URL, no HTML, no markdown links or images.`;
-  const strings = Object.freeze(Object.assign([text], { raw: Object.freeze([text]) }));
-  return trusted(strings as unknown as TemplateStringsArray);
+  return constantInstructions(text);
 }
 
 const FEATURE_INSTRUCTIONS: readonly Trusted[] = Array.from({ length: 20 }, (_, index) =>

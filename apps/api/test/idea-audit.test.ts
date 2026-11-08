@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp, createSeededDatabase } from "./helpers/app.ts";
 import { type ClientScene, createClientScene } from "./helpers/client-scene.ts";
 import { ideaApi, pageIdOf, seedIdeaTemplate } from "./helpers/idea.ts";
+import { ideaAgentApi, insertProposal } from "./helpers/idea-agent.ts";
 
 /**
  * TK-89 : chaque écriture du dossier d'idée produit exactement une entrée d'audit (acteur, cible, projet) ;
@@ -67,6 +68,8 @@ describe("idea : audit des écritures", () => {
       "idea.page.reorder",
       "idea.page.delete",
       "idea.page.restore",
+      "idea.proposal.decide",
+      "idea.proposal.undo",
     ];
     expect(writes(contract.idea, "idea").sort()).toEqual([...audited, ...UNAUDITED_HERE].sort());
   });
@@ -96,6 +99,31 @@ describe("idea : audit des écritures", () => {
         target_id: targetId,
         actor_id: scene.staff.dev.userId,
       });
+    }
+  });
+
+  it("accepter, rejeter et annuler une proposition : une entrée par décision, sur la page ou le projet", async () => {
+    const api = ideaAgentApi(app, scene.staff.dev);
+    const s = { organizationId: scene.organizationId, projectId: p() };
+    const page = await pageIdOf(database, p(), "utilisateurs");
+    const accepted = await insertProposal(database, s, { pageId: page, baseVersion: 1 });
+    const other = await pageIdOf(database, p(), "mesure");
+    const rejected = await insertProposal(database, s, { pageId: other, baseVersion: 1 });
+    const created = await insertProposal(database, s, { op: "create_page", title: "Audit agent" });
+    expect((await api.decide(p(), accepted, "accept")).status).toBe(200);
+    expect((await api.undo(p(), accepted)).status).toBe(200);
+    expect((await api.decide(p(), rejected, "reject")).status).toBe(200);
+    const made = await api.decide(p(), created, "accept");
+    const expected: [string, string, string][] = [
+      ["idea.proposal.accept", "idea_page", page],
+      ["idea.proposal.accept", "idea_page", made.body.page.id],
+      ["idea.proposal.undo", "idea_page", page],
+      ["idea.proposal.reject", "idea_page", other],
+    ];
+    for (const [action, kind, targetId] of expected) {
+      const rows = (await auditOf(p(), action)).filter((row) => row.target_id === targetId);
+      expect(rows, `${action} ${targetId}`).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ target_kind: kind, actor_id: scene.staff.dev.userId });
     }
   });
 
