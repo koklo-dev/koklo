@@ -104,6 +104,29 @@ test.describe("équipe", () => {
     await expect(page.getByRole("list", { name: "Présents dans le dossier" })).toBeVisible();
   });
 
+  test("sans clé d'IA : le panneau l'explique, l'éditeur et les pages restent utilisables (TK-90)", async ({
+    page,
+  }) => {
+    const { workspace, projectId } = await space();
+    await signIn(page, workspace.owner);
+    await open(page, projectId);
+    const agent = page.getByRole("complementary", { name: "Agent" });
+    await expect(agent.getByText(/aucune clé d'IA/)).toBeVisible();
+    await expect(agent.getByRole("link", { name: "Configurer l'IA" })).toHaveAttribute(
+      "href",
+      "/settings/ai",
+    );
+    await expect(agent.getByText("Qu'est-ce qui peut attendre ?")).toBeVisible();
+    await expect(agent.getByRole("textbox", { name: "Message à l'agent" })).toHaveCount(0);
+    await write(page, "Texte écrit sans l'agent.");
+    await expect(page.getByText("Brouillon enregistré")).toBeVisible();
+    await page.getByRole("button", { name: "Ajouter une page" }).click();
+    await expect(page.getByRole("textbox", { name: "Titre de la page" })).toHaveValue(
+      "Page sans titre",
+    );
+    expect(await violations(page)).toEqual([]);
+  });
+
   test("réordonner au clavier (Alt + flèche) et retrouver l'ordre", async ({ page }) => {
     const { workspace, projectId } = await space();
     await signIn(page, workspace.owner);
@@ -204,6 +227,18 @@ test.describe("client", () => {
     await open(page, projectId);
     expect(await violations(page)).toEqual([]);
     await capture(page, "client-sombre");
+  });
+
+  test("sans clé d'IA, le client est renvoyé à un administrateur (TK-90)", async ({ page }) => {
+    const { workspace, owner, projectId } = await space();
+    await linkClientToProject(owner, projectId, workspace.client);
+    await signIn(page, workspace.client);
+    await open(page, projectId);
+    const agent = page.getByRole("complementary", { name: "Agent" });
+    await expect(
+      agent.getByText("Demandez à un administrateur de l'organisation d'ajouter la clé."),
+    ).toBeVisible();
+    await expect(agent.getByRole("link", { name: "Configurer l'IA" })).toHaveCount(0);
   });
 
   test("un client non lié au projet n'y accède pas", async ({ page }) => {

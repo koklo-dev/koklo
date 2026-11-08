@@ -8,6 +8,7 @@ import {
   resetFeatures,
 } from "./stub-features.ts";
 import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts";
+import { handleIdea, type IdeaScenario, resetIdea } from "./stub-idea-agent.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 import { resetMembers } from "./stub-members.ts";
 import { handleSettings, resetSettings, type SettingsScenario } from "./stub-settings.ts";
@@ -37,6 +38,7 @@ type Scenario = {
   AiScenario &
   ProvidersScenario &
   ShellScenario &
+  IdeaScenario &
   SettingsScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
@@ -156,6 +158,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetSettings();
     resetMembers();
     resetShell(scenario);
+    resetIdea(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     send(json(200, scenario));
   });
@@ -180,16 +183,11 @@ const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
   handleAi(req, url, { scenario, knownProject, send, hold }) ||
   handleShell(req, url, { scenario, projects: allProjects, send, hold });
 
-createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://stub");
+type Sender = (reply: ReturnType<typeof json>) => void;
+
+/** Le reste du faux API : fonctionnalités, dépôt de spec, projets, kanban, GitHub, organisations. */
+function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
   const path = url.pathname;
-  const send = ({ status, body }: ReturnType<typeof json>) => {
-    res.writeHead(status, { "content-type": "application/json" }).end(body);
-  };
-  if (path === "/__health") return send(json(200, { ok: true }));
-  if (handleControl(req, path, send)) return;
-  if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
-  if (handleAiApis(req, url, send)) return;
   if (handleFeatures(req, url, { scenario, knownProject, send, hold })) return;
   if (
     handleSpecRepo(req, path, {
@@ -202,10 +200,24 @@ createServer((req, res) => {
   )
     return;
   if (path.endsWith("/projects")) {
-    if (scenario.projects === "loading") return void held.push(() => send(projectsResponse()));
-    return send(projectsResponse());
+    if (scenario.projects === "loading") held.push(() => send(projectsResponse()));
+    else send(projectsResponse());
+    return;
   }
   if (handleKanban(req, url, scenario, send, hold, expireSession, { knownProject })) return;
   if (handleGithub(req, path, scenario, send, hold)) return;
   send(invitationEndpoint(path) ?? readEndpoint(req.method, path));
+}
+
+createServer((req, res) => {
+  const url = new URL(req.url ?? "/", "http://stub");
+  const path = url.pathname;
+  const send = ({ status, body }: ReturnType<typeof json>) => {
+    res.writeHead(status, { "content-type": "application/json" }).end(body);
+  };
+  if (path === "/__health") return send(json(200, { ok: true }));
+  if (handleControl(req, path, send) || handleIdea(req, res, url, scenario.role)) return;
+  if (path.endsWith("/get-session")) return send(json(200, scenario.session ? session() : null));
+  if (handleAiApis(req, url, send)) return;
+  handleRest(req, url, send);
 }).listen(Number(process.env.STUB_API_PORT ?? 3101), "127.0.0.1");
