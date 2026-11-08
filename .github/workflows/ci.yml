@@ -45,7 +45,7 @@ jobs:
           cat "$GITHUB_OUTPUT"
 
   ci:
-    needs: [changes, e2e, images, deploy-check]
+    needs: [changes, e2e, a11y-web, images, deploy-check]
     # always() : si `changes` échoue, `ci` doit s'exécuter et échouer, pas être sauté —
     # un check requis sauté compte comme réussi.
     if: always()
@@ -65,6 +65,13 @@ jobs:
         if: needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled'
         run: |
           echo "::error::job 'e2e' ended with '${{ needs.e2e.result }}'"
+          exit 1
+
+      # Même logique que e2e : un écran qui viole WCAG 2.2 AA (axe) ne doit pas passer.
+      - name: Accessibility did not fail
+        if: needs.a11y-web.result == 'failure' || needs.a11y-web.result == 'cancelled'
+        run: |
+          echo "::error::job 'a11y-web' ended with '${{ needs.a11y-web.result }}'"
           exit 1
 
       # Même logique que e2e : `ci` est le seul check requis, il doit refuser une image qui ne se construit pas.
@@ -186,6 +193,43 @@ jobs:
           path: |
             e2e/playwright-report/
             e2e/test-results/
+          if-no-files-found: ignore
+
+  # Accessibilité des écrans de apps/web (TK-142) : axe WCAG 2.2 AA sur les états de a11y.spec.ts et
+  # sur la galerie /dev/ui, contre le faux API de e2e/support (ni base ni secret). Un worker : le faux
+  # API est partagé. Une relance par test absorbe une animation interrompue.
+  a11y-web:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.0
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web dependencies
+        run: pnpm exec turbo run build --filter=@koklo/web^...
+
+      - name: Install Playwright browser
+        run: pnpm --filter @koklo/web exec playwright install --with-deps chromium
+
+      - name: Accessibility (axe)
+        run: pnpm --filter @koklo/web exec playwright test e2e/a11y.spec.ts e2e/dev-ui.spec.ts --retries=1
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: a11y-web-report
+          path: apps/web/test-results/
           if-no-files-found: ignore
 
   # Construction des 3 images (TK-16, vision §20.4) : contexte = racine, sans --build-arg,

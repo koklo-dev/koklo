@@ -159,4 +159,34 @@ check "deploy-check: actions épinglées" dc_actions_pinned
 check "job ci agrège deploy-check (needs)" in_ci 'needs:.*deploy-check'
 check "job ci : échec si deploy-check est en failure ou cancelled" in_ci "needs\\.deploy-check\\.result == 'failure' \\|\\| needs\\.deploy-check\\.result == 'cancelled'"
 check "job ci : deploy-check skipped reste accepté (pas de garde != 'success')" ci_accepts_deploy_skipped
+
+# TK-142 : job a11y-web (axe sur les écrans de apps/web, faux API, sans base ni secret)
+a11y_block() { job_block a11y-web; }
+in_a11y() { a11y_block | grep -Eq -- "$1"; }
+a11y_present() { [ -n "$(a11y_block)" ]; }
+a11y_lacks() { a11y_present && ! a11y_block | grep -Eq -- "$1"; }
+a11y_pinned() { a11y_present && ! a11y_block | grep -E 'uses:' | grep -vE '@v[0-9]+\.[0-9]+\.[0-9]+' | grep -q .; }
+a11y_rank() { a11y_block | grep -nE -- "$1" | head -1 | cut -d: -f1; }
+a11y_before() {
+    local a b
+    a="$(a11y_rank "$1")"
+    b="$(a11y_rank "$2")"
+    [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]
+}
+ci_accepts_a11y_skipped() { ! job_block ci | grep -Eq "needs\\.a11y-web\\.result != 'success'"; }
+check "a11y-web: job présent" g '^  a11y-web:'
+check "a11y-web: dépend de changes" in_a11y 'needs:.*changes'
+check "a11y-web: déclenché par outputs.code" in_a11y "needs\.changes\.outputs\.code == 'true'"
+check "a11y-web: install --frozen-lockfile" in_a11y 'pnpm install --frozen-lockfile'
+check "a11y-web: construit les dépendances du web (turbo build --filter=@koklo/web^...)" in_a11y 'turbo run build --filter=@koklo/web\^\.\.\.'
+check "a11y-web: installe Chromium pour @koklo/web" in_a11y '@koklo/web exec playwright install --with-deps chromium'
+check "a11y-web: lance a11y.spec.ts et dev-ui.spec.ts" in_a11y 'playwright test e2e/a11y\.spec\.ts e2e/dev-ui\.spec\.ts'
+check "a11y-web: ordre build < tests" a11y_before 'turbo run build' 'playwright test'
+check "a11y-web: ordre navigateur < tests" a11y_before 'playwright install' 'playwright test'
+check "a11y-web: upload du rapport en cas d'échec" in_a11y 'if: (failure|always)\(\)'
+check "a11y-web: actions épinglées" a11y_pinned
+check "a11y-web: aucun secret (faux API)" a11y_lacks 'secrets\.'
+check "job ci agrège a11y-web (needs)" in_ci 'needs:.*a11y-web'
+check "job ci : échec si a11y-web est en failure ou cancelled" in_ci "needs\\.a11y-web\\.result == 'failure' \\|\\| needs\\.a11y-web\\.result == 'cancelled'"
+check "job ci : a11y-web skipped reste accepté (pas de garde != 'success')" ci_accepts_a11y_skipped
 finish

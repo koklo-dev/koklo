@@ -533,6 +533,19 @@ Workflows in `.github/workflows/`: `ci.yml`, `commitlint.yml`, `security.yml`,
 `release-please.yml`. Lint, types and coverage gates: TO DOCUMENT (`ci.yml` was not
 part of this sprint's range).
 
+### Accessibility of the web screens (`ci.yml`, job `a11y-web`, TK-142)
+- Runs on every change to code (`needs.changes.outputs.code == 'true'`), in parallel with `e2e`
+  and `images`. The required check `ci` fails when `a11y-web` ends in `failure` or `cancelled`
+  (`skipped` is accepted, as for the other jobs).
+- Builds the web dependencies (`turbo run build --filter=@koklo/web^...`), installs Chromium, then runs
+  `apps/web/e2e/a11y.spec.ts` (axe WCAG 2.2 AA on every screen state, light and dark) and
+  `apps/web/e2e/dev-ui.spec.ts` (axe on the `/dev/ui` gallery, 375 px without horizontal scroll),
+  against the stub API of `apps/web/e2e/support/` : no database, no secret. One worker (the stub is
+  shared) and `--retries=1`. On failure, `apps/web/test-results/` is uploaded as `a11y-web-report`.
+- Why: until TK-139, 30 axe tests failed on `develop` without anyone noticing, because CI did not run
+  the web Playwright suite. The full suite (about 650 tests, close to 20 minutes on one worker) stays a
+  local gate before each screen PR.
+
 ### Security scan (`security.yml`)
 - Triggers: every pull request, and pushes to `develop` and `main`. Permissions
   `contents: read`; concurrency per ref, `cancel-in-progress: true`.
