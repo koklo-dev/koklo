@@ -5,6 +5,7 @@
 > Auto-loaded by Claude Code every session. Keep this file short. Long content goes in spec/, agents/<role>/, or sprints/.
 
 ## Project
+- **Refonte en cours : lire d'abord `docs/refonte/passation.md`** (état des tickets, règles déjà tranchées par l'utilisateur, méthode, économie de jetons, pièges). La mettre à jour à chaque ticket fusionné ; aucune décision ne reste seulement dans la conversation
 - Name: koklo
 - Vision: `/home/devops/perso/projets/MyVault/koklo-v2/vision.md` (source of truth, never auto-edit)
 - State: `.project/state.json`
