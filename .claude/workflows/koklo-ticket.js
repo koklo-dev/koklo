@@ -15,6 +15,10 @@ export const meta = {
 // 1 à 2 lots, une revue code+sécurité fusionnée, revue visuelle échantillonnée, un seul tour de
 // correction qui ne relance que les revues refusées, effort moyen sur les lots mécaniques.
 const A = args
+// Garde : une chaîne (« TK-90 ») ou un objet incomplet ferait travailler sur develop sans revue visuelle.
+if (!A || typeof A !== 'object' || !A.tk || !A.branch || !A.sprint || !A.date || typeof A.ui !== 'boolean') {
+  throw new Error('args attendu : { tk, branch, sprint, date, sensitive, ui (booléen), notes } — voir docs/refonte/passation.md')
+}
 const WT = '/home/devops/perso/projets/koklo-new/koklo'
 const VAULT = '/home/devops/perso/projets/MyVault/koklo-v2'
 const ART = `${WT}/.workflow/${A.tk}`
