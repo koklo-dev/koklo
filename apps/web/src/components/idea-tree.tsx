@@ -3,6 +3,7 @@
 import type { IdeaPageSummary } from "@koklo/contract";
 import {
   Button,
+  DecisionNotice,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -12,11 +13,13 @@ import {
   InlineAlert,
   PageNavItem,
   PageStatus,
+  ProposedPageList,
   ReorderableList,
   RequiredTag,
   StatusLegend,
 } from "@koklo/ui";
 import { useEffect, useRef } from "react";
+import { buttonsNamed, focusWhenReady, undoButtonOf, visible } from "../lib/idea-focus.ts";
 import { moveAnnouncement, numberedTitle } from "../lib/idea-labels.ts";
 import { ideaPath } from "../lib/shell-routes.ts";
 import type { IdeaModel } from "../lib/use-idea-page.ts";
@@ -80,6 +83,7 @@ function PageRows({ model, handlers }: { model: IdeaModel; handlers: TreeHandler
           status={page.status}
           required={page.required}
           current={page.id === current?.id}
+          pending={page.pendingProposals > 0}
           LinkComponent={ShellLink}
           actions={
             canWrite ? (
@@ -100,6 +104,96 @@ function PageRows({ model, handlers }: { model: IdeaModel; handlers: TreeHandler
         />
       )}
     />
+  );
+}
+
+const treeLinks = () =>
+  document.querySelectorAll<HTMLElement>("nav[aria-label='Pages du dossier'] a");
+
+/**
+ * Après « Ignorer » : « Annuler » de la trace. Après « Ajouter la page » : l'entrée de la nouvelle page dans
+ * l'arborescence, sinon la carte suivante, sinon « Ajouter une page », sinon le menu des pages (375 px).
+ */
+function focusAfterPageDecision(
+  id: string,
+  decision: "accept" | "reject",
+  title: string,
+  nextCardId: string | undefined,
+) {
+  focusWhenReady((left) => {
+    if (decision === "reject") return undoButtonOf(id);
+    const created = visible([...treeLinks()].filter((link) => link.textContent?.includes(title)));
+    if (!created && left > 20) return null; // la relecture n'a pas encore rendu la nouvelle page
+    return (
+      created ??
+      (nextCardId ? visible(buttonsNamed("Ajouter la page")) : undefined) ??
+      visible(buttonsNamed("Ajouter une page")) ??
+      visible(document.querySelectorAll<HTMLElement>("nav[aria-label='Pages du dossier'] button"))
+    );
+  });
+}
+
+/** Après « Annuler » d'une page ignorée : « Ajouter la page » de la carte rétablie (copie affichée). */
+function focusRestoredCard(title: string | null) {
+  focusWhenReady(() =>
+    visible(
+      [...document.querySelectorAll<HTMLElement>("[data-slot='proposed-page-card']")]
+        .filter((card) => !title || card.textContent?.includes(title))
+        .flatMap((card) => [...card.querySelectorAll<HTMLElement>("button")])
+        .filter((button) => button.textContent?.trim() === "Ajouter la page"),
+    ),
+  );
+}
+
+/** Pages proposées par l'agent : décision humaine, dans l'arborescence (maquette 06 l.88-98). */
+function PageProposals({ model }: { model: IdeaModel }) {
+  const { pageProposals, decisions, canWrite } = model;
+  if (!canWrite || pageProposals.length === 0) return null;
+  const find = (id: string) => pageProposals.find((proposal) => proposal.id === id);
+  const items = pageProposals.map((proposal) => ({
+    id: proposal.id,
+    title: proposal.title ?? "Page sans titre",
+    rationale: `Proposée par l'agent : ${proposal.rationale}`,
+  }));
+  const decide = async (id: string, decision: "accept" | "reject") => {
+    const proposal = find(id);
+    if (!proposal) return;
+    const next = pageProposals.find((other) => other.id !== id)?.id;
+    if (await decisions.decide(proposal, decision))
+      focusAfterPageDecision(id, decision, proposal.title ?? "", next);
+  };
+  return (
+    <div className="mx-0.5 mt-3.5 mb-2.5">
+      <ProposedPageList
+        items={items}
+        busyId={decisions.busyId}
+        onAccept={(id) => void decide(id, "accept")}
+        onIgnore={(id) => void decide(id, "reject")}
+      />
+    </div>
+  );
+}
+
+/** Traces des pages ajoutées ou ignorées (pas de page ouverte pour les porter) et erreur de décision. */
+function PageDecisionNotices({ model }: { model: IdeaModel }) {
+  const { decisions } = model;
+  const notices = decisions.notices.filter((notice) => notice.pageId === null);
+  return (
+    <>
+      {notices.map((notice) => (
+        <DecisionNotice
+          key={notice.proposalId}
+          data-notice-id={notice.proposalId}
+          onUndo={
+            notice.undoable
+              ? () => void decisions.undo(notice).then(() => focusRestoredCard(notice.title))
+              : undefined
+          }
+        >
+          {notice.text}
+        </DecisionNotice>
+      ))}
+    </>
   );
 }
 
@@ -125,7 +219,7 @@ export function IdeaTreeDesktop({ model, handlers }: { model: IdeaModel; handler
   return (
     <nav
       aria-label="Pages du dossier"
-      className="hidden w-[264px] shrink-0 flex-col gap-0.5 border-r px-3 py-4 lg:flex"
+      className="hidden w-[264px] shrink-0 flex-col gap-0.5 border-r px-3 py-4 lg:flex lg:overflow-y-auto"
     >
       <div className="flex flex-col gap-0.5 px-2 pb-2.5">
         <span className="text-group-label text-muted-foreground uppercase">Pages</span>
@@ -137,6 +231,8 @@ export function IdeaTreeDesktop({ model, handlers }: { model: IdeaModel; handler
       </div>
       <PageRows model={model} handlers={handlers} />
       {handlers.deleting ? <DeleteConfirm page={handlers.deleting} handlers={handlers} /> : null}
+      <PageProposals model={model} />
+      <PageDecisionNotices model={model} />
       <AddPage model={model} handlers={handlers} />
       <StatusLegend />
       <IdeaTrash model={model} />
@@ -200,6 +296,8 @@ export function IdeaTreeMobile({ model, handlers }: { model: IdeaModel; handlers
         ) : null}
       </div>
       {handlers.deleting ? <DeleteConfirm page={handlers.deleting} handlers={handlers} /> : null}
+      <PageProposals model={model} />
+      <PageDecisionNotices model={model} />
       <IdeaTrash model={model} />
     </nav>
   );

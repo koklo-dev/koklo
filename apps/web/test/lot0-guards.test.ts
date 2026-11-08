@@ -53,7 +53,12 @@ describe("CA5 (5.2) : h2, h3 et titres de Sheet sur l'échelle v2", () => {
       utility: "text-(?:section|settings)-title",
       except: ["components/kanban-column.tsx"],
     },
-    { tag: /<h3\b[^>]*>/gs, utility: "(?:text-subsection-title|sr-only)" },
+    {
+      tag: /<h3\b[^>]*>/gs,
+      utility: "(?:text-subsection-title|sr-only)",
+      // h3 de proposition : style porté par `Prose` de packages/ui (18/600, maquette 06), pas de classe locale.
+      except: ["components/idea-proposal-text.tsx"],
+    },
     { tag: /<SheetTitle\b[^>]*\bclassName=[^>]*>/gs, utility: "text-section-title" },
   ];
 

@@ -9,6 +9,7 @@ import { orpc } from "./orpc.ts";
 import { canPublishIdea, canWriteIdea } from "./roles.ts";
 import { useActiveOrganization } from "./use-active-organization.ts";
 import { useIdeaActions } from "./use-idea-actions.ts";
+import { useIdeaProposals } from "./use-idea-proposals.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
 
 export type IdeaGate = "loading" | "not-found" | "error" | "ready";
@@ -24,10 +25,10 @@ function useIdeaList(projectId: string) {
 }
 
 /** Page ouverte : `?page=<slug>`, sinon la première page du dossier. */
-export function pickPage(
-  pages: IdeaPageSummary[],
+export function pickPage<T extends IdeaPageSummary>(
+  pages: T[],
   slug: string | null,
-): IdeaPageSummary | undefined {
+): T | undefined {
   return pages.find((page) => page.slug === slug) ?? pages[0];
 }
 
@@ -36,6 +37,7 @@ export function useIdeaPage(projectId: string) {
   const slug = useSearchParams().get("page");
   const { role } = useActiveOrganization();
   const actions = useIdeaActions(projectId);
+  const decisions = useIdeaProposals(projectId);
   const unauthorized = useUnauthorizedRedirect(list.error);
   const data: IdeaListOutput | undefined = list.data;
   const pages = useMemo(
@@ -49,6 +51,8 @@ export function useIdeaPage(projectId: string) {
     refetch: () => void list.refetch(),
     pages,
     trash: data?.trash ?? [],
+    pageProposals: data?.pendingPageProposals ?? [],
+    decisions,
     publication: data?.publication ?? { available: false, last: null },
     slug,
     current,
