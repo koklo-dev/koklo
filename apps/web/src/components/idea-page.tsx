@@ -7,12 +7,14 @@ import type { StorageScope } from "../lib/feature-draft.ts";
 import { moveAnnouncement, numberedTitle, type SaveState } from "../lib/idea-labels.ts";
 import { arrayMoveIds } from "../lib/idea-order.ts";
 import { ideaPath } from "../lib/shell-routes.ts";
+import { type IdeaAgent, useIdeaAgent } from "../lib/use-idea-agent.ts";
 import { type IdeaModel, useIdeaPage } from "../lib/use-idea-page.ts";
 import { useIdeaPresence } from "../lib/use-idea-presence.ts";
 import { useIdeaPublish } from "../lib/use-idea-publish.ts";
 import { useProjectShell } from "../lib/use-project-shell.ts";
 import { useBeginFeatureSession, useStorageScope } from "../lib/use-storage-scope.ts";
 import { ProjectNotFound } from "./features-empty.tsx";
+import { IdeaAgentPanel } from "./idea-agent-panel.tsx";
 import { DocumentSkeleton, IdeaDocument } from "./idea-document.tsx";
 import { IdeaHeader, IdeaPublishNotice } from "./idea-header.tsx";
 import { IdeaEmpty, IdeaLoadError, IdeaSkeleton } from "./idea-states.tsx";
@@ -90,6 +92,7 @@ function IdeaBody({
   open,
   handlers,
   announcement,
+  agent,
 }: {
   model: IdeaModel;
   scope: StorageScope | null;
@@ -99,6 +102,7 @@ function IdeaBody({
   open: (slug: string) => void;
   handlers: TreeHandlers;
   announcement: string;
+  agent: IdeaAgent;
 }) {
   const first = model.pages[0];
   const allEmpty = model.pages.every((p) => p.status === "empty");
@@ -108,12 +112,12 @@ function IdeaBody({
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
-      <div className="flex min-w-0 flex-col lg:flex-row">
+      <div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
         <IdeaTreeDesktop model={model} handlers={handlers} />
         <IdeaTreeMobile model={model} handlers={handlers} />
         <article
           aria-label="Page du dossier"
-          className="flex min-w-0 flex-1 flex-col gap-4 px-4 py-7 md:px-10 md:pb-12"
+          className="flex min-w-0 flex-1 flex-col gap-4 px-4 py-7 md:px-10 md:pb-12 lg:overflow-y-auto [&>*]:shrink-0"
         >
           <IdeaPublishNotice
             model={model}
@@ -129,11 +133,22 @@ function IdeaBody({
               scope={scope}
               renameFocus={renameId === model.current.id}
               onSaveState={onSaveState}
+              agent={agent}
             />
           ) : (
             <DocumentSkeleton />
           )}
         </article>
+        {model.canWrite ? (
+          <IdeaAgentPanel
+            agent={agent}
+            current={model.current}
+            onExplore={(file) => {
+              const target = model.pages.find((p) => p.slug === file);
+              if (target) open(target.slug);
+            }}
+          />
+        ) : null}
       </div>
     </>
   );
@@ -146,15 +161,9 @@ const asPeople = (present: ReturnType<typeof useIdeaPresence>) =>
     isClient: p.isClient,
   }));
 
-/** Écran S-idea (design/screens/S-idea.md) : arborescence des pages, document de la page, publication. */
-export function IdeaPage({ projectId }: { projectId: string }) {
-  const model = useIdeaPage(projectId);
-  const shell = useProjectShell(projectId);
-  const scope = useStorageScope();
-  useBeginFeatureSession(scope);
+/** État d'enregistrement du document et publication, qui vide d'abord ce qui attend. */
+function useSaveAndPublish(projectId: string) {
   const [save, setSave] = useState<SaveState>("idle");
-  const [announcement, setAnnouncement] = useState("");
-  const [renameId, setRenameId] = useState<string | null>(null);
   const flushRef = useRef<() => Promise<void>>(async () => undefined);
   const onSaveState = useCallback((state: SaveState, flush: () => Promise<void>) => {
     setSave(state);
@@ -164,8 +173,26 @@ export function IdeaPage({ projectId }: { projectId: string }) {
     projectId,
     useCallback(() => flushRef.current(), []),
   );
+  return { save, onSaveState, publish };
+}
+
+/** Écran S-idea (design/screens/S-idea.md) : arborescence des pages, document de la page, agent, publication. */
+export function IdeaPage({ projectId }: { projectId: string }) {
+  const model = useIdeaPage(projectId);
+  const shell = useProjectShell(projectId);
+  const scope = useStorageScope();
+  useBeginFeatureSession(scope);
+  const [announcement, setAnnouncement] = useState("");
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const { save, onSaveState, publish } = useSaveAndPublish(projectId);
   const present = useIdeaPresence(projectId, model.current?.id ?? null, model.canWrite);
   const { handlers, open } = useTreeHandlers(model, setAnnouncement, setRenameId);
+  const agent = useIdeaAgent({
+    projectId,
+    pages: model.pages,
+    current: model.current,
+    enabled: model.gate === "ready" && model.canWrite,
+  });
   const header = (
     <IdeaHeader
       model={model}
@@ -179,8 +206,8 @@ export function IdeaPage({ projectId }: { projectId: string }) {
   if (model.gate === "not-found") return <ProjectNotFound />;
   if (model.gate === "error") return <IdeaLoadError onRetry={model.refetch} />;
   return (
-    <>
-      {header}
+    <div className="lg:flex lg:h-dvh lg:flex-col">
+      <div className="lg:shrink-0">{header}</div>
       {model.gate === "loading" ? (
         <IdeaSkeleton />
       ) : (
@@ -193,8 +220,9 @@ export function IdeaPage({ projectId }: { projectId: string }) {
           open={open}
           handlers={handlers}
           announcement={announcement}
+          agent={agent}
         />
       )}
-    </>
+    </div>
   );
 }
