@@ -27,7 +27,7 @@ export function FormField({
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
-        className={cn("h-11 md:h-9", className)}
+        className={cn("h-11 md:h-10", className)}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         {...input}

@@ -140,24 +140,23 @@ describe("Membres : droits selon le rôle", () => {
 });
 
 describe("Membres : matrice « Ce que chaque rôle peut faire »", () => {
-  it("9 actions x 6 rôles, une coche ou un tiret nommé par cellule", async () => {
+  it("9 actions x 6 rôles, une coche ou un tiret « Oui » / « Non » par cellule", async () => {
     asRole("dev");
     renderWithQuery(<MembersPage />);
     const summary = await screen.findByText("Ce que chaque rôle peut faire");
     expect(summary.closest("details")).not.toBeNull();
-    const region = screen.getByRole("region", { name: "Ce que chaque rôle peut faire" });
-    expect(region).toHaveAttribute("tabindex", "0");
-    expect(within(region).getAllByRole("row")).toHaveLength(10);
-    expect(within(region).getAllByRole("columnheader")).toHaveLength(7);
-    const cells = within(region).getAllByRole("cell", { name: /: (oui|non)$/ });
-    expect(cells).toHaveLength(54);
-    const row = within(region).getByText("Gérer les tickets et les sprints").closest("tr");
-    expect(
-      within(row as HTMLElement).getByRole("cell", { name: "Développeur : oui" }),
-    ).toBeInTheDocument();
-    expect(
-      within(row as HTMLElement).getByRole("cell", { name: "Client : non" }),
-    ).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Ce que chaque rôle peut faire" });
+    expect(table.parentElement).toHaveAttribute("tabindex", "0");
+    expect(within(table).getAllByRole("row")).toHaveLength(10);
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(7);
+    expect(within(table).getAllByLabelText(/^(Oui|Non)$/)).toHaveLength(54);
+    const row = within(table).getByText("Gérer les tickets et les sprints").closest("tr");
+    const verdicts = within(row as HTMLElement)
+      .getAllByRole("cell")
+      .slice(1)
+      .map((cell) => cell.firstElementChild?.getAttribute("aria-label"));
+    // propriétaire, administrateur, développeur, designer, client, business
+    expect(verdicts).toEqual(["Oui", "Oui", "Oui", "Oui", "Non", "Non"]);
   });
 
   it("visible aussi du propriétaire, après le tableau", async () => {

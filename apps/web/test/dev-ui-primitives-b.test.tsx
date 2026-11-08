@@ -1,3 +1,4 @@
+import { ToastProvider } from "@koklo/ui";
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,7 +24,11 @@ beforeEach(async () => {
   vi.stubEnv("APP_VERSION", "0.0.0-test");
   vi.stubEnv("APP_ENV", "test");
   const { default: Page } = await import("../src/app/dev/ui/page.tsx");
-  render((await (Page as () => ReactElement | Promise<ReactElement>)()) as ReactElement);
+  render(
+    <ToastProvider>
+      {(await (Page as () => ReactElement | Promise<ReactElement>)()) as ReactElement}
+    </ToastProvider>,
+  );
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -86,8 +91,11 @@ describe("galerie : section « Primitives B » (S-dev-ui)", () => {
       "Business",
       "Client",
     ]) {
-      expect(within(f).getByText(label), label).toBeVisible();
+      expect(within(f).getAllByText(label)[0], label).toBeVisible();
     }
+    // TK-141 : `RolePill icon` (en-tête de Réglages)
+    expect(f.querySelector("[data-role='owner'] svg[data-icon='badge']")).not.toBeNull();
+    expect(f.querySelector("[data-role='client'] svg[data-icon='person']")).not.toBeNull();
     expect(f.querySelectorAll("[data-slot='id-tag']").length).toBeGreaterThanOrEqual(4);
     expect(f.querySelector("[data-slot='id-tag'].rounded-full")).not.toBeNull();
   });

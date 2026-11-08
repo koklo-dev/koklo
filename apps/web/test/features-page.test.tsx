@@ -236,6 +236,28 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(link).toHaveAttribute("title", "Connexion par e-mail");
   });
 
+  // TK-141 A5 (TK-94 n° 4, maquette 12 l.62) : IdTag, titre 500, sous-titre « N critères », priorité avant statut.
+  it("A5 : IdTag en tête, sous-titre « N critères », priorité avant avancement", async () => {
+    renderFeatures();
+    await findList();
+    const row = rowOf("Connexion par e-mail");
+    const tag = within(row).getByText("F-001");
+    expect(tag).toHaveAttribute("data-slot", "id-tag");
+    const content = row.querySelector("[data-slot='list-row']") as HTMLElement;
+    expect(content.tagName).toBe("DIV");
+    expect(content.contains(tag)).toBe(true);
+    expect(row.querySelectorAll("li")).toHaveLength(0);
+    const subtitle = within(row).getByText("3 critères").parentElement as HTMLElement;
+    expect(subtitle).toHaveClass("text-caption", "text-muted-foreground");
+    expect(subtitle.previousElementSibling?.textContent).toContain("Connexion par e-mail");
+    for (const trail of row.querySelectorAll("[data-slot='priority-indicator']")) {
+      const next = trail.compareDocumentPosition(
+        trail.parentElement?.querySelector("[data-slot='lifecycle-status']") as Element,
+      );
+      expect(next & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
   it("le titre est le seul élément interactif de la ligne", async () => {
     renderFeatures();
     await findList();
@@ -266,7 +288,9 @@ describe("Liste (§3.3, §4.2)", () => {
       expect(indicators, "PriorityIndicator").toHaveLength(2);
       for (const indicator of indicators) {
         expect(indicator).toHaveAttribute("data-level", String(level));
-        expect(indicator).toHaveTextContent(priority);
+        // Barres seules dans la liste (planche 12) : le libellé est le nom accessible, pas un texte visible.
+        expect(indicator).toHaveAttribute("aria-label", priority);
+        expect(indicator).toHaveAttribute("role", "img");
       }
       // Les critères n'ont qu'une cellule (écran large) : sous 768 px la ligne de 52 px garde avancement et priorité.
       expect(within(row).getAllByText(criteria)).toHaveLength(1);
@@ -278,9 +302,9 @@ describe("Liste (§3.3, §4.2)", () => {
     await findList();
     const row = rowOf("Connexion par e-mail");
     expect(row.querySelector("[data-slot='badge']")).toBeNull();
-    const labels = within(row).getAllByText("Indispensable");
-    expect(labels.length).toBeGreaterThan(0);
-    for (const label of labels) expect(label.className).not.toMatch(/font-semibold/);
+    // Barres seules (planche 12) : aucun libellé visible, le nom accessible porte le sens.
+    expect(within(row).queryByText("Indispensable")).toBeNull();
+    expect(within(row).getAllByRole("img", { name: "Indispensable" }).length).toBeGreaterThan(0);
     expect(within(row).queryByText("Brouillon")).toBeNull();
   });
 
@@ -524,6 +548,7 @@ describe("Vide filtré (§4.4)", () => {
       return found;
     });
     expect(empty).toHaveTextContent("Aucune fonctionnalité ne correspond à ces filtres.");
+    expect(empty).toHaveAttribute("data-variant", "inline");
     await waitFor(() =>
       expect(statusRegion()).toHaveTextContent(
         "Aucune fonctionnalité ne correspond à ces filtres.",

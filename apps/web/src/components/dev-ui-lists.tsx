@@ -303,6 +303,14 @@ export function DevUiLists() {
             />
           </li>
         </ListPanel>
+        <DevUiNote>EmptyState inline bordered (état vide qui remplace la liste)</DevUiNote>
+        <EmptyState
+          variant="inline"
+          bordered
+          icon="search_off"
+          title="Aucune fonctionnalité ne correspond à ces filtres."
+          description="Modifiez ou effacez les filtres pour revoir la liste."
+        />
       </DevUiFrame>
       <Paginations />
       <Groups />

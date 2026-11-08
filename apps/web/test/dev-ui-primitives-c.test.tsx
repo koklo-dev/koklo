@@ -1,3 +1,4 @@
+import { ToastProvider } from "@koklo/ui";
 import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import type { ReactElement } from "react";
@@ -21,7 +22,11 @@ beforeEach(async () => {
   vi.stubEnv("APP_VERSION", "0.0.0-test");
   vi.stubEnv("APP_ENV", "test");
   const { default: Page } = await import("../src/app/dev/ui/page.tsx");
-  render((await (Page as () => ReactElement | Promise<ReactElement>)()) as ReactElement);
+  render(
+    <ToastProvider>
+      {(await (Page as () => ReactElement | Promise<ReactElement>)()) as ReactElement}
+    </ToastProvider>,
+  );
 });
 afterEach(() => vi.unstubAllEnvs());
 

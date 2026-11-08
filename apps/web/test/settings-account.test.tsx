@@ -37,9 +37,8 @@ const asRole = (role: string) => {
 const switches = () =>
   screen
     .getAllByRole("switch")
-    .map((s) => document.getElementById(s.getAttribute("aria-labelledby") ?? "")?.textContent);
+    .map((s) => (s.id ? document.querySelector(`label[for="${s.id}"]`) : null)?.textContent);
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Mon compte : identité", () => {
   it("nom modifiable, e-mail en lecture seule avec son aide", async () => {
     renderWithQuery(<AccountPage />);
@@ -47,7 +46,8 @@ describe("Mon compte : identité", () => {
     const email = screen.getByRole("textbox", { name: "Adresse e-mail" });
     expect(email).toHaveValue("awa@example.com");
     expect(email).toHaveAttribute("readonly");
-    expect(screen.getByText("Cette adresse sert à vous connecter")).toBeInTheDocument();
+    // Pas d'aide sous l'adresse : elle désalignerait les champs (planche 24, align-items: flex-end).
+    expect(screen.queryByText("Cette adresse sert à vous connecter")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Mon compte" })).toBeInTheDocument();
   });
 
@@ -93,16 +93,13 @@ describe("Mon compte : identité", () => {
   });
 });
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Mon compte : thème", () => {
   const group = () => screen.findByRole("radiogroup", { name: "Thème" });
 
   it("Clair, Sombre, Système ; Clair par défaut", async () => {
     renderWithQuery(<AccountPage />);
     const radios = within(await group()).getAllByRole("radio");
-    expect(
-      radios.map((r) => r.getAttribute("aria-label") ?? r.closest("label")?.textContent),
-    ).toEqual(["Clair", "Sombre", "Système"]);
+    expect(radios.map((r) => r.textContent)).toEqual(["Clair", "Sombre", "Système"]);
     expect(within(await group()).getByRole("radio", { name: "Clair" })).toBeChecked();
   });
 
@@ -143,27 +140,28 @@ describe("Mon compte : Me prévenir par e-mail", () => {
     renderWithQuery(<AccountPage />);
     await screen.findByRole("group", { name: "Me prévenir par e-mail" });
     expect(switches()).toEqual([
-      "Validation ou changement d'un client",
-      "Pull request à relire",
-      "Agent sans nouvelles depuis 20 minutes",
-      "Consommation d'IA à 80 %",
+      "Le client valide ou demande un changement",
+      "Une pull request attend ma revue",
+      "Un agent n'a plus donné de nouvelles depuis 20 min",
+      "La consommation d'IA atteint 80 % du plafond",
       "Résumé de la semaine",
     ]);
     expect(screen.getByRole("switch", { name: "Résumé de la semaine" })).toHaveAttribute(
       "aria-checked",
       "false",
     );
-    expect(screen.getByRole("switch", { name: "Pull request à relire" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    expect(
+      screen.getByRole("switch", { name: "Une pull request attend ma revue" }),
+    ).toHaveAttribute("aria-checked", "true");
   });
 
   it("développeur : sans la consommation d'IA (réservée au propriétaire)", async () => {
     asRole("dev");
     renderWithQuery(<AccountPage />);
     await screen.findByRole("group", { name: "Me prévenir par e-mail" });
-    expect(screen.queryByRole("switch", { name: "Consommation d'IA à 80 %" })).toBeNull();
+    expect(
+      screen.queryByRole("switch", { name: "La consommation d'IA atteint 80 % du plafond" }),
+    ).toBeNull();
     expect(screen.getAllByRole("switch")).toHaveLength(4);
   });
 
@@ -172,9 +170,9 @@ describe("Mon compte : Me prévenir par e-mail", () => {
     renderWithQuery(<AccountPage />);
     await screen.findByRole("group", { name: "Me prévenir par e-mail" });
     expect(switches()).toEqual([
-      "Livrable ou écran à valider",
-      "Fonctionnalité prête à essayer",
-      "Réponse à un commentaire",
+      "Un livrable ou un écran attend ma validation",
+      "Une fonctionnalité est prête à essayer",
+      "L'équipe répond à mon commentaire",
     ]);
   });
 
@@ -204,7 +202,7 @@ describe("Mon compte : Me prévenir par e-mail", () => {
   it("l'interrupteur se pilote au clavier (Espace)", async () => {
     procedures.meUpdateNotification.mockResolvedValue({ key: "pr_to_review", enabled: false });
     renderWithQuery(<AccountPage />);
-    const toggle = await screen.findByRole("switch", { name: "Pull request à relire" });
+    const toggle = await screen.findByRole("switch", { name: "Une pull request attend ma revue" });
     toggle.focus();
     await userEvent.keyboard(" ");
     expect(toggle).toHaveAttribute("aria-checked", "false");

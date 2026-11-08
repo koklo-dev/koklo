@@ -35,14 +35,14 @@ export function AiInlineConfirm({
     <fieldset
       aria-label={groupLabel}
       onKeyDown={onKeyDown}
-      className="flex min-w-0 flex-col gap-3 rounded-md border p-3"
+      className="flex min-w-0 flex-col gap-3 rounded-card border p-3"
     >
       <p className="break-words text-sm">{text}</p>
       <div className="flex flex-col gap-2 md:flex-row">
         <Button
           ref={keepRef}
           type="button"
-          variant="outline"
+          variant="ghost"
           disabled={busy}
           className="h-11 w-full md:h-9 md:w-auto"
           onClick={onKeep}

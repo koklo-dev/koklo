@@ -83,7 +83,7 @@ describe("consommation", () => {
   });
   it("plafond saisi en euros devient des micro-dollars", async () => {
     await openProviders();
-    const field = screen.getByLabelText("Plafond mensuel (en euros)");
+    const field = screen.getByLabelText("Plafond mensuel, tous fournisseurs");
     await userEvent.type(field, "25,5");
     await userEvent.click(button("Enregistrer le plafond"));
     await waitFor(() =>
@@ -93,7 +93,7 @@ describe("consommation", () => {
   it("champ vidé : plafond retiré (null)", async () => {
     procedures.aiUsageReport.mockResolvedValue({ ...REPORT, monthlyCapMicroUsd: 10_000_000 });
     await openProviders();
-    const field = screen.getByLabelText("Plafond mensuel (en euros)") as HTMLInputElement;
+    const field = screen.getByLabelText("Plafond mensuel, tous fournisseurs") as HTMLInputElement;
     await waitFor(() => expect(field.value).toBe("10"));
     await userEvent.clear(field);
     await userEvent.click(button("Enregistrer le plafond"));
@@ -103,13 +103,13 @@ describe("consommation", () => {
   });
   it.each(["0", "-3", "abc"])("%s est refusé sans appel", async (value) => {
     await openProviders();
-    await userEvent.type(screen.getByLabelText("Plafond mensuel (en euros)"), value);
+    await userEvent.type(screen.getByLabelText("Plafond mensuel, tous fournisseurs"), value);
     await userEvent.click(button("Enregistrer le plafond"));
     expect(await screen.findByText(/supérieur à 0/)).toBeInTheDocument();
     expect(procedures.aiSettingsUpdate).not.toHaveBeenCalled();
   });
   it.each([
-    ["warning", /80 %/],
+    ["warning", /Vous avez atteint 80 %/],
     ["suspended", /Plafond atteint/],
   ])("état %s : message doublé d'une icône", async (capState, text) => {
     const base = {

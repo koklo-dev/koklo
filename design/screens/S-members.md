@@ -68,3 +68,4 @@ Sous 768 px : carte pleine largeur, bouton « Inviter » pleine largeur, cibles 
 | 1 | 2026-10-29 | TK-24 | Création : invitation (e-mail + rôle) et liste des membres, droits par rôle. Détail : `.workflow/TK-24/02-design.md` |
 | 1.1 | 2026-11-07 | TK-88 | Route `/settings/members` (`/members` redirige) sous « Réglages » ; plus d'entrée « Membres » dans la barre. Remplacée par S-settings au lot 13. Détail : `.workflow/TK-88/02-design.md` |
 | 2 | 2026-11-07 | TK-97 | Remplacée par S-settings (Réglages : Général, Membres, Mon compte). Décision B103. |
+| 2.1 | 2026-11-08 | TK-141 | Voir S-settings v1.3 (tableau, invitations et formulaire d'invitation repris sur la planche 24) |

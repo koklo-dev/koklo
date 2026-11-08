@@ -29,7 +29,7 @@ export function AppSidebar({
         data-slot="sidebar-scroll"
         className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 [@media(max-height:900px)]:gap-3 overflow-y-auto px-1"
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4 [@media(max-height:900px)]:gap-3">
           {/* Dans le tiroir, le bouton de fermeture du panneau occupe le coin haut droit. */}
           <div className={mobile ? "pr-9" : undefined}>
             <SidebarOrganization />

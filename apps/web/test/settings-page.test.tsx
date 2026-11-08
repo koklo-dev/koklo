@@ -42,15 +42,15 @@ const LOCK =
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Réglages : cadre", () => {
   it.each([
-    ["general", "Général"],
-    ["members", "Membres"],
-    ["account", "Mon compte"],
-  ] as const)("%s : un seul h1, lien actif, h2 de la section", async (section, label) => {
+    ["general", "Général", "Organisation"],
+    ["members", "Membres", "Membres"],
+    ["account", "Mon compte", "Mon compte"],
+  ] as const)("%s : un seul h1, lien actif, h2 de la section", async (section, label, title) => {
     asRole("owner");
     renderWithQuery(<SettingsPage section={section} />);
     expect(screen.getByRole("heading", { level: 1, name: "Réglages" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(await screen.findByRole("heading", { level: 2, name: label })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: title })).toBeInTheDocument();
     const current = within(nav()).getByRole("link", { current: "page" });
     expect(current).toHaveTextContent(label);
   });
@@ -127,7 +127,6 @@ describe("Réglages : cadre", () => {
   });
 });
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Réglages : section interdite et lecture seule", () => {
   it.each([
     ["dev", "github", "/settings/members"],

@@ -58,7 +58,7 @@ export function AiErrorNotice({ view, remaining, onRetry }: Props) {
             <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onRetry}>
               Réessayer
             </Button>
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-meta text-muted-foreground">
               Chaque essai est compté dans les limites de votre organisation.
             </p>
           </>

@@ -12,6 +12,8 @@ export interface EmptyStateProps
   description: string;
   /** `framed` : cadre pointillé et tuile (défaut) ; `inline` : sans cadre ni tuile, dans une liste. */
   variant?: EmptyStateVariant;
+  /** `inline` seulement : cadre plein de la liste (bordure et rayon 12, fond de page), pour un état vide qui remplace la liste. */
+  bordered?: boolean;
   /** Une seule action principale : le type ne prend pas de liste. */
   action?: ReactElement;
   /** Au plus une action secondaire, après la principale. */
@@ -33,6 +35,7 @@ export function EmptyState({
   title,
   description,
   variant = "framed",
+  bordered = false,
   action,
   secondaryAction,
   className,
@@ -42,7 +45,12 @@ export function EmptyState({
     <div
       data-slot="empty-state"
       data-variant={variant}
-      className={cn("flex flex-col items-center gap-2.5 text-center", FRAME[variant], className)}
+      className={cn(
+        "flex flex-col items-center gap-2.5 text-center",
+        FRAME[variant],
+        variant === "inline" && bordered && "rounded-xl border border-border bg-background",
+        className,
+      )}
       {...props}
     >
       {variant === "framed" ? (

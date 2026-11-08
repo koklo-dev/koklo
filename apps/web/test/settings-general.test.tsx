@@ -30,7 +30,7 @@ describe("Général", () => {
     renderWithQuery(<GeneralPage />);
     expect(await nameField()).toHaveValue("Atelier Lumière");
     expect(slugField()).toHaveValue("atelier-lumiere");
-    expect(screen.getByRole("heading", { level: 2, name: "Général" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Organisation" })).toBeInTheDocument();
     expect(screen.getByText("AL")).toBeInTheDocument();
   });
 

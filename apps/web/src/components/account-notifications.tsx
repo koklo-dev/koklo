@@ -1,6 +1,7 @@
 "use client";
 
 import type { MeNotificationsOutput, NotificationPreferenceKey, Role } from "@koklo/contract";
+import { Card, SwitchRow } from "@koklo/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { NOTIFICATION_LABELS, OWNER_ONLY_KEYS } from "../lib/account-labels.ts";
@@ -8,7 +9,6 @@ import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { orpc } from "../lib/orpc.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
-import { SwitchRow } from "./switch-row.tsx";
 
 function NotificationSwitch({
   preference,
@@ -33,7 +33,12 @@ function NotificationSwitch({
     );
   }
   return (
-    <SwitchRow label={NOTIFICATION_LABELS[preference.key]} checked={enabled} onChange={change} />
+    <SwitchRow
+      title={NOTIFICATION_LABELS[preference.key]}
+      checked={enabled}
+      onCheckedChange={change}
+      className="border-t"
+    />
   );
 }
 
@@ -56,18 +61,24 @@ export function AccountNotifications({ role }: { role: Role }) {
   }
   if (!notifications.data) return <LoadingStatus label="Chargement de vos préférences…" rows={2} />;
   return (
-    <fieldset className="m-0 flex min-w-0 max-w-xl flex-col gap-1 border-0 p-0">
-      <legend className="mb-1 p-0 text-sm font-medium">Me prévenir par e-mail</legend>
-      {failed ? <ErrorNotice title="Impossible d'enregistrer">{GENERIC_ERROR}</ErrorNotice> : null}
-      {notifications.data
-        .filter(({ key }) => visible(key, role))
-        .map((preference) => (
-          <NotificationSwitch
-            key={preference.key}
-            preference={preference}
-            onFailed={() => setFailed(true)}
-          />
-        ))}
-    </fieldset>
+    <Card asChild className="flex min-w-0 flex-col py-1.5">
+      <fieldset>
+        <legend className="float-left mt-2.5 mb-1 w-full p-0 text-subsection-title">
+          Me prévenir par e-mail
+        </legend>
+        {failed ? (
+          <ErrorNotice title="Impossible d'enregistrer">{GENERIC_ERROR}</ErrorNotice>
+        ) : null}
+        {notifications.data
+          .filter(({ key }) => visible(key, role))
+          .map((preference) => (
+            <NotificationSwitch
+              key={preference.key}
+              preference={preference}
+              onFailed={() => setFailed(true)}
+            />
+          ))}
+      </fieldset>
+    </Card>
   );
 }

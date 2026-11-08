@@ -415,7 +415,8 @@ test.describe("375 px", () => {
     await expect(table).toBeVisible();
     // La ligne de 52 px garde l'identifiant et le titre ; avancement et priorité passent sous le titre (TK-87, B22).
     await expect(table.getByLabel("Avancement : Spécifiée, étape 2 sur 6").first()).toBeVisible();
-    await expect(table.getByText("3 critères")).toBeHidden();
+    // Le sous-titre « N critères » reste visible à toute taille (maquette 12 l.62, TK-141).
+    await expect(table.getByText("3 critères").first()).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

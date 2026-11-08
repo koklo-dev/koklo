@@ -34,6 +34,11 @@ describe("SecondaryNav", () => {
     expect(label.className).toContain("max-md:sr-only");
   });
 
+  it("rangée défilante sous md : le conteneur est positionné, les libellés sr-only n'en sortent pas (TK-141)", () => {
+    render(<SecondaryNav label="Sections" groups={GROUPS} />);
+    expect(screen.getByRole("navigation", { name: "Sections" })).toHaveClass("relative");
+  });
+
   it("entrée courante : aria-current page, bg-secondary font-semibold, icône pleine primaire", () => {
     render(<SecondaryNav label="Sections" groups={GROUPS} />);
     const current = screen.getByRole("link", { name: "Général" });

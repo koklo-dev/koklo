@@ -401,3 +401,69 @@ describe("palette ⌘K branchée sur search.query (D1-D3, B3)", () => {
     expect(await screen.findByRole("dialog", { name: "Recherche" })).toBeInTheDocument();
   });
 });
+
+/** TK-141 lot A (TK-88 n° 1, 2, 7, 9) : la coquille sur ShellNavGroup, ShellNavItem count, PhaseRail inline, Kbd. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("TK-141 lot A : coquille fidèle à la maquette 05", () => {
+  const icons = (name: string) => nav().querySelectorAll(`svg[data-icon='${name}']`);
+
+  it("A1 : Tickets porte son compteur par ShellNavItem count ; replié, le nom accessible l'inclut", async () => {
+    renderFrame(SPEC);
+    const link = await within(nav()).findByRole("link", { name: /Tickets/ });
+    expect(link.querySelector("[data-slot='count-badge']")).toHaveTextContent("12");
+    await userEvent.click(within(nav()).getByRole("button", { name: "Replier la barre" }));
+    expect(await within(nav()).findByRole("link", { name: "Tickets, 12" })).toBeInTheDocument();
+  });
+
+  it("A1 : sans sprint actif, aucun compteur, replié comme déplié", async () => {
+    procedures.projectShell.mockResolvedValue(projectShell({ ticketCount: null }));
+    renderFrame(SPEC);
+    await within(nav()).findByRole("link", { name: "Tickets" });
+    expect(nav().querySelector("[data-slot='count-badge']")).toBeNull();
+    await userEvent.click(within(nav()).getByRole("button", { name: "Replier la barre" }));
+    expect(await within(nav()).findByRole("link", { name: "Tickets" })).toBeInTheDocument();
+  });
+
+  it("A2 : « Projet » et « Organisation » sont des groupes ShellNavGroup, le second séparé par un trait", async () => {
+    renderFrame(SPEC);
+    const project = await within(nav()).findByRole("group", { name: "Projet" });
+    const organization = within(nav()).getByRole("group", { name: "Organisation" });
+    expect(within(project).getByRole("link", { name: /Tickets/ })).toBeInTheDocument();
+    expect(within(organization).getByRole("link", { name: "Réglages" })).toBeInTheDocument();
+    expect(organization).toHaveClass("border-t");
+    expect(project).not.toHaveClass("border-t");
+  });
+
+  it("A3 : replié, la carte projet n'est pas rendue (une seule icône folder_open, celle de Tous les projets)", async () => {
+    renderFrame(SPEC);
+    await within(nav()).findByRole("button", { name: /Portail de réservation/ });
+    await userEvent.click(within(nav()).getByRole("button", { name: "Replier la barre" }));
+    await within(nav()).findByRole("link", { name: "Tous les projets" });
+    expect(within(nav()).queryByRole("button", { name: /Portail de réservation/ })).toBeNull();
+    expect(within(nav()).queryByTestId("project-card-loading")).toBeNull();
+    await waitFor(() => expect(icons("folder_open")).toHaveLength(1));
+  });
+
+  it("A3 : déplié, le fil de phase est inline dans la carte projet", async () => {
+    renderFrame(SPEC);
+    const card = await within(nav()).findByRole("button", { name: /Portail de réservation/ });
+    const rail = card.querySelector("[data-slot='phase-rail']");
+    expect(rail).toHaveAttribute("data-size", "inline");
+    expect(rail).toHaveTextContent(/\d sur 4/);
+  });
+
+  it("A4 : le champ Rechercher porte le raccourci dans un Kbd", async () => {
+    renderFrame("/projects");
+    const search = await within(nav()).findByRole("button", { name: /Rechercher/ });
+    expect(search.querySelector("[data-slot='kbd']")).toHaveTextContent(/Ctrl K|⌘K/);
+  });
+
+  it("A4 : le trait du pied est au-dessus de l'identité, sous « Replier la barre »", async () => {
+    renderFrame(SPEC);
+    const fold = await within(nav()).findByRole("button", { name: "Replier la barre" });
+    expect(fold.parentElement).not.toHaveClass("border-t");
+    const theme = within(nav()).getByRole("button", { name: /thème/ });
+    expect(theme.parentElement).toHaveClass("border-t");
+    expect(fold.parentElement).toContainElement(theme);
+  });
+});

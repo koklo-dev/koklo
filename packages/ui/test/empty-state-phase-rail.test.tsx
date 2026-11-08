@@ -52,6 +52,13 @@ describe("EmptyState", () => {
     expect(tile).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("TK-141 : inline bordered porte le cadre plein de la liste (rayon 12, pas de pointillés)", () => {
+    const { container } = render(<EmptyState {...props} variant="inline" bordered />);
+    const root = container.querySelector("[data-slot='empty-state']");
+    expect(root).toHaveClass("rounded-xl", "border", "border-border", "bg-background");
+    expect(root).not.toHaveClass("border-dashed");
+  });
+
   it("TK-139 : inline sans cadre ni tuile", () => {
     const { container } = render(<EmptyState {...props} variant="inline" />);
     const root = container.querySelector("[data-slot='empty-state']");

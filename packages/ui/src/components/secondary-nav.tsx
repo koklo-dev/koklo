@@ -92,7 +92,7 @@ export function SecondaryNav({ label, groups, LinkComponent, className }: Second
     <nav
       aria-label={label}
       className={cn(
-        "flex flex-col gap-0.5 md:w-60 md:shrink-0 md:border-r md:px-3 md:py-4",
+        "relative flex flex-col gap-0.5 md:w-60 md:shrink-0 md:border-r md:px-3 md:py-4",
         "max-md:flex-row max-md:gap-1 max-md:overflow-x-auto max-md:border-b max-md:px-4 max-md:py-1",
         className,
       )}

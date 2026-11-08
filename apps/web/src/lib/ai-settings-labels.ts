@@ -4,7 +4,7 @@ import type { AiProviderItemOutput } from "@koklo/contract";
 export const AI_SETTINGS_LABELS = {
   title: "Fournisseurs d'IA",
   intro:
-    "Koklo utilise les comptes d'IA de votre organisation pour le cadrage assisté. Vous fournissez vos propres clés : elles sont facturées par le fournisseur, pas par Koklo.",
+    "Les clés de vos comptes chez les fournisseurs : facturées par eux, jamais par Koklo. Elles servent seulement au travail en ligne de Koklo.",
   restricted:
     "Cette page est réservée aux propriétaires et aux administrateurs. Demandez à l'un d'eux de configurer l'IA.",
   loadingRole: "Chargement…",
@@ -66,7 +66,7 @@ export const AI_SETTINGS_LABELS = {
   // Modèle par usage
   usageTitle: "Modèle par usage",
   usageIntro:
-    "Chaque usage utilise le modèle par défaut du fournisseur principal, sauf si vous en choisissez un autre. Seuls les modèles qui passent nos tests sur chaque usage (sortie structurée, respect du schéma) sont proposés.",
+    "Seuls les modèles qui passent nos tests sur chaque usage (sortie structurée, respect du schéma) sont proposés.",
   change: "Changer",
   defaultModel: "Modèle par défaut",
   economy: "économique",
@@ -85,8 +85,9 @@ export const AI_SETTINGS_LABELS = {
 
   // Consommation
   consumptionNote: "Montants estimés, convertis des dollars facturés au taux de 1 € pour 1 $.",
-  capLabel: "Plafond mensuel (en euros)",
-  capHint: "Un seul plafond pour tous les fournisseurs. Laissez vide pour ne pas en fixer.",
+  capLabel: "Plafond mensuel, tous fournisseurs",
+  capHint:
+    "Alerte aux administrateurs à 80 % ; au plafond, les propositions de l'agent sont suspendues jusqu'au mois suivant.",
   capSave: "Enregistrer le plafond",
   capInvalid: "Saisissez un montant supérieur à 0, ou laissez vide pour retirer le plafond.",
   capSaved: "Plafond enregistré.",

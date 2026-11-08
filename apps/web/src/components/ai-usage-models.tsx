@@ -1,9 +1,16 @@
 "use client";
 
 import type { AiProviderItemOutput } from "@koklo/contract";
-import { Button, cn, Icon } from "@koklo/ui";
+import { Button, Card, CardDescription, CardTitle, Icon, IdTag, OptionChip, Pill } from "@koklo/ui";
 import { useMutation } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { providerName } from "../lib/ai-provider-names.ts";
 import {
   AI_SETTINGS_LABELS as L,
@@ -70,46 +77,47 @@ function ModelOption({
 }: {
   choice: Choice | null;
   selected: boolean;
-  setRef: (el: HTMLDivElement | null) => void;
+  setRef: (el: HTMLButtonElement | null) => void;
   onPick: () => void;
-  onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <div
+    <OptionChip
       ref={setRef}
-      role="option"
+      mono={choice !== null}
       tabIndex={-1}
-      aria-selected={selected}
-      onClick={onPick}
+      selected={selected}
+      onSelect={onPick}
       onKeyDown={onKeyDown}
-      className={cn(
-        "flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm md:min-h-9",
-        "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        selected && "border-primary bg-surface font-semibold",
-      )}
     >
-      {selected ? <Icon name="check" size={16} /> : <span className="size-4" />}
-      <span className={choice ? "font-mono" : undefined}>
-        {choice ? `${providerName(choice.provider)} · ${choice.model}` : L.defaultModel}
-      </span>
+      {choice ? (
+        <>
+          <span className="text-muted-foreground">{providerName(choice.provider)} ·</span>
+          {choice.model}
+        </>
+      ) : (
+        L.defaultModel
+      )}
       {choice?.economy ? (
-        <span className="rounded-full border px-2 text-xs">{L.economy}</span>
+        <Pill size="xs" tone="success">
+          {L.economy}
+        </Pill>
       ) : null}
-    </div>
+    </OptionChip>
   );
 }
 
 /** Liste des modèles qualifiés : focus sur l'option choisie, flèches, Début/Fin, Entrée, Échap. */
 function ModelListbox({ usage, choices, current, onPick, onClose }: ListboxProps) {
   const options: Array<Choice | null> = [null, ...choices];
-  const refs = useRef<Array<HTMLDivElement | null>>([]);
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const selected = Math.max(
     0,
     options.findIndex((choice) => isCurrent(current, choice)),
   );
   useEffect(() => refs.current[selected]?.focus(), [selected]);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>, index: number) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (event.key === "Escape") {
       event.preventDefault();
       return onClose();
@@ -152,6 +160,44 @@ interface RowProps {
   announce: (message: string) => void;
 }
 
+function UsageHeader({
+  usage,
+  modelTag,
+  open,
+  changeRef,
+  onToggle,
+}: {
+  usage: UsageId;
+  modelTag: ReactNode;
+  open: boolean;
+  changeRef: RefObject<HTMLButtonElement | null>;
+  onToggle: () => void;
+}) {
+  const label = USAGE_LABELS[usage];
+  return (
+    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+      <div className="flex min-w-0 flex-1 basis-60 flex-col leading-snug">
+        <span className="text-body font-semibold">{label}</span>
+        <span className="text-caption text-muted-foreground">{USAGE_PURPOSES[usage]}</span>
+      </div>
+      {modelTag}
+      <Button
+        ref={changeRef}
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={open}
+        aria-label={`${L.change} le modèle : ${label}`}
+        className="h-11 md:h-8"
+        onClick={onToggle}
+      >
+        {L.change}
+        <Icon name="keyboard_arrow_down" size={16} />
+      </Button>
+    </div>
+  );
+}
+
 function UsageRow({ usage, choices, current, announce }: RowProps) {
   const [open, setOpen] = useState(false);
   const change = useRef<HTMLButtonElement>(null);
@@ -174,33 +220,23 @@ function UsageRow({ usage, choices, current, announce }: RowProps) {
     }
     close();
   }
-  const chip =
-    current.isDefault || !current.provider
-      ? L.defaultModel
-      : `${providerName(current.provider)} · ${current.model}`;
+  const modelTag =
+    current.isDefault || !current.provider ? (
+      <IdTag variant="pill">{L.defaultModel}</IdTag>
+    ) : (
+      <IdTag variant="pill" prefix={`${providerName(current.provider)} · `}>
+        {current.model}
+      </IdTag>
+    );
   return (
-    <li aria-label={label} className="flex flex-col gap-2 border-t px-4 py-3 md:px-5">
-      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
-        <div className="flex min-w-0 flex-1 basis-60 flex-col leading-snug">
-          <span className="text-sm font-semibold">{label}</span>
-          <span className="text-xs text-muted-foreground">{USAGE_PURPOSES[usage]}</span>
-        </div>
-        <span className="max-w-full break-words rounded-md border bg-secondary px-2 py-1 font-mono text-xs">
-          {chip}
-        </span>
-        <Button
-          ref={change}
-          type="button"
-          variant="outline"
-          aria-expanded={open}
-          aria-label={`${L.change} le modèle : ${label}`}
-          className="h-11 md:h-9"
-          onClick={() => (open ? close() : setOpen(true))}
-        >
-          {L.change}
-          <Icon name="keyboard_arrow_down" size={16} />
-        </Button>
-      </div>
+    <li aria-label={label} className="flex flex-col gap-2 border-t px-[18px] py-3">
+      <UsageHeader
+        usage={usage}
+        modelTag={modelTag}
+        open={open}
+        changeRef={change}
+        onToggle={() => (open ? close() : setOpen(true))}
+      />
       {open ? (
         <ModelListbox
           usage={usage}
@@ -231,13 +267,10 @@ export function AiUsageModels({
     items.filter((item) => item.status !== "invalid").map((item) => item.provider),
   );
   return (
-    <section
-      aria-label={L.usageTitle}
-      className="flex flex-col overflow-hidden rounded-lg border bg-card"
-    >
-      <div className="flex flex-col gap-0.5 px-4 py-3.5 md:px-5">
-        <h3 className="text-subsection-title">{L.usageTitle}</h3>
-        <p className="text-sm text-muted-foreground">{L.usageIntro}</p>
+    <Card role="region" aria-label={L.usageTitle} className="flex flex-col overflow-hidden p-0">
+      <div className="flex flex-col gap-0.5 px-[18px] py-3.5">
+        <CardTitle>{L.usageTitle}</CardTitle>
+        <CardDescription>{L.usageIntro}</CardDescription>
       </div>
       <AiQueryBoundary query={settings} loading={L.loadingList} failed={L.loadFailedTitle}>
         {(data) => (
@@ -261,6 +294,6 @@ export function AiUsageModels({
         )}
       </AiQueryBoundary>
       <AiFallbackSwitch items={items} announce={announce} />
-    </section>
+    </Card>
   );
 }

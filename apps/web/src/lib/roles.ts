@@ -1,4 +1,5 @@
 import type { MemberRole, Role } from "@koklo/contract";
+import type { Role as PillRole } from "@koklo/ui";
 
 export const ROLE_LABELS: Record<Role, string> = {
   owner: "Propriétaire",
@@ -8,6 +9,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   client: "Client",
   business: "Business",
 };
+
+/** Rôle du contrat vers celui de `RolePill` (`dev` s'y écrit `developer`). */
+export const pillRole = (role: Role): PillRole => (role === "dev" ? "developer" : role);
 
 /** Seuls les propriétaires et les administrateurs créent des projets et invitent (CDC §14). */
 export function canManage(role: Role | undefined): boolean {

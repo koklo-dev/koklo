@@ -46,7 +46,7 @@ function RecentProjects({ open, currentId }: { open: boolean; currentId: string 
   ));
 }
 
-/** Carte du projet courant : nom, fil de phase, menu des huit projets récents (liste longue : jamais tous). */
+/** Carte du projet courant (absente dans le rail replié) : nom, fil de phase inline, menu des huit projets récents (liste longue : jamais tous). */
 export function SidebarProjectCard({
   projectId,
   shell,
@@ -58,8 +58,10 @@ export function SidebarProjectCard({
 }) {
   const { collapsed, mobile } = useShell();
   const [open, setOpen] = useState(false);
+  // Replié : la carte disparaît (maquette 05 l.266) ; le changement de projet reste atteignable par ⌘K.
+  if (collapsed) return null;
   if (shell.isPending)
-    return <Skeleton data-testid="project-card-loading" className="h-16 rounded-[10px]" />;
+    return <Skeleton data-testid="project-card-loading" className="h-16 rounded-card" />;
   const name = shell.data?.name ?? "Projet";
 
   return (
@@ -67,22 +69,13 @@ export function SidebarProjectCard({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={collapsed ? name : undefined}
-          title={collapsed ? name : undefined}
-          className="flex w-full items-center gap-2 rounded-[10px] border bg-background px-3 py-2 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[collapsed=true]:size-9 data-[collapsed=true]:justify-center data-[collapsed=true]:rounded-md data-[collapsed=true]:p-0 data-[collapsed=false]:min-h-16 data-[collapsed=false]:[@media(max-height:900px)]:min-h-14"
-          data-collapsed={collapsed}
+          className="flex min-h-16 w-full items-center gap-2 rounded-card border bg-background px-3 py-2 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(max-height:900px)]:min-h-14"
         >
-          {collapsed ? (
-            <Icon name="folder_open" size={20} className="text-muted-foreground" />
-          ) : (
-            <>
-              <span className="grid min-w-0 flex-1 gap-1.5">
-                <span className="truncate text-body font-semibold">{name}</span>
-                {shell.data ? <PhaseRail phase={shell.data.phase} size="sm" /> : null}
-              </span>
-              <Icon name="unfold_more" size={16} className="shrink-0 text-muted-foreground" />
-            </>
-          )}
+          <span className="grid min-w-0 flex-1 gap-1.5">
+            <span className="truncate text-body font-semibold">{name}</span>
+            {shell.data ? <PhaseRail phase={shell.data.phase} size="inline" /> : null}
+          </span>
+          <Icon name="unfold_more" size={16} className="shrink-0 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

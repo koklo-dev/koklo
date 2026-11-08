@@ -1,7 +1,7 @@
 "use client";
 
 import type { AiProviderItemOutput } from "@koklo/contract";
-import { Button, cn, Icon } from "@koklo/ui";
+import { Button, Icon, RadioCard, RadioCardGroup } from "@koklo/ui";
 import { useEffect, useRef, useState } from "react";
 import { PROVIDER_DESCRIPTIONS, PROVIDER_ORDER, providerName } from "../lib/ai-provider-names.ts";
 import { AI_SETTINGS_LABELS as L } from "../lib/ai-settings-labels.ts";
@@ -18,8 +18,7 @@ export function useAddPanel(initiallyOpen: boolean) {
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (open && !initiallyOpen)
-      panel.current?.querySelector<HTMLElement>("input[type=radio]")?.focus();
+    if (open && !initiallyOpen) panel.current?.querySelector<HTMLElement>("[role=radio]")?.focus();
   }, [open, initiallyOpen]);
   const close = () => {
     setOpen(false);
@@ -46,7 +45,8 @@ export function AiAddButton({ panel, canAdd }: { panel: Panel; canAdd: boolean }
       type="button"
       aria-expanded={panel.open}
       aria-controls="ai-add-panel"
-      className="h-11 w-full md:h-9 md:w-auto"
+      size="lg"
+      className="h-11 w-full md:h-10 md:w-auto"
       onClick={panel.toggle}
     >
       <Icon name="add" size={18} />
@@ -65,42 +65,21 @@ function ProviderCards({
   onSelect: (provider: Provider) => void;
 }) {
   return (
-    <div
-      role="radiogroup"
+    <RadioCardGroup
       aria-label={L.chooseProvider}
-      className="grid grid-cols-1 gap-2 md:grid-cols-2"
+      value={selected ?? ""}
+      onValueChange={(value) => onSelect(value as Provider)}
     >
       {choices.map((id) => (
-        <label
+        <RadioCard
           key={id}
-          className={cn(
-            "flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border bg-background px-3 py-2.5 text-sm",
-            "has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
-            selected === id && "border-2 border-primary px-[11px] py-[9px]",
-          )}
-        >
-          <input
-            type="radio"
-            name="ai-provider-choice"
-            value={id}
-            checked={selected === id}
-            onChange={() => onSelect(id)}
-            className="sr-only"
-          />
-          <Icon
-            name={selected === id ? "check_circle" : "radio_button_unchecked"}
-            size={20}
-            className="mt-0.5 shrink-0"
-          />
-          <span className="flex min-w-0 flex-col gap-1">
-            <span className="font-semibold">{providerName(id)}</span>
-            <span className="text-xs leading-snug text-muted-foreground">
-              {PROVIDER_DESCRIPTIONS[id]}
-            </span>
-          </span>
-        </label>
+          value={id}
+          title={providerName(id)}
+          description={PROVIDER_DESCRIPTIONS[id]}
+          className="min-h-11"
+        />
       ))}
-    </div>
+    </RadioCardGroup>
   );
 }
 
@@ -124,7 +103,7 @@ export function AiProviderAdd({
     <div
       id="ai-add-panel"
       ref={panel.panel}
-      className="flex flex-col gap-3 rounded-lg border border-dashed border-input p-4"
+      className="flex flex-col gap-3 rounded-card border border-dashed border-border-strong p-3.5"
     >
       <p className="text-sm font-semibold">{L.chooseTitle}</p>
       <ProviderCards choices={choices} selected={panel.selected} onSelect={panel.setSelected} />
@@ -139,6 +118,7 @@ export function AiProviderAdd({
           announce={announce}
         />
       ) : null}
+      <p className="text-meta text-muted-foreground">{L.encrypted}</p>
     </div>
   );
 }

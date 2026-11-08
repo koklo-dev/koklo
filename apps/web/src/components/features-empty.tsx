@@ -47,11 +47,13 @@ export function FeaturesEmptyFiltered({
   if (!q) {
     return (
       <EmptyState
+        variant="inline"
+        bordered
         icon="search_off"
         title="Aucune fonctionnalité ne correspond à ces filtres."
         description="Modifiez ou effacez les filtres pour revoir la liste."
         action={
-          <Button variant="outline" className="h-11 md:h-9" onClick={onClearFilters}>
+          <Button variant="outline" size="sm" onClick={onClearFilters}>
             Effacer les filtres
           </Button>
         }
@@ -64,11 +66,13 @@ export function FeaturesEmptyFiltered({
       : `La recherche porte sur les ${formatCount(projectTotal)} fonctionnalités, pas seulement celles affichées.`;
   return (
     <EmptyState
+      variant="inline"
+      bordered
       icon="search_off"
       title={`Aucune fonctionnalité ne correspond à « ${q} »`}
       description={scope}
       action={
-        <Button variant="outline" className="h-11 md:h-9" onClick={onClearSearch}>
+        <Button variant="outline" size="sm" onClick={onClearSearch}>
           Effacer la recherche
         </Button>
       }

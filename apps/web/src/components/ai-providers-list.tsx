@@ -1,7 +1,15 @@
 "use client";
 
 import type { AiProviderItemOutput } from "@koklo/contract";
-import { Button, cn, Icon, type IconName } from "@koklo/ui";
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  Icon,
+  type IconName,
+  Pill,
+  type PillTone,
+} from "@koklo/ui";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { providerInitials, providerName } from "../lib/ai-provider-names.ts";
@@ -23,16 +31,23 @@ interface RowProps {
 
 const STATUS: Record<
   Item["status"],
-  { icon: IconName; text: (item: Item) => string; word: string; pill: string }
+  { icon: IconName; tone: PillTone; text: (item: Item) => string; word: string; pill: string }
 > = {
   verified: {
     icon: "check_circle",
+    tone: "success",
     text: (item) => (item.lastUsedAt ? `Clé vérifiée le ${longDate(item.lastUsedAt)}` : ""),
     word: "vérifiée",
     pill: "Vérifiée",
   },
-  unverified: { icon: "schedule", text: () => "", word: "non vérifiée", pill: L.unverified },
-  invalid: { icon: "error", text: () => "", word: "refusée", pill: L.invalid },
+  unverified: {
+    icon: "schedule",
+    tone: "soft",
+    text: () => "",
+    word: "non vérifiée",
+    pill: L.unverified,
+  },
+  invalid: { icon: "error", tone: "danger", text: () => "", word: "refusée", pill: L.invalid },
 };
 
 /** « Fournisseur Anthropic, principal, vérifiée » : nom accessible de la ligne. */
@@ -41,45 +56,27 @@ const rowName = (item: Item): string =>
     .filter(Boolean)
     .join(", ");
 
-const PILL = "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium";
-
 function Pills({ item }: { item: Item }) {
   const status = STATUS[item.status];
   return (
     <>
       {item.role === "primary" ? (
-        <span className={cn(PILL, "border-transparent bg-primary text-primary-foreground")}>
+        <Pill size="sm" tone="primary">
           {L.primary}
-        </span>
+        </Pill>
       ) : null}
       {item.role === "fallback" ? (
-        <span className={cn(PILL, "border-border bg-secondary text-secondary-foreground")}>
+        <Pill size="sm" tone="soft">
           {L.fallback}
-        </span>
+        </Pill>
       ) : null}
-      <span
-        className={cn(
-          PILL,
-          "gap-1",
-          item.status === "invalid"
-            ? "border-destructive text-destructive"
-            : "border-border bg-secondary text-secondary-foreground",
-        )}
-      >
-        <Icon name={status.icon} size={16} fill />
+      <Pill size="sm" tone={status.tone} icon={status.icon}>
         {status.pill}
-      </span>
+      </Pill>
       {item.intermediary ? (
-        <span
-          className={cn(
-            PILL,
-            "gap-1",
-            "border-alert-warning-border bg-alert-warning text-alert-warning-foreground",
-          )}
-        >
-          <Icon name="call_split" size={16} />
+        <Pill size="sm" tone="warning" icon="swap_horiz">
           {L.intermediary}
-        </span>
+        </Pill>
       ) : null}
     </>
   );
@@ -89,22 +86,19 @@ function Identity({ item }: { item: Item }) {
   const status = STATUS[item.status];
   return (
     <div className="flex min-w-0 flex-1 basis-72 items-start gap-3">
-      <span
-        aria-hidden="true"
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-secondary-foreground"
-      >
-        {providerInitials(item.provider)}
-      </span>
+      <Avatar shape="tile" tone="soft" size={36} aria-hidden="true">
+        <AvatarFallback>{providerInitials(item.provider)}</AvatarFallback>
+      </Avatar>
       <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{providerName(item.provider)}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="font-semibold">{providerName(item.provider)}</span>
           <Pills item={item} />
         </div>
         {status.text(item) ? (
           <p className="text-meta text-muted-foreground">{status.text(item)}</p>
         ) : null}
         {item.intermediary ? (
-          <p className="text-meta text-muted-foreground">{L.intermediaryNote}</p>
+          <p className="text-caption text-muted-foreground">{L.intermediaryNote}</p>
         ) : null}
       </div>
     </div>
@@ -124,17 +118,18 @@ function Actions({
   onVerify: () => void;
 }) {
   const name = providerName(item.provider);
-  const style = "h-11 w-full md:h-9 md:w-auto";
+  const style = "h-11 w-full md:h-8 md:w-auto";
   const act = (
     action: string,
     label: string,
     onClick: () => void,
-    variant: "outline" | "default" = "outline",
+    variant: "outline" | "default" | "ghost" = "outline",
   ) => (
     <Button
       key={action}
       type="button"
       variant={variant}
+      size="sm"
       data-action={action}
       aria-label={`${label} ${name}`}
       disabled={busy}
@@ -154,7 +149,7 @@ function Actions({
         () => open("replace"),
         item.status === "invalid" ? "default" : "outline",
       )}
-      {item.role === "primary" ? null : act("remove", L.remove, () => open("remove"))}
+      {item.role === "primary" ? null : act("remove", L.remove, () => open("remove"), "ghost")}
     </div>
   );
 }
@@ -200,21 +195,76 @@ function useRowWrites(item: Item, announce: (message: string) => void, close: ()
   };
 }
 
+interface PanelProps {
+  item: Item;
+  panel: Panel | null;
+  primaryName: string | null;
+  hasModels: boolean;
+  announce: (message: string) => void;
+  close: () => void;
+  writes: ReturnType<typeof useRowWrites>;
+}
+
+/** Volet ouvert sous la ligne : remplacement de clé, retrait confirmé ou passage en principal confirmé. */
+function RowPanel({ item, panel, primaryName, hasModels, announce, close, writes }: PanelProps) {
+  const name = providerName(item.provider);
+  if (panel === "replace") {
+    return (
+      <ProviderKeyForm
+        provider={item.provider}
+        mode="replace"
+        hasModels={hasModels}
+        onDone={close}
+        onCancel={close}
+        announce={announce}
+      />
+    );
+  }
+  if (panel === "remove") {
+    return (
+      <AiInlineConfirm
+        groupLabel={L.confirmRemovalGroup}
+        text={L.confirmRemoval}
+        keepLabel={L.keep}
+        confirmLabel={L.remove}
+        destructive
+        busy={writes.busy}
+        onKeep={close}
+        onConfirm={writes.onRemove}
+      />
+    );
+  }
+  if (panel === "primary") {
+    return (
+      <AiInlineConfirm
+        groupLabel={L.confirmPrimaryGroup}
+        text={
+          primaryName
+            ? `${name} devient principal, ${primaryName} passe en secours.`
+            : `${name} devient principal.`
+        }
+        keepLabel={L.cancel}
+        confirmLabel={L.confirm}
+        busy={writes.busy}
+        onKeep={close}
+        onConfirm={writes.onPrimary}
+      />
+    );
+  }
+  return null;
+}
+
 function ProviderRow({ item, primaryName, hasModels, announce }: RowProps) {
   const [panel, setPanel] = useState<Panel | null>(null);
   const row = usePanelFocus(panel);
   const close = () => setPanel(null);
   const writes = useRowWrites(item, announce, close);
-  const name = providerName(item.provider);
-  const becomes = primaryName
-    ? `${name} devient principal, ${primaryName} passe en secours.`
-    : `${name} devient principal.`;
 
   return (
     <li
       ref={row}
       aria-label={rowName(item)}
-      className="flex flex-col gap-3 rounded-lg border bg-surface p-3 md:p-3.5"
+      className="flex flex-col gap-3 rounded-card border bg-surface p-3 md:p-3.5"
     >
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3">
         <Identity item={item} />
@@ -228,39 +278,15 @@ function ProviderRow({ item, primaryName, hasModels, announce }: RowProps) {
           {L.writeFailed}
         </p>
       ) : null}
-      {panel === "replace" ? (
-        <ProviderKeyForm
-          provider={item.provider}
-          mode="replace"
-          hasModels={hasModels}
-          onDone={close}
-          onCancel={close}
-          announce={announce}
-        />
-      ) : null}
-      {panel === "remove" ? (
-        <AiInlineConfirm
-          groupLabel={L.confirmRemovalGroup}
-          text={L.confirmRemoval}
-          keepLabel={L.keep}
-          confirmLabel={L.remove}
-          destructive
-          busy={writes.busy}
-          onKeep={close}
-          onConfirm={writes.onRemove}
-        />
-      ) : null}
-      {panel === "primary" ? (
-        <AiInlineConfirm
-          groupLabel={L.confirmPrimaryGroup}
-          text={becomes}
-          keepLabel={L.cancel}
-          confirmLabel={L.confirm}
-          busy={writes.busy}
-          onKeep={close}
-          onConfirm={writes.onPrimary}
-        />
-      ) : null}
+      <RowPanel
+        item={item}
+        panel={panel}
+        primaryName={primaryName}
+        hasModels={hasModels}
+        announce={announce}
+        close={close}
+        writes={writes}
+      />
     </li>
   );
 }

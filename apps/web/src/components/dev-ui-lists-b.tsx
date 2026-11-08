@@ -143,6 +143,23 @@ function Headers() {
   );
 }
 
+/** `ListRow as="div"` : le contenu de ligne d'un hôte qui pose déjà son `li` (VirtualList, TK-141). */
+function DivRow() {
+  return (
+    <ul className="m-0 list-none rounded-xl border p-0">
+      <li data-testid="list-row-div-host" className="flex h-[52px] items-center px-4">
+        <ListRow
+          as="div"
+          leading={<IdTag>F-001</IdTag>}
+          title="Réserver un créneau"
+          subtitle="3 critères"
+          trailing={<PriorityIndicator level={3} label="Haute" />}
+        />
+      </li>
+    </ul>
+  );
+}
+
 /** TK-140 lot B : lignes et en-têtes (fiche S-dev-ui, captures lists-b-*). */
 export function DevUiListsB() {
   return (
@@ -155,6 +172,9 @@ export function DevUiListsB() {
       </DevUiFrame>
       <DevUiFrame title="ListRow, actions en queue">
         <ActionRows />
+      </DevUiFrame>
+      <DevUiFrame title="ListRow as=div, dans l'li d'un hôte">
+        <DivRow />
       </DevUiFrame>
       <Headers />
     </DevUiSection>

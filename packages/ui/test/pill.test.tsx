@@ -129,6 +129,20 @@ describe("RolePill", () => {
     render(<RolePill role={role} />);
     expect(screen.getByText(label)).toHaveClass("h-6", cls);
   });
+
+  it("tone impose la teinte (en-tête de Réglages : développeur plein, TK-141)", () => {
+    const role = "developer" as const;
+    render(<RolePill role={role} tone="soft" />);
+    expect(screen.getByText("Développeur")).toHaveClass("bg-secondary");
+  });
+
+  it("icône facultative : pleine, décorative, avant le libellé (TK-141)", () => {
+    const role = "owner" as const;
+    render(<RolePill role={role} icon="badge" data-testid="pill" />);
+    const pill = screen.getByTestId("pill");
+    expect(pill.querySelector('svg[data-icon="badge"]')).toHaveAttribute("aria-hidden", "true");
+    expect(pill).toHaveTextContent("Propriétaire");
+  });
 });
 
 describe("IdTag", () => {
