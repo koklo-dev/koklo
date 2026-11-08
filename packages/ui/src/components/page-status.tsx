@@ -109,6 +109,8 @@ export interface PageNavItemProps {
   status: PageStatusValue;
   required?: boolean;
   current?: boolean;
+  /** Une proposition de l'agent attend une décision sur cette page : pastille de 7 px (TK-90, B225). */
+  pending?: boolean;
   LinkComponent?: ShellLink;
   linkProps?: AnchorHTMLAttributes<HTMLAnchorElement>;
   /** Actions de la ligne (menu de page) : après le lien, hors de celui-ci. */
@@ -122,6 +124,7 @@ export function PageNavItem({
   status,
   required = false,
   current = false,
+  pending = false,
   LinkComponent: Link = "a" as unknown as ShellLink,
   linkProps,
   actions,
@@ -145,6 +148,13 @@ export function PageNavItem({
           {title}
         </span>
         {required ? <RequiredTag /> : null}
+        {pending ? (
+          <span
+            role="img"
+            aria-label="Proposition en attente"
+            className="size-[7px] shrink-0 rounded-full bg-primary"
+          />
+        ) : null}
       </Link>
       {actions ? (
         <div

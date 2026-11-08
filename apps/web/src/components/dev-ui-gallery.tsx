@@ -1,3 +1,4 @@
+import { DevUiAgent } from "./dev-ui-agent.tsx";
 import { SURFACES, TYPE_SCALE } from "./dev-ui-data.ts";
 import { DevUiFrame, DevUiSection } from "./dev-ui-frame.tsx";
 import { DevUiIdea } from "./dev-ui-idea.tsx";
@@ -92,6 +93,7 @@ export function DevUiGallery() {
         <DevUiSurfacesB />
         <DevUiSurfacesC />
         <DevUiIdea />
+        <DevUiAgent />
       </main>
     </div>
   );
