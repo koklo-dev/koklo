@@ -103,6 +103,25 @@ describe("retrait des fuites de fournisseur codé en dur", () => {
   });
 });
 
+type ContractLeaf = { "~orpc": { meta: { "~openapi"?: { path?: string } } } };
+
+const isAgentRoute = (name: string, leaf: ContractLeaf): boolean => {
+  const path = leaf["~orpc"].meta["~openapi"]?.path ?? "";
+  const last = name.split(".").at(-1) ?? "";
+  return /^\/agent/.test(path) || /^agent/i.test(name) || /^agent/i.test(last);
+};
+
+/** Parcours récursif du contrat : un groupe peut contenir des sous-groupes (ex. `idea.page`). */
+function collectAgentRoutes(name: string, node: object, found: string[]): void {
+  if ("~orpc" in node) {
+    if (isAgentRoute(name, node as ContractLeaf)) found.push(name);
+    return;
+  }
+  for (const [key, child] of Object.entries(node)) {
+    collectAgentRoutes(name ? `${name}.${key}` : key, child, found);
+  }
+}
+
 describe("clés d'IA de l'organisation : inaccessibles aux agents de code", () => {
   it("aucun module de packages/delivery n'importe les clés, le résolveur ni @koklo/llm", () => {
     const sources = files(join(ROOT, "packages/delivery/src"));
@@ -140,19 +159,7 @@ describe("clés d'IA de l'organisation : inaccessibles aux agents de code", () =
   it("aucune route à jeton d'agent dans le contrat ; toute route /agent future doit être classée ici", () => {
     const AGENT_ROUTES_CLASSIFIED: string[] = [];
     const found: string[] = [];
-    // Parcours récursif : un groupe peut contenir des sous-groupes (ex. `idea.page`).
-    const visit = (name: string, node: object): void => {
-      if ("~orpc" in node) {
-        const meta = (node as { "~orpc": { meta: { "~openapi"?: { path?: string } } } })["~orpc"]
-          .meta;
-        const path = meta["~openapi"]?.path ?? "";
-        const leaf = name.split(".").at(-1) ?? "";
-        if (/^\/agent/.test(path) || /^agent/i.test(name) || /^agent/i.test(leaf)) found.push(name);
-        return;
-      }
-      for (const [key, child] of Object.entries(node)) visit(name ? `${name}.${key}` : key, child);
-    };
-    visit("", contract as unknown as object);
+    collectAgentRoutes("", contract as unknown as object, found);
     expect(found.sort()).toEqual(AGENT_ROUTES_CLASSIFIED);
   });
 });
