@@ -110,9 +110,9 @@ describe("TK-51a migration llm_provider_credentials : dossier et contenu", () =>
     expect(down[1]).toMatch(/^DROP TYPE (?:IF EXISTS )?(?:"public"\.)?"llm_provider"$/i);
   });
 
-  it("expectedTables contient la table (50 au total avec TK-97)", () => {
+  it("expectedTables contient la table (54 au total avec TK-90)", () => {
     expect(expectedTables).toContain(LLM_TABLE);
-    expect(expectedTables).toHaveLength(50);
+    expect(expectedTables).toHaveLength(54);
   });
 });
 

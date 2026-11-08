@@ -192,6 +192,10 @@ model Project {
   ideaPages          IdeaPage[]
   ideaPublications   IdeaPublication[]
   ideaPresences      IdeaPresence[]
+  ideaMessages       IdeaMessage[]
+  ideaProposals      IdeaProposal[]
+  ideaAiLocks        IdeaAiLock[]
+  ideaGapRuns        IdeaGapRun[]
   invitationProjects InvitationProject[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
@@ -1481,4 +1485,133 @@ model IdeaPresence {
   @@index([organizationId])
   @@index([projectId, seenAt])
   @@map("idea_presence")
+}
+
+/// Opération d'une proposition de l'agent sur l'espace Idée (TK-90). Le Markdown n'a pas d'identifiant de bloc : une
+/// proposition vise le rang d'un bloc de premier niveau à `baseVersion`.
+enum IdeaProposalOp {
+  insert_after
+  replace
+  append
+  create_page
+
+  @@map("idea_proposal_op")
+}
+
+/// Cycle d'une proposition : en attente -> acceptée ou rejetée (annulable 10 s) ; périmée dès que la page change.
+enum IdeaProposalStatus {
+  pending
+  accepted
+  rejected
+  stale
+
+  @@map("idea_proposal_status")
+}
+
+/// Mode de l'agent à l'envoi d'un message : entretien guidé ou échange libre.
+enum IdeaMessageMode {
+  interview
+  free
+
+  @@map("idea_message_mode")
+}
+
+/// Auteur d'un message du fil : un humain (`authorUserId`) ou l'agent (sans auteur).
+enum IdeaMessageAuthor {
+  human
+  agent
+
+  @@map("idea_message_author")
+}
+
+/// Message du fil de l'agent d'un projet (TK-90). `pageId` : la page de contexte, sans clé étrangère (la page peut partir
+/// en corbeille). `authorUserId` sans clé étrangère (RGPD). CHECK : voir la migration.
+model IdeaMessage {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  projectId      String            @map("project_id") @db.Uuid
+  pageId         String?           @map("page_id") @db.Uuid
+  authorUserId   String?           @map("author_user_id") @db.Uuid
+  author         IdeaMessageAuthor
+  mode           IdeaMessageMode
+  text           String
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project   Project        @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  proposals IdeaProposal[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([projectId, createdAt])
+  @@map("idea_messages")
+}
+
+/// Proposition de l'agent (TK-90) : jamais appliquée sans `idea.proposal.decide` par un humain. `baseVersion` : version
+/// de la page à la proposition (absente pour `create_page`). `previousContentMd` et `resultVersion` servent l'annulation.
+/// `decidedBy` sans clé étrangère (RGPD). CHECK : voir la migration.
+model IdeaProposal {
+  id                String             @id @default(uuid(7)) @db.Uuid
+  organizationId    String             @map("organization_id") @db.Uuid
+  projectId         String             @map("project_id") @db.Uuid
+  pageId            String?            @map("page_id") @db.Uuid
+  messageId         String             @map("message_id") @db.Uuid
+  op                IdeaProposalOp
+  anchorBlockIndex  Int?               @map("anchor_block_index")
+  rangeEnd          Int?               @map("range_end")
+  title             String?
+  afterPageId       String?            @map("after_page_id") @db.Uuid
+  contentMd         String             @map("content_md")
+  rationale         String
+  baseVersion       Int?               @map("base_version")
+  status            IdeaProposalStatus @default(pending)
+  decidedBy         String?            @map("decided_by") @db.Uuid
+  decidedAt         DateTime?          @map("decided_at") @db.Timestamptz(3)
+  previousContentMd String?            @map("previous_content_md")
+  resultVersion     Int?               @map("result_version")
+  createdPageId     String?            @map("created_page_id") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project     @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  message IdeaMessage @relation(fields: [organizationId, messageId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([organizationId])
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+  @@map("idea_proposals")
+}
+
+/// Verrou d'un appel d'IA (TK-90) : un seul à la fois par (projet, utilisateur), pris en base (plusieurs instances) et
+/// repris à `expiresAt` (120 s). `userId` sans clé étrangère.
+model IdeaAiLock {
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([projectId, userId])
+  @@index([organizationId])
+  @@map("idea_ai_locks")
+}
+
+/// Dernier calcul de « Ce qui manque encore » d'un projet (TK-90) : un résultat de moins de 30 s est rendu sans appel du
+/// modèle. `items` : tableau JSON (CHECK).
+model IdeaGapRun {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @unique @map("project_id") @db.Uuid
+  computedAt     DateTime @map("computed_at") @db.Timestamptz(3)
+  items          Json     @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([organizationId])
+  @@map("idea_gap_runs")
 }
