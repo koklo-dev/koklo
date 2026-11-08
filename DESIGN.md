@@ -365,6 +365,21 @@ Galerie : `/dev/ui`, sections « Listes · A » (listes longues, id `dev-ui-list
 
 Galerie : `/dev/ui`, section « 12. Espace Idée » (id `dev-ui-idea`). Sous 1024 px l'arborescence devient un menu déroulant (pas de glisser tactile).
 
+### 5.9 Agent de l'espace Idée (v2.11, TK-90, passation 02, maquette 06)
+
+| Composant | Règle |
+|---|---|
+| `AgentPanel` | `aside` nommé « Agent », 360 à 380 de large, `--surface`, bordure gauche ; en-tête `IconTile` 28 `soft` `wand_stars`, titre 600, `SegmentedControl` « Mode de l'agent » (Entretien / Libre, `aria-pressed`, absent si l'agent n'est pas configuré) ; fil défilant, pied pour la saisie. |
+| `ChatBubble` | Agent : rayon 4 12 12 12, `--background`, bordure ; humain : 12 4 12 12, `--secondary`, texte `--foreground`, aligné à droite ; marges 10 12, retrait de 24 du côté opposé ; auteur 12/400 muted au-dessus ; lien de contexte en dessous. Le texte reste littéral (jamais de lien actif ni de balise). |
+| `AgentComposer` | Cadre rayon 10 qui porte le focus (anneau), textarea de 2 lignes sans bordure, `Envoyer` 32 `--primary` (`arrow_upward`), Entrée envoie, Maj+Entrée saute une ligne ; pendant le flux `Arrêter` remplace `Envoyer`. |
+| `ProposalDiff` | Cadre pointillé 1 `--primary`, rayon 12, fond `--diff-bg` ; barre haute `wand_stars` + « Proposition de l'agent · ajout d'une section / remplacement / ajout » + justification ; remplacement : ancien texte barré (« Texte remplacé » pour les lecteurs d'écran) ; pied Accepter `A`, Modifier, Rejeter `R` (raccourcis actifs seulement avec le focus dans le cadre et hors champ de saisie, 2.1.4) ; « Proposition 1 sur 3 » avec précédente/suivante ; périmée : barrée, « Le texte a changé depuis cette proposition. », « Redemander à l'agent », plus d'Accepter. |
+| `DecisionNotice` | `role=status`, icône `history` 16, 13 muted, « Annuler » pendant les 10 s. |
+| `ProposedPageCard`, `ProposedPageList` | Dans l'arborescence : cadre pointillé rayon 8 `--diff-bg`, titre 600, justification 12, « Ajouter la page » et « Ignorer » de 28 ; la liste montre 3 cartes puis « N autres ». Pastille 7 `--primary` sur la page qui a des propositions en attente. |
+| `AgentPrivacyNote` | Sous la saisie : ligne nue `role="note"` (sans cadre), `lock` 16, texte 12/400 `--muted-foreground`, « Détails » de 22 de haut 12/600 souligné qui déplie la liste (`aria-expanded`). |
+| `AgentGapsCard` | « Ce qui manque encore », 4 lignes au plus, page en mono 12, « Explorer » (page existante) ou « Proposer une page » ; rien si la liste est vide. |
+
+Galerie : `/dev/ui`, section « 13. Agent de l'espace Idée » (id `dev-ui-agent`). Mention du fournisseur : jamais son nom (« Envoyé au fournisseur d'IA de l'organisation, avec sa clé », B228). Sous 1024 px le panneau passe sous le document. Dès 1024 px il occupe la hauteur sous l'en-tête (l'espace Idée fait la hauteur de la fenêtre ; arborescence, document et fil défilent chacun, saisie ancrée en bas). `Textarea mono` : texte de la proposition à modifier. Le texte d'une proposition se rend dans `Prose`. Justification, auteur et indication de mode : 12/400.
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -418,3 +433,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 07/11/2026 | v2.8 (TK-140, catalogue §1.4, I15, I18, I21, I22, I28, I29, B160 à B166) : §5.3 pagination segmentée, pied de liste d'une ligne, `GroupSection stacked`, `CountBar` à requête ; §5.4 `PageHeader`, « Déplier la barre » ; §5.7 listes et navigation (`ListPanel`, `ListRow`, `ProjectHeader` à `status`, `PhaseRail inline`, `ShellNavGroup`, `ShellNavItem count`, `SecondaryNav`) |
 | 08/11/2026 | v2.9 (TK-141, reprise des écrans sur les bases ; B171 et suivantes) : aucun composant nouveau attendu ; §5.4 Réglages et Fournisseurs d'IA précisés (tons des pastilles, `Toast` à la place de `role=status`) ; les écrans S-app-shell, S-features, S-settings et S-ai-settings suivent les planches 05, 10, 12 et 24 sans style local |
 | 08/11/2026 | v2.10 (TK-89, passation 02, maquette 06) : §5.8 espace Idée (`ReorderableList`, `PageStatus`, `StatusLegend`, `Prose`, `TaskItem`, `AvatarGroup`, rail replié par défaut) ; la jauge de maturité reste à TK-91 |
+| 08/11/2026 | v2.11 (TK-90, passation 02, maquette 06) : §5.9 agent de l'espace Idée (`AgentPanel`, `ChatBubble`, `AgentComposer`, `ProposalDiff`, `DecisionNotice`, `ProposedPageCard`, `ProposedPageList`, `AgentGapsCard`) ; icônes `explore` et `stop` ajoutées |

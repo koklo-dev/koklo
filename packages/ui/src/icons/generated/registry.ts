@@ -97,6 +97,8 @@ export const iconLoaders = {
   restore_from_trash: () => import("./restore_from_trash.ts"),
   format_bold: () => import("./format_bold.ts"),
   format_italic: () => import("./format_italic.ts"),
+  explore: () => import("./explore.ts"),
+  stop: () => import("./stop.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;
