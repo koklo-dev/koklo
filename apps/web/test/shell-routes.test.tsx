@@ -84,10 +84,12 @@ describe("/projects/<id> (C4)", () => {
 });
 
 describe("pages « Bientôt » (C4)", () => {
-  it("l'Idée est une page « Bientôt »", async () => {
+  it("l'Idée est l'écran du dossier d'idée (TK-89), plus une page « Bientôt »", async () => {
     const { default: Page } = await import("../src/app/(shell)/projects/[projectId]/idea/page.tsx");
-    const element = await Page(params({ projectId: ID }));
-    expect(element).toMatchObject({ props: { projectId: ID, slug: "idea" } });
+    const element = (await Page(params({ projectId: ID }))) as {
+      props: { children: { props: { projectId: string } } };
+    };
+    expect(element.props.children.props).toEqual({ projectId: ID });
   });
 
   it.each(["data", "architecture", "technical", "security", "design", "quality"])(

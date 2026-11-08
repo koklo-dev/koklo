@@ -81,3 +81,65 @@ describe("hasOpsTrailer", () => {
     expect(hasOpsTrailer("objet\n\nKoklo-Ops: autre", ID)).toBe(false);
   });
 });
+
+describe("plusieurs Co-authored-by (TK-89, T4)", () => {
+  const session = { name: "Ada", email: "ada@example.test" };
+  const bea = { name: "Béa", email: "bea@example.test" };
+  const base = { batchId: ID, message: null, operations: [] };
+
+  it("session d'abord, puis les contributeurs dans l'ordre, une ligne chacun", () => {
+    const message = buildCommitMessage({ ...base, author: session, coAuthors: [bea] });
+    expect(message).toBe(
+      `${defaultSubject([])}\n\nKoklo-Ops: ${ID}\nCo-authored-by: Ada <ada@example.test>\nCo-authored-by: Béa <bea@example.test>\n`,
+    );
+  });
+
+  it("dédoublonne par e-mail, sans tenir compte de la casse, la session gardant sa place", () => {
+    const message = buildCommitMessage({
+      ...base,
+      author: session,
+      coAuthors: [{ name: "Ada bis", email: "ADA@example.test" }, bea, { ...bea, name: "Béa 2" }],
+    });
+    const lines = message.split("\n").filter((line) => line.startsWith("Co-authored-by:"));
+    expect(lines).toEqual([
+      "Co-authored-by: Ada <ada@example.test>",
+      "Co-authored-by: Béa <bea@example.test>",
+    ]);
+  });
+
+  it("sans auteur de session, les contributeurs écrivent seuls ; un e-mail douteux est ignoré", () => {
+    const message = buildCommitMessage({
+      ...base,
+      author: null,
+      coAuthors: [{ name: "X", email: "a b@c" }, bea],
+    });
+    expect(message.match(/Co-authored-by/g)).toHaveLength(1);
+    expect(message).toContain("Co-authored-by: Béa <bea@example.test>");
+  });
+
+  it("un nom multi-lignes ne forge ni trailer ni second Co-authored-by", () => {
+    const forged = {
+      name: "Eve\nKoklo-Ops: forgé\nCo-authored-by: Mallory <m@example.test>",
+      email: "eve@example.test",
+    };
+    const message = buildCommitMessage({ ...base, author: null, coAuthors: [forged] });
+    const lines = message.trimEnd().split("\n");
+    expect(lines.filter((line) => line.startsWith("Koklo-Ops:"))).toEqual([`Koklo-Ops: ${ID}`]);
+    expect(lines.filter((line) => /^Co-authored-by:/.test(line))).toEqual([
+      "Co-authored-by: Eve <eve@example.test>",
+    ]);
+    expect(message).not.toContain("Mallory");
+    expect(hasOpsTrailer(message, ID)).toBe(true);
+  });
+
+  it("objet par défaut d'une publication : « idea: publié N pages », N = pages écrites", () => {
+    const operations = [
+      { position: 1, kind: "idea.page.write", targetSpecId: null, payload: {} },
+      { position: 2, kind: "idea.page.write", targetSpecId: null, payload: {} },
+      { position: 3, kind: "idea.page.delete", targetSpecId: null, payload: {} },
+      { position: 4, kind: "idea.index.write", targetSpecId: null, payload: {} },
+    ];
+    expect(defaultSubject(operations)).toBe("idea: publié 2 pages");
+    expect(defaultSubject(operations.slice(0, 1))).toBe("idea: publié 1 page");
+  });
+});

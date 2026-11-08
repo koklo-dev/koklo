@@ -13,6 +13,8 @@ const DRAFT_PREFIX = "koklo:feature-draft:";
 const PENDING_PREFIX = "koklo:feature-pending:";
 /** Brouillon de cadrage (TK-59) : même cycle de vie, purgé avec les autres à la fin de session. */
 export const FRAMING_DRAFT_PREFIX = "koklo:framing-draft:";
+/** Copie locale d'une page de l'espace Idée (TK-89) : même cycle de vie, purgée avec les autres. */
+export const IDEA_DRAFT_PREFIX = "koklo:idea-draft:";
 
 export interface FeatureDraft {
   values: FeatureFormValues;
@@ -130,7 +132,7 @@ export const readDraft = (
 export const clearDraft = (projectId: string, target: string): void =>
   removeStored(draftKey(projectId, target));
 
-const OWNED_PREFIXES = [DRAFT_PREFIX, PENDING_PREFIX, FRAMING_DRAFT_PREFIX];
+const OWNED_PREFIXES = [DRAFT_PREFIX, PENDING_PREFIX, FRAMING_DRAFT_PREFIX, IDEA_DRAFT_PREFIX];
 
 function removeWhere(drop: (key: string, data: unknown) => boolean): void {
   try {

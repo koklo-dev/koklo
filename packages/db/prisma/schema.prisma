@@ -138,6 +138,8 @@ model Member {
   projectAccess           ProjectClientAccess[]
   projectVisits           ProjectVisit[]
   notificationPreferences NotificationPreference[]
+  ideaContributions       IdeaPageContributor[]
+  ideaPresences           IdeaPresence[]
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -187,6 +189,9 @@ model Project {
   notifications      Notification[]
   clientAccess       ProjectClientAccess[]
   visits             ProjectVisit[]
+  ideaPages          IdeaPage[]
+  ideaPublications   IdeaPublication[]
+  ideaPresences      IdeaPresence[]
   invitationProjects InvitationProject[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
@@ -1364,4 +1369,116 @@ model NotificationPreference {
   @@unique([userId, organizationId, key])
   @@index([organizationId])
   @@map("notification_preferences")
+}
+
+/// Origine d'une page de l'espace Idée (TK-89) : gabarit serveur, ajout humain, ajout d'agent (TK-90).
+enum IdeaPageOrigin {
+  template
+  user
+  agent
+
+  @@map("idea_page_origin")
+}
+
+/// Statut d'une page de l'espace Idée (TK-89) : vide -> brouillon -> à relire -> stable.
+enum IdeaPageStatus {
+  empty
+  draft
+  review
+  stable
+
+  @@map("idea_page_status")
+}
+
+/// Page du dossier d'idée d'un projet (TK-89). `slug` ne change jamais (unique à vie, corbeille comprise) ;
+/// `position` 0..n-1 sur les pages actives ; `version` s'incrémente à chaque enregistrement du contenu
+/// (compare-and-set). `updatedBy` sans clé étrangère (RGPD). CHECK : voir la migration.
+model IdeaPage {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  projectId      String         @map("project_id") @db.Uuid
+  slug           String
+  title          String
+  position       Int
+  required       Boolean        @default(false)
+  origin         IdeaPageOrigin
+  templateKey    String?        @map("template_key")
+  status         IdeaPageStatus @default(empty)
+  contentMd      String         @default("") @map("content_md")
+  version        Int            @default(1)
+  updatedBy      String?        @map("updated_by") @db.Uuid
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project      Project               @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  contributors IdeaPageContributor[]
+
+  @@unique([projectId, slug])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([projectId, deletedAt, position])
+  @@map("idea_pages")
+}
+
+/// Publication de l'espace Idée (TK-89) : écrite quand le lot de publication est `committed`.
+/// `pagesVersions` : versions de contenu publiées par slug. `publishedBy` sans clé étrangère (RGPD).
+model IdeaPublication {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  batchId        String?  @map("batch_id") @db.Uuid
+  commitSha      String   @map("commit_sha")
+  publishedBy    String?  @map("published_by") @db.Uuid
+  publishedAt    DateTime @map("published_at") @db.Timestamptz(3)
+  pagesVersions  Json     @map("pages_versions") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([projectId, batchId])
+  @@index([organizationId])
+  @@index([projectId, publishedAt(sort: Desc)])
+  @@map("idea_publications")
+}
+
+/// Contributeur d'une page (TK-89) : alimenté à l'enregistrement, au renommage et à la création ; la publication
+/// en tire les `Co-authored-by`. Une ligne par (page, membre).
+model IdeaPageContributor {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  pageId         String   @map("page_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  lastAddedAt    DateTime @map("last_added_at") @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  page   IdeaPage @relation(fields: [organizationId, pageId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  member Member   @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([pageId, userId])
+  @@index([organizationId])
+  @@map("idea_page_contributors")
+}
+
+/// Présence sur l'espace Idée (TK-89) : une ligne par (projet, membre), en base (multi-instances) ; active si
+/// vue depuis moins de 45 s. `pageId` : la page ouverte, sans clé étrangère (la page peut partir en corbeille).
+model IdeaPresence {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  pageId         String?  @map("page_id") @db.Uuid
+  seenAt         DateTime @map("seen_at") @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  member  Member  @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([projectId, userId])
+  @@index([organizationId])
+  @@index([projectId, seenAt])
+  @@map("idea_presence")
 }

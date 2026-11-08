@@ -1,6 +1,7 @@
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
+import { isIdeaOperation } from "../idea/idea-batch.ts";
 import { carrierFilter } from "../repo/prisma-repo.repository.ts";
 import { isUniqueViolation, orNotFound } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
@@ -158,8 +159,10 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
     });
     const operations = [];
     for (const [index, operation] of batch.operations.entries()) {
-      const targetSpecId =
-        operation.specId ?? featureId(await nextCounterValue(tx, scope, "feature"));
+      // Les opérations de l'espace Idée ciblent une page, pas une feature : aucun F-nnn (compteur intact).
+      const targetSpecId = isIdeaOperation(operation.kind)
+        ? null
+        : (operation.specId ?? featureId(await nextCounterValue(tx, scope, "feature")));
       operations.push({
         organizationId,
         batchId: row.id,

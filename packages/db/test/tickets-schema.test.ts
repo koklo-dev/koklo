@@ -272,13 +272,13 @@ describe("TK-28 C10 conventions §18.1 (suite)", () => {
     }
   });
 
-  it("deleted_at existe uniquement sur tickets et ticket_comments", async () => {
+  it("deleted_at existe uniquement sur tickets, ticket_comments et idea_pages (corbeille de l'espace Idée, TK-89)", async () => {
     const rows = await db.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.columns
        WHERE table_schema = 'public' AND column_name = 'deleted_at' ORDER BY table_name`,
     );
 
-    expect(rows.map((r) => r.table_name)).toEqual(["ticket_comments", "tickets"]);
+    expect(rows.map((r) => r.table_name)).toEqual(["idea_pages", "ticket_comments", "tickets"]);
   });
 });
 

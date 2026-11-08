@@ -1,9 +1,23 @@
 import { isFeatureId, isSafeSpecPath, isValidBranchName } from "@koklo/domain";
+import { ideaDeleteSlug, ideaIndexPayload, ideaPagePayload } from "./idea-payload.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
 
 const MAX_SLUG_LENGTH = 40;
 const FEATURE_FILE = /^features\/(F-\d{3,})(?:-[^/]*)?\.md$/;
 export const OPERATION_KINDS = ["feature.create", "feature.update", "feature.delete"] as const;
+/** Opérations de publication de l'espace Idée (TK-89) : un lot n'en mêle jamais avec des features. */
+export const IDEA_OPERATION_KINDS = [
+  "idea.page.write",
+  "idea.page.delete",
+  "idea.index.write",
+] as const;
+
+export const isIdeaKind = (kind: string): boolean =>
+  (IDEA_OPERATION_KINDS as readonly string[]).includes(kind);
+
+/** Chemins du dossier `idea/` (relatifs à la racine de la spec) : le nom de fichier est le slug, sans numéro. */
+export const IDEA_INDEX_PATH = "idea/_index.yaml";
+export const ideaPagePath = (slug: string): string => `idea/${slug}.md`;
 
 /** Slug du titre : minuscules, sans accents, `[a-z0-9-]`, 40 caractères au plus, repli `feature`. */
 export function slugOf(title: unknown): string {
@@ -36,7 +50,24 @@ export function relativeToSpec(specPath: string | null, path: string): string | 
   return path.startsWith(`${specPath}/`) ? path.slice(specPath.length + 1) : undefined;
 }
 
-function operationProblem(operation: BatchOperation): string | undefined {
+function ideaOperationProblem(operation: BatchOperation): string | undefined {
+  const { kind, payload } = operation;
+  if (kind === "idea.page.delete") {
+    return ideaDeleteSlug(payload) === undefined ? "slug" : undefined;
+  }
+  if (!ideaSlugOk(kind, payload)) return "slug";
+  const valid = kind === "idea.page.write" ? ideaPagePayload(payload) : ideaIndexPayload(payload);
+  return valid === undefined ? "payload" : undefined;
+}
+
+/** Un slug douteux (hors `^[a-z0-9-]{1,40}$`) est signalé « slug » plutôt que « payload ». */
+function ideaSlugOk(kind: string, payload: Record<string, unknown>): boolean {
+  return kind !== "idea.page.write" || ideaDeleteSlug(payload) !== undefined;
+}
+
+function operationProblem(operation: BatchOperation, ideaLot: boolean): string | undefined {
+  if (isIdeaKind(operation.kind)) return ideaLot ? ideaOperationProblem(operation) : "kind";
+  if (ideaLot) return "kind";
   if (!(OPERATION_KINDS as readonly string[]).includes(operation.kind)) return "kind";
   return isFeatureId(operation.targetSpecId) ? undefined : "specId";
 }
@@ -49,8 +80,9 @@ function operationProblem(operation: BatchOperation): string | undefined {
 export function integrityProblem(batch: LoadedBatch): string | undefined {
   if (!isValidBranchName(batch.branch)) return "branch";
   if (batch.repo.specPath !== null && !isSafeSpecPath(batch.repo.specPath)) return "specPath";
+  const ideaLot = batch.operations.some((operation) => isIdeaKind(operation.kind));
   for (const operation of batch.operations) {
-    const problem = operationProblem(operation);
+    const problem = operationProblem(operation, ideaLot);
     if (problem) return problem;
   }
   return undefined;

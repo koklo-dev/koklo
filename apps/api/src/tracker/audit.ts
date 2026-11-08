@@ -21,7 +21,8 @@ export interface AuditEntry {
     | "suggestion"
     | "review"
     | "user"
-    | "notification_preference";
+    | "notification_preference"
+    | "idea_page";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;

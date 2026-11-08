@@ -297,7 +297,7 @@ Mesures normalisées (incohérences I1 à I29 tranchées, questions B143 et B144
 | Composant | Mesures et règles |
 |---|---|
 | Jetons | Couleur `--alert-success-*` (clair #f0fdf4 / #bbf7d0 / #14532d ; sombre #0f2a1a / #14532d / #bbf7d0), `--overlay` (rgb(13 11 28 / .38) ; sombre rgb(0 0 0 / .55)). Ombres `--shadow-dialog` (0 18px 44px .20), `--shadow-sheet` (-16px 0 40px .20), `--shadow-toast` (0 8px 24px .25), none en sombre sauf toast. Rayons `--radius-card` 10 et `--radius-dialog` 14. Texte : `text-card-title` 15/600, `text-dialog-title` 18/600, `text-stat` 24/600 -0,02 em, `text-count` 11/600, `text-code-sm` mono 11/500, `text-settings-title` 20/600 (Réglages seulement). |
-| `Button` | Tailles du §5.2. Variantes `default`, `secondary`, `outline`, `ghost`, `destructive`, `dashed` (bordure pointillée `--border-strong`, transparent), `inherit` (contour `currentColor`, texte hérité, 600), `link` (souligné 600, 28). Props `icon`, `shortcut` (`Kbd` en suffixe), `loading` (`Spinner`, `aria-busy`, .82), `pressed` (halo `0 0 0 3px --secondary`), `fullWidth`. `size="icon"` reste un alias de 36 × 36. |
+| `Button` | Tailles du §5.2. Variantes `default`, `secondary`, `outline`, `ghost`, `destructive`, `dashed` (bordure pointillée `--border-strong`, transparent), `inherit` (contour `currentColor`, texte hérité, 600), `link` (souligné 600, 28), `text` (lien texte 26, 13/500, marges 8, `--text`, souligné ; v2.10). Props `icon`, `shortcut` (`Kbd` en suffixe), `loading` (`Spinner`, `aria-busy`, .82), `pressed` (halo `0 0 0 3px --secondary`), `fullWidth`. `size="icon"` reste un alias de 36 × 36. |
 | `IconButton` | Carré `sm` 32 (icône 18, rayon 6) ou `default` 36 (icône 20) ; variante `primary` 32 rayon 8 (envoi). `aria-label` imposé par le type. |
 | `Kbd` | Mono 11/500 (`text-code-sm`), hauteur 18, marges 0 5, bordure `--border`, rayon 4, fond `--background`. |
 | `Spinner` | `progress_activity` 16, 18 ou 20, `--primary` ou `currentColor`, rotation sous `motion-safe:animate-spin`, `aria-hidden`. |
@@ -353,6 +353,18 @@ Galerie : `/dev/ui`, sections « Listes · A » (listes longues, id `dev-ui-list
 | `ShellNavItem` | Prop `count` : `CountBadge` 11/600, masqué dans le rail (le nom accessible du rail l'ajoute : « Tickets, 12 »). `badge` reste accepté. Libellé du bouton de rail « Déplier la barre » (I28). |
 | `SecondaryNav`, `NavItem` | 240 de large dès `md` (bordure droite), groupes 11/600 capitales, entrée de 36, 14, icône 18 (pleine `--primary` quand courante), active `--secondary` 600 texte `--foreground` (I18), `CountBadge outline` facultatif ; sous `md` liens horizontaux défilants sans libellés de groupe visibles (cibles de 44). |
 
+### 5.8 Espace Idée (v2.10, TK-89, passation 02, maquette 06)
+
+| Composant | Règle |
+|---|---|
+| `ReorderableList`, `PageStatus`, `StatusLegend` | `nav` de 264 (marges de l'encadré selon passation 12 §8.3), `ol`, ligne de 34, poignée `drag_indicator` 24 × 28 `--border-strong` (24 : cible minimale WCAG 2.5.8 ; la maquette dit 20), menu `more_horiz` de la ligne visible au survol et au focus seulement dès 1024 px, étiquette « requise » 10/600 bordure `--border` rayon 4, ajout en `Button dashed`. Légende : encadré `--surface`, 12/400, icônes `currentColor` (stable pleine). Menu sous 1024 px : état, titre, « requise » et marque de la page courante par entrée. Statuts : stable `check_circle` plein `success`, à relire `rate_review` `--primary`, brouillon `edit` muted, vide `radio_button_unchecked` `--border-strong`. `@dnd-kit/sortable` (ADR 0020), Alt + flèches, annonces. |
+| `Prose`, `TaskItem`, `TaskCheckbox` | Colonne de 680 (blocs espacés de 18 dans le contenu de l'éditeur aussi, interligne des listes 1,5, h2 en 1,2), chemin mono 12, h2 28/600 -0,02 em, h3 18/600, paragraphe 15/1,65, tâches `check_box` 20. L'éditeur TipTap (ADR 0019) vit dans `apps/web`, avec une tâche modifiable `TaskCheckbox` (même icône que `TaskItem`) : case de 20 dans une cible de 24, `role="checkbox"`, nom accessible = texte de la tâche. |
+| `AvatarGroup` | `Avatar` 28 chevauchés de -8, bordure 2 `--background`, ton `warning` pour le client. |
+| `AppShell defaultCollapsed` | Rail de 64 par défaut sur l'espace Idée, la valeur mémorisée reste prioritaire. |
+| `PageNavItem`, `PageStatus pill`, `ProseInvite`, `ProsePath`, `ProjectHeader meta` | Ligne de page (34, icône d'état, titre numéroté, « requise », nom accessible tiré du contenu (icône d'état, titre numéroté, « requise »)), pastille `soft` d'état du document, invite « Écrire, ou taper « / » », chemin mono 12, information à droite de l'emplacement (état d'enregistrement). Jetons `--text-prose-title-size` 28, `--text-prose-heading-size` 18, `--text-prose-body-size` 15 (interligne 1,65). |
+
+Galerie : `/dev/ui`, section « 12. Espace Idée » (id `dev-ui-idea`). Sous 1024 px l'arborescence devient un menu déroulant (pas de glisser tactile).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -405,3 +417,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 07/11/2026 | v2.7 (TK-139, catalogue §1.3 et §1.4, B152 à B157) : §5.6 surfaces et retours d'état (`Card` à 6 variantes, `StatCard`, `ProgressBar`, `InlineAlert` success et agent, `EmptyState inline`, `SkeletonRow`, `Toast`, `Dialog` / `AlertDialog`, `Sheet` 440 / 540 / 620, `Tabs underline`, `Table framed` et `YesNoCell`) ; `Alert` déprécié |
 | 07/11/2026 | v2.8 (TK-140, catalogue §1.4, I15, I18, I21, I22, I28, I29, B160 à B166) : §5.3 pagination segmentée, pied de liste d'une ligne, `GroupSection stacked`, `CountBar` à requête ; §5.4 `PageHeader`, « Déplier la barre » ; §5.7 listes et navigation (`ListPanel`, `ListRow`, `ProjectHeader` à `status`, `PhaseRail inline`, `ShellNavGroup`, `ShellNavItem count`, `SecondaryNav`) |
 | 08/11/2026 | v2.9 (TK-141, reprise des écrans sur les bases ; B171 et suivantes) : aucun composant nouveau attendu ; §5.4 Réglages et Fournisseurs d'IA précisés (tons des pastilles, `Toast` à la place de `role=status`) ; les écrans S-app-shell, S-features, S-settings et S-ai-settings suivent les planches 05, 10, 12 et 24 sans style local |
+| 08/11/2026 | v2.10 (TK-89, passation 02, maquette 06) : §5.8 espace Idée (`ReorderableList`, `PageStatus`, `StatusLegend`, `Prose`, `TaskItem`, `AvatarGroup`, rail replié par défaut) ; la jauge de maturité reste à TK-91 |

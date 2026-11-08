@@ -20,6 +20,7 @@ const VARIANTS = [
   ["destructive", "Supprimer"],
   ["dashed", "Pointillé"],
   ["link", "Lien"],
+  ["text", "Lien texte"],
 ] as const;
 const SIZES = [
   ["xs", "xs · 28"],

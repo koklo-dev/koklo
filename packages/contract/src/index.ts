@@ -7,6 +7,10 @@ export type {
   FeatureSummary,
   HealthInput,
   HealthOutput,
+  IdeaListOutput,
+  IdeaPage,
+  IdeaPageSummary,
+  IdeaPresenceOutput,
   InstallationOutput,
   InvitationCreateInput,
   InvitationListOutput,
@@ -60,6 +64,7 @@ export {
   encryptionUnavailableError,
   forbiddenError,
   forbiddenOf,
+  ideaConflictError,
   internalError,
   invalidTransitionError,
   leaseExpiredError,
@@ -104,6 +109,7 @@ export * from "./schemas-ai.ts";
 export * from "./schemas-ai-providers.ts";
 export * from "./schemas-client-space.ts";
 export * from "./schemas-collaboration.ts";
+export * from "./schemas-idea.ts";
 export * from "./schemas-lists.ts";
 export * from "./schemas-llm-credential.ts";
 export * from "./schemas-project-client.ts";

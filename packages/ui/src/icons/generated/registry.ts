@@ -89,6 +89,14 @@ export const iconLoaders = {
   subdirectory_arrow_right: () => import("./subdirectory_arrow_right.ts"),
   rate_review: () => import("./rate_review.ts"),
   group: () => import("./group.ts"),
+  publish: () => import("./publish.ts"),
+  info: () => import("./info.ts"),
+  cloud_off: () => import("./cloud_off.ts"),
+  arrow_downward: () => import("./arrow_downward.ts"),
+  delete: () => import("./delete.ts"),
+  restore_from_trash: () => import("./restore_from_trash.ts"),
+  format_bold: () => import("./format_bold.ts"),
+  format_italic: () => import("./format_italic.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

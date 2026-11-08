@@ -66,3 +66,11 @@ export function canTouchMember(actor: Role | undefined, target: Role): boolean {
 export function assignableRoles(actor: Role | undefined, target: Role): MemberRole[] {
   return invitableRoles(actor).filter((candidate) => candidate !== target);
 }
+
+/** Rédiger l'espace Idée : l'équipe et le client lié ; le business lit seulement (`IDEA_WRITE_ROLES`). Le serveur reste l'autorité. */
+export function canWriteIdea(role: Role | string | undefined): boolean {
+  return canWriteSpec(role) || role === "client";
+}
+
+/** Publier l'espace Idée dans le dépôt : l'équipe seulement (`SPEC_BATCH_ROLES`), jamais le client. */
+export const canPublishIdea = canWriteSpec;

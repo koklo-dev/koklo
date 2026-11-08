@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import * as dbPackage from "../src/index.ts";
 import { schemaPath } from "../src/testing/prisma-cli.ts";
 import { AI_MODELS } from "./support/ai-providers-fixtures.ts";
+import { IDEA_MODELS } from "./support/idea-fixtures.ts";
 import { LLM_MODELS } from "./support/llm-credentials-fixtures.ts";
 import { NOTIFICATION_MODELS } from "./support/notifications-fixtures.ts";
 import { OAUTH_MODELS } from "./support/oauth-fixtures.ts";
@@ -41,6 +42,7 @@ const EXPECTED_TENANT_MODELS = [
   "ProjectVisit",
   "InvitationProject",
   "NotificationPreference",
+  ...IDEA_MODELS,
 ];
 
 /**

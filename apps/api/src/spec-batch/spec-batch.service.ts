@@ -8,7 +8,9 @@ import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import {
   type BatchRecord,
+  type PreparedBatch,
   SPEC_BATCH_REPOSITORY,
+  type SpecBatchPlan,
   type SpecBatchRepository,
 } from "./spec-batch.repository.ts";
 import { prepareBatch } from "./spec-batch-input.ts";
@@ -36,18 +38,40 @@ export class SpecBatchService {
     role: string,
     input: SpecBatchSubmitInput,
   ): Promise<SpecBatchOutput> {
-    const plan = await this.repository.plan(scope);
-    if (this.provider === null) throw new ORPCError("PROVIDER_UNAVAILABLE");
-    const created = await this.repository.create(
-      scope,
-      role,
-      plan,
+    const created = await this.register(scope, role, (plan) =>
       prepareBatch(input, plan.defaultBranch),
     );
-    if (created.kind === "reused") throw reusedKey(created.batchId);
-    const settled = await this.settle(scope, created.batch);
+    const settled = await this.settle(scope, created);
     if (settled.status === "failed" || settled.status === "conflict") throw failureOf(settled);
     return outputOf(settled);
+  }
+
+  /**
+   * Enregistre et enfile un lot déjà préparé par un autre module (publication de l'espace Idée, TK-89),
+   * sans attendre le worker : l'appelant suit le lot par `get`. Mêmes refus que `submit` (dépôt de spec,
+   * fournisseur, clé d'idempotence réutilisée) ; rend l'identifiant du lot.
+   */
+  async enqueuePrepared(
+    scope: ProjectScope,
+    role: string,
+    build: (plan: SpecBatchPlan) => PreparedBatch,
+  ): Promise<string> {
+    const batch = await this.register(scope, role, build);
+    if (isOpen(batch.status)) await this.queue.enqueue(batch);
+    return batch.id;
+  }
+
+  /** Dépôt de spec, fournisseur, puis lot enregistré (une transaction) ; une clé réutilisée est refusée. */
+  private async register(
+    scope: ProjectScope,
+    role: string,
+    build: (plan: SpecBatchPlan) => PreparedBatch,
+  ): Promise<BatchRecord> {
+    const plan = await this.repository.plan(scope);
+    if (this.provider === null) throw new ORPCError("PROVIDER_UNAVAILABLE");
+    const created = await this.repository.create(scope, role, plan, build(plan));
+    if (created.kind === "reused") throw reusedKey(created.batchId);
+    return created.batch;
   }
 
   async get(scope: ProjectScope, batchId: string): Promise<SpecBatchOutput> {

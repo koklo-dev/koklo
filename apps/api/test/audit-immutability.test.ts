@@ -78,11 +78,10 @@ describe("C1b : aucune route d'écriture sur /audit", () => {
   it("le groupe audit du contrat n'expose que list, en GET", () => {
     expect(Object.keys(contract.audit)).toEqual(["list"]);
     type Procedure = { "~orpc": { meta: { "~openapi"?: { method?: string; path?: string } } } };
-    const procedures = Object.values(contract).flatMap((entry) =>
-      "~orpc" in entry
-        ? [entry as unknown as Procedure]
-        : Object.values(entry as unknown as Record<string, Procedure>),
-    );
+    // Parcourt aussi les sous-groupes (`idea.page`, TK-89) : une procédure est un nœud portant `~orpc`.
+    const leaves = (node: object): Procedure[] =>
+      "~orpc" in node ? [node as Procedure] : Object.values(node).flatMap(leaves);
+    const procedures = leaves(contract);
     const onAudit = procedures
       .map((procedure) => procedure["~orpc"].meta["~openapi"])
       .filter((meta) => meta?.path?.endsWith("/audit"));

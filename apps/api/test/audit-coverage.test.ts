@@ -162,6 +162,11 @@ const WRITE_GROUPS = [
   "aiUsage",
   "aiSettings",
 ];
+/**
+ * Groupes dont les écritures sont journalisées et prouvées par une suite dédiée (`idea-audit.test.ts`, TK-89) : leurs
+ * procédures sont imbriquées (`idea.page.*`), ce que l'énumération à deux niveaux ci-dessus ne parcourt pas.
+ */
+const DEDICATED_AUDIT_GROUPS = ["idea"];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace", "search", "aiModel"];
 /**
@@ -1418,6 +1423,7 @@ describe("garde de complétude : le contrat dicte les scénarios", () => {
   it("chaque groupe du contrat est couvert ou en lecture seule : aucune exclusion", () => {
     const known = new Set([
       ...WRITE_GROUPS,
+      ...DEDICATED_AUDIT_GROUPS,
       ...READ_ONLY_GROUPS,
       ...PENDING_GROUPS,
       ...STANDALONE_PROCEDURES,

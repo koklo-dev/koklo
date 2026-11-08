@@ -13,6 +13,7 @@ import type { AppConfig } from "./config.ts";
 import { DatabaseModule } from "./database/database.module.ts";
 import { ERROR_STATUS_MAP } from "./error-status.ts";
 import { HealthModule } from "./health/health.module.ts";
+import { IdeaModule } from "./idea/idea.module.ts";
 import { validationStatusInterceptor } from "./input-validation.ts";
 import { InstallationModule } from "./installation/installation.module.ts";
 import { InvitationModule } from "./invitation/invitation.module.ts";
@@ -111,6 +112,7 @@ export class AppModule {
         LlmCredentialRoutesModule,
         AiModule,
         SpecBatchModule,
+        IdeaModule,
         SpecReadModule,
         SearchModule,
         ...CLIENT_SPACE_MODULES,

@@ -5,6 +5,7 @@ import {
   withTenantIsolation,
 } from "@koklo/db";
 import { isRecord } from "../job-support.ts";
+import { contributorIdsOf } from "./idea-payload.ts";
 import type { BatchAuthor, BatchStatus, LoadedBatch, Outcome } from "./types.ts";
 
 const OPEN: BatchStatus[] = ["queued", "committing"];
@@ -76,6 +77,24 @@ export class SpecWriteStore {
     return this.raw.user.findUnique({
       where: { id: batch.authorUserId },
       select: { name: true, email: true },
+    });
+  }
+
+  /**
+   * Contributeurs d'une publication d'idée : nom et e-mail relus en base d'après les identifiants de
+   * l'index (jamais le payload), dans l'ordre de l'index ; un utilisateur supprimé est ignoré.
+   */
+  async coAuthors(batch: LoadedBatch): Promise<BatchAuthor[]> {
+    const ids = contributorIdsOf(batch.operations);
+    if (ids.length === 0) return [];
+    const users = await this.raw.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, email: true },
+    });
+    const byId = new Map(users.map((user) => [user.id, user]));
+    return ids.flatMap((id) => {
+      const user = byId.get(id);
+      return user ? [{ name: user.name, email: user.email }] : [];
     });
   }
 

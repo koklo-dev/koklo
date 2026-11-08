@@ -384,7 +384,6 @@ for (const theme of ["light", "dark"] as Theme[]) {
         SPEC,
         `${PROJECT}/framing`,
         `${PROJECT}/tickets`,
-        `${PROJECT}/idea`,
         `${PROJECT}/spec/data`,
         "/settings/members",
       ]) {
@@ -494,7 +493,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await shoot(page, "collapsed", theme);
   });
 
-  test(`captures S-app-shell : en-têtes Fonctionnel, Tickets, Cadrage et pages « Bientôt » (${theme})`, async ({
+  test(`captures S-app-shell : en-têtes Fonctionnel, Tickets, Cadrage et page « Bientôt » (${theme})`, async ({
     page,
   }) => {
     await page.setViewportSize(SIZES.desktop);
@@ -502,7 +501,6 @@ for (const theme of ["light", "dark"] as Theme[]) {
       ["header-features", SPEC, "Cahier fonctionnel"],
       ["header-tickets", `${PROJECT}/tickets`, "Tickets"],
       ["header-framing", `${PROJECT}/framing`, "Assistant de cadrage"],
-      ["soon-idea", `${PROJECT}/idea`, "Idée"],
       ["soon-data", `${PROJECT}/spec/data`, "Données"],
     ];
     for (const [name, path, title] of pages) {

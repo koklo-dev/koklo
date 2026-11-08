@@ -71,6 +71,15 @@ export const conflictOf = <R extends [string, ...string[]]>(...reasons: R) =>
     },
   }) as const;
 
+/** Enregistrement d'une page d'idée sur une version périmée (TK-89) : la version courante, jamais le contenu. */
+export const ideaConflictError = {
+  CONFLICT: {
+    status: 409,
+    message: "La page a changé depuis votre lecture",
+    data: z.object({ currentVersion: z.number().int() }),
+  },
+} as const;
+
 /** Transition refusée par la table du cycle de vie d'un ticket (`InvalidTicketTransitionError`). */
 export const invalidTransitionError = {
   INVALID_TRANSITION: {

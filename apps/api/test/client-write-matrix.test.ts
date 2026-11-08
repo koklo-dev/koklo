@@ -15,6 +15,15 @@ import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
  */
 const ALLOWED = [
   "comment.create",
+  // TK-89 (contrat 2.4.0) : le client rédige le dossier d'idée sans le publier (décision 1).
+  "idea.page.create",
+  "idea.page.delete",
+  "idea.page.rename",
+  "idea.page.reorder",
+  "idea.page.restore",
+  "idea.presence",
+  "idea.save",
+  "idea.setStatus",
   // TK-97 : préférences personnelles (nom, e-mails), ouvertes à toute session, client compris.
   "me.update",
   "me.updateNotification",
@@ -40,6 +49,8 @@ const DENIED = [
   "aiUsage.set",
   "dependency.add",
   "dependency.remove",
+  // TK-89 : la publication du dossier d'idée relève de l'équipe (SPEC_BATCH_ROLES).
+  "idea.publish",
   "installation.start",
   "lease.acquire",
   "lease.heartbeat",
@@ -85,20 +96,20 @@ interface Route {
 }
 type Procedure = { "~orpc": { meta: { "~openapi"?: { method?: string; path?: string } } } };
 
-/** Toutes les procédures du contrat (groupes et procédures isolées) avec méthode et chemin OpenAPI. */
+/** Toutes les procédures du contrat (groupes, sous-groupes comme `idea.page`, procédures isolées) avec méthode et chemin OpenAPI. */
 function routes(): Route[] {
-  const out: Route[] = [];
-  for (const [group, node] of Object.entries(contract as unknown as Record<string, object>)) {
-    const entries =
-      "~orpc" in node
-        ? [[group, node]]
-        : Object.entries(node).map(([n, p]) => [`${group}.${n}`, p]);
-    for (const [name, procedure] of entries as [string, Procedure][]) {
-      const meta = procedure["~orpc"].meta["~openapi"];
-      out.push({ name, method: meta?.method ?? "", path: meta?.path ?? "" });
+  const visit = (name: string, node: object): Route[] => {
+    if (!("~orpc" in node)) {
+      return Object.entries(node).flatMap(([child, value]) => visit(`${name}.${child}`, value));
     }
-  }
-  return out;
+    const meta = (node as Procedure)["~orpc"].meta["~openapi"];
+    return [{ name, method: meta?.method ?? "", path: meta?.path ?? "" }];
+  };
+  return Object.entries(contract as unknown as Record<string, object>).flatMap(([group, node]) =>
+    "~orpc" in node
+      ? visit(group, node)
+      : Object.entries(node).flatMap(([child, value]) => visit(`${group}.${child}`, value)),
+  );
 }
 const writes = () => routes().filter((r) => r.method !== "GET");
 
@@ -116,9 +127,17 @@ describe("classement exhaustif des écritures du contrat", () => {
     expect(routes().find((r) => r.name === "review.list")?.method).toBe("GET");
   });
 
-  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter, mémoriser son dernier projet et régler son compte", () => {
+  it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter, rédiger le dossier d'idée, mémoriser son dernier projet et régler son compte", () => {
     expect(ALLOWED).toEqual([
       "comment.create",
+      "idea.page.create",
+      "idea.page.delete",
+      "idea.page.rename",
+      "idea.page.reorder",
+      "idea.page.restore",
+      "idea.presence",
+      "idea.save",
+      "idea.setStatus",
       "me.update",
       "me.updateNotification",
       "project.visit",

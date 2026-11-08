@@ -151,3 +151,12 @@ export const ORG_READ_ROLES = STAFF_ROLES;
  * un lien `project_client_access` est créé par projet. Le cloisonnement serveur ne change que pour le client.
  */
 export const PROJECT_INVITATION_ROLES = [CLIENT_ROLE, "business"] as const;
+
+/** Lire le dossier d'idée (`idea.list|get`, TK-89, décision 2) : les six rôles, le client sur ses projets liés. */
+export const IDEA_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
+
+/**
+ * Rédiger le dossier d'idée (sauvegarde, statut, pages, présence, TK-89, décision 1) : le client rédige, le
+ * business lit seulement (aligné sur `COMMENT_WRITE_ROLES`, CDC §14). La publication relève de `SPEC_BATCH_ROLES`.
+ */
+export const IDEA_WRITE_ROLES = ["owner", "admin", "dev", "designer", "client"] as const;

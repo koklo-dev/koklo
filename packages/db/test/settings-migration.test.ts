@@ -67,9 +67,9 @@ describe("TK-97 migration settings : dossier et contenu", () => {
     expect(down).not.toMatch(/DROP\s+(?:TYPE|FUNCTION|TRIGGER)/i);
   });
 
-  it("expectedTables contient les deux tables (46 au total)", () => {
+  it("expectedTables contient les deux tables (50 au total)", () => {
     for (const table of TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(46);
+    expect(expectedTables).toHaveLength(50);
   });
 
   it("les modèles InvitationProject et NotificationPreference sont des modèles d'organisation", () => {
@@ -198,11 +198,13 @@ describe("TK-97 migration settings : up, down, up", () => {
     await insertLink(db, { ...scope, invitationId });
     await insertPreference(db, scope, "weekly_digest", true);
 
-    runPrismaOrThrow(
-      ["db", "execute", "--file", join(migrationsDir, migration(), "down.sql")],
-      db.url,
-    );
-    await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [migration()]);
+    // Les migrations postérieures (espace Idée, TK-89) sont défaites d'abord, de la plus récente à la plus ancienne.
+    for (const dir of dirs()
+      .filter((d) => d >= migration())
+      .reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, dir, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [dir]);
+    }
 
     expect(await inventory(db)).toEqual(expected);
     expect(await db.query("SELECT 1 FROM invitations WHERE id = $1", [invitationId])).toHaveLength(
