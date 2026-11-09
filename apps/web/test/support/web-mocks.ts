@@ -46,6 +46,9 @@ export const procedures = {
   projectShell: vi.fn(),
   projectVisit: vi.fn(),
   projectRecent: vi.fn(),
+  // TK-92 (contrat 2.7.0) : vue d'ensemble et activité du projet
+  projectOverview: vi.fn(),
+  projectActivity: vi.fn(),
   searchQuery: vi.fn(),
   sprintList: vi.fn(),
   ticketList: vi.fn(),
@@ -175,6 +178,8 @@ export const orpc = {
     shell: queryFull(["project", "shell"], procedures.projectShell),
     visit: mutationWithOptions(procedures.projectVisit),
     recent: queryFull(["project", "recent"], procedures.projectRecent),
+    overview: queryFull(["project", "overview"], procedures.projectOverview),
+    activity: queryFull(["project", "activity"], procedures.projectActivity),
   },
   search: {
     key: () => ["search"],

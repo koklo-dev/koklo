@@ -32,6 +32,7 @@ const GUARDED = [
   `/projects/${ID}/idea`,
   `/projects/${ID}/framing`,
   `/projects/${ID}/tickets`,
+  `/projects/${ID}/activity`,
   `/projects/${ID}/spec/functional`,
   `/projects/${ID}/spec/security`,
   "/settings",

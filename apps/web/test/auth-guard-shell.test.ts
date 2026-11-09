@@ -20,6 +20,7 @@ describe("guardedPathFor — routes de la coquille", () => {
     `/projects/${ID}/idea`,
     `/projects/${ID}/framing`,
     `/projects/${ID}/tickets`,
+    `/projects/${ID}/activity`,
     `/projects/${ID}/features`,
     ...SPEC_SLUGS.map((slug) => `/projects/${ID}/spec/${slug}`),
     "/settings",

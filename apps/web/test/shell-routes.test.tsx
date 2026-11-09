@@ -74,12 +74,20 @@ describe("/ et /kanban (C3)", () => {
   });
 });
 
-describe("/projects/<id> (C4)", () => {
-  it("redirige vers Spec · Fonctionnel, onglet Fonctionnalités", async () => {
+describe("/projects/<id> (C4, TK-92)", () => {
+  it("est la vue d'ensemble : plus de redirection vers le cahier fonctionnel", async () => {
     const { default: Page } = await import("../src/app/(shell)/projects/[projectId]/page.tsx");
-    await expect(Page(params({ projectId: ID }))).rejects.toThrow(
-      `NEXT_REDIRECT:/projects/${ID}/spec/functional?tab=features`,
+    const element = (await Page(params({ projectId: ID }))) as { props: { projectId: string } };
+    expect(redirect).not.toHaveBeenCalled();
+    expect(element.props).toEqual({ projectId: ID });
+  });
+
+  it("/projects/<id>/activity est la page d'activité", async () => {
+    const { default: Page } = await import(
+      "../src/app/(shell)/projects/[projectId]/activity/page.tsx"
     );
+    const element = (await Page(params({ projectId: ID }))) as { props: { projectId: string } };
+    expect(element.props).toEqual({ projectId: ID });
   });
 });
 
