@@ -93,6 +93,11 @@ function Phases() {
     <DevUiFrame title="PhaseRail" wide>
       <PhaseRail phase="framing" subtitles={PHASE_SUBTITLES} />
       <PhaseRail phase="idea" />
+      <PhaseRail
+        phase="framing"
+        hrefs={{ idea: "#idee", framing: "#cadrage" }}
+        subtitles={PHASE_SUBTITLES}
+      />
       <PhaseRail phase="iterations" />
       <DevUiRow>
         {PHASES.map((phase) => (

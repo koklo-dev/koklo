@@ -37,7 +37,7 @@ function Loaded({ projectId, overview }: { projectId: string; overview: ProjectO
   return (
     <PageBody>
       <div className="flex flex-col gap-6">
-        <OverviewPhase overview={overview} />
+        <OverviewPhase overview={overview} projectId={projectId} />
         {overview.nextAction ? (
           <OverviewNextStep nextAction={overview.nextAction} onCopy={copy} />
         ) : null}

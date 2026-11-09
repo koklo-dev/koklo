@@ -210,6 +210,7 @@ Galerie de référence : `/dev/ui` (fiche `design/screens/S-dev-ui.md`), chaque 
 
 **`PhaseRail`** : fil de phase Idée → Cadrage → Baseline 0 → Itérations. C'est la signature de Koklo.
 - Grand : liste ordonnée ; pastille de 32 px par étape (terminée : `--primary` plein, icône `check` en `--primary-foreground` ; en cours : `--secondary`, anneau de 2 px `--primary`, icône de l'étape en `--secondary-foreground` ; à venir : `--surface` + bordure `--border`, icône de l'étape en `--muted-foreground`), trait de 2 px entre les étapes (`--primary` si l'étape est terminée, sinon `--border`), libellé 14/600 suivi de l'état en 400 `--muted-foreground` (« terminée », « en cours », « à venir »), sous-titre facultatif 13 px. Icônes d'étape 18 px : Idée `lightbulb`, Cadrage `edit_note`, Baseline 0 `flag`, Itérations `sync`. L'étape en cours porte `aria-current="step"`.
+- Navigable (v2.11, TK-9x) : `hrefs` (adresse par étape) et `LinkComponent` rendent le libellé et son état en lien, souligné au survol, anneau de focus `--ring` ; une étape sans adresse reste du texte. L'appelant décide quelles étapes sont ouvertes (terminées ou en cours, avec une page) ; l'étape en cours garde `aria-current="step"`.
 - Miniature (`size="sm"`) : pastille de 28 px, bordure `--border`, 12/500 ; 4 traits de 14 × 4 px (rayon 2, écart 3 px ; terminé `--primary`, en cours `--primary` à 45 %, à venir `--border-strong`) + « Cadrage · 2 sur 4 ».
 - Phase calculée côté serveur ; si elle manque (lot 1), dériver : aucune fonctionnalité = Idée, pas de `baseline-0` = Cadrage, sinon Itérations.
 
