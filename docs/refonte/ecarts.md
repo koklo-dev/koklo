@@ -392,3 +392,5 @@ Tests à réécrire avec ces retraits :
 | Bouton « Passer au cadrage » : seul l'état désactivé est dessiné (l.62) | État actif : bouton principal du catalogue (B262) | La planche ne montre pas l'état atteint |
 | Synthèse, aperçu, « Modifié depuis idea-vN » absents de la planche | Composés avec `Prose`, `EmptyState`, `InlineAlert` (DESIGN.md §5.10, B262) | Décision 05 §2 les décrit sans les dessiner |
 | Boutons d'en-tête de l'espace Idée à 375 px : largeur naturelle, 36 px (l.61-62) | Pleine largeur, 44 px (B271) | Cible tactile WCAG 2.2 et fiche S-idea |
+| Planche 07 : six cartes de livrables, « quand les 6 sont validés » (l.129, l.339-345) | Sept cartes, « quand les 7 sont validés » (B282) | Décision 21 §0 : Sécurité est le 5e livrable |
+| Planche 07 : barre latérale, sélecteur de phase pointillé (l.30-64, l.71-75) | Barre de TK-88 ; pas de sélecteur | Périmés (décision 05 §2) ; le sélecteur est un outil de maquette |

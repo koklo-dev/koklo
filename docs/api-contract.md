@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.6.0** (TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.7.0** (TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1342,6 +1342,52 @@ the shell pages (Idée, Spec, Tickets, Tous les projets, Réglages; locked deliv
 person types. Opening a `feature` goes to `/projects/{projectId}/spec/functional?tab=features&sel=F-nnn`, a `ticket` to
 `/projects/{projectId}/tickets`, a `project` to `/projects/{projectId}`. No contract change: the lot adds no route.
 
+## Project overview (TK-92)
+
+Contract 2.7.0 (additive). Two reads feed the project home page (`/projects/{projectId}`). Like `project.shell`, both
+are open to any role that can reach the project and answer `404 NOT_FOUND` otherwise (unknown project, other
+organization, client not linked: same body, never `403`); a missing session is `401`. They write nothing (the only
+side effect is the idempotent reconciliation of `idea-vN` versions that `project.shell` already performs).
+
+| Operation | Method | Path | Typed errors (besides `INTERNAL`) |
+|-----------|--------|------|-----------------------------------|
+| `project.overview` | GET | `/projects/{projectId}/overview` | `UNAUTHORIZED`, `NOT_FOUND` |
+| `project.activity` | GET | `/projects/{projectId}/activity?cursor=&limit=` | `UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION` |
+
+- **Audience.** The role of the session (never an input) sets `audience`: `team` for owner, admin, dev and designer,
+  `client` for client and business (any other role is treated as `client`). `canInvite` is true for owner and admin only.
+  Every text is built on the server, in French; the screen only formats relative dates.
+- **`project.overview`** returns `{ project, audience, phase, phaseSteps, primaryAction?, canInvite, nextAction?, stats,
+  main, activity, people }` in one transaction.
+  - `phase`: `idea`, `framing` or `iterations` (no transient `baseline` phase before TK-100). `phaseSteps` always has
+    four entries `idea, framing, baseline, iterations` with `status` `done`, `current` or `todo` and a `subtitle`
+    (« Version idea-v1 figée le 5 novembre 2026 », « Non utilisée » for a project that reached framing without an idea
+    file, « Posée le … »).
+  - `nextAction` (`rule`, `tone` `warning` | `neutral`, `title`, `body`, `action?` `{ label, href, kind: link | copy_link }`)
+    is the first applicable rule of `nextActionOf` (pure function, `apps/api/src/project-overview/overview-next-action.ts`):
+    AI not configured and failed spec preparation (owner and admin only), pending agent proposals, new project, required
+    idea pages, client validation overdue (feature index at least 48 h old without a verdict), changes requested, propose
+    next deliverable, team validation, tickets in review, change request. The two last rules and « propose next » have no
+    source yet and never fire in production. The client view only keeps pending proposals (if the role can decide) and
+    features to validate, worded for the client, and otherwise answers « Rien n'attend votre action. L'équipe travaille sur
+    ... ». `copy_link` means the screen copies an absolute link; no e-mail is sent.
+  - `stats`: cards of the phase; a measured zero is shown, a card whose source is missing is absent (no placeholder).
+    The client receives no SHA and no git vocabulary.
+  - `main`: `{ kind: 'idea', pages }` (5 pages: pending proposals, required unstable pages, recent ones),
+    `{ kind: 'deliverables', items }` (seven cards in the writing order; only `functional` has statuses `todo`,
+    `pending`, `revise`, `validated`, an `href` and `available: true`; the other six are `todo`, « Bientôt disponible »,
+    unavailable; `validator` is `client` or `team`) or `{ kind: 'sprint', sprint?, tickets }` (5 tickets: in review, in
+    progress, recently done).
+  - `activity`: the 5 most recent readable events and the real `total`. `people`: at most 5 people (client first) and
+    the number of `others`.
+- **`project.activity`** is a list 1.1: `listOf(activityItem)`, 50 per page, `cursor` opaque (a malformed cursor is
+  `VALIDATION`), `limit` 1 to 100, `total` the real total, `offset` the rank of the first item.
+- **Readable events** come from `audit_log` through a closed list. Team: `review.approve`, `review.request_changes`,
+  `suggestion.create`, `idea.freeze`, `idea.proposal.accept`, `sprint.activate`, `sprint.close`, `spec.batch.submit`,
+  `project.create`, `project_client.add`. Client: only `review.*`, `suggestion.create` and `idea.freeze`. `system` events
+  are never shown. The sentence is built from the journal and a join; no raw journal data, identifier or e-mail reaches the
+  response. An actor whose account no longer exists is named « Un ancien membre ».
+
 ## Settings (TK-97, contract 2.2.0)
 
 Settings screens (General, Members, My account). **Additive** (question B95): `member.invite`, `member.setRole` and
@@ -1429,6 +1475,13 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.7.0** (TK-92, lot A): project overview. New routes `project.overview` (`GET /projects/{projectId}/overview`) and
+  `project.activity` (`GET /projects/{projectId}/activity`); 2 routes, 114 routes and 88 paths in all. **Additive**: no
+  route removed, no input changed, no table, no migration. The phase of `project.shell`, `project.overview` and
+  `clientSpace.projects` now comes from one calculation (`phaseOf`); `clientSpace.projects` keeps its `framing` /
+  `iteration` enum and returns `iteration` as soon as a `validated` or `tagged` baseline exists (it used to wait for
+  `tagged`). The fingerprint of 2.6.0 is frozen in `packages/contract/test/contract.test.ts`. See "Project overview
+  (TK-92)".
 - **2.6.0** (TK-91, lot A): idea maturity, Synthesis and `idea-vN` versions. New routes `idea.freeze`
   (`POST /projects/{projectId}/idea/freeze`), `idea.synthesis.get` (`GET .../idea/synthesis`) and `ai.ideaSynthesis`
   (`POST .../ai/idea/synthesis`); 3 routes, 112 routes and 86 paths in all. **Additive** to `idea.list`: the listing

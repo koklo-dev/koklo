@@ -391,6 +391,22 @@ Galerie : `/dev/ui`, section « 13. Agent de l'espace Idée » (id `dev-ui-agent
 
 Page Synthèse : lecture seule, `Prose` (colonne de 680), chemin mono « idea/_synthese.md », pastille « générée » et ligne « Générée depuis idea-v1 · <date> » ; « Régénérer » (équipe, `Button outline`). Avant la première version : `EmptyState` « La synthèse sera générée quand vous passerez au cadrage. » et, pour l'équipe, « Générer un aperçu ». Un aperçu porte la mention « Aperçu, non publié ». Galerie : `/dev/ui`, section « 12. Espace Idée » (ajouts : `MaturityMeter`, `SynthesisNavItem`).
 
+### 5.11 Vue d'ensemble du projet (v2.13, TK-92, passation 03, décision 05 §2 « Lot 3 », 21 §0, maquette 07 l.66-195)
+
+| Composant | Règle |
+|---|---|
+| `SegmentedGauge` | Crans `flex-1` de hauteur 6 (cartes d'indicateur, l.118) ou 5 (cartes de livrable, l.140), rayon 2, écart 3, 12 au plus ; atteints `--primary` (ou `--status-validated-foreground` pour un livrable validé), restants `--border-strong` ; `aria-hidden`, la valeur est écrite à côté. `MaturityMeter` (§5.10, crans de 10 × 6) en est une variante. |
+| `NextStep` | Carte « Prochaine étape » (l.103-111) : `section` nommée, rayon 12, marges 16 18, tuile d'icône 40 (rayon 10), surtitre 12/600 capitales « PROCHAINE ÉTAPE », titre 15/600, phrase 13, bouton contour 36 à droite (sous 768 px : pleine largeur sous le texte, 44). Ton `warning` (`--alert-warning-*`, identiques à la planche en clair et en sombre) ; ton `neutral` (`--alert-neutral-*`) pour « Rien n'attend d'action. », sans bouton. `role="note"`. Action : lien ou bouton selon `kind`. |
+| `DeliverableCard` | `Card interactive` (l.133-145) : tuile 32 `--secondary`, nom 14/600 (`text-subsection-title`), `DeliverableStatus` à droite, contenu 13 muted, `SegmentedGauge` 5, avancement 12/400 muted à gauche, valideur à droite (`person` 600 `--foreground` pour « Validation client · obligatoire », `groups` muted sinon). Un seul lien par carte, `aria-label` complet. Variante `soon` : non interactive, statut « À faire », « Bientôt disponible », sans jauge. Sans `href` (rôle qui ne peut pas ouvrir l'écran, ex. client) : carte non interactive, jauge conservée. |
+| `DeliverableStatus` `revise` | « À revoir » : icône `edit_note`, ton `--status-revise-*` (même gabarit que les autres statuts). Prime sur « À valider ». |
+| `ActivityFeed`, `PersonRow` | Liste d'écart 14 ; ligne : `Avatar` 32 (ton `warning` client, `agent` « IA », `soft` équipe), texte 13, date relative 12 muted (l.172-179). `PersonRow` : `Avatar` 32, nom 13/500, rôle 12 muted (l.185-188). |
+| `PageStatus pill="status"` | Pastille d'état d'une page de l'Idée dans la liste du bloc principal (l.161) : « Stable » en ton `success` (icône pleine), les autres en `soft` (icône au contour), marges 0 10 0 6, icône et libellé. |
+| `TicketStatus` | `Pill md` (icône pleine, au contour en ton `neutral` comme `DeliverableStatus` : prop `iconFill` de `Pill`) : En revue (`warning`, `rate_review`), En cours (`neutral`, `smart_toy` si agent sinon `edit`), Terminé (`success`, `check_circle`), À faire (`neutral`, `radio_button_unchecked`) ; l.161. |
+| Variantes de la planche 07 | `StatCard density="comfortable"` (marges 16 / 18, écart 8, valeur 26/1,1, note 13, l.115-120) ; `ListPanel density="comfortable"` (en-tête 14 20 avec ligne, lignes 12 20 écart 14, pied 10 20, titres et sous-titres qui passent à la ligne, l.151-166) ; `IconTile fill={false}` (tuile de livrable au contour, l.136) ; `Button size="compact"` (30 de haut, marges 10, 13/500, l.180) ; initiales d'`ActivityFeed` et `PersonRow` en 11/600. |
+| Assemblage | Fil : `PhaseRail` grand dans une carte rayon 12, marges 20 24 (l.88-101). Indicateurs : grille `auto-fit minmax(200px,1fr)` écart 16, `StatCard` (`segments`, jauge à crans décorative) (l.113-122). Bloc principal : `ListPanel` (Idée, Itérations : `IdTag`, titre, ligne secondaire, statut ; pied « Les 5 éléments les plus urgents… », l.151-166) ou grille `auto-fit minmax(260px,1fr)` écart 12 des sept `DeliverableCard` (l.126-148). Colonne de droite 320 à 420 : Activité (bouton « Voir toute l'activité · N ») puis Personnes, cartes marges 16 20 (l.169-191). En-tête : `ProjectHeader`, résumé « Client : … · démarré le … », « Inviter » secondaire (équipe), action principale selon la phase (l.67-84). |
+
+La barre latérale de la planche 07 (l.30-64) est périmée : on suit la décision 05 et la coquille de TK-88 (§5.4). Les sept livrables suivent l'ordre de la décision 21 (Sécurité 5e). Galerie : `/dev/ui`, section « 14. Vue d'ensemble » (ajouts ci-dessus). Fiche : `design/screens/S-overview.md`.
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -400,6 +416,7 @@ Page Synthèse : lecture seule, `Prose` (colonne de 680), chemin mono « idea/_s
 | Change request et impact | Maquetté, **base neutre à reprendre en Indigo** |
 | Kanban des tickets | Proposé, non maquetté |
 | Fondations v2 (jetons, statuts, composants signature) | Planche « Lot 0 · Fondations v2 », clair et sombre ; galerie `/dev/ui` |
+| Vue d'ensemble du projet | Planche « Lot 3 · Vue d'ensemble » (`07-Lot3Overview.html`) ; fiche `S-overview` |
 | Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
 Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/maquettes/` (planches 05 à 25).
@@ -446,3 +463,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 08/11/2026 | v2.10 (TK-89, passation 02, maquette 06) : §5.8 espace Idée (`ReorderableList`, `PageStatus`, `StatusLegend`, `Prose`, `TaskItem`, `AvatarGroup`, rail replié par défaut) ; la jauge de maturité reste à TK-91 |
 | 08/11/2026 | v2.11 (TK-90, passation 02, maquette 06) : §5.9 agent de l'espace Idée (`AgentPanel`, `ChatBubble`, `AgentComposer`, `ProposalDiff`, `DecisionNotice`, `ProposedPageCard`, `ProposedPageList`, `AgentGapsCard`) ; icônes `explore` et `stop` ajoutées |
 | 09/11/2026 | v2.12 (TK-91, passation 02 §9, décision 05 §2 « Lot 2 », maquette 06) : §5.10 maturité, Synthèse et passage au cadrage (`MaturityMeter`, `SynthesisNavItem`, « Passer au cadrage », bandeau « Modifié depuis idea-vN ») |
+| 09/11/2026 | v2.13 (TK-92, passation 03, décision 05 §2 « Lot 3 », maquette 07) : §5.11 vue d'ensemble (`SegmentedGauge`, `NextStep`, `DeliverableCard`, `DeliverableStatus` « À revoir », `ActivityFeed`, `PersonRow`, `TicketStatus`) |
