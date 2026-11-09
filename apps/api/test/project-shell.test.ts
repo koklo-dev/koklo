@@ -85,6 +85,57 @@ describe("A3 phase dérivée", () => {
   });
 });
 
+describe("TK-91 phase : une version idea-vN fait passer l'idée au cadrage", () => {
+  const insertVersion = (
+    s: { organizationId: string; projectId: string },
+    over: { number?: number; commitSha?: string | null } = {},
+  ) =>
+    bench().database.query(
+      `INSERT INTO idea_versions (id, organization_id, project_id, number, tag, commit_sha, pages_versions, frozen_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, '{}'::jsonb, now(), now())`,
+      [
+        randomUUID(),
+        s.organizationId,
+        s.projectId,
+        over.number ?? 1,
+        `idea-v${over.number ?? 1}`,
+        over.commitSha === undefined ? "a".repeat(40) : over.commitSha,
+      ],
+    );
+
+  it("framing : une version dont le lot est commité, sans aucune fonctionnalité", async () => {
+    const s = await readScene(bench());
+    await seedIndex(bench(), s, []);
+    expect((await shellOf(s.world)).body.phase).toBe("idea");
+    await insertVersion(s);
+    expect((await shellOf(s.world)).body.phase).toBe("framing");
+  });
+
+  it("idea : une version dont le lot n'est pas encore commité ne change rien", async () => {
+    const s = await readScene(bench());
+    await seedIndex(bench(), s, []);
+    await insertVersion(s, { commitSha: null });
+    expect((await shellOf(s.world)).body.phase).toBe("idea");
+  });
+
+  it("framing : le lot commité suffit, sans passer par la liste de l'idée (réconciliation à la lecture)", async () => {
+    const s = await readScene(bench());
+    await seedIndex(bench(), s, []);
+    const batchId = randomUUID();
+    await bench().database.query(
+      `INSERT INTO spec_write_batches (id, organization_id, project_id, repo_id, branch, idempotency_key, status, commit_sha, committed_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'cadrage', $5, 'committed', $6, now(), now())`,
+      [batchId, s.organizationId, s.projectId, s.repoId, `k-${batchId}`, "b".repeat(40)],
+    );
+    await bench().database.query(
+      `INSERT INTO idea_versions (id, organization_id, project_id, number, tag, batch_id, pages_versions, frozen_at, updated_at)
+       VALUES ($1, $2, $3, 1, 'idea-v1', $4, '{}'::jsonb, now(), now())`,
+      [randomUUID(), s.organizationId, s.projectId, batchId],
+    );
+    expect((await shellOf(s.world)).body.phase).toBe("framing");
+  });
+});
+
 describe("A4 sept livrables, rien d'inventé", () => {
   it("sans fonctionnalité : sept entrées dans l'ordre, seul Fonctionnel disponible, 0 validé", async () => {
     const world = await createWorld(bench().database);

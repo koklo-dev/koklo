@@ -1,5 +1,11 @@
 import { isFeatureId, isSafeSpecPath, isValidBranchName } from "@koklo/domain";
-import { ideaDeleteSlug, ideaIndexPayload, ideaPagePayload } from "./idea-payload.ts";
+import {
+  ideaDeleteSlug,
+  ideaIndexPayload,
+  ideaPagePayload,
+  ideaSynthesisPayload,
+  ideaTagName,
+} from "./idea-payload.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
 
 const MAX_SLUG_LENGTH = 40;
@@ -10,6 +16,8 @@ export const IDEA_OPERATION_KINDS = [
   "idea.page.write",
   "idea.page.delete",
   "idea.index.write",
+  "idea.synthesis.write",
+  "idea.version.tag",
 ] as const;
 
 export const isIdeaKind = (kind: string): boolean =>
@@ -17,6 +25,7 @@ export const isIdeaKind = (kind: string): boolean =>
 
 /** Chemins du dossier `idea/` (relatifs à la racine de la spec) : le nom de fichier est le slug, sans numéro. */
 export const IDEA_INDEX_PATH = "idea/_index.yaml";
+export const IDEA_SYNTHESIS_PATH = "idea/_synthese.md";
 export const ideaPagePath = (slug: string): string => `idea/${slug}.md`;
 
 /** Slug du titre : minuscules, sans accents, `[a-z0-9-]`, 40 caractères au plus, repli `feature`. */
@@ -55,6 +64,11 @@ function ideaOperationProblem(operation: BatchOperation): string | undefined {
   if (kind === "idea.page.delete") {
     return ideaDeleteSlug(payload) === undefined ? "slug" : undefined;
   }
+  if (kind === "idea.version.tag")
+    return ideaTagName(payload) === undefined ? "payload" : undefined;
+  if (kind === "idea.synthesis.write") {
+    return ideaSynthesisPayload(payload) === undefined ? "payload" : undefined;
+  }
   if (!ideaSlugOk(kind, payload)) return "slug";
   const valid = kind === "idea.page.write" ? ideaPagePayload(payload) : ideaIndexPayload(payload);
   return valid === undefined ? "payload" : undefined;
@@ -81,6 +95,10 @@ export function integrityProblem(batch: LoadedBatch): string | undefined {
   if (!isValidBranchName(batch.branch)) return "branch";
   if (batch.repo.specPath !== null && !isSafeSpecPath(batch.repo.specPath)) return "specPath";
   const ideaLot = batch.operations.some((operation) => isIdeaKind(operation.kind));
+  // Un lot ne pose jamais deux tags : un seul commit, une seule version.
+  if (batch.operations.filter((operation) => operation.kind === "idea.version.tag").length > 1) {
+    return "payload";
+  }
   for (const operation of batch.operations) {
     const problem = operationProblem(operation, ideaLot);
     if (problem) return problem;

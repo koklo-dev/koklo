@@ -111,6 +111,12 @@ export const ideaGapsOutputSchema = z
   })
   .strict();
 
+/** Synthèse de l'idée (TK-91) : un texte Markdown sans lien, balise ni image (D6), jamais d'identité. */
+export const IDEA_SYNTHESIS_MAX = 12_000;
+export const ideaSynthesisOutputSchema = z
+  .object({ contentMd: safeText({ min: 1, max: IDEA_SYNTHESIS_MAX, multiline: true }) })
+  .strict();
+
 /** `maxFeatures` : borne appliquée à la sortie (le modèle la connaît, mais ne la fait pas respecter). */
 export const featuresOutputSchema = (maxFeatures: number) =>
   z.object({ features: z.array(featureSchema).min(1).max(maxFeatures) }).strict();

@@ -1,7 +1,13 @@
 import type { FileChange } from "@koklo/domain";
-import { EmitIdeaError, emitIdeaIndex, emitIdeaPage } from "@koklo/schema";
-import { ideaDeleteSlug, ideaIndexPayload, ideaPagePayload } from "./idea-payload.ts";
-import { IDEA_INDEX_PATH, ideaPagePath } from "./paths.ts";
+import { EmitIdeaError, emitIdeaIndex, emitIdeaPage, emitIdeaSynthesis } from "@koklo/schema";
+import {
+  ideaDeleteSlug,
+  ideaIndexPayload,
+  ideaPagePayload,
+  ideaSynthesisPayload,
+  ideaTagName,
+} from "./idea-payload.ts";
+import { IDEA_INDEX_PATH, IDEA_SYNTHESIS_PATH, ideaPagePath } from "./paths.ts";
 import { toStoredReport } from "./report.ts";
 import { type BatchOperation, failed, type Outcome } from "./types.ts";
 
@@ -48,6 +54,25 @@ function emitted(path: string, build: () => string): FileChange | IdeaPlan {
 
 const isPlan = (value: FileChange | IdeaPlan): value is IdeaPlan => "outcome" in value;
 
+function record(draft: Draft, path: string, change: FileChange | IdeaPlan): IdeaPlan | undefined {
+  if (isPlan(change)) return change;
+  draft.changes.set(path, change);
+  return undefined;
+}
+
+function applySynthesis(draft: Draft, payload: BatchOperation["payload"]): IdeaPlan | undefined {
+  const synthesis = ideaSynthesisPayload(payload);
+  if (synthesis === undefined) return payloadError();
+  const change = emitted(IDEA_SYNTHESIS_PATH, () =>
+    emitIdeaSynthesis({
+      source: synthesis.source,
+      updatedAt: synthesis.generatedAt,
+      contentMd: synthesis.contentMd,
+    }),
+  );
+  return record(draft, IDEA_SYNTHESIS_PATH, change);
+}
+
 function applyOperation(draft: Draft, operation: BatchOperation): IdeaPlan | undefined {
   const { kind, payload } = operation;
   if (kind === "idea.page.delete") {
@@ -56,6 +81,10 @@ function applyOperation(draft: Draft, operation: BatchOperation): IdeaPlan | und
     draft.removals.push(ideaPagePath(slug));
     return undefined;
   }
+  // Le tag n'écrit aucun fichier : le worker le pose après le commit (`execute.ts`).
+  if (kind === "idea.version.tag")
+    return ideaTagName(payload) === undefined ? payloadError() : undefined;
+  if (kind === "idea.synthesis.write") return applySynthesis(draft, payload);
   const page = kind === "idea.page.write" ? ideaPagePayload(payload) : undefined;
   const index = kind === "idea.index.write" ? ideaIndexPayload(payload) : undefined;
   if (page === undefined && index === undefined) return payloadError();
@@ -63,9 +92,7 @@ function applyOperation(draft: Draft, operation: BatchOperation): IdeaPlan | und
   const change = emitted(path, () =>
     page ? emitIdeaPage(page) : emitIdeaIndex({ structure: STRUCTURE, pages: index?.pages ?? [] }),
   );
-  if (isPlan(change)) return change;
-  draft.changes.set(path, change);
-  return undefined;
+  return record(draft, path, change);
 }
 
 /**

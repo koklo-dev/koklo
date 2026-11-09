@@ -61,14 +61,27 @@ export class SpecBatchService {
     return batch.id;
   }
 
+  /**
+   * Refus d'avant-lot (dépôt de spec absent : `NOT_FOUND` ; aucun fournisseur : `PROVIDER_UNAVAILABLE`), sans rien
+   * écrire : permet de s'arrêter avant un appel coûteux (la Synthèse du passage au cadrage, TK-91).
+   */
+  async ensureWritable(scope: ProjectScope): Promise<void> {
+    await this.planned(scope);
+  }
+
+  private async planned(scope: ProjectScope): Promise<SpecBatchPlan> {
+    const plan = await this.repository.plan(scope);
+    if (this.provider === null) throw new ORPCError("PROVIDER_UNAVAILABLE");
+    return plan;
+  }
+
   /** Dépôt de spec, fournisseur, puis lot enregistré (une transaction) ; une clé réutilisée est refusée. */
   private async register(
     scope: ProjectScope,
     role: string,
     build: (plan: SpecBatchPlan) => PreparedBatch,
   ): Promise<BatchRecord> {
-    const plan = await this.repository.plan(scope);
-    if (this.provider === null) throw new ORPCError("PROVIDER_UNAVAILABLE");
+    const plan = await this.planned(scope);
     const created = await this.repository.create(scope, role, plan, build(plan));
     if (created.kind === "reused") throw reusedKey(created.batchId);
     return created.batch;

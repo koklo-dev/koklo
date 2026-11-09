@@ -138,6 +138,8 @@ export function installIdeaAgent(hooks: {
 }
 
 // --- Réponses simulées du modèle ---
+export const SYNTHESIS_TEXT =
+  "## Résumé\n\nUn outil de cadrage pour les agences.\n\n## Public visé\n\nLes chefs de projet.";
 export const CHAT_TEXT = "Pour qui est ce produit, et quel problème résout-il ?";
 export const proposalReply = (...proposals: Record<string, unknown>[]) => ({ proposals });
 export const aProposal = (over: Record<string, unknown> = {}) => ({
@@ -152,7 +154,7 @@ export const aProposal = (over: Record<string, unknown> = {}) => ({
 
 /** Modèle simulé : texte pour le flux, JSON pour les propositions et les manques, selon la finalité. */
 export function scripted(
-  opts: { text?: string; proposals?: unknown; gaps?: unknown } = {},
+  opts: { text?: string; proposals?: unknown; gaps?: unknown; synthesis?: unknown } = {},
 ): FakeLlm {
   const fake = new FakeLlm();
   const when = (purpose: string) => (call: { trace: { purpose: string } }) =>
@@ -167,6 +169,7 @@ export function scripted(
     "idea-gaps",
     opts.gaps ?? { items: [{ page: "Vision", text: "Le public visé n'est pas dit." }] },
   );
+  always("idea-synthesis", opts.synthesis ?? { contentMd: SYNTHESIS_TEXT });
   return fake;
 }
 

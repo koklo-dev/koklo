@@ -8,6 +8,8 @@ export interface ShellRecord {
   name: string;
   featureCount: number;
   validatedBaselines: number;
+  /** Versions `idea-vN` dont le lot est commité (TK-91). */
+  ideaVersions: number;
   /** Tickets du sprint actif ; `null` sans sprint actif. */
   activeSprintTickets: number | null;
 }

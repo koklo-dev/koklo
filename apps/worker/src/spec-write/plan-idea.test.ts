@@ -1,5 +1,6 @@
-import { checkSpec, emitIdeaIndex, emitIdeaPage } from "@koklo/schema";
+import { checkSpec, emitIdeaIndex, emitIdeaPage, emitIdeaSynthesis } from "@koklo/schema";
 import { describe, expect, it } from "vitest";
+import { ideaTagOf } from "./idea-payload.ts";
 import { integrityProblem } from "./paths.ts";
 import { planBatch } from "./plan.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
@@ -201,6 +202,141 @@ describe("integrityProblem : opérations idea.*", () => {
     ).toBe("payload");
     const mixed = [
       ...publish(SLUGS),
+      { position: 9, kind: "feature.create", targetSpecId: "F-001", payload: {} },
+    ];
+    expect(integrityProblem(batch(mixed))).toBe("kind");
+  });
+});
+
+const synthesisPayload = (over: Record<string, unknown> = {}) => ({
+  contentMd: "## Résumé\n\nUn outil de cadrage.\n",
+  source: "idea-v1",
+  generatedAt: "2026-11-09T10:00:00.000Z",
+  ...over,
+});
+const freezeLot = (tag = "idea-v1") => [
+  ...publish(SLUGS),
+  op("idea.synthesis.write", synthesisPayload({ source: tag })),
+  op("idea.version.tag", { name: tag }),
+];
+
+describe("planBatch : passage au cadrage (TK-91)", () => {
+  it("écrit idea/_synthese.md, signalé généré, avec la version source", () => {
+    const result = changes(plan(freezeLot("idea-v3")));
+    const file = result.find((change) => change.path === "idea/_synthese.md");
+    expect(file).toEqual({
+      path: "idea/_synthese.md",
+      content: emitIdeaSynthesis({
+        source: "idea-v3",
+        updatedAt: "2026-11-09T10:00:00.000Z",
+        contentMd: "## Résumé\n\nUn outil de cadrage.\n",
+      }),
+    });
+    const content = (file as { content: string }).content;
+    expect(content).toContain("genere: true");
+    expect(content).toContain("source: idea-v3");
+    expect(content).toContain("mis_a_jour: 2026-11-09");
+  });
+
+  it("le tag n'écrit aucun fichier : pages, index et Synthèse seulement", () => {
+    const paths = changes(plan(freezeLot())).map((change) => change.path);
+    expect(paths.sort()).toEqual([
+      "idea/_index.yaml",
+      "idea/_synthese.md",
+      "idea/perimetre.md",
+      "idea/probleme.md",
+      "idea/vision.md",
+    ]);
+  });
+
+  it("une Synthèse qui contient un NUL donne SPEC_INVALID sans changement", () => {
+    const bad = [
+      ...publish(SLUGS),
+      op("idea.synthesis.write", synthesisPayload({ contentMd: "a\u0000b" })),
+    ];
+    expect(plan(bad)).toMatchObject({ outcome: { status: "failed", errorCode: "SPEC_INVALID" } });
+  });
+
+  it("une publication ordinaire n'a pas de Synthèse et ne touche pas à celle qui existe", () => {
+    const result = changes(plan(publish(SLUGS), [{ path: "idea/_synthese.md", content: "x" }]));
+    expect(result.some((change) => change.path === "idea/_synthese.md")).toBe(false);
+  });
+
+  it("checkSpec ne dit rien de plus avec idea/_synthese.md", () => {
+    const files = changes(plan(freezeLot())).flatMap((change) =>
+      "content" in change ? [{ path: change.path, content: change.content }] : [],
+    );
+    expect(checkSpec(files).issues).toEqual([]);
+  });
+});
+
+describe("ideaTagOf : le nom du tag est revalidé par le worker", () => {
+  const tagOps = (name: unknown) => [op("idea.version.tag", { name })];
+
+  it.each(["idea-v1", "idea-v12", "idea-v9999"])("accepte %s", (name) => {
+    expect(ideaTagOf(tagOps(name))).toBe(name);
+  });
+
+  it.each([
+    "idea-v0",
+    "idea-v01",
+    "idea-v10000",
+    "../x",
+    "idea-v1\n",
+    "v1",
+    "IDEA-v1",
+    "",
+    1,
+    null,
+  ])("refuse %j", (name) => {
+    expect(ideaTagOf(tagOps(name))).toBeUndefined();
+  });
+
+  it("un lot sans opération de tag n'a pas de tag", () => {
+    expect(ideaTagOf(publish(SLUGS))).toBeUndefined();
+  });
+});
+
+describe("integrityProblem : opérations de Synthèse et de tag (TK-91)", () => {
+  const batch = (operations: BatchOperation[]): LoadedBatch =>
+    ({ branch: "cadrage", repo: { specPath: null }, operations }) as unknown as LoadedBatch;
+
+  it("accepte un lot de passage au cadrage", () => {
+    expect(integrityProblem(batch(freezeLot()))).toBeUndefined();
+  });
+
+  it.each(["idea-v0", "idea-v01", "idea-v10000", "../x", "idea-v1\n", "", 3])(
+    "refuse le tag %j avant tout appel au fournisseur",
+    (name) => {
+      expect(integrityProblem(batch([...publish(SLUGS), op("idea.version.tag", { name })]))).toBe(
+        "payload",
+      );
+    },
+  );
+
+  it("refuse deux tags dans un lot, un tag sans nom et une Synthèse mal formée", () => {
+    expect(
+      integrityProblem(batch([...freezeLot(), op("idea.version.tag", { name: "idea-v2" })])),
+    ).toBe("payload");
+    expect(integrityProblem(batch([op("idea.version.tag", {})]))).toBe("payload");
+    for (const over of [
+      { source: "brouillon" },
+      { source: "idea-v0" },
+      { contentMd: 3 },
+      { generatedAt: "demain" },
+      { generatedAt: 5 },
+    ]) {
+      expect(
+        integrityProblem(
+          batch([...publish(SLUGS), op("idea.synthesis.write", synthesisPayload(over))]),
+        ),
+      ).toBe("payload");
+    }
+  });
+
+  it("ne se mélange pas avec des features", () => {
+    const mixed = [
+      op("idea.version.tag", { name: "idea-v1" }),
       { position: 9, kind: "feature.create", targetSpecId: "F-001", payload: {} },
     ];
     expect(integrityProblem(batch(mixed))).toBe("kind");

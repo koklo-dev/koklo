@@ -11,6 +11,7 @@ const RECENT_BATCHES = 20;
  * lot B pourra déplacer cette écriture dans le worker sans changer le contrat.
  */
 export async function reconcilePublications(tx: Tx, scope: ProjectScope, now: Date): Promise<void> {
+  await reconcileIdeaVersions(tx, scope, now);
   const batches = await tx.specWriteBatch.findMany({
     where: {
       projectId: scope.projectId,
@@ -55,4 +56,51 @@ function versionsOf(payload: unknown): object {
   return typeof versions === "object" && versions !== null && !Array.isArray(versions)
     ? versions
     : {};
+}
+
+/** Une version sans lot (passage interrompu avant l'enfilage) est abandonnée après ce délai. */
+export const ABANDONED_VERSION_MS = 5 * 60_000;
+
+/**
+ * Versions figées (TK-91, B259) : une version dont le lot est `committed` reçoit son commit ; une dont le lot a échoué
+ * (`failed`, `conflict`) ou a disparu est supprimée, pour que la numérotation reste sans trou ; une version qui n'a
+ * jamais reçu de lot est abandonnée au bout de 5 minutes. Idempotent.
+ */
+export async function reconcileIdeaVersions(tx: Tx, scope: ProjectScope, now: Date): Promise<void> {
+  const open = await tx.ideaVersion.findMany({
+    where: { projectId: scope.projectId, commitSha: null },
+    select: { id: true, batchId: true, frozenAt: true },
+  });
+  if (open.length === 0) return;
+  const batches = await tx.specWriteBatch.findMany({
+    where: {
+      projectId: scope.projectId,
+      id: { in: open.flatMap((version) => version.batchId ?? []) },
+    },
+    select: { id: true, status: true, commitSha: true },
+  });
+  const byId = new Map(batches.map((batch) => [batch.id, batch]));
+  const dropped: string[] = [];
+  for (const version of open) {
+    const batch = version.batchId === null ? undefined : byId.get(version.batchId);
+    if (batch?.status === "committed" && batch.commitSha !== null) {
+      await tx.ideaVersion.update({
+        where: { id: version.id },
+        data: { commitSha: batch.commitSha },
+      });
+    } else if (isLost(version, batch, now)) {
+      dropped.push(version.id);
+    }
+  }
+  if (dropped.length > 0) await tx.ideaVersion.deleteMany({ where: { id: { in: dropped } } });
+}
+
+function isLost(
+  version: { batchId: string | null; frozenAt: Date },
+  batch: { status: string } | undefined,
+  now: Date,
+): boolean {
+  if (version.batchId === null)
+    return now.getTime() - version.frozenAt.getTime() > ABANDONED_VERSION_MS;
+  return batch === undefined || batch.status === "failed" || batch.status === "conflict";
 }

@@ -35,6 +35,7 @@ import {
   recordsOf,
   SUMMARY,
 } from "./prisma-idea-helpers.ts";
+import { maturityOf } from "./prisma-idea-maturity.ts";
 import { PROPOSAL, proposalRecord, staleProposalsOf } from "./prisma-idea-proposal-helpers.ts";
 
 const DAY_MS = 86_400_000;
@@ -87,6 +88,7 @@ export class PrismaIdeaRepository implements IdeaRepository {
         hasSpecRepo: repo !== null,
         lastPublication: last,
         pendingPageProposals: pending.filter((proposal) => proposal.op === "create_page"),
+        ...(await maturityOf(tx, scope, pages)),
       };
     });
   }
@@ -320,6 +322,10 @@ export class PrismaIdeaRepository implements IdeaRepository {
         scope.organizationId,
         contributions.map((c) => c.userId),
       );
+      const synthesis = await tx.ideaSynthesis.findUnique({
+        where: { projectId: scope.projectId },
+        select: { contentMd: true, source: true, generatedAt: true },
+      });
       const published = Object.keys((last?.pagesVersions ?? {}) as Record<string, unknown>);
       const active = new Set(rows.map((row) => row.slug));
       return {
@@ -331,6 +337,8 @@ export class PrismaIdeaRepository implements IdeaRepository {
             .flatMap((c) => names.get(c.userId)?.name ?? [])
             .sort(),
         })),
+        // Un aperçu (source vide) n'est jamais publié.
+        synthesis: synthesis?.source ? synthesis : null,
         removedSlugs: published.filter((slug) => !active.has(slug)).sort(),
         contributorUserIds: [
           ...new Set(

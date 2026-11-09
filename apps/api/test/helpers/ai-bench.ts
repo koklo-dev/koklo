@@ -12,10 +12,12 @@ import {
 } from "@koklo/domain";
 import { FakeLlm } from "@koklo/domain/testing";
 import type { INestApplication } from "@nestjs/common";
+import type { TestingModuleBuilder } from "@nestjs/testing";
 import request from "supertest";
 import type { AiLimits } from "../../src/ai/ai-budget.ts";
 import { AI_ADAPTERS, AI_CATALOG } from "../../src/ai/ai-tokens.ts";
 import { NONCE_SOURCE, type NonceSource } from "../../src/ai/nonce.ts";
+import { SpecWriteQueue } from "../../src/spec-batch/spec-write.queue.ts";
 import { createSeededDatabase } from "./app.ts";
 import { ENCRYPTION_KEY } from "./installations.ts";
 import { ManualClock } from "./leases.ts";
@@ -75,6 +77,19 @@ export const WIDE_LIMITS: AiLimits = {
   maxVerifyPerHourOrg: 1000,
   maxConcurrentPerOrg: 10,
 };
+
+/**
+ * File `spec-write` du banc : aucun worker ne tourne ici (il créerait la file pg-boss). Elle retient les lots
+ * enfilés, que les tests de l'espace Idée (TK-91) règlent à la main en base.
+ */
+export class RecordingSpecQueue {
+  enqueued: string[] = [];
+
+  enqueue(batch: { id: string }): Promise<void> {
+    this.enqueued.push(batch.id);
+    return Promise.resolve();
+  }
+}
 
 /** Nonces déterministes, uniques par appel (48 hexadécimaux) ; tout appel de `next()` est compté. */
 export class ScriptedNonces implements NonceSource {
@@ -194,6 +209,7 @@ export class PurposeLlm implements LlmProvider {
       "idea-chat": "Pour qui est ce produit ?",
       "idea-propose": { proposals: [] },
       "idea-gaps": { items: [] },
+      "idea-synthesis": { contentMd: "## Résumé\n\nUne synthèse." },
     };
     const reply = replies[request.trace.purpose];
     return FakeLlm.replying(reply).complete(request);
@@ -207,6 +223,8 @@ export class PurposeLlm implements LlmProvider {
 export interface AiBench extends RepoBench {
   provider: SwitchableProvider;
   nonces: ScriptedNonces;
+  /** Lots de spec enfilés (aucun worker au banc). */
+  queue: RecordingSpecQueue;
   /** Journaux (niveau info) de l'application principale. */
   lines: string[];
   /** Application sans porte-clés (`KOKLO_ENCRYPTION_KEY` absente). */
@@ -226,6 +244,29 @@ export interface AiBench extends RepoBench {
   }): Promise<INestApplication>;
 }
 
+/**
+ * Doubles du banc : nonces déterministes, file `spec-write` muette et, sauf `defaultRegistry` (adaptateurs de
+ * production, SDK et `fetch` global, catalogue de lancement), adaptateurs et catalogue de test.
+ */
+function withDoubles(
+  builder: TestingModuleBuilder,
+  doubles: { nonces: ScriptedNonces; queue: RecordingSpecQueue; provider: SwitchableProvider },
+  defaultRegistry: boolean,
+): TestingModuleBuilder {
+  const withNonces = builder
+    .overrideProvider(NONCE_SOURCE)
+    .useValue(doubles.nonces)
+    .overrideProvider(SpecWriteQueue)
+    .useValue(doubles.queue);
+  return defaultRegistry
+    ? withNonces
+    : withNonces
+        .overrideProvider(AI_ADAPTERS)
+        .useValue((id: LlmProviderId) => doubles.provider.forProvider(id))
+        .overrideProvider(AI_CATALOG)
+        .useValue({ list: () => TEST_CATALOG });
+}
+
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 export function installAiBench(hooks: {
   beforeAll: (fn: () => Promise<void>, timeout?: number) => void;
@@ -243,6 +284,7 @@ export function installAiBench(hooks: {
     const credentials = new TestCredentialsStore();
     const provider = new SwitchableProvider();
     const nonces = new ScriptedNonces();
+    const queue = new RecordingSpecQueue();
     const lines: string[] = [];
     const build = (over: Parameters<AiBench["makeApp"]>[0] = {}) =>
       createRepoApp(database.url, {
@@ -254,17 +296,8 @@ export function installAiBench(hooks: {
           : { encryptionKey: over.encryptionKey ?? ENCRYPTION_KEY }),
         logStream: over.logStream ?? { write: (line: string) => void lines.push(line) },
         config: { ai: { ...WIDE_LIMITS, ...(over.limits ?? {}) } },
-        configure: (builder) => {
-          const withNonces = builder.overrideProvider(NONCE_SOURCE).useValue(nonces);
-          // `defaultRegistry` : les adaptateurs de production (SDK, `fetch` global) et le catalogue de lancement.
-          return over.defaultRegistry
-            ? withNonces
-            : withNonces
-                .overrideProvider(AI_ADAPTERS)
-                .useValue((id: LlmProviderId) => provider.forProvider(id))
-                .overrideProvider(AI_CATALOG)
-                .useValue({ list: () => TEST_CATALOG });
-        },
+        configure: (builder) =>
+          withDoubles(builder, { nonces, queue, provider }, over.defaultRegistry === true),
       });
     const app = await build();
     const appWithoutKey = await build({ encryptionKey: null });
@@ -277,6 +310,7 @@ export function installAiBench(hooks: {
       credentials,
       provider,
       nonces,
+      queue,
       lines,
       use: (next) => {
         provider.target = next;
@@ -304,6 +338,7 @@ export function installAiBench(hooks: {
     bench.provider.keysSeen = [];
     bench.provider.byProvider.clear();
     bench.nonces.reset();
+    bench.queue.enqueued = [];
     bench.lines.length = 0;
     await bench.database.query("DELETE FROM audit_fail");
   });

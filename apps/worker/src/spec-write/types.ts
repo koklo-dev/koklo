@@ -59,9 +59,15 @@ export interface StoredReport {
   readonly issues: readonly ReportIssue[];
 }
 
+export interface CommittedOutcome {
+  readonly status: "committed";
+  readonly commitSha: string;
+  readonly report?: StoredReport;
+}
+
 /** Résultat final d'un lot : écrit sur la ligne, le job termine normalement. */
 export type Outcome =
-  | { readonly status: "committed"; readonly commitSha: string; readonly report?: StoredReport }
+  | CommittedOutcome
   | {
       readonly status: "failed" | "conflict";
       readonly errorCode: SpecBatchErrorCode;

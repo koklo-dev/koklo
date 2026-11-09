@@ -23,6 +23,20 @@ export interface IdeaIndexPayload {
   readonly contributorUserIds: readonly string[];
 }
 
+/** Étiquette de version construite par l'API (`idea-v<1..9999>`), jamais saisie : revalidée avant de poser le tag. */
+const IDEA_TAG = /^idea-v[1-9][0-9]{0,3}$/;
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T/;
+const SYNTHESIS_MAX = 50_000;
+
+export interface IdeaSynthesisPayload {
+  readonly contentMd: string;
+  readonly source: string;
+  readonly generatedAt: string;
+}
+
+export const isIdeaTag = (value: unknown): value is string =>
+  typeof value === "string" && IDEA_TAG.test(value);
+
 export const isIdeaSlug = (value: unknown): value is string =>
   typeof value === "string" && SLUG.test(value);
 
@@ -88,4 +102,30 @@ export function contributorIdsOf(
     .filter((operation) => operation.kind === "idea.index.write")
     .flatMap((operation) => ideaIndexPayload(operation.payload)?.contributorUserIds ?? []);
   return [...new Set(ids)];
+}
+
+/** `idea.synthesis.write` : le texte généré, la version qui le porte et l'instant de génération. */
+export function ideaSynthesisPayload(
+  payload: Record<string, unknown>,
+): IdeaSynthesisPayload | undefined {
+  const { contentMd, source, generatedAt } = payload;
+  if (typeof contentMd !== "string" || contentMd.length > SYNTHESIS_MAX) return undefined;
+  if (!isIdeaTag(source)) return undefined;
+  if (typeof generatedAt !== "string" || !ISO_INSTANT.test(generatedAt)) return undefined;
+  if (Number.isNaN(Date.parse(generatedAt))) return undefined;
+  return { contentMd, source, generatedAt };
+}
+
+/** `idea.version.tag` : le nom du tag à poser après le commit. */
+export const ideaTagName = (payload: Record<string, unknown>): string | undefined =>
+  isIdeaTag(payload.name) ? payload.name : undefined;
+
+/** Tag du lot (le premier `idea.version.tag` valide), `undefined` si le lot n'en demande pas. */
+export function ideaTagOf(
+  operations: readonly { kind: string; payload: Record<string, unknown> }[],
+): string | undefined {
+  for (const operation of operations) {
+    if (operation.kind === "idea.version.tag") return ideaTagName(operation.payload);
+  }
+  return undefined;
 }
