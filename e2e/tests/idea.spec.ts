@@ -94,7 +94,7 @@ test.describe("équipe", () => {
     );
     await expect(
       page.getByRole("navigation", { name: "Pages du dossier" }).getByRole("link"),
-    ).toHaveCount(10);
+    ).toHaveCount(11); // la Synthèse puis les dix pages du dossier
     await expect(page.getByText("idea/perimetre.md")).toBeVisible();
     await write(page, "Réserver un créneau sans compte.");
     await expect(page.getByText("Brouillon enregistré")).toBeVisible();
@@ -435,4 +435,81 @@ test.describe("captures de chaque état", () => {
       });
     }
   }
+});
+
+/** TK-91 lot B : maturité, passage au cadrage et Synthèse contre la vraie pile (faux fournisseur Git, sans clé d'IA). */
+interface ListedIdea {
+  pages: Array<{ id: string; required: boolean }>;
+  maturity: { stable: number; total: number; missingRequired: string[] };
+  version: { latest: { tag: string; commitSha: string } | null; modifiedSince: boolean };
+}
+
+async function listIdea(owner: APIRequestContext, projectId: string): Promise<ListedIdea> {
+  return (await (await owner.get(`${ORPC}/projects/${projectId}/idea/pages`)).json()) as ListedIdea;
+}
+
+async function makeRequiredStable(owner: APIRequestContext, projectId: string): Promise<void> {
+  const required = (await listIdea(owner, projectId)).pages.filter((p) => p.required);
+  for (const page of required) {
+    // Une page vide ne peut être qu'en brouillon : on lui donne un texte avant de la dire stable.
+    const detail = (await (
+      await owner.get(`${ORPC}/projects/${projectId}/idea/pages/${page.id}`)
+    ).json()) as { version: number };
+    const written = await owner.put(`${ORPC}/projects/${projectId}/idea/pages/${page.id}/content`, {
+      data: { baseVersion: detail.version, contentMd: "Contenu de la page.\n" },
+    });
+    expect(written.ok(), await written.text()).toBe(true);
+    const done = await owner.post(`${ORPC}/projects/${projectId}/idea/pages/${page.id}/status`, {
+      data: { status: "stable" },
+    });
+    expect(done.ok(), await done.text()).toBe(true);
+  }
+}
+
+test.describe("passage au cadrage (TK-91)", () => {
+  test("équipe : seuil, passage, tag idea-v1, Spec · Fonctionnel, Synthèse non générée sans clé d'IA", async ({
+    page,
+  }) => {
+    const { workspace, owner, projectId } = await space();
+    await signIn(page, workspace.owner);
+    await open(page, projectId);
+    await expect(page.getByRole("button", { name: "Passer au cadrage" })).toBeDisabled();
+    await expect(page.getByText(/Pour passer au cadrage, il manque : /)).toBeVisible();
+    await makeRequiredStable(owner, projectId);
+    await page.reload();
+    const freeze = page.getByRole("button", { name: "Passer au cadrage" });
+    await expect(freeze).toBeEnabled();
+    expect(await violations(page)).toEqual([]);
+    await freeze.click();
+    const confirm = page.getByRole("button", { name: "Passer quand même" });
+    if (await confirm.isVisible().catch(() => false)) await confirm.click();
+    await page.waitForURL(`**/projects/${projectId}/spec/functional**`, { timeout: 60_000 });
+    const listed = await listIdea(owner, projectId);
+    expect(listed.version.latest?.tag).toBe("idea-v1");
+    expect(listed.version.latest?.commitSha).toMatch(/^[0-9a-f]{7,40}$/);
+    expect(listed.version.modifiedSince).toBe(false);
+    await page.goto(ideaUrl(projectId, "synthese"));
+    await expect(page.getByText(/n'a pas été générée avec idea-v1/)).toBeVisible();
+    expect(await violations(page)).toEqual([]);
+    await capture(page, "cadrage-synthese-reelle");
+  });
+
+  test("client : jauge seule, ni bouton ni Régénérer, et le serveur refuse le passage", async ({
+    page,
+  }) => {
+    const { workspace, owner, projectId } = await space();
+    await linkClientToProject(owner, projectId, workspace.client);
+    await makeRequiredStable(owner, projectId);
+    await signIn(page, workspace.client);
+    await open(page, projectId);
+    await expect(page.getByRole("meter", { name: "Maturité du dossier" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Passer au cadrage" })).toHaveCount(0);
+    const client = await apiAs(baseURL, workspace.client);
+    const refused = await client.post(`${ORPC}/projects/${projectId}/idea/freeze`, {
+      data: { idempotencyKey: "idea-freeze-client-forge" },
+    });
+    expect(refused.status()).toBe(403);
+    const regenerate = await client.post(`${ORPC}/projects/${projectId}/ai/idea/synthesis`, {});
+    expect(regenerate.status()).toBe(403);
+  });
 });

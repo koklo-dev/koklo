@@ -11,6 +11,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
  * - `replace` : un remplacement ;   `pagePending` : une page proposée et une proposition ;   `pagesMany` : cinq pages proposées ;   `stale` : proposition périmée ;
  * - `hostile` : proposition pleine de HTML, de liens et d'images ;   `notConfigured` : pas de clé d'IA ;
  * - `rateLimited` : l'envoi est refusé (429) ;   `streaming` : le flux reste ouvert jusqu'à POST /__release.
+ *
+ * Cadrage (TK-91) : dépôt relié, maturité calculée sur les pages ;
+ * - `framingReady` : pages requises stables ;   `framingQuestions` : idem + 2 questions ouvertes ;
+ * - `framed` : version idea-v1 figée et Synthèse générée ;   `modified` : idem, modifiée depuis ;
+ * - `framedNoSynthesis` : version figée sans Synthèse ;   `freezeFails` : le lot de passage échoue ;
+ * - `synthesisFails` : « Régénérer » échoue ;   `preview` : dépôt relié, rien de figé, pas de Synthèse.
  */
 export type IdeaMode =
   | "empty"
@@ -24,7 +30,15 @@ export type IdeaMode =
   | "hostile"
   | "notConfigured"
   | "rateLimited"
-  | "streaming";
+  | "streaming"
+  | "framingReady"
+  | "framingQuestions"
+  | "framed"
+  | "modified"
+  | "framedNoSynthesis"
+  | "freezeFails"
+  | "synthesisFails"
+  | "preview";
 export type IdeaScenario = { idea?: IdeaMode };
 
 export const IDEA_PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
@@ -104,6 +118,50 @@ const seedPages = (): Page[] => [
       "Ce qui entre dans la première version du portail.\n\n### Première version\n\n- Réserver un créneau\n- Annuler une réservation\n\n### Plus tard\n\n- Programme de fidélité\n",
   },
 ];
+
+const FRAMING_MODES: IdeaMode[] = [
+  "framingReady",
+  "framingQuestions",
+  "framed",
+  "modified",
+  "framedNoSynthesis",
+  "freezeFails",
+  "synthesisFails",
+  "preview",
+];
+const ALL_STABLE: IdeaMode[] = [
+  "framingReady",
+  "framingQuestions",
+  "framed",
+  "modified",
+  "framedNoSynthesis",
+  "freezeFails",
+  "synthesisFails",
+];
+const FREEZE_BATCH = "01900000-0000-7000-8000-0000000009f1";
+const SYNTHESIS_TEXT =
+  "## Vision\n\nUn portail pour réserver sans appeler l'accueil.\n\n## Périmètre\n\n- Réserver un créneau\n- Annuler une réservation";
+
+interface Framing {
+  version: number;
+  modified: boolean;
+  openQuestions: number;
+  synthesis: { contentMd: string; source: string | null; generatedAt: string } | null;
+  batch: { reads: number; status: string; key: string } | null;
+  freezes: unknown[];
+}
+let framing: Framing = {
+  version: 0,
+  modified: false,
+  openQuestions: 0,
+  synthesis: null,
+  batch: null,
+  freezes: [],
+};
+
+/** Phase du projet de l'Idée dans la coquille : « idea » tant que rien n'est figé (modes de cadrage seulement). */
+export const ideaPhase = (): "idea" | "framing" =>
+  FRAMING_MODES.includes(mode) && framing.version === 0 ? "idea" : "framing";
 
 let pages: Page[] = seedPages();
 let proposals: Proposal[] = [];
@@ -228,6 +286,22 @@ export function resetIdea(scenario: IdeaScenario): void {
     hostile: [proposal(1, { contentMd: hostileText, rationale: "<b>important</b>" })],
   };
   proposals = base[mode] ?? [];
+  resetFraming();
+}
+
+function resetFraming(): void {
+  const stable = ALL_STABLE.includes(mode);
+  if (stable) for (const p of pages) p.status = "stable";
+  const framed = ["framed", "modified", "synthesisFails"].includes(mode);
+  const generatedAt = "2026-11-08T10:00:00.000Z";
+  framing = {
+    version: framed || mode === "framedNoSynthesis" ? 1 : 0,
+    modified: mode === "modified",
+    openQuestions: mode === "framingQuestions" ? 2 : 0,
+    synthesis: framed ? { contentMd: SYNTHESIS_TEXT, source: "idea-v1", generatedAt } : null,
+    batch: null,
+    freezes: [],
+  };
 }
 
 type Reply = { status: number; body: string };
@@ -252,11 +326,31 @@ const summary = (p: Page) => ({
   deletedAt: null,
 });
 const withContent = (p: Page) => ({ ...summary(p), contentMd: p.contentMd });
+const maturity = () => ({
+  stable: pages.filter((p) => p.status === "stable").length,
+  total: pages.length,
+  missingRequired: pages.filter((p) => p.required && p.status !== "stable").map((p) => p.title),
+  openQuestions: framing.openQuestions,
+});
+const versionView = () => ({
+  latest:
+    framing.version > 0
+      ? {
+          number: framing.version,
+          tag: `idea-v${framing.version}`,
+          commitSha: "abc1234def5678abc1234def5678abc1234def56",
+          frozenAt: "2026-11-08T10:00:00.000Z",
+        }
+      : null,
+  modifiedSince: framing.modified,
+});
 const listed = () => ({
   pages: pages.map((p) => ({ ...summary(p), pendingProposals: open(p.id).length })),
   trash: [],
   total: pages.length,
-  publication: { available: false, last: null },
+  publication: { available: FRAMING_MODES.includes(mode), last: null },
+  maturity: maturity(),
+  version: versionView(),
   pendingPageProposals: proposals
     .filter((p) => p.op === "create_page" && p.status === "pending")
     .map(view),
@@ -410,6 +504,7 @@ function readBody(req: IncomingMessage, done: (body: Record<string, unknown>) =>
   req.on("end", () => done(JSON.parse(raw || "{}")));
 }
 
+const TEAM_ONLY = new Set(["/idea/freeze", "/ai/idea/synthesis"]);
 const lockedOut = (role: string | undefined): boolean => role === "business";
 
 function messageList() {
@@ -427,6 +522,7 @@ function savePage(id: string, body: Record<string, unknown>): Reply {
   if (!page) return typed(404, "NOT_FOUND");
   page.contentMd = String(body.contentMd);
   page.version += 1;
+  if (framing.version > 0) framing.modified = true;
   for (const other of proposals)
     if (other.pageId === page.id && other.status === "pending") other.status = "stale";
   return reply(200, withContent(page));
@@ -440,9 +536,63 @@ function read(rest: string, role: string | undefined): Reply {
     return reply(200, { configured: mode !== "notConfigured", canConfigure });
   }
   if (rest === "/idea/messages") return messageList();
+  if (rest === "/idea/synthesis") return reply(200, framing.synthesis);
   const id = /^\/idea\/pages\/([^/]+)$/.exec(rest)?.[1];
   const found = pages.find((p) => p.id === id);
   return found ? reply(200, detail(found)) : typed(404, "NOT_FOUND");
+}
+
+/** Passage au cadrage : un lot qui se commit à la deuxième relecture (ou échoue en `freezeFails`). */
+function freeze(body: Record<string, unknown>): Reply {
+  framing.freezes.push(body);
+  const tag = `idea-v${framing.version + 1}`;
+  framing.batch ??= { reads: 0, status: "queued", key: String(body.idempotencyKey) };
+  return reply(200, { batchId: FREEZE_BATCH, tag, synthesis: "generated" });
+}
+
+/** Relecture du lot de passage : en cours, puis commité (version figée, Synthèse écrite) ou en échec. */
+function freezeBatch(): Reply {
+  const batch = framing.batch;
+  if (!batch) return typed(404, "NOT_FOUND");
+  batch.reads += 1;
+  if (batch.reads >= 2 && batch.status !== "committed" && batch.status !== "failed") {
+    if (mode === "freezeFails") batch.status = "failed";
+    else {
+      batch.status = "committed";
+      framing.version += 1;
+      framing.modified = false;
+      framing.synthesis = {
+        contentMd: SYNTHESIS_TEXT,
+        source: `idea-v${framing.version}`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  } else if (batch.status === "queued") batch.status = "committing";
+  const committed = batch.status === "committed";
+  if (batch.status === "failed") framing.batch = null;
+  return reply(200, {
+    id: FREEZE_BATCH,
+    branch: "main",
+    status: batch.status,
+    idempotencyKey: batch.key,
+    baseSha: null,
+    commitSha: committed ? "abc1234def5678abc1234def5678abc1234def56" : null,
+    errorCode: null,
+    report: null,
+    results: [],
+    enqueuedAt: STAMP,
+    committedAt: committed ? STAMP : null,
+  });
+}
+
+function regenerate(): Reply {
+  if (mode === "synthesisFails") return typed(500, "INTERNAL");
+  framing.synthesis = {
+    contentMd: SYNTHESIS_TEXT,
+    source: framing.version > 0 ? `idea-v${framing.version}` : null,
+    generatedAt: new Date().toISOString(),
+  };
+  return reply(200, framing.synthesis);
 }
 
 /** Écritures de l'Idée ; `null` : route inconnue. */
@@ -450,6 +600,8 @@ function write(rest: string, body: Record<string, unknown>): Reply | null {
   const save = /^\/idea\/pages\/([^/]+)\/content$/.exec(rest);
   const decision = /^\/idea\/proposals\/([^/]+)\/(decision|undo)$/.exec(rest);
   if (rest === "/ai/idea/gaps") return reply(200, GAPS);
+  if (rest === "/idea/freeze") return freeze(body);
+  if (rest === "/ai/idea/synthesis") return regenerate();
   if (save) return savePage(save[1] ?? "", body);
   if (!decision) return null;
   return decision[2] === "undo" ? undo(decision[1] ?? "") : decide(decision[1] ?? "", body);
@@ -463,7 +615,9 @@ function respond(
 ): Reply | null {
   if (method === "GET") return read(rest, role);
   if (rest === "/idea/presence") return reply(200, { present: [] });
-  return lockedOut(role) ? typed(403, "FORBIDDEN") : write(rest, body);
+  if (lockedOut(role)) return typed(403, "FORBIDDEN");
+  if (role === "client" && TEAM_ONLY.has(rest)) return typed(403, "FORBIDDEN");
+  return write(rest, body);
 }
 
 function chat(
@@ -494,6 +648,9 @@ export function handleIdea(
     for (const release of held.splice(0)) release();
     return send(res, reply(200, {}));
   }
+  if (path === "/__idea-freezes") return send(res, reply(200, framing.freezes));
+  if (path === `${BASE}/spec/batches/${FREEZE_BATCH}` && req.method === "GET")
+    return send(res, freezeBatch());
   const rest = path.startsWith(`${BASE}/`) ? path.slice(BASE.length) : "";
   if (!isIdeaRoute(rest)) return false;
   readBody(req, (body) => {

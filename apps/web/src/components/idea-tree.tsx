@@ -17,10 +17,11 @@ import {
   ReorderableList,
   RequiredTag,
   StatusLegend,
+  SynthesisNavItem,
 } from "@koklo/ui";
 import { useEffect, useRef } from "react";
 import { buttonsNamed, focusWhenReady, undoButtonOf, visible } from "../lib/idea-focus.ts";
-import { moveAnnouncement, numberedTitle } from "../lib/idea-labels.ts";
+import { moveAnnouncement, numberedTitle, SYNTHESIS_PAGE } from "../lib/idea-labels.ts";
 import { ideaPath } from "../lib/shell-routes.ts";
 import type { IdeaModel } from "../lib/use-idea-page.ts";
 import { IdeaPageMenu } from "./idea-page-menu.tsx";
@@ -35,6 +36,21 @@ export interface TreeHandlers {
   deleting: IdeaPageSummary | null;
   onAskDelete: (page: IdeaPageSummary | null) => void;
   onConfirmDelete: () => void;
+}
+
+const synthesisHref = (projectId: string): string =>
+  `${ideaPath(projectId)}?page=${SYNTHESIS_PAGE}`;
+
+/** Première ligne de l'arborescence (maquette 06 l.74) : « générée » dès qu'une version existe. */
+function SynthesisRow({ model }: { model: IdeaModel }) {
+  return (
+    <SynthesisNavItem
+      href={synthesisHref(model.projectId)}
+      current={model.synthesisOpen}
+      tag={model.version.latest ? "générée" : null}
+      LinkComponent={ShellLink}
+    />
+  );
 }
 
 const pageHref = (projectId: string, page: IdeaPageSummary): string =>
@@ -229,6 +245,7 @@ export function IdeaTreeDesktop({ model, handlers }: { model: IdeaModel; handler
             : "Structure de cadrage par défaut"}
         </span>
       </div>
+      <SynthesisRow model={model} />
       <PageRows model={model} handlers={handlers} />
       {handlers.deleting ? <DeleteConfirm page={handlers.deleting} handlers={handlers} /> : null}
       <PageProposals model={model} />
@@ -243,24 +260,36 @@ export function IdeaTreeDesktop({ model, handlers }: { model: IdeaModel; handler
 /** Sous 768 px : l'arborescence devient un menu « 05 · Périmètre » au-dessus du document, sans glisser tactile. */
 export function IdeaTreeMobile({ model, handlers }: { model: IdeaModel; handlers: TreeHandlers }) {
   const { pages, current, currentIndex, projectId } = model;
-  if (!current) return null;
+  if (!current && !model.synthesisOpen) return null;
+  const label = current ? numberedTitle(current.title, currentIndex) : "Synthèse";
   return (
     <nav aria-label="Pages du dossier" className="flex flex-col gap-2 border-b px-4 py-3 lg:hidden">
       <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="outline" className="h-11 min-w-0 flex-1 justify-between">
-              <span className="truncate">{numberedTitle(current.title, currentIndex)}</span>
+              <span className="truncate">{label}</span>
               <Icon name="keyboard_arrow_down" size={20} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)]">
+            <DropdownMenuItem asChild className="min-h-11">
+              <ShellLink
+                href={synthesisHref(projectId)}
+                aria-current={model.synthesisOpen ? "page" : undefined}
+                className={model.synthesisOpen ? "bg-secondary font-semibold" : undefined}
+              >
+                <Icon name="wand_stars" size={18} className="text-primary" />
+                <span className="min-w-0 flex-1 truncate">Synthèse</span>
+                {model.version.latest ? <RequiredTag label="générée" /> : null}
+              </ShellLink>
+            </DropdownMenuItem>
             {pages.map((page, index) => (
               <DropdownMenuItem key={page.id} asChild className="min-h-11">
                 <ShellLink
                   href={pageHref(projectId, page)}
-                  aria-current={page.id === current.id ? "page" : undefined}
-                  className={page.id === current.id ? "bg-secondary font-semibold" : undefined}
+                  aria-current={page.id === current?.id ? "page" : undefined}
+                  className={page.id === current?.id ? "bg-secondary font-semibold" : undefined}
                 >
                   <PageStatus status={page.status} />
                   <span className="min-w-0 flex-1 truncate">
@@ -280,7 +309,7 @@ export function IdeaTreeMobile({ model, handlers }: { model: IdeaModel; handlers
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
-        {model.canWrite ? (
+        {model.canWrite && current ? (
           <IdeaPageMenu
             page={current}
             title={numberedTitle(current.title, currentIndex)}

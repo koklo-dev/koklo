@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { errorCode } from "./api-error.ts";
+import { SYNTHESIS_PAGE } from "./idea-labels.ts";
 import { orpc } from "./orpc.ts";
 import { canPublishIdea, canWriteIdea } from "./roles.ts";
 import { useActiveOrganization } from "./use-active-organization.ts";
@@ -44,7 +45,9 @@ export function useIdeaPage(projectId: string) {
     () => [...(data?.pages ?? [])].sort((a, b) => a.position - b.position),
     [data],
   );
-  const current = pickPage(pages, slug);
+  const synthesisOpen = slug === SYNTHESIS_PAGE;
+  const current = synthesisOpen ? undefined : pickPage(pages, slug);
+  const publication = data?.publication ?? { available: false, last: null };
   return {
     projectId,
     gate: unauthorized ? ("loading" as const) : gateOf(list),
@@ -53,12 +56,22 @@ export function useIdeaPage(projectId: string) {
     trash: data?.trash ?? [],
     pageProposals: data?.pendingPageProposals ?? [],
     decisions,
-    publication: data?.publication ?? { available: false, last: null },
+    publication,
+    maturity: data?.maturity ?? {
+      stable: 0,
+      total: pages.length,
+      missingRequired: [],
+      openQuestions: 0,
+    },
+    version: data?.version ?? { latest: null, modifiedSince: false },
+    synthesisOpen,
     slug,
     current,
     currentIndex: current ? pages.indexOf(current) : -1,
     canWrite: canWriteIdea(role),
     canPublish: canPublishIdea(role),
+    /** Passer au cadrage, figer, régénérer : l'équipe, dépôt relié (le serveur reste l'autorité). */
+    canFreeze: canPublishIdea(role) && publication.available,
     actions,
   };
 }

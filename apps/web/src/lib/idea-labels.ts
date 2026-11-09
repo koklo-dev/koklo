@@ -34,3 +34,28 @@ export const SAVE_LABEL: Record<SaveState, string> = {
 
 export const moveAnnouncement = (title: string, position: number, total: number): string =>
   `${title} déplacée en position ${position} sur ${total}`;
+
+/** Adresse de la page Synthèse dans l'espace Idée : `?page=synthese`. */
+export const SYNTHESIS_PAGE = "synthese";
+
+/** Fichier publié de la Synthèse (généré, jamais saisi). */
+export const SYNTHESIS_FILE = "idea/_synthese.md";
+
+/** Raison dite à côté de « Passer au cadrage » désactivé : « …il manque : Utilisateurs et Périmètre stables ». */
+export function framingReason(missing: readonly string[]): string {
+  const last = missing.at(-1) ?? "";
+  const list =
+    missing.length <= 1
+      ? `${last} stable`
+      : `${missing.slice(0, -1).join(", ")} et ${last} stables`;
+  return `Pour passer au cadrage, il manque : ${list}`;
+}
+
+/** « 8 novembre 2026 », à l'heure de Paris. */
+export const synthesisDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Paris",
+  });

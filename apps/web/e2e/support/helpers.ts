@@ -162,3 +162,7 @@ export const ideaChatsSeen = async (): Promise<Array<Record<string, unknown>>> =
 export async function releaseIdeaStream(): Promise<void> {
   await fetch(`${STUB}/__release-idea`, { method: "POST" });
 }
+
+/** Corps reçus par `idea.freeze` du faux API (TK-91), dans l'ordre : la clé d'idempotence se relit ici. */
+export const ideaFreezesSeen = async (): Promise<Array<Record<string, unknown>>> =>
+  (await fetch(`${STUB}/__idea-freezes`)).json();
