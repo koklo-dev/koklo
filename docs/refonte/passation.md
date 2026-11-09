@@ -1,6 +1,6 @@
 ---
 doc_version: 1
-last_reviewed: 2026-11-08
+last_reviewed: 2026-11-09
 ---
 # Passation de la refonte : état, méthode, décisions
 
@@ -8,7 +8,7 @@ last_reviewed: 2026-11-08
 > fusionné, et ajouter ici toute nouvelle décision de méthode de l'utilisateur. Les décisions produit restent dans
 > `docs/refonte/questions.md` (une ligne B-nnn chacune) ; rien ne se décide « dans la conversation » sans être écrit.
 
-## État au 2026-11-08
+## État au 2026-11-09
 
 | Sprint | Ticket | État |
 | --- | --- | --- |
@@ -16,7 +16,8 @@ last_reviewed: 2026-11-08
 | 019 | TK-97, TK-138 à TK-142 | ✅ fusionnés (bibliothèque fidèle aux maquettes, reprise des écrans, axe en CI) |
 | 019 | TK-98 (fournisseurs d'IA) | 🟡 fusionné, critère 1 partiel : A5 tranchée (interrupteur « données en UE » par projet), réalisée avec TK-93 qui complète le critère |
 | 020 | TK-89 (espace Idée : pages, éditeur, publication, droits) | ✅ fusionné (PR #150, `e8c2247`) |
-| 020 | TK-90 (panneau de l'agent, propositions) puis TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | à faire, dans cet ordre |
+| 020 | TK-90 (panneau de l'agent, propositions) | ✅ fusionné (PR #154) |
+| 020 | TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | ✅ fusionné (PR #158, `da47953`) |
 | 021 | TK-92 (vue d'ensemble) puis TK-93 (projets en cartes, création en une étape) | à faire |
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
@@ -98,4 +99,5 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
   la copie.
 - Captures : comparer en RGB ; `getbbox()` sur une image RGBA ne regarde que l'alpha.
 - Un test qui parcourt le contrat oRPC doit descendre dans les sous-groupes (ex. `idea.page`).
+- CI `ci` : les tests de migration du paquet `db` partagent le CPU avec les suites api et web (`turbo run test`) ; la suite `db` dure ~21 min sur la CI contre ~4 min en local. Sous charge, leurs délais de 180 s expiraient (develop rouge après TK-90, PR #158 deux fois). Délais portés à 600 s (TK-91). Si ça revient : `--concurrency=2` dans `ci.yml`.
 - Une PR bloquée en « queued » : annuler l'exécution CI périmée (`gh run cancel`) qui occupe la file.
