@@ -195,7 +195,8 @@ test("S-features : accès depuis la liste des projets, l'en-tête de projet et l
   await sidebarOf(page).getByRole("button", { name: /Phase/ }).click();
   await expect(page.getByRole("menuitem", { name: "Portail partenaires" })).toBeVisible();
   await page.getByRole("menuitem", { name: "Atelier Lumière" }).click();
-  await expect(page).toHaveURL(new RegExp(`${PATH}\\?tab=features$`));
+  // TK-92 : la redirection provisoire est retirée, la carte projet ramène à la vue d'ensemble.
+  await expect(page).toHaveURL(new RegExp(`/projects/${FEATURE_PROJECT_ID}$`));
 });
 
 test("S-features : la route dynamique est gardée (sans session /login, sans organisation /organizations)", async ({

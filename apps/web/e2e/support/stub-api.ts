@@ -11,6 +11,7 @@ import { type GithubScenario, handleGithub, resetGithub } from "./stub-github.ts
 import { handleIdea, type IdeaScenario, resetIdea } from "./stub-idea-agent.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 import { resetMembers } from "./stub-members.ts";
+import { handleOverview, type OverviewScenario } from "./stub-overview.ts";
 import { handleSettings, resetSettings, type SettingsScenario } from "./stub-settings.ts";
 import { handleShell, resetShell, type ShellScenario } from "./stub-shell.ts";
 import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
@@ -38,6 +39,7 @@ type Scenario = {
   AiScenario &
   ProvidersScenario &
   ShellScenario &
+  OverviewScenario &
   IdeaScenario &
   SettingsScenario;
 
@@ -181,6 +183,7 @@ const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
   handleSettings(req, url, { scenario, send, projects: allProjects }) ||
   handleProviders(req, url, { scenario, send, hold }) ||
   handleAi(req, url, { scenario, knownProject, send, hold }) ||
+  handleOverview(req, url, { scenario, send, hold }) ||
   handleShell(req, url, { scenario, projects: allProjects, send, hold });
 
 type Sender = (reply: ReturnType<typeof json>) => void;

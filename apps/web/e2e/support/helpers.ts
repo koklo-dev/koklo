@@ -10,6 +10,7 @@ import type {
   KanbanRole,
   TransitionMode as KanbanTransition,
 } from "./stub-kanban.ts";
+import type { OverviewScenario } from "./stub-overview.ts";
 import type { SettingsScenario } from "./stub-settings.ts";
 import type { ShellScenario } from "./stub-shell.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
@@ -44,6 +45,7 @@ export async function setScenario(
     AiScenario &
     ProvidersScenario &
     ShellScenario &
+    OverviewScenario &
     IdeaScenario &
     Pick<SettingsScenario, "members">,
 ): Promise<void> {
