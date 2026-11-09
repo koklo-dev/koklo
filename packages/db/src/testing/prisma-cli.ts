@@ -73,6 +73,9 @@ export const expectedTables = [
   "idea_messages",
   "idea_ai_locks",
   "idea_gap_runs",
+  // TK-91 : versions figées de l'idée et Synthèse.
+  "idea_versions",
+  "idea_synthesis",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */

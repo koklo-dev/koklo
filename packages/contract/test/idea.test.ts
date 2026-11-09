@@ -10,6 +10,7 @@ import { errors, input, isValid, output, proc, UUID, UUID2 } from "./support.ts"
  */
 const TOP = [
   "agent",
+  "freeze",
   "get",
   "list",
   "message",
@@ -19,6 +20,7 @@ const TOP = [
   "publish",
   "save",
   "setStatus",
+  "synthesis",
 ];
 const PAGE = ["create", "delete", "rename", "reorder", "restore"];
 const BASE = "/projects/{projectId}/idea";
@@ -68,9 +70,9 @@ describe("idea : surface", () => {
     expect((await doc()).paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("le contrat courant est 2.5.0 (additif : version mineure)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.5.0");
-    expect((await doc()).info.version).toBe("2.5.0");
+  it("le contrat courant est 2.6.0 (additif : version mineure)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.6.0");
+    expect((await doc()).info.version).toBe("2.6.0");
   });
 });
 
@@ -164,6 +166,8 @@ describe("idea : sorties", () => {
       total: 1,
       publication: { available: true, last: { commitSha: "a".repeat(40), publishedAt: INSTANT } },
       pendingPageProposals: [],
+      maturity: { stable: 1, total: 1, missingRequired: [], openQuestions: 0 },
+      version: { latest: null, modifiedSince: false },
     };
     expect(await isValid(output("idea.list"), out)).toBe(true);
     expect(

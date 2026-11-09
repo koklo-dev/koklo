@@ -5,6 +5,7 @@ import {
   EmitIdeaError,
   emitIdeaIndex,
   emitIdeaPage,
+  emitIdeaSynthesis,
   type IdeaIndex,
   type IdeaPageFile,
 } from "../src/index.ts";
@@ -147,6 +148,65 @@ describe("checkSpec et le dossier idea/", () => {
       ...validFiles(),
       { path: "idea/perimetre.md", content: emitIdeaPage(page()) },
       { path: "idea/_index.yaml", content: emitIdeaIndex(index()) },
+    ];
+    expect(checkSpec(files).issues).toEqual(before);
+  });
+});
+
+describe("emitIdeaSynthesis (TK-91) : idea/_synthese.md", () => {
+  const input = {
+    source: "idea-v1",
+    updatedAt: "2026-11-09T09:30:00.000Z",
+    contentMd: "## Résumé\n\nUn outil de cadrage.\n",
+  };
+
+  it("écrit un en-tête signalé généré (genere: true), la source, la date, puis le contenu", () => {
+    const text = emitIdeaSynthesis(input);
+    expect(text.startsWith("---\n")).toBe(true);
+    expect(text).toContain("genere: true");
+    expect(text).toContain("source: idea-v1");
+    const header = frontmatterOf(text);
+    expect(header).toMatchObject({
+      id: "_synthese",
+      titre: "Synthèse",
+      genere: true,
+      source: "idea-v1",
+      mis_a_jour: "2026-11-09",
+    });
+    expect(text).toContain("# Synthèse\n\n## Résumé\n\nUn outil de cadrage.\n");
+  });
+
+  it("est pure : même entrée, même texte, entrée gelée non modifiée", () => {
+    const frozen = deepFreeze({ ...input });
+    expect(emitIdeaSynthesis(frozen)).toBe(emitIdeaSynthesis(input));
+  });
+
+  it.each(["idea-v0", "idea-v1\nx: y", "v1", "idea-v10000", ""])(
+    "refuse la source %j (EmitIdeaError, pointeur /source)",
+    (source) => {
+      expect(() => emitIdeaSynthesis({ ...input, source })).toThrow(EmitIdeaError);
+      try {
+        emitIdeaSynthesis({ ...input, source });
+      } catch (error) {
+        expect((error as EmitIdeaError).path).toBe("/source");
+      }
+    },
+  );
+
+  it("refuse une date invalide et un NUL dans le contenu", () => {
+    expect(() => emitIdeaSynthesis({ ...input, updatedAt: "demain" })).toThrow(EmitIdeaError);
+    expect(() => emitIdeaSynthesis({ ...input, contentMd: "a\0b" })).toThrow(EmitIdeaError);
+  });
+
+  it("un contenu vide n'écrit que le titre", () => {
+    expect(emitIdeaSynthesis({ ...input, contentMd: "  " }).endsWith("# Synthèse\n")).toBe(true);
+  });
+
+  it("checkSpec ne dit rien de plus quand idea/_synthese.md est ajouté", () => {
+    const before = checkSpec(validFiles()).issues;
+    const files = [
+      ...validFiles(),
+      { path: "idea/_synthese.md", content: emitIdeaSynthesis(input) },
     ];
     expect(checkSpec(files).issues).toEqual(before);
   });

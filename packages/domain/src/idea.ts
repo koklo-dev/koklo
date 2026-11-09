@@ -113,3 +113,80 @@ export function isIdeaReorderComplete(
 export function isIdeaPresenceActive(seenAt: Date, now: Date): boolean {
   return now.getTime() - seenAt.getTime() < IDEA_PRESENCE_TTL_MS;
 }
+
+/**
+ * Versions figées de l'idée (TK-91). Le slug `_synthese` est réservé à la Synthèse (`idea/_synthese.md`) : un slug de
+ * page ne contient jamais `_` (`ideaSlugOf`), donc aucune page ne peut le porter.
+ */
+export const IDEA_SYNTHESIS_SLUG = "_synthese";
+export const IDEA_VERSION_MAX = 9999;
+/** Étiquette construite par le serveur, jamais saisie : le worker la revalide avant de poser le tag. */
+export const IDEA_VERSION_TAG_PATTERN = /^idea-v[1-9][0-9]{0,3}$/;
+
+export function ideaVersionTag(number: number): string {
+  if (!Number.isInteger(number) || number < 1 || number > IDEA_VERSION_MAX) {
+    throw new InvalidIdeaError("number", `Le numéro de version va de 1 à ${IDEA_VERSION_MAX}.`);
+  }
+  return `idea-v${number}`;
+}
+
+export const isIdeaVersionTag = (value: unknown): value is string =>
+  typeof value === "string" && IDEA_VERSION_TAG_PATTERN.test(value);
+
+export interface FramingPage {
+  readonly title: string;
+  readonly required: boolean;
+  readonly status: IdeaPageStatus;
+}
+
+export interface FramingReadiness {
+  readonly ready: boolean;
+  /** Pages stables parmi les pages actives, et pages actives (la Synthèse n'est pas une page). */
+  readonly stable: number;
+  readonly total: number;
+  /** Titres courants des pages requises pas encore stables, dans l'ordre du dossier. */
+  readonly missing: readonly string[];
+}
+
+/** Seuil du passage au cadrage : toutes les pages requises (drapeau `required`, donc fidèle au renommage) sont stables. */
+export function framingReadiness(pages: readonly FramingPage[]): FramingReadiness {
+  const missing = pages
+    .filter((page) => page.required && page.status !== "stable")
+    .map((page) => page.title);
+  return {
+    ready: missing.length === 0,
+    stable: pages.filter((page) => page.status === "stable").length,
+    total: pages.length,
+    missing,
+  };
+}
+
+/** « Périmètre stable », « Utilisateurs et Périmètre stables » : la raison dite à côté du bouton désactivé. */
+export function framingMissingLabel(missing: readonly string[]): string {
+  const last = missing.at(-1) ?? "";
+  if (missing.length <= 1) return `${last} stable`;
+  return `${missing.slice(0, -1).join(", ")} et ${last} stables`;
+}
+
+const OPEN_TASK = /^[ \t]*[-*+][ \t]+\[ \](?:[ \t]|$)/;
+const FENCE = /^[ \t]*(?:```|~~~)/;
+
+/** Questions ouvertes d'une page : ses tâches Markdown non cochées (`- [ ]`), hors blocs de code. */
+export function countOpenQuestions(contentMd: string): number {
+  let inCode = false;
+  let count = 0;
+  for (const line of contentMd.split("\n")) {
+    if (FENCE.test(line)) inCode = !inCode;
+    else if (!inCode && OPEN_TASK.test(line)) count += 1;
+  }
+  return count;
+}
+
+/** Vrai si une page s'ajoute, disparaît ou change de version depuis l'empreinte figée (version de contenu par slug). */
+export function ideaModifiedSince(
+  frozen: Readonly<Record<string, number>>,
+  current: Readonly<Record<string, number>>,
+): boolean {
+  const slugs = new Set([...Object.keys(frozen), ...Object.keys(current)]);
+  return [...slugs].some((slug) => frozen[slug] !== current[slug]);
+}

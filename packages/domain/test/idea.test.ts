@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+  countOpenQuestions,
+  framingMissingLabel,
+  framingReadiness,
   IDEA_CONTENT_MAX,
   IDEA_PAGE_LIMIT,
   IDEA_PRESENCE_TTL_MS,
+  IDEA_SYNTHESIS_SLUG,
   IDEA_TRASH_DAYS,
+  type IdeaPageStatus,
   InvalidIdeaError,
+  ideaModifiedSince,
   ideaPageStatusAfterSave,
   ideaSlugOf,
+  ideaVersionTag,
   isIdeaPresenceActive,
   isIdeaReorderComplete,
   isIdeaRestorable,
+  isIdeaVersionTag,
   normalizeIdeaContent,
   normalizeIdeaTitle,
   uniqueIdeaSlug,
@@ -114,5 +122,132 @@ describe("isIdeaPresenceActive", () => {
   it("actif si vu depuis moins de 45 s", () => {
     expect(isIdeaPresenceActive(new Date("2026-11-08T11:59:30Z"), now)).toBe(true);
     expect(isIdeaPresenceActive(new Date("2026-11-08T11:59:14Z"), now)).toBe(false);
+  });
+});
+
+describe("idea : étiquette de version idea-vN (TK-91)", () => {
+  it("construit idea-v<entier> de 1 à 9999 et réserve le slug _synthese", () => {
+    expect(IDEA_SYNTHESIS_SLUG).toBe("_synthese");
+    expect(ideaVersionTag(1)).toBe("idea-v1");
+    expect(ideaVersionTag(9999)).toBe("idea-v9999");
+    // Un slug de page ne contient jamais `_` : la Synthèse ne peut pas être une page.
+    expect(ideaSlugOf(IDEA_SYNTHESIS_SLUG)).not.toBe(IDEA_SYNTHESIS_SLUG);
+  });
+
+  it.each([0, -1, 10_000, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "refuse le numéro %s",
+    (n) => {
+      expect(() => ideaVersionTag(n)).toThrow(InvalidIdeaError);
+    },
+  );
+
+  it("reconnaît seulement les étiquettes construites par le serveur", () => {
+    expect(isIdeaVersionTag("idea-v1")).toBe(true);
+    expect(isIdeaVersionTag("idea-v9999")).toBe(true);
+    for (const bad of [
+      "idea-v0",
+      "idea-v01",
+      "idea-v10000",
+      "idea-v1\n",
+      "v1",
+      "idea-v1;x",
+      "",
+      3,
+    ]) {
+      expect(isIdeaVersionTag(bad), String(bad)).toBe(false);
+    }
+  });
+});
+
+describe("idea : seuil du passage au cadrage (TK-91, B258)", () => {
+  const page = (title: string, required: boolean, status: IdeaPageStatus) => ({
+    title,
+    required,
+    status,
+  });
+
+  it("3 pages requises stables sur 4 : il manque Périmètre", () => {
+    const readiness = framingReadiness([
+      page("Vision", true, "stable"),
+      page("Problème", true, "stable"),
+      page("Utilisateurs", true, "stable"),
+      page("Périmètre", true, "draft"),
+      page("Glossaire", false, "empty"),
+    ]);
+    expect(readiness).toEqual({ ready: false, stable: 3, total: 5, missing: ["Périmètre"] });
+  });
+
+  it("toutes les requises stables : prêt, même si les autres pages ne le sont pas", () => {
+    const readiness = framingReadiness([
+      page("Vision", true, "stable"),
+      page("Mesure", false, "review"),
+    ]);
+    expect(readiness).toEqual({ ready: true, stable: 1, total: 2, missing: [] });
+  });
+
+  it("une page requise renommée garde son drapeau : le titre courant est dit", () => {
+    const readiness = framingReadiness([
+      page("Cible", true, "review"),
+      page("Vision", true, "stable"),
+    ]);
+    expect(readiness.missing).toEqual(["Cible"]);
+  });
+
+  it("sans aucune page requise, le seuil est atteint (rien n'est exigé)", () => {
+    expect(framingReadiness([]).ready).toBe(true);
+  });
+
+  it("le libellé nomme les pages manquantes, accordé au nombre", () => {
+    expect(framingMissingLabel(["Périmètre"])).toBe("Périmètre stable");
+    expect(framingMissingLabel(["Utilisateurs", "Périmètre"])).toBe(
+      "Utilisateurs et Périmètre stables",
+    );
+    expect(framingMissingLabel(["Vision", "Utilisateurs", "Périmètre"])).toBe(
+      "Vision, Utilisateurs et Périmètre stables",
+    );
+  });
+});
+
+describe("idea : questions ouvertes (TK-91, B258)", () => {
+  it("compte les tâches non cochées, pas les cochées ni les puces simples", () => {
+    const md = [
+      "# Hypothèses",
+      "- [ ] Le client paiera-t-il ?",
+      "- [x] Le marché existe",
+      "- [X] Cible validée",
+      "* [ ] Autre question",
+      "  - [ ] Question imbriquée",
+      "- simple puce",
+      "- [] sans espace",
+      "- [ ]sans séparation",
+    ].join("\n");
+    expect(countOpenQuestions(md)).toBe(3);
+  });
+
+  it("ignore les tâches dans un bloc de code et compte une tâche vide", () => {
+    const md = "```\n- [ ] exemple\n```\n- [ ]\n";
+    expect(countOpenQuestions(md)).toBe(1);
+  });
+
+  it("une page vide n'a aucune question ouverte", () => {
+    expect(countOpenQuestions("")).toBe(0);
+  });
+});
+
+describe("idea : modifié depuis la version figée (TK-91, B259)", () => {
+  const frozen = { vision: 2, probleme: 1 };
+
+  it("faux si les pages et leurs versions sont identiques", () => {
+    expect(ideaModifiedSince(frozen, { probleme: 1, vision: 2 })).toBe(false);
+  });
+
+  it("vrai si une version de page a changé, si une page s'ajoute ou disparaît", () => {
+    expect(ideaModifiedSince(frozen, { vision: 3, probleme: 1 })).toBe(true);
+    expect(ideaModifiedSince(frozen, { vision: 2, probleme: 1, mesure: 1 })).toBe(true);
+    expect(ideaModifiedSince(frozen, { vision: 2 })).toBe(true);
+  });
+
+  it("une empreinte vide contre un dossier vide : pas de modification", () => {
+    expect(ideaModifiedSince({}, {})).toBe(false);
   });
 });

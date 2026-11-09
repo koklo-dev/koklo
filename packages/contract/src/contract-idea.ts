@@ -12,6 +12,8 @@ import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
 import {
   ideaAgentStatusInputSchema,
   ideaAgentStatusOutputSchema,
+  ideaFreezeInputSchema,
+  ideaFreezeOutputSchema,
   ideaGetInputSchema,
   ideaListInputSchema,
   ideaListOutputSchema,
@@ -34,6 +36,8 @@ import {
   ideaPublishOutputSchema,
   ideaSaveInputSchema,
   ideaSetStatusInputSchema,
+  ideaSynthesisGetInputSchema,
+  ideaSynthesisGetOutputSchema,
 } from "./schemas-idea.ts";
 
 const BASE = "/projects/{projectId}/idea";
@@ -87,7 +91,21 @@ const proposal = {
 };
 
 /**
- * Espace Idée (TK-89, contrat 2.4.0 ; agent TK-90, 2.5.0) : le client rédige sans publier, le business lit. Un projet ou
+ * Passage au cadrage (TK-91, 2.6.0) : refus motivé `framing_threshold` si une page requise n'est pas stable (le rôle
+ * reste un 403 sans raison) ; un autre passage en cours, ou une clé réutilisée avec un autre contenu, est un
+ * SPEC_BATCH_CONFLICT.
+ */
+const freezeErrors = {
+  ...internalError,
+  ...unauthorizedError,
+  ...forbiddenOf("framing_threshold"),
+  ...notFoundError,
+  ...providerErrors,
+  ...specBatchConflictError,
+} as const;
+
+/**
+ * Espace Idée (TK-89, contrat 2.4.0 ; agent TK-90, 2.5.0 ; maturité, Synthèse et versions TK-91, 2.6.0) : le client rédige sans publier, le business lit. Un projet ou
  * une page hors périmètre est un NOT_FOUND uniforme ; `save` périmé rend CONFLICT + `currentVersion`.
  */
 export const idea = {
@@ -111,6 +129,17 @@ export const idea = {
     .errors({ ...writeErrors, ...providerErrors, ...specBatchConflictError })
     .input(ideaPublishInputSchema)
     .output(ideaPublishOutputSchema),
+  freeze: route("POST", `${BASE}/freeze`)
+    .errors(freezeErrors)
+    .input(ideaFreezeInputSchema)
+    .output(ideaFreezeOutputSchema),
+  /** Synthèse de l'idée pour les rôles de lecture de l'espace Idée ; `null` tant qu'aucune n'existe. */
+  synthesis: {
+    get: route("GET", `${BASE}/synthesis`)
+      .errors(readOneErrors)
+      .input(ideaSynthesisGetInputSchema)
+      .output(ideaSynthesisGetOutputSchema),
+  },
   presence: route("POST", `${BASE}/presence`)
     .errors(writeOneErrors)
     .input(ideaPresenceInputSchema)

@@ -16,7 +16,13 @@ import {
   IDEA_BASE_TABLES,
   IDEA_SUFFIX,
   IDEA_TEMPLATE_SQL,
+  IDEA_VERSIONS_SUFFIX,
+  IDEA_VERSIONS_TABLES,
 } from "./support/idea-fixtures.ts";
+
+/** Tables des migrations qui suivent `*_idea` (agent TK-90, versions TK-91) : absentes de la base de ce test. */
+const LATER_TABLES: readonly string[] = [...IDEA_AGENT_TABLES, ...IDEA_VERSIONS_TABLES];
+
 import { insertScope } from "./support/ticket-fixtures.ts";
 
 /**
@@ -58,9 +64,9 @@ describe("TK-89 migration idea : dossier et contenu", () => {
     expect(down.search(/DROP TABLE/i)).toBeLessThan(down.search(/DROP TYPE/i));
   });
 
-  it("expectedTables contient les quatre tables (54 au total avec TK-90)", () => {
+  it("expectedTables contient les quatre tables (56 au total avec TK-90 et TK-91)", () => {
     for (const table of IDEA_BASE_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(54);
+    expect(expectedTables).toHaveLength(56);
   });
 });
 
@@ -128,9 +134,7 @@ describe("TK-89 migration idea : pages des projets existants", () => {
         expect(row.organization_id).toBe(scope.organizationId);
       }
     }
-    expect(await tables()).toEqual(
-      expectedTables.filter((t) => !(IDEA_AGENT_TABLES as readonly string[]).includes(t)).sort(),
-    );
+    expect(await tables()).toEqual(expectedTables.filter((t) => !LATER_TABLES.includes(t)).sort());
   }, 180_000);
 
   it("down.sql retire les tables, up les recrée avec les pages (rejouable)", async () => {
@@ -138,7 +142,7 @@ describe("TK-89 migration idea : pages des projets existants", () => {
     const afterDown = await tables();
     for (const table of IDEA_BASE_TABLES) expect(afterDown).not.toContain(table);
     expect(afterDown).toHaveLength(
-      expectedTables.length - IDEA_BASE_TABLES.length - IDEA_AGENT_TABLES.length,
+      expectedTables.length - IDEA_BASE_TABLES.length - LATER_TABLES.length,
     );
 
     apply(db, migration(), "migration.sql");
@@ -147,8 +151,10 @@ describe("TK-89 migration idea : pages des projets existants", () => {
   }, 180_000);
 
   it("migrate diff entre la base et schema.prisma est vide (code 0), l'agent (TK-90) appliqué", () => {
-    // La base s'arrête à `*_idea` : le schéma courant porte aussi les tables de l'agent, de la migration suivante.
-    apply(db, dirs().find((dir) => dir.endsWith(IDEA_AGENT_SUFFIX)) as string, "migration.sql");
+    // La base s'arrête à `*_idea` : le schéma courant porte aussi les tables de l'agent et des versions, des migrations suivantes.
+    for (const suffix of [IDEA_AGENT_SUFFIX, IDEA_VERSIONS_SUFFIX]) {
+      apply(db, dirs().find((dir) => dir.endsWith(suffix)) as string, "migration.sql");
+    }
     const diff = ["migrate", "diff", "--from-config-datasource", "--to-schema", schemaPath];
     const { status, output } = runPrisma([...diff, "--exit-code"], db.url);
     expect(status, output).toBe(0);

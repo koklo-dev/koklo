@@ -44,9 +44,9 @@ describe("SH1 surface additive", () => {
     expect(Object.keys(group ?? {}).sort()).toEqual(["create", "list", "recent", "shell", "visit"]);
   });
 
-  it("le contrat est en 2.5.0 (version mineure : aucune route retirée ni modifiée)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.5.0");
-    expect((await doc()).info.version).toBe("2.5.0");
+  it("le contrat est en 2.6.0 (version mineure : aucune route retirée ni modifiée)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.6.0");
+    expect((await doc()).info.version).toBe("2.6.0");
   });
 });
 

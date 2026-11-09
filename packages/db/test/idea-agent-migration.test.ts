@@ -71,7 +71,7 @@ const tables = async () =>
   ).map((row) => row.name);
 
 describe("TK-90 migration idea_agent : base", () => {
-  it("applique tout jusqu'à la migration : les 54 tables attendues existent", async () => {
+  it("applique tout jusqu'à la migration : les 56 tables attendues existent", async () => {
     for (const dir of dirs()) apply(db, dir, "migration.sql");
     expect(await tables()).toEqual([...expectedTables].sort());
   }, 180_000);

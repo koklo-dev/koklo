@@ -67,9 +67,9 @@ describe("TK-97 migration settings : dossier et contenu", () => {
     expect(down).not.toMatch(/DROP\s+(?:TYPE|FUNCTION|TRIGGER)/i);
   });
 
-  it("expectedTables contient les deux tables (54 au total avec TK-90)", () => {
+  it("expectedTables contient les deux tables (56 au total avec TK-91)", () => {
     for (const table of TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(54);
+    expect(expectedTables).toHaveLength(56);
   });
 
   it("les modèles InvitationProject et NotificationPreference sont des modèles d'organisation", () => {

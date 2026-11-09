@@ -144,9 +144,9 @@ describe("TK-95 migration ai_providers : dossier et contenu", () => {
     expect(up).toMatch(/"monthly_cap_micro_usd"\s+BIGINT/i);
   });
 
-  it("expectedTables contient les trois tables (54 au total avec TK-90)", () => {
+  it("expectedTables contient les trois tables (56 au total avec TK-91)", () => {
     for (const table of AI_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(54);
+    expect(expectedTables).toHaveLength(56);
   });
 
   it("schema.prisma déclare les trois modèles, l'enum AiUsage et les valeurs de LlmProvider", () => {
