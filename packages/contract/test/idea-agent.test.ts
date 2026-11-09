@@ -223,6 +223,8 @@ describe("idea.list et idea.get : extension additive", () => {
       total: 1,
       publication: { available: false, last: null },
       pendingPageProposals: [{ ...PROPOSAL, op: "create_page", pageId: null, title: "Tarifs" }],
+      maturity: { stable: 0, total: 1, missingRequired: ["Vision"], openQuestions: 0 },
+      version: { latest: null, modifiedSince: false },
     };
     expect(await isValid(out, listing)).toBe(true);
     expect(await isValid(out, { ...listing, pendingPageProposals: undefined })).toBe(false);

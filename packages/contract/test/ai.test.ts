@@ -8,7 +8,14 @@ import { errors, INSTANT, input, isValid, output, parsed, proc, UUID } from "./s
  * `llmCredential.verify` et cinq erreurs typées. Les noms, bornes et formes figent
  * `.workflow/TK-54/02-decisions-54b.md` §2.
  */
-const NAMES = ["draftBrief", "ideaChat", "ideaGaps", "proposeCriteria", "proposeFeatures"];
+const NAMES = [
+  "draftBrief",
+  "ideaChat",
+  "ideaGaps",
+  "ideaSynthesis",
+  "proposeCriteria",
+  "proposeFeatures",
+];
 const META = {
   provider: "anthropic",
   model: "claude-test-1",
@@ -49,7 +56,7 @@ type Doc = {
 const doc = async () => (await generateOpenApi()) as unknown as Doc;
 
 describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
-  it("le routeur expose exactement draftBrief, ideaChat, ideaGaps, proposeCriteria, proposeFeatures", () => {
+  it("le routeur expose exactement draftBrief, ideaChat, ideaGaps, ideaSynthesis, proposeCriteria, proposeFeatures", () => {
     const group = (api.contract as unknown as Record<string, object>).ai;
     expect(group).toBeDefined();
     expect(Object.keys(group ?? {}).sort()).toEqual(NAMES);
@@ -76,8 +83,8 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
     }
   });
 
-  it("l'OpenAPI est en 2.5.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond, 2.0.0 projet explicite, 2.1.0 coquille, 2.2.0 réglages, 2.3.0 fournisseurs d'IA)", async () => {
-    expect((await doc()).info.version).toBe("2.5.0");
+  it("l'OpenAPI est en 2.6.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond, 2.0.0 projet explicite, 2.1.0 coquille, 2.2.0 réglages, 2.3.0 fournisseurs d'IA)", async () => {
+    expect((await doc()).info.version).toBe("2.6.0");
   });
 
   it("featureCreateSchema est exporté (parité avec specBatch.submit)", () => {

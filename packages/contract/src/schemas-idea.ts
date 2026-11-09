@@ -3,7 +3,7 @@ import { listInputShape, listOf } from "./schemas-lists.ts";
 import { specBatchSubmitInputSchema } from "./schemas-spec.ts";
 
 /**
- * Espace Idée (TK-89, contrat 2.4.0 ; agent TK-90, contrat 2.5.0). Bornes miroirs de `@koklo/domain` (`IDEA_*`) : le contrat ne
+ * Espace Idée (TK-89, contrat 2.4.0 ; agent TK-90, contrat 2.5.0 ; maturité, Synthèse et versions TK-91, contrat 2.6.0). Bornes miroirs de `@koklo/domain` (`IDEA_*`) : le contrat ne
  * dépend pas du domaine. Jamais d'identifiant d'utilisateur ni d'e-mail en sortie : l'auteur d'une
  * modification est un nom et un indicateur « client ».
  */
@@ -71,6 +71,30 @@ export const ideaListedPageSchema = ideaPageSummarySchema.extend({
   pendingProposals: z.number().int().min(0),
 });
 
+/**
+ * Maturité du dossier (TK-91) : pages stables sur pages actives (la Synthèse n'est pas une page), titres courants des
+ * pages requises pas encore stables, questions ouvertes (tâches `- [ ]` de « Hypothèses et risques »).
+ */
+export const ideaMaturitySchema = z.object({
+  stable: z.number().int().min(0),
+  total: z.number().int().min(0),
+  missingRequired: z.array(z.string()),
+  openQuestions: z.number().int().min(0),
+});
+
+/** Dernière version figée dont le lot est commité (`idea-vN`) et « Modifié depuis » (jamais l'identité de l'auteur). */
+export const ideaVersionSchema = z.object({
+  latest: z
+    .object({
+      number: z.number().int().min(1),
+      tag: z.string(),
+      commitSha: z.string(),
+      frozenAt: z.iso.datetime(),
+    })
+    .nullable(),
+  modifiedSince: z.boolean(),
+});
+
 export const ideaListInputSchema = z.object(scoped);
 export const ideaListOutputSchema = z.object({
   pages: z.array(ideaListedPageSchema),
@@ -81,6 +105,8 @@ export const ideaListOutputSchema = z.object({
     last: z.object({ commitSha: z.string(), publishedAt: z.iso.datetime() }).nullable(),
   }),
   pendingPageProposals: z.array(ideaProposalSchema),
+  maturity: ideaMaturitySchema,
+  version: ideaVersionSchema,
 });
 
 /** Une page ouverte : son contenu et les propositions en attente sur elle. */
@@ -165,3 +191,23 @@ export const ideaAgentStatusOutputSchema = z.object({
   configured: z.boolean(),
   canConfigure: z.boolean(),
 });
+
+/** Passage au cadrage (TK-91) : même clé d'idempotence que `idea.publish` ; le lot se suit par `specBatch.get`. */
+export const ideaFreezeInputSchema = ideaPublishInputSchema;
+export const ideaFreezeOutputSchema = z.object({
+  batchId: z.uuid(),
+  /** Étiquette `idea-vN` construite par le serveur. */
+  tag: z.string(),
+  /** La Synthèse ne bloque jamais le passage : `skipped` + le code d'erreur de l'appel d'IA. */
+  synthesis: z.enum(["generated", "skipped"]),
+  synthesisError: z.string().optional(),
+});
+
+/** Synthèse de l'idée : `source` = `idea-vN` quand elle est publiée avec cette version, `null` pour un aperçu. */
+export const ideaSynthesisSchema = z.object({
+  contentMd: z.string(),
+  source: z.string().nullable(),
+  generatedAt: z.iso.datetime(),
+});
+export const ideaSynthesisGetInputSchema = z.object(scoped);
+export const ideaSynthesisGetOutputSchema = ideaSynthesisSchema.nullable();

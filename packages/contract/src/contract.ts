@@ -57,7 +57,9 @@ import {
   type roleSchema,
 } from "./schemas.ts";
 import type {
+  ideaFreezeOutputSchema,
   ideaListOutputSchema,
+  ideaMaturitySchema,
   ideaMessageSchema,
   ideaPageDetailSchema,
   ideaPageSchema,
@@ -65,6 +67,8 @@ import type {
   ideaPresenceOutputSchema,
   ideaProposalOutputSchema,
   ideaProposalSchema,
+  ideaSynthesisSchema,
+  ideaVersionSchema,
 } from "./schemas-idea.ts";
 import type { projectClientSchema } from "./schemas-project-client.ts";
 import type { installationSchema, repoSchema } from "./schemas-provider.ts";
@@ -228,3 +232,7 @@ export type IdeaPageDetail = z.output<typeof ideaPageDetailSchema>;
 export type IdeaProposal = z.output<typeof ideaProposalSchema>;
 export type IdeaProposalOutput = z.output<typeof ideaProposalOutputSchema>;
 export type IdeaMessage = z.output<typeof ideaMessageSchema>;
+export type IdeaMaturity = z.output<typeof ideaMaturitySchema>;
+export type IdeaVersionInfo = z.output<typeof ideaVersionSchema>;
+export type IdeaFreezeOutput = z.output<typeof ideaFreezeOutputSchema>;
+export type IdeaSynthesis = z.output<typeof ideaSynthesisSchema>;

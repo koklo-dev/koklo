@@ -150,6 +150,9 @@ export const aiIdeaGapsOutputSchema = z.object({
   cached: z.boolean(),
 });
 
+/** Synthèse de l'idée (TK-91) : l'équipe la régénère ; la sortie est celle de `idea.synthesis.get`. */
+export const aiIdeaSynthesisInputSchema = z.object({ projectId: z.uuid() });
+
 export type AiIdeaChatInput = z.input<typeof aiIdeaChatInputSchema>;
 export type AiIdeaChatEvent = z.output<typeof aiIdeaChatEventSchema>;
 export type AiIdeaGapsOutput = z.output<typeof aiIdeaGapsOutputSchema>;

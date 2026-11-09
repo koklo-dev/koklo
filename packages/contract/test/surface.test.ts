@@ -20,7 +20,7 @@ const GROUPS: Record<string, string[]> = {
   audit: ["list"],
   installation: ["list", "start"],
   llmCredential: ["invalidate", "list", "remove", "set", "verify"],
-  ai: ["draftBrief", "ideaChat", "ideaGaps", "proposeCriteria", "proposeFeatures"],
+  ai: ["draftBrief", "ideaChat", "ideaGaps", "ideaSynthesis", "proposeCriteria", "proposeFeatures"],
   aiProvider: ["add", "list", "remove", "replaceKey", "setPrimary", "verify"],
   aiModel: ["listQualified"],
   aiUsage: ["report", "set"],
@@ -34,6 +34,7 @@ const GROUPS: Record<string, string[]> = {
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
   idea: [
     "agent",
+    "freeze",
     "get",
     "list",
     "message",
@@ -43,6 +44,7 @@ const GROUPS: Record<string, string[]> = {
     "publish",
     "save",
     "setStatus",
+    "synthesis",
   ],
   project: ["create", "list", "recent", "shell", "visit"],
   search: ["query"],
@@ -100,6 +102,9 @@ describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
 const AI_PAIRS = [
   "POST /projects/{projectId}/ai/idea/chat",
   "POST /projects/{projectId}/ai/idea/gaps",
+  "POST /projects/{projectId}/ai/idea/synthesis",
+  "POST /projects/{projectId}/idea/freeze",
+  "GET /projects/{projectId}/idea/synthesis",
   "POST /projects/{projectId}/ai/brief",
   "POST /projects/{projectId}/ai/features",
   "POST /projects/{projectId}/ai/criteria",
@@ -226,7 +231,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 sont présentes (109 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 sont présentes (112 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -247,7 +252,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(109);
+    expect(pairs).toHaveLength(112);
   });
 });
 

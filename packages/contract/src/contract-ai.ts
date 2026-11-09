@@ -22,11 +22,13 @@ import {
   aiIdeaChatInputSchema,
   aiIdeaGapsInputSchema,
   aiIdeaGapsOutputSchema,
+  aiIdeaSynthesisInputSchema,
   aiProposeCriteriaInputSchema,
   aiProposeCriteriaOutputSchema,
   aiProposeFeaturesInputSchema,
   aiProposeFeaturesOutputSchema,
 } from "./schemas-ai.ts";
+import { ideaSynthesisSchema } from "./schemas-idea.ts";
 
 /** Erreurs d'un appel au modèle, partagées par `ai.*` et `llmCredential.verify`. */
 export const llmCallErrors = {
@@ -77,4 +79,9 @@ export const ai = {
     .errors(proposalErrors)
     .input(aiIdeaGapsInputSchema)
     .output(aiIdeaGapsOutputSchema),
+  /** Régénère la Synthèse de l'idée (TK-91, 2.6.0) : `source` = dernière version figée, `null` pour un aperçu. */
+  ideaSynthesis: route("POST", "/projects/{projectId}/ai/idea/synthesis")
+    .errors(proposalErrors)
+    .input(aiIdeaSynthesisInputSchema)
+    .output(ideaSynthesisSchema),
 };

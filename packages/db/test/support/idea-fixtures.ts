@@ -38,9 +38,22 @@ export const IDEA_AGENT_ENUMS = [
 ] as const;
 export const IDEA_AGENT_SUFFIX = "_idea_agent";
 
+/** Tables et modèles ajoutés par TK-91 (versions figées `idea-vN` et Synthèse). */
+export const IDEA_VERSIONS_TABLES = ["idea_versions", "idea_synthesis"] as const;
+export const IDEA_VERSIONS_MODELS = ["IdeaVersion", "IdeaSynthesis"] as const;
+export const IDEA_VERSIONS_SUFFIX = "_idea_versions";
+
 /** Tout l'espace Idée : les migrations antérieures à `*_idea` ne le contiennent pas. */
-export const IDEA_TABLES = [...IDEA_BASE_TABLES, ...IDEA_AGENT_TABLES] as const;
-export const IDEA_MODELS = [...IDEA_BASE_MODELS, ...IDEA_AGENT_MODELS] as const;
+export const IDEA_TABLES = [
+  ...IDEA_BASE_TABLES,
+  ...IDEA_AGENT_TABLES,
+  ...IDEA_VERSIONS_TABLES,
+] as const;
+export const IDEA_MODELS = [
+  ...IDEA_BASE_MODELS,
+  ...IDEA_AGENT_MODELS,
+  ...IDEA_VERSIONS_MODELS,
+] as const;
 /** Types créés par les migrations de l'espace Idée (absents des bases de référence antérieures). */
 export const IDEA_ENUMS = [...IDEA_BASE_ENUMS, ...IDEA_AGENT_ENUMS] as const;
 /** Inventaire d'enums (`nom:valeurs` ou `nom`) sans ceux de l'espace Idée. */

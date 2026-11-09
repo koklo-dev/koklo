@@ -120,3 +120,38 @@ export function emitIdeaIndex(index: IdeaIndex): string {
   });
   return doc.toString({ lineWidth: 0, flowCollectionPadding: true });
 }
+
+/** Synthèse de l'idée à écrire dans `idea/_synthese.md` (TK-91) : texte généré, jamais une page du dossier. */
+export interface IdeaSynthesisFile {
+  /** Étiquette de la version qui la porte (`idea-vN`). */
+  readonly source: string;
+  /** Instant ISO 8601 ; seule la date est écrite. */
+  readonly updatedAt: string;
+  readonly contentMd: string;
+}
+
+const SYNTHESIS_SOURCE = /^idea-v[1-9][0-9]{0,3}$/;
+const SYNTHESIS_TITLE = "Synthèse";
+
+/** Fichier `idea/_synthese.md` : en-tête signalé `genere: true`, titre h1, puis le contenu généré. */
+export function emitIdeaSynthesis(synthesis: IdeaSynthesisFile): string {
+  if (!SYNTHESIS_SOURCE.test(synthesis.source)) {
+    throw new EmitIdeaError("étiquette de version invalide", "/source");
+  }
+  if (!ISO_DATE.test(synthesis.updatedAt)) throw new EmitIdeaError("date invalide", "/updatedAt");
+  if (synthesis.contentMd.includes("\0")) {
+    throw new EmitIdeaError("caractère NUL interdit", "/contentMd");
+  }
+  const header = stringify(
+    {
+      id: "_synthese",
+      titre: SYNTHESIS_TITLE,
+      genere: true,
+      source: synthesis.source,
+      mis_a_jour: synthesis.updatedAt.slice(0, 10),
+    },
+    { lineWidth: 0, flowCollectionPadding: false },
+  );
+  const body = synthesis.contentMd.trim() === "" ? "" : `\n${synthesis.contentMd}`;
+  return `---\n${header}---\n# ${SYNTHESIS_TITLE}\n${body}`;
+}

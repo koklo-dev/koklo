@@ -14,7 +14,7 @@ export const specBatchStatusSchema = z.enum([
   "failed",
   "conflict",
 ]);
-/** Types d'opérations d'un lot, tels que `specBatch.get` les rapporte : features (soumises) et pages d'idée (2.4.0, TK-89, produites par `idea.publish`). */
+/** Types d'opérations d'un lot, tels que `specBatch.get` les rapporte : features (soumises) et pages d'idée (2.4.0, TK-89, produites par `idea.publish`), Synthèse et tag de version (2.6.0, TK-91, produits par `idea.freeze`). */
 export const specOperationKindSchema = z.enum([
   "feature.create",
   "feature.update",
@@ -22,6 +22,8 @@ export const specOperationKindSchema = z.enum([
   "idea.page.write",
   "idea.page.delete",
   "idea.index.write",
+  "idea.synthesis.write",
+  "idea.version.tag",
 ]);
 
 const slug = "[a-z0-9][a-z0-9-]*";

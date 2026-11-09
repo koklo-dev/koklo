@@ -5,11 +5,13 @@ export {
   EmitIdeaError,
   emitIdeaIndex,
   emitIdeaPage,
+  emitIdeaSynthesis,
   type IdeaIndex,
   type IdeaIndexPage,
   type IdeaPageFile,
   type IdeaPageFileOrigin,
   type IdeaPageFileStatus,
+  type IdeaSynthesisFile,
 } from "./emit/idea.ts";
 export * from "./entities/index.ts";
 export { jsonSchemas, type SchemaName } from "./json-schemas.ts";

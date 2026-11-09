@@ -196,6 +196,8 @@ model Project {
   ideaProposals      IdeaProposal[]
   ideaAiLocks        IdeaAiLock[]
   ideaGapRuns        IdeaGapRun[]
+  ideaVersions       IdeaVersion[]
+  ideaSyntheses      IdeaSynthesis[]
   invitationProjects InvitationProject[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
@@ -1614,4 +1616,47 @@ model IdeaGapRun {
 
   @@index([organizationId])
   @@map("idea_gap_runs")
+}
+
+/// Version figée de l'idée (TK-91) : `idea-vN`, numérotée sans trou par projet (CHECK 1..9999, étiquette `idea-v<N>`).
+/// `batchId` : le lot de publication qui la porte ; `commitSha` : renseigné quand ce lot est commité ; une version dont le
+/// lot échoue est supprimée. `pagesVersions` : version de contenu figée par slug. `frozenBy` sans clé étrangère (RGPD).
+model IdeaVersion {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  number         Int
+  tag            String
+  batchId        String?  @map("batch_id") @db.Uuid
+  commitSha      String?  @map("commit_sha")
+  pagesVersions  Json     @map("pages_versions") @db.JsonB
+  frozenBy       String?  @map("frozen_by") @db.Uuid
+  frozenAt       DateTime @map("frozen_at") @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([projectId, number])
+  @@unique([projectId, batchId])
+  @@index([organizationId])
+  @@map("idea_versions")
+}
+
+/// Synthèse de l'idée d'un projet (TK-91) : une ligne par projet. `source` = `idea-vN` quand elle a été publiée avec
+/// cette version, vide pour un aperçu (jamais publié). Texte généré : jamais d'identité.
+model IdeaSynthesis {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @unique @map("project_id") @db.Uuid
+  contentMd      String   @map("content_md")
+  source         String?
+  generatedAt    DateTime @map("generated_at") @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([organizationId])
+  @@map("idea_synthesis")
 }
