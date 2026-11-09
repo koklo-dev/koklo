@@ -35,12 +35,12 @@ test("sans session, un ancien chemin renvoie vers /login (la garde passe avant l
   }
 });
 
-test("/projects/<id> ouvre le cahier fonctionnel ; /settings ouvre Membres ; section inconnue : 404", async ({
+test("/projects/<id> ouvre la vue d'ensemble (plus de redirection) ; /settings ouvre Membres ; section inconnue : 404", async ({
   page,
 }) => {
   await page.goto(PROJECT);
-  await expect(page).toHaveURL(new RegExp(`${PROJECT}/spec/functional\\?tab=features$`));
-  await expect(page.getByRole("heading", { level: 1, name: "Cahier fonctionnel" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${PROJECT}$`));
+  await expect(page.getByRole("heading", { level: 1, name: "Vue d'ensemble" })).toBeVisible();
   await page.goto("/settings");
   await expect(page).toHaveURL(/\/settings\/members$/);
   expect((await page.goto("/settings/inconnue"))?.status()).toBe(404);
@@ -59,7 +59,8 @@ test("/ et /kanban ouvrent le dernier projet ouvert, sinon la liste des projets"
     .poll(async () => (await fetch("http://127.0.0.1:3101/__visits")).json())
     .toContain(FEATURE_PROJECT_ID);
   await page.goto("/");
-  await expect(page).toHaveURL(new RegExp(`${PROJECT}/spec/functional\\?tab=features$`));
+  await expect(page).toHaveURL(new RegExp(`${PROJECT}$`));
+  await expect(page.getByRole("heading", { level: 1, name: "Vue d'ensemble" })).toBeVisible();
   await page.goto("/kanban");
   await expect(page).toHaveURL(new RegExp(`${PROJECT}/tickets$`));
   await expect(page.getByRole("heading", { level: 1, name: "Tickets" })).toBeVisible();
