@@ -6,6 +6,7 @@ import {
   seedTaggedBaseline,
 } from "./helpers/client-space.ts";
 import { installBench } from "./helpers/repo-scene.ts";
+import { shellApi } from "./helpers/shell.ts";
 import { seedIndex } from "./helpers/spec-read.ts";
 import { send } from "./helpers/tickets.ts";
 
@@ -104,6 +105,27 @@ describe("clientSpace.projects : phase", () => {
 
     expect(one.body[0].phase).toBe("iteration");
     expect(two.body[0].phase).toBe("framing");
+  });
+
+  it("phase unique (TK-92, B272) : une baseline validée, pas encore taguée, donne aussi iteration, comme project.shell", async () => {
+    const b = bench();
+    const { sha } = await seedIndex(b, scene.p1, [{ id: "F-001" }]);
+    await seedTaggedBaseline(b.database, scene.p1, sha);
+    await b.database.query(
+      "UPDATE baselines SET status = 'validated', tag_sha = NULL, tagged_at = NULL WHERE project_id = $1",
+      [scene.p1.projectId],
+    );
+
+    expect((await projectsOf(scene.c1)).body[0].phase).toBe("iteration");
+    const shell = await shellApi(b.app, scene.p1.world.actors.owner).shell(scene.p1.projectId);
+    expect(shell.body.phase).toBe("iterations");
+  });
+
+  it("un projet sans fonctionnalité ni version : framing côté client (idea et framing se confondent)", async () => {
+    const b = bench();
+    expect((await projectsOf(scene.c2)).body[0].phase).toBe("framing");
+    const shell = await shellApi(b.app, scene.p1.world.actors.owner).shell(scene.p2.projectId);
+    expect(shell.body.phase).toBe("idea");
   });
 
   it("une baseline seulement proposée ne ferme pas le cadrage", async () => {

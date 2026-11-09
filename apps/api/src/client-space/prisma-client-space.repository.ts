@@ -1,6 +1,8 @@
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
+import { readPhaseFacts } from "../project/prisma-project-shell.repository.ts";
+import { phaseOf } from "../project/project-shell.ts";
 import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -12,7 +14,7 @@ import type {
 } from "./client-space.repository.ts";
 import { latestReview } from "./validation.ts";
 
-/** Lecture seule : aucune méthode n'écrit (ni reviews, ni suggestions, ni audit). */
+/** Lecture seule : aucune méthode n'écrit (ni reviews, ni suggestions, ni audit) ; la phase réconcilie seulement les versions de l'idée, comme `project.shell`. */
 @Injectable()
 export class PrismaClientSpaceRepository implements ClientSpaceRepository {
   constructor(
@@ -25,22 +27,30 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
     organizationId: string,
     linkedIds: readonly string[] | null,
   ): Promise<ClientProjectRecord[]> {
-    const rows = await withOrganization(organizationId, () =>
-      this.database.client.project.findMany({
-        where: linkedIds === null ? {} : { id: { in: [...linkedIds] } },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: {
-          id: true,
-          name: true,
-          baselines: { where: { status: "tagged" }, select: { id: true }, take: 1 },
-        },
+    return withOrganization(organizationId, () =>
+      this.database.client.$transaction(async (tx) => {
+        const rows = await tx.project.findMany({
+          where: linkedIds === null ? {} : { id: { in: [...linkedIds] } },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: { id: true, name: true },
+        });
+        const projects: ClientProjectRecord[] = [];
+        for (const { id, name } of rows) {
+          // Même calcul que `project.shell` et `project.overview` (B272) ; le contrat du client garde `framing` / `iteration`.
+          const facts = await readPhaseFacts(tx, this.resolver, {
+            organizationId,
+            projectId: id,
+            userId: "",
+          });
+          projects.push({
+            id,
+            name,
+            phase: phaseOf(facts) === "iterations" ? "iteration" : "framing",
+          });
+        }
+        return projects;
       }),
     );
-    return rows.map(({ id, name, baselines }) => ({
-      id,
-      name,
-      phase: baselines.length > 0 ? "iteration" : "framing",
-    }));
   }
 
   /** Instantané de la tête courante, `null` si rien n'est indexé ou si l'indexation a échoué. */

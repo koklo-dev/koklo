@@ -27,6 +27,7 @@ import { OrganizationModule } from "./organization/organization.module.ts";
 import { ProjectModule } from "./project/project.module.ts";
 import { ProjectAccessModule } from "./project/project-access.module.ts";
 import { ProjectClientModule } from "./project-client/project-client.module.ts";
+import { ProjectOverviewModule } from "./project-overview/project-overview.module.ts";
 import { ProjectStateModule } from "./project-state/project-state.module.ts";
 import { GitProviderModule } from "./repo/git-provider.module.ts";
 import { RepoModule } from "./repo/repo.module.ts";
@@ -61,6 +62,9 @@ const CLIENT_SPACE_MODULES = [
 
 /** Réglages (TK-97) : membres, invitations avec projets, compte et préférences. */
 const SETTINGS_MODULES = [MemberModule, InvitationModule, MeModule];
+
+/** Projets (TK-92) : liste, création, coquille, puis la vue d'ensemble. */
+const PROJECT_MODULES = [ProjectModule, ProjectOverviewModule];
 
 @Module({})
 export class AppModule {
@@ -97,7 +101,7 @@ export class AppModule {
         OrganizationModule,
         ...SETTINGS_MODULES,
         ProjectAccessModule,
-        ProjectModule,
+        ...PROJECT_MODULES,
         ProjectClientModule,
         TicketModule,
         SprintModule,

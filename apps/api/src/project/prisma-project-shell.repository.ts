@@ -11,6 +11,7 @@ import type {
   RecentVisit,
   ShellRecord,
 } from "./project-shell.repository.ts";
+import type { ShellFacts } from "./project-shell.ts";
 
 const VALIDATED = ["validated", "tagged"] as const;
 
@@ -33,6 +34,24 @@ async function committedIdeaVersions(tx: Tx, scope: ProjectScope): Promise<numbe
   return tx.ideaVersion.count({ where: { projectId: scope.projectId, commitSha: { not: null } } });
 }
 
+/**
+ * Faits qui décident de la phase, lus une fois pour `project.shell`, `project.overview` et `clientSpace.projects`
+ * (TK-92, B272). Le lot commité d'une version est réconcilié à la lecture : la phase suit le commit sans passer par la liste.
+ */
+export async function readPhaseFacts(
+  tx: Tx,
+  resolver: SpecHeadResolver,
+  scope: ProjectScope,
+): Promise<ShellFacts> {
+  return {
+    featureCount: await featureCount(tx, resolver, scope),
+    validatedBaselines: await tx.baseline.count({
+      where: { projectId: scope.projectId, status: { in: [...VALIDATED] } },
+    }),
+    ideaVersions: await committedIdeaVersions(tx, scope),
+  };
+}
+
 @Injectable()
 export class PrismaProjectShellRepository implements ProjectShellRepository {
   constructor(
@@ -49,12 +68,7 @@ export class PrismaProjectShellRepository implements ProjectShellRepository {
       });
       return {
         ...project,
-        featureCount: await featureCount(tx, this.resolver, scope),
-        validatedBaselines: await tx.baseline.count({
-          where: { projectId: scope.projectId, status: { in: [...VALIDATED] } },
-        }),
-        // Le lot commité d'une version est réconcilié à la lecture : la phase suit le commit sans passer par la liste.
-        ideaVersions: await committedIdeaVersions(tx, scope),
+        ...(await readPhaseFacts(tx, this.resolver, scope)),
         activeSprintTickets: await activeSprintTickets(tx, scope.projectId),
       };
     });
