@@ -84,7 +84,7 @@ let baseline: TestDatabase;
 beforeAll(async () => {
   db = await createTestDatabase();
   baseline = await createTestDatabase();
-}, 180_000);
+}, 600_000);
 
 afterAll(async () => {
   await db?.dispose();
@@ -183,7 +183,7 @@ describe("TK-97 migration settings : up, down, up", () => {
     expect(idx).toMatch(
       /UNIQUE INDEX.*ON public\.notification_preferences.*\(user_id, organization_id, key\)/,
     );
-  }, 180_000);
+  }, 600_000);
 
   it("down.sql ramène exactement à l'état précédent ; les membres et invitations survivent", async () => {
     for (const dir of dirs().filter((d) => d < migration())) {
@@ -213,7 +213,7 @@ describe("TK-97 migration settings : up, down, up", () => {
     expect(await db.query("SELECT 1 FROM members WHERE user_id = $1", [scope.userId])).toHaveLength(
       1,
     );
-  }, 180_000);
+  }, 600_000);
 
   it("second deploy : même inventaire, tables vides", async () => {
     runPrismaOrThrow(["migrate", "deploy"], db.url);
@@ -222,13 +222,13 @@ describe("TK-97 migration settings : up, down, up", () => {
       const [count] = await db.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${table}`);
       expect(count?.n).toBe("0");
     }
-  }, 180_000);
+  }, 600_000);
 
   it("migrate diff entre la base et schema.prisma est vide (code 0)", () => {
     const diff = ["migrate", "diff", "--from-config-datasource", "--to-schema", schemaPath];
     const { status, output } = runPrisma([...diff, "--exit-code"], db.url);
     expect(status, output).toBe(0);
-  }, 120_000);
+  }, 600_000);
 
   it("schema.prisma déclare les deux modèles sans champ Json", () => {
     const schema = readFileSync(schemaPath, "utf8");

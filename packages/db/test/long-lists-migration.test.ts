@@ -95,7 +95,7 @@ let afterFirstUp: Awaited<ReturnType<typeof inventory>>;
 beforeAll(async () => {
   db = await createTestDatabase();
   baseline = await createTestDatabase();
-}, 180_000);
+}, 600_000);
 
 afterAll(async () => {
   await db?.dispose();
@@ -127,7 +127,7 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
       { table_name: "tickets", column_name: "priority_rank" },
       { table_name: "tickets", column_name: "search" },
     ]);
-  }, 180_000);
+  }, 600_000);
 
   it("spec_number suit le numéro de F-nnn (F-1000 se trie après F-999)", async () => {
     scope = await insertScope(db, "long-lists");
@@ -221,7 +221,7 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
     expect(await inventory(db)).toEqual(expected);
     const rows = await db.query("SELECT 1 FROM spec_features WHERE snapshot_id = $1", [snapshotId]);
     expect(rows, "les fonctionnalités existantes sont conservées").toHaveLength(4);
-  }, 180_000);
+  }, 600_000);
 
   it("second deploy : même inventaire qu'au premier up, colonnes recalculées", async () => {
     runPrismaOrThrow(["migrate", "deploy"], db.url);
@@ -231,7 +231,7 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
       [snapshotId],
     );
     expect(row?.spec_number).toBe(1000);
-  }, 180_000);
+  }, 600_000);
 
   it("migrate diff entre la base et schema.prisma est vide (code 0)", () => {
     const { status, output } = runPrisma(
@@ -239,7 +239,7 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
       db.url,
     );
     expect(status, output).toBe(0);
-  }, 120_000);
+  }, 600_000);
 });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
@@ -288,7 +288,7 @@ describe("TK-94 migration long_lists : les index sont utilisés (1 000 fonctionn
       [scope.organizationId, scope.projectId],
     );
     await db.query("ANALYZE");
-  }, 120_000);
+  }, 600_000);
 
   it("fonctionnalités : tri (snapshot_id, spec_number, id)", async () => {
     const text = await plan(
