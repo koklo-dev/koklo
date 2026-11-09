@@ -95,7 +95,12 @@ export function InlineAlert({
       className={cn(inlineAlertVariants({ variant }), className)}
       {...props}
     >
-      <div className="flex flex-1 items-center gap-2.5 py-1.5 pr-2 pl-3">
+      <div
+        className={cn(
+          "flex flex-1 items-center gap-2.5 py-1.5 pr-2 pl-3",
+          actions && "max-md:flex-wrap",
+        )}
+      >
         <Icon name={icon} size={18} className="shrink-0" />
         <div className="min-w-0 flex-1 py-1">{children}</div>
         {action ? (
@@ -104,7 +109,7 @@ export function InlineAlert({
           </button>
         ) : null}
         {actions ? (
-          <span className="flex shrink-0 flex-wrap items-center gap-2">
+          <span className="flex flex-wrap items-center gap-2 md:shrink-0 max-md:basis-full max-md:pb-1 max-md:pl-7">
             {actions.map((item) => (
               <Button
                 key={item.label}

@@ -90,14 +90,14 @@ export function StatusLegend({ className }: { className?: string }) {
   );
 }
 
-/** Étiquette « requise » d'une page (10/600, bordure, rayon 4). */
-export function RequiredTag() {
+/** Étiquette d'une ligne de l'arborescence (10/600, bordure, rayon 4) : « requise » par défaut, « générée » pour la Synthèse. */
+export function RequiredTag({ label = "requise", title }: { label?: string; title?: string }) {
   return (
     <span
-      title="Page requise pour passer au cadrage"
+      title={title ?? (label === "requise" ? "Page requise pour passer au cadrage" : undefined)}
       className="rounded-[4px] border border-border px-1 text-[10px] font-semibold leading-4 text-muted-foreground"
     >
-      requise
+      {label}
     </span>
   );
 }
@@ -165,5 +165,44 @@ export function PageNavItem({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Ligne « Synthèse » (maquette 06 l.74, DESIGN.md §5.10) : première de l'arborescence, hors liste réordonnable. 34 px,
+ * bordure, rayon 6, icône `wand_stars` 18, étiquette « générée ». Ni poignée, ni menu, ni statut.
+ */
+export function SynthesisNavItem({
+  href,
+  current = false,
+  label = "Synthèse",
+  tag = "générée",
+  LinkComponent: Link = "a" as unknown as ShellLink,
+  linkProps,
+}: {
+  href: string;
+  current?: boolean;
+  label?: string;
+  /** Étiquette à droite ; `null` pour ne rien afficher. */
+  tag?: string | null;
+  LinkComponent?: ShellLink;
+  linkProps?: AnchorHTMLAttributes<HTMLAnchorElement>;
+}) {
+  return (
+    <Link
+      {...linkProps}
+      href={href}
+      data-slot="synthesis-nav-item"
+      aria-current={current ? "page" : undefined}
+      className={cn(
+        "mb-1.5 flex min-h-9 min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-meta hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11",
+        current && "bg-secondary font-semibold",
+        linkProps?.className,
+      )}
+    >
+      <Icon name="wand_stars" size={18} className="shrink-0 text-primary" />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {tag ? <RequiredTag label={tag} /> : null}
+    </Link>
   );
 }
