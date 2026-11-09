@@ -389,3 +389,6 @@ Tests à réécrire avec ces retraits :
 | Bulle d'agent avec lien vers le document | Pas de lien (B242) | Aucun type « page » dans `EntityChip` |
 | Carte « Ce qui manque encore » toujours présente | Après « Voir ce qui manque » (B243) | Un appel du modèle consomme le quota |
 
+| Bouton « Passer au cadrage » : seul l'état désactivé est dessiné (l.62) | État actif : bouton principal du catalogue (B262) | La planche ne montre pas l'état atteint |
+| Synthèse, aperçu, « Modifié depuis idea-vN » absents de la planche | Composés avec `Prose`, `EmptyState`, `InlineAlert` (DESIGN.md §5.10, B262) | Décision 05 §2 les décrit sans les dessiner |
+| Boutons d'en-tête de l'espace Idée à 375 px : largeur naturelle, 36 px (l.61-62) | Pleine largeur, 44 px (B271) | Cible tactile WCAG 2.2 et fiche S-idea |
