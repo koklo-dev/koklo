@@ -39,6 +39,7 @@ export * from "./components/label.tsx";
 export * from "./components/lifecycle-status.tsx";
 export * from "./components/list-footer.tsx";
 export * from "./components/list-row.tsx";
+export * from "./components/maturity-meter.tsx";
 export * from "./components/page-header.tsx";
 export * from "./components/page-status.tsx";
 export * from "./components/pagination.tsx";

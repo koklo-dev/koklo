@@ -239,6 +239,26 @@ describe("InlineAlert TK-139", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
+  it("actions : sous md la rangée passe à la ligne et les actions occupent toute la largeur sous le texte", () => {
+    const { container } = render(
+      <InlineAlert
+        variant="neutral"
+        icon="lock"
+        actions={[
+          { label: "Revoir", onClick: () => undefined },
+          { label: "Passer quand même", onClick: () => undefined },
+        ]}
+      >
+        Il reste 2 questions ouvertes.
+      </InlineAlert>,
+    );
+    const row = container.querySelector('[data-slot="inline-alert"] > div');
+    expect(row).toHaveClass("max-md:flex-wrap");
+    const group = screen.getByRole("button", { name: "Revoir" }).parentElement;
+    expect(group).toHaveClass("max-md:basis-full", "md:shrink-0");
+    expect(group).not.toHaveClass("shrink-0");
+  });
+
   it("actions dans le ton neutre : bouton contour", () => {
     render(
       <InlineAlert
