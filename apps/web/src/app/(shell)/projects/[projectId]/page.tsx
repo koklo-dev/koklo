@@ -1,12 +1,15 @@
-import { redirect } from "next/navigation";
-import { featuresPath } from "../../../../lib/shell-routes.ts";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { OverviewPage } from "../../../../components/overview-page.tsx";
 
-/** Vue d'ensemble du projet (lot 3) : en attendant, le cahier fonctionnel, onglet Fonctionnalités. */
+export const metadata: Metadata = { title: "Vue d'ensemble · Koklo" };
+
+/** Vue d'ensemble du projet (lot 3, S-overview) : remplace la redirection provisoire vers le cahier fonctionnel. */
 export default async function Page({
   params,
 }: {
   params: Promise<{ projectId: string }>;
-}): Promise<never> {
+}): Promise<ReactNode> {
   const { projectId } = await params;
-  redirect(featuresPath(projectId));
+  return <OverviewPage projectId={projectId} />;
 }

@@ -6,6 +6,7 @@ import { DevUiLists } from "./dev-ui-lists.tsx";
 import { DevUiListsB } from "./dev-ui-lists-b.tsx";
 import { DevUiNav } from "./dev-ui-nav.tsx";
 import { DevUiSurfacesB } from "./dev-ui-overlays.tsx";
+import { DevUiOverview } from "./dev-ui-overview.tsx";
 import { DevUiPrimitivesA } from "./dev-ui-primitives-a.tsx";
 import { DevUiPrimitivesB } from "./dev-ui-primitives-b.tsx";
 import { DevUiPrimitivesC } from "./dev-ui-primitives-c.tsx";
@@ -94,6 +95,7 @@ export function DevUiGallery() {
         <DevUiSurfacesC />
         <DevUiIdea />
         <DevUiAgent />
+        <DevUiOverview />
       </main>
     </div>
   );

@@ -29,6 +29,8 @@ export const isSettingsSection = (value: string): value is SettingsSection =>
 export const PROJECTS_PATH = "/projects";
 export const settingsPath = (section: SettingsSection): string => `/settings/${section}`;
 export const projectPath = (projectId: string): string => `/projects/${projectId}`;
+/** Activité complète du projet (liste à curseur de `project.activity`). */
+export const activityPath = (projectId: string): string => `/projects/${projectId}/activity`;
 export const ideaPath = (projectId: string): string => `/projects/${projectId}/idea`;
 export const framingPath = (projectId: string): string => `/projects/${projectId}/framing`;
 export const ticketsPath = (projectId: string): string => `/projects/${projectId}/tickets`;

@@ -24,11 +24,11 @@ const EXACT_PATHS: readonly string[] = [
   "/organizations",
 ];
 /**
- * `/projects/<un segment>`, `…/idea`, `…/framing`, `…/tickets`, `…/features` (ancien chemin, redirigé) ou
+ * `/projects/<un segment>`, `…/idea`, `…/framing`, `…/tickets`, `…/activity`, `…/features` (ancien chemin, redirigé) ou
  * `…/spec/<livrable>` : jamais de sous-chemin inconnu ni de barre oblique finale.
  */
 const PROJECT_PAGE = new RegExp(
-  `^/projects/[^/]+(?:/(?:idea|framing|tickets|features)|/spec/(?:${SPEC_SLUGS.join("|")}))?$`,
+  `^/projects/[^/]+(?:/(?:idea|framing|tickets|features|activity)|/spec/(?:${SPEC_SLUGS.join("|")}))?$`,
 );
 
 /**

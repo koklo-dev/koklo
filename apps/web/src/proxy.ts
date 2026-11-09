@@ -16,7 +16,7 @@ const GITHUB_CALLBACK_PATH = "/api/github/callback";
  * - `/api/webhooks/github` est relayé tel quel, sans session (livraisons signées de GitHub) ;
  * - `/api/github/callback` est relayé tel quel avec le cookie de session, sans lecture de session ici :
  *   l'API arbitre (session absente ou état invalide = `/settings/github?result=invalid_state`, jamais `/login`) ;
- * - `/login`, `/projects`, les pages d'un projet (`/projects/<id>`, `idea`, `framing`, `tickets`, `spec/<livrable>`),
+ * - `/login`, `/projects`, les pages d'un projet (`/projects/<id>`, `idea`, `framing`, `tickets`, `activity`, `spec/<livrable>`),
  *   `/kanban`, `/settings` et ses sections, et `/organizations` sont gardés selon la session et l'organisation active ;
  * - une fois la garde passée, les anciens chemins (`/projects/<id>/features`, `/members`, `/github`) sont redirigés
  *   en 307 vers la coquille avec toute la requête (jamais avant la garde : pas de redirection vers une page protégée) ;
@@ -79,6 +79,7 @@ export const config = {
     "/projects/:projectId/framing",
     "/projects/:projectId/tickets",
     "/projects/:projectId/features",
+    "/projects/:projectId/activity",
     "/projects/:projectId/spec/:slug",
     "/kanban",
     "/members",
