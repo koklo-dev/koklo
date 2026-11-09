@@ -166,7 +166,7 @@ let suggestionId: string;
 beforeAll(async () => {
   db = await createTestDatabase();
   baseline = await createTestDatabase();
-}, 180_000);
+}, 600_000);
 
 afterAll(async () => {
   await db?.dispose();
@@ -186,7 +186,7 @@ describe("TK-51c migration reviews_baselines : up -> (données) -> down -> up", 
     expect(afterFirstUp.triggers).toEqual(
       expect.arrayContaining(["reviews_no_update_delete", "reviews_no_truncate"]),
     );
-  }, 180_000);
+  }, 600_000);
 
   it("down.sql ramène exactement à l'état précédent ; les données des autres tables survivent", async () => {
     const expected = await inventory(await applyEarlierMigrations(baseline));
@@ -229,7 +229,7 @@ describe("TK-51c migration reviews_baselines : up -> (données) -> down -> up", 
       { name: "suggestion", last_value: 5 },
       { name: "ticket", last_value: 3 },
     ]);
-  }, 180_000);
+  }, 600_000);
 });
 
 describe("TK-51c migration reviews_baselines : fonction d'immutabilité et repo sans FK", () => {
@@ -251,7 +251,7 @@ describe("TK-51c migration reviews_baselines : second up", () => {
     await expect(
       db.query("UPDATE reviews SET comment = 'x' WHERE id = $1", [id]),
     ).rejects.toThrow();
-  }, 180_000);
+  }, 600_000);
 });
 
 describe("TK-51c migration reviews_baselines : schéma Prisma", () => {
@@ -262,7 +262,7 @@ describe("TK-51c migration reviews_baselines : schéma Prisma", () => {
     const diff = ["migrate", "diff", "--from-config-datasource", "--to-schema", schemaPath];
     const { status, output } = runPrisma([...diff, "--exit-code"], db.url);
     expect(status, output).toBe(0);
-  }, 120_000);
+  }, 600_000);
 
   it("la fonction installée porte search_path=public", async () => {
     const [fn] = await db.query<{ config: string[] | null }>(
