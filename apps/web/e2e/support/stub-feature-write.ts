@@ -268,6 +268,8 @@ export function handleFeatureWrites(req: IncomingMessage, url: URL, h: Handlers)
     return true;
   }
   if (req.method === "GET" && batchId) {
+    // Lot inconnu d'ici : le faux API de l'Idée (passage au cadrage) peut le connaître.
+    if (!batches.some((b) => b.id === batchId)) return false;
     get(batchId, h);
     return true;
   }

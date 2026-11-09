@@ -2,6 +2,7 @@
 
 import {
   AvatarGroup,
+  MaturityMeter,
   PageNavItem,
   PageStatus,
   type PageStatusValue,
@@ -10,6 +11,7 @@ import {
   ProsePath,
   ReorderableList,
   StatusLegend,
+  SynthesisNavItem,
   TaskCheckbox,
   TaskItem,
   taskItemClassName,
@@ -79,6 +81,28 @@ export function DevUiIdea() {
             <PageStatus key={status} status={status} pill />
           ))}
         </DevUiRow>
+      </DevUiFrame>
+      <DevUiFrame title="Jauge de maturité (crans qui passent à la ligne)">
+        <DevUiRow>
+          <MaturityMeter stable={3} total={10} />
+        </DevUiRow>
+        <DevUiRow>
+          <MaturityMeter stable={1} total={10} />
+          <MaturityMeter stable={10} total={10} />
+        </DevUiRow>
+        <div className="w-40 max-w-full">
+          <MaturityMeter stable={4} total={16} />
+        </div>
+      </DevUiFrame>
+      <DevUiFrame title="Ligne Synthèse (hors liste réordonnable)">
+        <nav
+          aria-label="Synthèse de la démonstration"
+          className="flex w-[240px] max-w-full flex-col"
+        >
+          <SynthesisNavItem href="/dev/ui#dev-ui-idea" />
+          <SynthesisNavItem href="/dev/ui#dev-ui-idea" current />
+          <SynthesisNavItem href="/dev/ui#dev-ui-idea" tag={null} />
+        </nav>
       </DevUiFrame>
       <DevUiFrame title="Pile d'avatars">
         <AvatarGroup label="Présents dans le dossier" people={PEOPLE} />

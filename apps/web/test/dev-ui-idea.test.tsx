@@ -13,4 +13,13 @@ describe("galerie /dev/ui : section Espace Idée", () => {
     expect(within(region).getByText("idea/perimetre.md")).toBeVisible();
     expect(within(region).getByText(/taper « \/ » pour insérer un bloc/)).toBeVisible();
   });
+
+  it("TK-91 : jauge de maturité et ligne Synthèse", () => {
+    render(<DevUiIdea />);
+    const region = screen.getByRole("region", { name: "12. Espace Idée" });
+    const meters = within(region).getAllByRole("meter", { name: "Maturité du dossier" });
+    expect(meters.length).toBeGreaterThanOrEqual(2);
+    expect(within(region).getByText("1 page stable sur 10")).toBeVisible();
+    expect(within(region).getAllByRole("link", { name: /Synthèse/ })).toHaveLength(3);
+  });
 });

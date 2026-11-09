@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { ideaPhase } from "./stub-idea-agent.ts";
 
 /**
  * Faux API de la coquille (TK-88, contrat 2.1.0) : `project.shell`, `project.visit`, `project.recent` et
@@ -122,7 +123,7 @@ function shellResponse(projectId: string, h: Handlers): Reply {
   return reply(200, {
     id: project.id,
     name: project.name,
-    phase: "framing",
+    phase: ideaPhase(),
     deliverables: DELIVERABLES.map(([key, available, after]) => ({ key, available, after })),
     validatedCount: 0,
     ticketCount: noSprint ? null : 8,
