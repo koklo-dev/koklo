@@ -6,7 +6,7 @@ export const CLIENT_SPACE_REPOSITORY = Symbol("CLIENT_SPACE_REPOSITORY");
 export interface ClientProjectRecord {
   id: string;
   name: string;
-  /** `iteration` ssi une baseline taguée existe, sinon `framing`. */
+  /** `iteration` ssi `phaseOf` donne `iterations` (une baseline validée ou taguée, B272), sinon `framing`. */
   phase: "framing" | "iteration";
 }
 
