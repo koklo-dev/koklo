@@ -4,6 +4,7 @@ import type { HTMLAttributes } from "react";
 import { primeIcon } from "../icons/cache.ts";
 import * as checkCircle from "../icons/generated/check_circle.ts";
 import * as edit from "../icons/generated/edit.ts";
+import * as editNote from "../icons/generated/edit_note.ts";
 import * as radioButtonUnchecked from "../icons/generated/radio_button_unchecked.ts";
 import * as schedule from "../icons/generated/schedule.ts";
 import { Icon, type IconName } from "../icons/icon.tsx";
@@ -15,8 +16,9 @@ primeIcon("radio_button_unchecked", radioButtonUnchecked);
 primeIcon("edit", edit);
 primeIcon("schedule", schedule);
 primeIcon("check_circle", checkCircle);
+primeIcon("edit_note", editNote);
 
-export type DeliverableStatusValue = "todo" | "in_progress" | "pending" | "validated";
+export type DeliverableStatusValue = "todo" | "in_progress" | "pending" | "revise" | "validated";
 
 const DELIVERABLE: Record<
   DeliverableStatusValue,
@@ -25,6 +27,7 @@ const DELIVERABLE: Record<
   todo: { label: "À faire", icon: "radio_button_unchecked", tone: "neutral" },
   in_progress: { label: "En cours", icon: "edit", tone: "neutral" },
   pending: { label: "À valider", icon: "schedule", tone: "pending" },
+  revise: { label: "À revoir", icon: "edit_note", tone: "revise" },
   validated: { label: "Validé", icon: "check_circle", tone: "validated" },
 };
 
@@ -64,7 +67,7 @@ export function DeliverableStatus({
       )}
       {...props}
     >
-      <Icon name={icon} size={16} fill />
+      <Icon name={icon} size={16} fill={tone !== "neutral"} />
       <span className={hideLabel ? "sr-only" : undefined}>{label}</span>
     </span>
   );

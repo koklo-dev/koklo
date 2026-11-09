@@ -107,6 +107,9 @@ export const ICON_NAMES = [
   "subdirectory_arrow_right",
   // Surfaces (TK-139) : bandeau de demande de changements (planche 22)
   "rate_review",
+  // Vue d'ensemble (TK-92) : carte Livrables
+  "inventory_2",
+  "forum",
   // Réglages (TK-141) : navigation secondaire, Membres
   "group",
   // Espace Idée (TK-89)

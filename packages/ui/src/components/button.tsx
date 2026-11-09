@@ -25,6 +25,7 @@ const baseVariants = cva(
       size: {
         xs: "h-7 gap-1.5 px-2.5 text-caption",
         sm: "h-8 gap-1.5 px-3 text-meta",
+        compact: "h-[30px] gap-1.5 px-2.5 text-meta",
         default: "h-9 px-3.5",
         lg: "h-10 px-4",
         icon: "size-9",
@@ -82,7 +83,7 @@ type IconSizedProps = CommonProps & { size: "icon" } & (
   );
 
 type TextSizedProps = CommonProps & {
-  size?: "xs" | "sm" | "default" | "lg";
+  size?: "xs" | "sm" | "compact" | "default" | "lg";
   "aria-label"?: string;
   "aria-labelledby"?: string;
 };

@@ -34,17 +34,22 @@ export function PageStatus({
   status: PageStatusValue;
   size?: 16 | 18;
   showLabel?: boolean;
-  pill?: boolean;
+  pill?: boolean | "status";
   className?: string;
 }) {
   const icon = ICON[status];
   if (pill) {
     return (
       <Pill
-        tone="soft"
+        tone={pill === "status" && status === "stable" ? "success" : "soft"}
         icon={icon.name}
+        iconFill={pill === "status" ? status === "stable" : true}
         data-status={status}
-        className={cn("pl-2 text-foreground", className)}
+        className={cn(
+          pill !== "status" && "pl-2",
+          pill === "status" && status === "stable" ? "" : "text-foreground",
+          className,
+        )}
       >
         {PAGE_STATUS_LABEL[status]}
       </Pill>
