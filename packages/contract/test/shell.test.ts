@@ -39,14 +39,22 @@ describe("SH1 surface additive", () => {
     expect((await doc()).paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("les procédures de project existantes sont inchangées (list, create) et trois s'ajoutent", () => {
+  it("les procédures de project existantes sont inchangées (list, create) et cinq s'ajoutent", () => {
     const group = (api.contract as unknown as Record<string, object>).project;
-    expect(Object.keys(group ?? {}).sort()).toEqual(["create", "list", "recent", "shell", "visit"]);
+    expect(Object.keys(group ?? {}).sort()).toEqual([
+      "activity",
+      "create",
+      "list",
+      "overview",
+      "recent",
+      "shell",
+      "visit",
+    ]);
   });
 
-  it("le contrat est en 2.6.0 (version mineure : aucune route retirée ni modifiée)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.6.0");
-    expect((await doc()).info.version).toBe("2.6.0");
+  it("le contrat est en 2.7.0 (version mineure : aucune route retirée ni modifiée)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.7.0");
+    expect((await doc()).info.version).toBe("2.7.0");
   });
 });
 

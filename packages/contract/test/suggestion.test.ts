@@ -53,9 +53,9 @@ describe("SG1 surface : exactement accept, create, list, reject, withdraw", () =
     expect((await doc()).paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("le contrat courant est 2.6.0 (suggestion est apparu en 0.12.0, review en 0.13.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.6.0");
-    expect((await doc()).info.version).toBe("2.6.0");
+  it("le contrat courant est 2.7.0 (suggestion est apparu en 0.12.0, review en 0.13.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.7.0");
+    expect((await doc()).info.version).toBe("2.7.0");
   });
 });
 
