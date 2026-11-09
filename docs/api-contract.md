@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.5.0** (TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.6.0** (TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1429,6 +1429,14 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.6.0** (TK-91, lot A): idea maturity, Synthesis and `idea-vN` versions. New routes `idea.freeze`
+  (`POST /projects/{projectId}/idea/freeze`), `idea.synthesis.get` (`GET .../idea/synthesis`) and `ai.ideaSynthesis`
+  (`POST .../ai/idea/synthesis`); 3 routes, 112 routes and 86 paths in all. **Additive** to `idea.list`: the listing
+  gains `maturity` (`stable`, `total`, `missingRequired`, `openQuestions`) and `version` (`latest`, `modifiedSince`);
+  no route removed, no input changed. New tables `idea_versions` and `idea_synthesis` (migration
+  `20261109090000_idea_versions`, with `down.sql`). `specBatch.get` `results[].kind` also lists
+  `idea.synthesis.write` and `idea.version.tag`. The fingerprint of 2.5.0 is frozen in
+  `packages/contract/test/contract.test.ts`. See "Idea maturity, Synthesis and versions (TK-91)".
 - **2.5.0** (TK-90, lot A): idea space agent. New sub-groups `idea.proposal` (`decide`, `undo`), `idea.message`
   (`list`) and `idea.agent` (`status`) plus `ai.ideaChat` (event stream) and `ai.ideaGaps`; 6 routes, 109 routes and
   83 paths in all. **Additive** to `idea.list` (each page gains `pendingProposals`, the listing gains
@@ -1522,6 +1530,23 @@ seven writes as denied to a client.
   `LEASE_NOT_HOLDER`, `VALIDATION`; `CONFLICT.reason` extended. Backward compatible
   (pre-1.0 addition); the frozen fingerprint of 0.3.0 is unchanged.
 - 0.3.0 (TK-21): organisations, members, projects.
+
+## Idea maturity, Synthesis and versions (TK-91)
+
+Moving to framing freezes the idea as a numbered version (`idea-v1`, `idea-v2`, ... without gaps) and opens the
+functional specification. Rights are checked on the server; a client or business user never freezes nor regenerates.
+
+| Procedure | Route | Roles | Notes |
+|---|---|---|---|
+| `idea.freeze` | `POST /projects/{projectId}/idea/freeze` | owner, admin, dev, designer | Body `{ idempotencyKey }`. Refused `403 FORBIDDEN` with `data.reason: "framing_threshold"` while a required page (flag `required`, which follows renaming and moving; trash excluded) is not `stable`. Generates the Synthesis (never blocking: `synthesis: "skipped"` + `synthesisError` when no key, cap reached or model error), allocates the number, then registers ONE batch on `cadrage`: `idea.page.write` per page, `idea.page.delete`, `idea.index.write`, `idea.synthesis.write` (when generated) and `idea.version.tag`. Answer `{ batchId, tag, synthesis, synthesisError? }`; follow the batch with `specBatch.get`. Same key and same project: the same batch; another freeze still running: `409 SPEC_BATCH_CONFLICT` (`write_conflict`). |
+| `idea.synthesis.get` | `GET .../idea/synthesis` | six read roles | `{ contentMd, source, generatedAt }` or `null`. `source` is `idea-vN` once published with that version, `null` for a preview (never published). |
+| `ai.ideaSynthesis` | `POST .../ai/idea/synthesis` | owner, admin, dev, designer | Regenerates the Synthesis (same admissions as `ai.ideaGaps`: organization cap, quota, exclusive lock per project). `source` is the latest version, `null` before the first. |
+
+- **`idea.list`** adds `maturity.stable / total` (active pages; the Synthesis is not a page), `maturity.missingRequired` (current titles of required pages not yet stable) and `maturity.openQuestions` (unchecked `- [ ]` tasks of the `hypotheses-risques` page, trash excluded; the server never blocks on them). `version.latest` is the newest version whose batch is committed; `version.modifiedSince` is true when a page was added, removed or changed version since then (a new Synthesis does not count).
+- **Worker**: after the commit (also on the recovery path) it creates the git tag `idea-vN` on the commit. The name is built by the server and revalidated (`^idea-v[1-9][0-9]{0,3}$`); a tag already on the same commit is accepted, a transient failure is retried. `idea/_synthese.md` carries `genere: true`, `source: idea-vN` and `mis_a_jour`.
+- **Phase**: `idea` until a version has a commit (or a feature exists), then `framing`.
+- **What reaches the model**: page titles and content only (authors are "l'équipe" or "le client"); never an e-mail, a name or an id.
+- **Audit**: `idea.freeze` (on the project) and `ai.idea.synthesis`.
 
 ## Idea agent (TK-90)
 

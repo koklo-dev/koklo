@@ -380,6 +380,17 @@ Galerie : `/dev/ui`, section « 12. Espace Idée » (id `dev-ui-idea`). Sous 102
 
 Galerie : `/dev/ui`, section « 13. Agent de l'espace Idée » (id `dev-ui-agent`). Mention du fournisseur : jamais son nom (« Envoyé au fournisseur d'IA de l'organisation, avec sa clé », B228). Sous 1024 px le panneau passe sous le document. Dès 1024 px il occupe la hauteur sous l'en-tête (l'espace Idée fait la hauteur de la fenêtre ; arborescence, document et fil défilent chacun, saisie ancrée en bas). `Textarea mono` : texte de la proposition à modifier. Le texte d'une proposition se rend dans `Prose`. Justification, auteur et indication de mode : 12/400.
 
+### 5.10 Maturité, Synthèse et passage au cadrage (v2.12, TK-91, passation 02 §9, décision 05 §2 « Lot 2 », maquette 06 l.43-64 et l.74)
+
+| Composant | Règle |
+|---|---|
+| `MaturityMeter` | `role="meter"` nommé « Maturité du dossier », `aria-valuemin` 0, `aria-valuemax` = pages hors corbeille, `aria-valuenow` = pages stables. Crans de 10 × 6 (rayon 2, écart 3) : atteints `--primary`, restants `--border-strong` ; les crans passent à la ligne au-delà de la largeur disponible. Le texte « N pages stables sur M » (13 `--muted-foreground`, « 1 page stable » au singulier) l'accompagne : la jauge n'est jamais seule, ni la couleur. |
+| `SynthesisNavItem` | Première ligne de l'arborescence, au-dessus de la liste numérotée, hors `ReorderableList` : 34 de haut, bordure `--border`, rayon 6, fond `--background`, icône `wand_stars` 18 `--primary` (`auto_awesome` absente du jeu, B230), libellé « Synthèse », étiquette « générée » (même gabarit que `RequiredTag`). Page courante : `--secondary` 600, `aria-current="page"`. Ni poignée, ni menu, ni statut, ni pastille. |
+| `Button` « Passer au cadrage » | Principal (`--primary`) avec `arrow_forward` à droite quand le seuil est atteint ; sinon `disabled` en pointillé (style natif de `Button`), relié par `aria-describedby` à la raison « Pour passer au cadrage, il manque : Périmètre stable » (`info` 16, 12 `--muted-foreground`, visible, jamais une infobulle seule). Absent pour le client et le business. |
+| `InlineAlert` « Modifié depuis idea-v1 » | Sous l'en-tête, `info` neutre, bouton « Figer une nouvelle version » (équipe seulement) ; le client lit seulement l'information. |
+
+Page Synthèse : lecture seule, `Prose` (colonne de 680), chemin mono « idea/_synthese.md », pastille « générée » et ligne « Générée depuis idea-v1 · <date> » ; « Régénérer » (équipe, `Button outline`). Avant la première version : `EmptyState` « La synthèse sera générée quand vous passerez au cadrage. » et, pour l'équipe, « Générer un aperçu ». Un aperçu porte la mention « Aperçu, non publié ». Galerie : `/dev/ui`, section « 12. Espace Idée » (ajouts : `MaturityMeter`, `SynthesisNavItem`).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -434,3 +445,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 08/11/2026 | v2.9 (TK-141, reprise des écrans sur les bases ; B171 et suivantes) : aucun composant nouveau attendu ; §5.4 Réglages et Fournisseurs d'IA précisés (tons des pastilles, `Toast` à la place de `role=status`) ; les écrans S-app-shell, S-features, S-settings et S-ai-settings suivent les planches 05, 10, 12 et 24 sans style local |
 | 08/11/2026 | v2.10 (TK-89, passation 02, maquette 06) : §5.8 espace Idée (`ReorderableList`, `PageStatus`, `StatusLegend`, `Prose`, `TaskItem`, `AvatarGroup`, rail replié par défaut) ; la jauge de maturité reste à TK-91 |
 | 08/11/2026 | v2.11 (TK-90, passation 02, maquette 06) : §5.9 agent de l'espace Idée (`AgentPanel`, `ChatBubble`, `AgentComposer`, `ProposalDiff`, `DecisionNotice`, `ProposedPageCard`, `ProposedPageList`, `AgentGapsCard`) ; icônes `explore` et `stop` ajoutées |
+| 09/11/2026 | v2.12 (TK-91, passation 02 §9, décision 05 §2 « Lot 2 », maquette 06) : §5.10 maturité, Synthèse et passage au cadrage (`MaturityMeter`, `SynthesisNavItem`, « Passer au cadrage », bandeau « Modifié depuis idea-vN ») |
