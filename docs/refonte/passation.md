@@ -18,7 +18,8 @@ last_reviewed: 2026-11-09
 | 020 | TK-89 (espace Idée : pages, éditeur, publication, droits) | ✅ fusionné (PR #150, `e8c2247`) |
 | 020 | TK-90 (panneau de l'agent, propositions) | ✅ fusionné (PR #154) |
 | 020 | TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | ✅ fusionné (PR #158, `da47953`) |
-| 021 | TK-92 (vue d'ensemble) puis TK-93 (projets en cartes, création en une étape) | à faire |
+| 021 | TK-92 (vue d'ensemble : `project.overview`, S-overview) | ✅ fusionné (PR #160, `0b4ea76`) |
+| 021 | TK-93 (projets en cartes, création en une étape) | à faire |
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
@@ -100,4 +101,5 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - Captures : comparer en RGB ; `getbbox()` sur une image RGBA ne regarde que l'alpha.
 - Un test qui parcourt le contrat oRPC doit descendre dans les sous-groupes (ex. `idea.page`).
 - CI `ci` : les tests de migration du paquet `db` partagent le CPU avec les suites api et web (`turbo run test`) ; la suite `db` dure ~21 min sur la CI contre ~4 min en local. Sous charge, leurs délais de 180 s expiraient (develop rouge après TK-90, PR #158 deux fois). Délais portés à 600 s (TK-91). Si ça revient : `--concurrency=2` dans `ci.yml`.
+- CI `ci` : `features-long-list.test.tsx` (anti-rebond de la recherche, « expected 5 to be less than 5 ») est sensible à la charge du runner ; une relance du job suffit (TK-92). Ne pas oublier qu'un test unitaire d'API peut dater d'avant une correction de revue : lancer `pnpm --filter @koklo/api exec vitest run src` en entier avant de pousser, pas seulement les fichiers du lot.
 - Une PR bloquée en « queued » : annuler l'exécution CI périmée (`gh run cancel`) qui occupe la file.
