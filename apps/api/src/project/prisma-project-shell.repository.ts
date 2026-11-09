@@ -1,6 +1,7 @@
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
+import { reconcileIdeaVersions } from "../idea/idea-publications.ts";
 import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -27,6 +28,11 @@ async function activeSprintTickets(tx: Tx, projectId: string): Promise<number | 
   return tx.ticket.count({ where: { projectId, sprintId: sprint.id, deletedAt: null } });
 }
 
+async function committedIdeaVersions(tx: Tx, scope: ProjectScope): Promise<number> {
+  await reconcileIdeaVersions(tx, scope, new Date());
+  return tx.ideaVersion.count({ where: { projectId: scope.projectId, commitSha: { not: null } } });
+}
+
 @Injectable()
 export class PrismaProjectShellRepository implements ProjectShellRepository {
   constructor(
@@ -47,6 +53,8 @@ export class PrismaProjectShellRepository implements ProjectShellRepository {
         validatedBaselines: await tx.baseline.count({
           where: { projectId: scope.projectId, status: { in: [...VALIDATED] } },
         }),
+        // Le lot commité d'une version est réconcilié à la lecture : la phase suit le commit sans passer par la liste.
+        ideaVersions: await committedIdeaVersions(tx, scope),
         activeSprintTickets: await activeSprintTickets(tx, scope.projectId),
       };
     });

@@ -31,6 +31,28 @@ export interface IdeaPageRecord {
   proposals?: IdeaProposalRecord[];
 }
 
+/** Maturité du dossier (TK-91) : pages stables, requises manquantes (titres courants), questions ouvertes. */
+export interface IdeaMaturityRecord {
+  stable: number;
+  total: number;
+  missingRequired: string[];
+  openQuestions: number;
+}
+
+export interface IdeaVersionRecord {
+  number: number;
+  tag: string;
+  commitSha: string;
+  frozenAt: Date;
+}
+
+/** Synthèse de l'idée : `source` nul = aperçu, jamais publié. */
+export interface IdeaSynthesisRecord {
+  contentMd: string;
+  source: string | null;
+  generatedAt: Date;
+}
+
 export interface IdeaListing {
   pages: IdeaPageRecord[];
   trash: IdeaPageRecord[];
@@ -39,6 +61,9 @@ export interface IdeaListing {
   lastPublication: { commitSha: string; publishedAt: Date } | null;
   /** Propositions de page (`create_page`) en attente : elles n'ont pas encore de page. */
   pendingPageProposals: IdeaProposalRecord[];
+  maturity: IdeaMaturityRecord;
+  /** Dernière version dont le lot est commité, et « modifié depuis » (pages ajoutées, retirées ou changées). */
+  version: { latest: IdeaVersionRecord | null; modifiedSince: boolean };
 }
 
 export interface IdeaActor {
@@ -62,6 +87,8 @@ export interface IdeaSnapshot {
   /** Slugs en corbeille déjà publiés lors de la dernière publication : le dépôt doit les retirer. */
   removedSlugs: string[];
   contributorUserIds: string[];
+  /** Synthèse déjà portée par une version (source non vide) : elle est republiée avec le lot suivant. */
+  synthesis: IdeaSynthesisRecord | null;
 }
 
 /**

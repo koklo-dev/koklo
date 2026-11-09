@@ -56,6 +56,9 @@ const DENIED = [
   "dependency.add",
   "dependency.remove",
   // TK-89 : la publication du dossier d'idée relève de l'équipe (SPEC_BATCH_ROLES).
+  // TK-91 (contrat 2.6.0) : le passage au cadrage et la Synthèse de l'idée aussi.
+  "ai.ideaSynthesis",
+  "idea.freeze",
   "idea.publish",
   "installation.start",
   "lease.acquire",
@@ -331,4 +334,44 @@ describe("TK-90 : l'agent de l'espace Idée suit les droits de l'éditeur (le bu
       }
     },
   );
+});
+
+describe("TK-91 : le passage au cadrage et la Synthèse relèvent de l'équipe (SPEC_BATCH_ROLES)", () => {
+  const TEAM_WRITES = ["idea.freeze", "ai.ideaSynthesis"];
+
+  it("ce sont des écritures du contrat, classées interdites au client", () => {
+    const names = writes().map((r) => r.name);
+    for (const name of TEAM_WRITES) {
+      expect(names).toContain(name);
+      expect(DENIED).toContain(name);
+      expect(ALLOWED).not.toContain(name);
+    }
+  });
+
+  it.each(TEAM_WRITES)(
+    "%s : 403 FORBIDDEN pour le client lié et pour le business",
+    async (name) => {
+      const route = routes().find((r) => r.name === name);
+      const business = await insertActor(bench().database, scene.p1.organizationId, "business");
+      for (const actor of [scene.c1, business]) {
+        const path = (route?.path ?? "").replace("{projectId}", scene.p1.projectId);
+        const res = await send(bench().app, actor.cookie, "post", path, {
+          projectId: scene.p1.projectId,
+          idempotencyKey: "forge-1",
+        });
+        expect(res.status, `${name} : ${res.text}`).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
+      }
+    },
+  );
+
+  it.each(TEAM_WRITES)("%s : un client d'un autre projet ne passe pas non plus", async (name) => {
+    const route = routes().find((r) => r.name === name);
+    const path = (route?.path ?? "").replace("{projectId}", scene.p2.projectId);
+    const res = await send(bench().app, scene.c1.cookie, "post", path, {
+      projectId: scene.p2.projectId,
+      idempotencyKey: "forge-2",
+    });
+    expect([403, 404]).toContain(res.status);
+  });
 });

@@ -8,7 +8,8 @@ export type AiPurpose =
   | "credential-verify"
   | "idea-chat"
   | "idea-propose"
-  | "idea-gaps";
+  | "idea-gaps"
+  | "idea-synthesis";
 
 /** Plafonds par défaut du quota (D8, à valider par l'humain) ; réglables par `AppConfig.ai`. */
 export interface AiLimits {
@@ -45,6 +46,8 @@ export const AI_BUDGETS: Readonly<Record<AiPurpose, LlmBudget>> = {
   "idea-chat": { maxOutputTokens: 1200, timeoutMs: 90_000, ...IDEA },
   "idea-propose": { maxOutputTokens: 6000, timeoutMs: 90_000, ...IDEA },
   "idea-gaps": { maxOutputTokens: 800, timeoutMs: 60_000, ...IDEA },
+  /** Synthèse de l'idée (TK-91) : le dossier entier part, une page de Markdown revient. */
+  "idea-synthesis": { maxOutputTokens: 2500, timeoutMs: 90_000, ...IDEA },
 };
 
 /** Nombre maximal de features existantes (lignes) transmises au modèle comme contexte. */

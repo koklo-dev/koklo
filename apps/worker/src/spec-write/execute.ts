@@ -8,10 +8,18 @@ import {
 } from "@koklo/domain";
 import { readSpecFiles } from "../spec-read/read-spec.ts";
 import { RECOVERY_WINDOW } from "./constants.ts";
+import { ideaTagOf } from "./idea-payload.ts";
 import { buildCommitMessage, hasOpsTrailer } from "./message.ts";
 import { relativeToSpec, withSpecPath } from "./paths.ts";
 import { planBatch } from "./plan.ts";
-import { type BatchAuthor, conflicted, failed, type LoadedBatch, type Outcome } from "./types.ts";
+import {
+  type BatchAuthor,
+  type CommittedOutcome,
+  conflicted,
+  failed,
+  type LoadedBatch,
+  type Outcome,
+} from "./types.ts";
 
 interface Target {
   readonly provider: GitProvider;
@@ -90,12 +98,46 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
 const isStaleHead = (error: unknown): boolean =>
   error instanceof GitConflictError && error.reason === "stale-sha";
 
+/** Reprise, puis lecture-plan-commit, rejouée UNE fois si la tête a bougé entre la lecture et l'écriture. */
+async function commitBatch(target: Target, author: BatchAuthor | null): Promise<Outcome> {
+  const recovered = await recover(target);
+  if (recovered) return recovered;
+  try {
+    return await attempt(target, author);
+  } catch (error) {
+    if (!isStaleHead(error)) throw error;
+    return attempt(target, author);
+  }
+}
+
+const isTagExists = (error: unknown): boolean =>
+  error instanceof GitConflictError && error.reason === "exists";
+
+/**
+ * Tag `idea-vN` d'un lot de passage au cadrage (TK-91), posé APRÈS le commit, y compris sur le chemin de reprise :
+ * un job rejoué entre le commit et le tag le pose sans recommiter. Un tag déjà présent sur le même commit est un
+ * succès ; sur un autre commit, un conflit (jamais déplacé) ; une panne est levée et le job rejoue.
+ */
+async function tagVersion(target: Target, outcome: CommittedOutcome): Promise<Outcome> {
+  const name = ideaTagOf(target.batch.operations);
+  if (name === undefined) return outcome;
+  const { provider, auth, repo } = target;
+  try {
+    await provider.createTag({ auth, repo, ref: outcome.commitSha, name });
+  } catch (error) {
+    if (!isTagExists(error)) throw error;
+    const [pointed] = await provider.listCommits({ auth, repo, ref: name, limit: 1 });
+    if (pointed?.sha !== outcome.commitSha) return conflicted("write_conflict");
+  }
+  return outcome;
+}
+
 /**
  * `beforeWrite` pose le lot en `committing` juste avant `writeCommit` (jamais avant la lecture de
  * l'état) : une panne transitoire en lecture laisse le lot `queued`, rejouable sans « sort inconnu ».
- * Exécute un lot hors de toute transaction : reprise, puis lecture-plan-commit, rejouée UNE fois
- * si la tête a bougé entre la lecture et l'écriture. Rend le résultat métier ; une panne du
- * fournisseur est levée telle quelle (le job la classe : transitoire ou métier).
+ * Exécute un lot hors de toute transaction : reprise, puis lecture-plan-commit, puis le tag éventuel.
+ * Rend le résultat métier ; une panne du fournisseur est levée telle quelle (le job la classe :
+ * transitoire ou métier).
  */
 export async function executeBatch(
   provider: GitProvider,
@@ -110,12 +152,6 @@ export async function executeBatch(
   });
   const repo = { owner: { kind: ownerKind, login: batch.repo.ownerLogin }, name: batch.repo.name };
   const target: Target = { provider, auth, repo, batch, coAuthors, beforeWrite };
-  const recovered = await recover(target);
-  if (recovered) return recovered;
-  try {
-    return await attempt(target, author);
-  } catch (error) {
-    if (!isStaleHead(error)) throw error;
-    return attempt(target, author);
-  }
+  const outcome = await commitBatch(target, author);
+  return outcome.status === "committed" ? tagVersion(target, outcome) : outcome;
 }

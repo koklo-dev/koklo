@@ -18,6 +18,8 @@ export interface ShellFacts {
   featureCount: number;
   /** Baselines `validated` ou `tagged`. */
   validatedBaselines: number;
+  /** Versions `idea-vN` dont le lot est commité (TK-91, B260). */
+  ideaVersions: number;
 }
 
 /** Ce qui précède un livrable, dit à l'utilisateur quand il est verrouillé (« Disponible après … »). */
@@ -45,8 +47,13 @@ const ORDER: readonly DeliverableKey[] = [
   "quality",
 ];
 
-export function phaseOf({ featureCount, validatedBaselines }: ShellFacts): ProjectPhase {
-  if (featureCount === 0) return "idea";
+/** `idea` tant qu'aucune version `idea-vN` n'est commitée et qu'aucune fonctionnalité n'existe ; `framing` ensuite. */
+export function phaseOf({
+  featureCount,
+  validatedBaselines,
+  ideaVersions,
+}: ShellFacts): ProjectPhase {
+  if (featureCount === 0 && ideaVersions === 0) return "idea";
   return validatedBaselines > 0 ? "iterations" : "framing";
 }
 

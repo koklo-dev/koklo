@@ -32,6 +32,8 @@ afterAll(async () => {
 });
 
 const UNAUDITED_HERE = ["idea.presence", "idea.publish"];
+/** Le passage au cadrage exige un dépôt de spec et le modèle : son audit est prouvé dans `idea-freeze.test.ts`. */
+const AUDITED_ELSEWHERE = ["idea.freeze"];
 type Node = { "~orpc"?: { meta: { "~openapi"?: { method?: string } } } };
 function writes(node: object, prefix: string): string[] {
   return Object.entries(node).flatMap(([name, value]) => {
@@ -71,7 +73,9 @@ describe("idea : audit des écritures", () => {
       "idea.proposal.decide",
       "idea.proposal.undo",
     ];
-    expect(writes(contract.idea, "idea").sort()).toEqual([...audited, ...UNAUDITED_HERE].sort());
+    expect(writes(contract.idea, "idea").sort()).toEqual(
+      [...audited, ...UNAUDITED_HERE, ...AUDITED_ELSEWHERE].sort(),
+    );
   });
 
   it("save, setStatus, create, rename, delete, restore : une entrée par appel, sur la page, par l'acteur", async () => {

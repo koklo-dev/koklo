@@ -206,6 +206,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "ai.draftBrief",
   "ai.ideaChat",
   "ai.ideaGaps",
+  "ai.ideaSynthesis",
   "ai.proposeCriteria",
   "ai.proposeFeatures",
   "aiProvider.add",
@@ -1014,9 +1015,14 @@ function aiScenarios(): Scenario[] {
       },
       deniedStatuses: [403],
     },
-    ...(["ideaChat", "ideaGaps"] as const).map((name): Scenario => {
-      const route = (projectId: string) =>
-        `/projects/${projectId}/ai/idea/${name === "ideaChat" ? "chat" : "gaps"}`;
+    ...(["ideaChat", "ideaGaps", "ideaSynthesis"] as const).map((name): Scenario => {
+      const segment = { ideaChat: "chat", ideaGaps: "gaps", ideaSynthesis: "synthesis" }[name];
+      const action = {
+        ideaChat: "ai.idea.chat",
+        ideaGaps: "ai.idea.gaps",
+        ideaSynthesis: "ai.idea.synthesis",
+      }[name];
+      const route = (projectId: string) => `/projects/${projectId}/ai/idea/${segment}`;
       const body = (projectId: string) =>
         name === "ideaChat" ? { projectId, mode: "free", text: "Bonjour" } : { projectId };
       return {
@@ -1024,8 +1030,8 @@ function aiScenarios(): Scenario[] {
         role: "dev",
         prepare: keyed,
         call: (ctx) => call(ctx, "dev", route(ctx.world.projectId), body(ctx.world.projectId)),
-        expected: onProject(name === "ideaChat" ? "ai.idea.chat" : "ai.idea.gaps"),
-        // TK-90 : le business lit l'espace Idée sans dialoguer avec l'agent.
+        expected: onProject(action),
+        // TK-90 : le business lit l'espace Idée sans dialoguer avec l'agent (TK-91 : ni synthèse).
         denied: (ctx) =>
           call(ctx, "business", route(ctx.world.projectId), body(ctx.world.projectId)),
         deniedStatuses: [403],

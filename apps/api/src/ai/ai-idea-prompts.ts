@@ -171,3 +171,36 @@ export function ideaGapsPrompt(nonce: string, context: IdeaPromptContext): Frame
     data: common({ ...context, focus: undefined }, false),
   });
 }
+
+/** Pages de la Synthèse : plus de place que pour le dialogue, car le dossier entier est résumé. */
+const SYNTHESIS_PAGE_CHARS = 6000;
+const SYNTHESIS_TOTAL_CHARS = 60_000;
+
+const SYNTHESIS_INSTRUCTIONS = constantInstructions(
+  [
+    ROLE,
+    "Write the synthesis of the whole idea file as a JSON object with a single contentMd field: Markdown in French of 6000 characters at most, with level-2 headings (Résumé, Public visé, Problème et valeur, Périmètre, Points à clarifier), short paragraphs and bullet lists.",
+    "Only restate what the pages say, never invent a fact, and say plainly what is still missing. List the unchecked tasks of the pages under Points à clarifier.",
+    PLAIN,
+  ].join(" "),
+);
+
+function synthesisPagesText(pages: readonly IdeaPromptPage[]): string {
+  let room = SYNTHESIS_TOTAL_CHARS;
+  return pages
+    .map((page) => {
+      const body = cut(page.contentMd, Math.min(SYNTHESIS_PAGE_CHARS, room));
+      room = Math.max(0, room - body.length);
+      return `## ${page.title}\n${body}`;
+    })
+    .join("\n\n");
+}
+
+/** Synthèse de l'idée (TK-91) : titres et contenus seulement, dans un bloc non fiable ; jamais d'auteur ni de fil. */
+export function ideaSynthesisPrompt(nonce: string, pages: readonly IdeaPromptPage[]): FramedPrompt {
+  return framePrompt({
+    instructions: SYNTHESIS_INSTRUCTIONS,
+    nonce,
+    data: [new Untrusted("user-input", synthesisPagesText(pages))],
+  });
+}

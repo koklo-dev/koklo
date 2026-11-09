@@ -65,6 +65,14 @@ export class IdeaService {
         },
       },
       pendingPageProposals: listing.pendingPageProposals.map(proposalOf),
+      maturity: listing.maturity,
+      version: {
+        latest: listing.version.latest && {
+          ...listing.version.latest,
+          frozenAt: listing.version.latest.frozenAt.toISOString(),
+        },
+        modifiedSince: listing.version.modifiedSince,
+      },
     };
   }
 

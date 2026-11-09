@@ -5,9 +5,7 @@ import type {
   IdeaMessage,
 } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
-import type { AiPurpose } from "../ai/ai-budget.ts";
-import { AiCallRunner, type AiStreamEnd, correlationIdOf, validated } from "../ai/ai-call.ts";
-import { rateLimited } from "../ai/ai-errors.ts";
+import { AiCallRunner, type AiStreamEnd, validated } from "../ai/ai-call.ts";
 import { ideaChatPrompt, ideaGapsPrompt, ideaProposePrompt } from "../ai/ai-idea-prompts.ts";
 import { ideaGapsOutputSchema, ideaProposalsOutputSchema, jsonSchemaOf } from "../ai/ai-schemas.ts";
 import { PrismaAiRoutingStore } from "../ai/prisma-ai-routing-store.ts";
@@ -21,13 +19,11 @@ import {
   type IdeaGapItem,
   type IdeaProposalDraft,
 } from "./idea-agent.repository.ts";
+import { acquireIdeaLock, ideaCallBase } from "./idea-ai-call.ts";
 import { checkedDrafts, promptContextOf, relayText, wantsProposals } from "./idea-chat-flow.ts";
 import { nextQuestion } from "./idea-guide.ts";
 import { proposalOf } from "./idea-views.ts";
 
-/** Un appel d'IA à la fois par utilisateur et projet : le verrou vit 120 s et un refus invite à réessayer dans 5 s. */
-const LOCK_TTL_MS = 120_000;
-const LOCK_RETRY_SECONDS = 5;
 /** Un calcul des manques de moins de 30 s est rendu tel quel, sans appel du modèle (C6). */
 const GAPS_TTL_MS = 30_000;
 
@@ -97,7 +93,7 @@ export class IdeaAgentService {
     const token = await this.lock(scope);
     try {
       const stream = await this.runner.stream({
-        ...this.base(scope, requestId, "idea-chat", "ai.idea.chat"),
+        ...ideaCallBase(scope, requestId, "idea-chat", "ai.idea.chat"),
         usage: "idea_space",
         exclusive: true,
         ...(signal === undefined ? {} : { signal }),
@@ -160,7 +156,7 @@ export class IdeaAgentService {
     signal: AbortSignal | undefined,
   ): Promise<IdeaProposalDraft[]> {
     return this.runner.run({
-      ...this.base(scope, requestId, "idea-propose", "ai.idea.chat"),
+      ...ideaCallBase(scope, requestId, "idea-propose", "ai.idea.chat"),
       usage: "idea_space",
       exclusive: true,
       admitted: true,
@@ -187,7 +183,7 @@ export class IdeaAgentService {
     const token = await this.lock(scope);
     try {
       const items = await this.runner.run({
-        ...this.base(scope, requestId, "idea-gaps", "ai.idea.gaps"),
+        ...ideaCallBase(scope, requestId, "idea-gaps", "ai.idea.gaps"),
         usage: "idea_space",
         exclusive: true,
         output: { kind: "json", schema: GAPS_SCHEMA },
@@ -223,10 +219,8 @@ export class IdeaAgentService {
     });
   }
 
-  private async lock(scope: ProjectScope): Promise<Date> {
-    const token = await this.repository.tryLock(scope, new Date(this.clock.now()), LOCK_TTL_MS);
-    if (token === null) throw rateLimited(LOCK_RETRY_SECONDS);
-    return token;
+  private lock(scope: ProjectScope): Promise<Date> {
+    return acquireIdeaLock(this.repository, this.clock, scope);
   }
 
   private chatInput(input: AiIdeaChatInput) {
@@ -235,20 +229,6 @@ export class IdeaAgentService {
       action: input.action,
       text: input.text,
       selection: input.selection,
-    };
-  }
-
-  private base(scope: ProjectScope, requestId: string, purpose: AiPurpose, action: string) {
-    return {
-      purpose,
-      actor: {
-        organizationId: scope.organizationId,
-        userId: scope.userId,
-        projectId: scope.projectId,
-      },
-      correlationId: correlationIdOf(requestId),
-      quota: "ai" as const,
-      entry: () => ({ action, targetKind: "project" as const, targetId: scope.projectId }),
     };
   }
 }
