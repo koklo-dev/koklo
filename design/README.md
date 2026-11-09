@@ -62,3 +62,4 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-feature-form](screens/S-feature-form.md) | 1.3 | TK-48 (48e) |
 | [S-dev-ui](screens/S-dev-ui.md) | 1.2 | TK-138 |
 | [S-app-shell](screens/S-app-shell.md) | 2 | TK-88 |
+| [S-overview](screens/S-overview.md) | 1 | TK-92 |
