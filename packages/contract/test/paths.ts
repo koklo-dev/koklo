@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 2.6.0 (112 routes, 86 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 2.7.0 (114 routes, 88 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -28,6 +28,7 @@ export const ALL_PAIRS: string[] = [
   "GET /organizations",
   "GET /project-visits",
   "GET /projects",
+  "GET /projects/{projectId}/activity",
   "GET /projects/{projectId}/audit",
   "GET /projects/{projectId}/clients",
   "GET /projects/{projectId}/comments",
@@ -36,6 +37,7 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/idea/pages",
   "GET /projects/{projectId}/idea/pages/{pageId}",
   "GET /projects/{projectId}/idea/synthesis",
+  "GET /projects/{projectId}/overview",
   "GET /projects/{projectId}/project-state",
   "GET /projects/{projectId}/repos",
   "GET /projects/{projectId}/reviews",
@@ -147,6 +149,7 @@ export const ALL_PATHS: string[] = [
   "/organizations",
   "/project-visits",
   "/projects",
+  "/projects/{projectId}/activity",
   "/projects/{projectId}/ai/brief",
   "/projects/{projectId}/ai/criteria",
   "/projects/{projectId}/ai/features",
@@ -172,6 +175,7 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/idea/proposals/{proposalId}/undo",
   "/projects/{projectId}/idea/publish",
   "/projects/{projectId}/idea/synthesis",
+  "/projects/{projectId}/overview",
   "/projects/{projectId}/project-state",
   "/projects/{projectId}/repos",
   "/projects/{projectId}/reviews",
