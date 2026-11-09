@@ -229,11 +229,8 @@ describe("nextActionOf : vue client (B277)", () => {
     const next = client({ functional });
     expect(next.rule).toBe("validation_overdue");
     expect(next.title).toBe("Vous avez 2 fonctionnalités à valider");
-    expect(next.action).toEqual({
-      label: "Ouvrir",
-      href: `/projects/${PROJECT}/spec/functional`,
-      kind: "link",
-    });
+    // Le client n'a pas accès à /spec : aucune action (correction du tour 1 de la revue).
+    expect(next.action).toBeUndefined();
   });
 
   it("règle 3 : seulement si son rôle peut décider", () => {
