@@ -29,6 +29,8 @@ type PillBase = {
   tone?: PillTone;
   /** Icône pleine, 14 en xs et sm, 16 en md. */
   icon?: IconName;
+  /** Icône pleine (défaut) ; `false` : au contour (statuts neutres, maquette 07). */
+  iconFill?: boolean;
 };
 
 export type PillProps = PillBase &
@@ -45,6 +47,7 @@ export function Pill({
   size = "md",
   tone = "neutral",
   icon,
+  iconFill = true,
   interactive,
   className,
   children,
@@ -62,7 +65,7 @@ export function Pill({
       className,
     ),
   };
-  const content = icon ? <Icon name={icon} size={ICON_SIZE[size]} fill /> : null;
+  const content = icon ? <Icon name={icon} size={ICON_SIZE[size]} fill={iconFill} /> : null;
   if (interactive) {
     return (
       <button type="button" {...shared} {...(rest as ComponentProps<"button">)}>
