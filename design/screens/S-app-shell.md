@@ -1,7 +1,7 @@
 ---
 id: S-app-shell
 titre: Coquille de l'application (barre latérale, en-tête de projet, recherche ⌘K, pages « Bientôt »)
-version: 2.1
+version: 2.2
 ---
 > Sources : `docs/refonte/passations/01-lots-0-1-passation.md` §1.1 à §1.7, `05-decisions-2026-11-05-spec-sans-brief.md` §1.7 et §2 « Lot 1 », `21-lot-14-securite-passation.md` §0, `12-lot-8-technique-passation.md` §8.4. Planches : `docs/refonte/maquettes/05-Lot1Shell.html` (mise en page), `10-Lot5Fonctionnel.html` (barre : « SPEC N/7 », entrées numérotées, cadenas ; questions.md B2). Règles visuelles : `DESIGN.md` §5.4. Détail du ticket : `.workflow/TK-88/02-design.md`.
 
@@ -24,6 +24,7 @@ version: 2.1
 | Entrées SPEC | disponibilité, condition, compteur « N/7 » | `project.shell` (`deliverables`, `validatedCount`) |
 | Tickets | compteur du sprint actif (absent sans sprint actif) | `project.shell` (`ticketCount`) |
 | Menu de la carte | 8 projets récents | `project.recent` |
+| Groupe « Récents » (hors projet, au-dessus d'Organisation) | 3 projets récents au plus : `ProjectTile` 22 aux initiales (teinte `colorKey`) + nom, une ligne de 36, lien vers le projet ; absent sans projet récent, en rail replié seule la tuile reste | `project.recent` (`initials`, `colorKey`), TK-93 lot B, maquette 08 l.37-42 |
 | En-tête | nom du projet, section, page ; SHA et âge de la spec (équipe) ; résumé (« N fonctionnalités ») ; onglets | `project.shell`, `spec.head` |
 | Palette | pages (locales), projets, fonctionnalités, tickets (serveur, 20 au plus) | `search.query` |
 | Ouverture d'un projet | enregistrée une fois | `project.visit` |
@@ -79,6 +80,7 @@ Entrées de la barre : Vue d'ensemble `/projects/<id>` ; Idée `/projects/<id>/i
 | 1 | 2026-11-07 | TK-88 | Création : `AppShell` collant 256 / 64 px à `localStorage`, tiroir sous 768 px ; groupe SPEC à sept entrées numérotées avec cadenas et compteur N/7 (planche 10 contre planche 05, B2) ; `ProjectHeader` à trois lignes avec onglets en liens ; palette ⌘K à recherche serveur ; pages « Bientôt » ; retrait de Kanban, Membres, GitHub, IA et de la liste de projets de la barre ; `--sidebar` sur `--surface`. Détail : `.workflow/TK-88/02-design.md` |
 | 2 | 2026-11-07 | TK-88 (finition) | Palette branchée et testée au clavier (focus rendu, première option active, filtrage des pages à la frappe, liste masquée sans option : axe) ; pied de barre épinglé (B90) ; captures de la coquille et de chaque écran existant ; comparaison aux planches 05 et 10 (§12). B91 |
 | 2.1 | 2026-11-07 | TK-140 | Bibliothèque : `ShellNavGroup`, `ShellNavItem count`, libellé « Déplier la barre » (I28), `PhaseRail inline`, `ProjectHeader` à emplacement `status`, résumé en ligne dès `md` et « / » à 12. L'écran n'est pas migré (TK-141) : seuls le libellé du rail et l'en-tête changent. |
+| 2.2 | 2026-11-09 | TK-93 (lot B) | Groupe « Récents » (3 projets, `ProjectTile` 22) au-dessus d'Organisation hors d'un projet ; `ShellNavItem leading`. Raison : maquette 08 l.37-42 |
 
 ## 11. Captures (générées par `apps/web/e2e/app-shell.spec.ts`, clair, sombre et 375 px)
 Dossier `design/screens/captures/S-app-shell/`, chacune en `-light` / `-dark` (375 px : suffixe `-mobile`) : `expanded`, `spec-group` (barre seule), `collapsed`, `locked-tooltip`, `header-features`, `header-tickets`, `header-framing`, `soon-idea`, `soon-data`, `palette-idle`, `palette-results`, `palette-empty`, `palette-error`, `palette-loading`, et à 375 px `drawer`. Chaque écran existant dans la coquille : `design/screens/captures/<S-id>/shell-light.png`, `shell-dark.png`, `shell-light-mobile.png`, `shell-dark-mobile.png` (S-projects, S-features, S-framing, S-kanban, S-members, S-github, S-ai-settings ; S-organizations, S-login, S-accept-invitation et S-dev-ui sont hors coquille). Aucune capture n'est prise pendant un chargement (le test attend l'absence de squelette).

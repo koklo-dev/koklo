@@ -1,12 +1,12 @@
 ---
 title: API contract
 audience: technical
-doc_version: 0.4.0
+doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-10
 covers_release: unreleased
 sources: []
-covers_commit: 7f97066
+covers_commit: 5fa5b1c
 ---
 # API contract
 
@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.7.0** (TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.8.0** (TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1475,6 +1475,20 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.8.0** (TK-93, lot A): project cards and one-step creation. New routes `project.cards` (`GET /projects/cards`),
+  `project.creationStatus` (`GET /projects/{projectId}/creation`), `project.retryRepo`
+  (`POST /projects/{projectId}/creation/retry`, owner and admin) and `project.setEuOnly`
+  (`PATCH /projects/{projectId}/eu-only`, owner and admin); 4 routes, 118 routes and 92 paths in all. **Additive**:
+  `project.list` is unchanged; `project.create` gains optional `clientEmail`, `ideaTemplate` (`default` or `empty`),
+  `installationId`, `repoName`, `euOnly` and `idempotencyKey` (`{ name }` alone stays valid, same `{ id, name }` output,
+  new `VALIDATION` error); `project.recent` items gain `initials` and `colorKey` (1 to 5). `project.cards` filters
+  (`q`, `phase`), sorts (`activity`, `name`, `attention`), counts (`total`, `facets`, `attention`) and pages (24 at most,
+  keyset cursor) on the server; a client only receives their own projects with `audience: "client"`. A card carries
+  the phase, the progress, the next step (same pure rules as the overview), up to three people, the last activity and,
+  while the spec repository is being created, has failed or has no GitHub account to use (`skipped`, `no_account`), its `creation` state (steps with a `status`, 12 closed error
+  codes, `canAct` for owner and admin). New table `project_creations` and column `projects.eu_only` (migration
+  `20261109120000_project_creations`, with `down.sql`). The fingerprint of 2.7.0 is frozen in
+  `packages/contract/test/contract.test.ts`.
 - **2.7.0** (TK-92, lot A): project overview. New routes `project.overview` (`GET /projects/{projectId}/overview`) and
   `project.activity` (`GET /projects/{projectId}/activity`); 2 routes, 114 routes and 88 paths in all. **Additive**: no
   route removed, no input changed, no table, no migration. The phase of `project.shell`, `project.overview` and

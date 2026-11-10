@@ -129,11 +129,11 @@
 
 | Élément (§) | État | Fichiers | Effort | Risque |
 |---|---|---|---|---|
-| Groupe « Récents » (§2) | absent | `nav-projects.tsx` (liste complète, contraire) | S | — |
-| En-tête organisation, recherche, filtres de phase, tri (§2) | absent | `apps/web/src/app/projects/page.tsx`, `projects-view.tsx` | M | Compteurs côté serveur (07 §0). |
-| Grille de cartes `ul` (§2, §9) | **contraire** | `projects-view.tsx` (`Table`) | M | — |
-| Carte : couleur, client, phase, avancement, prochaine étape, avatars (§3) | absent | `projectSchema = {id, name}` (`packages/contract/src/schemas.ts`) | L | Agrégation des lots 2 et 3. |
-| Vue client : ses projets, redirection s'il n'en a qu'un (§3.1) | partiel | `apps/api/src/project/prisma-project-access.ts` | S | — |
+| Groupe « Récents » (§2) | absent | `nav-projects.tsx` (liste complète, contraire) | S | — **Soldé (TK-93, lots A à C).** |
+| En-tête organisation, recherche, filtres de phase, tri (§2) | absent | `apps/web/src/app/projects/page.tsx`, `projects-view.tsx` | M | Compteurs côté serveur (07 §0). **Soldé (TK-93, lots A à C).** |
+| Grille de cartes `ul` (§2, §9) | **contraire** | `projects-view.tsx` (`Table`) | M | — **Soldé (TK-93, lots A à C).** |
+| Carte : couleur, client, phase, avancement, prochaine étape, avatars (§3) | absent | `projectSchema = {id, name}` (`packages/contract/src/schemas.ts`) | L | Agrégation des lots 2 et 3. **Soldé (TK-93, lots A à C).** |
+| Vue client : ses projets, redirection s'il n'en a qu'un (§3.1) | partiel | `apps/api/src/project/prisma-project-access.ts` | S | — **Soldé (TK-93, lots A à C).** |
 | Boîte « Nouveau projet » en une étape (§4) | **contraire** | `project-create-{sheet,flow,steps,actions}.tsx`, `lib/use-project-creation.ts`, `use-creation-steps.ts` | M | Pas de `Dialog`. |
 | Client invité à la création (§4) | absent | `member.invite` + `projectClient.add` existants, non atomiques | M | — |
 | Choix de la structure du dossier (§4) | absent | — | M | Dépend du lot 2. |
@@ -355,7 +355,7 @@ Tests à réécrire avec ces retraits :
 | Index de spec générique | Table d'entités (kind, specId, zone, chemin, JSON, hachage, texte recherchable `tsvector`) ; index `(project_id, tri, id)` | Réindexation complète des têtes (`apps/worker/src/webhook/index-writer.ts`, `reconcile/`) | 5a puis chaque livrable |
 | Format de spec v2 | `spec_version: 2` ; commande de migration en un lot du bot : tables (`T-*.yaml` → cible, types, relations éclatées), endpoints (`E-*` → `zone.verbe`, liens des features), tests (`tests/` → `quality/`), documents en sections, `.koklo/rules.yaml` → `design/rules.yaml`, ajout de `zone:` | Chaque dépôt de spec existant migré une fois, par lot, avec relecture ; `checkVersion` (`packages/schema/src/parse/files.ts`) accepte v1 et v2 pendant la transition | 6 à 10 (une étape par livrable) |
 | Règles métier | Vocabulaire : ADR 0012 (`contrainte\|calcul\|workflow` + `tables`, `endpoints`, `exemples`) contre passation 06 §6 (`constraint\|calc\|workflow` + `etats`, `fonctionnalites`) | Choix à faire (questions.md) ; prudence : garder l'ADR et ajouter `etats` et `fonctionnalites` | 5b |
-| Création de projet | Table `project_creations` (statut, étape, erreur, nom de dépôt, installation) ; `invitation_projects` | Projet avec `ProjectRepo` spec → terminé ; sans dépôt → « à relancer » | 4 |
+| Création de projet | Table `project_creations` (statut, étape, erreur, nom de dépôt, installation) ; `invitation_projects` | Projet avec `ProjectRepo` spec → terminé ; sans dépôt → « à relancer » | 4 (soldé TK-93) |
 | Règles du projet, archivage, préférences | `projects.policies` (JSON), `projects.archived_at`, préférences de thème et de notification | Valeurs par défaut ; thème `light` (H-24) | 13a, 13c |
 | Fournisseurs d'IA | Enum `llm_provider` + mistral, openrouter, openai_compatible ; `baseUrl` ; principal / secours ; table modèle par usage ; plafond mensuel ; table de consommation | La clé Anthropic existante devient Principal ; modèles par usage initialisés avec le modèle par défaut actuel | 13b |
 | Tickets et sprints | Échéance et début, points, raison de blocage, réalisé par Agent / Humain (depuis `assigneeKind`), paquet libre, capacité de sprint | `estimateHours` conservé à côté des points ; tickets sans sprint → Backlog | 12a |

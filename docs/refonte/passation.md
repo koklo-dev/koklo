@@ -19,7 +19,7 @@ last_reviewed: 2026-11-09
 | 020 | TK-90 (panneau de l'agent, propositions) | ✅ fusionné (PR #154) |
 | 020 | TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | ✅ fusionné (PR #158, `da47953`) |
 | 021 | TK-92 (vue d'ensemble : `project.overview`, S-overview) | ✅ fusionné (PR #160, `0b4ea76`) |
-| 021 | TK-93 (projets en cartes, création en une étape) | à faire |
+| 021 | TK-93 (projets en cartes, création en une étape) | 🟡 lots A (serveur), B (liste) et C (création) livrés dans l'espace principal, en revue ; décisions B297 à B311 ; à compléter dans le sprint : critère 1 de TK-98 (moteur + création livrés, réglage après création au lot 13c) |
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
@@ -103,3 +103,4 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - CI `ci` : les tests de migration du paquet `db` partagent le CPU avec les suites api et web (`turbo run test`) ; la suite `db` dure ~21 min sur la CI contre ~4 min en local. Sous charge, leurs délais de 180 s expiraient (develop rouge après TK-90, PR #158 deux fois). Délais portés à 600 s (TK-91). Si ça revient : `--concurrency=2` dans `ci.yml`.
 - CI `ci` : `features-long-list.test.tsx` (anti-rebond de la recherche, « expected 5 to be less than 5 ») est sensible à la charge du runner ; une relance du job suffit (TK-92). Ne pas oublier qu'un test unitaire d'API peut dater d'avant une correction de revue : lancer `pnpm --filter @koklo/api exec vitest run src` en entier avant de pousser, pas seulement les fichiers du lot.
 - Une PR bloquée en « queued » : annuler l'exécution CI périmée (`gh run cancel`) qui occupe la file.
+- Création de projet (TK-93 lot C) : l'état de la création vient du serveur (`project.cards` → `creation`, `project.creationStatus`) ; ne jamais réintroduire de marqueur `sessionStorage` ni d'appel à `repo.createSpec` pour un nouveau projet (seule la page Fonctionnalités d'un projet sans dépôt le garde). Une création `skipped` (`no_account`) garde sa carte tant que le dépôt n'existe pas (B311). Les e2e de la création pilotent le faux API par `creation`, `creationSeed`, `retryTo` (`apps/web/e2e/support/stub-spec-repo.ts`).

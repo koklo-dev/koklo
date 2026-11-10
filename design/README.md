@@ -48,7 +48,7 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | Écran | Version | Dernier ticket |
 |---|---|---|
 | [S-login](screens/S-login.md) | 3 | TK-85 (correction) |
-| [S-projects](screens/S-projects.md) | 6.1 | TK-88 |
+| [S-projects](screens/S-projects.md) | 7 | TK-93 |
 | [S-organizations](screens/S-organizations.md) | 2 (remplacée par S-settings) | TK-97 |
 | [S-members](screens/S-members.md) | 2 (remplacée par S-settings) | TK-97 |
 | [S-settings](screens/S-settings.md) | 1 | TK-97 |

@@ -3,10 +3,10 @@ title: Domain model
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-01
+last_reviewed: 2026-11-10
 covers_release: unreleased
 sources: []
-covers_commit: bb9f740
+covers_commit: 5fa5b1c
 ---
 # Domain model
 
@@ -344,6 +344,22 @@ project a member opened, to fill the project card of the application shell and t
   index `(organization_id, user_id, visited_at DESC)` serving `project.recent` (8 rows at most).
 - **Not a right**: a visit grants nothing. `project.recent` re-checks access on every read (organization, client link),
   so a row may outlive the access that created it without leaking the project.
+
+### Project creation table and EU data (TK-93)
+One tenant table (`TENANT_MODELS`: `ProjectCreation`) and one column, migration `20261109120000_project_creations`
+(additive; `down.sql` drops the table then the column). It tracks the background creation of a project's spec
+repository (questions B301 to B304).
+- **`projects.eu_only`**: `boolean not null default false`. A project "data in the EU" never reaches a non-EU AI
+  provider (OpenRouter), as primary or as fallback; the engine (`AiCallRunner`) reads it for every call, an unknown
+  project counting as EU.
+- **`project_creations`**: `id`, `organization_id`, `project_id`, `status` (`pending`, `running`, `succeeded`, `failed`,
+  `skipped`), `error_code` (12 closed codes), `retry_after_ms`, `repo_name`, `installation_id` (null = no GitHub
+  account chosen), `idea_template` (`default` or `empty`), `idempotency_key`, `requested_by`, `invitation_failed`,
+  timestamps. One row per attempt: a retry adds a row, the latest one is the current state. A project card keeps its creation card until the latest row is `succeeded` (`skipped` included: "Relier GitHub", then "Réessayer"). `CHECK` constraints
+  (written by hand) keep status, error code, template, `retry_after_ms >= 0` and `char_length(repo_name) <= 100` closed.
+- **Keys and indexes**: `(organization_id, project_id)` references `projects(organization_id, id)` `ON DELETE CASCADE`;
+  `UNIQUE (organization_id, idempotency_key)` (same key, same project); index
+  `(organization_id, project_id, created_at DESC)`.
 
 ### TK-51 summary: BYOK, suggestions, reviews, notifications
 Five tables over four additive and reversible migrations, each with a `down.sql` that returns to the
