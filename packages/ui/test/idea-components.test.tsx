@@ -230,6 +230,29 @@ describe("Prose, TaskItem, AvatarGroup (T17)", () => {
   });
 });
 
+describe("AvatarGroup 24 (cartes de projet)", () => {
+  it("AvatarGroup 24 : chevauchement de -6, personnes non clientes en ton soft, initiales 10/600", () => {
+    render(
+      <AvatarGroup
+        size={24}
+        people={[
+          { name: "Marie (client)", initials: "ML", isClient: true },
+          { name: "Awa", initials: "AK" },
+          { name: "Moussa", initials: "MD" },
+        ]}
+      />,
+    );
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).not.toHaveClass("-ml-1.5");
+    expect(items[1]).toHaveClass("-ml-1.5");
+    expect(screen.getByRole("img", { name: "Moussa" })).toHaveClass(
+      "bg-secondary",
+      "text-[10px]",
+      "font-semibold",
+    );
+  });
+});
+
 describe("AppShell defaultCollapsed", () => {
   const shell = (props: Record<string, unknown> = {}) => (
     <AppShell sidebar={<span>barre</span>} mobileTitle="Koklo" {...props}>

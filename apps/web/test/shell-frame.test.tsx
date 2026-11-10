@@ -55,6 +55,64 @@ const linkHrefs = () =>
     .getAllByRole("link")
     .map((link) => [link.textContent?.trim(), link.getAttribute("href")]);
 
+const recentOf = (id: string, name: string, initials: string, colorKey = 1) => ({
+  id,
+  name,
+  initials,
+  colorKey,
+  visitedAt: "2026-11-07T10:00:00.000Z",
+});
+
+/** TK-93 lot B (B306, maquette 08 l.37-42) : groupe « Récents » de la barre, hors d'un projet. */
+describe("groupe Récents de la barre", () => {
+  const RECENT = [
+    recentOf(PROJECT_ID, "Portail de réservation", "PR", 1),
+    recentOf(OTHER_ID, "Plateforme de formation", "PF", 2),
+    recentOf("7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b03", "Portail partenaires", "PP", 3),
+    recentOf("7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b04", "Application caisse", "AC", 4),
+  ];
+
+  it("hors projet : trois projets au plus, plus récent d'abord, au-dessus d'Organisation", async () => {
+    procedures.projectRecent.mockResolvedValue(RECENT);
+    renderFrame("/projects");
+    const group = await within(nav()).findByRole("group", { name: "Récents" });
+    const links = within(group).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual([
+      "PRPortail de réservation",
+      "PFPlateforme de formation",
+      "PPPortail partenaires",
+    ]);
+    expect(links[0]).toHaveAttribute("href", `/projects/${PROJECT_ID}`);
+    expect(links[0]).toHaveAccessibleName("Portail de réservation");
+    const organisation = within(nav()).getByRole("group", { name: "Organisation" });
+    expect(
+      group.compareDocumentPosition(organisation) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("les tuiles sont décoratives (initiales cachées aux lecteurs d'écran)", async () => {
+    procedures.projectRecent.mockResolvedValue(RECENT);
+    renderFrame("/projects");
+    const group = await within(nav()).findByRole("group", { name: "Récents" });
+    expect(group.querySelectorAll("[data-slot='project-tile'][aria-hidden='true']")).toHaveLength(
+      3,
+    );
+  });
+
+  it("dans un projet : pas de groupe Récents (la carte du projet porte déjà le menu)", async () => {
+    procedures.projectRecent.mockResolvedValue(RECENT);
+    renderFrame(SPEC);
+    await within(nav()).findByRole("link", { name: "Réglages" });
+    expect(within(nav()).queryByRole("group", { name: "Récents" })).toBeNull();
+  });
+
+  it("aucun projet récent, ou lecture en échec : pas de groupe", async () => {
+    renderFrame("/projects");
+    await within(nav()).findByRole("link", { name: "Réglages" });
+    expect(within(nav()).queryByRole("group", { name: "Récents" })).toBeNull();
+  });
+});
+
 describe("page d'organisation (/projects)", () => {
   it("n'a ni groupe Projet, ni SPEC, ni appel à project.shell ou project.visit", async () => {
     renderFrame("/projects");

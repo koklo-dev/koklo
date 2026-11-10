@@ -12,9 +12,15 @@ import { handleIdea, type IdeaScenario, resetIdea } from "./stub-idea-agent.ts";
 import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from "./stub-kanban.ts";
 import { resetMembers } from "./stub-members.ts";
 import { handleOverview, type OverviewScenario } from "./stub-overview.ts";
+import { handleProjectCards, type ProjectsCardsScenario } from "./stub-projects.ts";
 import { handleSettings, resetSettings, type SettingsScenario } from "./stub-settings.ts";
 import { handleShell, resetShell, type ShellScenario } from "./stub-shell.ts";
-import { handleSpecRepo, resetSpecRepo, type SpecRepoScenario } from "./stub-spec-repo.ts";
+import {
+  handleSpecRepo,
+  resetSpecRepo,
+  type SpecRepoScenario,
+  seedCreation,
+} from "./stub-spec-repo.ts";
 
 /**
  * Faux API pour les e2e : session Better Auth + project.list, sans Postgres.
@@ -41,6 +47,7 @@ type Scenario = {
   ShellScenario &
   OverviewScenario &
   IdeaScenario &
+  ProjectsCardsScenario &
   SettingsScenario;
 
 let scenario: Scenario = { session: true, projects: "data" };
@@ -104,6 +111,12 @@ function projectsResponse(): ReturnType<typeof json> {
   }
 }
 
+/** Échec de `project.cards` selon le scénario de la liste : erreur serveur ou session expirée (null : réponse normale). */
+function cardsFailure(mode: string): ReturnType<typeof json> | null {
+  if (mode === "internal" || mode === "unauthorized") return projectsResponse();
+  return null;
+}
+
 /** Better Auth : `get-invitation` et `organization/list` pour l'écran d'acceptation. */
 function invitationEndpoint(path: string): ReturnType<typeof json> | null {
   const mode = scenario.invitation;
@@ -162,6 +175,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetShell(scenario);
     resetIdea(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
+    seedCreation(scenario, addProject);
     send(json(200, scenario));
   });
   return true;
@@ -199,6 +213,16 @@ function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
       hold,
       addProject,
       onSpecRepoCreated: markSpecRepoCreated,
+    })
+  )
+    return;
+  if (
+    handleProjectCards(req, url, {
+      scenario,
+      projects: () => (scenario.projects === "empty" ? createdProjects : allProjects()),
+      send,
+      hold,
+      failure: cardsFailure,
     })
   )
     return;

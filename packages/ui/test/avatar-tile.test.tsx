@@ -27,7 +27,7 @@ describe("Avatar (DESIGN.md §5.5)", () => {
   });
 
   it.each([
-    [24, "text-caption"],
+    [24, "text-[10px]"],
     [32, "text-caption"],
     [36, "text-body"],
     [56, "text-[length:var(--text-settings-title-size)]"],
@@ -37,7 +37,7 @@ describe("Avatar (DESIGN.md §5.5)", () => {
         <AvatarFallback>YK</AvatarFallback>
       </Avatar>,
     );
-    expect(screen.getByText("YK")).toHaveClass(cls, "font-bold");
+    expect(screen.getByText("YK")).toHaveClass(cls, size === 24 ? "font-semibold" : "font-bold");
   });
 
   it.each([

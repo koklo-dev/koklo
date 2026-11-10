@@ -8,9 +8,12 @@ test("session de test → liste des projets du seed", async ({ page, baseURL }) 
   await page.goto("/projects");
 
   await expect(page).toHaveURL(/\/projects$/);
-  const rows = page.getByRole("row").filter({ hasNot: page.getByRole("columnheader") });
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText(SEED.projectName);
+  const cards = page.getByTestId("projects-grid").getByRole("link");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText(SEED.projectName);
+  await expect(cards.first()).toHaveAccessibleName(new RegExp(`^${SEED.projectName}`));
+  await expect(page.getByRole("group", { name: "Filtrer par phase" })).toBeVisible();
+  await expect(page.getByText(/^1 projet/)).toBeVisible();
 });
 
 test("sans session, /projects redirige vers /login (vrai API)", async ({ page }) => {

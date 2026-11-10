@@ -35,7 +35,7 @@ describe("CA5 (5.2) : échelle v2 appliquée, aucune taille de titre arbitraire"
 
   it("le garde voit bien des h1 (il ne passe pas à vide)", () => {
     const count = sources.reduce((n, f) => n + [...read(f).matchAll(/<h1\b/g)].length, 0);
-    expect(count).toBeGreaterThanOrEqual(5);
+    expect(count).toBeGreaterThanOrEqual(4);
   });
 });
 

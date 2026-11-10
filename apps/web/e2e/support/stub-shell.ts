@@ -135,7 +135,17 @@ function recentResponse(h: Handlers): Reply {
   const ids = [...new Set([...visits, ...seeded])].filter((id) => known.has(id)).slice(0, 8);
   return reply(
     200,
-    ids.map((id) => ({ id, name: known.get(id), visitedAt: "2026-11-07T10:00:00.000Z" })),
+    ids.map((id) => ({
+      id,
+      name: known.get(id),
+      visitedAt: "2026-11-07T10:00:00.000Z",
+      initials: String(known.get(id) ?? "")
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join(""),
+      colorKey: (Number.parseInt(id.slice(-2), 16) % 5) + 1,
+    })),
   );
 }
 

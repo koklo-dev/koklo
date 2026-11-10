@@ -7,7 +7,7 @@ import { FilterChip, OptionChip, SegmentedControl } from "../src/index.ts";
 /** TK-138 lot C : FilterChip, OptionChip, SegmentedControl (catalogue §1.3, fiche lot C). */
 
 describe("FilterChip", () => {
-  it("h-7 rounded-full px-3 text-caption, inactif : border bg-background text-muted-foreground", () => {
+  it("h-7 rounded-full px-3 text-caption, inactif : border bg-background text-foreground (maquette 08 l.223)", () => {
     render(<FilterChip>Tous</FilterChip>);
     const chip = screen.getByRole("button", { name: "Tous" });
     for (const c of [
@@ -17,7 +17,7 @@ describe("FilterChip", () => {
       "text-caption",
       "border",
       "bg-background",
-      "text-muted-foreground",
+      "text-foreground",
     ]) {
       expect(chip).toHaveClass(c);
     }

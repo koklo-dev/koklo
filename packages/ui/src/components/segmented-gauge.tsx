@@ -13,6 +13,8 @@ export type SegmentedGaugeProps = Omit<ComponentProps<"span">, "children"> & {
   tone?: "primary" | "validated";
   /** Un cran par unité de `total`, sans plafond ni proportion, de largeur fixe 10 (variante `MaturityMeter`). */
   exact?: boolean;
+  /** Nombre de crans au plus (12 par défaut ; 10 sur les cartes de projet, maquette 08 l.111). */
+  max?: number;
   /** Faux : la jauge porte un rôle et un nom (le parent les passe) ; vrai par défaut, la valeur est écrite à côté. */
   decorative?: boolean;
 };
@@ -22,11 +24,12 @@ export function gaugeCells(
   done: number,
   total: number,
   exact: boolean,
+  max: number = GAUGE_MAX_CELLS,
 ): { cells: number; reached: number } {
   const safeTotal = Math.max(0, Math.floor(total));
   const safeDone = Math.min(Math.max(done, 0), safeTotal);
   if (exact) return { cells: safeTotal, reached: Math.floor(safeDone) };
-  const cells = Math.min(safeTotal, GAUGE_MAX_CELLS);
+  const cells = Math.min(safeTotal, max);
   return { cells, reached: safeTotal === 0 ? 0 : Math.round((safeDone / safeTotal) * cells) };
 }
 
@@ -40,11 +43,12 @@ export function SegmentedGauge({
   height = 6,
   tone = "primary",
   exact = false,
+  max = GAUGE_MAX_CELLS,
   decorative = true,
   className,
   ...props
 }: SegmentedGaugeProps) {
-  const { cells, reached } = gaugeCells(done, total, exact);
+  const { cells, reached } = gaugeCells(done, total, exact, max);
   return (
     <span
       data-slot="segmented-gauge"

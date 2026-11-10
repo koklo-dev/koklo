@@ -76,7 +76,7 @@ export function AvatarImage({
   );
 }
 
-/** Initiales : 12/700 jusqu'à 32, 14/700 au-delà. */
+/** Initiales : 10/600 en 24, 12/700 jusqu'à 32, 14/700 au-delà. */
 export function AvatarFallback({
   className,
   ...props
@@ -86,11 +86,13 @@ export function AvatarFallback({
     <AvatarPrimitive.Fallback
       className={cn(
         "flex size-full items-center justify-center font-bold",
-        look.size <= 32
-          ? "text-caption"
-          : look.size >= 56
-            ? "text-[length:var(--text-settings-title-size)]"
-            : "text-body",
+        look.size === 24
+          ? "text-[10px] font-semibold"
+          : look.size <= 32
+            ? "text-caption"
+            : look.size >= 56
+              ? "text-[length:var(--text-settings-title-size)]"
+              : "text-body",
         radius(look),
         TONE[look.tone],
         className,

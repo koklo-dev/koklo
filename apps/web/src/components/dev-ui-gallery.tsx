@@ -10,6 +10,7 @@ import { DevUiOverview } from "./dev-ui-overview.tsx";
 import { DevUiPrimitivesA } from "./dev-ui-primitives-a.tsx";
 import { DevUiPrimitivesB } from "./dev-ui-primitives-b.tsx";
 import { DevUiPrimitivesC } from "./dev-ui-primitives-c.tsx";
+import { DevUiProjects } from "./dev-ui-projects.tsx";
 import { DevUiShell } from "./dev-ui-shell.tsx";
 import { DevUiSignature } from "./dev-ui-signature.tsx";
 import { DevUiStatuses } from "./dev-ui-statuses.tsx";
@@ -96,6 +97,7 @@ export function DevUiGallery() {
         <DevUiIdea />
         <DevUiAgent />
         <DevUiOverview />
+        <DevUiProjects />
       </main>
     </div>
   );

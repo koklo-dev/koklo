@@ -17,7 +17,7 @@ function themeInline(): Record<string, string> {
   return out;
 }
 
-const sources = [cssPath.theme, cssPath.tentative, cssPath.status].map(loadBlocks);
+const sources = [cssPath.theme, cssPath.tentative, cssPath.status, cssPath.hues].map(loadBlocks);
 const rootVars = merge(...sources.map((b) => b[":root"] ?? {}));
 const darkVars = merge(...sources.map((b) => b[".dark"] ?? {}));
 const mapping = themeInline();

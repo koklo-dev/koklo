@@ -9,15 +9,18 @@ export interface AvatarGroupPerson {
   isClient?: boolean;
 }
 
-/** Pile d'avatars (DESIGN.md §5.8) : 28 px, bordure de 2 `--background`, chevauchement de -8, au plus `max` visibles. */
+/** Pile d'avatars (DESIGN.md §5.8) : 28 px, bordure de 2 `--background`, chevauchement de -8 (-6 en 24), au plus `max` visibles. */
 export function AvatarGroup({
   people,
   max = 5,
+  size = 28,
   label,
   className,
 }: {
   people: AvatarGroupPerson[];
   max?: number;
+  /** 28 par défaut ; 24 sur les cartes de projet. */
+  size?: 24 | 28;
   label?: string;
   className?: string;
 }) {
@@ -33,11 +36,11 @@ export function AvatarGroup({
         <li
           key={`${person.initials}-${person.name}`}
           title={person.name}
-          className={cn("flex", index > 0 && "-ml-2")}
+          className={cn("flex", index > 0 && (size === 24 ? "-ml-1.5" : "-ml-2"))}
         >
           <Avatar
-            size={28}
-            tone={person.isClient ? "warning" : index === 0 ? "soft" : "muted"}
+            size={size}
+            tone={person.isClient ? "warning" : "soft"}
             className="border-2 border-background"
           >
             <AvatarFallback aria-label={person.name} role="img">
@@ -47,8 +50,8 @@ export function AvatarGroup({
         </li>
       ))}
       {hidden > 0 ? (
-        <li className="-ml-2 flex">
-          <Avatar size={28} tone="muted" className="border-2 border-background">
+        <li className={cn("flex", size === 24 ? "-ml-1.5" : "-ml-2")}>
+          <Avatar size={size} tone="muted" className="border-2 border-background">
             <AvatarFallback
               aria-label={`${hidden} autres`}
               role="img"

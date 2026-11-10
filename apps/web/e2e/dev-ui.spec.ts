@@ -517,11 +517,15 @@ test("S-dev-ui superpositions B : dialogue d'alerte, tiroirs 440 / 540 / 620, F8
     await expect(page.getByRole("dialog")).toHaveCount(0);
   }
   await page.getByRole("button", { name: "Toast de succès" }).click();
-  await expect(page.getByText("Projet créé")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Notifications (F8)" }).getByText("Projet créé"),
+  ).toBeVisible();
   await page.keyboard.press("F8");
   await expect(page.locator("[aria-label='Notifications (F8)'] ol")).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(page.getByText("Projet créé")).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Notifications (F8)" }).getByText("Projet créé"),
+  ).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/Anthropic|OpenAI/);
 });
 

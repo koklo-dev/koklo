@@ -105,16 +105,17 @@ test("T1 créer un projet depuis l'UI crée le dépôt de spec", async ({ page }
   await signIn(page, workspace.owner);
   await page.goto("/projects");
   await page.getByTestId("create-project-button").click();
-  const dialog = page.getByRole("dialog", { name: "Créer un projet" });
-  await expect(dialog).toContainText(`Compte GitHub : ${workspace.slug}`);
+  const dialog = page.getByRole("dialog", { name: "Nouveau projet" });
+  await expect(dialog).toContainText(`Dépôt créé sur ${workspace.slug}`);
   await dialog.getByLabel("Nom du projet").fill(name);
   await dialog.getByRole("button", { name: "Créer le projet" }).click();
 
-  // Succès complet : le panneau se ferme (les étapes « Terminé » n'y sont plus visibles) et une région d'état l'annonce.
+  // La boîte se ferme dès que le projet existe ; le worker crée le dépôt en arrière-plan, la carte de création
+  // devient une carte normale à la fin (sondage de 3 s).
   await expect(dialog).toBeHidden();
-  await expect(
-    page.getByRole("status").filter({ hasText: `Projet « ${name} » et dépôt de spec créés.` }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`^${name}`) })).toBeVisible({
+    timeout: 30_000,
+  });
 
   const owner = await apiAs(baseURL, workspace.owner);
   const projects = await json<{ id: string; name: string }[]>(await owner.get(`${ORPC}/projects`));

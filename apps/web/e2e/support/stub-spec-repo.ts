@@ -14,7 +14,19 @@ export type SpecRepoMode =
   | "nameTaken"
   | "exists"
   | "failOnceThenOk";
+/**
+ * État de la création du dépôt par le worker (TK-93) : `running` reste en cours, `finishing` se termine au premier
+ * sondage, `succeeded` est déjà finie, un code d'échec (`CreationErrorCode`) donne une carte en échec.
+ */
+export type CreationMode = "running" | "finishing" | "succeeded" | string;
 export type SpecRepoScenario = {
+  creation?: CreationMode;
+  /** Le projet créé existe dès le départ avec cet état (reprise après rechargement, captures). */
+  creationSeed?: boolean;
+  /** Invitation du client en échec (étape « Invitation envoyée au client »). */
+  creationInvitation?: "done" | "error";
+  /** État après « Réessayer » (défaut : `succeeded`). */
+  retryTo?: CreationMode;
   specRepo?: SpecRepoMode;
   /** `loading` retient la réponse de `project.create` jusqu'à `/__release`. */
   projectCreate?: "ok" | "loading";
@@ -44,6 +56,9 @@ const REPO = {
 };
 
 const projectCreates: unknown[] = [];
+const creationRetries: unknown[] = [];
+type CreationState = { mode: CreationMode; polls: number };
+let creationState: CreationState | null = null;
 const specRepoCalls: unknown[] = [];
 const repoLinks: unknown[] = [];
 let specAttempts = 0;
@@ -52,7 +67,65 @@ export function resetSpecRepo(): void {
   projectCreates.length = 0;
   specRepoCalls.length = 0;
   repoLinks.length = 0;
+  creationRetries.length = 0;
+  creationState = null;
   specAttempts = 0;
+}
+
+const MODES = new Set(["running", "finishing", "succeeded"]);
+const PROJECT_NAME = "Atelier neuf";
+
+/** Statut de la ligne et état de l'étape « dépôt » pour un mode du scénario. */
+function creationPhase(state: CreationState): { status: string; repo: string } {
+  if (state.mode === "succeeded" || (state.mode === "finishing" && state.polls > 0)) {
+    return { status: "succeeded", repo: "done" };
+  }
+  if (MODES.has(state.mode)) return { status: "running", repo: "running" };
+  return state.mode === "no_account"
+    ? { status: "skipped", repo: "todo" }
+    : { status: "failed", repo: "error" };
+}
+
+function creationBody(state: CreationState, scenario: SpecRepoScenario) {
+  const { status, repo } = creationPhase(state);
+  const invitation = scenario.creationInvitation
+    ? [{ key: "invitation", status: scenario.creationInvitation }]
+    : [];
+  const error = {
+    code: state.mode,
+    ownerLogin: "acme-corp",
+    repoName: "atelier-neuf-spec",
+    ...(state.mode === "rate_limited" ? { retryAfterMs: 12000 } : {}),
+  };
+  return {
+    status,
+    steps: [
+      { key: "project", status: "done" },
+      { key: "idea", status: "done" },
+      ...invitation,
+      { key: "repo", status },
+    ].map((step) => (step.key === "repo" ? { key: "repo", status: repo } : step)),
+    ideaPages: 10,
+    ...(MODES.has(state.mode) ? {} : { error }),
+    canAct: true,
+  };
+}
+
+/** Création à joindre à la carte du projet créé : `null` une fois le dépôt créé (carte normale). */
+export function creationForCard(projectId: string, scenario: SpecRepoScenario) {
+  if (projectId !== CREATED_PROJECT_ID || !creationState) return null;
+  const body = creationBody(creationState, scenario);
+  return body.status === "succeeded" ? null : body;
+}
+
+/** Projet créé dès le départ (`creationSeed`) : sa carte est en cours ou en échec dès le chargement de la liste. */
+export function seedCreation(
+  scenario: SpecRepoScenario,
+  addProject: (project: { id: string; name: string }) => void,
+): void {
+  if (!scenario.creationSeed) return;
+  addProject({ id: CREATED_PROJECT_ID, name: PROJECT_NAME });
+  creationState = { mode: scenario.creation ?? "running", polls: 0 };
 }
 
 function specRepoResponse(mode: SpecRepoMode): Reply {
@@ -103,16 +176,31 @@ export function handleSpecRepo(req: IncomingMessage, path: string, h: Handlers):
     "/__project-creates": projectCreates,
     "/__spec-repo-calls": specRepoCalls,
     "/__repo-links": repoLinks,
+    "/__creation-retries": creationRetries,
   };
   const journal = journals[path];
   if (journal) {
     send(reply(200, journal));
     return true;
   }
+  if (req.method === "GET" && path === `/projects/${CREATED_PROJECT_ID}/creation`) {
+    if (creationState) creationState.polls += 1;
+    send(reply(200, creationState ? creationBody(creationState, scenario) : null));
+    return true;
+  }
   if (req.method !== "POST") return false;
+  if (path === `/projects/${CREATED_PROJECT_ID}/creation/retry`) {
+    readBody(req, (body) => {
+      creationRetries.push(body);
+      creationState = { mode: scenario.retryTo ?? "succeeded", polls: 0 };
+      send(reply(200, creationBody(creationState, scenario)));
+    });
+    return true;
+  }
   if (path.endsWith("/projects")) {
     readBody(req, (body) => {
       projectCreates.push(body);
+      creationState = { mode: scenario.creation ?? "succeeded", polls: 0 };
       addProject({ id: CREATED_PROJECT_ID, name: String(body.name) });
       const created = reply(200, { id: CREATED_PROJECT_ID, name: body.name });
       if (scenario.projectCreate === "loading") hold(() => send(created));

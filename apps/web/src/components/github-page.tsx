@@ -4,7 +4,6 @@ import { Alert, AlertDescription, Icon } from "@koklo/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { readCreationResume } from "../lib/creation-resume.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import {
   type InstallationCallbackOutcome,
@@ -81,12 +80,6 @@ function GithubManager({ result }: { result: InstallationCallbackOutcome | undef
   const redirecting = useUnauthorizedRedirect(installations.error);
   const [outcome, setOutcome] = useState(() => (isKnownOutcome(result) ? result : undefined));
   const [failure, setFailure] = useState<StartFailure>();
-  const [resumeName, setResumeName] = useState<string>();
-
-  // Après l'installation, un marqueur de création de projet valide propose de reprendre (S-projects §5.1).
-  useEffect(() => {
-    setResumeName(outcome === "installed" ? readCreationResume()?.projectName : undefined);
-  }, [outcome]);
 
   // Le message du retour de GitHub est gardé dans l'état, puis le paramètre quitte l'URL (pas de rejeu).
   useEffect(() => {
@@ -127,7 +120,7 @@ function GithubManager({ result }: { result: InstallationCallbackOutcome | undef
           {REDIRECTING_LABEL}
         </p>
       )}
-      {outcome ? <GithubResultNotice outcome={outcome} resumeProjectName={resumeName} /> : null}
+      {outcome ? <GithubResultNotice outcome={outcome} /> : null}
       {failure ? (
         <ErrorNotice {...(failure.title ? { title: failure.title } : {})}>
           {failure.text}

@@ -54,7 +54,7 @@ type RadioCardProps = Omit<ComponentProps<typeof RadioPrimitive.Item>, "title"> 
   badge?: ReactNode;
 };
 
-/** Carte radio (`role="radio"`) : titre 13/600, description 12 muted, choisie = anneau `--primary`. */
+/** Carte radio (`role="radio"`) : bouton radio 18 visible, titre 14/600, description 12 muted, choisie = anneau `--primary`. */
 export function RadioCard({ title, description, badge, className, ...props }: RadioCardProps) {
   const descId = useId();
   return (
@@ -62,24 +62,33 @@ export function RadioCard({ title, description, badge, className, ...props }: Ra
       data-slot="radio-card"
       aria-describedby={description ? descId : undefined}
       className={cn(
-        "flex min-w-0 flex-col items-start gap-1 rounded-card border bg-background px-3 py-2.5 text-left outline-none motion-safe:transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-dashed disabled:border-border-strong disabled:bg-surface disabled:text-muted-foreground data-[state=checked]:border-primary data-[state=checked]:bg-diff-bg data-[state=checked]:ring-1 data-[state=checked]:ring-inset data-[state=checked]:ring-primary",
+        "group/radio flex min-w-0 items-start gap-2.5 rounded-card border bg-background p-3 text-left outline-none motion-safe:transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-dashed disabled:border-border-strong disabled:bg-surface disabled:text-muted-foreground data-[state=checked]:border-primary data-[state=checked]:bg-diff-bg data-[state=checked]:ring-1 data-[state=checked]:ring-inset data-[state=checked]:ring-primary",
         className,
       )}
       {...props}
     >
-      <span className="flex w-full items-center justify-between gap-2 text-meta font-semibold">
-        {title}
-        {badge ? (
-          <Pill size="sm" tone="soft">
-            {badge}
-          </Pill>
+      <span
+        aria-hidden="true"
+        data-slot="radio-card-mark"
+        className="mt-[3px] inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 border-border-strong bg-background group-data-[state=checked]/radio:border-primary"
+      >
+        <RadioPrimitive.Indicator className="block size-2 rounded-full bg-primary" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+        <span className="flex w-full items-center justify-between gap-2 text-body font-semibold">
+          {title}
+          {badge ? (
+            <Pill size="sm" tone="soft">
+              {badge}
+            </Pill>
+          ) : null}
+        </span>
+        {description ? (
+          <span id={descId} className="text-caption font-normal text-muted-foreground">
+            {description}
+          </span>
         ) : null}
       </span>
-      {description ? (
-        <span id={descId} className="text-caption font-normal text-muted-foreground">
-          {description}
-        </span>
-      ) : null}
     </RadioPrimitive.Item>
   );
 }

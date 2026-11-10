@@ -22,6 +22,7 @@ export const cssPath = {
   theme: join(stylesDir, "theme.css"),
   tentative: join(stylesDir, "tentative.css"),
   status: join(stylesDir, "status.css"),
+  hues: join(stylesDir, "hues.css"),
   typography: join(stylesDir, "typography.css"),
   fonts: join(stylesDir, "fonts.css"),
 } as const;

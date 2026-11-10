@@ -232,7 +232,10 @@ export const ITEM_ACTIVE = "border-border bg-background font-semibold";
 
 export interface ShellNavItemProps {
   href: string;
-  icon: IconName;
+  /** Icône de tête ; absente quand `leading` la remplace. */
+  icon?: IconName;
+  /** Élément de tête à la place de l'icône (tuile d'un projet récent, `ProjectTile` 22). */
+  leading?: ReactNode;
   label: string;
   active?: boolean;
   /** Pastille de compteur (ex. tickets du sprint actif) ; masquée dans le rail. */
@@ -246,6 +249,7 @@ export interface ShellNavItemProps {
 export function ShellNavItem({
   href,
   icon,
+  leading,
   label,
   active = false,
   badge,
@@ -268,11 +272,14 @@ export function ShellNavItem({
         active && ITEM_ACTIVE,
       )}
     >
-      <Icon
-        name={icon}
-        fill={active}
-        className={active ? "text-primary" : "text-muted-foreground"}
-      />
+      {leading ??
+        (icon ? (
+          <Icon
+            name={icon}
+            fill={active}
+            className={active ? "text-primary" : "text-muted-foreground"}
+          />
+        ) : null)}
       {collapsed ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
       {collapsed || count === undefined ? null : <CountBadge>{count}</CountBadge>}
       {collapsed ? null : badge}

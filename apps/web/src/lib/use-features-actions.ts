@@ -2,10 +2,9 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { clearCreationResume } from "./creation-resume.ts";
-import type { CreationOutcome } from "./creation-types.ts";
 import type { FeaturesView } from "./features-view.ts";
 import { orpc } from "./orpc.ts";
+import type { RepoOutcome } from "./use-spec-repo-create.ts";
 
 /**
  * Annonces de la région d'état : « La spec est prête. » quand la liste remplace la carte de préparation,
@@ -27,18 +26,14 @@ export function useAnnouncements(view: FeaturesView) {
   };
 }
 
-/** Issue du panneau de création du dépôt (reprise en place) : relit la spec et les dépôts du projet. */
+/** Issue de la boîte de création du dépôt (en place) : relit la spec et les dépôts du projet. */
 export function useRepoCreated(announce: (text: string) => void) {
   const queryClient = useQueryClient();
   const [created, setCreated] = useState(false);
   const onFinish = useCallback(
-    (outcome: CreationOutcome) => {
-      if (!["created-with-repo", "linked", "existing-repo"].includes(outcome.kind)) return;
-      clearCreationResume();
+    (outcome: RepoOutcome) => {
       setCreated(true);
-      if (outcome.kind !== "existing-repo") {
-        announce(outcome.kind === "linked" ? "Dépôt de spec relié." : "Dépôt de spec créé.");
-      }
+      if (outcome !== "existing-repo") announce("Dépôt de spec créé.");
       void queryClient.invalidateQueries({ queryKey: orpc.spec.key() });
       void queryClient.invalidateQueries({ queryKey: orpc.repo.key() });
     },

@@ -27,23 +27,20 @@ test("C1 : session sans organisation → créer une organisation → créer un p
   await page.getByRole("button", { name: "Créer l'organisation" }).click();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByRole("heading", { level: 1, name: "Projets" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Aucun projet pour le moment" })).toBeVisible();
+  await expect(page.getByTestId("projects-empty")).toContainText("Aucun projet pour l'instant");
   await expect(page.getByTestId("create-project-button")).toBeVisible();
 
-  // C1.c : création d'un projet depuis le panneau, la ligne apparaît et le compteur passe à 1.
+  // C1.c : création d'un projet depuis la boîte « Nouveau projet » : le projet est visible aussitôt (carte de
+  // création, puis carte normale), le compteur passe à 1. Sans installation GitHub, le dépôt attend l'application.
   await page.getByTestId("create-project-button").click();
-  const sheet = page.getByRole("dialog", { name: "Créer un projet" });
-  await sheet.getByLabel("Nom du projet").fill(projectName);
-  // Cette pile e2e n'a aucune installation GitHub : le projet est créé sans dépôt de spec (design 48c §2),
-  // le panneau reste ouvert sur la notice « Relier GitHub » jusqu'à ce qu'on le ferme.
-  await expect(sheet.getByText("Aucun compte GitHub n'est relié", { exact: false })).toBeVisible();
-  await sheet.getByRole("button", { name: "Créer le projet" }).click();
-  await expect(sheet.getByText(`Projet « ${projectName} » créé, sans dépôt de spec`)).toBeVisible();
-  await expect(sheet.getByRole("link", { name: "Relier GitHub" })).toBeVisible();
-  await sheet.getByRole("button", { name: "Fermer", exact: true }).click();
-  await expect(sheet).toBeHidden();
-  await expect(page.getByRole("cell", { name: projectName })).toBeVisible();
-  await expect(page.getByText("1 projet", { exact: true })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Nouveau projet" });
+  await expect(dialog.getByText("Aucun compte GitHub n'est relié", { exact: false })).toBeVisible();
+  await dialog.getByLabel("Nom du projet").fill(projectName);
+  await dialog.getByRole("button", { name: "Créer le projet" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("link", { name: "Relier GitHub" })).toBeVisible();
+  await expect(page.getByText(new RegExp(`^${projectName}`)).first()).toBeVisible();
+  await expect(page.getByText(/^1 projet/)).toBeVisible();
 });
 
 test("G1 : session sans organisation active ne boucle pas entre /login et /projects", async ({

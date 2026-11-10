@@ -6,6 +6,7 @@ import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { SidebarFooter } from "./sidebar-footer.tsx";
 import { OrganizationNav, ProjectNav } from "./sidebar-nav.tsx";
 import { SidebarOrganization } from "./sidebar-organization.tsx";
+import { SidebarRecents } from "./sidebar-recents.tsx";
 import { SidebarSearch } from "./sidebar-search.tsx";
 
 /**
@@ -36,7 +37,11 @@ export function AppSidebar({
           </div>
           <SidebarSearch onOpen={onOpenSearch} />
         </div>
-        {projectId ? <ProjectNav projectId={projectId} pathname={pathname} role={role} /> : null}
+        {projectId ? (
+          <ProjectNav projectId={projectId} pathname={pathname} role={role} />
+        ) : (
+          <SidebarRecents />
+        )}
         <OrganizationNav pathname={pathname} role={role} />
       </div>
       <SidebarFooter />

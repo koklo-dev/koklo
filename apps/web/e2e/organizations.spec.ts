@@ -60,17 +60,6 @@ const SHOTS: Shot[] = [
       await expect(page.getByText("Awa Koné")).toBeVisible();
     },
   },
-  {
-    screen: "S-projects",
-    state: "create-sheet",
-    path: "/projects",
-    scenario: { session: true, projects: "data" },
-    ready: async (page) => {
-      await page.getByTestId("create-project-button").click();
-      await expect(page.getByTestId("create-project-sheet")).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Créer un projet" })).toBeVisible();
-    },
-  },
 ];
 
 for (const theme of ["light", "dark"] as Theme[]) {

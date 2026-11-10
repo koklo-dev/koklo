@@ -119,3 +119,20 @@ describe("CA2 - le calcul de contraste échoue sous le seuil", () => {
     expect(assertContrast("paire limite", "#767676", "#ffffff")).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+describe.each([":root", ".dark"] as const)(
+  "TK-93 - teintes des tuiles de projet %s",
+  (selector) => {
+    it.each([1, 2, 3, 4, 5])("teinte %i : texte sur fond >= 4,5:1", (n) => {
+      const vars = loadBlocks(cssPath.hues)[selector] ?? {};
+      expect(vars[`--hue-${n}-bg`], `${selector} --hue-${n}-bg`).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(
+        assertContrast(
+          `${selector} teinte ${n}`,
+          vars[`--hue-${n}-fg`] as string,
+          vars[`--hue-${n}-bg`] as string,
+        ),
+      ).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
+    });
+  },
+);

@@ -129,7 +129,9 @@ function FieldLabel({
           <span className="sr-only">obligatoire</span>
         </>
       ) : null}
-      {optional ? <span className="font-normal text-muted-foreground">(facultatif)</span> : null}
+      {optional ? (
+        <span className="font-normal text-muted-foreground">{" (facultatif)"}</span>
+      ) : null}
     </Label>
   );
 }
