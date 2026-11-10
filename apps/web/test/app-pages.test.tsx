@@ -6,10 +6,22 @@ import RootLayout, { metadata } from "../src/app/layout.tsx";
 import LoginPage from "../src/app/login/page.tsx";
 import { THEME_INIT_SCRIPT } from "../src/lib/theme.ts";
 
+const redirect = vi.hoisted(() =>
+  vi.fn((path: string) => {
+    throw new Error(`NEXT_REDIRECT ${path}`);
+  }),
+);
+const singleClientProjectPath = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
   usePathname: () => "/projects",
+  redirect,
 }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ cookie: "sid=abc" }) }));
+vi.mock("../src/lib/runtime-config.ts", () => ({
+  readRuntimeConfig: () => ({ apiUrl: "http://api.internal:3001" }),
+}));
+vi.mock("../src/lib/single-client-project.ts", () => ({ singleClientProjectPath }));
 vi.mock("../src/components/projects-page.tsx", () => ({
   ProjectsPage: () => <p>liste</p>,
 }));
@@ -38,9 +50,27 @@ describe("page /login", () => {
 });
 
 describe("page /projects", () => {
-  it("rend le titre h1 et la vue projets (la coquille vit dans le layout du groupe (shell))", () => {
-    render(<ProjectsRoute />);
-    expect(screen.getByRole("heading", { level: 1, name: "Projets" })).toBeInTheDocument();
+  const route = async (params: Record<string, string> = {}) =>
+    ProjectsRoute({ searchParams: Promise.resolve(params) });
+
+  it("rend la vue projets (le titre h1 et la coquille vivent dans la vue et le layout du groupe (shell))", async () => {
+    render(await route());
     expect(screen.getByText("liste")).toBeInTheDocument();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("client à un seul projet : redirige côté serveur vers ce projet", async () => {
+    singleClientProjectPath.mockResolvedValueOnce("/projects/p1");
+    await expect(route()).rejects.toThrow("NEXT_REDIRECT /projects/p1");
+    expect(singleClientProjectPath).toHaveBeenCalledWith(expect.any(String), "sid=abc");
+  });
+
+  it("recherche ou filtre dans l'adresse : jamais de redirection", async () => {
+    singleClientProjectPath.mockClear();
+    singleClientProjectPath.mockResolvedValue("/projects/p1");
+    render(await route({ phase: "idea" }));
+    render(await route({ q: "alpha" }));
+    expect(singleClientProjectPath).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
   });
 });

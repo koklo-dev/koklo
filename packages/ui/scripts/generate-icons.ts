@@ -47,6 +47,7 @@ export const ICON_NAMES = [
   "search",
   "link",
   "person",
+  "corporate_fare",
   "settings",
   "lock",
   "visibility",

@@ -8,3 +8,18 @@ const ALLOWED = /^[A-Za-z0-9._-]{1,100}$/;
 export function isValidSpecRepoName(name: string): boolean {
   return ALLOWED.test(name) && name !== "." && name !== ".." && !/\.git$/i.test(name);
 }
+
+const SLUG_MAX = 80;
+
+/** Nom de dépôt proposé pour un projet : son nom en minuscules sans accents, suivi de « -spec » (aperçu seulement). */
+export function suggestedRepoName(projectName: string): string {
+  const slug = projectName
+    .normalize("NFD")
+    .replaceAll(/\p{M}/gu, "")
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "")
+    .slice(0, SLUG_MAX)
+    .replaceAll(/-+$/g, "");
+  return `${slug.length >= 2 ? slug : "projet"}-spec`;
+}

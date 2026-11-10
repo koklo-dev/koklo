@@ -42,7 +42,7 @@ export function FilterChip({
         "h-7 rounded-full px-3 text-caption",
         add && "border-dashed border-border-strong bg-transparent text-muted-foreground",
         !add && on && "border-primary bg-secondary text-secondary-foreground",
-        !add && !on && "bg-background text-muted-foreground",
+        !add && !on && "bg-background text-foreground",
         className,
       )}
       onClick={(event) => {

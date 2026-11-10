@@ -14,9 +14,12 @@ afterEach(() => {
 const recent = (body: unknown, status = 200) =>
   fetchMock.mockResolvedValue(new Response(JSON.stringify(body), { status }));
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("lastProjectPath", () => {
   it("appelle GET /project-visits avec le cookie de la requête", async () => {
-    recent([{ id: ID, name: "A", visitedAt: "2026-11-07T10:00:00.000Z" }]);
+    recent([
+      { id: ID, name: "A", visitedAt: "2026-11-07T10:00:00.000Z", initials: "A", colorKey: 1 },
+    ]);
     await lastProjectPath("http://api.internal:3001", "sid=abc");
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(String(url)).toBe("http://api.internal:3001/project-visits");
@@ -26,18 +29,22 @@ describe("lastProjectPath", () => {
 
   it("rend le plus récent (premier de la liste)", async () => {
     recent([
-      { id: ID, name: "A", visitedAt: "2026-11-07T10:00:00.000Z" },
+      { id: ID, name: "A", visitedAt: "2026-11-07T10:00:00.000Z", initials: "A", colorKey: 1 },
       {
         id: "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b02",
         name: "B",
         visitedAt: "2026-11-06T10:00:00.000Z",
+        initials: "B",
+        colorKey: 2,
       },
     ]);
     expect(await lastProjectPath("http://api.internal:3001", null)).toBe(`/projects/${ID}`);
   });
 
   it("ajoute le suffixe demandé (/kanban → tickets)", async () => {
-    recent([{ id: ID, name: "A", visitedAt: "2026-11-07T10:00:00.000Z" }]);
+    recent([
+      { id: ID, name: "A", visitedAt: "2026-11-07T10:00:00.000Z", initials: "A", colorKey: 1 },
+    ]);
     expect(await lastProjectPath("http://api.internal:3001", null, "/tickets")).toBe(
       `/projects/${ID}/tickets`,
     );
@@ -64,7 +71,15 @@ describe("lastProjectPath", () => {
   });
 
   it("un identifiant qui n'est pas un uuid n'est jamais mis dans l'adresse", async () => {
-    recent([{ id: "../../etc", name: "A", visitedAt: "2026-11-07T10:00:00.000Z" }]);
+    recent([
+      {
+        id: "../../etc",
+        name: "A",
+        visitedAt: "2026-11-07T10:00:00.000Z",
+        initials: "A",
+        colorKey: 1,
+      },
+    ]);
     expect(await lastProjectPath("http://api.internal:3001", null)).toBe("/projects");
   });
 });

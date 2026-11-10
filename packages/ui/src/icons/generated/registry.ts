@@ -33,6 +33,7 @@ export const iconLoaders = {
   search: () => import("./search.ts"),
   link: () => import("./link.ts"),
   person: () => import("./person.ts"),
+  corporate_fare: () => import("./corporate_fare.ts"),
   settings: () => import("./settings.ts"),
   lock: () => import("./lock.ts"),
   visibility: () => import("./visibility.ts"),

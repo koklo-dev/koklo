@@ -2,28 +2,21 @@
 
 import { Button, Card, Icon } from "@koklo/ui";
 import { useRef, useState } from "react";
-import type { CreationOutcome } from "../lib/creation-types.ts";
-import { ProjectCreateSheet } from "./project-create-sheet.tsx";
+import type { RepoOutcome } from "../lib/use-spec-repo-create.ts";
+import { SpecRepoCreateDialog } from "./spec-repo-create-dialog.tsx";
 
 interface MissingProps {
   projectId: string;
-  projectName: string | undefined;
   /** Propriétaire ou administrateur : seuls à pouvoir créer le dépôt. */
   canCreate: boolean;
-  /** Issue du panneau de création, une fois fermé. */
-  onFinish: (outcome: CreationOutcome) => void;
+  /** Issue de la boîte de création du dépôt. */
+  onFinish: (outcome: RepoOutcome) => void;
   /** Le dépôt vient d'être créé : le focus ne revient pas au bouton (il disparaît avec cette carte). */
   created: boolean;
 }
 
 /** Projet sans dépôt de spec (§4.6) : la reprise de 48c s'ouvre en place, à l'étape 2, sans rappeler `project.create`. */
-export function SpecRepoMissing({
-  projectId,
-  projectName,
-  canCreate,
-  onFinish,
-  created,
-}: MissingProps) {
+export function SpecRepoMissing({ projectId, canCreate, onFinish, created }: MissingProps) {
   const [panel, setPanel] = useState({ key: 0, open: false });
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -46,11 +39,12 @@ export function SpecRepoMissing({
         </Button>
       ) : null}
       {panel.key > 0 ? (
-        <ProjectCreateSheet
+        <SpecRepoCreateDialog
           key={panel.key}
+          projectId={projectId}
           open={panel.open}
-          resume={{ marker: { projectId, projectName: projectName ?? "Projet" }, offerLink: false }}
-          onFinish={(outcome) => {
+          onClose={() => setPanel((current) => ({ ...current, open: false }))}
+          onDone={(outcome) => {
             setPanel((current) => ({ ...current, open: false }));
             onFinish(outcome);
           }}

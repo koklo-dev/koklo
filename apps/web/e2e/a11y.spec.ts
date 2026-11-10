@@ -42,6 +42,8 @@ const PAGES: readonly Page[] = [
   { name: "projects loading", path: "/projects", session: true, projects: "loading" },
   { name: "projects empty", path: "/projects", session: true, projects: "empty" },
   { name: "projects data", path: "/projects", session: true, projects: "data" },
+  { name: "projects filtered", path: "/projects?phase=framing", session: true, projects: "data" },
+  { name: "projects no result", path: "/projects?q=introuvable", session: true, projects: "data" },
   { name: "projects error", path: "/projects", session: true, projects: "internal" },
   {
     name: "kanban loading",

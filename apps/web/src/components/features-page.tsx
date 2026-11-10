@@ -139,7 +139,7 @@ function NoResults({ page }: { page: FeaturesPageModel }) {
 
 /** Corps de l'écran : un seul état principal à la fois (design/screens/S-features.md §4). */
 function Body({ page }: { page: FeaturesPageModel }) {
-  const { view, role, projectName, retryLoad, refresh } = page.data;
+  const { view, role, retryLoad, refresh } = page.data;
   switch (view.kind) {
     case "loading":
       return <Skeleton />;
@@ -164,7 +164,6 @@ function Body({ page }: { page: FeaturesPageModel }) {
       return (
         <SpecRepoMissing
           projectId={page.data.projectId}
-          projectName={projectName}
           canCreate={canManage(role)}
           onFinish={page.repoCreated.onFinish}
           created={page.repoCreated.created}

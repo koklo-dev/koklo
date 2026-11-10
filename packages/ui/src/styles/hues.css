@@ -1,0 +1,27 @@
+/* Teintes douces des tuiles de projet - DESIGN.md §5.12 (TK-93, maquette 08 l.196-198). Cinq paires fond / texte,
+   choisies par `colorKey` (1 à 5) ; contrastes AA vérifiés par `contrast.test.ts`. */
+:root {
+  --hue-1-bg: #eeeaff;
+  --hue-1-fg: #43299f;
+  --hue-2-bg: #e0f5fa;
+  --hue-2-fg: #0e5566;
+  --hue-3-bg: #e3f7ea;
+  --hue-3-fg: #1d5e33;
+  --hue-4-bg: #fef3c7;
+  --hue-4-fg: #7a3b0a;
+  --hue-5-bg: #fbe7f1;
+  --hue-5-fg: #7d2252;
+}
+
+.dark {
+  --hue-1-bg: #231d4a;
+  --hue-1-fg: #cbc1ff;
+  --hue-2-bg: #0f2f3a;
+  --hue-2-fg: #a5e4f3;
+  --hue-3-bg: #14301f;
+  --hue-3-fg: #b4ebc6;
+  --hue-4-bg: #3a2a0c;
+  --hue-4-fg: #fde68a;
+  --hue-5-bg: #3b1a2e;
+  --hue-5-fg: #f5c2dd;
+}

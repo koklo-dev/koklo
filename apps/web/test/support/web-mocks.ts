@@ -41,7 +41,10 @@ export const procedures = {
   invitationResend: vi.fn(),
   invitationRevoke: vi.fn(),
   projectList: vi.fn(),
+  projectCards: vi.fn(),
   projectCreate: vi.fn(),
+  projectCreationStatus: vi.fn(),
+  projectRetryRepo: vi.fn(),
   // TK-88 : coquille (contrat 2.1.0) — agrégat du projet, visites, récents, recherche ⌘K
   projectShell: vi.fn(),
   projectVisit: vi.fn(),
@@ -173,7 +176,10 @@ export const orpc = {
   },
   project: {
     list: query(["project", "list"], procedures.projectList),
+    cards: queryFull(["project", "cards"], procedures.projectCards),
     create: mutation(procedures.projectCreate),
+    creationStatus: queryFull(["project", "creationStatus"], procedures.projectCreationStatus),
+    retryRepo: mutationWithOptions(procedures.projectRetryRepo),
     key: () => ["project"],
     shell: queryFull(["project", "shell"], procedures.projectShell),
     visit: mutationWithOptions(procedures.projectVisit),
@@ -296,6 +302,46 @@ const DELIVERABLE_KEYS = [
 ] as const;
 const AVAILABLE = new Set<string>(["functional", "data", "design"]);
 
+/** Une carte de `project.cards` (contrat 2.8.0) : projet d'idée sans client, sans création. */
+export const projectCard = (over: Record<string, unknown> = {}) => ({
+  id: "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01",
+  name: "Alpha",
+  initials: "AL",
+  colorKey: 1,
+  clientContact: null,
+  phase: "idea",
+  progress: {
+    label: "Dossier d'idée",
+    done: 1,
+    total: 10,
+    valueLabel: "1 page stable sur 10",
+  },
+  nextAction: null as { title: string; attention: boolean } | null,
+  people: [{ initials: "AK", name: "Awa Koné", client: false }],
+  lastActivity: null,
+  creation: null,
+  ...over,
+});
+
+/** Une page de `project.cards` : facettes calculées sur les cartes données, sauf surcharge. */
+export const cardsPage = (
+  items: Array<ReturnType<typeof projectCard>>,
+  over: Record<string, unknown> = {},
+) => ({
+  items,
+  nextCursor: null,
+  total: items.length,
+  facets: {
+    all: items.length,
+    idea: items.filter((card) => card.phase === "idea").length,
+    framing: items.filter((card) => card.phase === "framing").length,
+    iterations: items.filter((card) => card.phase === "iterations").length,
+  },
+  attention: items.filter((card) => card.nextAction?.attention).length,
+  audience: "team",
+  ...over,
+});
+
 /** Sortie de `project.shell` : Fonctionnel, Données et Design disponibles, les autres verrouillés (B77). */
 export const projectShell = (over: Record<string, unknown> = {}) => ({
   id: PROJECT_ID,
@@ -376,6 +422,7 @@ export function resetWebMocks(): void {
   getSession.mockResolvedValue(sessionWith(ORG_ID));
   procedures.organizationList.mockResolvedValue([organization()]);
   procedures.projectList.mockResolvedValue([]);
+  procedures.projectCards.mockResolvedValue(cardsPage([]));
   procedures.memberPage.mockResolvedValue({ items: [], total: 0, totalIsEstimate: false });
   procedures.invitationList.mockResolvedValue([]);
   procedures.projectShell.mockResolvedValue(projectShell());

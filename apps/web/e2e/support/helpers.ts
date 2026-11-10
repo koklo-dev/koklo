@@ -11,6 +11,7 @@ import type {
   TransitionMode as KanbanTransition,
 } from "./stub-kanban.ts";
 import type { OverviewScenario } from "./stub-overview.ts";
+import type { ProjectsCardsScenario } from "./stub-projects.ts";
 import type { SettingsScenario } from "./stub-settings.ts";
 import type { ShellScenario } from "./stub-shell.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
@@ -47,6 +48,7 @@ export async function setScenario(
     ShellScenario &
     OverviewScenario &
     IdeaScenario &
+    ProjectsCardsScenario &
     Pick<SettingsScenario, "members">,
 ): Promise<void> {
   await fetch(`${STUB}/__scenario`, { method: "POST", body: JSON.stringify(scenario) });
@@ -68,8 +70,10 @@ export async function githubStartsSeen(): Promise<unknown[]> {
 }
 
 /** Corps reçus par `project.create`, `repo.createSpec` et `repo.link` sur le faux API, dans l'ordre. */
-export const projectCreatesSeen = async (): Promise<Array<{ name: string }>> =>
+export const projectCreatesSeen = async (): Promise<Array<Record<string, unknown>>> =>
   (await fetch(`${STUB}/__project-creates`)).json();
+export const creationRetriesSeen = async (): Promise<Array<Record<string, unknown>>> =>
+  (await fetch(`${STUB}/__creation-retries`)).json();
 export const specRepoCallsSeen = async (): Promise<Array<Record<string, unknown>>> =>
   (await fetch(`${STUB}/__spec-repo-calls`)).json();
 export const repoLinksSeen = async (): Promise<Array<Record<string, unknown>>> =>

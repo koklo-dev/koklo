@@ -12,6 +12,7 @@
     "./theme.css": "./src/styles/theme.css",
     "./tentative.css": "./src/styles/tentative.css",
     "./status.css": "./src/styles/status.css",
+    "./hues.css": "./src/styles/hues.css",
     "./typography.css": "./src/styles/typography.css",
     "./fonts.css": "./src/styles/fonts.css"
   },

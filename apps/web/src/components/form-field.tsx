@@ -1,8 +1,10 @@
-import { cn, Field, FieldDescription, FieldError, Input, Label } from "@koklo/ui";
+import { cn, Field, FieldDescription, FieldError, FieldLabel, Input } from "@koklo/ui";
 import { type ComponentProps, useId } from "react";
 
 interface FormFieldProps extends Omit<ComponentProps<"input">, "id"> {
   label: string;
+  /** « (facultatif) » en 400 muted après le libellé. */
+  optional?: boolean;
   error?: string | undefined;
   hint?: string;
   /** Annonce l'erreur (`role="alert"`) ; à désactiver quand une autre alerte du même écran est déjà annoncée. */
@@ -12,6 +14,7 @@ interface FormFieldProps extends Omit<ComponentProps<"input">, "id"> {
 /** Champ texte accessible : `Label` associé, aide et erreur liées par `aria-describedby` (erreur d'abord). */
 export function FormField({
   label,
+  optional,
   error,
   hint,
   announceError = true,
@@ -24,7 +27,9 @@ export function FormField({
   const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(" ");
   return (
     <Field>
-      <Label htmlFor={id}>{label}</Label>
+      <FieldLabel htmlFor={id} optional={optional}>
+        {label}
+      </FieldLabel>
       <Input
         id={id}
         className={cn("h-11 md:h-10", className)}

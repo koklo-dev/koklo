@@ -127,8 +127,7 @@ describe("RadioCard", () => {
     expect(a).toHaveAttribute("aria-checked", "true");
     for (const c of [
       "rounded-card",
-      "px-3",
-      "py-2.5",
+      "p-3",
       "data-[state=checked]:border-primary",
       "data-[state=checked]:ring-1",
       "data-[state=checked]:ring-inset",
@@ -137,6 +136,18 @@ describe("RadioCard", () => {
       expect(a).toHaveClass(c);
     }
     expect(a).toHaveAccessibleDescription(/Modèle par défaut/);
+    // Bouton radio visible (maquette 08 l.143) : rond de 18 avec point quand la carte est choisie.
+    expect(a.querySelector("[data-slot=radio-card-mark]")).toHaveClass(
+      "size-[18px]",
+      "rounded-full",
+    );
+    expect(a.querySelector("[data-slot=radio-card-mark] span")).toHaveClass("bg-primary");
+    expect(
+      screen
+        .getByRole("radio", { name: /Fournisseur B/ })
+        .querySelector("[data-slot=radio-card-mark] span"),
+    ).toBeNull();
+    expect(screen.getByText("Fournisseur A").className).toMatch(/text-body/);
     expect(screen.getByText("Recommandé")).toBeVisible();
     await userEvent.click(screen.getByRole("radio", { name: /Fournisseur B/ }));
     expect(screen.getByRole("radio", { name: /Fournisseur B/ })).toHaveAttribute(

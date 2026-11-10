@@ -3,6 +3,7 @@
 @import "./theme.css";
 @import "./tentative.css";
 @import "./status.css";
+@import "./hues.css";
 @import "./typography.css";
 
 /* Expose les variables à Tailwind (utilitaires bg-primary, text-muted-foreground, etc.). */
@@ -46,6 +47,17 @@
   --color-status-pending-foreground: var(--status-pending-fg);
   --color-status-revise: var(--status-revise-bg);
   --color-status-revise-foreground: var(--status-revise-fg);
+
+  --color-hue-1: var(--hue-1-bg);
+  --color-hue-1-foreground: var(--hue-1-fg);
+  --color-hue-2: var(--hue-2-bg);
+  --color-hue-2-foreground: var(--hue-2-fg);
+  --color-hue-3: var(--hue-3-bg);
+  --color-hue-3-foreground: var(--hue-3-fg);
+  --color-hue-4: var(--hue-4-bg);
+  --color-hue-4-foreground: var(--hue-4-fg);
+  --color-hue-5: var(--hue-5-bg);
+  --color-hue-5-foreground: var(--hue-5-fg);
 
   --color-alert-neutral: var(--alert-neutral-bg);
   --color-alert-neutral-border: var(--alert-neutral-border);

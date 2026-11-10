@@ -177,8 +177,13 @@ test("S-features : accès depuis la liste des projets, l'en-tête de projet et l
 }) => {
   await setScenario({ session: true, projects: "data" });
   await page.goto("/projects");
-  await page.getByRole("link", { name: /^Atelier Lumière\s?:\s?fonctionnalités$/ }).click();
-  await expect(page).toHaveURL(new RegExp(`${PATH}\\?tab=features$`));
+  await page
+    .getByTestId("projects-grid")
+    .getByRole("link", { name: /^Atelier Lumière/ })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${FEATURE_PROJECT_ID}$`));
+  await sidebarOf(page).getByRole("link", { name: "Fonctionnel" }).click();
+  await expect(page).toHaveURL(new RegExp(`${PATH}`));
   await expect(sidebarOf(page).getByRole("link", { name: "Fonctionnel" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -293,7 +298,7 @@ test("S-features : « Actualiser » une spec en préparation devenue prête affi
   await expect(page.getByRole("status")).toContainText("La spec est prête.");
 });
 
-test("S-features : reprise du dépôt de spec d'un projet créé sans dépôt (propriétaire)", async ({
+test("S-features : création du dépôt de spec d'un projet créé sans dépôt (propriétaire)", async ({
   page,
 }) => {
   await setScenario({ session: true, projects: "data", spec: "noSpec", installations: "single" });
@@ -302,9 +307,7 @@ test("S-features : reprise du dépôt de spec d'un projet créé sans dépôt (p
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel("Nom du projet")).toHaveCount(0);
-  await expect(
-    dialog.getByRole("list", { name: "Étapes de la création" }).getByRole("listitem").first(),
-  ).toContainText("Terminé");
+  await expect(dialog).toContainText("Dépôt créé sur acme-corp");
   await dialog.getByRole("button", { name: "Créer le dépôt" }).click();
   await expect(dialog).toBeHidden();
   await expect(
