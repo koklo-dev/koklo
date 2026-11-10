@@ -3,10 +3,10 @@ title: Créer une organisation
 audience: functional
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-29
+last_reviewed: 2026-11-10
 covers_release: unreleased
 sources: []
-covers_commit: 7f97066
+covers_commit: 5fa5b1c
 ---
 # Créer une organisation
 
@@ -40,7 +40,7 @@ covers_commit: 7f97066
 
 ## Vérifier que ça a marché
 Vous arrivez sur "Projets", et le sélecteur en haut du menu affiche le nom de l'organisation et votre rôle (Propriétaire).
-Pour un nouveau compte, la liste indique "Aucun projet pour le moment".
+Pour un nouveau compte, la liste indique "Aucun projet pour l'instant".
 
 ## Si quelque chose ne va pas
 | Symptôme | Cause | Que faire |

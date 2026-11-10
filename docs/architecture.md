@@ -3,10 +3,10 @@ title: Architecture
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-01
+last_reviewed: 2026-11-10
 covers_release: unreleased
 sources: []
-covers_commit: bb9f740
+covers_commit: 5fa5b1c
 ---
 # Architecture
 
@@ -694,7 +694,7 @@ Decision record: [ADR 0008](adr/0008-web-entry-gate-organizations.md).
 | Route | Page | Frame | Guard (`resolveAccess`) |
 |-------|------|-------|-------------------------|
 | `/organizations` | `OrganizationsPage` (+ `OrganizationForm`, `OrganizationList`) | none (full-page, like `/login`) | session required; never redirected when a session exists |
-| `/projects` | `ProjectsPage` (+ `ProjectCreateSheet`) | `AppFrame` | session + active organization |
+| `/projects` | `ProjectsPage` (+ `ProjectCreateDialog`, `CreationCard`) | `AppFrame` | session + active organization |
 | `/members` | `MembersPage` (+ `InviteForm`, `RoleField`) | `AppFrame` | session + active organization |
 
 - **Guard** (`lib/auth-guard.ts`, pure, `lib/session.ts`, `proxy.ts`): only a missing session leads to
@@ -723,7 +723,7 @@ flowchart TB
     orgPage[OrganizationsPage] --> entry[use-organization-entry]
     orgPage --> orgForm[OrganizationForm]
     entry --> act[use-activate-organization]
-    projPage[ProjectsPage] --> sheet[ProjectCreateSheet]
+    projPage[ProjectsPage] --> sheet[ProjectCreateDialog]
     memPage[MembersPage] --> inv[InviteForm]
     projPage & memPage --> frame[AppFrame] --> ts[TeamSwitcher]
     ts --> act
@@ -761,11 +761,11 @@ sequenceDiagram
   W->>A: organization.create
   A-->>W: organization (caller owner, active on the session)
   W-->>U: navigate /projects (empty list)
-  U->>W: "Créer un projet" (name)
+  U->>W: "Nouveau projet" (name, optional client, template, account)
   W->>A: project.create
   A-->>W: project
-  W->>A: project.list (invalidated)
-  W-->>U: list updated, status "Projet « name » créé."
+  W->>A: project.cards (invalidated)
+  W-->>U: creation card, status "Projet « name » créé."
 ```
 
 ### Web: project features list (TK-48d)
@@ -790,7 +790,7 @@ stateDiagram-v2
 - **Hooks** (`apps/web/src/lib`, functions of 50 lines at most): `use-features-page` composes `use-features-data` (queries and view), `use-features-url` (filters and open sheet in the address, History API: filters replace, the sheet pushes so Back closes it), `use-features-list` ("Afficher plus", filters actions, focus), `use-feature-sheet` (shareable link of a row, focus return, background refetch) and `use-features-actions` (announcements, repository created). `features-region.ts` holds the pure text of the single status region and which views show filters or the version line.
 - **Sheet**: `FeatureSheet` (`Sheet` modal) opened by `?feature=F-nnn`; header from the list row, detail from `spec.getFeature`. Plain text description (no Markdown, no active content). Technical groups (tables, endpoints, non functional requirements) and the commit/file provenance are shown to `canReadRepos` roles only (no git vocabulary for client and business). The scrollable body is a focusable named region (axe `scrollable-region-focusable`).
 - **Accessibility**: one `role="status"` region (counter, loading, announcements), a real `table` with caption, 44 px targets under `md`, skeletons animate under `motion-safe:` only, statuses are icon + text.
-- **Tests**: unit `apps/web/test/features-*.test.tsx`, `project-create-48d-fixes.test.tsx`; e2e `apps/web/e2e/features.spec.ts` (46 tests against the fake API `e2e/support/stub-features.ts`, captures in `design/screens/captures/S-features/`).
+- **Tests**: unit `apps/web/test/features-*.test.tsx`, `features-repo-create.test.tsx`; e2e `apps/web/e2e/features.spec.ts` (46 tests against the fake API `e2e/support/stub-features.ts`, captures in `design/screens/captures/S-features/`).
 
 ### Web: feature form, create and edit (TK-48e-1)
 `apps/web` only, on top of the features list; contract (0.7.0) and API unchanged. A `Sheet` over `/projects/[projectId]/features` (`?new=1`, `?edit=F-nnn`); `@koklo/ui` gains `Textarea`. Deletion (`feature.delete`) is sub-lot 48e-2, described below. Screen sheet: `design/screens/S-feature-form.md` (v1.3).
@@ -1332,26 +1332,44 @@ flowchart LR
 - **Start**: one action in flight (a ref lock set before render, re-armed on `pageshow` from the back/forward cache). The URL comes from the API only and `isGithubUrl` (`lib/github-redirect.ts`) accepts nothing but `https://github.com` (no userinfo, no port, exact host); anything else shows an error and does not navigate. Typed errors (`PROVIDER_UNAVAILABLE`, `too_many_pending`, `NOT_FOUND`, `FORBIDDEN`) map to messages in `lib/github-start-error.ts`.
 - Statuses are always icon + text (`github-status.tsx`); no token, state, code or external id is displayed, stored or logged by the web. Screen sheet: `design/screens/S-github.md`.
 
-### Web: project creation with its spec repository (TK-48c)
-The "Créer un projet" panel (`ProjectCreateSheet`, a `Sheet`) creates the project, then its spec repository, in two visible steps. `apps/web` only: it consumes `project.create`, `installation.list`, `repo.createSpec`, `repo.link` and `installation.start`; the contract (`@koklo/contract` 0.7.0) and the API are unchanged. Screen sheet: `design/screens/S-projects.md` (v5, §3.1, §4.1, §5).
+### Web: one-step project creation and creation card (TK-93, lot C)
+The "Nouveau projet" dialog (`ProjectCreateDialog`, a `Dialog`; full screen under 768 px) calls `project.create` once and
+closes; the spec repository is created in the background by the worker (job `project-creation`, see "Project cards and
+one-step creation (TK-93)"). The browser never calls `repo.createSpec` for a new project and never talks to GitHub except
+through the `installation.start` redirect. `apps/web` consumes `project.create`, `project.cards`, `project.creationStatus`,
+`project.retryRepo`, `installation.list` and `installation.start`; screen sheet `design/screens/S-projects.md` (v7, §4.1, §4.2).
 ```mermaid
 stateDiagram-v2
-  [*] --> form
-  form --> creating_project: submit (validated before any call)
-  creating_project --> form: project.create failed
-  creating_project --> creating_repo: project created
-  creating_project --> no_account: no GitHub account linked
-  creating_repo --> existing: success or spec_repo_exists
-  creating_repo --> failed: typed provider error
-  failed --> creating_repo: retry (repo.createSpec only)
-  failed --> existing: repo.link succeeded
-  ready --> creating_repo: resume
+  [*] --> dialog: Nouveau projet
+  dialog --> card_running: project.create ok (dialog closes, cards invalidated)
+  card_running --> card_running: project.creationStatus every 3 s
+  card_running --> card_normal: succeeded (cards invalidated)
+  card_running --> card_failed: failed or skipped (no_account)
+  card_failed --> card_running: project.retryRepo
+  card_failed --> card_normal: retry succeeded
 ```
-- **Hooks** (`apps/web/src/lib`, Biome caps functions at 50 lines): `use-creation-panel` composes the accounts query (`use-github-accounts`, enabled only once the panel is mounted), the state machine (`use-project-creation`, one in-flight lock, `project.create` called once), the two steps (`use-creation-steps`), the fields and their validation (`use-creation-fields`), the "authorize" redirect (`use-start-installation`, shared with `/github`) and the `repo.link` fallback (`use-spec-repo-link`). `use-creation-page` owns the page side: opening (the panel is remounted by `key`), the result announcement and the resume notice.
-- **Errors**: `describeSpecRepoError` maps each typed code to one text and one action (retry, authorize, reauthorize, close). `spec_repo_exists` is a success. `UNAUTHORIZED` goes through `useUnauthorizedRedirect` (G1: `/login` only when the session is really lost).
-- **Resume marker** (`creation-resume.ts`): `sessionStorage`, zod strict, 1 h TTL, every access in `try/catch`. It holds `projectId`, `projectName`, `installationId` and the typed repo name; never a token, a `state` or a URL. It is written when the panel closes with a project and no repository, and right before the redirect to GitHub; any success erases it. `/github?result=installed` shows a "Reprendre la création du projet" link when a valid marker exists.
-- **Accessibility**: one `role="status"` or `role="alert"` at a time in the panel, steps as an ordered list (icon + text, never colour alone), 44 px targets on mobile, animations only under `motion-safe:`.
-- **Tests**: unit (`apps/web/test/project-create-*.test.tsx`, `spec-repo-errors`, `creation-resume`, including `project-create-gaps` for the `/login` redirect, outside click and reduced motion); e2e `e2e/project-create.spec.ts` against the fake API (`e2e/support/stub-spec-repo.ts`, which journals the project taken from the URL path), never against github.com.
+- **Source of truth**: the server. A card whose `creation` is not null is rendered as a `CreationCard` at the head of the grid
+  (loaded cards only; order otherwise unchanged); after a reload it is redrawn from `project.cards`, with no browser marker.
+  `creation-resume.ts` (the old `sessionStorage` marker), the two-step panel and `ProjectCreateSheet` are gone.
+- **Hooks** (`apps/web/src/lib`): `use-project-create` (fields, validation with the contract schema, accounts via
+  `use-github-accounts`, one idempotency key per opening, one `project.create` in flight), `use-new-project` (opening, announcement),
+  `use-creation-status` (3 s polling while `pending` or `running`, stops on `succeeded`, `failed`, `skipped`; a finished or
+  missing creation invalidates `project.cards` and `project.recent`), `use-creation-retry` (`project.retryRepo`, a 409 only
+  rereads the state), `creation-copy` (closed table: 12 error codes to one sentence and the actions, the sentence never shows a
+  provider message), `creation-progress` (steps and labels).
+- **Actions** (`creation-actions.tsx`): "Réessayer", "Relier GitHub", "Ouvrir la page GitHub", "Autoriser / Réautoriser Koklo"
+  (the account is found by the `ownerLogin` of the error), a "Choisir un autre nom" field (name taken or invalid) and an account
+  selector (account gone). Without the right to act (`canAct` false) the card shows "Demandez à un propriétaire ou à un
+  administrateur." and no button. The retry is never disabled by a timer.
+- **Project without a repository on the Features page** (`SpecRepoMissing`): a small `SpecRepoCreateDialog` calls
+  `repo.createSpec` alone (no `project.create`); `spec_repo_exists` is a success; `describeSpecRepoError` keeps its table.
+- **Accessibility**: the creation card is the only `role="status"` of its item, steps are icon + text, the page announces
+  "Projet « … » créé."; focus goes back to "Nouveau projet" when the dialog closes; Escape with input asks for confirmation.
+- **Tests**: unit `creation-copy`, `creation-card` (12 failures, polling on fake timers), `project-create-dialog`,
+  `projects-page`, `features-repo-create`; e2e `apps/web/e2e/project-create.spec.ts` against the fake API
+  (`e2e/support/stub-spec-repo.ts`: `creation` mode, `creationSeed`, `retryTo`), captures in
+  `design/screens/captures/S-projects/create-*`; root e2e `projects.spec.ts`, `organizations.spec.ts`, `r2-journeys.spec.ts` T1
+  (the worker of the e2e stack creates the repository on the fake Git provider).
 
 ### Spec write foundations (TK-44a)
 Additive building blocks for writing the spec in batches; no API procedure or worker job uses them
@@ -1795,3 +1813,25 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK; its use in the API, TK-54b),
 [0016](adr/0016-client-access-by-project.md) (proposed: client access by project, central fail-closed scoping).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.
+
+## Project creation queue (TK-93)
+
+`project.create` writes the project, its idea pages and a `project_creations` row in one transaction, then drops
+`{ creationId }` (nothing else: no token, no repository name) into the pg-boss queue `project-creation`
+(`key_strict_fifo`, `singletonKey = creationId`). The worker job `apps/worker/src/jobs/project-creation.ts` loads the
+row, moves `pending` or `failed` to `running`, authenticates (installation token, plus the requester's decrypted user
+token for a personal account), calls `provisionSpecRepo` and, in one transaction, links the repository to the project
+and settles the row. The provisioning code and the token encryption live in `packages/github`
+(`provisioning/`, `credentials/`) and are shared with the api. A repository already linked to the project settles as
+`succeeded` without a provider call; a transient provider failure (`GitProviderUnavailableError`) puts the row back to
+`pending` and lets pg-boss retry, the last attempt settles `failed` with a closed `error_code`.
+
+```mermaid
+flowchart LR
+  API["api: project.create / project.retryRepo"] -->|"tx: project + pages + project_creations"| DB[(PostgreSQL)]
+  API -->|"send {creationId}"| Q["pg-boss project-creation"]
+  Q --> W["worker: project-creation job"]
+  W -->|"createRepo, writeCommit, createBranch"| GH["GitHub (port GitProvider)"]
+  W -->|"project_repos + status"| DB
+  Web["web: project.cards poll 3 s"] --> API
+```

@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.10)
+# Koklo : design (v2.14)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -163,7 +163,7 @@ Règle : la marque (violet) n'est jamais utilisée pour un statut ni pour une al
 | Phase | `check`, `lightbulb`, `edit_note`, `flag`, `sync` |
 | Versions | `commit`, `call_split`, `merge`, `difference`, `history` |
 | Données et technique | `database`, `api`, `palette`, `smart_toy`, `terminal` |
-| Interface | `add`, `search`, `link`, `person`, `settings`, `lock`, `visibility`, `warning`, `error`, `unfold_more`, `light_mode`, `dark_mode`, `wand_stars`, `keyboard_arrow_down`, `progress_activity`, `check_box`, `check_box_outline_blank`, `content_copy`, `swap_horiz`, `person_add`, `badge`, `key`, `arrow_forward`, `expand_less` (v2.6) |
+| Interface | `add`, `search`, `link`, `person`, `settings`, `lock`, `visibility`, `warning`, `error`, `unfold_more`, `light_mode`, `dark_mode`, `wand_stars`, `keyboard_arrow_down`, `progress_activity`, `check_box`, `check_box_outline_blank`, `content_copy`, `swap_horiz`, `person_add`, `badge`, `key`, `arrow_forward`, `expand_less` (v2.6), `corporate_fare` (compte GitHub de type organisation, boîte « Nouveau projet », TK-93) |
 | Statuts de ticket (kanban, TK-35) | `inbox` (backlog), `radio_button_unchecked` (à faire), `play_circle` (en cours), `fact_check` (en revue), `block` (bloqué), `check_circle` (terminé), `cancel` (annulé) |
 
 À ajouter au registre du générateur au lot 0 (`packages/ui/scripts/generate-icons.ts`) : `remove`, `edit`, `view_kanban`, `gavel`, `table`, `error`, `flag`, `sync`, `lightbulb`.
@@ -307,12 +307,12 @@ Mesures normalisées (incohérences I1 à I29 tranchées, questions B143 et B144
 | `RolePill` | `Pill md` : propriétaire et administrateur `soft`, développeur, designer et business `outline`, client `warning`. `tone` facultatif (v2.10, TK-141 : l'en-tête de Réglages est plein, `warning` pour le client, planche 24 l.336) ; `icon` facultatif (TK-141) : `badge` dans l'en-tête de Réglages, `person` pour le client ; l'icône `group` (Membres) s'ajoute au registre. |
 | `IdTag` | Mono 12/500, hauteur 22, 0 6, rayon 6 ; `tone` `soft` ou `outline` ; `size` `sm` 20 mono 11 ; variante `pill` « Fournisseur · modèle » (30, rond, bordure `--border`, `--surface`). |
 | Statuts | `STATUS_PILL` = `Pill md` : 24 px, `0 10 0 6`, écart 6 (`LifecycleStatus` : `0 10 0 8`, écart 8). Valable pour `ValidationStatus`, `DeliverableStatus`, `LifecycleStatus`. |
-| `Avatar`, `IconTile` | `Avatar` 24, 28, 32, 36 (défaut), 40 ; tons `soft`, `warning` (client), `agent` (`--primary`), `muted` ; forme `circle` ou `tile` (rayon 6, 8, 10, 14 selon la taille) ; initiales 12/700 jusqu'à 32, 14/700 au-delà. `IconTile` 28 / 32 / 36 / 40 / 48, rayon 8 / 8 / 10 / 10 / 12, icône 18 / 18 / 20 / 20 / 28 ; tons `soft`, `primary`, `success`, `warning`. |
-| `FilterChip`, `OptionChip` | Pilule 28, 0 12, 12/500, `aria-pressed`. Actif : bordure `--primary`, fond `--secondary`, texte `--secondary-foreground`. Inactif : `--border`, `--background`, muted. Compteur facultatif. Variante `add` pointillée. `OptionChip` : 32, `role="option"`, sélection bordure 2 `--primary` + `--secondary`. |
+| `Avatar`, `IconTile` | `Avatar` 24, 28, 32, 36 (défaut), 40 ; tons `soft`, `warning` (client), `agent` (`--primary`), `muted` ; forme `circle` ou `tile` (rayon 6, 8, 10, 14 selon la taille) ; initiales 10/600 en 24 (cartes de projet), 12/700 jusqu'à 32, 14/700 au-delà. `IconTile` 28 / 32 / 36 / 40 / 48, rayon 8 / 8 / 10 / 10 / 12, icône 18 / 18 / 20 / 20 / 28 ; tons `soft`, `primary`, `success`, `warning`. |
+| `FilterChip`, `OptionChip` | Pilule 28, 0 12, 12/500, `aria-pressed`. Actif : bordure `--primary`, fond `--secondary`, texte `--secondary-foreground`. Inactif : `--border`, `--background`, `--foreground` (planche 08 l.223). Compteur facultatif. Variante `add` pointillée. `OptionChip` : 32, `role="option"`, sélection bordure 2 `--primary` + `--secondary`. |
 | `SegmentedControl` | 2 à 4 segments, conteneur `--surface` bordure `--border` rayon 8 marge 3 écart 2 ; segment 26 (`xs` 24), 12/500, rayon 6 ; **actif : `--background` + anneau 1 `--border`, texte `--foreground`, sans violet ni ombre** (I5) ; inactif transparent, muted. `aria-pressed` ou `radiogroup`. |
 | `Switch`, `SwitchRow` | Radix `role="switch"`, 38 × 22, marge 3, rond 16 blanc (jeton `--switch-thumb`, identique clair et sombre) ; allumé `--primary`, éteint `--border-strong`, désactivé .6 ; ligne ≥ 44 au tactile. |
 | `Checkbox` | Radix, case 20 (`check_box` plein `--primary`, `check_box_outline_blank` muted), cible 28. |
-| `RadioGroup`, `RadioCard` | Radio 18, bordure 2 (`--primary` si choisi, sinon `--border-strong`), point 8. Carte rayon 10, marges 10 12 ; choisie : bordure 1 `--primary` + anneau interne 1 + fond `--diff-bg` (I26). |
+| `RadioGroup`, `RadioCard` | Radio 18, bordure 2 (`--primary` si choisi, sinon `--border-strong`), point 8. Carte rayon 10, marges 12, **bouton radio 18 visible** (marge haute 3, écart 10), titre 14/600, description 12 muted ; choisie : bordure 1 `--primary` + anneau interne 1 + fond `--diff-bg` (I26). |
 | `Input`, `SearchField`, `Textarea` | `Input` 40 (36 en `sm`), rayon 8, bordure `--border`, fond `--background`, 14, marges 0 12 ; `mono` ; invalide : bordure `--destructive` ; **désactivé : pointillé `--border-strong`, fond `--surface`, texte muted, sans `opacity-50`**. `SearchField` : `search` 18 en tête, libellé `sr-only`. `Textarea` : marges 10 12, interligne 1,5. |
 | `Field`, `Select` | `Field` : libellé 13/600, écart 6, `required` (astérisque `--primary`, « obligatoire »), `optional` (« (facultatif) » 400 muted), aide 12 muted, erreur `role="alert"` 12/500 avec `error` 16. `Select` : déclencheur 40 (36 en `sm`), `keyboard_arrow_down` 18. |
 
@@ -360,7 +360,7 @@ Galerie : `/dev/ui`, sections « Listes · A » (listes longues, id `dev-ui-list
 |---|---|
 | `ReorderableList`, `PageStatus`, `StatusLegend` | `nav` de 264 (marges de l'encadré selon passation 12 §8.3), `ol`, ligne de 34, poignée `drag_indicator` 24 × 28 `--border-strong` (24 : cible minimale WCAG 2.5.8 ; la maquette dit 20), menu `more_horiz` de la ligne visible au survol et au focus seulement dès 1024 px, étiquette « requise » 10/600 bordure `--border` rayon 4, ajout en `Button dashed`. Légende : encadré `--surface`, 12/400, icônes `currentColor` (stable pleine). Menu sous 1024 px : état, titre, « requise » et marque de la page courante par entrée. Statuts : stable `check_circle` plein `success`, à relire `rate_review` `--primary`, brouillon `edit` muted, vide `radio_button_unchecked` `--border-strong`. `@dnd-kit/sortable` (ADR 0020), Alt + flèches, annonces. |
 | `Prose`, `TaskItem`, `TaskCheckbox` | Colonne de 680 (blocs espacés de 18 dans le contenu de l'éditeur aussi, interligne des listes 1,5, h2 en 1,2), chemin mono 12, h2 28/600 -0,02 em, h3 18/600, paragraphe 15/1,65, tâches `check_box` 20. L'éditeur TipTap (ADR 0019) vit dans `apps/web`, avec une tâche modifiable `TaskCheckbox` (même icône que `TaskItem`) : case de 20 dans une cible de 24, `role="checkbox"`, nom accessible = texte de la tâche. |
-| `AvatarGroup` | `Avatar` 28 chevauchés de -8, bordure 2 `--background`, ton `warning` pour le client. |
+| `AvatarGroup` | `Avatar` 28 chevauchés de -8 (24 chevauchés de -6), bordure 2 `--background`, ton `warning` pour le client, `soft` pour les autres personnes. |
 | `AppShell defaultCollapsed` | Rail de 64 par défaut sur l'espace Idée, la valeur mémorisée reste prioritaire. |
 | `PageNavItem`, `PageStatus pill`, `ProseInvite`, `ProsePath`, `ProjectHeader meta` | Ligne de page (34, icône d'état, titre numéroté, « requise », nom accessible tiré du contenu (icône d'état, titre numéroté, « requise »)), pastille `soft` d'état du document, invite « Écrire, ou taper « / » », chemin mono 12, information à droite de l'emplacement (état d'enregistrement). Jetons `--text-prose-title-size` 28, `--text-prose-heading-size` 18, `--text-prose-body-size` 15 (interligne 1,65). |
 
@@ -408,6 +408,20 @@ Page Synthèse : lecture seule, `Prose` (colonne de 680), chemin mono « idea/_s
 
 La barre latérale de la planche 07 (l.30-64) est périmée : on suit la décision 05 et la coquille de TK-88 (§5.4). Les sept livrables suivent l'ordre de la décision 21 (Sécurité 5e). Galerie : `/dev/ui`, section « 14. Vue d'ensemble » (ajouts ci-dessus). Fiche : `design/screens/S-overview.md`.
 
+### 5.12 Liste des projets et création (v2.14, TK-93, passation 04, B297 à B308, maquette 08 l.55-166)
+
+| Composant | Règle |
+|---|---|
+| Teintes `--hue-1..5-bg` / `--hue-1..5-fg` | Cinq paires douces (indigo, cyan, vert, ambre, rose), l.196-199 de la maquette : clair `#eeeaff/#43299f`, `#e0f5fa/#0e5566`, `#e3f7ea/#1d5e33`, `#fef3c7/#7a3b0a`, `#fbe7f1/#7d2252` ; sombre `#231d4a/#cbc1ff`, `#0f2f3a/#a5e4f3`, `#14301f/#b4ebc6`, `#3a2a0c/#fde68a`, `#3b1a2e/#f5c2dd`. Contrastes AA vérifiés par `contrast.test.ts`. La teinte est choisie par `colorKey` (1 à 5, serveur). |
+| `ProjectTile` | Tuile aux initiales (`tone="soft"` : `--secondary` au lieu de la teinte, carte de création l.87), 22 (barre, rayon 6, 10/700), 36 (carte de création, rayon 10) ou 40 (carte, rayon 10, 14/700), teinte `--hue-n`, `aria-hidden`. |
+| `PhasePill` | Pastille contour (`Pill`, hauteur 24, 0 10, 12/500, bordure `--border`) : 4 traits 10 × 4 rayon 2 (faits `--primary`, courant `--primary` à 45 %, restants `--border-strong`) + « Cadrage · 2/4 » (l.107-109). Un trait à 10 px est la valeur de la planche 08 (I15 la ramenait à 12 : la planche fait foi ici). |
+| `ProjectCard` | `a` entier (l.97-119) : bordure `--border`, rayon 14, marges 18, écart 14, fond `--background`, survol `--border-strong` ; tuile 40, nom 16/600, client 13 muted, `PhasePill` ; avancement 13 (libellé muted, valeur 600) + `SegmentedGauge` 6 (10 crans au plus) ; encart de prochaine étape 13 (rayon 8, marges 8 10, icône 16) : ton `warning` (`schedule`, `--alert-warning-*`) ou `neutral` (`arrow_forward`, `--surface`) ; pied 12 muted : `AvatarGroup` 24 (client en ton `warning` en premier) + « acteur, date relative » en forme courte (« il y a 20 min », « il y a 2 h », « hier », « il y a 3 j »). Pas d'`aria-label` : le nom accessible vient du contenu visible (WCAG 2.5.3, axe `label-content-name-mismatch`). |
+| `ProjectCard creating` | Cadre pointillé `--primary`, fond `--diff-bg`, `role="status"`, marges 18, écart 12 (l.85-96) : tuile 36, nom 16/600, `ProgressChecklist`, phrase 12 muted, bouton « Ouvrir le projet » (`Button sm`, `arrow_forward`). Échec : l'étape passe en `error` (icône `error`, texte `--destructive`) avec sa phrase et son action (S-projects v7 §4.2). |
+| `ProgressChecklist` | Lignes 13 (écart 8) : `check_circle` plein 18 en `--status-validated-foreground`, étape en cours `Spinner` 18 `--primary` (animation sous `motion-safe:`), à venir `radio_button_unchecked`, échec `error` ; libellé muted tant que l'étape n'est pas faite ; `role="status"`, chaque changement annoncé une fois. |
+| Assemblage | En-tête `ProjectHeader` d'organisation (l.56-64, h1 24/600) ; barre d'outils (l.67-82) : `SearchField` 36 (max 320), `FilterChip` 32 en `role="group"` nommé « Filtrer par phase » (`aria-pressed`, compteur 12 à 75 %), « Trié par : activité récente » à droite (menu de tri ; trois choix) ; grille `repeat(auto-fill, minmax(320px, 1fr))` écart 16 ; pied `ListFooter` ; boîte `Dialog` 520 (l.124-164) : titre 18/600, bouton « Fermer », phrase 13 muted, `RadioCard` pour la structure, compte GitHub en `Select` 40 seulement s'il y en a plusieurs, `Switch` « Les données de ce projet restent dans l'UE » (owner et admin). |
+
+Barre : groupe « Récents » (3 projets, `ProjectTile` 22, l.38-41) au-dessus d'« Organisation » quand aucun projet n'est actif. Il s'écrit avec `ShellNavItem leading` (la tuile prend la place de l'icône) ; `SegmentedGauge max` (10 sur les cartes, 12 par défaut) et `AvatarGroup size` (24 sur les cartes, 28 par défaut) servent la carte. Les teintes vivent dans `packages/ui/src/styles/hues.css`, exposées en `bg-hue-n` / `text-hue-n-foreground`. Galerie : `/dev/ui`, section « 15. Projets » (`ProjectTile`, `PhasePill`, `ProgressChecklist`, `ProjectCard` : normale, attention, client, création, échec). Fiche : `design/screens/S-projects.md` v7.
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -417,6 +431,7 @@ La barre latérale de la planche 07 (l.30-64) est périmée : on suit la décisi
 | Change request et impact | Maquetté, **base neutre à reprendre en Indigo** |
 | Kanban des tickets | Proposé, non maquetté |
 | Fondations v2 (jetons, statuts, composants signature) | Planche « Lot 0 · Fondations v2 », clair et sombre ; galerie `/dev/ui` |
+| Liste des projets et création | Planche « Lot 4 · Projets » (`08-Lot4Projects.html`) ; fiche `S-projects` v7 |
 | Vue d'ensemble du projet | Planche « Lot 3 · Vue d'ensemble » (`07-Lot3Overview.html`) ; fiche `S-overview` |
 | Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
@@ -465,3 +480,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 08/11/2026 | v2.11 (TK-90, passation 02, maquette 06) : §5.9 agent de l'espace Idée (`AgentPanel`, `ChatBubble`, `AgentComposer`, `ProposalDiff`, `DecisionNotice`, `ProposedPageCard`, `ProposedPageList`, `AgentGapsCard`) ; icônes `explore` et `stop` ajoutées |
 | 09/11/2026 | v2.12 (TK-91, passation 02 §9, décision 05 §2 « Lot 2 », maquette 06) : §5.10 maturité, Synthèse et passage au cadrage (`MaturityMeter`, `SynthesisNavItem`, « Passer au cadrage », bandeau « Modifié depuis idea-vN ») |
 | 09/11/2026 | v2.13 (TK-92, passation 03, décision 05 §2 « Lot 3 », maquette 07) : §5.11 vue d'ensemble (`SegmentedGauge`, `NextStep`, `DeliverableCard`, `DeliverableStatus` « À revoir », `ActivityFeed`, `PersonRow`, `TicketStatus`) |
+| 09/11/2026 | v2.14 (TK-93, passation 04, maquette 08) : §5.12 liste des projets et création (`ProjectTile`, `PhasePill`, `ProgressChecklist`, `ProjectCard`, teintes `--hue-1..5`, groupe « Récents ») ; lot B : `ShellNavItem leading`, `SegmentedGauge max`, `AvatarGroup size`, `hues.css` |
