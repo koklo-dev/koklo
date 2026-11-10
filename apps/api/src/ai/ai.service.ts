@@ -125,6 +125,7 @@ export class AiService {
     return {
       purpose,
       actor: { organizationId: scope.organizationId, userId: scope.userId },
+      projectId: scope.projectId,
       correlationId: correlationIdOf(requestId),
       quota: "ai" as const,
       entry: () => ({ action, targetKind: "project" as const, targetId: scope.projectId }),

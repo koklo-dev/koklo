@@ -1,7 +1,8 @@
 import { withOrganization } from "@koklo/db";
 import type { GitAuth, GitInstallation, GitProvider, GitUserCredentials } from "@koklo/domain";
+import type { CreationAuth, ProviderStep } from "@koklo/github";
 import { Inject, Injectable } from "@nestjs/common";
-import { mapProviderError, type ProviderStep } from "./provider-errors.ts";
+import { mapProviderError } from "./provider-errors.ts";
 import type { InstallationRecord } from "./repo.repository.ts";
 import { USER_CREDENTIALS, type UserCredentialsStore } from "./tokens.ts";
 
@@ -17,12 +18,6 @@ export async function step<T>(name: ProviderStep, call: () => Promise<T>): Promi
   } catch (error) {
     throw mapProviderError(error, name);
   }
-}
-
-/** Jetons nécessaires à la création d'un dépôt : `create` (utilisateur si disponible) puis `write`. */
-export interface CreationAuth {
-  create: GitAuth;
-  write: GitAuth;
 }
 
 /** Authentification auprès du fournisseur pour une installation ; aucun jeton n'est conservé ici. */

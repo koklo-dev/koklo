@@ -244,7 +244,8 @@ describe("C6 types exportés", () => {
   it("expose les types d'entrée et de rôle", () => {
     expectTypeOf<OrganizationCreateInput>().toHaveProperty("name");
     expectTypeOf<MemberInviteInput>().toHaveProperty("email");
-    expectTypeOf<ProjectCreateInput>().toEqualTypeOf<{ name: string }>();
+    expectTypeOf<ProjectCreateInput>().toHaveProperty("name");
+    expectTypeOf<{ name: string }>().toExtend<ProjectCreateInput>();
     expectTypeOf<MemberRole>().toEqualTypeOf<
       "admin" | "dev" | "designer" | "client" | "business"
     >();

@@ -7,17 +7,9 @@ import {
   RepoCreationForbiddenError,
   UserTokenRequiredError,
 } from "@koklo/domain";
+import type { ProviderStep } from "@koklo/github";
 import { ORPCError } from "@orpc/server";
 import { conflict, notFound } from "../tracker/api-errors.ts";
-
-/** Opération du port qui a échoué : le même conflit n'a pas le même sens selon l'étape. */
-export type ProviderStep =
-  | "authenticate"
-  | "createRepo"
-  | "getRepo"
-  | "readFile"
-  | "writeCommit"
-  | "createBranch";
 
 /**
  * Erreurs du port vers les erreurs typées du contrat, par `instanceof` (le `name` d'une erreur est

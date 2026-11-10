@@ -1,4 +1,5 @@
-import { RECENT_PROJECTS_MAX } from "@koklo/contract";
+import { type ProjectRecent, RECENT_PROJECTS_MAX } from "@koklo/contract";
+import { projectTileOf } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import type { AuthSession } from "../auth/session.ts";
 import { CLOCK, type Clock } from "../clock.ts";
@@ -47,13 +48,17 @@ export class ProjectShellService {
   async recent(
     session: AuthSession,
     linkedProjectIds: readonly string[] | null,
-  ): Promise<{ id: string; name: string; visitedAt: string }[]> {
+  ): Promise<ProjectRecent[]> {
     const visits = await this.repository.recent({
       organizationId: session.organizationId,
       userId: session.userId,
       linkedProjectIds,
       limit: RECENT_PROJECTS_MAX,
     });
-    return visits.map((visit) => ({ ...visit, visitedAt: visit.visitedAt.toISOString() }));
+    return visits.map((visit) => ({
+      ...visit,
+      ...projectTileOf(visit.id, visit.name),
+      visitedAt: visit.visitedAt.toISOString(),
+    }));
   }
 }

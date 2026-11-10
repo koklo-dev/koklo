@@ -3,16 +3,16 @@ import { isUniqueViolation, notFound } from "../tracker/api-errors.ts";
 import { encodeCursor, keysetAfter, positionOf } from "../tracker/cursor.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
-import {
-  type IdeaAgentContext,
-  type IdeaAgentRepository,
-  type IdeaAuthorKind,
-  type IdeaExchange,
-  type IdeaGapItem,
-  type IdeaGapRunRecord,
-  type IdeaMessagePage,
-  type IdeaMode,
-  type IdeaProposalDraft,
+import type {
+  IdeaAgentContext,
+  IdeaAgentRepository,
+  IdeaAuthorKind,
+  IdeaExchange,
+  IdeaGapItem,
+  IdeaGapRunRecord,
+  IdeaMessagePage,
+  IdeaMode,
+  IdeaProposalDraft,
 } from "./idea-agent.repository.ts";
 import type { IdeaProposalRecord } from "./idea-proposal.repository.ts";
 import { authorsOf } from "./prisma-idea-helpers.ts";

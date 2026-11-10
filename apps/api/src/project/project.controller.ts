@@ -2,6 +2,7 @@ import { contract } from "@koklo/contract";
 import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
+import { fromNodeHeaders } from "better-auth/node";
 import type { Request } from "express";
 import { MANAGER_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
@@ -9,6 +10,8 @@ import { guard, requestIdOf } from "../request-context.ts";
 import { inProject } from "../tracker/scope.ts";
 import { ProjectService } from "./project.service.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "./project-access.ts";
+import { ProjectCardsService } from "./project-cards.service.ts";
+import { ProjectCreationService } from "./project-creation.service.ts";
 import { ProjectShellService } from "./project-shell.service.ts";
 
 @Controller()
@@ -16,6 +19,8 @@ export class ProjectController {
   constructor(
     @Inject(ProjectService) private readonly service: ProjectService,
     @Inject(ProjectShellService) private readonly shells: ProjectShellService,
+    @Inject(ProjectCardsService) private readonly cardsService: ProjectCardsService,
+    @Inject(ProjectCreationService) private readonly creations: ProjectCreationService,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -39,8 +44,67 @@ export class ProjectController {
   create(@Req() request: Request) {
     const requestId = requestIdOf(request);
     return implement(contract.project.create).handler(({ input, errors }) =>
-      guard(requestId, errors, async () =>
-        this.service.create(requireSession(request), input.name),
+      guard(requestId, errors, () =>
+        this.creations.create(requireSession(request), input, fromNodeHeaders(request.headers)),
+      ),
+    );
+  }
+
+  /** Liste en cartes (TK-93) : tout rôle ayant accès, le client ne reçoit que ses projets. */
+  @UseGuards(SessionGuard)
+  @Implement(contract.project.cards)
+  cards(@Req() request: Request) {
+    const requestId = requestIdOf(request);
+    return implement(contract.project.cards).handler(({ input, errors }) =>
+      guard(requestId, errors, async () => {
+        const session = requireSession(request);
+        const linked = await this.access.linkedProjectIds(session);
+        return this.cardsService.cards(session, linked, input);
+      }),
+    );
+  }
+
+  /** État de la création du dépôt de spec : `null` sans ligne ; 404 uniforme hors accès. */
+  @UseGuards(SessionGuard)
+  @Implement(contract.project.creationStatus)
+  creationStatus(@Req() request: Request) {
+    return implement(contract.project.creationStatus).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.creations.status(scope, requireSession(request).role),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...MANAGER_ROLES)
+  @Implement(contract.project.retryRepo)
+  retryRepo(@Req() request: Request) {
+    return implement(contract.project.retryRepo).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.creations.retry(scope, requireSession(request).role, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...MANAGER_ROLES)
+  @Implement(contract.project.setEuOnly)
+  setEuOnly(@Req() request: Request) {
+    return implement(contract.project.setEuOnly).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.creations.setEuOnly(scope, input.euOnly),
+        this.access,
       ),
     );
   }

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
 import { framePrompt, type LlmBudget, trusted, Untrusted } from "@koklo/domain";
 import { FakeLlm } from "@koklo/domain/testing";
+import { createKeyRing } from "@koklo/github";
 import { AiProviderRouter, actualCostMicroUsd } from "@koklo/llm";
 import { qualifiedCatalog, RecordingEvents } from "@koklo/llm/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -9,7 +10,6 @@ import { PrismaAiCredentialSource } from "../src/ai/prisma-ai-credential-source.
 import { PrismaAiRoutingStore } from "../src/ai/prisma-ai-routing-store.ts";
 import { PrismaAiUsageMeter } from "../src/ai/prisma-ai-usage-meter.ts";
 import type { Clock } from "../src/clock.ts";
-import { createKeyRing } from "../src/crypto/key-ring.ts";
 import { DatabaseService } from "../src/database/database.module.ts";
 import { LlmCredentialResolver } from "../src/llm-credential/llm-credential.resolver.ts";
 import { LlmCredentialService } from "../src/llm-credential/llm-credential.service.ts";

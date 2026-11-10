@@ -6,10 +6,10 @@ import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { IdeaPageRecord } from "./idea.repository.ts";
 import { applyBlockOperation, IdeaOperationError } from "./idea-markdown-ops.ts";
-import {
-  type IdeaDecisionActor,
-  type IdeaProposalOutcome,
-  type IdeaProposalRepository,
+import type {
+  IdeaDecisionActor,
+  IdeaProposalOutcome,
+  IdeaProposalRepository,
 } from "./idea-proposal.repository.ts";
 import {
   audit,

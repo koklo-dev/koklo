@@ -1,7 +1,7 @@
+import { keyRingOf } from "@koklo/github";
 import { Module } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import type { AppConfig } from "../config.ts";
-import { keyRingOf } from "../crypto/key-ring.ts";
 import { APP_CONFIG } from "../database/database.module.ts";
 import { CredentialProbe } from "./credential-probe.ts";
 import { LLM_CREDENTIAL_REPOSITORY } from "./llm-credential.repository.ts";

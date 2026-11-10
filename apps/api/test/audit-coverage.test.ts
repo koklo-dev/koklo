@@ -240,6 +240,8 @@ const EXPECTED_WRITE_PROCEDURES = [
   "org.update",
   "organization.create",
   "project.create",
+  "project.retryRepo",
+  "project.setEuOnly",
   "projectClient.add",
   "projectClient.remove",
   "projectState.update",
@@ -853,6 +855,79 @@ const SCENARIOS: Scenario[] = [
     }),
     denied: (ctx) =>
       send(app, ctx.world.actors.dev.cookie, "post", "/projects", { name: "Refusé" }),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "project.retryRepo",
+    role: "owner",
+    prepare: async (ctx) => {
+      const installation = await insertInstallation(database, ctx.world.organizationId);
+      await database.query(
+        `INSERT INTO project_creations (id, organization_id, project_id, status, error_code, repo_name, installation_id, idea_template, requested_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, 'failed', 'name_taken', 'projet-spec', $3, 'default', $4, now(), now())`,
+        [
+          ctx.world.organizationId,
+          ctx.world.projectId,
+          installation.id,
+          ctx.world.actors.owner.userId,
+        ],
+      );
+      return {};
+    },
+    call: (ctx) =>
+      send(
+        app,
+        ctx.world.actors.owner.cookie,
+        "post",
+        `/projects/${ctx.world.projectId}/creation/retry`,
+        {},
+      ),
+    expected: async (ctx) => ({
+      action: "project.retry_repo",
+      targetKind: "project",
+      targetId: ctx.world.projectId,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      send(
+        app,
+        ctx.world.actors.dev.cookie,
+        "post",
+        `/projects/${ctx.world.projectId}/creation/retry`,
+        {},
+      ),
+    deniedStatuses: [403],
+  },
+  {
+    procedure: "project.setEuOnly",
+    role: "owner",
+    prepare: async () => ({}),
+    call: (ctx) =>
+      send(
+        app,
+        ctx.world.actors.owner.cookie,
+        "patch",
+        `/projects/${ctx.world.projectId}/eu-only`,
+        {
+          euOnly: true,
+        },
+      ),
+    expected: async (ctx) => ({
+      action: "project.eu_only",
+      targetKind: "project",
+      targetId: ctx.world.projectId,
+      ticketId: null,
+    }),
+    denied: (ctx) =>
+      send(
+        app,
+        ctx.world.actors.designer.cookie,
+        "patch",
+        `/projects/${ctx.world.projectId}/eu-only`,
+        {
+          euOnly: true,
+        },
+      ),
     deniedStatuses: [403],
   },
   {

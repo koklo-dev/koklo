@@ -1,10 +1,14 @@
 import type { RepoOutput } from "@koklo/contract";
-import type { GitProvider, RepoRole } from "@koklo/domain";
+import type { FileWrite, GitProvider, RepoRef, RepoRole } from "@koklo/domain";
+import type { CreationAuth, ProviderStep } from "@koklo/github";
+import { buildInitialSpecFiles, ProvisionError, provisionSpecRepo } from "@koklo/github";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
+import { requestLogger } from "../request-logger.ts";
 import { conflict, notFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { GitAccess, gitInstallationOf, step } from "./git-access.ts";
+import { mapProviderError } from "./provider-errors.ts";
 import {
   type InsertOutcome,
   REPO_REPOSITORY,
@@ -12,9 +16,28 @@ import {
   type RepoRepository,
 } from "./repo.repository.ts";
 import { checkSpecPath, projectSlugOf, specRepoName } from "./repo-names.ts";
-import { logOrphan, provisionSpecRepo } from "./spec-provisioning.ts";
-import { buildInitialSpecFiles } from "./spec-scaffold.ts";
 import { GIT_PROVIDER, type GitProviderBinding } from "./tokens.ts";
+
+/** Le dépôt existe chez le fournisseur mais n'est pas enregistré : journal de réparation, sans jeton ni message brut. */
+function logOrphan(repo: RepoRef, failedStep: ProviderStep | "insert"): void {
+  requestLogger().error(
+    { repo: `${repo.owner.login}/${repo.name}`, step: failedStep },
+    "repo.createSpec : dépôt créé chez le fournisseur mais non enregistré (à réparer à la main)",
+  );
+}
+
+/** Provisionnement partagé avec le worker ; une panne devient l'erreur typée du contrat. */
+async function provisionOrThrow(
+  provider: GitProvider,
+  auth: CreationAuth,
+  request: { ref: RepoRef; files: readonly FileWrite[] },
+) {
+  try {
+    return await provisionSpecRepo(provider, auth, request, logOrphan);
+  } catch (error) {
+    throw error instanceof ProvisionError ? mapProviderError(error.cause, error.step) : error;
+  }
+}
 
 const outputOf = (repo: RepoRecord): RepoOutput => ({
   id: repo.id,
@@ -75,7 +98,7 @@ export class RepoService {
       projectSlug: projectSlugOf(plan.projectName),
     });
     const auth = await this.access.creationAuth(provider, scope, installation);
-    const created = await provisionSpecRepo(provider, auth, { ref, files });
+    const created = await provisionOrThrow(provider, auth, { ref, files });
 
     try {
       const outcome = await this.repository.insert(

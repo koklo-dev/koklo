@@ -1,5 +1,5 @@
 import type { LlmProviderId } from "@koklo/domain";
-import type { EncryptedSecret } from "../crypto/token-cipher.ts";
+import type { EncryptedSecret } from "@koklo/github";
 import type { AuditActor } from "../tracker/audit.ts";
 
 export const LLM_CREDENTIAL_REPOSITORY = Symbol("LLM_CREDENTIAL_REPOSITORY");

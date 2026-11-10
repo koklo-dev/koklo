@@ -8,7 +8,7 @@ import {
   functionalStateOf,
 } from "./overview-deliverables.ts";
 import { ideaLink, specLink, ticketsLink } from "./overview-links.ts";
-import { ideaPagesOf, peopleOf, sprintTicketsOf } from "./overview-main.ts";
+import { ideaPagesOf, peopleOf, sprintTicketsOf, type TicketFact } from "./overview-main.ts";
 import { type NextActionFacts, nextActionOf } from "./overview-next-action.ts";
 import { statsOf } from "./overview-stats.ts";
 import { phaseStepsOf } from "./overview-texts.ts";
@@ -23,10 +23,27 @@ export interface OverviewContext {
 const includes = (roles: readonly string[], role: string): boolean => roles.includes(role);
 const SHORT_SHA = 7;
 
+/** Ce que la prochaine étape et la phase lisent d'un enregistrement : la liste des projets en cartes (TK-93) le fournit aussi. */
+export interface NextFactsRecord {
+  project: { id: string };
+  phaseFacts: OverviewRecord["phaseFacts"];
+  pages: Pick<OverviewRecord["pages"][number], "title" | "status" | "required">[];
+  clients: OverviewRecord["clients"];
+  spec: {
+    failed: boolean;
+    head: { sha: string; indexedAt: Date } | null;
+    verdicts: OverviewRecord["spec"]["verdicts"];
+  };
+  sprint: { key: string; tickets: TicketFact[] } | null;
+  pendingProposals: number;
+  proposalAuthor: string | null;
+  aiConfigured: boolean | null;
+}
+
 type Derived = ReturnType<typeof deriveOf>;
 
 /** Faits dérivés de l'enregistrement, partagés par le fil, la prochaine étape, les indicateurs et le bloc principal. */
-function deriveOf(record: OverviewRecord) {
+export function deriveOf(record: NextFactsRecord) {
   const { pages, clients, spec, sprint } = record;
   const phase = phaseOf(record.phaseFacts);
   const functional: FunctionalState = functionalStateOf(spec.verdicts, spec.head?.sha ?? null);
@@ -37,13 +54,13 @@ function deriveOf(record: OverviewRecord) {
     hasClient: clients.length > 0,
     stablePages: pages.filter((page) => page.status === "stable").length,
     fresh: phase === "idea" && allEmpty && record.pendingProposals === 0,
-    ideaUnused: allEmpty && record.ideaVersion === null,
+    allEmpty,
     validatedDeliverables: functional.status === "validated" ? 1 : 0,
     tickets: sprint?.tickets ?? [],
   };
 }
 
-function nextFacts(record: OverviewRecord, ctx: OverviewContext, d: Derived): NextActionFacts {
+function nextFacts(record: NextFactsRecord, ctx: OverviewContext, d: Derived): NextActionFacts {
   const missing = record.pages.filter((page) => page.required && page.status !== "stable");
   const clientName =
     record.clients.find((c) => c.role === "client")?.name ?? record.clients[0]?.name ?? null;
@@ -72,6 +89,11 @@ function nextFacts(record: OverviewRecord, ctx: OverviewContext, d: Derived): Ne
     inReviewTickets: d.tickets.filter((ticket) => ticket.status === "in_review").length,
     changeRequest: null,
   };
+}
+
+/** Prochaine étape d'un projet, mêmes règles que la vue d'ensemble : `deriveOf` et `nextFacts` en un seul appel. */
+export function nextActionFor(record: NextFactsRecord, ctx: OverviewContext) {
+  return nextActionOf(nextFacts(record, ctx, deriveOf(record)));
 }
 
 function primaryActionOf(
@@ -158,7 +180,7 @@ export function buildOverview(record: OverviewRecord, ctx: OverviewContext): Pro
       phase: d.phase,
       stablePages: d.stablePages,
       totalPages: record.pages.length,
-      ideaUnused: d.ideaUnused,
+      ideaUnused: d.allEmpty && record.ideaVersion === null,
       ideaVersion: record.ideaVersion,
       validatedDeliverables: d.validatedDeliverables,
       baselineAt: record.baselineAt,

@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
+import { createKeyRing } from "@koklo/github";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Clock } from "../src/clock.ts";
-import { createKeyRing } from "../src/crypto/key-ring.ts";
 import { DatabaseService } from "../src/database/database.module.ts";
 import { LlmCredentialResolver } from "../src/llm-credential/llm-credential.resolver.ts";
 import { LlmCredentialService } from "../src/llm-credential/llm-credential.service.ts";

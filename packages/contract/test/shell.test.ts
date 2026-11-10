@@ -39,22 +39,26 @@ describe("SH1 surface additive", () => {
     expect((await doc()).paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("les procédures de project existantes sont inchangées (list, create) et cinq s'ajoutent", () => {
+  it("les procédures de project existantes sont inchangées (list, create) ; cinq s'ajoutent en 2.1.0 à 2.7.0, quatre en 2.8.0", () => {
     const group = (api.contract as unknown as Record<string, object>).project;
     expect(Object.keys(group ?? {}).sort()).toEqual([
       "activity",
+      "cards",
       "create",
+      "creationStatus",
       "list",
       "overview",
       "recent",
+      "retryRepo",
+      "setEuOnly",
       "shell",
       "visit",
     ]);
   });
 
-  it("le contrat est en 2.7.0 (version mineure : aucune route retirée ni modifiée)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.7.0");
-    expect((await doc()).info.version).toBe("2.7.0");
+  it("le contrat est en 2.8.0 (version mineure : aucune route retirée ni modifiée)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.8.0");
+    expect((await doc()).info.version).toBe("2.8.0");
   });
 });
 
@@ -118,7 +122,7 @@ describe("SH3 project.visit et project.recent", () => {
 
   it("recent : sans entrée ; sortie : tableau de { id, name, visitedAt }, 8 au plus", async () => {
     const out = output("project.recent");
-    const item = { id: UUID, name: "Koklo", visitedAt: INSTANT };
+    const item = { id: UUID, name: "Koklo", visitedAt: INSTANT, initials: "KO", colorKey: 1 };
     expect(await isValid(out, [])).toBe(true);
     expect(await isValid(out, [item])).toBe(true);
     expect(

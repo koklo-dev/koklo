@@ -41,6 +41,32 @@ export class InvitationRepository {
     return found !== null;
   }
 
+  /** Membre de l'organisation portant cette adresse : son identifiant d'utilisateur et son rôle. */
+  async memberByEmail(
+    organizationId: string,
+    email: string,
+  ): Promise<{ userId: string; role: string } | null> {
+    return this.database.client.member.findFirst({
+      where: { organizationId, user: { email: { equals: email, mode: "insensitive" } } },
+      select: { userId: true, role: true },
+    });
+  }
+
+  /** Invitation vivante pour cette adresse (la plus récente) : on y ajoute le projet plutôt que d'en créer une. */
+  async liveInvitationId(organizationId: string, email: string): Promise<string | null> {
+    const found = await this.database.client.invitation.findFirst({
+      where: {
+        organizationId,
+        status: "pending",
+        expiresAt: { gt: new Date() },
+        email: { equals: email, mode: "insensitive" },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      select: { id: true },
+    });
+    return found?.id ?? null;
+  }
+
   async hasLiveInvitation(organizationId: string, email: string): Promise<boolean> {
     const found = await this.database.client.invitation.findFirst({
       where: {

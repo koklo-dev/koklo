@@ -97,13 +97,18 @@ const ROLE_LABEL: Record<string, string> = {
 };
 const TEAM_ORDER = ["owner", "admin", "dev", "designer"];
 
+/** L'équipe par rôle (owner, admin, dev, designer) puis par nom. */
+export const teamInOrder = (staff: readonly MemberFact[]): MemberFact[] =>
+  [...staff].sort(
+    (a, b) =>
+      TEAM_ORDER.indexOf(a.role) - TEAM_ORDER.indexOf(b.role) || a.name.localeCompare(b.name, "fr"),
+  );
+
 /** Personnes du projet : le ou les clients d'abord, puis l'équipe par rôle ; cinq au plus, le reste compté. */
 export function peopleOf(clients: readonly MemberFact[], staff: readonly MemberFact[]) {
-  const byRole = (a: MemberFact, b: MemberFact) =>
-    TEAM_ORDER.indexOf(a.role) - TEAM_ORDER.indexOf(b.role) || a.name.localeCompare(b.name, "fr");
   const everyone = [
     ...clients.map((member) => ({ member, kind: "client" as const })),
-    ...[...staff].sort(byRole).map((member) => ({ member, kind: "team" as const })),
+    ...teamInOrder(staff).map((member) => ({ member, kind: "team" as const })),
   ];
   return {
     items: everyone.slice(0, OVERVIEW_LIST_MAX).map(({ member, kind }) => ({

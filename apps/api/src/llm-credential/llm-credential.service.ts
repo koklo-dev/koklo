@@ -4,9 +4,9 @@ import {
   llmCredential,
   llmProviderTraits,
 } from "@koklo/domain";
+import type { TokenCipher } from "@koklo/github";
 import { assertSafeBaseUrl, UnsafeBaseUrlError } from "@koklo/llm";
 import { type Clock, systemClock } from "../clock.ts";
-import type { TokenCipher } from "../crypto/token-cipher.ts";
 import type { AuditActor } from "../tracker/audit.ts";
 import type { LlmCredentialRepository, LlmCredentialStatus } from "./llm-credential.repository.ts";
 import { llmCredentialAad } from "./llm-credential-aad.ts";

@@ -1,7 +1,7 @@
+import type { EncryptedSecret } from "@koklo/github";
 import type { DatabaseService } from "../database/database.module.ts";
 import { llmCredentialAad } from "../llm-credential/llm-credential-aad.ts";
 import { LlmCredentialStoreError } from "../llm-credential/llm-credential-errors.ts";
-import type { EncryptedSecret } from "./token-cipher.ts";
 
 export type RotationTableKey = "llm" | "userTokens";
 

@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { QualifiedModel } from "@koklo/domain";
+import { createKeyRing } from "@koklo/github";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AiSettingsInputError, AiSettingsService } from "../src/ai/ai-settings.service.ts";
 import { AiUsageReportService } from "../src/ai/ai-usage-report.service.ts";
 import { PrismaAiRoutingStore } from "../src/ai/prisma-ai-routing-store.ts";
 import type { Clock } from "../src/clock.ts";
-import { createKeyRing } from "../src/crypto/key-ring.ts";
 import { DatabaseService } from "../src/database/database.module.ts";
 import { LlmCredentialService } from "../src/llm-credential/llm-credential.service.ts";
 import { PrismaLlmCredentialRepository } from "../src/llm-credential/prisma-llm-credential.repository.ts";

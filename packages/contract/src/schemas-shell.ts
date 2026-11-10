@@ -54,6 +54,9 @@ export const projectRecentSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   visitedAt: z.iso.datetime(),
+  /** Tuile du projet (TK-93, 2.8.0) : initiales et teinte 1..5, comme sur la carte. */
+  initials: z.string(),
+  colorKey: z.number().int().min(1).max(5),
 });
 export const projectRecentOutputSchema = z.array(projectRecentSchema).max(RECENT_PROJECTS_MAX);
 

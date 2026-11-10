@@ -40,6 +40,7 @@ const EXPECTED_TENANT_MODELS = [
   ...PROJECT_CLIENT_MODELS,
   ...AI_MODELS,
   "ProjectVisit",
+  "ProjectCreation",
   "InvitationProject",
   "NotificationPreference",
   ...IDEA_MODELS,
@@ -60,7 +61,7 @@ describe("garde multi-tenant : tout modèle portant organizationId est classé (
     expect(typeof TENANT_EXCLUDED_MODELS).toBe("object");
   });
 
-  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d), liaison client-projet (TK-55a), couche d'IA (TK-95), visites de projet (TK-88), réglages (TK-97)", () => {
+  it("les modèles métier : Project, ticket (TK-28), spec (TK-41), OAuth (TK-48a1), BYOK (TK-51a), suggestions (TK-51b), reviews et baselines (TK-51c), notifications (TK-51d), liaison client-projet (TK-55a), couche d'IA (TK-95), visites de projet (TK-88), réglages (TK-97), créations de projet (TK-93)", () => {
     expect([...TENANT_MODELS].sort()).toEqual([...EXPECTED_TENANT_MODELS].sort());
   });
 

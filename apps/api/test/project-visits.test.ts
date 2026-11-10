@@ -1,4 +1,5 @@
 import type { TestDatabase } from "@koklo/db/testing";
+import { projectTileOf } from "@koklo/domain";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp, createSeededDatabase } from "./helpers/app.ts";
@@ -133,7 +134,16 @@ describe("A8 project.recent", () => {
     }
     const res = await dev.recent();
     expect(namesOf(res.body)).toEqual(["Bravo", "Alpha"]);
-    expect(Object.keys(res.body[0]).sort()).toEqual(["id", "name", "visitedAt"]);
+    expect(Object.keys(res.body[0]).sort()).toEqual([
+      "colorKey",
+      "id",
+      "initials",
+      "name",
+      "visitedAt",
+    ]);
+    // TK-93 (2.8.0) : tuile du projet, calculée comme sur la carte (domaine `projectTileOf`).
+    expect(res.body.map((row: { initials: string }) => row.initials)).toEqual(["BR", "AL"]);
+    expect(res.body[0].colorKey).toBe(projectTileOf(b, "Bravo").colorKey);
     await dev.visit(a);
     expect(namesOf((await dev.recent()).body)).toEqual(["Alpha", "Bravo"]);
   });

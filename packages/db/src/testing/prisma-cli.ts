@@ -76,6 +76,8 @@ export const expectedTables = [
   // TK-91 : versions figées de l'idée et Synthèse.
   "idea_versions",
   "idea_synthesis",
+  // TK-93 : création du dépôt de spec par le worker (une ligne par tentative).
+  "project_creations",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
