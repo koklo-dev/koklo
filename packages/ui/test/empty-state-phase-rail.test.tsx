@@ -153,6 +153,50 @@ describe("PhaseRail grand", () => {
   });
 });
 
+const CustomLink = ({ href, children, ...rest }: React.ComponentProps<"a"> & { href: string }) => (
+  <a href={href} data-custom="oui" {...rest}>
+    {children}
+  </a>
+);
+
+describe("PhaseRail navigable", () => {
+  const hrefs = { idea: "/p/idea", framing: "/p/framing" } as const;
+
+  it("une étape avec adresse devient un lien nommé par son libellé et son état", () => {
+    render(<PhaseRail phase="framing" hrefs={hrefs} />);
+    expect(screen.getByRole("link", { name: "Idée terminée" })).toHaveAttribute("href", "/p/idea");
+    expect(screen.getByRole("link", { name: "Cadrage en cours" })).toHaveAttribute(
+      "href",
+      "/p/framing",
+    );
+  });
+
+  it("une étape sans adresse reste du texte, sans lien", () => {
+    render(<PhaseRail phase="framing" hrefs={hrefs} />);
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    expect(screen.getByText("Baseline 0")).toBeVisible();
+  });
+
+  it("sans adresses : aucun lien (affichage seul)", () => {
+    render(<PhaseRail phase="framing" />);
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("l'étape en cours garde aria-current=step et le lien est dans l'élément de liste", () => {
+    render(<PhaseRail phase="framing" hrefs={hrefs} />);
+    const link = screen.getByRole("link", { name: "Cadrage en cours" });
+    expect(link.closest("li")).toHaveAttribute("aria-current", "step");
+  });
+
+  it("utilise LinkComponent quand il est fourni", () => {
+    render(<PhaseRail phase="idea" hrefs={{ idea: "/x" }} LinkComponent={CustomLink} />);
+    expect(screen.getByRole("link", { name: "Idée en cours" })).toHaveAttribute(
+      "data-custom",
+      "oui",
+    );
+  });
+});
+
 describe("PhaseRail miniature (size=sm)", () => {
   it.each([
     ["idea", "Idée · 1 sur 4"],

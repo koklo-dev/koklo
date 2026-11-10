@@ -4,6 +4,7 @@ import { aiAuditRows } from "./helpers/ai-bench.ts";
 import { createClientScene } from "./helpers/client-scene.ts";
 import { ideaApi, seedIdeaTemplate } from "./helpers/idea.ts";
 import {
+  BlockingCompleteLlm,
   countOf,
   installIdeaAgent,
   payloadOf,
@@ -322,12 +323,16 @@ describe("idea.freeze : idempotence, double clic et erreurs", () => {
 
   it("double clic simultané (deux clés) : un seul lot, une seule version", async () => {
     const project = await framingProject(b(), w());
-    b().use(scripted());
-    const calls = await Promise.all([
-      freeze(w().scene.staff.owner, project.projectId),
-      freeze(w().scene.staff.owner, project.projectId),
-    ]);
-    expect(calls.map((r) => r.status).sort()).toEqual([200, 409]);
+    // Le premier passage reste en vol (version allouée, Synthèse en cours) : le chevauchement est garanti,
+    // il ne dépend plus de la vitesse du runner.
+    const blocking = new BlockingCompleteLlm(scripted());
+    b().use(blocking);
+    const first = Promise.resolve(freeze(w().scene.staff.owner, project.projectId));
+    await blocking.untilStarted();
+    const second = await freeze(w().scene.staff.owner, project.projectId);
+    expect(second.status, second.text).toBe(409);
+    blocking.release();
+    expect((await first).status).toBe(200);
     expect(await batchRows(b().database, project.projectId)).toHaveLength(1);
     expect(await versionRows(b().database, project.projectId)).toHaveLength(1);
   });

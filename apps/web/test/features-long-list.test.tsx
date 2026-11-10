@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -302,7 +302,11 @@ describe("Recherche (§2.1)", () => {
   it("la saisie relance la requête avec q après le délai, et l'écrit dans l'adresse", async () => {
     renderFeatures();
     await findList();
-    await type("annul");
+    // Cinq frappes dans le même tour : aucun délai entre elles, donc le résultat ne dépend pas de la charge
+    // du runner (avec `userEvent.type`, une frappe lente dépasse le délai et relance une requête par lettre).
+    for (const value of ["a", "an", "ann", "annu", "annul"]) {
+      fireEvent.change(searchBox(), { target: { value } });
+    }
     await waitFor(() => expect(lastInput()).toMatchObject({ q: "annul" }));
     expect(new URLSearchParams(window.location.search).get("q")).toBe("annul");
     // pas une requête par lettre

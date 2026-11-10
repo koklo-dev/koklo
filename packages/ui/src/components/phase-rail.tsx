@@ -9,6 +9,7 @@ import * as lightbulb from "../icons/generated/lightbulb.ts";
 import * as sync from "../icons/generated/sync.ts";
 import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
+import type { ShellLink } from "./app-shell.tsx";
 
 // Le fil de phase est toujours visible : ses icônes sont rendues sans attente.
 primeIcon("check", check);
@@ -55,6 +56,9 @@ export interface PhaseRailProps extends SpanProps {
   phase: Phase;
   size?: "default" | "sm" | "inline";
   subtitles?: Partial<Record<Phase, string>>;
+  /** Adresse de chaque étape navigable ; une étape sans adresse reste du texte. */
+  hrefs?: Partial<Record<Phase, string>>;
+  LinkComponent?: ShellLink;
 }
 
 const MINI = {
@@ -95,17 +99,29 @@ function PhaseRailMini({
   );
 }
 
+const LINK =
+  "rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 function PhaseStep({
   index,
   current,
   subtitle,
+  href,
+  LinkComponent: Link = "a" as unknown as ShellLink,
 }: {
   index: number;
   current: number;
   subtitle?: string;
+  href?: string;
+  LinkComponent?: ShellLink;
 }) {
   const step = STEPS[index] as (typeof STEPS)[number];
   const state = stateOf(index, current);
+  const label = (
+    <>
+      {step.label} <span className="font-normal text-muted-foreground">{STATE_TEXT[state]}</span>
+    </>
+  );
   return (
     <li
       aria-current={state === "current" ? "step" : undefined}
@@ -136,7 +152,13 @@ function PhaseStep({
         ) : null}
       </span>
       <span className="text-subsection-title text-foreground">
-        {step.label} <span className="font-normal text-muted-foreground">{STATE_TEXT[state]}</span>
+        {href ? (
+          <Link href={href} className={LINK}>
+            {label}
+          </Link>
+        ) : (
+          label
+        )}
       </span>
       {subtitle ? <span className="text-meta text-muted-foreground">{subtitle}</span> : null}
     </li>
@@ -148,6 +170,8 @@ export function PhaseRail({
   phase,
   size = "default",
   subtitles,
+  hrefs,
+  LinkComponent,
   className,
   ...props
 }: PhaseRailProps) {
@@ -168,6 +192,8 @@ export function PhaseRail({
           index={i}
           current={current}
           subtitle={subtitles?.[step.phase]}
+          href={hrefs?.[step.phase]}
+          {...(LinkComponent ? { LinkComponent } : {})}
         />
       ))}
     </ol>

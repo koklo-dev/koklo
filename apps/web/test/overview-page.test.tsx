@@ -105,6 +105,7 @@ describe("états du contenu", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("phases", () => {
   it("Cadrage : fil, sept cartes, un seul lien (le Fonctionnel), six « Bientôt disponible »", async () => {
     await show(FRAMING);
@@ -118,6 +119,36 @@ describe("phases", () => {
         name: /^Cahier fonctionnel\s*À valider\s*7 fonctionnalités\s*4 fonctionnalités validées sur 7\s*Validation client · obligatoire$/,
       }),
     ).toHaveAttribute("href", `/projects/${PROJECT_ID}/spec/functional`);
+  });
+
+  it("fil de phase : les étapes terminées ou en cours mènent à leur espace, les étapes à venir et Baseline 0 non", async () => {
+    await show(FRAMING);
+    const rail = screen.getByRole("region", { name: "Phases du projet" });
+    expect(within(rail).getByRole("link", { name: "Idée terminée" })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/idea`,
+    );
+    expect(within(rail).getByRole("link", { name: "Cadrage en cours" })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/framing`,
+    );
+    expect(within(rail).getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("fil de phase en Itérations : l'étape en cours ouvre les tickets, Baseline 0 reste sans lien", async () => {
+    await show(ITERATIONS);
+    const rail = screen.getByRole("region", { name: "Phases du projet" });
+    expect(within(rail).getByRole("link", { name: /^Itérations/ })).toHaveAttribute(
+      "href",
+      `/projects/${PROJECT_ID}/tickets`,
+    );
+    expect(within(rail).queryByRole("link", { name: /^Baseline 0/ })).toBeNull();
+  });
+
+  it("fil de phase : aucun lien pour le client (espaces fermés)", async () => {
+    await show({ ...CLIENT, main: IDEA.main, phase: "idea", phaseSteps: IDEA.phaseSteps });
+    const rail = screen.getByRole("region", { name: "Phases du projet" });
+    expect(within(rail).queryByRole("link")).toBeNull();
   });
 
   it("Cadrage : indicateurs du serveur, jauge à crans, zéro mesuré affiché", async () => {
