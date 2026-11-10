@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
 import { LLM_PROVIDER_IDS, type LlmProviderId, revealLlmCredential } from "@koklo/domain";
+import { createKeyRing } from "@koklo/github";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaAiCredentialSource } from "../src/ai/prisma-ai-credential-source.ts";
 import type { Clock } from "../src/clock.ts";
-import { createKeyRing } from "../src/crypto/key-ring.ts";
 import { DatabaseService } from "../src/database/database.module.ts";
 import { LlmCredentialResolver } from "../src/llm-credential/llm-credential.resolver.ts";
 import { LlmCredentialService } from "../src/llm-credential/llm-credential.service.ts";

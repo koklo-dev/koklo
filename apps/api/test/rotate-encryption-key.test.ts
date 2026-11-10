@@ -1,12 +1,11 @@
 import { randomBytes } from "node:crypto";
+import { KeyRingConfigError, TokenDecryptionError } from "@koklo/github";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { KeyRingConfigError } from "../src/crypto/key-ring.ts";
 import {
   RotationConfigError,
   type RotationReport,
   rotateEncryptionKey,
 } from "../src/crypto/rotate-encryption-key.ts";
-import { TokenDecryptionError } from "../src/crypto/token-cipher.ts";
 import { LlmCredentialStoreError } from "../src/llm-credential/llm-credential-errors.ts";
 import {
   createRotationHarness,

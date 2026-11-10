@@ -17,6 +17,7 @@ import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import {
   PROJECT_CLIENT_TABLES,
+  PROJECT_CREATION_TABLES,
   PROJECT_VISIT_TABLES,
   SETTINGS_TABLES,
 } from "./support/project-client-fixtures.ts";
@@ -89,6 +90,7 @@ const LATER_TABLES: readonly string[] = [
   ...NOTIFICATION_TABLES,
   ...PROJECT_CLIENT_TABLES,
   ...PROJECT_VISIT_TABLES,
+  ...PROJECT_CREATION_TABLES,
   ...SETTINGS_TABLES,
   ...IDEA_TABLES,
   ...IDEA_ENUMS,

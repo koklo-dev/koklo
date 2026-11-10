@@ -1,5 +1,5 @@
+import { buildInitialSpecFiles } from "@koklo/github";
 import { describe, expect, it } from "vitest";
-import { buildInitialSpecFiles } from "../src/repo/spec-scaffold.ts";
 
 /**
  * TK-43 CA2 : générateur pur de la structure initiale (annexe A §4.0). Contrat attendu :

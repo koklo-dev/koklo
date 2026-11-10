@@ -1,5 +1,10 @@
+import {
+  createKeyRing,
+  type KeyRingSettings,
+  type TokenCipher,
+  TokenDecryptionError,
+} from "@koklo/github";
 import type { DatabaseService } from "../database/database.module.ts";
-import { createKeyRing, type KeyRingSettings } from "./key-ring.ts";
 import {
   llmTable,
   type RotationRow,
@@ -7,7 +12,6 @@ import {
   type RotationTableKey,
   userTokensTable,
 } from "./rotation-tables.ts";
-import { type TokenCipher, TokenDecryptionError } from "./token-cipher.ts";
 
 /** Comptes d'une table ; jamais de valeur, de clé ni d'identifiant. */
 export interface TableRotationReport {

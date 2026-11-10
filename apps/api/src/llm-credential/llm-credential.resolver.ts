@@ -1,5 +1,5 @@
 import { type LlmCredential, type LlmProviderId, llmCredential } from "@koklo/domain";
-import type { TokenCipher } from "../crypto/token-cipher.ts";
+import type { TokenCipher } from "@koklo/github";
 import type { LlmCredentialRepository } from "./llm-credential.repository.ts";
 import { llmCredentialAad } from "./llm-credential-aad.ts";
 import { LlmCredentialUnavailableError } from "./llm-credential-errors.ts";

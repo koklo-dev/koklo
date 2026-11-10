@@ -1,8 +1,7 @@
-import { createOctokitGitProvider } from "@koklo/github";
+import { createOctokitGitProvider, keyRingOf } from "@koklo/github";
 import { type DynamicModule, Global, Module } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import type { AppConfig } from "../config.ts";
-import { keyRingOf } from "../crypto/key-ring.ts";
 import { DatabaseService } from "../database/database.module.ts";
 import { requestLogger } from "../request-logger.ts";
 import { PrismaUserCredentials } from "./prisma-user-credentials.ts";

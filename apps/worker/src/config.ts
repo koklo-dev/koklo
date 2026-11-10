@@ -9,7 +9,14 @@ import {
   WEBHOOK_RETENTION_DAYS_MAX,
   WEBHOOK_RETENTION_DAYS_MIN,
 } from "@koklo/domain";
-import { type GithubAppSettings, githubAppFromEnv } from "@koklo/github";
+import {
+  type GithubAppSettings,
+  githubAppFromEnv,
+  InvalidEncryptionKeyError,
+  type KeyRingSettings,
+  keyRingFromEnv,
+  parseEncryptionKey,
+} from "@koklo/github";
 import { LOG_LEVELS, type LogLevel } from "@koklo/observability";
 
 /** Envoi d'emails : capture en mémoire (développement, test) ou Resend (staging, production). */
@@ -34,6 +41,8 @@ export type WorkerConfig = {
   readonly webBaseUrl: string;
   /** Absent : fournisseur git non configuré (staging sans App) ; les lots `spec-write` échouent en `PROVIDER_UNAVAILABLE`. */
   readonly githubApp?: GithubAppSettings;
+  /** Porte-clés des jetons utilisateur (`KOKLO_ENCRYPTION_KEY[_VERSION]`, `KOKLO_ENCRYPTION_KEYS_PREVIOUS`) : déchiffre le jeton d'un compte personnel à la création d'un dépôt. Absent : aucun jeton lisible. */
+  readonly encryptionKeyring?: KeyRingSettings;
   /** Rétention des livraisons de webhook, en jours (`WEBHOOK_RETENTION_DAYS`, 1 à 365). `loadConfig` la renseigne toujours (défaut 30) ; absente, le défaut s'applique. */
   readonly webhookRetentionDays?: number;
   /** Âge avant qu'une ligne non réglée soit jugée orpheline (`RECONCILE_GRACE_MINUTES`, 5 à 1440). `loadConfig` la renseigne toujours (défaut 15) ; absente, le défaut s'applique. */
@@ -105,6 +114,28 @@ function parseMaxProviderCalls(value: string | undefined): number {
         "RECONCILE_MAX_PROVIDER_CALLS",
         "must be a whole number of calls within the documented range",
       );
+}
+
+/** Porte-clés de l'environnement, `undefined` sans clé ; le message ne cite que les variables, jamais une valeur. */
+function parseKeyring(
+  env: Readonly<Record<string, string | undefined>>,
+): KeyRingSettings | undefined {
+  const raw = env.KOKLO_ENCRYPTION_KEY || undefined;
+  let key: Buffer | undefined;
+  try {
+    key = raw === undefined ? undefined : parseEncryptionKey(raw);
+  } catch (error) {
+    if (!(error instanceof InvalidEncryptionKeyError)) throw error;
+    return fail(
+      "KOKLO_ENCRYPTION_KEY",
+      "must be 32 bytes in base64, or 32 alphanumeric characters",
+    );
+  }
+  return keyRingFromEnv(
+    key,
+    env.KOKLO_ENCRYPTION_KEY_VERSION || undefined,
+    env.KOKLO_ENCRYPTION_KEYS_PREVIOUS || undefined,
+  );
 }
 
 const LOCAL_ENVS = ["development", "test"];
@@ -187,6 +218,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
   }
   const appEnv = env.APP_ENV || "development";
   const githubApp = githubAppFromEnv(env);
+  const encryptionKeyring = parseKeyring(env);
   return {
     databaseUrl,
     appEnv,
@@ -196,6 +228,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): W
     mail: parseMail(env, appEnv),
     webBaseUrl: parseWebBaseUrl(env.WEB_BASE_URL, appEnv),
     ...(githubApp ? { githubApp } : {}),
+    ...(encryptionKeyring ? { encryptionKeyring } : {}),
     webhookRetentionDays: parseRetentionDays(env.WEBHOOK_RETENTION_DAYS),
     reconcileGraceMinutes: parseGraceMinutes(env.RECONCILE_GRACE_MINUTES),
     reconcileMaxProviderCalls: parseMaxProviderCalls(env.RECONCILE_MAX_PROVIDER_CALLS),

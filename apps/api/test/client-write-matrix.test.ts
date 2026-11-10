@@ -79,6 +79,8 @@ const DENIED = [
   // TK-55 (décision du 2026-11-06) : un compte qui n'est que client ne crée pas d'organisation.
   "organization.create",
   "project.create",
+  "project.retryRepo",
+  "project.setEuOnly",
   "projectClient.add",
   "projectClient.remove",
   "projectState.update",

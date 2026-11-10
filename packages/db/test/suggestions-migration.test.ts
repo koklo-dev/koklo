@@ -147,7 +147,7 @@ describe("TK-51b migration suggestions : dossier et contenu", () => {
 
   it("expectedTables contient la table (56 au total avec TK-91)", () => {
     expect(expectedTables).toContain(SUGGESTION_TABLE);
-    expect(expectedTables).toHaveLength(56);
+    expect(expectedTables).toHaveLength(57);
   });
 });
 

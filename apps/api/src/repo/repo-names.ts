@@ -1,29 +1,20 @@
 import { isSafeSpecPath } from "@koklo/domain";
-import { slugify } from "../organization/slug.ts";
+import { InvalidRepoNameError, projectSlugOf, specRepoName as specRepoNameOf } from "@koklo/github";
 import { validation } from "../tracker/api-errors.ts";
 
-const MAX_NAME_LENGTH = 100;
-const SUFFIX = "-spec";
-const NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
-
-/** Slug du projet : sert au nom du dépôt et au manifeste (`projet`). */
-export const projectSlugOf = (projectName: string): string =>
-  slugify(projectName, { maxLength: MAX_NAME_LENGTH - SUFFIX.length, fallback: "projet" });
+export { projectSlugOf };
 
 /**
  * Nom du dépôt de spec : celui du client s'il est valide pour GitHub, sinon `VALIDATION` (avant
- * tout réseau) ; par défaut `<slug du projet>-spec`.
+ * tout réseau) ; par défaut `<slug du projet>-spec`. Règles : `@koklo/github`.
  */
 export function specRepoName(projectName: string, requested: string | undefined): string {
-  if (requested === undefined) return `${projectSlugOf(projectName)}${SUFFIX}`;
-  const reserved = requested === "." || requested === ".." || requested.endsWith(".git");
-  if (!NAME_PATTERN.test(requested) || reserved) {
-    throw validation(
-      "name",
-      "Nom de dépôt invalide : 1 à 100 caractères parmi lettres, chiffres, '.', '_' et '-' (ni '.', '..' ni suffixe '.git').",
-    );
+  try {
+    return specRepoNameOf(projectName, requested);
+  } catch (error) {
+    if (error instanceof InvalidRepoNameError) throw validation("name", error.message);
+    throw error;
   }
-  return requested;
 }
 
 /** Dossier de la spec dans un monorepo : relatif, sans remontée, sans `.git` (règle du domaine, aussi appliquée par le worker). */

@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createKeyRing, KeyRingConfigError } from "../src/crypto/key-ring.ts";
+import { createKeyRing, KeyRingConfigError } from "../src/credentials/key-ring.ts";
 import {
   createTokenCipher,
   InvalidEncryptionKeyError,
   TokenDecryptionError,
-} from "../src/crypto/token-cipher.ts";
+} from "../src/credentials/token-cipher.ts";
 
 /**
  * TK-52a : porte-clés versionné derrière l'interface `TokenCipher`. `keyVersion` = version

@@ -127,7 +127,7 @@ describe("TK-51d migration notifications : dossier et contenu", () => {
 
   it("expectedTables contient la table (56 au total avec TK-91)", () => {
     for (const table of NOTIFICATION_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(56);
+    expect(expectedTables).toHaveLength(57);
   });
 });
 

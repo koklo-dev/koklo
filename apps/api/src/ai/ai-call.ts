@@ -22,6 +22,7 @@ import { ORPCError } from "@orpc/server";
 import { CredentialProbe } from "../llm-credential/credential-probe.ts";
 import { LlmCredentialService } from "../llm-credential/llm-credential.service.ts";
 import { LlmCredentialUnavailableError } from "../llm-credential/llm-credential-errors.ts";
+import { PROJECT_POLICY, type ProjectPolicyStore } from "../project/project-policy.ts";
 import { requestLogger } from "../request-logger.ts";
 import type { AuditActor, AuditEntry } from "../tracker/audit.ts";
 import { AI_BUDGETS, type AiPurpose } from "./ai-budget.ts";
@@ -51,6 +52,8 @@ export const correlationIdOf = (requestId: string): string =>
 interface AiCallBase<T> {
   readonly purpose: AiPurpose;
   readonly actor: AuditActor;
+  /** Projet de l'appel : le moteur en lit `eu_only` (B304). Absent : appel d'organisation, jamais restreint à l'UE. */
+  readonly projectId?: string;
   readonly correlationId: string;
   readonly quota: QuotaKind;
   readonly output: LlmOutputSpec;
@@ -130,13 +133,14 @@ export class AiCallRunner {
     @Inject(LlmCredentialService) private readonly credentials: LlmCredentialService,
     @Inject(NONCE_SOURCE) private readonly nonces: NonceSource,
     @Inject(AiLedger) private readonly ledger: AiLedger,
+    @Inject(PROJECT_POLICY) private readonly policy: ProjectPolicyStore,
   ) {
     this.#gate = new ConcurrencyGate(ledger.limits.maxConcurrentPerOrg);
   }
 
   async run<T>(call: AiUsageCall<T>): Promise<T> {
     const { organizationId } = call.actor;
-    const request = this.requestOf(call, call.output);
+    const request = await this.requestOf(call, call.output);
     await this.refusals(organizationId, () => this.engine.preflight(request));
     const release = call.exclusive ? () => undefined : this.#gate.acquire(organizationId);
     try {
@@ -156,7 +160,7 @@ export class AiCallRunner {
    * l'appelant tient un verrou en base. Les erreurs du milieu du flux sont les mêmes erreurs typées.
    */
   async stream(call: AiStreamCall): Promise<AsyncGenerator<string, AiStreamEnd | undefined>> {
-    const request = this.requestOf(call, { kind: "text" });
+    const request = await this.requestOf(call, { kind: "text" });
     await this.refusals(call.actor.organizationId, () => this.engine.preflight(request));
     if (!call.admitted) await this.ledger.admit(call.actor, call.quota, call.entry());
     return this.relay(call, request);
@@ -189,18 +193,26 @@ export class AiCallRunner {
     return this.settle(call, { ...response, provider: call.provider });
   }
 
-  private requestOf(
+  /** Données en UE du projet de l'appel ; sans projet, aucune restriction. */
+  private euOnlyOf(call: Pick<AiUsageCall<unknown>, "actor" | "projectId">): Promise<boolean> {
+    const projectId = call.projectId ?? call.actor.projectId;
+    return projectId === undefined
+      ? Promise.resolve(false)
+      : this.policy.euOnly(call.actor.organizationId, projectId);
+  }
+
+  private async requestOf(
     call: Pick<
       AiUsageCall<unknown>,
-      "actor" | "usage" | "purpose" | "correlationId" | "frame" | "signal"
+      "actor" | "projectId" | "usage" | "purpose" | "correlationId" | "frame" | "signal"
     >,
     output: LlmOutputSpec,
-  ): AiRequest {
+  ): Promise<AiRequest> {
     return {
       organizationId: call.actor.organizationId,
       userId: call.actor.userId,
       usage: call.usage,
-      euOnly: false,
+      euOnly: await this.euOnlyOf(call),
       prompt: this.frame(call),
       output,
       budget: AI_BUDGETS[call.purpose],

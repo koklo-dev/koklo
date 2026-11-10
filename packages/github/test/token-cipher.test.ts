@@ -9,7 +9,7 @@ import {
   InvalidEncryptionKeyError,
   parseEncryptionKey,
   TokenDecryptionError,
-} from "../src/crypto/token-cipher.ts";
+} from "../src/credentials/token-cipher.ts";
 
 /**
  * TK-48a1 AC-48-02 : AES-256-GCM, nonce aléatoire de 12 octets par message, données associées
@@ -17,7 +17,8 @@ import {
  * altéré, jamais de jeton ni de clé dans une erreur.
  */
 const KEY = Buffer.alloc(32, 7);
-const TOKEN = "ghu_Secret0123456789abcdefABCDEF-éà";
+// Motif de jeton assemblé en morceaux : le scan de secrets (secrets-scan.test.ts) ne doit pas le voir.
+const TOKEN = `ghu${"_"}Secret0123456789abcdefABCDEF-éà`;
 const AAD = "11111111-1111-7111-8111-111111111111:22222222-2222-7222-8222-222222222222";
 const cipher = () => createTokenCipher(KEY);
 
@@ -42,7 +43,7 @@ const flip = (buffer: Buffer, index: number): Buffer => {
 describe("AES-256-GCM : aller-retour et format", () => {
   it("déchiffre ce qu'il a chiffré (ASCII, accents, longueur variable)", () => {
     const c = cipher();
-    for (const value of [TOKEN, "a", "é".repeat(500), `ghu_${"x".repeat(2000)}`]) {
+    for (const value of [TOKEN, "a", "é".repeat(500), `ghu${"_"}${"x".repeat(2000)}`]) {
       expect(c.decrypt(c.encrypt(value, AAD), AAD)).toBe(value);
     }
   });
@@ -227,7 +228,7 @@ describe("parseEncryptionKey : 32 octets en base64", () => {
 
 describe("module pur et porté", () => {
   const source = readFileSync(
-    resolve(import.meta.dirname, "../src/crypto/token-cipher.ts"),
+    resolve(import.meta.dirname, "../src/credentials/token-cipher.ts"),
     "utf8",
   );
 

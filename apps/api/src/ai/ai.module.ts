@@ -8,6 +8,8 @@ import { AiProviderRouter, createSdkProvider, launchCatalog } from "@koklo/llm";
 import { Module } from "@nestjs/common";
 import { LlmCredentialModule } from "../llm-credential/llm-credential.module.ts";
 import { LlmCredentialResolver } from "../llm-credential/llm-credential.resolver.ts";
+import { PrismaProjectPolicy } from "../project/prisma-project-policy.ts";
+import { PROJECT_POLICY } from "../project/project-policy.ts";
 import { SpecReadModule } from "../spec-read/spec-read.module.ts";
 import { TrackerModule } from "../tracker/tracker.module.ts";
 import { AiController } from "./ai.controller.ts";
@@ -62,6 +64,7 @@ function sdkAdapters(): AiAdapterFactory {
   providers: [
     AiService,
     AiCallRunner,
+    { provide: PROJECT_POLICY, useClass: PrismaProjectPolicy },
     AiLedger,
     AiSettingsService,
     AiProvidersService,

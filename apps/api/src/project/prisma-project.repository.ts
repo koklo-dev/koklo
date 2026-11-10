@@ -1,8 +1,6 @@
 import { withOrganization } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
-import { IDEA_TEMPLATE } from "../idea/idea-template.ts";
-import { type AuditActor, recordAudit } from "../tracker/audit.ts";
 import type { ProjectRecord, ProjectRepository } from "./project.repository.ts";
 
 @Injectable()
@@ -15,38 +13,6 @@ export class PrismaProjectRepository implements ProjectRepository {
       this.database.client.project.findMany({
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: { id: true, name: true, organizationId: true, createdAt: true },
-      }),
-    );
-  }
-
-  create(actor: AuditActor, name: string): Promise<ProjectRecord> {
-    // `organizationId` est affecté (et vérifié) par l'extension multi-tenant.
-    return withOrganization(actor.organizationId, () =>
-      this.database.client.$transaction(async (tx) => {
-        const project = await tx.project.create({
-          data: { name, organizationId: actor.organizationId },
-          select: { id: true, name: true, organizationId: true, createdAt: true },
-        });
-        // Gabarit « cadrage par défaut » (TK-89) : les 10 pages naissent avec le projet, ou pas du tout.
-        await tx.ideaPage.createMany({
-          data: IDEA_TEMPLATE.map((entry, position) => ({
-            organizationId: actor.organizationId,
-            projectId: project.id,
-            slug: entry.slug,
-            title: entry.title,
-            position,
-            required: entry.required,
-            origin: "template" as const,
-            templateKey: entry.slug,
-            status: "empty" as const,
-          })),
-        });
-        await recordAudit(tx, actor, {
-          action: "project.create",
-          targetKind: "project",
-          targetId: project.id,
-        });
-        return project;
       }),
     );
   }

@@ -5,6 +5,7 @@ import { clientSpace } from "./contract-client-space.ts";
 import { audit, comment, lease, projectState } from "./contract-collaboration.ts";
 import { idea } from "./contract-idea.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
+import { projectCards } from "./contract-project-cards.ts";
 import { projectClient } from "./contract-project-client.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { review } from "./contract-review.ts";
@@ -20,6 +21,7 @@ import {
   internalError,
   notFoundError,
   unauthorizedError,
+  validationError,
 } from "./errors.ts";
 import { route } from "./route-helpers.ts";
 import type {
@@ -135,7 +137,7 @@ const memberSetRole = route("PATCH", "/members/{memberId}/role")
   .output(memberSetRoleOutputSchema);
 
 const projectCreate = route("POST", "/projects")
-  .errors({ ...internalError, ...authErrors })
+  .errors({ ...internalError, ...authErrors, ...validationError })
   .input(projectCreateInputSchema)
   .output(projectSchema);
 
@@ -147,7 +149,7 @@ export const contract = {
   // `invite`, `list`, `setRole` : dépréciées depuis 2.2.0 (B95), retirées à la prochaine majeure ; mêmes services que les routes de `memberSettings`.
   member: { invite: memberInvite, list: memberList, setRole: memberSetRole, ...memberSettings },
   me,
-  project: { list: projectList, create: projectCreate, ...projectShell },
+  project: { list: projectList, create: projectCreate, ...projectShell, ...projectCards },
   projectClient,
   search,
   clientSpace,

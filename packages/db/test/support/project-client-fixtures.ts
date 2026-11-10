@@ -13,6 +13,8 @@ export const PROJECT_CLIENT_MODELS = ["ProjectClientAccess"] as const;
 
 /** Table ajoutée par TK-88 : dernier projet ouvert par membre (carte projet de la coquille). */
 export const PROJECT_VISIT_TABLES = ["project_visits"] as const;
+/** TK-93 : création du dépôt de spec par le worker (une ligne par tentative) et colonne `projects.eu_only`. */
+export const PROJECT_CREATION_TABLES = ["project_creations"] as const;
 /** TK-97 : projets proposés à une invitation, préférences d'e-mail. */
 export const SETTINGS_TABLES = ["invitation_projects", "notification_preferences"] as const;
 

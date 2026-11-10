@@ -173,6 +173,8 @@ model Project {
   id             String   @id @default(uuid(7)) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   name           String
+  /// Données en UE (TK-93, B304) : vrai = jamais de fournisseur d'IA hors UE pour ce projet.
+  euOnly         Boolean  @default(false) @map("eu_only")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -189,6 +191,7 @@ model Project {
   notifications      Notification[]
   clientAccess       ProjectClientAccess[]
   visits             ProjectVisit[]
+  creations          ProjectCreation[]
   ideaPages          IdeaPage[]
   ideaPublications   IdeaPublication[]
   ideaPresences      IdeaPresence[]
@@ -1659,4 +1662,30 @@ model IdeaSynthesis {
 
   @@index([organizationId])
   @@map("idea_synthesis")
+}
+
+/// Création du dépôt de spec d'un projet (TK-93, B301) : une ligne par tentative, `pending` à l'API, suivie par le worker.
+/// Statut, code d'erreur et modèle d'idée sont contraints par CHECK en SQL (listes fermées, pas d'enum natif).
+model ProjectCreation {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  status         String
+  errorCode      String?  @map("error_code")
+  retryAfterMs   Int?     @map("retry_after_ms")
+  repoName       String   @map("repo_name")
+  installationId String?  @map("installation_id") @db.Uuid
+  ideaTemplate   String   @map("idea_template")
+  idempotencyKey String?  @map("idempotency_key")
+  requestedBy    String   @map("requested_by") @db.Uuid
+  /// L'invitation du client demandée à la création n'a pas pu être envoyée (B303) : l'étape passe en erreur sur la carte.
+  invitationFailed Boolean @default(false) @map("invitation_failed")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, projectId, createdAt(sort: Desc)])
+  @@map("project_creations")
 }

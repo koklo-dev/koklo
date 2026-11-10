@@ -46,7 +46,19 @@ const GROUPS: Record<string, string[]> = {
     "setStatus",
     "synthesis",
   ],
-  project: ["activity", "create", "list", "overview", "recent", "shell", "visit"],
+  project: [
+    "activity",
+    "cards",
+    "create",
+    "creationStatus",
+    "list",
+    "overview",
+    "recent",
+    "retryRepo",
+    "setEuOnly",
+    "shell",
+    "visit",
+  ],
   search: ["query"],
   org: ["get", "update"],
   invitation: ["create", "list", "resend", "revoke"],
@@ -225,6 +237,12 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /ai/settings",
     "PATCH /ai/settings",
   ];
+  const CARDS_PAIRS = [
+    "GET /projects/cards",
+    "GET /projects/{projectId}/creation",
+    "POST /projects/{projectId}/creation/retry",
+    "PATCH /projects/{projectId}/eu-only",
+  ];
   const SHELL_PAIRS = [
     "GET /projects/{projectId}/shell",
     "GET /projects/{projectId}/overview",
@@ -233,7 +251,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 sont présentes (114 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 sont présentes (118 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -251,10 +269,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...SETTINGS_PAIRS,
       ...AI_PROVIDER_PAIRS,
       ...IDEA_PAIRS,
+      ...CARDS_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(114);
+    expect(pairs).toHaveLength(118);
   });
 });
 

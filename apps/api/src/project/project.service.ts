@@ -1,6 +1,5 @@
 import type { ProjectListOutput } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
-import type { AuditActor } from "../tracker/audit.ts";
 import { PROJECT_REPOSITORY, type ProjectRepository } from "./project.repository.ts";
 
 @Injectable()
@@ -27,11 +26,5 @@ export class ProjectService {
     }
     const linked = new Set(linkedIds);
     return projects.filter(({ id }) => linked.has(id));
-  }
-
-  /** Crée un projet dans l'organisation de la session (journalisé par le dépôt). */
-  async create(actor: AuditActor, name: string): Promise<ProjectListOutput[number]> {
-    const { id } = await this.repository.create(actor, name);
-    return { id, name };
   }
 }

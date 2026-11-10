@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { inspect } from "node:util";
 import type { TestDatabase } from "@koklo/db/testing";
+import { createKeyRing } from "@koklo/github";
 import * as Sentry from "@sentry/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createKeyRing } from "../src/crypto/key-ring.ts";
 import { DatabaseService } from "../src/database/database.module.ts";
 import { LlmCredentialService } from "../src/llm-credential/llm-credential.service.ts";
 import { LlmCredentialStoreError } from "../src/llm-credential/llm-credential-errors.ts";

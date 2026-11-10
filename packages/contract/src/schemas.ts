@@ -18,7 +18,16 @@ export const projectListOutputSchema = z.array(projectSchema);
 export const roleSchema = z.enum(["owner", "admin", "dev", "designer", "client", "business"]);
 export const memberRoleSchema = roleSchema.exclude(["owner"]);
 
-export const projectCreateInputSchema = z.object({ name: z.string().min(1).max(100) });
+/** Création en une étape (TK-93) : tout champ au-delà du nom est facultatif, `{ name }` seul reste valide. */
+export const projectCreateInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  clientEmail: z.email().optional(),
+  ideaTemplate: z.enum(["default", "empty"]).optional(),
+  installationId: z.uuid().optional(),
+  repoName: z.string().min(1).max(100).optional(),
+  euOnly: z.boolean().optional(),
+  idempotencyKey: z.string().min(1).max(64).optional(),
+});
 
 export const organizationCreateInputSchema = z.object({
   name: z.string().min(1).max(100),

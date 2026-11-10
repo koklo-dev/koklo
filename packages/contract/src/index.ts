@@ -122,6 +122,7 @@ export * from "./schemas-lists.ts";
 export * from "./schemas-llm-credential.ts";
 export * from "./schemas-overview.ts";
 export * from "./schemas-project-client.ts";
+export * from "./schemas-projects.ts";
 export * from "./schemas-provider.ts";
 export * from "./schemas-review.ts";
 export * from "./schemas-settings.ts";

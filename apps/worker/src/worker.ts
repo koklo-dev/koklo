@@ -4,10 +4,12 @@ import {
   RECONCILE_GRACE_MINUTES_DEFAULT,
   WEBHOOK_RETENTION_DAYS_DEFAULT,
 } from "@koklo/domain";
+import { keyRingOf } from "@koklo/github";
 import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
 import type { WorkerConfig } from "./config.ts";
 import { handleNoop, NOOP_QUEUE } from "./jobs/noop.ts";
+import type { ProjectCreationSettings } from "./jobs/project-creation.ts";
 import {
   createSendInvitationHandler,
   SEND_INVITATION_QUEUE,
@@ -27,6 +29,8 @@ import { createMailSender } from "./mail/create-mail-sender.ts";
 import type { MailSender } from "./mail/mail-sender.ts";
 import { registerNotificationEmail } from "./notification/register.ts";
 import { instrumentJob, setupObservability } from "./observability.ts";
+import { registerProjectCreation } from "./project-creation/register.ts";
+import { ProjectCreationStore } from "./project-creation/store.ts";
 import { registerReconcile } from "./reconcile/register.ts";
 import { providerOf, registerSpecWrite } from "./spec-write/register.ts";
 import { SpecWriteStore } from "./spec-write/store.ts";
@@ -47,6 +51,8 @@ export interface StartWorkerOptions {
   gitProvider?: GitProvider;
   /** Essais et concurrence de la file `spec-write` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
   specWrite?: Partial<SpecWriteSettings>;
+  /** Essais et concurrence de la file `project-creation` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
+  projectCreation?: Partial<ProjectCreationSettings>;
   /** Essais et concurrence de la file `webhook-delivery` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
   webhookDelivery?: Partial<WebhookDeliverySettings>;
   /** Essais et concurrence de la file `send-notification-email` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
@@ -93,6 +99,18 @@ async function registerDatabaseJobs(
     logger,
     { store: new SpecWriteStore(database), provider },
     options.specWrite,
+  );
+  await registerProjectCreation(
+    boss,
+    logger,
+    {
+      store: new ProjectCreationStore(
+        database,
+        keyRingOf({ encryptionKeyring: config.encryptionKeyring }),
+      ),
+      provider,
+    },
+    options.projectCreation,
   );
   await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
   await registerWebhookPurge(boss, logger, { raw: database, retentionDays });

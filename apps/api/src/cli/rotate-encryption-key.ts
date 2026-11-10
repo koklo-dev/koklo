@@ -1,11 +1,15 @@
-import { KeyRingConfigError, type KeyRingSettings } from "../crypto/key-ring.ts";
-import { keyRingFromEnv } from "../crypto/key-ring-config.ts";
+import {
+  InvalidEncryptionKeyError,
+  KeyRingConfigError,
+  type KeyRingSettings,
+  keyRingFromEnv,
+  parseEncryptionKey,
+} from "@koklo/github";
 import {
   RotationConfigError,
   type RotationReport,
   rotateEncryptionKey,
 } from "../crypto/rotate-encryption-key.ts";
-import { InvalidEncryptionKeyError, parseEncryptionKey } from "../crypto/token-cipher.ts";
 import { DatabaseService } from "../database/database.module.ts";
 
 export interface RotateCliIo {

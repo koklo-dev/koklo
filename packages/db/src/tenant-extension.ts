@@ -44,6 +44,7 @@ export const TENANT_MODELS: readonly string[] = [
   "AiUsageModel",
   "AiUsageMonthly",
   "ProjectVisit",
+  "ProjectCreation",
   "InvitationProject",
   "NotificationPreference",
   "IdeaPage",
