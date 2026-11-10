@@ -57,6 +57,30 @@ const holdStdout = (command, args) => {
   const child = spawn(command, args, { stdio: ["ignore", "inherit", "inherit"] });
   writeFileSync(join(dir, "grandchild.pid"), String(child.pid));
   child.unref();
+  return child.pid;
+};
+
+// Session d'un processus (champ 6 de /proc/<pid>/stat), null s'il n'existe plus.
+const sessionOf = (pid) => {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[3];
+  } catch {
+    return null;
+  }
+};
+
+// `setsid` s'exécute après le `spawn` : sur un runner chargé, annoncer « prêt » avant le détachement laisse
+// le petit-fils dans le groupe, et le timeout le tue avec lui. On attend donc sa propre session.
+const markReadyOnceDetached = (pid) => {
+  const own = sessionOf(process.pid);
+  const timer = setInterval(() => {
+    const session = sessionOf(pid);
+    if (session !== null && session !== own) {
+      clearInterval(timer);
+      markReady();
+    }
+  }, 10);
 };
 
 const flood = () => {
@@ -101,9 +125,9 @@ const SCENARIOS = {
     result(false, text);
   },
   escape: () => {
-    holdStdout("setsid", ["sleep", "120"]);
+    const grandchild = holdStdout("setsid", ["sleep", "120"]);
     emit({ type: "assistant", message: { content: [{ type: "text", text }] } });
-    markReady();
+    markReadyOnceDetached(grandchild);
     setInterval(() => {}, 1000);
   },
   hang: () => hang(false),

@@ -216,6 +216,40 @@ export class BlockingStreamLlm implements LlmProvider {
   }
 }
 
+/** Modèle dont le premier `complete` attend `release()` : le passage au cadrage reste en vol le temps du test. */
+export class BlockingCompleteLlm implements LlmProvider {
+  readonly id = "fake" as const;
+  started = 0;
+  private open: () => void = () => undefined;
+  private readonly gate = new Promise<void>((resolve) => {
+    this.open = resolve;
+  });
+
+  constructor(private readonly inner: FakeLlm) {}
+
+  async complete(request: LlmRequest): Promise<LlmResponse> {
+    this.started += 1;
+    if (this.started === 1) await this.gate;
+    return this.inner.complete(request);
+  }
+
+  stream(request: LlmRequest): AsyncGenerator<LlmStreamEvent> {
+    return this.inner.stream(request);
+  }
+
+  release(): void {
+    this.open();
+  }
+
+  async untilStarted(count = 1): Promise<void> {
+    const deadline = Date.now() + 10_000;
+    while (this.started < count) {
+      if (Date.now() > deadline) throw new Error("l'appel n'a pas démarré");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+}
+
 // --- Lectures et écritures en base ---
 export interface ProposalRow {
   id: string;
