@@ -1,6 +1,6 @@
 ---
 doc_version: 1
-last_reviewed: 2026-11-09
+last_reviewed: 2026-11-10
 ---
 # Passation de la refonte : état, méthode, décisions
 
@@ -8,13 +8,13 @@ last_reviewed: 2026-11-09
 > fusionné, et ajouter ici toute nouvelle décision de méthode de l'utilisateur. Les décisions produit restent dans
 > `docs/refonte/questions.md` (une ligne B-nnn chacune) ; rien ne se décide « dans la conversation » sans être écrit.
 
-## État au 2026-11-09
+## État au 2026-11-10
 
 | Sprint | Ticket | État |
 | --- | --- | --- |
 | 018 | TK-87, TK-88, TK-94, TK-95, TK-96 | ✅ fusionnés |
 | 019 | TK-97, TK-138 à TK-142 | ✅ fusionnés (bibliothèque fidèle aux maquettes, reprise des écrans, axe en CI) |
-| 019 | TK-98 (fournisseurs d'IA) | 🟡 fusionné, critère 1 partiel : A5 tranchée (interrupteur « données en UE » par projet), réalisée avec TK-93 qui complète le critère |
+| 019 | TK-98 (fournisseurs d'IA) | ✅ critère 1 complété par TK-93 (moteur `euOnly` + case à la création ; réglage après création au lot 13c, B304) |
 | 020 | TK-89 (espace Idée : pages, éditeur, publication, droits) | ✅ fusionné (PR #150, `e8c2247`) |
 | 020 | TK-90 (panneau de l'agent, propositions) | ✅ fusionné (PR #154) |
 | 020 | TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | ✅ fusionné (PR #158, `da47953`) |
@@ -104,3 +104,4 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - CI `ci` : `features-long-list.test.tsx` (anti-rebond de la recherche, « expected 5 to be less than 5 ») est sensible à la charge du runner ; une relance du job suffit (TK-92). Ne pas oublier qu'un test unitaire d'API peut dater d'avant une correction de revue : lancer `pnpm --filter @koklo/api exec vitest run src` en entier avant de pousser, pas seulement les fichiers du lot.
 - Une PR bloquée en « queued » : annuler l'exécution CI périmée (`gh run cancel`) qui occupe la file.
 - Création de projet (TK-93 lot C) : l'état de la création vient du serveur (`project.cards` → `creation`, `project.creationStatus`) ; ne jamais réintroduire de marqueur `sessionStorage` ni d'appel à `repo.createSpec` pour un nouveau projet (seule la page Fonctionnalités d'un projet sans dépôt le garde). Une création `skipped` (`no_account`) garde sa carte tant que le dépôt n'existe pas (B311). Les e2e de la création pilotent le faux API par `creation`, `creationSeed`, `retryTo` (`apps/web/e2e/support/stub-spec-repo.ts`).
+- TK-93 : le workflow a duré ~3 h 20 (3 lots) et la CI `ci` ~60 min sous charge. Non vérifié : `KOKLO_ENCRYPTION_KEY` injecté au service worker par `.deploy/manifest.yaml` (secret `generate` global supposé) ; à contrôler au premier déploiement staging. Après un rebase, relancer lint, typecheck et la suite web avant le push forcé.
