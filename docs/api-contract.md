@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.8.0** (TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.9.0** (TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1475,6 +1475,29 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.9.0** (TK-99a, lot A): agent proposals, server side. New routes `ai.proposeDeliverable`
+  (`POST /projects/{projectId}/ai/deliverable/propose`), `ai.proposeOptions` (`GET .../ai/deliverable/options`),
+  `ai.reviseProposal` (`POST .../ai/proposals/{proposalId}/revise`) and the group `proposal`: `proposal.list`
+  (`GET .../proposals`), `proposal.decide` (`POST .../proposals/{proposalId}/decision`) and `proposal.decideMany`
+  (`POST .../proposals/decisions`); 6 routes, 124 routes and 98 paths in all. **Additive**: `specBatch.submit` now
+  accepts 200 operations (it was 50; `SPEC_BATCH_OPERATIONS_MAX`) and an optional `proposalIds` (200 at most): every id
+  must be an `accepted`, not yet applied proposal of the project of type `feature` or `criteria`; it receives the batch
+  as `appliedBatchId` in the transaction that enqueues it (422 `VALIDATION` otherwise). Without `proposalIds` nothing
+  changes. `deliverable` takes the seven keys of `DELIVERABLE_KEYS`; only `functional` is wired (the six others answer
+  422 `VALIDATION`, TK-100 wires them). All six routes are for `SPEC_BATCH_ROLES` (owner, admin, dev, designer): a
+  client and a business member get 403 on everything. New typed errors: `PROPOSAL_IN_PROGRESS` (409, `{ launchId }`:
+  a launch is already active for this project and deliverable, held by a partial unique index) and
+  `PROPOSAL_COUNT_CHANGED` (409, `{ expected, actual }`: the N shown is not the N applied, nothing is decided);
+  `proposal.decide` and `ai.reviseProposal` answer 409 `CONFLICT` (`proposal_applied`) for a proposal a batch already
+  applied. A proposal carries its payload as `content` (the column is `payload`: the contract exposes no property named
+  `payload`). `proposal.list` groups beyond 30 proposals only (`groupBy` `type` or `type_zone`, one `all` group
+  below), pages by a stable `(position, id)` cursor and refreshes the launch `lastSeenAt` at most every 10 seconds.
+  `proposal.decideMany` acts on ALL pending proposals of the group, loaded or not. New tables `agent_launches`,
+  `agent_proposals`, `agent_proposal_decisions`, and the `notifications` CHECK gains `proposal.ready` and
+  `agent_launch` (migration `20261111090000_agent_proposals`, with `down.sql`). The fingerprint of 2.8.0 is frozen in
+  `packages/contract/test/contract.test.ts`. Audit: `ai.deliverable.propose` (target `agent_launch`, one line per
+  launch), `ai.proposal.revise`, `proposal.decide` (target `agent_proposal`) and `proposal.decideMany` (target
+  `agent_launch`). Migration note: a client that submits more than 50 operations now needs the 2.9.0 contract.
 - **2.8.0** (TK-93, lot A): project cards and one-step creation. New routes `project.cards` (`GET /projects/cards`),
   `project.creationStatus` (`GET /projects/{projectId}/creation`), `project.retryRepo`
   (`POST /projects/{projectId}/creation/retry`, owner and admin) and `project.setEuOnly`
