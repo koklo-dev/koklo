@@ -12,6 +12,8 @@ export interface FeaturesUrlState {
   new?: true;
   /** `?edit=F-nnn` : formulaire de modification (TK-48 / 48e). Exclusif de `feature`. */
   edit?: string;
+  /** `?view=review` : relecture des propositions de l'agent (TK-99b). */
+  review?: true;
 }
 
 export type FeaturesUrlPatch = {
@@ -50,6 +52,7 @@ export function readFeaturesUrl(search: string): FeaturesUrlState {
   const status = featureStatusSchema.safeParse(params.get("status"));
   const priority = featurePrioritySchema.safeParse(params.get("priority"));
   return {
+    ...(params.get("view") === "review" ? { review: true as const } : {}),
     ...(status.success ? { status: status.data } : {}),
     ...(priority.success ? { priority: priority.data } : {}),
     ...readQuery(params),
@@ -70,6 +73,8 @@ export function withFeaturesUrl(search: string, patch: FeaturesUrlPatch): string
     if (patch.feature === null) params.delete(SELECTED);
     else params.set(SELECTED, patch.feature);
   }
+  if (patch.review === null) params.delete("view");
+  else if (patch.review) params.set("view", "review");
   if (patch.new === null) params.delete("new");
   else if (patch.new) params.set("new", "1");
   const query = params.toString();

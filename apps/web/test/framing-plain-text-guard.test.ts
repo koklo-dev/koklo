@@ -24,6 +24,18 @@ const FRAMING_FILES = [
   "lib/framing-operations.ts",
   "lib/framing-types.ts",
   "lib/use-framing-proposals.ts",
+  // TK-99b : relecture des propositions de l'agent sur le Fonctionnel
+  "components/features-propose.tsx",
+  "components/features-review.tsx",
+  "components/features-review-detail.tsx",
+  "lib/proposal-edit.ts",
+  "lib/proposal-labels.ts",
+  "lib/proposal-operations.ts",
+  "lib/use-proposal-actions.ts",
+  "lib/use-proposal-launch.ts",
+  "lib/use-proposal-review.ts",
+  "lib/use-proposal-save.ts",
+  "lib/use-proposal-status.ts",
 ];
 
 /** Tout fichier `framing-*` ou `ai-*` ajouté plus tard au lot est contrôlé aussi. */

@@ -553,3 +553,132 @@ test("S-dev-ui surfaces C : onglets soulignés (36, trait --primary), tableau en
   expect(await region.getByRole("img", { name: "Oui" }).count()).toBeGreaterThan(0);
   expect(await region.getByRole("img", { name: "Non" }).count()).toBeGreaterThan(0);
 });
+
+/** TK-99b lot A : section « Propositions de l'agent » (fiche S-features §6, captures proposals-*). */
+const proposals = (page: Page) => page.getByRole("region", { name: "16. Propositions de l'agent" });
+const frameOf = (page: Page, title: string) =>
+  proposals(page).getByRole("heading", { level: 3, name: title }).locator("..");
+
+const PROPOSAL_FRAMES = [
+  { key: "buttons", title: "AgentProposeButton, cinq états" },
+  { key: "generating", title: "Génération en cours" },
+  { key: "review-flat", title: "Relecture à plat (12 propositions)" },
+  { key: "review-volume", title: "Relecture en volume (400 propositions, groupes)" },
+] as const;
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui propositions ${viewport.name} (${theme}) : axe sans violation, sans défilement horizontal, captures`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await proposals(page).scrollIntoViewIfNeeded();
+      await settle(page);
+      const results = await new AxeBuilder({ page })
+        .include("[aria-labelledby='dev-ui-proposals']")
+        .withTags(AXE_TAGS)
+        .analyze();
+      expect(results.violations).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      for (const frame of PROPOSAL_FRAMES) {
+        await frameOf(page, frame.title).screenshot({
+          path: `${DIR}/proposals-${frame.key}-${theme}${viewport.suffix}.png`,
+        });
+      }
+    });
+
+    test(`S-dev-ui propositions modale ${viewport.name} (${theme}) : axe, focus piégé, Échap, capture`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await settle(page);
+      const trigger = frameOf(page, "AgentProposePopover").getByRole("button", {
+        name: "Proposer avec l'agent",
+      });
+      await trigger.scrollIntoViewIfNeeded();
+      const dialog = page.getByRole("dialog", { name: "Proposer avec l'agent" });
+      // Avant l'hydratation le clic est sans effet : on le rejoue jusqu'à l'ouverture.
+      await expect(async () => {
+        await trigger.click();
+        await expect(dialog).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
+      await page.waitForTimeout(400);
+      const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+      expect(results.violations).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      const box = await dialog.boundingBox();
+      expect(box?.width ?? 0).toBeLessThanOrEqual(Math.min(520, viewport.width - 32) + 1);
+      for (let i = 0; i < 12; i += 1) {
+        await page.keyboard.press("Tab");
+        expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+      }
+      await page.screenshot({ path: `${DIR}/proposals-modal-${theme}${viewport.suffix}.png` });
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    });
+  }
+}
+
+test("S-dev-ui propositions : J et K déplacent la sélection, A accepte, jamais dans le champ de demande", async ({
+  page,
+}) => {
+  await open(page, "light");
+  await settle(page);
+  const flat = proposals(page).getByRole("region", { name: "Relecture des propositions" }).first();
+  await flat.scrollIntoViewIfNeeded();
+  const current = flat.locator("[data-slot=proposal-review-list] [aria-current='true']");
+  await expect(current).toContainText("F-006");
+  await current.focus();
+  await page.keyboard.press("j");
+  await expect(flat.locator("[aria-current='true']")).toContainText("F-007");
+  await page.keyboard.press("k");
+  await expect(flat.locator("[aria-current='true']")).toContainText("F-006");
+  await page.keyboard.press("a");
+  await expect(flat.getByRole("group", { name: "Mode relecture" })).toContainText("1 acceptée");
+  await expect(flat.getByRole("status")).toHaveText("F-006 acceptée");
+  await expect(flat.locator("[aria-current='true']")).toContainText("F-007");
+  const field = flat.getByRole("textbox", { name: "Demander une modification à l'agent" });
+  await field.fill("ajoute un cas");
+  await expect(field).toHaveValue("ajoute un cas");
+  await expect(flat.getByRole("group", { name: "Mode relecture" })).toContainText("1 acceptée");
+});
+
+test("S-dev-ui propositions en volume : 400 propositions, moins de 300 nœuds li, défilement sans tâche longue", async ({
+  page,
+}) => {
+  await open(page, "light");
+  await settle(page);
+  const volume = proposals(page).getByRole("region", { name: "Relecture des propositions" }).nth(1);
+  await volume.scrollIntoViewIfNeeded();
+  await expect(volume.getByRole("button", { name: /^À relire/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const more = volume.getByRole("button", { name: /^Afficher \d+ de plus/ }).first();
+  for (let i = 0; i < 3; i += 1) await more.click();
+  // Au-delà de 30 éléments chargés, le groupe passe par VirtualList.
+  const virtual = volume.locator("[data-slot=virtual-list]").first();
+  await expect(virtual).toBeVisible();
+  const count = await volume.locator("li").count();
+  expect(count).toBeLessThan(300);
+  const longTasks = await virtual.evaluate(async (el) => {
+    let worst = 0;
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) worst = Math.max(worst, entry.duration);
+    });
+    observer.observe({ entryTypes: ["longtask"] });
+    for (let top = 0; top <= el.scrollHeight; top += 240) {
+      el.scrollTop = top;
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    }
+    observer.disconnect();
+    return worst;
+  });
+  expect(longTasks).toBeLessThan(50);
+  const header = volume.getByRole("button", { name: /^Fonctionnalités · Réservation$/ });
+  await header.click();
+  await expect(header).toHaveAttribute("aria-expanded", "false");
+});

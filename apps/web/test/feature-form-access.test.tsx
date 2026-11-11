@@ -118,15 +118,17 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
     expect(newButtons()).toHaveLength(0);
   });
 
-  it("état vide : le bouton est aussi dans la carte « Aucune fonctionnalité pour le moment »", async () => {
+  it("état vide : la saisie à la main passe par la carte de l'agent, l'en-tête n'a aucune action (maquette 10 l.640)", async () => {
     procedures.specHead.mockResolvedValue(
       head({ counts: { features: 0, tables: 0, endpoints: 0 } }),
     );
     procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
-    const heading = await findNamed("heading", "Aucune fonctionnalité pour le moment");
-    const card = heading.parentElement as HTMLElement;
-    expect(within(card).getByRole("button", { name: NEW_BUTTON })).toBeVisible();
+    const heading = await findNamed("button", "Ajouter à la main");
+    expect(heading).toBeVisible();
+    expect(
+      within(document.body).queryByRole("button", { name: NEW_BUTTON }),
+    ).not.toBeInTheDocument();
   });
 
   it("état vide côté client : aucun bouton", async () => {

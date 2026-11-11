@@ -18,10 +18,17 @@ import { useProjectShell } from "../lib/use-project-shell.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FeatureFormSheet } from "./feature-form-sheet.tsx";
 import { FeatureSheet } from "./feature-sheet.tsx";
-import { FeaturesEmpty, FeaturesEmptyFiltered, ProjectNotFound } from "./features-empty.tsx";
+import {
+  FeaturesAgentEmpty,
+  FeaturesEmpty,
+  FeaturesEmptyFiltered,
+  ProjectNotFound,
+} from "./features-empty.tsx";
 import { FeaturesFilters } from "./features-filters.tsx";
 import { FeaturesHeader } from "./features-header.tsx";
 import { FeaturesList } from "./features-list.tsx";
+import { ProposeButton, ProposeDialog } from "./features-propose.tsx";
+import { FeaturesReview } from "./features-review.tsx";
 import { PageBody } from "./page-body.tsx";
 import { WriteFailure, WriteNotice } from "./saved-notice.tsx";
 import { SpecIndexFailed } from "./spec-index-failed.tsx";
@@ -173,11 +180,13 @@ function Body({ page }: { page: FeaturesPageModel }) {
     case "preparing":
       return <Preparing page={page} />;
     case "empty":
-      return (
-        <FeaturesEmpty
-          projectId={page.data.projectId}
-          onCreate={page.form.canWrite ? page.form.openCreate : undefined}
+      return page.propose.enabled && page.form.canWrite ? (
+        <FeaturesAgentEmpty
+          agent={<ProposeEntry page={page} idleLabel="Proposer le fonctionnel" />}
+          onCreate={page.form.openCreate}
         />
+      ) : (
+        <FeaturesEmpty onCreate={page.form.canWrite ? page.form.openCreate : undefined} />
       );
     case "empty-filtered":
       return <NoResults page={page} />;
@@ -225,63 +234,123 @@ function FormSheet({ page }: { page: FeaturesPageModel }) {
   );
 }
 
-/** Corps de l'onglet Fonctionnalités : liste, filtres, fiche et formulaire (design/screens/S-features.md). */
+/** Bouton de l'agent : le même dans l'en-tête et dans l'état vide, toujours sur le modèle partagé de la page. */
+function ProposeEntry({ page, idleLabel }: { page: FeaturesPageModel; idleLabel?: string }) {
+  return (
+    <ProposeButton
+      {...(idleLabel ? { idleLabel } : {})}
+      launch={page.propose.launch}
+      readyCount={page.propose.status.counts.pending}
+      onReview={page.url.openReview}
+    />
+  );
+}
+
+/** Région d'état et avis d'écriture : sous le formulaire modal, c'est celle du panneau qui parle. */
+function StatusBlock({ page }: { page: FeaturesPageModel }) {
+  return (
+    <>
+      <div
+        // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau ; avec la
+        // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
+        role={page.form.open || page.region.countBar ? undefined : "status"}
+        aria-busy={page.region.busy || undefined}
+        className="text-meta text-muted-foreground empty:hidden"
+      >
+        {page.form.open ? null : (
+          <>
+            {page.region.countBar ? null : page.region.text}
+            <WriteNotice
+              write={page.write}
+              role={page.data.role}
+              hrefFor={page.sheet.hrefFor}
+              onOpen={page.url.openFeature}
+            />
+          </>
+        )}
+      </div>
+      {page.form.open ? null : (
+        <WriteFailure write={page.write} role={page.data.role} onReopen={page.reopenDraft} />
+      )}
+      {page.propose.enabled && page.propose.launch.notice ? (
+        <InlineAlert variant="neutral" icon="schedule">
+          {page.propose.launch.notice}
+        </InlineAlert>
+      ) : null}
+    </>
+  );
+}
+
+/** Filtres puis, selon l'adresse, la relecture des propositions (`?view=review`) ou le corps de la liste. */
+function MainView({ page, projectId }: { page: FeaturesPageModel; projectId: string }) {
+  if (page.propose.reviewing) {
+    return (
+      <FeaturesReview
+        projectId={projectId}
+        branch={page.data.head?.branch}
+        onLeave={page.url.closeReview}
+      />
+    );
+  }
+  return (
+    <>
+      {page.showFilters ? (
+        <FeaturesFilters
+          status={page.url.status}
+          priority={page.url.priority}
+          onChange={page.filters.onChange}
+          onClear={page.filters.onClear}
+          statusRef={page.filters.statusRef}
+          search={page.search}
+        />
+      ) : null}
+      <Body page={page} />
+    </>
+  );
+}
+
+/** Corps de l'onglet Fonctionnalités : liste, filtres, fiche, formulaire et relecture (design/screens/S-features.md). */
 function FeaturesTab({ projectId }: { projectId: string }) {
   const page = useFeaturesPage(projectId);
   const { head, projectName } = page.data;
+  const reviewing = page.propose.reviewing;
+  // État Prêt (maquette 10 l.640) : la carte de l'agent porte les deux actions, l'en-tête n'en montre aucune.
+  const agentCard =
+    !reviewing && page.data.view.kind === "empty" && page.propose.enabled && page.form.canWrite;
   return (
     <>
       <FeaturesHeader
         projectId={projectId}
         name={projectName}
         titleRef={page.titleRef}
-        onCreate={page.form.canWrite ? page.form.openCreate : undefined}
+        onCreate={page.form.canWrite && !agentCard ? page.form.openCreate : undefined}
+        proposeAction={
+          page.propose.enabled && !agentCard ? <ProposeEntry page={page} /> : undefined
+        }
         tab="features"
         head={head ?? undefined}
         team={page.team}
       />
-      <PageBody>
-        <div className="flex flex-col gap-4">
-          {page.showVersion && head && !page.team ? (
-            <UpdatedLine indexedAt={head.indexedAt} />
-          ) : null}
-          <div
-            // Une seule région d'état dans le document : sous le formulaire modal, c'est celle du panneau ; avec la
-            // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
-            role={page.form.open || page.region.countBar ? undefined : "status"}
-            aria-busy={page.region.busy || undefined}
-            className="text-meta text-muted-foreground empty:hidden"
-          >
-            {page.form.open ? null : (
-              <>
-                {page.region.countBar ? null : page.region.text}
-                <WriteNotice
-                  write={page.write}
-                  role={page.data.role}
-                  hrefFor={page.sheet.hrefFor}
-                  onOpen={page.url.openFeature}
-                />
-              </>
-            )}
+      {reviewing ? (
+        <>
+          {/* Relecture en bandes pleine largeur sous les onglets (maquette 10 l.114-134), sans le cadre de page. */}
+          <MainView page={page} projectId={projectId} />
+          {page.propose.enabled ? <ProposeDialog launch={page.propose.launch} /> : null}
+        </>
+      ) : (
+        <PageBody>
+          <div className="flex flex-col gap-4">
+            {page.showVersion && head && !page.team ? (
+              <UpdatedLine indexedAt={head.indexedAt} />
+            ) : null}
+            <StatusBlock page={page} />
+            <MainView page={page} projectId={projectId} />
+            {page.propose.enabled ? <ProposeDialog launch={page.propose.launch} /> : null}
+            <Sheet page={page} />
+            <FormSheet page={page} />
           </div>
-          {page.form.open ? null : (
-            <WriteFailure write={page.write} role={page.data.role} onReopen={page.reopenDraft} />
-          )}
-          {page.showFilters ? (
-            <FeaturesFilters
-              status={page.url.status}
-              priority={page.url.priority}
-              onChange={page.filters.onChange}
-              onClear={page.filters.onClear}
-              statusRef={page.filters.statusRef}
-              search={page.search}
-            />
-          ) : null}
-          <Body page={page} />
-          <Sheet page={page} />
-          <FormSheet page={page} />
-        </div>
-      </PageBody>
+        </PageBody>
+      )}
     </>
   );
 }
