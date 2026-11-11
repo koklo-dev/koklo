@@ -167,3 +167,12 @@ export const IDEA_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
  * business lit seulement (aligné sur `COMMENT_WRITE_ROLES`, CDC §14). La publication relève de `SPEC_BATCH_ROLES`.
  */
 export const IDEA_WRITE_ROLES = ["owner", "admin", "dev", "designer", "client"] as const;
+
+/**
+ * Créer une organisation (`organization.create`, TK-55) : le rôle est PAR organisation. Autorisé à
+ * qui n'a aucune appartenance (premier compte) ou au moins une appartenance d'équipe ; refusé à qui
+ * n'est que `client`, ou n'a que des rôles hors de la liste fermée `STAFF_ROLES` (fail-closed).
+ */
+export function mayCreateOrganization(roles: readonly string[]): boolean {
+  return roles.length === 0 || roles.some((role) => STAFF_ROLES.some((staff) => staff === role));
+}

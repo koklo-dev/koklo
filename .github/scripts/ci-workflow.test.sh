@@ -46,7 +46,7 @@ ci_accepts_e2e_skipped() { ! job_block ci | grep -Eq "needs\\.e2e\\.result != 's
 
 # T1.3
 check "checkout v7.0.1" g 'actions/checkout@v7\.0\.1'
-check "pnpm/action-setup v6.1.0" g 'pnpm/action-setup@v6\.1\.0'
+check "pnpm/action-setup v6.1.1" g 'pnpm/action-setup@v6\.1\.1'
 check "setup-node v7.1.0" g 'actions/setup-node@v7\.1\.0'
 check "aucune action non épinglée" no_unpinned
 check "permissions contents: read" g '^  contents: read'
@@ -93,7 +93,7 @@ check "job e2e présent" g '^  e2e:'
 check "e2e: dépend de changes" in_e2e 'needs:.*changes'
 check "e2e: déclenché par outputs.code" in_e2e "needs\.changes\.outputs\.code == 'true'"
 check "e2e: checkout épinglé" in_e2e 'actions/checkout@v7\.0\.1'
-check "e2e: pnpm/action-setup épinglé" in_e2e 'pnpm/action-setup@v6\.1\.0'
+check "e2e: pnpm/action-setup épinglé" in_e2e 'pnpm/action-setup@v6\.1\.1'
 check "e2e: setup-node épinglé" in_e2e 'actions/setup-node@v7\.1\.0'
 check "e2e: install --frozen-lockfile" in_e2e 'pnpm install --frozen-lockfile'
 check "e2e: installation du navigateur Playwright" in_e2e 'playwright install'

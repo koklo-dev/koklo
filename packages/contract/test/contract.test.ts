@@ -233,6 +233,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "2.6.0",
       "2.7.0",
       "2.8.0",
+      "2.8.1",
       "2.9.0",
     ]);
   });
@@ -402,6 +403,14 @@ describe("CT-10b empreintes figées des versions publiées", () => {
       "ee7c58d839a8bfd6923434499c2410058f5debd4d1c333c8c0bd46f15268b177",
     );
     expect(versions["2.8.0"]).not.toBe(versions["2.7.0"]);
+  });
+
+  it("conserve l'empreinte figée de 2.8.1 (oRPC beta.48 : corps PATCH sprint et ticket en additionalProperties false) : elle ne suit plus le document courant", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["2.8.1"]).toBe(
+      "bc702c01bbafb88216fecbe505496f0290e581342b07c00b15caeb9720c7d756",
+    );
+    expect(versions["2.8.1"]).not.toBe(versions["2.8.0"]);
   });
 
   it("l'empreinte 2.9.0 est celle du document généré et diffère de 2.8.0 (propositions de l'agent, TK-99a)", async () => {
