@@ -12,6 +12,9 @@ updates:
       include: scope
     open-pull-requests-limit: 5
     groups:
+      # Les bêtas oRPC montent ensemble (déclaré avant minor-and-patch : le premier groupe correspondant gagne).
+      orpc:
+        patterns: ["@orpc/*"]
       minor-and-patch:
         update-types: [minor, patch]
 
@@ -32,3 +35,7 @@ updates:
     commit-message:
       prefix: chore
     open-pull-requests-limit: 5
+    # La stack fixe Node 24 LTS (vision §16.1) : pas de montée de version majeure de l'image.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

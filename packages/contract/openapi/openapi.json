@@ -21173,6 +21173,7 @@
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "definitionOfDone": {
                     "type": "string"
@@ -24096,6 +24097,7 @@
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "assignee": {
                     "properties": {
