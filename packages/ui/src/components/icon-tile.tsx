@@ -2,12 +2,13 @@ import type { ComponentProps } from "react";
 import { Icon, type IconName, type IconSize } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 
-export type IconTileSize = 28 | 32 | 36 | 40 | 48;
+export type IconTileSize = 28 | 32 | 34 | 36 | 40 | 48;
 export type IconTileTone = "soft" | "primary" | "success" | "warning";
 
 const SIZE: Record<IconTileSize, { box: string; icon: IconSize }> = {
   28: { box: "size-7 rounded-lg", icon: 18 },
   32: { box: "size-8 rounded-lg", icon: 18 },
+  34: { box: "size-[34px] rounded-card", icon: 18 },
   36: { box: "size-9 rounded-card", icon: 20 },
   40: { box: "size-10 rounded-card", icon: 20 },
   48: { box: "size-12 rounded-xl", icon: 28 },

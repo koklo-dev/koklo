@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactElement } from "react";
+import type { HTMLAttributes, ReactElement, ReactNode } from "react";
 import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { IconTile } from "./icon-tile.tsx";
@@ -18,6 +18,10 @@ export interface EmptyStateProps
   action?: ReactElement;
   /** Au plus une action secondaire, après la principale. */
   secondaryAction?: ReactElement;
+  /** Ligne sous les actions, dans le cadre (ex. `AgentPrivacyNote`, maquette 10 l.102). */
+  note?: ReactNode;
+  /** `framed` : la phrase prend toute la largeur du cadre au lieu de 280 (maquette 10 l.97). */
+  wideDescription?: boolean;
 }
 
 const FRAME: Record<EmptyStateVariant, string> = {
@@ -38,6 +42,8 @@ export function EmptyState({
   bordered = false,
   action,
   secondaryAction,
+  note,
+  wideDescription = false,
   className,
   ...props
 }: EmptyStateProps) {
@@ -59,7 +65,12 @@ export function EmptyState({
         <Icon name={icon} size={28} className="text-muted-foreground" />
       )}
       <p className="text-subsection-title text-foreground">{title}</p>
-      <p className={cn("text-meta text-muted-foreground", variant === "framed" && "max-w-[280px]")}>
+      <p
+        className={cn(
+          "text-meta text-muted-foreground",
+          variant === "framed" && !wideDescription && "max-w-[280px]",
+        )}
+      >
         {description}
       </p>
       {action || secondaryAction ? (
@@ -73,6 +84,7 @@ export function EmptyState({
           {secondaryAction}
         </div>
       ) : null}
+      {note}
     </div>
   );
 }

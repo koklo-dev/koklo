@@ -32,12 +32,15 @@ export function DialogClose(props: ComponentProps<typeof DialogPrimitive.Close>)
 
 export type DialogContentProps = ComponentProps<typeof DialogPrimitive.Content> & {
   closeLabel?: string;
+  /** Position ou taille du bouton Fermer quand l'en-tête n'a pas la hauteur par défaut. */
+  closeClassName?: string;
 };
 
 export function DialogContent({
   className,
   children,
   closeLabel = "Fermer",
+  closeClassName,
   ...props
 }: DialogContentProps) {
   return (
@@ -50,7 +53,7 @@ export function DialogContent({
             icon="close"
             size="sm"
             aria-label={closeLabel}
-            className="absolute right-3 top-3"
+            className={cn("absolute right-3 top-3", closeClassName)}
           />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

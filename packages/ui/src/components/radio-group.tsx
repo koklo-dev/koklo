@@ -52,17 +52,30 @@ type RadioCardProps = Omit<ComponentProps<typeof RadioPrimitive.Item>, "title"> 
   description?: ReactNode;
   /** Pastille facultative à droite du titre. */
   badge?: ReactNode;
+  /** Pastilles collées au titre (« Recommandé », compte) : elles passent à la ligne avec lui. */
+  tags?: ReactNode;
+  /** `compact` : marges 10 12, titre 13/600, description à 1,45 (modale de l'agent, maquette 21 l.127). */
+  density?: "default" | "compact";
 };
 
 /** Carte radio (`role="radio"`) : bouton radio 18 visible, titre 14/600, description 12 muted, choisie = anneau `--primary`. */
-export function RadioCard({ title, description, badge, className, ...props }: RadioCardProps) {
+export function RadioCard({
+  title,
+  description,
+  badge,
+  tags,
+  density = "default",
+  className,
+  ...props
+}: RadioCardProps) {
   const descId = useId();
   return (
     <RadioPrimitive.Item
       data-slot="radio-card"
       aria-describedby={description ? descId : undefined}
       className={cn(
-        "group/radio flex min-w-0 items-start gap-2.5 rounded-card border bg-background p-3 text-left outline-none motion-safe:transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-dashed disabled:border-border-strong disabled:bg-surface disabled:text-muted-foreground data-[state=checked]:border-primary data-[state=checked]:bg-diff-bg data-[state=checked]:ring-1 data-[state=checked]:ring-inset data-[state=checked]:ring-primary",
+        "group/radio flex min-w-0 items-start gap-2.5 rounded-card border bg-background text-left outline-none motion-safe:transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-dashed disabled:border-border-strong disabled:bg-surface disabled:text-muted-foreground data-[state=checked]:border-primary data-[state=checked]:bg-diff-bg",
+        density === "compact" ? "px-3 py-2.5" : "p-3",
         className,
       )}
       {...props}
@@ -70,13 +83,21 @@ export function RadioCard({ title, description, badge, className, ...props }: Ra
       <span
         aria-hidden="true"
         data-slot="radio-card-mark"
-        className="mt-[3px] inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 border-border-strong bg-background group-data-[state=checked]/radio:border-primary"
+        className="mt-px inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 border-border-strong bg-background group-data-[state=checked]/radio:border-primary"
       >
         <RadioPrimitive.Indicator className="block size-2 rounded-full bg-primary" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-        <span className="flex w-full items-center justify-between gap-2 text-body font-semibold">
-          {title}
+        <span className="flex w-full items-center justify-between gap-2">
+          <span
+            className={cn(
+              "flex min-w-0 flex-wrap items-center gap-1.5 font-semibold",
+              density === "compact" ? "text-meta" : "text-body",
+            )}
+          >
+            {title}
+            {tags}
+          </span>
           {badge ? (
             <Pill size="sm" tone="soft">
               {badge}
