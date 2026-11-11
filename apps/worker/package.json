@@ -22,6 +22,7 @@
     "@koklo/db": "workspace:*",
     "@koklo/domain": "workspace:*",
     "@koklo/github": "workspace:*",
+    "@koklo/llm": "workspace:*",
     "@koklo/observability": "workspace:*",
     "@koklo/schema": "workspace:*",
     "pg-boss": "12.38.0",

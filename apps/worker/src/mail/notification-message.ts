@@ -48,6 +48,11 @@ export const NOTIFICATION_COPY: Readonly<
     subject: "Un ticket est bloqué sur Koklo",
     lead: "Un ticket est bloqué et demande votre attention.",
   },
+  // Jamais envoyé par e-mail (`EMAILED_TYPES`) : le dictionnaire reste exhaustif pour le type.
+  "proposal.ready": {
+    subject: "Des propositions de l'agent sont prêtes sur Koklo",
+    lead: "La génération est terminée : des propositions attendent votre relecture.",
+  },
 };
 
 const UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -61,6 +66,7 @@ export const SUBJECT_REF_PATTERNS: Readonly<Record<NotificationSubjectKind, RegE
   ticket: /^TK-[1-9][0-9]*$/,
   baseline: /^baseline-(0|[1-9][0-9]*)$/,
   review: UUID,
+  agent_launch: UUID,
 };
 
 export function isValidSubjectRef(kind: NotificationSubjectKind, ref: string): boolean {

@@ -1,4 +1,4 @@
-/** Types fermés de `notifications.type` (CHECK de TK-51d). */
+/** Types fermés de `notifications.type` (CHECK de TK-51d, étendu par `*_agent_proposals`). */
 export const NOTIFICATION_TYPES = [
   "suggestion.created",
   "suggestion.decided",
@@ -7,10 +7,18 @@ export const NOTIFICATION_TYPES = [
   "baseline.validated",
   "baseline.tagged",
   "ticket.blocked",
+  // TK-99a : un lancement d'agent est terminé alors que l'utilisateur est parti (sans e-mail, B314 h).
+  "proposal.ready",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-export const NOTIFICATION_SUBJECT_KINDS = ["suggestion", "review", "baseline", "ticket"] as const;
+export const NOTIFICATION_SUBJECT_KINDS = [
+  "suggestion",
+  "review",
+  "baseline",
+  "ticket",
+  "agent_launch",
+] as const;
 export type NotificationSubjectKind = (typeof NOTIFICATION_SUBJECT_KINDS)[number];
 
 export const EMAIL_STATES = ["pending", "sent", "skipped", "failed"] as const;

@@ -7,6 +7,7 @@ import {
 import { keyRingOf } from "@koklo/github";
 import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
+import { type AgentProposeOptions, wireAgentPropose } from "./agent-propose/wire.ts";
 import type { WorkerConfig } from "./config.ts";
 import { handleNoop, NOOP_QUEUE } from "./jobs/noop.ts";
 import type { ProjectCreationSettings } from "./jobs/project-creation.ts";
@@ -57,6 +58,8 @@ export interface StartWorkerOptions {
   webhookDelivery?: Partial<WebhookDeliverySettings>;
   /** Essais et concurrence de la file `send-notification-email` (tests : `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
   notificationEmail?: Partial<NotificationEmailSettings>;
+  /** File `agent-propose` (tests : faux `AiProvider` dans `ai`, `{ retryLimit: 1, retryDelaySeconds: 1 }`). */
+  agentPropose?: AgentProposeOptions;
 }
 
 interface MailQueue {
@@ -111,6 +114,13 @@ async function registerDatabaseJobs(
       provider,
     },
     options.projectCreation,
+  );
+  await wireAgentPropose(
+    boss,
+    logger,
+    database,
+    keyRingOf({ encryptionKeyring: config.encryptionKeyring }),
+    options.agentPropose,
   );
   await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
   await registerWebhookPurge(boss, logger, { raw: database, retentionDays });

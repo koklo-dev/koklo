@@ -28,6 +28,8 @@ export {
   UnsafeBaseUrlError,
   type UnsafeBaseUrlReason,
 } from "./common/ssrf.ts";
+export * from "./credentials/index.ts";
+export * from "./proposals/index.ts";
 export * from "./qualification/index.ts";
 export * from "./router/index.ts";
 export { createSdkProvider, SdkLlmProvider, type SdkProviderOptions } from "./sdk/sdk-provider.ts";
