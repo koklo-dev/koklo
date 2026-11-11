@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { AXE_TAGS, CAPTURES_DIR, settle, type Theme } from "./support/helpers.ts";
+import { AXE_TAGS, CAPTURES_DIR, hydrated, settle, type Theme } from "./support/helpers.ts";
 
 /**
  * TK-87 CA2 (cas 2.11), CA4 (cas 4.5) et CA6 (cas 6.1, 6.2) : galerie `/dev/ui` (fiche S-dev-ui).
@@ -19,6 +19,8 @@ async function open(page: Page, theme: Theme): Promise<void> {
   await expect(
     page.getByRole("heading", { level: 1, name: "Galerie des composants" }),
   ).toBeVisible();
+  // La galerie est longue (section 16 : 400 propositions) : avant l'hydratation, un clic est sans effet.
+  await hydrated(page);
   if (theme === "dark") {
     // La galerie a sa propre bascule (hors AppShell) ; avant l'hydratation le clic est sans effet.
     await expect(async () => {

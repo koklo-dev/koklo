@@ -209,7 +209,11 @@ test("T3 webhook : mauvaise signature 401, rejeu du même delivery id sans secon
 });
 
 async function fillFeatureForm(page: Page, title: string): Promise<void> {
-  await page.getByRole("button", { name: "Nouvelle fonctionnalité" }).first().click();
+  // Spec vide : la saisie à la main passe par la carte de l'agent (« Ajouter à la main », TK-99b) ; sinon l'en-tête.
+  await page
+    .getByRole("button", { name: /^(Nouvelle fonctionnalité|Ajouter à la main)$/ })
+    .first()
+    .click();
   const form = page.getByRole("dialog");
   await form.getByRole("textbox", { name: "Titre (obligatoire)" }).fill(title);
   await form.getByRole("combobox", { name: "Priorité (obligatoire)" }).click();
