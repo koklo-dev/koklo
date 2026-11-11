@@ -60,5 +60,6 @@ export function prepareBatch(input: SpecBatchSubmitInput, defaultBranch: string)
     baseSha: input.baseSha ?? null,
     message: input.message ?? null,
     operations,
+    ...(input.proposalIds === undefined ? {} : { proposalIds: [...new Set(input.proposalIds)] }),
   };
 }

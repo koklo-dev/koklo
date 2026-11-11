@@ -29,6 +29,7 @@ import { ProjectAccessModule } from "./project/project-access.module.ts";
 import { ProjectClientModule } from "./project-client/project-client.module.ts";
 import { ProjectOverviewModule } from "./project-overview/project-overview.module.ts";
 import { ProjectStateModule } from "./project-state/project-state.module.ts";
+import { ProposalModule } from "./proposal/proposal.module.ts";
 import { GitProviderModule } from "./repo/git-provider.module.ts";
 import { RepoModule } from "./repo/repo.module.ts";
 import { requestIdFrom } from "./request-context.ts";
@@ -65,6 +66,9 @@ const SETTINGS_MODULES = [MemberModule, InvitationModule, MeModule];
 
 /** Projets (TK-92) : liste, création, coquille, puis la vue d'ensemble. */
 const PROJECT_MODULES = [ProjectModule, ProjectOverviewModule];
+
+/** IA (TK-95) puis propositions de l'agent (TK-99a) : le second dépend du premier. */
+const AI_MODULES = [AiModule, ProposalModule];
 
 @Module({})
 export class AppModule {
@@ -114,7 +118,7 @@ export class AppModule {
         RepoModule,
         InstallationModule,
         LlmCredentialRoutesModule,
-        AiModule,
+        ...AI_MODULES,
         SpecBatchModule,
         IdeaModule,
         SpecReadModule,

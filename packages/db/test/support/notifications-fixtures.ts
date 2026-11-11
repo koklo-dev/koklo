@@ -23,8 +23,16 @@ export const NOTIFICATION_TYPES = [
   "baseline.validated",
   "baseline.tagged",
   "ticket.blocked",
+  // TK-99a : fin de lancement d'agent (migration `*_agent_proposals`).
+  "proposal.ready",
 ] as const;
-export const NOTIFICATION_SUBJECT_KINDS = ["suggestion", "review", "baseline", "ticket"] as const;
+export const NOTIFICATION_SUBJECT_KINDS = [
+  "suggestion",
+  "review",
+  "baseline",
+  "ticket",
+  "agent_launch",
+] as const;
 
 /** Colonnes exactes (`udt_name/is_nullable`) : aucune JSON, aucun texte libre long. */
 export const NOTIFICATION_COLUMNS = {

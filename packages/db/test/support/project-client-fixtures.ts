@@ -15,6 +15,12 @@ export const PROJECT_CLIENT_MODELS = ["ProjectClientAccess"] as const;
 export const PROJECT_VISIT_TABLES = ["project_visits"] as const;
 /** TK-93 : création du dépôt de spec par le worker (une ligne par tentative) et colonne `projects.eu_only`. */
 export const PROJECT_CREATION_TABLES = ["project_creations"] as const;
+/** TK-99a : lancements d'agent, propositions et journal des décisions (migration `*_agent_proposals`). */
+export const AGENT_PROPOSAL_TABLES = [
+  "agent_launches",
+  "agent_proposals",
+  "agent_proposal_decisions",
+] as const;
 /** TK-97 : projets proposés à une invitation, préférences d'e-mail. */
 export const SETTINGS_TABLES = ["invitation_projects", "notification_preferences"] as const;
 

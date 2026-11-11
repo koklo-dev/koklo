@@ -35,7 +35,8 @@ type ConflictReason =
   | "self_role"
   | "self_remove"
   | "creation_running"
-  | "creation_succeeded";
+  | "creation_succeeded"
+  | "proposal_applied";
 
 export const forbidden = () => new ORPCError("FORBIDDEN", { message: "Accès refusé" });
 export const notFound = () => new ORPCError("NOT_FOUND", { message: "Ressource introuvable" });

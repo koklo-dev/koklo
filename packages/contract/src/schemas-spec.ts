@@ -173,7 +173,9 @@ export const specOperationSchema = z.discriminatedUnion("kind", [
   featureDeleteSchema,
 ]);
 
-export const SPEC_BATCH_OPERATIONS_MAX = 50;
+/** 200 opérations par lot depuis 2.9.0 (TK-99a) : un groupe de propositions se soumet en un commit. */
+export const SPEC_BATCH_OPERATIONS_MAX = 200;
+export const SPEC_BATCH_PROPOSALS_MAX = 200;
 /** L'auteur et les trailers du commit viennent de la session : jamais de l'entrée. */
 export const specBatchSubmitInputSchema = z.object({
   projectId: z.uuid(),
@@ -182,6 +184,8 @@ export const specBatchSubmitInputSchema = z.object({
   baseSha: commitShaSchema.optional(),
   message: z.string().max(200).optional(),
   operations: z.array(specOperationSchema).min(1).max(SPEC_BATCH_OPERATIONS_MAX),
+  /** Preuve serveur que les opérations viennent de propositions acceptées du projet (TK-99a, 2.9.0). */
+  proposalIds: z.array(z.uuid()).max(SPEC_BATCH_PROPOSALS_MAX).optional(),
 });
 
 /** Sans `authorUserId` : aucun identifiant interne d'utilisateur n'est exposé. */

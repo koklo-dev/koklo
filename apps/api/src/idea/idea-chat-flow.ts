@@ -1,7 +1,7 @@
 import type { AiIdeaChatEvent, AiIdeaChatInput } from "@koklo/contract";
+import { isSafeText } from "@koklo/schema";
 import { outputInvalid } from "../ai/ai-errors.ts";
 import type { IdeaPromptContext } from "../ai/ai-idea-prompts.ts";
-import { isSafeText } from "../ai/ai-text-policy.ts";
 import type { IdeaAgentContext, IdeaProposalDraft } from "./idea-agent.repository.ts";
 import { hasBlock } from "./idea-markdown-ops.ts";
 

@@ -19,6 +19,7 @@ export { parseFeatureMarkdown } from "./parse/feature-markdown.ts";
 export { parseSpecFiles } from "./parse/files.ts";
 export { type Kind, kindOf } from "./parse/kinds.ts";
 export { parseRuleMarkdown } from "./parse/rule-markdown.ts";
+export * from "./proposals/index.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";
 export { checkSpec, validateSpec } from "./validate.ts";

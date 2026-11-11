@@ -78,6 +78,10 @@ export const expectedTables = [
   "idea_synthesis",
   // TK-93 : création du dépôt de spec par le worker (une ligne par tentative).
   "project_creations",
+  // TK-99a : lancements d'agent, propositions et journal des décisions.
+  "agent_launches",
+  "agent_proposals",
+  "agent_proposal_decisions",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
@@ -94,8 +98,15 @@ export const compositeKeyTables: readonly string[] = [
   "idea_ai_locks",
 ];
 
-/** Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et `audit_log` (jamais modifiée). */
-export const stampExemptTables: readonly string[] = [...compositeKeyTables, "audit_log"];
+/**
+ * Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et journaux jamais modifiés
+ * (`audit_log`, `agent_proposal_decisions` : une ligne par décision, horodatée par `decided_at`).
+ */
+export const stampExemptTables: readonly string[] = [
+  ...compositeKeyTables,
+  "audit_log",
+  "agent_proposal_decisions",
+];
 
 export interface CliResult {
   status: number | null;

@@ -16,6 +16,7 @@ import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import {
+  AGENT_PROPOSAL_TABLES,
   PROJECT_CLIENT_TABLES,
   PROJECT_CREATION_TABLES,
   PROJECT_VISIT_TABLES,
@@ -91,6 +92,7 @@ const LATER_TABLES: readonly string[] = [
   ...PROJECT_CLIENT_TABLES,
   ...PROJECT_VISIT_TABLES,
   ...PROJECT_CREATION_TABLES,
+  ...AGENT_PROPOSAL_TABLES,
   ...SETTINGS_TABLES,
   ...IDEA_TABLES,
   ...IDEA_ENUMS,

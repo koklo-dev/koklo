@@ -10,13 +10,15 @@ export interface SeededVolume {
   tables: number;
   endpoints: number;
   tickets: number;
+  /** Propositions de l'agent (TK-99a) : un lancement terminé et ses propositions, en 3 groupes par zone. */
+  proposals: number;
 }
 
 export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
-  large: { features: 1000, tables: 80, endpoints: 50, tickets: 500 },
+  large: { features: 1000, tables: 80, endpoints: 50, tickets: 500, proposals: 400 },
   // 47 « actions » de la planche = points d'accès ; la planche ne donne aucun volume de tickets,
   // 60 permettent d'exercer le kanban à l'écran (lecture prudente, B34).
-  planche: { features: 248, tables: 65, endpoints: 47, tickets: 60 },
+  planche: { features: 248, tables: 65, endpoints: 47, tickets: 60, proposals: 0 },
 };
 
 /** Volume d'un type de donnée dont le modèle n'existe pas encore, et le ticket qui le créera. */
@@ -25,9 +27,7 @@ export interface PendingVolume {
   ticket: string;
 }
 
-type PendingProfile = Partial<
-  Record<"rules" | "proposals" | "journeys" | "sampleRows", PendingVolume>
->;
+type PendingProfile = Partial<Record<"rules" | "journeys" | "sampleRows", PendingVolume>>;
 
 /**
  * Volumes demandés par les passations pour des modèles absents du schéma : déclarés, jamais insérés
@@ -36,7 +36,6 @@ type PendingProfile = Partial<
 export const PENDING_VOLUMES: Record<VolumeProfile, PendingProfile> = {
   large: {
     rules: { count: 300, ticket: "ticket du lot 5 (règles métier)" },
-    proposals: { count: 400, ticket: "ticket du lot 2 (propositions de l'agent)" },
   },
   planche: {
     rules: { count: 86, ticket: "ticket du lot 5 (règles métier)" },
@@ -54,7 +53,6 @@ export const PENDING_MODELS: readonly string[] = [
   "BusinessRule",
   "Rule",
   "Proposal",
-  "AgentProposal",
   "SpecProposal",
   "Journey",
   "SpecJourney",

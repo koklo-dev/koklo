@@ -17,6 +17,7 @@ import { credentialRows } from "./helpers/llm-credential-routes.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { insertActor, startQueueBoss } from "./helpers/organizations.ts";
 import { linkRows, projectClientApi } from "./helpers/project-client.ts";
+import { freezeIdea, insertProposal, PROPOSAL_ROUTES } from "./helpers/proposals.ts";
 import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import { reviewApi } from "./helpers/reviews.ts";
@@ -158,6 +159,7 @@ const WRITE_GROUPS = [
   "installation",
   "llmCredential",
   "ai",
+  "proposal",
   "aiProvider",
   "aiUsage",
   "aiSettings",
@@ -208,7 +210,9 @@ const EXPECTED_WRITE_PROCEDURES = [
   "ai.ideaGaps",
   "ai.ideaSynthesis",
   "ai.proposeCriteria",
+  "ai.proposeDeliverable",
   "ai.proposeFeatures",
+  "ai.reviseProposal",
   "aiProvider.add",
   "aiProvider.remove",
   "aiProvider.replaceKey",
@@ -245,6 +249,8 @@ const EXPECTED_WRITE_PROCEDURES = [
   "projectClient.add",
   "projectClient.remove",
   "projectState.update",
+  "proposal.decide",
+  "proposal.decideMany",
   "repo.createSpec",
   "repo.link",
   "review.submit",
@@ -1043,8 +1049,133 @@ const SCENARIOS: Scenario[] = [
   ...suggestionScenarios(),
   ...reviewScenarios(),
   ...aiScenarios(),
+  ...proposalScenarios(),
   ...aiProviderScenarios(),
 ];
+
+/**
+ * TK-99a : lancement, révision et décisions sur les propositions de l'agent. Le lancement écrit sa ligne d'audit
+ * (une par lancement) via le quota, la révision aussi ; chaque décision écrit la sienne dans sa transaction.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+function proposalScenarios(): Scenario[] {
+  const appOf = async () => (await repoRuntimeOf()).app;
+  const key = makeSentinel();
+  const keyed = async (ctx: Ctx) => {
+    await send(await appOf(), ctx.world.actors.owner.cookie, "put", "/llm-credentials/anthropic", {
+      provider: "anthropic",
+      apiKey: key,
+    });
+  };
+  const scope = (ctx: Ctx) => ({
+    organizationId: ctx.world.organizationId,
+    projectId: ctx.world.projectId,
+  });
+  const as = async (
+    ctx: Ctx,
+    role: Role,
+    method: "get" | "post",
+    path: string,
+    body?: Record<string, unknown>,
+  ) => send(await appOf(), ctx.world.actors[role].cookie, method, path, body);
+  const ofProposal = (action: string, targetKind: string, targetId: string): Expected => ({
+    action,
+    targetKind,
+    targetId,
+    ticketId: null,
+  });
+  return [
+    {
+      procedure: "ai.proposeDeliverable",
+      role: "dev",
+      prepare: async (ctx) => {
+        await keyed(ctx);
+        await freezeIdea(database, scope(ctx));
+        return {};
+      },
+      call: (ctx) =>
+        as(ctx, "dev", "post", PROPOSAL_ROUTES.propose(ctx.world.projectId), {
+          projectId: ctx.world.projectId,
+          deliverable: "functional",
+          mode: "complete",
+        }),
+      expected: async (_ctx, _state, response) =>
+        ofProposal("ai.deliverable.propose", "agent_launch", String(response.body.launchId)),
+      denied: (ctx) =>
+        as(ctx, "business", "post", PROPOSAL_ROUTES.propose(ctx.world.projectId), {
+          projectId: ctx.world.projectId,
+          deliverable: "functional",
+          mode: "complete",
+        }),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "ai.reviseProposal",
+      role: "dev",
+      prepare: async (ctx) => {
+        await keyed(ctx);
+        return insertProposal(database, scope(ctx));
+      },
+      call: (ctx, state) =>
+        as(ctx, "dev", "post", PROPOSAL_ROUTES.revise(ctx.world.projectId, state.id), {
+          projectId: ctx.world.projectId,
+          proposalId: state.id,
+          instruction: "Plus court",
+        }),
+      expected: async (_ctx, state) => ofProposal("ai.proposal.revise", "agent_proposal", state.id),
+      denied: (ctx, state) =>
+        as(ctx, "client", "post", PROPOSAL_ROUTES.revise(ctx.world.projectId, state.id), {
+          projectId: ctx.world.projectId,
+          proposalId: state.id,
+          instruction: "Plus court",
+        }),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "proposal.decide",
+      role: "dev",
+      prepare: (ctx) => insertProposal(database, scope(ctx)),
+      call: (ctx, state) =>
+        as(ctx, "dev", "post", PROPOSAL_ROUTES.decide(ctx.world.projectId, state.id), {
+          projectId: ctx.world.projectId,
+          proposalId: state.id,
+          decision: "accept",
+        }),
+      expected: async (_ctx, state) => ofProposal("proposal.decide", "agent_proposal", state.id),
+      denied: (ctx, state) =>
+        as(ctx, "business", "post", PROPOSAL_ROUTES.decide(ctx.world.projectId, state.id), {
+          projectId: ctx.world.projectId,
+          proposalId: state.id,
+          decision: "accept",
+        }),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "proposal.decideMany",
+      role: "dev",
+      prepare: (ctx) => insertProposal(database, scope(ctx)),
+      call: (ctx, state) =>
+        as(ctx, "dev", "post", PROPOSAL_ROUTES.decideMany(ctx.world.projectId), {
+          projectId: ctx.world.projectId,
+          launchId: state.launchId,
+          group: "all",
+          decision: "accept",
+          expectedPending: 1,
+        }),
+      expected: async (_ctx, state) =>
+        ofProposal("proposal.decideMany", "agent_launch", state.launchId),
+      denied: (ctx, state) =>
+        as(ctx, "client", "post", PROPOSAL_ROUTES.decideMany(ctx.world.projectId), {
+          projectId: ctx.world.projectId,
+          launchId: state.launchId,
+          group: "all",
+          decision: "accept",
+          expectedPending: 1,
+        }),
+      deniedStatuses: [403],
+    },
+  ];
+}
 
 /**
  * TK-54b : propositions IA et vérification de clé. Chaque appel (modèle simulé) produit exactement une
@@ -1500,7 +1631,7 @@ describe("écritures hors journal (TK-88)", () => {
 });
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 47 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement les 51 attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 

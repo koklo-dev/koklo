@@ -63,9 +63,9 @@ describe("TK-93 migration project_creations : dossier et contenu", () => {
     expect(down).not.toMatch(/DROP\s+(?:TYPE|FUNCTION|TRIGGER)/i);
   });
 
-  it("expectedTables contient la table (57 au total)", () => {
+  it("expectedTables contient la table (60 au total)", () => {
     expect(expectedTables).toContain(TABLE);
-    expect(expectedTables).toHaveLength(57);
+    expect(expectedTables).toHaveLength(60);
   });
 
   it("le modèle ProjectCreation est un modèle d'organisation", () => {

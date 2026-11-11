@@ -1,4 +1,10 @@
 export type {
+  AgentProposal,
+  AiProposeDeliverableInput,
+  AiProposeDeliverableOutput,
+  AiProposeOptionsInput,
+  AiProposeOptionsOutput,
+  AiReviseProposalInput,
   AuditEntry,
   CommentCreateInput,
   CommentOutput,
@@ -48,6 +54,11 @@ export type {
   ProjectListOutput,
   ProjectStateOutput,
   ProjectStateUpdateInput,
+  ProposalDecideInput,
+  ProposalDecideManyInput,
+  ProposalDecideManyOutput,
+  ProposalListInput,
+  ProposalListOutput,
   RepoOutput,
   Role,
   SpecBatchOutput,
@@ -79,6 +90,8 @@ export {
   leaseHeldError,
   leaseNotHolderError,
   notFoundError,
+  proposalCountChangedError,
+  proposalInProgressError,
   providerAuthExpiredError,
   providerErrors,
   providerRateLimitedError,
@@ -123,6 +136,7 @@ export * from "./schemas-llm-credential.ts";
 export * from "./schemas-overview.ts";
 export * from "./schemas-project-client.ts";
 export * from "./schemas-projects.ts";
+export * from "./schemas-proposals.ts";
 export * from "./schemas-provider.ts";
 export * from "./schemas-review.ts";
 export * from "./schemas-settings.ts";

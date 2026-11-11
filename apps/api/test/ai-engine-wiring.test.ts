@@ -133,10 +133,9 @@ describe("clés d'IA de l'organisation : inaccessibles aux agents de code", () =
     }
   });
 
-  it("le résolveur de clés n'est référencé que par la liste blanche (moteur et service de clés)", () => {
+  it("le résolveur de clés n'est référencé que par la liste blanche (moteur et service de clés ; la porte de clé du moteur vit désormais dans @koklo/llm)", () => {
     const allowed = [
       "src/ai/ai.module.ts",
-      "src/ai/prisma-ai-credential-source.ts",
       "src/llm-credential/credential-probe.ts",
       "src/llm-credential/llm-credential.module.ts",
       "src/llm-credential/llm-credential.resolver.ts",

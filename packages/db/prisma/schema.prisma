@@ -202,6 +202,8 @@ model Project {
   ideaVersions       IdeaVersion[]
   ideaSyntheses      IdeaSynthesis[]
   invitationProjects InvitationProject[]
+  agentLaunches      AgentLaunch[]
+  agentProposals     AgentProposal[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -1688,4 +1690,84 @@ model ProjectCreation {
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, projectId, createdAt(sort: Desc)])
   @@map("project_creations")
+}
+
+/// Lancement d'agent (TK-99a, B314) : une génération de propositions pour un livrable, suivie par le worker. Un seul
+/// lancement actif (`queued`/`running`) par (projet, livrable), imposé par l'index unique partiel
+/// `agent_launches_one_active` (écrit à la main : Prisma ne modélise pas les index partiels). `requestedBy` sans clé
+/// étrangère (RGPD). `sources` : liste des lectures de l'agent, en JSONB (aucune colonne liste, incident 6). Les listes fermées et les bornes sont des CHECK écrits à la main.
+model AgentLaunch {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  projectId       String    @map("project_id") @db.Uuid
+  deliverable     String
+  mode            String
+  instruction     String?
+  status          String
+  errorCode       String?   @map("error_code")
+  requestedBy     String    @map("requested_by") @db.Uuid
+  sources         Json      @default("[]") @db.JsonB
+  baseVersion     Int?      @map("base_version")
+  discardedCount  Int       @default(0) @map("discarded_count")
+  proposedCount   Int       @default(0) @map("proposed_count")
+  heartbeatAt     DateTime  @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
+  lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz(3)
+  startedAt       DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt      DateTime? @map("finished_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project   Project         @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  proposals AgentProposal[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, projectId, deliverable, createdAt(sort: Desc)])
+  @@map("agent_launches")
+}
+
+/// Proposition de l'agent (TK-99a) : une charge JSON par type (`kind`), relue puis décidée par un humain. `deliverable` et
+/// `projectId` sont dénormalisés depuis le lancement pour l'index de liste. `appliedBatchId` : le lot de spec qui l'a
+/// appliquée (seulement si `accepted`, CHECK) ; une proposition appliquée n'est plus modifiable.
+model AgentProposal {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  launchId       String   @map("launch_id") @db.Uuid
+  deliverable    String
+  kind           String
+  zone           String
+  position       Int
+  title          String
+  rationale      String
+  payload        Json     @db.JsonB
+  status         String   @default("pending")
+  appliedBatchId String?  @map("applied_batch_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project   Project                 @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  launch    AgentLaunch             @relation(fields: [organizationId, launchId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  decisions AgentProposalDecision[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, launchId, position, id])
+  @@index([projectId, deliverable, status, kind, zone, id], map: "agent_proposals_list_idx")
+  @@map("agent_proposals")
+}
+
+/// Journal des décisions sur une proposition (TK-99a) : une ligne par décision, jamais modifiée. `decidedBy` sans clé
+/// étrangère (RGPD) ; `edited` : la charge a été corrigée avant l'acceptation.
+model AgentProposalDecision {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  proposalId     String   @map("proposal_id") @db.Uuid
+  decision       String
+  decidedBy      String   @map("decided_by") @db.Uuid
+  decidedAt      DateTime @default(now()) @map("decided_at") @db.Timestamptz(3)
+  edited         Boolean  @default(false)
+
+  proposal AgentProposal @relation(fields: [organizationId, proposalId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([organizationId, proposalId, decidedAt])
+  @@map("agent_proposal_decisions")
 }

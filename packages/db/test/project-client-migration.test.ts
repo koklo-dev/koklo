@@ -126,7 +126,7 @@ describe("TK-55a migration project_client_access : dossier et contenu", () => {
 
   it("expectedTables contient la table (56 au total avec TK-91)", () => {
     for (const table of PROJECT_CLIENT_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(57);
+    expect(expectedTables).toHaveLength(60);
   });
 });
 

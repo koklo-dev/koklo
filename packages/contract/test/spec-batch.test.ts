@@ -55,12 +55,12 @@ describe("B1 specBatch.submit : enveloppe", () => {
     expect(await isValid(i(), submit({ message: "a".repeat(200) }))).toBe(true);
     expect(await isValid(i(), submit({ message: "a".repeat(201) }))).toBe(false);
   });
-  it("1 à 50 opérations", async () => {
+  it("1 à 200 opérations (TK-99a)", async () => {
     expect(await isValid(i(), submit({ operations: [] }))).toBe(false);
     expect(await isValid(i(), submit({ operations: undefined }))).toBe(false);
     expect(await isValid(i(), submit({ operations: ops(1) }))).toBe(true);
-    expect(await isValid(i(), submit({ operations: ops(50) }))).toBe(true);
-    expect(await isValid(i(), submit({ operations: ops(51) }))).toBe(false);
+    expect(await isValid(i(), submit({ operations: ops(200) }))).toBe(true);
+    expect(await isValid(i(), submit({ operations: ops(201) }))).toBe(false);
   });
   it("ne lit jamais l'auteur ni les trailers du commit (posés par le serveur)", async () => {
     const value = await parsed(

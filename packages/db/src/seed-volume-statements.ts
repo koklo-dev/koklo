@@ -1,4 +1,4 @@
-import { SEED_DATE } from "./seed-data.ts";
+import { SEED_DATE, SEED_IDS } from "./seed-data.ts";
 import type { SeedStatement } from "./seed-statements.ts";
 import { SEED_VOLUMES, type VolumeProfile } from "./seed-volumes.ts";
 
@@ -211,6 +211,50 @@ function trackerStatements(profile: VolumeProfile, target: VolumeTarget): SeedSt
   return sql.map((statement) => statementOf(statement, target));
 }
 
+/** Zones du jeu de propositions : 120 + 140 + 140, toutes au-delà du seuil de 30 qui déclenche le groupement. */
+const PROPOSAL_ZONES = [
+  { zone: "Réservations", kind: "feature", last: 120 },
+  { zone: "Paiements", kind: "feature", last: 260 },
+  { zone: "Facturation", kind: "criteria", last: 400 },
+] as const;
+
+const PROPOSAL_STEPS = `jsonb_build_array(
+  jsonb_build_object('type', 'etant_donne', 'text', 'un client connecté'),
+  jsonb_build_object('type', 'quand', 'text', 'il ouvre la page'),
+  jsonb_build_object('type', 'alors', 'text', 'il voit le résultat'))`;
+
+/**
+ * Lancement terminé et 400 propositions de l'agent (TK-99a) : trois groupes de plus de 30 par zone, 70 % en
+ * attente, 20 % acceptées, 10 % refusées. Les charges respectent les schémas par type (feature, criteria).
+ */
+function proposalStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
+  const total = SEED_VOLUMES[profile].proposals;
+  if (total === 0) return [];
+  const at = "$3::timestamptz";
+  const zone = `CASE ${PROPOSAL_ZONES.map(({ zone: name, last }) => `WHEN n <= ${last} THEN '${name}'`).join(" ")} END`;
+  const title = `${pick(VERBS, "n % 9")} || ' ' || ${pick(NOUNS, "(n / 9) % 10")} || ' (proposition ' || n || ')'`;
+  const criterion = `jsonb_build_array(jsonb_build_object('title', 'Affichage du résultat', 'steps', ${PROPOSAL_STEPS}))`;
+  const payload = `CASE WHEN n > ${PROPOSAL_ZONES[1].last}
+         THEN jsonb_build_object('specId', 'F-' || ${pad("(n - 260)")}, 'criteria', ${criterion})
+         ELSE jsonb_build_object('title', ${title}, 'priority', 'should', 'description', 'Jeu de volume', 'criteria', ${criterion}) END`;
+  const sql = [
+    `INSERT INTO agent_launches (id, organization_id, project_id, deliverable, mode, status, requested_by, sources,
+        proposed_count, discarded_count, heartbeat_at, last_seen_at, started_at, finished_at, created_at, updated_at)
+     VALUES (${own("launch")}, $2, $1::uuid, 'functional', 'complete', 'done', '${SEED_IDS.adminUser}',
+        '["idea.frozen", "idea.synthesis", "idea.risks", "functional.current"]'::jsonb, ${total}, 0, ${at}, ${at}, ${at}, ${at}, ${at}, ${at})
+     ON CONFLICT (id) DO UPDATE SET proposed_count = EXCLUDED.proposed_count`,
+    `INSERT INTO agent_proposals (id, organization_id, project_id, launch_id, deliverable, kind, zone, position, title,
+        rationale, payload, status, created_at, updated_at)
+     SELECT ${nth("proposal")}, $2, $1::uuid, ${own("launch")}, 'functional',
+            CASE WHEN n > ${PROPOSAL_ZONES[1].last} THEN 'criteria' ELSE 'feature' END, ${zone}, n, ${title},
+            'Absent du cahier actuel', ${payload},
+            CASE WHEN n % 10 < 2 THEN 'accepted' WHEN n % 10 = 2 THEN 'rejected' ELSE 'pending' END, ${at}, ${at}
+       FROM generate_series(1, ${total}) AS n
+     ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payload = EXCLUDED.payload`,
+  ];
+  return sql.map((statement) => statementOf(statement, target));
+}
+
 /** Toutes les instructions d'un profil dans l'ordre des clés étrangères (le projet existe déjà). */
 export function buildVolumeStatements(
   profile: VolumeProfile,
@@ -220,5 +264,6 @@ export function buildVolumeStatements(
     ...repositoryStatements(target),
     ...specStatements(profile, target),
     ...trackerStatements(profile, target),
+    ...proposalStatements(profile, target),
   ];
 }

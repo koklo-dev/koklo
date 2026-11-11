@@ -18,6 +18,8 @@ export interface PreparedBatch {
   baseSha: string | null;
   message: string | null;
   operations: PreparedOperation[];
+  /** Propositions de l'agent que le lot applique (TK-99a) : `accepted`, du projet, pas encore appliquées. */
+  proposalIds?: readonly string[];
 }
 
 export interface BatchRecord {

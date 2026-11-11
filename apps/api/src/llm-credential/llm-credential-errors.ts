@@ -8,21 +8,7 @@ export class LlmCredentialStoreError extends Error {
   }
 }
 
-export type LlmCredentialUnavailableReason =
-  | "missing"
-  | "invalidated"
-  | "undecryptable"
-  | "no-encryption-key";
-
-/** `resolve` ne peut pas rendre de clé ; ne porte ni clé ni organisation. */
-export class LlmCredentialUnavailableError extends Error {
-  readonly reason: LlmCredentialUnavailableReason;
-  constructor(reason: LlmCredentialUnavailableReason) {
-    super(`Clé de fournisseur LLM indisponible (${reason})`);
-    this.name = "LlmCredentialUnavailableError";
-    this.reason = reason;
-  }
-}
+export { LlmCredentialUnavailableError, type LlmCredentialUnavailableReason } from "@koklo/llm";
 
 /** Aucun porte-clés configuré : `set` est impossible (503 `ENCRYPTION_UNAVAILABLE` en 52b). */
 export class EncryptionUnavailableError extends Error {

@@ -1,7 +1,9 @@
 import { eventIterator } from "@orpc/contract";
 import {
+  conflictOf,
   encryptionUnavailableError,
   notFoundError,
+  proposalInProgressError,
   providerErrors,
   specIndexFailedError,
   validationError,
@@ -29,6 +31,14 @@ import {
   aiProposeFeaturesOutputSchema,
 } from "./schemas-ai.ts";
 import { ideaSynthesisSchema } from "./schemas-idea.ts";
+import {
+  aiProposeDeliverableInputSchema,
+  aiProposeDeliverableOutputSchema,
+  aiProposeOptionsInputSchema,
+  aiProposeOptionsOutputSchema,
+  aiReviseProposalInputSchema,
+  proposalSchema,
+} from "./schemas-proposals.ts";
 
 /** Erreurs d'un appel au modèle, partagées par `ai.*` et `llmCredential.verify`. */
 export const llmCallErrors = {
@@ -84,4 +94,23 @@ export const ai = {
     .errors(proposalErrors)
     .input(aiIdeaSynthesisInputSchema)
     .output(ideaSynthesisSchema),
+  /**
+   * Lancement d'une génération de propositions (TK-99a, 2.9.0) : rapide (refus du moteur, quota et audit avant,
+   * verrou en base, tâche de fond) ; la génération se lit ensuite par `proposal.list`. 409 PROPOSAL_IN_PROGRESS si un
+   * lancement est déjà actif pour ce livrable.
+   */
+  proposeDeliverable: route("POST", "/projects/{projectId}/ai/deliverable/propose")
+    .errors({ ...proposalErrors, ...proposalInProgressError })
+    .input(aiProposeDeliverableInputSchema)
+    .output(aiProposeDeliverableOutputSchema),
+  /** Options du popover « Proposer » : comptes calculés en base, ce que l'agent lit, disponibilité. */
+  proposeOptions: route("GET", "/projects/{projectId}/ai/deliverable/options")
+    .errors({ ...writeErrors, ...notFoundError, ...validationError })
+    .input(aiProposeOptionsInputSchema)
+    .output(aiProposeOptionsOutputSchema),
+  /** Révise UNE proposition (appel synchrone, texte brut) : elle reste en attente et n'entre jamais dans la spec. */
+  reviseProposal: route("POST", "/projects/{projectId}/ai/proposals/{proposalId}/revise")
+    .errors({ ...proposalErrors, ...conflictOf("proposal_applied") })
+    .input(aiReviseProposalInputSchema)
+    .output(proposalSchema),
 };

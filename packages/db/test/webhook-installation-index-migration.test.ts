@@ -18,6 +18,7 @@ import { LONG_LISTS_INDEXES } from "./support/long-lists-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import {
+  AGENT_PROPOSAL_TABLES,
   PROJECT_CLIENT_TABLES,
   PROJECT_CREATION_TABLES,
   PROJECT_VISIT_TABLES,
@@ -122,6 +123,7 @@ const LATER_OBJECTS: readonly string[] = [
   ...PROJECT_CLIENT_TABLES,
   ...PROJECT_VISIT_TABLES,
   ...PROJECT_CREATION_TABLES,
+  ...AGENT_PROPOSAL_TABLES,
   ...SETTINGS_TABLES,
   ...IDEA_TABLES,
   ...IDEA_ENUMS,
@@ -166,7 +168,7 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
   });
 
   it("cette migration n'ajoute aucune table (50 attendues au total avec TK-97)", () => {
-    expect(expectedTables).toHaveLength(57);
+    expect(expectedTables).toHaveLength(60);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });

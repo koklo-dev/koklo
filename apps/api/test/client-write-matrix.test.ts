@@ -44,7 +44,10 @@ const OWN_ONLY = ["comment.delete"];
 const DENIED = [
   "ai.draftBrief",
   "ai.proposeCriteria",
+  // TK-99a (contrat 2.9.0) : lancer, réviser et décider les propositions de l'agent relèvent de l'équipe.
+  "ai.proposeDeliverable",
   "ai.proposeFeatures",
+  "ai.reviseProposal",
   // TK-98 (contrat 2.3.0) : fournisseurs d'IA, réglages et plafond, owner et admin seulement.
   "aiProvider.add",
   "aiProvider.remove",
@@ -78,6 +81,8 @@ const DENIED = [
   "org.update",
   // TK-55 (décision du 2026-11-06) : un compte qui n'est que client ne crée pas d'organisation.
   "organization.create",
+  "proposal.decide",
+  "proposal.decideMany",
   "project.create",
   "project.retryRepo",
   "project.setEuOnly",
@@ -376,4 +381,56 @@ describe("TK-91 : le passage au cadrage et la Synthèse relèvent de l'équipe (
     });
     expect([403, 404]).toContain(res.status);
   });
+});
+
+describe("TK-99a : les propositions de l'agent relèvent de l'équipe (SPEC_BATCH_ROLES), client et business : 403 partout", () => {
+  const AGENT_ROUTES = [
+    "ai.proposeDeliverable",
+    "ai.proposeOptions",
+    "ai.reviseProposal",
+    "proposal.list",
+    "proposal.decide",
+    "proposal.decideMany",
+  ];
+  const AGENT_WRITES = AGENT_ROUTES.filter(
+    (name) => !["ai.proposeOptions", "proposal.list"].includes(name),
+  );
+
+  it("les six routes existent ; les quatre écritures sont classées interdites au client, les deux lectures sont des GET", () => {
+    const all = routes();
+    for (const name of AGENT_ROUTES)
+      expect(
+        all.map((r) => r.name),
+        name,
+      ).toContain(name);
+    for (const name of AGENT_WRITES) {
+      expect(writes().map((r) => r.name)).toContain(name);
+      expect(DENIED).toContain(name);
+      expect(ALLOWED).not.toContain(name);
+    }
+    for (const name of ["ai.proposeOptions", "proposal.list"]) {
+      expect(all.find((r) => r.name === name)?.method).toBe("GET");
+    }
+  });
+
+  it.each(AGENT_ROUTES)(
+    "%s : 403 FORBIDDEN pour le client lié et pour le business",
+    async (name) => {
+      const route = routes().find((r) => r.name === name);
+      const business = await insertActor(bench().database, scene.p1.organizationId, "business");
+      const method = (route?.method ?? "GET").toLowerCase() as HttpMethod;
+      for (const actor of [scene.c1, business]) {
+        const path = fill(route?.path ?? "");
+        const res = await send(
+          bench().app,
+          actor.cookie,
+          method,
+          method === "get" ? `${path}?deliverable=functional&groupBy=type` : path,
+          method === "get" ? undefined : {},
+        );
+        expect(res.status, `${name} : ${res.text}`).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
+      }
+    },
+  );
 });

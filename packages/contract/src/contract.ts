@@ -7,6 +7,7 @@ import { idea } from "./contract-idea.ts";
 import { llmCredential } from "./contract-llm-credential.ts";
 import { projectCards } from "./contract-project-cards.ts";
 import { projectClient } from "./contract-project-client.ts";
+import { proposal } from "./contract-proposals.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { review } from "./contract-review.ts";
 import { invitation, me, memberSettings, org } from "./contract-settings.ts";
@@ -73,6 +74,19 @@ import type {
   ideaVersionSchema,
 } from "./schemas-idea.ts";
 import type { projectClientSchema } from "./schemas-project-client.ts";
+import type {
+  aiProposeDeliverableInputSchema,
+  aiProposeDeliverableOutputSchema,
+  aiProposeOptionsInputSchema,
+  aiProposeOptionsOutputSchema,
+  aiReviseProposalInputSchema,
+  proposalDecideInputSchema,
+  proposalDecideManyInputSchema,
+  proposalDecideManyOutputSchema,
+  proposalListInputSchema,
+  proposalListOutputSchema,
+  proposalSchema,
+} from "./schemas-proposals.ts";
 import type { installationSchema, repoSchema } from "./schemas-provider.ts";
 import type {
   invitationCreateInputSchema,
@@ -166,6 +180,7 @@ export const contract = {
   installation,
   llmCredential,
   ai,
+  proposal,
   aiProvider,
   aiModel,
   aiUsage,
@@ -238,3 +253,14 @@ export type IdeaMaturity = z.output<typeof ideaMaturitySchema>;
 export type IdeaVersionInfo = z.output<typeof ideaVersionSchema>;
 export type IdeaFreezeOutput = z.output<typeof ideaFreezeOutputSchema>;
 export type IdeaSynthesis = z.output<typeof ideaSynthesisSchema>;
+export type AiProposeDeliverableInput = z.input<typeof aiProposeDeliverableInputSchema>;
+export type AiProposeDeliverableOutput = z.output<typeof aiProposeDeliverableOutputSchema>;
+export type AiProposeOptionsInput = z.input<typeof aiProposeOptionsInputSchema>;
+export type AiProposeOptionsOutput = z.output<typeof aiProposeOptionsOutputSchema>;
+export type AiReviseProposalInput = z.input<typeof aiReviseProposalInputSchema>;
+export type AgentProposal = z.output<typeof proposalSchema>;
+export type ProposalListInput = z.output<typeof proposalListInputSchema>;
+export type ProposalListOutput = z.output<typeof proposalListOutputSchema>;
+export type ProposalDecideInput = z.input<typeof proposalDecideInputSchema>;
+export type ProposalDecideManyInput = z.input<typeof proposalDecideManyInputSchema>;
+export type ProposalDecideManyOutput = z.output<typeof proposalDecideManyOutputSchema>;
