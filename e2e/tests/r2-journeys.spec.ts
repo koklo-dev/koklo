@@ -165,8 +165,13 @@ test("T2 le push de la branche cadrage construit l'index de la spec", async ({ p
   expect(sha).toMatch(SHA);
 
   await page.reload();
+  // Spec lue et vide : l'équipe voit la carte de l'agent (TK-99b), ou l'état vide simple si l'agent est indisponible.
   await expect(
-    page.getByRole("heading", { name: "Aucune fonctionnalité pour le moment" }),
+    page
+      .getByText(
+        /^(L'agent peut proposer le cahier fonctionnel|Aucune fonctionnalité pour le moment)$/,
+      )
+      .first(),
   ).toBeVisible();
   await owner.dispose();
 });
