@@ -13,6 +13,7 @@ import { handleKanban, type KanbanRole, type KanbanScenario, resetKanban } from 
 import { resetMembers } from "./stub-members.ts";
 import { handleOverview, type OverviewScenario } from "./stub-overview.ts";
 import { handleProjectCards, type ProjectsCardsScenario } from "./stub-projects.ts";
+import { handleProposals, type ProposalsScenario, resetProposals } from "./stub-proposals.ts";
 import { handleSettings, resetSettings, type SettingsScenario } from "./stub-settings.ts";
 import { handleShell, resetShell, type ShellScenario } from "./stub-shell.ts";
 import {
@@ -43,6 +44,7 @@ type Scenario = {
   SpecRepoScenario &
   FeaturesScenario &
   AiScenario &
+  ProposalsScenario &
   ProvidersScenario &
   ShellScenario &
   OverviewScenario &
@@ -169,6 +171,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetSpecRepo();
     resetFeatures();
     resetAi();
+    resetProposals(scenario);
     resetProviders();
     resetSettings();
     resetMembers();
@@ -196,6 +199,7 @@ const knownProject = (id: string) => allProjects().some((project) => project.id 
 const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
   handleSettings(req, url, { scenario, send, projects: allProjects }) ||
   handleProviders(req, url, { scenario, send, hold }) ||
+  handleProposals(req, url, { scenario, send }) ||
   handleAi(req, url, { scenario, knownProject, send, hold }) ||
   handleOverview(req, url, { scenario, send, hold }) ||
   handleShell(req, url, { scenario, projects: allProjects, send, hold });

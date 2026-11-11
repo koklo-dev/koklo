@@ -102,13 +102,13 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
     );
   });
 
-  it("actions de l'équipe : « Cadrer avec l'IA » (secondaire) puis « Nouvelle fonctionnalité » (principale)", () => {
-    renderHeader();
-    expect(screen.getByRole("link", { name: /Cadrer avec l'IA/ })).toHaveAttribute(
-      "href",
-      `/projects/${ID}/framing`,
-    );
+  it("actions de l'équipe : « Proposer avec l'agent » en premier, « Nouvelle fonctionnalité » en contour ; plus de lien de cadrage", () => {
+    renderHeader({ proposeAction: <button type="button">Proposer avec l'agent</button> });
+    // L'agent est dans la zone visuellement première (order-1), « Nouvelle fonctionnalité » dans la seconde.
+    const first = screen.getByRole("button", { name: "Proposer avec l'agent" }).parentElement;
+    expect(first).toHaveClass("order-1");
     expect(screen.getByRole("button", { name: /Nouvelle fonctionnalité/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Cadrer avec l'IA/ })).toBeNull();
   });
 
   it("sans droit d'écriture : aucune action", () => {

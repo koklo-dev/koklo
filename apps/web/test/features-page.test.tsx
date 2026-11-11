@@ -349,6 +349,9 @@ describe("Vide (§4.3)", () => {
   });
 
   it("carte « Aucune fonctionnalité pour le moment » avec son texte, sans table ni filtres", async () => {
+    serve("client");
+    procedures.specHead.mockResolvedValue(EMPTY_HEAD);
+    procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
     expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
     expect(visibleText()).toContain("La spec de ce projet ne décrit encore aucune fonctionnalité.");
@@ -366,12 +369,27 @@ describe("Vide (§4.3)", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it.each([...TEAM, ...CLIENT_SIDE])("même carte pour %s", async (role) => {
+  it.each(CLIENT_SIDE)("même carte pour %s", async (role) => {
     serve(role);
     procedures.specListFeatures.mockResolvedValue(list([]));
     procedures.specHead.mockResolvedValue(EMPTY_HEAD);
     renderFeatures();
     expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
+  });
+
+  it.each(TEAM)("%s : l'agent peut proposer le cahier, saisie à la main proposée", async (role) => {
+    serve(role);
+    procedures.specListFeatures.mockResolvedValue(list([]));
+    procedures.specHead.mockResolvedValue(EMPTY_HEAD);
+    renderFeatures();
+    expect(await findNamed("button", "Ajouter à la main")).toBeVisible();
+    expect(visibleText()).toContain("L'agent peut proposer le cahier fonctionnel");
+    // État Prêt (maquette 10 l.99, l.640) : un seul bouton de l'agent, dans la carte ; l'en-tête n'a aucune action.
+    expect(screen.getAllByRole("button", { name: "Proposer le fonctionnel" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Proposer avec l'agent/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Nouvelle fonctionnalité/ }),
+    ).not.toBeInTheDocument();
   });
 });
 

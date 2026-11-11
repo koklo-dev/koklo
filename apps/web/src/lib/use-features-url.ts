@@ -37,6 +37,11 @@ export function useFeaturesUrl() {
     setFilters: useCallback((patch: FeaturesUrlPatch) => write(patch, "replace"), []),
     setQuery: useCallback((q: string | null) => write({ q }, "replace"), []),
     openFeature: useCallback((feature: string) => write({ feature }, "push"), []),
+    /** Ouverture automatique au chargement : remplace l'entrée courante (pas de « Retour » vers la liste vide). */
+    autoOpenReview: useCallback(() => write({ review: true }, "replace"), []),
+    openReview: useCallback(() => write({ review: true, new: null, edit: null }, "push"), []),
+    /** « Quitter la relecture » : retire le paramètre sans rouvrir la relecture dans la même session. */
+    closeReview: useCallback(() => write({ review: null }, "replace"), []),
     closeFeature: useCallback(() => write({ feature: null }, "replace"), []),
     openCreate: useCallback(() => write({ new: true, edit: null, feature: null }, "push"), []),
     openEdit: useCallback(

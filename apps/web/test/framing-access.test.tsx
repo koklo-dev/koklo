@@ -57,38 +57,43 @@ beforeEach(() => {
 });
 
 const FRAME_BUTTON = "Cadrer avec l'IA";
+const PROPOSE_BUTTON = /Proposer avec l'agent/;
 
-describe("Bouton « Cadrer avec l'IA » sur la liste des fonctionnalités (S-features v1.5)", () => {
-  it.each(TEAM)("%s voit le bouton, qui mène à /projects/<id>/framing", async (role) => {
+describe("Entrée de l'agent sur la liste des fonctionnalités (S-features v2.0)", () => {
+  it.each(TEAM)("%s voit « Proposer avec l'agent », plus le lien de cadrage", async (role) => {
     serve(role);
     renderFeatures();
-    const link = await findNamed("link", FRAME_BUTTON);
-    expect(link).toHaveAttribute("href", `/projects/${PROJECT_ID}/framing`);
+    expect(await findNamed("button", PROPOSE_BUTTON)).toBeVisible();
+    expect(screen.queryByText(FRAME_BUTTON)).not.toBeInTheDocument();
   });
 
-  it.each(CLIENT_SIDE)("%s ne voit aucun bouton « Cadrer avec l'IA »", async (role) => {
+  it.each(CLIENT_SIDE)("%s ne voit aucun bouton de l'agent et n'appelle rien", async (role) => {
     serve(role);
     renderFeatures();
     await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
     expect(screen.queryByText(FRAME_BUTTON)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: PROPOSE_BUTTON })).not.toBeInTheDocument();
     expect(aiCallCount()).toBe(0);
+    expect(procedures.aiProposeOptions).not.toHaveBeenCalled();
+    expect(procedures.proposalList).not.toHaveBeenCalled();
   });
 
-  it("le bouton est aussi dans l'état vide, pour l'équipe", async () => {
+  it("état vide, pour l'équipe : un seul bouton de l'agent, dans la carte (« Proposer le fonctionnel »)", async () => {
     procedures.specHead.mockResolvedValue(
       head({ counts: { features: 0, tables: 0, endpoints: 0 } }),
     );
     procedures.specListFeatures.mockResolvedValue(list([]));
     renderFeatures();
-    await findNamed("heading", "Aucune fonctionnalité pour le moment");
-    expect(screen.getAllByRole("link", { name: FRAME_BUTTON }).length).toBeGreaterThanOrEqual(1);
+    await findNamed("button", "Ajouter à la main");
+    expect(screen.getAllByRole("button", { name: "Proposer le fonctionnel" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: PROPOSE_BUTTON })).not.toBeInTheDocument();
   });
 
   it("pas de bouton quand la spec n'est pas lue (en préparation)", async () => {
     procedures.specHead.mockResolvedValue(head({ status: "building" }));
     renderFeatures();
     await findNamed("heading", "Cahier fonctionnel", { level: 1 });
-    expect(screen.queryByText(FRAME_BUTTON)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: PROPOSE_BUTTON })).not.toBeInTheDocument();
   });
 });
 

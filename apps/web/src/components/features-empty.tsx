@@ -1,14 +1,8 @@
-import { Button, Card, EmptyState, formatCount, Icon } from "@koklo/ui";
-import { FramingLink } from "./framing-link.tsx";
+import { AgentPrivacyNote, Button, Card, EmptyState, formatCount, Icon } from "@koklo/ui";
+import type { ReactElement } from "react";
 
 /** Spec lue, aucune fonctionnalité, aucun filtre ; l'équipe qui écrit peut créer la première. */
-export function FeaturesEmpty({
-  projectId,
-  onCreate,
-}: {
-  projectId: string;
-  onCreate: (() => void) | undefined;
-}) {
+export function FeaturesEmpty({ onCreate }: { onCreate: (() => void) | undefined }) {
   return (
     <Card className="flex flex-col items-center gap-2 p-8 text-center">
       <Icon name="checklist" size={28} className="text-muted-foreground" />
@@ -18,7 +12,6 @@ export function FeaturesEmpty({
       </p>
       {onCreate ? (
         <div className="flex flex-col gap-2 md:flex-row">
-          <FramingLink projectId={projectId} />
           <Button type="button" className="h-11 md:h-9" onClick={onCreate}>
             <Icon name="add" size={20} />
             Nouvelle fonctionnalité
@@ -26,6 +19,45 @@ export function FeaturesEmpty({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+/** Spec vide, équipe qui écrit : l'agent peut proposer le cahier (maquette 10 l.92-105) ; la saisie à la main reste proposée. */
+export function FeaturesAgentEmpty({
+  agent,
+  onCreate,
+}: {
+  agent: ReactElement;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-3">
+      <EmptyState
+        icon="task_alt"
+        title="L'agent peut proposer le cahier fonctionnel"
+        description="À partir du dossier d'idée figé : fonctionnalités avec critères d'acceptation. Vous relisez tout avant que rien n'entre dans la spec."
+        wideDescription
+        action={agent}
+        note={
+          <AgentPrivacyNote
+            className="mt-1.5"
+            details={
+              <p>
+                L'agent lit les pages du dossier d'idée figé et, si vous en écrivez une, votre
+                consigne. Rien n'est enregistré sans votre relecture.
+              </p>
+            }
+          >
+            Le dossier d'idée est envoyé à l'agent IA avec la clé de l'organisation.
+          </AgentPrivacyNote>
+        }
+        secondaryAction={
+          <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onCreate}>
+            Ajouter à la main
+          </Button>
+        }
+      />
+    </div>
   );
 }
 

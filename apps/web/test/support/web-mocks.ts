@@ -71,6 +71,13 @@ export const procedures = {
   // TK-59 : propositions de l'IA (contrat 0.9.0), jamais d'appel réel
   aiDraftBrief: vi.fn(),
   aiProposeFeatures: vi.fn(),
+  // TK-99b (contrat 2.9.0) : propositions de l'agent sur le Fonctionnel, jamais d'appel réel
+  aiProposeOptions: vi.fn(),
+  aiProposeDeliverable: vi.fn(),
+  aiReviseProposal: vi.fn(),
+  proposalList: vi.fn(),
+  proposalDecide: vi.fn(),
+  proposalDecideMany: vi.fn(),
   // Fournisseurs d'IA (contrat 2.3.0, TK-98) : jamais d'appel réel
   aiProviderList: vi.fn(),
   aiProviderAdd: vi.fn(),
@@ -230,6 +237,18 @@ export const orpc = {
     key: () => ["ai"],
     draftBrief: mutation(procedures.aiDraftBrief),
     proposeFeatures: mutation(procedures.aiProposeFeatures),
+    proposeOptions: queryFull(["ai", "proposeOptions"], procedures.aiProposeOptions),
+    proposeDeliverable: mutationWithOptions(procedures.aiProposeDeliverable),
+    reviseProposal: mutationWithOptions(procedures.aiReviseProposal),
+  },
+  proposal: {
+    key: () => ["proposal"],
+    list: {
+      ...queryFull(["proposal", "list"], procedures.proposalList),
+      call: (input?: unknown) => procedures.proposalList(input),
+    },
+    decide: mutationWithOptions(procedures.proposalDecide),
+    decideMany: mutationWithOptions(procedures.proposalDecideMany),
   },
   // Les options (`gcTime`, `retry`...) sont transmises telles quelles, comme le client oRPC réel.
   aiProvider: {
@@ -423,6 +442,16 @@ export function resetWebMocks(): void {
   procedures.organizationList.mockResolvedValue([organization()]);
   procedures.projectList.mockResolvedValue([]);
   procedures.projectCards.mockResolvedValue(cardsPage([]));
+  procedures.proposalList.mockResolvedValue({
+    items: [],
+    nextCursor: null,
+    previousCursor: null,
+    offset: 0,
+    total: 0,
+    groups: [],
+    launch: null,
+  });
+  procedures.aiProposeOptions.mockResolvedValue({ options: [], reads: [], available: true });
   procedures.memberPage.mockResolvedValue({ items: [], total: 0, totalIsEstimate: false });
   procedures.invitationList.mockResolvedValue([]);
   procedures.projectShell.mockResolvedValue(projectShell());

@@ -67,7 +67,12 @@ const STATES: State[] = [
     name: "data",
     visible: (page) => expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible(),
   },
-  { name: "empty", spec: "empty", visible: heading("Aucune fonctionnalité pour le moment") },
+  {
+    name: "empty",
+    spec: "empty",
+    visible: (page) =>
+      expect(page.getByText("L'agent peut proposer le cahier fonctionnel")).toBeVisible(),
+  },
   {
     name: "empty-filtered",
     path: `${PATH}?priority=could`,
