@@ -97,10 +97,17 @@ describe("lecture d'autrui via Better Auth : fermée au client", () => {
     expect(bodies.size).toBe(1);
   });
 
+  // Better Auth 1.7.18 : les liens d'invitation ne se lisent qu'avec le droit `invitation:create`
+  // (propriétaire et admin) ; dev, designer et business reçoivent 403 sur `list-invitations`.
+  const INVITATIONS_PATH = "/api/auth/organization/list-invitations";
+  const CAN_CREATE_INVITATION = ["owner", "admin"];
+
   it.each(STAFF)("%s : toujours servi", async (role) => {
     for (const path of READ_OTHERS) {
       const res = await send(app, scene.staff[role].cookie, "get", path);
-      expect(res.status, `${role} ${path}`).toBe(200);
+      const expected =
+        path === INVITATIONS_PATH && !CAN_CREATE_INVITATION.includes(role) ? 403 : 200;
+      expect(res.status, `${role} ${path}`).toBe(expected);
     }
   });
 
