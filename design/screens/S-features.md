@@ -1,7 +1,7 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 1.8
+version: 2.0
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
@@ -193,6 +193,14 @@ Gabarit de S-projects §6 (barre latérale 248 px repliable, marge 32 px ; sous 
 - 48c, non bloquants 2 et 3 (marqueur de reprise absent après `UNAUTHORIZED` à l'étape 2 ; compte sélectionné disparu : « Projet créé. » sans dépôt ni reprise) : **résolus pour l'utilisateur** par 4.6, car un projet sans dépôt est toujours repris depuis sa page. Le code du panneau reste à corriger si on y touche (voir §11).
 - 48c, non bloquant 4 (texte d'erreur générique visible brièvement pendant la redirection `UNAUTHORIZED`) : à corriger dans le panneau réutilisé (ne rien afficher tant que la redirection est en cours).
 
+## 9a. Propositions de l'agent (TK-99b, maquettes 21, 10 et 12 ; passations 14, 06 §4.2-4.3, 07 §1.4)
+- **Bouton `AgentProposeButton`** : premier des actions de l'en-tête de l'équipe qui écrit (`canWriteSpec`), absent en vue client et business ; 5 états `idle`, `open`, `running` (« L'agent propose… »), `ready` (« Relire N propositions »), `unavailable` (raison en infobulle + lien vers les réglages). « Nouvelle fonctionnalité » passe en `outline` ; « Cadrer avec l'IA » quitte l'en-tête (la route `/framing` reste jusqu'au nettoyage).
+- **Modale `AgentProposePopover`** : choix et comptes lus de `ai.proposeOptions` (option à 0 masquée, première = Recommandé), consigne facultative (500 car.), « L'agent lit » = `reads`, pied « Rien n'est enregistré sans votre relecture. », Annuler · Lancer. Échap, clic dehors, focus piégé et rendu au bouton.
+- **États du corps** : prêt (carte pointillée), génération (bandeau `role="status"` + squelettes, premières propositions avant la fin, « Annuler l'attente » quitte l'attente seulement), relecture (`?view=review`, bandeau + progression, liste 330 px, détail, J / K / A / R hors champ de saisie, « Remettre à relire », « Demander une modification à l'agent »), relecture en volume (> 30 : groupes collants, 8 puis 20 de plus, filtre « À relire » par défaut, « Accepter les N restantes » par groupe, liste virtualisée), tout relu, erreur de liste, erreur de lancement, lot échoué (« Enregistrement échoué · à reprendre par l'équipe technique », B320).
+- **Retour sur la page** après un départ : le bouton est `ready` et l'écran s'ouvre une fois en relecture.
+- **Enregistrement** : « Enregistrer N dans la spec », un `specBatch.submit` jusqu'à 200 opérations, sinon un commit par groupe et un récapitulatif unique. Texte des propositions brut, jamais de lien.
+- **375 px** : modale `calc(100% - 32px)` défilante ; liste puis détail en colonne ; cibles 44 px. **Annonces** : arrivées par lots, décisions, changement de groupe, enregistrement, dans une seule région `role="status"` par vue.
+
 ## 10. Historique
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
@@ -240,3 +248,4 @@ Dossier `design/screens/captures/S-features/` (32 images) : `loading`, `data`, `
 
 L'axe des e2e est exécuté avec les étiquettes WCAG (`wcag2a`, `wcag2aa`, `wcag21aa`), comme les autres écrans ; les règles « best-practice » (landmarks de la barre latérale, `label-content-name-mismatch` du menu utilisateur) relèvent du gabarit sidebar-07 et non de cet écran.
 | 1.9 | 2026-11-08 | TK-141 | Reprise sur les bases (planches 10 et 12) : lignes en `ListRow` (`IdTag`, sous-titre « N critères », priorité avant le statut), recherche sans résultat en `EmptyState inline` avec « 0 résultat pour « … » ». Détail : `.workflow/TK-141/00-fiche.md` |
+| 2.0 | 2026-11-11 | TK-99b | Propositions de l'agent sur le Fonctionnel : bouton (5 états), modale, relecture et relecture en volume (§9a), décisions lues et écrites côté serveur. Le bouton suit la maquette 21 (`--primary`) plutôt que le contour de la maquette 10 (B319). Détail : `.workflow/TK-99b/00-fiche.md` |
