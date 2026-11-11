@@ -12,6 +12,7 @@ import type {
 } from "./stub-kanban.ts";
 import type { OverviewScenario } from "./stub-overview.ts";
 import type { ProjectsCardsScenario } from "./stub-projects.ts";
+import type { ProposalsScenario } from "./stub-proposals.ts";
 import type { SettingsScenario } from "./stub-settings.ts";
 import type { ShellScenario } from "./stub-shell.ts";
 import type { SpecRepoScenario } from "./stub-spec-repo.ts";
@@ -44,6 +45,7 @@ export async function setScenario(
     SpecRepoScenario &
     FeaturesScenario &
     AiScenario &
+    ProposalsScenario &
     ProvidersScenario &
     ShellScenario &
     OverviewScenario &
@@ -78,6 +80,10 @@ export const specRepoCallsSeen = async (): Promise<Array<Record<string, unknown>
   (await fetch(`${STUB}/__spec-repo-calls`)).json();
 export const repoLinksSeen = async (): Promise<Array<Record<string, unknown>>> =>
   (await fetch(`${STUB}/__repo-links`)).json();
+
+/** Appels reçus par le faux API des propositions (chemin sans projet + corps), dans l'ordre. */
+export const proposalCallsSeen = async (): Promise<Array<Record<string, unknown>>> =>
+  (await fetch(`${STUB}/__proposal-calls`)).json();
 
 export async function releaseHeld(): Promise<void> {
   await fetch(`${STUB}/__release`, { method: "POST" });

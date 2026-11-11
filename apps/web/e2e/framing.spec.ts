@@ -392,13 +392,14 @@ for (const role of ["client", "business"] as KanbanRole[]) {
   });
 }
 
-test("S-framing : l'équipe voit le bouton « Cadrer avec l'IA » sur la liste, qui ouvre l'écran", async ({
+test("S-framing : le lien « Cadrer avec l'IA » a quitté la liste (TK-99b), la route reste ouverte", async ({
   page,
 }) => {
   await scenario({ role: "dev" });
   await page.goto(FEATURES_PATH);
-  await page.getByRole("link", { name: "Cadrer avec l'IA" }).first().click();
-  await expect(page).toHaveURL(new RegExp(`${PATH}$`));
+  await expect(page.getByRole("button", { name: /Proposer avec l'agent/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cadrer avec l'IA" })).toHaveCount(0);
+  await page.goto(PATH);
   await expect(page.getByRole("heading", { name: "Assistant de cadrage", level: 1 })).toBeVisible();
 });
 

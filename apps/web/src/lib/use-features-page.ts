@@ -11,7 +11,7 @@ import {
   writeRegionText,
 } from "./features-region.ts";
 import type { FeaturesView } from "./features-view.ts";
-import { canReadRepos } from "./roles.ts";
+import { canReadRepos, canWriteSpec } from "./roles.ts";
 import { useFeatureFormPanel } from "./use-feature-form-panel.ts";
 import { useFeatureSheet } from "./use-feature-sheet.ts";
 import { useFeatureWrite } from "./use-feature-submit.ts";
@@ -25,6 +25,8 @@ import {
 } from "./use-features-list.ts";
 import { useFeaturesUrl } from "./use-features-url.ts";
 import { usePendingResume } from "./use-pending-save.ts";
+import { useProposalLaunch } from "./use-proposal-launch.ts";
+import { useProposalStatus } from "./use-proposal-status.ts";
 
 /** Ce que la liste dit d'elle-même : barre de compte, résultat annoncé après la frappe, avis « hors des filtres ». */
 function useListSummary(
@@ -84,6 +86,29 @@ function regionOf({ view, expired, announcement, write, formOpen, summary }: Reg
   };
 }
 
+/**
+ * Propositions de l'agent : bouton, modale et état du dernier lancement, pour l'équipe qui écrit sur une spec lue
+ * seulement. Au chargement, un lancement à relire ouvre la relecture une fois (`replaceState`), jamais deux.
+ */
+function useProposals(
+  projectId: string,
+  url: ReturnType<typeof useFeaturesUrl>,
+  data: ReturnType<typeof useFeaturesData>,
+) {
+  const enabled = canWriteSpec(data.role) && data.head?.status === "ready";
+  const status = useProposalStatus(projectId, enabled);
+  const launch = useProposalLaunch(projectId, status, { enabled, onLaunched: url.openReview });
+  const checked = useRef(false);
+  const { autoOpenReview } = url;
+  const { loaded, active, counts } = status;
+  useEffect(() => {
+    if (!enabled || !loaded || checked.current) return;
+    checked.current = true;
+    if (!active && counts.pending > 0 && !url.review) autoOpenReview();
+  }, [enabled, loaded, active, counts.pending, url.review, autoOpenReview]);
+  return { enabled, status, launch, reviewing: enabled && Boolean(url.review) };
+}
+
 /** Tout ce que l'écran des fonctionnalités pilote : données, adresse, annonces, liste, fiche et visibilités. */
 export function useFeaturesPage(projectId: string) {
   const url = useFeaturesUrl();
@@ -101,8 +126,10 @@ export function useFeaturesPage(projectId: string) {
   const { view, head } = data;
   const headReady = head !== null && head.status !== "failed";
   const summary = useListSummary(url, data);
+  const propose = useProposals(projectId, url, data);
 
   return {
+    propose,
     url,
     data,
     announcement,

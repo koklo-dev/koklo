@@ -1,9 +1,8 @@
 import { Button, Icon, ProjectHeader, type ProjectHeaderTab } from "@koklo/ui";
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import { FEATURES_TABS, type FeaturesTab } from "../lib/features-tab.ts";
 import { projectPath, specPath } from "../lib/shell-routes.ts";
 import { ageOf } from "../lib/spec-age.ts";
-import { FramingLink } from "./framing-link.tsx";
 import { ShellLink } from "./shell-link.tsx";
 
 const TAB_LABELS: Record<FeaturesTab, string> = {
@@ -39,6 +38,7 @@ export function FeaturesHeader({
   name,
   titleRef,
   onCreate,
+  proposeAction,
   tab,
   head,
   team,
@@ -48,6 +48,8 @@ export function FeaturesHeader({
   titleRef: Ref<HTMLHeadingElement>;
   /** Présent seulement pour l'équipe qui écrit, quand la spec est lue. */
   onCreate: (() => void) | undefined;
+  /** Bouton « Proposer avec l'agent » : premier des actions, équipe qui écrit seulement (absent en vue client). */
+  proposeAction?: ReactNode;
   tab: FeaturesTab;
   head: FeaturesHead | undefined;
   team: boolean;
@@ -68,10 +70,11 @@ export function FeaturesHeader({
         : {})}
       {...(onCreate
         ? {
-            secondaryActions: <FramingLink projectId={projectId} />,
+            ...(proposeAction ? { secondaryActions: proposeAction } : {}),
             primaryAction: (
               <Button
                 type="button"
+                variant={proposeAction ? "outline" : "default"}
                 data-new-feature
                 className="h-11 w-full md:h-9 md:w-auto"
                 onClick={onCreate}
