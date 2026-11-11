@@ -109,7 +109,7 @@ describe("RadioGroup", () => {
 });
 
 describe("RadioCard", () => {
-  it("carte choisie : border-primary ring-1 ring-inset bg-diff-bg ; titre, description, badge", async () => {
+  it("carte choisie : border-primary 1 px, bg-diff-bg ; titre, description, badge", async () => {
     render(
       <RadioCardGroup aria-label="Fournisseur" defaultValue="a">
         <RadioCard
@@ -129,8 +129,6 @@ describe("RadioCard", () => {
       "rounded-card",
       "p-3",
       "data-[state=checked]:border-primary",
-      "data-[state=checked]:ring-1",
-      "data-[state=checked]:ring-inset",
       "data-[state=checked]:bg-diff-bg",
     ]) {
       expect(a).toHaveClass(c);
