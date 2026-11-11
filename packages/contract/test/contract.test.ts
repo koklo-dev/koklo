@@ -204,9 +204,9 @@ describe("CT-8b garde de version", () => {
 });
 
 describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93)", () => {
-  it("est en 2.8.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("2.8.0");
-    expect(CONTRACT_VERSION).toBe("2.8.0");
+  it("est en 2.8.1 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("2.8.1");
+    expect(CONTRACT_VERSION).toBe("2.8.1");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -233,6 +233,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "2.6.0",
       "2.7.0",
       "2.8.0",
+      "2.8.1",
     ]);
   });
 });
@@ -395,13 +396,21 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["2.7.0"]).not.toBe(versions["2.6.0"]);
   });
 
-  it("l'empreinte 2.8.0 est celle du document généré et diffère de 2.7.0 (cartes de projets, TK-93)", async () => {
+  it("conserve l'empreinte figée de 2.8.0 (cartes de projets, TK-93) : elle ne suit plus le document courant", () => {
+    const versions = readJson("openapi/versions.json") as Record<string, string>;
+    expect(versions["2.8.0"]).toBe(
+      "ee7c58d839a8bfd6923434499c2410058f5debd4d1c333c8c0bd46f15268b177",
+    );
+    expect(versions["2.8.0"]).not.toBe(versions["2.7.0"]);
+  });
+
+  it("l'empreinte 2.8.1 est celle du document généré et diffère de 2.8.0 (oRPC beta.48 : corps PATCH sprint et ticket en additionalProperties false)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["2.8.0"]).toBe(hash);
-    expect(versions["2.8.0"]).not.toBe(versions["2.7.0"]);
+    expect(versions["2.8.1"]).toBe(hash);
+    expect(versions["2.8.1"]).not.toBe(versions["2.8.0"]);
   });
 });
 
