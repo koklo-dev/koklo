@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.14)
+# Koklo : design (v2.15)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -312,7 +312,7 @@ Mesures normalisées (incohérences I1 à I29 tranchées, questions B143 et B144
 | `SegmentedControl` | 2 à 4 segments, conteneur `--surface` bordure `--border` rayon 8 marge 3 écart 2 ; segment 26 (`xs` 24), 12/500, rayon 6 ; **actif : `--background` + anneau 1 `--border`, texte `--foreground`, sans violet ni ombre** (I5) ; inactif transparent, muted. `aria-pressed` ou `radiogroup`. |
 | `Switch`, `SwitchRow` | Radix `role="switch"`, 38 × 22, marge 3, rond 16 blanc (jeton `--switch-thumb`, identique clair et sombre) ; allumé `--primary`, éteint `--border-strong`, désactivé .6 ; ligne ≥ 44 au tactile. |
 | `Checkbox` | Radix, case 20 (`check_box` plein `--primary`, `check_box_outline_blank` muted), cible 28. |
-| `RadioGroup`, `RadioCard` | Radio 18, bordure 2 (`--primary` si choisi, sinon `--border-strong`), point 8. Carte rayon 10, marges 12, **bouton radio 18 visible** (marge haute 3, écart 10), titre 14/600, description 12 muted ; choisie : bordure 1 `--primary` + anneau interne 1 + fond `--diff-bg` (I26). |
+| `RadioGroup`, `RadioCard` | Radio 18, bordure 2 (`--primary` si choisi, sinon `--border-strong`), point 8. Carte rayon 10, marges 12, **bouton radio 18 visible** (marge haute 1, écart 10), titre 14/600, description 12 muted ; choisie : bordure 1 `--primary` + fond `--diff-bg`, sans anneau en plus (maquettes 21 l.131 et 10 l.398-406 ; la maquette l'emporte sur I26, B323) ; le point plein reste le repère non coloré. |
 | `Input`, `SearchField`, `Textarea` | `Input` 40 (36 en `sm`), rayon 8, bordure `--border`, fond `--background`, 14, marges 0 12 ; `mono` ; invalide : bordure `--destructive` ; **désactivé : pointillé `--border-strong`, fond `--surface`, texte muted, sans `opacity-50`**. `SearchField` : `search` 18 en tête, libellé `sr-only`. `Textarea` : marges 10 12, interligne 1,5. |
 | `Field`, `Select` | `Field` : libellé 13/600, écart 6, `required` (astérisque `--primary`, « obligatoire »), `optional` (« (facultatif) » 400 muted), aide 12 muted, erreur `role="alert"` 12/500 avec `error` 16. `Select` : déclencheur 40 (36 en `sm`), `keyboard_arrow_down` 18. |
 
@@ -324,7 +324,7 @@ Galerie : `/dev/ui`, sections « Surfaces » (lot A), « Superpositions » (lot 
 |---|---|
 | `Card` | `variant` : `panel` (défaut : rayon 12, bordure `--border`, `--background`, marges 16 / 18), `inset` (rayon 10 `--radius-card`, marges 12 / 14, `--surface`), `interactive` (lien ou bouton entier, focus visible, sélection bordure `--primary`), `proposal` (bordure pointillée `--primary`, `--diff-bg`), `dashed` (bordure pointillée `--border-strong`), `warning` (bordure `--alert-warning-border`). Titre `text-card-title` 15/600, description 13 muted, action à droite. |
 | `StatCard` | `Card panel` : libellé 13 muted avec icône 18, valeur `text-stat`, jauge `ProgressBar` facultative, note 12 muted. Grille d'appel `auto-fit minmax(200px,1fr)`, écart 16. |
-| `ProgressBar` | Piste `--border-strong`, `md` 6 (rayon 3) ou `lg` 8 (rayon 4), remplissage `--primary`, `role="progressbar"`, `aria-valuenow` / `min` / `max`, nom accessible obligatoire. Valeur en texte à côté (jamais seule en couleur). |
+| `ProgressBar` | Piste `--border-strong`, `md` 6 (rayon 3) ou `lg` 8 (rayon 4), remplissage `--primary`, `role="progressbar"`, `aria-valuenow` / `min` / `max`, nom accessible obligatoire. Valeur en texte à côté (jamais seule en couleur). Variante `split` (v2.15, relecture) : second segment `--muted-foreground` à 50 %, 6 de haut. |
 | `InlineAlert` | Rayon 10, écart 10, icône 18. Tons `neutral`, `warning`, `error`, `success` (`--alert-success-*`), `agent` (`--diff-bg`, bordure pointillée `--primary`). Actions : lien souligné (28) ou un à deux `Button sm` (`inherit` dans un ton coloré). `Alert` est déprécié : on migre vers `InlineAlert neutral`. |
 | `EmptyState` | Écart 10. Variantes `framed` (défaut) et `inline` (sans cadre ni tuile, icône 28 `--muted-foreground`, dans une liste). Une action principale plus au plus une secondaire (I20). |
 | `Skeleton`, `SkeletonRow` | Bloc `motion-safe:animate-pulse`. `SkeletonRow` : hauteur 52, pavé 48 × 18 `--secondary` puis barre de 14 à 60, 45, 70 ou 52 %, `aria-hidden`. |
@@ -422,6 +422,18 @@ La barre latérale de la planche 07 (l.30-64) est périmée : on suit la décisi
 
 Barre : groupe « Récents » (3 projets, `ProjectTile` 22, l.38-41) au-dessus d'« Organisation » quand aucun projet n'est actif. Il s'écrit avec `ShellNavItem leading` (la tuile prend la place de l'icône) ; `SegmentedGauge max` (10 sur les cartes, 12 par défaut) et `AvatarGroup size` (24 sur les cartes, 28 par défaut) servent la carte. Les teintes vivent dans `packages/ui/src/styles/hues.css`, exposées en `bg-hue-n` / `text-hue-n-foreground`. Galerie : `/dev/ui`, section « 15. Projets » (`ProjectTile`, `PhasePill`, `ProgressChecklist`, `ProjectCard` : normale, attention, client, création, échec). Fiche : `design/screens/S-projects.md` v7.
 
+### 5.13 Propositions de l'agent (v2.15, correction 1, TK-99b, passations 14 et 07 §1.4, B319, maquettes 21, 10 l.92-169 et 388-419, 12 l.126-148)
+
+| Composant | Règle |
+|---|---|
+| `AgentProposeButton` | Hauteur 36, marges 0 14 0 12, rayon 6, 14/500, icône `wand_stars` 20 (l'`auto_awesome` des planches, §4). `idle` `--primary` ; `open` + halo 3 `--soft` ; `running` `progress_activity` (animation sous `motion-safe:`), « L'agent propose… », opacité .82, curseur `progress`, `aria-disabled` ; `ready` `rate_review`, « Relire N propositions », halo ; `unavailable` bordure pointillée `--border-strong`, fond `--surface`, texte `--muted-foreground`, infobulle avec la raison. Premier des actions de l'en-tête, absent en vue client. Maquette 21 l.110-118. |
+| `AgentProposePopover` | Modale `Dialog` centrée, 520 (`calc(100% - 32px)`), rayon 14, ombre `0 18px 44px rgba(20,16,43,.20)`, voile `--overlay` flou 6 sous `motion-safe`. En-tête `IconTile` 34 `--primary` + titre 15/600 + sous-titre 12 ; cartes radio (`role="radio"`, pastille 18, point 8, rayon 10, choisie : bordure `--primary` et fond `--diff-bg`), `Pill xs primary` « Recommandé », `Pill xs soft` pour le compte ; `Textarea` 2 lignes (`value`) ; puces « L'agent lit » 22 ; pied `--surface`. Maquette 21 l.57-68, 127-131 ; 10 l.388-419. |
+| `ProposalGenerationBanner` | Bande de génération pleine largeur (maquette 10 l.107-108) : `--diff-bg`, bordure basse, `progress_activity` 18 `--primary`, texte 13 (« … Cela peut prendre une minute. Vous pouvez quitter la page. »), « Annuler l'attente » souligné ; `role="status"`. Suivie de `ProposalSkeleton` (6 lignes de 44). |
+| `ProposalReview` | Bandeau `--diff-bg` (`role="group"` nommé ; les annonces passent par une région `role="status"` à part) : « Mode relecture · N propositions · A acceptées · R rejetées · P à relire », barre 6 (acceptées `--primary`, rejetées `--muted` à 50 %), « Enregistrer A dans la spec ». Liste 330, détail, pied Accepter `A` · Modifier · Rejeter `R` · demande à l'agent ; « Remettre à relire » une fois décidée. Raccourcis J / K / A / R hors champ de saisie (2.1.4). Maquette 10 l.114-168. |
+| Relecture en volume | Filtre « À relire » par défaut ; au-delà de 30, groupes repliables à en-tête collant (`aria-expanded`), 8 éléments puis « Afficher 20 de plus · N restantes dans ce groupe », « Accepter les N restantes » par groupe seulement, liste du groupe ouvert virtualisée (`aria-setsize`, `aria-posinset`). Maquette 12 l.126-148. |
+
+Galerie : `/dev/ui`, section « 14. Propositions de l'agent » (id `dev-ui-proposals`). Texte du modèle toujours brut (jamais de lien ni de balise) ; jamais le nom du fournisseur d'IA (la note dit « l'agent IA avec la clé de l'organisation »).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -481,3 +493,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 09/11/2026 | v2.12 (TK-91, passation 02 §9, décision 05 §2 « Lot 2 », maquette 06) : §5.10 maturité, Synthèse et passage au cadrage (`MaturityMeter`, `SynthesisNavItem`, « Passer au cadrage », bandeau « Modifié depuis idea-vN ») |
 | 09/11/2026 | v2.13 (TK-92, passation 03, décision 05 §2 « Lot 3 », maquette 07) : §5.11 vue d'ensemble (`SegmentedGauge`, `NextStep`, `DeliverableCard`, `DeliverableStatus` « À revoir », `ActivityFeed`, `PersonRow`, `TicketStatus`) |
 | 09/11/2026 | v2.14 (TK-93, passation 04, maquette 08) : §5.12 liste des projets et création (`ProjectTile`, `PhasePill`, `ProgressChecklist`, `ProjectCard`, teintes `--hue-1..5`, groupe « Récents ») ; lot B : `ShellNavItem leading`, `SegmentedGauge max`, `AvatarGroup size`, `hues.css` |
+| 11/11/2026 | v2.15 (TK-99b, passations 14 et 07 §1.4, maquettes 21, 10, 12) : §5.13 propositions de l'agent (`AgentProposeButton`, `AgentProposePopover`, `ProposalReview`, relecture en volume) ; le bouton reste `--primary` partout (maquette 21 l'emporte sur le contour de la maquette 10) |
