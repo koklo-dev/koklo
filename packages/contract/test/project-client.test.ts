@@ -40,9 +40,9 @@ describe("PC1 surface : exactement list, add, remove", () => {
     expect(d.paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("le groupe projectClient est apparu en 0.10.0 ; le contrat courant est 2.8.0 (TK-94, projet explicite TK-96)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.8.0");
-    expect((await doc()).info.version).toBe("2.8.0");
+  it("le groupe projectClient est apparu en 0.10.0 ; le contrat courant est 2.8.1 (TK-94, projet explicite TK-96)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.8.1");
+    expect((await doc()).info.version).toBe("2.8.1");
   });
 });
 

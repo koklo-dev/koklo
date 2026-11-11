@@ -1271,7 +1271,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "2.8.0"
+    "version": "2.8.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -19555,6 +19555,7 @@
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "definitionOfDone": {
                     "type": "string"
@@ -22478,6 +22479,7 @@
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "assignee": {
                     "properties": {
