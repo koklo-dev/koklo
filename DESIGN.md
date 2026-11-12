@@ -297,7 +297,7 @@ Mesures normalisées (incohérences I1 à I29 tranchées, questions B143 et B144
 
 | Composant | Mesures et règles |
 |---|---|
-| Jetons | Couleur `--alert-success-*` (clair #f0fdf4 / #bbf7d0 / #14532d ; sombre #0f2a1a / #14532d / #bbf7d0), `--overlay` (rgb(13 11 28 / .38) ; sombre rgb(0 0 0 / .55)). Ombres `--shadow-dialog` (0 18px 44px .20), `--shadow-sheet` (-16px 0 40px .20), `--shadow-toast` (0 8px 24px .25), none en sombre sauf toast. Rayons `--radius-card` 10 et `--radius-dialog` 14. Texte : `text-card-title` 15/600, `text-dialog-title` 18/600, `text-stat` 24/600 -0,02 em, `text-count` 11/600, `text-code-sm` mono 11/500, `text-settings-title` 20/600 (Réglages seulement). |
+| Jetons | Couleur `--alert-success-*` (clair #f0fdf4 / #bbf7d0 / #14532d ; sombre #0f2a1a / #14532d / #bbf7d0), `--overlay` (rgb(13 11 28 / .38) ; sombre rgb(0 0 0 / .55)). Ombres `--shadow-dialog` (0 18px 44px .20), `--shadow-sheet` (-16px 0 40px .22, gardée en sombre), `--shadow-toast` (0 8px 24px .25), none en sombre sauf toast et tiroir. Rayons `--radius-card` 10 et `--radius-dialog` 14. Texte : `text-card-title` 15/600, `text-dialog-title` 18/600, `text-stat` 24/600 -0,02 em, `text-count` 11/600, `text-code-sm` mono 11/500, `text-settings-title` 20/600 (Réglages seulement). |
 | `Button` | Tailles du §5.2. Variantes `default`, `secondary`, `outline`, `ghost`, `destructive`, `dashed` (bordure pointillée `--border-strong`, transparent), `inherit` (contour `currentColor`, texte hérité, 600), `link` (souligné 600, 28), `text` (lien texte 26, 13/500, marges 8, `--text`, souligné ; v2.10). Props `icon`, `shortcut` (`Kbd` en suffixe), `loading` (`Spinner`, `aria-busy`, .82), `pressed` (halo `0 0 0 3px --secondary`), `fullWidth`. `size="icon"` reste un alias de 36 × 36. |
 | `IconButton` | Carré `sm` 32 (icône 18, rayon 6) ou `default` 36 (icône 20) ; variante `primary` 32 rayon 8 (envoi). `aria-label` imposé par le type. |
 | `Kbd` | Mono 11/500 (`text-code-sm`), hauteur 18, marges 0 5, bordure `--border`, rayon 4, fond `--background`. |
@@ -434,6 +434,21 @@ Barre : groupe « Récents » (3 projets, `ProjectTile` 22, l.38-41) au-dessus d
 
 Galerie : `/dev/ui`, section « 14. Propositions de l'agent » (id `dev-ui-proposals`). Texte du modèle toujours brut (jamais de lien ni de balise) ; jamais le nom du fournisseur d'IA (la note dit « l'agent IA avec la clé de l'organisation »).
 
+### 5.14 Panneau d'édition `SpecItemSheet` (v2.16, TK-101, passation 11, B329, maquette 16 l.58-108 et 196-229)
+
+| Composant | Règle |
+|---|---|
+| `SpecItemSheet` | `Sheet` latéral droit `size="form"` : 540 (`md:max-w-[540px]`), **plein écran sous 768** (la passation 11 l'emporte sur le 640 du `Sheet` de base), `role="dialog"`, `aria-modal`, `h2` relié par `aria-labelledby`, fond `--background`, bordure gauche, ombre `-16px 0 40px rgba(20,16,43,.22)`, voile `--overlay`. En-tête sur une ligne : `IconTile` 36 `soft`, titre 18/600 (interligne 1,3), sous-titre 12 `--muted-foreground`, `IdTag` mono à droite, fermer 32 (icône 20), sans rayon (B332). Corps défilant (région `tabIndex=0`), marges 16 20, espacement 16. Pied `--surface` : ligne de fichier mono 12 (`description` 16) + « un commit à l'enregistrement » ; « Supprimer » (ghost, texte `--muted-foreground` comme la maquette l.98, `--destructive` au survol, icône `delete`) à gauche en modification ; « Annuler » `outline` ; principal « Enregistrer dans la spec » / « Enregistrer les modifications » (icône `check`), 36 de haut (44 sous 768). |
+| Encadré « Décrire en une phrase » | Création seulement : contour pointillé `--primary`, fond `--diff-bg`, rayon 12, titre 13/600 icône `wand_stars` 18 (l'`auto_awesome` des planches, §4), zone de texte 2 lignes (`rows`, B332) dans un cadre rayon 10 + « Préremplir » (32, rayon 8, `--primary`, toujours actif : phrase vide, message d'aide), note « Rien n'est enregistré tant que vous n'avez pas cliqué sur « Enregistrer ». ». |
+| Bandeau « Préremplie par l'agent » | `role="status"`, `--surface`, bordure, rayon 10, 13 px, « Effacer » souligné 600 (26 de haut, cible 24 minimum). |
+| `Field` + `agentFilled` | Marqueur sur tout le bloc (libellé, champ, aide) : filet gauche 3 `--primary`, retrait 12, « proposé par l'agent » 11 px `--primary` à côté du libellé. Jamais le filet dans la bordure du champ. « * » `--primary` + `aria-label="obligatoire"`. |
+| `TagInput` (`packages/ui`, combobox maison : l'appelant fournit `suggestions`, `onQueryChange`, `validate`) | Puces de références : cadre 40 mini, rayon 8, puces 24 mono 12 `--soft` / `--soft-foreground` avec ✕ (bouton nommé « Retirer R-001 »), saisie « Ajouter… » 13, liste d'autocomplétion `role="listbox"` (20 résultats au plus, anti-rebond 200 ms, `aria-activedescendant`, annonce du nombre de résultats). |
+| Choix en pastilles (`RadioPillGroup` / `RadioPill`, variante des radios) | 32 de haut (44 sous 768), rayon plein, 13/500 ; choisie : bordure `--primary`, fond `--secondary`, texte `--secondary-foreground` ; `role="radiogroup"`. |
+| Avertissement et erreurs | `InlineAlert` attention en `role="note"` (livrable validé, B332) et erreur (résumé « N champs obligatoires sont vides : … », `role="alert"`, focus sur le premier champ en erreur) ; sous le champ « Obligatoire » 12/500 rouge, icône `error` 16. |
+| Fermeture | Échap, fond ou « Annuler » : si la saisie diffère de l'état d'ouverture, `AlertDialog` « Fermer sans enregistrer ? » (la saisie reste gardée en brouillon sur cet appareil) ; ⌘ / Ctrl + Entrée enregistre. |
+
+Galerie : `/dev/ui`, section « 17. Panneau d'édition » (la 16 est déjà « Propositions de l'agent ») (id `dev-ui-spec-item-sheet`) : les 4 modes, en clair, en sombre et à 375 px. Maquette 16 : le toast « F-249 enregistrée dans la spec · commit e4c90a1 » est le `Toast` Radix existant (pas de Sonner).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -494,3 +509,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 09/11/2026 | v2.13 (TK-92, passation 03, décision 05 §2 « Lot 3 », maquette 07) : §5.11 vue d'ensemble (`SegmentedGauge`, `NextStep`, `DeliverableCard`, `DeliverableStatus` « À revoir », `ActivityFeed`, `PersonRow`, `TicketStatus`) |
 | 09/11/2026 | v2.14 (TK-93, passation 04, maquette 08) : §5.12 liste des projets et création (`ProjectTile`, `PhasePill`, `ProgressChecklist`, `ProjectCard`, teintes `--hue-1..5`, groupe « Récents ») ; lot B : `ShellNavItem leading`, `SegmentedGauge max`, `AvatarGroup size`, `hues.css` |
 | 11/11/2026 | v2.15 (TK-99b, passations 14 et 07 §1.4, maquettes 21, 10, 12) : §5.13 propositions de l'agent (`AgentProposeButton`, `AgentProposePopover`, `ProposalReview`, relecture en volume) ; le bouton reste `--primary` partout (maquette 21 l'emporte sur le contour de la maquette 10) |
+| 12/11/2026 | v2.16 (TK-101, passation 11, B329, maquette 16) : §5.14 panneau d'édition (`SpecItemSheet`, `Field agentFilled`, `TagInput`, choix en pastilles, confirmation de fermeture) ; plein écran sous 768 (et non 640) pour ce panneau |

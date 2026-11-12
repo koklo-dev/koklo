@@ -59,7 +59,8 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-framing](screens/S-framing.md) | 2.4 | TK-88 |
 | [S-ai-settings](screens/S-ai-settings.md) | 1.2 | TK-88 |
 | [S-idea](screens/S-idea.md) | 1 | TK-89 |
-| [S-feature-form](screens/S-feature-form.md) | 1.3 | TK-48 (48e) |
-| [S-dev-ui](screens/S-dev-ui.md) | 1.5 | TK-99b |
+| [S-feature-form](screens/S-feature-form.md) | 2.0 | TK-101 |
+| [S-spec-item-sheet](screens/S-spec-item-sheet.md) | 1 | TK-101 |
+| [S-dev-ui](screens/S-dev-ui.md) | 1.6 | TK-101 |
 | [S-app-shell](screens/S-app-shell.md) | 2 | TK-88 |
 | [S-overview](screens/S-overview.md) | 1 | TK-92 |
