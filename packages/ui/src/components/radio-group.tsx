@@ -113,3 +113,25 @@ export function RadioCard({
     </RadioPrimitive.Item>
   );
 }
+
+/** Groupe de pastilles de choix (maquette 16 l.88) : rangée qui passe à la ligne, espacement 6. */
+export function RadioPillGroup({
+  className,
+  ...props
+}: ComponentProps<typeof RadioPrimitive.Root>) {
+  return <RadioGroup className={cn("flex-row flex-wrap gap-1.5", className)} {...props} />;
+}
+
+/** Pastille de choix 32 px (`role="radio"`) : choisie = bordure `--primary`, fond et texte doux ; invalide = bordure `--destructive`. */
+export function RadioPill({ className, ...props }: ComponentProps<typeof RadioPrimitive.Item>) {
+  return (
+    <RadioPrimitive.Item
+      data-slot="radio-pill"
+      className={cn(
+        "inline-flex h-8 items-center rounded-full border border-border bg-background px-3 text-meta font-medium text-foreground outline-none motion-safe:transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-dashed disabled:bg-surface disabled:text-muted-foreground data-[state=checked]:border-primary data-[state=checked]:bg-secondary data-[state=checked]:text-secondary-foreground max-md:h-11",
+        className,
+      )}
+      {...props}
+    />
+  );
+}

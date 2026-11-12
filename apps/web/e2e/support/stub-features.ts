@@ -8,6 +8,7 @@ import {
   resetFeatureWrites,
   type WriteMode,
 } from "./stub-feature-write.ts";
+import { handleSpecItem, type SpecItemScenario } from "./stub-spec-item.ts";
 
 /**
  * Faux API de l'écran /projects/[projectId]/features (TK-48 / 48d) : `spec.head`, `spec.listFeatures`,
@@ -42,7 +43,11 @@ export type FeatureMode =
   | "indexFailed"
   | "internal"
   | "loading";
-export type FeaturesScenario = { spec?: SpecMode; feature?: FeatureMode; write?: WriteMode };
+export type FeaturesScenario = {
+  spec?: SpecMode;
+  feature?: FeatureMode;
+  write?: WriteMode;
+} & SpecItemScenario;
 
 type Reply = { status: number; body: string };
 type Send = (reply: Reply) => void;
@@ -322,6 +327,19 @@ export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boo
   if (handleFeatureWrites(req, url, { mode: h.scenario.write ?? "ok", ...h })) return true;
   if (url.pathname === "/__spec-reads") {
     h.send(reply(200, reads));
+    return true;
+  }
+  writeMode = h.scenario.write;
+  if (h.scenario.feature === "loading" && /\/spec\/items\//.test(url.pathname)) {
+    // Lecture d'édition retenue jusqu'à POST /__release : état « chargement de la fonctionnalité ».
+    h.hold(() => handleSpecItem(req, url, h, h.scenario, (specId) => getFeature("ok", specId)));
+    return true;
+  }
+  if (
+    handleSpecItem(req, url, h, h.scenario, (specId) =>
+      getFeature(h.scenario.feature ?? "ok", specId),
+    )
+  ) {
     return true;
   }
   if (req.method !== "GET") return false;

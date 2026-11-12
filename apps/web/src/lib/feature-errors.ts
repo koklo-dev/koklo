@@ -172,7 +172,7 @@ function forbidden(role: Role | undefined): Entry {
     return entry(
       "forbidden-designer",
       "Vous ne pouvez enregistrer que les fonctionnalités liées à un écran",
-      "Ajoutez un écran dans « Éléments liés », ou demandez à un développeur.",
+      "Ajoutez un écran dans « Liens », ou demandez à un développeur.",
       ["goto-links", "close"],
     );
   }

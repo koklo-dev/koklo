@@ -79,15 +79,15 @@ describe("validateFeatureForm", () => {
 
   it("vide : titre puis priorité, dans l'ordre du formulaire", () => {
     expect(messages(EMPTY_VALUES)).toEqual([
-      ["title", "Saisissez un titre."],
-      ["priority", "Choisissez une priorité."],
+      ["title", "Obligatoire"],
+      ["priority", "Obligatoire"],
     ]);
   });
 
   it.each(["", " ", "   ", "\t\n "])(
     "titre %j : refusé (le contrat accepte un titre d'espaces, pas nous)",
     (title) => {
-      expect(messages(valid({ title }))).toEqual([["title", "Saisissez un titre."]]);
+      expect(messages(valid({ title }))).toEqual([["title", "Obligatoire"]]);
     },
   );
 
@@ -106,9 +106,9 @@ describe("validateFeatureForm", () => {
     expect(validateFeatureForm(valid({ priority }))).toEqual([]);
   });
 
-  it("priorité hors énumération : « Choisissez une priorité. »", () => {
+  it("priorité hors énumération : « Obligatoire »", () => {
     expect(messages({ ...valid(), priority: "urgent" as never })).toEqual([
-      ["priority", "Choisissez une priorité."],
+      ["priority", "Obligatoire"],
     ]);
   });
 
@@ -167,9 +167,9 @@ describe("validateFeatureForm", () => {
       expect(validateFeatureForm(valid({ [field]: id }))).toEqual([]);
     });
 
-    it.each(bad)("refuse %s avec la ligne et un exemple", (id) => {
+    it.each(bad)("refuse %s en le citant, avec un exemple", (id) => {
       expect(messages(valid({ [field]: `${good[0]}\n${id}` }))).toEqual([
-        [field, `La ligne 2 n'est pas un identifiant valide (exemple : ${example}).`],
+        [field, `« ${id} » n'est pas un identifiant valide (exemple : ${example}).`],
       ]);
     });
   });
@@ -180,15 +180,15 @@ describe("validateFeatureForm", () => {
     ).toEqual([]);
   });
 
-  it("le numéro de ligne compte les lignes vides (celle que la personne voit)", () => {
+  it("le message cite l'identifiant refusé, lignes vides ignorées", () => {
     expect(messages(valid({ screens: "S-login\n\nnon" }))).toEqual([
-      ["screens", "La ligne 3 n'est pas un identifiant valide (exemple : S-inscription)."],
+      ["screens", "« non » n'est pas un identifiant valide (exemple : S-inscription)."],
     ]);
   });
 
   it("une seule erreur par champ de liens (la première ligne invalide)", () => {
     expect(messages(valid({ rules: "R-1\nR-2\nR-003" }))).toEqual([
-      ["rules", "La ligne 1 n'est pas un identifiant valide (exemple : R-001)."],
+      ["rules", "« R-1 » n'est pas un identifiant valide (exemple : R-001)."],
     ]);
   });
 

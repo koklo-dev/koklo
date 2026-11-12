@@ -3,14 +3,13 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { draftKey } from "../src/lib/feature-draft.ts";
 import {
+  addLinks,
   clickSave,
   fillMinimum,
   linkField,
   NEW_TITLE,
   openCreate,
-  openLinks,
   serveWrite,
-  setText,
   submitInputs,
   titleField,
 } from "./support/feature-form.tsx";
@@ -197,7 +196,7 @@ describe("Table des échecs de submit", () => {
     const { alert } = await failWith(apiError("FORBIDDEN"), "dev");
     expect(alert).toHaveTextContent("Vous n'avez pas le droit d'enregistrer dans la spec.");
     expect(within(alert).getByRole("button", { name: "Fermer" })).toBeVisible();
-    expect(within(alert).queryByRole("button", { name: "Aller à Éléments liés" })).toBeNull();
+    expect(within(alert).queryByRole("button", { name: "Aller aux liens" })).toBeNull();
   });
 
   it("FORBIDDEN, designer (écran lié côté client, refus serveur) : explication et « Aller à Éléments liés » vers « Écrans »", async () => {
@@ -208,9 +207,9 @@ describe("Table des échecs de submit", () => {
       ),
     ).toBeVisible();
     expect(alert).toHaveTextContent(
-      "Ajoutez un écran dans « Éléments liés », ou demandez à un développeur.",
+      "Ajoutez un écran dans « Liens », ou demandez à un développeur.",
     );
-    await userEvent.click(within(alert).getByRole("button", { name: "Aller à Éléments liés" }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Aller aux liens" }));
     await waitFor(() => expect(linkField(panel, "Écrans")).toHaveFocus());
   });
 
@@ -286,11 +285,9 @@ describe("Table des échecs de submit", () => {
 });
 
 async function linkScreen(panel: Panel): Promise<void> {
-  await openLinks(panel);
-  await setText(linkField(panel, "Écrans"), "S-login");
+  await addLinks(panel, ["S-login"]);
 }
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("SPEC_INVALID : diagnostics liés aux champs (§4.7)", () => {
   const invalid = (report = REPORT()) => failWith(apiError("SPEC_INVALID", { report }));
 
@@ -317,10 +314,6 @@ describe("SPEC_INVALID : diagnostics liés aux champs (§4.7)", () => {
     await userEvent.click(link);
     await waitFor(() => expect(linkField(panel, "Écrans")).toHaveFocus());
     expect(linkField(panel, "Écrans")).toHaveAttribute("aria-invalid", "true");
-    expect(panel.getByRole("button", { name: /Éléments liés/ })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
   });
 
   it("un diagnostic sans champ connu reste dans la liste, sans lien", async () => {
@@ -366,7 +359,7 @@ describe("Après un échec, la saisie n'est jamais perdue", () => {
     const { panel } = await failWith(error);
     expect(titleField(panel)).toHaveValue(NEW_TITLE);
     expect(titleField(panel)).not.toHaveAttribute("readonly");
-    expect(panel.getByRole("button", { name: "Enregistrer" })).toBeEnabled();
+    expect(panel.getByRole("button", { name: /^Enregistrer/ })).toBeEnabled();
     await waitFor(() => expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).not.toBeNull());
   });
 

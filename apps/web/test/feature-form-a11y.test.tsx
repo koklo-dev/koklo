@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clickSave,
+  closePanel,
   dialog,
   fillMinimum,
   form,
@@ -58,9 +59,10 @@ beforeEach(() => {
   serveWrite();
 });
 
-const TEAM_JARGON = /\blot\b|commit|branche|\bSHA\b|idempoten|payload|\bbatch\b/i;
+/** « un commit à l'enregistrement » est le texte du pied de la maquette 16 (l.95-103) : seul terme git permis. */
+const TEAM_JARGON =
+  /\blot\b|commit(?! à l'enregistrement| ?, relu dans l'historique)|branche|\bSHA\b|idempoten|payload|\bbatch\b/i;
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Dialogue, focus, étiquettes", () => {
   it("dialogue modal nommé par son h2, focus initial sur le titre", async () => {
     const panel = await openCreate();
@@ -71,13 +73,13 @@ describe("Dialogue, focus, étiquettes", () => {
 
   it("chaque champ a un libellé visible lié ; les aides sont reliées par aria-describedby", async () => {
     const panel = await openCreate();
-    for (const name of ["Titre (obligatoire)", "Description"]) {
+    for (const name of [/^Titre\s*obligatoire$/, "Description"]) {
       const field = panel.getByRole("textbox", { name });
       expect(field.id).not.toBe("");
       expect(document.querySelector(`label[for="${field.id}"]`)).not.toBeNull();
     }
-    for (const name of ["Priorité (obligatoire)", "Statut"]) {
-      expect(panel.getByRole("combobox", { name })).toBeVisible();
+    for (const name of [/^Priorité\s*obligatoire$/, /^Statut/]) {
+      expect(panel.getByRole("radiogroup", { name })).toBeVisible();
     }
   });
 
@@ -87,11 +89,10 @@ describe("Dialogue, focus, étiquettes", () => {
     expect(region).toHaveAttribute("tabindex", "0");
   });
 
-  it("pied : « Enregistrer » principal et « Fermer » outline, cibles 44 px en mobile (h-11 md:h-9)", async () => {
+  it("pied : « Enregistrer dans la spec » principal et « Annuler » outline, cibles 44 px en mobile (max-md:h-11)", async () => {
     const panel = await openCreate();
-    for (const name of ["Enregistrer", "Fermer"]) {
-      expect(panel.getByRole("button", { name }).className).toMatch(/\bh-11\b/);
-      expect(panel.getByRole("button", { name }).className).toMatch(/md:h-9/);
+    for (const name of ["Enregistrer dans la spec", "Annuler"]) {
+      expect(panel.getByRole("button", { name }).className).toMatch(/max-md:h-11/);
     }
   });
 
@@ -100,11 +101,11 @@ describe("Dialogue, focus, étiquettes", () => {
     expect(panel.getByRole("button", { name: "Fermer le formulaire" })).toBeVisible();
   });
 
-  it("panneau de 440 px au plus (gabarit de la fiche), pleine largeur en mobile", async () => {
+  it("panneau de 540 px au plus (maquette 16), plein écran sous 768", async () => {
     await openCreate();
     const root = await dialog();
     expect(root.className).toMatch(/w-full/);
-    expect(root.className).toMatch(/max-w-\[440px\]/);
+    expect(root.className).toMatch(/md:max-w-\[540px\]/);
   });
 
   it("ordre de tabulation = ordre visuel : titre, priorité, statut, description", async () => {
@@ -120,8 +121,8 @@ describe("Dialogue, focus, étiquettes", () => {
           "",
       );
     }
-    expect(order[0]).toMatch(/Priorité|Choisir/);
-    expect(order[1]).toMatch(/Brouillon|Statut/);
+    expect(order[0]).toMatch(/Indispensable/);
+    expect(order[1]).toMatch(/Brouillon/);
     expect((document.activeElement as HTMLElement).tagName).toBe("TEXTAREA");
   });
 });
@@ -144,7 +145,7 @@ describe("Une seule région d'état, une seule alerte (§7)", () => {
     expect(within(await dialog()).getByRole("status")).toHaveTextContent(
       "Envoi de votre modification…",
     );
-    await userEvent.click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, userEvent);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(statusRegions()).toHaveLength(1);
     expect(statusRegions()[0]?.closest('[role="dialog"]')).toBeNull();
@@ -170,11 +171,13 @@ describe("Une seule région d'état, une seule alerte (§7)", () => {
     expect(statusRegions()).toHaveLength(1);
   });
 
-  it("résumé de validation : une seule alerte, pas de seconde région d'état", async () => {
+  it("résumé de validation : l'alerte de tête et une alerte par champ en erreur (maquette 16 l.90-93), pas de seconde région d'état", async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    await panel.findByRole("alert");
-    expect(panel.getAllByRole("alert")).toHaveLength(1);
+    await panel.findAllByRole("alert");
+    const alerts = panel.getAllByRole("alert");
+    expect(alerts[0]).toHaveTextContent("2 champs obligatoires sont vides : Titre, Priorité.");
+    expect(alerts).toHaveLength(3);
     expect(statusRegions()).toHaveLength(1);
   });
 
@@ -193,13 +196,14 @@ describe("Une seule région d'état, une seule alerte (§7)", () => {
 describe("Mobile 375 px et mouvement réduit (§6, §7)", () => {
   beforeEach(() => setViewport(MOBILE));
 
-  it("pied : boutons pleine largeur, « Enregistrer » avant « Fermer » dans le flux", async () => {
+  it("pied collant : « Annuler » puis « Enregistrer » (maquette 16 l.95-103), cibles 44 px", async () => {
     const panel = await openCreate();
-    const save = panel.getByRole("button", { name: "Enregistrer" });
-    const close = panel.getByRole("button", { name: "Fermer" });
-    expect(save.className).toMatch(/w-full/);
-    expect(close.className).toMatch(/w-full/);
-    expect(save.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const save = panel.getByRole("button", { name: /^Enregistrer/ });
+    const close = panel.getByRole("button", { name: "Annuler" });
+    expect(save.className).toMatch(/max-md:h-11/);
+    expect(close.className).toMatch(/max-md:h-11/);
+    expect(save.closest('[class*="max-md:sticky"]')).not.toBeNull();
+    expect(close.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("éditeur de critères : actions « Monter », « Descendre », « Retirer » avec libellés texte et cibles 44 px", async () => {
@@ -239,7 +243,7 @@ describe("Vocabulaire (§5.9, AC-48-28)", () => {
   it("équipe : aucun terme technique (lot, commit, branche, SHA, idempotence, payload) dans le formulaire au repos", async () => {
     const panel = await openCreate();
     expect(visibleText(await dialog())).not.toMatch(TEAM_JARGON);
-    expect(panel.getByRole("button", { name: "Enregistrer" })).toBeVisible();
+    expect(panel.getByRole("button", { name: /^Enregistrer/ })).toBeVisible();
   });
 
   it("équipe : ni dans la modification, ni dans l'indicateur d'avancement, ni dans une erreur", async () => {

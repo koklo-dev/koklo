@@ -79,7 +79,7 @@ describe("jetons de couleur, d'ombre et de voile", () => {
   it.each([
     ["--overlay", "rgb(13 11 28 / 0.38)", "rgb(0 0 0 / 0.55)"],
     ["--shadow-dialog", "0 18px 44px rgb(20 16 43 / 0.2)", "none"],
-    ["--shadow-sheet", "-16px 0 40px rgb(20 16 43 / 0.2)", "none"],
+    ["--shadow-sheet", "-16px 0 40px rgb(20 16 43 / 0.22)", "-16px 0 40px rgb(20 16 43 / 0.22)"],
     ["--shadow-toast", "0 8px 24px rgb(20 16 43 / 0.25)", "0 8px 24px rgb(20 16 43 / 0.25)"],
   ])("%s dans theme.css", (name, light, dark) => {
     expect(norm(effectiveTheme(":root")[name])).toBe(norm(light));

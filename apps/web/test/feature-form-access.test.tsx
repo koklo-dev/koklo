@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  closePanel,
   dialog,
   form,
   openCreate,
@@ -156,7 +157,7 @@ describe("Ouverture de la création", () => {
     expect(window.history.length).toBe(length + 1);
   });
 
-  it("focus initial sur le champ « Titre (obligatoire) », sans appel à spec.getFeature", async () => {
+  it("focus initial sur le champ « Titre », sans appel à spec.getFeature", async () => {
     const panel = await openCreate();
     await waitFor(() => expect(titleField(panel)).toHaveFocus());
     expect(procedures.specGetFeature).not.toHaveBeenCalled();
@@ -246,7 +247,7 @@ describe("Ouverture de la modification", () => {
       serveWrite(role);
       renderFeatures({ search: "?edit=F-001" });
       const panel = await dialog();
-      expect(panel).toHaveAccessibleName("Modifier F-001");
+      expect(panel).toHaveAccessibleName("Modifier la fonctionnalité");
       expect(inputsOf(procedures.specGetFeature)).toEqual([
         { projectId: PROJECT_ID, specId: "F-001" },
       ]);
@@ -256,17 +257,15 @@ describe("Ouverture de la modification", () => {
   it("l'identifiant du titre est en police mono", async () => {
     renderFeatures({ search: "?edit=F-001" });
     const panel = await dialog();
-    const mono = within(panel)
-      .getByRole("heading", { level: 2 })
-      .querySelector("[class*='font-mono']");
-    expect(mono).toHaveTextContent("F-001");
+    const tag = within(panel).getByText("F-001", { selector: "[data-slot='id-tag']" });
+    expect(tag).toHaveClass("font-mono");
   });
 
   it("la fiche d'une équipe propose « Modifier » : la fiche est remplacée par le formulaire", async () => {
     renderFeatures({ search: "?feature=F-001" });
     const sheet = await findNamed("dialog", "Connexion par e-mail");
     await userEvent.click(await within(sheet).findByRole("button", { name: "Modifier" }));
-    const panel = await findNamed("dialog", "Modifier F-001");
+    const panel = await findNamed("dialog", "Modifier la fonctionnalité");
     expect(panel).toBeVisible();
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
     const params = new URLSearchParams(window.location.search);
@@ -278,12 +277,12 @@ describe("Ouverture de la modification", () => {
     renderFeatures({ search: "?feature=F-001" });
     const sheet = await findNamed("dialog", "Connexion par e-mail");
     await userEvent.click(await within(sheet).findByRole("button", { name: "Modifier" }));
-    await findNamed("dialog", "Modifier F-001");
+    await findNamed("dialog", "Modifier la fonctionnalité");
     window.history.back();
     // Le texte « Connexion par e-mail » est déjà dans la ligne du tableau : attendre la disparition du
     // formulaire, puis la fiche, plutôt que de lire le rôle tout de suite (jsdom traite back() en différé).
     await waitFor(
-      () => expect(screen.queryByRole("dialog", { name: "Modifier F-001" })).toBeNull(),
+      () => expect(screen.queryByRole("dialog", { name: "Modifier la fonctionnalité" })).toBeNull(),
       {
         timeout: 8000,
       },
@@ -303,43 +302,58 @@ describe("Ouverture de la modification", () => {
     expect(
       await within(panel).findByText("Cette fonctionnalité n'existe plus dans la spec."),
     ).toBeVisible();
-    expect(within(panel).getByRole("button", { name: "Fermer" })).toBeVisible();
-    expect(within(panel).queryByRole("textbox")).toBeNull();
-    expect(within(panel).queryByRole("button", { name: "Enregistrer" })).toBeNull();
+    expect(within(panel).getByRole("button", { name: "Annuler" })).toBeVisible();
+    expect(within(panel).queryByRole("textbox", { name: /^Titre/ })).toBeNull();
+    expect(within(panel).getByRole("button", { name: /^Enregistrer/ })).toBeDisabled();
   });
 
-  it("chargement : « Chargement de la fonctionnalité… » en attente, sans champ ni bouton « Enregistrer »", async () => {
+  it("chargement : « Chargement de la fonctionnalité… » en attente, sans champ, « Enregistrer » désactivé", async () => {
     procedures.specGetFeature.mockReturnValue(new Promise(() => undefined));
     renderFeatures({ search: "?edit=F-001" });
     const panel = await form();
     const loading = await panel.findByText("Chargement de la fonctionnalité…");
     expect(loading.closest("[aria-busy='true']")).not.toBeNull();
-    expect(panel.queryByRole("textbox")).toBeNull();
-    expect(panel.queryByRole("button", { name: "Enregistrer" })).toBeNull();
+    expect(panel.queryByRole("textbox", { name: /^Titre/ })).toBeNull();
+    expect(panel.getByRole("button", { name: /^Enregistrer/ })).toBeDisabled();
   });
 });
 
 describe("Fermeture (sans confirmation, brouillon gardé)", () => {
   it("« Fermer » ferme, retire ?new=1 et rend le focus au bouton « Nouvelle fonctionnalité »", async () => {
     const panel = await openCreate();
-    await userEvent.click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, userEvent);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(window.location.search).toBe("?tab=features");
     expect(screen.getByRole("button", { name: NEW_BUTTON })).toHaveFocus();
   });
 
-  it("Échap ferme sans aucun dialogue de confirmation", async () => {
+  it("Échap : sans saisie, ferme directement ; avec saisie, confirmation « Fermer sans enregistrer ? » (B329 g)", async () => {
     const panel = await openCreate();
     await userEvent.type(titleField(panel), "Un début");
     await userEvent.keyboard("{Escape}");
+    const confirm = await screen.findByRole("alertdialog", { name: "Fermer sans enregistrer ?" });
+    expect(within(confirm).getByRole("button", { name: "Continuer la saisie" })).toHaveFocus();
+    await userEvent.click(within(confirm).getByRole("button", { name: "Continuer la saisie" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Fermer sans enregistrer",
+      }),
+    );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(screen.queryByText(/Quitter sans enregistrer/)).toBeNull();
   });
 
-  it("le bouton de fermeture de l'angle est distinct de « Fermer » (un seul bouton nommé « Fermer »)", async () => {
+  it("Échap sur un formulaire vierge ferme sans confirmation", async () => {
+    await openCreate();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("le bouton de fermeture de l'angle est distinct de « Annuler » (un seul bouton nommé « Annuler »)", async () => {
     const panel = await openCreate();
-    expect(panel.getAllByRole("button", { name: "Fermer" })).toHaveLength(1);
+    expect(panel.getAllByRole("button", { name: "Annuler" })).toHaveLength(1);
     expect(panel.getByRole("button", { name: "Fermer le formulaire" })).toBeVisible();
   });
 
@@ -352,7 +366,7 @@ describe("Fermeture (sans confirmation, brouillon gardé)", () => {
 
   it("fermer ne déclenche aucun appel d'écriture", async () => {
     const panel = await openCreate();
-    await userEvent.click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, userEvent);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(submitInputs()).toEqual([]);
   });

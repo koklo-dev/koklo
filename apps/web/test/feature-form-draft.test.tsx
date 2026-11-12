@@ -1,5 +1,5 @@
 import { SidebarProvider } from "@koklo/ui";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NavUser } from "../src/components/nav-user.tsx";
@@ -9,7 +9,9 @@ import { EMPTY_VALUES, valuesFromDetail } from "../src/lib/feature-form.ts";
 import {
   advance,
   clickSave,
+  closePanel,
   DETAIL_TYPED as DETAIL,
+  expectPriority,
   fillMinimum,
   form,
   liveText,
@@ -84,7 +86,7 @@ async function typeThenClose() {
   const panel = await openCreate(userEvent.setup({ delay: null }));
   await fillMinimum(panel, "Brouillon en cours");
   await advance(700);
-  await userEvent.setup({ delay: null }).click(panel.getByRole("button", { name: "Fermer" }));
+  await closePanel(panel, userEvent.setup({ delay: null }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 }
 
@@ -161,6 +163,7 @@ describe("Sauvegarde automatique", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Fermer et reprendre", () => {
   it("fermer avec un brouillon : « Brouillon gardé sur cet appareil. » dans la région d'état, sans confirmation", async () => {
     await typeThenClose();
@@ -171,7 +174,7 @@ describe("Fermer et reprendre", () => {
 
   it("fermer sans rien saisir : aucune annonce de brouillon", async () => {
     const panel = await openCreate(userEvent.setup({ delay: null }));
-    await userEvent.setup({ delay: null }).click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, userEvent.setup({ delay: null }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).not.toContain("Brouillon gardé");
   });
@@ -180,7 +183,13 @@ describe("Fermer et reprendre", () => {
     const panel = await openCreate(userEvent.setup({ delay: null }));
     await fillMinimum(panel, "Au clavier");
     await advance(700);
-    await userEvent.setup({ delay: null }).keyboard("{Escape}");
+    const user = userEvent.setup({ delay: null });
+    await user.keyboard("{Escape}");
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Fermer sans enregistrer",
+      }),
+    );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain("Brouillon gardé sur cet appareil.");
   });
@@ -190,9 +199,7 @@ describe("Fermer et reprendre", () => {
     const panel = await reopenNew();
     expect(await panel.findByText(/^Brouillon repris, enregistré le .+\.$/)).toBeVisible();
     expect(titleField(panel)).toHaveValue("Brouillon en cours");
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveTextContent(
-      "Importante",
-    );
+    expectPriority(panel, "Importante");
     expect(panel.getByRole("button", { name: "Abandonner le brouillon" })).toBeVisible();
     expect(statusRegions()).toHaveLength(1);
   });
@@ -219,6 +226,7 @@ describe("Fermer et reprendre", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Abandon avec confirmation en ligne", () => {
   async function resumed() {
     await typeThenClose();
@@ -253,9 +261,11 @@ describe("Abandon avec confirmation en ligne", () => {
     await u.click(await panel.findByRole("button", { name: "Abandonner le brouillon" }));
     await u.click(await panel.findByRole("button", { name: "Abandonner" }));
     await waitFor(() => expect(titleField(panel)).toHaveValue(""));
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveTextContent(
-      "Choisir une priorité",
-    );
+    for (const radio of within(panel.getByRole("radiogroup", { name: /^Priorité/ })).getAllByRole(
+      "radio",
+    )) {
+      expect(radio).not.toBeChecked();
+    }
     expect(liveText()).toContain("Brouillon abandonné.");
     expect(stored(NEW_KEY)).toBeNull();
     expect(panel.queryByText(/Brouillon repris/)).toBeNull();

@@ -2,13 +2,15 @@ import { waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  addLinks,
+  clearLinks,
   clickSave,
+  expectPriority,
   fillMinimum,
   linkField,
   NEW_SHA,
   openCreate,
   openEdit,
-  openLinks,
   operationOf,
   pick,
   serveWrite,
@@ -64,7 +66,7 @@ const RELOAD = "Recharger la version actuelle";
 async function editAndConflict() {
   const panel = await openEdit();
   await setText(titleField(panel), "Mon titre");
-  await pick(panel, "Priorité (obligatoire)", "Importante");
+  await pick(panel, /^Priorité\s*obligatoire$/, "Importante");
   procedures.specBatchSubmit.mockRejectedValueOnce(stale());
   await clickSave(panel);
   const alert = await panel.findByRole("alert");
@@ -109,9 +111,7 @@ describe("stale_base : « Recharger la version actuelle » (comparaison à trois
       ),
     );
     expect(titleField(panel)).toHaveValue("Mon titre");
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveTextContent(
-      "Importante",
-    );
+    expectPriority(panel, "Importante");
   });
 
   it("champs modifiés des deux côtés : votre valeur gardée, signalés en tête et sous le champ", async () => {
@@ -222,13 +222,9 @@ describe("Designer : fonctionnalité liée à au moins un écran (AC-48-27)", ()
     "En tant que designer, vous pouvez enregistrer une fonctionnalité seulement si elle est liée à au moins un écran.";
   beforeEach(() => serveWrite("designer"));
 
-  it("« Éléments liés » ouvert d'office, avec l'aide permanente sous « Écrans »", async () => {
+  it("« Liens » : l'aide permanente du designer est reliée à la saisie", async () => {
     const panel = await openCreate();
-    expect(panel.getByRole("button", { name: /Éléments liés/ })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    expect(panel.getByText(HELP)).toBeVisible();
+    expect(panel.getByText(new RegExp(HELP))).toBeVisible();
     expect(linkField(panel, "Écrans")).toHaveAccessibleDescription(/En tant que designer/);
   });
 
@@ -248,7 +244,7 @@ describe("Designer : fonctionnalité liée à au moins un écran (AC-48-27)", ()
     procedures.specBatchSubmit.mockReturnValue(new Promise(() => undefined));
     const panel = await openCreate();
     await fillMinimum(panel);
-    await setText(linkField(panel, "Écrans"), "S-login");
+    await addLinks(panel, ["S-login"]);
     await clickSave(panel);
     await waitFor(() => expect(submitInputs()).toHaveLength(1));
     expect(operationOf()).toMatchObject({ screens: ["S-login"] });
@@ -256,7 +252,7 @@ describe("Designer : fonctionnalité liée à au moins un écran (AC-48-27)", ()
 
   it("modification d'une fonctionnalité liée : retirer tous les écrans est refusé", async () => {
     const panel = await openEdit();
-    await setText(linkField(panel, "Écrans"), "");
+    await clearLinks(panel);
     await clickSave(panel);
     expect(await panel.findByRole("link", { name: MESSAGE })).toBeVisible();
     expect(submitInputs()).toEqual([]);
@@ -283,8 +279,7 @@ describe("Designer : fonctionnalité liée à au moins un écran (AC-48-27)", ()
     procedures.specBatchSubmit.mockRejectedValue(apiError("FORBIDDEN"));
     const panel = await openCreate();
     await fillMinimum(panel);
-    await openLinks(panel);
-    await setText(linkField(panel, "Écrans"), "S-login");
+    await addLinks(panel, ["S-login"]);
     await clickSave(panel);
     const alert = await panel.findByRole("alert");
     expect(alert).toHaveTextContent(
@@ -301,10 +296,6 @@ describe("Autres rôles d'équipe : pas de règle d'écran", () => {
       procedures.specBatchSubmit.mockReturnValue(new Promise(() => undefined));
       const panel = await openCreate();
       expect(panel.queryByText(/En tant que designer/)).toBeNull();
-      expect(panel.getByRole("button", { name: /Éléments liés/ })).toHaveAttribute(
-        "aria-expanded",
-        "false",
-      );
       await fillMinimum(panel);
       await clickSave(panel);
       await waitFor(() => expect(submitInputs()).toHaveLength(1));
@@ -314,7 +305,7 @@ describe("Autres rôles d'équipe : pas de règle d'écran", () => {
   it("propriétaire : retirer tous les écrans d'une fonctionnalité est permis", async () => {
     procedures.specBatchSubmit.mockReturnValue(new Promise(() => undefined));
     const panel = await openEdit();
-    await setText(linkField(panel, "Écrans"), "");
+    await clearLinks(panel);
     await clickSave(panel);
     await waitFor(() => expect(submitInputs()).toHaveLength(1));
     expect(operationOf()).toMatchObject({ screens: [] });

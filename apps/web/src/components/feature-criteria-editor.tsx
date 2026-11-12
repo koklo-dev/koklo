@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Icon } from "@koklo/ui";
+import { Button, Field, FieldLabel, Icon } from "@koklo/ui";
 import {
   addCriterion,
   criterionKey,
@@ -17,12 +17,14 @@ interface EditorProps {
   model: FeatureFormModel;
   readOnly: boolean;
   announce: (text: string) => void;
+  /** Rempli par l'agent : filet et mention « proposé par l'agent ». */
+  agentFilled?: boolean;
   /** Critères tels que lus, pour reconnaître un titre changé. */
   original: FeatureFormModel["state"]["baseline"];
 }
 
 /** Liste ordonnée des critères d'acceptation, envoyée en bloc (S-feature-form §3.3). */
-export function CriteriaEditor({ model, readOnly, announce, original }: EditorProps) {
+export function CriteriaEditor({ model, readOnly, announce, original, agentFilled }: EditorProps) {
   const list = model.state.values.criteria;
   const set = (criteria: typeof list) => model.setValues({ criteria });
   const error = (field: string) => messageOf(model, field);
@@ -30,13 +32,13 @@ export function CriteriaEditor({ model, readOnly, announce, original }: EditorPr
     if (!readOnly) action();
   };
   return (
-    <section aria-labelledby="feature-form-criteria-heading" className="flex flex-col gap-3">
-      <h3
-        id="feature-form-criteria-heading"
-        className="text-subsection-title text-muted-foreground"
-      >
-        Critères d'acceptation
-      </h3>
+    <Field
+      role="region"
+      agentFilled={Boolean(agentFilled) && list.length > 0}
+      aria-labelledby="feature-form-criteria-heading"
+      className="gap-3"
+    >
+      <FieldLabel id="feature-form-criteria-heading">Critères d'acceptation</FieldLabel>
       {list.length > 0 ? (
         <ol className="flex flex-col gap-3">
           {list.map((criterion, index) => (
@@ -85,6 +87,6 @@ export function CriteriaEditor({ model, readOnly, announce, original }: EditorPr
         <Icon name="add" size={16} />
         Ajouter un critère
       </Button>
-    </section>
+    </Field>
   );
 }

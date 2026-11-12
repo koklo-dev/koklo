@@ -3,14 +3,14 @@
 import { featurePrioritySchema, featureStatusSchema } from "@koklo/contract";
 import {
   Button,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
   Icon,
   Input,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  RadioPill,
+  RadioPillGroup,
   Textarea,
 } from "@koklo/ui";
 import type { ReactNode } from "react";
@@ -37,11 +37,21 @@ interface ControlProps {
   id: string;
   "aria-describedby": string | undefined;
   "aria-invalid": true | undefined;
+  /** Identifiant du libellé, pour nommer un groupe de pastilles. */
+  labelId: string;
 }
 interface ShellProps {
   field: FieldKey;
   label: string;
   model: FeatureFormModel;
+  /** « * » après le libellé (champ obligatoire). */
+  required?: boolean;
+  /** « (facultatif) » après le libellé. */
+  optional?: boolean;
+  /** Rempli par l'agent : filet de 3 px et mention « proposé par l'agent ». */
+  agentFilled?: boolean;
+  /** Le libellé désigne un contrôle étiqueté (`false` pour un groupe de pastilles, nommé par `aria-labelledby`). */
+  labelFor?: boolean;
   /** Aide permanente sous le champ. */
   hint?: ReactNode;
   hintId?: string;
@@ -49,7 +59,7 @@ interface ShellProps {
 }
 
 /** « Valeur actuelle dans la spec : … » pour un champ modifié des deux côtés (S-feature-form §5.8). */
-function CurrentValue({ field, model }: { field: FieldKey; model: FeatureFormModel }) {
+export function CurrentValue({ field, model }: { field: FieldKey; model: FeatureFormModel }) {
   const { current, conflicts } = model.state;
   if (!current || !conflicts.includes(field)) return null;
   return (
@@ -67,33 +77,42 @@ function CurrentValue({ field, model }: { field: FieldKey; model: FeatureFormMod
   );
 }
 
-/** Libellé visible lié, aide, erreur et valeur actuelle d'un champ du formulaire. */
-export function FieldShell({ field, label, model, hint, hintId, children }: ShellProps) {
+/** Libellé visible lié, aide, erreur et valeur actuelle d'un champ du formulaire (maquette 16 l.82-93). */
+export function FieldShell(props: ShellProps) {
+  const { field, label, model, hint, hintId, children } = props;
   const id = fieldId(field);
   const message = messageOf(model, field);
   const invalid = Boolean(message) || model.state.serverFields.includes(field);
   const describedBy = [message ? `${id}-error` : null, hint ? hintId : null]
     .filter(Boolean)
     .join(" ");
+  const labelId = `${id}-label`;
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+    <Field agentFilled={props.agentFilled ?? false} className="gap-1.5">
+      <FieldLabel
+        id={labelId}
+        {...(props.labelFor === false ? {} : { htmlFor: id })}
+        required={props.required ?? false}
+        optional={props.optional ?? false}
+      >
+        {label}
+      </FieldLabel>
       {children({
         id,
         "aria-describedby": describedBy || undefined,
         "aria-invalid": invalid ? true : undefined,
+        labelId,
       })}
-      {message ? <FieldMessage id={`${id}-error`} text={message} /> : null}
+      {message ? <FieldError id={`${id}-error`}>{message}</FieldError> : null}
       {hint}
       <CurrentValue field={field} model={model} />
-    </div>
+    </Field>
   );
 }
 
-const Hint = ({ id, children }: { id: string; children: ReactNode }) => (
-  <p id={id} className="text-meta text-muted-foreground">
-    {children}
-  </p>
+/** Aide sous un champ : 12 px, `--muted-foreground`. */
+export const Hint = ({ id, children }: { id: string; children: ReactNode }) => (
+  <FieldDescription id={id}>{children}</FieldDescription>
 );
 
 const PRIORITIES = featurePrioritySchema.options.map((value) => ({
@@ -105,87 +124,110 @@ const STATUSES = featureStatusSchema.options.map((value) => ({
   label: statusLabel(value),
 }));
 
-interface FieldsProps {
+export interface FieldsProps {
   model: FeatureFormModel;
   readOnly: boolean;
+  /** Champs que l'agent a remplis (marqués tant qu'ils ne sont pas vides). */
+  agentFilled?: (key: "title" | "priority" | "description") => boolean;
 }
 
-function EnumSelect<V extends string>(props: {
+/** Choix d'une valeur parmi quelques-unes, en pastilles de 32 px (maquette 16 l.88). */
+function PillChoice<V extends string>(props: {
   control: ControlProps;
   value: string;
   options: { value: V; label: string }[];
-  placeholder?: string;
   disabled: boolean;
   onChange: (value: V) => void;
   onBlur: () => void;
 }) {
-  const { control, value, options, placeholder, disabled, onChange, onBlur } = props;
+  const { control, value, options, disabled, onChange, onBlur } = props;
+  const { labelId, id, ...aria } = control;
   return (
-    <Select value={value} disabled={disabled} onValueChange={(next) => onChange(next as V)}>
-      <SelectTrigger {...control} className="h-11 md:h-9" onBlur={onBlur}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <RadioPillGroup
+      {...aria}
+      aria-labelledby={labelId}
+      value={value}
+      disabled={disabled}
+      onValueChange={(next) => onChange(next as V)}
+      onBlur={onBlur}
+    >
+      {options.map((option, index) => (
+        // La première pastille porte l'identifiant du champ : c'est elle qui reçoit le focus d'une erreur.
+        <RadioPill
+          key={option.value}
+          value={option.value}
+          {...(index === 0 ? { id } : {})}
+          aria-invalid={aria["aria-invalid"]}
+        >
+          {option.label}
+        </RadioPill>
+      ))}
+    </RadioPillGroup>
   );
 }
 
-/** Titre, priorité et statut (section « Général »). */
-export function GeneralFields({ model, readOnly }: FieldsProps) {
-  const { values } = model.state;
-  const length = values.title.length;
+/** Titre : compteur de caractères dès 180. */
+function TitleField({ model, readOnly, agentFilled }: FieldsProps) {
+  const { title } = model.state.values;
   const counterId = `${fieldId("title")}-count`;
   return (
-    <section aria-labelledby="feature-form-general" className="flex flex-col gap-4">
-      <h3 id="feature-form-general" className="text-subsection-title text-muted-foreground">
-        Général
-      </h3>
+    <FieldShell
+      field="title"
+      label="Titre"
+      required
+      agentFilled={agentFilled?.("title") === true && title.trim() !== ""}
+      model={model}
+      hintId={counterId}
+      hint={
+        title.length >= 180 ? (
+          <p id={counterId} aria-live="polite" className="text-meta text-muted-foreground">
+            {`${title.length} / ${TITLE_MAX}`}
+          </p>
+        ) : null
+      }
+    >
+      {({ labelId: _label, ...control }) => (
+        <Input
+          {...control}
+          className="max-md:h-11"
+          value={title}
+          readOnly={readOnly}
+          onChange={(event) => model.setValues({ title: event.target.value })}
+          onBlur={() => model.blur("title")}
+        />
+      )}
+    </FieldShell>
+  );
+}
+
+/** Titre, priorité et statut. */
+export function GeneralFields({ model, readOnly, agentFilled }: FieldsProps) {
+  const { values } = model.state;
+  return (
+    <>
+      <TitleField model={model} readOnly={readOnly} {...(agentFilled ? { agentFilled } : {})} />
       <FieldShell
-        field="title"
-        label="Titre (obligatoire)"
+        field="priority"
+        label="Priorité"
+        required
+        labelFor={false}
+        agentFilled={agentFilled?.("priority") === true && values.priority !== ""}
         model={model}
-        hintId={counterId}
-        hint={
-          length >= 180 ? (
-            <p id={counterId} aria-live="polite" className="text-meta text-muted-foreground">
-              {`${length} / ${TITLE_MAX}`}
-            </p>
-          ) : null
-        }
       >
         {(control) => (
-          <Input
-            {...control}
-            className="h-11 md:h-9"
-            value={values.title}
-            readOnly={readOnly}
-            onChange={(event) => model.setValues({ title: event.target.value })}
-            onBlur={() => model.blur("title")}
-          />
-        )}
-      </FieldShell>
-      <FieldShell field="priority" label="Priorité (obligatoire)" model={model}>
-        {(control) => (
-          <EnumSelect
+          <PillChoice
             control={control}
             value={values.priority}
             options={PRIORITIES}
-            placeholder="Choisir une priorité"
             disabled={readOnly}
             onChange={(priority) => model.setValues({ priority })}
             onBlur={() => model.blur("priority")}
           />
         )}
       </FieldShell>
-      <FieldShell field="status" label="Statut" model={model}>
+      <FieldShell field="status" label="Statut" optional labelFor={false} model={model}>
         {(control) => (
-          <EnumSelect
+          <PillChoice
             control={control}
             value={values.status}
             options={STATUSES}
@@ -195,33 +237,34 @@ export function GeneralFields({ model, readOnly }: FieldsProps) {
           />
         )}
       </FieldShell>
-    </section>
+    </>
   );
 }
 
 /** Description en texte brut : les retours à la ligne sont conservés. */
-export function DescriptionField({ model, readOnly }: FieldsProps) {
+export function DescriptionField({ model, readOnly, agentFilled }: FieldsProps) {
   const hintId = `${fieldId("description")}-hint`;
+  const { description } = model.state.values;
   return (
-    <section aria-label="Description" className="flex flex-col gap-4">
-      <FieldShell
-        field="description"
-        label="Description"
-        model={model}
-        hintId={hintId}
-        hint={<Hint id={hintId}>Texte brut : les retours à la ligne sont conservés.</Hint>}
-      >
-        {(control) => (
-          <Textarea
-            {...control}
-            rows={4}
-            value={model.state.values.description}
-            readOnly={readOnly}
-            onChange={(event) => model.setValues({ description: event.target.value })}
-          />
-        )}
-      </FieldShell>
-    </section>
+    <FieldShell
+      field="description"
+      label="Description"
+      agentFilled={Boolean(agentFilled?.("description")) && description.trim() !== ""}
+      model={model}
+      hintId={hintId}
+      hint={<Hint id={hintId}>Ce que l'utilisateur peut faire, en une ou deux phrases.</Hint>}
+    >
+      {({ labelId: _label, ...control }) => (
+        <Textarea
+          {...control}
+          rows={3}
+          className="resize-y"
+          value={description}
+          readOnly={readOnly}
+          onChange={(event) => model.setValues({ description: event.target.value })}
+        />
+      )}
+    </FieldShell>
   );
 }
 

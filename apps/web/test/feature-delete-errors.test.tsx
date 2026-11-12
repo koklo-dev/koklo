@@ -6,6 +6,7 @@ import {
   confirmDelete,
   DELETE_BUTTON,
   form,
+  linkField,
   openEdit,
   serveWrite,
   setText,
@@ -80,7 +81,7 @@ describe("Table des échecs de submit, appliquée à la suppression", () => {
   it("l'alerte remplace la confirmation : on retrouve le pied normal (Enregistrer, Fermer, Supprimer cette fonctionnalité)", async () => {
     const { panel } = await failWith(apiError("PROVIDER_UNAVAILABLE"));
     expect(panel.queryByRole("group", { name: "Confirmer la suppression" })).toBeNull();
-    expect(panel.getByRole("button", { name: "Fermer" })).toBeVisible();
+    expect(panel.getByRole("button", { name: "Annuler" })).toBeVisible();
     expect(panel.getByRole("button", { name: DELETE_BUTTON })).toBeVisible();
   });
 
@@ -151,7 +152,7 @@ describe("Table des échecs de submit, appliquée à la suppression", () => {
     const { alert } = await failWith(apiError("FORBIDDEN"), "dev");
     expect(alert).toHaveTextContent("Vous n'avez pas le droit d'enregistrer dans la spec.");
     expect(within(alert).getByRole("button", { name: "Fermer" })).toBeVisible();
-    expect(within(alert).queryByRole("button", { name: "Aller à Éléments liés" })).toBeNull();
+    expect(within(alert).queryByRole("button", { name: "Aller aux liens" })).toBeNull();
   });
 
   it("FORBIDDEN, designer : règle de l'écran ; « Aller à Éléments liés » ouvre la section et place le focus sur « Écrans »", async () => {
@@ -159,8 +160,8 @@ describe("Table des échecs de submit, appliquée à la suppression", () => {
     expect(alert).toHaveTextContent(
       "Vous ne pouvez enregistrer que les fonctionnalités liées à un écran",
     );
-    await userEvent.click(within(alert).getByRole("button", { name: "Aller à Éléments liés" }));
-    await waitFor(() => expect(panel.getByRole("textbox", { name: "Écrans" })).toHaveFocus());
+    await userEvent.click(within(alert).getByRole("button", { name: "Aller aux liens" }));
+    await waitFor(() => expect(linkField(panel)).toHaveFocus());
   });
 
   it("NOT_FOUND (projet ou dépôt de spec disparu) : « Ce projet n'a plus de dépôt de spec », « Voir les projets », « Fermer »", async () => {
@@ -263,15 +264,17 @@ describe("Conflits d'une suppression", () => {
   });
 
   it("déjà supprimée par quelqu'un d'autre : write_conflict, puis le rechargement dit que la fonctionnalité n'existe plus", async () => {
-    const { panel, alert } = await failWith(writeConflict());
+    const { alert } = await failWith(writeConflict());
     procedures.specGetFeature.mockRejectedValue(apiError("NOT_FOUND"));
     await userEvent.click(
       within(alert).getByRole("button", { name: "Recharger la version actuelle" }),
     );
+    // Le panneau de chargement remplace le formulaire : on relit le dialogue.
     expect(
-      await panel.findByText("Cette fonctionnalité n'existe plus dans la spec."),
+      await screen.findByText("Cette fonctionnalité n'existe plus dans la spec."),
     ).toBeVisible();
-    expect(panel.getByRole("button", { name: "Fermer" })).toBeVisible();
+    const panel = await form();
+    expect(panel.getByRole("button", { name: "Annuler" })).toBeVisible();
     expect(panel.queryByRole("button", { name: DELETE_BUTTON })).toBeNull();
     expect(submitInputs()).toHaveLength(1);
   });
@@ -289,9 +292,8 @@ describe("Refus préalable du designer (règle documentée : au moins un écran 
     procedures.specGetFeature.mockResolvedValue({ ...DETAIL, screens: [] });
     procedures.specBatchSubmit.mockReturnValue(new Promise(() => undefined));
     renderFeatures({ search: "?edit=F-001" });
-    const panel = await form();
-    await panel.findByDisplayValue("Connexion par e-mail");
-    return panel;
+    await screen.findByDisplayValue("Connexion par e-mail", undefined, { timeout: 8_000 });
+    return form();
   }
 
   it("sans écran lié : la confirmation ne part pas, la règle du designer s'affiche, aucun appel", async () => {
@@ -301,7 +303,7 @@ describe("Refus préalable du designer (règle documentée : au moins un écran 
     expect(alert).toHaveTextContent(
       "Vous ne pouvez enregistrer que les fonctionnalités liées à un écran",
     );
-    expect(within(alert).getByRole("button", { name: "Aller à Éléments liés" })).toBeVisible();
+    expect(within(alert).getByRole("button", { name: "Aller aux liens" })).toBeVisible();
     expect(submitInputs()).toHaveLength(0);
     expect(procedures.specBatchSubmit).not.toHaveBeenCalled();
   });

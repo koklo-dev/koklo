@@ -49,7 +49,11 @@ const sheetVariants = cva(
 );
 
 export type SheetContentProps = ComponentProps<typeof SheetPrimitive.Content> &
-  VariantProps<typeof sheetVariants> & { closeLabel?: string };
+  VariantProps<typeof sheetVariants> & {
+    closeLabel?: string;
+    /** Position du ✕ quand l'en-tête le loge sur sa ligne (le défaut le place en haut à droite). */
+    closeClassName?: string;
+  };
 
 export function SheetContent({
   side,
@@ -57,6 +61,7 @@ export function SheetContent({
   className,
   children,
   closeLabel = "Fermer",
+  closeClassName,
   ...props
 }: SheetContentProps) {
   return (
@@ -70,9 +75,9 @@ export function SheetContent({
         <SheetPrimitive.Close asChild>
           <IconButton
             icon="close"
-            size="sm"
+            size={closeClassName ? "default" : "sm"}
             aria-label={closeLabel}
-            className="absolute right-4 top-4"
+            className={cn("absolute right-4 top-4", closeClassName)}
           />
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
@@ -85,21 +90,34 @@ export type SheetHeaderProps = ComponentProps<"div"> & {
   icon?: IconName;
   /** Identifiant (ticket, écran) en `IdTag`, sous le sous-titre. */
   tag?: string;
+  /** L'identifiant passe sur la ligne du titre, à droite, avant le ✕ (maquette 16 l.62). */
+  tagInline?: boolean;
 };
 
-export function SheetHeader({ icon, tag, className, children, ...props }: SheetHeaderProps) {
+export function SheetHeader({
+  icon,
+  tag,
+  tagInline = false,
+  className,
+  children,
+  ...props
+}: SheetHeaderProps) {
   return (
     <div className={cn("flex items-start gap-3 pr-10", className)} {...props}>
       {icon ? <IconTile icon={icon} size={36} tone="soft" /> : null}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className={cn("flex min-w-0 flex-1 flex-col", !tagInline && "gap-1")}>
         {children}
-        {tag ? <IdTag className="self-start">{tag}</IdTag> : null}
+        {tag && !tagInline ? <IdTag className="self-start">{tag}</IdTag> : null}
       </div>
+      {tag && tagInline ? <IdTag className="shrink-0">{tag}</IdTag> : null}
     </div>
   );
 }
 
-/** Pied `--surface` à bordure haute, collé aux bords du tiroir (compense les marges 16 / 20). */
+/**
+ * Pied `--surface` à bordure haute, collé aux bords du tiroir (compense les marges 16 / 20). Un tiroir sans marge
+ * (`px-0 py-0`) annule la compensation par `mx-0 mb-0`.
+ */
 export function SheetFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div

@@ -78,6 +78,10 @@ const LINK_RULES: Record<LinkField, { pattern: RegExp; example: string }> = {
 export const isLinkField = (field: string): field is LinkField =>
   (LINK_FIELDS as readonly string[]).includes(field);
 
+/** Vrai quand `text` respecte le motif de l'identifiant de la liste `field`. */
+export const isLinkId = (field: LinkField, text: string): boolean =>
+  LINK_RULES[field].pattern.test(text);
+
 /** Exemple d'identifiant d'une liste de liens (aide sous le champ). */
 export const linkExample = (field: LinkField): string => LINK_RULES[field].example;
 
@@ -133,9 +137,12 @@ export function valuesFromDetail(detail: FeatureDetail): FeatureFormValues {
   };
 }
 
+/** Message d'un champ obligatoire vide (maquette 16 l.208) ; le résumé le reconnaît pour compter les champs vides. */
+export const REQUIRED_MESSAGE = "Obligatoire";
+
 function validateTitle(title: string): FormIssue[] {
   const length = title.trim().length;
-  if (length === 0) return [{ field: "title", message: "Saisissez un titre." }];
+  if (length === 0) return [{ field: "title", message: REQUIRED_MESSAGE }];
   if (length > TITLE_MAX) {
     return [{ field: "title", message: "Le titre ne doit pas dépasser 200 caractères." }];
   }
@@ -181,7 +188,7 @@ function validateLinks(values: FeatureFormValues): FormIssue[] {
     if (index >= 0) {
       issues.push({
         field,
-        message: `La ligne ${index + 1} n'est pas un identifiant valide (exemple : ${example}).`,
+        message: `« ${lines[index]} » n'est pas un identifiant valide (exemple : ${example}).`,
       });
     }
   }
@@ -192,7 +199,7 @@ function validateLinks(values: FeatureFormValues): FormIssue[] {
 export function validateFeatureForm(values: FeatureFormValues): FormIssue[] {
   const issues = validateTitle(values.title);
   if (!featurePrioritySchema.safeParse(values.priority).success) {
-    issues.push({ field: "priority", message: "Choisissez une priorité." });
+    issues.push({ field: "priority", message: REQUIRED_MESSAGE });
   }
   if (!featureStatusSchema.safeParse(values.status).success) {
     issues.push({ field: "status", message: "Choisissez un statut." });

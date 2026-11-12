@@ -122,7 +122,7 @@ describe("L'entrée de specBatch.submit pour une suppression", () => {
     await confirmDelete(panel);
     await waitFor(() => expect(submitInputs()).toHaveLength(1));
     expect(panel.queryByRole("button", { name: DELETE_BUTTON })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Enregistrer" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Enregistrer/ })).toBeNull();
     expect(submitInputs()).toHaveLength(1);
   });
 });

@@ -1,3 +1,4 @@
+import { ToastProvider } from "@koklo/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,7 +61,11 @@ describe("Route /projects/[projectId]/features", () => {
   it("la page rend l'écran du projet de l'adresse (params asynchrones)", async () => {
     setUrl(`/projects/${PROJECT_ID}/spec/functional?tab=features`);
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
-    render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
+    render(
+      <QueryClientProvider client={client()}>
+        <ToastProvider>{element}</ToastProvider>
+      </QueryClientProvider>,
+    );
     expect(await findNamed("heading", "Cahier fonctionnel", { level: 1 })).toBeInTheDocument();
     await findList();
     expect(procedures.specHead.mock.calls[0]?.[0]).toMatchObject({ projectId: PROJECT_ID });
@@ -69,7 +74,11 @@ describe("Route /projects/[projectId]/features", () => {
   it("un projectId qui n'est pas un uuid arrive jusqu'à l'écran « Projet introuvable » sans appel de spec", async () => {
     setUrl("/projects/pas-un-uuid/spec/functional?tab=features");
     const element = await route.default({ params: Promise.resolve({ projectId: "pas-un-uuid" }) });
-    render(<QueryClientProvider client={client()}>{element}</QueryClientProvider>);
+    render(
+      <QueryClientProvider client={client()}>
+        <ToastProvider>{element}</ToastProvider>
+      </QueryClientProvider>,
+    );
     expect(await findNamed("heading", "Projet introuvable")).toBeInTheDocument();
     expect(procedures.specHead).not.toHaveBeenCalled();
   });
@@ -82,7 +91,9 @@ describe("Gabarit de la route", () => {
     const element = await route.default({ params: Promise.resolve({ projectId: PROJECT_ID }) });
     render(
       <QueryClientProvider client={client()}>
-        <ShellFrame>{element}</ShellFrame>
+        <ToastProvider>
+          <ShellFrame>{element}</ShellFrame>
+        </ToastProvider>
       </QueryClientProvider>,
     );
     await findList();

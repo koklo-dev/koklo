@@ -65,6 +65,10 @@ export const procedures = {
   specHead: vi.fn(),
   specListFeatures: vi.fn(),
   specGetFeature: vi.fn(),
+  // TK-101 (contrat 2.11.0) : lecture d'édition, autocomplétion des liens et préremplissage
+  specItemGet: vi.fn(),
+  specRefsSearch: vi.fn(),
+  aiPrefillItem: vi.fn(),
   // TK-100 (contrat 2.10.0) : les sept livrables de la spec (barre et compteur SPEC N/7)
   specDeliverables: vi.fn(),
   repoList: vi.fn(),
@@ -221,6 +225,8 @@ export const orpc = {
     head: queryFull(["spec", "head"], procedures.specHead),
     listFeatures: queryFull(["spec", "listFeatures"], procedures.specListFeatures),
     getFeature: queryFull(["spec", "getFeature"], procedures.specGetFeature),
+    item: { get: queryFull(["spec", "item", "get"], procedures.specItemGet) },
+    refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
   },
   specBatch: {
@@ -241,6 +247,7 @@ export const orpc = {
     key: () => ["ai"],
     draftBrief: mutation(procedures.aiDraftBrief),
     proposeFeatures: mutation(procedures.aiProposeFeatures),
+    prefillItem: mutationWithOptions(procedures.aiPrefillItem),
     proposeOptions: queryFull(["ai", "proposeOptions"], procedures.aiProposeOptions),
     proposeDeliverable: mutationWithOptions(procedures.aiProposeDeliverable),
     reviseProposal: mutationWithOptions(procedures.aiReviseProposal),

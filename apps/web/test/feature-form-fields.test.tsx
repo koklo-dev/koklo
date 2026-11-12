@@ -1,14 +1,12 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clickSave,
   fillMinimum,
-  linkField,
   liveText,
   openCreate,
   openEdit,
-  openLinks,
   type Panel,
   pick,
   saveButton,
@@ -61,49 +59,42 @@ const stepSelects = (group: Panel) => group.queryAllByRole("combobox", { name: "
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Création : champs et valeurs initiales (§3.1)", () => {
-  it("titre et priorité portent « (obligatoire) » dans leur libellé écrit", async () => {
+  it("titre et priorité portent « * » (obligatoire pour les lecteurs d'écran) dans leur libellé", async () => {
     const panel = await openCreate();
-    expect(panel.getByRole("textbox", { name: "Titre (obligatoire)" })).toBeVisible();
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toBeVisible();
+    expect(panel.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toBeVisible();
+    expect(panel.getByRole("radiogroup", { name: /^Priorité\s*obligatoire$/ })).toBeVisible();
   });
 
-  it("priorité sans aucune présélection : « Choisir une priorité »", async () => {
+  it("priorité sans aucune présélection : quatre pastilles, aucune choisie", async () => {
     const panel = await openCreate();
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveTextContent(
-      "Choisir une priorité",
-    );
-  });
-
-  it("options de priorité en toutes lettres, dans l'ordre du contrat", async () => {
-    const panel = await openCreate();
-    await userEvent.click(panel.getByRole("combobox", { name: "Priorité (obligatoire)" }));
-    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
+    const group = within(panel.getByRole("radiogroup", { name: /^Priorité/ }));
+    expect(group.getAllByRole("radio").map((r) => r.textContent)).toEqual([
       "Indispensable",
       "Importante",
       "Souhaitable",
       "Reportée",
     ]);
+    for (const radio of group.getAllByRole("radio")) expect(radio).not.toBeChecked();
   });
 
-  it("statut : présélection « Brouillon », quatre options avec libellés de la liste", async () => {
+  it("statut (facultatif) : pastilles, « Brouillon » présélectionné, libellés de la liste", async () => {
     const panel = await openCreate();
-    const select = panel.getByRole("combobox", { name: "Statut" });
-    expect(select).toHaveTextContent("Brouillon");
-    await userEvent.click(select);
-    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
+    const group = within(panel.getByRole("radiogroup", { name: /^Statut/ }));
+    expect(group.getAllByRole("radio").map((r) => r.textContent)).toEqual([
       "Brouillon",
       "Spécifiée",
       "Implémentée",
       "Adoptée",
     ]);
+    expect(group.getByRole("radio", { name: "Brouillon" })).toBeChecked();
   });
 
-  it("description : texte brut multiligne avec son aide reliée par aria-describedby", async () => {
+  it("description : texte brut multiligne avec l'aide de la maquette reliée par aria-describedby", async () => {
     const panel = await openCreate();
     const field = panel.getByRole("textbox", { name: "Description" });
     expect(field.tagName).toBe("TEXTAREA");
     expect(field).toHaveAccessibleDescription(
-      /Texte brut : les retours à la ligne sont conservés\./,
+      /Ce que l'utilisateur peut faire, en une ou deux phrases\./,
     );
   });
 
@@ -121,27 +112,12 @@ describe("Création : champs et valeurs initiales (§3.1)", () => {
     }
   });
 
-  it("« Éléments liés » : fermé par défaut ; ouvert, six champs multilignes avec exemple", async () => {
+  it("« Liens » : une seule saisie à puces avec son aide ; plus de liste par type", async () => {
     const panel = await openCreate();
-    const trigger = panel.getByRole("button", { name: /Éléments liés/ });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(panel.queryByRole("textbox", { name: "Écrans" })).toBeNull();
-    await userEvent.click(trigger);
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    for (const label of LINK_LABELS) {
-      expect(linkField(panel, label).tagName).toBe("TEXTAREA");
-    }
-    expect(panel.getByText(/un identifiant par ligne/i)).toBeVisible();
-    for (const example of [
-      "S-inscription",
-      "RL-admin",
-      "R-001",
-      "T-utilisateur",
-      "E-connexion",
-      "NFR-performance",
-    ]) {
-      expect(panel.getByText(example, { exact: false })).toBeInTheDocument();
-    }
+    expect(panel.getByRole("combobox", { name: "Liens : ajouter" })).toBeVisible();
+    expect(panel.getByText("Règles, rôles, écrans, parcours.")).toBeVisible();
+    for (const label of LINK_LABELS)
+      expect(panel.queryByRole("textbox", { name: label })).toBeNull();
   });
 
   it("compteur « n / 200 » sur le titre, annoncé à partir de 180 caractères", async () => {
@@ -162,10 +138,16 @@ describe("Modification : préremplissage depuis spec.getFeature (§4.2)", () => 
   it("reprend titre, priorité, statut, description tels quels", async () => {
     const panel = await openEdit();
     expect(titleField(panel)).toHaveValue("Connexion par e-mail");
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveTextContent(
-      "Indispensable",
-    );
-    expect(panel.getByRole("combobox", { name: "Statut" })).toHaveTextContent("Brouillon");
+    expect(
+      within(panel.getByRole("radiogroup", { name: /^Priorité/ })).getByRole("radio", {
+        name: "Indispensable",
+      }),
+    ).toBeChecked();
+    expect(
+      within(panel.getByRole("radiogroup", { name: /^Statut/ })).getByRole("radio", {
+        name: "Brouillon",
+      }),
+    ).toBeChecked();
     expect(panel.getByRole("textbox", { name: "Description" })).toHaveValue(DETAIL.description);
   });
 
@@ -200,18 +182,11 @@ describe("Modification : préremplissage depuis spec.getFeature (§4.2)", () => 
     );
   });
 
-  it("liens remplis : la section est ouverte, un identifiant par ligne", async () => {
+  it("liens remplis : une puce par identifiant, rangés dans l'ordre des six listes", async () => {
     const panel = await openEdit();
-    expect(panel.getByRole("button", { name: /Éléments liés/ })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    expect(linkField(panel, "Écrans")).toHaveValue("S-login");
-    expect(linkField(panel, "Rôles")).toHaveValue("RL-owner");
-    expect(linkField(panel, "Règles")).toHaveValue("R-001");
-    expect(linkField(panel, "Tables")).toHaveValue("T-user");
-    expect(linkField(panel, "Endpoints")).toHaveValue("E-login");
-    expect(linkField(panel, "Exigences non fonctionnelles")).toHaveValue("NFR-latence");
+    for (const tag of ["S-login", "RL-owner", "R-001", "T-user", "E-login", "NFR-latence"]) {
+      expect(panel.getByRole("button", { name: `Retirer ${tag}` })).toBeVisible();
+    }
   });
 
   it("sans aucune modification : « Enregistrer » désactivé, relié à « Aucune modification à enregistrer. »", async () => {
@@ -233,33 +208,35 @@ describe("Modification : préremplissage depuis spec.getFeature (§4.2)", () => 
 
   it("le bouton de suppression existe en modification (lot 48e-2), les tests de la suppression sont dans feature-delete-*", async () => {
     const panel = await openEdit();
-    expect(panel.getByRole("button", { name: "Supprimer cette fonctionnalité" })).toBeVisible();
+    expect(panel.getByRole("button", { name: "Supprimer" })).toBeVisible();
   });
 });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Validation côté client (§4.3)", () => {
-  it("envoi invalide : aucun appel réseau, résumé en alerte « Corrigez 2 points avant d'enregistrer »", async () => {
+  it("envoi invalide : aucun appel réseau, résumé en alerte « 2 champs obligatoires sont vides : Titre, Priorité. »", async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    const summary = await panel.findByRole("alert");
-    expect(within(summary).getByText("Corrigez 2 points avant d'enregistrer")).toBeVisible();
-    expect(within(summary).getByRole("link", { name: "Saisissez un titre." })).toBeVisible();
-    expect(within(summary).getByRole("link", { name: "Choisissez une priorité." })).toBeVisible();
+    const summary = (await panel.findAllByRole("alert"))[0] as HTMLElement;
+    expect(summary).toHaveTextContent("2 champs obligatoires sont vides : Titre, Priorité.");
+    expect(within(summary).getByRole("link", { name: "Titre" })).toBeVisible();
+    expect(within(summary).getByRole("link", { name: "Priorité" })).toBeVisible();
     expect(submitInputs()).toEqual([]);
   });
 
-  it("singulier : « Corrigez 1 point avant d'enregistrer »", async () => {
+  it("singulier : « 1 champ obligatoire est vide : Priorité. »", async () => {
     const panel = await openCreate();
     await setText(titleField(panel), "Un titre");
     await clickSave(panel);
-    expect(await panel.findByText("Corrigez 1 point avant d'enregistrer")).toBeVisible();
+    expect((await panel.findAllByRole("alert"))[0]).toHaveTextContent(
+      "1 champ obligatoire est vide : Priorité.",
+    );
   });
 
   it("le focus va sur le titre du résumé (tabindex -1)", async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    const heading = await panel.findByText("Corrigez 2 points avant d'enregistrer");
+    const heading = (await panel.findAllByRole("alert"))[0]?.querySelector("p") as HTMLElement;
     await waitFor(() => expect(heading).toHaveFocus());
     expect(heading).toHaveAttribute("tabindex", "-1");
   });
@@ -267,24 +244,28 @@ describe("Validation côté client (§4.3)", () => {
   it('chaque lien du résumé est un vrai <a href="#champ"> qui place le focus sur le champ', async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    const link = await panel.findByRole("link", { name: "Saisissez un titre." });
+    const link = await panel.findByRole("link", { name: "Titre" });
     expect(link.getAttribute("href")).toMatch(/^#.+/);
     await userEvent.click(link);
     await waitFor(() => expect(titleField(panel)).toHaveFocus());
-    await userEvent.click(panel.getByRole("link", { name: "Choisissez une priorité." }));
+    await userEvent.click(panel.getByRole("link", { name: "Priorité" }));
     await waitFor(() =>
-      expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveFocus(),
+      expect(
+        within(panel.getByRole("radiogroup", { name: /^Priorité\s*obligatoire$/ })).getAllByRole(
+          "radio",
+        )[0],
+      ).toHaveFocus(),
     );
   });
 
   it("champ en erreur : aria-invalid, message texte relié par aria-describedby (pas la couleur seule)", async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    await panel.findByRole("alert");
+    await panel.findAllByRole("alert");
     const title = titleField(panel);
     expect(title).toHaveAttribute("aria-invalid", "true");
-    expect(title).toHaveAccessibleDescription(/Saisissez un titre\./);
-    expect(panel.getByRole("combobox", { name: "Priorité (obligatoire)" })).toHaveAttribute(
+    expect(title).toHaveAccessibleDescription(/Obligatoire/);
+    expect(panel.getByRole("radiogroup", { name: /^Priorité\s*obligatoire$/ })).toHaveAttribute(
       "aria-invalid",
       "true",
     );
@@ -294,16 +275,16 @@ describe("Validation côté client (§4.3)", () => {
     const panel = await openCreate();
     await userEvent.click(titleField(panel));
     await userEvent.tab();
-    expect(await panel.findByText("Saisissez un titre.")).toBeVisible();
+    expect((await panel.findAllByText("Obligatoire"))[0]).toBeVisible();
     expect(titleField(panel)).toHaveAttribute("aria-invalid", "true");
     expect(submitInputs()).toEqual([]);
   });
 
-  it("titre d'espaces seulement : « Saisissez un titre. »", async () => {
+  it("titre d'espaces seulement : « Obligatoire »", async () => {
     const panel = await openCreate();
     await setText(titleField(panel), "    ");
     await clickSave(panel);
-    expect(await panel.findByRole("link", { name: "Saisissez un titre." })).toBeVisible();
+    expect(await panel.findByRole("link", { name: "Titre" })).toBeVisible();
   });
 
   it("titre de 201 caractères : « Le titre ne doit pas dépasser 200 caractères. »", async () => {
@@ -316,21 +297,13 @@ describe("Validation côté client (§4.3)", () => {
     expect(submitInputs()).toEqual([]);
   });
 
-  it("ligne de lien invalide : message avec le numéro de ligne, section repliée ouverte, champ marqué", async () => {
+  it("identifiant mal formé saisi dans « Liens » : refusé avec un exemple, aucune puce", async () => {
     const panel = await openCreate();
-    await fillMinimum(panel);
-    await openLinks(panel);
-    await setText(linkField(panel, "Écrans"), "S-login\nnon valide");
-    await userEvent.click(panel.getByRole("button", { name: /Éléments liés/ }));
-    await clickSave(panel);
-    const message = "La ligne 2 n'est pas un identifiant valide (exemple : S-inscription).";
-    expect(await panel.findByRole("link", { name: message })).toBeVisible();
-    expect(panel.getByRole("button", { name: /Éléments liés/ })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    expect(linkField(panel, "Écrans")).toHaveAttribute("aria-invalid", "true");
-    expect(linkField(panel, "Écrans")).toHaveAccessibleDescription(/La ligne 2/);
+    await userEvent.type(panel.getByRole("combobox", { name: "Liens : ajouter" }), "R-1{Enter}");
+    expect(
+      await panel.findByText("« R-1 » n'est pas un identifiant valide (exemple : R-001)."),
+    ).toBeVisible();
+    expect(panel.queryByRole("button", { name: "Retirer R-1" })).toBeNull();
   });
 
   it("critère sans titre et étape sans texte : messages numérotés", async () => {
@@ -358,7 +331,7 @@ describe("Validation côté client (§4.3)", () => {
   it("une saisie corrigée fait disparaître le résumé et laisse partir l'envoi", async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    await panel.findByRole("alert");
+    await panel.findAllByRole("alert");
     await fillMinimum(panel);
     await clickSave(panel);
     await waitFor(() => expect(submitInputs()).toHaveLength(1));

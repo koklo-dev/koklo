@@ -82,3 +82,12 @@ describe("Textarea, styles", () => {
     );
   });
 });
+
+describe("Textarea : lignes demandées", () => {
+  it("avec rows, la hauteur est celle des lignes ; sans rows, elle suit le contenu", () => {
+    const { rerender } = render(<Textarea aria-label="a" rows={3} />);
+    expect(screen.getByLabelText("a")).not.toHaveClass("field-sizing-content");
+    rerender(<Textarea aria-label="a" />);
+    expect(screen.getByLabelText("a")).toHaveClass("field-sizing-content");
+  });
+});

@@ -3,17 +3,16 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  addLinks,
   clickSave,
   deferred,
   fillMinimum,
   form,
   lastSubmit,
-  linkField,
   liveText,
   NEW_TITLE,
   openCreate,
   openEdit,
-  openLinks,
   operationOf,
   pick,
   saveButton,
@@ -113,13 +112,12 @@ describe("Création : l'entrée de specBatch.submit", () => {
     const [first, second] = criterion.getAllByRole("textbox", { name: "Texte de l'étape" });
     await setText(first as HTMLElement, "un compte existant");
     await setText(second as HTMLElement, "la personne se connecte");
-    await openLinks(panel);
-    await setText(linkField(panel, "Écrans"), "S-login\n\nS-home");
-    await setText(linkField(panel, "Rôles"), "RL-owner");
-    await setText(linkField(panel, "Règles"), "R-001");
-    await setText(linkField(panel, "Tables"), "T-user");
-    await setText(linkField(panel, "Endpoints"), "E-login");
-    await setText(linkField(panel, "Exigences non fonctionnelles"), "NFR-latence");
+    await addLinks(panel, ["S-login", "S-home"]);
+    await addLinks(panel, ["RL-owner"]);
+    await addLinks(panel, ["R-001"]);
+    await addLinks(panel, ["T-user"]);
+    await addLinks(panel, ["E-login"]);
+    await addLinks(panel, ["NFR-latence"]);
     await clickSave(panel);
     await waitFor(() => expect(submitInputs()).toHaveLength(1));
     expect(operationOf()).toStrictEqual({
@@ -197,7 +195,7 @@ describe("Modification : patch minimal avec baseSha", () => {
 
   it("priorité, statut et description modifiés : ces trois champs et rien d'autre", async () => {
     const panel = await openEdit();
-    await pick(panel, "Priorité (obligatoire)", "Reportée");
+    await pick(panel, /^Priorité\s*obligatoire$/, "Reportée");
     await pick(panel, "Statut", "Adoptée");
     await setText(panel.getByRole("textbox", { name: "Description" }), "Nouvelle description");
     await clickSave(panel);
@@ -213,7 +211,7 @@ describe("Modification : patch minimal avec baseSha", () => {
 
   it("une liste de liens vidée part comme tableau vide", async () => {
     const panel = await openEdit();
-    await setText(linkField(panel, "Écrans"), "");
+    await userEvent.click(panel.getByRole("button", { name: "Retirer S-login" }));
     await clickSave(panel);
     await waitFor(() => expect(submitInputs()).toHaveLength(1));
     expect(operationOf()).toStrictEqual({ kind: "feature.update", specId: "F-001", screens: [] });
@@ -259,7 +257,7 @@ describe("Envoi en cours (§4.4)", () => {
   it("double clic : un seul appel ; « Enregistrement… » en attente, champs en lecture seule, « Fermer » actif", async () => {
     const panel = await openCreate();
     await fillMinimum(panel);
-    await userEvent.dblClick(panel.getByRole("button", { name: "Enregistrer" }));
+    await userEvent.dblClick(panel.getByRole("button", { name: /^Enregistrer/ }));
     const busy = await panel.findByRole("button", { name: "Enregistrement…" });
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(submitInputs()).toHaveLength(1);
@@ -267,7 +265,7 @@ describe("Envoi en cours (§4.4)", () => {
     expect(title).toHaveAttribute("readonly");
     expect(title).not.toBeDisabled();
     expect(panel.getByRole("textbox", { name: "Description" })).toHaveAttribute("readonly");
-    expect(panel.getByRole("button", { name: "Fermer" })).toBeEnabled();
+    expect(panel.getByRole("button", { name: "Annuler" })).toBeEnabled();
   });
 
   it("annonce « Envoi de votre modification… » dans la région d'état unique", async () => {
@@ -439,7 +437,7 @@ describe("Aucun appel sans saisie valide", () => {
   it("création vide : aucun appel d'écriture", async () => {
     const panel = await openCreate();
     await clickSave(panel);
-    await panel.findByRole("alert");
+    await panel.findAllByRole("alert");
     expect(screen.queryByRole("list", { name: "Avancement de l'enregistrement" })).toBeNull();
     expect(submitInputs()).toEqual([]);
   });

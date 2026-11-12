@@ -1,7 +1,7 @@
 "use client";
 
 import { cva, type VariantProps } from "class-variance-authority";
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 
@@ -76,19 +76,31 @@ const fieldVariants = cva("group/field flex w-full gap-1.5", {
   },
 });
 
-function Field({
-  className,
-  orientation = "vertical",
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
+/** Vrai dans un `Field agentFilled` : `FieldLabel` y ajoute la mention « proposé par l'agent ». */
+const AgentFilledContext = createContext(false);
+
+type FieldProps = React.ComponentProps<"div"> &
+  VariantProps<typeof fieldVariants> & {
+    /** Champ rempli par l'agent (maquette 16 l.83-84) : filet `--primary` de 3 px, retrait 12, mention sous le libellé. */
+    agentFilled?: boolean;
+  };
+
+function Field({ className, orientation = "vertical", agentFilled = false, ...props }: FieldProps) {
   return (
-    <div
-      role="group"
-      data-slot="field"
-      data-orientation={orientation}
-      className={cn(fieldVariants({ orientation }), className)}
-      {...props}
-    />
+    <AgentFilledContext.Provider value={agentFilled}>
+      <div
+        role="group"
+        data-slot="field"
+        data-orientation={orientation}
+        data-agent-filled={agentFilled || undefined}
+        className={cn(
+          fieldVariants({ orientation }),
+          agentFilled && "border-l-[3px] border-primary pl-3",
+          className,
+        )}
+        {...props}
+      />
+    </AgentFilledContext.Provider>
   );
 }
 
@@ -109,11 +121,12 @@ function FieldLabel({
   children,
   ...props
 }: React.ComponentProps<typeof Label> & { required?: boolean; optional?: boolean }) {
+  const agentFilled = useContext(AgentFilledContext);
   return (
     <Label
       data-slot="field-label"
       className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 text-meta font-semibold leading-snug group-data-[disabled=true]/field:text-muted-foreground",
+        "group/field-label peer/field-label flex w-fit gap-1.5 text-meta font-semibold leading-snug group-data-[disabled=true]/field:text-muted-foreground",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border [&>*]:data-[slot=field]:p-4",
         "has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10",
         className,
@@ -123,7 +136,7 @@ function FieldLabel({
       {children}
       {required ? (
         <>
-          <span aria-hidden="true" className="-ml-1 text-primary">
+          <span aria-hidden="true" className="text-primary">
             *
           </span>
           <span className="sr-only">obligatoire</span>
@@ -131,6 +144,9 @@ function FieldLabel({
       ) : null}
       {optional ? (
         <span className="font-normal text-muted-foreground">{" (facultatif)"}</span>
+      ) : null}
+      {agentFilled ? (
+        <span className="text-[11px] font-medium text-primary">proposé par l'agent</span>
       ) : null}
     </Label>
   );
@@ -232,10 +248,7 @@ function FieldError({
     <div
       role="alert"
       data-slot="field-error"
-      className={cn(
-        "flex items-start gap-1.5 text-caption font-medium text-destructive",
-        className,
-      )}
+      className={cn("flex items-start gap-1 text-caption font-medium text-destructive", className)}
       {...props}
     >
       <Icon name="error" size={16} />

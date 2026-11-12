@@ -1,7 +1,7 @@
 import type { FeatureDetail } from "@koklo/contract";
 import { act, type BoundFunctions, type queries, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 import {
   DETAIL,
   FEATURES,
@@ -100,7 +100,13 @@ export const operationOf = (input: Loose = lastSubmit()): Loose => input.operati
 
 /** Les régions d'état de l'écran, accessibles ou non : la fiche modale en masque le reste aux lecteurs d'écran. */
 export const statusRegions = (): HTMLElement[] =>
-  Array.from(document.querySelectorAll<HTMLElement>('[role="status"], output'));
+  Array.from(document.querySelectorAll<HTMLElement>('[role="status"], output')).filter(
+    // Le toast de fin d'écriture (maquette 16 l.106) est une notification à part, pas la région d'état de l'écran.
+    // (Radix pose l'annonce du toast, un `role="status"`, directement sous <body>.)
+    (region) =>
+      region.parentElement !== document.body &&
+      !region.closest('[data-slot="toast"], [aria-label^="Notifications"]'),
+  );
 /** La région d'état unique (S-feature-form §7) : échoue s'il y en a zéro ou plusieurs. */
 export function liveRegion(): HTMLElement {
   const regions = statusRegions();
@@ -123,12 +129,12 @@ export async function openCreate(user: { click: (element: Element) => Promise<vo
 /** Ouvre le formulaire de modification de F-001 par l'adresse. */
 export async function openEdit(search = "?edit=F-001") {
   renderFeatures({ search });
-  const panel = await form();
-  await panel.findByDisplayValue("Connexion par e-mail", undefined, { timeout: 8_000 });
-  return panel;
+  // Le panneau de chargement est remplacé par le formulaire une fois la fiche lue : on relit le dialogue ensuite.
+  await screen.findByDisplayValue("Connexion par e-mail", undefined, { timeout: 8_000 });
+  return form();
 }
 
-export const DELETE_BUTTON = "Supprimer cette fonctionnalité";
+export const DELETE_BUTTON = "Supprimer";
 export const CONFIRM_GROUP = "Confirmer la suppression";
 export const CONFIRM_TITLE = "Supprimer F-001 « Connexion par e-mail » ?";
 export const CONFIRM_TEXT =
@@ -159,6 +165,13 @@ export async function deleteF001(user: { click: (e: Element) => Promise<void> } 
 }
 
 export async function pick(panel: Panel, label: string | RegExp, option: string) {
+  const group = panel.queryByRole("radiogroup", {
+    name: typeof label === "string" ? new RegExp(`^${label}`) : label,
+  });
+  if (group) {
+    await userEvent.click(within(group).getByRole("radio", { name: option }));
+    return;
+  }
   await userEvent.click(panel.getByRole("combobox", { name: label }));
   await userEvent.click(await findNamed("option", option));
 }
@@ -170,26 +183,56 @@ export async function setText(field: HTMLElement, value: string) {
 }
 
 export const titleField = (panel: Panel) =>
-  panel.getByRole("textbox", { name: "Titre (obligatoire)" });
+  panel.getByRole("textbox", { name: /^Titre\s*obligatoire$/ });
 
 /** Saisit un titre et une priorité (le minimum d'une création). */
 export async function fillMinimum(panel: Panel, title = NEW_TITLE, priority = "Importante") {
   await setText(titleField(panel), title);
-  await pick(panel, "Priorité (obligatoire)", priority);
+  await pick(panel, /^Priorité\s*obligatoire$/, priority);
+}
+
+/**
+ * Ferme le panneau par « Annuler » : une saisie changée demande d'abord « Fermer sans enregistrer ? » (TK-101),
+ * confirmée ici. Le brouillon est gardé comme avant.
+ */
+export async function closePanel(
+  panel: Panel,
+  user: { click: (element: Element) => Promise<void> } = userEvent,
+): Promise<void> {
+  await user.click(await panel.findByRole("button", { name: "Annuler" }));
+  const confirm = screen.queryByRole("alertdialog");
+  if (confirm) {
+    await user.click(within(confirm).getByRole("button", { name: "Fermer sans enregistrer" }));
+  }
+}
+
+/** La pastille de priorité choisie (`RadioPill` cochée). */
+export function expectPriority(panel: Panel, label: string): void {
+  const radio = within(panel.getByRole("radiogroup", { name: /^Priorité/ })).getByRole("radio", {
+    name: label,
+  });
+  expect(radio).toBeChecked();
 }
 
 export const saveButton = (panel: Panel) =>
-  panel.getByRole("button", { name: /^Enregistre(r|ment…)$/ });
+  panel.getByRole("button", { name: /^Enregistre(r|ment…)/ });
 export const clickSave = (panel: Panel) =>
-  userEvent.click(panel.getByRole("button", { name: "Enregistrer" }));
+  userEvent.click(panel.getByRole("button", { name: /^Enregistrer/ }));
 
-/** Ouvre la section « Éléments liés » si elle est fermée. */
-export async function openLinks(panel: Panel) {
-  const trigger = panel.getByRole("button", { name: /Éléments liés/ });
-  if (trigger.getAttribute("aria-expanded") !== "true") await userEvent.click(trigger);
+/** Saisie à puces « Liens » (une seule pour les six listes du schéma). */
+export const linksInput = (panel: Panel) =>
+  panel.getByRole("combobox", { name: "Liens : ajouter" });
+export const linkField = (panel: Panel, _label?: string) => linksInput(panel);
+/** Ajoute des liens, un par Entrée. */
+export async function addLinks(panel: Panel, tags: string[]): Promise<void> {
+  for (const tag of tags) await userEvent.type(linksInput(panel), `${tag}{Enter}`);
 }
-export const linkField = (panel: Panel, label: string) =>
-  panel.getByRole("textbox", { name: label });
+/** Retire toutes les puces de liens. */
+export async function clearLinks(panel: Panel): Promise<void> {
+  for (const button of panel.queryAllByRole("button", { name: /^Retirer (S|RL|R|T|E|NFR)-/ })) {
+    await userEvent.click(button);
+  }
+}
 
 /** Visibilité de l'onglet (les relectures sont suspendues onglet masqué). */
 export function setTabVisibility(visible: boolean): void {

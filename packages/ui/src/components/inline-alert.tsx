@@ -42,6 +42,8 @@ type Common = Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
   variant: InlineAlertVariant;
   icon: IconName;
   children: ReactNode;
+  /** Remplace le rôle dérivé de la variante (un avertissement fixe, sans annonce, est une `note`). */
+  role?: "note" | "status" | "alert";
 };
 
 export type InlineAlertProps = Common &
@@ -82,6 +84,7 @@ export function InlineAlert({
   detailsLabel = "Détails",
   defaultOpen = false,
   className,
+  role,
   ...props
 }: InlineAlertProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -91,7 +94,7 @@ export function InlineAlert({
     <div
       data-slot="inline-alert"
       data-variant={variant}
-      role={ROLE[variant]}
+      role={role ?? ROLE[variant]}
       className={cn(inlineAlertVariants({ variant }), className)}
       {...props}
     >
