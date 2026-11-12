@@ -122,8 +122,12 @@
   "vision_source": "/home/devops/perso/projets/MyVault/koklo-v2/vision.md",
   "vision_mode": "verbatim",
   "engineering_spec": "/home/devops/perso/projets/MyVault/koklo-v2/spec/engineering-standards.md",
-  "current_sprint": 1,
-  "completed_sprints": [],
+  "current_sprint": 4,
+  "completed_sprints": [
+    1,
+    2,
+    3
+  ],
   "active_agents": [],
   "specialized_agents": [],
   "specialized_workflows": [],
@@ -217,8 +221,8 @@
     "target": null,
     "docs_root": null,
     "doc_version": null,
-    "last_pass": null,
-    "last_documented_commit": null,
+    "last_pass": "2026-10-27T17:08:06Z",
+    "last_documented_commit": "30823a85460d2fb7ea975da7014f3a5f6bb988ce",
     "screenshots": {
       "tool": null,
       "last_capture": null
@@ -243,9 +247,32 @@
   "repos": [],
   "loop": {
     "status": "idle",
-    "current_iteration": null,
+    "current_iteration": {
+      "id": "sprint-004.md",
+      "title": "sprint-004.md",
+      "start_date": "",
+      "end_date": ""
+    },
     "current_issue": null,
-    "attempts": {},
+    "attempts": {
+      "TK-1": 1,
+      "TK-2": 1,
+      "TK-3": 1,
+      "TK-4": 0,
+      "TK-5": 2,
+      "TK-6": 1,
+      "TK-7": 1,
+      "TK-8": 1,
+      "TK-9": 1,
+      "TK-10": 0,
+      "TK-11": 1,
+      "TK-12": 0,
+      "TK-13": 1,
+      "TK-84": 1,
+      "TK-14": 0,
+      "TK-15": 0,
+      "TK-85": 1
+    },
     "paused_reason": null,
     "resume_after": null,
     "board_id": null,
@@ -255,6 +282,9 @@
     "max_iterations_per_sprint": 50,
     "escalated_issues": [],
     "blockers": [],
-    "tickets": "vault"
+    "tickets": "vault",
+    "review": {},
+    "merged_total": 16,
+    "triage": {}
   }
 }
