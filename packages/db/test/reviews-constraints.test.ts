@@ -367,8 +367,10 @@ describe("reviews : immutabilité (trigger, calqué sur audit_log)", () => {
   it("TRUNCATE est refusé (23001) ; les lignes restent", async () => {
     const scope = await reviewScope(db, "immutable-truncate");
     const id = await insertReview(db, scope);
-    // `baselines` est tronquée avec `reviews` : sinon PostgreSQL refuse avant le trigger (FK entrante).
-    expect(await sqlState(() => db.query("TRUNCATE reviews, baselines"))).toBe(RESTRICT);
+    // `baselines` et `review_versions` sont tronquées avec `reviews` : sinon PostgreSQL refuse avant le trigger (FK entrante).
+    expect(await sqlState(() => db.query("TRUNCATE reviews, baselines, review_versions"))).toBe(
+      RESTRICT,
+    );
     expect(await db.query("SELECT 1 FROM reviews WHERE id = $1", [id])).toHaveLength(1);
   });
 

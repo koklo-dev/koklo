@@ -17,10 +17,12 @@ import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import {
   AGENT_PROPOSAL_TABLES,
+  DELIVERABLE_OVERRIDE_TABLES,
   PROJECT_CLIENT_TABLES,
   PROJECT_CREATION_TABLES,
   PROJECT_VISIT_TABLES,
   SETTINGS_TABLES,
+  SPEC_ENTITY_TABLES,
 } from "./support/project-client-fixtures.ts";
 import { REVIEW_TABLES } from "./support/reviews-fixtures.ts";
 import { insertDelivery, insertFullTree, SPEC_TABLES } from "./support/spec-fixtures.ts";
@@ -93,6 +95,8 @@ const LATER_TABLES: readonly string[] = [
   ...PROJECT_VISIT_TABLES,
   ...PROJECT_CREATION_TABLES,
   ...AGENT_PROPOSAL_TABLES,
+  ...DELIVERABLE_OVERRIDE_TABLES,
+  ...SPEC_ENTITY_TABLES,
   ...SETTINGS_TABLES,
   ...IDEA_TABLES,
   ...IDEA_ENUMS,

@@ -11,7 +11,15 @@ export const REVIEW_SUFFIX = "_reviews_baselines";
 export const REVIEW_MIGRATION = "20261101110000_reviews_baselines";
 
 /** Valeurs d'enum attendues (ordre de déclaration). */
-export const REVIEW_TARGET_KINDS = ["feature", "screen", "baseline"] as const;
+export const REVIEW_TARGET_KINDS = [
+  "feature",
+  "screen",
+  "baseline",
+  "flow",
+  "rules",
+  "roles",
+  "deliverable",
+] as const;
 export const REVIEW_STATUSES = ["approved", "changes_requested"] as const;
 export const BASELINE_STATUSES = ["proposed", "validated", "tagged"] as const;
 
