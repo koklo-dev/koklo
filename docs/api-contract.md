@@ -3,7 +3,7 @@ title: API contract
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 covers_release: unreleased
 sources: []
 covers_commit: 5fa5b1c
@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **3.1.0** (TK-103, lot A: additive, the operations `rule.*`, `role.*` and `flow.*` of `specBatch.submit`, `spec.functional.list`, `spec.roles.matrix`, `spec.item.get` for rules, roles and flows, the counters `rules`, `roles` and `flows` of `spec.head`; 3.0.0, TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **3.2.0** (TK-104, lot A: additive, `clientSpace.progress|flows|rules|roles`, `review.remind`, the review status `withdrawn`, `untreated` and `around` on `clientSpace.features`, labelled links and a version note on `clientSpace.feature`; 3.1.0, TK-103, lot A: additive, the operations `rule.*`, `role.*` and `flow.*` of `specBatch.submit`, `spec.functional.list`, `spec.roles.matrix`, `spec.item.get` for rules, roles and flows, the counters `rules`, `roles` and `flows` of `spec.head`; 3.0.0, TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1475,7 +1475,54 @@ address (B15); validation messages are fixed.
 written before the test (documented exception in `audit-coverage.test.ts`: two lines). `client-write-matrix` classes the
 seven writes as denied to a client.
 
+## Client validation view and reminders (TK-104, contract 3.2.0)
+Additive. 135 routes on 109 paths (4 reads in `clientSpace`, 1 write in `review`). Decisions B347 to B353 in
+`docs/refonte/questions.md`.
+
+| Procedure | Method | Path | Roles |
+|---|---|---|---|
+| `clientSpace.progress` | GET | `/client-space/projects/{projectId}/progress` | the six roles (a client only reaches linked projects) |
+| `clientSpace.flows` | GET | `/client-space/projects/{projectId}/flows?limit&cursor` | same |
+| `clientSpace.rules` | GET | `/client-space/projects/{projectId}/rules?limit&cursor` | same |
+| `clientSpace.roles` | GET | `/client-space/projects/{projectId}/roles` | same |
+| `review.remind` | POST | `/projects/{projectId}/reviews/reminders` | owner, admin (session only, never an agent token) |
+
+- `progress` returns `hasClient`, `canValidate` (decided by the server with `canReview(role, deliverable, functional,
+  hasClient)`, never read from the input), `clientFirstName`, the status of the whole book `validation`, the counters of the
+  four tabs `{ count, units, treated, toRevise }` (a block of rules or of roles is one unit), `untreated`, `toRevise`,
+  `changed` (validated, then modified since), `next` (`{ kind, ref }` of the first untreated unit in tab order, or null) and
+  the opaque `version`. A unit is treated when validated or when a change request is current.
+- `flows` and `rules` are cursor lists in the index order with `total`, `offset`, `nextCursor`, `previousCursor`; `flows`
+  items carry their own `validation`, `rules` and `roles` carry the validation of the whole block. Plain language: no file
+  path, no identifier of the repository, no pending proposal (`proposal.*`, `ai.*` and `spec.*` stay closed to the client).
+- `clientSpace.features` gains `untreated=true` (only the features still to validate), `around=F-nnn` (the page that holds
+  the feature, aligned on `limit`, also outside the loaded page; excluded with a cursor, unknown feature 404, a feature
+  hidden by the filter gives the first page) and `total` / `offset`. `clientSpace.feature` gains `links` (`[{ id, label }]`
+  in the order rules, flows, roles, screens; an element absent from the index is not listed) and `versionNote`
+  `{ date, label }`: the date of the indexed version and its first 7 characters, the only exception to the vocabulary
+  without git (B348), never the whole identifier.
+- `review.submit` accepts the status `withdrawn` (B349): "Cancel" appends a review that puts the target back to "to
+  validate" (never "previously validated"); the journal stays append-only, an identical replay writes nothing, nobody is
+  notified, the audit action is `review.withdraw`. A baseline cannot be withdrawn (409 `baseline_not_open`).
+- `review.submit` on `deliverable` `functional` is guarded (B351), after the per-target policy (a role without the right
+  gets 403, never 409) and before any write: `approved` ("Validate the book") needs every unit treated and no current
+  change request; `changes_requested` ("Send my requests") needs every unit treated and at least one current change request.
+  Otherwise `409 CONFLICT` with `reason: review_incomplete`, nothing written. A modification of the content (hash) turns the
+  unit back to "to validate".
+- `review.remind` (B352): input `{ projectId }`, output `{ reminded }` (the number of clients notified by this call). One
+  notification `review.reminded` (subject kind `review`, subject the project, category `client_validation`, sent by the
+  existing mail circuit) per linked client and per day (dedupe key `review.reminded:<project>:<client>:<YYYY-MM-DD>`), so a
+  replay the same day gives `reminded: 0`; audit `review.remind` (target kind `project_client`, one per client notified);
+  activity line "<name> reminded <first name>" in the team's overview, never in the client's. No linked client: `409`
+  `reason: no_client`. dev, designer, business, client: 403.
+- Spec batches: the body of `POST /projects/{projectId}/spec/batches` is read by a dedicated JSON parser capped at
+  `SPEC_BATCH_MAX_BODY_BYTES` (4 MiB, exported by the contract, commit 1899865f) mounted before the global parsers; the other
+  routes keep Express' 100 kB. The web client cuts its batches under 3 MiB of operations as well as 200 operations
+  (commit e30875d), so a save of several hundred proposals is several batches, not a 413.
+
 ## Version history
+- **3.2.0** (TK-104, lot A, additive): see "Client validation view and reminders (TK-104, contract 3.2.0)". The fingerprint
+  of 3.1.0 stays frozen.
 - **3.1.0** (TK-103, lot A, additive): business rules, roles and flows are written and read like features.
   `specBatch.submit` takes the operations `rule.create|update|delete` (`title`, `type` `contrainte|calcul|workflow`,
   `statement`, optional `examples`, `states` (the first is the initial state), `features`, `tables`, `endpoints`),
