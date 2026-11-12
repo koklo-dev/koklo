@@ -29,9 +29,16 @@ import { insertCounter } from "./support/ticket-fixtures.ts";
  */
 /** TK-100 : les quatre valeurs ajoutées à `review_target_kind` sont postérieures à cette migration. */
 const withoutReviewKinds = (enums: string[]) =>
-  enums.map((entry) =>
-    entry.startsWith("review_target_kind:") ? "review_target_kind:feature,screen,baseline" : entry,
-  );
+  enums
+    .map((entry) =>
+      entry.startsWith("review_target_kind:")
+        ? "review_target_kind:feature,screen,baseline"
+        : entry,
+    )
+    .map((entry) =>
+      // TK-103 : la valeur `rule` de `counter_name` est postérieure à cette migration.
+      entry.startsWith("counter_name:") ? "counter_name:ticket,sprint,feature,suggestion" : entry,
+    );
 const dirs = () => listMigrationDirs();
 const migration = () => dirs().find((dir) => dir.endsWith(NOTIFICATION_SUFFIX)) as string;
 const sqlOf = (dir: string, file: "migration.sql" | "down.sql") =>

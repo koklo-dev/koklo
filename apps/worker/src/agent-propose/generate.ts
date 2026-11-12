@@ -25,13 +25,16 @@ export interface GenerateDeps {
 
 const randomNonce = (): string => randomBytes(24).toString("hex");
 
-/** Types de proposition que chaque mode du Fonctionnel demande (`rule`, `role`, `flow` ne sont pas générés, B314 d). */
+/** Types de proposition que chaque mode du Fonctionnel demande (TK-103, B342 : règles, rôles et parcours s'y ajoutent). */
 const KINDS_OF_MODE: Readonly<Record<string, readonly AgentProposalKind[]>> = {
-  complete: ["feature"],
-  update: ["feature"],
+  complete: ["feature", "rule", "role", "flow"],
+  update: ["feature", "rule", "role", "flow"],
   criteria: ["criteria"],
-  all: ["feature", "criteria"],
+  all: ["feature", "criteria", "rule", "role", "flow"],
 };
+
+export const kindsOfMode = (mode: string): readonly AgentProposalKind[] =>
+  KINDS_OF_MODE[mode] ?? KINDS_OF_MODE.complete ?? [];
 
 const ZONES_SCHEMA = {
   type: "object",
@@ -103,7 +106,7 @@ export async function generate(
   sources: LaunchSources,
   euOnly: boolean,
 ): Promise<boolean> {
-  const kinds = KINDS_OF_MODE[launch.mode] ?? KINDS_OF_MODE.complete ?? [];
+  const kinds = kindsOfMode(launch.mode);
   const started = deps.now().getTime();
   const zones = await ask(deps, launch, euOnly, {
     purpose: "proposal-zones",
@@ -113,7 +116,12 @@ export async function generate(
   });
   const context = {
     kinds,
-    titles: new Set(sources.features.map((feature) => titleKey(feature.title))),
+    titles: {
+      feature: new Set(sources.features.map((feature) => titleKey(feature.title))),
+      rule: new Set(sources.rules.map((rule) => titleKey(rule.title))),
+      role: new Set(sources.roles.map((role) => titleKey(role.title))),
+      flow: new Set(sources.flows.map((flow) => titleKey(flow.title))),
+    },
     missingCriteria: new Map(
       sources.features
         .filter((feature) => feature.criteria.length === 0)

@@ -83,7 +83,15 @@ circulaire) lève une `CanonicalizeError` dont `path` est le pointeur JSON fauti
   (`R-` et 3 chiffres au moins), `type` (`contrainte`, `calcul`, `workflow`), `tables`,
   `endpoints` ; section `## Énoncé` obligatoire (`/enonce`) ; `## Exemples` facultative, une puce
   par exemple (`/exemples`). Les autres sections sont ignorées. Le corps remplace `enonce` et
-  `exemples` du front matter. Les autres fichiers de `domain/` sont ignorés.
+  `exemples` du front matter. Les autres fichiers de `domain/` sont ignorés. TK-103 : `titre?`,
+  `etats?` (noms d'états d'un workflow, le premier est l'état initial) et `fonctionnalites?`
+  (`F-nnn`, règle 4) s'ajoutent, `emitRuleMarkdown` écrit le fichier canonique.
+- **Rôles, suite (TK-103)** : le rôle porte `restrictions?` (`PM-… -> texte`), la permission
+  `libelle?` ; `ressource` et `action` acceptent un nom métier (`agenda`, `modifier`), la règle 4
+  ne vérifiant que `T-…` et `E-…` ; `emitRolesYaml` écrit le fichier canonique.
+- **Parcours** (`design/flows/P-<slug>.yaml`, `parseFlowFile`, genre `flow`, TK-103) : `id`
+  `P-slug`, `titre`, `acteur`, `depart { libelle, ecran? }`, `etapes`, `erreurs [{ etape, texte }]`,
+  `fonctionnalites` ; `emitFlowYaml` l'écrit. Un `.json` hérité reste lu par l'indexeur du worker.
 - Aucun parseur ne lève : toute erreur devient une `Issue` `STRUCT_*`.
 
 ## Règles et codes d'issue

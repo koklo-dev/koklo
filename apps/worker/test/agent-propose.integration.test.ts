@@ -149,7 +149,7 @@ describe("validation (cas 4)", () => {
     ai.batch = () => ({
       proposals: [
         feature("Bonne"),
-        { kind: "rule", rationale: "x", content: { title: "R", statement: "S" } },
+        { kind: "criteria", rationale: "x", content: { specId: "F-001", criteria: [] } },
         "texte",
         { kind: "feature", rationale: "x", content: null },
       ],

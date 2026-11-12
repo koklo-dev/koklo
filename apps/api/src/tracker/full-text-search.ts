@@ -2,6 +2,7 @@ import {
   type EntityRef,
   entitiesReferencing,
   type SearchTarget,
+  searchEntityIds,
   searchEntityRefs,
   searchIds,
 } from "@koklo/db";
@@ -19,6 +20,11 @@ export class FullTextSearch {
 
   ids(target: SearchTarget, scopeId: string, query: string): Promise<string[]> {
     return searchIds(this.database.raw, target, scopeId, query);
+  }
+
+  /** Lignes d'un genre (règles, parcours) d'un instantané qui correspondent à la recherche (TK-103). */
+  entityIds(snapshotId: string, kind: string, query: string): Promise<string[]> {
+    return searchEntityIds(this.database.raw, snapshotId, kind, query);
   }
 
   /** Autocomplétion des liens (TK-101) : éléments de l'index générique d'un instantané, 20 au plus. */

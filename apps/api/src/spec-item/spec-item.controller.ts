@@ -26,7 +26,7 @@ export class SpecItemController {
         request,
         errors,
         input.projectId,
-        (scope) => this.service.get(scope, requireSession(request).role, input.id),
+        (scope) => this.service.get(scope, requireSession(request).role, input.type, input.id),
         this.access,
       ),
     );

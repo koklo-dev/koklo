@@ -6,6 +6,7 @@ import {
   KOKLO_BOT_AUTHOR,
   SPEC_BATCH_ERROR_CODES,
   SPEC_WRITE_QUEUE,
+  slugOf,
   specWriteSingletonKey,
 } from "../src/index.ts";
 
@@ -87,5 +88,18 @@ describe("spec-write : specPath", () => {
     3,
   ])("specPath %j refusé", (path) => {
     expect(isSafeSpecPath(path)).toBe(false);
+  });
+});
+
+describe("slugOf (TK-103)", () => {
+  it("minuscules, sans accents, tirets, 40 caractères au plus, repli", () => {
+    expect(slugOf("Annulation tardive d'une réservation", "x")).toBe(
+      "annulation-tardive-d-une-reservation",
+    );
+    expect(slugOf("  --Été 2026!  ", "x")).toBe("ete-2026");
+    expect(slugOf("a".repeat(60), "x")).toHaveLength(40);
+    expect(slugOf("a".repeat(39) + " b", "x")).toBe("a".repeat(39));
+    expect(slugOf("!!!", "regle")).toBe("regle");
+    expect(slugOf(undefined, "role")).toBe("role");
   });
 });

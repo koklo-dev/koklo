@@ -5,7 +5,7 @@ import { validation } from "./tracker/api-errors.ts";
  * Routes (`MÉTHODE chemin` du contrat) dont le refus du schéma ressort en `VALIDATION` (422) et
  * non en `BAD_REQUEST` (400) : un commentaire vide ou trop long est une saisie invalide au même
  * titre qu'une cible qui n'est pas un UUID (`targetId`, contrat 0.5.0), en création comme en liste ; chemins `/projects/{projectId}/...` depuis le contrat 2.0.0 (TK-96).
- * Les lectures de la spec en relèvent aussi : `branch` et `commitSha` exclusifs, filtre ou limite inconnus
+ * Les lectures de la spec en relèvent aussi (dont les onglets Règles métier, Parcours et Rôles, TK-103) : `branch` et `commitSha` exclusifs, filtre ou limite inconnus
  * (contrat 0.6.0). Les clés BYOK aussi : fournisseur inconnu, clé ou modèle refusés (contrat 0.8.0), comme les propositions de l'IA et la vérification d'une clé (0.9.0). Les liens client <-> projet aussi :
  * identifiant de projet ou de membre mal formé (contrat 0.10.0), comme les lectures de l'espace client : limite, projet ou feature mal formés (0.11.0), et les suggestions : texte, cible ou identifiant refusés (0.12.0), et les validations : cible, version, statut ou commentaire refusés (0.13.0), et la recherche de la palette : saisie vide, trop longue ou projet mal formé (2.1.0), et les réglages : nom, slug, invitation, page, rôle ou clé de préférence refusés (2.2.0), et les fournisseurs d'IA : clé, modèle, adresse, usage, mois ou plafond refusés (2.3.0).
  */
@@ -14,6 +14,8 @@ const VALIDATION_ROUTES = new Set([
   "GET /projects/{projectId}/comments",
   "GET /projects/{projectId}/spec",
   "GET /projects/{projectId}/spec/features",
+  "GET /projects/{projectId}/spec/functional",
+  "GET /projects/{projectId}/spec/roles/matrix",
   "PUT /llm-credentials/{provider}",
   "DELETE /llm-credentials/{provider}",
   "POST /llm-credentials/{provider}/invalidate",

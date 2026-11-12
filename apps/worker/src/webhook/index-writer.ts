@@ -1,6 +1,6 @@
 import { raiseCounterTo, type TenantClient, type TenantTx, withOrganization } from "@koklo/db";
 import type { ParsedSpec, SpecFile } from "@koklo/schema";
-import { featureCounterOf, type IndexRows, rowsOf } from "./index-rows.ts";
+import { featureCounterOf, type IndexRows, rowsOf, ruleCounterOf } from "./index-rows.ts";
 import type { Target } from "./types.ts";
 
 /** Une transaction d'écriture d'index dure quelques requêtes en lot, sans réseau : 30 s au plus. */
@@ -87,6 +87,7 @@ export class IndexWriter {
     const { id: repoId, projectId } = target.repo;
     const rows = snapshot.status === "ready" ? rowsOf(snapshot.spec, snapshot.flows) : undefined;
     const counter = snapshot.status === "ready" ? featureCounterOf(snapshot.spec) : { skipped: 0 };
+    const rules = snapshot.status === "ready" ? ruleCounterOf(snapshot.spec) : { skipped: 0 };
     await withOrganization(organizationId, () =>
       this.client.$transaction(
         async (tx) => {
@@ -99,6 +100,9 @@ export class IndexWriter {
           });
           if (counter.raiseTo !== undefined) {
             await raiseCounterTo(tx, { organizationId, projectId }, "feature", counter.raiseTo);
+          }
+          if (rules.raiseTo !== undefined) {
+            await raiseCounterTo(tx, { organizationId, projectId }, "rule", rules.raiseTo);
           }
         },
         { timeout: TRANSACTION_TIMEOUT_MS },

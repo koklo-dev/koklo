@@ -133,7 +133,14 @@ describe("N3 types inférés exportés", () => {
       status: "building" | "ready" | "failed";
       errorCode: string | null;
       indexedAt: string;
-      counts: { features: number; tables: number; endpoints: number };
+      counts: {
+        features: number;
+        tables: number;
+        endpoints: number;
+        rules: number;
+        roles: number;
+        flows: number;
+      };
     } | null>();
     expectTypeOf<api.FeatureDetail>().toHaveProperty("criteria");
     expectTypeOf<api.SpecBatchOutput>().toHaveProperty("results");
@@ -143,7 +150,18 @@ describe("N3 types inférés exportés", () => {
     expectTypeOf<api.SpecBatchSubmitInput>().toHaveProperty("idempotencyKey");
     expectTypeOf<api.SpecBatchSubmitInput["operations"]>().toEqualTypeOf<api.SpecOperation[]>();
     expectTypeOf<api.SpecOperation["kind"]>().toEqualTypeOf<
-      "feature.create" | "feature.update" | "feature.delete"
+      | "feature.create"
+      | "feature.update"
+      | "feature.delete"
+      | "rule.create"
+      | "rule.update"
+      | "rule.delete"
+      | "role.create"
+      | "role.update"
+      | "role.delete"
+      | "flow.create"
+      | "flow.update"
+      | "flow.delete"
     >();
     expectTypeOf<Extract<api.SpecOperation, { kind: "feature.delete" }>>().toEqualTypeOf<{
       kind: "feature.delete";

@@ -39,7 +39,17 @@ const GROUPS: Record<string, string[]> = {
   projectClient: ["add", "list", "remove"],
   clientSpace: ["feature", "features", "projects"],
   repo: ["createSpec", "link", "list"],
-  spec: ["deliverables", "forceDeliverable", "getFeature", "head", "item", "listFeatures", "refs"],
+  spec: [
+    "deliverables",
+    "forceDeliverable",
+    "functional",
+    "getFeature",
+    "head",
+    "item",
+    "listFeatures",
+    "refs",
+    "roles",
+  ],
   review: ["list", "submit"],
   specBatch: ["get", "submit"],
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
@@ -275,8 +285,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "POST /projects/{projectId}/ai/item/prefill",
     "GET /projects/{projectId}/spec/items/{type}/{id}",
     "GET /projects/{projectId}/spec/refs",
+    // TK-103 (3.1.0) : onglets Règles métier, Rôles et Parcours.
+    "GET /projects/{projectId}/spec/functional",
+    "GET /projects/{projectId}/spec/roles/matrix",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a et les 5 de TK-100 et TK-101 sont présentes (128 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a et les 5 de TK-100 et TK-101 sont présentes (130 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -299,7 +312,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(128);
+    expect(pairs).toHaveLength(130);
   });
 });
 

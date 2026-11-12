@@ -340,6 +340,7 @@ enum CounterName {
   sprint
   feature
   suggestion
+  rule
 
   @@map("counter_name")
 }

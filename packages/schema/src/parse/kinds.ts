@@ -2,6 +2,7 @@ import type { z } from "zod";
 import {
   BusinessRuleSchema,
   EndpointSchema,
+  FlowSchema,
   ProjectManifestSchema,
   RelationsFileSchema,
   RolesFileSchema,
@@ -19,7 +20,8 @@ export type Kind =
   | "screen"
   | "test"
   | "roles"
-  | "rule";
+  | "rule"
+  | "flow";
 
 /** Type de fichier d'après son chemin ; `undefined` : hors modèle, ignoré. */
 export function kindOf(path: string): Kind | undefined {
@@ -31,12 +33,17 @@ export function kindOf(path: string): Kind | undefined {
   if (/^api\/endpoints\/E-[^/]*\.yaml$/.test(path)) return "endpoint";
   if (/^design\/screens\/S-[^/]*\.json$/.test(path)) return "screen";
   if (/^domain\/rules\/R-[^/]*\.md$/.test(path)) return "rule";
+  if (/^design\/flows\/P-[^/]*\.yaml$/.test(path)) return "flow";
   if (/^tests\/scenarios\/[^/]*\.yaml$/.test(path)) return "test";
   return undefined;
 }
 
-/** Parcours `design/flows/P-*.json` : entité JSON brute indexée par le worker (B325 g), sans schéma, ignorée de `kindOf`. */
-export const isFlowPath = (path: string): boolean => /^design\/flows\/P-[^/]*\.json$/.test(path);
+/**
+ * Parcours `design/flows/P-*` : le `.yaml` est une entité du modèle (`kindOf`, TK-103) ; le `.json` hérité (B325 g) n'est
+ * que lu par le worker, sans schéma, jamais validé ni réécrit.
+ */
+export const isFlowPath = (path: string): boolean =>
+  /^design\/flows\/P-[^/]*\.(yaml|json)$/.test(path);
 
 export const SCHEMAS = {
   project: ProjectManifestSchema,
@@ -47,6 +54,7 @@ export const SCHEMAS = {
   test: TestScenarioSchema,
   roles: RolesFileSchema,
   rule: BusinessRuleSchema,
+  flow: FlowSchema,
 } as const satisfies Record<string, z.ZodType>;
 
 /** Clé donnant l'identifiant d'une entité dans la donnée brute. */

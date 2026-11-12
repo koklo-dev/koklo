@@ -55,3 +55,49 @@ describe("prepareBatch", () => {
     expect(fieldOf(base({ branch: "travail", message: "ok" }))).toBeUndefined();
   });
 });
+
+describe("prepareBatch : règles, rôles et parcours (TK-103)", () => {
+  it("les créations portent un specId nul (attribué à l'enfilage), les autres leur identifiant", () => {
+    const prepared = prepareBatch(
+      base({
+        operations: [
+          { kind: "rule.create", title: "Délai", type: "contrainte", statement: "x" },
+          {
+            kind: "role.create",
+            name: "Chef",
+            description: "d",
+            permissions: [{ id: "PM-a.lire" }],
+          },
+          {
+            kind: "flow.create",
+            title: "Inscription",
+            actor: "Visiteur",
+            start: { label: "a" },
+            steps: [{ label: "b" }],
+          },
+          { kind: "rule.update", specId: "R-001", title: "Nouveau" },
+          { kind: "role.delete", specId: "RL-chef" },
+          { kind: "flow.update", specId: "P-inscription", actor: "Client" },
+        ],
+      }),
+      "main",
+    );
+    expect(prepared.operations.map((o) => [o.kind, o.specId])).toEqual([
+      ["rule.create", null],
+      ["role.create", null],
+      ["flow.create", null],
+      ["rule.update", "R-001"],
+      ["role.delete", "RL-chef"],
+      ["flow.update", "P-inscription"],
+    ]);
+    expect(prepared.operations[3]?.payload).toEqual({ title: "Nouveau" });
+  });
+
+  it("refuse deux opérations sur la même règle", () => {
+    const twice = [
+      { kind: "rule.update", specId: "R-001", title: "a" },
+      { kind: "rule.delete", specId: "R-001" },
+    ] as SpecBatchSubmitInput["operations"];
+    expect(fieldOf(base({ operations: twice }))).toBe("operations");
+  });
+});

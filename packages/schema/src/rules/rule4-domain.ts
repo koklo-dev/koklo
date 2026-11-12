@@ -48,12 +48,36 @@ function referencingLinks(spec: ParsedSpec, index: SpecIndex, at: Collect): void
     checkLinks([roleLink(s.roles, index)], at(path, s.id));
   }
   for (const { path, value: r } of spec.rules) {
-    checkLinks(tablesAndEndpoints(r, index), at(path, r.id));
+    const features = featureLink(r.fonctionnalites ?? [], "/fonctionnalites", index);
+    checkLinks([...tablesAndEndpoints(r, index), features], at(path, r.id));
+  }
+  for (const { path, value: flow } of spec.flows) {
+    const screens: Link = {
+      items: [flow.depart, ...flow.etapes].flatMap((step) => (step.ecran ? [step.ecran] : [])),
+      base: "/etapes",
+      known: index.screens,
+      code: "R4_UNKNOWN_SCREEN",
+      label: "L'écran",
+    };
+    checkLinks(
+      [screens, featureLink(flow.fonctionnalites, "/fonctionnalites", index)],
+      at(path, flow.id),
+    );
   }
 }
 
+const featureLink = (items: readonly string[], base: string, index: SpecIndex): Link => ({
+  items,
+  base,
+  known: { has: (id: string) => index.features.has(id) },
+  code: "R4_UNKNOWN_FEATURE",
+  label: "La fonctionnalité",
+});
+
 function checkResource(permission: Permission, index: SpecIndex, emit: Emit, i: number): void {
   const isTable = permission.ressource.startsWith("T-");
+  // Un nom métier (`agenda`) ne désigne ni table ni endpoint : rien à vérifier (B338 c).
+  if (!isTable && !permission.ressource.startsWith("E-")) return;
   const known = isTable
     ? index.tables.has(permission.ressource)
     : index.endpoints.has(permission.ressource);

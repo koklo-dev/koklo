@@ -145,7 +145,7 @@ function expectOutcomeSchema(state: Awaited<ReturnType<typeof inventory>>): void
       "spec_write_batches.author_role text null=YES default=-",
     ]),
   );
-  expect(state.enums).toContain("counter_name:ticket,sprint,feature,suggestion");
+  expect(state.enums).toContain("counter_name:ticket,sprint,feature,suggestion,rule");
 }
 
 describe("TK-44a migration spec_batch_outcome : dossier et contenu", () => {

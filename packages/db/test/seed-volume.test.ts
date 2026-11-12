@@ -278,6 +278,9 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
     expect(counts).toEqual({
       endpoint: SEED_VOLUMES.large.endpoints,
       feature: 1000,
+      flow: 18,
+      roles: 1,
+      rule: 300,
       table: 80,
     });
     const [snapshot] = await db.query<{ entities_indexed_at: Date | null }>(
@@ -335,20 +338,18 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
     const counts = Object.fromEntries(
       (await entityCounts(planche)).map((row) => [row.kind, row.n]),
     );
-    expect(counts).toMatchObject({ feature: 248, table: 65, endpoint: 47 });
+    expect(counts).toMatchObject({ feature: 248, table: 65, endpoint: 47, rule: 86, flow: 18 });
   }, 120_000);
 });
 
 describe("TK-94 volumes déclarés des modèles à venir (lecture prudente, B34)", () => {
   it("déclare les volumes de la passation 07 §6 et 08 §4 avec le ticket qui créera le modèle", () => {
-    expect(PENDING_VOLUMES.large).toMatchObject({ rules: { count: 300 } });
+    // TK-103 : les règles et les parcours sont désormais insérés (voir seed-volume-domain.test.ts).
+    expect(PENDING_VOLUMES.large).not.toHaveProperty("rules");
     // TK-99a : les 400 propositions sont désormais insérées, plus seulement déclarées.
     expect(PENDING_VOLUMES.large).not.toHaveProperty("proposals");
-    expect(PENDING_VOLUMES.planche).toMatchObject({
-      rules: { count: 86 },
-      journeys: { count: 18 },
-      sampleRows: { count: 1240 },
-    });
+    expect(PENDING_VOLUMES.planche).toMatchObject({ sampleRows: { count: 1240 } });
+    expect(PENDING_VOLUMES.planche).not.toHaveProperty("journeys");
     for (const profile of Object.values(PENDING_VOLUMES)) {
       for (const [type, declared] of Object.entries(profile)) {
         expect(declared.ticket, `ticket d'accueil de ${type}`).toMatch(/\S/);

@@ -5,7 +5,6 @@ import { isIdeaOperation } from "../idea/idea-batch.ts";
 import { carrierFilter } from "../repo/prisma-repo.repository.ts";
 import { isUniqueViolation, orNotFound, validation } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
-import { nextCounterValue } from "../tracker/counters.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { sameContent } from "./batch-content.ts";
@@ -16,10 +15,9 @@ import type {
   SpecBatchPlan,
   SpecBatchRepository,
 } from "./spec-batch.repository.ts";
+import { createdSpecId } from "./spec-ids.ts";
 
 const WITH_OPERATIONS = { operations: { orderBy: { position: "asc" as const } } };
-
-const featureId = (value: number): string => `F-${String(value).padStart(3, "0")}`;
 
 interface Row {
   id: string;
@@ -58,8 +56,8 @@ const recordOf = (row: Row): BatchRecord => ({
   })),
 });
 
-/** Les seuls types de proposition qui ont une opération de spec (B314 d) ; règles, rôles et parcours : sprint 023. */
-const APPLICABLE_KINDS = ["feature", "criteria"];
+/** Les types de proposition qui ont une opération de spec : fonctionnalités et critères, règles, rôles et parcours (TK-103). */
+const APPLICABLE_KINDS = ["feature", "criteria", "rule", "role", "flow"];
 
 /**
  * Preuve serveur que les opérations viennent de propositions acceptées (TK-99a) : chacune est du projet, `accepted`,
@@ -165,7 +163,7 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
       : { kind: "reused", batchId: record.id };
   }
 
-  /** Lot, opérations, F-nnn des créations (compteur du projet) et audit : tout ou rien. */
+  /** Lot, opérations, identifiants des créations (compteurs du projet, `RL-` et `P-` d'après le texte) et audit : tout ou rien. */
   private async insert(
     tx: Tx,
     scope: ProjectScope,
@@ -193,7 +191,7 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
       // Les opérations de l'espace Idée ciblent une page, pas une feature : aucun F-nnn (compteur intact).
       const targetSpecId = isIdeaOperation(operation.kind)
         ? null
-        : (operation.specId ?? featureId(await nextCounterValue(tx, scope, "feature")));
+        : (operation.specId ?? (await createdSpecId(tx, scope, operation)));
       operations.push({
         organizationId,
         batchId: row.id,

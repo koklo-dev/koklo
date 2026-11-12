@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { canonicalize, type ParsedSpec, type SpecFile } from "@koklo/schema";
+import { type BusinessRule, canonicalize, type ParsedSpec, type SpecFile } from "@koklo/schema";
 
 /** Genres indexés dans `spec_entities` : le CHECK de la migration porte la même liste. */
 export type EntityKind =
@@ -45,10 +45,13 @@ const hashOf = (kind: EntityKind, data: unknown): string =>
 const stemOf = (path: string): string => (path.split("/").pop() ?? path).replace(/\.[^.]+$/, "");
 
 const FLOW_ID = /^P-[A-Za-z0-9][A-Za-z0-9-]{0,62}$/;
+const ROLES_TITLE = "Rôles et permissions";
+const RULE_NUMBER = /^R-(\d+)$/;
+const TITLE_MAX = 120;
 
 /**
- * Identifiant d'un parcours (B325 g) : le `id` du JSON quand il est de la forme `P-…` et que le nom du fichier est cet
- * identifiant (ou commence par `<id>-`), sinon le nom du fichier sans extension.
+ * Identifiant d'un parcours JSON hérité (B325 g) : le `id` du JSON quand il est de la forme `P-…` et que le nom du fichier
+ * est cet identifiant (ou commence par `<id>-`), sinon le nom du fichier sans extension.
  */
 function flowIdOf(path: string, data: Record<string, unknown>): string {
   const stem = stemOf(path);
@@ -58,11 +61,12 @@ function flowIdOf(path: string, data: Record<string, unknown>): string {
   return matches ? id : stem;
 }
 
-/** Parcours lisibles : JSON objet seulement ; le reste (JSON invalide, tableau, scalaire) est ignoré, jamais une erreur. */
-function parsedFlows(
+/** Parcours JSON hérités lisibles : objet JSON seulement ; le reste (JSON invalide, tableau, scalaire) est ignoré, jamais une erreur. */
+function legacyFlows(
   files: readonly SpecFile[],
 ): { path: string; data: Record<string, unknown> }[] {
   return files.flatMap((file) => {
+    if (!file.path.endsWith(".json")) return [];
     try {
       const data: unknown = JSON.parse(file.content);
       const plain = data !== null && typeof data === "object" && !Array.isArray(data);
@@ -72,6 +76,22 @@ function parsedFlows(
     }
   });
 }
+
+/** Titre d'une règle sans `titre` (fichiers d'avant TK-103) : la première phrase de l'énoncé, bornée. */
+function titleOfStatement(statement: string): string {
+  const first = statement.trim().split(/\n/, 1)[0] ?? "";
+  const sentence = /^.*?[.!?](?=\s|$)/.exec(first)?.[0] ?? first;
+  return sentence.slice(0, TITLE_MAX).trim();
+}
+
+const ruleNumber = (id: string): number =>
+  Number(RULE_NUMBER.exec(id)?.[1] ?? Number.MAX_SAFE_INTEGER);
+
+/** Règle indexée avec un `titre` (celui du fichier, sinon le début de l'énoncé) : recherche, listes et références. */
+const withTitle = (rule: BusinessRule): BusinessRule => ({
+  ...rule,
+  titre: rule.titre ?? titleOfStatement(rule.enonce),
+});
 
 type Candidate = { kind: EntityKind; specId: string; path: string; value: unknown };
 
@@ -85,11 +105,21 @@ function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[]
       (entry): Candidate => ({ kind, specId: id(entry), path: entry.path, value: entry.value }),
     );
   const idOf = (entry: { value: unknown }) => (entry.value as { id: string }).id;
+  const rules = [...spec.rules].sort((a, b) => ruleNumber(a.value.id) - ruleNumber(b.value.id));
   return [
     ...of("feature", spec.features, idOf),
-    ...of("rule", spec.rules, idOf),
-    ...of("roles", spec.roles, () => "roles"),
-    ...parsedFlows(flows).map(
+    ...of(
+      "rule",
+      rules.map(({ path, value }) => ({ path, value: withTitle(value) })),
+      idOf,
+    ),
+    ...of(
+      "roles",
+      spec.roles.map(({ path, value }) => ({ path, value: { ...value, titre: ROLES_TITLE } })),
+      () => "roles",
+    ),
+    ...of("flow", spec.flows, idOf),
+    ...legacyFlows(flows).map(
       (flow): Candidate => ({
         kind: "flow",
         specId: flowIdOf(flow.path, flow.data),

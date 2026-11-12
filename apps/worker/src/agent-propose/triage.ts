@@ -18,8 +18,8 @@ export interface Candidate {
 export interface TriageContext {
   /** Types que le mode du lancement demande ; tout autre type est écarté. */
   readonly kinds: readonly AgentProposalKind[];
-  /** Titres déjà connus (cahier, propositions déjà publiées), normalisés : alimenté au fil de la génération. */
-  readonly titles: Set<string>;
+  /** Titres déjà connus par type (cahier, propositions déjà publiées), normalisés : alimenté au fil de la génération. */
+  readonly titles: Partial<Record<AgentProposalKind, Set<string>>>;
   /** Fonctionnalités sans critère (`F-nnn` vers titre) : seules cibles d'une proposition `criteria`, une fois chacune. */
   readonly missingCriteria: Map<string, string>;
 }
@@ -61,8 +61,10 @@ function candidateOf(entry: unknown, context: TriageContext): Candidate | undefi
     return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
   }
   const title = titleOf(asKind, payload);
-  if (context.titles.has(titleKey(title))) return undefined;
-  context.titles.add(titleKey(title));
+  const known = context.titles[asKind] ?? new Set<string>();
+  context.titles[asKind] = known;
+  if (known.has(titleKey(title))) return undefined;
+  known.add(titleKey(title));
   return { kind: asKind, title, rationale, payload };
 }
 

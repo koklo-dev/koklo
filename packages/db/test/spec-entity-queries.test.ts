@@ -4,6 +4,7 @@ import {
   entitiesReferencing,
   likePrefixOf,
   MissingOrganizationContextError,
+  searchEntityIds,
   searchEntityRefs,
 } from "../src/index.ts";
 
@@ -32,6 +33,9 @@ describe("lectures de spec_entities", () => {
       MissingOrganizationContextError,
     );
     await expect(entitiesReferencing(raw, "s", "F-003", 20)).rejects.toThrow(
+      MissingOrganizationContextError,
+    );
+    await expect(searchEntityIds(raw, "s", "rule", "R-250")).rejects.toThrow(
       MissingOrganizationContextError,
     );
   });

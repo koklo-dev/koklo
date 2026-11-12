@@ -5,6 +5,8 @@ import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { loadWindow } from "../tracker/long-list.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { entitySource, entityWhere, ruleTypeFacets } from "./entity-list.ts";
+import { functionalItemOf } from "./entity-values.ts";
 import {
   featureFacets,
   featureSelect,
@@ -15,11 +17,15 @@ import {
 import { readFeatureValidations, validationOfFeature } from "./feature-validation.ts";
 import { type Snapshot, SpecHeadResolver } from "./spec-head-resolver.ts";
 import type {
+  EntityItem,
   EntityReference,
   FeatureListRequest,
   FeatureSource,
+  FunctionalListRequest,
+  FunctionalPage,
   IndexedFeaturePage,
   IndexedFeatures,
+  IndexedFunctionalPage,
   RefHit,
   Revision,
   SpecReadRepository,
@@ -46,18 +52,29 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
       const found = await this.resolver.resolve(tx, scope, revision);
       if (!found) return null;
       const where = { snapshotId: found.snapshot.id };
-      const [features, tables, endpoints] = await Promise.all([
+      const [features, tables, endpoints, rules, flows, rolesFile] = await Promise.all([
         tx.specFeature.count({ where }),
         tx.specTable.count({ where }),
         tx.specEndpoint.count({ where }),
+        tx.specEntity.count({ where: { ...where, kind: "rule" } }),
+        tx.specEntity.count({ where: { ...where, kind: "flow" } }),
+        tx.specEntity.findFirst({ where: { ...where, kind: "roles" }, select: { data: true } }),
       ]);
+      const roleList = (rolesFile?.data as { roles?: unknown } | null)?.roles;
       return {
         branch: found.branch,
         commitSha: found.snapshot.commitSha,
         status: found.snapshot.status,
         errorCode: found.snapshot.errorCode,
         indexedAt: found.snapshot.indexedAt.toISOString(),
-        counts: { features, tables, endpoints },
+        counts: {
+          features,
+          tables,
+          endpoints,
+          rules,
+          roles: Array.isArray(roleList) ? roleList.length : 0,
+          flows,
+        },
       };
     });
   }
@@ -83,6 +100,52 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
         validation: validationOfFeature(validations, row.specId),
       }));
       return { kind: "page", page: { items, ...position, facets } };
+    });
+  }
+
+  functionalPage(
+    scope: ProjectScope,
+    revision: Revision,
+    { tab, type, q, ...request }: FunctionalListRequest,
+  ): Promise<IndexedFunctionalPage | null> {
+    return this.transactions.run(scope, async (tx) => {
+      const found = await this.resolver.resolve(tx, scope, revision);
+      if (!found) return null;
+      const { snapshot } = found;
+      if (snapshot.status === "failed") return failureOf(snapshot);
+      const kind = tab === "rules" ? "rule" : "flow";
+      const ids = q === undefined ? null : await this.search.entityIds(snapshot.id, kind, q);
+      const where = entityWhere(snapshot.id, kind, ids, kind === "rule" ? type : undefined);
+      const { rows, ...position } = await loadWindow(
+        entitySource(tx, snapshot.id, kind, where),
+        request,
+      );
+      const facets: FunctionalPage["facets"] =
+        kind === "rule" ? { type: await ruleTypeFacets(tx, snapshot.id, ids) } : {};
+      return {
+        kind: "page",
+        page: { items: rows.map((row) => functionalItemOf(kind, row)), ...position, facets },
+      };
+    });
+  }
+
+  entityItem(
+    scope: ProjectScope,
+    kind: "rule" | "flow" | "roles",
+    specId: string,
+    revision: Revision = {},
+  ): Promise<EntityItem | null> {
+    return this.transactions.run(scope, async (tx) => {
+      const found = await this.resolver.resolve(tx, scope, revision);
+      const snapshot = found?.snapshot;
+      if (!snapshot) return null;
+      if (snapshot.status === "failed") return failureOf(snapshot);
+      if (snapshot.entitiesIndexedAt === null) return null;
+      const row = await tx.specEntity.findFirst({
+        where: { snapshotId: snapshot.id, kind, specId },
+        select: { path: true, data: true },
+      });
+      return row ? { kind: "found", commitSha: snapshot.commitSha, ...row } : null;
     });
   }
 

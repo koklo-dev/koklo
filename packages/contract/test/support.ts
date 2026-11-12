@@ -184,7 +184,7 @@ export const specHead = {
   status: "ready",
   errorCode: null,
   indexedAt: INSTANT,
-  counts: { features: 3, tables: 2, endpoints: 4 },
+  counts: { features: 3, tables: 2, endpoints: 4, rules: 5, roles: 3, flows: 2 },
 };
 
 export const featureSummary = {

@@ -35,7 +35,7 @@ const nth = (kind: string, n = "n") => uuidOf(`$1::text || ':${kind}:' || ${n}`)
 /** Au moins trois chiffres, sans jamais tronquer (`lpad` couperait 1000 en 100). */
 const pad = (n = "n") => `lpad(${n}::text, GREATEST(3, length(${n}::text)), '0')`;
 const pick = (values: readonly string[], index: string) =>
-  `(ARRAY[${values.map((value) => `'${value}'`).join(", ")}])[1 + ${index}]`;
+  `(ARRAY[${values.map((value) => `'${value.replace(/'/g, "''")}'`).join(", ")}])[1 + ${index}]`;
 
 const FEATURE_STATUSES = ["brouillon", "specifiee", "implementee", "adoptee"] as const;
 const FEATURE_PRIORITIES = ["must", "should", "could", "wont"] as const;
@@ -231,6 +231,148 @@ function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedSta
   return sql.map((statement) => statementOf(statement, target));
 }
 
+/** Titre connu des tests de recherche des règles : le seul à contenir « tardive », au rang 250 (page 11 de 24 sur `large`). */
+const KNOWN_RULE_TITLE = "Annulation tardive d'une réservation";
+const KNOWN_RULE_RANK = 250;
+const RULE_TITLES = [
+  "Unicité de l'adresse e-mail",
+  "Calcul du total TTC",
+  "Cycle de vie d'une réservation",
+  "Plafond de paiement",
+  "Délai de remboursement",
+  "Statut d'une facture",
+  "Durée de conservation des documents",
+  "Droit d'accès au planning",
+] as const;
+const FLOW_ACTORS = ["Visiteur", "Gestionnaire", "Client", "Administrateur"] as const;
+
+/** Ressources du jeu de permissions : 12 groupes, 47 actions (6, 6, 5, 5, 5, 4, 4, 3, 3, 2, 2, 2). */
+const PERMISSION_GROUPS: readonly (readonly [string, string, number])[] = [
+  ["agenda", "l'agenda", 6],
+  ["reservations", "les réservations", 6],
+  ["clients", "les clients", 5],
+  ["paiements", "les paiements", 5],
+  ["factures", "les factures", 5],
+  ["documents", "les documents", 4],
+  ["notifications", "les notifications", 4],
+  ["rapports", "les rapports", 3],
+  ["acces", "les accès", 3],
+  ["equipes", "les équipes", 2],
+  ["parametres", "les paramètres", 2],
+  ["journal", "le journal", 2],
+];
+const PERMISSION_ACTIONS = [
+  ["lire", "Consulter"],
+  ["creer", "Créer"],
+  ["modifier", "Modifier"],
+  ["supprimer", "Supprimer"],
+  ["exporter", "Exporter"],
+  ["archiver", "Archiver"],
+] as const;
+
+/** Permissions du jeu : `PM-<ressource>.<action>`, libellé métier, ressource et action lisibles. */
+function permissionsOf(count: number) {
+  return PERMISSION_GROUPS.flatMap(([resource, label, size]) =>
+    PERMISSION_ACTIONS.slice(0, size).map(([action, verb]) => ({
+      id: `PM-${resource}.${action}`,
+      libelle: `${verb} ${label}`,
+      action,
+      ressource: resource,
+      conditions: [] as string[],
+      endpoints: [] as string[],
+    })),
+  ).slice(0, count);
+}
+
+/** Rôles du jeu : un administrateur (tout), un gestionnaire (sans suppression, restreint sur l'agenda), un lecteur. */
+function rolesOf(permissions: readonly { id: string; action: string }[], count: number) {
+  const ids = (keep: (action: string) => boolean) =>
+    permissions.filter(({ action }) => keep(action)).map(({ id }) => id);
+  return [
+    {
+      id: "RL-administrateur",
+      nom: "Administrateur",
+      description: "Gère tout le produit livré.",
+      permissions: ids(() => true),
+    },
+    {
+      id: "RL-gestionnaire",
+      nom: "Gestionnaire",
+      description: "Gère l'activité courante, sans supprimer.",
+      permissions: ids((action) => action !== "supprimer"),
+      restrictions: { "PM-agenda.modifier": "les siennes", "PM-agenda.creer": "pour son équipe" },
+    },
+    {
+      id: "RL-lecteur",
+      nom: "Lecteur",
+      description: "Consulte sans rien modifier.",
+      permissions: ids((action) => action === "lire"),
+    },
+  ].slice(0, count);
+}
+
+/** Littéral SQL d'un document JSON (apostrophes doublées). */
+const jsonLiteral = (value: unknown) => `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
+
+/**
+ * Règles, parcours, rôles et permissions de l'index d'entités (TK-103, B343) : mêmes formes que celles que le worker écrit
+ * depuis `domain/rules/R-nnn-*.md`, `design/flows/P-*.yaml` et `domain/roles.yaml` (une seule ligne `roles`, `sort` = rang
+ * numérique de `R-nnn`).
+ */
+function domainStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
+  const volume = SEED_VOLUMES[profile];
+  const at = "$3::timestamptz";
+  const columns =
+    "id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at";
+  const conflict = `ON CONFLICT (snapshot_id, kind, spec_id) DO UPDATE SET path = EXCLUDED.path, data = EXCLUDED.data,
+       content_hash = EXCLUDED.content_hash, sort = EXCLUDED.sort`;
+  const ruleTitle = `CASE WHEN n = ${KNOWN_RULE_RANK} THEN '${KNOWN_RULE_TITLE.replace(/'/g, "''")}'
+       ELSE ${pick(RULE_TITLES, "n % 8")} || ' (' || n || ')' END`;
+  const rule = `INSERT INTO spec_entities (${columns})
+     SELECT ${nth("entity:rule")}, $2, ${own("snapshot")}, 'rule', 'R-' || ${pad()}, 'functional',
+            'domain/rules/R-' || ${pad()} || '-regle-' || ${pad()} || '.md',
+            jsonb_build_object('id', 'R-' || ${pad()}, 'titre', title, 'type', typ, 'tables', '[]'::jsonb,
+              'endpoints', '[]'::jsonb,
+              'fonctionnalites', jsonb_build_array('F-' || ${pad(`(1 + n % ${volume.features})`)}),
+              'enonce', 'Énoncé de la règle ' || n || ' : ' || title || '.',
+              'exemples', jsonb_build_array('Exemple de la règle ' || n || '.'))
+              || CASE WHEN typ = 'workflow'
+                   THEN jsonb_build_object('etats', jsonb_build_array('Brouillon', 'En validation', 'Validée', 'Archivée'))
+                   ELSE '{}'::jsonb END,
+            ${entityHash("rule", `'R-' || ${pad()}`, "title")}, n, ${at}, ${at}
+       FROM (SELECT n, ${ruleTitle} AS title, ${pick(["contrainte", "calcul", "workflow"], "n % 3")} AS typ
+               FROM generate_series(1, ${volume.rules}) AS n) AS series
+     ${conflict}`;
+  const flowId = `'P-parcours-' || ${pad()}`;
+  const flow = `INSERT INTO spec_entities (${columns})
+     SELECT ${nth("entity:flow")}, $2, ${own("snapshot")}, 'flow', ${flowId}, 'functional',
+            'design/flows/P-parcours-' || ${pad()} || '.yaml',
+            jsonb_build_object('id', ${flowId}, 'titre', title, 'acteur', ${pick(FLOW_ACTORS, "n % 4")},
+              'depart', jsonb_build_object('libelle', 'Ouvrir l''écran d''accueil', 'ecran', 'S-accueil'),
+              'etapes', (SELECT jsonb_agg(jsonb_build_object('libelle', 'Étape ' || (k + 1) || ' du parcours ' || n,
+                           'ecran', 'S-ecran-' || k) ORDER BY k) FROM generate_series(1, 2 + n % 3) AS k),
+              'erreurs', CASE WHEN n % 2 = 0
+                           THEN jsonb_build_array(jsonb_build_object('etape', 2, 'texte', 'Le service est indisponible'))
+                           ELSE '[]'::jsonb END,
+              'fonctionnalites', jsonb_build_array('F-001', 'F-004')),
+            ${entityHash("flow", flowId, "title")}, n, ${at}, ${at}
+       FROM (SELECT n, 'Parcours ' || n || ' : ' || ${pick(VERBS, "n % 9")} || ' ' || ${pick(NOUNS, "n % 10")} AS title
+               FROM generate_series(1, ${volume.flows}) AS n) AS series
+     ${conflict}`;
+  const permissions = permissionsOf(volume.permissions);
+  const file = {
+    titre: "Rôles et permissions",
+    roles: rolesOf(permissions, volume.roles),
+    permissions,
+  };
+  const roles = `INSERT INTO spec_entities (${columns})
+     VALUES (${own("entity:roles")}, $2, ${own("snapshot")}, 'roles', 'roles', 'functional', 'domain/roles.yaml',
+             ${jsonLiteral(file)},
+             encode(sha256(convert_to('roles:' || ${jsonLiteral(file)}::text, 'UTF8')), 'hex'), 1, ${at}, ${at})
+     ${conflict}`;
+  return [rule, flow, roles].map((sql) => statementOf(sql, target));
+}
+
 function trackerStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
   const total = SEED_VOLUMES[profile].tickets;
   const at = "$3::timestamptz";
@@ -312,6 +454,7 @@ export function buildVolumeStatements(
     ...repositoryStatements(target),
     ...specStatements(profile, target),
     ...entityStatements(profile, target),
+    ...domainStatements(profile, target),
     ...trackerStatements(profile, target),
     ...proposalStatements(profile, target),
   ];

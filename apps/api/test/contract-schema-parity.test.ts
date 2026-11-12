@@ -33,6 +33,28 @@ const ID_SOURCE_LITERALS = [
   slugged("nfr", "NFR"),
 ];
 
+describe("TK-103 : règles, rôles et parcours (contrat 3.1.0)", () => {
+  it("types de règle du contrat = ceux de BusinessRuleSchema", () => {
+    const types = ["calcul", "contrainte", "workflow"];
+    expect(zodEnum("domain.ts", "type")).toEqual(types);
+    expect(options(api.ruleTypeSchema)).toEqual(types);
+  });
+  it("identifiants R-, RL-, P- et PM- du contrat = ceux de schema", () => {
+    const source = read("packages/schema/src/entities/ids.ts");
+    expect(source).toContain(slugged("flow", "P"));
+    for (const [schema, ok, bad] of [
+      [api.ruleIdSchema, "R-007", "R-7"],
+      [api.roleIdSchema, "RL-chef", "RL-Chef"],
+      [api.flowIdSchema, "P-inscription", "P-"],
+      [api.permissionIdSchema, "PM-agenda.lire", "PM-"],
+    ] as const) {
+      const parser = schema as { safeParse(value: unknown): { success: boolean } };
+      expect(parser.safeParse(ok).success, ok).toBe(true);
+      expect(parser.safeParse(bad).success, bad).toBe(false);
+    }
+  });
+});
+
 describe("D3 paquet schema : énumérations, étapes, identifiants", () => {
   it("statut et priorité des features", () => {
     const status = ["adoptee", "brouillon", "implementee", "specifiee"];

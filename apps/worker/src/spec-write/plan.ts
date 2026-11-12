@@ -5,20 +5,24 @@ import {
   emitFeatureMarkdown,
   type Feature,
   parseFeatureMarkdown,
+  parseSpecFiles,
   type SpecFile,
 } from "@koklo/schema";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
+import { applyFlow, flowIndex } from "./flows.ts";
 import { featureIdOfPath, featurePathOf, isIdeaKind } from "./paths.ts";
 import { planIdeaBatch } from "./plan-idea.ts";
 import { newIssues, toStoredReport } from "./report.ts";
+import { applyRole, roleIds } from "./roles.ts";
+import { applyRule, ruleIndex } from "./rules.ts";
 import {
   type BatchOperation,
   conflicted,
   failed,
   type LoadedBatch,
   type Outcome,
-  type ReportIssue,
 } from "./types.ts";
+import { invalidEmit, PlanStop, removeFile, stop, type Workspace, writeFile } from "./workspace.ts";
 
 /** Ce que le lot donne sur l'état lu : un résultat métier sans commit, ou les changements à commiter. */
 export type Plan =
@@ -28,24 +32,16 @@ export type Plan =
       readonly report?: ReturnType<typeof toStoredReport>;
     };
 
-/** Arrêt du calcul avec un résultat métier (conflit, interdit, spec invalide). */
-class PlanStop extends Error {
-  readonly outcome: Outcome;
-  constructor(outcome: Outcome) {
-    super("plan stopped");
-    this.outcome = outcome;
-  }
+interface Planned extends Workspace {
+  /** Fichiers de la tête, par genre : identifiant -> chemin (les créations du lot n'y figurent pas). */
+  readonly index: Index;
 }
 
-interface Workspace {
-  readonly designer: boolean;
-  readonly files: Map<string, string>;
-  readonly changes: Map<string, FileChange>;
-  readonly index: Map<string, string>;
-}
-
-function stop(outcome: Outcome): never {
-  throw new PlanStop(outcome);
+interface Index {
+  readonly features: Map<string, string>;
+  readonly rules: Map<string, string>;
+  readonly flows: { owned: Map<string, string>; taken: Set<string> };
+  readonly roles: Set<string>;
 }
 
 function featureIndex(files: readonly SpecFile[]): Map<string, string> {
@@ -57,11 +53,40 @@ function featureIndex(files: readonly SpecFile[]): Map<string, string> {
   return index;
 }
 
-/** `update` et `delete` visent une feature présente sur la tête ; `create` une identité libre. */
-function conflictOf(operations: readonly BatchOperation[], index: Map<string, string>) {
+/** Genre d'une opération (`feature`, `rule`, `role`, `flow`) : le préfixe de son `kind`. */
+const genreOf = (operation: BatchOperation): string => operation.kind.split(".")[0] ?? "";
+
+function indexOf(files: readonly SpecFile[]): Index {
+  const paths = files.map((file) => file.path);
+  const roles = new Set<string>();
+  if (paths.includes("domain/roles.yaml")) {
+    for (const file of parseSpecFiles(files.filter((f) => f.path === "domain/roles.yaml")).spec
+      .roles) {
+      for (const role of file.value.roles) roles.add(role.id);
+    }
+  }
+  return { features: featureIndex(files), rules: ruleIndex(paths), flows: flowIndex(paths), roles };
+}
+
+/** Une identité est-elle déjà prise sur la tête ? Un `.json` hérité occupe encore l'identifiant de son parcours. */
+function present(index: Index, operation: BatchOperation): boolean {
+  const id = operation.targetSpecId ?? "";
+  const genre = genreOf(operation);
+  if (genre === "rule") return index.rules.has(id);
+  if (genre === "role") return index.roles.has(id);
+  if (genre === "flow") {
+    const created = operation.kind === "flow.create";
+    return created ? index.flows.taken.has(id) : index.flows.owned.has(id);
+  }
+  return index.features.has(id);
+}
+
+/** `update` et `delete` visent un élément présent sur la tête ; `create` une identité libre. */
+function conflictOf(operations: readonly BatchOperation[], index: Index) {
   for (const operation of operations) {
-    const present = index.has(operation.targetSpecId ?? "");
-    if ((operation.kind === "feature.create") === present) return conflicted("write_conflict");
+    if (operation.kind.endsWith(".create") === present(index, operation)) {
+      return conflicted("write_conflict");
+    }
   }
   return undefined;
 }
@@ -70,28 +95,13 @@ function requireDesign(workspace: Workspace, linked: boolean): void {
   if (workspace.designer && !linked) stop(failed("FORBIDDEN"));
 }
 
-function issueOfEmit(path: string, id: string, error: EmitFeatureError): ReportIssue {
-  return {
-    rule: "structure",
-    code: "STRUCT_SCHEMA_VIOLATION",
-    severity: "error",
-    path,
-    pointer: error.path,
-    entityId: id,
-    message: error.message,
-  };
-}
-
 function write(workspace: Workspace, path: string, id: string, feature: Feature): void {
-  let content: string;
   try {
-    content = emitFeatureMarkdown(feature);
+    writeFile(workspace, path, emitFeatureMarkdown(feature));
   } catch (error) {
     if (!(error instanceof EmitFeatureError)) throw error;
-    stop(failed("SPEC_INVALID", toStoredReport([issueOfEmit(path, id, error)])));
+    invalidEmit(path, id, error);
   }
-  workspace.files.set(path, content);
-  workspace.changes.set(path, { path, content });
 }
 
 function currentFeature(workspace: Workspace, path: string): Feature {
@@ -107,8 +117,7 @@ function applyCreate(workspace: Workspace, id: string, operation: BatchOperation
 
 function applyDelete(workspace: Workspace, path: string): void {
   if (workspace.designer) requireDesign(workspace, isDesignLinked(currentFeature(workspace, path)));
-  workspace.files.delete(path);
-  workspace.changes.set(path, { path, delete: true });
+  removeFile(workspace, path);
 }
 
 function applyUpdate(workspace: Workspace, id: string, path: string, operation: BatchOperation) {
@@ -119,9 +128,22 @@ function applyUpdate(workspace: Workspace, id: string, path: string, operation: 
   write(workspace, path, id, next);
 }
 
-function applyOperation(workspace: Workspace, operation: BatchOperation): void {
+function applyOperation(workspace: Planned, operation: BatchOperation): void {
   const id = operation.targetSpecId ?? "";
-  const path = workspace.index.get(id) ?? "";
+  const genre = genreOf(operation);
+  if (genre === "rule") {
+    applyRule(workspace, operation, workspace.index.rules.get(id));
+    return;
+  }
+  if (genre === "role") {
+    applyRole(workspace, operation);
+    return;
+  }
+  if (genre === "flow") {
+    applyFlow(workspace, operation, workspace.index.flows.owned.get(id));
+    return;
+  }
+  const path = workspace.index.features.get(id) ?? "";
   if (operation.kind === "feature.create") {
     applyCreate(workspace, id, operation);
   } else if (operation.kind === "feature.delete") {
@@ -158,10 +180,10 @@ export function planBatch(
   if (batch.operations.some((operation) => isIdeaKind(operation.kind))) {
     return planIdeaBatch(batch.operations, treePaths);
   }
-  const index = featureIndex(files);
+  const index = indexOf(files);
   const conflict = conflictOf(batch.operations, index);
   if (conflict) return { outcome: conflict };
-  const workspace: Workspace = {
+  const workspace: Planned = {
     designer: batch.authorRole === "designer",
     files: new Map(files.map((file) => [file.path, file.content])),
     changes: new Map(),

@@ -15,9 +15,23 @@
       "minLength": 1,
       "type": "string"
     },
+    "etats": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
     "exemples": {
       "default": [],
       "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "fonctionnalites": {
+      "items": {
+        "pattern": "^F-\\d{3,}$",
         "type": "string"
       },
       "type": "array"
@@ -33,6 +47,10 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "titre": {
+      "minLength": 1,
+      "type": "string"
     },
     "type": {
       "enum": [

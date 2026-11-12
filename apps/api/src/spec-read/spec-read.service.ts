@@ -1,5 +1,8 @@
 import type {
   FeatureDetail,
+  FunctionalListInput,
+  RolesMatrixInput,
+  RulesMatrix,
   SpecHeadOutput,
   SpecItem,
   SpecRefsSearchInput,
@@ -13,13 +16,16 @@ import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { buildMatrix } from "./entity-values.ts";
 import { detailOf } from "./feature-detail.ts";
 import { compareFeatures } from "./feature-page.ts";
 import {
+  type EntityItem,
   type FeatureFilter,
   type FeatureHead,
   type FeatureListRequest,
   type FeaturePage,
+  type FunctionalPage,
   type Revision,
   SPEC_READ_REPOSITORY,
   type SpecReadRepository,
@@ -38,6 +44,16 @@ const EMPTY_PAGE: FeaturePage = {
   offset: 0,
   total: 0,
   facets: { status: {}, priority: {}, validation: {} },
+};
+
+/** Page rendue pour une révision non indexée : liste vide, facettes vides. */
+const EMPTY_FUNCTIONAL: FunctionalPage = {
+  items: [],
+  nextCursor: null,
+  previousCursor: null,
+  offset: 0,
+  total: 0,
+  facets: {},
 };
 
 /**
@@ -77,6 +93,33 @@ export class SpecReadService {
     );
     if (indexed?.kind === "failed") throw indexFailed(indexed);
     return indexed?.page ?? EMPTY_PAGE;
+  }
+
+  /** Règles ou parcours (TK-103) : une page de l'index d'entités ; liste vide quand la révision n'est pas indexée. */
+  async functionalList(scope: ProjectScope, input: FunctionalListInput): Promise<FunctionalPage> {
+    const { branch, commitSha, tab, type, q, cursor, around, limit } = input;
+    const indexed = await this.repository.functionalPage(
+      scope,
+      { branch, commitSha },
+      { tab, type, q, cursor, around, limit: limit ?? DEFAULT_PAGE_SIZE },
+    );
+    if (indexed?.kind === "failed") throw indexFailed(indexed);
+    return indexed?.page ?? EMPTY_FUNCTIONAL;
+  }
+
+  /** Matrice des rôles (TK-103) : calculée sur le fichier de rôles indexé ; vide quand rien n'est indexé. */
+  async rolesMatrix(scope: ProjectScope, input: RolesMatrixInput): Promise<RulesMatrix> {
+    const { branch, commitSha, group, q } = input;
+    const file = await this.repository.entityItem(scope, "roles", "roles", { branch, commitSha });
+    if (file?.kind === "failed") throw indexFailed(file);
+    return buildMatrix(file?.data, { group, q });
+  }
+
+  /** Règle, parcours ou fichier de rôles de la tête, lus dans l'index d'entités (aucun réseau) ; `NOT_FOUND` si absent. */
+  async entity(scope: ProjectScope, kind: "rule" | "flow" | "roles", specId: string) {
+    const item: EntityItem | null = await this.repository.entityItem(scope, kind, specId);
+    if (item?.kind === "failed") throw indexFailed(item);
+    return orNotFound(item);
   }
 
   /**

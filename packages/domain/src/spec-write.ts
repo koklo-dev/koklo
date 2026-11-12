@@ -48,6 +48,25 @@ const hasControlCharacter = (text: string): boolean =>
 export const isFeatureId = (value: unknown): value is string =>
   typeof value === "string" && FEATURE_ID.test(value);
 
+const MAX_SLUG_LENGTH = 40;
+
+/**
+ * Slug d'un texte pour un nom de fichier ou un identifiant (`R-007-<slug>.md`, `RL-<slug>`, `P-<slug>`) : minuscules, sans
+ * accents, `[a-z0-9-]`, 40 caractères au plus ; `fallback` quand il ne reste rien. Partagé par l'API (identifiants posés à
+ * l'enfilage) et le worker (noms de fichiers) : une seule définition.
+ */
+export function slugOf(text: unknown, fallback: string): string {
+  const slug = (typeof text === "string" ? text : "")
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .slice(0, MAX_SLUG_LENGTH)
+    .replace(/-+$/, "");
+  return slug === "" ? fallback : slug;
+}
+
 /** Nom de branche acceptable (sous-ensemble prudent de `git check-ref-format`). */
 export function isValidBranchName(name: unknown): name is string {
   if (typeof name !== "string" || name === "" || name === "@") return false;

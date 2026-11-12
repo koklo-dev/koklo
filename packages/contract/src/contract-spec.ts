@@ -28,6 +28,12 @@ import {
   specRefsSearchInputSchema,
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
+import {
+  functionalItemSchema,
+  functionalListInputSchema,
+  rolesMatrixInputSchema,
+  rolesMatrixSchema,
+} from "./schemas-spec-domain.ts";
 
 /** Lecture depuis l'index en base (CDC §8.2) : ouverte à tous les rôles, 404 hors projet. */
 const readIndexErrors = { ...readOneErrors, ...validationError } as const;
@@ -41,6 +47,23 @@ const spec = {
     .errors({ ...readIndexErrors, ...specIndexFailedError })
     .input(featureListInputSchema)
     .output(listOf(featureSummarySchema)),
+  /**
+   * Onglets Règles métier et Parcours (TK-103, 3.1.0, B341) : liste à curseur de l'index d'entités de la tête, filtre de type
+   * (règles), recherche sur tout l'index, `around` pour le lien direct. Garde et erreurs de `spec.listFeatures`.
+   */
+  functional: {
+    list: route("GET", "/projects/{projectId}/spec/functional")
+      .errors({ ...readIndexErrors, ...specIndexFailedError })
+      .input(functionalListInputSchema)
+      .output(listOf(functionalItemSchema)),
+  },
+  /** Onglet Rôles et permissions (3.1.0) : rôles, groupes de ressources et actions de la matrice « Qui peut faire quoi ». */
+  roles: {
+    matrix: route("GET", "/projects/{projectId}/spec/roles/matrix")
+      .errors({ ...readIndexErrors, ...specIndexFailedError })
+      .input(rolesMatrixInputSchema)
+      .output(rolesMatrixSchema),
+  },
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })
     .input(featureGetInputSchema)
