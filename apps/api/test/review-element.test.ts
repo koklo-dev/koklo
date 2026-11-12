@@ -99,13 +99,16 @@ describe("enregistrement : SHA, auteur, décision, commentaire et hachage du con
     async (targetKind, targetRef) => {
       const version = await head(BASE);
       const role = targetRef === "data" ? "dev" : "client";
+      // TK-104 (B351) : « Valider le cahier » exige que toutes les unités soient traitées.
+      if (targetRef === "functional") await approveAll(version);
 
       const res = await as(role).submit(p1(), version, { targetKind, targetRef });
 
       expect(res.status, JSON.stringify(res.body)).toBe(200);
       const rows = await bench().database.query<{ content_hash: string }>(
-        `SELECT v.content_hash FROM review_versions v JOIN reviews r ON r.id = v.review_id WHERE r.project_id = $1`,
-        [p1()],
+        `SELECT v.content_hash FROM review_versions v JOIN reviews r ON r.id = v.review_id
+          WHERE r.project_id = $1 AND r.target_kind = $2::review_target_kind`,
+        [p1(), targetKind],
       );
       expect(rows).toHaveLength(1);
       expect(rows[0]?.content_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -136,6 +139,7 @@ describe("cibles absentes de la tête", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("invalidation (B11)", () => {
   it("modifier un élément invalide sa validation ; le livrable n'est plus validé", async () => {
     await approveAll(await head(BASE));
@@ -182,6 +186,15 @@ describe("invalidation (B11)", () => {
     const owner = as("owner");
     await bench().database.query("DELETE FROM project_client_access WHERE project_id = $1", [p1()]);
     const version = await head(BASE);
+    for (const [targetKind, targetRef] of [
+      ["feature", "F-001"],
+      ["feature", "F-002"],
+      ["flow", "P-001"],
+      ["rules", "rules"],
+      ["roles", "roles"],
+    ] as const) {
+      expect((await owner.submit(p1(), version, { targetKind, targetRef })).status).toBe(200);
+    }
     expect(
       (await owner.submit(p1(), version, { targetKind: "deliverable", targetRef: "functional" }))
         .status,

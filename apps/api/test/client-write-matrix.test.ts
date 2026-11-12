@@ -92,6 +92,8 @@ const DENIED = [
   "projectState.update",
   "repo.createSpec",
   "repo.link",
+  // TK-104 (contrat 3.2.0) : relancer le client relève d'owner et d'admin (B352).
+  "review.remind",
   // TK-100 (contrat 2.10.0) : forcer l'ouverture d'un livrable relève d'owner et d'admin.
   "spec.forceDeliverable",
   "specBatch.submit",

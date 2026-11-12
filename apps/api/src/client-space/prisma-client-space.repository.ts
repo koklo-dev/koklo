@@ -11,9 +11,22 @@ import type { ProjectScope } from "../tracker/scope.ts";
 import type {
   ClientProjectRecord,
   ClientSpaceRepository,
+  EntityListRequest,
   FeatureTrail,
+  FlowsRead,
   IndexedHead,
+  ProgressFacts,
+  RolesRead,
+  RulesRead,
 } from "./client-space.repository.ts";
+import type { LabelRows, LinkSources } from "./client-space-entities.ts";
+import {
+  readFlows,
+  readLinkLabels,
+  readProgress,
+  readRoles,
+  readRules,
+} from "./prisma-client-space-entities.ts";
 
 /** Lecture seule : aucune méthode n'écrit (ni reviews, ni suggestions, ni audit) ; la phase réconcilie seulement les versions de l'idée, comme `project.shell`. */
 @Injectable()
@@ -81,7 +94,10 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
     });
   }
 
-  featureHead(scope: ProjectScope, specId: string): Promise<{ found: boolean } | null> {
+  featureHead(
+    scope: ProjectScope,
+    specId: string,
+  ): Promise<{ found: boolean; indexedAt: Date } | null> {
     return this.transactions.run(scope, async (tx) => {
       const snapshot = await this.readySnapshot(tx, scope);
       if (!snapshot) return null;
@@ -89,7 +105,42 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
         where: { snapshotId: snapshot.id, specId },
         select: { id: true },
       });
-      return { found: feature !== null };
+      return { found: feature !== null, indexedAt: snapshot.indexedAt };
+    });
+  }
+
+  linkLabels(scope: ProjectScope, featureId: string, source: LinkSources): Promise<LabelRows> {
+    return this.transactions.run(scope, async (tx) => {
+      const snapshot = await this.readySnapshot(tx, scope);
+      if (!snapshot)
+        return { rules: new Map(), flows: new Map(), screens: new Map(), rolesFile: null };
+      return readLinkLabels(tx, snapshot, featureId, source);
+    });
+  }
+
+  progress(scope: ProjectScope): Promise<ProgressFacts | null> {
+    return this.readOnSnapshot(scope, (tx, snapshot) => readProgress(tx, scope, snapshot));
+  }
+
+  flows(scope: ProjectScope, request: EntityListRequest): Promise<FlowsRead | null> {
+    return this.readOnSnapshot(scope, (tx, snapshot) => readFlows(tx, scope, snapshot, request));
+  }
+
+  rules(scope: ProjectScope, request: EntityListRequest): Promise<RulesRead | null> {
+    return this.readOnSnapshot(scope, (tx, snapshot) => readRules(tx, scope, snapshot, request));
+  }
+
+  roles(scope: ProjectScope): Promise<RolesRead | null> {
+    return this.readOnSnapshot(scope, (tx, snapshot) => readRoles(tx, scope, snapshot));
+  }
+
+  private readOnSnapshot<T>(
+    scope: ProjectScope,
+    read: (tx: Tx, snapshot: Snapshot) => Promise<T>,
+  ): Promise<T | null> {
+    return this.transactions.run(scope, async (tx) => {
+      const snapshot = await this.readySnapshot(tx, scope);
+      return snapshot ? read(tx, snapshot) : null;
     });
   }
 

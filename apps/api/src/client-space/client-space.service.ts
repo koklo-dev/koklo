@@ -17,8 +17,15 @@ import {
   type ClientSpaceRepository,
   type FeatureTrail,
 } from "./client-space.repository.ts";
+import { linksOf } from "./client-space-entities.ts";
 import { validationOf } from "./validation.ts";
 
+interface FeaturesInput {
+  limit?: number | undefined;
+  cursor?: string | undefined;
+  untreated?: "true" | undefined;
+  around?: string | undefined;
+}
 type Projects = z.output<typeof clientSpaceProjectsOutputSchema>;
 type Features = z.output<typeof clientSpaceFeaturesOutputSchema>;
 type Feature = z.output<typeof clientSpaceFeatureOutputSchema>;
@@ -68,17 +75,37 @@ export class ClientSpaceService {
     return this.repository.projects(organizationId, linkedIds);
   }
 
-  async features(
-    scope: ProjectScope,
-    input: { limit?: number; cursor?: string },
-  ): Promise<Features> {
+  /**
+   * `untreated` (seulement les « à valider ») et `around` (la page de cette fonctionnalité, aussi hors de la page chargée)
+   * lisent le statut de toutes les fonctionnalités ; sans eux, seule la page demandée est lue (B350).
+   */
+  async features(scope: ProjectScope, input: FeaturesInput): Promise<Features> {
     const head = await this.repository.indexedHead(scope);
     if (head === null) throw notReady();
-    const page = pageFeatures(head.rows, input.limit ?? DEFAULT_PAGE_SIZE, input.cursor);
-    const trails = await this.repository.trails(
-      scope,
-      page.items.map((row) => row.specId),
-    );
+    const limit = input.limit ?? DEFAULT_PAGE_SIZE;
+    if (input.around !== undefined && !head.rows.some((row) => row.specId === input.around)) {
+      throw notFound();
+    }
+    const everything = input.untreated !== undefined || input.around !== undefined;
+    const all = everything
+      ? await this.repository.trails(
+          scope,
+          head.rows.map((row) => row.specId),
+        )
+      : undefined;
+    const candidates =
+      input.untreated === undefined || all === undefined
+        ? head.rows
+        : head.rows.filter(
+            (row) => stateOf(all.get(row.specId), head.sha).validation === "to_validate",
+          );
+    const page = pageFeatures(candidates, limit, input);
+    const trails =
+      all ??
+      (await this.repository.trails(
+        scope,
+        page.items.map((row) => row.specId),
+      ));
     return {
       items: page.items.map((row) => ({
         id: row.specId,
@@ -89,6 +116,8 @@ export class ClientSpaceService {
       })),
       version: head.sha,
       nextCursor: page.nextCursor,
+      total: page.total,
+      offset: page.offset,
     };
   }
 
@@ -103,6 +132,11 @@ export class ClientSpaceService {
     });
     const trail = (await this.repository.trails(scope, [featureId])).get(featureId);
     const { openSuggestions: _open, ...state } = stateOf(trail, detail.commitSha);
+    const labels = await this.repository.linkLabels(scope, featureId, {
+      rules: detail.rules,
+      roles: detail.roles,
+      screens: detail.screens,
+    });
     return {
       id: detail.specId,
       title: detail.title,
@@ -110,6 +144,11 @@ export class ClientSpaceService {
       priority: detail.priority,
       criteria: detail.criteria.map(({ specId, title, steps }) => ({ id: specId, title, steps })),
       ...state,
+      links: linksOf({ rules: detail.rules, roles: detail.roles, screens: detail.screens }, labels),
+      versionNote: {
+        date: head.indexedAt.toISOString().slice(0, 10),
+        label: detail.commitSha.slice(0, 7),
+      },
       version: detail.commitSha,
     };
   }

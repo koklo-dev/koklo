@@ -1,17 +1,20 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { CLIENT_ROLE } from "../auth/roles.ts";
+import { isCahierComplete, progressOf } from "../client-space/client-space-progress.ts";
 import { NotificationEmitter } from "../notification/notification-emitter.ts";
 import { hasLinkedClient } from "../project/client-presence.ts";
-import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import { conflict, forbidden, notFound } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { keysetAfter, pageOfItems } from "../tracker/cursor.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { entityHashesOf } from "./entity-hashes.ts";
+import { remindClients } from "./prisma-review-remind.ts";
 import type {
   ListReviews,
+  RemindedClients,
   ReviewActor,
   ReviewPage,
   ReviewRecord,
@@ -20,6 +23,7 @@ import type {
   SubmittedReview,
 } from "./review.repository.ts";
 import { canReview, clientListFilter } from "./review-policy.ts";
+import { readStatusFacts } from "./status-facts.ts";
 import { type EntityHash, targetHashOf } from "./target-hash.ts";
 
 const SELECT = {
@@ -50,12 +54,36 @@ function recordOf({ version, ...row }: Row): ReviewRecord {
   };
 }
 
+const AUDIT_ACTION = {
+  approved: "review.approve",
+  changes_requested: "review.request_changes",
+  withdrawn: "review.withdraw",
+} as const;
+
+/** Décision sur le cahier entier : « Valider le cahier » ou « Envoyer mes demandes » (B351). */
+const isCahierDecision = (input: SubmitReview): boolean =>
+  input.targetKind === "deliverable" &&
+  input.targetRef === "functional" &&
+  input.status !== "withdrawn";
+
 const staleVersion = () => new ORPCError("STALE_VERSION");
 const spaceNotReady = () => new ORPCError("SPACE_NOT_READY");
 /** Une baseline se valide tant qu'elle est proposée, et seulement à la version qu'elle propose. */
 function assertOpen(baseline: { status: string; proposedSha: string }, headSha: string): void {
   if (baseline.status !== "proposed") throw conflict("baseline_not_open");
   if (baseline.proposedSha !== headSha) throw staleVersion();
+}
+/**
+ * Une baseline taguée est refusée avant le rejeu (une review identique antérieure ne la rouvre pas) ; une baseline ne
+ * s'annule pas : son passage à `validated` est définitif (B349).
+ */
+function assertBaselineAllowsDecision(
+  baseline: { status: string } | null,
+  input: SubmitReview,
+): void {
+  if (baseline && (baseline.status === "tagged" || input.status === "withdrawn")) {
+    throw conflict("baseline_not_open");
+  }
 }
 const baselineNumber = (ref: string) => Number(ref.slice("baseline-".length));
 
@@ -81,20 +109,40 @@ export class PrismaReviewRepository implements ReviewRepository {
       const headSha = head.snapshot.commitSha;
       if (input.version !== headSha) throw staleVersion();
       const { baseline, hash } = await this.assertTarget(tx, scope, head.snapshot.id, input);
-      // Une baseline taguée est refusée avant le rejeu : une review identique antérieure ne la rouvre pas.
-      if (baseline?.status === "tagged") throw conflict("baseline_not_open");
+      assertBaselineAllowsDecision(baseline, input);
       const same = await this.findReplay(tx, scope, input, { headSha, hash });
       if (same) return { record: same, headSha, currentHash: hash };
+      if (isCahierDecision(input)) await this.assertCahierComplete(tx, scope, head.snapshot, input);
       if (baseline) assertOpen(baseline, headSha);
       const record = await this.insert(tx, scope, actor, head.repo.id, input, {
         sha: headSha,
         hash,
       });
-      const validates = baseline !== null && input.status === "approved";
-      if (validates) await this.validateBaseline(tx, baseline.id, headSha, record, actor.now);
-      await this.announce(tx, scope, record, validates ? baselineNumber(input.targetRef) : null);
+      await this.settle(tx, scope, record, { baseline, now: actor.now, headSha });
       return { record, headSha, currentHash: hash };
     });
+  }
+
+  /** Suites de l'écriture : passage de la baseline approuvée à `validated`, puis notifications et audit. */
+  private async settle(
+    tx: Tx,
+    scope: ProjectScope,
+    record: ReviewRecord,
+    context: { baseline: { id: string } | null; now: Date; headSha: string },
+  ): Promise<void> {
+    const { baseline } = context;
+    const validates = baseline !== null && record.status === "approved";
+    if (validates)
+      await this.validateBaseline(tx, baseline.id, context.headSha, record, context.now);
+    await this.announce(tx, scope, record, validates ? baselineNumber(record.targetRef) : null);
+  }
+
+  /**
+   * Relance (B352) : une notification par client lié et par jour, un audit par client réellement relancé. Le droit (owner,
+   * admin) est vérifié par le garde de route ; sans client invité, `no_client`.
+   */
+  remind(scope: ProjectScope, now: Date): Promise<RemindedClients> {
+    return this.transactions.run(scope, (tx) => remindClients(tx, this.notifications, scope, now));
   }
 
   list(scope: ProjectScope, query: ListReviews): Promise<ReviewPage> {
@@ -131,6 +179,21 @@ export class PrismaReviewRepository implements ReviewRepository {
   }
 
   /**
+   * Garde de complétude (B351), après la politique et avant l'écriture : toutes les unités du cahier traitées sur le
+   * contenu courant ; `review_incomplete` sinon, sans rien écrire.
+   */
+  private async assertCahierComplete(
+    tx: Tx,
+    scope: ProjectScope,
+    snapshot: Snapshot,
+    input: SubmitReview,
+  ): Promise<void> {
+    const progress = progressOf(await readStatusFacts(tx, scope, snapshot));
+    const decision = input.status === "approved" ? "approved" : "changes_requested";
+    if (!isCahierComplete(progress, decision)) throw conflict("review_incomplete");
+  }
+
+  /**
    * Politique par cible (D1, B325 d) : décidée ici d'après le lien client du projet, jamais l'entrée. Placée avant toute
    * lecture de la cible : un refus ne dit rien de son existence.
    */
@@ -155,14 +218,15 @@ export class PrismaReviewRepository implements ReviewRepository {
     record: ReviewRecord,
     validatedNumber: number | null,
   ): Promise<void> {
-    if (record.authorRole === CLIENT_ROLE) {
+    // Annuler une décision (B349) ne prévient personne : la cible redevient seulement à valider.
+    if (record.authorRole === CLIENT_ROLE && record.status !== "withdrawn") {
       await this.notifications.reviewSubmitted(tx, scope, record.id);
     }
     if (validatedNumber !== null) {
       await this.notifications.baselineValidated(tx, scope, validatedNumber);
     }
     await recordAudit(tx, scope, {
-      action: record.status === "approved" ? "review.approve" : "review.request_changes",
+      action: AUDIT_ACTION[record.status],
       targetKind: "review",
       targetId: record.id,
     });

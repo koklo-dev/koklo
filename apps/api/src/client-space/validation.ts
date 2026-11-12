@@ -4,7 +4,7 @@ export type Validation = "validated" | "to_validate" | "to_revise";
 /** Verdict d'une review, tel que stocké : `sha` est la tête de spec lue au moment du verdict. */
 export interface ReviewVerdict {
   id: string;
-  status: "approved" | "changes_requested";
+  status: "approved" | "changes_requested" | "withdrawn";
   sha: string;
   createdAt: Date;
   /** Hachage du contenu de la cible au moment du verdict (`review_versions`) ; absent pour une review d'avant TK-100. */
@@ -46,7 +46,10 @@ export function isCurrent(verdict: ReviewVerdict, headSha: string): boolean {
 
 /** Statut de validation au regard du contenu courant de la cible (hachage, à défaut SHA de tête). */
 export function validationOf(latest: ReviewVerdict | undefined, headSha: string): ValidationState {
-  if (latest === undefined) return { validation: "to_validate", previouslyValidated: false };
+  // « Annuler » (B349) : la cible redevient à valider, jamais « précédemment validée ».
+  if (latest === undefined || latest.status === "withdrawn") {
+    return { validation: "to_validate", previouslyValidated: false };
+  }
   if (isCurrent(latest, headSha)) {
     return {
       validation: latest.status === "approved" ? "validated" : "to_revise",

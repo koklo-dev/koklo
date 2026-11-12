@@ -66,6 +66,23 @@ describe("claimForSend : préférences d'e-mail", () => {
     expect(await store.claimForSend(id)).toEqual({ kind: "skipped", reason: "preference-off" });
   });
 
+  it("review.reminded (TK-104) suit client_validation : e-mail par défaut, rien si la préférence est coupée", async () => {
+    const scene = await bench.scene("pref-reminded");
+    const on = await bench.notify(scene, {
+      type: "review.reminded",
+      subjectKind: "review",
+      subjectRef: "R-1",
+    });
+    expect((await store.claimForSend(on)).kind).toBe("ready");
+    await prefer(scene, "client_validation", false);
+    const off = await bench.notify(scene, {
+      type: "review.reminded",
+      subjectKind: "review",
+      subjectRef: "R-1",
+    });
+    expect(await store.claimForSend(off)).toEqual({ kind: "skipped", reason: "preference-off" });
+  });
+
   it("une autre clé, un autre utilisateur ou une autre organisation n'ont aucun effet", async () => {
     const scene = await bench.scene("pref-scope");
     const other = await bench.scene("pref-scope-other");

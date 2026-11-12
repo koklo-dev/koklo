@@ -20,17 +20,46 @@ function decodeCursor(cursor: string): string {
   return specId;
 }
 
-/** Page d'une liste triée numériquement, par curseur opaque (l'identifiant de la dernière ligne). */
+export interface FeatureWindow<T> {
+  items: T[];
+  nextCursor: string | null;
+  /** Nombre de lignes de la liste triée et rang de la première ligne de la page (0 en tête). */
+  total: number;
+  offset: number;
+}
+
+/**
+ * Page d'une liste triée numériquement, par curseur opaque (l'identifiant de la dernière ligne) ou, avec `around`, la page
+ * alignée sur `limit` qui contient cette ligne (TK-104, B350) ; une ligne absente de `rows` donne la première page.
+ */
 export function pageFeatures<T extends { specId: string }>(
   rows: readonly T[],
   limit: number,
-  cursor: string | undefined,
-): { items: T[]; nextCursor: string | null } {
-  const after = cursor === undefined ? undefined : { specId: decodeCursor(cursor) };
-  const sorted = [...rows]
-    .sort(compareFeatures)
-    .filter((row) => after === undefined || compareFeatures(row, after) > 0);
-  const items = sorted.slice(0, limit);
+  position: { cursor?: string | undefined; around?: string | undefined },
+): FeatureWindow<T> {
+  const sorted = [...rows].sort(compareFeatures);
+  const start = startOf(sorted, limit, position);
+  const items = sorted.slice(start, start + limit);
   const last = items.at(-1);
-  return { items, nextCursor: sorted.length > limit && last ? encodeCursor(last.specId) : null };
+  const more = start + items.length < sorted.length;
+  return {
+    items,
+    nextCursor: more && last ? encodeCursor(last.specId) : null,
+    total: sorted.length,
+    offset: start,
+  };
+}
+
+function startOf(
+  sorted: readonly { specId: string }[],
+  limit: number,
+  { cursor, around }: { cursor?: string | undefined; around?: string | undefined },
+): number {
+  if (cursor !== undefined) {
+    const after = { specId: decodeCursor(cursor) };
+    const index = sorted.findIndex((row) => compareFeatures(row, after) > 0);
+    return index === -1 ? sorted.length : index;
+  }
+  const rank = around === undefined ? -1 : sorted.findIndex((row) => row.specId === around);
+  return rank === -1 ? 0 : rank - (rank % limit);
 }

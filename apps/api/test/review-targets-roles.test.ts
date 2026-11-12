@@ -46,6 +46,18 @@ const FUNCTIONAL: Target[] = [
   ["roles", "roles"],
   ["deliverable", "functional"],
 ];
+/** TK-104 (B351) : « Valider le cahier » exige que toutes les unités du Fonctionnel soient traitées. */
+const UNITS: Target[] = [
+  ["feature", "F-001"],
+  ["feature", "F-002"],
+  ["flow", "P-001"],
+  ["rules", "rules"],
+  ["roles", "roles"],
+];
+const isWhole = ([kind]: Target) => kind === "deliverable";
+const validateUnits = async (role: Role) => {
+  for (const unit of UNITS) expect(await statusOf(role, unit), `${role} ${unit[1]}`).toBe(200);
+};
 const submitAs = (role: Role, [targetKind, targetRef]: Target) =>
   as(role).submit(p1(), version, { targetKind, targetRef });
 const statusOf = async (role: Role, target: Target) => (await submitAs(role, target)).status;
@@ -58,6 +70,7 @@ describe("D1 : un client est invité", () => {
         expect(await statusOf(role, target), role).toBe(403);
       }
       expect(await reviewRows(bench().database, p1())).toHaveLength(0);
+      if (isWhole(target)) await validateUnits("client");
       expect(await statusOf("client", target)).toBe(200);
     },
   );
@@ -71,6 +84,7 @@ describe("D1 : aucun client invité", () => {
       for (const role of ["dev", "designer", "business"] as const) {
         expect(await statusOf(role, target), role).toBe(403);
       }
+      if (isWhole(target)) await validateUnits("owner");
       expect(await statusOf("owner", target)).toBe(200);
       expect(await statusOf("admin", target)).toBe(200);
     },

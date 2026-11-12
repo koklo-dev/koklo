@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Untrusted } from "@koklo/domain";
 import { describe, expect, it } from "vitest";
-import { REVIEW_READ_ROLES, REVIEW_SUBMIT_ROLES } from "../src/auth/roles.ts";
+import { REVIEW_READ_ROLES, REVIEW_REMIND_ROLES, REVIEW_SUBMIT_ROLES } from "../src/auth/roles.ts";
 import { untrustedReviewComment } from "../src/review/untrusted-review.ts";
 
 /**
@@ -26,6 +26,10 @@ describe("constantes de rôles des procédures review.*", () => {
     expect([...REVIEW_SUBMIT_ROLES].sort()).toEqual(["admin", "client", "dev", "owner"]);
   });
 
+  it("REVIEW_REMIND_ROLES : owner et admin seulement (TK-104, B352)", () => {
+    expect([...REVIEW_REMIND_ROLES].sort()).toEqual(["admin", "owner"]);
+  });
+
   it("REVIEW_READ_ROLES : les six rôles, le client pour ses seules cibles (filtre serveur, TK-100)", () => {
     expect([...REVIEW_READ_ROLES].sort()).toEqual(
       ["admin", "business", "client", "designer", "dev", "owner"].sort(),
@@ -44,15 +48,16 @@ describe("décorateurs du contrôleur", () => {
   it.each([
     ["submit", "REVIEW_SUBMIT_ROLES"],
     ["list", "REVIEW_READ_ROLES"],
+    ["remind", "REVIEW_REMIND_ROLES"],
   ])("%s : session, garde de rôle et %s", (name, constant) => {
     const before = decorators(name);
     expect(before).toContain("@UseGuards(SessionGuard, RoleGuard)");
     expect(before).toContain(`@Roles(...${constant})`);
   });
 
-  it("aucun rôle nommé en dur, deux gardes de rôle, cloisonnement central injecté", () => {
+  it("aucun rôle nommé en dur, trois gardes de rôle (submit, list, remind), cloisonnement central injecté", () => {
     const source = read(CONTROLLER);
-    expect(source.match(/@Roles\(/g) ?? []).toHaveLength(2);
+    expect(source.match(/@Roles\(/g) ?? []).toHaveLength(3);
     expect(source).not.toMatch(/@Roles\(\s*"/);
     expect(source).toContain("PROJECT_ACCESS");
   });

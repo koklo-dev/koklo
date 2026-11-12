@@ -10,7 +10,7 @@ import { leaksOf, vocabularyOf } from "./vocabulary.ts";
  * journal avec le SHA (`sha`). L'auteur, son rôle, `repo_id` et le SHA retenu sont posés par le
  * serveur, jamais lus de l'entrée. `STALE_VERSION` est 409 sans `data` (aucun oracle).
  */
-const NAMES = ["list", "submit"];
+const NAMES = ["list", "remind", "submit"];
 const COLLECTION = "/projects/{projectId}/reviews";
 const SHA40 = "a".repeat(40);
 const SUBMITTED = {
@@ -59,13 +59,13 @@ describe("RV1 surface : exactement list et submit", () => {
   it("aucune route de modification ni de suppression d'une review (journal append-only)", async () => {
     const d = await doc();
     const reviewPaths = Object.keys(d.paths).filter((path) => path.includes("/reviews"));
-    expect(reviewPaths).toEqual([COLLECTION]);
+    expect(reviewPaths.sort()).toEqual([COLLECTION, `${COLLECTION}/reminders`]);
     expect(Object.keys(d.paths[COLLECTION] ?? {}).sort()).toEqual(["get", "post"]);
   });
 
-  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 3.1.0 (TK-94, projet explicite TK-96)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.1.0");
-    expect((await doc()).info.version).toBe("3.1.0");
+  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 3.2.0 (TK-94, projet explicite TK-96)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.2.0");
+    expect((await doc()).info.version).toBe("3.2.0");
   });
 });
 
@@ -309,5 +309,36 @@ describe("RV6 fuite de vocabulaire technique dans le contrat client", () => {
     expect(names.length, "le parcours a trouvé des propriétés").toBeGreaterThan(0);
     const leaks = leaksOf(names);
     expect(leaks, leaks.join(", ")).toEqual([]);
+  });
+});
+
+describe("RV9 TK-104 : annuler une décision et relancer le client", () => {
+  it("withdrawn est un statut de review ; submit l'accepte, la sortie aussi", async () => {
+    const body = { projectId: UUID, targetKind: "flow", targetRef: "P-reserver", version: "v" };
+    expect(await isValid(input("review.submit"), { ...body, status: "withdrawn" })).toBe(true);
+    expect(await isValid(input("review.submit"), { ...body, status: "dismissed" })).toBe(false);
+    expect(await isValid(output("review.submit"), { ...SUBMITTED, status: "withdrawn" })).toBe(
+      true,
+    );
+  });
+
+  it("submit déclare les conflits baseline_not_open et review_incomplete", () => {
+    const data = errors("review.submit").CONFLICT?.data;
+    expect(data).toBeDefined();
+    expect(JSON.stringify(Object.keys(errors("review.submit")))).toContain("CONFLICT");
+  });
+
+  it("remind : POST /reviews/reminders, projectId seul, sortie `reminded`, erreurs d'écriture et no_client", async () => {
+    expect((await doc()).paths[`${COLLECTION}/reminders`]?.post).toBeDefined();
+    expect(await isValid(input("review.remind"), { projectId: UUID })).toBe(true);
+    expect(await isValid(input("review.remind"), {})).toBe(false);
+    expect(await isValid(output("review.remind"), { reminded: 0 })).toBe(true);
+    expect(await isValid(output("review.remind"), { reminded: -1 })).toBe(false);
+    const declared = errors("review.remind");
+    for (const code of ["FORBIDDEN", "NOT_FOUND", "CONFLICT"])
+      expect(declared[code], code).toBeDefined();
+    const reason = await parsed(declared.CONFLICT?.data, { reason: "no_client" });
+    expect(reason).toEqual({ reason: "no_client" });
+    expect(await parsed(declared.CONFLICT?.data, { reason: "other" })).toBeUndefined();
   });
 });

@@ -1221,6 +1221,7 @@ enum ReviewTargetKind {
 enum ReviewStatus {
   approved
   changes_requested
+  withdrawn
 
   @@map("review_status")
 }

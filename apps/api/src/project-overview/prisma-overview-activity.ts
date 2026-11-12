@@ -26,6 +26,9 @@ function whereOf(scope: ProjectScope, audience: Audience) {
   };
 }
 
+const isReviewVerdict = (action: string) =>
+  action.startsWith("review.") && action !== "review.remind";
+
 const idsOf = (rows: AuditRow[], match: (action: string) => boolean): string[] => [
   ...new Set(rows.filter((row) => match(row.action)).map((row) => row.targetId)),
 ];
@@ -40,6 +43,23 @@ const reviewLabel = (
   return title ? `${review.targetRef} ${title}` : review.targetRef;
 };
 
+/** Relance du client (B352) : la cible de l'audit est le lien d'accès, le libellé le prénom du client. */
+async function clientLabels(
+  tx: Tx,
+  scope: ProjectScope,
+  rows: AuditRow[],
+  labels: Map<string, string>,
+): Promise<void> {
+  const links = await tx.projectClientAccess.findMany({
+    where: { projectId: scope.projectId, id: { in: idsOf(rows, (a) => a === "review.remind") } },
+    select: { id: true, member: { select: { user: { select: { name: true } } } } },
+  });
+  for (const link of links) {
+    const first = link.member.user.name.trim().split(/\s+/)[0];
+    if (first) labels.set(link.id, first);
+  }
+}
+
 /** Libellés des cibles citées : une requête par famille de cible, jamais une par ligne. */
 async function targetLabels(
   tx: Tx,
@@ -49,7 +69,7 @@ async function targetLabels(
 ) {
   const labels = new Map<string, string>();
   const reviews = await tx.review.findMany({
-    where: { id: { in: idsOf(rows, (a) => a.startsWith("review.")) } },
+    where: { id: { in: idsOf(rows, isReviewVerdict) } },
     select: { id: true, targetKind: true, targetRef: true },
   });
   const features = headSnapshot
@@ -72,6 +92,7 @@ async function targetLabels(
     select: { id: true, key: true },
   });
   for (const row of [...suggestions, ...sprints]) labels.set(row.id, row.key);
+  await clientLabels(tx, scope, rows, labels);
   return labels;
 }
 

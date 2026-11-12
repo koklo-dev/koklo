@@ -3,6 +3,8 @@ import { route, writeOneErrors } from "./route-helpers.ts";
 import {
   reviewListInputSchema,
   reviewListOutputSchema,
+  reviewRemindInputSchema,
+  reviewRemindOutputSchema,
   reviewSubmitInputSchema,
   reviewSubmitOutputSchema,
 } from "./schemas-review.ts";
@@ -12,7 +14,7 @@ const COLLECTION = "/projects/{projectId}/reviews";
 const submitErrors = {
   ...writeOneErrors,
   ...validationError,
-  ...conflictOf("baseline_not_open"),
+  ...conflictOf("baseline_not_open", "review_incomplete"),
   ...staleVersionError,
   ...spaceNotReadyError,
 } as const;
@@ -31,4 +33,8 @@ export const review = {
     .errors({ ...writeOneErrors, ...validationError })
     .input(reviewListInputSchema)
     .output(reviewListOutputSchema),
+  remind: route("POST", `${COLLECTION}/reminders`)
+    .errors({ ...writeOneErrors, ...conflictOf("no_client") })
+    .input(reviewRemindInputSchema)
+    .output(reviewRemindOutputSchema),
 };

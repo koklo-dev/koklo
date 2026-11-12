@@ -3,9 +3,9 @@ import type { TestDatabase } from "@koklo/db/testing";
 import type { INestApplication } from "@nestjs/common";
 import { type Actor, insertActor } from "./organizations.ts";
 import type { RepoBench } from "./repo-scene.ts";
-import { type FeatureSeed, type SpecReadScene, seedIndex } from "./spec-read.ts";
+import { type FeatureSeed, readScene, type SpecReadScene, seedIndex } from "./spec-read.ts";
 import { createSuggestionScene, type SuggestionScene } from "./suggestions.ts";
-import { linkClient, send } from "./tickets.ts";
+import { insertProject, linkClient, send } from "./tickets.ts";
 
 /**
  * Client HTTP des deux procédures `review.*` du contrat 0.13.0 (fixé par .workflow/TK-55d/03-red.md) :
@@ -36,6 +36,9 @@ export function reviewApi(app: INestApplication, actor: Pick<Actor, "cookie"> | 
         ...over,
       }),
     list: (projectId: string, query = "") => send(app, cookie, "get", `${base(projectId)}${query}`),
+    /** TK-104 : relance du client (`POST /projects/{projectId}/reviews/reminders`). */
+    remind: (projectId: string) =>
+      send(app, cookie, "post", `${base(projectId)}/reminders`, { projectId }),
   };
 }
 
@@ -149,4 +152,53 @@ export async function reviewTotal(database: TestDatabase, organizationId: string
     [organizationId],
   );
   return rows[0]?.n ?? 0;
+}
+
+/** Éléments d'un cahier complet : deux fonctionnalités, un parcours, des règles, un fichier de rôles (avec données lisibles). */
+export const FLOW_DATA = {
+  titre: "Réserver",
+  acteur: "Cliente",
+  depart: { libelle: "Ouvrir l'agenda" },
+  etapes: [{ libelle: "Choisir un créneau" }],
+  fonctionnalites: ["F-001"],
+};
+export const RULE_DATA = {
+  titre: "Pas de double réservation",
+  type: "contrainte",
+  enonce: "Un créneau n'a qu'une réservation.",
+  fonctionnalites: ["F-001"],
+};
+export const ROLES_DATA = {
+  roles: [
+    {
+      id: "RL-accueil",
+      nom: "Accueil",
+      description: "Reçoit les clients",
+      permissions: ["PM-booking.read"],
+    },
+  ],
+  permissions: [{ id: "PM-booking.read", ressource: "booking", action: "read", libelle: "Voir" }],
+};
+
+/** Projet de l'organisation de `scene` sans aucun client invité (la validation revient à owner et admin, D1). */
+export async function createNoClientScene(
+  bench: RepoBench,
+  scene: ReviewScene,
+): Promise<SpecReadScene> {
+  const id = await insertProject(
+    bench.database,
+    scene.p1.organizationId,
+    "Sans client",
+    "2026-01-03T00:00:00.000Z",
+  );
+  return readScene(bench, { world: scene.p1.world, projectId: id });
+}
+
+/** Notifications `review.reminded` d'une organisation. */
+export function reminderRows(database: TestDatabase, organizationId: string) {
+  return database.query<{ recipient_user_id: string; dedupe_key: string; subject_kind: string }>(
+    `SELECT recipient_user_id, dedupe_key, subject_kind FROM notifications
+      WHERE organization_id = $1 AND type = 'review.reminded' ORDER BY dedupe_key`,
+    [organizationId],
+  );
 }

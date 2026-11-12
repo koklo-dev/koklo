@@ -25,6 +25,8 @@ export const NOTIFICATION_TYPES = [
   "ticket.blocked",
   // TK-99a : fin de lancement d'agent (migration `*_agent_proposals`).
   "proposal.ready",
+  // TK-104 : relance du client (migration `*_review_withdrawn`).
+  "review.reminded",
 ] as const;
 export const NOTIFICATION_SUBJECT_KINDS = [
   "suggestion",

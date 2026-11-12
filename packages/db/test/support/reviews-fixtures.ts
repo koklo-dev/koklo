@@ -20,7 +20,7 @@ export const REVIEW_TARGET_KINDS = [
   "roles",
   "deliverable",
 ] as const;
-export const REVIEW_STATUSES = ["approved", "changes_requested"] as const;
+export const REVIEW_STATUSES = ["approved", "changes_requested", "withdrawn"] as const;
 export const BASELINE_STATUSES = ["proposed", "validated", "tagged"] as const;
 
 /** Colonnes exactes (`udt_name/is_nullable`). Auteur et proposant sans FK users (preuve conservée). */

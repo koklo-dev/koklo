@@ -106,6 +106,43 @@ export class NotificationEmitter {
     );
   }
 
+  /**
+   * `review.reminded` (B352) : une notification par client lié et par jour (la date est dans la clé de dédoublonnage), rien
+   * de libre. Rend les liens réellement notifiés par cet appel : un rejeu du même jour n'en rend aucun.
+   */
+  async reviewReminded<L extends { id: string; userId: string }>(
+    tx: Tx,
+    scope: ProjectScope,
+    links: readonly L[],
+    day: string,
+  ): Promise<L[]> {
+    const drafts = links.map((link) => ({
+      link,
+      draft: {
+        recipientUserId: link.userId,
+        type: "review.reminded",
+        subjectKind: "review" as const,
+        subjectRef: scope.projectId,
+        dedupeKey: `review.reminded:${scope.projectId}:${link.userId}:${day}`,
+      },
+    }));
+    const known = await tx.notification.findMany({
+      where: {
+        organizationId: scope.organizationId,
+        dedupeKey: { in: drafts.map(({ draft }) => draft.dedupeKey) },
+      },
+      select: { dedupeKey: true },
+    });
+    const seen = new Set(known.map((row) => row.dedupeKey));
+    const fresh = drafts.filter(({ draft }) => !seen.has(draft.dedupeKey));
+    await this.write(
+      tx,
+      scope,
+      fresh.map(({ draft }) => draft),
+    );
+    return fresh.map(({ link }) => link);
+  }
+
   private async team(tx: Tx, scope: ProjectScope): Promise<string[]> {
     const members = await tx.member.findMany({
       where: {

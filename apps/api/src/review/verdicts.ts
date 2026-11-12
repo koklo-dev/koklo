@@ -13,7 +13,7 @@ export const VERDICT_SELECT = {
 
 export interface VerdictRow {
   id: string;
-  status: "approved" | "changes_requested";
+  status: "approved" | "changes_requested" | "withdrawn";
   sha: string;
   createdAt: Date;
   targetKind: string;

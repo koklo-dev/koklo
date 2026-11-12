@@ -5,11 +5,18 @@ import {
   clientSpaceFeatureOutputSchema,
   clientSpaceFeaturesInputSchema,
   clientSpaceFeaturesOutputSchema,
+  clientSpaceFlowsOutputSchema,
+  clientSpaceListInputSchema,
+  clientSpaceProgressInputSchema,
+  clientSpaceProgressOutputSchema,
   clientSpaceProjectsInputSchema,
   clientSpaceProjectsOutputSchema,
+  clientSpaceRolesInputSchema,
+  clientSpaceRolesOutputSchema,
+  clientSpaceRulesOutputSchema,
 } from "./schemas-client-space.ts";
 
-/** Lectures de l'espace client (TK-55b) : six rôles, cloisonnement par projet côté API. */
+/** Lectures de l'espace client (TK-55b, TK-104) : six rôles, cloisonnement par projet côté API. */
 const spaceReadErrors = { ...readOneErrors, ...validationError, ...spaceNotReadyError } as const;
 
 export const clientSpace = {
@@ -25,4 +32,20 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceFeatureInputSchema)
     .output(clientSpaceFeatureOutputSchema),
+  progress: route("GET", "/client-space/projects/{projectId}/progress")
+    .errors(spaceReadErrors)
+    .input(clientSpaceProgressInputSchema)
+    .output(clientSpaceProgressOutputSchema),
+  flows: route("GET", "/client-space/projects/{projectId}/flows")
+    .errors(spaceReadErrors)
+    .input(clientSpaceListInputSchema)
+    .output(clientSpaceFlowsOutputSchema),
+  rules: route("GET", "/client-space/projects/{projectId}/rules")
+    .errors(spaceReadErrors)
+    .input(clientSpaceListInputSchema)
+    .output(clientSpaceRulesOutputSchema),
+  roles: route("GET", "/client-space/projects/{projectId}/roles")
+    .errors(spaceReadErrors)
+    .input(clientSpaceRolesInputSchema)
+    .output(clientSpaceRolesOutputSchema),
 };

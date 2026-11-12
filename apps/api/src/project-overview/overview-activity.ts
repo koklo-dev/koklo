@@ -19,6 +19,8 @@ export const ACTIVITY_ACTIONS = [
   "spec.batch.submit",
   "project.create",
   "project_client.add",
+  // TK-104 (B352) : relance du client ; réservée à l'équipe, jamais dans `CLIENT_ACTIVITY_ACTIONS`.
+  "review.remind",
 ] as const;
 
 /** Un événement du journal et ce que la jointure en a retenu ; rien d'autre n'atteint le texte. */
@@ -45,6 +47,8 @@ const PHRASES: Record<string, Phrase> = {
   "spec.batch.submit": () => "a enregistré des modifications de la spec",
   "project.create": () => "a créé le projet",
   "project_client.add": () => "a donné accès au projet à un client",
+  // La cible est le prénom du client relancé ; un lien disparu donne « le client ».
+  "review.remind": (t) => `a relancé ${t ?? "le client"}`,
 };
 
 const AGENT = { kind: "agent", name: "L'agent", initials: "IA" } as const;

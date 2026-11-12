@@ -158,6 +158,8 @@ export interface EntitySeed {
     | "test";
   specId: string;
   hash?: string;
+  /** Données de l'entité (`spec_entities.data`), `{}` par défaut. */
+  data?: Record<string, unknown>;
 }
 
 const hashOf = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -171,10 +173,16 @@ export const featureEntities = (features: readonly FeatureSeed[]): EntitySeed[] 
   }));
 
 /** Hachage d'une entité d'après un contenu : deux contenus différents, deux hachages. */
-export const entity = (kind: EntitySeed["kind"], specId: string, content = ""): EntitySeed => ({
+export const entity = (
+  kind: EntitySeed["kind"],
+  specId: string,
+  content = "",
+  data?: Record<string, unknown>,
+): EntitySeed => ({
   kind,
   specId,
   hash: hashOf(`${kind}:${specId}:${content}`),
+  ...(data === undefined ? {} : { data }),
 });
 
 async function insertGenericEntities(
@@ -186,7 +194,7 @@ async function insertGenericEntities(
   for (const [sort, seed] of entities.entries()) {
     await db.query(
       `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NULL, $6, '{}'::jsonb, $7, $8, now(), now())`,
+       VALUES ($1, $2, $3, $4, $5, NULL, $6, $7::jsonb, $8, $9, now(), now())`,
       [
         randomUUID(),
         s.organizationId,
@@ -194,6 +202,7 @@ async function insertGenericEntities(
         seed.kind,
         seed.specId,
         `${seed.kind}/${seed.specId}`,
+        JSON.stringify(seed.data ?? {}),
         seed.hash ?? hashOf(`${seed.kind}:${seed.specId}`),
         sort,
       ],
