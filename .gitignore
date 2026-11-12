@@ -18,3 +18,4 @@ packages/db/src/generated/
 .workflow/
 apps/web/next-env.d.ts
 playwright-report/
+.vitest/

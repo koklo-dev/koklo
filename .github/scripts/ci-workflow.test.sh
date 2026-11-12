@@ -83,7 +83,7 @@ check "tests: dépend de changes, déclenché par outputs.code" in_job tests "ne
 check "tests: install" in_job tests 'pnpm install --frozen-lockfile'
 check "tests: turbo run test" in_job tests 'turbo run test'
 check "tests: matrice sans fail-fast (chaque lot va au bout)" in_job tests 'fail-fast: false'
-for lot in api web worker-db other; do
+for lot in api-1 api-2 api-3 web worker-db other; do
     check "tests: lot $lot" in_job tests "name: $lot"
 done
 check "tests: le lot 'other' prend tout le reste (--except)" in_job tests -- '--except @koklo/api'
@@ -99,6 +99,20 @@ check "coverage: télécharge les rapports des lots" in_job coverage 'actions/do
 check "coverage: ordre fusion < seuils" jbefore coverage 'Merge coverage' 'check-coverage\.sh'
 check "job ci agrège checks (needs)" in_ci 'needs:.*checks'
 check "job ci agrège tests (needs)" in_ci 'needs:.*tests'
+# API en 3 shards : blobs fusionnés par api-coverage, seuils jugés sur l'ensemble
+check "tests: shards de l'API 1/3, 2/3 et 3/3" bash -c "$(declare -f job_block in_job); WF='$WF'; for i in 1 2 3; do job_block tests | grep -Eq \"shard: \$i/3\" || exit 1; done"
+check "tests: shards en reporter blob" in_job tests -- '--reporter=blob'
+check "tests: seuils Vitest neutralisés sur un shard (partiel)" in_job tests -- '--coverage\.thresholds\.lines=0'
+check "tests: blobs publiés (fichiers cachés inclus)" in_job tests 'include-hidden-files: true'
+check "tests: pas de résumé de couverture partiel publié pour un shard" in_job tests "!matrix\.shard"
+check "job api-coverage présent" g '^  api-coverage:'
+check "api-coverage: dépend de tests" in_job api-coverage 'needs:.*tests'
+check "api-coverage: fusionne avec --merge-reports" in_job api-coverage -- '--merge-reports --coverage'
+check "api-coverage: exige les 3 blobs" in_job api-coverage -- '-eq 3'
+check "api-coverage: publie le rapport fusionné (coverage-shard-api)" in_job api-coverage 'coverage-shard-api'
+check "coverage dépend de api-coverage" in_job coverage 'needs:.*api-coverage'
+check "job ci agrège api-coverage (needs)" in_ci 'needs:.*api-coverage'
+check "job ci : échec si api-coverage est en failure ou cancelled" in_ci "needs\\.api-coverage\\.result == 'failure' \\|\\| needs\\.api-coverage\\.result == 'cancelled'"
 check "job ci agrège coverage (needs)" in_ci 'needs:.*coverage'
 check "job ci : échec si checks est en failure ou cancelled" in_ci "needs\\.checks\\.result == 'failure' \\|\\| needs\\.checks\\.result == 'cancelled'"
 check "job ci : échec si tests est en failure ou cancelled" in_ci "needs\\.tests\\.result == 'failure' \\|\\| needs\\.tests\\.result == 'cancelled'"
