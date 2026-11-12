@@ -14,7 +14,7 @@
     "@koklo/config": "workspace:*",
     "@koklo/github": "workspace:*",
     "@koklo/worker": "workspace:*",
-    "@nestjs/testing": "12.4.0",
+    "@nestjs/testing": "12.4.2",
     "@playwright/test": "1.65.0",
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
