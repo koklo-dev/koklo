@@ -25,16 +25,16 @@ interface Fake {
 /** Client factice : chaque délégué rend la donnée de la scène, les appels sont observables. */
 function fakeClient(scene: Fake) {
   const client = {
-    ideaVersion: { findFirst: vi.fn(async () => scene.version ?? null) },
-    ideaPage: { findMany: vi.fn(async () => scene.pages ?? []) },
-    ideaSynthesis: { findFirst: vi.fn(async () => scene.synthesis ?? null) },
-    projectRepo: { findFirst: vi.fn(async () => scene.repo ?? null) },
+    ideaVersion: { findFirst: vi.fn(async (_args: unknown) => scene.version ?? null) },
+    ideaPage: { findMany: vi.fn(async (_args: unknown) => scene.pages ?? []) },
+    ideaSynthesis: { findFirst: vi.fn(async (_args: unknown) => scene.synthesis ?? null) },
+    projectRepo: { findFirst: vi.fn(async (_args: unknown) => scene.repo ?? null) },
     specHead: {
       findFirst: vi.fn(
         async ({ where }: { where: { branch: string } }) => scene.heads?.[where.branch] ?? null,
       ),
     },
-    specFeature: { findMany: vi.fn(async () => scene.features ?? []) },
+    specFeature: { findMany: vi.fn(async (_args: unknown) => scene.features ?? []) },
   };
   return { client, typed: client as unknown as DossierClient };
 }
