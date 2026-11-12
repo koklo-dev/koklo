@@ -165,6 +165,7 @@ describe("D4 FeatureSchema : chaque champ a un homologue dans le détail et dans
     nfr: "nfr",
     description: "description",
     criteres: "criteria",
+    zone: "zone",
   };
   it("la table de correspondance couvre exactement les champs de FeatureSchema", () => {
     const source = read("packages/schema/src/entities/feature.ts");
@@ -193,6 +194,7 @@ describe("D4b homologues dans les opérations", () => {
       rules: ["R-001"],
       nfr: ["NFR-perf"],
       criteria: [],
+      zone: "Authentification",
     };
     const wrap = (op: object) => ({
       projectId: "123e4567-e89b-42d3-a456-426614174000",
