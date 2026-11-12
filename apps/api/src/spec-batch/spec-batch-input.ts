@@ -27,10 +27,10 @@ function branchOf(requested: string | undefined, defaultBranch: string): string 
 function operationOf(operation: Operation): PreparedOperation {
   const { kind, ...fields } = operation;
   const { specId, ...payload } = fields as { specId?: string } & Record<string, unknown>;
-  return { kind, specId: kind === "feature.create" ? null : (specId ?? null), payload };
+  return { kind, specId: kind.endsWith(".create") ? null : (specId ?? null), payload };
 }
 
-/** Une seule opération par feature dans un lot : l'ordre n'a de sens qu'entre fichiers distincts. */
+/** Une seule opération par élément (fonctionnalité, règle, rôle, parcours) dans un lot : l'ordre n'a de sens qu'entre fichiers distincts. */
 function assertDistinctTargets(operations: readonly PreparedOperation[]): void {
   const seen = new Set<string>();
   for (const { specId } of operations) {

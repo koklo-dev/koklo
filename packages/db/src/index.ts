@@ -12,7 +12,10 @@ export {
   type TenantTx,
 } from "./counters.ts";
 export {
+  type CurrentDomainTitles,
   type CurrentFeature,
+  type CurrentTitle,
+  currentDomainTitles,
   currentFeatures,
   type DossierClient,
   type DossierSources,
@@ -43,6 +46,7 @@ export {
   type EntityRef,
   entitiesReferencing,
   likePrefixOf,
+  searchEntityIds,
   searchEntityRefs,
 } from "./spec-entity-queries.ts";
 export {

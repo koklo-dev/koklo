@@ -1,4 +1,4 @@
-import { isFeatureId, isSafeSpecPath, isValidBranchName } from "@koklo/domain";
+import { isFeatureId, isSafeSpecPath, isValidBranchName, slugOf as slugTitle } from "@koklo/domain";
 import {
   ideaDeleteSlug,
   ideaIndexPayload,
@@ -8,9 +8,26 @@ import {
 } from "./idea-payload.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
 
-const MAX_SLUG_LENGTH = 40;
 const FEATURE_FILE = /^features\/(F-\d{3,})(?:-[^/]*)?\.md$/;
-export const OPERATION_KINDS = ["feature.create", "feature.update", "feature.delete"] as const;
+export const OPERATION_KINDS = [
+  "feature.create",
+  "feature.update",
+  "feature.delete",
+  "rule.create",
+  "rule.update",
+  "rule.delete",
+  "role.create",
+  "role.update",
+  "role.delete",
+  "flow.create",
+  "flow.update",
+  "flow.delete",
+] as const;
+const TARGET_ID: Readonly<Record<string, RegExp>> = {
+  rule: /^R-\d{3,}$/,
+  role: /^RL-[a-z0-9][a-z0-9-]*$/,
+  flow: /^P-[a-z0-9][a-z0-9-]*$/,
+};
 /** Opérations de publication de l'espace Idée (TK-89) : un lot n'en mêle jamais avec des features. */
 export const IDEA_OPERATION_KINDS = [
   "idea.page.write",
@@ -28,19 +45,8 @@ export const IDEA_INDEX_PATH = "idea/_index.yaml";
 export const IDEA_SYNTHESIS_PATH = "idea/_synthese.md";
 export const ideaPagePath = (slug: string): string => `idea/${slug}.md`;
 
-/** Slug du titre : minuscules, sans accents, `[a-z0-9-]`, 40 caractères au plus, repli `feature`. */
-export function slugOf(title: unknown): string {
-  const text = typeof title === "string" ? title : "";
-  const slug = text
-    .normalize("NFD")
-    .replace(/\p{M}+/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .slice(0, MAX_SLUG_LENGTH)
-    .replace(/-+$/, "");
-  return slug === "" ? "feature" : slug;
-}
+/** Slug du titre pour un nom de fichier : repli `feature` (ou `fallback`). */
+export const slugOf = (title: unknown, fallback = "feature"): string => slugTitle(title, fallback);
 
 /** Chemin (relatif à la racine de la spec) d'une feature nouvelle. */
 export const featurePathOf = (specId: string, title: unknown): string =>
@@ -83,6 +89,9 @@ function operationProblem(operation: BatchOperation, ideaLot: boolean): string |
   if (isIdeaKind(operation.kind)) return ideaLot ? ideaOperationProblem(operation) : "kind";
   if (ideaLot) return "kind";
   if (!(OPERATION_KINDS as readonly string[]).includes(operation.kind)) return "kind";
+  const pattern = TARGET_ID[operation.kind.split(".")[0] ?? ""];
+  if (pattern !== undefined)
+    return pattern.test(operation.targetSpecId ?? "") ? undefined : "specId";
   return isFeatureId(operation.targetSpecId) ? undefined : "specId";
 }
 

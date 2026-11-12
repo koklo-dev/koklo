@@ -1,5 +1,6 @@
 import type {
   FeatureSummary,
+  FunctionalItem,
   SpecHeadOutput,
   SpecItem,
   SpecRefsSearchOutput,
@@ -80,6 +81,35 @@ export type EntityReference = SpecItem["referencedBy"]["items"][number];
 /** Résultat de l'autocomplétion : les six genres qu'on peut lier. */
 export type RefHit = SpecRefsSearchOutput["items"][number];
 
+/** Demande de page de `spec.functional.list` : onglet, filtre de type des règles, recherche, position, taille. */
+export interface FunctionalListRequest {
+  tab: "rules" | "flows";
+  type?: string;
+  q?: string;
+  limit: number;
+  cursor?: string;
+  around?: string;
+}
+
+export interface FunctionalPage {
+  items: FunctionalItem[];
+  nextCursor: string | null;
+  previousCursor: string | null;
+  offset: number;
+  total: number;
+  facets: Record<string, Record<string, number>>;
+}
+
+/** Page lue ; `null` quand le projet n'a pas de dépôt de spec ou que la révision n'est pas indexée. */
+export type IndexedFunctionalPage =
+  | { kind: "failed"; errorCode: string; commitSha: string }
+  | { kind: "page"; page: FunctionalPage };
+
+/** Une entité de l'index générique lue pour une fiche ou la matrice (`rule`, `flow`, ou le fichier `roles`). */
+export type EntityItem =
+  | { kind: "failed"; errorCode: string; commitSha: string }
+  | { kind: "found"; commitSha: string; path: string; data: unknown };
+
 /** Lectures de l'index de la spec ; chaque méthode est une transaction courte, sans réseau. */
 export interface SpecReadRepository {
   /** `NOT_FOUND` si le projet n'est pas de l'organisation ; `null` si la révision n'est pas indexée. */
@@ -94,6 +124,22 @@ export interface SpecReadRepository {
     revision: Revision,
     request: FeatureListRequest,
   ): Promise<IndexedFeaturePage | null>;
+  /** Une page de règles ou de parcours de la révision (liste à curseur de l'index d'entités). */
+  functionalPage(
+    scope: ProjectScope,
+    revision: Revision,
+    request: FunctionalListRequest,
+  ): Promise<IndexedFunctionalPage | null>;
+  /**
+   * Une entité de la tête (`rule`, `flow` ou `roles`, dont `specId` est `roles`) avec son chemin et son contenu indexé ;
+   * `null` si elle est absente ou que les entités de la tête ne sont pas indexées.
+   */
+  entityItem(
+    scope: ProjectScope,
+    kind: "rule" | "flow" | "roles",
+    specId: string,
+    revision?: Revision,
+  ): Promise<EntityItem | null>;
   /** Toutes les features de la révision, non triées (prompts de l'agent) ; `null` si non indexée. */
   features(scope: ProjectScope, revision: Revision): Promise<IndexedFeatures | null>;
   /** Feature de la tête par défaut du projet ; `null` si absente de l'instantané courant. */

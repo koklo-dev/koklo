@@ -1,5 +1,7 @@
 import {
+  type CurrentDomainTitles,
   type CurrentFeature,
+  currentDomainTitles,
   currentFeatures,
   type FrozenPage,
   frozenPages,
@@ -27,6 +29,10 @@ export interface LaunchSources {
   readonly synthesis: string | null;
   readonly risks: string | null;
   readonly features: readonly CurrentFeature[];
+  /** Titres des règles, rôles et parcours déjà au cahier (TK-103) : jamais redemandés, jamais dupliqués. */
+  readonly rules: CurrentDomainTitles["rules"];
+  readonly roles: CurrentDomainTitles["roles"];
+  readonly flows: CurrentDomainTitles["flows"];
 }
 
 /** Diff `idea-vN-1` vers `idea-vN` du mode `update` ; `null` sans version précédente, `undefined` hors mode `update`. */
@@ -60,6 +66,7 @@ export function readSources(
       versionsOf(version.pagesVersions),
       changed || undefined,
     );
+    const domain = await currentDomainTitles(client, launch.projectId);
     return {
       tag: version.tag,
       ...(diff ? { diff: { from: diff.from, removed: diff.removed } } : {}),
@@ -67,6 +74,7 @@ export function readSources(
       synthesis: diff ? null : await publishedSynthesis(client, launch.projectId),
       risks: pages.find((page) => page.slug === RISKS_SLUG)?.content ?? null,
       features: await currentFeatures(client, launch.projectId),
+      ...domain,
     };
   });
 }

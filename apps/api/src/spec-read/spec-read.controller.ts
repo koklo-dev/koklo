@@ -50,6 +50,38 @@ export class SpecReadController {
     );
   }
 
+  /** Onglets Règles métier et Parcours (TK-103) : même garde que `spec.listFeatures`. */
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_READ_ROLES)
+  @Implement(contract.spec.functional.list)
+  listFunctional(@Req() request: Request) {
+    return implement(contract.spec.functional.list).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.functionalList(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  /** Onglet Rôles et permissions (TK-103) : même garde que `spec.listFeatures`. */
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_READ_ROLES)
+  @Implement(contract.spec.roles.matrix)
+  rolesMatrix(@Req() request: Request) {
+    return implement(contract.spec.roles.matrix).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.rolesMatrix(scope, input),
+        this.access,
+      ),
+    );
+  }
+
   @UseGuards(SessionGuard, RoleGuard)
   @Roles(...SPEC_READ_ROLES)
   @Implement(contract.spec.getFeature)

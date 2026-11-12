@@ -13,6 +13,9 @@ export type {
   DependencyAddInput,
   FeatureDetail,
   FeatureSummary,
+  FlowDetail,
+  FunctionalItem,
+  FunctionalListInput,
   HealthInput,
   HealthOutput,
   IdeaFreezeOutput,
@@ -63,6 +66,10 @@ export type {
   ProposalListOutput,
   RepoOutput,
   Role,
+  RoleDetail,
+  RolesMatrixInput,
+  RuleDetail,
+  RulesMatrix,
   SpecBatchOutput,
   SpecBatchSubmitInput,
   SpecHeadOutput,
@@ -148,6 +155,7 @@ export * from "./schemas-review.ts";
 export * from "./schemas-settings.ts";
 export * from "./schemas-shell.ts";
 export * from "./schemas-spec.ts";
+export * from "./schemas-spec-domain.ts";
 export * from "./schemas-suggestion.ts";
 export * from "./schemas-tickets.ts";
 export { CONTRACT_VERSION } from "./version.ts";

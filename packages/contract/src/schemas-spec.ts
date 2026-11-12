@@ -1,5 +1,24 @@
 import { z } from "zod";
 import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
+import {
+  DOMAIN_OPERATION_KINDS,
+  flowCreateSchema,
+  flowDeleteSchema,
+  flowDetailSchema,
+  flowIdSchema,
+  flowUpdateSchema,
+  roleCreateSchema,
+  roleDeleteSchema,
+  roleDetailSchema,
+  roleIdSchema,
+  roleUpdateSchema,
+  ruleCreateSchema,
+  ruleDeleteSchema,
+  ruleDetailSchema,
+  ruleIdSchema,
+  ruleUpdateSchema,
+  specIdSchema,
+} from "./schemas-spec-domain.ts";
 import { instantSchema } from "./schemas-tickets.ts";
 
 /** Valeurs et motifs identiques à ceux de @koklo/schema (parité vérifiée par apps/api/test). */
@@ -24,6 +43,7 @@ export const specOperationKindSchema = z.enum([
   "feature.create",
   "feature.update",
   "feature.delete",
+  ...DOMAIN_OPERATION_KINDS,
   "idea.page.write",
   "idea.page.delete",
   "idea.index.write",
@@ -87,6 +107,10 @@ export const specHeadSchema = z
       features: z.number().int().min(0),
       tables: z.number().int().min(0),
       endpoints: z.number().int().min(0),
+      /** Règles, rôles et parcours de la tête (3.1.0) : compteurs d'onglet et résumé d'en-tête. */
+      rules: z.number().int().min(0),
+      roles: z.number().int().min(0),
+      flows: z.number().int().min(0),
     }),
   })
   .nullable();
@@ -175,11 +199,20 @@ const featureDeleteSchema = z.object({
   specId: featureIdSchema,
 });
 
-/** Tables, endpoints, écrans : hors 0.5.0 ; un nouveau `kind` sera un ajout de version mineure. */
+/** Fonctionnalités, règles, rôles et parcours (3.1.0) ; tables, endpoints, écrans : un nouveau `kind` sera un ajout mineur. */
 export const specOperationSchema = z.discriminatedUnion("kind", [
   featureCreateSchema,
   featureUpdateSchema,
   featureDeleteSchema,
+  ruleCreateSchema,
+  ruleUpdateSchema,
+  ruleDeleteSchema,
+  roleCreateSchema,
+  roleUpdateSchema,
+  roleDeleteSchema,
+  flowCreateSchema,
+  flowUpdateSchema,
+  flowDeleteSchema,
 ]);
 
 /** 200 opérations par lot depuis 2.9.0 (TK-99a) : un groupe de propositions se soumet en un commit. */
@@ -211,7 +244,7 @@ export const specBatchSchema = z.object({
     z.object({
       position: z.number().int().min(0),
       kind: specOperationKindSchema,
-      specId: featureIdSchema.nullable(),
+      specId: specIdSchema.nullable(),
     }),
   ),
   enqueuedAt: instantSchema,
@@ -220,8 +253,8 @@ export const specBatchSchema = z.object({
 export const specBatchGetInputSchema = z.object({ projectId: z.uuid(), batchId: z.uuid() });
 
 /**
- * Panneau d'édition d'un élément (TK-101, 2.11.0, B329 b, c, e). Seule la fonctionnalité a un formulaire pour l'instant :
- * `type` n'accepte que `feature`, les autres genres arriveront avec leurs formulaires.
+ * Panneau d'édition d'un élément (TK-101, 2.11.0, B329 b, c, e) : la fonctionnalité, puis (3.1.0) la règle, le rôle et le
+ * parcours. Les autres genres arriveront avec leurs formulaires.
  */
 export const SPEC_REFS_MAX = 20;
 export const specRefKindSchema = z.enum(["feature", "rule", "flow", "table", "endpoint", "screen"]);
@@ -240,15 +273,21 @@ const specEntityKindSchema = z.enum([
 const refShape = { specId: z.string().min(1).max(100), title: z.string().max(300) };
 export const specRefSchema = z.object({ kind: specRefKindSchema, ...refShape });
 
-export const specItemGetInputSchema = z.object({
-  projectId: z.uuid(),
-  type: z.literal("feature"),
-  id: featureIdSchema,
-});
-export const specItemSchema = z.object({
-  type: z.literal("feature"),
-  id: featureIdSchema,
-  values: featureDetailSchema,
+export const SPEC_ITEM_TYPES = ["feature", "rule", "role", "flow"] as const;
+const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
+  feature: featureIdSchema,
+  rule: ruleIdSchema,
+  role: roleIdSchema,
+  flow: flowIdSchema,
+};
+export const specItemGetInputSchema = z
+  .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
+  .refine((input) => ITEM_ID[input.type].safeParse(input.id).success, {
+    message: "id ne correspond pas au type",
+    path: ["id"],
+  });
+
+const itemShared = {
   /** Le livrable Fonctionnel est validé : modifier l'élément l'invalidera (avertissement du panneau). */
   validated: z.boolean(),
   /** Éléments de la tête qui citent celui-ci (jeton exact), 20 au plus ; `total` les compte tous. */
@@ -256,7 +295,18 @@ export const specItemSchema = z.object({
     items: z.array(z.object({ kind: specEntityKindSchema, ...refShape })).max(SPEC_REFS_MAX),
     total: z.number().int().min(0),
   }),
-});
+};
+const itemOf = <T extends (typeof SPEC_ITEM_TYPES)[number], V extends z.ZodType>(
+  type: T,
+  id: z.ZodType<string>,
+  values: V,
+) => z.object({ type: z.literal(type), id, values, ...itemShared });
+export const specItemSchema = z.discriminatedUnion("type", [
+  itemOf("feature", featureIdSchema, featureDetailSchema),
+  itemOf("rule", ruleIdSchema, ruleDetailSchema),
+  itemOf("role", roleIdSchema, roleDetailSchema),
+  itemOf("flow", flowIdSchema, flowDetailSchema),
+]);
 
 export const specRefsSearchInputSchema = z.object({
   projectId: z.uuid(),

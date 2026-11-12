@@ -8,6 +8,7 @@ export const MAX_SPEC_FILES = 2000;
 export const FEATURE_COUNTER_MAX = 999_999;
 
 const FEATURE_NUMBER = /^F-(\d+)$/;
+const RULE_NUMBER = /^R-(\d+)$/;
 
 export interface IndexRows {
   readonly features: readonly {
@@ -92,15 +93,12 @@ export function rowsOf(spec: ParsedSpec, flows: readonly SpecFile[] = []): Index
   };
 }
 
-/**
- * Plus grand numéro `F-nnn` des features, borné à `FEATURE_COUNTER_MAX`, et nombre d'identifiants
- * ignorés parce qu'au-dessus. `undefined` s'il n'y a rien à relever.
- */
-export function featureCounterOf(spec: ParsedSpec): { raiseTo?: number; skipped: number } {
+/** Plus grand numéro d'une liste d'identifiants `<préfixe>-nnn`, borné à `FEATURE_COUNTER_MAX` ; le reste est compté ignoré. */
+function counterOf(ids: readonly string[], pattern: RegExp): { raiseTo?: number; skipped: number } {
   let raiseTo: number | undefined;
   let skipped = 0;
-  for (const { value } of spec.features) {
-    const digits = FEATURE_NUMBER.exec(value.id)?.[1];
+  for (const id of ids) {
+    const digits = pattern.exec(id)?.[1];
     const number = digits === undefined ? Number.NaN : Number(digits);
     if (!(number <= FEATURE_COUNTER_MAX)) {
       skipped += 1;
@@ -110,3 +108,20 @@ export function featureCounterOf(spec: ParsedSpec): { raiseTo?: number; skipped:
   }
   return raiseTo === undefined ? { skipped } : { raiseTo, skipped };
 }
+
+/**
+ * Plus grand numéro `F-nnn` des features, borné à `FEATURE_COUNTER_MAX`, et nombre d'identifiants
+ * ignorés parce qu'au-dessus. `undefined` s'il n'y a rien à relever.
+ */
+export const featureCounterOf = (spec: ParsedSpec) =>
+  counterOf(
+    spec.features.map(({ value }) => value.id),
+    FEATURE_NUMBER,
+  );
+
+/** Même relevé pour les règles `R-nnn` (compteur `rule`, TK-103). */
+export const ruleCounterOf = (spec: ParsedSpec) =>
+  counterOf(
+    spec.rules.map(({ value }) => value.id),
+    RULE_NUMBER,
+  );

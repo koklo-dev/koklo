@@ -4,11 +4,7 @@ import type { BatchAuthor, BatchOperation } from "./types.ts";
 const MAX_SUBJECT = 200;
 const MAX_NAME = 100;
 const EMAIL = /^[^\s<>@\p{Cc}]+@[^\s<>@\p{Cc}]+$/u;
-const VERBS: Record<string, string> = {
-  "feature.create": "créé",
-  "feature.update": "modifié",
-  "feature.delete": "supprimé",
-};
+const VERBS: Record<string, string> = { create: "créé", update: "modifié", delete: "supprimé" };
 
 const CONTROL = /\p{Cc}/gu;
 const LINE_BREAK = /[\r\n\u2028\u2029]/;
@@ -37,7 +33,7 @@ export function defaultSubject(operations: readonly BatchOperation[]): string {
   }
   const byVerb = new Map<string, string[]>();
   for (const operation of operations) {
-    const verb = VERBS[operation.kind] ?? "modifié";
+    const verb = VERBS[operation.kind.split(".").pop() ?? ""] ?? "modifié";
     byVerb.set(verb, [...(byVerb.get(verb) ?? []), operation.targetSpecId ?? ""]);
   }
   const groups = [...byVerb].map(([verb, ids]) => `${verb} ${ids.join(", ")}`);

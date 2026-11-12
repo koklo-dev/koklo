@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { errorCodeOf } from "./errors.ts";
-import { type TriageContext, triageProposals, zonesOf } from "./triage.ts";
+import { type TriageContext, titleKey, triageProposals, zonesOf } from "./triage.ts";
 
 /** TK-99a lot B : tri pur de la sortie d'une zone (validation Zod, texte brut, doublons) et des zones. */
 const criteria = [
@@ -20,7 +20,7 @@ const item = (title: string) => ({
 });
 const context = (over: Partial<TriageContext> = {}): TriageContext => ({
   kinds: ["feature"],
-  titles: new Set(),
+  titles: {},
   missingCriteria: new Map(),
   ...over,
 });
@@ -94,5 +94,71 @@ describe("errorCodeOf", () => {
   it("ne rend qu'un code, jamais le texte de l'erreur", () => {
     expect(errorCodeOf(new Error("SECRET"))).toBe("provider_error");
     expect(errorCodeOf(new TypeError("SECRET"))).toBe("provider_error");
+  });
+});
+
+/** TK-103 (B342) : règles, rôles et parcours sont triés comme les fonctionnalités ; les doublons de titre se comptent par type. */
+describe("triageProposals : règle, rôle, parcours", () => {
+  const rule = (title: string, extra = {}) => ({
+    kind: "rule",
+    rationale: "Pourquoi",
+    content: { title, statement: "Énoncé.", ...extra },
+  });
+  const role = (name: string) => ({
+    kind: "role",
+    rationale: "x",
+    content: {
+      name,
+      description: "D",
+      permissions: [{ id: "PM-agenda.lire", restriction: "les siennes" }],
+    },
+  });
+  const flow = (title: string) => ({
+    kind: "flow",
+    rationale: "x",
+    content: { title, steps: ["a", "b"], actor: "Visiteur", errors: [{ step: 1, text: "Échec" }] },
+  });
+  const ctx = () => context({ kinds: ["feature", "rule", "role", "flow"], titles: {} });
+
+  it("accepte les trois types enrichis, avec le titre (nom pour un rôle)", () => {
+    const { accepted, discarded } = triageProposals(
+      {
+        proposals: [
+          rule("Délai", { type: "workflow", states: ["A", "B"] }),
+          role("Gestionnaire"),
+          flow("Inscription"),
+        ],
+      },
+      ctx(),
+    );
+    expect(discarded).toBe(0);
+    expect(accepted.map((a) => [a.kind, a.title])).toEqual([
+      ["rule", "Délai"],
+      ["role", "Gestionnaire"],
+      ["flow", "Inscription"],
+    ]);
+  });
+
+  it("un même titre est un doublon dans son type seulement", () => {
+    const { accepted, discarded } = triageProposals(
+      { proposals: [rule("Export"), item("Export"), rule("export"), flow("Export")] },
+      ctx(),
+    );
+    expect(accepted.map((a) => a.kind)).toEqual(["rule", "feature", "flow"]);
+    expect(discarded).toBe(1);
+  });
+
+  it("un titre déjà présent au cahier pour ce type est écarté, pas pour un autre type", () => {
+    const known = context({
+      kinds: ["rule", "flow"],
+      titles: { rule: new Set([titleKey("Délai")]) },
+    });
+    const { accepted } = triageProposals({ proposals: [rule("Délai"), flow("Délai")] }, known);
+    expect(accepted.map((a) => a.kind)).toEqual(["flow"]);
+  });
+
+  it("écarte un type non demandé par le mode", () => {
+    const only = context({ kinds: ["feature"], titles: {} });
+    expect(triageProposals({ proposals: [rule("X"), role("Y")] }, only).discarded).toBe(2);
   });
 });

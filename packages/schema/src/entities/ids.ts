@@ -12,6 +12,7 @@ export const PATTERNS = {
   role: new RegExp(`^RL-${slug}$`),
   permission: new RegExp(`^PM-${slug}(\\.${slug})*$`),
   rule: /^R-\d{3,}$/,
+  flow: new RegExp(`^P-${slug}$`),
   nfr: new RegExp(`^NFR-${slug}$`),
   tableField: new RegExp(`^T-${slug}\\.${field}$`),
   fieldName: new RegExp(`^${field}$`),
@@ -25,3 +26,4 @@ export const screenId = z.string().regex(PATTERNS.screen);
 export const roleId = z.string().regex(PATTERNS.role);
 export const permissionId = z.string().regex(PATTERNS.permission);
 export const ruleId = z.string().regex(PATTERNS.rule);
+export const flowId = z.string().regex(PATTERNS.flow);

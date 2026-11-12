@@ -1,3 +1,4 @@
+import { SEARCH_LIMIT, tsqueryOf } from "./full-text.ts";
 import type { PrismaClient } from "./generated/client.ts";
 import { currentOrganizationId, MissingOrganizationContextError } from "./tenant-context.ts";
 
@@ -73,4 +74,25 @@ export async function entitiesReferencing(
     items: rows.map((row) => ({ kind: row.kind, specId: row.spec_id, title: row.title })),
     total: rows[0]?.total ?? 0,
   };
+}
+
+/**
+ * Identifiants (`id` de ligne) des éléments d'un genre de l'instantané dont l'identifiant commence par `q` OU dont l'identifiant
+ * et le titre contiennent ses mots (`french`, le dernier en préfixe) : la recherche des listes de règles et de parcours, que
+ * Prisma ne sait pas filtrer (colonne `tsvector`). `q` sans mot ni préfixe cherchable : liste vide. Au plus `SEARCH_LIMIT` lignes.
+ */
+export async function searchEntityIds(
+  raw: PrismaClient,
+  snapshotId: string,
+  kind: string,
+  q: string,
+): Promise<string[]> {
+  const organizationId = organizationOf();
+  const query = tsqueryOf(q);
+  const rows = await raw.$queryRaw<{ id: string }[]>`
+    SELECT id FROM spec_entities
+     WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = ${kind}
+       AND (spec_id ILIKE ${likePrefixOf(q.trim())} OR (${query}::text IS NOT NULL AND search @@ to_tsquery('french', ${query})))
+     LIMIT ${SEARCH_LIMIT}`;
+  return rows.map((row) => row.id);
 }

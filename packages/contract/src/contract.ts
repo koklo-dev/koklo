@@ -115,6 +115,15 @@ import type {
   specRefsSearchOutputSchema,
   validationReportSchema,
 } from "./schemas-spec.ts";
+import type {
+  flowDetailSchema,
+  functionalItemSchema,
+  functionalListInputSchema,
+  roleDetailSchema,
+  rolesMatrixInputSchema,
+  rolesMatrixSchema,
+  ruleDetailSchema,
+} from "./schemas-spec-domain.ts";
 
 const health = route("GET", "/health")
   .errors(internalError)
@@ -241,6 +250,13 @@ export type SpecHeadOutput = z.output<typeof specHeadSchema>;
 export type FeatureSummary = z.output<typeof featureSummarySchema>;
 export type FeatureDetail = z.output<typeof featureDetailSchema>;
 export type SpecItem = z.output<typeof specItemSchema>;
+export type FunctionalItem = z.output<typeof functionalItemSchema>;
+export type FunctionalListInput = z.output<typeof functionalListInputSchema>;
+export type RulesMatrix = z.output<typeof rolesMatrixSchema>;
+export type RolesMatrixInput = z.input<typeof rolesMatrixInputSchema>;
+export type RuleDetail = z.output<typeof ruleDetailSchema>;
+export type RoleDetail = z.output<typeof roleDetailSchema>;
+export type FlowDetail = z.output<typeof flowDetailSchema>;
 export type SpecRefsSearchInput = z.input<typeof specRefsSearchInputSchema>;
 export type SpecRefsSearchOutput = z.output<typeof specRefsSearchOutputSchema>;
 export type SpecOperation = z.input<typeof specOperationSchema>;

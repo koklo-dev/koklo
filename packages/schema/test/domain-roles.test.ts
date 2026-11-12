@@ -149,8 +149,8 @@ const BAD: Bad[] = [
     "/permissions/0/id",
   ),
   schemaBad(
-    "action hors enum",
-    perm("    action: voir\n    ressource: T-user\n"),
+    "action ni du vocabulaire ni un nom métier (TK-103)",
+    perm("    action: Voir il\n    ressource: T-user\n"),
     "/permissions/0/action",
   ),
   schemaBad("action absente", perm("    ressource: T-user\n"), "/permissions/0/action"),

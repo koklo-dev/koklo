@@ -7,7 +7,13 @@ import type { TenantClient } from "./client.ts";
  */
 export type DossierClient = Pick<
   TenantClient,
-  "ideaVersion" | "ideaPage" | "ideaSynthesis" | "projectRepo" | "specHead" | "specFeature"
+  | "ideaVersion"
+  | "ideaPage"
+  | "ideaSynthesis"
+  | "projectRepo"
+  | "specHead"
+  | "specFeature"
+  | "specEntity"
 >;
 
 /** Page du dossier au moment du gel : jamais un contenu modifié depuis. */
@@ -21,6 +27,18 @@ export interface CurrentFeature {
   readonly specId: string;
   readonly title: string;
   readonly criteria: readonly string[];
+}
+
+/** Règle, rôle ou parcours du cahier actuel : l'identifiant et le titre (le nom pour un rôle), pour éviter les doublons (TK-103). */
+export interface CurrentTitle {
+  readonly specId: string;
+  readonly title: string;
+}
+
+export interface CurrentDomainTitles {
+  readonly rules: readonly CurrentTitle[];
+  readonly roles: readonly CurrentTitle[];
+  readonly flows: readonly CurrentTitle[];
 }
 
 export interface DossierSources {
@@ -101,40 +119,90 @@ export async function publishedSynthesis(
   return synthesis?.source ? synthesis.contentMd : null;
 }
 
-/** Cahier actuel : les 300 premières fonctionnalités de la tête de spec (branche de cadrage, sinon branche par défaut). */
-export async function currentFeatures(
-  client: DossierClient,
-  projectId: string,
-): Promise<CurrentFeature[]> {
+/** Instantané de la tête de spec (branche de cadrage, sinon branche par défaut) ; `null` s'il n'y en a pas ou s'il a échoué. */
+async function headSnapshotId(client: DossierClient, projectId: string): Promise<string | null> {
   const repo = await client.projectRepo.findFirst({
     where: { projectId, OR: [{ role: "spec" }, { specPath: { not: null } }] },
     select: { id: true, defaultBranch: true },
   });
-  if (!repo) return [];
+  if (!repo) return null;
   for (const branch of [WORKING_BRANCH, repo.defaultBranch]) {
     const head = await client.specHead.findFirst({
       where: { repoId: repo.id, branch },
       include: { snapshot: { select: { id: true, status: true } } },
     });
     if (!head) continue;
-    if (head.snapshot.status === "failed") return [];
-    const rows = await client.specFeature.findMany({
-      where: { snapshotId: head.snapshot.id },
-      orderBy: [{ specNumber: "asc" }, { id: "asc" }],
-      take: FEATURES_MAX,
-      select: {
-        specId: true,
-        title: true,
-        criteria: { orderBy: { position: "asc" }, select: { title: true } },
-      },
-    });
-    return rows.map((row) => ({
-      specId: row.specId,
-      title: row.title,
-      criteria: row.criteria.map((criterion) => criterion.title),
-    }));
+    return head.snapshot.status === "failed" ? null : head.snapshot.id;
   }
-  return [];
+  return null;
+}
+
+/** Cahier actuel : les 300 premières fonctionnalités de la tête de spec (branche de cadrage, sinon branche par défaut). */
+export async function currentFeatures(
+  client: DossierClient,
+  projectId: string,
+): Promise<CurrentFeature[]> {
+  const snapshotId = await headSnapshotId(client, projectId);
+  if (snapshotId === null) return [];
+  const rows = await client.specFeature.findMany({
+    where: { snapshotId },
+    orderBy: [{ specNumber: "asc" }, { id: "asc" }],
+    take: FEATURES_MAX,
+    select: {
+      specId: true,
+      title: true,
+      criteria: { orderBy: { position: "asc" }, select: { title: true } },
+    },
+  });
+  return rows.map((row) => ({
+    specId: row.specId,
+    title: row.title,
+    criteria: row.criteria.map((criterion) => criterion.title),
+  }));
+}
+
+const DOMAIN_TITLES_MAX = 300;
+
+const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
+const recordOf = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+/** Rôles d'un fichier `roles` de l'index : `{ id, nom }` par rôle. */
+const rolesOf = (data: unknown): CurrentTitle[] => {
+  const roles = recordOf(data).roles;
+  return Array.isArray(roles)
+    ? roles.map((role) => ({
+        specId: textOf(recordOf(role).id),
+        title: textOf(recordOf(role).nom),
+      }))
+    : [];
+};
+
+/** Règles, rôles et parcours de la tête de spec (index d'entités) : seuls les titres, jamais le contenu (TK-103, B342). */
+export async function currentDomainTitles(
+  client: DossierClient,
+  projectId: string,
+): Promise<CurrentDomainTitles> {
+  const none = { rules: [], roles: [], flows: [] };
+  const snapshotId = await headSnapshotId(client, projectId);
+  if (snapshotId === null) return none;
+  const rows = await client.specEntity.findMany({
+    where: { snapshotId, kind: { in: ["rule", "roles", "flow"] } },
+    orderBy: [{ kind: "asc" }, { sort: "asc" }, { id: "asc" }],
+    select: { kind: true, specId: true, data: true },
+  });
+  const titled = (kind: string) =>
+    rows
+      .filter((row) => row.kind === kind)
+      .slice(0, DOMAIN_TITLES_MAX)
+      .map((row) => ({ specId: row.specId, title: textOf(recordOf(row.data).titre) }));
+  return {
+    rules: titled("rule"),
+    roles: rows.filter((row) => row.kind === "roles").flatMap((row) => rolesOf(row.data)),
+    flows: titled("flow"),
+  };
 }
 
 /**
