@@ -427,9 +427,8 @@ test("T7 un rôle sans droit d'écriture ne voit pas le formulaire et reçoit 40
 
   await signIn(page, workspace.business);
   await page.goto(featuresPath(projectId));
-  await expect(
-    page.getByRole("heading", { name: "Aucune fonctionnalité pour le moment" }),
-  ).toBeVisible();
+  // Depuis TK-104 (B353), business lit la vue client, en lecture seule.
+  await expect(page.getByText("Rien à valider pour l'instant", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nouvelle fonctionnalité" })).toHaveCount(0);
 
   // L'équipe (dev) écrit : le même appel passe.
