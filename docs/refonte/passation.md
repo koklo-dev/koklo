@@ -23,6 +23,11 @@ last_reviewed: 2026-11-10
 | 022 | TK-99a (serveur des propositions : tables, verrou en base, tâche `agent-propose`, `ai.*` / `proposal.*`, contrat 2.9.0) | ✅ fusionné (PR #169, `5fe5f56`) ; décisions B313 à B317 ; ADR 0021 |
 | 022 | TK-99b (interface des propositions : `AgentProposeButton`, modale, relecture à plat et en volume, enregistrement par lots) | ✅ fusionné (PR #179, `a09ce95`, remplace la #173) ; décisions B319 à B324 ; suivi serveur : libération d'une proposition verrouillée par un lot échoué (B320) |
 | 022 | TK-100 (`spec.deliverables`, forçage, index d'entités, validation par élément et D1, impact amont, contrat 2.10.0) | ✅ fusionné (PR #181, `83439ac`) ; décisions B1, B11, B325 à B328 ; Baseline 0 sans client (D1) renvoyée à TK-104 |
+| 022 | TK-101 (`SpecItemSheet`, `ai.prefillItem`, `spec.item.get`, `spec.refs.search`, contrat 2.11.0) | ✅ fusionné (PR #184, `7ffe7c1`) ; décisions B329 à B332 |
+| 022 | TK-102 (cahier fonctionnel par état, onglet Fonctionnalités, retrait de l'Assistant et d'`ai.draftBrief`, contrat 3.0.0) | ✅ fusionné (PR #186, `6094e5d`) ; décisions B333 à B337 ; « Relancer » renvoyé à TK-104 |
+| 023 | TK-103 (Règles métier, Rôles et permissions, Parcours, contrat 3.1.0, `seed:large` à 300 règles) | ✅ fusionné (PR #187, `e02a57e`) ; décisions B338 à B346 |
+
+Prochain ticket : TK-104 (vue client et validation du cahier, « Relancer »), puis TK-105 (volume réel), sprint 023. DoD du sprint 022 (4 cases) encore à vérifier avant de la cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
