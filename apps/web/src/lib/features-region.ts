@@ -7,10 +7,19 @@ export const plural = (count: number, word: string): string =>
   `${count} ${word}${count > 1 ? "s" : ""}`;
 
 /** Texte de la région d'état quand la barre de compte n'est pas affichée (chargement, préparation). */
-export function regionText({ view, expired }: { view: FeaturesView; expired: boolean }): string {
+export function regionText({
+  view,
+  expired,
+  noun = "des fonctionnalités",
+}: {
+  view: FeaturesView;
+  expired: boolean;
+  /** Ce qui se charge, avec son article (« des règles métier »). */
+  noun?: string;
+}): string {
   switch (view.kind) {
     case "loading":
-      return "Chargement des fonctionnalités…";
+      return `Chargement ${noun}…`;
     case "preparing":
       return expired ? "" : "Préparation de la spec en cours.";
     default:
@@ -87,12 +96,17 @@ export const PLACEMENT_TEXT: Partial<Record<Placement, string>> = {
   more: "Utilisez « Charger la suite » pour la voir.",
 };
 
+/** Féminin (fonctionnalité `F-`, règle `R-`) ou masculin (rôle `RL-`, parcours `P-`) : accord des participes. */
+export const feminineId = (specId: string | undefined): boolean =>
+  specId === undefined || specId.startsWith("F-") || /^R-\d/.test(specId);
+
 /** « F-001 supprimée. » (sans titre) ou « F-004 « Titre » créée. » / « … enregistrée. » ; phrase propre si l'index a échoué. */
 export function confirmationText(meta: WriteMeta, indexFailed: boolean): string {
   if (indexFailed)
     return "Votre modification a été enregistrée, mais la spec n'a pas pu être relue.";
-  if (meta.kind === "delete") return `${meta.specId} supprimée.`;
-  return `${meta.specId} « ${meta.title} » ${meta.kind === "create" ? "créée" : "enregistrée"}.`;
+  const e = feminineId(meta.specId) ? "e" : "";
+  if (meta.kind === "delete") return `${meta.specId} supprimé${e}.`;
+  return `${meta.specId} « ${meta.title} » ${meta.kind === "create" ? `créé${e}` : `enregistré${e}`}.`;
 }
 
 /**

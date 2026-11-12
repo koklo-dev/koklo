@@ -173,3 +173,18 @@ describe("CountBar : écarts de la planche 12 l.53", () => {
     expect(container.querySelector("[data-slot='count-bar-sort']")).toHaveClass("gap-2");
   });
 });
+
+describe("CountBar : showAllLoaded (TK-103)", () => {
+  it("écrit « toutes chargées » ou « tous chargés » une fois la liste chargée", () => {
+    const { rerender, container } = render(
+      <CountBar total={4} loaded={4} noun={NOUN} showAllLoaded />,
+    );
+    expect(container).toHaveTextContent("· toutes chargées");
+    rerender(<CountBar total={4} loaded={4} noun={{ ...NOUN, masculine: true }} showAllLoaded />);
+    expect(container).toHaveTextContent("· tous chargés");
+    rerender(<CountBar total={4} loaded={2} noun={NOUN} showAllLoaded />);
+    expect(container).not.toHaveTextContent("toutes chargées");
+    rerender(<CountBar total={4} loaded={4} noun={NOUN} />);
+    expect(container).not.toHaveTextContent("toutes chargées");
+  });
+});

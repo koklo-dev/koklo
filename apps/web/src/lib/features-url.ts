@@ -4,6 +4,11 @@ import {
   featureValidationSchema,
 } from "@koklo/contract";
 import type { FeaturePriority, FeatureStatus, FeatureValidation } from "./feature-labels.ts";
+import { type FeaturesTab, readFeaturesTab, TAB_ID } from "./features-tab.ts";
+
+/** Types de règle du filtre `?type=` (légende de l'onglet Règles métier). */
+export const RULE_TYPES = ["contrainte", "calcul", "workflow"] as const;
+export type RuleTypeFilter = (typeof RULE_TYPES)[number];
 
 export interface FeaturesUrlState {
   status?: FeatureStatus;
@@ -12,11 +17,13 @@ export interface FeaturesUrlState {
   validation?: FeatureValidation;
   /** Recherche (`?q=`), 1 à 200 caractères comme le contrat. */
   q?: string;
-  /** Identifiant `F-nnn` de la fiche ouverte (`?sel=` ; l'ancien `?feature=` est lu, jamais écrit). */
+  /** Type de règle (`?type=`), onglet Règles métier seulement. */
+  type?: RuleTypeFilter;
+  /** Identifiant de l'élément choisi (`?sel=` ; l'ancien `?feature=` est lu, jamais écrit) : `F-nnn`, `R-nnn`, `RL-…` ou `P-…` selon l'onglet. */
   feature?: string;
   /** `?new=1` : formulaire de création (TK-48 / 48e). Exclusif de `edit` et de `feature`. */
   new?: true;
-  /** `?edit=F-nnn` : formulaire de modification (TK-48 / 48e). Exclusif de `feature`. */
+  /** `?edit=<identifiant>` : formulaire de modification (TK-48 / 48e). Exclusif de `feature`. */
   edit?: string;
   /** `?view=review` : relecture des propositions de l'agent (TK-99b). */
   review?: true;
@@ -26,25 +33,25 @@ export type FeaturesUrlPatch = {
   [K in keyof FeaturesUrlState]?: FeaturesUrlState[K] | null;
 };
 
-const FEATURE_ID = /^F-\d{3,}$/;
-const KEYS = ["status", "priority", "validation", "q", "edit"] as const;
+const KEYS = ["status", "priority", "validation", "q", "edit", "type"] as const;
 /** Paramètre de la fiche ouverte ; `feature` est son ancien nom (liens déjà partagés). */
 const SELECTED = "sel";
 const LEGACY_SELECTED = "feature";
 /** Longueur maximale de la recherche, celle du contrat (`LIST_QUERY_MAX_LENGTH`). */
 export const QUERY_MAX_LENGTH = 200;
 
-const isFeatureId = (value: string | null): value is string =>
-  value !== null && FEATURE_ID.test(value);
-
 /** Le formulaire (`edit` l'emporte sur `new`) ou, à défaut, la fiche : jamais deux panneaux. */
-function readPanel(params: URLSearchParams): Pick<FeaturesUrlState, "new" | "edit" | "feature"> {
+function readPanel(
+  params: URLSearchParams,
+  tab: FeaturesTab,
+): Pick<FeaturesUrlState, "new" | "edit" | "feature"> {
+  const isId = (value: string | null): value is string => value !== null && TAB_ID[tab].test(value);
   const edit = params.get("edit");
-  if (isFeatureId(edit)) return { edit };
+  if (isId(edit)) return { edit };
   if (params.get("new") === "1") return { new: true };
   const selected = params.get(SELECTED);
-  const feature = isFeatureId(selected) ? selected : params.get(LEGACY_SELECTED);
-  return isFeatureId(feature) ? { feature } : {};
+  const feature = isId(selected) ? selected : params.get(LEGACY_SELECTED);
+  return isId(feature) ? { feature } : {};
 }
 
 function readQuery(params: URLSearchParams): Pick<FeaturesUrlState, "q"> {
@@ -58,13 +65,15 @@ export function readFeaturesUrl(search: string): FeaturesUrlState {
   const status = featureStatusSchema.safeParse(params.get("status"));
   const priority = featurePrioritySchema.safeParse(params.get("priority"));
   const validation = featureValidationSchema.safeParse(params.get("validation"));
+  const type = RULE_TYPES.find((candidate) => candidate === params.get("type"));
   return {
     ...(params.get("view") === "review" ? { review: true as const } : {}),
     ...(status.success ? { status: status.data } : {}),
     ...(priority.success ? { priority: priority.data } : {}),
     ...(validation.success ? { validation: validation.data } : {}),
+    ...(type ? { type } : {}),
     ...readQuery(params),
-    ...readPanel(params),
+    ...readPanel(params, readFeaturesTab(search)),
   };
 }
 
@@ -89,10 +98,10 @@ export function withFeaturesUrl(search: string, patch: FeaturesUrlPatch): string
   return query ? `?${query}` : "";
 }
 
-/** Met `tab=features` en tête de la requête (l'écran vit sous `?tab=`) ; le reste est conservé tel quel. */
-export function withFeaturesTab(search: string): string {
+/** Met `tab=<onglet>` en tête de la requête (l'écran vit sous `?tab=`) ; le reste est conservé tel quel. */
+export function withFeaturesTab(search: string, tab: FeaturesTab = "features"): string {
   const params = new URLSearchParams(search);
   params.delete("tab");
   const rest = params.toString();
-  return `?tab=features${rest ? `&${rest}` : ""}`;
+  return `?tab=${tab}${rest ? `&${rest}` : ""}`;
 }

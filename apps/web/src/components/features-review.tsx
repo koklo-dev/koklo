@@ -9,6 +9,7 @@ import {
   Skeleton,
 } from "@koklo/ui";
 import { errorCode } from "../lib/api-error.ts";
+import type { FeaturesTab } from "../lib/features-tab.ts";
 import { NO_ACCESS } from "../lib/proposal-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import { type ProposalReviewModel, useProposalReview } from "../lib/use-proposal-review.ts";
@@ -124,17 +125,27 @@ function ReviewNotices({ review, actions, onLeave }: Notices) {
 export function FeaturesReview({
   projectId,
   branch,
+  tab = "features",
   onLeave,
 }: {
   projectId: string;
   branch: string | undefined;
+  /** Onglet affiché : la liste relit les propositions de son type (maquette 10 l.532). */
+  tab?: FeaturesTab;
   onLeave: () => void;
 }) {
-  const review = useProposalReview(projectId, true);
+  const review = useProposalReview(projectId, true, tab);
   const actions = useProposalActions(projectId, review, branch);
   const { counts } = review;
   const placeholder = placeholderOf(review, onLeave);
   if (placeholder) return placeholder;
+  if (review.groups.length === 0) {
+    return (
+      <Notice title="Aucune proposition dans cet onglet" onLeave={onLeave}>
+        Les propositions de l'agent sont dans les autres onglets.
+      </Notice>
+    );
+  }
   const selected = actions.selected;
   const item = review.groups.flatMap((group) => group.items).find((i) => i.id === selected?.id);
   return (

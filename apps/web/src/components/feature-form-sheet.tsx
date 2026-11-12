@@ -8,6 +8,7 @@ import { errorCode } from "../lib/api-error.ts";
 import { DELETE_TRIGGER_ID, fieldId, REASON_ID } from "../lib/feature-form-ids.ts";
 import { orpc } from "../lib/orpc.ts";
 import { describeFeatureError } from "../lib/spec-errors.ts";
+import { asFeatureItem } from "../lib/spec-item.ts";
 import { type FeatureFormModel, useFeatureForm } from "../lib/use-feature-form.ts";
 import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import { useItemPrefill } from "../lib/use-item-prefill.ts";
@@ -276,6 +277,7 @@ export function FeatureFormSheet(props: FormSheetProps) {
     ...orpc.spec.item.get.queryOptions({
       input: { projectId, type: "feature", id: specId ?? "" },
     }),
+    select: asFeatureItem,
     enabled: mode === "edit",
   });
   useUnauthorizedRedirect(query.error);

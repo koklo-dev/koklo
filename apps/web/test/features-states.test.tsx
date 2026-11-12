@@ -56,7 +56,9 @@ describe("En-tête : Liste · équipe", () => {
     await findList();
     await waitFor(() => expect(pill()).toHaveAttribute("data-status", "pending"));
     expect(pill()).toHaveTextContent("À valider");
-    expect(within(header()).getByText("3 fonctionnalités")).toBeInTheDocument();
+    expect(
+      within(header()).getByText("3 fonctionnalités · 4 règles · 3 rôles · 2 parcours"),
+    ).toBeInTheDocument();
     // L'agent est dans la zone visuellement première (order-1), « Nouvelle fonctionnalité » dans la seconde.
     const agent = within(header()).getByRole("button", { name: /Proposer avec l'agent/ });
     const create = within(header()).getAllByRole("button", { name: /Nouvelle fonctionnalité/ });
@@ -119,7 +121,8 @@ describe("En-tête : Génération", () => {
     expect(await findNamed("button", "Ajouter")).toBeVisible();
     await waitFor(() => expect(pill()).toHaveAttribute("data-status", "generating"));
     expect(within(header()).getByText("Depuis le dossier d'idée figé")).toBeInTheDocument();
-    expect(within(header()).getByText("…")).toBeInTheDocument();
+    // Un « … » sur chacun des quatre onglets (maquette 10 l.670).
+    expect(within(header()).getAllByText("…")).toHaveLength(4);
     expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 });

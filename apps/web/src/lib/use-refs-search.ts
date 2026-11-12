@@ -9,13 +9,14 @@ import { orpc } from "./orpc.ts";
 export const REFS_DEBOUNCE_MS = 200;
 
 /** Genres proposés pour un lien de fonctionnalité : les `F-` et `P-` n'y sont pas admis (B329 e). */
-const KINDS = ["screen", "rule", "table", "endpoint"] as const;
+const FEATURE_LINK_KINDS = ["screen", "rule", "table", "endpoint"] as const;
+type Kind = "feature" | "rule" | "flow" | "table" | "endpoint" | "screen";
 
 /**
  * Autocomplétion des liens : `spec.refs.search` une fois la frappe posée (200 ms), jamais sur une saisie vide.
  * Les propositions déjà choisies sont écartées par la saisie à puces.
  */
-export function useRefsSearch(projectId: string) {
+export function useRefsSearch(projectId: string, kinds: readonly Kind[] = FEATURE_LINK_KINDS) {
   const [query, setQuery] = useState("");
   const [settled, setSettled] = useState("");
   useEffect(() => {
@@ -23,7 +24,7 @@ export function useRefsSearch(projectId: string) {
     return () => clearTimeout(timer);
   }, [query]);
   const search = useQuery({
-    ...orpc.spec.refs.search.queryOptions({ input: { projectId, kinds: [...KINDS], q: settled } }),
+    ...orpc.spec.refs.search.queryOptions({ input: { projectId, kinds: [...kinds], q: settled } }),
     enabled: settled !== "",
   });
   const items: SpecRefsSearchOutput["items"] = settled === "" ? [] : (search.data?.items ?? []);

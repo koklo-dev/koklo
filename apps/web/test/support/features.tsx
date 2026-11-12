@@ -29,7 +29,7 @@ export const head = (over: Record<string, unknown> = {}) => ({
   status: "ready",
   errorCode: null,
   indexedAt: "2026-10-30T12:00:00.000Z",
-  counts: { features: 3, tables: 2, endpoints: 4 },
+  counts: { features: 3, tables: 2, endpoints: 4, rules: 4, roles: 3, flows: 2 },
   ...over,
 });
 

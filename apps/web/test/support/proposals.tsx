@@ -8,7 +8,7 @@ const uuid = (n: number): string => `0190bbbb-0000-7000-8000-${String(n).padStar
 export interface Fake {
   id: string;
   launchId: string;
-  kind: "feature" | "criteria";
+  kind: "feature" | "criteria" | "rule" | "role" | "flow";
   zone: string;
   position: number;
   title: string;
@@ -59,17 +59,31 @@ export const store: { items: Fake[]; launchStatus: string; options: unknown } = 
   options: null,
 };
 
+const KIND_LABEL: Record<string, string> = {
+  feature: "Fonctionnalités",
+  criteria: "Critères",
+  rule: "Règles",
+  role: "Rôles",
+  flow: "Parcours",
+};
+
 const keyOf = (p: Fake): string => `${p.kind}:${p.zone}`;
 
+/** Jusqu'à 30 propositions : un groupe par type (clé `feature`) ; au-delà, un groupe par type et zone. */
+const isFlat = (items: Fake[]): boolean => items.length <= 30;
+const groupKey = (p: Fake, flat: boolean): string => (flat ? p.kind : keyOf(p));
+
 function groupsOf(items: Fake[]) {
-  const flat = items.length <= 30;
-  const keys = flat ? ["all"] : [...new Set(items.map(keyOf))];
+  const flat = isFlat(items);
+  const keys = [...new Set(items.map((p) => groupKey(p, flat)))];
   return keys.map((key) => {
-    const own = flat ? items : items.filter((p) => keyOf(p) === key);
+    const own = items.filter((p) => groupKey(p, flat) === key);
     const n = (s: string) => own.filter((p) => p.status === s).length;
     return {
       key,
-      label: flat ? "Toutes" : `Fonctionnalités · ${key.split(":")[1]}`,
+      label: flat
+        ? (KIND_LABEL[key] ?? key)
+        : `${KIND_LABEL[key.split(":")[0] ?? ""] ?? key} · ${key.split(":")[1]}`,
       total: own.length,
       accepted: n("accepted"),
       rejected: n("rejected"),
@@ -80,7 +94,8 @@ function groupsOf(items: Fake[]) {
 
 function listAnswer(input: Record<string, unknown>) {
   let items = store.items;
-  if (input.group && input.group !== "all") items = items.filter((p) => keyOf(p) === input.group);
+  const flat = isFlat(store.items);
+  if (input.group) items = items.filter((p) => groupKey(p, flat) === input.group);
   if (input.status === "pending") items = items.filter((p) => p.status === "pending");
   const from = input.cursor ? Number(input.cursor) : 0;
   const limit = Number(input.limit ?? 50);

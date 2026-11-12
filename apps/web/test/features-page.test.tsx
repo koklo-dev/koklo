@@ -141,7 +141,7 @@ describe("En-tête (§3.1)", () => {
     expect(within(location).getByText("Fonctionnel")).toHaveAttribute("aria-current", "page");
   });
 
-  it("onglets en liens : Fonctionnalités (compteur de spec.head), les trois autres sans compteur", async () => {
+  it("onglets en liens : un compteur par onglet (spec.head.counts)", async () => {
     renderFeatures();
     await findList();
     const tabs = screen.getByRole("navigation", { name: "Sections du cahier fonctionnel" });
@@ -150,7 +150,7 @@ describe("En-tête (§3.1)", () => {
       within(tabs)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Fonctionnalités3", "Règles métier", "Rôles et permissions", "Parcours"]);
+    ).toEqual(["Fonctionnalités3", "Règles métier4", "Rôles et permissions3", "Parcours2"]);
   });
 
   it("compteur sans filtre : N fonctionnalités (spec.head.counts.features), au singulier à 1", async () => {

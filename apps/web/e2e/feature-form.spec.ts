@@ -396,13 +396,15 @@ test("S-feature-form : fiche puis « Modifier », Retour revient à la fiche", a
   await scenario({ write: "ok" });
   await page.goto(`${PATH}?feature=F-001`);
   await page
-    .getByRole("dialog", { name: "Connexion par e-mail" })
+    .getByRole("complementary", { name: "Fiche de la fonctionnalité" })
     .getByRole("button", { name: "Modifier" })
     .click();
   await expect(page.getByRole("dialog", { name: "Modifier la fonctionnalité" })).toBeVisible();
   await expect(page).toHaveURL(/edit=F-001/);
   await page.goBack();
-  await expect(page.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+  ).toBeVisible();
 });
 
 test("S-feature-form : lot en attente, fermer, suivi par la page puis reprise après rechargement sans nouvel envoi", async ({
@@ -567,7 +569,9 @@ test.describe("rôles", () => {
         page.getByRole("button", { name: /Nouvelle fonctionnalité|Modifier/ }),
       ).toHaveCount(0);
       await page.goto(`${PATH}?edit=F-001`);
-      await expect(page.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+      ).toBeVisible();
       await expect(page.getByRole("textbox")).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Modifier" })).toHaveCount(0);
       expect(await specWritesSeen()).toEqual([]);
@@ -867,7 +871,9 @@ test.describe("Suppression (48e-2)", () => {
     }) => {
       await scenario({ write: "ok", role });
       await page.goto(`${PATH}?edit=F-001`);
-      await expect(page.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+      ).toBeVisible();
       await expect(page.getByRole("button", { name: /Supprimer|Modifier/ })).toHaveCount(0);
       await expect(page.getByRole("group", { name: "Confirmer la suppression" })).toHaveCount(0);
       expect(await specWritesSeen()).toEqual([]);

@@ -103,6 +103,9 @@ export const iconLoaders = {
   format_italic: () => import("./format_italic.ts"),
   explore: () => import("./explore.ts"),
   stop: () => import("./stop.ts"),
+  calculate: () => import("./calculate.ts"),
+  shield_person: () => import("./shield_person.ts"),
+  support_agent: () => import("./support_agent.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

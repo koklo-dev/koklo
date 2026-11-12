@@ -91,7 +91,25 @@ export const writeCount = (): number =>
 
 const nextId = (): string => `F-${String(4 + created.length).padStart(3, "0")}`;
 
+const slugOf = (text: string): string =>
+  text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/** Identifiant attribué à la création d'une règle, d'un rôle ou d'un parcours (TK-103). */
+function domainCreateId(op: Record<string, unknown>): string | null {
+  if (op.kind === "rule.create") return "R-005";
+  if (op.kind === "role.create") return `RL-${slugOf(String(op.name))}`;
+  if (op.kind === "flow.create") return `P-${slugOf(String(op.title))}`;
+  return null;
+}
+
 function applyOne(op: Record<string, unknown>, position: number): Batch["results"][number] {
+  const made = domainCreateId(op);
+  if (made) return { position, kind: String(op.kind), specId: made };
   if (op.kind === "feature.create") {
     const specId = nextId();
     created.push({

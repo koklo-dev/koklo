@@ -25,12 +25,75 @@ function criteriaOf(content: Record<string, unknown>): CriterionContent[] {
   }));
 }
 
+const strings = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : []).filter((item): item is string => typeof item === "string");
+
+/** Champ facultatif : absent quand la proposition ne le porte pas (le contrat refuse une liste vide pour certains). */
+const optional = <T>(key: string, value: T | undefined | []): Record<string, T> =>
+  value === undefined || (Array.isArray(value) && value.length === 0) ? {} : { [key]: value as T };
+
+/** `rule.create` : le type est « contrainte » quand l'agent n'en dit rien. */
+function ruleOperation(content: Record<string, unknown>): Operation {
+  const type = ["contrainte", "calcul", "workflow"].includes(str(content.type))
+    ? (str(content.type) as "contrainte" | "calcul" | "workflow")
+    : "contrainte";
+  const example = str(content.example).trim();
+  return {
+    kind: "rule.create",
+    title: str(content.title).trim(),
+    type,
+    statement: str(content.statement).trim(),
+    ...optional("examples", example ? [example] : undefined),
+    ...optional("states", type === "workflow" ? strings(content.states) : undefined),
+    ...optional("features", strings(content.features)),
+  };
+}
+
+function roleOperation(content: Record<string, unknown>): Operation {
+  const permissions = (Array.isArray(content.permissions) ? content.permissions : []).map(
+    (item: Record<string, unknown>) => {
+      const restriction = str(item.restriction).trim();
+      return { id: str(item.id), ...(restriction ? { restriction } : {}) };
+    },
+  );
+  return {
+    kind: "role.create",
+    name: str(content.name).trim(),
+    description: str(content.description).trim(),
+    permissions,
+  };
+}
+
+/** `flow.create` : acteur « Client » et départ = première étape quand l'agent ne les donne pas (11 §3). */
+function flowOperation(content: Record<string, unknown>): Operation {
+  const labels = strings(content.steps);
+  const given = str(content.start).trim();
+  const start = given || labels[0] || "";
+  const rest = given || labels.length < 2 ? labels : labels.slice(1);
+  const steps = rest.map((label) => ({ label }));
+  const errors = (Array.isArray(content.errors) ? content.errors : []).map(
+    (item: Record<string, unknown>) => ({ step: Number(item.step), text: str(item.text) }),
+  );
+  return {
+    kind: "flow.create",
+    title: str(content.title).trim(),
+    actor: str(content.actor).trim() || "Client",
+    start: { label: start },
+    steps,
+    ...optional("errors", errors),
+    ...optional("features", strings(content.features)),
+  };
+}
+
 /**
  * Opération d'une proposition acceptée : `feature` crée une fonctionnalité, `criteria` ajoute des critères à une
- * fonctionnalité existante (B314 d). Les autres types n'ont pas d'opération avant le sprint 023 : `null`.
+ * fonctionnalité existante (B314 d), `rule`, `role` et `flow` créent l'élément (TK-103).
  */
 export function operationOf(proposal: ProposalOutput): Operation | null {
   const { content } = proposal;
+  if (proposal.kind === "rule") return ruleOperation(content);
+  if (proposal.kind === "role") return roleOperation(content);
+  if (proposal.kind === "flow") return flowOperation(content);
   if (proposal.kind === "feature") {
     return {
       kind: "feature.create",

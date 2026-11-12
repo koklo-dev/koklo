@@ -1,4 +1,5 @@
 import { priorityLabel } from "./feature-labels.ts";
+import { FEATURES_TABS, tabOfProposalKind } from "./features-tab.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
 /** Livrable branché par TK-99b : le cahier fonctionnel (les six autres suivent TK-100). */
@@ -58,6 +59,28 @@ export const SAVED_TEXT = (saved: number, left: number): string =>
     : `${saved} enregistrée${saved >= 2 ? "s" : ""}, ${left} à reprendre`;
 export const BLOCKED_TEXT = "Enregistrement échoué · à reprendre par l'équipe technique";
 
+const TAB_NOUNS = {
+  features: ["fonctionnalité", "fonctionnalités"],
+  rules: ["règle", "règles"],
+  roles: ["rôle", "rôles"],
+  flows: ["parcours", "parcours"],
+} as const;
+
+/**
+ * Récapitulatif d'un enregistrement groupé par onglet : « 3 fonctionnalités, 2 règles ». Vide quand tout vient d'un
+ * seul onglet (le décompte seul suffit).
+ */
+export function savedBreakdown(kinds: readonly string[]): string {
+  const counts = FEATURES_TABS.map((tab) => ({
+    tab,
+    n: kinds.filter((kind) => tabOfProposalKind(kind) === tab).length,
+  })).filter((entry) => entry.n > 0);
+  if (counts.length < 2) return "";
+  return counts
+    .map(({ tab, n }) => `${n} ${n >= 2 ? TAB_NOUNS[tab][1] : TAB_NOUNS[tab][0]}`)
+    .join(", ");
+}
+
 const countLabel = (n: number, [one, other]: [string, string]): string =>
   `${n} ${n >= 2 ? other : one}`;
 export const optionCountLabel = (mode: string, count: number | undefined): string | undefined => {
@@ -66,21 +89,43 @@ export const optionCountLabel = (mode: string, count: number | undefined): strin
 };
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
-const criteriaOf = (content: Record<string, unknown>): unknown[] =>
-  Array.isArray(content.criteria) ? content.criteria : [];
 
-/** Identifiant lisible : `F-nnn` d'une fonctionnalité visée, sinon rang dans le lancement (`P-007`). */
+/** Préfixe du rang quand la proposition n'a pas d'identifiant : un rôle ne prend jamais `P-` (parcours). */
+const RANK_PREFIX: Record<string, string> = { rule: "R", role: "RL", flow: "P" };
+
+/** Identifiant lisible : celui de la fiche visée, sinon rang dans le lancement (`P-007`, `RL-002`). */
 export function refOf(proposal: ProposalOutput): string {
   const specId = text(proposal.content.specId);
-  return specId || `P-${String(proposal.position + 1).padStart(3, "0")}`;
+  return (
+    specId ||
+    `${RANK_PREFIX[proposal.kind] ?? "P"}-${String(proposal.position + 1).padStart(3, "0")}`
+  );
 }
 
-/** Ligne secondaire : « Fonctionnalité · Haute · 2 critères ». */
+const RULE_TYPE_TEXT: Record<string, string> = {
+  contrainte: "contrainte",
+  calcul: "calcul",
+  workflow: "workflow à états",
+};
+
+const countOf = (value: unknown): number => (Array.isArray(value) ? value.length : 0);
+const plural = (n: number, one: string, other: string): string => `${n} ${n >= 2 ? other : one}`;
+
+/** Ligne secondaire : « Fonctionnalité · Haute · 2 critères », « Règle · calcul », « Rôle · 4 permissions », « Parcours · 5 étapes ». */
 export function subtitleOf(proposal: ProposalOutput): string {
-  const n = criteriaOf(proposal.content).length;
-  const parts = [KIND_LABELS[proposal.kind] ?? proposal.kind];
-  const priority = text(proposal.content.priority);
+  const { content } = proposal;
+  const label = KIND_LABELS[proposal.kind] ?? proposal.kind;
+  if (proposal.kind === "rule")
+    return `${label} · ${RULE_TYPE_TEXT[text(content.type)] ?? "contrainte"}`;
+  if (proposal.kind === "role")
+    return `${label} · ${plural(countOf(content.permissions), "permission", "permissions")}`;
+  if (proposal.kind === "flow") {
+    const steps = countOf(content.steps) + (text(content.start) ? 1 : 0);
+    return `${label} · ${plural(steps, "étape", "étapes")}`;
+  }
+  const parts = [label];
+  const priority = text(content.priority);
   if (priority) parts.push(priorityLabel(priority));
-  parts.push(countLabel(n, ["critère", "critères"]));
+  parts.push(countLabel(countOf(content.criteria), ["critère", "critères"]));
   return parts.join(" · ");
 }

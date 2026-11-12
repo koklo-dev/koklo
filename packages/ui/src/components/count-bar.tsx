@@ -17,6 +17,8 @@ export interface CountBarProps extends Omit<HTMLAttributes<HTMLDivElement>, "chi
   sort?: ReactNode;
   /** Recherche saisie : « 0 résultat pour « x » » remplace le nom de l'objet. */
   query?: string;
+  /** Liste entièrement chargée : « · toutes chargées » après le total (maquette 10 l.501). */
+  showAllLoaded?: boolean;
   /** Version de colonne (kanban) : le total seul. */
   compact?: boolean;
   /** Recherche en cours : la barre est atténuée. */
@@ -52,9 +54,13 @@ function Summary({
   noun,
   filterLabel,
   query,
-}: Pick<CountBarProps, "total" | "loaded" | "noun" | "filterLabel" | "query">) {
+  showAllLoaded,
+}: Pick<CountBarProps, "total" | "loaded" | "noun" | "filterLabel" | "query" | "showAllLoaded">) {
+  const plural = total >= 2;
+  const all = noun.masculine ? (plural ? "tous" : "tout") : plural ? "toutes" : "toute";
   const rest = [
     loaded < total ? `${formatCount(loaded)} ${loadedWord(loaded, noun)}` : "",
+    showAllLoaded && loaded >= total && total > 0 ? `${all} ${loadedWord(total, noun)}` : "",
     filterLabel ?? "",
   ].filter(Boolean);
   const searching = query !== undefined && query !== "";
@@ -87,6 +93,7 @@ export function CountBar({
   filterLabel,
   query,
   sort,
+  showAllLoaded,
   compact = false,
   busy = false,
   announcement,
@@ -116,6 +123,7 @@ export function CountBar({
           noun={noun}
           filterLabel={filterLabel}
           query={query}
+          showAllLoaded={showAllLoaded}
         />
       )}
       {sort && !compact ? (
