@@ -1,4 +1,8 @@
-import type { reviewListOutputSchema, reviewSubmitOutputSchema } from "@koklo/contract";
+import type {
+  reviewListOutputSchema,
+  reviewRemindOutputSchema,
+  reviewSubmitOutputSchema,
+} from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import { CLIENT_ROLE } from "../auth/roles.ts";
@@ -16,6 +20,7 @@ import { isDelegatedTarget } from "./review-policy.ts";
 
 type Submitted = z.output<typeof reviewSubmitOutputSchema>;
 type ReviewList = z.output<typeof reviewListOutputSchema>;
+type Reminded = z.output<typeof reviewRemindOutputSchema>;
 
 /**
  * Validation d'une cible par le client, ou par l'équipe selon la cible (TK-55d, TK-100). Le service ne lit ni ne
@@ -45,6 +50,10 @@ export class ReviewService {
       validation: validationOf({ ...record, currentHash }, headSha).validation,
       createdAt: record.createdAt.toISOString(),
     };
+  }
+
+  remind(scope: ProjectScope): Promise<Reminded> {
+    return this.repository.remind(scope, new Date(this.clock.now()));
   }
 
   async list(

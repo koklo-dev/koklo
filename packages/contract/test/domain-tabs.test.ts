@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, UUID } from "./support.ts";
  * lectures `spec.functional.list` et `spec.roles.matrix`, `spec.item.get` étendu, compteurs `rules`, `roles`, `flows`.
  */
 describe("TK-103 A surface", () => {
-  it("version 3.1.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.1.0");
+  it("version 3.2.0", () => {
+    expect(CONTRACT_VERSION).toBe("3.2.0");
   });
 
   it.each([

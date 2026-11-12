@@ -15,6 +15,15 @@ export function clientSpaceApi(app: INestApplication, actor: Pick<Actor, "cookie
       send(app, cookie, "get", `/client-space/projects/${projectId}/features${query}`),
     feature: (projectId: string, featureId: string) =>
       send(app, cookie, "get", `/client-space/projects/${projectId}/features/${featureId}`),
+    // TK-104 (contrat 3.2.0) : progression, parcours, règles et rôles.
+    progress: (projectId: string) =>
+      send(app, cookie, "get", `/client-space/projects/${projectId}/progress`),
+    flows: (projectId: string, query = "") =>
+      send(app, cookie, "get", `/client-space/projects/${projectId}/flows${query}`),
+    rules: (projectId: string, query = "") =>
+      send(app, cookie, "get", `/client-space/projects/${projectId}/rules${query}`),
+    roles: (projectId: string) =>
+      send(app, cookie, "get", `/client-space/projects/${projectId}/roles`),
   };
 }
 

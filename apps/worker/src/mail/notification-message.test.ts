@@ -59,27 +59,28 @@ function failureOf(fn: () => unknown): MailDeliveryError | undefined {
 }
 
 describe("types de notification : parité avec la base", () => {
-  it("la liste du worker est exactement celle du CHECK de la dernière migration qui l'a étendu (agent_proposals, TK-99a)", () => {
-    const sql = readFileSync(
-      resolve(
-        import.meta.dirname,
-        "../../../../packages/db/prisma/migrations/20261111090000_agent_proposals/migration.sql",
-      ),
-      "utf8",
-    );
-    const listOf = (constraint: string) =>
-      [
+  it("les listes du worker sont exactement celles des CHECK des dernières migrations qui les ont étendues (review_withdrawn, TK-104, pour les types ; agent_proposals, TK-99a, pour les sujets)", () => {
+    const migrations = resolve(import.meta.dirname, "../../../../packages/db/prisma/migrations");
+    const listOf = (migration: string, constraint: string) => {
+      const sql = readFileSync(resolve(migrations, migration, "migration.sql"), "utf8");
+      return [
         ...(
           sql.match(new RegExp(`${constraint}" CHECK \\("[a-z_]+" IN \\(([^)]*)\\)`))?.[1] ?? ""
         ).matchAll(/'([^']+)'/g),
       ].map((m) => m[1]);
-    expect([...NOTIFICATION_TYPES]).toEqual(listOf("notifications_type_check"));
-    expect([...NOTIFICATION_SUBJECT_KINDS]).toEqual(listOf("notifications_subject_kind_check"));
+    };
+    expect([...NOTIFICATION_TYPES]).toEqual(
+      listOf("20261112170000_review_withdrawn", "notifications_type_check"),
+    );
+    expect([...NOTIFICATION_SUBJECT_KINDS]).toEqual(
+      listOf("20261111090000_agent_proposals", "notifications_subject_kind_check"),
+    );
   });
 
-  it("seuls baseline.proposed, review.submitted et ticket.blocked envoient un e-mail (D2)", () => {
+  it("seuls baseline.proposed, review.reminded (TK-104), review.submitted et ticket.blocked envoient un e-mail (D2)", () => {
     expect([...EMAILED_TYPES].sort()).toEqual([
       "baseline.proposed",
+      "review.reminded",
       "review.submitted",
       "ticket.blocked",
     ]);
@@ -87,7 +88,7 @@ describe("types de notification : parité avec la base", () => {
 });
 
 describe("gabarit par type : exhaustivité", () => {
-  it("le dictionnaire couvre exactement les 8 types, sans type en trop", () => {
+  it("le dictionnaire couvre exactement les 9 types, sans type en trop", () => {
     expect(Object.keys(NOTIFICATION_COPY).sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(Object.keys(SUBJECT_REF_PATTERNS).sort()).toEqual(
       [...NOTIFICATION_SUBJECT_KINDS].sort(),
@@ -283,5 +284,16 @@ describe("injection HTML et destinataire piégé", () => {
       expect(error, to).toBeInstanceOf(MailDeliveryError);
       expect(error?.message).not.toContain("example.test");
     }
+  });
+});
+
+describe("review.reminded (TK-104, B352) : relance du client", () => {
+  it("texte français, sans nom ni contenu libre, lien sur le projet", () => {
+    const message = buildNotificationMessage(
+      input({ type: "review.reminded", subjectKind: "review", subjectRef: REFS.review }),
+    );
+    expect(NOTIFICATION_COPY["review.reminded"].subject).toMatch(/validation/i);
+    expect(message.text).toContain(NOTIFICATION_COPY["review.reminded"].lead);
+    expect(message.text).toContain(`${BASE}/projects/${PROJECT_ID}/review/${REFS.review}`);
   });
 });

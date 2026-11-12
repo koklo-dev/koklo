@@ -173,6 +173,7 @@ describe("TK-89 migration idea : pages des projets existants", () => {
       "_deliverable_overrides",
       "_spec_entities_review_versions",
       "_rule_counter",
+      "_review_withdrawn",
     ]) {
       apply(db, dirs().find((dir) => dir.endsWith(suffix)) as string, "migration.sql");
     }

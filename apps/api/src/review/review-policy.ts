@@ -1,4 +1,7 @@
-import { CLIENT_ROLE } from "../auth/roles.ts";
+import { CLIENT_ROLE, REVIEW_REMIND_ROLES } from "../auth/roles.ts";
+
+/** Rôles qui relancent le client (B352) : la relance n'est pas une validation, elle ne dépend pas de la cible. */
+export const REMINDERS: readonly string[] = REVIEW_REMIND_ROLES;
 
 /** Cibles que `review.submit` accepte (les écrans restent masqués, D2). */
 export type ReviewKind = "feature" | "baseline" | "flow" | "rules" | "roles" | "deliverable";

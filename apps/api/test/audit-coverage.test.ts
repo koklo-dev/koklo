@@ -263,6 +263,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "proposal.decideMany",
   "repo.createSpec",
   "repo.link",
+  "review.remind",
   "review.submit",
   "spec.forceDeliverable",
   "specBatch.submit",
@@ -1574,6 +1575,7 @@ function suggestionScenarios(): Scenario[] {
  * TK-55d : validation d'une feature par le client lié (spec indexée et committée dans le faux
  * fournisseur du banc `repo`). La cible de l'audit est l'id de la review ; ni SHA ni commentaire.
  */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 function reviewScenarios(): Scenario[] {
   const prepare = async (ctx: Ctx) => {
     const runtime = await repoRuntimeOf();
@@ -1611,6 +1613,29 @@ function reviewScenarios(): Scenario[] {
           ctx.world.projectId,
           state.sha,
         ),
+      deniedStatuses: [403],
+    },
+    {
+      // TK-104 (B352) : relance du client ; l'audit cible le lien d'accès du client relancé, rien de libre.
+      procedure: "review.remind",
+      role: "owner",
+      prepare,
+      call: async (ctx) =>
+        reviewApi((await repoRuntimeOf()).app, ctx.world.actors.owner).remind(ctx.world.projectId),
+      expected: async (ctx) => {
+        const [link] = await database.query<{ id: string }>(
+          "SELECT id FROM project_client_access WHERE project_id = $1",
+          [ctx.world.projectId],
+        );
+        return {
+          action: "review.remind",
+          targetKind: "project_client",
+          targetId: link?.id ?? "",
+          ticketId: null,
+        };
+      },
+      denied: async (ctx) =>
+        reviewApi((await repoRuntimeOf()).app, ctx.world.actors.dev).remind(ctx.world.projectId),
       deniedStatuses: [403],
     },
   ];
@@ -1785,8 +1810,8 @@ describe("garde TK-55d : le groupe review", () => {
     expect(sources.some((source) => referencesGroup(source, "review"))).toBe(true);
   });
 
-  it("review.list est une lecture : seule review.submit est à journaliser", () => {
-    expect(nonGetProcedures(["review"])).toEqual(["review.submit"]);
+  it("review.list est une lecture : seules review.remind (TK-104) et review.submit sont à journaliser", () => {
+    expect(nonGetProcedures(["review"]).sort()).toEqual(["review.remind", "review.submit"]);
   });
 });
 

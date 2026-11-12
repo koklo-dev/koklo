@@ -227,7 +227,7 @@ describe("claimForSend : relecture du destinataire à l'envoi", () => {
     expect(result.context.organizationName).not.toBe(b.organizationName);
   });
 
-  it.each(["baseline.proposed", "review.submitted", "ticket.blocked"] as const)(
+  it.each(["baseline.proposed", "review.reminded", "review.submitted", "ticket.blocked"] as const)(
     "le type %s est envoyé par e-mail",
     async (type) => {
       const scene = await bench.scene("emailed");

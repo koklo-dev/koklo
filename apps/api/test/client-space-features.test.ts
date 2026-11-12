@@ -68,6 +68,8 @@ describe("clientSpace.features : contenu d'une ligne", () => {
       ],
       version: sha,
       nextCursor: null,
+      total: 1,
+      offset: 0,
     });
   });
 

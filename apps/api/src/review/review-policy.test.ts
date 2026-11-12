@@ -3,6 +3,7 @@ import {
   canReview,
   clientListFilter,
   isDelegatedTarget,
+  REMINDERS,
   type ReviewKind,
 } from "./review-policy.ts";
 
@@ -85,5 +86,11 @@ describe("validation déléguée (onBehalf) et lecture du client", () => {
     expect(JSON.stringify(filter)).toContain("functional");
     expect(JSON.stringify(filter)).toContain("design");
     for (const key of TECH_DELIVERABLES) expect(JSON.stringify(filter)).not.toContain(key);
+  });
+});
+
+describe("TK-104 (B352) : relancer le client", () => {
+  it("owner et admin seulement, jamais le client, le business, le développeur, le designer ni un agent", () => {
+    expect(ROLES.filter((role) => REMINDERS.includes(role))).toEqual(["owner", "admin"]);
   });
 });

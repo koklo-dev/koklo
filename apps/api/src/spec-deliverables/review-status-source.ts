@@ -1,6 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { entityHashesOf } from "../review/entity-hashes.ts";
-import { VERDICT_SELECT } from "../review/verdicts.ts";
+import { readStatusFacts } from "../review/status-facts.ts";
 import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import { ProjectTransactions } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -22,25 +21,7 @@ export class ReviewStatusSource implements DeliverableStatusSource {
     return this.transactions.run(scope, async (tx) => {
       const found = await this.resolver.resolve(tx, scope, {});
       if (!found || found.snapshot.status === "failed") return ALL_TODO;
-      const snapshotId = found.snapshot.id;
-      const entities = await entityHashesOf(tx, snapshotId);
-      const features = await tx.specFeature.findMany({
-        where: { snapshotId },
-        select: { specId: true },
-      });
-      const reviews = await tx.review.findMany({
-        where: {
-          projectId: scope.projectId,
-          targetKind: { in: ["feature", "flow", "rules", "roles", "deliverable"] },
-        },
-        select: VERDICT_SELECT,
-      });
-      return deliverableStatusesOf({
-        headSha: found.snapshot.commitSha,
-        entities,
-        featureIds: features.map((feature) => feature.specId),
-        reviews,
-      });
+      return deliverableStatusesOf(await readStatusFacts(tx, scope, found.snapshot));
     });
   }
 }

@@ -154,6 +154,12 @@ export const DELIVERABLE_FORCE_ROLES = ["owner", "admin"] as const;
  */
 export const REVIEW_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
 
+/**
+ * Relancer le client (`review.remind`, TK-104, B352) : owner et admin seulement (`MANAGER_ROLES`), jamais le client,
+ * le business, le développeur, le designer ni un jeton d'agent.
+ */
+export const REVIEW_REMIND_ROLES = MANAGER_ROLES;
+
 /** Notifiés d'une validation (`review.submitted`, `baseline.validated`) : l'équipe qui agit, pas le business. */
 export const REVIEW_NOTIFIED_ROLES = ["owner", "admin", "dev", "designer"] as const;
 

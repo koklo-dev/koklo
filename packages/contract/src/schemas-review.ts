@@ -22,7 +22,8 @@ export const reviewTargetKindSchema = z.enum([
   "roles",
   "deliverable",
 ]);
-export const reviewStatusSchema = z.enum(["approved", "changes_requested"]);
+/** `withdrawn` : « Annuler » une décision (TK-104, B349) ; le journal reste en ajout seul, la cible redevient « à valider ». */
+export const reviewStatusSchema = z.enum(["approved", "changes_requested", "withdrawn"]);
 export const baselineRefSchema = z.string().regex(/^baseline-(0|[1-9]\d*)$/);
 
 export const flowRefSchema = z.string().regex(/^P-[A-Za-z0-9][A-Za-z0-9-]{0,62}$/);
@@ -88,3 +89,10 @@ export const reviewSchema = z.object({
 });
 
 export const reviewListOutputSchema = pageOf(reviewSchema);
+
+/** Relance du client (TK-104, B352) : owner et admin, un rappel par client et par jour. */
+export const reviewRemindInputSchema = z.object({ projectId: z.uuid() });
+export const reviewRemindOutputSchema = z.object({
+  /** Clients prévenus par cet appel ; 0 quand tous l'avaient déjà été aujourd'hui. */
+  reminded: z.number().int().min(0),
+});

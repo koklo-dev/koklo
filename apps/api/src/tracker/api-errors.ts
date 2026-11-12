@@ -28,6 +28,8 @@ type ConflictReason =
   | "framing_closed"
   | "suggestion_not_open"
   | "baseline_not_open"
+  | "review_incomplete"
+  | "no_client"
   | "slug_taken"
   | "already_member"
   | "already_invited"
