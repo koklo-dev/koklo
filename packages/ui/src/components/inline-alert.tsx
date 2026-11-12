@@ -6,7 +6,14 @@ import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { Button } from "./button.tsx";
 
-export type InlineAlertVariant = "neutral" | "success" | "agent" | "warning" | "error";
+export type InlineAlertVariant =
+  | "neutral"
+  | "success"
+  | "agent"
+  | "warning"
+  | "error"
+  | "revise"
+  | "validated";
 
 /** Rôle dérivé de la variante : information, attente (compte à rebours), échec. */
 const ROLE: Record<InlineAlertVariant, "note" | "status" | "alert"> = {
@@ -15,7 +22,14 @@ const ROLE: Record<InlineAlertVariant, "note" | "status" | "alert"> = {
   agent: "status",
   warning: "status",
   error: "alert",
+  /** Demande de changement enregistrée : une confirmation, pas une erreur (TK-104). */
+  revise: "status",
+  /** Décision validée enregistrée (TK-104). */
+  validated: "status",
 };
+
+/** Confirmations de décision (maquette 10 l.312, 328, 440-441) : fond plein du statut, sans bordure, 14 px, icône pleine. */
+const SOLID: ReadonlySet<InlineAlertVariant> = new Set(["revise", "validated"]);
 
 const inlineAlertVariants = cva("flex min-h-10 flex-col rounded-card border text-meta", {
   variants: {
@@ -25,6 +39,8 @@ const inlineAlertVariants = cva("flex min-h-10 flex-col rounded-card border text
       agent: "border-dashed border-primary bg-diff-bg text-foreground",
       warning: "border-alert-warning-border bg-alert-warning text-alert-warning-foreground",
       error: "border-alert-error-border bg-alert-error text-alert-error-foreground",
+      revise: "border-transparent bg-status-revise text-status-revise-foreground text-sm",
+      validated: "border-transparent bg-status-validated text-status-validated-foreground text-sm",
     },
   },
 });
@@ -104,7 +120,7 @@ export function InlineAlert({
           actions && "max-md:flex-wrap",
         )}
       >
-        <Icon name={icon} size={18} className="shrink-0" />
+        <Icon name={icon} size={18} fill={SOLID.has(variant)} className="shrink-0" />
         <div className="min-w-0 flex-1 py-1">{children}</div>
         {action ? (
           <button type="button" className={ACTION} onClick={action.onClick}>

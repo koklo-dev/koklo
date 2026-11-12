@@ -12,7 +12,11 @@ const VARIANTS = [
   ["neutral", "note", "lock"],
   ["warning", "status", "schedule"],
   ["error", "alert", "error"],
+  ["revise", "status", "edit_note"],
+  ["validated", "status", "check_circle"],
 ] as const;
+
+const SOLID: ReadonlySet<string> = new Set(["revise", "validated"]);
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("InlineAlert", () => {
@@ -38,7 +42,7 @@ describe("InlineAlert", () => {
       </InlineAlert>,
     );
     const cls = screen.getByRole(role).className;
-    expect(cls).toMatch(new RegExp(`alert-${variant}`));
+    expect(cls).toMatch(new RegExp(SOLID.has(variant) ? `status-${variant}` : `alert-${variant}`));
     expect(cls).not.toMatch(/primary|violet|purple/);
   });
 
