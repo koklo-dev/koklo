@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { InvitationModule } from "../invitation/invitation.module.ts";
 import { InvitationRepository } from "../invitation/invitation.repository.ts";
 import { ProjectCreationQueue } from "../queue/project-creation-queue.ts";
+import { SpecDeliverablesModule } from "../spec-deliverables/spec-deliverables.module.ts";
 import { SpecReadModule } from "../spec-read/spec-read.module.ts";
 import { TrackerModule } from "../tracker/tracker.module.ts";
 import { PrismaProjectRepository } from "./prisma-project.repository.ts";
@@ -19,7 +20,7 @@ import { PROJECT_SHELL_REPOSITORY } from "./project-shell.repository.ts";
 import { ProjectShellService } from "./project-shell.service.ts";
 
 @Module({
-  imports: [TrackerModule, SpecReadModule, InvitationModule],
+  imports: [TrackerModule, SpecReadModule, SpecDeliverablesModule, InvitationModule],
   controllers: [ProjectController],
   providers: [
     ProjectService,

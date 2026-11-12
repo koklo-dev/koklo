@@ -1,10 +1,10 @@
-import type { DELIVERABLE_KEYS } from "@koklo/contract";
+import { DELIVERABLE_KEYS } from "@koklo/contract";
+import type { DeliverableStatus } from "@koklo/domain";
 import { type ReviewVerdict, validationOf } from "../client-space/validation.ts";
 import { specLink } from "./overview-links.ts";
 import { plural } from "./overview-texts.ts";
 
 type Key = (typeof DELIVERABLE_KEYS)[number];
-export type DeliverableStatus = "todo" | "pending" | "revise" | "validated";
 
 /** Ce que les reviews disent du Fonctionnel, seul livrable validable avant TK-100 (B273). */
 export interface FunctionalState {
@@ -45,16 +45,6 @@ export interface DeliverableCard {
   href?: string;
 }
 
-/** Ordre de rédaction de la spec (passation 21 §0 : Sécurité en 5e). */
-const ORDER: readonly Key[] = [
-  "functional",
-  "data",
-  "architecture",
-  "technical",
-  "security",
-  "design",
-  "quality",
-];
 /** Livrables que le client valide obligatoirement (D1). */
 const CLIENT_VALIDATED: readonly Key[] = ["functional", "design"];
 
@@ -100,7 +90,7 @@ export function deliverableCards(
   hasClient: boolean,
   audience: "team" | "client" = "team",
 ): DeliverableCard[] {
-  return ORDER.map((key) => {
+  return DELIVERABLE_KEYS.map((key) => {
     const validator = validatorOf(key, hasClient);
     if (key !== "functional") {
       return {

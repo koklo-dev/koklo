@@ -70,10 +70,11 @@ export const freezeIdea = (
   scope: { organizationId: string; projectId: string },
   number = 1,
   pagesVersions: Record<string, number> = { vision: 1, personas: 1 },
+  frozenAt: Date = new Date(),
 ) =>
   database.query(
     `INSERT INTO idea_versions (id, organization_id, project_id, number, tag, commit_sha, pages_versions, frozen_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now(), now())`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, now())`,
     [
       randomUUID(),
       scope.organizationId,
@@ -82,6 +83,7 @@ export const freezeIdea = (
       `idea-v${number}`,
       "a".repeat(40),
       JSON.stringify(pagesVersions),
+      frozenAt,
     ],
   );
 
@@ -95,6 +97,7 @@ export interface LaunchRow {
   id: string;
   status: string;
   deliverable: string;
+  mode: string;
   error_code: string | null;
   base_version: number | null;
   sources: string[];
@@ -103,7 +106,7 @@ export interface LaunchRow {
 
 export const launchRows = (database: TestDatabase, projectId: string) =>
   database.query<LaunchRow>(
-    `SELECT id, status, deliverable, error_code, base_version, sources, instruction
+    `SELECT id, status, deliverable, mode, error_code, base_version, sources, instruction
        FROM agent_launches WHERE project_id = $1 ORDER BY created_at, id`,
     [projectId],
   );

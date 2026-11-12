@@ -41,6 +41,7 @@ describe("contenu", () => {
         comment: "Merci",
         createdAt: sent.body.createdAt,
         current: true,
+        onBehalf: false,
       },
     ]);
   });

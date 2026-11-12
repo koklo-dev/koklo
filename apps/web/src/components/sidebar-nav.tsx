@@ -15,6 +15,7 @@ import {
   ticketsPath,
 } from "../lib/shell-routes.ts";
 import { useProjectShell } from "../lib/use-project-shell.ts";
+import { useSpecDeliverables } from "../lib/use-spec-deliverables.ts";
 import { ShellLink } from "./shell-link.tsx";
 import { SidebarProjectCard } from "./sidebar-project-card.tsx";
 
@@ -29,10 +30,11 @@ export function ProjectNav({
   role: Role | undefined;
 }) {
   const shell = useProjectShell(projectId);
+  const spec = useSpecDeliverables(projectId);
   const base = projectPath(projectId);
-  // `project.shell` en échec : aucune entrée SPEC n'est ouverte (fermé par défaut), la navigation reste.
+  // `spec.deliverables` en échec : aucune entrée SPEC n'est ouverte (fermé par défaut), la navigation reste.
   const hrefs = Object.fromEntries(
-    (shell.data?.deliverables ?? [])
+    (spec.data?.deliverables ?? [])
       .filter((deliverable) => deliverable.available)
       .map((deliverable) => [deliverable.key, specPath(projectId, deliverable.key)]),
   ) as Partial<Record<SpecKey, string>>;
@@ -70,8 +72,8 @@ export function ProjectNav({
         <SpecNav
           hrefs={hrefs}
           {...(slug ? { activeKey: slug } : {})}
-          validatedCount={shell.data?.validatedCount ?? 0}
-          loading={shell.isPending}
+          validatedCount={spec.data?.validatedCount ?? 0}
+          loading={spec.isPending}
           LinkComponent={ShellLink}
         />
         <ShellNavItem

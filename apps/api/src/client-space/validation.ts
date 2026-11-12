@@ -7,6 +7,10 @@ export interface ReviewVerdict {
   status: "approved" | "changes_requested";
   sha: string;
   createdAt: Date;
+  /** Hachage du contenu de la cible au moment du verdict (`review_versions`) ; absent pour une review d'avant TK-100. */
+  contentHash?: string | null;
+  /** Hachage courant du contenu de la cible, posé par le lecteur ; absent quand l'index n'a pas encore d'entités. */
+  currentHash?: string | null;
 }
 
 export interface ValidationState {
@@ -30,10 +34,20 @@ function compare(a: ReviewVerdict, b: ReviewVerdict): number {
   return a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-/** Statut de validation au regard de la tête courante (comparaison exacte du SHA). */
+/**
+ * Le verdict porte-t-il encore sur le contenu courant ? Comparaison du hachage de la cible quand la review en a un et que
+ * l'index aussi (TK-100, B11 : un autre élément ou la mise en page ne l'invalident pas), sinon du SHA de tête.
+ */
+export function isCurrent(verdict: ReviewVerdict, headSha: string): boolean {
+  const { contentHash, currentHash } = verdict;
+  if (contentHash != null && currentHash != null) return contentHash === currentHash;
+  return verdict.sha === headSha;
+}
+
+/** Statut de validation au regard du contenu courant de la cible (hachage, à défaut SHA de tête). */
 export function validationOf(latest: ReviewVerdict | undefined, headSha: string): ValidationState {
   if (latest === undefined) return { validation: "to_validate", previouslyValidated: false };
-  if (latest.sha === headSha) {
+  if (isCurrent(latest, headSha)) {
     return {
       validation: latest.status === "approved" ? "validated" : "to_revise",
       previouslyValidated: false,

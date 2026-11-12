@@ -7,6 +7,7 @@ import {
   launch,
   launchState,
   proposalsOf,
+  seedIdeaV2,
   seedOtherProject,
   seedProject,
 } from "./support/agent-propose-bench.ts";
@@ -181,6 +182,56 @@ describe("validation (cas 4)", () => {
     expect(done).toMatchObject({ proposed_count: 1, discarded_count: 2 });
     const [row] = await proposalsOf(bench, id);
     expect(row).toMatchObject({ kind: "criteria", title: "F-002 · Export" });
+  });
+});
+
+describe("mode update (B328)", () => {
+  it("le modèle ne reçoit que le diff idea-v1 vers idea-v2 : pages modifiées et ajoutées, jamais les pages inchangées", async () => {
+    await seedIdeaV2(bench, scene);
+    const id = await launch(bench, scene, { mode: "update", baseVersion: 2 });
+    await finished(bench, id);
+    const sent = ai.sent();
+    for (const present of ["VISION-V2", "ANNEXE-V2", "idea-v1", "idea-v2", "F-001", "Connexion"]) {
+      expect(sent, present).toContain(present);
+    }
+    for (const absent of [
+      "FROZEN-VISION",
+      "FROZEN-PERSONAS",
+      "RISK-OK",
+      "SYNTH-OK",
+      "SECRET-PAGE-MODIFIEE",
+    ]) {
+      expect(sent, absent).not.toContain(absent);
+    }
+  });
+
+  it("la consigne du mode update demande de ne proposer que ce qui découle des changements", async () => {
+    await seedIdeaV2(bench, scene);
+    await finished(bench, await launch(bench, scene, { mode: "update", baseVersion: 2 }));
+    const [first] = ai.requests;
+    expect(first?.prompt.system).toMatch(/changes between the two versions/i);
+  });
+
+  it("pages retirées : seul leur identifiant est transmis, jamais un contenu", async () => {
+    await seedIdeaV2(bench, scene);
+    await bench.query(
+      `UPDATE idea_versions SET pages_versions = pages_versions - 'personas' WHERE project_id = $1 AND number = 2`,
+      [scene.projectId],
+    );
+    await finished(bench, await launch(bench, scene, { mode: "update", baseVersion: 2 }));
+    expect(ai.sent()).toContain("personas");
+    expect(ai.sent()).not.toContain("FROZEN-PERSONAS");
+  });
+
+  it("le mode complete reste inchangé : tout le dossier figé est lu", async () => {
+    await finished(bench, await launch(bench, scene));
+    expect(ai.sent()).toContain("FROZEN-PERSONAS");
+  });
+
+  it("update sans version précédente : échec propre, rien n'est envoyé au modèle", async () => {
+    const done = await finished(bench, await launch(bench, scene, { mode: "update" }));
+    expect(done.status).toBe("failed");
+    expect(ai.requests).toEqual([]);
   });
 });
 

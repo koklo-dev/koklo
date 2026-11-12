@@ -1,4 +1,6 @@
-import { latestReview, type ReviewVerdict } from "../client-space/validation.ts";
+import type { ReviewVerdict } from "../client-space/validation.ts";
+import { featureHashesOf } from "../review/entity-hashes.ts";
+import { groupByTarget, VERDICT_SELECT, verdictOf } from "../review/verdicts.ts";
 import type { Resolved, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import type { Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -135,7 +137,7 @@ async function headOf(tx: Tx, { repo, snapshot }: Resolved) {
   };
 }
 
-async function verdictsOf(
+export async function verdictsOf(
   tx: Tx,
   scope: ProjectScope,
   snapshotId: string,
@@ -150,13 +152,16 @@ async function verdictsOf(
       targetKind: "feature",
       targetRef: { in: features.map((feature) => feature.specId) },
     },
-    select: { id: true, status: true, sha: true, createdAt: true, targetRef: true },
+    select: VERDICT_SELECT,
   });
-  const byFeature = new Map<string, typeof reviews>();
-  for (const review of reviews) {
-    byFeature.set(review.targetRef, [...(byFeature.get(review.targetRef) ?? []), review]);
-  }
-  return features.map((feature) => latestReview(byFeature.get(feature.specId) ?? []));
+  const byFeature = groupByTarget(reviews);
+  const hashes = (await featureHashesOf(tx, [snapshotId])).get(snapshotId);
+  return features.map((feature) =>
+    verdictOf(
+      byFeature.get(`feature:${feature.specId}`) ?? [],
+      hashes?.get(feature.specId) ?? null,
+    ),
+  );
 }
 
 async function readSuggestions(

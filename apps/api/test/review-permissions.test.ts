@@ -4,9 +4,10 @@ import { installBench } from "./helpers/repo-scene.ts";
 import { createReviewScene, type ReviewScene, reviewApi, reviewRows } from "./helpers/reviews.ts";
 
 /**
- * TK-55d : matrice des rôles (CDC §14, analyse §3.3, N7). Valider = le CLIENT lié seul : owner, admin,
- * dev, designer et business reçoivent 403, y compris le propriétaire. Lire le journal : l'équipe et le
- * business, jamais le client. Le garde de rôle précède le cloisonnement.
+ * TK-55d : matrice des rôles (CDC §14, analyse §3.3, N7). Tant qu'un client est lié au projet (D1), valider une
+ * fonctionnalité ou une baseline = le CLIENT lié seul : owner, admin, dev, designer et business reçoivent 403, y compris
+ * le propriétaire (la matrice par cible, avec et sans client, est dans `review-targets-roles.test.ts`). Lire le journal :
+ * l'équipe et le business, et (TK-100) le client pour ses cibles. Le garde de rôle précède le cloisonnement.
  */
 const bench = installBench({ beforeAll, afterAll, beforeEach });
 let scene: ReviewScene;
@@ -56,12 +57,12 @@ describe("review.list", () => {
     expect(res.body.items).toEqual([]);
   });
 
-  it("le client, lié ou non : 403 (le détail technique est réservé à l'équipe)", async () => {
-    for (const actor of [scene.c1, scene.c3]) {
-      const res = await reviewApi(bench().app, actor).list(p1());
-      expect(res.status).toBe(403);
-      expect(res.body.code).toBe("FORBIDDEN");
-    }
+  it("le client lié lit le journal de ses cibles (TK-100, B325 e) : 200 ; non lié : 404, le cloisonnement refuse", async () => {
+    const linked = await reviewApi(bench().app, scene.c1).list(p1());
+    expect(linked.status, JSON.stringify(linked.body)).toBe(200);
+    const other = await reviewApi(bench().app, scene.c3).list(p1());
+    expect(other.status).toBe(404);
+    expect(other.body.code).toBe("NOT_FOUND");
   });
 
   it("sans session : 401", async () => {

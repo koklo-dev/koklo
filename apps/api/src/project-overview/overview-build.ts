@@ -1,5 +1,6 @@
 import type { ProjectOverview } from "@koklo/contract";
 import { IDEA_WRITE_ROLES, MANAGER_ROLES, REVIEW_SUBMIT_ROLES } from "../auth/roles.ts";
+import { hasClientOf } from "../project/client-presence.ts";
 import { phaseOf } from "../project/project-shell.ts";
 import { activityItemOf } from "./overview-activity.ts";
 import {
@@ -51,7 +52,7 @@ export function deriveOf(record: NextFactsRecord) {
   return {
     phase,
     functional,
-    hasClient: clients.length > 0,
+    hasClient: hasClientOf(clients),
     stablePages: pages.filter((page) => page.status === "stable").length,
     fresh: phase === "idea" && allEmpty && record.pendingProposals === 0,
     allEmpty,

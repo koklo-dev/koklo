@@ -6,6 +6,12 @@ import {
   validationError,
 } from "./errors.ts";
 import { readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
+import {
+  specDeliverableSchema,
+  specDeliverablesInputSchema,
+  specDeliverablesSchema,
+  specForceDeliverableInputSchema,
+} from "./schemas-deliverables.ts";
 import { listOf } from "./schemas-lists.ts";
 import {
   featureDetailSchema,
@@ -35,6 +41,16 @@ const spec = {
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })
     .input(featureGetInputSchema)
     .output(featureDetailSchema),
+  /** Les sept livrables, leur disponibilité et leur statut : tout rôle ayant accès au projet (TK-100, 2.10.0). */
+  deliverables: route("GET", "/projects/{projectId}/spec/deliverables")
+    .errors(readOneErrors)
+    .input(specDeliverablesInputSchema)
+    .output(specDeliverablesSchema),
+  /** Ouvre un livrable sans rien valider : owner et admin seulement (403 sinon), idempotent, audité. */
+  forceDeliverable: route("POST", "/projects/{projectId}/spec/deliverables/{key}/force")
+    .errors({ ...writeOneErrors, ...validationError })
+    .input(specForceDeliverableInputSchema)
+    .output(specDeliverableSchema),
 };
 
 const specBatch = {

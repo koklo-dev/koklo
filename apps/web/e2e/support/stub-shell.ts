@@ -2,8 +2,8 @@ import type { IncomingMessage } from "node:http";
 import { ideaPhase } from "./stub-idea-agent.ts";
 
 /**
- * Faux API de la coquille (TK-88, contrat 2.1.0) : `project.shell`, `project.visit`, `project.recent` et
- * `search.query`, sans Postgres. Pilotage : `shell` (agrégat du projet), `recent` (projets déjà visités au départ).
+ * Faux API de la coquille (TK-88, contrat 2.1.0) : `project.shell`, `project.visit`, `project.recent`,
+ * `spec.deliverables` (TK-100, 2.10.0 : barre et compteur SPEC, même scénario que `shell`) et `search.query`, sans Postgres. Pilotage : `shell` (agrégat du projet), `recent` (projets déjà visités au départ).
  * Les visites reçues s'ajoutent en tête des récents ; `GET /__visits` les rend, dans l'ordre.
  */
 export type ShellMode = "data" | "noSprint" | "internal" | "loading";
@@ -47,7 +47,7 @@ type Handlers = {
   hold: (release: () => void) => void;
 };
 
-const SHELL = /^\/projects\/([^/]+)\/(shell|visit)$/;
+const SHELL = /^\/projects\/([^/]+)\/(shell|visit|spec\/deliverables)$/;
 
 /** Résultats de `search.query` : projets par nom, puis (avec un projet) fonctionnalités et tickets connus du faux API. */
 const FEATURES = [
@@ -130,6 +130,27 @@ function shellResponse(projectId: string, h: Handlers): Reply {
   });
 }
 
+function deliverablesResponse(projectId: string, h: Handlers): Reply {
+  const mode = h.scenario.shell ?? "data";
+  if (!h.projects().some((candidate) => candidate.id === projectId)) {
+    return reply(404, { defined: true, code: "NOT_FOUND", message: "Not found" });
+  }
+  if (mode === "internal") {
+    return reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
+  }
+  return reply(200, {
+    deliverables: DELIVERABLES.map(([key, available, after]) => ({
+      key,
+      status: "todo",
+      available,
+      forced: false,
+      condition: after === null ? null : `Disponible après ${after}`,
+      pendingProposals: 0,
+    })),
+    validatedCount: 0,
+  });
+}
+
 function recentResponse(h: Handlers): Reply {
   const known = new Map(h.projects().map((project) => [project.id, project.name]));
   const ids = [...new Set([...visits, ...seeded])].filter((id) => known.has(id)).slice(0, 8);
@@ -170,15 +191,21 @@ function handleReads(req: IncomingMessage, url: URL, h: Handlers): boolean {
   return answer !== undefined;
 }
 
+/** Lectures d'un projet (`shell`, `spec/deliverables`) : réponse immédiate, ou retenue dans le scénario « loading ». */
+function handleProjectRead(action: string, projectId: string, h: Handlers): boolean {
+  const respond = action === "shell" ? shellResponse : deliverablesResponse;
+  if (h.scenario.shell === "loading") h.hold(() => h.send(respond(projectId, h)));
+  else h.send(respond(projectId, h));
+  return true;
+}
+
 export function handleShell(req: IncomingMessage, url: URL, h: Handlers): boolean {
   if (handleReads(req, url, h)) return true;
   const match = SHELL.exec(url.pathname);
   if (!match) return false;
-  const [, projectId = "", action] = match;
-  if (action === "shell" && req.method === "GET") {
-    if (h.scenario.shell === "loading") h.hold(() => h.send(shellResponse(projectId, h)));
-    else h.send(shellResponse(projectId, h));
-    return true;
+  const [, projectId = "", action = ""] = match;
+  if (req.method === "GET" && (action === "shell" || action === "spec/deliverables")) {
+    return handleProjectRead(action, projectId, h);
   }
   if (action === "visit" && req.method === "POST") {
     const known = h.projects().some((project) => project.id === projectId);

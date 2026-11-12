@@ -163,6 +163,7 @@ const WRITE_GROUPS = [
   "aiProvider",
   "aiUsage",
   "aiSettings",
+  "spec",
 ];
 /**
  * Groupes dont les écritures sont journalisées et prouvées par une suite dédiée (`idea-audit.test.ts`, TK-89) : leurs
@@ -170,7 +171,7 @@ const WRITE_GROUPS = [
  */
 const DEDICATED_AUDIT_GROUPS = ["idea"];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
-const READ_ONLY_GROUPS = ["audit", "spec", "clientSpace", "search", "aiModel"];
+const READ_ONLY_GROUPS = ["audit", "clientSpace", "search", "aiModel"];
 /**
  * Groupes du contrat sans implémentation API : plus aucun depuis TK-48a2 (`installation` a rejoint
  * WRITE_GROUPS : `installation.start` est une écriture, `installation.list` une lecture du même groupe,
@@ -254,6 +255,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "repo.createSpec",
   "repo.link",
   "review.submit",
+  "spec.forceDeliverable",
   "specBatch.submit",
   "sprint.activate",
   "sprint.close",
@@ -1050,8 +1052,43 @@ const SCENARIOS: Scenario[] = [
   ...reviewScenarios(),
   ...aiScenarios(),
   ...proposalScenarios(),
+  ...deliverableScenarios(),
   ...aiProviderScenarios(),
 ];
+
+/** TK-100 : forcer l'ouverture d'un livrable, journalisé sur la ligne de forçage. */
+function deliverableScenarios(): Scenario[] {
+  const call = async (ctx: Ctx, role: Role) =>
+    send(
+      (await repoRuntimeOf()).app,
+      ctx.world.actors[role].cookie,
+      "post",
+      `/projects/${ctx.world.projectId}/spec/deliverables/data/force`,
+      { projectId: ctx.world.projectId, key: "data", confirm: true },
+    );
+  return [
+    {
+      procedure: "spec.forceDeliverable",
+      role: "owner",
+      prepare: async () => ({}),
+      call: (ctx) => call(ctx, "owner"),
+      expected: async (ctx) => {
+        const [row] = await database.query<{ id: string }>(
+          "SELECT id FROM deliverable_overrides WHERE project_id = $1 AND deliverable = 'data'",
+          [ctx.world.projectId],
+        );
+        return {
+          action: "deliverable.force",
+          targetKind: "deliverable_override",
+          targetId: row?.id ?? "",
+          ticketId: null,
+        };
+      },
+      denied: (ctx) => call(ctx, "dev"),
+      deniedStatuses: [403],
+    },
+  ];
+}
 
 /**
  * TK-99a : lancement, révision et décisions sur les propositions de l'agent. Le lancement écrit sa ligne d'audit
@@ -1631,7 +1668,7 @@ describe("écritures hors journal (TK-88)", () => {
 });
 
 describe("garde de complétude : le contrat dicte les scénarios", () => {
-  it("les procédures non-GET des groupes sont exactement les 51 attendues", () => {
+  it("les procédures non-GET des groupes sont exactement celles attendues", () => {
     expect(nonGetProcedures(WRITE_GROUPS).sort()).toEqual(EXPECTED_WRITE_PROCEDURES);
   });
 

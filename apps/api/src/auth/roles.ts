@@ -136,13 +136,23 @@ export const SUGGESTION_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
 export const SUGGESTION_DECIDE_ROLES = ["owner", "admin", "dev"] as const;
 
 /**
- * Valider une feature ou une baseline (`review.submit`, CDC §14, TK-55d) : le CLIENT seul, jamais le
- * propriétaire ni l'équipe (une validation est une preuve d'avenant).
+ * Valider une cible (`review.submit`, CDC §14, TK-55d, TK-100 B325 d) : le client, et l'équipe qui valide à sa place ou
+ * un livrable technique (owner, admin, développeur). Le garde ne fait que fermer le designer, le business et tout rôle
+ * inconnu (403) ; la politique fine par cible (D1, rôles par livrable) est `review-policy.ts`. Jamais un jeton d'agent.
  */
-export const REVIEW_SUBMIT_ROLES = [CLIENT_ROLE] as const;
+export const REVIEW_SUBMIT_ROLES = [CLIENT_ROLE, "owner", "admin", "dev"] as const;
 
-/** Relire le journal des validations avec le SHA (`review.list`) : équipe et business, pas le client. */
-export const REVIEW_READ_ROLES = STAFF_ROLES;
+/**
+ * Forcer l'ouverture d'un livrable de la spec (`spec.forceDeliverable`, TK-100, B325 f) : owner et admin seulement. Le
+ * forçage ouvre sans rien valider ; jamais un client, un développeur, un designer, un business ni un jeton d'agent.
+ */
+export const DELIVERABLE_FORCE_ROLES = ["owner", "admin"] as const;
+
+/**
+ * Relire le journal des validations (`review.list`) : l'équipe avec le SHA, le client pour les seules cibles qu'il valide
+ * (B325 e, filtre serveur dans `review-policy.ts`).
+ */
+export const REVIEW_READ_ROLES = [...STAFF_ROLES, CLIENT_ROLE] as const;
 
 /** Notifiés d'une validation (`review.submitted`, `baseline.validated`) : l'équipe qui agit, pas le business. */
 export const REVIEW_NOTIFIED_ROLES = ["owner", "admin", "dev", "designer"] as const;

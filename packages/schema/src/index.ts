@@ -17,7 +17,7 @@ export * from "./entities/index.ts";
 export { jsonSchemas, type SchemaName } from "./json-schemas.ts";
 export { parseFeatureMarkdown } from "./parse/feature-markdown.ts";
 export { parseSpecFiles } from "./parse/files.ts";
-export { type Kind, kindOf } from "./parse/kinds.ts";
+export { isFlowPath, type Kind, kindOf } from "./parse/kinds.ts";
 export { parseRuleMarkdown } from "./parse/rule-markdown.ts";
 export * from "./proposals/index.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";

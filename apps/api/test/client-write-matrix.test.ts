@@ -91,7 +91,8 @@ const DENIED = [
   "projectState.update",
   "repo.createSpec",
   "repo.link",
-  "review.list",
+  // TK-100 (contrat 2.10.0) : forcer l'ouverture d'un livrable relève d'owner et d'admin.
+  "spec.forceDeliverable",
   "specBatch.submit",
   "sprint.activate",
   "sprint.close",
@@ -127,6 +128,7 @@ function routes(): Route[] {
       : Object.entries(node).flatMap(([child, value]) => visit(`${group}.${child}`, value)),
   );
 }
+const classifiedNames = () => [...ALLOWED, ...OWN_ONLY, ...DENIED];
 const writes = () => routes().filter((r) => r.method !== "GET");
 
 describe("classement exhaustif des écritures du contrat", () => {
@@ -136,11 +138,12 @@ describe("classement exhaustif des écritures du contrat", () => {
       writes()
         .map((r) => r.name)
         .sort(),
-    ).toEqual(classified.filter((n) => n !== "review.list"));
+    ).toEqual(classified);
   });
 
-  it("review.list est une lecture (GET) classée interdite au client au titre du détail technique", () => {
+  it("review.list est une lecture (GET), ouverte au client pour ses seules cibles et sans SHA (TK-100, B325 e) : hors de ce classement d'écritures", () => {
     expect(routes().find((r) => r.name === "review.list")?.method).toBe("GET");
+    expect(classifiedNames()).not.toContain("review.list");
   });
 
   it("les écritures autorisées au client sont exactement suggérer, retirer, valider, commenter, rédiger le dossier d'idée et dialoguer avec son agent, mémoriser son dernier projet et régler son compte", () => {
@@ -433,4 +436,35 @@ describe("TK-99a : les propositions de l'agent relèvent de l'équipe (SPEC_BATC
       }
     },
   );
+});
+
+describe("TK-100 : forcer un livrable est interdit au client, lire les livrables ne l'est pas", () => {
+  it("spec.forceDeliverable est une écriture classée interdite ; spec.deliverables est un GET", () => {
+    expect(writes().map((r) => r.name)).toContain("spec.forceDeliverable");
+    expect(DENIED).toContain("spec.forceDeliverable");
+    expect(ALLOWED).not.toContain("spec.forceDeliverable");
+    expect(routes().find((r) => r.name === "spec.deliverables")?.method).toBe("GET");
+  });
+
+  it("le client lié lit spec.deliverables (200) mais reçoit 403 sur le forçage, aucune ligne écrite", async () => {
+    const { projectId } = scene.p1;
+    const read = await send(
+      bench().app,
+      scene.c1.cookie,
+      "get",
+      `/projects/${projectId}/spec/deliverables`,
+    );
+    expect(read.status, JSON.stringify(read.body)).toBe(200);
+    const res = await send(
+      bench().app,
+      scene.c1.cookie,
+      "post",
+      `/projects/${projectId}/spec/deliverables/data/force`,
+      { projectId, key: "data", confirm: true },
+    );
+    expect(res.status, res.text).toBe(403);
+    expect(res.body.code).toBe("FORBIDDEN");
+    const rows = await bench().database.query("SELECT 1 FROM deliverable_overrides");
+    expect(rows).toEqual([]);
+  });
 });

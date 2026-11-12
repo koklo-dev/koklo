@@ -35,6 +35,9 @@ export function kindOf(path: string): Kind | undefined {
   return undefined;
 }
 
+/** Parcours `design/flows/P-*.json` : entité JSON brute indexée par le worker (B325 g), sans schéma, ignorée de `kindOf`. */
+export const isFlowPath = (path: string): boolean => /^design\/flows\/P-[^/]*\.json$/.test(path);
+
 export const SCHEMAS = {
   project: ProjectManifestSchema,
   table: TableSchema,

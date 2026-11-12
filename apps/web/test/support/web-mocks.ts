@@ -1,3 +1,4 @@
+import { DELIVERABLE_KEYS } from "@koklo/contract";
 import { useSyncExternalStore } from "react";
 import { type Mock, vi } from "vitest";
 
@@ -64,6 +65,8 @@ export const procedures = {
   specHead: vi.fn(),
   specListFeatures: vi.fn(),
   specGetFeature: vi.fn(),
+  // TK-100 (contrat 2.10.0) : les sept livrables de la spec (barre et compteur SPEC N/7)
+  specDeliverables: vi.fn(),
   repoList: vi.fn(),
   // TK-48e : écriture de la spec par lots (contrat 0.7.0)
   specBatchSubmit: vi.fn(),
@@ -218,6 +221,7 @@ export const orpc = {
     head: queryFull(["spec", "head"], procedures.specHead),
     listFeatures: queryFull(["spec", "listFeatures"], procedures.specListFeatures),
     getFeature: queryFull(["spec", "getFeature"], procedures.specGetFeature),
+    deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
   },
   specBatch: {
     key: () => ["specBatch"],
@@ -310,15 +314,6 @@ export const apiError = (code: string, data?: unknown) =>
 
 export const PROJECT_ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
 
-const DELIVERABLE_KEYS = [
-  "functional",
-  "data",
-  "architecture",
-  "technical",
-  "security",
-  "design",
-  "quality",
-] as const;
 const AVAILABLE = new Set<string>(["functional", "data", "design"]);
 
 /** Une carte de `project.cards` (contrat 2.8.0) : projet d'idée sans client, sans création. */
@@ -375,6 +370,25 @@ export const projectShell = (over: Record<string, unknown> = {}) => ({
   ticketCount: 12,
   ...over,
 });
+
+/** Sortie de `spec.deliverables` (contrat 2.10.0) : Fonctionnel, Données et Design ouverts, les autres verrouillés (B1). */
+export const specDeliverables = (
+  over: { validated?: readonly string[]; open?: ReadonlySet<string> } = {},
+) => {
+  const open = over.open ?? AVAILABLE;
+  const deliverables = DELIVERABLE_KEYS.map((key) => ({
+    key,
+    status: over.validated?.includes(key) ? "validated" : "todo",
+    available: open.has(key),
+    forced: false,
+    condition: open.has(key) ? null : "Disponible après l'architecture",
+    pendingProposals: 0,
+  }));
+  return {
+    deliverables,
+    validatedCount: deliverables.filter((entry) => entry.status === "validated").length,
+  };
+};
 
 /** Sortie de `org.get` (contrat 2.2.0). */
 export const orgSummary = (over: Record<string, unknown> = {}) => ({
@@ -455,6 +469,7 @@ export function resetWebMocks(): void {
   procedures.memberPage.mockResolvedValue({ items: [], total: 0, totalIsEstimate: false });
   procedures.invitationList.mockResolvedValue([]);
   procedures.projectShell.mockResolvedValue(projectShell());
+  procedures.specDeliverables.mockResolvedValue(specDeliverables());
   procedures.projectVisit.mockResolvedValue({ visitedAt: "2026-11-07T10:00:00.000Z" });
   procedures.projectRecent.mockResolvedValue([]);
   procedures.searchQuery.mockResolvedValue({ items: [], total: 0, nextCursor: null });

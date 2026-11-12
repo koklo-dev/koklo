@@ -1,5 +1,5 @@
 import type { GitAuth, GitProvider, RepoRef } from "@koklo/domain";
-import { kindOf, type SpecFile } from "@koklo/schema";
+import { isFlowPath, kindOf, type SpecFile } from "@koklo/schema";
 import { READ_CONCURRENCY } from "../spec-write/constants.ts";
 import { relativeToSpec, withSpecPath } from "../spec-write/paths.ts";
 
@@ -16,16 +16,21 @@ export type ReadSpecInput = {
   readonly listing: SpecListing;
   /** Dossier de la spec dans un monorepo, `null` quand la spec est à la racine. */
   readonly specPath: string | null;
+  /** Lire aussi les parcours `design/flows/P-*.json` (indexeur d'entités, TK-100) ; faux pour l'écriture de lots. */
+  readonly flows?: boolean;
 };
 
 /** Chemins (relatifs à la racine de la spec) des fichiers que le schéma reconnaît. */
 export function recognizedSpecPaths(
   specPath: string | null,
   files: readonly { path: string }[],
+  options: { flows?: boolean } = {},
 ): string[] {
   return files.flatMap((file) => {
     const path = relativeToSpec(specPath, file.path);
-    return path !== undefined && kindOf(path) !== undefined ? [path] : [];
+    if (path === undefined) return [];
+    const known = kindOf(path) !== undefined || (options.flows === true && isFlowPath(path));
+    return known ? [path] : [];
   });
 }
 
@@ -40,8 +45,9 @@ export async function readSpecFiles({
   repo,
   listing,
   specPath,
+  flows,
 }: ReadSpecInput): Promise<SpecFile[]> {
-  const paths = recognizedSpecPaths(specPath, listing.files);
+  const paths = recognizedSpecPaths(specPath, listing.files, { flows });
   const files: SpecFile[] = [];
   for (let start = 0; start < paths.length; start += READ_CONCURRENCY) {
     const chunk = paths.slice(start, start + READ_CONCURRENCY);

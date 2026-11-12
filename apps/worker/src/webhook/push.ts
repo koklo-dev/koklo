@@ -6,7 +6,7 @@ import {
   type RepoRef,
 } from "@koklo/domain";
 import type { Logger } from "@koklo/observability";
-import { parseSpecFiles, type SpecFile } from "@koklo/schema";
+import { isFlowPath, parseSpecFiles, type SpecFile } from "@koklo/schema";
 import { readSpecFiles, recognizedSpecPaths } from "../spec-read/read-spec.ts";
 import { MAX_SPEC_FILES } from "./index-rows.ts";
 import type { IndexWriter, SnapshotWrite } from "./index-writer.ts";
@@ -69,7 +69,7 @@ function parsedSnapshot(deps: PushDeps, files: readonly SpecFile[]): SnapshotWri
     { files: files.length, issues: issues.length },
     "webhook-delivery: spec analysée",
   );
-  return { status: "ready", spec };
+  return { status: "ready", spec, flows: files.filter((file) => isFlowPath(file.path)) };
 }
 
 /**
@@ -99,11 +99,11 @@ export async function indexBranch(
     return processed();
   }
   const known = await deps.targets.snapshotOf(repo.id, listing.ref);
-  if (known?.status === "ready") {
+  if (known?.status === "ready" && known.entitiesIndexed) {
     await deps.targets.moveHead(target, branch, known.id);
     return processed();
   }
-  if (recognizedSpecPaths(repo.specPath, listing.files).length > MAX_SPEC_FILES) {
+  if (recognizedSpecPaths(repo.specPath, listing.files, { flows: true }).length > MAX_SPEC_FILES) {
     await deps.writer.write(target, branch, listing.ref, {
       status: "failed",
       errorCode: "spec_too_large",
@@ -116,6 +116,7 @@ export async function indexBranch(
     repo: ref,
     listing,
     specPath: repo.specPath,
+    flows: true,
   });
   const result = await deps.writer.write(target, branch, listing.ref, parsedSnapshot(deps, files));
   if (result.counterSkipped > 0) {

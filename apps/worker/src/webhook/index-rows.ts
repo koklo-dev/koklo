@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ParsedSpec } from "@koklo/schema";
+import type { ParsedSpec, SpecFile } from "@koklo/schema";
+import { type EntityRow, entityRowsOf } from "./entity-rows.ts";
 
 /** Plafond des fichiers reconnus d'un commit : au-delà, le snapshot est `failed` / `spec_too_large`. */
 export const MAX_SPEC_FILES = 2000;
@@ -33,6 +34,8 @@ export interface IndexRows {
     path: string;
     filePath: string;
   }[];
+  /** Index d'entités générique (TK-100) : un élément du modèle par ligne, avec son hachage de contenu. */
+  readonly entities: readonly EntityRow[];
 }
 
 const links = (featureId: string, targets: readonly string[]) =>
@@ -43,7 +46,7 @@ const links = (featureId: string, targets: readonly string[]) =>
  * doublons internes à un fichier (critère ou lien répété) sont écartés : l'index ne doit jamais
  * échouer sur un contenu git, qui n'est pas fiable.
  */
-export function rowsOf(spec: ParsedSpec): IndexRows {
+export function rowsOf(spec: ParsedSpec, flows: readonly SpecFile[] = []): IndexRows {
   const features: IndexRows["features"][number][] = [];
   const criteria: IndexRows["criteria"][number][] = [];
   const tableLinks: IndexRows["tableLinks"][number][] = [];
@@ -85,6 +88,7 @@ export function rowsOf(spec: ParsedSpec): IndexRows {
       path: value.chemin,
       filePath: path,
     })),
+    entities: entityRowsOf(spec, flows),
   };
 }
 

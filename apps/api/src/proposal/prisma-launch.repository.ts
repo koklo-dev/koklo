@@ -42,11 +42,6 @@ export const launchOf = (row: Row): LaunchRecord => ({
   finishedAt: row.finishedAt,
 });
 
-/** Nombre de pages dont la version diffère entre deux empreintes de pages (clé = identifiant stable de page). */
-function changedPages(from: Record<string, number>, to: Record<string, number>): number {
-  return Object.entries(to).filter(([slug, version]) => from[slug] !== version).length;
-}
-
 @Injectable()
 export class PrismaLaunchRepository implements LaunchRepository {
   constructor(
@@ -116,10 +111,9 @@ export class PrismaLaunchRepository implements LaunchRepository {
     });
   }
 
-  optionFacts(scope: ProjectScope, deliverable: string): Promise<OptionFacts> {
+  optionFacts(scope: ProjectScope): Promise<OptionFacts> {
     return this.transactions.run(scope, async (tx) => ({
       withoutCriteria: await this.countWithoutCriteria(tx, scope),
-      changedPages: await this.countChangedPages(tx, scope, deliverable),
     }));
   }
 
@@ -180,33 +174,5 @@ export class PrismaLaunchRepository implements LaunchRepository {
     return tx.specFeature.count({
       where: { snapshotId: found.snapshot.id, criteria: { none: {} } },
     });
-  }
-
-  private async countChangedPages(
-    tx: Tx,
-    scope: ProjectScope,
-    deliverable: string,
-  ): Promise<number> {
-    const last = await tx.agentLaunch.findFirst({
-      where: {
-        projectId: scope.projectId,
-        deliverable,
-        status: "done",
-        baseVersion: { not: null },
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      select: { baseVersion: true },
-    });
-    const latest = await this.latestFrozen(tx, scope);
-    if (!last?.baseVersion || !latest) return 0;
-    const read = await tx.ideaVersion.findFirst({
-      where: { projectId: scope.projectId, number: last.baseVersion },
-      select: { pagesVersions: true },
-    });
-    if (!read) return 0;
-    return changedPages(
-      read.pagesVersions as Record<string, number>,
-      latest.pagesVersions as Record<string, number>,
-    );
   }
 }
