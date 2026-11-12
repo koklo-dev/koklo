@@ -200,7 +200,33 @@ function TitleField({ model, readOnly, agentFilled }: FieldsProps) {
   );
 }
 
-/** Titre, priorité et statut. */
+/** Zone fonctionnelle : texte libre facultatif, 80 caractères au plus ; vide = non renseignée (B366). */
+function ZoneField({ model, readOnly }: FieldsProps) {
+  const hintId = `${fieldId("zone")}-hint`;
+  return (
+    <FieldShell
+      field="zone"
+      label="Zone"
+      optional
+      model={model}
+      hintId={hintId}
+      hint={<Hint id={hintId}>Le domaine du produit où se range la fonctionnalité.</Hint>}
+    >
+      {({ labelId: _label, ...control }) => (
+        <Input
+          {...control}
+          className="max-md:h-11"
+          value={model.state.values.zone}
+          readOnly={readOnly}
+          onChange={(event) => model.setValues({ zone: event.target.value })}
+          onBlur={() => model.blur("zone")}
+        />
+      )}
+    </FieldShell>
+  );
+}
+
+/** Titre, priorité, statut et zone. */
 export function GeneralFields({ model, readOnly, agentFilled }: FieldsProps) {
   const { values } = model.state;
   return (
@@ -237,6 +263,7 @@ export function GeneralFields({ model, readOnly, agentFilled }: FieldsProps) {
           />
         )}
       </FieldShell>
+      <ZoneField model={model} readOnly={readOnly} />
     </>
   );
 }

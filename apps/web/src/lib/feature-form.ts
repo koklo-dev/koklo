@@ -1,5 +1,9 @@
 import type { FeatureDetail } from "@koklo/contract";
-import { featurePrioritySchema, featureStatusSchema } from "@koklo/contract";
+import {
+  FEATURE_ZONE_MAX_LENGTH,
+  featurePrioritySchema,
+  featureStatusSchema,
+} from "@koklo/contract";
 import type { FeaturePriority, FeatureStatus, StepType } from "./feature-labels.ts";
 
 /** Valeurs, validation et comparaison du formulaire d'une fonctionnalité (design/screens/S-feature-form.md §3). */
@@ -20,6 +24,8 @@ export interface FeatureFormValues {
   /** "" tant que la personne n'a rien choisi (aucune présélection). */
   priority: "" | FeaturePriority;
   status: FeatureStatus;
+  /** Zone fonctionnelle (texte libre, 80 caractères au plus) ; vide = non renseignée (TK-105, B366). */
+  zone: string;
   description: string;
   criteria: CriterionValue[];
   /** Listes de liens : un identifiant par ligne (lignes vides ignorées). */
@@ -44,15 +50,19 @@ export const FIELD_ORDER: readonly FieldKey[] = [
   "title",
   "priority",
   "status",
+  "zone",
   "description",
   "criteria",
   ...LINK_FIELDS,
 ];
 export const TITLE_MAX = 200;
+/** Longueur maximale de la zone (= `FEATURE_ZONE_MAX_LENGTH` du contrat). */
+export const ZONE_MAX = FEATURE_ZONE_MAX_LENGTH;
 export const EMPTY_VALUES: FeatureFormValues = {
   title: "",
   priority: "",
   status: "brouillon",
+  zone: "",
   description: "",
   criteria: [],
   screens: "",
@@ -106,6 +116,7 @@ export function normalizeCriteria(criteria: CriterionValue[]) {
 /** Valeur normalisée d'un champ, comparable par signature. */
 function normalizedField(values: FeatureFormValues, field: FieldKey): unknown {
   if (field === "title") return values.title.trim();
+  if (field === "zone") return values.zone.trim();
   if (field === "description") return normalizeText(values.description);
   if (field === "criteria") return normalizeCriteria(values.criteria);
   if (isLinkField(field)) return parseLinks(values[field]);
@@ -122,6 +133,7 @@ export function valuesFromDetail(detail: FeatureDetail): FeatureFormValues {
     title: detail.title,
     priority: detail.priority,
     status: detail.status,
+    zone: detail.zone ?? "",
     description: detail.description,
     criteria: detail.criteria.map((criterion) => ({
       id: criterion.specId,
@@ -204,12 +216,19 @@ export function validateFeatureForm(values: FeatureFormValues): FormIssue[] {
   if (!featureStatusSchema.safeParse(values.status).success) {
     issues.push({ field: "status", message: "Choisissez un statut." });
   }
+  if (values.zone.trim().length > ZONE_MAX) {
+    issues.push({ field: "zone", message: `La zone ne doit pas dépasser ${ZONE_MAX} caractères.` });
+  }
   return [...issues, ...validateCriteria(values.criteria), ...validateLinks(values)];
 }
 
 /** Champs dont la valeur normalisée diffère (titre sans espaces autour, CRLF=LF, liens sans lignes vides). */
 export function diffValues(baseline: FeatureFormValues, values: FeatureFormValues): FieldKey[] {
-  return FIELD_ORDER.filter((field) => !sameField(baseline, values, field));
+  // Une zone vidée n'est pas envoyée : le contrat n'accepte pas de zone vide (B366).
+  return FIELD_ORDER.filter(
+    (field) =>
+      !sameField(baseline, values, field) && !(field === "zone" && values.zone.trim() === ""),
+  );
 }
 
 const DESIGNER_MESSAGE = "Liez au moins un écran pour enregistrer cette fonctionnalité.";

@@ -12,9 +12,14 @@ import {
   SearchField,
 } from "@koklo/ui";
 import { useMemo, useState } from "react";
-import { footerState, useClientCards, useClientRoles } from "../lib/use-client-space.ts";
+import {
+  footerState,
+  useClientCards,
+  useClientRoles,
+  useDebouncedValue,
+} from "../lib/use-client-space.ts";
 import { DecisionBlock, type ReviewActions } from "./client-decision.tsx";
-import { CardsSkeleton } from "./domain-list-parts.tsx";
+import { CardsSkeleton, DomainNoResults } from "./domain-list-parts.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 
 interface BlockProps {
@@ -36,7 +41,7 @@ const NOTHING = (
 const RULES_HELP =
   "Une règle métier est une vérité du domaine que le produit doit toujours respecter.";
 
-/** Intro, légende des types (filtre local), barre de compte et recherche (maquette 10 l.227-228). */
+/** Intro, légende des types et recherche (filtres serveur), barre de compte et recherche (maquette 10 l.227-228). */
 function RulesToolbar({
   total,
   loaded,
@@ -69,8 +74,8 @@ function RulesToolbar({
           {...(needle ? { query: needle } : {})}
         />
         <SearchField
-          label="Rechercher une règle"
-          placeholder="Rechercher une règle"
+          label="Rechercher une règle ou R-nnn"
+          placeholder="Rechercher une règle ou R-nnn"
           name="q"
           autoComplete="off"
           maxLength={200}
@@ -83,26 +88,91 @@ function RulesToolbar({
   );
 }
 
-/** Filtre local des règles chargées : type et texte (identifiant, titre, énoncé). */
-function useRuleFilter(items: ClientRule[]) {
+/** Filtres de la liste : type et texte, envoyés au serveur (anti-rebond sur le texte) ; jamais un tri des seules règles chargées. */
+function useRuleFilter() {
   const [type, setType] = useState<ClientRule["type"] | undefined>();
   const [query, setQuery] = useState("");
-  const needle = query.trim().toLowerCase();
-  const shown = items.filter(
-    (rule) =>
-      (!type || rule.type === type) &&
-      (!needle || `${rule.id} ${rule.title} ${rule.statement}`.toLowerCase().includes(needle)),
+  const settled = useDebouncedValue(query.trim());
+  return { type, setType, query, setQuery, settled };
+}
+
+/** Cartes des règles, ou l'état « aucun résultat » quand un filtre ne garde rien. */
+function RuleCards({
+  items,
+  search,
+  onClearSearch,
+  onClearType,
+}: {
+  items: ClientRule[];
+  search: string;
+  onClearSearch: () => void;
+  onClearType: () => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <DomainNoResults
+        title={
+          search
+            ? `Aucune règle ne correspond à « ${search} »`
+            : "Aucune règle ne correspond à ce type."
+        }
+        description={
+          search
+            ? "La recherche porte sur toutes les règles, pas seulement celles affichées."
+            : "Choisissez un autre type pour revoir la liste."
+        }
+        clearLabel={search ? "Effacer la recherche" : "Effacer le filtre"}
+        onClear={search ? onClearSearch : onClearType}
+      />
+    );
+  }
+  return (
+    <div className="grid gap-3 lg:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
+      {items.map((rule) => (
+        <RuleCard key={rule.id} {...rule} />
+      ))}
+    </div>
   );
-  return { type, setType, query, setQuery, shown };
+}
+
+/** Pied de liste, absent sous l'état « aucun résultat » (DESIGN.md l.247). */
+function RulesFooter({
+  query,
+  items,
+  total,
+}: {
+  query: Parameters<typeof footerState>[0] & {
+    fetchNextPage: () => Promise<unknown>;
+  };
+  items: number;
+  total: number;
+}) {
+  if (items === 0) return null;
+  return (
+    <ListFooter
+      framed
+      state={footerState(query)}
+      pageSize={24}
+      loadedCount={items}
+      total={total}
+      noun={RULE_NOUN}
+      onLoadMore={() => void query.fetchNextPage()}
+      onRetry={() => void query.fetchNextPage()}
+    />
+  );
 }
 
 /** Règles en bloc (maquette 10 l.320-328) : les cartes, puis la barre de validation du bloc en pied d'onglet. */
 export function ClientRulesTab({ projectId, canValidate, actions }: BlockProps) {
-  const { rules } = useClientCards(projectId, "rules");
+  const filter = useRuleFilter();
+  const { rules } = useClientCards(projectId, "rules", {
+    ...(filter.settled ? { q: filter.settled } : {}),
+    ...(filter.type ? { type: filter.type } : {}),
+  });
   const pages = rules.data?.pages ?? [];
   const items = pages.flatMap((page) => page.items);
   const last = pages.at(-1);
-  const filter = useRuleFilter(items);
+  const filtered = Boolean(filter.settled || filter.type);
   if (rules.isPending) return <CardsSkeleton label="Chargement des règles métier" />;
   if (rules.isError && items.length === 0) {
     return (
@@ -114,7 +184,7 @@ export function ClientRulesTab({ projectId, canValidate, actions }: BlockProps) 
       </ErrorNotice>
     );
   }
-  if (items.length === 0 || !last) return NOTHING;
+  if ((items.length === 0 && !filtered) || !last) return NOTHING;
   return (
     <div className="flex flex-col gap-4">
       <RulesToolbar
@@ -125,28 +195,24 @@ export function ClientRulesTab({ projectId, canValidate, actions }: BlockProps) 
         query={filter.query}
         onQuery={filter.setQuery}
       />
-      <div className="grid gap-3 lg:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
-        {filter.shown.map((rule) => (
-          <RuleCard key={rule.id} {...rule} />
-        ))}
-      </div>
-      <ListFooter
-        framed
-        state={footerState(rules)}
-        pageSize={24}
-        loadedCount={items.length}
-        total={last.total}
-        noun={RULE_NOUN}
-        onLoadMore={() => void rules.fetchNextPage()}
-        onRetry={() => void rules.fetchNextPage()}
+      <RuleCards
+        items={items}
+        search={filter.settled}
+        onClearSearch={() => filter.setQuery("")}
+        onClearType={() => filter.setType(undefined)}
       />
+      <RulesFooter query={rules} items={items.length} total={last.total} />
       {canValidate ? (
         <DecisionBlock
           variant="bar"
           noun="bloc"
           target={{ targetKind: "rules", targetRef: "rules", version: last.version }}
           validation={last.validation}
-          question={`Ces ${last.total} règles décrivent-elles bien votre activité ?`}
+          question={
+            filtered
+              ? "Ces règles décrivent-elles bien votre activité ?"
+              : `Ces ${last.total} règles décrivent-elles bien votre activité ?`
+          }
           validateLabel="Valider les règles"
           actions={actions}
         />

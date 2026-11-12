@@ -28,6 +28,7 @@ describe("EMPTY_VALUES", () => {
       title: "",
       priority: "",
       status: "brouillon",
+      zone: "",
       description: "",
       criteria: [],
       screens: "",
