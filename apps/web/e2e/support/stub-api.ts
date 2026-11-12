@@ -1,6 +1,11 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { handleProviders, type ProvidersScenario, resetProviders } from "./stub-ai-providers.ts";
 import {
+  type ClientSpaceScenario,
+  handleClientSpace,
+  resetClientSpace,
+} from "./stub-client-space.ts";
+import {
   type FeaturesScenario,
   handleFeatures,
   markSpecRepoCreated,
@@ -43,6 +48,7 @@ type Scenario = {
   SpecRepoScenario &
   FeaturesScenario &
   ProposalsScenario &
+  ClientSpaceScenario &
   ProvidersScenario &
   ShellScenario &
   OverviewScenario &
@@ -168,6 +174,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetGithub();
     resetSpecRepo();
     resetFeatures();
+    resetClientSpace();
     resetProposals(scenario);
     resetProviders();
     resetSettings();
@@ -205,6 +212,10 @@ type Sender = (reply: ReturnType<typeof json>) => void;
 /** Le reste du faux API : fonctionnalités, dépôt de spec, projets, kanban, GitHub, organisations. */
 function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
   const path = url.pathname;
+  if (/^\/(client-space|projects\/[^/]+\/reviews)/.test(path) || path === "/__client-calls") {
+    void handleClientSpace(req, url, { scenario, send });
+    return;
+  }
   if (handleFeatures(req, url, { scenario, knownProject, send, hold })) return;
   if (
     handleSpecRepo(req, path, {

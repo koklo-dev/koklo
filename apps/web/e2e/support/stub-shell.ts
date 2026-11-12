@@ -141,7 +141,8 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
   return reply(200, {
     deliverables: DELIVERABLES.map(([key, available, after]) => ({
       key,
-      status: "todo",
+      // Un scénario de la vue client attend la validation du Fonctionnel (TK-104).
+      status: key === "functional" && "clientSpace" in h.scenario ? "pending" : "todo",
       available,
       forced: false,
       condition: after === null ? null : `Disponible après ${after}`,
