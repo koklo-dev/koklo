@@ -58,17 +58,14 @@ const pushTo = (
     ...(after ? { after } : {}),
   });
 
-async function submitFeature(
+async function submitOperations(
   api: APIRequestContext,
   projectId: string,
-  title: string,
+  operations: Record<string, unknown>[],
 ): Promise<Batch> {
   const submitted = await json<Batch>(
     await api.post(`${ORPC}/projects/${projectId}/spec/batches`, {
-      data: {
-        idempotencyKey: `e2e-${randomUUID()}`,
-        operations: [{ kind: "feature.create", title, priority: "must" }],
-      },
+      data: { idempotencyKey: `e2e-${randomUUID()}`, operations },
     }),
   );
   let batch = submitted;
@@ -85,6 +82,9 @@ async function submitFeature(
     .toBe("committed");
   return batch;
 }
+
+const submitFeature = (api: APIRequestContext, projectId: string, title: string) =>
+  submitOperations(api, projectId, [{ kind: "feature.create", title, priority: "must" }]);
 
 async function pushAndIndex(
   api: APIRequestContext,
@@ -342,6 +342,62 @@ test("T6 deux écritures donnent deux commits distincts et ordonnés", async ({ 
     "F-001",
     "F-002",
   ]);
+  await project.owner.dispose();
+});
+
+test("T9 règle, rôle et parcours écrits en un lot : commit, index et trois onglets (TK-103)", async ({
+  page,
+}) => {
+  const project = await readyProject("Domaine");
+  await signIn(page, project.workspace.owner);
+  const stamp = randomUUID().slice(0, 8);
+  const batch = await submitOperations(project.owner, project.projectId, [
+    {
+      kind: "rule.create",
+      title: `Delai ${stamp}`,
+      type: "contrainte",
+      statement: "Plus de 2 h avant.",
+    },
+    {
+      kind: "role.create",
+      name: `Accueil ${stamp}`,
+      description: "Gère l'agenda.",
+      permissions: [
+        { id: "PM-agenda.lire" },
+        { id: "PM-reservation.modifier", restriction: "les siennes" },
+      ],
+    },
+    {
+      kind: "flow.create",
+      title: `Annuler ${stamp}`,
+      actor: "Client",
+      start: { label: "Lien du SMS" },
+      steps: [{ label: "Confirmer" }],
+    },
+  ]);
+  expect(batch.results.map((result) => result.kind)).toEqual([
+    "rule.create",
+    "role.create",
+    "flow.create",
+  ]);
+  expect(batch.results[0]?.specId).toBe("R-001");
+  await pushAndIndex(
+    project.owner,
+    project.workspace,
+    project.repositoryId,
+    project.projectId,
+    batch.commitSha as string,
+  );
+  const base = featuresPath(project.projectId);
+  await page.goto(`${base}?tab=rules`);
+  await expect(page.getByRole("heading", { name: `Delai ${stamp}` })).toBeVisible();
+  await page.goto(`${base}?tab=roles`);
+  await expect(page.getByRole("heading", { name: `Accueil ${stamp}` })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Qui peut faire quoi" })).toContainText(
+    "PM-agenda.lire",
+  );
+  await page.goto(`${base}?tab=flows`);
+  await expect(page.getByRole("heading", { name: `Annuler ${stamp}` })).toBeVisible();
   await project.owner.dispose();
 });
 
