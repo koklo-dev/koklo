@@ -2,10 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CLIENT_SIDE,
   FEATURES,
   findList,
-  GIT_VOCABULARY,
   head,
   inputsOf,
   list,
@@ -129,8 +127,10 @@ describe("Projet sans dépôt de spec (§4.6) — spec.head null et repo.list sa
   it("le rôle inconnu (organisation pas encore chargée) n'affirme rien et n'appelle pas repo.list", async () => {
     procedures.organizationList.mockImplementation(() => new Promise(() => undefined));
     renderFeatures();
-    await findRole("status");
-    await waitFor(() => expect(procedures.specHead).toHaveBeenCalled());
+    // TK-104 : l'aiguillage client / équipe attend le rôle ; en attendant, aucune lecture de la spec n'est lancée.
+    await waitFor(() => expect(procedures.organizationList).toHaveBeenCalled());
+    expect(document.querySelector("[aria-busy='true']")).not.toBeNull();
+    expect(procedures.specHead).not.toHaveBeenCalled();
     expect(procedures.repoList).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: NO_REPO_TITLE })).not.toBeInTheDocument();
   });
@@ -143,35 +143,6 @@ describe("Projet sans dépôt de spec (§4.6) — spec.head null et repo.list sa
     await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
     expect(await heading(NO_REPO_TITLE)).toBeVisible();
     expect(procedures.repoList).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("Spec indisponible, rôle sans détail (§4.7) — client, business", () => {
-  it.each(CLIENT_SIDE)(
-    "%s : état neutre, texte du produit, AUCUN appel à repo.list",
-    async (role) => {
-      serve(role);
-      procedures.specHead.mockResolvedValue(null);
-      renderFeatures();
-      expect(await heading(NEUTRAL_TITLE)).toBeVisible();
-      expect(visibleText()).toContain(
-        "La spec de ce projet n'est pas encore disponible. Revenez plus tard ou demandez à l'équipe où en est la préparation.",
-      );
-      expect(screen.getByRole("button", { name: "Actualiser" })).toBeEnabled();
-      expect(procedures.repoList).not.toHaveBeenCalled();
-      expect(visibleText()).not.toMatch(GIT_VOCABULARY);
-      expect(screen.queryByRole("heading", { name: NO_REPO_TITLE })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Créer le dépôt/ })).not.toBeInTheDocument();
-    },
-  );
-
-  it("« Actualiser » relit spec.head", async () => {
-    serve("client");
-    procedures.specHead.mockResolvedValue(null);
-    renderFeatures();
-    await heading(NEUTRAL_TITLE);
-    await userEvent.click(screen.getByRole("button", { name: "Actualiser" }));
-    await waitFor(() => expect(procedures.specHead).toHaveBeenCalledTimes(2));
   });
 });
 
@@ -209,15 +180,6 @@ describe("Spec en préparation (§4.5)", () => {
       ).not.toBeInTheDocument();
     },
   );
-
-  it.each(CLIENT_SIDE)("%s : « building » = même carte, vocabulaire sans git", async (role) => {
-    serve(role);
-    procedures.specHead.mockResolvedValue(head({ status: "building" }));
-    procedures.specListFeatures.mockResolvedValue(list([]));
-    renderFeatures();
-    await expectPreparing();
-    expect(visibleText()).not.toMatch(/commit|branche|SHA|indexation|index\b/i);
-  });
 
   it("« Actualiser » relit spec.head et annonce « La spec est prête. » quand la liste arrive", async () => {
     procedures.specHead
@@ -276,29 +238,6 @@ describe("Index en échec (§4.8)", () => {
       expect(technical.className).toMatch(/font-mono/);
     },
   );
-
-  it.each(CLIENT_SIDE)(
-    "%s : « Prévenez l'équipe », ni code, ni version, ni consigne technique",
-    async (role) => {
-      serve(role);
-      procedures.specHead.mockResolvedValue(failed());
-      renderFeatures();
-      const alert = await findRole("alert");
-      expect(alert).toHaveTextContent("Prévenez l'équipe : la spec doit être corrigée.");
-      expect(alert).toHaveTextContent(TOO_LARGE);
-      expect(visibleText()).not.toMatch(GIT_VOCABULARY);
-      expect(visibleText()).not.toMatch(/Code :|poussez|Corrigez la spec/);
-    },
-  );
-
-  it("errorCode inconnu : phrase générique ; pour le client la valeur brute n'apparaît nulle part", async () => {
-    serve("client");
-    procedures.specHead.mockResolvedValue(failed("yaml_boom_42"));
-    renderFeatures();
-    const alert = await findRole("alert");
-    expect(alert).toHaveTextContent(CORRUPT);
-    expect(visibleText()).not.toContain("yaml_boom_42");
-  });
 
   it("errorCode inconnu côté équipe : la phrase reste générique (la valeur n'est que dans la ligne technique)", async () => {
     procedures.specHead.mockResolvedValue(failed("yaml_boom_42"));

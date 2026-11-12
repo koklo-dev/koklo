@@ -98,4 +98,22 @@ describe("compteur de l'onglet Fonctionnalités", () => {
     });
     expect(headerStateOf({ ...BASE, viewKind: "empty", total: 0 }).tabCount).toBeUndefined();
   });
+
+  it("TK-104 : cahier à valider, « Relancer » ou « Valider à la place du client » passe avant les autres actions", () => {
+    const pending = { ...BASE, deliverable: "pending" as const };
+    expect(headerStateOf({ ...pending, clientAction: "remind" }).actions).toEqual([
+      "remind",
+      "propose",
+      "create",
+    ]);
+    expect(
+      headerStateOf({ ...pending, agent: false, clientAction: "validate-client" }).actions,
+    ).toEqual(["validate-client", "create"]);
+  });
+
+  it("TK-104 : hors « À valider », aucune action de relance, même si l'entrée en propose une", () => {
+    expect(
+      headerStateOf({ ...BASE, deliverable: "validated", clientAction: "remind" }).actions,
+    ).toEqual(["propose", "create"]);
+  });
 });

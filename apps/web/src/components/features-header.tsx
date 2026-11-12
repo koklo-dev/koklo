@@ -30,14 +30,14 @@ export interface FeaturesHead {
 
 type TabCounts = Partial<Record<FeaturesTab, HeaderTabCount>>;
 
-function tabsOf(projectId: string, active: FeaturesTab, counts: TabCounts, reviewing: boolean) {
+function tabsOf(projectId: string, active: FeaturesTab, counts: TabCounts, suffix: string) {
   return FEATURES_TABS.map<ProjectHeaderTab>((tab) => {
     const count = counts[tab];
     return {
       label: TAB_LABELS[tab],
       icon: TAB_ICONS[tab],
-      // La relecture suit l'onglet : chaque onglet relit les propositions de son type.
-      href: `${specPath(projectId, "functional")}?tab=${tab}${reviewing ? "&view=review" : ""}`,
+      // La relecture et la vue client suivent l'onglet : chaque onglet garde la vue ouverte.
+      href: `${specPath(projectId, "functional")}?tab=${tab}${suffix}`,
       active: tab === active,
       ...(count
         ? {
@@ -66,6 +66,7 @@ export function FeaturesHeader({
   tabCount,
   tabCounts,
   reviewing = false,
+  clientView = false,
   tab,
   head,
   team,
@@ -87,6 +88,8 @@ export function FeaturesHeader({
   tabCounts?: TabCounts | undefined;
   /** Relecture ouverte : les onglets gardent `?view=review`. */
   reviewing?: boolean;
+  /** Vue client de l'équipe (`?vue=client`, D1) : les onglets la gardent. */
+  clientView?: boolean;
   tab: FeaturesTab;
   head: FeaturesHead | undefined;
   team: boolean;
@@ -111,7 +114,12 @@ export function FeaturesHeader({
         : {})}
       {...(secondaryActions ? { secondaryActions } : {})}
       {...(primaryAction ? { primaryAction } : {})}
-      tabs={tabsOf(projectId, tab, tabCounts ?? (tabCount ? { [tab]: tabCount } : {}), reviewing)}
+      tabs={tabsOf(
+        projectId,
+        tab,
+        tabCounts ?? (tabCount ? { [tab]: tabCount } : {}),
+        `${reviewing ? "&view=review" : ""}${clientView ? "&vue=client" : ""}`,
+      )}
       tabsLabel="Sections du cahier fonctionnel"
       LinkComponent={ShellLink}
     />

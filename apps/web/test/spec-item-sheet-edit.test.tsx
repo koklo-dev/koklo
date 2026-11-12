@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { serveClient } from "./support/client-space.tsx";
 import {
   askDelete,
   clickSave,
@@ -53,9 +54,10 @@ const item =
 
 describe.each(["client", "business"] as const)("%s : aucun accès au panneau", (role) => {
   it("aucun bouton, ?new=1 ignoré, aucun appel de préremplissage ni de lecture d'édition", async () => {
-    serveWrite(role);
+    // TK-104 : client et business lisent la vue client (aucune écriture de la spec).
+    serveClient(role, { canValidate: role === "client" });
     renderFeatures({ search: "?new=1" });
-    await screen.findByText("Connexion par e-mail", undefined, { timeout: 8_000 });
+    await screen.findByRole("note", undefined, { timeout: 8_000 });
     expect(screen.queryByRole("button", { name: "Nouvelle fonctionnalité" })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(procedures.aiPrefillItem).not.toHaveBeenCalled();

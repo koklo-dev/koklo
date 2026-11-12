@@ -1,14 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { tabNumbers } from "../lib/features-header-state.ts";
+import { type HeaderAction, tabNumbers } from "../lib/features-header-state.ts";
 import type { FeaturesTab } from "../lib/features-tab.ts";
 import type { DomainTab as Tab } from "../lib/use-domain-data.ts";
 import type { DomainPageModel } from "../lib/use-domain-page.ts";
 import { useDomainPage } from "../lib/use-domain-page.ts";
 import { SpecBody } from "./features-body.tsx";
 import { FeaturesHeader } from "./features-header.tsx";
-import { HeaderActionButton, useHeaderState } from "./features-header-action.tsx";
+import { type ClientEntry, HeaderActionButton, useHeaderState } from "./features-header-action.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
 import { ReviewView } from "./features-review-view.tsx";
 import { StatusBlock } from "./features-status-block.tsx";
@@ -98,7 +98,8 @@ function FormSheet({ page }: { page: DomainPageModel }) {
 /** Actions de l'en-tête de l'onglet : les secondaires, puis la primaire (« Nouvelle règle », « Nouveau rôle », « Nouveau parcours »). */
 function headerActions(
   page: DomainPageModel,
-  actions: ReadonlyArray<"add" | "propose" | "repropose" | "create">,
+  actions: ReadonlyArray<HeaderAction>,
+  client: ClientEntry,
 ) {
   const button = (action: (typeof actions)[number]) => (
     <HeaderActionButton
@@ -108,6 +109,7 @@ function headerActions(
       propose={page.propose}
       onCreate={page.form.openCreate}
       onReview={page.url.openReview}
+      client={client}
     />
   );
   const secondary = actions.filter((action) => action !== "create").map(button);
@@ -123,6 +125,7 @@ export function DomainTab({ projectId, tab }: { projectId: string; tab: Tab & Fe
   const { head, projectName } = page.data;
   const header = useHeaderState(page.propose, projectId, {
     team: page.team,
+    role: page.data.role,
     canWrite: page.form.canWrite,
     viewKind: page.data.view.kind,
     total: head?.counts[tab],
@@ -140,7 +143,7 @@ export function DomainTab({ projectId, tab }: { projectId: string; tab: Tab & Fe
         summary={header.summary}
         tabCounts={header.tabCounts}
         reviewing={page.propose.reviewing}
-        {...headerActions(page, header.actions)}
+        {...headerActions(page, header.actions, header.client)}
         tab={tab}
         head={head ?? undefined}
         team={page.team}

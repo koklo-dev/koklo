@@ -115,7 +115,7 @@ describe("PROVIDER_AUTH_EXPIRED (403, l'« accès refusé » côté fournisseur)
     },
   );
 
-  it.each(["dev", "designer", "client", "business"] as const)(
+  it.each(["dev", "designer"] as const)(
     "%s : « Demandez à un propriétaire ou à un administrateur… », aucun lien",
     async (role) => {
       const { alert } = await openWith(error, role);

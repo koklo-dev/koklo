@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as route from "../src/app/(shell)/projects/[projectId]/spec/functional/page.tsx";
 import { ShellFrame } from "../src/components/shell-frame.tsx";
 import { findList, head, list, PROJECT_ID, renderFeatures, serve } from "./support/features.tsx";
-import { fake, LAUNCH_ID, many, renderTeam, serveProposals } from "./support/proposals.tsx";
+import { LAUNCH_ID, many, renderTeam, serveProposals } from "./support/proposals.tsx";
 import { findNamed } from "./support/wait.ts";
 import {
   pathname,
@@ -66,15 +66,6 @@ describe("En-tête : Liste · équipe", () => {
     expect(create).toHaveLength(1);
     expect(create[0]?.parentElement).toHaveClass("order-2");
     expect(within(header()).queryByRole("button", { name: "Ajouter" })).toBeNull();
-  });
-
-  it("client : ni statut, ni résumé, ni action", async () => {
-    serve("client");
-    renderFeatures();
-    await findList();
-    expect(within(header()).queryByRole("button")).toBeNull();
-    expect(pill()).toBeNull();
-    expect(within(header()).queryByText("3 fonctionnalités")).toBeNull();
   });
 });
 
