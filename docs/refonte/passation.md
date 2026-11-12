@@ -26,8 +26,9 @@ last_reviewed: 2026-11-10
 | 022 | TK-101 (`SpecItemSheet`, `ai.prefillItem`, `spec.item.get`, `spec.refs.search`, contrat 2.11.0) | ✅ fusionné (PR #184, `7ffe7c1`) ; décisions B329 à B332 |
 | 022 | TK-102 (cahier fonctionnel par état, onglet Fonctionnalités, retrait de l'Assistant et d'`ai.draftBrief`, contrat 3.0.0) | ✅ fusionné (PR #186, `6094e5d`) ; décisions B333 à B337 ; « Relancer » renvoyé à TK-104 |
 | 023 | TK-103 (Règles métier, Rôles et permissions, Parcours, contrat 3.1.0, `seed:large` à 300 règles) | ✅ fusionné (PR #187, `e02a57e`) ; décisions B338 à B346 |
+| 023 | TK-104 (vue client des 4 onglets, « Valider le cahier », annulation `withdrawn`, `review.remind`, contrat 3.2.0) | ✅ fusionné (PR #193, `67b2556`, remplace la #192) ; décisions B347 à B362 ; case du sprint non cochée : critères 9 (e2e `seed:large`) et 13 (axe après décision) partiels, acceptés par B361, à vérifier avec TK-105 |
 
-Prochain ticket : TK-104 (vue client et validation du cahier, « Relancer »), puis TK-105 (volume réel), sprint 023. DoD du sprint 022 (4 cases) encore à vérifier avant de la cocher.
+Prochain ticket : TK-105 (volume réel), sprint 023 ; il vérifie aussi les critères 9 et 13 de TK-104 avec `seed:large`. DoD du sprint 022 (4 cases) encore à vérifier avant de la cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
@@ -106,6 +107,11 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 
 ## Pièges connus
 
+- Commits : en-tête de 100 caractères au plus (commitlint en CI). Lancer `.github/scripts/commitlint-local.sh` avant le
+  push ; un `git commit --amend` est bloqué par le garde shipyard, et le push forcé est exclu : on recrée la branche par
+  `cherry-pick -n` + commit (le shell est zsh : tableaux indexés à partir de 1). TK-104 : PR #192 remplacée par la #193.
+- Changer la vue d'un rôle (TK-104 : business passe en vue client) casse les e2e d'autres écrans qui l'utilisent
+  (`e2e/tests/r2-journeys.spec.ts` T7). Chercher le rôle dans `e2e/tests/` avant de pousser.
 - `@koklo/ui` est consommé par `dist` : `pnpm --filter @koklo/ui build` avant les tests web, et pas pendant qu'une
   suite Playwright web tourne.
 - Les e2e laissent `e2e/playwright-report/` : `biome ci` du paquet `e2e` le lint et échoue (3 700 erreurs). Le
