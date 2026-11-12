@@ -3,12 +3,13 @@ import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
-import { SPEC_BATCH_ROLES } from "../auth/roles.ts";
+import { PROPOSAL_ROLES, SPEC_BATCH_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { requestIdOf } from "../request-context.ts";
 import { inProject } from "../tracker/scope.ts";
 import { AiService } from "./ai.service.ts";
+import { AiPrefillService } from "./ai-prefill.service.ts";
 
 /**
  * Propositions de l'IA : `SPEC_BATCH_ROLES` (le client suggère, le business lit ; le designer n'écrit
@@ -18,6 +19,7 @@ import { AiService } from "./ai.service.ts";
 export class AiController {
   constructor(
     @Inject(AiService) private readonly service: AiService,
+    @Inject(AiPrefillService) private readonly prefills: AiPrefillService,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -61,6 +63,22 @@ export class AiController {
         errors,
         input.projectId,
         (scope) => this.service.proposeCriteria(scope, input, requestIdOf(request)),
+        this.access,
+      ),
+    );
+  }
+
+  /** Préremplissage du panneau d'édition (TK-101) : aucune écriture, texte brut. */
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...PROPOSAL_ROLES)
+  @Implement(contract.ai.prefillItem)
+  prefillItem(@Req() request: Request) {
+    return implement(contract.ai.prefillItem).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.prefills.prefill(scope, input, requestIdOf(request)),
         this.access,
       ),
     );

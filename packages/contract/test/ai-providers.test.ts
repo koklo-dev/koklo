@@ -52,6 +52,7 @@ describe("AP1 surface : onze routes sous /ai", () => {
       "/projects/{projectId}/ai/idea/chat",
       "/projects/{projectId}/ai/idea/gaps",
       "/projects/{projectId}/ai/idea/synthesis",
+      "/projects/{projectId}/ai/item/prefill",
       "/projects/{projectId}/ai/proposals/{proposalId}/revise",
     ]);
   });

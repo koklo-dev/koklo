@@ -25,6 +25,8 @@ import {
   aiIdeaGapsInputSchema,
   aiIdeaGapsOutputSchema,
   aiIdeaSynthesisInputSchema,
+  aiPrefillItemInputSchema,
+  aiPrefillItemOutputSchema,
   aiProposeCriteriaInputSchema,
   aiProposeCriteriaOutputSchema,
   aiProposeFeaturesInputSchema,
@@ -108,6 +110,14 @@ export const ai = {
     .errors({ ...writeErrors, ...notFoundError, ...validationError })
     .input(aiProposeOptionsInputSchema)
     .output(aiProposeOptionsOutputSchema),
+  /**
+   * Préremplit le formulaire d'un élément à partir d'une phrase (TK-101, 2.11.0) : texte brut, aucune écriture, aucune
+   * proposition. Erreurs des propositions ; `PROPOSAL_ROLES` (client et business : 403).
+   */
+  prefillItem: route("POST", "/projects/{projectId}/ai/item/prefill")
+    .errors(proposalErrors)
+    .input(aiPrefillItemInputSchema)
+    .output(aiPrefillItemOutputSchema),
   /** Révise UNE proposition (appel synchrone, texte brut) : elle reste en attente et n'entre jamais dans la spec. */
   reviseProposal: route("POST", "/projects/{projectId}/ai/proposals/{proposalId}/revise")
     .errors({ ...proposalErrors, ...conflictOf("proposal_applied") })

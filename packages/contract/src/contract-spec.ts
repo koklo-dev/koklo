@@ -23,6 +23,10 @@ import {
   specBatchSubmitInputSchema,
   specHeadInputSchema,
   specHeadSchema,
+  specItemGetInputSchema,
+  specItemSchema,
+  specRefsSearchInputSchema,
+  specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
 
 /** Lecture depuis l'index en base (CDC §8.2) : ouverte à tous les rôles, 404 hors projet. */
@@ -51,6 +55,23 @@ const spec = {
     .errors({ ...writeOneErrors, ...validationError })
     .input(specForceDeliverableInputSchema)
     .output(specDeliverableSchema),
+  /**
+   * Panneau d'édition (TK-101, 2.11.0) : l'élément, l'état « validé » du Fonctionnel et les éléments qui le citent.
+   * `SPEC_BATCH_ROLES` seuls (client et business : 403). Erreurs de `spec.getFeature`.
+   */
+  item: {
+    get: route("GET", "/projects/{projectId}/spec/items/{type}/{id}")
+      .errors({ ...writeOneErrors, ...validationError, ...providerErrors, ...specIndexFailedError })
+      .input(specItemGetInputSchema)
+      .output(specItemSchema),
+  },
+  /** Autocomplétion des liens : 20 résultats au plus sur l'index d'entités de la tête, aucun curseur. */
+  refs: {
+    search: route("GET", "/projects/{projectId}/spec/refs")
+      .errors({ ...writeOneErrors, ...validationError })
+      .input(specRefsSearchInputSchema)
+      .output(specRefsSearchOutputSchema),
+  },
 };
 
 const specBatch = {

@@ -156,3 +156,30 @@ export const aiIdeaSynthesisInputSchema = z.object({ projectId: z.uuid() });
 export type AiIdeaChatInput = z.input<typeof aiIdeaChatInputSchema>;
 export type AiIdeaChatEvent = z.output<typeof aiIdeaChatEventSchema>;
 export type AiIdeaGapsOutput = z.output<typeof aiIdeaGapsOutputSchema>;
+
+/**
+ * Préremplissage du panneau d'édition (TK-101, 2.11.0, B329 d) : une phrase de l'humain (500 caractères), des valeurs en
+ * texte brut en retour. Rien n'est écrit : le formulaire n'accepte que les champs vides, l'humain enregistre ensuite par
+ * `specBatch.submit`. Le serveur applique la politique de texte brut à l'entrée et à la sortie.
+ */
+export const AI_PREFILL_DESCRIPTION_MAX = 500;
+export const AI_PREFILL_LINKS_MAX = 30;
+
+export const aiPrefillItemInputSchema = z.object({
+  projectId: z.uuid(),
+  type: z.literal("feature"),
+  description: nonBlank(AI_PREFILL_DESCRIPTION_MAX),
+});
+
+export const prefilledValuesSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  priority: featurePrioritySchema.optional(),
+  description: z.string().max(4000).optional(),
+  criteria: z.array(aiProposedCriterionSchema).max(AI_CRITERIA_MAX).optional(),
+  links: z.array(z.string().min(1).max(100)).max(AI_PREFILL_LINKS_MAX).optional(),
+});
+
+export const aiPrefillItemOutputSchema = z.object({
+  type: z.literal("feature"),
+  values: prefilledValuesSchema,
+});

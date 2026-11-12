@@ -56,9 +56,9 @@ describe("SH1 surface additive", () => {
     ]);
   });
 
-  it("le contrat est en 2.10.0 (version mineure : aucune route retirée ni modifiée)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.10.0");
-    expect((await doc()).info.version).toBe("2.10.0");
+  it("le contrat est en 2.11.0 (version mineure : aucune route retirée ni modifiée)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.11.0");
+    expect((await doc()).info.version).toBe("2.11.0");
   });
 });
 

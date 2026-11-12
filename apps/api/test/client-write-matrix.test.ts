@@ -43,6 +43,8 @@ const ALLOWED = [
 const OWN_ONLY = ["comment.delete"];
 const DENIED = [
   "ai.draftBrief",
+  // TK-101 (contrat 2.11.0) : le préremplissage du panneau d'édition relève de l'équipe (SPEC_BATCH_ROLES).
+  "ai.prefillItem",
   "ai.proposeCriteria",
   // TK-99a (contrat 2.9.0) : lancer, réviser et décider les propositions de l'agent relèvent de l'équipe.
   "ai.proposeDeliverable",

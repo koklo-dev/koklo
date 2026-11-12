@@ -128,11 +128,20 @@ const groups = contract as unknown as Record<string, Record<string, Procedure>>;
  */
 const UNAUDITED_PREFERENCES = ["project.visit"];
 
+/** Procédures d'un groupe, sous-groupes compris (`spec.item.get`, TK-101) : `nom` pointé jusqu'à la procédure. */
+function proceduresOf(prefix: string, node: Record<string, unknown>): [string, Procedure][] {
+  return Object.entries(node).flatMap(([name, child]) =>
+    "~orpc" in (child as object)
+      ? [[`${prefix}.${name}`, child as Procedure] as [string, Procedure]]
+      : proceduresOf(`${prefix}.${name}`, child as Record<string, unknown>),
+  );
+}
+
 function nonGetProcedures(groupNames: readonly string[]): string[] {
   return groupNames.flatMap((group) =>
-    Object.entries(groups[group] ?? {})
+    proceduresOf(group, groups[group] ?? {})
       .filter(([, procedure]) => procedure["~orpc"].meta["~openapi"]?.method !== "GET")
-      .map(([name]) => `${group}.${name}`)
+      .map(([name]) => name)
       .filter((name) => !UNAUDITED_PREFERENCES.includes(name)),
   );
 }
@@ -210,6 +219,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "ai.ideaChat",
   "ai.ideaGaps",
   "ai.ideaSynthesis",
+  "ai.prefillItem",
   "ai.proposeCriteria",
   "ai.proposeDeliverable",
   "ai.proposeFeatures",
@@ -1280,6 +1290,29 @@ function aiScenarios(): Scenario[] {
         deniedStatuses: [403],
       };
     }),
+    {
+      procedure: "ai.prefillItem",
+      role: "dev",
+      prepare: keyed,
+      call: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "dev", `/projects/${projectId}/ai/item/prefill`, {
+          projectId,
+          type: "feature",
+          description: "Annuler une réservation",
+        });
+      },
+      expected: onProject("ai.item.prefill"),
+      denied: (ctx) => {
+        const projectId = ctx.world.projectId;
+        return call(ctx, "business", `/projects/${projectId}/ai/item/prefill`, {
+          projectId,
+          type: "feature",
+          description: "Annuler une réservation",
+        });
+      },
+      deniedStatuses: [403],
+    },
     {
       procedure: "ai.proposeFeatures",
       role: "dev",

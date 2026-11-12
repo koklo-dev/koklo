@@ -1,5 +1,7 @@
 export type {
   AgentProposal,
+  AiPrefillItemInput,
+  AiPrefillItemOutput,
   AiProposeDeliverableInput,
   AiProposeDeliverableOutput,
   AiProposeOptionsInput,
@@ -64,7 +66,10 @@ export type {
   SpecBatchOutput,
   SpecBatchSubmitInput,
   SpecHeadOutput,
+  SpecItem,
   SpecOperation,
+  SpecRefsSearchInput,
+  SpecRefsSearchOutput,
   SprintCreateInput,
   SprintOutput,
   TicketCreateInput,

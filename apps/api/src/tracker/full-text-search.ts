@@ -1,4 +1,10 @@
-import { type SearchTarget, searchIds } from "@koklo/db";
+import {
+  type EntityRef,
+  entitiesReferencing,
+  type SearchTarget,
+  searchEntityRefs,
+  searchIds,
+} from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
 
@@ -13,5 +19,20 @@ export class FullTextSearch {
 
   ids(target: SearchTarget, scopeId: string, query: string): Promise<string[]> {
     return searchIds(this.database.raw, target, scopeId, query);
+  }
+
+  /** Autocomplétion des liens (TK-101) : éléments de l'index générique d'un instantané, 20 au plus. */
+  refs(
+    snapshotId: string,
+    kinds: readonly string[],
+    query: string,
+    limit: number,
+  ): Promise<EntityRef[]> {
+    return searchEntityRefs(this.database.raw, snapshotId, kinds, query, limit);
+  }
+
+  /** Éléments d'un instantané qui citent `specId` (jeton exact), `total` compris (TK-101). */
+  referencing(snapshotId: string, specId: string, limit: number) {
+    return entitiesReferencing(this.database.raw, snapshotId, specId, limit);
   }
 }
