@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.9.0** (2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.10.0** (TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1475,6 +1475,56 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.10.0** (TK-100, lot C, same version, not yet released): upstream impact, no new field. `spec.deliverables` now fills
+  `staleBecause: { idea, changedPages }` and sets the status to `revise` for every dependent deliverable already validated or recorded
+  (a decision exists) before the latest `idea-vN` and affected by it (graph of sources: Functional <- idea, Data and Design <-
+  Functional, Architecture <- Data, Technical <- Architecture, Security <- Technical, Quality <- Technical, Security, Design);
+  `changedPages` counts pages added, modified or removed since `idea-vN-1`. A forced deliverable stays `revise`. `ai.proposeDeliverable`
+  with `mode: "update"` answers 422 `VALIDATION` unless the Functional deliverable has a `staleBecause`; the worker then reads only the
+  diff between the two versions. `ai.proposeOptions` lists the `update` option, `count` = `changedPages`, only in that case.
+  Migration note: none.
+- **2.10.0** (TK-100, lot B, same version, not yet released): validation by element and by block. `review.submit` and `review.list`
+  now take the targets `flow` (a `design/flows/P-*.json` journey, `targetRef` `P-...`), `rules` (the whole rules block, `targetRef`
+  `rules`), `roles` (the roles file, `targetRef` `roles`) and `deliverable` (a whole deliverable, `targetRef` a key of
+  `DELIVERABLE_KEYS`) in addition to `feature` and `baseline`; screens stay hidden (D2). `version` is still the opaque head SHA and
+  `STALE_VERSION` is unchanged. A validation now also stores the hash of the validated content (`review_versions`): it stays valid
+  while that hash is the current one, so a commit on another element or on `_layout.yaml` invalidates nothing; a review without a
+  hash (older than TK-100) is still compared with the head SHA. `review.list` items gain `onBehalf: boolean` ("validated by the team,
+  no client invited") and `sha` is now nullable (always `null` for a client, the SHA being git vocabulary). Rights: `review.submit`
+  is open to client, owner, admin and dev, then decided per target on the server (D1): Functional (feature, flow, rules, roles,
+  deliverable `functional`) and Design go to the client when one is invited (a `project_client_access` link) and to owner or admin
+  otherwise; Data, Architecture, Technical, Security and Quality go to owner, admin and dev; baseline stays client only; designer,
+  business and agent tokens never (403). `review.list` is open to the client for the targets they validate only. The status of a
+  deliverable in `spec.deliverables` is now computed: validated when the deliverable, or every one of its element and block
+  targets, is validated on the current hash; to revise when a change request is current; to do without any entity; to validate
+  otherwise. New tables `spec_entities` (generic entity index, one row per model element, `content_hash`) and `review_versions`,
+  column `spec_snapshots.entities_indexed_at`, four values added to `review_target_kind` (migration
+  `20261112120000_spec_entities_review_versions`, with `down.sql`). Migration note: none for existing clients (additive); an
+  existing snapshot is re-indexed by the reconciliation pass, until then its validations compare the head SHA.
+- **2.10.0** (TK-100, lot A): spec deliverables, server side. New routes `spec.deliverables`
+  (`GET /projects/{projectId}/spec/deliverables`) and `spec.forceDeliverable`
+  (`POST /projects/{projectId}/spec/deliverables/{key}/force`); 2 routes, 126 routes and 100 paths in all. **Additive**,
+  nothing removed or changed. `spec.deliverables` is open to every role that can reach the project (uniform 404
+  otherwise) and returns the seven entries in the order of `DELIVERABLE_KEYS` (the single list, Security 5th) plus
+  `validatedCount`: `{ key, status (todo|pending|revise|validated), available, forced, condition (string|null),
+  pendingProposals, staleBecause? { idea, changedPages } }`. `available` follows B1 and is computed in `packages/domain`
+  (`deliverablesAvailabilityOf`): Functional from `idea-v1` (or when features are already indexed); Data and Design as soon
+  as the Functional deliverable holds an indexed entity; Architecture, Technical, Security and Quality when every upstream
+  deliverable is validated; a forcing opens one deliverable without validating it. `condition` is the text "Disponible
+  après ..." while it is closed. `pendingProposals` counts the `pending` rows of `agent_proposals` per deliverable; the
+  client always gets 0 (it never sees proposals). `staleBecause` is declared and filled by lot C (absent in lot A). The
+  status comes from a replaceable `DeliverableStatusSource`: lot A reads the Functional deliverable from the per-feature
+  reviews and leaves the six others at `todo`; lot B replaces the source without changing the contract.
+  `spec.forceDeliverable` takes `{ projectId, key, confirm: true }` (`confirm` is the literal `true`), is reserved to
+  owner and admin (403 `FORBIDDEN` for dev, designer, business, client; no agent or runner token path), is idempotent
+  (a second call answers 200 with the same entry, nothing is written or audited) and returns the deliverable entry.
+  New table `deliverable_overrides` (unique `(project_id, deliverable)`, CHECK on the key, composite foreign key to
+  `projects`, cascade; migration `20261112090000_deliverable_overrides`, with `down.sql`). Audit: `deliverable.force`
+  (target `deliverable_override`, one line per forcing). `project.shell` is unchanged in shape; its `deliverables` and
+  `validatedCount` now come from the same service (the web reads `spec.deliverables` for the SPEC bar). The Functional
+  `after` of `project.shell` is now "la première version de l'idée" (it was `null`). The fingerprint of 2.9.0 is frozen in
+  `packages/contract/test/contract.test.ts`. `client-write-matrix` classes `spec.forceDeliverable` as denied to a client.
+  Migration note: none for existing clients; the SPEC bar of the web needs the 2.10.0 contract.
 - **2.9.0** (TK-99a, lot A): agent proposals, server side. New routes `ai.proposeDeliverable`
   (`POST /projects/{projectId}/ai/deliverable/propose`), `ai.proposeOptions` (`GET .../ai/deliverable/options`),
   `ai.reviseProposal` (`POST .../ai/proposals/{proposalId}/revise`) and the group `proposal`: `proposal.list`
