@@ -27,8 +27,9 @@ last_reviewed: 2026-11-10
 | 022 | TK-102 (cahier fonctionnel par état, onglet Fonctionnalités, retrait de l'Assistant et d'`ai.draftBrief`, contrat 3.0.0) | ✅ fusionné (PR #186, `6094e5d`) ; décisions B333 à B337 ; « Relancer » renvoyé à TK-104 |
 | 023 | TK-103 (Règles métier, Rôles et permissions, Parcours, contrat 3.1.0, `seed:large` à 300 règles) | ✅ fusionné (PR #187, `e02a57e`) ; décisions B338 à B346 |
 | 023 | TK-104 (vue client des 4 onglets, « Valider le cahier », annulation `withdrawn`, `review.remind`, contrat 3.2.0) | ✅ fusionné (PR #193, `67b2556`, remplace la #192) ; décisions B347 à B362 ; case du sprint non cochée : critères 9 (e2e `seed:large`) et 13 (axe après décision) partiels, acceptés par B361, à vérifier avec TK-105 |
+| 023 | TK-105 (volume réel : recherche serveur de la vue client, contrat 3.3.0, `seed:planche` à 355 propositions, champ Zone) | 🟡 branche `feat/tk-105-volume-reel`, lots A, B, C faits, non fusionné ; décisions B363 à B370 ; e2e web `volume-reel.spec.ts` (18 tests verts) ; e2e racine `e2e/tests/volume-reel.spec.ts` écrit et typé mais NON exécuté (pile complète, CI) ; critères 9 et 13 de TK-104 à confirmer par la CI |
 
-Prochain ticket : TK-105 (volume réel), sprint 023 ; il vérifie aussi les critères 9 et 13 de TK-104 avec `seed:large`. DoD du sprint 022 (4 cases) encore à vérifier avant de la cocher.
+Ticket en cours : TK-105 (volume réel), sprint 023, à relire et fusionner ; il vérifie les critères 9 et 13 de TK-104 (e2e racine avec `seed:planche`). DoD du sprint 022 (4 cases) encore à vérifier avant de la cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
