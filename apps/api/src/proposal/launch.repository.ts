@@ -35,8 +35,6 @@ export type LaunchOutcome =
 export interface OptionFacts {
   /** Fonctionnalités du cahier indexé sans aucun critère. */
   withoutCriteria: number;
-  /** Pages du dossier figé modifiées depuis la version lue par le dernier lancement ; 0 sans lancement précédent. */
-  changedPages: number;
 }
 
 /** Accès aux lancements d'agent du projet ; chaque méthode est une transaction courte, sans réseau. */
@@ -52,7 +50,7 @@ export interface LaunchRepository {
   discard(scope: ProjectScope, launchId: string): Promise<void>;
   /** Échec côté API (enfilage impossible) : le lancement passe `failed`, le verrou est libéré. */
   fail(scope: ProjectScope, launchId: string, errorCode: string, now: Date): Promise<void>;
-  optionFacts(scope: ProjectScope, deliverable: string): Promise<OptionFacts>;
+  optionFacts(scope: ProjectScope): Promise<OptionFacts>;
   /** Le lancement désigné, ou le dernier du livrable ; `null` s'il n'y en a pas (ou hors du projet). */
   forList(
     scope: ProjectScope,

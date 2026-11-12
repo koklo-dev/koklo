@@ -39,7 +39,7 @@ const GROUPS: Record<string, string[]> = {
   projectClient: ["add", "list", "remove"],
   clientSpace: ["feature", "features", "projects"],
   repo: ["createSpec", "link", "list"],
-  spec: ["getFeature", "head", "listFeatures"],
+  spec: ["deliverables", "forceDeliverable", "getFeature", "head", "listFeatures"],
   review: ["list", "submit"],
   specBatch: ["get", "submit"],
   suggestion: ["accept", "create", "list", "reject", "withdraw"],
@@ -269,7 +269,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /project-visits",
     "GET /search",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a sont présentes (124 routes)", async () => {
+  const DELIVERABLE_PAIRS = [
+    "GET /projects/{projectId}/spec/deliverables",
+    "POST /projects/{projectId}/spec/deliverables/{key}/force",
+  ];
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a et les 2 de TK-100 sont présentes (126 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -288,10 +292,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...AI_PROVIDER_PAIRS,
       ...IDEA_PAIRS,
       ...CARDS_PAIRS,
+      ...DELIVERABLE_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(124);
+    expect(pairs).toHaveLength(126);
   });
 });
 

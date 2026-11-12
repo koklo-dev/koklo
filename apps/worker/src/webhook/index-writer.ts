@@ -1,5 +1,5 @@
 import { raiseCounterTo, type TenantClient, type TenantTx, withOrganization } from "@koklo/db";
-import type { ParsedSpec } from "@koklo/schema";
+import type { ParsedSpec, SpecFile } from "@koklo/schema";
 import { featureCounterOf, type IndexRows, rowsOf } from "./index-rows.ts";
 import type { Target } from "./types.ts";
 
@@ -10,7 +10,12 @@ const CHUNK = 1000;
 
 /** Ce qu'il faut écrire pour un commit : un snapshot lisible avec ses entités, ou un snapshot en échec. */
 export type SnapshotWrite =
-  | { readonly status: "ready"; readonly spec: ParsedSpec }
+  | {
+      readonly status: "ready";
+      readonly spec: ParsedSpec;
+      /** Parcours `design/flows/P-*.json` lus (JSON brut, sans schéma) : indexés comme entités. */
+      readonly flows?: readonly SpecFile[];
+    }
   | { readonly status: "failed"; readonly errorCode: string };
 
 export interface WriteResult {
@@ -54,6 +59,11 @@ async function insertEntities(
   for (const part of chunks(rows.endpoints)) {
     await tx.specEndpoint.createMany({ data: part.map((row) => scoped({ ...row, snapshotId })) });
   }
+  for (const part of chunks(rows.entities)) {
+    await tx.specEntity.createMany({
+      data: part.map((row) => scoped({ ...row, data: row.data as object, snapshotId })),
+    });
+  }
 }
 
 /**
@@ -75,7 +85,7 @@ export class IndexWriter {
   ): Promise<WriteResult> {
     const { organizationId } = target.installation;
     const { id: repoId, projectId } = target.repo;
-    const rows = snapshot.status === "ready" ? rowsOf(snapshot.spec) : undefined;
+    const rows = snapshot.status === "ready" ? rowsOf(snapshot.spec, snapshot.flows) : undefined;
     const counter = snapshot.status === "ready" ? featureCounterOf(snapshot.spec) : { skipped: 0 };
     await withOrganization(organizationId, () =>
       this.client.$transaction(
@@ -107,6 +117,8 @@ export class IndexWriter {
       status: snapshot.status,
       errorCode: snapshot.status === "failed" ? snapshot.errorCode : null,
       indexedAt: new Date(),
+      // Marqueur TK-100 : posé avec les entités, dans la même transaction ; absent = la réconciliation réindexe.
+      entitiesIndexedAt: snapshot.status === "ready" ? new Date() : null,
     };
     const existing = await tx.specSnapshot.findFirst({
       where: { repoId: key.repoId, commitSha: key.commitSha },
@@ -122,6 +134,7 @@ export class IndexWriter {
     await tx.specFeature.deleteMany({ where: { snapshotId: existing.id } });
     await tx.specTable.deleteMany({ where: { snapshotId: existing.id } });
     await tx.specEndpoint.deleteMany({ where: { snapshotId: existing.id } });
+    await tx.specEntity.deleteMany({ where: { snapshotId: existing.id } });
     await tx.specSnapshot.updateMany({ where: { id: existing.id }, data: state });
     return existing.id;
   }

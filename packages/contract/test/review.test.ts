@@ -30,6 +30,7 @@ const LISTED = {
   comment: "Parfait",
   createdAt: "2026-11-04T10:00:00.000Z",
   current: true,
+  onBehalf: false,
 };
 
 type Operation = { responses: Record<string, unknown> };
@@ -62,9 +63,9 @@ describe("RV1 surface : exactement list et submit", () => {
     expect(Object.keys(d.paths[COLLECTION] ?? {}).sort()).toEqual(["get", "post"]);
   });
 
-  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 2.9.0 (TK-94, projet explicite TK-96)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.9.0");
-    expect((await doc()).info.version).toBe("2.9.0");
+  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 2.10.0 (TK-94, projet explicite TK-96)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("2.10.0");
+    expect((await doc()).info.version).toBe("2.10.0");
   });
 });
 

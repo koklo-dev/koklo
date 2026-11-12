@@ -1,6 +1,7 @@
 import { FakeLlm } from "@koklo/domain/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { aiAuditRows, installAiBench, keyedWorld } from "./helpers/ai-bench.ts";
+import { ago, insertReviewAt } from "./helpers/deliverable-reviews.ts";
 import { freezeIdea, launchRows, proposalApi } from "./helpers/proposals.ts";
 
 /**
@@ -16,6 +17,60 @@ async function readyWorld() {
   await freezeIdea(b.database, world);
   return { b, world };
 }
+
+/** Fonctionnel validé avant `idea-v2`, qui modifie la vision et ajoute une page : le Fonctionnel est « À revoir ». */
+async function staleFunctional(
+  b: ReturnType<typeof bench>,
+  world: Awaited<ReturnType<typeof keyedWorld>>["world"],
+) {
+  const { seedProposals } = await import("./helpers/proposals.ts");
+  await seedProposals(b.database, world);
+  await b.database.query("UPDATE idea_versions SET frozen_at = $2 WHERE project_id = $1", [
+    world.projectId,
+    ago(3),
+  ]);
+  const [repo] = await b.database.query<{ id: string }>(
+    "SELECT id FROM project_repos WHERE project_id = $1",
+    [world.projectId],
+  );
+  await insertReviewAt(
+    b.database,
+    { organizationId: world.organizationId, projectId: world.projectId, repoId: repo?.id ?? "" },
+    world.actors.owner.userId,
+    ago(2),
+  );
+  await freezeIdea(b.database, world, 2, { vision: 2, personas: 1, risques: 1 });
+}
+
+describe("ai.proposeDeliverable : mode update (B328)", () => {
+  it("sans staleBecause : 422 VALIDATION, aucun lancement, rien d'enfilé", async () => {
+    const { b, world } = await readyWorld();
+    const res = await proposalApi(b.app, world.actors.dev).propose(world.projectId, {
+      mode: "update",
+    });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe("VALIDATION");
+    expect(await launchRows(b.database, world.projectId)).toHaveLength(0);
+    expect(b.agentQueue.jobs).toHaveLength(0);
+  });
+
+  it("avec staleBecause : lancement queued en mode update, sur la version figée la plus récente", async () => {
+    const { b, world } = await readyWorld();
+    b.use(FakeLlm.replying({}));
+    await staleFunctional(b, world);
+    const res = await proposalApi(b.app, world.actors.dev).propose(world.projectId, {
+      mode: "update",
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const rows = await launchRows(b.database, world.projectId);
+    expect(rows.find((row) => row.id === res.body.launchId)).toMatchObject({
+      status: "queued",
+      mode: "update",
+      base_version: 2,
+    });
+    expect(b.agentQueue.jobs).toHaveLength(1);
+  }, 120_000);
+});
 
 describe("ai.proposeDeliverable : nominal", () => {
   it("200 { launchId, status: queued } ; lancement en base, une tâche enfilée sans secret ni consigne", async () => {
@@ -206,8 +261,6 @@ describe("droits (cas 8)", () => {
     expect(cross.status).toBe(404);
   });
 });
-
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("ai.proposeOptions (cas 13)", () => {
   it("sans version figée : available false, raison no_frozen_idea, « L'agent lit » quand même listé", async () => {
     const b = bench();
@@ -244,19 +297,14 @@ describe("ai.proposeOptions (cas 13)", () => {
     ]);
   });
 
-  it("critères : les fonctionnalités sans critère ; mise à jour : les pages changées depuis le dernier lancement", async () => {
+  it("critères : les fonctionnalités sans critère ; mise à jour : les pages changées entre idea-v1 et idea-v2, Fonctionnel à revoir", async () => {
     const { b, world } = await readyWorld();
-    const { seedProposals } = await import("./helpers/proposals.ts");
-    await seedProposals(b.database, world);
+    await staleFunctional(b, world);
     // seed:large : 1 000 fonctionnalités, chacune a au moins un critère -> aucune sans critère.
     await b.database.query(
       "DELETE FROM spec_criteria WHERE feature_id IN (SELECT f.id FROM spec_features f JOIN spec_snapshots s ON s.id = f.snapshot_id JOIN project_repos r ON r.id = s.repo_id WHERE r.project_id = $1 ORDER BY f.spec_id LIMIT 7)",
       [world.projectId],
     );
-    await b.database.query("UPDATE agent_launches SET base_version = 1 WHERE project_id = $1", [
-      world.projectId,
-    ]);
-    await freezeIdea(b.database, world, 2, { vision: 2, personas: 1, risques: 1 });
 
     const res = await proposalApi(b.app, world.actors.dev).options(world.projectId);
 

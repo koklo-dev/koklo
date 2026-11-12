@@ -1,12 +1,15 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
+import { CLIENT_ROLE } from "../auth/roles.ts";
 import { NotificationEmitter } from "../notification/notification-emitter.ts";
+import { hasLinkedClient } from "../project/client-presence.ts";
 import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
-import { conflict, notFound } from "../tracker/api-errors.ts";
+import { conflict, forbidden, notFound } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { keysetAfter, pageOfItems } from "../tracker/cursor.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { entityHashesOf } from "./entity-hashes.ts";
 import type {
   ListReviews,
   ReviewActor,
@@ -16,6 +19,8 @@ import type {
   SubmitReview,
   SubmittedReview,
 } from "./review.repository.ts";
+import { canReview, clientListFilter } from "./review-policy.ts";
+import { type EntityHash, targetHashOf } from "./target-hash.ts";
 
 const SELECT = {
   id: true,
@@ -27,16 +32,23 @@ const SELECT = {
   authorRole: true,
   comment: true,
   createdAt: true,
+  version: { select: { contentHash: true } },
 } as const;
 
 /** Les écrans ne sont pas exposés (D2) : seules les cibles feature et baseline sont visibles. */
 const VISIBLE = { targetKind: { not: "screen" } } as const;
 
-type Row = Omit<ReviewRecord, "targetKind"> & { targetKind: string };
-const recordOf = (row: Row): ReviewRecord => ({
-  ...row,
-  targetKind: row.targetKind === "baseline" ? "baseline" : "feature",
-});
+type Row = Omit<ReviewRecord, "targetKind" | "contentHash"> & {
+  targetKind: ReviewRecord["targetKind"] | "screen";
+  version: { contentHash: string } | null;
+};
+function recordOf({ version, ...row }: Row): ReviewRecord {
+  return {
+    ...row,
+    targetKind: row.targetKind as ReviewRecord["targetKind"],
+    contentHash: version?.contentHash ?? null,
+  };
+}
 
 const staleVersion = () => new ORPCError("STALE_VERSION");
 const spaceNotReady = () => new ORPCError("SPACE_NOT_READY");
@@ -49,8 +61,9 @@ const baselineNumber = (ref: string) => Number(ref.slice("baseline-".length));
 
 /**
  * Journal `reviews` en base. Seul ce fichier écrit la table, par INSERT uniquement (le journal est
- * append-only, la base refuse aussi UPDATE et DELETE). Le commentaire est stocké et renvoyé tel
- * quel : il n'est ni journalisé, ni interpolé, ni copié dans l'audit ou les notifications.
+ * append-only, la base refuse aussi UPDATE et DELETE), avec sa ligne annexe `review_versions` (hachage du contenu validé).
+ * Le commentaire est stocké et renvoyé tel quel : il n'est ni journalisé, ni interpolé, ni copié dans l'audit ou les
+ * notifications.
  */
 @Injectable()
 export class PrismaReviewRepository implements ReviewRepository {
@@ -63,20 +76,24 @@ export class PrismaReviewRepository implements ReviewRepository {
   submit(scope: ProjectScope, actor: ReviewActor, input: SubmitReview): Promise<SubmittedReview> {
     return this.transactions.run(scope, async (tx) => {
       await this.lockAuthor(tx, scope, actor.role);
+      await this.assertMayReview(tx, scope, actor.role, input);
       const head = await this.head(tx, scope);
       const headSha = head.snapshot.commitSha;
       if (input.version !== headSha) throw staleVersion();
-      const baseline = await this.assertTarget(tx, scope, head.snapshot.id, input);
+      const { baseline, hash } = await this.assertTarget(tx, scope, head.snapshot.id, input);
       // Une baseline taguée est refusée avant le rejeu : une review identique antérieure ne la rouvre pas.
       if (baseline?.status === "tagged") throw conflict("baseline_not_open");
-      const same = await this.findReplay(tx, scope, input, headSha);
-      if (same) return { record: same, headSha };
+      const same = await this.findReplay(tx, scope, input, { headSha, hash });
+      if (same) return { record: same, headSha, currentHash: hash };
       if (baseline) assertOpen(baseline, headSha);
-      const record = await this.insert(tx, scope, actor, head.repo.id, input, headSha);
+      const record = await this.insert(tx, scope, actor, head.repo.id, input, {
+        sha: headSha,
+        hash,
+      });
       const validates = baseline !== null && input.status === "approved";
       if (validates) await this.validateBaseline(tx, baseline.id, headSha, record, actor.now);
       await this.announce(tx, scope, record, validates ? baselineNumber(input.targetRef) : null);
-      return { record, headSha };
+      return { record, headSha, currentHash: hash };
     });
   }
 
@@ -86,6 +103,7 @@ export class PrismaReviewRepository implements ReviewRepository {
         where: {
           projectId: scope.projectId,
           ...VISIBLE,
+          ...(query.clientOnly ? clientListFilter() : {}),
           ...(query.targetKind === undefined ? {} : { targetKind: query.targetKind }),
           ...(query.targetRef === undefined ? {} : { targetRef: query.targetRef }),
           ...(query.after ? keysetAfter("createdAt", query.after, "desc") : {}),
@@ -96,22 +114,50 @@ export class PrismaReviewRepository implements ReviewRepository {
       });
       const page = pageOfItems(rows, query.limit, (row) => row.createdAt, recordOf);
       const found = await this.resolver.resolve(tx, scope, {});
+      const usable = found && found.snapshot.status !== "failed" ? found : null;
+      const entities = usable ? await entityHashesOf(tx, usable.snapshot.id) : [];
       return {
         records: page.items,
         nextCursor: page.nextCursor,
-        headSha: found && found.snapshot.status !== "failed" ? found.snapshot.commitSha : null,
+        headSha: usable?.snapshot.commitSha ?? null,
+        currentHashes: new Map(
+          page.items.map((record) => [
+            `${record.targetKind}:${record.targetRef}`,
+            targetHashOf(entities, record.targetKind, record.targetRef),
+          ]),
+        ),
       };
     });
   }
 
-  /** Notifications puis audit, dans la transaction de l'écriture (`validatedNumber` : baseline validée). */
+  /**
+   * Politique par cible (D1, B325 d) : décidée ici d'après le lien client du projet, jamais l'entrée. Placée avant toute
+   * lecture de la cible : un refus ne dit rien de son existence.
+   */
+  private async assertMayReview(
+    tx: Tx,
+    scope: ProjectScope,
+    role: string,
+    input: SubmitReview,
+  ): Promise<void> {
+    const hasClient = await hasLinkedClient(tx, scope.projectId);
+    if (!canReview(role, input.targetKind, input.targetRef, hasClient)) throw forbidden();
+  }
+
+  /**
+   * Notifications puis audit, dans la transaction de l'écriture (`validatedNumber` : baseline validée). Seule la validation
+   * du client prévient l'équipe ; celle de l'équipe elle-même ne notifie personne. L'audit cible la review : son rôle
+   * d'auteur dit si elle a été posée à la place du client.
+   */
   private async announce(
     tx: Tx,
     scope: ProjectScope,
     record: ReviewRecord,
     validatedNumber: number | null,
   ): Promise<void> {
-    await this.notifications.reviewSubmitted(tx, scope, record.id);
+    if (record.authorRole === CLIENT_ROLE) {
+      await this.notifications.reviewSubmitted(tx, scope, record.id);
+    }
     if (validatedNumber !== null) {
       await this.notifications.baselineValidated(tx, scope, validatedNumber);
     }
@@ -142,22 +188,42 @@ export class PrismaReviewRepository implements ReviewRepository {
     return found;
   }
 
-  /** La cible doit exister dans ce projet : feature de la tête, ou baseline du projet (404 sinon). */
+  /**
+   * La cible doit exister dans ce projet (404 sinon) : fonctionnalité de la tête, baseline du projet, ou entité indexée
+   * (parcours, bloc de règles, rôles, livrable). Rend aussi son hachage courant : `null` pour une baseline et pour une
+   * fonctionnalité d'un snapshot d'avant TK-100 (la validation retombe sur le SHA).
+   */
   private async assertTarget(tx: Tx, scope: ProjectScope, snapshotId: string, input: SubmitReview) {
-    if (input.targetKind === "feature") {
-      const feature = await tx.specFeature.findFirst({
-        where: { snapshotId, specId: input.targetRef },
-        select: { id: true },
+    if (input.targetKind === "baseline") {
+      const baseline = await tx.baseline.findFirst({
+        where: { projectId: scope.projectId, number: baselineNumber(input.targetRef) },
+        select: { id: true, status: true, proposedSha: true },
       });
-      if (!feature) throw notFound();
-      return null;
+      if (!baseline) throw notFound();
+      return { baseline, hash: null };
     }
-    const baseline = await tx.baseline.findFirst({
-      where: { projectId: scope.projectId, number: baselineNumber(input.targetRef) },
-      select: { id: true, status: true, proposedSha: true },
+    const entities = await entityHashesOf(tx, snapshotId);
+    const hash = targetHashOf(entities, input.targetKind, input.targetRef);
+    if (input.targetKind === "feature") {
+      await this.assertFeature(tx, snapshotId, input.targetRef, entities);
+    } else if (hash === null) {
+      throw notFound();
+    }
+    return { baseline: null, hash };
+  }
+
+  private async assertFeature(
+    tx: Tx,
+    snapshotId: string,
+    specId: string,
+    entities: readonly EntityHash[],
+  ): Promise<void> {
+    if (entities.some((entity) => entity.kind === "feature" && entity.specId === specId)) return;
+    const feature = await tx.specFeature.findFirst({
+      where: { snapshotId, specId },
+      select: { id: true },
     });
-    if (!baseline) throw notFound();
-    return baseline;
+    if (!feature) throw notFound();
   }
 
   private async insert(
@@ -166,7 +232,7 @@ export class PrismaReviewRepository implements ReviewRepository {
     actor: ReviewActor,
     repoId: string,
     input: SubmitReview,
-    sha: string,
+    version: { sha: string; hash: string | null },
   ): Promise<ReviewRecord> {
     const row = await tx.review.create({
       data: {
@@ -175,24 +241,28 @@ export class PrismaReviewRepository implements ReviewRepository {
         repoId,
         targetKind: input.targetKind,
         targetRef: input.targetRef,
-        sha,
+        sha: version.sha,
         status: input.status,
         authorUserId: scope.userId,
         authorRole: actor.role,
         comment: input.comment ?? null,
         createdAt: actor.now,
+        ...(version.hash === null ? {} : { version: { create: { contentHash: version.hash } } }),
       },
       select: SELECT,
     });
     return recordOf(row);
   }
 
-  /** Rejeu strictement identique à SA dernière review de la cible : cette ligne, rien d'écrit. */
+  /**
+   * Rejeu strictement identique à SA dernière review de la cible : cette ligne, rien d'écrit. « Identique » = même
+   * contenu (hachage) quand la cible en a un, sinon même tête de spec.
+   */
   private async findReplay(
     tx: Tx,
     scope: ProjectScope,
     input: SubmitReview,
-    headSha: string,
+    current: { headSha: string; hash: string | null },
   ): Promise<ReviewRecord | null> {
     const last = await tx.review.findFirst({
       where: {
@@ -204,11 +274,13 @@ export class PrismaReviewRepository implements ReviewRepository {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       select: SELECT,
     });
+    if (last === null) return null;
+    const sameContent =
+      current.hash !== null && last.version !== null
+        ? last.version.contentHash === current.hash
+        : last.sha === current.headSha;
     const identical =
-      last !== null &&
-      last.sha === headSha &&
-      last.status === input.status &&
-      last.comment === (input.comment ?? null);
+      sameContent && last.status === input.status && last.comment === (input.comment ?? null);
     return identical ? recordOf(last) : null;
   }
 

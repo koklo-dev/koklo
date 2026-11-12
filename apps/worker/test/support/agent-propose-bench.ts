@@ -183,6 +183,8 @@ export interface LaunchOver {
   lastSeenAt?: string | null;
   heartbeatAt?: string;
   instruction?: string | null;
+  /** Version d'idée lue par le lancement (1 par défaut). */
+  baseVersion?: number;
 }
 
 /** Lancement `queued` posé comme l'API (SQL), puis enfilé `{ launchId }` seul. */
@@ -195,7 +197,7 @@ export async function launch(
   await bench.query(
     `INSERT INTO agent_launches (id, organization_id, project_id, deliverable, mode, instruction, status, requested_by,
                                  sources, base_version, last_seen_at, heartbeat_at, updated_at)
-     VALUES ($1, $2, $3, 'functional', $4, $5, $6, $7, '["idea.frozen"]'::jsonb, 1, $8, COALESCE($9::timestamptz, now()), now())`,
+     VALUES ($1, $2, $3, 'functional', $4, $5, $6, $7, '["idea.frozen"]'::jsonb, $10, $8, COALESCE($9::timestamptz, now()), now())`,
     [
       id,
       scene.organizationId,
@@ -206,6 +208,7 @@ export async function launch(
       scene.userId,
       over.lastSeenAt ?? null,
       over.heartbeatAt ?? null,
+      over.baseVersion ?? 1,
     ],
   );
   const worker = bench.worker;
@@ -260,3 +263,32 @@ export const proposalsOf = (bench: WorkerBench, launchId: string) =>
        FROM agent_proposals WHERE launch_id = $1 ORDER BY position`,
     [launchId],
   );
+
+/**
+ * `idea-v2` après `idea-v1` : la vision est modifiée, la page « annexes » ajoutée, les personas et les risques inchangés
+ * (leur texte ne doit jamais atteindre le modèle en mode `update`).
+ */
+export async function seedIdeaV2(bench: WorkerBench, scene: Scene): Promise<void> {
+  const { organizationId: org, projectId: project } = scene;
+  await bench.query(
+    "UPDATE idea_pages SET content_md = 'VISION-V2 texte modifie', version = 2 WHERE project_id = $1 AND slug = 'vision'",
+    [project],
+  );
+  await bench.query(
+    `INSERT INTO idea_pages (id, organization_id, project_id, slug, title, position, required, origin,
+                             template_key, status, content_md, version, updated_at)
+     VALUES ($1, $2, $3, 'annexes', 'Annexes', 9, false, 'template', 'annexes', 'draft', 'ANNEXE-V2 nouvelle page', 1, now())`,
+    [randomUUID(), org, project],
+  );
+  await bench.query(
+    `INSERT INTO idea_versions (id, organization_id, project_id, number, tag, commit_sha, pages_versions, frozen_at, updated_at)
+     VALUES ($1, $2, $3, 2, 'idea-v2', $4, $5::jsonb, now(), now())`,
+    [
+      randomUUID(),
+      org,
+      project,
+      "c".repeat(40),
+      JSON.stringify({ vision: 2, personas: 1, "hypotheses-risques": 1, perimetre: 1, annexes: 1 }),
+    ],
+  );
+}

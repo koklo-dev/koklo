@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { roleSchema } from "./schemas.ts";
 import { clientValidationSchema } from "./schemas-client-space.ts";
+import { deliverableKeySchema } from "./schemas-shell.ts";
 import { commitShaSchema, featureIdSchema } from "./schemas-spec.ts";
 import { CLEAN_MESSAGE, isCleanText } from "./schemas-suggestion.ts";
 import { pageInputSchema, pageOf } from "./schemas-tickets.ts";
@@ -9,11 +10,32 @@ import { pageInputSchema, pageOf } from "./schemas-tickets.ts";
 export const REVIEW_COMMENT_MAX = 2000;
 export const REVIEW_VERSION_MAX = 256;
 
-export const reviewTargetKindSchema = z.enum(["feature", "baseline"]);
+/**
+ * Cibles de validation : une fonctionnalité, une baseline, et (TK-100, B325 c) un parcours, le bloc des règles, le bloc des
+ * rôles ou un livrable entier. Les écrans restent masqués (D2).
+ */
+export const reviewTargetKindSchema = z.enum([
+  "feature",
+  "baseline",
+  "flow",
+  "rules",
+  "roles",
+  "deliverable",
+]);
 export const reviewStatusSchema = z.enum(["approved", "changes_requested"]);
 export const baselineRefSchema = z.string().regex(/^baseline-(0|[1-9]\d*)$/);
 
-const REF_BY_KIND = { feature: featureIdSchema, baseline: baselineRefSchema } as const;
+export const flowRefSchema = z.string().regex(/^P-[A-Za-z0-9][A-Za-z0-9-]{0,62}$/);
+
+/** Référence attendue par genre : `rules` et `roles` désignent le bloc entier, `deliverable` une clé de `DELIVERABLE_KEYS`. */
+const REF_BY_KIND = {
+  feature: featureIdSchema,
+  baseline: baselineRefSchema,
+  flow: flowRefSchema,
+  rules: z.literal("rules"),
+  roles: z.literal("roles"),
+  deliverable: deliverableKeySchema,
+} as const;
 
 /**
  * Le client valide une cible liée à la `version` qu'il a lue : jeton opaque, aucune forme imposée
@@ -53,13 +75,16 @@ export const reviewSchema = z.object({
   id: z.uuid(),
   targetKind: reviewTargetKindSchema,
   targetRef: z.string(),
-  sha: commitShaSchema,
+  /** Jamais montré au client (vocabulaire git fermé, D7) : `null` pour lui. */
+  sha: commitShaSchema.nullable(),
   status: reviewStatusSchema,
   authorId: z.uuid(),
   authorRole: roleSchema.nullable(),
   comment: z.string().nullable(),
   createdAt: z.iso.datetime(),
   current: z.boolean(),
+  /** Validation posée par l'équipe sans client invité (D1) : « validé par l'équipe · sans client ». */
+  onBehalf: z.boolean(),
 });
 
 export const reviewListOutputSchema = pageOf(reviewSchema);

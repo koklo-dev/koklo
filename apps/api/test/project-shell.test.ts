@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { stripRequestId } from "./helpers/client-scene.ts";
+import { freezeIdea } from "./helpers/proposals.ts";
 import { installBench } from "./helpers/repo-scene.ts";
 import { seedProposedBaseline } from "./helpers/reviews.ts";
 import { DELIVERABLE_KEYS, shellApi } from "./helpers/shell.ts";
+import { deliverablesApi } from "./helpers/spec-deliverables.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import {
   apiFor,
@@ -136,14 +138,24 @@ describe("TK-91 phase : une version idea-vN fait passer l'idée au cadrage", () 
   });
 });
 
-describe("A4 sept livrables, rien d'inventé", () => {
-  it("sans fonctionnalité : sept entrées dans l'ordre, seul Fonctionnel disponible, 0 validé", async () => {
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("A4 sept livrables, lus dans spec.deliverables (TK-100)", () => {
+  it("sans idée figée ni fonctionnalité : sept entrées dans l'ordre, aucune disponible, 0 validé", async () => {
     const world = await createWorld(bench().database);
     const { body } = await shellOf(world);
     expect(body.deliverables.map((d: { key: string }) => d.key)).toEqual([...DELIVERABLE_KEYS]);
     const available = body.deliverables.filter((d: { available: boolean }) => d.available);
-    expect(available.map((d: { key: string }) => d.key)).toEqual(["functional"]);
+    expect(available).toEqual([]);
     expect(body.validatedCount).toBe(0);
+  });
+
+  it("idea-v1 commitée : seul le Fonctionnel s'ouvre", async () => {
+    const s = await readScene(bench());
+    await seedIndex(bench(), s, []);
+    await freezeIdea(bench().database, s);
+    const { body } = await shellOf(s.world);
+    const available = body.deliverables.filter((d: { available: boolean }) => d.available);
+    expect(available.map((d: { key: string }) => d.key)).toEqual(["functional"]);
   });
 
   it("avec une fonctionnalité : Données et Design s'ouvrent, les quatre autres restent verrouillées", async () => {
@@ -164,13 +176,22 @@ describe("A4 sept livrables, rien d'inventé", () => {
     expect(body.validatedCount).toBe(0);
   });
 
-  it("chaque livrable verrouillé dit après quoi il s'ouvre ; Fonctionnel n'attend rien", async () => {
+  it("la disponibilité du shell est celle de spec.deliverables", async () => {
+    const s = await framingWorld();
+    const shell = (await shellOf(s.world)).body.deliverables;
+    const list = (await deliverablesApi(bench().app, s.world.actors.dev).list(s.projectId)).body;
+    expect(shell.map((d: { key: string; available: boolean }) => [d.key, d.available])).toEqual(
+      list.deliverables.map((d: { key: string; available: boolean }) => [d.key, d.available]),
+    );
+  });
+
+  it("chaque livrable dit après quoi il s'ouvre ; le Fonctionnel attend la première version de l'idée", async () => {
     const world = await createWorld(bench().database);
     const { body } = await shellOf(world);
     const after = Object.fromEntries(
       body.deliverables.map((d: { key: string; after: string | null }) => [d.key, d.after]),
     );
-    expect(after.functional).toBeNull();
+    expect(after.functional).toBe("la première version de l'idée");
     for (const key of ["architecture", "technical", "security", "quality"]) {
       expect(typeof after[key], key).toBe("string");
       expect(after[key].length, key).toBeGreaterThan(0);

@@ -1,3 +1,4 @@
+import { DELIVERABLE_KEYS } from "@koklo/contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -11,6 +12,7 @@ import {
   procedures,
   projectShell,
   resetWebMocks,
+  specDeliverables,
 } from "./support/web-mocks.ts";
 import { DESKTOP, MOBILE, setViewport } from "./viewport.ts";
 
@@ -192,6 +194,37 @@ describe("page de projet", () => {
     ]);
   });
 
+  it("lit spec.deliverables du projet de l'URL, une seule fois (barre et compteur SPEC)", async () => {
+    renderFrame(SPEC);
+    await within(nav()).findByRole("link", { name: "Données" });
+    expect(procedures.specDeliverables).toHaveBeenCalledTimes(1);
+    expect(procedures.specDeliverables).toHaveBeenCalledWith({ projectId: PROJECT_ID });
+  });
+
+  it("le compteur et les liens viennent de spec.deliverables, pas de project.shell", async () => {
+    procedures.projectShell.mockResolvedValue(
+      projectShell({
+        validatedCount: 6,
+        deliverables: DELIVERABLE_KEYS.map((key) => ({ key, available: true, after: null })),
+      }),
+    );
+    procedures.specDeliverables.mockResolvedValue(
+      specDeliverables({
+        validated: ["functional", "data"],
+        open: new Set(["functional", "data"]),
+      }),
+    );
+    renderFrame(SPEC);
+    const group = await within(nav()).findByRole("group", { name: "Spec" });
+    await within(group).findByRole("link", { name: "Données" });
+    expect(group).toHaveTextContent("2/7");
+    expect(
+      within(group)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Fonctionnel", "Données"]);
+  });
+
   it("SPEC : compteur 0/7, livrables non disponibles en boutons aria-disabled", async () => {
     renderFrame(SPEC);
     const group = await within(nav()).findByRole("group", { name: "Spec" });
@@ -246,20 +279,29 @@ describe("page de projet", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("un identifiant qui n'est pas un uuid n'appelle ni project.shell ni project.visit", async () => {
+  it("un identifiant qui n'est pas un uuid n'appelle ni project.shell, ni spec.deliverables, ni project.visit", async () => {
     renderFrame("/projects/pas-un-uuid/spec/functional");
     await within(nav()).findByRole("link", { name: "Tous les projets" });
     expect(procedures.projectShell).not.toHaveBeenCalled();
+    expect(procedures.specDeliverables).not.toHaveBeenCalled();
     expect(procedures.projectVisit).not.toHaveBeenCalled();
   });
 
-  it("project.shell en échec : la navigation reste, SPEC verrouillée (fail-closed), pas de compteur", async () => {
+  it("project.shell en échec : la navigation reste et SPEC garde ses livrables (ils ne viennent plus de la coquille)", async () => {
     procedures.projectShell.mockRejectedValue(new Error("500"));
+    renderFrame(SPEC);
+    const group = await within(nav()).findByRole("group", { name: "Spec" });
+    expect(await within(group).findByRole("link", { name: "Données" })).toBeInTheDocument();
+    expect(within(nav()).getByRole("link", { name: "Vue d'ensemble" })).toBeInTheDocument();
+  });
+
+  it("spec.deliverables en échec : la navigation reste, SPEC verrouillée (fail-closed), pas de compteur", async () => {
+    procedures.specDeliverables.mockRejectedValue(new Error("500"));
     renderFrame(SPEC);
     const group = await within(nav()).findByRole("group", { name: "Spec" });
     await waitFor(() => expect(group).not.toHaveAttribute("aria-busy"));
     expect(within(group).queryAllByRole("link")).toHaveLength(0);
-    expect(within(nav()).getByRole("link", { name: "Tickets" })).toHaveTextContent(/^Tickets$/);
+    expect(within(nav()).getByRole("link", { name: /Tickets/ })).toBeInTheDocument();
     expect(within(nav()).getByRole("link", { name: "Vue d'ensemble" })).toBeInTheDocument();
   });
 });

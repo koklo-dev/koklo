@@ -11,6 +11,7 @@ import { AiCallRunner, correlationIdOf } from "../ai/ai-call.ts";
 import { verifyPrompt } from "../ai/ai-prompts.ts";
 import { CLOCK, type Clock } from "../clock.ts";
 import { AgentProposeQueue } from "../queue/agent-propose-queue.ts";
+import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { validation } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { LAUNCH_REPOSITORY, type LaunchRepository } from "./launch.repository.ts";
@@ -43,6 +44,7 @@ export class ProposalLaunchService {
     @Inject(AiCallRunner) private readonly runner: AiCallRunner,
     @Inject(AgentProposeQueue) private readonly queue: AgentProposeQueue,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(SpecDeliverablesService) private readonly deliverables: SpecDeliverablesService,
   ) {}
 
   async propose(
@@ -58,6 +60,12 @@ export class ProposalLaunchService {
       throw validation(
         "deliverable",
         "Aucune version figée du dossier d'idée : figez-la avant de proposer.",
+      );
+    }
+    if (input.mode === "update" && !(await this.deliverables.staleBecause(scope, "functional"))) {
+      throw validation(
+        "mode",
+        "Aucun changement du dossier d'idée à reporter : rien à mettre à jour.",
       );
     }
     const created = await this.launches.create(
@@ -90,11 +98,12 @@ export class ProposalLaunchService {
     if ((await this.launches.frozenVersion(scope)) === null) {
       return { options: [], reads: reads(), available: false, reason: "no_frozen_idea" };
     }
-    const facts = await this.launches.optionFacts(scope, input.deliverable);
+    const facts = await this.launches.optionFacts(scope);
+    const stale = await this.deliverables.staleBecause(scope, "functional");
     const listed = [
       option("complete"),
       ...(facts.withoutCriteria > 0 ? [option("criteria", facts.withoutCriteria)] : []),
-      ...(facts.changedPages > 0 ? [option("update", facts.changedPages)] : []),
+      ...(stale && stale.changedPages > 0 ? [option("update", stale.changedPages)] : []),
       option("all"),
     ];
     return {

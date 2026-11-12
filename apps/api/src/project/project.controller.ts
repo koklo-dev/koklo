@@ -114,7 +114,13 @@ export class ProjectController {
   @Implement(contract.project.shell)
   shell(@Req() request: Request) {
     return implement(contract.project.shell).handler(({ input, errors }) =>
-      inProject(request, errors, input.projectId, (scope) => this.shells.shell(scope), this.access),
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.shells.shell(scope, requireSession(request).role),
+        this.access,
+      ),
     );
   }
 

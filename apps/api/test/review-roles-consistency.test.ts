@@ -22,13 +22,13 @@ const rel = (file: string) => file.slice(SRC.length + 1);
 const CONTROLLER = "review/review.controller.ts";
 
 describe("constantes de rôles des procédures review.*", () => {
-  it("REVIEW_SUBMIT_ROLES : le client seul (ni owner, ni admin, ni équipe)", () => {
-    expect([...REVIEW_SUBMIT_ROLES]).toEqual(["client"]);
+  it("REVIEW_SUBMIT_ROLES : le client, et owner, admin, dev (jamais designer ni business) ; la politique par cible est dans review-policy.ts (TK-100)", () => {
+    expect([...REVIEW_SUBMIT_ROLES].sort()).toEqual(["admin", "client", "dev", "owner"]);
   });
 
-  it("REVIEW_READ_ROLES : owner, admin, dev, designer, business (pas le client)", () => {
+  it("REVIEW_READ_ROLES : les six rôles, le client pour ses seules cibles (filtre serveur, TK-100)", () => {
     expect([...REVIEW_READ_ROLES].sort()).toEqual(
-      ["admin", "business", "designer", "dev", "owner"].sort(),
+      ["admin", "business", "client", "designer", "dev", "owner"].sort(),
     );
   });
 });

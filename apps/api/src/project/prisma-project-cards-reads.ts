@@ -1,4 +1,4 @@
-import { latestReview, type ReviewVerdict } from "../client-space/validation.ts";
+import type { ReviewVerdict } from "../client-space/validation.ts";
 import {
   ACTIVITY_ACTIONS,
   CLIENT_ACTIVITY_ACTIONS,
@@ -9,6 +9,8 @@ import {
   teamInOrder,
 } from "../project-overview/overview-main.ts";
 import { carrierFilter } from "../repo/prisma-repo.repository.ts";
+import { featureHashesOf } from "../review/entity-hashes.ts";
+import { VERDICT_SELECT, verdictOf } from "../review/verdicts.ts";
 import type { Tx } from "../tracker/project-transactions.ts";
 import type { Audience, CardFacts } from "./project-cards.ts";
 
@@ -178,15 +180,9 @@ async function specFacts(
   });
   const reviews = await tx.review.findMany({
     where: { projectId: { in: [...snapshotOf.keys()] }, targetKind: "feature" },
-    select: {
-      id: true,
-      projectId: true,
-      status: true,
-      sha: true,
-      createdAt: true,
-      targetRef: true,
-    },
+    select: { ...VERDICT_SELECT, projectId: true },
   });
+  const hashes = await featureHashesOf(tx, snapshotIds);
   const featuresOf = new Map<string, string[]>();
   for (const feature of features) {
     featuresOf.set(feature.snapshotId, [
@@ -208,7 +204,10 @@ async function specFacts(
           verdicts: failed
             ? []
             : specIds.map((specId) =>
-                latestReview(own.filter((review) => review.targetRef === specId)),
+                verdictOf(
+                  own.filter((review) => review.targetRef === specId),
+                  hashes.get(snapshot.id)?.get(specId) ?? null,
+                ),
               ),
         },
       ];

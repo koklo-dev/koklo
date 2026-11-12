@@ -99,6 +99,8 @@ describe("GET /openapi.json (C3.1)", () => {
       "/projects/{projectId}/spec-repo",
       "/projects/{projectId}/spec/batches",
       "/projects/{projectId}/spec/batches/{batchId}",
+      "/projects/{projectId}/spec/deliverables",
+      "/projects/{projectId}/spec/deliverables/{key}/force",
       "/projects/{projectId}/spec/features",
       "/projects/{projectId}/spec/features/{specId}",
       "/projects/{projectId}/sprints",

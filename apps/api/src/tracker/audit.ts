@@ -24,7 +24,8 @@ export interface AuditEntry {
     | "notification_preference"
     | "idea_page"
     | "agent_launch"
-    | "agent_proposal";
+    | "agent_proposal"
+    | "deliverable_override";
   /** UUID de la ressource, posé par le serveur (jamais lu de l'entrée). */
   targetId: string;
   ticketId?: string;

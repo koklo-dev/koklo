@@ -3,6 +3,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
 import { readPhaseFacts } from "../project/prisma-project-shell.repository.ts";
 import { phaseOf } from "../project/project-shell.ts";
+import { featureHashesOf } from "../review/entity-hashes.ts";
+import { VERDICT_SELECT, verdictOf } from "../review/verdicts.ts";
 import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -12,7 +14,6 @@ import type {
   FeatureTrail,
   IndexedHead,
 } from "./client-space.repository.ts";
-import { latestReview } from "./validation.ts";
 
 /** Lecture seule : aucune méthode n'écrit (ni reviews, ni suggestions, ni audit) ; la phase réconcilie seulement les versions de l'idée, comme `project.shell`. */
 @Injectable()
@@ -95,10 +96,14 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
   trails(scope: ProjectScope, refs: readonly string[]): Promise<Map<string, FeatureTrail>> {
     return this.transactions.run(scope, async (tx) => {
       const targetRef = { in: [...refs] };
+      const snapshot = await this.readySnapshot(tx, scope);
+      const hashes = snapshot
+        ? (await featureHashesOf(tx, [snapshot.id])).get(snapshot.id)
+        : undefined;
       const [reviews, suggestions] = await Promise.all([
         tx.review.findMany({
           where: { projectId: scope.projectId, targetKind: "feature", targetRef },
-          select: { id: true, targetRef: true, status: true, sha: true, createdAt: true },
+          select: VERDICT_SELECT,
         }),
         tx.suggestion.findMany({
           where: { projectId: scope.projectId, targetKind: "feature", status: "open", targetRef },
@@ -109,7 +114,10 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
         refs.map((ref) => [
           ref,
           {
-            latestReview: latestReview(reviews.filter((review) => review.targetRef === ref)),
+            latestReview: verdictOf(
+              reviews.filter((review) => review.targetRef === ref),
+              hashes?.get(ref) ?? null,
+            ),
             openSuggestions: suggestions.filter((row) => row.targetRef === ref).length,
           },
         ]),

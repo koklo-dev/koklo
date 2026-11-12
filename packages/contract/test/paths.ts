@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 2.9.0 (124 routes, 98 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 2.10.0 (126 routes, 100 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -48,6 +48,7 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/shell",
   "GET /projects/{projectId}/spec",
   "GET /projects/{projectId}/spec/batches/{batchId}",
+  "GET /projects/{projectId}/spec/deliverables",
   "GET /projects/{projectId}/spec/features",
   "GET /projects/{projectId}/spec/features/{specId}",
   "GET /projects/{projectId}/sprints",
@@ -103,6 +104,7 @@ export const ALL_PAIRS: string[] = [
   "POST /projects/{projectId}/reviews",
   "POST /projects/{projectId}/spec-repo",
   "POST /projects/{projectId}/spec/batches",
+  "POST /projects/{projectId}/spec/deliverables/{key}/force",
   "POST /projects/{projectId}/sprints",
   "POST /projects/{projectId}/sprints/{key}/activate",
   "POST /projects/{projectId}/sprints/{key}/close",
@@ -204,6 +206,8 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/spec-repo",
   "/projects/{projectId}/spec/batches",
   "/projects/{projectId}/spec/batches/{batchId}",
+  "/projects/{projectId}/spec/deliverables",
+  "/projects/{projectId}/spec/deliverables/{key}/force",
   "/projects/{projectId}/spec/features",
   "/projects/{projectId}/spec/features/{specId}",
   "/projects/{projectId}/sprints",

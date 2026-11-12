@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { TestDatabase } from "@koklo/db/testing";
 import type { RepoRef } from "@koklo/domain";
 import type { INestApplication } from "@nestjs/common";
@@ -140,6 +140,68 @@ export interface SeedOptions {
   indexedAt?: string;
   tables?: string[];
   endpoints?: { id: string; method: string; path: string }[];
+  /** Entités génériques (`spec_entities`, TK-100) comme les écrirait le worker ; absent = snapshot d'avant TK-100 (repli sur le SHA). */
+  entities?: EntitySeed[];
+}
+
+/** Une ligne `spec_entities` ; `hash` par défaut dérivé du genre et de l'identifiant (changer `hash` = modifier l'élément). */
+export interface EntitySeed {
+  kind:
+    | "feature"
+    | "rule"
+    | "roles"
+    | "flow"
+    | "relations"
+    | "table"
+    | "endpoint"
+    | "screen"
+    | "test";
+  specId: string;
+  hash?: string;
+}
+
+const hashOf = (text: string) => createHash("sha256").update(text).digest("hex");
+
+/** Les fonctionnalités de `features` comme entités ; le hachage suit tout le contenu de la graine (titre compris). */
+export const featureEntities = (features: readonly FeatureSeed[]): EntitySeed[] =>
+  features.map((seed) => ({
+    kind: "feature",
+    specId: seed.id,
+    hash: hashOf(JSON.stringify(seed)),
+  }));
+
+/** Hachage d'une entité d'après un contenu : deux contenus différents, deux hachages. */
+export const entity = (kind: EntitySeed["kind"], specId: string, content = ""): EntitySeed => ({
+  kind,
+  specId,
+  hash: hashOf(`${kind}:${specId}:${content}`),
+});
+
+async function insertGenericEntities(
+  db: TestDatabase,
+  s: SpecReadScene,
+  snapshotId: string,
+  entities: readonly EntitySeed[],
+): Promise<void> {
+  for (const [sort, seed] of entities.entries()) {
+    await db.query(
+      `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NULL, $6, '{}'::jsonb, $7, $8, now(), now())`,
+      [
+        randomUUID(),
+        s.organizationId,
+        snapshotId,
+        seed.kind,
+        seed.specId,
+        `${seed.kind}/${seed.specId}`,
+        seed.hash ?? hashOf(`${seed.kind}:${seed.specId}`),
+        sort,
+      ],
+    );
+  }
+  await db.query("UPDATE spec_snapshots SET entities_indexed_at = now() WHERE id = $1", [
+    snapshotId,
+  ]);
 }
 
 const randomSha = () => randomUUID().replaceAll("-", "").padEnd(40, "0").slice(0, 40);
@@ -258,6 +320,9 @@ export async function seedIndex(
     ],
   );
   await insertEntities(bench.database, s, snapshotId, features, options);
+  if (options.entities) {
+    await insertGenericEntities(bench.database, s, snapshotId, options.entities);
+  }
   if (!options.noHead) await moveHead(bench.database, s, branch, snapshotId);
   return { sha, snapshotId };
 }

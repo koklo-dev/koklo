@@ -24,8 +24,8 @@ export const DELIVERABLE_KEYS = [
 export const deliverableKeySchema = z.enum(DELIVERABLE_KEYS);
 
 /**
- * Un livrable de la barre « SPEC N/7 ». `after` dit ce qui l'ouvre (« le fonctionnel ») ; `null`
- * pour le premier. Disponibilité dérivée côté serveur en attendant `spec.deliverables` (B77).
+ * Un livrable de la barre « SPEC N/7 ». `after` dit ce qui l'ouvre (« le fonctionnel »). Depuis 2.10.0 la
+ * disponibilité vient du service des livrables (`spec.deliverables`, TK-100, règle B1) ; le web lit `spec.deliverables`.
  */
 export const deliverableAvailabilitySchema = z.object({
   key: deliverableKeySchema,

@@ -1,20 +1,21 @@
 import { type ProjectRecent, RECENT_PROJECTS_MAX } from "@koklo/contract";
-import { projectTileOf } from "@koklo/domain";
+import { type DeliverableKey, deliverableAfterOf, projectTileOf } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import type { AuthSession } from "../auth/session.ts";
 import { CLOCK, type Clock } from "../clock.ts";
+import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import {
   PROJECT_SHELL_REPOSITORY,
   type ProjectShellRepository,
 } from "./project-shell.repository.ts";
-import { type Deliverable, deliverablesOf, type ProjectPhase, phaseOf } from "./project-shell.ts";
+import { type ProjectPhase, phaseOf } from "./project-shell.ts";
 
 export interface ProjectShell {
   id: string;
   name: string;
   phase: ProjectPhase;
-  deliverables: Deliverable[];
+  deliverables: { key: DeliverableKey; available: boolean; after: string | null }[];
   validatedCount: number;
   ticketCount: number | null;
 }
@@ -24,17 +25,25 @@ export class ProjectShellService {
   constructor(
     @Inject(PROJECT_SHELL_REPOSITORY) private readonly repository: ProjectShellRepository,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(SpecDeliverablesService) private readonly deliverables: SpecDeliverablesService,
   ) {}
 
-  async shell(scope: ProjectScope): Promise<ProjectShell> {
-    const record = await this.repository.shell(scope);
+  /** Disponibilité et compteur « SPEC N/7 » viennent de `spec.deliverables` (TK-100) ; le rôle n'y change rien. */
+  async shell(scope: ProjectScope, role: string | undefined): Promise<ProjectShell> {
+    const [record, spec] = await Promise.all([
+      this.repository.shell(scope),
+      this.deliverables.list(scope, role),
+    ]);
     return {
       id: record.id,
       name: record.name,
       phase: phaseOf(record),
-      deliverables: deliverablesOf(record),
-      // Aucun livrable n'est validable avant TK-100 : le compteur reste à zéro (B77).
-      validatedCount: 0,
+      deliverables: spec.deliverables.map(({ key, available }) => ({
+        key,
+        available,
+        after: deliverableAfterOf(key),
+      })),
+      validatedCount: spec.validatedCount,
       ticketCount: record.activeSprintTickets,
     };
   }

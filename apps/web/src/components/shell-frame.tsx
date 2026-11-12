@@ -7,6 +7,7 @@ import { canListMembers } from "../lib/roles.ts";
 import { isIdeaPath, isSpecSlug, projectIdFromPath, type SpecSlug } from "../lib/shell-routes.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 import { useProjectShell, useProjectVisit } from "../lib/use-project-shell.ts";
+import { useSpecDeliverables } from "../lib/use-spec-deliverables.ts";
 import { AppSidebar } from "./app-sidebar.tsx";
 import { ShellPalette } from "./shell-palette.tsx";
 import { ThemeToggle } from "./theme-toggle.tsx";
@@ -20,17 +21,18 @@ export function ShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const projectId = projectIdFromPath(pathname);
   const shell = useProjectShell(projectId);
+  const spec = useSpecDeliverables(projectId);
   useProjectVisit(projectId);
   const { role } = useActiveOrganization();
   const [searchOpen, setSearchOpen] = useState(false);
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const available = useMemo(
     () =>
-      (shell.data?.deliverables ?? [])
+      (spec.data?.deliverables ?? [])
         .filter((deliverable) => deliverable.available)
         .map((deliverable) => deliverable.key)
         .filter((key): key is SpecSlug => isSpecSlug(key)),
-    [shell.data],
+    [spec.data],
   );
 
   return (

@@ -65,11 +65,19 @@ export class TargetStore {
   async snapshotOf(
     repoId: string,
     commitSha: string,
-  ): Promise<{ id: string; status: "building" | "ready" | "failed" } | null> {
-    return this.raw.specSnapshot.findUnique({
+  ): Promise<{
+    id: string;
+    status: "building" | "ready" | "failed";
+    /** Les entités génériques (`spec_entities`) du snapshot sont écrites (TK-100) ; faux = à réindexer. */
+    entitiesIndexed: boolean;
+  } | null> {
+    const row = await this.raw.specSnapshot.findUnique({
       where: { repoId_commitSha: { repoId, commitSha } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, entitiesIndexedAt: true },
     });
+    return (
+      row && { id: row.id, status: row.status, entitiesIndexed: row.entitiesIndexedAt !== null }
+    );
   }
 
   /** Pointe la branche vers un snapshot déjà indexé (rafale, rejeu, force-push en arrière). */

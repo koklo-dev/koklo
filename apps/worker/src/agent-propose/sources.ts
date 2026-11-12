@@ -1,4 +1,5 @@
 import { type TenantClient, withOrganization } from "@koklo/db";
+import { ideaPagesDiff } from "@koklo/domain";
 import { isRecord } from "../job-support.ts";
 import type { LaunchContext } from "./store.ts";
 
@@ -22,6 +23,8 @@ export interface CurrentFeature {
  */
 export interface LaunchSources {
   readonly tag: string;
+  /** Mode `update` : la version précédente et les pages retirées ; `pages` ne porte alors que les pages ajoutées ou modifiées. */
+  readonly diff?: { readonly from: string; readonly removed: readonly string[] };
   readonly pages: readonly FrozenPage[];
   readonly synthesis: string | null;
   readonly risks: string | null;
@@ -51,40 +54,17 @@ async function frozenVersion(client: TenantClient, launch: LaunchContext) {
       ...(launch.baseVersion === null ? {} : { number: launch.baseVersion }),
     },
     orderBy: { number: "desc" },
-    select: { tag: true, pagesVersions: true },
+    select: { number: true, tag: true, pagesVersions: true },
   });
 }
 
-/** Pages dont la version diffère de celle du lancement terminé précédent (mode `update`) ; `undefined` : aucune base. */
-async function changedSinceLastLaunch(
-  client: TenantClient,
-  launch: LaunchContext,
-  current: Record<string, number>,
-): Promise<Set<string> | undefined> {
-  const previous = await client.agentLaunch.findFirst({
-    where: {
-      projectId: launch.projectId,
-      deliverable: launch.deliverable,
-      status: "done",
-      baseVersion: { not: null },
-      id: { not: launch.id },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { baseVersion: true },
+/** Version figée qui précède celle du lancement (mode `update`) ; `null` sans version précédente. */
+const previousVersion = (client: TenantClient, launch: LaunchContext, number: number) =>
+  client.ideaVersion.findFirst({
+    where: { projectId: launch.projectId, commitSha: { not: null }, number: { lt: number } },
+    orderBy: { number: "desc" },
+    select: { tag: true, pagesVersions: true },
   });
-  if (previous?.baseVersion == null) return undefined;
-  const before = await client.ideaVersion.findFirst({
-    where: { projectId: launch.projectId, number: previous.baseVersion },
-    select: { pagesVersions: true },
-  });
-  if (!before) return undefined;
-  const old = versionsOf(before.pagesVersions);
-  return new Set(
-    Object.entries(current)
-      .filter(([slug, v]) => old[slug] !== v)
-      .map(([s]) => s),
-  );
-}
 
 async function currentFeatures(client: TenantClient, projectId: string): Promise<CurrentFeature[]> {
   const repo = await client.projectRepo.findFirst({
@@ -118,6 +98,27 @@ async function currentFeatures(client: TenantClient, projectId: string): Promise
   return [];
 }
 
+/** Diff `idea-vN-1` vers `idea-vN` du mode `update` ; `null` sans version précédente, `undefined` hors mode `update`. */
+async function updateDiff(
+  client: TenantClient,
+  launch: LaunchContext,
+  version: { number: number; pagesVersions: unknown },
+) {
+  if (launch.mode !== "update") return undefined;
+  const previous = await previousVersion(client, launch, version.number);
+  if (!previous) return null;
+  const diff = ideaPagesDiff(versionsOf(previous.pagesVersions), versionsOf(version.pagesVersions));
+  return { ...diff, from: previous.tag };
+}
+
+async function publishedSynthesis(client: TenantClient, projectId: string) {
+  const synthesis = await client.ideaSynthesis.findFirst({
+    where: { projectId },
+    select: { contentMd: true, source: true },
+  });
+  return synthesis?.source ? synthesis.contentMd : null;
+}
+
 /** Lit les sources du lancement ; `null` sans version figée (le lancement échoue, rien n'est envoyé). */
 export function readSources(
   client: TenantClient,
@@ -127,8 +128,10 @@ export function readSources(
     const version = await frozenVersion(client, launch);
     if (!version) return null;
     const frozen = versionsOf(version.pagesVersions);
-    const changed =
-      launch.mode === "update" ? await changedSinceLastLaunch(client, launch, frozen) : undefined;
+    // Mode `update` : le diff seul ; sans version précédente, il n'y a rien à mettre à jour.
+    const diff = await updateDiff(client, launch, version);
+    if (diff === null) return null;
+    const changed = diff && new Set([...diff.added, ...diff.modified]);
     const rows = await client.ideaPage.findMany({
       where: { projectId: launch.projectId, deletedAt: null, slug: { in: Object.keys(frozen) } },
       orderBy: { position: "asc" },
@@ -136,18 +139,13 @@ export function readSources(
     });
     // Une page modifiée depuis le gel (version différente) est exclue : jamais le contenu non figé.
     const pages = rows
-      .filter((row) => row.version === frozen[row.slug])
+      .filter((row) => row.version === frozen[row.slug] && (!changed || changed.has(row.slug)))
       .map((row) => ({ slug: row.slug, title: row.title, content: row.contentMd }));
-    const synthesis = await client.ideaSynthesis.findFirst({
-      where: { projectId: launch.projectId },
-      select: { contentMd: true, source: true },
-    });
     return {
       tag: version.tag,
-      pages: pages.filter(
-        (page) => page.slug !== RISKS_SLUG && (changed === undefined || changed.has(page.slug)),
-      ),
-      synthesis: synthesis?.source ? synthesis.contentMd : null,
+      ...(diff ? { diff: { from: diff.from, removed: diff.removed } } : {}),
+      pages: pages.filter((page) => page.slug !== RISKS_SLUG),
+      synthesis: diff ? null : await publishedSynthesis(client, launch.projectId),
       risks: pages.find((page) => page.slug === RISKS_SLUG)?.content ?? null,
       features: await currentFeatures(client, launch.projectId),
     };
