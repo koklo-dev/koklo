@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { listOf } from "./schemas-lists.ts";
+import { LIST_QUERY_MAX_LENGTH, listOf } from "./schemas-lists.ts";
 import {
   criterionIdSchema,
   featureIdSchema,
@@ -33,6 +33,9 @@ export const clientSpaceProjectSchema = z.object({
 export const clientSpaceProjectsInputSchema = z.object({});
 export const clientSpaceProjectsOutputSchema = clientSpaceProjectSchema.array();
 
+/** Recherche serveur sur tout l'index (TK-105, B364) : jamais seulement sur les éléments déjà chargés. */
+const searchShape = { q: z.string().min(1).max(LIST_QUERY_MAX_LENGTH).optional() };
+
 /**
  * `untreated` ne garde que les fonctionnalités encore « à valider » ; `around` amène la page de cette fonctionnalité
  * (aussi hors de la page chargée, TK-104, B350). Les deux s'excluent avec un curseur seulement pour `around`.
@@ -42,6 +45,7 @@ export const clientSpaceFeaturesInputSchema = z
     projectId: z.uuid(),
     untreated: z.enum(["true"]).optional(),
     around: featureIdSchema.optional(),
+    ...searchShape,
     ...pageInputSchema,
   })
   .refine((input) => input.around === undefined || input.cursor === undefined, {
@@ -133,7 +137,19 @@ export const clientSpaceProgressOutputSchema = z.object({
   version: z.string().min(1),
 });
 
-export const clientSpaceListInputSchema = z.object({ projectId: z.uuid(), ...pageInputSchema });
+/** Parcours : recherche `q` (TK-105, 3.3.0). */
+export const clientSpaceListInputSchema = z.object({
+  projectId: z.uuid(),
+  ...searchShape,
+  ...pageInputSchema,
+});
+/** Règles : recherche `q` et filtre de type (TK-105, 3.3.0), appliqués sur tout l'index. */
+export const clientSpaceRulesInputSchema = z.object({
+  projectId: z.uuid(),
+  type: ruleTypeSchema.optional(),
+  ...searchShape,
+  ...pageInputSchema,
+});
 
 export const clientRuleSchema = z.object({
   id: ruleIdSchema,

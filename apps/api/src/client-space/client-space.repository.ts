@@ -45,9 +45,12 @@ export interface EntityRow {
   path: string;
   data: unknown;
 }
+/** Page d'une liste d'entités ; `q` (recherche plein texte) et `type` (règles) portent sur tout l'index (TK-105, B364). */
 export interface EntityListRequest {
   limit: number;
   cursor: string | undefined;
+  q: string | undefined;
+  type: string | undefined;
 }
 /** Page de parcours : chaque ligne avec son dernier verdict (clé `P-…`). */
 export interface FlowsRead {
@@ -75,8 +78,8 @@ export interface ClientSpaceRepository {
     organizationId: string,
     linkedIds: readonly string[] | null,
   ): Promise<ClientProjectRecord[]>;
-  /** `null` : aucune spec indexée ou index en échec. */
-  indexedHead(scope: ProjectScope): Promise<IndexedHead | null>;
+  /** `null` : aucune spec indexée ou index en échec. `q` ne garde que les fonctionnalités qui correspondent à la recherche. */
+  indexedHead(scope: ProjectScope, q?: string): Promise<IndexedHead | null>;
   /** Tête lue et présence de la feature ; `null` : aucune spec indexée ou index en échec. */
   featureHead(
     scope: ProjectScope,

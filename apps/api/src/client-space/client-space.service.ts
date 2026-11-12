@@ -25,6 +25,7 @@ interface FeaturesInput {
   cursor?: string | undefined;
   untreated?: "true" | undefined;
   around?: string | undefined;
+  q?: string | undefined;
 }
 type Projects = z.output<typeof clientSpaceProjectsOutputSchema>;
 type Features = z.output<typeof clientSpaceFeaturesOutputSchema>;
@@ -80,7 +81,7 @@ export class ClientSpaceService {
    * lisent le statut de toutes les fonctionnalités ; sans eux, seule la page demandée est lue (B350).
    */
   async features(scope: ProjectScope, input: FeaturesInput): Promise<Features> {
-    const head = await this.repository.indexedHead(scope);
+    const head = await this.repository.indexedHead(scope, input.q);
     if (head === null) throw notReady();
     const limit = input.limit ?? DEFAULT_PAGE_SIZE;
     if (input.around !== undefined && !head.rows.some((row) => row.specId === input.around)) {

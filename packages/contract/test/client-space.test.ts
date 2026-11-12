@@ -91,9 +91,9 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 3.2.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.2.0");
-    expect((await doc()).info.version).toBe("3.2.0");
+  it("le contrat courant est 3.3.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.3.0");
+    expect((await doc()).info.version).toBe("3.3.0");
   });
 });
 
@@ -378,5 +378,35 @@ describe("CS5 TK-104 : progression, parcours, règles et rôles", () => {
       expect(names.length, route).toBeGreaterThan(0);
       expect(leaksOf(names), route).toEqual([]);
     }
+  });
+});
+
+describe("TK-105 (3.3.0) : recherche serveur de l'espace client", () => {
+  const search = async (path: string, extra: Record<string, unknown> = {}) => {
+    const i = input(path);
+    expect(await isValid(i, { projectId: UUID, q: "R-0", ...extra }), path).toBe(true);
+    for (const q of ["", "x".repeat(201)]) {
+      expect(await isValid(i, { projectId: UUID, q }), `${path} q=${q.length}`).toBe(false);
+    }
+    expect(await isValid(i, { projectId: UUID }), path).toBe(true);
+  };
+
+  it("features et parcours : q de 1 à 200 caractères, optionnel", async () => {
+    await search("clientSpace.features", { limit: 50 });
+    await search("clientSpace.flows", { limit: 6 });
+  });
+
+  it("règles : q et type (contrainte, calcul, workflow), le reste est refusé", async () => {
+    await search("clientSpace.rules", { type: "calcul", limit: 24 });
+    const i = input("clientSpace.rules");
+    expect(await isValid(i, { projectId: UUID, type: "inconnu" })).toBe(false);
+  });
+
+  it("les parcours n'ont pas de filtre de type", async () => {
+    const parsedFlows = await parsed(input("clientSpace.flows"), {
+      projectId: UUID,
+      type: "calcul",
+    });
+    expect(JSON.stringify(parsedFlows)).not.toContain("calcul");
   });
 });

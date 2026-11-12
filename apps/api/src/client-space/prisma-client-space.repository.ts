@@ -6,6 +6,7 @@ import { phaseOf } from "../project/project-shell.ts";
 import { featureHashesOf } from "../review/entity-hashes.ts";
 import { VERDICT_SELECT, verdictOf } from "../review/verdicts.ts";
 import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
@@ -35,6 +36,7 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(ProjectTransactions) private readonly transactions: ProjectTransactions,
     @Inject(SpecHeadResolver) private readonly resolver: SpecHeadResolver,
+    @Inject(FullTextSearch) private readonly search: FullTextSearch,
   ) {}
 
   async projects(
@@ -73,12 +75,14 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
     return found && found.snapshot.status !== "failed" ? found.snapshot : null;
   }
 
-  indexedHead(scope: ProjectScope): Promise<IndexedHead | null> {
+  indexedHead(scope: ProjectScope, q?: string): Promise<IndexedHead | null> {
     return this.transactions.run(scope, async (tx) => {
       const snapshot = await this.readySnapshot(tx, scope);
       if (!snapshot) return null;
+      const matching =
+        q === undefined ? null : await this.search.ids("specFeature", snapshot.id, q);
       const features = await tx.specFeature.findMany({
-        where: { snapshotId: snapshot.id },
+        where: { snapshotId: snapshot.id, ...(matching ? { id: { in: matching } } : {}) },
         select: {
           specId: true,
           title: true,
@@ -123,15 +127,24 @@ export class PrismaClientSpaceRepository implements ClientSpaceRepository {
   }
 
   flows(scope: ProjectScope, request: EntityListRequest): Promise<FlowsRead | null> {
-    return this.readOnSnapshot(scope, (tx, snapshot) => readFlows(tx, scope, snapshot, request));
+    return this.readOnSnapshot(scope, async (tx, snapshot) =>
+      readFlows(tx, scope, snapshot, request, await this.matching(snapshot, "flow", request.q)),
+    );
   }
 
   rules(scope: ProjectScope, request: EntityListRequest): Promise<RulesRead | null> {
-    return this.readOnSnapshot(scope, (tx, snapshot) => readRules(tx, scope, snapshot, request));
+    return this.readOnSnapshot(scope, async (tx, snapshot) =>
+      readRules(tx, scope, snapshot, request, await this.matching(snapshot, "rule", request.q)),
+    );
   }
 
   roles(scope: ProjectScope): Promise<RolesRead | null> {
     return this.readOnSnapshot(scope, (tx, snapshot) => readRoles(tx, scope, snapshot));
+  }
+
+  /** Lignes du genre qui correspondent à la recherche (`null` sans recherche : aucun filtre). */
+  private matching(snapshot: Snapshot, kind: "rule" | "flow", q: string | undefined) {
+    return q === undefined ? Promise.resolve(null) : this.search.entityIds(snapshot.id, kind, q);
   }
 
   private readOnSnapshot<T>(
