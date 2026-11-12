@@ -220,10 +220,12 @@ async function fillFeatureForm(page: Page, title: string): Promise<void> {
     .first()
     .click();
   const form = page.getByRole("dialog");
-  await form.getByRole("textbox", { name: "Titre (obligatoire)" }).fill(title);
-  await form.getByRole("combobox", { name: "Priorité (obligatoire)" }).click();
-  await page.getByRole("option", { name: "Indispensable", exact: true }).click();
-  await form.getByRole("button", { name: "Enregistrer" }).click();
+  await form.getByRole("textbox", { name: /^Titre\s*obligatoire$/ }).fill(title);
+  await form
+    .getByRole("radiogroup", { name: /^Priorité\s*obligatoire$/ })
+    .getByRole("radio", { name: "Indispensable", exact: true })
+    .click();
+  await form.getByRole("button", { name: /^Enregistrer/ }).click();
 }
 
 interface ReadyProject {
