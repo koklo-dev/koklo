@@ -17,6 +17,15 @@ describe("guardedPathFor", () => {
     expect(guardedPathFor(FEATURES)).toBe(FEATURES);
   });
 
+  it("TK-104 : le cahier fonctionnel (vue client comprise, `?vue=client` est une query) est gardé par session et organisation, jamais par rôle", () => {
+    const functional = `/projects/${ID}/spec/functional` as const;
+    expect(guardedPathFor(functional)).toBe(functional);
+    expect(
+      resolveAccess({ path: functional, hasSession: true, hasActiveOrganization: true }),
+    ).toBeNull();
+    expect(resolveAccess({ path: functional, hasSession: false })).toBe("/login");
+  });
+
   it("un identifiant qui n'est pas un uuid est gardé aussi (la page répond « Projet introuvable »)", () => {
     expect(guardedPathFor("/projects/pas-un-uuid/features")).toBe("/projects/pas-un-uuid/features");
   });

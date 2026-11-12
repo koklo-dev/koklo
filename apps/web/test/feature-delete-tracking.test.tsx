@@ -10,6 +10,7 @@ import {
   savePending,
 } from "../src/lib/feature-draft.ts";
 import { valuesFromDetail } from "../src/lib/feature-form.ts";
+import { serveClient } from "./support/client-space.tsx";
 import {
   advance,
   BATCH_ID,
@@ -599,7 +600,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
   });
 
   it("client : un marqueur de suppression laissé sur l'appareil n'affiche rien et ne relit rien", async () => {
-    serveWrite("client");
+    serveClient("client");
     procedures.specHead.mockImplementation(async () => head());
     savePending(SCOPE, PROJECT_ID, {
       batchId: BATCH_ID,
@@ -609,7 +610,8 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
       savedAt: new Date().toISOString(),
     });
     renderFeatures();
-    await findNamed("list", "Fonctionnalités", { text: TITLE, hidden: true });
+    // TK-104 : le client lit la vue client, qui ne relit jamais un marqueur d'écriture.
+    await screen.findByRole("note");
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
     expect(liveText()).not.toContain("Suppression de");
   });

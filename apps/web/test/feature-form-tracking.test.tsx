@@ -3,6 +3,7 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { draftKey, readPending, savePending } from "../src/lib/feature-draft.ts";
+import { serveClient } from "./support/client-space.tsx";
 import {
   advance,
   BATCH_ID,
@@ -747,7 +748,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
   });
 
   it("client : un marqueur laissé sur l'appareil n'affiche rien et ne relit rien", async () => {
-    serveWrite("client");
+    serveClient("client");
     savePending(SCOPE, PROJECT_ID, {
       batchId: BATCH_ID,
       kind: "create",
@@ -756,7 +757,8 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     });
     procedures.specHead.mockImplementation(async () => head());
     renderFeatures();
-    await findNamed("list", "Fonctionnalités", { text: "Connexion par e-mail", hidden: true });
+    // TK-104 : le client lit la vue client, qui ne relit jamais un marqueur d'écriture.
+    await screen.findByRole("note");
     expect(procedures.specBatchGet).not.toHaveBeenCalled();
     expect(liveText()).not.toContain("en cours…");
     cleanup();

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { savePending } from "../src/lib/feature-draft.ts";
+import { serveClient } from "./support/client-space.tsx";
 import {
   askDelete,
   CONFIRM_GROUP,
@@ -109,11 +110,12 @@ describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
   });
 
   it.each(CLIENT_SIDE)(
-    "%s : ni bouton ni formulaire, ?edit=F-001 devient la fiche en lecture",
+    "%s : ni bouton ni formulaire (vue client), ?edit=F-001 est ignoré",
     async (role) => {
-      serveWrite(role);
+      // TK-104 : client et business lisent la vue client, où ?edit= n'ouvre rien.
+      serveClient(role, { canValidate: role === "client" });
       renderFeatures({ search: "?edit=F-001" });
-      await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
+      await screen.findByRole("note");
       expect(deleteButton()).toBeNull();
       expect(screen.queryByRole("button", { name: /Supprimer|Modifier|Enregistrer/ })).toBeNull();
       expect(screen.queryAllByRole("textbox")).toHaveLength(0);

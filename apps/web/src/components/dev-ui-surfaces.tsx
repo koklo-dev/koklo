@@ -103,7 +103,7 @@ function ProgressFrame() {
 function AlertsFrame() {
   return (
     <DevUiFrame title="InlineAlert">
-      <DevUiNote>Cinq tons, action en lien</DevUiNote>
+      <DevUiNote>Sept tons, action en lien</DevUiNote>
       {ALERTS.map(({ variant, icon, text, action }) =>
         action === "Détails" ? (
           <InlineAlert

@@ -6,7 +6,13 @@ import type { FeaturesView } from "./features-view.ts";
 export type TabNumbers = Record<FeaturesTab, number>;
 
 /** Actions de l'en-tête, dans l'ordre de la maquette 10 (l.637-658) ; `create` est l'action primaire, une seule. */
-export type HeaderAction = "add" | "propose" | "repropose" | "create";
+export type HeaderAction =
+  | "remind"
+  | "validate-client"
+  | "add"
+  | "propose"
+  | "repropose"
+  | "create";
 
 /** Compteur de l'onglet Fonctionnalités : le nombre, « … » en génération, « N à relire » (teinte `primary`) en relecture. */
 export interface HeaderTabCount {
@@ -48,6 +54,11 @@ export interface HeaderInput {
   pendingByTab?: TabNumbers | undefined;
   /** Statut du livrable (`spec.deliverables`) : celui de l'état Liste. */
   deliverable: "todo" | "pending" | "revise" | "validated" | undefined;
+  /**
+   * Action du cahier à valider (TK-104) : `remind` (« Relancer <prénom> », client invité) ou `validate-client` (aucun
+   * client : l'équipe valide, D1). Propriétaire et administrateur seulement ; absente sinon.
+   */
+  clientAction?: "remind" | "validate-client" | undefined;
 }
 
 const plural = (count: number, one: string, other: string): string =>
@@ -107,7 +118,10 @@ function listState(input: HeaderInput): HeaderState {
     ...(deliverable === "pending" ? { statusLabel: "À valider par le client · obligatoire" } : {}),
     ...(total === undefined ? {} : { tabCount: { value: total } }),
     ...(summary ? { summary } : {}),
-    actions: input.agent ? ["propose", "create"] : ["create"],
+    actions: [
+      ...(deliverable === "pending" && input.clientAction ? [input.clientAction] : []),
+      ...(input.agent ? (["propose", "create"] as const) : (["create"] as const)),
+    ],
   };
 }
 

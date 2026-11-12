@@ -150,17 +150,6 @@ describe("Actualisation automatique de la spec en préparation (§4.5)", () => {
     expect(headCalls()).toBe(initial);
   });
 
-  it("projet sans détail (client) : même actualisation bornée, sans appel à repo.list", async () => {
-    serve("client");
-    procedures.specHead.mockResolvedValue(null);
-    renderFeatures();
-    await findNamed("heading", "Aucune fonctionnalité à afficher pour le moment");
-    const initial = headCalls();
-    await advance(5.5 * SECOND);
-    expect(headCalls()).toBe(initial + 1);
-    expect(procedures.repoList).not.toHaveBeenCalled();
-  });
-
   it("aucune animation ni compte à rebours pendant l'actualisation", async () => {
     await renderPreparing();
     await advance(10 * SECOND);

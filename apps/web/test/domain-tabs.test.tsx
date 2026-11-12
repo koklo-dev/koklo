@@ -2,6 +2,7 @@ import { specBatchSubmitInputSchema } from "@koklo/contract";
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RULE, serveClient } from "./support/client-space.tsx";
 import { head, inputsOf, list, PROJECT_ID, renderFeatures, serve } from "./support/features.tsx";
 import { findNamed, findRole } from "./support/wait.ts";
 import {
@@ -225,9 +226,10 @@ describe("Onglet Règles métier : états et droits", () => {
   it.each(["client", "business"] as const)(
     "%s : aucune carte modifiable, aucun bouton d'ajout",
     async (role) => {
-      serve(role);
+      // TK-104 : client et business lisent la vue client (règles en bloc), jamais la vue équipe.
+      serveClient(role, { canValidate: role === "client" });
       renderFeatures({ search: "?tab=rules" });
-      await findNamed("heading", "Règle numéro 1");
+      expect(await screen.findByText(RULE.title)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /^Modifier R-/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /Nouvelle règle/ })).toBeNull();
     },

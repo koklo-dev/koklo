@@ -56,6 +56,18 @@ export const ALERTS: ReadonlyArray<{
   },
   { variant: "success", icon: "check_circle", text: "Dossier enregistré. Rien d'autre à faire." },
   {
+    variant: "validated",
+    icon: "check_circle",
+    text: "Vous avez validé ce parcours.",
+    action: "Annuler",
+  },
+  {
+    variant: "revise",
+    icon: "edit_note",
+    text: "Votre demande de changement est envoyée.",
+    action: "Annuler",
+  },
+  {
     variant: "agent",
     icon: "wand_stars",
     text: "L'agent propose 3 critères d'acceptation pour cette fonctionnalité.",

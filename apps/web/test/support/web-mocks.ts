@@ -75,6 +75,16 @@ export const procedures = {
   // TK-100 (contrat 2.10.0) : les sept livrables de la spec (barre et compteur SPEC N/7)
   specDeliverables: vi.fn(),
   repoList: vi.fn(),
+  // TK-104 (contrat 3.2.0) : vue client (progression, listes en langage simple) et décisions du client
+  clientSpaceProgress: vi.fn(),
+  clientSpaceFeatures: vi.fn(),
+  clientSpaceFeature: vi.fn(),
+  clientSpaceFlows: vi.fn(),
+  clientSpaceRules: vi.fn(),
+  clientSpaceRoles: vi.fn(),
+  reviewSubmit: vi.fn(),
+  reviewList: vi.fn(),
+  reviewRemind: vi.fn(),
   // TK-48e : écriture de la spec par lots (contrat 0.7.0)
   specBatchSubmit: vi.fn(),
   specBatchGet: vi.fn(),
@@ -241,6 +251,21 @@ export const orpc = {
     },
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
+  },
+  clientSpace: {
+    key: () => ["clientSpace"],
+    progress: queryFull(["clientSpace", "progress"], procedures.clientSpaceProgress),
+    features: queryFull(["clientSpace", "features"], procedures.clientSpaceFeatures),
+    feature: queryFull(["clientSpace", "feature"], procedures.clientSpaceFeature),
+    flows: queryFull(["clientSpace", "flows"], procedures.clientSpaceFlows),
+    rules: queryFull(["clientSpace", "rules"], procedures.clientSpaceRules),
+    roles: queryFull(["clientSpace", "roles"], procedures.clientSpaceRoles),
+  },
+  review: {
+    key: () => ["review"],
+    submit: mutationWithOptions(procedures.reviewSubmit),
+    list: queryFull(["review", "list"], procedures.reviewList),
+    remind: mutationWithOptions(procedures.reviewRemind),
   },
   specBatch: {
     key: () => ["specBatch"],
@@ -489,6 +514,8 @@ export function resetWebMocks(): void {
   procedures.invitationList.mockResolvedValue([]);
   procedures.projectShell.mockResolvedValue(projectShell());
   procedures.specDeliverables.mockResolvedValue(specDeliverables());
+  // Aucun client invité par défaut : l'équipe ne voit ni « Relancer » ni la vue client.
+  procedures.clientSpaceProgress.mockResolvedValue({ hasClient: false, canValidate: false });
   procedures.projectVisit.mockResolvedValue({ visitedAt: "2026-11-07T10:00:00.000Z" });
   procedures.projectRecent.mockResolvedValue([]);
   procedures.searchQuery.mockResolvedValue({ items: [], total: 0, nextCursor: null });
