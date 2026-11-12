@@ -18,7 +18,7 @@ const row = (over: Partial<ActivityRow> = {}): ActivityRow => ({
 });
 
 describe("listes fermées d'événements (B279)", () => {
-  it("l'équipe lit dix événements, le client trois familles seulement", () => {
+  it("l'équipe lit onze événements, le client trois familles seulement", () => {
     expect([...ACTIVITY_ACTIONS].sort()).toEqual(
       [
         "idea.freeze",
@@ -26,6 +26,7 @@ describe("listes fermées d'événements (B279)", () => {
         "project.create",
         "project_client.add",
         "review.approve",
+        "review.remind",
         "review.request_changes",
         "spec.batch.submit",
         "sprint.activate",
@@ -95,5 +96,20 @@ describe("activityItemOf : phrases complètes, jamais un identifiant seul", () =
     expect(activityItemOf(row({ action: "suggestion.create", target: null })).text).toBe(
       "Marie Lefèvre a ajouté une suggestion",
     );
+  });
+});
+
+describe("TK-104 : relance du client", () => {
+  it("nomme le prénom du client relancé, sinon « le client »", () => {
+    expect(activityItemOf(row({ action: "review.remind", target: "Camille" })).text).toBe(
+      "Marie Lefèvre a relancé Camille",
+    );
+    expect(activityItemOf(row({ action: "review.remind", target: null })).text).toBe(
+      "Marie Lefèvre a relancé le client",
+    );
+  });
+
+  it("n'est pas lisible par le client : hors CLIENT_ACTIVITY_ACTIONS", () => {
+    expect(CLIENT_ACTIVITY_ACTIONS as readonly string[]).not.toContain("review.remind");
   });
 });

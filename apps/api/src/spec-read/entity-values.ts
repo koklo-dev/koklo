@@ -178,11 +178,12 @@ function permissionsOf(file: Json): Permission[] {
 /**
  * Matrice « Qui peut faire quoi » : les rôles, les groupes de ressources avec leur compte et les actions des groupes
  * ouverts. Au plus 20 actions : tout est ouvert ; au-delà : le groupe demandé et les groupes de moins de 5 actions.
- * `q` ne garde que les actions dont l'identifiant ou le libellé la contient (tout est alors ouvert, 200 au plus).
+ * `q` ne garde que les actions dont l'identifiant ou le libellé la contient (tout est alors ouvert, 200 au plus) ; `all`
+ * ouvre tous les groupes (vue du client, qui lit le bloc entier).
  */
 export function buildMatrix(
   file: unknown,
-  options: { group?: string | undefined; q?: string | undefined },
+  options: { group?: string | undefined; q?: string | undefined; all?: boolean },
 ): RulesMatrix {
   const record = isRecord(file) ? file : {};
   const roles = list(record.roles).filter(isRecord);
@@ -195,6 +196,7 @@ export function buildMatrix(
     counts.set(permission.resource, (counts.get(permission.resource) ?? 0) + 1);
   }
   const isOpen = (resource: string) =>
+    options.all === true ||
     needle !== "" ||
     all.length <= OPEN_ALL_AT_MOST ||
     resource === options.group ||

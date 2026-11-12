@@ -19,7 +19,7 @@ describe("rôles des procédures clientSpace.*", () => {
     );
   });
 
-  it.each(["projects", "features", "feature"])(
+  it.each(["projects", "features", "feature", "progress", "flows", "rules", "roles"])(
     "%s : session, garde de rôle et CLIENT_SPACE_READ_ROLES",
     (name) => {
       const source = read(CONTROLLER);
@@ -35,7 +35,7 @@ describe("rôles des procédures clientSpace.*", () => {
 
   it("aucun rôle nommé en dur, et le cloisonnement central (PROJECT_ACCESS) est injecté", () => {
     const source = read(CONTROLLER);
-    expect(source.match(/@Roles\(/g)).toHaveLength(3);
+    expect(source.match(/@Roles\(/g)).toHaveLength(7); // projects, features, feature, puis progress, flows, rules, roles (TK-104)
     expect(source).not.toMatch(/@Roles\(\s*"/);
     expect(source).toContain("PROJECT_ACCESS");
   });

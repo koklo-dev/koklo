@@ -1,10 +1,20 @@
 import { z } from "zod";
+import { listOf } from "./schemas-lists.ts";
 import {
   criterionIdSchema,
   featureIdSchema,
   featurePrioritySchema,
   stepSchema,
 } from "./schemas-spec.ts";
+import {
+  flowErrorSchema,
+  flowIdSchema,
+  flowStepSchema,
+  matrixActionSchema,
+  roleIdSchema,
+  ruleIdSchema,
+  ruleTypeSchema,
+} from "./schemas-spec-domain.ts";
 import { pageInputSchema } from "./schemas-tickets.ts";
 
 /**
@@ -23,10 +33,21 @@ export const clientSpaceProjectSchema = z.object({
 export const clientSpaceProjectsInputSchema = z.object({});
 export const clientSpaceProjectsOutputSchema = clientSpaceProjectSchema.array();
 
-export const clientSpaceFeaturesInputSchema = z.object({
-  projectId: z.uuid(),
-  ...pageInputSchema,
-});
+/**
+ * `untreated` ne garde que les fonctionnalités encore « à valider » ; `around` amène la page de cette fonctionnalité
+ * (aussi hors de la page chargée, TK-104, B350). Les deux s'excluent avec un curseur seulement pour `around`.
+ */
+export const clientSpaceFeaturesInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    untreated: z.enum(["true"]).optional(),
+    around: featureIdSchema.optional(),
+    ...pageInputSchema,
+  })
+  .refine((input) => input.around === undefined || input.cursor === undefined, {
+    message: "around et cursor s'excluent",
+    path: ["around"],
+  });
 
 export const clientFeatureSummarySchema = z.object({
   id: featureIdSchema,
@@ -42,11 +63,22 @@ export const clientSpaceFeaturesOutputSchema = z.object({
   items: z.array(clientFeatureSummarySchema),
   version: z.string().min(1),
   nextCursor: z.string().nullable(),
+  /** Nombre de fonctionnalités de la liste filtrée et rang de la première de la page (0 en tête). */
+  total: z.number().int().min(0),
+  offset: z.number().int().min(0),
 });
 
 export const clientSpaceFeatureInputSchema = z.object({
   projectId: z.uuid(),
   featureId: featureIdSchema,
+});
+
+/** Élément lié à une fonctionnalité, par libellé (« Délai d'annulation »), jamais par chemin. */
+export const clientLinkSchema = z.object({ id: z.string().min(1), label: z.string().min(1) });
+/** Date de la version relue et ses sept premiers caractères (seule trace de version montrée, B348) ; jamais l'identifiant entier. */
+export const clientVersionNoteSchema = z.object({
+  date: z.iso.date(),
+  label: z.string().length(7),
 });
 
 export const clientSpaceFeatureOutputSchema = z.object({
@@ -59,5 +91,89 @@ export const clientSpaceFeatureOutputSchema = z.object({
   ),
   validation: clientValidationSchema,
   previouslyValidated: z.boolean(),
+  links: z.array(clientLinkSchema),
+  versionNote: clientVersionNoteSchema,
   version: z.string().min(1),
+});
+
+// --- TK-104 (3.2.0) : progression, parcours, règles et rôles du point de vue du client ---
+export const clientTargetKindSchema = z.enum(["feature", "flow", "rules", "roles"]);
+
+/** Compteurs d'un onglet : éléments affichés, unités à traiter (un bloc = une), traitées, et demandes de changement. */
+export const clientTabProgressSchema = z.object({
+  count: z.number().int().min(0),
+  units: z.number().int().min(0),
+  treated: z.number().int().min(0),
+  toRevise: z.number().int().min(0),
+});
+
+export const clientSpaceProgressInputSchema = z.object({ projectId: z.uuid() });
+export const clientSpaceProgressOutputSchema = z.object({
+  /** Un client est invité au projet (décide qui valide, D1). */
+  hasClient: z.boolean(),
+  /** Le lecteur peut valider le cahier (`canReview` côté serveur) ; faux pour le business, l'équipe avec client, etc. */
+  canValidate: z.boolean(),
+  clientFirstName: z.string().nullable(),
+  /** Statut du cahier entier (livrable Fonctionnel). */
+  validation: clientValidationSchema,
+  tabs: z.object({
+    features: clientTabProgressSchema,
+    flows: clientTabProgressSchema,
+    rules: clientTabProgressSchema,
+    roles: clientTabProgressSchema,
+  }),
+  /** Unités encore « à valider », toutes familles confondues. */
+  untreated: z.number().int().min(0),
+  /** Unités avec une demande de changement d'actualité. */
+  toRevise: z.number().int().min(0),
+  /** Unités validées dont le contenu a changé depuis (à revalider). */
+  changed: z.number().int().min(0),
+  /** Première unité non traitée dans l'ordre des onglets ; `null` quand tout est traité. */
+  next: z.object({ kind: clientTargetKindSchema, ref: z.string().min(1) }).nullable(),
+  version: z.string().min(1),
+});
+
+export const clientSpaceListInputSchema = z.object({ projectId: z.uuid(), ...pageInputSchema });
+
+export const clientRuleSchema = z.object({
+  id: ruleIdSchema,
+  title: z.string(),
+  type: ruleTypeSchema,
+  statement: z.string(),
+  example: z.string().optional(),
+  states: z.array(z.string()),
+  features: z.array(featureIdSchema),
+});
+const blockState = {
+  validation: clientValidationSchema,
+  previouslyValidated: z.boolean(),
+  version: z.string().min(1),
+};
+export const clientSpaceRulesOutputSchema = listOf(clientRuleSchema).extend(blockState);
+
+export const clientFlowSchema = z.object({
+  id: flowIdSchema,
+  title: z.string(),
+  actor: z.string(),
+  start: flowStepSchema,
+  steps: z.array(flowStepSchema),
+  errors: z.array(flowErrorSchema),
+  features: z.array(featureIdSchema),
+  validation: clientValidationSchema,
+  previouslyValidated: z.boolean(),
+});
+export const clientSpaceFlowsOutputSchema = listOf(clientFlowSchema).extend({
+  version: z.string().min(1),
+});
+
+export const clientSpaceRolesInputSchema = z.object({ projectId: z.uuid() });
+export const clientRoleSchema = z.object({
+  id: roleIdSchema,
+  name: z.string(),
+  description: z.string().optional(),
+});
+export const clientSpaceRolesOutputSchema = z.object({
+  roles: z.array(clientRoleSchema),
+  actions: z.array(matrixActionSchema),
+  ...blockState,
 });

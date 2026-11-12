@@ -48,6 +48,10 @@ export const NOTIFICATION_COPY: Readonly<
     subject: "Un ticket est bloqué sur Koklo",
     lead: "Un ticket est bloqué et demande votre attention.",
   },
+  "review.reminded": {
+    subject: "Votre validation est attendue sur Koklo",
+    lead: "Votre équipe vous rappelle que la validation du cahier est attendue de votre part.",
+  },
   // Jamais envoyé par e-mail (`EMAILED_TYPES`) : le dictionnaire reste exhaustif pour le type.
   "proposal.ready": {
     subject: "Des propositions de l'agent sont prêtes sur Koklo",

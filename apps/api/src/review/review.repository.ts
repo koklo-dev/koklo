@@ -4,7 +4,7 @@ import type { ProjectScope } from "../tracker/scope.ts";
 export const REVIEW_REPOSITORY = Symbol("REVIEW_REPOSITORY");
 
 export type ReviewTargetKind = "feature" | "baseline" | "flow" | "rules" | "roles" | "deliverable";
-export type ReviewStatus = "approved" | "changes_requested";
+export type ReviewStatus = "approved" | "changes_requested" | "withdrawn";
 
 /** Une review telle que stockée ; `sha` et `authorUserId` ne sortent que par `review.list` (équipe). */
 export interface ReviewRecord {
@@ -43,6 +43,11 @@ export interface SubmittedReview {
   currentHash: string | null;
 }
 
+/** Clients réellement prévenus par une relance (0 quand tous l'avaient déjà été aujourd'hui). */
+export interface RemindedClients {
+  reminded: number;
+}
+
 export interface ListReviews {
   /** Le lecteur est le client : seules les cibles qu'il valide (B325 e). */
   clientOnly: boolean;
@@ -68,4 +73,6 @@ export interface ReviewPage {
 export interface ReviewRepository {
   submit(scope: ProjectScope, actor: ReviewActor, input: SubmitReview): Promise<SubmittedReview>;
   list(scope: ProjectScope, query: ListReviews): Promise<ReviewPage>;
+  /** Relance du client (B352) : notification par client et par jour, audit par client relancé ; `no_client` sans lien. */
+  remind(scope: ProjectScope, now: Date): Promise<RemindedClients>;
 }

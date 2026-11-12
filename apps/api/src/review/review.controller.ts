@@ -3,7 +3,7 @@ import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
-import { REVIEW_READ_ROLES, REVIEW_SUBMIT_ROLES } from "../auth/roles.ts";
+import { REVIEW_READ_ROLES, REVIEW_REMIND_ROLES, REVIEW_SUBMIT_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { inProject } from "../tracker/scope.ts";
@@ -31,6 +31,22 @@ export class ReviewController {
         errors,
         input.projectId,
         (scope) => this.service.submit(scope, requireSession(request).role, input),
+        this.access,
+      ),
+    );
+  }
+
+  /** Relancer le client (B352) : owner et admin, session humaine ; aucun jeton d'agent n'est accepté. */
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...REVIEW_REMIND_ROLES)
+  @Implement(contract.review.remind)
+  remind(@Req() request: Request) {
+    return implement(contract.review.remind).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.remind(scope),
         this.access,
       ),
     );

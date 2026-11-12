@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 3.0.0 (128 routes, 102 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 3.2.0 (135 routes, 109 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -17,6 +17,10 @@ export const ALL_PAIRS: string[] = [
   "GET /client-space/projects",
   "GET /client-space/projects/{projectId}/features",
   "GET /client-space/projects/{projectId}/features/{featureId}",
+  "GET /client-space/projects/{projectId}/flows",
+  "GET /client-space/projects/{projectId}/progress",
+  "GET /client-space/projects/{projectId}/roles",
+  "GET /client-space/projects/{projectId}/rules",
   "GET /health",
   "GET /invitations",
   "GET /llm-credentials",
@@ -106,6 +110,7 @@ export const ALL_PAIRS: string[] = [
   "POST /projects/{projectId}/proposals/{proposalId}/decision",
   "POST /projects/{projectId}/repos",
   "POST /projects/{projectId}/reviews",
+  "POST /projects/{projectId}/reviews/reminders",
   "POST /projects/{projectId}/spec-repo",
   "POST /projects/{projectId}/spec/batches",
   "POST /projects/{projectId}/spec/deliverables/{key}/force",
@@ -145,6 +150,10 @@ export const ALL_PATHS: string[] = [
   "/client-space/projects",
   "/client-space/projects/{projectId}/features",
   "/client-space/projects/{projectId}/features/{featureId}",
+  "/client-space/projects/{projectId}/flows",
+  "/client-space/projects/{projectId}/progress",
+  "/client-space/projects/{projectId}/roles",
+  "/client-space/projects/{projectId}/rules",
   "/health",
   "/invitations",
   "/invitations/{invitationId}",
@@ -205,6 +214,7 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/proposals/{proposalId}/decision",
   "/projects/{projectId}/repos",
   "/projects/{projectId}/reviews",
+  "/projects/{projectId}/reviews/reminders",
   "/projects/{projectId}/shell",
   "/projects/{projectId}/spec",
   "/projects/{projectId}/spec-repo",

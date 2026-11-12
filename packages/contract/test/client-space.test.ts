@@ -9,7 +9,7 @@ import { leaksOf, vocabularyOf } from "./vocabulary.ts";
  * ouvertes aux six rôles (le cloisonnement par projet est côté API). Vocabulaire métier seulement :
  * le jeton `version` est opaque, aucune clé ni valeur d'énumération ne parle de git.
  */
-const NAMES = ["feature", "features", "projects"];
+const NAMES = ["feature", "features", "flows", "progress", "projects", "roles", "rules"];
 const PROJECT = { id: UUID, name: "Refonte du site", phase: "framing" };
 const SUMMARY = {
   id: "F-001",
@@ -34,8 +34,24 @@ const DETAIL = {
   ],
   validation: "validated",
   previouslyValidated: false,
+  links: [{ id: "R-002", label: "Délai d'annulation" }],
+  versionNote: { date: "2026-11-12", label: "e30875d" },
   version: "jeton-opaque",
 };
+const TAB = { count: 3, units: 3, treated: 1, toRevise: 0 };
+const PROGRESS = {
+  hasClient: true,
+  canValidate: true,
+  clientFirstName: "Marie",
+  validation: "to_validate",
+  tabs: { features: TAB, flows: TAB, rules: { ...TAB, units: 1 }, roles: { ...TAB, units: 1 } },
+  untreated: 4,
+  toRevise: 0,
+  changed: 1,
+  next: { kind: "feature", ref: "F-002" },
+  version: "jeton-opaque",
+};
+const PAGE = { nextCursor: null, previousCursor: null, offset: 0, total: 1 };
 const INTERNAL_KEYS = [
   "filePath",
   "commitSha",
@@ -65,15 +81,19 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     ["clientSpace.projects", "/client-space/projects"],
     ["clientSpace.features", "/client-space/projects/{projectId}/features"],
     ["clientSpace.feature", "/client-space/projects/{projectId}/features/{featureId}"],
+    ["clientSpace.progress", "/client-space/projects/{projectId}/progress"],
+    ["clientSpace.flows", "/client-space/projects/{projectId}/flows"],
+    ["clientSpace.rules", "/client-space/projects/{projectId}/rules"],
+    ["clientSpace.roles", "/client-space/projects/{projectId}/roles"],
   ])("%s : GET %s dans l'OpenAPI, lecture seule", async (name, path) => {
     expect(proc(name)).toBeDefined();
     const d = await doc();
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 3.1.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.1.0");
-    expect((await doc()).info.version).toBe("3.1.0");
+  it("le contrat courant est 3.2.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.2.0");
+    expect((await doc()).info.version).toBe("3.2.0");
   });
 });
 
@@ -116,11 +136,21 @@ describe("CS3 sorties : vocabulaire métier, rien d'interne", () => {
 
   it("features : items, version opaque non vide, nextCursor nullable", async () => {
     const o = output("clientSpace.features");
-    expect(await isValid(o, { items: [SUMMARY], version: "jeton-opaque", nextCursor: null })).toBe(
-      true,
-    );
-    expect(await isValid(o, { items: [], version: SHA, nextCursor: "c" })).toBe(true);
-    expect(await isValid(o, { items: [], version: "", nextCursor: null })).toBe(false);
+    expect(
+      await isValid(o, {
+        items: [SUMMARY],
+        version: "jeton-opaque",
+        nextCursor: null,
+        total: 1,
+        offset: 0,
+      }),
+    ).toBe(true);
+    expect(
+      await isValid(o, { items: [], version: SHA, nextCursor: "c", total: 0, offset: 0 }),
+    ).toBe(true);
+    expect(
+      await isValid(o, { items: [], version: "", nextCursor: null, total: 0, offset: 0 }),
+    ).toBe(false);
     expect(await isValid(o, { items: [SUMMARY], nextCursor: null })).toBe(false);
   });
 });
@@ -135,7 +165,13 @@ describe("CS3b sorties : valeurs refusées et clés internes écartées", () => 
     ["openSuggestions", -1],
   ])("features : %s = %s est refusé", async (key, value) => {
     const o = output("clientSpace.features");
-    const bad = { items: [{ ...SUMMARY, [key]: value }], version: "v", nextCursor: null };
+    const bad = {
+      items: [{ ...SUMMARY, [key]: value }],
+      version: "v",
+      nextCursor: null,
+      total: 1,
+      offset: 0,
+    };
     expect(await isValid(o, bad)).toBe(false);
   });
 
@@ -144,7 +180,13 @@ describe("CS3b sorties : valeurs refusées et clés internes écartées", () => 
     async (validation) => {
       const o = output("clientSpace.features");
       expect(
-        await isValid(o, { items: [{ ...SUMMARY, validation }], version: "v", nextCursor: null }),
+        await isValid(o, {
+          items: [{ ...SUMMARY, validation }],
+          version: "v",
+          nextCursor: null,
+          total: 1,
+          offset: 0,
+        }),
       ).toBe(true);
     },
   );
@@ -169,6 +211,8 @@ describe("CS3b sorties : valeurs refusées et clés internes écartées", () => 
         items: [{ ...SUMMARY, [key]: "interne" }],
         version: "v",
         nextCursor: null,
+        total: 1,
+        offset: 0,
       });
       expect(JSON.stringify(page)).not.toContain(`"${key}"`);
     },
@@ -179,6 +223,8 @@ describe("CS3b sorties : valeurs refusées et clés internes écartées", () => 
       items: [SUMMARY],
       version: "v",
       nextCursor: null,
+      total: 1,
+      offset: 0,
     });
     const first = (page?.items as object[] | undefined)?.[0] ?? {};
     expect(Object.keys(first).sort()).toEqual(Object.keys(SUMMARY).sort());
@@ -231,9 +277,13 @@ describe("CS5 fuite de vocabulaire technique dans le contrat publié", () => {
     "/client-space/projects",
     "/client-space/projects/{projectId}/features",
     "/client-space/projects/{projectId}/features/{featureId}",
+    "/client-space/projects/{projectId}/progress",
+    "/client-space/projects/{projectId}/flows",
+    "/client-space/projects/{projectId}/rules",
+    "/client-space/projects/{projectId}/roles",
   ];
 
-  it("les trois chemins sont présents (la garde ne couvre pas du vide)", async () => {
+  it("les sept chemins sont présents (la garde ne couvre pas du vide)", async () => {
     const d = await doc();
     for (const path of PATHS) expect(d.paths[path]?.get, path).toBeDefined();
   });
@@ -250,4 +300,83 @@ describe("CS5 fuite de vocabulaire technique dans le contrat publié", () => {
       expect(leaks, `${path} : ${leaks.join(", ")}`).toEqual([]);
     },
   );
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
+describe("CS5 TK-104 : progression, parcours, règles et rôles", () => {
+  it("features : untreated n'accepte que « true », around est un F-nnn exclusif d'un curseur", async () => {
+    const i = input("clientSpace.features");
+    expect(await isValid(i, { projectId: UUID, untreated: "true", around: "F-248" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, untreated: "false" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, around: "R-001" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, around: "F-001", cursor: "c" })).toBe(false);
+  });
+
+  it("la fiche porte des liens libellés et une note de version (date, sept caractères)", async () => {
+    const o = output("clientSpace.feature");
+    expect(await isValid(o, DETAIL)).toBe(true);
+    expect(await isValid(o, { ...DETAIL, versionNote: { date: "2026-11-12", label: SHA } })).toBe(
+      false,
+    );
+    expect(await isValid(o, { ...DETAIL, links: [{ id: "R-002" }] })).toBe(false);
+  });
+
+  it("progress : compteurs par onglet, suivante et éléments modifiés ; aucun SHA ni chemin", async () => {
+    const o = output("clientSpace.progress");
+    expect(await isValid(o, PROGRESS)).toBe(true);
+    expect(await isValid(o, { ...PROGRESS, next: null })).toBe(true);
+    expect(await isValid(o, { ...PROGRESS, next: { kind: "screen", ref: "S-1" } })).toBe(false);
+    expect(await isValid(o, { ...PROGRESS, untreated: -1 })).toBe(false);
+    expect(await isValid(input("clientSpace.progress"), { projectId: UUID })).toBe(true);
+  });
+
+  it("flows, rules, roles : listes à curseur et jeton de version opaque", async () => {
+    const step = { label: "Choisir un créneau" };
+    const flow = {
+      id: "P-reserver",
+      title: "Réserver",
+      actor: "Cliente",
+      start: step,
+      steps: [step],
+      errors: [{ step: 1, text: "Créneau pris" }],
+      features: ["F-001"],
+      validation: "to_validate",
+      previouslyValidated: false,
+    };
+    const rule = {
+      id: "R-001",
+      title: "Pas de double réservation",
+      type: "contrainte",
+      statement: "Un créneau n'a qu'une réservation.",
+      states: [],
+      features: ["F-001"],
+    };
+    expect(
+      await isValid(output("clientSpace.flows"), { items: [flow], ...PAGE, version: "v" }),
+    ).toBe(true);
+    expect(await isValid(output("clientSpace.flows"), { items: [flow], ...PAGE })).toBe(false);
+    const block = { validation: "validated", previouslyValidated: false, version: "v" };
+    expect(await isValid(output("clientSpace.rules"), { items: [rule], ...PAGE, ...block })).toBe(
+      true,
+    );
+    const roles = {
+      roles: [{ id: "RL-accueil", name: "Accueil" }],
+      actions: [
+        {
+          specId: "PM-booking.read",
+          label: "Voir les réservations",
+          resource: "booking",
+          access: [{ roleId: "RL-accueil", level: "allowed" }],
+        },
+      ],
+      ...block,
+    };
+    expect(await isValid(output("clientSpace.roles"), roles)).toBe(true);
+    const d = await doc();
+    for (const route of ["progress", "flows", "rules", "roles"]) {
+      const names = vocabularyOf(d.paths[`/client-space/projects/{projectId}/${route}`]?.get, d);
+      expect(names.length, route).toBeGreaterThan(0);
+      expect(leaksOf(names), route).toEqual([]);
+    }
+  });
 });

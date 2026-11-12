@@ -61,6 +61,14 @@ import {
 } from "./schemas.ts";
 import type { aiPrefillItemInputSchema, aiPrefillItemOutputSchema } from "./schemas-ai.ts";
 import type {
+  clientFeatureSummarySchema,
+  clientFlowSchema,
+  clientRuleSchema,
+  clientSpaceFeatureOutputSchema,
+  clientSpaceProgressOutputSchema,
+  clientSpaceRolesOutputSchema,
+} from "./schemas-client-space.ts";
+import type {
   ideaFreezeOutputSchema,
   ideaListOutputSchema,
   ideaMaturitySchema,
@@ -247,6 +255,12 @@ export type AuditEntry = z.output<typeof auditEntrySchema>;
 export type RepoOutput = z.output<typeof repoSchema>;
 export type InstallationOutput = z.output<typeof installationSchema>;
 export type SpecHeadOutput = z.output<typeof specHeadSchema>;
+export type ClientSpaceProgress = z.output<typeof clientSpaceProgressOutputSchema>;
+export type ClientFeatureSummary = z.output<typeof clientFeatureSummarySchema>;
+export type ClientFeature = z.output<typeof clientSpaceFeatureOutputSchema>;
+export type ClientFlow = z.output<typeof clientFlowSchema>;
+export type ClientRule = z.output<typeof clientRuleSchema>;
+export type ClientRoles = z.output<typeof clientSpaceRolesOutputSchema>;
 export type FeatureSummary = z.output<typeof featureSummarySchema>;
 export type FeatureDetail = z.output<typeof featureDetailSchema>;
 export type SpecItem = z.output<typeof specItemSchema>;

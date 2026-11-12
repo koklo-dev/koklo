@@ -4,7 +4,7 @@ import {
   deliverableStatusOf,
   type TargetValidation,
 } from "@koklo/domain";
-import { validationOf } from "../client-space/validation.ts";
+import { type ValidationState, validationOf } from "../client-space/validation.ts";
 import type { ReviewKind } from "../review/review-policy.ts";
 import { type EntityHash, targetHashOf } from "../review/target-hash.ts";
 import { groupByTarget, type VerdictRow, verdictOf } from "../review/verdicts.ts";
@@ -20,10 +20,10 @@ export interface StatusFacts {
   reviews: readonly VerdictRow[];
 }
 
-type Target = readonly [ReviewKind, string];
+export type Target = readonly [ReviewKind, string];
 
 /** Cibles élément ou bloc d'un livrable : seul le Fonctionnel en a (parcours, règles, rôles, fonctionnalités). */
-function elementTargets(key: DeliverableKey, facts: StatusFacts): Target[] {
+export function elementTargets(key: DeliverableKey, facts: StatusFacts): Target[] {
   if (key !== "functional") return [];
   const features = new Set([
     ...facts.featureIds,
@@ -37,20 +37,28 @@ function elementTargets(key: DeliverableKey, facts: StatusFacts): Target[] {
   return targets;
 }
 
+/** Validation d'une cible sur le contenu courant (dernière review, hachage ou SHA) ; sans review, « à valider ». */
+export function targetStateReader(facts: StatusFacts): (target: Target) => ValidationState {
+  const groups = groupByTarget(facts.reviews);
+  return ([kind, ref]) => {
+    const verdict = verdictOf(
+      groups.get(`${kind}:${ref}`) ?? [],
+      targetHashOf(facts.entities, kind, ref),
+    );
+    return verdict
+      ? validationOf(verdict, facts.headSha)
+      : { validation: "to_validate", previouslyValidated: false };
+  };
+}
+
 /**
  * Statut des sept livrables d'après les validations sur le contenu courant (B325 b, c) : un livrable est « Validé » quand
  * lui-même, ou toutes ses cibles élément et bloc, sont validés sur le hachage courant ; « À revoir » si une demande de
  * changement est d'actualité ; « À faire » sans entité ; « À valider » sinon.
  */
 export function deliverableStatusesOf(facts: StatusFacts): DeliverableStatuses {
-  const groups = groupByTarget(facts.reviews);
-  const validationOfTarget = ([kind, ref]: Target): TargetValidation => {
-    const verdict = verdictOf(
-      groups.get(`${kind}:${ref}`) ?? [],
-      targetHashOf(facts.entities, kind, ref),
-    );
-    return verdict ? validationOf(verdict, facts.headSha).validation : "to_validate";
-  };
+  const stateOf = targetStateReader(facts);
+  const validationOfTarget = (target: Target): TargetValidation => stateOf(target).validation;
   const statusOf = (key: DeliverableKey) => {
     const targets = elementTargets(key, facts);
     const kinds = DELIVERABLE_ENTITY_KINDS[key];

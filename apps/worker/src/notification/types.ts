@@ -1,4 +1,4 @@
-/** Types fermés de `notifications.type` (CHECK de TK-51d, étendu par `*_agent_proposals`). */
+/** Types fermés de `notifications.type` (CHECK de TK-51d, étendu par `*_agent_proposals` puis `*_review_withdrawn`). */
 export const NOTIFICATION_TYPES = [
   "suggestion.created",
   "suggestion.decided",
@@ -9,6 +9,8 @@ export const NOTIFICATION_TYPES = [
   "ticket.blocked",
   // TK-99a : un lancement d'agent est terminé alors que l'utilisateur est parti (sans e-mail, B314 h).
   "proposal.ready",
+  // TK-104 (B352) : relance du client par l'équipe (migration `*_review_withdrawn`).
+  "review.reminded",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -27,6 +29,7 @@ export type EmailState = (typeof EMAIL_STATES)[number];
 /** Types qui déclenchent réellement un e-mail (D2) ; les autres passent `skipped`. */
 export const EMAILED_TYPES: readonly NotificationType[] = [
   "baseline.proposed",
+  "review.reminded",
   "review.submitted",
   "ticket.blocked",
 ];
@@ -43,5 +46,6 @@ export const SWEEP_WINDOW_HOURS = 24;
 export const PREFERENCE_KEY_OF_TYPE: Readonly<Partial<Record<NotificationType, string>>> = {
   "baseline.proposed": "deliverable_to_validate",
   "review.submitted": "client_validation",
+  "review.reminded": "client_validation",
   "baseline.validated": "client_validation",
 };

@@ -37,6 +37,10 @@ const withoutReviewKinds = (enums: string[]) =>
     .map((entry) =>
       // TK-103 : la valeur `rule` de `counter_name` est postérieure à cette migration.
       entry.startsWith("counter_name:") ? "counter_name:ticket,sprint,feature,suggestion" : entry,
+    )
+    .map((entry) =>
+      // TK-104 : la valeur `withdrawn` de `review_status` est postérieure à cette migration.
+      entry.startsWith("review_status:") ? "review_status:approved,changes_requested" : entry,
     );
 const dirs = () => listMigrationDirs();
 const migration = () => dirs().find((dir) => dir.endsWith(PROJECT_CLIENT_SUFFIX)) as string;

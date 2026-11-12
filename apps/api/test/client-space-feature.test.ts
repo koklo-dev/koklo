@@ -56,6 +56,7 @@ const indexedLogin = () =>
     endpoints: [{ id: "E-login", method: "POST", path: "/login" }],
   });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("clientSpace.feature : détail métier", () => {
   it("description, critères et étapes, statut de validation et version ; rien de technique", async () => {
     const { sha } = await indexedLogin();
@@ -87,6 +88,9 @@ describe("clientSpace.feature : détail métier", () => {
       ],
       validation: "validated",
       previouslyValidated: false,
+      // TK-104 : liens libellés (aucun ici) et note de version, jamais le SHA entier.
+      links: [],
+      versionNote: { date: "2026-10-31", label: sha.slice(0, 7) },
       version: sha,
     });
   });
