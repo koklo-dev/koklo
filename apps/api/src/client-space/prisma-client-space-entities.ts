@@ -24,13 +24,16 @@ import type { ReviewVerdict } from "./validation.ts";
  */
 const entityRowOf = ({ specId, path, data }: EntityRow): EntityRow => ({ specId, path, data });
 
+/** `ids` : lignes qui correspondent à la recherche (`null` sans recherche). Le type ne filtre que les règles. */
 async function window(
   tx: Tx,
   snapshot: Snapshot,
   kind: "rule" | "flow",
   request: EntityListRequest,
+  ids: readonly string[] | null,
 ): Promise<ListWindow<EntityRow>> {
-  const source = entitySource(tx, snapshot.id, kind, entityWhere(snapshot.id, kind, null));
+  const type = kind === "rule" ? request.type : undefined;
+  const source = entitySource(tx, snapshot.id, kind, entityWhere(snapshot.id, kind, ids, type));
   const page = await loadWindow(source, {
     limit: request.limit,
     ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
@@ -99,8 +102,9 @@ export async function readFlows(
   scope: ProjectScope,
   snapshot: Snapshot,
   request: EntityListRequest,
+  ids: readonly string[] | null,
 ): Promise<FlowsRead> {
-  const page = await window(tx, snapshot, "flow", request);
+  const page = await window(tx, snapshot, "flow", request, ids);
   const verdicts = await verdictsOf(
     tx,
     scope,
@@ -116,8 +120,9 @@ export async function readRules(
   scope: ProjectScope,
   snapshot: Snapshot,
   request: EntityListRequest,
+  ids: readonly string[] | null,
 ): Promise<RulesRead> {
-  const page = await window(tx, snapshot, "rule", request);
+  const page = await window(tx, snapshot, "rule", request, ids);
   const block = await blockVerdict(tx, scope, snapshot.id, "rules");
   return { headSha: snapshot.commitSha, window: page, block };
 }

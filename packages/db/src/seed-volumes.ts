@@ -15,7 +15,7 @@ export interface SeededVolume {
   flows: number;
   roles: number;
   permissions: number;
-  /** Propositions de l'agent (TK-99a) : un lancement terminé et ses propositions, en 3 groupes par zone. */
+  /** Propositions de l'agent (TK-99a, TK-105) : un lancement terminé et ses propositions, groupées par type et par zone. */
   proposals: number;
 }
 
@@ -42,7 +42,8 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     flows: 18,
     roles: 3,
     permissions: 47,
-    proposals: 0,
+    // 248 fonctionnalités + 86 règles + 3 rôles + 18 parcours relus (TK-105, B365).
+    proposals: 355,
   },
 };
 

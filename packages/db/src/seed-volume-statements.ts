@@ -1,5 +1,15 @@
-import { SEED_DATE, SEED_IDS } from "./seed-data.ts";
 import type { SeedStatement } from "./seed-statements.ts";
+import { proposalStatements } from "./seed-volume-proposals.ts";
+import {
+  NOUNS,
+  nth,
+  own,
+  pad,
+  pick,
+  statementOf,
+  VERBS,
+  type VolumeTarget,
+} from "./seed-volume-sql.ts";
 import { SEED_VOLUMES, type VolumeProfile } from "./seed-volumes.ts";
 
 /**
@@ -9,33 +19,9 @@ import { SEED_VOLUMES, type VolumeProfile } from "./seed-volumes.ts";
  * les identifiants dérivent de l'identifiant du projet (`md5(projet || ':' || nature)`), ce qui permet
  * de charger le même jeu dans plusieurs projets sans collision et de le recharger sans doublon.
  *
- * Paramètres de chaque requête : `$1` projet, `$2` organisation, `$3` date fixe.
+ * Paramètres de chaque requête : `$1` projet, `$2` organisation, `$3` date fixe. Briques communes : `seed-volume-sql.ts`.
  */
-export interface VolumeTarget {
-  organizationId: string;
-  projectId: string;
-}
-
-/** Une requête ne reçoit que les paramètres qu'elle cite (`pg` refuse un paramètre en trop). */
-const statementOf = (sql: string, target: VolumeTarget): SeedStatement => {
-  const used = Math.max(...[...sql.matchAll(/\$(\d)/g)].map((match) => Number(match[1])));
-  return { sql, params: [target.projectId, target.organizationId, SEED_DATE].slice(0, used) };
-};
-
-/**
- * UUID dérivé d'un texte : les 32 chiffres de `md5`, dont les quartets de version (8) et de variante
- * (a) sont fixés pour que l'identifiant soit un UUID valide aux yeux du contrat (`z.uuid()`).
- */
-const uuidOf = (text: string) =>
-  `overlay(overlay(md5(${text}) placing '8' from 13 for 1) placing 'a' from 17 for 1)::uuid`;
-/** Identifiant dérivé d'une nature d'objet unique du projet (installation, dépôt, instantané…). */
-const own = (kind: string) => uuidOf(`$1::text || ':${kind}'`);
-/** Identifiant dérivé du n-ième objet d'une série. */
-const nth = (kind: string, n = "n") => uuidOf(`$1::text || ':${kind}:' || ${n}`);
-/** Au moins trois chiffres, sans jamais tronquer (`lpad` couperait 1000 en 100). */
-const pad = (n = "n") => `lpad(${n}::text, GREATEST(3, length(${n}::text)), '0')`;
-const pick = (values: readonly string[], index: string) =>
-  `(ARRAY[${values.map((value) => `'${value.replace(/'/g, "''")}'`).join(", ")}])[1 + ${index}]`;
+export type { VolumeTarget } from "./seed-volume-sql.ts";
 
 const FEATURE_STATUSES = ["brouillon", "specifiee", "implementee", "adoptee"] as const;
 const FEATURE_PRIORITIES = ["must", "should", "could", "wont"] as const;
@@ -59,31 +45,6 @@ const TICKET_PACKAGES = [
   "infra",
 ] as const;
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-
-/** Verbes et compléments tournants : des titres lisibles, distincts, stables d'une exécution à l'autre. */
-const VERBS = [
-  "Gérer",
-  "Consulter",
-  "Exporter",
-  "Importer",
-  "Valider",
-  "Suspendre",
-  "Relancer",
-  "Archiver",
-  "Planifier",
-] as const;
-const NOUNS = [
-  "les réservations",
-  "le calendrier",
-  "les paiements",
-  "les clients",
-  "les factures",
-  "les notifications",
-  "le planning",
-  "les documents",
-  "les accès",
-  "les rapports",
-] as const;
 
 /** Titre connu des tests de recherche : le seul à contenir « annul » et « group ». */
 const KNOWN_TITLE = "Annulation groupée des réservations";
@@ -397,50 +358,6 @@ function trackerStatements(profile: VolumeProfile, target: VolumeTarget): SeedSt
     `INSERT INTO project_counters (organization_id, project_id, name, last_value, created_at, updated_at)
      VALUES ($2, $1::uuid, 'ticket', ${total}, ${at}, ${at}), ($2, $1::uuid, 'sprint', 1, ${at}, ${at})
      ON CONFLICT (project_id, name) DO UPDATE SET last_value = GREATEST(project_counters.last_value, EXCLUDED.last_value)`,
-  ];
-  return sql.map((statement) => statementOf(statement, target));
-}
-
-/** Zones du jeu de propositions : 120 + 140 + 140, toutes au-delà du seuil de 30 qui déclenche le groupement. */
-const PROPOSAL_ZONES = [
-  { zone: "Réservations", kind: "feature", last: 120 },
-  { zone: "Paiements", kind: "feature", last: 260 },
-  { zone: "Facturation", kind: "criteria", last: 400 },
-] as const;
-
-const PROPOSAL_STEPS = `jsonb_build_array(
-  jsonb_build_object('type', 'etant_donne', 'text', 'un client connecté'),
-  jsonb_build_object('type', 'quand', 'text', 'il ouvre la page'),
-  jsonb_build_object('type', 'alors', 'text', 'il voit le résultat'))`;
-
-/**
- * Lancement terminé et 400 propositions de l'agent (TK-99a) : trois groupes de plus de 30 par zone, 70 % en
- * attente, 20 % acceptées, 10 % refusées. Les charges respectent les schémas par type (feature, criteria).
- */
-function proposalStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
-  const total = SEED_VOLUMES[profile].proposals;
-  if (total === 0) return [];
-  const at = "$3::timestamptz";
-  const zone = `CASE ${PROPOSAL_ZONES.map(({ zone: name, last }) => `WHEN n <= ${last} THEN '${name}'`).join(" ")} END`;
-  const title = `${pick(VERBS, "n % 9")} || ' ' || ${pick(NOUNS, "(n / 9) % 10")} || ' (proposition ' || n || ')'`;
-  const criterion = `jsonb_build_array(jsonb_build_object('title', 'Affichage du résultat', 'steps', ${PROPOSAL_STEPS}))`;
-  const payload = `CASE WHEN n > ${PROPOSAL_ZONES[1].last}
-         THEN jsonb_build_object('specId', 'F-' || ${pad("(n - 260)")}, 'criteria', ${criterion})
-         ELSE jsonb_build_object('title', ${title}, 'priority', 'should', 'description', 'Jeu de volume', 'criteria', ${criterion}) END`;
-  const sql = [
-    `INSERT INTO agent_launches (id, organization_id, project_id, deliverable, mode, status, requested_by, sources,
-        proposed_count, discarded_count, heartbeat_at, last_seen_at, started_at, finished_at, created_at, updated_at)
-     VALUES (${own("launch")}, $2, $1::uuid, 'functional', 'complete', 'done', '${SEED_IDS.adminUser}',
-        '["idea.frozen", "idea.synthesis", "idea.risks", "functional.current"]'::jsonb, ${total}, 0, ${at}, ${at}, ${at}, ${at}, ${at}, ${at})
-     ON CONFLICT (id) DO UPDATE SET proposed_count = EXCLUDED.proposed_count`,
-    `INSERT INTO agent_proposals (id, organization_id, project_id, launch_id, deliverable, kind, zone, position, title,
-        rationale, payload, status, created_at, updated_at)
-     SELECT ${nth("proposal")}, $2, $1::uuid, ${own("launch")}, 'functional',
-            CASE WHEN n > ${PROPOSAL_ZONES[1].last} THEN 'criteria' ELSE 'feature' END, ${zone}, n, ${title},
-            'Absent du cahier actuel', ${payload},
-            CASE WHEN n % 10 < 2 THEN 'accepted' WHEN n % 10 = 2 THEN 'rejected' ELSE 'pending' END, ${at}, ${at}
-       FROM generate_series(1, ${total}) AS n
-     ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payload = EXCLUDED.payload`,
   ];
   return sql.map((statement) => statementOf(statement, target));
 }
