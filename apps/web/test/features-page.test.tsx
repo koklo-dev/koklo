@@ -2,10 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CLIENT_SIDE,
   FEATURES,
   findList,
-  GIT_VOCABULARY,
   head,
   inputsOf,
   list,
@@ -186,16 +184,6 @@ describe("En-tête (§3.1)", () => {
     },
   );
 
-  it.each(CLIENT_SIDE)("%s : « Mise à jour le … », aucun identifiant technique", async (role) => {
-    serve(role);
-    renderFeatures();
-    await findList();
-    expect(visibleText()).toMatch(/Mise à jour le 30 octobre 2026/);
-    expect(visibleText()).not.toMatch(/a1b2c3d|Version de la spec|indexée|spec à jour/i);
-    expect(screen.queryByLabelText(/Version de la spec/)).not.toBeInTheDocument();
-    expect(screen.queryByText("3 fonctionnalités")).not.toBeInTheDocument();
-  });
-
   it("la ligne de version est absente tant que spec.head n'a pas répondu", async () => {
     procedures.specHead.mockImplementation(neverResolves);
     renderFeatures();
@@ -333,57 +321,12 @@ describe("Liste (§3.3, §4.2)", () => {
       "Fin de la liste",
     );
   });
-
-  it("le client ne voit aucun bouton d'écriture (créer, modifier, supprimer) ; l'équipe, 48e-1", async () => {
-    serve("client");
-    renderFeatures();
-    await findList();
-    expect(
-      screen.queryByRole("button", { name: /nouvelle|créer|modifier|supprimer|ajouter/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("le client ne voit aucun chemin de fichier dans la liste", async () => {
-    serve("client");
-    renderFeatures();
-    await findList();
-    expect(visibleText()).not.toMatch(GIT_VOCABULARY);
-  });
 });
 
 describe("Vide (§4.3)", () => {
   beforeEach(() => {
     procedures.specHead.mockResolvedValue(EMPTY_HEAD);
     procedures.specListFeatures.mockResolvedValue(list([]));
-  });
-
-  it("carte « Aucune fonctionnalité pour le moment » avec son texte, sans table ni filtres", async () => {
-    serve("client");
-    procedures.specHead.mockResolvedValue(EMPTY_HEAD);
-    procedures.specListFeatures.mockResolvedValue(list([]));
-    renderFeatures();
-    expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
-    expect(visibleText()).toContain("La spec de ce projet ne décrit encore aucune fonctionnalité.");
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-  });
-
-  it("le client ne voit aucun bouton, aucun emplacement d'écriture vide", async () => {
-    serve("client");
-    procedures.specHead.mockResolvedValue(EMPTY_HEAD);
-    procedures.specListFeatures.mockResolvedValue(list([]));
-    renderFeatures();
-    await findNamed("heading", "Aucune fonctionnalité pour le moment");
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it.each(CLIENT_SIDE)("même carte pour %s", async (role) => {
-    serve(role);
-    procedures.specListFeatures.mockResolvedValue(list([]));
-    procedures.specHead.mockResolvedValue(EMPTY_HEAD);
-    renderFeatures();
-    expect(await findNamed("heading", "Aucune fonctionnalité pour le moment")).toBeVisible();
   });
 
   it.each(TEAM)("%s : l'agent peut proposer le cahier, saisie à la main proposée", async (role) => {

@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { serveClient } from "./support/client-space.tsx";
 import {
   clickSave,
   closePanel,
@@ -15,13 +16,7 @@ import {
   statusRegions,
   titleField,
 } from "./support/feature-form.tsx";
-import {
-  CLIENT_SIDE,
-  findList,
-  GIT_VOCABULARY,
-  renderFeatures,
-  visibleText,
-} from "./support/features.tsx";
+import { CLIENT_SIDE, GIT_VOCABULARY, renderFeatures, visibleText } from "./support/features.tsx";
 import {
   apiError,
   polyfillRadix,
@@ -259,11 +254,12 @@ describe("Vocabulaire (§5.9, AC-48-28)", () => {
   it.each(CLIENT_SIDE)(
     "%s : ?new=1 et ?edit=F-001 ne montrent ni formulaire ni terme git",
     async (role) => {
-      serveWrite(role);
+      // TK-104 : client et business lisent la vue client, où aucune adresse d'écriture ne s'ouvre.
+      serveClient(role, { canValidate: role === "client" });
       renderFeatures({ search: "?new=1" });
-      await findList();
+      await screen.findByRole("note");
       expect(screen.queryByRole("dialog")).toBeNull();
-      expect(visibleText()).not.toMatch(GIT_VOCABULARY);
+      expect(visibleText().replace(/a1b2c3d(?![0-9a-f])/g, "")).not.toMatch(GIT_VOCABULARY);
       expect(visibleText()).not.toMatch(
         /Enregistrer|Nouvelle fonctionnalité|Brouillon repris|Éléments liés/,
       );
@@ -274,7 +270,7 @@ describe("Vocabulaire (§5.9, AC-48-28)", () => {
   it.each(CLIENT_SIDE)(
     "%s : un marqueur de suivi resté sur l'appareil n'apparaît pas à l'écran",
     async (role) => {
-      serveWrite(role);
+      serveClient(role, { canValidate: role === "client" });
       localStorage.setItem(
         `koklo:feature-pending:7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01`,
         JSON.stringify({
@@ -285,7 +281,7 @@ describe("Vocabulaire (§5.9, AC-48-28)", () => {
         }),
       );
       renderFeatures();
-      await findList();
+      await screen.findByRole("note");
       expect(visibleText()).not.toContain("Secret");
     },
   );

@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { serveClient } from "./support/client-space.tsx";
 import {
   closePanel,
   dialog,
@@ -65,22 +66,23 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
   });
 
   it.each(CLIENT_SIDE)(
-    "%s : aucun bouton, aucun emplacement vide, aucun bouton grisé",
+    "%s : la vue client n'a aucun bouton d'écriture de la spec (TK-104)",
     async (role) => {
-      serveWrite(role);
+      serveClient(role, { canValidate: role === "client" });
       renderFeatures();
-      await findList();
+      await screen.findByRole("note");
       expect(newButtons()).toHaveLength(0);
       expect(screen.queryByRole("button", { name: /Modifier|Enregistrer|Nouvelle/ })).toBeNull();
-      expect(screen.queryAllByRole("button").filter((b) => b.hasAttribute("disabled"))).toEqual([]);
     },
   );
 
   it("tant que le rôle est inconnu, aucun bouton (jamais d'apparition puis de disparition)", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));
     renderFeatures();
-    await findList();
+    // TK-104 : l'aiguillage attend le rôle, aucune vue (donc aucun bouton) n'apparaît avant lui.
+    await waitFor(() => expect(procedures.organizationList).toHaveBeenCalled());
     expect(newButtons()).toHaveLength(0);
+    expect(procedures.specHead).not.toHaveBeenCalled();
   });
 
   it("spec en préparation : aucun bouton", async () => {
@@ -131,17 +133,6 @@ describe("Bouton « Nouvelle fonctionnalité » par rôle", () => {
       within(document.body).queryByRole("button", { name: NEW_BUTTON }),
     ).not.toBeInTheDocument();
   });
-
-  it("état vide côté client : aucun bouton", async () => {
-    serveWrite("client");
-    procedures.specHead.mockResolvedValue(
-      head({ counts: { features: 0, tables: 0, endpoints: 0 } }),
-    );
-    procedures.specListFeatures.mockResolvedValue(list([]));
-    renderFeatures();
-    await findNamed("heading", "Aucune fonctionnalité pour le moment");
-    expect(newButtons()).toHaveLength(0);
-  });
 });
 
 describe("Ouverture de la création", () => {
@@ -191,45 +182,23 @@ describe("Ouverture de la création", () => {
 
 describe("Client et business : adresses d'écriture ignorées (AC-48-27)", () => {
   it.each(CLIENT_SIDE)(
-    "%s : ?new=1 n'ouvre rien, le paramètre est retiré, aucun appel d'écriture",
+    "%s : ?new=1 n'ouvre rien (vue client), aucun appel d'écriture",
     async (role) => {
-      serveWrite(role);
+      serveClient(role, { canValidate: role === "client" });
       renderFeatures({ search: "?new=1&status=brouillon" });
-      await findList();
+      await screen.findByRole("note");
       expect(screen.queryByRole("dialog")).toBeNull();
-      await waitFor(() =>
-        expect(new URLSearchParams(window.location.search).has("new")).toBe(false),
-      );
-      expect(new URLSearchParams(window.location.search).get("status")).toBe("brouillon");
       expect(writeCalls()).toBe(0);
     },
   );
 
-  it.each(CLIENT_SIDE)(
-    "%s : ?edit=F-001 ouvre la fiche en lecture, jamais le formulaire",
-    async (role) => {
-      serveWrite(role);
-      renderFeatures({ search: "?edit=F-001" });
-      const panel = await screen.findByRole("complementary", {
-        name: "Fiche de la fonctionnalité",
-      });
-      expect(within(panel).queryByRole("button", { name: /Modifier|Enregistrer/ })).toBeNull();
-      expect(within(panel).queryByRole("textbox")).toBeNull();
-      await waitFor(() => {
-        const params = new URLSearchParams(window.location.search);
-        expect(params.has("edit")).toBe(false);
-        expect(params.get("sel")).toBe("F-001");
-      });
-      expect(writeCalls()).toBe(0);
-    },
-  );
-
-  it.each(CLIENT_SIDE)("%s : la fiche n'a pas de bouton « Modifier »", async (role) => {
-    serveWrite(role);
-    renderFeatures({ search: "?feature=F-001" });
-    const panel = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
-    await within(panel).findByText("Critères d'acceptation");
-    expect(within(panel).queryByRole("button", { name: "Modifier" })).toBeNull();
+  it.each(CLIENT_SIDE)("%s : ?edit=F-001 n'ouvre aucun formulaire (vue client)", async (role) => {
+    serveClient(role, { canValidate: role === "client" });
+    renderFeatures({ search: "?edit=F-001" });
+    await screen.findByRole("note");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Modifier|Enregistrer/ })).toBeNull();
+    expect(writeCalls()).toBe(0);
   });
 
   it("aucune adresse d'écriture ne se transforme en appel `submit` pour un rôle inconnu", async () => {

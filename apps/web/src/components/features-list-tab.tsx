@@ -1,12 +1,12 @@
 "use client";
 
-import { tabNumbers } from "../lib/features-header-state.ts";
+import { type HeaderAction, tabNumbers } from "../lib/features-header-state.ts";
 import type { FeaturesPageModel } from "../lib/use-features-page.ts";
 import { useFeaturesPage } from "../lib/use-features-page.ts";
 import { FeatureFormSheet } from "./feature-form-sheet.tsx";
 import { Collection } from "./features-collection.tsx";
 import { FeaturesHeader } from "./features-header.tsx";
-import { HeaderActionButton, useHeaderState } from "./features-header-action.tsx";
+import { type ClientEntry, HeaderActionButton, useHeaderState } from "./features-header-action.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
 import { ReviewView } from "./features-review-view.tsx";
 import { StatusBlock } from "./features-status-block.tsx";
@@ -44,7 +44,8 @@ function FormSheet({ page }: { page: FeaturesPageModel }) {
 /** Actions de l'en-tête : les secondaires, puis la primaire (« Nouvelle fonctionnalité »). */
 function headerActions(
   page: FeaturesPageModel,
-  actions: ReadonlyArray<"add" | "propose" | "repropose" | "create">,
+  actions: ReadonlyArray<HeaderAction>,
+  client: ClientEntry,
 ) {
   const button = (action: (typeof actions)[number]) => (
     <HeaderActionButton
@@ -54,6 +55,7 @@ function headerActions(
       propose={page.propose}
       onCreate={page.form.openCreate}
       onReview={page.url.openReview}
+      client={client}
     />
   );
   const secondary = actions.filter((action) => action !== "create").map(button);
@@ -69,6 +71,7 @@ export function FeaturesListTab({ projectId }: { projectId: string }) {
   const { head, projectName } = page.data;
   const header = useHeaderState(page.propose, projectId, {
     team: page.team,
+    role: page.data.role,
     canWrite: page.form.canWrite,
     viewKind: page.data.view.kind,
     total: head?.counts.features,
@@ -87,7 +90,7 @@ export function FeaturesListTab({ projectId }: { projectId: string }) {
         tabCount={header.tabCount}
         tabCounts={header.tabCounts}
         reviewing={page.propose.reviewing}
-        {...headerActions(page, header.actions)}
+        {...headerActions(page, header.actions, header.client)}
         tab="features"
         head={head ?? undefined}
         team={page.team}
