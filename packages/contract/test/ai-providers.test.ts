@@ -46,10 +46,13 @@ describe("AP1 surface : onze routes sous /ai", () => {
     expect(paths.filter((p) => p.startsWith("/projects/")).sort()).toEqual([
       "/projects/{projectId}/ai/brief",
       "/projects/{projectId}/ai/criteria",
+      "/projects/{projectId}/ai/deliverable/options",
+      "/projects/{projectId}/ai/deliverable/propose",
       "/projects/{projectId}/ai/features",
       "/projects/{projectId}/ai/idea/chat",
       "/projects/{projectId}/ai/idea/gaps",
       "/projects/{projectId}/ai/idea/synthesis",
+      "/projects/{projectId}/ai/proposals/{proposalId}/revise",
     ]);
   });
 });

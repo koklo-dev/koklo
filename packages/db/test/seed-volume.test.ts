@@ -216,12 +216,55 @@ describe("TK-94 seed:planche", () => {
   }, 120_000);
 });
 
+describe("TK-99a seed:large : 400 propositions de l'agent", () => {
+  it("insère un lancement terminé et 400 propositions en 3 groupes de plus de 30, statuts mêlés", async () => {
+    await seedLarge(db.url);
+    const project = await projectByName("Volume · charge");
+    const id = project?.id as string;
+    expect(SEED_VOLUMES.large.proposals).toBe(400);
+    const launches = await db.query<{
+      status: string;
+      proposed_count: number;
+      deliverable: string;
+    }>("SELECT status, proposed_count, deliverable FROM agent_launches WHERE project_id = $1", [
+      id,
+    ]);
+    expect(launches).toEqual([{ status: "done", proposed_count: 400, deliverable: "functional" }]);
+    const groups = await db.query<{ kind: string; zone: string; n: number; pending: number }>(
+      `SELECT kind, zone, count(*)::int AS n, count(*) FILTER (WHERE status = 'pending')::int AS pending
+         FROM agent_proposals WHERE project_id = $1 GROUP BY kind, zone ORDER BY zone`,
+      [id],
+    );
+    expect(groups).toHaveLength(3);
+    expect(groups.reduce((sum, g) => sum + g.n, 0)).toBe(400);
+    for (const group of groups) {
+      expect(group.n).toBeGreaterThan(30);
+      expect(group.pending).toBeGreaterThan(0);
+      expect(group.pending).toBeLessThan(group.n);
+    }
+    expect(await count("agent_proposals", "project_id", id)).toBe(400);
+  }, 120_000);
+
+  it("est idempotent : un second chargement ne duplique rien", async () => {
+    await seedLarge(db.url);
+    const project = await projectByName("Volume · charge");
+    const id = project?.id as string;
+    expect(await count("agent_proposals", "project_id", id)).toBe(400);
+    expect(await count("agent_launches", "project_id", id)).toBe(1);
+  }, 120_000);
+
+  it("seed:planche n'insère aucune proposition", async () => {
+    await seedPlanche(db.url);
+    const project = await projectByName("Volume · planche");
+    expect(await count("agent_proposals", "project_id", project?.id as string)).toBe(0);
+  }, 120_000);
+});
+
 describe("TK-94 volumes déclarés des modèles à venir (lecture prudente, B34)", () => {
   it("déclare les volumes de la passation 07 §6 et 08 §4 avec le ticket qui créera le modèle", () => {
-    expect(PENDING_VOLUMES.large).toMatchObject({
-      rules: { count: 300 },
-      proposals: { count: 400 },
-    });
+    expect(PENDING_VOLUMES.large).toMatchObject({ rules: { count: 300 } });
+    // TK-99a : les 400 propositions sont désormais insérées, plus seulement déclarées.
+    expect(PENDING_VOLUMES.large).not.toHaveProperty("proposals");
     expect(PENDING_VOLUMES.planche).toMatchObject({
       rules: { count: 86 },
       journeys: { count: 18 },

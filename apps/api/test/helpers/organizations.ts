@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
+import { AGENT_PROPOSE_QUEUE } from "@koklo/domain";
 import type { INestApplication } from "@nestjs/common";
 import { PgBoss } from "pg-boss";
 import request from "supertest";
@@ -89,6 +90,7 @@ export async function startQueueBoss(database: TestDatabase): Promise<PgBoss> {
   const boss = new PgBoss(database.url);
   await boss.start();
   await boss.createQueue(SEND_INVITATION_QUEUE);
+  await boss.createQueue(AGENT_PROPOSE_QUEUE);
   return boss;
 }
 

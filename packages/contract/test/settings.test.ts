@@ -41,7 +41,7 @@ const ROUTES: [string, string, string][] = [
 ];
 
 describe("contrat 2.8.0 : version et routes", () => {
-  it("est en 2.8.1", () => expect(CONTRACT_VERSION).toBe("2.8.1"));
+  it("est en 2.9.0", () => expect(CONTRACT_VERSION).toBe("2.9.0"));
 
   it.each(ROUTES)("%s : %s %s", (name, method, path) => {
     expect(meta(name)).toMatchObject({ method, path });

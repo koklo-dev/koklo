@@ -159,4 +159,22 @@ export const staleVersionError = {
   STALE_VERSION: { status: 409, message: "La version a changé, relisez avant de valider" },
 } as const;
 
+/** Un lancement d'agent est déjà actif pour ce livrable (index unique partiel en base) : on rejoint `launchId`. */
+export const proposalInProgressError = {
+  PROPOSAL_IN_PROGRESS: {
+    status: 409,
+    message: "Une génération est déjà en cours pour ce livrable",
+    data: z.object({ launchId: z.uuid() }),
+  },
+} as const;
+
+/** Le N de propositions en attente affiché n'est plus le N réel : rien n'est décidé (« le N affiché est le N appliqué »). */
+export const proposalCountChangedError = {
+  PROPOSAL_COUNT_CHANGED: {
+    status: 409,
+    message: "Le nombre de propositions en attente a changé",
+    data: z.object({ expected: z.number().int().min(0), actual: z.number().int().min(0) }),
+  },
+} as const;
+
 export * from "./errors-provider.ts";

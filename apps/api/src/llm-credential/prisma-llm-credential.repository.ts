@@ -1,4 +1,4 @@
-import { withOrganization } from "@koklo/db";
+import { LlmCredentialLookupStore, withOrganization } from "@koklo/db";
 import type { LlmProviderId } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
@@ -41,9 +41,6 @@ function statusOf(row: Row): LlmCredentialStatus {
     updatedAt: row.updatedAt.toISOString(),
   };
 }
-
-/** Hex (24 caractères) du nonce AES-GCM de 12 octets : identifie une version de la clé stockée. */
-const revisionOf = (nonce: Uint8Array): string => Buffer.from(nonce).toString("hex");
 
 const REVISION_PATTERN = /^[0-9a-f]{24}$/;
 
@@ -95,7 +92,11 @@ async function detachFromSettings(tx: Tx, provider: LlmProviderId): Promise<void
  */
 @Injectable()
 export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  private readonly lookup: LlmCredentialLookupStore;
+
+  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {
+    this.lookup = new LlmCredentialLookupStore(database.client);
+  }
 
   private async run<T>(organizationId: string, work: () => Promise<T>): Promise<T> {
     try {
@@ -158,24 +159,7 @@ export class PrismaLlmCredentialRepository implements LlmCredentialRepository {
   }
 
   find(organizationId: string, provider: LlmProviderId): Promise<StoredLlmCredential | null> {
-    return this.run(organizationId, async () => {
-      const row = await this.table.findFirst({ where: { provider } });
-      if (row === null) return null;
-      return {
-        id: row.id,
-        organizationId: row.organizationId,
-        provider: row.provider,
-        secret: {
-          ciphertext: Buffer.from(row.ciphertext),
-          nonce: Buffer.from(row.nonce),
-          keyVersion: row.keyVersion,
-        },
-        defaultModel: row.defaultModel,
-        baseUrl: row.baseUrl,
-        invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
-        revision: revisionOf(row.nonce),
-      };
-    });
+    return this.run(organizationId, () => this.lookup.find(organizationId, provider));
   }
 
   remove(

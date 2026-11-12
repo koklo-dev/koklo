@@ -32,6 +32,7 @@ const REFS: Record<NotificationSubjectKind, string> = {
   review: "01900000-0000-7000-8000-0000000000cc",
   baseline: "baseline-0",
   ticket: "TK-45",
+  agent_launch: "01900000-0000-7000-8000-0000000000dd",
 };
 
 function input(over: Partial<NotificationMessageInput> = {}): NotificationMessageInput {
@@ -58,11 +59,11 @@ function failureOf(fn: () => unknown): MailDeliveryError | undefined {
 }
 
 describe("types de notification : parité avec la base", () => {
-  it("la liste du worker est exactement celle du CHECK de la migration notifications", () => {
+  it("la liste du worker est exactement celle du CHECK de la dernière migration qui l'a étendu (agent_proposals, TK-99a)", () => {
     const sql = readFileSync(
       resolve(
         import.meta.dirname,
-        "../../../../packages/db/prisma/migrations/20261101120000_notifications/migration.sql",
+        "../../../../packages/db/prisma/migrations/20261111090000_agent_proposals/migration.sql",
       ),
       "utf8",
     );
@@ -86,7 +87,7 @@ describe("types de notification : parité avec la base", () => {
 });
 
 describe("gabarit par type : exhaustivité", () => {
-  it("le dictionnaire couvre exactement les 7 types, sans type en trop", () => {
+  it("le dictionnaire couvre exactement les 8 types, sans type en trop", () => {
     expect(Object.keys(NOTIFICATION_COPY).sort()).toEqual([...NOTIFICATION_TYPES].sort());
     expect(Object.keys(SUBJECT_REF_PATTERNS).sort()).toEqual(
       [...NOTIFICATION_SUBJECT_KINDS].sort(),

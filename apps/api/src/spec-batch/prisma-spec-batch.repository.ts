@@ -3,7 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
 import { isIdeaOperation } from "../idea/idea-batch.ts";
 import { carrierFilter } from "../repo/prisma-repo.repository.ts";
-import { isUniqueViolation, orNotFound } from "../tracker/api-errors.ts";
+import { isUniqueViolation, orNotFound, validation } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { nextCounterValue } from "../tracker/counters.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
@@ -57,6 +57,37 @@ const recordOf = (row: Row): BatchRecord => ({
     payload: operation.payload,
   })),
 });
+
+/** Les seuls types de proposition qui ont une opération de spec (B314 d) ; règles, rôles et parcours : sprint 023. */
+const APPLICABLE_KINDS = ["feature", "criteria"];
+
+/**
+ * Preuve serveur que les opérations viennent de propositions acceptées (TK-99a) : chacune est du projet, `accepted`,
+ * d'un type enregistrable et pas déjà appliquée ; elle reçoit le lot dans la transaction de l'enfilage. Une course
+ * entre deux lots sur la même proposition est tranchée par la condition de l'écriture (tout ou rien).
+ */
+async function applyProposals(
+  tx: Tx,
+  scope: ProjectScope,
+  batchId: string,
+  ids: readonly string[],
+) {
+  if (ids.length === 0) return;
+  const where = {
+    id: { in: [...ids] },
+    projectId: scope.projectId,
+    status: "accepted",
+    kind: { in: APPLICABLE_KINDS },
+    appliedBatchId: null,
+  };
+  const applied = await tx.agentProposal.updateMany({ where, data: { appliedBatchId: batchId } });
+  if (applied.count !== ids.length) {
+    throw validation(
+      "proposalIds",
+      "Chaque proposition doit être acceptée, du projet et pas déjà appliquée.",
+    );
+  }
+}
 
 @Injectable()
 export class PrismaSpecBatchRepository implements SpecBatchRepository {
@@ -173,6 +204,7 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
       });
     }
     await tx.specWriteOperation.createMany({ data: operations });
+    await applyProposals(tx, scope, row.id, batch.proposalIds ?? []);
     await recordAudit(tx, scope, {
       action: "spec.batch.submit",
       targetKind: "spec_batch",

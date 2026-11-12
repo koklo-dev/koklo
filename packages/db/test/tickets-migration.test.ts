@@ -16,6 +16,7 @@ import { LLM_TABLES } from "./support/llm-credentials-fixtures.ts";
 import { NOTIFICATION_TABLES } from "./support/notifications-fixtures.ts";
 import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import {
+  AGENT_PROPOSAL_TABLES,
   PROJECT_CLIENT_TABLES,
   PROJECT_CREATION_TABLES,
   PROJECT_VISIT_TABLES,
@@ -40,6 +41,7 @@ const initialTables = expectedTables.filter(
     !(PROJECT_CLIENT_TABLES as readonly string[]).includes(table) &&
     !(PROJECT_VISIT_TABLES as readonly string[]).includes(table) &&
     !(PROJECT_CREATION_TABLES as readonly string[]).includes(table) &&
+    !(AGENT_PROPOSAL_TABLES as readonly string[]).includes(table) &&
     !(SETTINGS_TABLES as readonly string[]).includes(table) &&
     !(IDEA_TABLES as readonly string[]).includes(table),
 );

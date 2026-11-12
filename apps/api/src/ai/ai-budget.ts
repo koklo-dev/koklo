@@ -1,4 +1,5 @@
 import type { LlmBudget } from "@koklo/domain";
+import { PROPOSAL_BUDGETS, type ProposalPurpose } from "@koklo/llm";
 
 /** Finalités fixes (`trace.purpose`) : une par procédure. */
 export type AiPurpose =
@@ -9,7 +10,9 @@ export type AiPurpose =
   | "idea-chat"
   | "idea-propose"
   | "idea-gaps"
-  | "idea-synthesis";
+  | "idea-synthesis"
+  | "proposal-admit"
+  | ProposalPurpose;
 
 /** Plafonds par défaut du quota (D8, à valider par l'humain) ; réglables par `AppConfig.ai`. */
 export interface AiLimits {
@@ -48,6 +51,10 @@ export const AI_BUDGETS: Readonly<Record<AiPurpose, LlmBudget>> = {
   "idea-gaps": { maxOutputTokens: 800, timeoutMs: 60_000, ...IDEA },
   /** Synthèse de l'idée (TK-91) : le dossier entier part, une page de Markdown revient. */
   "idea-synthesis": { maxOutputTokens: 2500, timeoutMs: 90_000, ...IDEA },
+  /** Lancement d'une génération (TK-99a) : aucun appel à l'API, le budget ne sert qu'à l'examen du moteur. */
+  "proposal-admit": { maxOutputTokens: 16, timeoutMs: 15_000, ...COMMON },
+  /** Génération et révision des propositions (TK-99a) : budgets partagés avec le worker. */
+  ...PROPOSAL_BUDGETS,
 };
 
 /** Nombre maximal de features existantes (lignes) transmises au modèle comme contexte. */

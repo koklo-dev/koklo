@@ -361,6 +361,31 @@ repository (questions B301 to B304).
   `UNIQUE (organization_id, idempotency_key)` (same key, same project); index
   `(organization_id, project_id, created_at DESC)`.
 
+### Agent launches and proposals (TK-99a)
+Three tenant tables (`TENANT_MODELS`: `AgentLaunch`, `AgentProposal`, `AgentProposalDecision`), migration
+`20261111090000_agent_proposals` (additive; `down.sql` restores the `notifications` CHECK lists, then drops the three
+tables). Constants and the queue name (`agent-propose`) live in `packages/domain/src/agent-launch.ts`; one Zod schema
+per proposal type (`feature`, `criteria`, `rule`, `role`, `flow`) and the plain-text policy live in
+`packages/schema/src/proposals/` (questions B314, B315).
+- **`agent_launches`**: one generation of proposals for a deliverable. `deliverable` (7 keys), `mode`, `instruction`
+  (500 characters at most), `status` (`queued`, `running`, `done`, `failed`, `canceled`), `error_code` (only when
+  `failed`, a lowercase code), `requested_by` (no foreign key), `sources` (what the agent read, a JSONB array: no list column), `base_version` (the
+  `idea-vN` read), `discarded_count`, `proposed_count`, `heartbeat_at`, `last_seen_at` (last `proposal.list`),
+  `started_at`, `finished_at`.
+- **Lock**: the partial unique index `agent_launches_one_active (project_id, deliverable) WHERE status IN ('queued',
+  'running')` (written by hand: Prisma does not model partial indexes). A violation (23505) is the API's
+  `409 PROPOSAL_IN_PROGRESS`. A `running` launch without a heartbeat for 5 minutes is retaken (`failed` /
+  `worker_lost`) by the next launch request.
+- **`agent_proposals`**: `launch_id`, `deliverable` and `project_id` (denormalised for the list index), `kind`, `zone`,
+  `position`, `title`, `rationale`, `payload` (JSONB object), `status` (`pending`, `accepted`, `rejected`),
+  `applied_batch_id` (only when `accepted`, CHECK; set by `specBatch.submit` with `proposalIds`; an applied proposal
+  is never modified again). Index `agent_proposals_list_idx (project_id, deliverable, status, kind, zone, id)`.
+- **`agent_proposal_decisions`**: the journal, one row per decision (`accept`, `reject`, `reset`), `decided_by` (no
+  foreign key), `edited` (the content was corrected first). Never modified.
+- **Keys**: `(organization_id, project_id)` and `(organization_id, launch_id)` / `(organization_id, proposal_id)`
+  `ON DELETE CASCADE`. `notifications` accepts the type `proposal.ready` and the subject `agent_launch`.
+- **`seed:large`**: one `done` launch and 400 proposals in three groups of more than 30 (120, 140, 140), statuses mixed.
+
 ### TK-51 summary: BYOK, suggestions, reviews, notifications
 Five tables over four additive and reversible migrations, each with a `down.sql` that returns to the
 previous state (data of the dropped tables is lost by design):

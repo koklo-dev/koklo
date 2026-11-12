@@ -1835,3 +1835,41 @@ flowchart LR
   W -->|"project_repos + status"| DB
   Web["web: project.cards poll 3 s"] --> API
 ```
+
+## Proposals generation flow (TK-99a)
+
+`ai.proposeDeliverable` (api, module `proposal`) does everything that must be refused or audited before any work:
+role check (client and business get 403), frozen `idea-vN` version, the partial unique index "one launch per
+deliverable" (`agent_launches`), then engine, quota and ceiling checks, the audit line `ai.deliverable.propose`, and
+finally the pg-boss message `{ launchId }` (nothing else) on the queue `agent-propose`. A refused admission removes
+the launch (lock released); an enqueue failure settles it `failed` / `enqueue_failed`. The worker job
+`apps/worker/src/jobs/agent-propose.ts` (`key_strict_fifo`, `singletonKey = launchId`, `retryLimit` 1,
+`expireInSeconds` 900) moves the launch `queued` to `running` (heartbeat at each call), asks the model for the zones
+(12 at most), then calls it once per zone; each zone is validated (Zod schema per type, plain-text policy, duplicates,
+caps of 25 per zone and 500 per launch) and published in one transaction as `pending` proposals, so the review can
+start before the end. Invalid entries are dropped and counted (`discardedCount`). At `done`, a `proposal.ready`
+notification is created when `proposal.list` was not read for 30 s. The worker never writes into the spec nor into
+`spec_write_batches`: a proposal enters the spec only through `proposal.decide` then `specBatch.submit`
+(`proposalIds`). A launch without heartbeat for 5 minutes is released by the api as `worker_lost`. The engine
+(`AiProviderRouter`, credential resolver, routing and usage stores) is shared through `@koklo/llm` and `@koklo/db`;
+the worker needs `KOKLO_ENCRYPTION_KEY` and the AI keys (to check at deployment, see
+[ADR 0021](adr/0021-generation-propositions-worker.md)).
+
+```mermaid
+sequenceDiagram
+  participant Web as web (TK-99b)
+  participant API as api: ai.proposeDeliverable
+  participant DB as PostgreSQL
+  participant Q as pg-boss agent-propose
+  participant W as worker: agent-propose
+  participant AI as AI provider (router)
+  Web->>API: launch (deliverable, mode)
+  API->>DB: lock (unique index), audit, launch queued
+  API->>Q: send { launchId }
+  Q->>W: job
+  W->>DB: running, heartbeat
+  W->>AI: zones, then one call per zone
+  W->>DB: tx per zone: pending proposals
+  W->>DB: proposal.ready notification, done
+  Web->>API: proposal.list / decide / specBatch.submit
+```

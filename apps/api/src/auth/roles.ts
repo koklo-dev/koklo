@@ -86,6 +86,13 @@ export const REPO_READ_ROLES = ["owner", "admin", "dev", "designer"] as const;
 export const SPEC_BATCH_ROLES = ["owner", "admin", "dev", "designer"] as const;
 
 /**
+ * Lancer, relire et décider les propositions de l'agent (`ai.proposeDeliverable|proposeOptions|reviseProposal`,
+ * `proposal.*`, TK-99a) : ceux de `specBatch`, qui seuls peuvent les appliquer. Client et business : 403 partout
+ * (jamais de proposition en attente côté client).
+ */
+export const PROPOSAL_ROLES = SPEC_BATCH_ROLES;
+
+/**
  * Rôles qui voient toute l'organisation (CDC §14, TK-55a) : seul le `client` est cloisonné par
  * projet. Liste FERMÉE : un rôle absent ou inconnu n'en fait pas partie et est cloisonné comme un
  * client (fail-closed, `AuthSession.role` est optionnel).

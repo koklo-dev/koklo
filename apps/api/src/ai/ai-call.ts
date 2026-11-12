@@ -78,6 +78,9 @@ export interface AiUsageCall<T> extends AiCallBase<T> {
 /** Appel en flux de texte : mêmes refus, quota et audit qu'un appel `run`, sans `output` ni `settle`. */
 export type AiStreamCall = Omit<AiUsageCall<never>, "output" | "settle">;
 
+/** Admission seule (TK-99a) : le prompt ne sert qu'à l'examen du moteur, il n'est jamais envoyé. */
+export type AiAdmitCall = Omit<AiUsageCall<never>, "output" | "settle">;
+
 /** Fin d'un flux : ce que le fournisseur a réellement servi. */
 export interface AiStreamEnd {
   readonly stop: LlmStopReason;
@@ -164,6 +167,16 @@ export class AiCallRunner {
     await this.refusals(call.actor.organizationId, () => this.engine.preflight(request));
     if (!call.admitted) await this.ledger.admit(call.actor, call.quota, call.entry());
     return this.relay(call, request);
+  }
+
+  /**
+   * Refus du moteur (plafond, aucune clé), quota et audit AVANT un travail confié à une tâche de fond (TK-99a) : aucun
+   * appel au modèle ici, la tâche fait les siens. Mêmes erreurs typées qu'un appel `run`.
+   */
+  async admit(call: AiAdmitCall): Promise<void> {
+    const request = await this.requestOf(call, { kind: "text" });
+    await this.refusals(call.actor.organizationId, () => this.engine.preflight(request));
+    await this.ledger.admit(call.actor, call.quota, call.entry());
   }
 
   async verify<T>(call: AiVerifyCall<T>): Promise<T> {

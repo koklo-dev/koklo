@@ -148,16 +148,16 @@
 | Acquis S-framing : règle d'or, texte brut, erreurs IA (06 §1) | fait | `apps/api/src/ai/ai-text-policy.ts`, `apps/web/test/framing-plain-text*.test.*`, `apps/web/src/lib/framing-operations.ts` | S | À extraire avant suppression. |
 | Retrait de l'Assistant, redirections `/framing` et `/features` (06 §2) | absent | voir lot 1 | S | — |
 | En-tête et 4 onglets (06 §3) | absent | `features-header.tsx` | M | — |
-| États Prêt / Génération continue côté serveur (06 §4.1-4.2) | absent | aucun job IA dans `apps/worker/src/jobs/` | L | Tâche de fond pg-boss et propositions persistées. |
-| `ProposalReview` générique, J / K / A / R, `ai.reviseProposal` (06 §4.3) | partiel (features, côté client) | `framing-proposals.tsx`, `framing-proposal-card.tsx`, `proposal-editor.tsx`, `proposal-criteria-editor.tsx`, `lib/use-framing-proposals.ts` | L | Décisions aujourd'hui dans le navigateur. |
+| États Prêt / Génération continue côté serveur (06 §4.1-4.2) | absent | aucun job IA dans `apps/worker/src/jobs/` | L | Tâche de fond pg-boss et propositions persistées. **Part serveur faite (TK-99a)** : tâche `agent-propose`, propositions persistées ; écran : TK-99b. |
+| `ProposalReview` générique, J / K / A / R, `ai.reviseProposal` (06 §4.3) | partiel (features, côté client) | `framing-proposals.tsx`, `framing-proposal-card.tsx`, `proposal-editor.tsx`, `proposal-criteria-editor.tsx`, `lib/use-framing-proposals.ts` | L | Décisions aujourd'hui dans le navigateur. **Part serveur faite (TK-99a)** : `ai.reviseProposal` côté API, décisions persistées ; composants : TK-99b. |
 | Onglet Fonctionnalités, liste + fiche (06 §4.4) | partiel | `features-list.tsx`, `feature-sheet.tsx`, `feature-detail.tsx` ; `spec.listFeatures`, `spec.getFeature` | M | Pas de recherche `q`, pas de `total`. |
 | Onglets Règles, Rôles (matrice), Parcours (06 §4.4) | absent (format partiel) | `packages/schema/src/entities/domain.ts`, `parse/rule-markdown.ts`, `parse/roles-file.ts`, ADR 0012 ; non indexés (`apps/worker/src/webhook/index-rows.ts`) ; `design/flows/` absent de `kindOf` | L | Vocabulaire des règles différent (voir migrations). |
 | Vue client et validation (06 §4.5) | partiel (API features, aucune UI) | `apps/api/src/client-space/`, `apps/api/src/review/`, `contract-client-space.ts`, `contract-review.ts` | L | Toute l'UI client est à faire. |
 | Validation liée au SHA, invalidée par élément (06 §5) | **contraire** | `validation.ts:34`, `apps/api/src/review/prisma-review.repository.ts` | M | Version par élément (hachage de contenu dans l'index). |
 | `spec.deliverables` (7 entrées) (06 §6) | absent | — | M | — |
 | `spec.functional.list` paginé, `spec.roles.matrix` (08 §3) | absent | — | M | — |
-| `ai.proposeDeliverable`, modes initial / update (06 §6, 14 §4) | partiel | `ai.proposeFeatures`, `ai.proposeCriteria` (`contract-ai.ts`) | L | Types rule, role, flow à créer. |
-| `proposal.decide` persisté, `proposal.list` groupé, `decideMany` (06 §6, 07 §1.4) | absent | — | M | « Accepter les N » couvre des éléments non chargés : serveur. |
+| `ai.proposeDeliverable`, modes initial / update (06 §6, 14 §4) | partiel | `ai.proposeFeatures`, `ai.proposeCriteria` (`contract-ai.ts`) | L | Types rule, role, flow à créer. **Part serveur faite (TK-99a)** : `ai.proposeDeliverable` (modes `complete`, `criteria`, `update`, `all` ; types `feature` et `criteria`) ; types rule, role, flow : sprint 023. |
+| `proposal.decide` persisté, `proposal.list` groupé, `decideMany` (06 §6, 07 §1.4) | absent | — | M | « Accepter les N » couvre des éléments non chargés : serveur. **Faits (TK-99a)** : `proposal.list` groupé, `proposal.decide`, `proposal.decideMany`. |
 | `specBatch.submit` avec `rule.*`, `role.*`, `flow.*` (06 §6) | partiel | `packages/contract/src/schemas-spec.ts:16`, `apps/worker/src/spec-write/{plan,paths,features,criteria}.ts` | M | `roles.yaml` unique : conflits d'écriture. Plafond de 50 opérations (`SPEC_BATCH_OPERATIONS_MAX`). |
 | `review.submit` / `review.list` étendus (cibles, client lecteur) (06 §6) | partiel | contrat `targetKind` feature / baseline ; enum `ReviewTargetKind` ; `REVIEW_READ_ROLES = STAFF_ROLES` | M | Renommages incompatibles, `ALTER TYPE`. |
 | Impact amont « À revoir », mode update (06 §7) | absent | — | L | Diff `idea-vN` → `idea-vN+1` et graphe des sources. |
@@ -165,7 +165,7 @@
 | Champ `zone:` des fonctionnalités (08 §1.2) | absent | `packages/schema/src/entities/feature.ts` (`strictObject`) | S | Un fichier avec `zone` échoue tant que le schéma n'est pas étendu. |
 | `SpecItemSheet` commun, 12+ formulaires (11 §1, §3) | partiel (fonctionnalité seule) | `feature-form-{sheet,fields,errors,footer}.tsx`, `feature-delete-confirm.tsx`, `lib/use-feature-form*.ts` | L | Généraliser sans régresser S-feature-form. |
 | `ai.prefillItem`, `spec.item.get`, `spec.refs.search` (11 §5) | absent / partiel | `spec.getFeature` | M | — |
-| `AgentProposeButton`, `AgentProposePopover`, `ai.proposeOptions`, verrou par livrable (14) | absent | amorce `framing-call-button.tsx` | M | Verrou en base. |
+| `AgentProposeButton`, `AgentProposePopover`, `ai.proposeOptions`, verrou par livrable (14) | absent | amorce `framing-call-button.tsx` | M | Verrou en base. **Part serveur faite (TK-99a)** : `ai.proposeOptions`, verrou en base ; boutons : TK-99b. |
 
 ## Lot 6 · Données (passation 09, 08 §2)
 

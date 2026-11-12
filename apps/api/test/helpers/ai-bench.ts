@@ -17,6 +17,7 @@ import request from "supertest";
 import type { AiLimits } from "../../src/ai/ai-budget.ts";
 import { AI_ADAPTERS, AI_CATALOG } from "../../src/ai/ai-tokens.ts";
 import { NONCE_SOURCE, type NonceSource } from "../../src/ai/nonce.ts";
+import { AgentProposeQueue } from "../../src/queue/agent-propose-queue.ts";
 import { SpecWriteQueue } from "../../src/spec-batch/spec-write.queue.ts";
 import { createSeededDatabase } from "./app.ts";
 import { ENCRYPTION_KEY } from "./installations.ts";
@@ -88,6 +89,23 @@ export class RecordingSpecQueue {
   enqueue(batch: { id: string }): Promise<void> {
     this.enqueued.push(batch.id);
     return Promise.resolve();
+  }
+}
+
+/**
+ * File `agent-propose` du banc (TK-99a) : aucun worker ne tourne ici. Elle retient les lancements enfilés ;
+ * `failNext` simule un pg-boss indisponible.
+ */
+export class RecordingAgentQueue {
+  jobs: { id: string; launchId: string }[] = [];
+  failNext = false;
+
+  async enqueue(launch: { id: string }): Promise<void> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error("pg-boss indisponible");
+    }
+    this.jobs.push({ id: launch.id, launchId: launch.id });
   }
 }
 
@@ -210,6 +228,7 @@ export class PurposeLlm implements LlmProvider {
       "idea-propose": { proposals: [] },
       "idea-gaps": { items: [] },
       "idea-synthesis": { contentMd: "## Résumé\n\nUne synthèse." },
+      "proposal-revise": { ...modelFeature({ title: "Proposition révisée" }) },
     };
     const reply = replies[request.trace.purpose];
     return FakeLlm.replying(reply).complete(request);
@@ -225,6 +244,8 @@ export interface AiBench extends RepoBench {
   nonces: ScriptedNonces;
   /** Lots de spec enfilés (aucun worker au banc). */
   queue: RecordingSpecQueue;
+  /** Lancements d'agent enfilés (aucun worker au banc, TK-99a). */
+  agentQueue: RecordingAgentQueue;
   /** Journaux (niveau info) de l'application principale. */
   lines: string[];
   /** Application sans porte-clés (`KOKLO_ENCRYPTION_KEY` absente). */
@@ -250,14 +271,21 @@ export interface AiBench extends RepoBench {
  */
 function withDoubles(
   builder: TestingModuleBuilder,
-  doubles: { nonces: ScriptedNonces; queue: RecordingSpecQueue; provider: SwitchableProvider },
+  doubles: {
+    nonces: ScriptedNonces;
+    queue: RecordingSpecQueue;
+    agentQueue: RecordingAgentQueue;
+    provider: SwitchableProvider;
+  },
   defaultRegistry: boolean,
 ): TestingModuleBuilder {
   const withNonces = builder
     .overrideProvider(NONCE_SOURCE)
     .useValue(doubles.nonces)
     .overrideProvider(SpecWriteQueue)
-    .useValue(doubles.queue);
+    .useValue(doubles.queue)
+    .overrideProvider(AgentProposeQueue)
+    .useValue(doubles.agentQueue);
   return defaultRegistry
     ? withNonces
     : withNonces
@@ -285,6 +313,7 @@ export function installAiBench(hooks: {
     const provider = new SwitchableProvider();
     const nonces = new ScriptedNonces();
     const queue = new RecordingSpecQueue();
+    const agentQueue = new RecordingAgentQueue();
     const lines: string[] = [];
     const build = (over: Parameters<AiBench["makeApp"]>[0] = {}) =>
       createRepoApp(database.url, {
@@ -297,7 +326,11 @@ export function installAiBench(hooks: {
         logStream: over.logStream ?? { write: (line: string) => void lines.push(line) },
         config: { ai: { ...WIDE_LIMITS, ...(over.limits ?? {}) } },
         configure: (builder) =>
-          withDoubles(builder, { nonces, queue, provider }, over.defaultRegistry === true),
+          withDoubles(
+            builder,
+            { nonces, queue, agentQueue, provider },
+            over.defaultRegistry === true,
+          ),
       });
     const app = await build();
     const appWithoutKey = await build({ encryptionKey: null });
@@ -311,6 +344,7 @@ export function installAiBench(hooks: {
       provider,
       nonces,
       queue,
+      agentQueue,
       lines,
       use: (next) => {
         provider.target = next;
@@ -339,6 +373,8 @@ export function installAiBench(hooks: {
     bench.provider.byProvider.clear();
     bench.nonces.reset();
     bench.queue.enqueued = [];
+    bench.agentQueue.jobs = [];
+    bench.agentQueue.failNext = false;
     bench.lines.length = 0;
     await bench.database.query("DELETE FROM audit_fail");
   });

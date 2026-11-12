@@ -1,4 +1,5 @@
 import { contract } from "@koklo/contract";
+import * as domain from "@koklo/domain";
 import * as schema from "@koklo/schema";
 import { emitFeatureMarkdown, parseFeatureMarkdown } from "@koklo/schema";
 import { describe, expect, it } from "vitest";
@@ -141,5 +142,65 @@ describe("la règle d'ordre des étapes est celle de @koklo/schema", () => {
         ]),
       )?.[0]?.code,
     ).toBe("R5_CRITERION_INCOMPLETE");
+  });
+});
+
+/**
+ * TK-99a : parité du contrat 2.9.0 (`proposal.*`, `ai.propose*`) avec `@koklo/domain` et `@koklo/schema`. Le contrat
+ * ne les importe pas : les vocabulaires (types, statuts, modes, livrables) sont recopiés, ce test les garde égaux.
+ */
+describe("les propositions de l'agent : vocabulaires du contrat égaux à ceux du domaine et du schéma", () => {
+  const enumOf = async (path: string, kind: "inputSchemas" | "outputSchemas", field: string) => {
+    const validate_ = schemaOf(path, kind);
+    const accepted: string[] = [];
+    const candidates = [
+      ...domain.AGENT_PROPOSAL_KINDS,
+      ...domain.AGENT_PROPOSAL_STATUSES,
+      ...domain.FUNCTIONAL_MODES,
+      ...domain.DELIVERABLES,
+      "inconnu",
+    ];
+    for (const value of new Set(candidates)) {
+      const probe = await validate(validate_, { [field]: value });
+      // Une valeur du vocabulaire n'est jamais l'objet d'une issue sur ce champ.
+      const issues = (probe?.issues ?? []) as { path?: (string | { key?: string })[] }[];
+      const refused = issues.some((issue) =>
+        (issue.path ?? []).some((part) => (typeof part === "string" ? part : part.key) === field),
+      );
+      if (!refused) accepted.push(value);
+    }
+    return accepted.sort();
+  };
+
+  it("types de proposition : ceux du domaine et un schéma de contenu par type", async () => {
+    expect(Object.keys(schema.PROPOSAL_SCHEMAS)).toEqual([...domain.AGENT_PROPOSAL_KINDS]);
+  });
+
+  it("modes du lancement : ceux du domaine", async () => {
+    expect(await enumOf("ai.proposeDeliverable", "inputSchemas", "mode")).toEqual(
+      [...domain.FUNCTIONAL_MODES].sort(),
+    );
+  });
+
+  it("livrables : les sept du domaine", async () => {
+    expect(await enumOf("ai.proposeDeliverable", "inputSchemas", "deliverable")).toEqual(
+      [...domain.DELIVERABLES].sort(),
+    );
+  });
+
+  it("une charge produite par le schéma d'un type est acceptée par le contrat de décision (contenu corrigé)", async () => {
+    const content = schema.featureProposalSchema.parse(modelFeature());
+    const verdict = await validate(schemaOf("proposal.decide", "inputSchemas"), {
+      projectId: "123e4567-e89b-42d3-a456-426614174000",
+      proposalId: "123e4567-e89b-42d3-a456-426614174001",
+      decision: "accept",
+      edited: content,
+    });
+    expect(verdict?.issues).toBeUndefined();
+  });
+
+  it("une proposition de type feature devient un fichier de spec valide (même chemin que ai.proposeFeatures)", () => {
+    const content = schema.featureProposalSchema.parse(modelFeature());
+    expect(content.criteria[0]?.title).toBe(CRITERION.title);
   });
 });
