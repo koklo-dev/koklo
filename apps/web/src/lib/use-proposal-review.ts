@@ -4,6 +4,7 @@ import type { ProposalReviewGroup, ProposalReviewItem } from "@koklo/ui";
 import { PROPOSAL_FIRST_PAGE, PROPOSAL_GROUP_THRESHOLD, PROPOSAL_NEXT_PAGE } from "@koklo/ui";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { type FeaturesTab, tabOfProposalKind } from "./features-tab.ts";
 import { orpc } from "./orpc.ts";
 import { refOf, subtitleOf } from "./proposal-labels.ts";
 import { isSavable } from "./proposal-operations.ts";
@@ -88,11 +89,19 @@ function groupOf(
  * Lecture de la relecture : un groupe par `proposal.list` (`group`), `status: pending` par défaut au-delà de 30,
  * 8 éléments puis 20 de plus par groupe ; sonde toutes les 2 s tant que le lancement tourne.
  */
-export function useProposalReview(projectId: string, enabled: boolean) {
+export function useProposalReview(
+  projectId: string,
+  enabled: boolean,
+  tab: FeaturesTab = "features",
+) {
   const status = useProposalStatus(projectId, enabled);
   const [filter, setFilter] = useState<ReviewFilter>("pending");
   const [shown, setShown] = useState<Record<string, number>>({});
-  const { groups, counts, active } = status;
+  const { counts, active } = status;
+  // Chaque onglet relit les propositions de son type (maquette 10 l.532) ; les comptes du bandeau restent ceux du lancement.
+  const groups = status.groups.filter(
+    (group) => tabOfProposalKind(group.key.split(":")[0] ?? "") === tab,
+  );
   const grouped = counts.total > PROPOSAL_GROUP_THRESHOLD;
   const results = useQueries({
     queries: groups.map((group) => ({

@@ -740,3 +740,26 @@ for (const theme of ["light", "dark"] as Theme[]) {
     });
   }
 }
+
+/** TK-103 lot B : section « 19. Règles, rôles et parcours » (DESIGN.md §5.16, captures spec-cards-*). */
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui règles, rôles et parcours ${viewport.name} (${theme}) : axe, sans défilement horizontal, capture`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await settle(page);
+      const section = page.locator("[aria-labelledby='dev-ui-spec-cards']");
+      await section.scrollIntoViewIfNeeded();
+      const results = await new AxeBuilder({ page })
+        .withTags(AXE_TAGS)
+        .include("[aria-labelledby='dev-ui-spec-cards']")
+        .analyze();
+      expect(results.violations, results.violations.map((v) => v.id).join(",")).toEqual([]);
+      await expectNoHorizontalScroll(page);
+      await section.screenshot({ path: `${DIR}/spec-cards-${theme}${viewport.suffix}.png` });
+    });
+  }
+}

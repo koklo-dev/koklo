@@ -8,6 +8,7 @@ import type { IncomingMessage } from "node:http";
  * Modes :
  * - `none` (défaut) : options disponibles, aucune proposition ; `Lancer` démarre un lancement qui avance à chaque lecture
  *   (3 propositions à la 2e lecture, 12 à la 4e, puis `done`) ;
+ * - `mixed` : 6 propositions de quatre types (fonctionnalités, règle, rôle, parcours) ;
  * - `ready` : 12 propositions à relire, lancement terminé ; `generating` : lancement en cours, rien d'arrivé ; `volume` : 400 propositions sur 16 zones ;
  * - `unavailable` : `available: false` (`no_frozen_idea`) ; `notConfigured` : le lancement répond LLM_NOT_CONFIGURED ;
  * - `inProgress` : le lancement répond 409 PROPOSAL_IN_PROGRESS ; `hostile` : une proposition pleine de HTML et de liens.
@@ -18,6 +19,8 @@ export type ProposalsMode =
   /** Lancement en cours, rien d'arrivé (capture de l'attente) ; ne progresse pas. */
   | "generating"
   | "volume"
+  /** TK-103 : 3 fonctionnalités, 1 règle, 1 rôle, 1 parcours à relire (un groupe par type). */
+  | "mixed"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -37,7 +40,7 @@ const HOSTILE =
 interface Item {
   id: string;
   launchId: string;
-  kind: "feature";
+  kind: "feature" | "rule" | "role" | "flow";
   zone: string;
   position: number;
   title: string;
@@ -79,6 +82,61 @@ function make(n: number, zones: number, hostile = false): Item {
   };
 }
 
+const DOMAIN: Array<Pick<Item, "kind" | "zone" | "title" | "content">> = [
+  {
+    kind: "rule",
+    zone: "Règles",
+    title: "Délai d'annulation",
+    content: {
+      title: "Délai d'annulation",
+      statement: "Une réservation ne peut être annulée qu'à plus de 2 h du rendez-vous.",
+      type: "workflow",
+      example: "Rendez-vous à 14 h : annulation possible jusqu'à 12 h.",
+      states: ["Confirmée", "Honorée", "Annulée"],
+      features: ["F-002"],
+    },
+  },
+  {
+    kind: "role",
+    zone: "Rôles",
+    title: "Accueil",
+    content: {
+      name: "Accueil",
+      description: "Gère l'agenda du jour et les réservations au téléphone.",
+      permissions: [
+        { id: "PM-reservation.creer", restriction: "pour un client" },
+        { id: "PM-agenda.lire" },
+        { id: "PM-creneau.bloquer" },
+      ],
+    },
+  },
+  {
+    kind: "flow",
+    zone: "Parcours",
+    title: "Annuler ou déplacer",
+    content: {
+      title: "Annuler ou déplacer",
+      actor: "Client",
+      start: "Lien du SMS",
+      steps: ["Annuler ou déplacer", "Confirmation"],
+      errors: [{ step: 2, text: "moins de 2 h avant, refus avec le téléphone du salon (R-002)." }],
+      features: ["F-002"],
+    },
+  },
+];
+
+function mixed(): Item[] {
+  const features = Array.from({ length: 3 }, (_, i) => make(i + 1, 1));
+  return [
+    ...features,
+    ...DOMAIN.map((entry, i) => ({
+      ...make(features.length + i + 1, 1),
+      ...entry,
+      rationale: "Tiré des parcours et des utilisateurs du dossier d'idée.",
+    })),
+  ];
+}
+
 let items: Item[] = [];
 let launchStatus: "queued" | "running" | "done" = "done";
 let reads = 0;
@@ -93,6 +151,7 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   launchStatus = "done";
   items = [];
   if (mode === "ready") items = Array.from({ length: 12 }, (_, i) => make(i + 1, 3));
+  if (mode === "mixed") items = mixed();
   if (mode === "generating") {
     started = true;
     launchStatus = "running";
@@ -101,17 +160,32 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   if (mode === "hostile") items = [make(1, 1, true)];
 }
 
-const keyOf = (item: Item): string => `feature:${item.zone}`;
+const keyOf = (item: Item): string => `${item.kind}:${item.zone}`;
+/** Jusqu'à 30 propositions d'un seul type : un groupe « all » ; avec plusieurs types, un groupe par type. */
+const MIXED_FLAT = (): boolean =>
+  items.length <= 30 && items.some((item) => item.kind !== "feature");
+const groupKeyOf = (item: Item): string => (MIXED_FLAT() ? item.kind : keyOf(item));
+
+const LABELS: Record<string, string> = {
+  feature: "Fonctionnalités",
+  rule: "Règles",
+  role: "Rôles",
+  flow: "Parcours",
+};
 
 function groups() {
   const flat = items.length <= 30;
-  const keys = flat ? ["all"] : [...new Set(items.map(keyOf))];
+  const keys = MIXED_FLAT() || !flat ? [...new Set(items.map(groupKeyOf))] : ["all"];
   return keys.map((key) => {
-    const own = flat ? items : items.filter((item) => keyOf(item) === key);
+    const own = flat && !MIXED_FLAT() ? items : items.filter((item) => groupKeyOf(item) === key);
     const count = (status: string) => own.filter((item) => item.status === status).length;
     return {
       key,
-      label: flat ? "Fonctionnalités" : `Fonctionnalités · ${key.split(":")[1]}`,
+      label: MIXED_FLAT()
+        ? (LABELS[key] ?? key)
+        : flat
+          ? "Fonctionnalités"
+          : `Fonctionnalités · ${key.split(":")[1]}`,
       total: own.length,
       accepted: count("accepted"),
       rejected: count("rejected"),
@@ -135,7 +209,7 @@ function list(query: URLSearchParams, mode: ProposalsMode): Reply {
   advance(mode);
   let own = items;
   const group = query.get("group");
-  if (group && group !== "all") own = own.filter((item) => keyOf(item) === group);
+  if (group && group !== "all") own = own.filter((item) => groupKeyOf(item) === group);
   if (query.get("status") === "pending") own = own.filter((item) => item.status === "pending");
   const from = Number(query.get("cursor") ?? 0);
   const limit = Number(query.get("limit") ?? 50);
@@ -180,7 +254,9 @@ function launch(mode: ProposalsMode): Reply {
 
 function decide(path: string, body: Record<string, unknown>): Reply {
   if (path.endsWith("/proposals/decisions")) {
-    const own = items.filter((item) => keyOf(item) === body.group && item.status === "pending");
+    const own = items.filter(
+      (item) => groupKeyOf(item) === body.group && item.status === "pending",
+    );
     if (own.length !== body.expectedPending) {
       return typed(409, "PROPOSAL_COUNT_CHANGED", {
         expected: body.expectedPending,

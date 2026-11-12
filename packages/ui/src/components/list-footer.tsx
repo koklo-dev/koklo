@@ -32,39 +32,43 @@ export interface ListFooterProps
     Omit<HTMLAttributes<HTMLDivElement>, "children"> {
   /** `compact` : pied de colonne du kanban, une ligne par état. */
   variant?: "full" | "compact";
+  /** Plein, cadré : cadre bordé, rayon 10, 12 px, icône 16 (cartes des règles, rôles et parcours, maquette 10 l.243). */
+  framed?: boolean;
 }
 
-const FRAME = "border-border bg-surface text-meta text-muted-foreground";
+const FRAME = "border-border bg-surface text-muted-foreground";
 const COMPACT_FRAME = "rounded-xl border border-dashed border-border-strong text-center";
 const ERROR_FRAME = "bg-alert-error";
 
 function Message({
   icon,
+  iconSize = 18,
   iconClassName,
   spinner = false,
   children,
 }: {
   icon?: IconName;
+  iconSize?: 16 | 18;
   iconClassName?: string;
   spinner?: boolean;
   children: string;
 }) {
   return (
     <p className="flex min-w-0 flex-1 items-center gap-2.5">
-      {spinner ? <Spinner size={18} /> : null}
-      {icon ? <Icon name={icon} size={18} className={iconClassName} /> : null}
+      {spinner ? <Spinner size={iconSize} /> : null}
+      {icon ? <Icon name={icon} size={iconSize} className={iconClassName} /> : null}
       <span>{children}</span>
     </p>
   );
 }
 
-function shownText(count: number | undefined): string {
-  return count === 1
-    ? "La première reste affichée."
-    : `Les ${formatCount(count ?? 0)} premières restent affichées.`;
+function shownText(count: number | undefined, masculine = false): string {
+  if (count === 1) return masculine ? "Le premier reste affiché." : "La première reste affichée.";
+  return `Les ${formatCount(count ?? 0)} ${masculine ? "premiers restent affichés" : "premières restent affichées"}.`;
 }
 
 function FullBody({
+  framed,
   state,
   pageSize = 50,
   loadedCount,
@@ -74,11 +78,16 @@ function FullBody({
   onLoadMore,
   onRetry,
   onBackToTop,
-}: FooterOptions) {
+}: FooterOptions & { framed?: boolean }) {
+  const iconSize = framed ? 16 : 18;
+  const next = noun?.masculine ? "suivants" : "suivantes";
   if (state === "more") {
     return (
       <>
-        <Message icon="expand_circle_down">{`Les ${formatCount(pageSize)} suivantes se chargent automatiquement en approchant du bas.`}</Message>
+        <Message
+          icon="expand_circle_down"
+          iconSize={iconSize}
+        >{`Les ${formatCount(pageSize)} ${next} se chargent automatiquement en approchant du bas.`}</Message>
         <Button variant="outline" size="xs" className="text-foreground" onClick={onLoadMore}>
           Charger la suite
         </Button>
@@ -86,15 +95,21 @@ function FullBody({
     );
   }
   if (state === "loading") {
-    return <Message spinner>{`Chargement des ${formatCount(pageSize)} suivantes…`}</Message>;
+    return (
+      <Message
+        spinner
+        iconSize={iconSize}
+      >{`Chargement des ${formatCount(pageSize)} ${next}…`}</Message>
+    );
   }
   if (state === "error") {
     return (
       <>
         <Message
           icon="error"
+          iconSize={iconSize}
           iconClassName="text-alert-error-foreground"
-        >{`Impossible de charger la suite. ${shownText(loadedCount)}`}</Message>
+        >{`Impossible de charger la suite. ${shownText(loadedCount, noun?.masculine)}`}</Message>
         <Button variant="outline" size="xs" className="text-foreground" onClick={onRetry}>
           Réessayer
         </Button>
@@ -104,7 +119,10 @@ function FullBody({
   const name = noun ? ` ${nounFor(total, noun)}` : "";
   return (
     <>
-      <Message icon="check">{`Fin de la liste · ${formatCount(total)}${name}`}</Message>
+      <Message
+        icon="check"
+        iconSize={iconSize}
+      >{`Fin de la liste · ${formatCount(total)}${name}`}</Message>
       {longList ? (
         <Button variant="ghost" size="sm" onClick={onBackToTop}>
           <Icon name="arrow_upward" size={20} />
@@ -148,7 +166,12 @@ function CompactBody({
  * Pied de liste à quatre états (DESIGN.md v2.1 §5.3) : suite à charger, chargement, erreur, fin.
  * Seul l'état d'erreur parle (`role="alert"`) ; la région d'état de la `CountBar` annonce le reste.
  */
-export function ListFooter({ variant = "full", className, ...props }: ListFooterProps) {
+export function ListFooter({
+  variant = "full",
+  framed = false,
+  className,
+  ...props
+}: ListFooterProps) {
   const {
     state,
     pageSize,
@@ -186,15 +209,18 @@ export function ListFooter({ variant = "full", className, ...props }: ListFooter
       aria-busy={state === "loading" || undefined}
       className={cn(
         FRAME,
+        !(framed && !compact) && "text-meta",
         state === "error" && ERROR_FRAME,
         compact
           ? cn(COMPACT_FRAME, "flex flex-wrap items-center justify-center gap-2 px-3 py-2")
-          : "flex flex-wrap items-center gap-2.5 border-t px-4 py-3",
+          : framed
+            ? "flex flex-wrap items-center gap-2 rounded-[10px] border px-4 py-2.5 text-caption font-normal"
+            : "flex flex-wrap items-center gap-2.5 border-t px-4 py-3",
         className,
       )}
       {...attrs}
     >
-      {compact ? <CompactBody {...options} /> : <FullBody {...options} />}
+      {compact ? <CompactBody {...options} /> : <FullBody {...options} framed={framed} />}
     </div>
   );
 }

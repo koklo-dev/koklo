@@ -93,7 +93,7 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
   it("l'onglet actif suit la prop tab", () => {
     renderHeader({ tab: "roles" });
     const tabs = screen.getByRole("navigation", { name: "Sections du cahier fonctionnel" });
-    expect(within(tabs).getByRole("link", { name: "Rôles et permissions" })).toHaveAttribute(
+    expect(within(tabs).getByRole("link", { name: /^Rôles et permissions/ })).toHaveAttribute(
       "aria-current",
       "page",
     );

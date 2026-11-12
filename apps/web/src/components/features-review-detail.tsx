@@ -15,6 +15,11 @@ import { editedContentOf, editValuesOf, issuesOf } from "../lib/proposal-edit.ts
 import type { ProposalOutput } from "../lib/proposal-types.ts";
 import type { EditValues } from "../lib/proposal-validation.ts";
 import { AiErrorNotice } from "./ai-error-notice.tsx";
+import {
+  DomainProposalContent,
+  isDomainProposal,
+  reviewMetaOf,
+} from "./features-review-content.tsx";
 import { ProposalCriteriaEditor } from "./proposal-criteria-editor.tsx";
 import { ProposalEditor } from "./proposal-editor.tsx";
 import { ProposalIssues } from "./proposal-issues.tsx";
@@ -125,13 +130,16 @@ export interface ReviewDetailProps {
 export function ReviewDetail(props: ReviewDetailProps) {
   const { proposal, item, onDecide, announce } = props;
   const [editing, setEditing] = useState<string | null>(null);
-  const isEditing = editing === proposal.id && item.status === "pending";
+  const domain = isDomainProposal(proposal);
+  const isEditing = !domain && editing === proposal.id && item.status === "pending";
+  const meta = reviewMetaOf(proposal);
   return (
     <ProposalDetail
       item={item}
       why={proposal.rationale}
+      {...(meta ? { meta } : {})}
       onDecide={onDecide}
-      {...(item.status === "pending" ? { onEdit: () => setEditing(proposal.id) } : {})}
+      {...(item.status === "pending" && !domain ? { onEdit: () => setEditing(proposal.id) } : {})}
       {...(item.status === "pending"
         ? { onRevise: (instruction: string) => props.onRevise(proposal.id, instruction) }
         : {})}
@@ -150,6 +158,8 @@ export function ReviewDetail(props: ReviewDetailProps) {
             onDecide(proposal.id, "accepted", edited);
           }}
         />
+      ) : domain ? (
+        <DomainProposalContent proposal={proposal} />
       ) : (
         <Content proposal={proposal} />
       )}

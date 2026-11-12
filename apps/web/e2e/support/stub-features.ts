@@ -8,6 +8,7 @@ import {
   resetFeatureWrites,
   type WriteMode,
 } from "./stub-feature-write.ts";
+import { domainCounts, handleSpecDomain } from "./stub-spec-domain.ts";
 import { handleSpecItem, type SpecItemScenario } from "./stub-spec-item.ts";
 
 /**
@@ -176,18 +177,27 @@ const head = (mode: SpecMode) => {
       return {
         ...baseHead(),
         status: "building",
-        counts: { features: 0, tables: 0, endpoints: 0 },
+        counts: { features: 0, tables: 0, endpoints: 0, rules: 0, roles: 0, flows: 0 },
       };
     case "failed":
       return { ...baseHead(), status: "failed", errorCode: "spec_too_large" };
     case "empty":
-      return { ...baseHead(), counts: { features: 0, tables: 0, endpoints: 0 } };
+      return {
+        ...baseHead(),
+        counts: { features: 0, tables: 0, endpoints: 0, rules: 0, roles: 0, flows: 0 },
+      };
     case "paginated":
-      return { ...baseHead(), counts: { features: MANY.length, tables: 2, endpoints: 4 } };
+      return {
+        ...baseHead(),
+        counts: { features: MANY.length, tables: 2, endpoints: 4, ...domainCounts(false) },
+      };
     case "large":
     case "largeMoreError":
     case "largeMoreSlow":
-      return { ...baseHead(), counts: { features: LARGE_COUNT, tables: 2, endpoints: 4 } };
+      return {
+        ...baseHead(),
+        counts: { features: LARGE_COUNT, tables: 2, endpoints: 4, ...domainCounts(true) },
+      };
     default:
       return baseHead();
   }
@@ -203,6 +213,7 @@ const baseHead = () => ({
     features: FEW.length + createdFeatures().length - deletedFeatures().length,
     tables: 2,
     endpoints: 4,
+    ...domainCounts(false),
   },
 });
 
@@ -330,6 +341,7 @@ export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boo
     return true;
   }
   writeMode = h.scenario.write;
+  if (handleSpecDomain(req, url, h, (h.scenario.spec ?? "ready").startsWith("large"))) return true;
   if (h.scenario.feature === "loading" && /\/spec\/items\//.test(url.pathname)) {
     // Lecture d'édition retenue jusqu'à POST /__release : état « chargement de la fonctionnalité ».
     h.hold(() => handleSpecItem(req, url, h, h.scenario, (specId) => getFeature("ok", specId)));

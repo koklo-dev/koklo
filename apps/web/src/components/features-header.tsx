@@ -8,7 +8,7 @@ import {
 } from "@koklo/ui";
 import type { ReactNode, Ref } from "react";
 import type { HeaderTabCount } from "../lib/features-header-state.ts";
-import { FEATURES_TABS, type FeaturesTab } from "../lib/features-tab.ts";
+import { FEATURES_TABS, type FeaturesTab, TAB_LABELS } from "../lib/features-tab.ts";
 import { projectPath, specPath } from "../lib/shell-routes.ts";
 import { ageOf } from "../lib/spec-age.ts";
 import { ShellLink } from "./shell-link.tsx";
@@ -21,13 +21,6 @@ const TAB_ICONS: Record<FeaturesTab, IconName> = {
   flows: "route",
 };
 
-const TAB_LABELS: Record<FeaturesTab, string> = {
-  features: "Fonctionnalités",
-  rules: "Règles métier",
-  roles: "Rôles et permissions",
-  flows: "Parcours",
-};
-
 /** Ce que l'en-tête lit de `spec.head` : l'identifiant du commit, la date d'indexation et le nombre de fonctionnalités. */
 export interface FeaturesHead {
   commitSha: string;
@@ -35,20 +28,25 @@ export interface FeaturesHead {
   counts: { features: number };
 }
 
-function tabsOf(projectId: string, active: FeaturesTab, count: HeaderTabCount | undefined) {
-  return FEATURES_TABS.map<ProjectHeaderTab>((tab) => ({
-    label: TAB_LABELS[tab],
-    icon: TAB_ICONS[tab],
-    href: `${specPath(projectId, "functional")}?tab=${tab}`,
-    active: tab === active,
-    // Seul le compteur des fonctionnalités est connu (index) ; les autres onglets n'en ont pas.
-    ...(tab === "features" && count
-      ? {
-          count: typeof count.value === "number" ? formatCount(count.value) : count.value,
-          ...(count.tone ? { countTone: count.tone } : {}),
-        }
-      : {}),
-  }));
+type TabCounts = Partial<Record<FeaturesTab, HeaderTabCount>>;
+
+function tabsOf(projectId: string, active: FeaturesTab, counts: TabCounts, reviewing: boolean) {
+  return FEATURES_TABS.map<ProjectHeaderTab>((tab) => {
+    const count = counts[tab];
+    return {
+      label: TAB_LABELS[tab],
+      icon: TAB_ICONS[tab],
+      // La relecture suit l'onglet : chaque onglet relit les propositions de son type.
+      href: `${specPath(projectId, "functional")}?tab=${tab}${reviewing ? "&view=review" : ""}`,
+      active: tab === active,
+      ...(count
+        ? {
+            count: typeof count.value === "number" ? formatCount(count.value) : count.value,
+            ...(count.tone ? { countTone: count.tone } : {}),
+          }
+        : {}),
+    };
+  });
 }
 
 /**
@@ -66,6 +64,8 @@ export function FeaturesHeader({
   secondaryActions,
   primaryAction,
   tabCount,
+  tabCounts,
+  reviewing = false,
   tab,
   head,
   team,
@@ -81,7 +81,12 @@ export function FeaturesHeader({
   secondaryActions?: ReactNode;
   /** « Nouvelle fonctionnalité » : la seule action primaire. */
   primaryAction?: ReactNode;
+  /** Compteur de l'onglet affiché seul (sans le décompte des autres onglets). */
   tabCount?: HeaderTabCount | undefined;
+  /** Compteur de chaque onglet (total, « … » ou « N à relire »). */
+  tabCounts?: TabCounts | undefined;
+  /** Relecture ouverte : les onglets gardent `?view=review`. */
+  reviewing?: boolean;
   tab: FeaturesTab;
   head: FeaturesHead | undefined;
   team: boolean;
@@ -106,7 +111,7 @@ export function FeaturesHeader({
         : {})}
       {...(secondaryActions ? { secondaryActions } : {})}
       {...(primaryAction ? { primaryAction } : {})}
-      tabs={tabsOf(projectId, tab, tabCount)}
+      tabs={tabsOf(projectId, tab, tabCounts ?? (tabCount ? { [tab]: tabCount } : {}), reviewing)}
       tabsLabel="Sections du cahier fonctionnel"
       LinkComponent={ShellLink}
     />

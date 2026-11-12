@@ -68,6 +68,9 @@ export const procedures = {
   // TK-101 (contrat 2.11.0) : lecture d'édition, autocomplétion des liens et préremplissage
   specItemGet: vi.fn(),
   specRefsSearch: vi.fn(),
+  // TK-103 (contrat 3.1.0) : règles métier, parcours (liste paginée) et matrice des rôles
+  specFunctionalList: vi.fn(),
+  specRolesMatrix: vi.fn(),
   aiPrefillItem: vi.fn(),
   // TK-100 (contrat 2.10.0) : les sept livrables de la spec (barre et compteur SPEC N/7)
   specDeliverables: vi.fn(),
@@ -224,7 +227,18 @@ export const orpc = {
     head: queryFull(["spec", "head"], procedures.specHead),
     listFeatures: queryFull(["spec", "listFeatures"], procedures.specListFeatures),
     getFeature: queryFull(["spec", "getFeature"], procedures.specGetFeature),
-    item: { get: queryFull(["spec", "item", "get"], procedures.specItemGet) },
+    item: {
+      key: () => ["spec", "item"],
+      get: queryFull(["spec", "item", "get"], procedures.specItemGet),
+    },
+    functional: {
+      key: () => ["spec", "functional"],
+      list: queryFull(["spec", "functional", "list"], procedures.specFunctionalList),
+    },
+    roles: {
+      key: () => ["spec", "roles"],
+      matrix: queryFull(["spec", "roles", "matrix"], procedures.specRolesMatrix),
+    },
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
   },

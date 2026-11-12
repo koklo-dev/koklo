@@ -2,6 +2,7 @@
 
 import { useToast } from "@koklo/ui";
 import { useEffect, useRef } from "react";
+import { feminineId } from "./features-region.ts";
 import type { FeatureWrite } from "./use-feature-submit.ts";
 
 /**
@@ -17,7 +18,8 @@ export function useSavedToast(write: FeatureWrite): void {
     const key = `${saved.meta.target}:${saved.commitSha}`;
     if (done.current === key) return;
     done.current = key;
-    const verb = saved.meta.kind === "create" ? "enregistrée" : "modifiée";
+    const e = feminineId(saved.meta.specId) ? "e" : "";
+    const verb = saved.meta.kind === "create" ? `enregistré${e}` : `modifié${e}`;
     toast({
       tone: "success",
       title: `${saved.meta.specId} ${verb} dans la spec · commit ${saved.commitSha.slice(0, 7)}`,

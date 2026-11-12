@@ -33,12 +33,13 @@ const PAGES: readonly Page[] = [
     session: true,
     projects: "data",
   },
-  {
-    name: "functional rules soon",
-    path: `/projects/${FEATURE_PROJECT_ID}/spec/functional?tab=rules`,
+  // TK-103 : les trois onglets du cahier fonctionnel (règles, rôles et matrice, parcours) ne sont plus « Bientôt ».
+  ...(["rules", "roles", "flows"] as const).map((tab) => ({
+    name: `functional ${tab}`,
+    path: `/projects/${FEATURE_PROJECT_ID}/spec/functional?tab=${tab}`,
     session: true,
-    projects: "data",
-  },
+    projects: "data" as const,
+  })),
   { name: "projects loading", path: "/projects", session: true, projects: "loading" },
   { name: "projects empty", path: "/projects", session: true, projects: "empty" },
   { name: "projects data", path: "/projects", session: true, projects: "data" },

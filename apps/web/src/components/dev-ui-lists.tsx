@@ -130,6 +130,13 @@ function Footers() {
         />
         <ListFooter state="loading" pageSize={LIST_PAGE} className="rounded-lg border" />
         <ListFooter
+          framed
+          state="more"
+          pageSize={6}
+          noun={{ one: "parcours", other: "parcours", masculine: true }}
+          onLoadMore={noop}
+        />
+        <ListFooter
           state="error"
           pageSize={LIST_PAGE}
           loadedCount={100}

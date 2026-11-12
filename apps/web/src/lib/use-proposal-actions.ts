@@ -12,6 +12,7 @@ import {
   GROUP_CHANGED_TEXT,
   refOf,
   SAVED_TEXT,
+  savedBreakdown,
 } from "./proposal-labels.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 import type { ProposalReviewModel } from "./use-proposal-review.ts";
@@ -137,9 +138,11 @@ function useSaveAll(
     const launchId = review.status.launch?.id;
     if (!launchId) return;
     clearError();
+    const kinds = review.savable.map((proposal) => proposal.kind);
     const result = await saver.save(launchId, review.savable);
     if (!result) return;
-    const text = SAVED_TEXT(result.saved, result.left);
+    const breakdown = result.left === 0 ? savedBreakdown(kinds) : "";
+    const text = [SAVED_TEXT(result.saved, result.left), breakdown].filter(Boolean).join(" : ");
     setSummary(text);
     announce(text);
   };

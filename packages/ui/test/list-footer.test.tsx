@@ -162,3 +162,22 @@ describe("ListFooter", () => {
     expect(footer()).toHaveTextContent("Fin de la colonne");
   });
 });
+
+describe("ListFooter : variante encadrée et accord (TK-103)", () => {
+  const PARCOURS = { one: "parcours", other: "parcours", masculine: true };
+  it("masculin : « suivants », « premiers » ; féminin par défaut", () => {
+    const { rerender } = render(<ListFooter state="more" pageSize={6} noun={PARCOURS} />);
+    expect(footer()).toHaveTextContent("Les 6 suivants se chargent");
+    rerender(<ListFooter state="loading" pageSize={6} noun={PARCOURS} />);
+    expect(footer()).toHaveTextContent("Chargement des 6 suivants…");
+    rerender(<ListFooter state="error" loadedCount={12} noun={PARCOURS} />);
+    expect(footer()).toHaveTextContent("Les 12 premiers restent affichés.");
+    rerender(<ListFooter state="more" pageSize={6} noun={NOUN} />);
+    expect(footer()).toHaveTextContent("Les 6 suivantes se chargent");
+  });
+  it("framed : cadre bordé de rayon 10, 12 px", () => {
+    render(<ListFooter state="end" total={3} framed />);
+    expect(footer()).toHaveClass("rounded-[10px]", "border", "text-caption", "font-normal");
+    expect(footer()).not.toHaveClass("border-t");
+  });
+});

@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo } from "react";
+import { readFeaturesTab } from "./features-tab.ts";
 import {
   type FeaturesUrlPatch,
   readFeaturesUrl,
@@ -11,7 +12,7 @@ import {
 
 function write(patch: FeaturesUrlPatch, mode: "push" | "replace"): void {
   const { pathname, search } = window.location;
-  const url = `${pathname}${withFeaturesTab(withFeaturesUrl(search, patch))}`;
+  const url = `${pathname}${withFeaturesTab(withFeaturesUrl(search, patch), readFeaturesTab(search))}`;
   if (mode === "push") window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
 }

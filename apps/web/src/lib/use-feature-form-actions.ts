@@ -23,6 +23,7 @@ import {
 } from "./feature-operation.ts";
 import { rebase } from "./feature-rebase.ts";
 import { orpc } from "./orpc.ts";
+import { asFeatureItem } from "./spec-item.ts";
 import { useFeatureDelete } from "./use-feature-delete.ts";
 
 interface ActionContext {
@@ -110,7 +111,8 @@ export function useReload({ args, state, setState }: ActionContext) {
     ]).catch(() => null);
     // Lecture refusée (par exemple fonctionnalité déjà supprimée) : le panneau affiche l'erreur de la lecture.
     if (!reads) return;
-    const [latestHead, latest] = reads;
+    const [latestHead, item] = reads;
+    const latest = asFeatureItem(item);
     const current = valuesFromDetail(latest.values);
     const merged = rebase(state.baseline, state.values, current);
     const baseSha = latestHead?.commitSha ?? latest.values.commitSha;

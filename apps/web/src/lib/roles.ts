@@ -41,6 +41,18 @@ export function canWriteSpec(role: Role | string | undefined): boolean {
 }
 
 /**
+ * Écrire un onglet du cahier (B340) : l'équipe écrit les fonctionnalités ; le designer écrit aussi les parcours mais ni
+ * les règles ni les rôles (vision §14). Le serveur reste l'autorité (403).
+ */
+export function canWriteTab(
+  role: Role | string | undefined,
+  tab: "features" | "rules" | "roles" | "flows",
+): boolean {
+  if (!canWriteSpec(role)) return false;
+  return role !== "designer" || tab === "features" || tab === "flows";
+}
+
+/**
  * `member.list` expose noms, e-mails et rôles de toute l'organisation : réservé à l'équipe et au
  * business (liste fermée, comme `STAFF_ROLES` côté api). Rôle inconnu ou absent : non autorisé.
  */

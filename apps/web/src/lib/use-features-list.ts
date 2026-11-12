@@ -1,15 +1,29 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { type useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorCode } from "./api-error.ts";
 import { QUERY_MAX_LENGTH } from "./features-url.ts";
 import { orpc } from "./orpc.ts";
-import type { useFeatures } from "./use-features.ts";
 import type { useFeaturesUrl } from "./use-features-url.ts";
 
-type Features = ReturnType<typeof useFeatures>;
 type Url = ReturnType<typeof useFeaturesUrl>;
+
+/** Ce que le pied de liste lit d'une liste paginée : les fonctionnalités, les règles ou les parcours. */
+interface PagedList {
+  query: Pick<
+    ReturnType<typeof useInfiniteQuery>,
+    | "isFetchingNextPage"
+    | "isFetchNextPageError"
+    | "isFetchingPreviousPage"
+    | "fetchNextPage"
+    | "fetchPreviousPage"
+    | "error"
+  >;
+  items: readonly unknown[];
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
 
 export type FooterState = "more" | "loading" | "error" | "end";
 
@@ -20,7 +34,10 @@ const ANNOUNCE_DELAY_MS = 500;
 const LONG_LIST_ROWS = 20;
 
 /** Pied de liste : « Charger la suite », chargement, erreur de suite (curseur périmé : reprise depuis le début), fin. */
-export function useListFooter(features: Features) {
+export function useListFooter(
+  features: PagedList,
+  listKey: () => readonly unknown[] = () => orpc.spec.listFeatures.key(),
+) {
   const queryClient = useQueryClient();
   const { query } = features;
   const state: FooterState = query.isFetchingNextPage
@@ -46,7 +63,7 @@ export function useListFooter(features: Features) {
     }, [hasPrevious, isFetchingPreviousPage, fetchPreviousPage]),
     onRetry: () => {
       if (errorCode(query.error) === "VALIDATION") {
-        void queryClient.resetQueries({ queryKey: orpc.spec.listFeatures.key() });
+        void queryClient.resetQueries({ queryKey: listKey() });
       } else void fetchNextPage();
     },
   };
