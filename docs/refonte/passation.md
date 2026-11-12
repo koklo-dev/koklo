@@ -8,7 +8,7 @@ last_reviewed: 2026-11-10
 > fusionné, et ajouter ici toute nouvelle décision de méthode de l'utilisateur. Les décisions produit restent dans
 > `docs/refonte/questions.md` (une ligne B-nnn chacune) ; rien ne se décide « dans la conversation » sans être écrit.
 
-## État au 2026-11-10
+## État au 2026-11-12
 
 | Sprint | Ticket | État |
 | --- | --- | --- |
@@ -19,15 +19,18 @@ last_reviewed: 2026-11-10
 | 020 | TK-90 (panneau de l'agent, propositions) | ✅ fusionné (PR #154) |
 | 020 | TK-91 (maturité, Synthèse, `idea-vN`, « Passer au cadrage ») | ✅ fusionné (PR #158, `da47953`) |
 | 021 | TK-92 (vue d'ensemble : `project.overview`, S-overview) | ✅ fusionné (PR #160, `0b4ea76`) |
-| 021 | TK-93 (projets en cartes, création en une étape) | 🟡 lots A (serveur), B (liste) et C (création) livrés dans l'espace principal, en revue ; décisions B297 à B311 ; à compléter dans le sprint : critère 1 de TK-98 (moteur + création livrés, réglage après création au lot 13c) |
-| 022 | TK-99a (serveur des propositions : tables, verrou en base, tâche `agent-propose`, `ai.*` / `proposal.*`, contrat 2.9.0) | 🟡 livré dans l'espace principal sur `feat/tk-99a-propositions-serveur`, revue en cours (tour de correction 1 : documentation) ; décisions B313 à B316 ; ADR 0021 ; TK-99b (écrans) à suivre |
-| 022 | TK-99b (interface des propositions : `AgentProposeButton`, modale, relecture à plat et en volume, enregistrement par lots) | 🟡 lot B livré dans l'espace principal sur `feat/tk-99b-propositions-interface` (branchement `apps/web`, e2e `proposals`, captures `S-features/proposals-*`), revue à faire ; décisions B319 à B322 ; suivi serveur : libération d'une proposition verrouillée par un lot échoué (B320) | TK-99a |
+| 021 | TK-93 (projets en cartes, création en une étape, données en UE) | ✅ fusionné (PR #164, `4d8429a`) ; décisions B297 à B311 ; complète le critère 1 de TK-98 |
+| 022 | TK-99a (serveur des propositions : tables, verrou en base, tâche `agent-propose`, `ai.*` / `proposal.*`, contrat 2.9.0) | ✅ fusionné (PR #169, `5fe5f56`) ; décisions B313 à B317 ; ADR 0021 |
+| 022 | TK-99b (interface des propositions : `AgentProposeButton`, modale, relecture à plat et en volume, enregistrement par lots) | ✅ fusionné (PR #179, `a09ce95`, remplace la #173) ; décisions B319 à B324 ; suivi serveur : libération d'une proposition verrouillée par un lot échoué (B320) |
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
 ## Règles de l'utilisateur (ne pas redemander)
 
-- Autonomie : fusion vers `develop` autorisée quand la CI est verte (`gh pr merge N --rebase --delete-branch`). Une
+- Autonomie : fusion vers `develop` autorisée quand la CI est verte (`gh pr merge N --rebase --delete-branch`).
+  **Historique linéaire** (demande du 2026-11-12, imposé par la protection de `develop`) : jamais de merge de
+  `develop` dans une branche. Une branche en retard se rebase (`gh pr update-branch N --rebase`) ou se recrée depuis
+  `develop` par cherry-pick, sans push forcé. Les PR empilées sont rejouées sur `develop` après la fusion de leur base. Une
   question ouverte ne bloque pas : lecture la plus prudente conforme aux passations, consignée dans `questions.md`
   (« Décidée en autonomie le AAAA-MM-JJ : … »).
 - Maquettes de `docs/refonte/maquettes/` : elles font foi (`pnpm maquette NN`). Composant ou variante absent →
