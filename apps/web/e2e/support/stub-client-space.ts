@@ -4,7 +4,8 @@ import type { IncomingMessage } from "node:http";
  * Faux API de la vue client (TK-104, contrat 3.2.0) : `clientSpace.*`, `review.submit|list|remind`, sans Postgres.
  * Piloté par le scénario :
  * - `clientSpace` : `ready` (défaut), `changed` (2 éléments ont changé depuis la validation), `empty` (rien à valider),
- *   `large` (248 fonctionnalités), `refused` (« Valider le cahier » est refusé par le serveur) ;
+ *   `large` (volume réel de la planche : 248 fonctionnalités, 86 règles, 18 parcours ; `q` et `type` filtrent tout
+ *   l'index, pages à curseur de 50, 24 et 6), `refused` (« Valider le cahier » est refusé par le serveur) ;
  * - `hasClient` (défaut vrai) : un client est invité ; sinon l'équipe valide (D1).
  * Le rôle de la personne (`role`) décide de `canValidate` : client, ou propriétaire sans client.
  * Les décisions reçues se lisent à `/__client-calls`, dans l'ordre. Aucune donnée réelle.
@@ -85,6 +86,56 @@ const ROLES = [
   ["RL-gerant", "Gérant", "Gère les services, les prix et le personnel."],
 ] as const;
 
+const LARGE_FLOWS = 18;
+const LARGE_RULES = 86;
+const RULE_KINDS = ["contrainte", "calcul", "workflow"] as const;
+
+const flowEntries = (mode: ClientSpaceMode) =>
+  mode === "large"
+    ? Array.from({ length: LARGE_FLOWS }, (_, i) => {
+        const base = FLOWS[i % FLOWS.length] as (typeof FLOWS)[number];
+        return i < FLOWS.length
+          ? base
+          : ([`P-flux-${pad(i + 1)}`, `${base[1]} (${i + 1})`, base[2]] as const);
+      })
+    : FLOWS;
+const ruleEntries = (mode: ClientSpaceMode) =>
+  mode === "large"
+    ? Array.from({ length: LARGE_RULES }, (_, i) => {
+        const base = RULES[i % RULES.length] as (typeof RULES)[number];
+        return i < RULES.length
+          ? base
+          : ([
+              `R-${pad(i + 1)}`,
+              `${base[1]} (${i + 1})`,
+              RULE_KINDS[i % RULE_KINDS.length] as (typeof RULE_KINDS)[number],
+              base[3],
+            ] as const);
+      })
+    : RULES;
+
+/** Page à curseur d'un index filtré par `q` (identifiant ou titre) : le total est celui du filtre, jamais de la page. */
+function paged<T extends readonly [string, string, ...unknown[]]>(
+  entries: readonly T[],
+  url: URL,
+  match: (entry: T) => boolean,
+) {
+  const limit = Number(url.searchParams.get("limit") ?? 50);
+  const needle = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+  const kept = entries.filter(
+    (entry) =>
+      match(entry) && (!needle || `${entry[0]} ${entry[1]}`.toLowerCase().includes(needle)),
+  );
+  const offset = Number(url.searchParams.get("cursor") ?? 0);
+  const end = offset + limit;
+  return {
+    slice: kept.slice(offset, end),
+    nextCursor: end < kept.length ? String(end) : null,
+    total: kept.length,
+    offset,
+  };
+}
+
 const decisions = new Map<string, Validation>();
 const calls: Array<Record<string, unknown>> = [];
 let reminded = false;
@@ -107,7 +158,7 @@ function featureKeys(mode: ClientSpaceMode): string[] {
 
 function progress(mode: ClientSpaceMode, role: string | undefined, hasClient: boolean) {
   const keys = featureKeys(mode);
-  const flows = FLOWS.map(([id]) => `flow:${id}`);
+  const flows = flowEntries(mode).map(([id]) => `flow:${id}`);
   const blocks = ["rules:rules", "roles:roles"];
   const all = [...keys, ...flows, ...blocks];
   const done = (list: string[]) => list.filter(treated).length;
@@ -127,8 +178,8 @@ function progress(mode: ClientSpaceMode, role: string | undefined, hasClient: bo
     validation: deliverable,
     tabs: {
       features: tab(keys, keys.length),
-      flows: tab(flows, FLOWS.length),
-      rules: tab(["rules:rules"], RULES.length),
+      flows: tab(flows, flows.length),
+      rules: tab(["rules:rules"], ruleEntries(mode).length),
       roles: tab(["roles:roles"], ROLES.length),
     },
     untreated: all.filter((k) => !treated(k)).length,
@@ -142,9 +193,14 @@ function progress(mode: ClientSpaceMode, role: string | undefined, hasClient: bo
 function featuresPage(mode: ClientSpaceMode, url: URL) {
   const limit = Number(url.searchParams.get("limit") ?? 50);
   const untreated = url.searchParams.get("untreated") === "true";
+  const needle = (url.searchParams.get("q") ?? "").trim().toLowerCase();
   const ids = featureKeys(mode)
     .map((k) => k.split(":")[1] as string)
-    .filter((id) => !untreated || !treated(`feature:${id}`));
+    .filter((id) => !untreated || !treated(`feature:${id}`))
+    .filter(
+      (id) =>
+        !needle || `${id} ${featureOf(Number(id.slice(2))).title}`.toLowerCase().includes(needle),
+    );
   const around = url.searchParams.get("around");
   const aroundAt = around ? ids.indexOf(around) : -1;
   const offset = url.searchParams.has("cursor")
@@ -210,17 +266,10 @@ function featureDetail(id: string) {
 }
 
 const step = (label: string, screen?: string) => (screen ? { label, screen } : { label });
-const list = <T>(items: T[], extra: Record<string, unknown>) => ({
-  items,
-  nextCursor: null,
-  previousCursor: null,
-  offset: 0,
-  total: items.length,
-  ...extra,
-});
 
-function flowsPage() {
-  const items = FLOWS.map(([id, title, actor]) => ({
+function flowsPage(mode: ClientSpaceMode, url: URL) {
+  const { slice, ...cursor } = paged(flowEntries(mode), url, () => true);
+  const items = slice.map(([id, title, actor]) => ({
     id,
     title,
     actor,
@@ -231,23 +280,28 @@ function flowsPage() {
     validation: stateOf(`flow:${id}`),
     previouslyValidated: false,
   }));
-  return list(items, { version: "v1" });
+  return { items, previousCursor: null, version: "v1", ...cursor };
 }
 
-function rulesPage() {
-  const items = RULES.map(([id, title, type, statement]) => ({
+function rulesPage(mode: ClientSpaceMode, url: URL) {
+  const type = url.searchParams.get("type");
+  const { slice, ...cursor } = paged(ruleEntries(mode), url, (rule) => !type || rule[2] === type);
+  const items = slice.map(([id, title, kind, statement]) => ({
     id,
     title,
-    type,
+    type: kind,
     statement,
-    states: type === "workflow" ? ["Demandée", "Confirmée", "Terminée"] : [],
+    states: kind === "workflow" ? ["Demandée", "Confirmée", "Terminée"] : [],
     features: ["F-001"],
   }));
-  return list(items, {
+  return {
+    items,
+    previousCursor: null,
     validation: stateOf("rules:rules"),
     previouslyValidated: false,
     version: "v1",
-  });
+    ...cursor,
+  };
 }
 
 const rolesOut = () => ({
@@ -325,8 +379,8 @@ function reads(url: URL, ctx: Ctx): boolean {
   const out: Record<string, () => unknown> = {
     progress: () => progress(mode, role, hasClient),
     features: () => (id ? featureDetail(id) : featuresPage(mode, url)),
-    flows: flowsPage,
-    rules: rulesPage,
+    flows: () => flowsPage(mode, url),
+    rules: () => rulesPage(mode, url),
     roles: rolesOut,
   };
   send(reply(200, (out[resource as string] as () => unknown)()));
