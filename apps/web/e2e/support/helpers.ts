@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import type { ProvidersScenario } from "./stub-ai-providers.ts";
+import type { ClientSpaceScenario } from "./stub-client-space.ts";
 import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
 import type { IdeaScenario } from "./stub-idea-agent.ts";
@@ -44,6 +45,7 @@ export async function setScenario(
     SpecRepoScenario &
     FeaturesScenario &
     ProposalsScenario &
+    ClientSpaceScenario &
     ProvidersScenario &
     ShellScenario &
     OverviewScenario &
@@ -168,3 +170,7 @@ export async function releaseIdeaStream(): Promise<void> {
 /** Corps reçus par `idea.freeze` du faux API (TK-91), dans l'ordre : la clé d'idempotence se relit ici. */
 export const ideaFreezesSeen = async (): Promise<Array<Record<string, unknown>>> =>
   (await fetch(`${STUB}/__idea-freezes`)).json();
+
+/** Décisions et relances reçues par le faux API de la vue client (corps de `review.submit`, `{ remind: true }`), dans l'ordre. */
+export const clientCallsSeen = async (): Promise<Array<Record<string, unknown>>> =>
+  (await fetch(`${STUB}/__client-calls`)).json();
