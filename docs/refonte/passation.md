@@ -22,6 +22,7 @@ last_reviewed: 2026-11-10
 | 021 | TK-93 (projets en cartes, création en une étape, données en UE) | ✅ fusionné (PR #164, `4d8429a`) ; décisions B297 à B311 ; complète le critère 1 de TK-98 |
 | 022 | TK-99a (serveur des propositions : tables, verrou en base, tâche `agent-propose`, `ai.*` / `proposal.*`, contrat 2.9.0) | ✅ fusionné (PR #169, `5fe5f56`) ; décisions B313 à B317 ; ADR 0021 |
 | 022 | TK-99b (interface des propositions : `AgentProposeButton`, modale, relecture à plat et en volume, enregistrement par lots) | ✅ fusionné (PR #179, `a09ce95`, remplace la #173) ; décisions B319 à B324 ; suivi serveur : libération d'une proposition verrouillée par un lot échoué (B320) |
+| 022 | TK-100 (`spec.deliverables`, forçage, index d'entités, validation par élément et D1, impact amont, contrat 2.10.0) | ✅ fusionné (PR #181, `83439ac`) ; décisions B1, B11, B325 à B328 ; Baseline 0 sans client (D1) renvoyée à TK-104 |
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
