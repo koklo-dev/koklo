@@ -13,6 +13,7 @@ import { valuesFromDetail } from "../src/lib/feature-form.ts";
 import {
   advance,
   BATCH_ID,
+  closePanel,
   committingBatch,
   confirmDelete,
   conflictBatch,
@@ -268,9 +269,9 @@ describe("Succès : la fonctionnalité disparaît de la liste relue (§4.5, §5.
   it("les filtres de l'adresse sont gardés, le curseur est oublié", async () => {
     submitReplies(deletedBatch());
     renderFeatures({ search: "?priority=must&edit=F-001" });
-    const panel = await findNamed("dialog", "Modifier F-001", { text: "Modifier F-001" }).then(
-      (d) => within(d),
-    );
+    const panel = await findNamed("dialog", "Modifier la fonctionnalité", {
+      text: "Modifier la fonctionnalité",
+    }).then((d) => within(d));
     await panel.findByDisplayValue(TITLE);
     await confirmDelete(panel, user());
     await catchUp(5 * SECOND);
@@ -292,9 +293,9 @@ describe("Succès : la fonctionnalité disparaît de la liste relue (§4.5, §5.
     });
     submitReplies(deletedBatch());
     renderFeatures({ search: "?edit=F-001" });
-    const panel = await findNamed("dialog", "Modifier F-001", { text: "Modifier F-001" }).then(
-      (d) => within(d),
-    );
+    const panel = await findNamed("dialog", "Modifier la fonctionnalité", {
+      text: "Modifier la fonctionnalité",
+    }).then((d) => within(d));
     await panel.findByText(/Brouillon repris/);
     await confirmDelete(panel, user());
     await waitFor(() => expect(localStorage.getItem(draftKey(PROJECT_ID, "F-001"))).toBeNull());
@@ -360,7 +361,7 @@ describe("Index en retard (§4.6)", () => {
       ),
     ).toBeVisible();
     expect(panel.queryByRole("alert")).toBeNull();
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("link", { name: TITLE })).toBeVisible();
   });
@@ -369,7 +370,7 @@ describe("Index en retard (§4.6)", () => {
     submitReplies(deletedBatch());
     const panel = await startDelete();
     await advance(31 * SECOND);
-    await user().click(await panel.findByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await advance(20 * SECOND);
     await catchUp(6 * SECOND);
@@ -496,7 +497,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await startDelete();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain(`Suppression de « ${TITLE} » en cours…`);
     expect(statusRegions()).toHaveLength(1);
@@ -512,7 +513,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await startDelete();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     getReply = () => deletedBatch();
     await catchUp(8 * SECOND);
     await waitFor(() => expect(liveText()).toContain("F-001 supprimée."));
@@ -526,7 +527,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await startDelete();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     getReply = () => failedBatch("PROVIDER_UNAVAILABLE");
     await advance(8 * SECOND);

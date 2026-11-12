@@ -8,8 +8,6 @@ import {
   type FeatureFormValues,
   type FieldKey,
   type FormIssue,
-  LINK_FIELDS,
-  parseLinks,
   validateFeatureForm,
 } from "./feature-form.ts";
 import { FIELD_LABELS } from "./feature-form-ids.ts";
@@ -38,7 +36,6 @@ export interface FormState {
   conflicts: FieldKey[];
   banner: Banner | null;
   confirming: boolean;
-  linksOpen: boolean;
   touched: string[];
   submitted: number;
   serverFields: FieldKey[];
@@ -59,18 +56,14 @@ export interface FormArgs {
   announce: (text: string) => void;
 }
 
-const hasLinks = (values: FeatureFormValues): boolean =>
-  LINK_FIELDS.some((field) => parseLinks(values[field]).length > 0);
-
 /** Brouillon repris ou valeurs lues : l'état du formulaire à son ouverture (S-feature-form §5.5). */
 export function initialState(
   args: FormArgs,
   current: FeatureFormValues | null,
   scope: StorageScope | null,
 ): { state: FormState; resume: ResumeKey | undefined } {
-  const { projectId, mode, specId, detail, head, role } = args;
+  const { projectId, mode, specId, detail, head } = args;
   const draft = readDraft(scope, projectId, specId ?? "new");
-  const opensLinks = (values: FeatureFormValues) => role === "designer" || hasLinks(values);
   const base: FormState = {
     values: current ?? EMPTY_VALUES,
     baseline: current,
@@ -80,13 +73,12 @@ export function initialState(
     conflicts: [],
     banner: null,
     confirming: false,
-    linksOpen: false,
     touched: [],
     submitted: 0,
     serverFields: [],
     unchangedReloads: 0,
   };
-  if (!draft) return { state: { ...base, linksOpen: opensLinks(base.values) }, resume: undefined };
+  if (!draft) return { state: base, resume: undefined };
   const values = { ...EMPTY_VALUES, ...draft.values };
   const changed = mode === "edit" && draft.baseCommitSha !== (detail?.commitSha ?? null);
   const state: FormState = {
@@ -95,7 +87,6 @@ export function initialState(
     baseline: changed ? (draft.baseline ?? current) : current,
     baseCommitSha: changed ? draft.baseCommitSha : base.baseCommitSha,
     banner: { kind: changed ? "changed" : "resumed", savedAt: draft.savedAt },
-    linksOpen: opensLinks(values),
   };
   const resume = draft.idempotencyKey
     ? { key: draft.idempotencyKey, snapshot: JSON.stringify([values, base.baseSha]) }

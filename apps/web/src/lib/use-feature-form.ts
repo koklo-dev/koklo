@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeSaveError, type SaveFailure } from "./feature-errors.ts";
 import {
   diffValues,
+  EMPTY_VALUES,
   type FeatureFormValues,
-  isLinkField,
   valuesFromDetail,
 } from "./feature-form.ts";
 import { focusIdOf, topField } from "./feature-form-ids.ts";
@@ -25,7 +25,7 @@ import { useStorageScope } from "./use-storage-scope.ts";
 export type { Banner, FormArgs } from "./feature-form-state.ts";
 
 /** Demande de focus sur un élément du formulaire, appliquée après le rendu qui l'a (ré)ouvert. */
-function useFocusRequests(criteriaCount: number, setState: SetFormState) {
+function useFocusRequests(criteriaCount: number) {
   const [request, setRequest] = useState<{ id: string; nonce: number } | null>(null);
   useEffect(() => {
     if (request) document.getElementById(request.id)?.focus();
@@ -35,11 +35,8 @@ function useFocusRequests(criteriaCount: number, setState: SetFormState) {
     [],
   );
   const focusField = useCallback(
-    (field: string) => {
-      setState((s) => ({ ...s, linksOpen: s.linksOpen || isLinkField(topField(field)) }));
-      focusId(focusIdOf(field, criteriaCount));
-    },
-    [criteriaCount, focusId, setState],
+    (field: string) => focusId(focusIdOf(field, criteriaCount)),
+    [criteriaCount, focusId],
   );
   return { focusId, focusField };
 }
@@ -68,17 +65,13 @@ function useFailure(
   useEffect(() => {
     if (!view) return;
     const fields = serverFields(view);
-    setState((s) => ({
-      ...s,
-      serverFields: fields,
-      linksOpen: s.linksOpen || fields.some(isLinkField),
-    }));
+    setState((s) => ({ ...s, serverFields: fields }));
     flush();
   }, [view, setState, flush]);
   return view;
 }
 
-/** Saisie : valeurs, champs touchés, section « Éléments liés », confirmation d'abandon. */
+/** Saisie : valeurs, champs touchés, confirmation d'abandon. */
 function useFieldActions(setState: SetFormState) {
   const patch = (next: Partial<FormState>) => setState((s) => ({ ...s, ...next }));
   return {
@@ -93,7 +86,6 @@ function useFieldActions(setState: SetFormState) {
     ),
     blur: (field: string) =>
       setState((s) => (s.touched.includes(field) ? s : { ...s, touched: [...s.touched, field] })),
-    setLinksOpen: (linksOpen: boolean) => patch({ linksOpen }),
     ask: (confirming: boolean) => patch({ confirming }),
   };
 }
@@ -131,6 +123,8 @@ export function useFeatureForm(args: FormArgs) {
       mode === "edit" &&
       state.baseline !== null &&
       diffValues(state.baseline, state.values).length === 0,
+    /** Saisie différente de la version lue (ou du formulaire vide) : fermer demande confirmation. */
+    dirty: diffValues(state.baseline ?? EMPTY_VALUES, state.values).length > 0,
     awaitingChoice: state.banner?.kind === "changed",
     ...useFieldActions(setState),
     save,
@@ -138,7 +132,7 @@ export function useFeatureForm(args: FormArgs) {
     del,
     reload: useReload(context),
     ...useDraftChoices(context),
-    ...useFocusRequests(state.values.criteria.length, setState),
+    ...useFocusRequests(state.values.criteria.length),
     flushDraft: draft.flush,
   };
 }

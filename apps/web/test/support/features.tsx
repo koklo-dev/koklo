@@ -141,6 +141,12 @@ export function serve(role: Role = "owner"): void {
   procedures.specHead.mockResolvedValue(head());
   procedures.specListFeatures.mockResolvedValue(list(FEATURES));
   procedures.specGetFeature.mockResolvedValue(DETAIL);
+  procedures.specItemGet.mockImplementation(async (input) => {
+    const { projectId, id } = input as { projectId: string; id: string };
+    const values = await procedures.specGetFeature({ projectId, specId: id });
+    return { type: "feature", id, values, validated: false, referencedBy: { items: [], total: 0 } };
+  });
+  procedures.specRefsSearch.mockResolvedValue({ items: [] });
   procedures.repoList.mockResolvedValue([]);
 }
 

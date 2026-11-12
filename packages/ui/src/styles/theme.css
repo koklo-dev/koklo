@@ -32,7 +32,7 @@
   /* TK-138 (DESIGN.md §5.5) : voile des dialogues et ombres des surfaces superposées. */
   --overlay: rgb(13 11 28 / 0.38);
   --shadow-dialog: 0 18px 44px rgb(20 16 43 / 0.2);
-  --shadow-sheet: -16px 0 40px rgb(20 16 43 / 0.2);
+  --shadow-sheet: -16px 0 40px rgb(20 16 43 / 0.22);
   --shadow-toast: 0 8px 24px rgb(20 16 43 / 0.25);
   --sidebar: var(--surface);
   --sidebar-foreground: var(--card-foreground);
@@ -69,7 +69,8 @@
   --shadow-floating: none;
   --overlay: rgb(0 0 0 / 0.55);
   --shadow-dialog: none;
-  --shadow-sheet: none;
+  /* Le tiroir garde son ombre en sombre (maquette 16 l.58). */
+  --shadow-sheet: -16px 0 40px rgb(20 16 43 / 0.22);
   /* Le toast garde son ombre en sombre. */
   --shadow-toast: 0 8px 24px rgb(20 16 43 / 0.25);
 }

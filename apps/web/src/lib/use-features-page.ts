@@ -27,6 +27,7 @@ import { useFeaturesUrl } from "./use-features-url.ts";
 import { usePendingResume } from "./use-pending-save.ts";
 import { useProposalLaunch } from "./use-proposal-launch.ts";
 import { useProposalStatus } from "./use-proposal-status.ts";
+import { useSavedToast } from "./use-saved-toast.ts";
 
 /** Ce que la liste dit d'elle-même : barre de compte, résultat annoncé après la frappe, avis « hors des filtres ». */
 function useListSummary(
@@ -123,6 +124,7 @@ export function useFeaturesPage(projectId: string) {
   const keepFocus = useRef(false);
   keepFocus.current = write.phase === "saved";
   useSavedFocus(write, form.open, data.features.items, titleRef);
+  useSavedToast(write);
   const { view, head } = data;
   const headReady = head !== null && head.status !== "failed";
   const summary = useListSummary(url, data);

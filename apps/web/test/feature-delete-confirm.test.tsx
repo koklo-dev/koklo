@@ -71,7 +71,9 @@ beforeEach(() => {
 });
 
 const deleteButton = () => screen.queryByRole("button", { name: DELETE_BUTTON });
-const TEAM_JARGON = /\blot\b|commit|branche|\bSHA\b|idempoten|payload|\bbatch\b/i;
+/** « un commit à l'enregistrement » est le texte du pied de la maquette 16 (l.95-103) : seul terme git permis. */
+const TEAM_JARGON =
+  /\blot\b|commit(?! à l'enregistrement| ?, relu dans l'historique)|branche|\bSHA\b|idempoten|payload|\bbatch\b/i;
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
@@ -143,17 +145,16 @@ describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
 });
 
 describe("Le bouton dans le pied (§3.2 point 8, §6)", () => {
-  it("ghost à texte --destructive, libellé explicite, cible h-11 md:h-9, après « Enregistrer » et « Fermer » dans le DOM", async () => {
+  it("ghost au texte atténué (maquette 16 l.98), cible max-md:h-11, avant « Annuler » et le bouton principal dans le DOM", async () => {
     const panel = await openEdit();
     const trigger = panel.getByRole("button", { name: DELETE_BUTTON });
-    expect(trigger.className).toMatch(/text-destructive/);
-    expect(trigger.className).toMatch(/\bh-11\b/);
-    expect(trigger.className).toMatch(/md:h-9/);
+    expect(trigger.className).toMatch(/text-muted-foreground/);
+    expect(trigger.className).toMatch(/max-md:h-11/);
     const buttons = panel.getAllByRole("button");
     const at = (name: string) => buttons.findIndex((b) => b.textContent === name);
-    expect(at("Enregistrer")).toBeGreaterThanOrEqual(0);
-    expect(at("Enregistrer")).toBeLessThan(at("Fermer"));
-    expect(at("Fermer")).toBeLessThan(buttons.indexOf(trigger));
+    // Maquette 16 l.95-103 : Supprimer à gauche, puis Annuler, puis le bouton principal.
+    expect(buttons.indexOf(trigger)).toBeLessThan(at("Annuler"));
+    expect(at("Annuler")).toBeLessThan(at("Enregistrer les modifications"));
   });
 
   it("aucune couleur brute ni icône « delete » : un libellé, pas une icône seule", async () => {
@@ -208,7 +209,7 @@ describe("Confirmation en ligne (§4.8)", () => {
     const keep = confirmation.getByRole("button", { name: "Garder" });
     expect(confirm.className).toMatch(/bg-destructive/);
     expect(keep.className).toMatch(/border-input|border\b/);
-    for (const name of ["Enregistrer", "Fermer", DELETE_BUTTON]) {
+    for (const name of ["Enregistrer les modifications", "Annuler"]) {
       expect(panel.queryByRole("button", { name })).toBeNull();
     }
   });
@@ -234,8 +235,8 @@ describe("Confirmation en ligne (§4.8)", () => {
     const confirmation = await askDelete(panel);
     await userEvent.click(confirmation.getByRole("button", { name: "Garder" }));
     await waitFor(() => expect(panel.queryByRole("group", { name: CONFIRM_GROUP })).toBeNull());
-    expect(panel.getByRole("button", { name: "Enregistrer" })).toBeVisible();
-    expect(panel.getByRole("button", { name: "Fermer" })).toBeVisible();
+    expect(panel.getByRole("button", { name: /^Enregistrer/ })).toBeVisible();
+    expect(panel.getByRole("button", { name: "Annuler" })).toBeVisible();
     await waitFor(() => expect(panel.getByRole("button", { name: DELETE_BUTTON })).toHaveFocus());
     expect(procedures.specBatchSubmit).not.toHaveBeenCalled();
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
@@ -345,8 +346,8 @@ describe("Accessibilité de la confirmation (§7, §10)", () => {
     serveWrite("designer");
     procedures.specGetFeature.mockResolvedValue({ ...DETAIL, screens: [] });
     renderFeatures({ search: "?edit=F-001" });
+    await screen.findByDisplayValue("Connexion par e-mail", undefined, { timeout: 8_000 });
     const panel = await form();
-    await panel.findByDisplayValue("Connexion par e-mail");
     expect(panel.getByRole("button", { name: DELETE_BUTTON })).toBeVisible();
     expect(panel.getByText(/En tant que designer, vous pouvez enregistrer/)).toBeVisible();
   });

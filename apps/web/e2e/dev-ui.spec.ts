@@ -684,3 +684,55 @@ test("S-dev-ui propositions en volume : 400 propositions, moins de 300 nœuds li
   await header.click();
   await expect(header).toHaveAttribute("aria-expanded", "false");
 });
+
+/** TK-101 lot B : section « 17. Panneau d'édition » (S-dev-ui 1.6), les 4 modes de la maquette 16. */
+const specItemSheet = (page: Page) => page.getByRole("region", { name: "17. Panneau d'édition" });
+const SHEET_MODES = [
+  { key: "create", label: "Création" },
+  { key: "filled", label: "Préremplie par l'agent" },
+  { key: "edit", label: "Modification" },
+  { key: "err", label: "Erreurs" },
+] as const;
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  for (const viewport of VIEWPORTS) {
+    test(`S-dev-ui panneau d'édition ${viewport.name} (${theme}) : 4 modes, axe, focus piégé, Échap, captures`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await open(page, theme);
+      await settle(page);
+      const section = specItemSheet(page);
+      await section.scrollIntoViewIfNeeded();
+      const dialog = page.getByRole("dialog");
+      for (const mode of SHEET_MODES) {
+        await section.getByRole("radio", { name: mode.label }).click();
+        const trigger = section.getByRole("button", { name: "Ouvrir le panneau d'exemple" });
+        await expect(async () => {
+          await trigger.click();
+          await expect(dialog).toBeVisible({ timeout: 1_000 });
+        }).toPass({ timeout: 15_000 });
+        await page.waitForTimeout(400);
+        const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+        expect(results.violations, `${mode.key} : ${results.violations.map((v) => v.id)}`).toEqual(
+          [],
+        );
+        await expectNoHorizontalScroll(page);
+        for (let i = 0; i < 14; i += 1) {
+          await page.keyboard.press("Tab");
+          expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+        }
+        await page.screenshot({
+          path: `${DIR}/spec-item-sheet-${mode.key}-${theme}${viewport.suffix}.png`,
+        });
+        await dialog.getByRole("button", { name: "Annuler" }).click();
+        const confirm = page.getByRole("alertdialog");
+        if (await confirm.isVisible()) {
+          await confirm.getByRole("button", { name: "Fermer sans enregistrer" }).click();
+        }
+        await expect(dialog).toHaveCount(0);
+      }
+    });
+  }
+}

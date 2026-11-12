@@ -1,4 +1,4 @@
-import type { FieldKey } from "./feature-form.ts";
+import { type FieldKey, isLinkField } from "./feature-form.ts";
 
 /** Bouton d'entrée de la suppression : reçoit le focus quand on garde la fonctionnalité. */
 export const DELETE_TRIGGER_ID = "feature-delete-trigger";
@@ -22,7 +22,8 @@ export const FIELD_LABELS: Record<FieldKey, string> = {
 };
 
 /** Identifiant DOM d'un champ du formulaire d'après son nom d'erreur (`criteria.2.title` devient `feature-form-criteria-2-title`). */
-export const fieldId = (field: string): string => `feature-form-${field.replaceAll(".", "-")}`;
+export const fieldId = (field: string): string =>
+  `feature-form-${isLinkField(field) ? "links" : field.replaceAll(".", "-")}`;
 
 export const ADD_CRITERION_ID = "feature-form-criteria-add";
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { Alert, AlertDescription, AlertTitle, Button, Icon } from "@koklo/ui";
-import { useEffect, useRef } from "react";
+import { Alert, AlertDescription, AlertTitle, Button, Icon, InlineAlert } from "@koklo/ui";
+import { Fragment, type ReactNode, useEffect, useRef } from "react";
 import {
   GITHUB_STATUS_LINK,
   type SaveErrorAction,
   type SaveErrorView,
 } from "../lib/feature-errors.ts";
-import type { FormIssue } from "../lib/feature-form.ts";
+import { type FormIssue, REQUIRED_MESSAGE } from "../lib/feature-form.ts";
 import { FIELD_LABELS, fieldId, focusIdOf } from "../lib/feature-form-ids.ts";
 import { settingsPath } from "../lib/shell-routes.ts";
 import { fieldOfIssue } from "../lib/spec-issues.ts";
@@ -20,38 +20,57 @@ interface SummaryProps {
   onFocusField: (field: string) => void;
 }
 
-const points = (count: number): string => `${count} point${count > 1 ? "s" : ""}`;
+const sentenceHead = (count: number): string =>
+  `${count} champ${count > 1 ? "s obligatoires sont vides" : " obligatoire est vide"} : `;
 
-/** Résumé des erreurs de saisie : une alerte, un vrai lien par erreur qui place le focus sur le champ. */
+/**
+ * Résumé des erreurs de saisie : une alerte d'erreur (maquette 16 l.79-81). La phrase compte les champs obligatoires
+ * vides ; les autres erreurs (critères, liens, longueur) suivent, chacune en vrai lien qui place le focus sur le champ.
+ */
 export function FormSummary({ issues, attempt, criteriaCount, onFocusField }: SummaryProps) {
-  const title = useRef<HTMLHeadingElement>(null);
+  const title = useRef<HTMLParagraphElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: chaque tentative invalide ramène le focus ici
   useEffect(() => title.current?.focus(), [attempt]);
+  const empty = issues.filter((issue) => issue.message === REQUIRED_MESSAGE);
+  const others = issues.filter((issue) => issue.message !== REQUIRED_MESSAGE);
+  const focusLink = (issue: FormIssue, label: ReactNode) => (
+    <a
+      href={`#${focusIdOf(issue.field, criteriaCount)}`}
+      className="underline underline-offset-4"
+      onClick={(event) => {
+        event.preventDefault();
+        onFocusField(issue.field);
+      }}
+    >
+      {label}
+    </a>
+  );
   return (
-    <Alert variant="destructive">
-      <Icon name="warning" size={20} />
-      <AlertTitle ref={title} tabIndex={-1} className="outline-none">
-        {`Corrigez ${points(issues.length)} avant d'enregistrer`}
-      </AlertTitle>
-      <AlertDescription>
-        <ul className="flex list-none flex-col gap-1">
-          {issues.map((issue) => (
-            <li key={issue.field}>
-              <a
-                href={`#${focusIdOf(issue.field, criteriaCount)}`}
-                className="underline underline-offset-4"
-                onClick={(event) => {
-                  event.preventDefault();
-                  onFocusField(issue.field);
-                }}
-              >
-                {issue.message}
-              </a>
-            </li>
+    <InlineAlert variant="error" icon="error">
+      <p ref={title} tabIndex={-1} className="outline-none">
+        {empty.length > 0 ? (
+          <>
+            {sentenceHead(empty.length)}
+            {empty.map((issue, index) => (
+              <Fragment key={issue.field}>
+                {index > 0 ? ", " : null}
+                {focusLink(issue, FIELD_LABELS[issue.field as keyof typeof FIELD_LABELS])}
+              </Fragment>
+            ))}
+            .
+          </>
+        ) : (
+          `${others.length} point${others.length > 1 ? "s" : ""} à corriger.`
+        )}
+      </p>
+      {others.length > 0 ? (
+        <ul className="mt-1 flex list-none flex-col gap-1">
+          {others.map((issue) => (
+            <li key={issue.field}>{focusLink(issue, issue.message)}</li>
           ))}
         </ul>
-      </AlertDescription>
-    </Alert>
+      ) : null}
+    </InlineAlert>
   );
 }
 
@@ -77,7 +96,7 @@ const LABELS: Record<SaveErrorAction, string> = {
   retry: "Réessayer",
   "check-list": "Vérifier la liste",
   reload: "Recharger la version actuelle",
-  "goto-links": "Aller à Éléments liés",
+  "goto-links": "Aller aux liens",
   close: "Fermer",
   github: "Ouvrir la page GitHub",
   projects: "Voir les projets",

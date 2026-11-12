@@ -9,6 +9,7 @@ import {
   batch,
   CREATED_ID,
   clickSave,
+  closePanel,
   committingBatch,
   conflictBatch,
   failedBatch,
@@ -121,7 +122,7 @@ const gaps = (times: number[]) => times.slice(1).map((t, i) => t - (times[i] as 
 async function fillAndSave(title = NEW_TITLE) {
   const panel = await openCreate(user());
   await fillMinimum(panel, title);
-  await userEvent.setup({ delay: null }).click(panel.getByRole("button", { name: "Enregistrer" }));
+  await userEvent.setup({ delay: null }).click(panel.getByRole("button", { name: /^Enregistrer/ }));
   return panel;
 }
 const steps = (panel: ReturnType<typeof within>) =>
@@ -244,7 +245,7 @@ describe("Dépassement des 60 s : pas d'erreur (§4.4)", () => {
     expect(await panel.findByText(SLOW)).toBeVisible();
     expect(panel.queryByRole("alert")).toBeNull();
     expect(panel.getByRole("button", { name: "Vérifier maintenant" })).toBeVisible();
-    expect(panel.getByRole("button", { name: "Fermer" })).toBeVisible();
+    expect(panel.getByRole("button", { name: "Annuler" })).toBeVisible();
     expect(titleField(panel)).toHaveValue(NEW_TITLE);
     expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).not.toBeNull();
     expect(statusRegions()).toHaveLength(1);
@@ -445,7 +446,7 @@ describe("Index en retard (§4.6)", () => {
     ).toBeVisible();
     expect(panel.queryByRole("alert")).toBeNull();
     expect(panel.getByRole("button", { name: "Actualiser la liste" })).toBeVisible();
-    expect(panel.getByRole("button", { name: "Fermer" })).toBeVisible();
+    expect(panel.getByRole("button", { name: "Annuler" })).toBeVisible();
     expect(statusRegions()).toHaveLength(1);
   });
 
@@ -478,7 +479,7 @@ describe("Index en retard (§4.6)", () => {
     submitReplies(batch());
     const panel = await fillAndSave();
     await advance(31 * SECOND);
-    await user().click(await panel.findByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await screen.findByRole("group", { name: "Enregistrement en cours" })).toBeVisible();
     expect(liveText()).toContain("La liste se mettra à jour dans un instant.");
@@ -493,7 +494,7 @@ describe("Index en retard (§4.6)", () => {
     submitReplies(batch());
     const panel = await fillAndSave();
     await advance(31 * SECOND);
-    await user().click(await panel.findByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await advance(2 * SECOND);
     const during = procedures.specHead.mock.calls.length;
     await advance(60 * SECOND);
@@ -512,7 +513,7 @@ describe("Index en retard (§4.6)", () => {
     submitReplies(batch());
     const panel = await fillAndSave();
     await advance(31 * SECOND);
-    await user().click(await panel.findByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).toBeNull();
   });
@@ -623,7 +624,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await fillAndSave();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(liveText()).toContain(`Enregistrement de « ${NEW_TITLE} » en cours…`);
     expect(statusRegions()).toHaveLength(1);
@@ -640,7 +641,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await fillAndSave();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     const before = getTimes.length;
     getReply = () => batch();
     indexCatchesUp();
@@ -655,7 +656,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await fillAndSave();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await advance(61 * SECOND);
     expect(await screen.findByRole("button", { name: "Vérifier maintenant" })).toBeVisible();
     expect(liveText()).toContain("L'enregistrement prend plus de temps que prévu.");
@@ -665,11 +666,11 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await fillAndSave();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await user().click(await findNamed("button", "Nouvelle fonctionnalité"));
     const next = await form();
-    const save = next.getByRole("button", { name: "Enregistrer" });
+    const save = next.getByRole("button", { name: /^Enregistrer/ });
     expect(save).toBeDisabled();
     expect(save).toHaveAccessibleDescription("Un enregistrement est déjà en cours.");
   });
@@ -678,7 +679,7 @@ describe("Suivi par la page, formulaire fermé (§5.7)", () => {
     submitReplies(queuedBatch());
     const panel = await fillAndSave();
     await advance(2 * SECOND);
-    await user().click(panel.getByRole("button", { name: "Fermer" }));
+    await closePanel(panel, user());
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     getReply = () => failedBatch("PROVIDER_UNAVAILABLE");
     await advance(8 * SECOND);

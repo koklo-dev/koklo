@@ -37,20 +37,21 @@ async function scenario(
   });
 }
 
-async function chooseOption(page: Page, label: string, option: string): Promise<void> {
-  await dialogOf(page).getByRole("combobox", { name: label }).click();
-  await page.getByRole("option", { name: option, exact: true }).click();
+/** Choix d'une pastille (priorité, statut) : `RadioPillGroup` du panneau. */
+async function chooseOption(page: Page, label: RegExp, option: string): Promise<void> {
+  const group = dialogOf(page).getByRole("radiogroup", { name: label });
+  await group.getByRole("radio", { name: option, exact: true }).click();
 }
 async function fillCreate(page: Page, title = TITLE): Promise<void> {
   const dialog = dialogOf(page);
-  await dialog.getByRole("textbox", { name: "Titre (obligatoire)" }).fill(title);
-  await chooseOption(page, "Priorité (obligatoire)", "Importante");
+  await dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ }).fill(title);
+  await chooseOption(page, /^Priorité\s*obligatoire$/, "Importante");
 }
 async function fillRich(page: Page): Promise<void> {
   await fillCreate(page);
   const dialog = dialogOf(page);
   await dialog
-    .getByRole("textbox", { name: "Description" })
+    .getByRole("textbox", { name: "Description", exact: true })
     .fill("Un e-mail est envoyé à chaque changement.\n\nLe contenu reste en texte brut.");
   await dialog.getByRole("button", { name: "Ajouter un critère" }).click();
   await dialog.getByRole("textbox", { name: "Titre du critère" }).fill("E-mail reçu");
@@ -58,26 +59,35 @@ async function fillRich(page: Page): Promise<void> {
   await dialog.getByRole("textbox", { name: "Texte de l'étape" }).fill("un abonnement actif");
 }
 async function linkScreen(page: Page, id = "S-login"): Promise<void> {
-  const dialog = dialogOf(page);
-  const trigger = dialog.getByRole("button", { name: /Éléments liés/ });
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
-  await dialog.getByRole("textbox", { name: "Écrans" }).fill(id);
+  const input = dialogOf(page).getByRole("combobox", { name: "Liens : ajouter" });
+  await input.fill(id);
+  await input.press("Enter");
 }
-const DELETE = "Supprimer cette fonctionnalité";
+/** « Annuler », puis « Fermer sans enregistrer » quand la saisie a changé (TK-101). */
+async function closeSheet(page: Page): Promise<void> {
+  await dialogOf(page).getByRole("button", { name: "Annuler", exact: true }).click();
+  const confirm = page.getByRole("alertdialog", { name: "Fermer sans enregistrer ?" });
+  if (await confirm.isVisible())
+    await confirm.getByRole("button", { name: "Fermer sans enregistrer" }).click();
+}
+const DELETE = "Supprimer";
 const askDelete = (page: Page) => dialogOf(page).getByRole("button", { name: DELETE }).click();
 const confirmGroup = (page: Page) =>
   dialogOf(page).getByRole("group", { name: "Confirmer la suppression" });
 const confirmDeletion = (page: Page) =>
   confirmGroup(page).getByRole("button", { name: "Supprimer", exact: true }).click();
 const titleBox = (page: Page) =>
-  dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" });
+  dialogOf(page).getByRole("textbox", { name: /^Titre\s*obligatoire$/ });
 /** Ouvre la modification de F-001 et attend le préremplissage. */
 async function openF001(page: Page): Promise<void> {
   await page.goto(`${PATH}?edit=F-001`);
   await expect(titleBox(page)).toHaveValue("Connexion par e-mail");
 }
 const submitsSeen = async () => (await specWritesSeen()).filter((entry) => entry.kind === "submit");
-const save = (page: Page) => dialogOf(page).getByRole("button", { name: "Enregistrer" }).click();
+const save = (page: Page) =>
+  dialogOf(page)
+    .getByRole("button", { name: /^Enregistrer/ })
+    .click();
 const region = (page: Page) => page.locator('[role="status"], output');
 /** Les lignes de la liste des fonctionnalités (pas les éléments de liste du gabarit). */
 const rows = (page: Page) =>
@@ -134,13 +144,13 @@ const STATES: State[] = [
       await dialogOf(page).waitFor();
       await save(page);
     },
-    visible: see((p) => dialogOf(p).getByText("Corrigez 2 points avant d'enregistrer")),
+    visible: see((p) => dialogOf(p).getByText(/2 champs obligatoires sont vides/)),
   },
   {
     name: "edit-prefilled",
     path: `${PATH}?edit=F-001`,
     visible: async (page) =>
-      expect(dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" })).toHaveValue(
+      expect(dialogOf(page).getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toHaveValue(
         "Connexion par e-mail",
       ),
   },
@@ -221,10 +231,10 @@ const STATES: State[] = [
     write: "conflictOnce",
     act: async (page) => {
       const dialog = dialogOf(page);
-      await expect(dialog.getByRole("textbox", { name: "Titre (obligatoire)" })).toHaveValue(
+      await expect(dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toHaveValue(
         "Connexion par e-mail",
       );
-      await dialog.getByRole("textbox", { name: "Titre (obligatoire)" }).fill("Mon titre");
+      await dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ }).fill("Mon titre");
       await save(page);
     },
     visible: see((p) =>
@@ -273,7 +283,7 @@ const STATES: State[] = [
     path: `${PATH}?edit=F-001`,
     act: async (page) => {
       await expect(
-        dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" }),
+        dialogOf(page).getByRole("textbox", { name: /^Titre\s*obligatoire$/ }),
       ).toHaveValue("Connexion par e-mail");
       await askDelete(page);
     },
@@ -366,7 +376,7 @@ test("S-feature-form : modification, patch minimal avec baseSha, liste à jour",
 }) => {
   await scenario({ write: "ok" });
   await page.goto(`${PATH}?edit=F-001`);
-  const title = dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" });
+  const title = dialogOf(page).getByRole("textbox", { name: /^Titre\s*obligatoire$/ });
   await expect(title).toHaveValue("Connexion par e-mail");
   await expect(dialogOf(page).getByRole("button", { name: "Enregistrer" })).toBeDisabled();
   await title.fill("Connexion sans mot de passe");
@@ -389,7 +399,7 @@ test("S-feature-form : fiche puis « Modifier », Retour revient à la fiche", a
     .getByRole("dialog", { name: "Connexion par e-mail" })
     .getByRole("button", { name: "Modifier" })
     .click();
-  await expect(page.getByRole("dialog", { name: "Modifier F-001" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Modifier la fonctionnalité" })).toBeVisible();
   await expect(page).toHaveURL(/edit=F-001/);
   await page.goBack();
   await expect(page.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible();
@@ -403,7 +413,7 @@ test("S-feature-form : lot en attente, fermer, suivi par la page puis reprise ap
   await fillCreate(page);
   await save(page);
   await expect(dialogOf(page).getByText("En attente de son tour").first()).toBeVisible();
-  await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
+  await closeSheet(page);
   await expect(
     region(page).filter({ hasText: `Enregistrement de « ${TITLE} » en cours…` }),
   ).toBeVisible();
@@ -432,7 +442,7 @@ test("S-feature-form : conflit stale_base, rechargement, nouvel envoi réussi (A
 }) => {
   await scenario({ write: "conflictOnce" });
   await page.goto(`${PATH}?edit=F-001`);
-  const title = dialogOf(page).getByRole("textbox", { name: "Titre (obligatoire)" });
+  const title = dialogOf(page).getByRole("textbox", { name: /^Titre\s*obligatoire$/ });
   await expect(title).toHaveValue("Connexion par e-mail");
   await title.fill("Mon titre");
   await save(page);
@@ -462,14 +472,16 @@ test("S-feature-form : SPEC_INVALID, le diagnostic mène au champ, saisie conser
   await fillCreate(page);
   await save(page);
   const dialog = dialogOf(page);
-  await expect(dialog.getByRole("alert")).toContainText("La spec obtenue ne serait pas valide");
+  await expect(dialog.getByRole("alert").first()).toContainText(
+    "La spec obtenue ne serait pas valide",
+  );
   await dialog.getByRole("link", { name: /L'écran S-inconnu n'existe pas/ }).click();
-  await expect(dialog.getByRole("textbox", { name: "Écrans" })).toBeFocused();
-  await expect(dialog.getByRole("textbox", { name: "Écrans" })).toHaveAttribute(
+  await expect(dialog.getByRole("combobox", { name: "Liens : ajouter" })).toBeFocused();
+  await expect(dialog.getByRole("combobox", { name: "Liens : ajouter" })).toHaveAttribute(
     "aria-invalid",
     "true",
   );
-  await expect(dialog.getByRole("textbox", { name: "Titre (obligatoire)" })).toHaveValue(TITLE);
+  await expect(dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toHaveValue(TITLE);
 });
 
 test("S-feature-form : brouillon gardé à la fermeture, repris après rechargement, abandon confirmé en ligne", async ({
@@ -479,21 +491,21 @@ test("S-feature-form : brouillon gardé à la fermeture, repris après rechargem
   await page.goto(`${PATH}?new=1`);
   await fillCreate(page);
   await page.waitForTimeout(800);
-  await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
+  await closeSheet(page);
   await expect(dialogOf(page)).toBeHidden();
   await expect(region(page).filter({ hasText: "Brouillon gardé sur cet appareil." })).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "Nouvelle fonctionnalité" }).click();
   const dialog = dialogOf(page);
   await expect(dialog.getByText(/^Brouillon repris, enregistré le/)).toBeVisible();
-  await expect(dialog.getByRole("textbox", { name: "Titre (obligatoire)" })).toHaveValue(TITLE);
+  await expect(dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toHaveValue(TITLE);
   await dialog.getByRole("button", { name: "Abandonner le brouillon" }).click();
   await expect(
     dialog.getByText("Abandonner ce brouillon ? Votre saisie sera effacée."),
   ).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Garder", exact: true })).toBeFocused();
   await dialog.getByRole("button", { name: "Abandonner", exact: true }).click();
-  await expect(dialog.getByRole("textbox", { name: "Titre (obligatoire)" })).toHaveValue("");
+  await expect(dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toHaveValue("");
   await expect(region(page).filter({ hasText: "Brouillon abandonné." })).toBeVisible();
 });
 
@@ -504,9 +516,11 @@ test("S-feature-form : validation côté client, résumé d'erreurs, liens vers 
   await page.goto(`${PATH}?new=1`);
   await save(page);
   const dialog = dialogOf(page);
-  await expect(dialog.getByRole("alert")).toContainText("Corrigez 2 points avant d'enregistrer");
-  await dialog.getByRole("link", { name: "Saisissez un titre." }).click();
-  await expect(dialog.getByRole("textbox", { name: "Titre (obligatoire)" })).toBeFocused();
+  await expect(dialog.getByRole("alert").first()).toContainText(
+    "2 champs obligatoires sont vides : Titre, Priorité.",
+  );
+  await dialog.getByRole("link", { name: "Titre" }).click();
+  await expect(dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toBeFocused();
   expect((await specWritesSeen()).filter((entry) => entry.kind === "submit")).toHaveLength(0);
 });
 
@@ -520,7 +534,7 @@ test.describe("rôles", () => {
     await expect(region(page).filter({ hasText: "créée." })).toBeVisible({ timeout: 20_000 });
   });
 
-  test("designer : « Éléments liés » ouvert, aide, refus préalable sans écran puis envoi avec un écran", async ({
+  test("designer : « Liens » avec l'aide, refus préalable sans écran puis envoi avec un écran", async ({
     page,
   }) => {
     await scenario({ write: "ok", role: "designer" });
@@ -572,9 +586,14 @@ test("S-feature-form : clavier, Tab dans l'ordre, Échap ferme et rend le focus 
   await trigger.focus();
   await page.keyboard.press("Enter");
   const dialog = dialogOf(page);
-  await expect(dialog.getByRole("textbox", { name: "Titre (obligatoire)" })).toBeFocused();
+  await expect(dialog.getByRole("textbox", { name: /^Titre\s*obligatoire$/ })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(dialog.getByRole("combobox", { name: "Priorité (obligatoire)" })).toBeFocused();
+  await expect(
+    dialog
+      .getByRole("radiogroup", { name: /^Priorité\s*obligatoire$/ })
+      .getByRole("radio")
+      .first(),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
@@ -614,7 +633,7 @@ test("S-feature-form : mouvement réduit, aucune animation infinie dans le formu
 test.describe("375 px", () => {
   test.use({ viewport: { width: 375, height: 800 } });
 
-  test("create-filled-mobile : pleine largeur, pied à deux boutons empilés, aucun défilement horizontal, capture", async ({
+  test("create-filled-mobile : plein écran, pied collant à deux boutons de 44 px, aucun défilement horizontal, capture", async ({
     page,
   }) => {
     await scenario();
@@ -623,12 +642,16 @@ test.describe("375 px", () => {
     await settle(page);
     const box = await dialogOf(page).boundingBox();
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(370);
-    const saveBox = await dialogOf(page).getByRole("button", { name: "Enregistrer" }).boundingBox();
-    const closeBox = await dialogOf(page)
-      .getByRole("button", { name: "Fermer", exact: true })
+    const saveBox = await dialogOf(page)
+      .getByRole("button", { name: /^Enregistrer/ })
       .boundingBox();
+    const closeBox = await dialogOf(page)
+      .getByRole("button", { name: "Annuler", exact: true })
+      .boundingBox();
+    // Pied collant de la maquette 16 : « Annuler » puis « Enregistrer » sur une ligne, cibles de 44 px.
     expect(saveBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-    expect(saveBox?.y ?? 0).toBeLessThan(closeBox?.y ?? 0);
+    expect(closeBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(closeBox?.x ?? 0).toBeLessThan(saveBox?.x ?? 0);
     expect(await noHorizontalScroll(page)).toBe(true);
     await capture(page, "create-filled", "light", "-mobile");
     await noAxeViolation(page);
@@ -739,7 +762,7 @@ test.describe("Suppression (48e-2)", () => {
     await expect(alert).not.toContainText("Corrigez");
     await expect(alert).toContainText("Le scénario TS-001 renvoie à F-001, qui n'existerait plus.");
     await expect(dialogOf(page).getByRole("button", { name: DELETE })).toBeVisible();
-    await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
+    await closeSheet(page);
     await expect(page.getByRole("link", { name: "Connexion par e-mail" })).toBeVisible();
   });
 
@@ -768,7 +791,7 @@ test.describe("Suppression (48e-2)", () => {
     await askDelete(page);
     await confirmDeletion(page);
     await expect(dialogOf(page).getByText("En attente de son tour").first()).toBeVisible();
-    await dialogOf(page).getByRole("button", { name: "Fermer", exact: true }).click();
+    await closeSheet(page);
     await expect(
       region(page).filter({ hasText: "Suppression de « Connexion par e-mail » en cours…" }),
     ).toBeVisible();

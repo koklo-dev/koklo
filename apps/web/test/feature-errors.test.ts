@@ -122,9 +122,7 @@ describe("describeSaveError, erreur de submit", () => {
     const v = view(submit(apiError("FORBIDDEN")), "designer");
     expect(v).toMatchObject({ kind: "forbidden-designer", actions: ["goto-links", "close"] });
     expect(v.title).toBe("Vous ne pouvez enregistrer que les fonctionnalités liées à un écran");
-    expect(v.text).toContain(
-      "Ajoutez un écran dans « Éléments liés », ou demandez à un développeur.",
-    );
+    expect(v.text).toContain("Ajoutez un écran dans « Liens », ou demandez à un développeur.");
   });
 
   it("FORBIDDEN d'un autre rôle : pas le droit d'enregistrer", () => {

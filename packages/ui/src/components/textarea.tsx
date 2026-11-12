@@ -16,7 +16,9 @@ function Textarea({
       data-slot="textarea"
       className={cn(
         FIELD_BASE,
-        "flex field-sizing-content min-h-16 py-2.5 leading-normal",
+        "flex min-h-16 py-2.5 leading-normal",
+        // Sans `rows`, la zone grandit avec son contenu ; avec `rows`, la hauteur est celle des lignes demandées.
+        props.rows === undefined && "field-sizing-content",
         mono && "font-mono text-meta",
         className,
       )}
