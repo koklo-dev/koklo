@@ -55,8 +55,8 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-accept-invitation](screens/S-accept-invitation.md) | 1 | TK-86 |
 | [S-kanban](screens/S-kanban.md) | 1.6 | TK-88 |
 | [S-github](screens/S-github.md) | 4.1 | TK-88 |
-| [S-features](screens/S-features.md) | 2.0 | TK-99b |
-| [S-framing](screens/S-framing.md) | 2.4 | TK-88 |
+| [S-features](screens/S-features.md) | 2.1 (onglet de S-spec-functional) | TK-102 |
+| [S-framing](screens/S-framing.md) | 3 (remplacée par S-spec-functional) | TK-102 |
 | [S-ai-settings](screens/S-ai-settings.md) | 1.2 | TK-88 |
 | [S-idea](screens/S-idea.md) | 1 | TK-89 |
 | [S-feature-form](screens/S-feature-form.md) | 2.0 | TK-101 |
@@ -64,3 +64,4 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-dev-ui](screens/S-dev-ui.md) | 1.6 | TK-101 |
 | [S-app-shell](screens/S-app-shell.md) | 2 | TK-88 |
 | [S-overview](screens/S-overview.md) | 1 | TK-92 |
+| [S-spec-functional](screens/S-spec-functional.md) | 1 | TK-102 |

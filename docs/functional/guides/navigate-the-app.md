@@ -22,7 +22,7 @@ and you can fold the menu or open it as a drawer on a phone.
 1. Open the application. On the "Connexion à Koklo" page, click **Continuer avec GitHub**, then authorise the sign-in on
    GitHub. You arrive on your last project, or on **Projets** if you have none.
 2. The side menu has three parts. Under **PROJET** (only on a project page) you find the project card with its phase,
-   **Vue d'ensemble**, **Idée**, **Assistant de cadrage**, the **SPEC** group and **Tickets**. Under **ORGANISATION** you find
+   **Vue d'ensemble**, **Idée**, the **SPEC** group and **Tickets**. Under **ORGANISATION** you find
    **Tous les projets** and **Réglages** (members, GitHub, AI), shown only if your role allows it.
 3. The **SPEC** group lists the seven deliverables in the order they are written, with a counter (for example "0/7"). An entry
    with a padlock is not available yet: put the focus on it to read when it opens (for example "Disponible après les

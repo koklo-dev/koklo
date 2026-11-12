@@ -1,12 +1,14 @@
 ---
 id: S-features
 titre: Fonctionnalités d'un projet (lecture seule)
-version: 2.0
+version: 2.1
 ---
+> **TK-102** : cet écran est l'onglet Fonctionnalités de [S-spec-functional](S-spec-functional.md), qui porte la page, ses états et la fiche ancrée (§3.4 ci-dessous est remplacé par elle).
+
 ## 1. Utilisateurs et objectif
 - **Vue équipe** (propriétaire, administrateur, développeur, designer) : relit les fonctionnalités de la spec d'un projet, leurs critères d'acceptation et leurs liens (tables, endpoints, écrans). Voit la version de la spec lue (court identifiant de commit) et le chemin du fichier.
 - **Vue client / business** : lit les fonctionnalités en langage courant, sans jamais croiser de vocabulaire git (vision §1 principe 7, AC-48-28) : ni « commit », ni « branche », ni SHA, ni chemin de fichier, ni code d'erreur technique.
-- Écran **par projet**, en **lecture seule** (TK-48 / 48d). L'écriture (créer, modifier, supprimer) est décrite par la fiche [S-feature-form](S-feature-form.md) (48e) : pour la vue équipe qui écrit (propriétaire, administrateur, développeur, designer) et seulement quand la spec est lue (`ready`), s'ajoutent le bouton « Nouvelle fonctionnalité » (en-tête et état vide 4.3), le bouton « Modifier » dans le pied de la fiche, le bloc de confirmation ou de suivi au-dessus du tableau et les paramètres d'adresse `?new=1` / `?edit=F-001`. Client et business : aucun bouton d'écriture, aucun emplacement vide. S'y ajoute le bouton « Cadrer avec l'IA » (§3.1.1, page décrite par [S-framing](S-framing.md)). Arrive depuis la liste des projets ou la barre latérale.
+- Écran **par projet**, en **lecture seule** (TK-48 / 48d). L'écriture (créer, modifier, supprimer) est décrite par la fiche [S-feature-form](S-feature-form.md) (48e) : pour la vue équipe qui écrit (propriétaire, administrateur, développeur, designer) et seulement quand la spec est lue (`ready`), s'ajoutent le bouton « Nouvelle fonctionnalité » (en-tête et état vide 4.3), le bouton « Modifier » dans le pied de la fiche, le bloc de confirmation ou de suivi au-dessus du tableau et les paramètres d'adresse `?new=1` / `?edit=F-001`. Client et business : aucun bouton d'écriture, aucun emplacement vide. Le bouton « Cadrer avec l'IA » et la page [S-framing](S-framing.md) sont retirés par TK-102 (relecture des propositions dans [S-spec-functional](S-spec-functional.md)). Arrive depuis la liste des projets ou la barre latérale.
 
 ## 2. Tâches et parcours
 - Principale : parcourir la liste des fonctionnalités et ouvrir la fiche de l'une d'elles.
@@ -249,3 +251,4 @@ Dossier `design/screens/captures/S-features/` (32 images) : `loading`, `data`, `
 L'axe des e2e est exécuté avec les étiquettes WCAG (`wcag2a`, `wcag2aa`, `wcag21aa`), comme les autres écrans ; les règles « best-practice » (landmarks de la barre latérale, `label-content-name-mismatch` du menu utilisateur) relèvent du gabarit sidebar-07 et non de cet écran.
 | 1.9 | 2026-11-08 | TK-141 | Reprise sur les bases (planches 10 et 12) : lignes en `ListRow` (`IdTag`, sous-titre « N critères », priorité avant le statut), recherche sans résultat en `EmptyState inline` avec « 0 résultat pour « … » ». Détail : `.workflow/TK-141/00-fiche.md` |
 | 2.0 | 2026-11-11 | TK-99b | Propositions de l'agent sur le Fonctionnel : bouton (5 états), modale, relecture et relecture en volume (§9a), décisions lues et écrites côté serveur. Le bouton suit la maquette 21 (`--primary`) plutôt que le contour de la maquette 10 (B319). Détail : `.workflow/TK-99b/00-fiche.md` |
+| 2.1 | 2026-11-12 | TK-102 | Devient l'onglet Fonctionnalités de S-spec-functional (page, états Prêt / Génération / Relecture, `SpecCollection` à fiche ancrée, validation par ligne, filtre Validation) ; la fiche modale de §3.4 est remplacée par la fiche ancrée. Le reste (états de lecture, index, dépôt) est inchangé. |

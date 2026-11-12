@@ -195,7 +195,7 @@ Galerie de référence : `/dev/ui` (fiche `design/screens/S-dev-ui.md`), chaque 
 - `status: validated | pending | revise | unsubmitted` (Validée, À valider, À revoir, Non soumise), couleurs et icônes de §2.2, icône pleine de 16 px, pastille de 24 px, 12/500. Libellé texte toujours présent.
 - `label` facultatif : libellé propre à l'écran pour un statut qui n'est pas une validation (proposition, installation), avec la tonalité la plus proche (questions.md B25). Icône : celle de la tonalité, ou `cancel` / `block` pour la tonalité Non soumise quand l'écran distingue rejet et suspension. Aucune autre icône.
 
-**`DeliverableStatus`** : statut d'un livrable du cadrage. À faire (`radio_button_unchecked`, neutre), En cours (`edit`, neutre), À valider (`schedule`, couleurs À valider), Validé (`check_circle`, couleurs Validée). Neutre = fond `--secondary`, texte `--foreground`. Même gabarit que `ValidationStatus` ; variante `compact` : texte 11 px, icône 16 px, libellé masquable visuellement mais toujours présent pour les lecteurs d'écran (barre latérale du lot 1).
+**`DeliverableStatus`** : statut d'un livrable du cadrage. À faire (`radio_button_unchecked`, neutre), En cours (`edit`, teinte `soft`), À valider (`schedule`, couleurs À valider), Validé (`check_circle`, couleurs Validée). Neutre = fond `--secondary`, texte `--foreground`. Icône pleine pour tous les statuts sauf À faire (maquette 10 l.76). Prop `label` : libellé long (« À valider par le client · obligatoire »). Même gabarit que `ValidationStatus` ; variante `compact` : texte 11 px, icône 16 px, libellé masquable visuellement mais toujours présent pour les lecteurs d'écran (barre latérale du lot 1).
 
 **`PriorityIndicator`** : 3 barres verticales de 3 px (hauteurs 4, 8, 12 px, écart 2 px, rayon 1, alignées en bas), actives en `--foreground`, inactives en `--border-strong`, puis le libellé 13/500. Indispensable 3, Importante 2, Souhaitable 1, Reportée 0. Barres `aria-hidden` : le libellé porte le sens. Variante `barsOnly` (v2.10, TK-141, planche 12 : ligne de liste) : barres de 4 px de large et de 6, 10, 14 px de haut, actives en `--primary`, sans libellé visible, `role="img"` nommé par le libellé. Remplace le gras / gris v1. Les tickets réutilisent le composant avec leurs propres libellés (critique 3, haute 2, moyenne 1, basse 0 ; questions.md B23).
 
@@ -308,7 +308,7 @@ Mesures normalisées (incohérences I1 à I29 tranchées, questions B143 et B144
 | `IdTag` | Mono 12/500, hauteur 22, 0 6, rayon 6 ; `tone` `soft` ou `outline` ; `size` `sm` 20 mono 11 ; variante `pill` « Fournisseur · modèle » (30, rond, bordure `--border`, `--surface`). |
 | Statuts | `STATUS_PILL` = `Pill md` : 24 px, `0 10 0 6`, écart 6 (`LifecycleStatus` : `0 10 0 8`, écart 8). Valable pour `ValidationStatus`, `DeliverableStatus`, `LifecycleStatus`. |
 | `Avatar`, `IconTile` | `Avatar` 24, 28, 32, 36 (défaut), 40 ; tons `soft`, `warning` (client), `agent` (`--primary`), `muted` ; forme `circle` ou `tile` (rayon 6, 8, 10, 14 selon la taille) ; initiales 10/600 en 24 (cartes de projet), 12/700 jusqu'à 32, 14/700 au-delà. `IconTile` 28 / 32 / 36 / 40 / 48, rayon 8 / 8 / 10 / 10 / 12, icône 18 / 18 / 20 / 20 / 28 ; tons `soft`, `primary`, `success`, `warning`. |
-| `FilterChip`, `OptionChip` | Pilule 28, 0 12, 12/500, `aria-pressed`. Actif : bordure `--primary`, fond `--secondary`, texte `--secondary-foreground`. Inactif : `--border`, `--background`, `--foreground` (planche 08 l.223). Compteur facultatif. Variante `add` pointillée. `OptionChip` : 32, `role="option"`, sélection bordure 2 `--primary` + `--secondary`. |
+| `FilterChip`, `OptionChip` | Pilule 28, 0 12, 12/500, `aria-pressed`. Actif : bordure `--primary`, fond `--secondary`, texte `--secondary-foreground`. Inactif : `--border`, `--background`, `--foreground` (planche 08 l.223). Compteur facultatif. Variante `add` pointillée : 30 px, texte `--foreground` 500 (maquette 10 l.184). `OptionChip` : 32, `role="option"`, sélection bordure 2 `--primary` + `--secondary`. |
 | `SegmentedControl` | 2 à 4 segments, conteneur `--surface` bordure `--border` rayon 8 marge 3 écart 2 ; segment 26 (`xs` 24), 12/500, rayon 6 ; **actif : `--background` + anneau 1 `--border`, texte `--foreground`, sans violet ni ombre** (I5) ; inactif transparent, muted. `aria-pressed` ou `radiogroup`. |
 | `Switch`, `SwitchRow` | Radix `role="switch"`, 38 × 22, marge 3, rond 16 blanc (jeton `--switch-thumb`, identique clair et sombre) ; allumé `--primary`, éteint `--border-strong`, désactivé .6 ; ligne ≥ 44 au tactile. |
 | `Checkbox` | Radix, case 20 (`check_box` plein `--primary`, `check_box_outline_blank` muted), cible 28. |
@@ -347,7 +347,7 @@ Galerie : `/dev/ui`, sections « Listes · A » (listes longues, id `dev-ui-list
 | `GroupSection` | `stacked`, `actionIcon`, action visible replié, rangée « Afficher N de plus » pleine largeur `--primary`. |
 | `ListPanel` | Cadre rayon 12, `--border`, `overflow:hidden`, `--background`. En-tête facultatif : h2 16/600 et lien « Tout voir » `--primary` 13/500 avec `arrow_forward` 16. Pied facultatif `--surface`, 12 `--muted-foreground`, bordure haute. Liste `ul` nommée. |
 | `ListRow` | `li` (ou, avec `as="div"`, contenu de ligne sans bordure ni marge pour un hôte qui pose son `li`, comme `VirtualList`) séparé du précédent par une bordure haute `--border`. Marges 12 / 16 (ou `fixedHeight` : 52). Tête : icône d'état 18 à 20, `IdTag` ou case à cocher. Titre 14/500 tronqué, sous-titre 12 `--muted-foreground`. Queue : pastille, valeur mono 12 ou actions `Button sm`. `selected` : fond `--secondary`, `aria-current="true"`. Ligne entière cliquable (lien ou bouton) avec focus visible `--ring`. |
-| `ProjectHeader` | Emplacement `status` (h1, puis `status`, puis résumé 13 muted, tous sur une ligne à partir de `md`) ; « / » à 12 de part et d'autre. |
+| `ProjectHeader` | Emplacement `status` (h1, puis `status`, puis résumé 13 muted, tous sur une ligne à partir de `md` ; prop `summaryOwnLine` : le résumé a sa propre ligne sous le titre, à toute largeur, comme à l'écran Fonctionnel, maquette 10 l.77) ; « / » à 12 de part et d'autre. |
 | `PageHeader` | Page d'organisation : fil facultatif (13 muted, dernier segment `aria-current="page"`, premier en 500 `--foreground`), h1 24/600, `status` et actions facultatifs. Marges et bordure basse de `ProjectHeader`, sans SHA ni onglets. |
 | `PhaseRail size="inline"` | Texte 12 `--muted-foreground`, sans cadre ni marge, traits 12 × 4 (rayon 2, écart 3) ; libellé « Cadrage · 2 sur 4 » ; `sm` encadré garde 14 (I15). |
 | `ShellNavGroup` | Libellé 11/600 capitales +0,06 em `--muted-foreground` ; `separator` : trait haut `--border` et 12 de marge ; dans le rail le libellé devient un trait de 24 `--border`. |
@@ -449,6 +449,20 @@ Galerie : `/dev/ui`, section « 14. Propositions de l'agent » (id `dev-ui-propo
 
 Galerie : `/dev/ui`, section « 17. Panneau d'édition » (la 16 est déjà « Propositions de l'agent ») (id `dev-ui-spec-item-sheet`) : les 4 modes, en clair, en sombre et à 375 px. Maquette 16 : le toast « F-249 enregistrée dans la spec · commit e4c90a1 » est le `Toast` Radix existant (pas de Sonner).
 
+### 5.15 Collection de la spec et page Fonctionnel (v2.17, TK-102, passation 06 §3-4.4, B333, B334, maquette 10 l.59-223)
+
+| Composant | Règle |
+|---|---|
+| `SpecCollection` | Liste à gauche (`flex 999 1 420px`, cadre rayon 12, lignes 52, `VirtualList`) et fiche ancrée à droite (380 à 440 px, bordure gauche `--border`). Sous 1280 px la fiche est un panneau superposé, sous 1024 px liste puis fiche plein écran (« ← Liste »). Ligne choisie : fond `--secondary`. |
+| `DeliverableStatus` | Variantes `ready` (« Prêt », `arrow_forward`, teinte `--secondary`) et `generating` (« Génération », `progress_activity`, `motion-safe:animate-spin`) en plus de celles de §5.1. |
+| `SpecNav` | Pastille de badge par entrée (11/600, rayon 999, `1px 7px`) : « Prêt » `--secondary`, « … » `--secondary` pendant la génération, « N à relire » `--primary`, « À valider » ambre. |
+| Ligne de fonctionnalité | `IdTag`, titre 500 et « N critères », `PriorityIndicator` avec libellé (112 px), `ValidationStatus`. Sous 768 px, priorité et validation passent sous le titre. |
+| Fiche ancrée | Région `aside` « Fiche de la fonctionnalité » : `IdTag`, validation, « Modifier », titre 20/600 (`text-settings-title`), `LifecycleStatus` (aligné à gauche), description, critères (`ProposalDetailLines plain ordered`, « AC-n · Étant donné …, quand …, alors … » d'un trait), Liens (titre 12/600 capitales, une `EntityChip` par entité, sans groupes ni lien faute de page cible), pied « Enregistrée dans la spec · fichier ». Fermeture : « Fermer la fiche » (visible sous 1024 px, croix de 1024 à 1279 px), Échap. |
+| `TabsNav` / `ProjectHeader` | `count` accepte un texte (« … », « 3 à relire ») et `countTone: "primary"` ; icône 16 px par onglet (`task_alt`, `gavel`, `admin_panel_settings`, `route`) ; nombres formatés (« 1 000 »). |
+| Filtres | `FilterChip` pointillés Validation, Priorité, Avancement ouvrant un menu à choix unique ; la pastille nomme le choix. |
+
+Galerie : `/dev/ui`, section « 18. Collection de la spec ». La vue client de ce cahier (validation un par un) n'est pas dans ce ticket.
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -460,6 +474,7 @@ Galerie : `/dev/ui`, section « 17. Panneau d'édition » (la 16 est déjà « P
 | Fondations v2 (jetons, statuts, composants signature) | Planche « Lot 0 · Fondations v2 », clair et sombre ; galerie `/dev/ui` |
 | Liste des projets et création | Planche « Lot 4 · Projets » (`08-Lot4Projects.html`) ; fiche `S-projects` v7 |
 | Vue d'ensemble du projet | Planche « Lot 3 · Vue d'ensemble » (`07-Lot3Overview.html`) ; fiche `S-overview` |
+| Cahier fonctionnel (Prêt, Génération, Relecture, Liste · équipe) | Planche « Lot 5 · Fonctionnel » (`10-Lot5Fonctionnel.html`) ; fiche `S-spec-functional` |
 | Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
 Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/maquettes/` (planches 05 à 25).
@@ -510,3 +525,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 09/11/2026 | v2.14 (TK-93, passation 04, maquette 08) : §5.12 liste des projets et création (`ProjectTile`, `PhasePill`, `ProgressChecklist`, `ProjectCard`, teintes `--hue-1..5`, groupe « Récents ») ; lot B : `ShellNavItem leading`, `SegmentedGauge max`, `AvatarGroup size`, `hues.css` |
 | 11/11/2026 | v2.15 (TK-99b, passations 14 et 07 §1.4, maquettes 21, 10, 12) : §5.13 propositions de l'agent (`AgentProposeButton`, `AgentProposePopover`, `ProposalReview`, relecture en volume) ; le bouton reste `--primary` partout (maquette 21 l'emporte sur le contour de la maquette 10) |
 | 12/11/2026 | v2.16 (TK-101, passation 11, B329, maquette 16) : §5.14 panneau d'édition (`SpecItemSheet`, `Field agentFilled`, `TagInput`, choix en pastilles, confirmation de fermeture) ; plein écran sous 768 (et non 640) pour ce panneau |
+| 12/11/2026 | v2.17 (TK-102, passation 06, B333, maquette 10) : §5.15 collection de la spec (`SpecCollection` à fiche ancrée, statuts « Prêt » et « Génération », badge de `SpecNav`) ; Assistant de cadrage retiré |

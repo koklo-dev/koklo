@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.11.0** (TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **3.0.0** (TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -515,7 +515,7 @@ the new routes take an explicit `projectId` (path), the historical ones keep the
 | `repo.link` | POST | `/projects/{projectId}/repos` | links an existing repository (`mode: adopted`), also the manual fallback of ADR 0009 |
 | `repo.createSpec` | POST | `/projects/{projectId}/spec-repo` | always private, no visibility input |
 | `spec.head` | GET | `/projects/{projectId}/spec` | `branch` or `commitSha`, never both; `null` while the branch is not indexed |
-| `spec.listFeatures` | GET | `/projects/{projectId}/spec/features` | filters `status`, `priority`; paginated |
+| `spec.listFeatures` | GET | `/projects/{projectId}/spec/features` | filters `status`, `priority`, `validation` (3.0.0); paginated |
 | `spec.getFeature` | GET | `/projects/{projectId}/spec/features/{specId}` | description and steps are read from git at the indexed commit |
 | `specBatch.submit` | POST | `/projects/{projectId}/spec/batches` | idempotent, 1 to 50 operations, all or nothing |
 | `specBatch.get` | GET | `/projects/{projectId}/spec/batches/{batchId}` | status, `commitSha`, `report`, per-operation `results` |
@@ -941,8 +941,7 @@ through `specBatch.submit`.
 
 | Operation | Method | Path | Roles | Input | Output |
 |-----------|--------|------|-------|-------|--------|
-| `ai.draftBrief` | POST | `/projects/{projectId}/ai/brief` | `SPEC_BATCH_ROLES` (owner, admin, dev, designer) | `{ projectId, idea (1..8000, not blank), answers? (0..10 of 1..1000) }` | `{ brief, meta }` |
-| `ai.proposeFeatures` | POST | `/projects/{projectId}/ai/features` | `SPEC_BATCH_ROLES` | `{ projectId, brief (1..20000, not blank), maxFeatures? (integer 1..20, default 8) }` | `{ features, duplicates, meta }` |
+| `ai.proposeFeatures` | POST | `/projects/{projectId}/ai/features` | `SPEC_BATCH_ROLES` | `{ projectId, maxFeatures? (integer 1..20, default 8) }`; `brief` is refused (422) since 3.0.0 | `{ features, duplicates, meta }` |
 | `ai.proposeCriteria` | POST | `/projects/{projectId}/ai/criteria` | `SPEC_BATCH_ROLES` | `{ projectId, specId (F-nnn) }` | `{ operation, meta }` |
 | `llmCredential.verify` | POST | `/llm-credentials/{provider}/verify` | `MANAGER_ROLES` (owner, admin) | `{ provider }` (`fake` refused) | `{ ok: true, model, checkedAt }` |
 
@@ -967,7 +966,7 @@ key's `defaultModel`, otherwise `ANTHROPIC_DEFAULT_MODEL` of `@koklo/llm`.
 1. Session and role guard (401/403). 2. Project in the session organization (and, for `proposeCriteria`, the
 feature in the index: `404 NOT_FOUND`). 3. Engine pre-check, before any audit line or quota (since 1.1.0): monthly cap reached (`LLM_CAP_REACHED`), no usable
 key (`LLM_NOT_CONFIGURED`, `ENCRYPTION_UNAVAILABLE`). The procedure names a **usage**, never a provider or a model:
-`ai.draftBrief` is the usage `idea_space`; `ai.proposeFeatures` and `ai.proposeCriteria` are `spec_deliverables`
+`ai.proposeFeatures` and `ai.proposeCriteria` are `spec_deliverables`
 (B46); `llmCredential.verify` has no usage (the provider of the URL, the model of its key or of the catalog,
 neither cap nor metering).
 4. Prompt framed with a **fresh nonce** (a collision is `PROMPT_REJECTED`). 5. Concurrency gate then quota.
@@ -1012,9 +1011,9 @@ provider fails): `ai.brief.draft`, `ai.features.propose`, `ai.criteria.propose` 
 (no idea, brief, title, output, model or nonce). Refusals before the audit write nothing.
 
 ### What enters a prompt, and what never does (vision section 15)
-Always as untrusted data blocks, never in the instruction: `draftBrief` the idea and the answers; `proposeFeatures`
-the brief (block 1) then, if any, one block listing at most 100 lines `F-nnn | title | status | priority` of the
-index (no description, no criterion); `proposeCriteria` the feature (title, status, priority, description, criteria
+Always as untrusted data blocks, never in the instruction: `proposeFeatures` the frozen dossier (block 1), the
+published Synthesis and the frozen risks page when they exist, then the current specification (at most 300 features,
+`F-nnn | title` and the titles of the criteria, no description; same blocks and truncations as the `agent-propose` job); `proposeCriteria` the feature (title, status, priority, description, criteria
 read in git at the indexed commit). **Never**: the key, a token, an id, name or email of a user or member, the id,
 name or slug of the organization, the id or name of the project, the repository (owner, name, external id), the
 installation, the audit log, comments, data of another project. The output is hostile by default: strict Zod, no
@@ -1475,6 +1474,21 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **3.0.0** (TK-102, lot A): the Assistant of framing is removed, the functional specification is written from the
+  frozen idea dossier. **Breaking**: `ai.draftBrief` (`POST /projects/{projectId}/ai/brief`) and its schemas
+  (`aiDraftBriefInputSchema`, `aiDraftBriefOutputSchema`, `aiBriefSchema`) are removed, and `ai.proposeFeatures` no longer
+  takes `brief`: the input is `{ projectId, maxFeatures? }`; a `brief` is refused with `422 VALIDATION` (the field is declared
+  as never allowed). `ai.proposeFeatures` stays synchronous and reads the same sources as the `agent-propose` job (frozen
+  dossier `idea-vN`, published Synthesis, frozen risks page, current specification, same truncations); a project without a
+  frozen version answers `422 VALIDATION` on `projectId`. **Additive, same version**: `featureSummarySchema.validation`
+  (`validated | to_validate | to_revise`, the latest review of the feature judged on its current content, like
+  `spec.deliverables`), filter `validation` on `spec.listFeatures` applied by the server on the whole list (not only the
+  loaded items), facet `facets.validation` (each dimension ignores its own filter), and an optional `zone` (plain text,
+  1 to 80 characters) on `featureCreateSchema`, the `feature.update` operation and `featureDetailSchema`, written in the
+  front matter of the feature file. The spec repository scaffold no longer creates `brief/0001-idee-initiale.md`. 128 routes
+  and 102 paths. The fingerprint of 2.11.0 is frozen in `packages/contract/test/contract.test.ts`.
+  Migration note: a client of 2.x must stop calling `ai.draftBrief` and stop sending `brief` to `ai.proposeFeatures`; to
+  propose features, freeze the idea dossier (`idea.freeze`) then call `ai.proposeFeatures` or `ai.proposeDeliverable`.
 - **2.11.0** (TK-101, lot A): editing panel, server side (B329). **Additive**, nothing removed or changed; 3 new routes, 129 routes and
   103 paths in all. The fingerprint of 2.10.0 is frozen in `openapi/versions.json` and in `test/contract.test.ts`.
   - `ai.prefillItem` (`POST /projects/{projectId}/ai/item/prefill`): takes `{ projectId, type: "feature", description }`

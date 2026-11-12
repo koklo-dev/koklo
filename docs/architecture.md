@@ -1638,7 +1638,8 @@ flowchart LR
 
 ### API: AI proposals, module `ai` (TK-54b)
 `apps/api/src/ai` turns the key of the organization and the `@koklo/llm` adapter into three proposals
-(`ai.draftBrief`, `ai.proposeFeatures`, `ai.proposeCriteria`, contract 0.9.0) and into `llmCredential.verify`.
+(`ai.proposeFeatures`, `ai.proposeCriteria`, contract 0.9.0; `ai.draftBrief` was removed in 3.0.0, TK-102) and into `llmCredential.verify`.
+`ai.proposeFeatures` reads the frozen idea dossier through `readFrozenDossier` of `@koklo/db`, the same sources as the `agent-propose` job of the worker (`sourceBlocks` of `@koklo/domain` builds the prompt blocks for both).
 Nothing a model returns is persisted ([ADR 0015](adr/0015-anthropic-llm-adapter.md), [API contract](api-contract.md#ai-proposals-and-key-verification-tk-54b)).
 - Since TK-95 `AiModule` provides `AI_PROVIDER`, the `AiProviderRouter` of `@koklo/llm` plugged on the Prisma ports
   (`PrismaAiRoutingStore`, `PrismaAiUsageMeter`, `PrismaAiCredentialSource`), on `AuditAiEventSink` (fallback log,
@@ -1707,7 +1708,7 @@ record for `cmdk`: [ADR 0018](adr/0018-cmdk.md).
 | `/projects/<id>` | redirect to `/projects/<id>/spec/functional?tab=features` (overview: lot 3) | idem |
 | `/projects/<id>/spec/functional?tab=features\|rules\|roles\|flows` | `FeaturesPage` (`FeaturesHeader` = `ProjectHeader` with tabs; the last three tabs are `EmptyState` "Bientôt") | idem |
 | `/projects/<id>/spec/{data,architecture,technical,security,design,quality}`, `/projects/<id>/idea` | `SoonPage` | idem; an unknown livrable is a 404 |
-| `/projects/<id>/framing` | `FramingPage` (`FramingHeader` = `ProjectHeader`) | idem |
+| `/projects/<id>/framing` | no page: the proxy redirects (307, request kept) to `/projects/<id>/spec/functional` after the guard (TK-102) | idem |
 | `/projects/<id>/tickets` | `KanbanPage` for the project of the URL (the "first project" of TK-96 is gone) | idem |
 | `/settings` → `/settings/{members,github,ai}` | `SettingsPage` (h1 "Réglages", tabs as links by role, the three screens below, their titles now h2) | idem; an unknown section is a 404 |
 
@@ -1715,7 +1716,7 @@ record for `cmdk`: [ADR 0018](adr/0018-cmdk.md).
   (`AppShell` of `@koklo/ui`, `AppSidebar`, `ShellPalette`, one `main`). It reads the project from the URL
   (`projectIdFromPath`, uuid only), calls `project.shell` once (shared by the project card, the SPEC group, the Tickets badge and
   the mobile title through React Query) and `project.visit` once per opened project (failures are silent). Role-dependent
-  entries: "Réglages" needs `canListMembers`, "Assistant de cadrage" needs `canWriteSpec`; an unknown role sees neither
+  entry: "Réglages" needs `canListMembers` (the "Assistant de cadrage" entry was removed in TK-102; `/projects/<id>/framing` is redirected by the proxy to `/spec/functional`); an unknown role does not see it
   (fail-closed). `project.shell` failing locks every SPEC entry, the rest of the navigation stays.
 - **Guards** (`lib/auth-guard.ts`, `proxy.ts`): the guard knows `/projects/<id>`, `idea`, `framing`, `tickets`, `features` (legacy),
   `spec/<livrable>`, `/settings` and its three sections; any other sub-path is not guarded and ends in a 404. The matcher lists the
