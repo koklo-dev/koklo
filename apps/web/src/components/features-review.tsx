@@ -163,6 +163,7 @@ export function FeaturesReview({
         onLoadMore={review.loadMore}
         {...(review.savable.length > 0 ? { onSave: () => void actions.save() } : {})}
         saving={actions.saving}
+        saveProgress={actions.saveProgress}
         onLeave={onLeave}
         announcement={actions.announcement}
       >

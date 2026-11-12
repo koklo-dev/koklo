@@ -1,5 +1,5 @@
+import { SPEC_BATCH_MAX_BODY_BYTES } from "@koklo/contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { SPEC_BATCH_MAX_BODY_BYTES } from "../src/spec-batch/spec-batch-body-parser.ts";
 import {
   BRANCH,
   batch,

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isSavable, operationOf, planBatches } from "../src/lib/proposal-operations.ts";
+import {
+  BATCH_BYTES_BUDGET,
+  isSavable,
+  operationOf,
+  planBatches,
+} from "../src/lib/proposal-operations.ts";
 import { fake, many } from "./support/proposals.tsx";
 
 /** TK-99b : acceptées -> opérations, lots de 200 au plus, clés d'idempotence stables (fiche §3 critère 10). */
@@ -39,6 +44,28 @@ describe("planBatches", () => {
     expect(plans.every((p) => p.operations.length <= 200)).toBe(true);
     expect(plans.flatMap((p) => p.proposalIds)).toHaveLength(450);
     expect(new Set(plans.map((p) => p.key)).size).toBe(3);
+  });
+
+  it("lots coupés aussi par taille : chaque lot sous le budget en octets, ordre et couverture conservés", () => {
+    const long = many(30, 1, (i) => ({
+      status: "accepted",
+      content: { ...fake(i).content, description: "Description détaillée. ".repeat(200) },
+    }));
+    const one = new TextEncoder().encode(JSON.stringify(operationOf(long[0] as never))).length;
+    const budget = one * 7;
+    const plans = planBatches("L", long, budget);
+    expect(plans.length).toBeGreaterThanOrEqual(5);
+    for (const plan of plans) {
+      expect(plan.operations.length).toBeLessThanOrEqual(7);
+      const bytes = new TextEncoder().encode(JSON.stringify(plan.operations)).length;
+      expect(bytes).toBeLessThanOrEqual(budget + plan.operations.length + 2);
+    }
+    expect(plans.flatMap((p) => p.proposalIds)).toEqual(long.map((p) => p.id));
+    expect(new Set(plans.map((p) => p.key)).size).toBe(plans.length);
+  });
+
+  it("budget par défaut : les trois quarts des 4 Mio de l'API", () => {
+    expect(BATCH_BYTES_BUDGET).toBe(3 * 1024 * 1024);
   });
 
   it("clé stable pour le même lot, différente quand le contenu change ; forme acceptée par le contrat", () => {

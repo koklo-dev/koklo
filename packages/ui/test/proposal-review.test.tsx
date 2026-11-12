@@ -341,3 +341,36 @@ describe("ProposalSkeleton", () => {
     expect(root.children[0]).toHaveClass("h-11", "rounded-card", "border");
   });
 });
+
+describe("ProposalReview : enregistrement par lots", () => {
+  it("enregistrement découpé : barre verte, texte « lot 2 sur 3 », sortie bloquée jusqu'à la fin", () => {
+    setup({
+      saving: true,
+      saveProgress: { saved: 200, sending: 200, total: 512, batch: 2, batches: 3 },
+    });
+    const bar = screen.getByRole("progressbar", { name: "Avancement de l'enregistrement" });
+    expect(bar).toHaveAttribute("aria-valuetext", "200 enregistrées sur 512");
+    expect(bar.children[0]).toHaveClass("bg-status-validated-foreground");
+    expect(screen.getByText("Enregistrement · lot 2 sur 3 · 200 sur 512")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quitter la relecture" })).toBeDisabled();
+  });
+
+  it("un seul lot : pas de numéro de lot", () => {
+    setup({
+      saving: true,
+      saveProgress: { saved: 0, sending: 149, total: 149, batch: 1, batches: 1 },
+    });
+    expect(screen.getByText("Enregistrement · 0 sur 149")).toBeInTheDocument();
+  });
+
+  it("hors enregistrement, un avancement résiduel est ignoré : barre de relecture, sortie possible", () => {
+    setup({
+      saving: false,
+      saveProgress: { saved: 3, sending: 0, total: 3, batch: 1, batches: 1 },
+    });
+    expect(
+      screen.getByRole("progressbar", { name: "Avancement de la relecture" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quitter la relecture" })).toBeEnabled();
+  });
+});

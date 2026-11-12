@@ -1,3 +1,4 @@
+import { SPEC_BATCH_MAX_BODY_BYTES } from "@koklo/contract";
 import express, {
   type NextFunction,
   type Request,
@@ -6,11 +7,10 @@ import express, {
 } from "express";
 
 /**
- * Plafond du corps de `POST /projects/{projectId}/spec/batches` : 200 opérations au plus (`SPEC_BATCH_OPERATIONS_MAX`),
- * chacune avec description et critères. Les 100 ko par défaut d'Express refusaient (413) un enregistrement de
- * 149 propositions de l'agent, sans que la requête atteigne l'application ni le journal.
+ * Plafond du corps : `SPEC_BATCH_MAX_BODY_BYTES` (contrat, 4 Mio), pour 200 opérations au plus avec description et
+ * critères. Les 100 ko par défaut d'Express refusaient (413) un enregistrement de 149 propositions de l'agent, sans que
+ * la requête atteigne l'application ni le journal.
  */
-export const SPEC_BATCH_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 const SPEC_BATCH_PATH = /^\/projects\/[^/]+\/spec\/batches\/?$/i;
 

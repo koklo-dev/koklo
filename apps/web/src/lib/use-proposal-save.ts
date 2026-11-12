@@ -1,6 +1,7 @@
 "use client";
 
 import type { SpecBatchOutput } from "@koklo/contract";
+import type { ProposalSaveProgress } from "@koklo/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { errorCode } from "./api-error.ts";
@@ -31,6 +32,26 @@ async function follow(projectId: string, batch: SpecBatchOutput): Promise<SpecBa
   return current;
 }
 
+/** Envoie les lots l'un après l'autre et publie l'avancement avant chacun ; un lot en échec arrête la suite. */
+async function runPlans(
+  plans: BatchPlan[],
+  runPlan: (plan: BatchPlan) => Promise<string | null>,
+  onProgress: (progress: ProposalSaveProgress) => void,
+) {
+  const total = plans.reduce((sum, plan) => sum + plan.proposalIds.length, 0);
+  const batches = plans.length;
+  let saved = 0;
+  let code: string | null = null;
+  for (const [index, plan] of plans.entries()) {
+    onProgress({ saved, sending: plan.proposalIds.length, total, batch: index + 1, batches });
+    code = await runPlan(plan);
+    if (code) break;
+    saved += plan.proposalIds.length;
+  }
+  onProgress({ saved, sending: 0, total, batch: batches, batches });
+  return { saved, total, code };
+}
+
 /**
  * Enregistrement des propositions acceptées : un seul `specBatch.submit` jusqu'à 200, sinon un commit par groupe,
  * l'un après l'autre. Rien n'est écrit sans appel explicite ; un lot en échec arrête la suite (« M à reprendre »).
@@ -40,6 +61,7 @@ export function useProposalSave(options: { projectId: string; branch: string | u
   const submit = useMutation(orpc.specBatch.submit.mutationOptions());
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<ProposalSaveProgress | undefined>(undefined);
   const busy = useRef(false);
 
   const runPlan = useCallback(
@@ -68,21 +90,15 @@ export function useProposalSave(options: { projectId: string; branch: string | u
       if (plans.length === 0) return null;
       busy.current = true;
       setSaving(true);
-      let saved = 0;
-      let code: string | null = null;
-      for (const plan of plans) {
-        code = await runPlan(plan);
-        if (code) break;
-        saved += plan.proposalIds.length;
-      }
-      const total = plans.reduce((sum, plan) => sum + plan.proposalIds.length, 0);
+      const { saved, total, code } = await runPlans(plans, runPlan, setProgress);
       await queryClient.invalidateQueries({ queryKey: orpc.proposal.key() });
       await queryClient.invalidateQueries({ queryKey: orpc.spec.key() });
       busy.current = false;
       setSaving(false);
+      setProgress(undefined);
       return { saved, left: total - saved, code };
     },
     [queryClient, runPlan],
   );
-  return { saving, save };
+  return { saving, progress, save };
 }

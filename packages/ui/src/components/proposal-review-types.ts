@@ -8,6 +8,16 @@ export type ProposalDecision = "accepted" | "rejected" | "pending";
 
 export type ProposalFilter = "pending" | "all";
 
+/** Avancement d'un enregistrement découpé en lots : `saved` propositions écrites, `sending` dans le lot en cours. */
+export interface ProposalSaveProgress {
+  saved: number;
+  sending: number;
+  total: number;
+  /** Rang du lot en cours (1 pour le premier) et nombre de lots. */
+  batch: number;
+  batches: number;
+}
+
 /** Au-delà de ce nombre de propositions, la liste se range en groupes repliables (passation 07 §1.4). */
 export const PROPOSAL_GROUP_THRESHOLD = 30;
 

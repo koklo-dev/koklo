@@ -1,4 +1,8 @@
-import { SPEC_BATCH_OPERATIONS_MAX, type SpecBatchSubmitInput } from "@koklo/contract";
+import {
+  SPEC_BATCH_MAX_BODY_BYTES,
+  SPEC_BATCH_OPERATIONS_MAX,
+  type SpecBatchSubmitInput,
+} from "@koklo/contract";
 import type { ProposalOutput } from "./proposal-types.ts";
 
 type Operation = SpecBatchSubmitInput["operations"][number];
@@ -130,14 +134,50 @@ function fingerprint(ids: string[]): string {
 }
 
 /**
- * Découpe l'enregistrement : jusqu'à 200 propositions, un seul lot ; au-delà, un lot par groupe
- * (`type:zone`), chacun de 200 au plus. Clé `proposal-<lancement>-<groupe>-<n>-<empreinte>` : identique si le même
- * lot est renvoyé (reprise après coupure), différente dès que son contenu change.
+ * Octets d'opérations par lot : les trois quarts du plafond de l'API, le reste couvre l'enveloppe (clé, identifiants
+ * des propositions) et l'échappement JSON.
  */
-export function planBatches(launchId: string, proposals: ProposalOutput[]): BatchPlan[] {
+export const BATCH_BYTES_BUDGET = Math.floor((SPEC_BATCH_MAX_BODY_BYTES * 3) / 4);
+
+const encoder = new TextEncoder();
+const bytesOf = (proposal: ProposalOutput): number =>
+  encoder.encode(JSON.stringify(operationOf(proposal))).length;
+
+/** Coupe une suite en tranches de 200 opérations et de `BATCH_BYTES_BUDGET` octets au plus, dans l'ordre. */
+function slices(items: ProposalOutput[], budget: number): ProposalOutput[][] {
+  const out: ProposalOutput[][] = [];
+  let current: ProposalOutput[] = [];
+  let size = 0;
+  for (const item of items) {
+    const bytes = bytesOf(item);
+    const full = current.length >= SPEC_BATCH_OPERATIONS_MAX || size + bytes > budget;
+    if (current.length > 0 && full) {
+      out.push(current);
+      current = [];
+      size = 0;
+    }
+    current.push(item);
+    size += bytes;
+  }
+  if (current.length > 0) out.push(current);
+  return out;
+}
+
+/**
+ * Découpe l'enregistrement : jusqu'à 200 propositions, un seul lot ; au-delà, un lot par groupe
+ * (`type:zone`), chacun de 200 au plus. Tout lot reste aussi sous `BATCH_BYTES_BUDGET` octets d'opérations, pour ne
+ * jamais buter sur le plafond de l'API (413) avec des descriptions longues. Clé
+ * `proposal-<lancement>-<groupe>-<n>-<empreinte>` : identique si le même lot est renvoyé (reprise après coupure),
+ * différente dès que son contenu change.
+ */
+export function planBatches(
+  launchId: string,
+  proposals: ProposalOutput[],
+  budget = BATCH_BYTES_BUDGET,
+): BatchPlan[] {
   const chunks: Array<{ group: string; items: ProposalOutput[] }> = [];
   if (proposals.length <= SPEC_BATCH_OPERATIONS_MAX) {
-    chunks.push({ group: "all", items: proposals });
+    for (const items of slices(proposals, budget)) chunks.push({ group: "all", items });
   } else {
     const groups = new Map<string, ProposalOutput[]>();
     for (const item of proposals) {
@@ -145,9 +185,7 @@ export function planBatches(launchId: string, proposals: ProposalOutput[]): Batc
       groups.set(key, [...(groups.get(key) ?? []), item]);
     }
     for (const [group, items] of groups) {
-      for (let at = 0; at < items.length; at += SPEC_BATCH_OPERATIONS_MAX) {
-        chunks.push({ group, items: items.slice(at, at + SPEC_BATCH_OPERATIONS_MAX) });
-      }
+      for (const slice of slices(items, budget)) chunks.push({ group, items: slice });
     }
   }
   return chunks.map(({ group, items }, index) => {
