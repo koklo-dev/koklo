@@ -194,13 +194,11 @@ covers_commit: 5fa5b1c
 - Every call has a mandatory budget (tokens, duration, prompt size, cost) capped by the domain at
   5 USD per call; run `assertLlmRequest` before any network call and refuse, never clamp silently.
 
-### AI framing screen: what is sent and replayed (TK-59)
-- Only `{ projectId, idea, answers }` (brief) and `{ projectId, brief }` (proposals) leave for the provider;
-  never a person identifier. Proposals are rendered as plain text (guard test `framing-plain-text-guard`).
-- **"Réessayer" replays the current input, not the first click's**: `useFramingCalls.retry` calls the handlers of
-  the latest render, so an idea or brief edited after a failure is what is sent (test `framing-retry`).
+### AI proposals: what is sent and rendered (TK-59, reworked in TK-102)
+- Only the frozen dossier, Synthesis, risks and current specification (`ai.proposeFeatures`) leave for the provider;
+  never a person identifier. Proposals are rendered as plain text (guard test `proposal-plain-text-guard`).
 - Cancelling the wait frees the local lock only; the server request continues and stays counted in the
-  per-user hourly cap. Functional guide: `docs/functional/guides/frame-with-ai.md`.
+  per-user hourly cap. The Assistant of framing (and its functional guide) was removed in TK-102.
 
 ### BYOK credentials table: database errors (TK-51a)
 - **Never log the raw `meta` or `message` of a database error raised on `llm_provider_credentials`.**
@@ -737,7 +735,7 @@ state = 'failed'` must be 0). Logs carry the batch id, the final status and the 
 token, a provider message or an e-mail address.
 
 ### AI proposals: quotas and operation (TK-54b)
-`ai.draftBrief`, `ai.proposeFeatures`, `ai.proposeCriteria` and `llmCredential.verify` call the model with the
+`ai.proposeFeatures`, `ai.proposeCriteria` and `llmCredential.verify` call the model with the
 organization's own key (BYOK). Four optional variables of `api` set the ceilings; empty or absent means the
 default of the code, a non-integer or a value outside 1..100000 fails the start naming the variable (never the
 value).
@@ -1219,7 +1217,7 @@ is meant to plug the Zod schema of each usage into the same runner; only Idea sp
 
 ## AI engine wiring, cap and key guards (TK-95, lot D)
 - **Wiring**: `AiModule` builds `AI_PROVIDER` (the `AiProviderRouter`) on the Prisma ports. Procedures name a usage
-  (`ai.draftBrief` is Idea space, `ai.proposeFeatures` and `ai.proposeCriteria` are Spec deliverables);
+  (`ai.proposeFeatures` and `ai.proposeCriteria` are Spec deliverables; `ai.draftBrief` was removed in 3.0.0);
   `llmCredential.verify` has no usage. No file of `apps/api/src/ai` may name a provider, a model or the default model
   (`ai-engine-wiring.test.ts`); the former `LLM_PROVIDERS` registry and `src/llm` no longer exist.
 - **Order of a call**: engine pre-check (`preflight`: cap, usable key) before the audit line and the quota, so a

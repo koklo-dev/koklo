@@ -1,8 +1,10 @@
 ---
 id: S-framing
 titre: Cadrage assisté par IA (idée, brief, propositions de fonctionnalités)
-version: 2.3
+version: 3
 ---
+> **Remplacée par [S-spec-functional](S-spec-functional.md)** (TK-102) pour tout cet écran : l'Assistant de cadrage, le brief et la route `/framing` sont retirés (décision 05 §1.1, redirection vers `/spec/functional`).
+
 ## 1. Utilisateurs et objectif
 - **Vue équipe qui écrit** : propriétaire, administrateur, développeur, designer (`canWriteSpec` = `SPEC_BATCH_ROLES` des appels `ai.*`). Elle transforme une idée en brief structuré, puis en propositions de fonctionnalités à relire, éditer, accepter ou rejeter, et enregistre les acceptées dans la spec en une seule fois.
 - **Sans droit d'écriture** : client, business (et tout rôle inconnu) ne voient **aucun** bouton « Cadrer avec l'IA ». Une adresse directe affiche une page sobre (4.12), sans formulaire, sans bouton grisé, et n'émet **aucun** appel `ai.*` ni `specBatch.submit`. Le cadrage « côté client » (suggestions, validation) relève d'autres tickets (TK-55, TK-60).
@@ -229,6 +231,7 @@ Bandeau en haut de page (`DraftBanner` généralisé) : « Brouillon de cadrage 
 | 2.2 | 2026-11-06 | TK-87 | Lot 0 : bloc d'envoi en `InlineAlert` neutre d'une ligne + « Détails » replié, sans nom de fournisseur ni pays (B15, B24) ; statut des propositions en `ValidationStatus` (B25) et priorité en `PriorityIndicator`, à la place des badges faits main ; rappel « …viennent de l'agent IA… » ; raison du bouton désactivé reliée par `aria-describedby` ; échelle v2 (h1 24 px, h2 16 px, h3 de carte 14 px). Détail : `.workflow/TK-87/02-design.md` |
 | 2.3 | 2026-11-07 | TK-88 | Route `/projects/<id>/framing` inchangée, rendue dans `AppShell` (entrée « Assistant de cadrage » de la barre) avec `ProjectHeader` (sans onglet ni action) à la place du fil d'Ariane v1 et du sous-titre ; « Réessayez dans 30 s » affiché une seule fois (règle 5, correctif 1.6). L'écran disparaît au lot 5. Détail : `.workflow/TK-88/02-design.md` |
 | 2.4 | 2026-11-07 | TK-88 (finition) | Limite atteinte : « Réessayez dans N s » une seule fois à l'écran ; la région d'état le porte pour les lecteurs d'écran dans un `span` `sr-only` (passation 01 §1.6, règle 5, B92). Captures `shell-*.png` |
+| 3 | 2026-11-12 | TK-102 | Remplacée par S-spec-functional : Assistant, brief (`ai.draftBrief`) et route `/framing` retirés ; brouillons `framingDraftKey` purgés. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur)
 Aucun changement de contrat ni nouvelle dépendance. Fichiers sous `apps/web/src`, chacun <= 300 lignes.
