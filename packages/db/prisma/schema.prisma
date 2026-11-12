@@ -107,6 +107,7 @@ model Organization {
   specSnapshots           SpecSnapshot[]
   specHeads               SpecHead[]
   specFeatures            SpecFeature[]
+  specEntities            SpecEntity[]
   specCriteria            SpecCriterion[]
   specTables              SpecTable[]
   specEndpoints           SpecEndpoint[]
@@ -178,32 +179,33 @@ model Project {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tickets            Ticket[]
-  sprints            Sprint[]
-  state              ProjectState?
-  counters           ProjectCounter[]
-  repos              ProjectRepo[]
-  writeBatches       SpecWriteBatch[]
-  suggestions        Suggestion[]
-  reviews            Review[]
-  baselines          Baseline[]
-  notifications      Notification[]
-  clientAccess       ProjectClientAccess[]
-  visits             ProjectVisit[]
-  creations          ProjectCreation[]
-  ideaPages          IdeaPage[]
-  ideaPublications   IdeaPublication[]
-  ideaPresences      IdeaPresence[]
-  ideaMessages       IdeaMessage[]
-  ideaProposals      IdeaProposal[]
-  ideaAiLocks        IdeaAiLock[]
-  ideaGapRuns        IdeaGapRun[]
-  ideaVersions       IdeaVersion[]
-  ideaSyntheses      IdeaSynthesis[]
-  invitationProjects InvitationProject[]
-  agentLaunches      AgentLaunch[]
-  agentProposals     AgentProposal[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tickets              Ticket[]
+  sprints              Sprint[]
+  state                ProjectState?
+  counters             ProjectCounter[]
+  repos                ProjectRepo[]
+  writeBatches         SpecWriteBatch[]
+  suggestions          Suggestion[]
+  reviews              Review[]
+  baselines            Baseline[]
+  notifications        Notification[]
+  clientAccess         ProjectClientAccess[]
+  visits               ProjectVisit[]
+  creations            ProjectCreation[]
+  ideaPages            IdeaPage[]
+  ideaPublications     IdeaPublication[]
+  ideaPresences        IdeaPresence[]
+  ideaMessages         IdeaMessage[]
+  ideaProposals        IdeaProposal[]
+  ideaAiLocks          IdeaAiLock[]
+  ideaGapRuns          IdeaGapRun[]
+  ideaVersions         IdeaVersion[]
+  ideaSyntheses        IdeaSynthesis[]
+  invitationProjects   InvitationProject[]
+  agentLaunches        AgentLaunch[]
+  agentProposals       AgentProposal[]
+  deliverableOverrides DeliverableOverride[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -750,15 +752,17 @@ model ProjectRepo {
 
 /// Projection d'un commit de la spec (snapshot complet, reconstruction idempotente par commit).
 model SpecSnapshot {
-  id             String          @id @default(uuid(7)) @db.Uuid
-  organizationId String          @map("organization_id") @db.Uuid
-  repoId         String          @map("repo_id") @db.Uuid
-  commitSha      String          @map("commit_sha")
-  status         SpecIndexStatus
-  errorCode      String?         @map("error_code")
-  indexedAt      DateTime        @default(now()) @map("indexed_at") @db.Timestamptz(3)
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                String          @id @default(uuid(7)) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  repoId            String          @map("repo_id") @db.Uuid
+  commitSha         String          @map("commit_sha")
+  status            SpecIndexStatus
+  errorCode         String?         @map("error_code")
+  indexedAt         DateTime        @default(now()) @map("indexed_at") @db.Timestamptz(3)
+  /// Marqueur TK-100 : posé quand les entités génériques (`spec_entities`) du snapshot sont écrites ; nul = à réindexer par la réconciliation.
+  entitiesIndexedAt DateTime?       @map("entities_indexed_at") @db.Timestamptz(3)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   repo         ProjectRepo    @relation(fields: [organizationId, repoId], references: [organizationId, id], onDelete: Cascade)
@@ -766,6 +770,7 @@ model SpecSnapshot {
   features     SpecFeature[]
   tables       SpecTable[]
   endpoints    SpecEndpoint[]
+  entities     SpecEntity[]
 
   @@unique([repoId, commitSha])
   @@unique([organizationId, id])
@@ -1203,6 +1208,10 @@ enum ReviewTargetKind {
   feature
   screen
   baseline
+  flow
+  rules
+  roles
+  deliverable
 
   @@map("review_target_kind")
 }
@@ -1242,8 +1251,9 @@ model Review {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  project   Project    @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+  project   Project        @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
   baselines Baseline[]
+  version   ReviewVersion?
 
   @@unique([organizationId, id])
   @@unique([organizationId, projectId, id])
@@ -1669,21 +1679,21 @@ model IdeaSynthesis {
 /// Création du dépôt de spec d'un projet (TK-93, B301) : une ligne par tentative, `pending` à l'API, suivie par le worker.
 /// Statut, code d'erreur et modèle d'idée sont contraints par CHECK en SQL (listes fermées, pas d'enum natif).
 model ProjectCreation {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  projectId      String   @map("project_id") @db.Uuid
-  status         String
-  errorCode      String?  @map("error_code")
-  retryAfterMs   Int?     @map("retry_after_ms")
-  repoName       String   @map("repo_name")
-  installationId String?  @map("installation_id") @db.Uuid
-  ideaTemplate   String   @map("idea_template")
-  idempotencyKey String?  @map("idempotency_key")
-  requestedBy    String   @map("requested_by") @db.Uuid
+  id               String   @id @default(uuid(7)) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  status           String
+  errorCode        String?  @map("error_code")
+  retryAfterMs     Int?     @map("retry_after_ms")
+  repoName         String   @map("repo_name")
+  installationId   String?  @map("installation_id") @db.Uuid
+  ideaTemplate     String   @map("idea_template")
+  idempotencyKey   String?  @map("idempotency_key")
+  requestedBy      String   @map("requested_by") @db.Uuid
   /// L'invitation du client demandée à la création n'a pas pu être envoyée (B303) : l'étape passe en erreur sur la carte.
-  invitationFailed Boolean @default(false) @map("invitation_failed")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  invitationFailed Boolean  @default(false) @map("invitation_failed")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -1697,25 +1707,25 @@ model ProjectCreation {
 /// `agent_launches_one_active` (écrit à la main : Prisma ne modélise pas les index partiels). `requestedBy` sans clé
 /// étrangère (RGPD). `sources` : liste des lectures de l'agent, en JSONB (aucune colonne liste, incident 6). Les listes fermées et les bornes sont des CHECK écrits à la main.
 model AgentLaunch {
-  id              String    @id @default(uuid(7)) @db.Uuid
-  organizationId  String    @map("organization_id") @db.Uuid
-  projectId       String    @map("project_id") @db.Uuid
-  deliverable     String
-  mode            String
-  instruction     String?
-  status          String
-  errorCode       String?   @map("error_code")
-  requestedBy     String    @map("requested_by") @db.Uuid
-  sources         Json      @default("[]") @db.JsonB
-  baseVersion     Int?      @map("base_version")
-  discardedCount  Int       @default(0) @map("discarded_count")
-  proposedCount   Int       @default(0) @map("proposed_count")
-  heartbeatAt     DateTime  @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
-  lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz(3)
-  startedAt       DateTime? @map("started_at") @db.Timestamptz(3)
-  finishedAt      DateTime? @map("finished_at") @db.Timestamptz(3)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  projectId      String    @map("project_id") @db.Uuid
+  deliverable    String
+  mode           String
+  instruction    String?
+  status         String
+  errorCode      String?   @map("error_code")
+  requestedBy    String    @map("requested_by") @db.Uuid
+  sources        Json      @default("[]") @db.JsonB
+  baseVersion    Int?      @map("base_version")
+  discardedCount Int       @default(0) @map("discarded_count")
+  proposedCount  Int       @default(0) @map("proposed_count")
+  heartbeatAt    DateTime  @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
+  lastSeenAt     DateTime? @map("last_seen_at") @db.Timestamptz(3)
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   project   Project         @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
   proposals AgentProposal[]
@@ -1770,4 +1780,70 @@ model AgentProposalDecision {
 
   @@index([organizationId, proposalId, decidedAt])
   @@map("agent_proposal_decisions")
+}
+
+/// Forçage de l'ouverture d'un livrable de la spec (TK-100, B325 f) : owner ou admin, `spec.forceDeliverable`. Une ligne par
+/// projet et livrable, jamais modifiée ; ouvre le livrable sans rien valider. `forcedBy` sans clé étrangère (RGPD).
+model DeliverableOverride {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  deliverable    String
+  forcedBy       String   @map("forced_by") @db.Uuid
+  forcedAt       DateTime @default(now()) @map("forced_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organizationId, id])
+  @@unique([projectId, deliverable])
+  @@index([organizationId, projectId])
+  @@map("deliverable_overrides")
+}
+
+/// Index d'entités générique d'un snapshot (TK-100, B11, B325) : une ligne par élément du modèle (fonctionnalité, règle, rôles,
+/// parcours, table, relations, endpoint, écran, scénario). `contentHash` = sha256 de la forme canonique du contenu (jamais la mise
+/// en page : `_layout.yaml` n'est pas indexé). `kind` est contraint par un CHECK de la migration, `search` est une colonne générée.
+model SpecEntity {
+  id             String                   @id @default(uuid(7)) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  snapshotId     String                   @map("snapshot_id") @db.Uuid
+  kind           String
+  specId         String                   @map("spec_id")
+  zone           String?
+  path           String
+  data           Json
+  contentHash    String                   @map("content_hash")
+  sort           Int
+  /// Colonne générée (migration) : texte de recherche, configuration `french`. Jamais écrite par Prisma.
+  search         Unsupported("tsvector")? @default(dbgenerated("to_tsvector('french'::regconfig, ((replace(spec_id, '-'::text, ' '::text) || ' '::text) || COALESCE((data ->> 'titre'::text), ''::text)))"))
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  snapshot     SpecSnapshot @relation(fields: [organizationId, snapshotId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([snapshotId, kind, specId])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([snapshotId, kind, sort, id])
+  @@index([search], type: Gin)
+  @@map("spec_entities")
+}
+
+/// Hachage du contenu de la cible au moment du verdict (TK-100, B325 b) : une ligne par review, en ajout seul comme `reviews`.
+/// Une review sans ligne (antérieure à TK-100) se compare encore au SHA de tête.
+model ReviewVersion {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  reviewId       String   @map("review_id") @db.Uuid
+  contentHash    String   @map("content_hash")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  review Review @relation(fields: [organizationId, reviewId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, reviewId])
+  @@index([organizationId])
+  @@map("review_versions")
 }

@@ -21,6 +21,11 @@ export const AGENT_PROPOSAL_TABLES = [
   "agent_proposals",
   "agent_proposal_decisions",
 ] as const;
+/** TK-100 : forçage de l'ouverture d'un livrable (migration `*_deliverable_overrides`). */
+export const DELIVERABLE_OVERRIDE_TABLES = ["deliverable_overrides"] as const;
+
+/** TK-100 lot B : index d'entités générique et hachage du contenu validé (migration `*_spec_entities_review_versions`). */
+export const SPEC_ENTITY_TABLES = ["spec_entities", "review_versions"] as const;
 /** TK-97 : projets proposés à une invitation, préférences d'e-mail. */
 export const SETTINGS_TABLES = ["invitation_projects", "notification_preferences"] as const;
 

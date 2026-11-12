@@ -27,6 +27,11 @@ import { insertCounter } from "./support/ticket-fixtures.ts";
  * enum, aucune fonction, aucun trigger. Le `down.sql` la retire seule. Rejouable
  * (up -> down -> up), `migrate diff` vide, données des tables antérieures conservées.
  */
+/** TK-100 : les quatre valeurs ajoutées à `review_target_kind` sont postérieures à cette migration. */
+const withoutReviewKinds = (enums: string[]) =>
+  enums.map((entry) =>
+    entry.startsWith("review_target_kind:") ? "review_target_kind:feature,screen,baseline" : entry,
+  );
 const dirs = () => listMigrationDirs();
 const migration = () => dirs().find((dir) => dir.endsWith(NOTIFICATION_SUFFIX)) as string;
 const sqlOf = (dir: string, file: "migration.sql" | "down.sql") =>
@@ -127,7 +132,7 @@ describe("TK-51d migration notifications : dossier et contenu", () => {
 
   it("expectedTables contient la table (56 au total avec TK-91)", () => {
     for (const table of NOTIFICATION_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(60);
+    expect(expectedTables).toHaveLength(63);
   });
 });
 
@@ -152,9 +157,14 @@ describe("TK-51d migration notifications : up -> (données) -> down -> up", () =
     expect(afterFirstUp.tables).toEqual([...expectedTables].sort());
     for (const table of NOTIFICATION_TABLES) expect(afterFirstUp.tables).toContain(table);
     const earlier = await inventory(await applyEarlierMigrations(baseline));
-    expect(withoutIdeaEnums(withoutAiEnums(afterFirstUp.enums))).toEqual(earlier.enums);
-    expect(afterFirstUp.functions).toEqual(earlier.functions);
-    expect(afterFirstUp.triggers).toEqual(earlier.triggers);
+    expect(withoutReviewKinds(withoutIdeaEnums(withoutAiEnums(afterFirstUp.enums)))).toEqual(
+      earlier.enums,
+    );
+    // TK-100 : la fonction et les triggers de `review_versions` sont postérieurs à cette migration.
+    const notLater = (names: string[]) =>
+      names.filter((name) => !name.startsWith("review_versions_"));
+    expect(notLater(afterFirstUp.functions)).toEqual(earlier.functions);
+    expect(notLater(afterFirstUp.triggers)).toEqual(earlier.triggers);
   }, 180_000);
 
   it("down.sql ramène exactement à l'état précédent ; les données des autres tables survivent", async () => {

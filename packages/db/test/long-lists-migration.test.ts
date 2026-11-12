@@ -84,7 +84,7 @@ describe("TK-94 migration long_lists : dossier et contenu", () => {
   });
 
   it("n'ajoute aucune table : expectedTables est à 56 (TK-91)", () => {
-    expect(expectedTables).toHaveLength(60);
+    expect(expectedTables).toHaveLength(63);
   });
 });
 
@@ -121,6 +121,7 @@ describe("TK-94 migration long_lists : up -> (données) -> down -> up", () => {
        WHERE is_generated = 'ALWAYS' AND table_schema = 'public' ORDER BY 1, 2`,
     );
     expect(generated).toEqual([
+      { table_name: "spec_entities", column_name: "search" },
       { table_name: "spec_features", column_name: "search" },
       { table_name: "spec_features", column_name: "spec_number" },
       { table_name: "tickets", column_name: "key_number" },

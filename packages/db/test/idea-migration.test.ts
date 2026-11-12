@@ -21,7 +21,9 @@ import {
 } from "./support/idea-fixtures.ts";
 import {
   AGENT_PROPOSAL_TABLES,
+  DELIVERABLE_OVERRIDE_TABLES,
   PROJECT_CREATION_TABLES,
+  SPEC_ENTITY_TABLES,
 } from "./support/project-client-fixtures.ts";
 
 /** Tables des migrations qui suivent `*_idea` (agent TK-90, versions TK-91) : absentes de la base de ce test. */
@@ -30,6 +32,8 @@ const LATER_TABLES: readonly string[] = [
   ...IDEA_VERSIONS_TABLES,
   ...PROJECT_CREATION_TABLES,
   ...AGENT_PROPOSAL_TABLES,
+  ...DELIVERABLE_OVERRIDE_TABLES,
+  ...SPEC_ENTITY_TABLES,
 ];
 
 import { insertScope } from "./support/ticket-fixtures.ts";
@@ -75,7 +79,7 @@ describe("TK-89 migration idea : dossier et contenu", () => {
 
   it("expectedTables contient les quatre tables (56 au total avec TK-90 et TK-91)", () => {
     for (const table of IDEA_BASE_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(60);
+    expect(expectedTables).toHaveLength(63);
   });
 });
 
@@ -166,6 +170,8 @@ describe("TK-89 migration idea : pages des projets existants", () => {
       IDEA_VERSIONS_SUFFIX,
       "_project_creations",
       "_agent_proposals",
+      "_deliverable_overrides",
+      "_spec_entities_review_versions",
     ]) {
       apply(db, dirs().find((dir) => dir.endsWith(suffix)) as string, "migration.sql");
     }
