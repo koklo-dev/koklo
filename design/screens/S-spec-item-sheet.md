@@ -31,6 +31,7 @@ B329 (lectures prudentes). Aucune ne bloque.
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
 | 1 | 2026-11-12 | TK-101 | Création : socle `SpecItemSheet`, 4 modes de la maquette 16, formulaire Fonctionnalité ; généralise S-feature-form. |
+| 1.1 | 2026-11-12 | TK-103 | Formulaires Règle (Titre, Type, Énoncé, Exemple, Appliquée par), Rôle (Nom, Description, Permissions avec restriction entre parenthèses) et Parcours (Titre, Acteur, Point de départ, Étapes « libellé · écran », Cas d'erreur, Fonctionnalités), chemins `domain/rules/R-nnn-<slug>.md`, `domain/roles.yaml`, `design/flows/P-<slug>.yaml` ; le designer n'a que le formulaire Parcours (B340). |
 
 ## 11. Captures
 Générées par `apps/web/e2e/spec-item-sheet.spec.ts` (faux API `support/stub-spec-item.ts`, axe sans violation sur chacune) dans `design/screens/captures/S-spec-item-sheet/` : pour chacun des 4 modes (`create`, `filled`, `edit`, `err`), `<mode>-light.png` (1280 px), `<mode>-dark.png` (1280 px) et `<mode>-mobile.png` (375 px, plein écran) ; plus `delete-confirm-light.png` (modification, confirmation de suppression qui liste `R-004` et `P-annuler`). Galerie : `/dev/ui`, section « 17. Panneau d'édition » (id `dev-ui-spec-item-sheet`), captures `design/screens/captures/S-dev-ui/spec-item-sheet-<mode>-<light|dark>[-mobile].png` générées par `apps/web/e2e/dev-ui.spec.ts`.

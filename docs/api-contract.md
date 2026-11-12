@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **3.0.0** (TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **3.1.0** (TK-103, lot A: additive, the operations `rule.*`, `role.*` and `flow.*` of `specBatch.submit`, `spec.functional.list`, `spec.roles.matrix`, `spec.item.get` for rules, roles and flows, the counters `rules`, `roles` and `flows` of `spec.head`; 3.0.0, TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -517,6 +517,8 @@ the new routes take an explicit `projectId` (path), the historical ones keep the
 | `spec.head` | GET | `/projects/{projectId}/spec` | `branch` or `commitSha`, never both; `null` while the branch is not indexed |
 | `spec.listFeatures` | GET | `/projects/{projectId}/spec/features` | filters `status`, `priority`, `validation` (3.0.0); paginated |
 | `spec.getFeature` | GET | `/projects/{projectId}/spec/features/{specId}` | description and steps are read from git at the indexed commit |
+| `spec.functional.list` | GET | `/projects/{projectId}/spec/functional` | tabs Business rules and Flows (3.1.0): `tab` `rules` or `flows`, `type` (rules), `q`, cursor, `around` (`R-nnn` or `P-slug`); read from the entity index, same guard as `spec.listFeatures` |
+| `spec.roles.matrix` | GET | `/projects/{projectId}/spec/roles/matrix` | tab Roles and permissions (3.1.0): roles, resource groups with their count, actions of the open groups (`group`, `q`); same guard as `spec.listFeatures` |
 | `specBatch.submit` | POST | `/projects/{projectId}/spec/batches` | idempotent, 1 to 50 operations, all or nothing |
 | `specBatch.get` | GET | `/projects/{projectId}/spec/batches/{batchId}` | status, `commitSha`, `report`, per-operation `results` |
 
@@ -1474,6 +1476,24 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **3.1.0** (TK-103, lot A, additive): business rules, roles and flows are written and read like features.
+  `specBatch.submit` takes the operations `rule.create|update|delete` (`title`, `type` `contrainte|calcul|workflow`,
+  `statement`, optional `examples`, `states` (the first is the initial state), `features`, `tables`, `endpoints`),
+  `role.create|update|delete` (`name`, `description`, `permissions` `[{ id: "PM-…", restriction? }]`, at least one) and
+  `flow.create|update|delete` (`title`, `actor`, `start { label, screen? }`, `steps` (at least one), optional `errors`
+  `[{ step, text }]` and `features`). The server assigns the identifier of a creation: `R-nnn` from the project counter
+  `rule` (never twice the same value, even concurrently), `RL-<slug of the name>` and `P-<slug of the title>`; an identifier
+  already present is a `409 SPEC_BATCH_CONFLICT` with `reason: write_conflict`. A reference to an unknown feature, screen or
+  permission is refused with `422 SPEC_INVALID` unless the element is in the same batch. A designer writes flows but not rules
+  nor roles (`403 FORBIDDEN`, decided by the worker); client and business are refused everywhere (403). `results[].specId` and
+  `specOperationKindSchema` are widened accordingly. New reads: `spec.functional.list` (rules: pages of the entity index sorted
+  by the numeric rank of `R-nnn`, facet `facets.type`, `q` over the whole list, `around`; flows: same list without facet) and
+  `spec.roles.matrix` (`roles`, `groups` `{ resource, count, open }`, `actions` with one `access` per role: `allowed`,
+  `restricted` with its text, or `denied`; all actions open up to 20, otherwise the requested `group` and the groups of fewer
+  than 5 actions). `spec.item.get` accepts `type` `feature|rule|role|flow` (the id must match the type; rules, roles and flows
+  are read from the entity index, no provider call). `spec.head.counts` gains `rules`, `roles` and `flows`. 130 routes and
+  104 paths. The fingerprint of 3.0.0 is frozen in `packages/contract/test/contract.test.ts`. Migration note: a client that
+  builds `spec.head` counts or reads `spec.item.get` must accept the new shapes; nothing is removed.
 - **3.0.0** (TK-102, lot A): the Assistant of framing is removed, the functional specification is written from the
   frozen idea dossier. **Breaking**: `ai.draftBrief` (`POST /projects/{projectId}/ai/brief`) and its schemas
   (`aiDraftBriefInputSchema`, `aiDraftBriefOutputSchema`, `aiBriefSchema`) are removed, and `ai.proposeFeatures` no longer

@@ -342,8 +342,8 @@ Galerie : `/dev/ui`, sections « Listes · A » (listes longues, id `dev-ui-list
 |---|---|
 | `Pagination` | Voir §5.3. Boutons 32 bordés, numéros en mono 13, « Lignes par page » en `SegmentedControl xs`, désactivés sans `disabledReason`. |
 | `VirtualList` | `framed` (rayon 12, bordure `--border`, `overflow:hidden`) ; `loadingRows={n}` : `n` `SkeletonRow` sous les lignes, `aria-hidden`. |
-| `CountBar` | Total et nom en gras ; `query` : « 0 résultat pour « … » » ; tri puis `swap_vert`. |
-| `ListFooter` | Une ligne dans le cadre, icône 18, `Spinner` `--primary` en chargement, erreur à texte muted et icône rouge, bouton `xs`. |
+| `CountBar` | Total et nom en gras ; `query` : « 0 résultat pour « … » » ; tri puis `swap_vert` ; `showAllLoaded` : « · toutes chargées » quand tout est chargé (règles, rôles, parcours, sans tri). |
+| `ListFooter` | Une ligne dans le cadre (variante `framed` : cadre bordé, rayon 10, 12 px, icône 16, pour les cartes de règles, rôles et parcours ; « suivants » / « suivantes » selon le genre du nom), icône 18, `Spinner` `--primary` en chargement, erreur à texte muted et icône rouge, bouton `xs`. |
 | `GroupSection` | `stacked`, `actionIcon`, action visible replié, rangée « Afficher N de plus » pleine largeur `--primary`. |
 | `ListPanel` | Cadre rayon 12, `--border`, `overflow:hidden`, `--background`. En-tête facultatif : h2 16/600 et lien « Tout voir » `--primary` 13/500 avec `arrow_forward` 16. Pied facultatif `--surface`, 12 `--muted-foreground`, bordure haute. Liste `ul` nommée. |
 | `ListRow` | `li` (ou, avec `as="div"`, contenu de ligne sans bordure ni marge pour un hôte qui pose son `li`, comme `VirtualList`) séparé du précédent par une bordure haute `--border`. Marges 12 / 16 (ou `fixedHeight` : 52). Tête : icône d'état 18 à 20, `IdTag` ou case à cocher. Titre 14/500 tronqué, sous-titre 12 `--muted-foreground`. Queue : pastille, valeur mono 12 ou actions `Button sm`. `selected` : fond `--secondary`, `aria-current="true"`. Ligne entière cliquable (lien ou bouton) avec focus visible `--ring`. |
@@ -463,6 +463,23 @@ Galerie : `/dev/ui`, section « 17. Panneau d'édition » (la 16 est déjà « P
 
 Galerie : `/dev/ui`, section « 18. Collection de la spec ». La vue client de ce cahier (validation un par un) n'est pas dans ce ticket.
 
+### 5.16 Règles métier, Rôles et permissions, Parcours (v2.18, TK-103, passation 06 §4.3-4.4 et §9, 08 §1.1, 11 §3-4, B338 à B344, maquette 10 l.225-318, 335-382, 532-541, 581-621, 722-740)
+
+| Composant | Règle |
+|---|---|
+| `RuleCard` | `article` rayon 12, bordure `--border`, marges 16, écart 10, fond `--background`, dans une grille `repeat(auto-fill, minmax(420px, 1fr))` écart 12 (1 colonne sous 1024 px). Ligne d'en-tête : `IdTag` `R-nnn`, titre 15/600, `Pill soft` du type (icône 16 : `block` Contrainte, `calculate` Calcul, `account_tree` Workflow à états), icône `edit` 28 `aria-label="Modifier R-002"` pour l'équipe qui écrit. Énoncé 14/1,55 dans un encadré `--surface` rayon 8 marges 10 12 ; « Exemple » 12/600 `--muted-foreground` puis 13 ; « Appliquée par » 12 et `IdTag` `F-nnn`. Carte choisie (`?sel=`) : bordure `--primary`. |
+| `WorkflowStates` | Liste (`ul`, `aria-label` « États de la règle », lue dans l'ordre) en ligne 12 px : état initial plein `--primary` / `--primary-foreground`, flèche `arrow_forward` 16 `--muted-foreground` (`aria-hidden`), états finaux en contour `--border` ; chaque état rayon 6 marges 3 8. L'ordre du fichier fait foi (le premier est l'état initial). |
+| Légende des types (`RuleTypeLegend`) | Trois pastilles à contour (`pillVariants` `outline`) à icône 16, boutons `aria-pressed` dans un groupe nommé « Filtrer par type de règle » qui filtrent (`?type=`) ; un second appui sur le type actif retire le filtre ; actif : bordure `--primary`, fond `--secondary` ; 44 px de haut sous 768 px. |
+| `RoleCard` | Rayon 12, marges 14 16, écart 12, grille `minmax(260px, 1fr)` ; `IconTile` 40 au contour (teintes cycliques `warning`, `soft`, `success` en jetons de statut, icône décorative), nom 600, `IdTag` mono 11 `RL-…` en `--muted-foreground`, description 13 `--muted-foreground`, icône `edit` 28. |
+| `PermissionMatrix` | Vrai `table` dans un cadre rayon 12 à défilement horizontal (région `tabIndex=0` nommée), `min-width` 640. `caption` 14/600 (« Qui peut faire quoi ») avec le total d'actions, la mention « groupées par ressource au-delà de 20 » et le champ « Filtrer les actions » ; `thead` `--surface` 12 `--muted-foreground` (`th scope="col"`, noms de rôle centrés) ; ligne : `th scope="row"` libellé + code `PM-…` mono 11 ; cellule : `check_circle` plein 18 (`--status-validated-fg`) + « autorisé » ; avec restriction `check_circle` `--primary` + « autorisé : les siennes » (texte de la restriction) ; `remove` 18 `--border-strong` + « non autorisé » ; le texte est visible à 12 px (lecteur d'écran et daltoniens). Au-delà de 20 actions : lignes de groupe `th scope="rowgroup"` (fond `--surface`, bouton chevron `aria-expanded`, « Paiement et caisse · 12 actions », ouvert sous 5 actions). |
+| `FlowCard` | Section rayon 12, marges 16, écart 14 : `IdTag` `P-…`, `h3` 16/600, acteur 13 `--muted-foreground`, « Fonctionnalités : F-001, F-004 » 12 à droite, icône `edit`. |
+| `FlowSteps` | `ol` sans puce, étapes en ligne qui passent à la ligne : carte 150 px, rayon 10, `--surface`, marges 10 12, « Étape n » 11 `--muted-foreground`, libellé 13/600, `IdTag` d'écran 11 ; flèche `arrow_forward` 20 `aria-hidden` entre les étapes. Sous 768 px : colonne, flèche `arrow_downward`. L'étape 1 est le point de départ. |
+| `FlowError` | Fond `--alert-error-bg`, texte `--alert-error-fg` (mêmes valeurs que la maquette l.620 : `#fef2f2` / `#991b1b` en clair, `#3b1219` / `#fecaca` en sombre ; aucun jeton nouveau), rayon 8, marges 8 10, 13 px, icône `subdirectory_arrow_right` 18, « Étape 4 : » en 600 ; une ligne par cas d'erreur. |
+| Pied de liste et recherche | `CountBar` « 300 règles · 24 chargées » avec « Rechercher une règle ou R-nnn » ; `ListFooter` (suite, chargement, erreur, fin) et bouton « Charger la suite » ; recherche vide : `EmptyState` compact avec « Effacer la recherche ». |
+
+Relecture : `ProposalReview` générique (§5.13) ; le détail ajoute le type et l'exemple (règle), la liste « Permissions » (rôle), la liste « Étapes » (parcours) dans `ProposalLines`. Les compteurs d'onglet affichent « N à relire » en relecture.
+Galerie : `/dev/ui`, section « 19. Règles, rôles et parcours » (`RuleCard`, `WorkflowStates`, `RuleTypeLegend`, `RoleCard`, `PermissionMatrix`, `FlowCard`, `FlowSteps`, `FlowError`). `PermissionMatrix` reçoit `filterRef` : le raccourci `/` de l'écran met le focus sur « Filtrer les actions ». Icônes ajoutées au registre : `calculate`, `shield_person`, `support_agent`.
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -526,3 +543,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 11/11/2026 | v2.15 (TK-99b, passations 14 et 07 §1.4, maquettes 21, 10, 12) : §5.13 propositions de l'agent (`AgentProposeButton`, `AgentProposePopover`, `ProposalReview`, relecture en volume) ; le bouton reste `--primary` partout (maquette 21 l'emporte sur le contour de la maquette 10) |
 | 12/11/2026 | v2.16 (TK-101, passation 11, B329, maquette 16) : §5.14 panneau d'édition (`SpecItemSheet`, `Field agentFilled`, `TagInput`, choix en pastilles, confirmation de fermeture) ; plein écran sous 768 (et non 640) pour ce panneau |
 | 12/11/2026 | v2.17 (TK-102, passation 06, B333, maquette 10) : §5.15 collection de la spec (`SpecCollection` à fiche ancrée, statuts « Prêt » et « Génération », badge de `SpecNav`) ; Assistant de cadrage retiré |
+| 12/11/2026 | v2.18 (TK-103, passations 06 et 11, B338 à B344, maquette 10) : §5.16 règles métier, rôles et permissions, parcours (`RuleCard`, `WorkflowStates`, `RoleCard`, `PermissionMatrix`, `FlowCard`, `FlowSteps`, `FlowError`) ; compteurs et actions par onglet |
