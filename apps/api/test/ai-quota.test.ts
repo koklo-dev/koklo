@@ -5,13 +5,14 @@ import {
   AI_ACTIONS,
   aiApi,
   aiAuditRows,
-  BRIEF_REPLY,
+  featuresReply,
   GatedLlm,
   insertAuditAt,
   installAiBench,
   keyedWorld,
   setKey,
 } from "./helpers/ai-bench.ts";
+import { freezeIdea } from "./helpers/proposals.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import { createWorld } from "./helpers/tickets.ts";
 
@@ -37,12 +38,13 @@ describe("valeurs par défaut (D8, à valider par l'humain)", () => {
   it("une application sans réglage applique ces défauts", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     const defaults = await b.makeApp({ limits: { ...AI_LIMIT_DEFAULTS } });
     const api = aiApi(defaults, world.actors.dev);
 
     const statuses: number[] = [];
-    for (let i = 0; i < 11; i += 1) statuses.push((await api.draftBrief(world.projectId)).status);
+    for (let i = 0; i < 11; i += 1)
+      statuses.push((await api.proposeFeatures(world.projectId)).status);
 
     expect(statuses.slice(0, 10)).toEqual(Array(10).fill(200));
     expect(statuses[10]).toBe(429);
@@ -55,13 +57,13 @@ describe("quota par utilisateur et par organisation", () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 2, maxCallsPerHourOrg: 100 } });
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
     const api = aiApi(app, world.actors.dev);
 
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
-    const refused = await api.draftBrief(world.projectId);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
+    const refused = await api.proposeFeatures(world.projectId);
 
     expect(refused.status, JSON.stringify(refused.body)).toBe(429);
     expect(refused.body.code).toBe("LLM_RATE_LIMITED");
@@ -78,15 +80,16 @@ describe("quota par utilisateur et par organisation", () => {
     const scene = await readScene(b);
     await seedIndex(b, scene, [{ id: "F-001", titre: "Connexion" }], { commit: true });
     const { world } = scene;
+    await freezeIdea(b.database, world);
     await setKey(app, world, "FAKE-KEY-NOT-REAL-QUOTA-0101");
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     const dev = aiApi(app, world.actors.dev);
     const admin = aiApi(app, world.actors.admin);
 
-    await dev.draftBrief(world.projectId);
+    await dev.proposeFeatures(world.projectId);
     await dev.proposeFeatures(world.projectId);
     const refused = await dev.proposeCriteria(world.projectId);
-    const other = await admin.draftBrief(world.projectId);
+    const other = await admin.proposeFeatures(world.projectId);
 
     expect(refused.status, JSON.stringify(refused.body)).toBe(429);
     expect(other.status, JSON.stringify(other.body)).toBe(200);
@@ -96,13 +99,13 @@ describe("quota par utilisateur et par organisation", () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 100, maxCallsPerHourOrg: 3 } });
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
     const statuses = [
-      (await aiApi(app, world.actors.dev).draftBrief(world.projectId)).status,
-      (await aiApi(app, world.actors.admin).draftBrief(world.projectId)).status,
-      (await aiApi(app, world.actors.designer).draftBrief(world.projectId)).status,
-      (await aiApi(app, world.actors.owner).draftBrief(world.projectId)).status,
+      (await aiApi(app, world.actors.dev).proposeFeatures(world.projectId)).status,
+      (await aiApi(app, world.actors.admin).proposeFeatures(world.projectId)).status,
+      (await aiApi(app, world.actors.designer).proposeFeatures(world.projectId)).status,
+      (await aiApi(app, world.actors.owner).proposeFeatures(world.projectId)).status,
     ];
 
     expect(statuses).toEqual([200, 200, 200, 429]);
@@ -113,16 +116,16 @@ describe("quota par utilisateur et par organisation", () => {
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 1, maxCallsPerHourOrg: 1 } });
     const first = await keyedWorld(b);
     const second = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
     expect(
-      (await aiApi(app, first.world.actors.dev).draftBrief(first.world.projectId)).status,
+      (await aiApi(app, first.world.actors.dev).proposeFeatures(first.world.projectId)).status,
     ).toBe(200);
     expect(
-      (await aiApi(app, first.world.actors.dev).draftBrief(first.world.projectId)).status,
+      (await aiApi(app, first.world.actors.dev).proposeFeatures(first.world.projectId)).status,
     ).toBe(429);
     expect(
-      (await aiApi(app, second.world.actors.dev).draftBrief(second.world.projectId)).status,
+      (await aiApi(app, second.world.actors.dev).proposeFeatures(second.world.projectId)).status,
     ).toBe(200);
   });
 
@@ -132,24 +135,24 @@ describe("quota par utilisateur et par organisation", () => {
     const one = await b.makeApp({ limits });
     const two = await b.makeApp({ limits });
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
-    expect((await aiApi(one, world.actors.dev).draftBrief(world.projectId)).status).toBe(200);
-    expect((await aiApi(two, world.actors.dev).draftBrief(world.projectId)).status).toBe(200);
-    expect((await aiApi(one, world.actors.dev).draftBrief(world.projectId)).status).toBe(429);
-    expect((await aiApi(two, world.actors.dev).draftBrief(world.projectId)).status).toBe(429);
+    expect((await aiApi(one, world.actors.dev).proposeFeatures(world.projectId)).status).toBe(200);
+    expect((await aiApi(two, world.actors.dev).proposeFeatures(world.projectId)).status).toBe(200);
+    expect((await aiApi(one, world.actors.dev).proposeFeatures(world.projectId)).status).toBe(429);
+    expect((await aiApi(two, world.actors.dev).proposeFeatures(world.projectId)).status).toBe(429);
   });
 
   it("fenêtre glissante : les lignes de plus d'une heure ne comptent pas, celles de la fenêtre comptent", async () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 2, maxCallsPerHourOrg: 100 } });
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     const user = world.actors.dev.userId;
     const old = {
       organizationId: world.organizationId,
       userId: user,
-      action: AI_ACTIONS.draftBrief,
+      action: AI_ACTIONS.proposeFeatures,
       targetKind: "project" as const,
       targetId: world.projectId,
     };
@@ -157,10 +160,10 @@ describe("quota par utilisateur et par organisation", () => {
     await insertAuditAt(b.database, { ...old, at: new Date(Date.now() - 3 * HOUR) });
     const api = aiApi(app, world.actors.dev);
 
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
 
     await insertAuditAt(b.database, { ...old, at: new Date(Date.now() - 10 * 60 * 1000) });
-    const refused = await api.draftBrief(world.projectId);
+    const refused = await api.proposeFeatures(world.projectId);
     expect(refused.status).toBe(429);
     // La plus ancienne ligne de la fenêtre (il y a 10 minutes) sort dans ~50 minutes.
     expect(refused.body.data.retryAfterSeconds).toBeGreaterThan(2800);
@@ -171,7 +174,7 @@ describe("quota par utilisateur et par organisation", () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 1, maxCallsPerHourOrg: 1 } });
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     await insertAuditAt(b.database, {
       organizationId: world.organizationId,
       userId: world.actors.dev.userId,
@@ -181,7 +184,7 @@ describe("quota par utilisateur et par organisation", () => {
       at: new Date(),
     });
 
-    const res = await aiApi(app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
   });
@@ -190,12 +193,12 @@ describe("quota par utilisateur et par organisation", () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxCallsPerHourUser: 1, maxCallsPerHourOrg: 1 } });
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    await aiApi(app, world.actors.client).draftBrief(world.projectId);
+    b.use(FakeLlm.replying(featuresReply()));
+    await aiApi(app, world.actors.client).proposeFeatures(world.projectId);
     const bare = await createWorld(b.database);
-    await aiApi(app, bare.actors.dev).draftBrief(bare.projectId);
+    await aiApi(app, bare.actors.dev).proposeFeatures(bare.projectId);
 
-    expect((await aiApi(app, world.actors.dev).draftBrief(world.projectId)).status).toBe(200);
+    expect((await aiApi(app, world.actors.dev).proposeFeatures(world.projectId)).status).toBe(200);
     expect(await aiAuditRows(b.database, bare.organizationId)).toEqual([]);
   });
 });
@@ -214,8 +217,8 @@ describe("quota de llmCredential.verify", () => {
     expect((await owner.verify()).status).toBe(200);
     expect((await admin.verify()).status).toBe(200);
     const refused = await owner.verify();
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    const aiCall = await aiApi(app, world.actors.dev).draftBrief(world.projectId);
+    b.use(FakeLlm.replying(featuresReply()));
+    const aiCall = await aiApi(app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(refused.status, JSON.stringify(refused.body)).toBe(429);
     expect(refused.body.code).toBe("LLM_RATE_LIMITED");
@@ -231,14 +234,14 @@ describe("concurrence : sémaphore par organisation", () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxConcurrentPerOrg: 2 } });
     const { world } = await keyedWorld(b);
-    const gated = new GatedLlm(FakeLlm.replying(BRIEF_REPLY));
+    const gated = new GatedLlm(FakeLlm.replying(featuresReply()));
     b.use(gated);
     const api = aiApi(app, world.actors.dev);
 
-    const first = api.draftBrief(world.projectId).then((res) => res);
-    const second = api.draftBrief(world.projectId).then((res) => res);
+    const first = api.proposeFeatures(world.projectId).then((res) => res);
+    const second = api.proposeFeatures(world.projectId).then((res) => res);
     await gated.untilStarted(2);
-    const third = await api.draftBrief(world.projectId);
+    const third = await api.proposeFeatures(world.projectId);
 
     expect(third.status, JSON.stringify(third.body)).toBe(429);
     expect(third.body.code).toBe("LLM_RATE_LIMITED");
@@ -248,7 +251,7 @@ describe("concurrence : sémaphore par organisation", () => {
     gated.release();
     expect((await first).status).toBe(200);
     expect((await second).status).toBe(200);
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
   });
 
   it("la place est rendue même quand le fournisseur échoue", async () => {
@@ -260,10 +263,10 @@ describe("concurrence : sémaphore par organisation", () => {
     const api = aiApi(app, world.actors.dev);
 
     for (let i = 0; i < 3; i += 1) {
-      expect((await api.draftBrief(world.projectId)).status).toBe(502);
+      expect((await api.proposeFeatures(world.projectId)).status).toBe(502);
     }
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
+    b.use(FakeLlm.replying(featuresReply()));
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
   });
 
   it("la place est rendue quand la sortie est invalide, ou quand une erreur inattendue est levée", async () => {
@@ -273,11 +276,11 @@ describe("concurrence : sémaphore par organisation", () => {
     const api = aiApi(app, world.actors.dev);
 
     b.use(FakeLlm.replying({ pas: "un brief" }));
-    expect((await api.draftBrief(world.projectId)).status).toBe(502);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(502);
     b.use({ id: "fake", complete: () => Promise.reject(new Error("panne inattendue")) });
-    expect((await api.draftBrief(world.projectId)).status).toBe(502);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(502);
+    b.use(FakeLlm.replying(featuresReply()));
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
   });
 
   it("une autre organisation n'est pas bloquée par la saturation de la première", async () => {
@@ -285,15 +288,15 @@ describe("concurrence : sémaphore par organisation", () => {
     const app = await b.makeApp({ limits: { maxConcurrentPerOrg: 1 } });
     const busy = await keyedWorld(b);
     const free = await keyedWorld(b);
-    const gated = new GatedLlm(FakeLlm.replying(BRIEF_REPLY));
+    const gated = new GatedLlm(FakeLlm.replying(featuresReply()));
     b.use(gated);
 
     const stuck = aiApi(app, busy.world.actors.dev)
-      .draftBrief(busy.world.projectId)
+      .proposeFeatures(busy.world.projectId)
       .then((res) => res);
     await gated.untilStarted(1);
     const other = aiApi(app, free.world.actors.dev)
-      .draftBrief(free.world.projectId)
+      .proposeFeatures(free.world.projectId)
       .then((res) => res);
     await gated.untilStarted(2);
 
@@ -307,13 +310,13 @@ describe("concurrence : sémaphore par organisation", () => {
     const b = bench();
     const app = await b.makeApp({ limits: { maxConcurrentPerOrg: 1 } });
     const { world } = await keyedWorld(b);
-    const gated = new GatedLlm(FakeLlm.replying(BRIEF_REPLY));
+    const gated = new GatedLlm(FakeLlm.replying(featuresReply()));
     b.use(gated);
     const api = aiApi(app, world.actors.dev);
 
-    const running = api.draftBrief(world.projectId).then((res) => res);
+    const running = api.proposeFeatures(world.projectId).then((res) => res);
     await gated.untilStarted(1);
-    const refused = await api.draftBrief(world.projectId);
+    const refused = await api.proposeFeatures(world.projectId);
     gated.release();
     await running;
 

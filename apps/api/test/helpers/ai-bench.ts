@@ -24,6 +24,7 @@ import { ENCRYPTION_KEY } from "./installations.ts";
 import { ManualClock } from "./leases.ts";
 import { makeSentinel } from "./llm-credentials.ts";
 import type { Actor } from "./organizations.ts";
+import { freezeIdea } from "./proposals.ts";
 import type { RepoBench } from "./repo-scene.ts";
 import {
   createRepoApp,
@@ -39,7 +40,7 @@ import { createWorld, send, type World } from "./tickets.ts";
  *  - jetons `AI_ADAPTERS` (fabrique d'adaptateur par fournisseur) et `AI_CATALOG` (modèles qualifiés), et
  *    `NONCE_SOURCE` (`src/ai/nonce.ts`, `{ next(): string }`), surchargés ici par `overrideProvider` ; le
  *    moteur `AI_PROVIDER` et ses ports Prisma sont ceux de la production (TK-95) ;
- *  - `AppConfig.ai?: Partial<AiLimits>` ; routes `POST /projects/{projectId}/ai/{brief|features|criteria}`
+ *  - `AppConfig.ai?: Partial<AiLimits>` ; routes `POST /projects/{projectId}/ai/{features|criteria}`
  *    et `POST /llm-credentials/{provider}/verify` ;
  *  - AUCUN réseau : l'adaptateur est un `FakeLlm` (ou un double de test), le même pour tout fournisseur
  *    sauf ceux déclarés par `useFor`.
@@ -59,13 +60,11 @@ export const TEST_CATALOG: readonly QualifiedModel[] = (
 }));
 export const PROVIDER = "anthropic";
 export const AI_ROUTES = {
-  draftBrief: (projectId: string) => `/projects/${projectId}/ai/brief`,
   proposeFeatures: (projectId: string) => `/projects/${projectId}/ai/features`,
   proposeCriteria: (projectId: string) => `/projects/${projectId}/ai/criteria`,
   verify: (provider = PROVIDER) => `/llm-credentials/${provider}/verify`,
 } as const;
 export const AI_ACTIONS = {
-  draftBrief: "ai.brief.draft",
   proposeFeatures: "ai.features.propose",
   proposeCriteria: "ai.criteria.propose",
   verify: "llm_credential.verify",
@@ -220,7 +219,6 @@ export class PurposeLlm implements LlmProvider {
 
   async complete(request: LlmRequest): Promise<LlmResponse> {
     const replies: Record<string, unknown> = {
-      "brief-draft": BRIEF_REPLY,
       "features-propose": featuresReply(),
       "criteria-propose": criteriaReply(),
       "credential-verify": "OK",
@@ -388,9 +386,11 @@ export function installAiBench(hooks: {
 /** Monde avec une clé BYOK `anthropic` posée par l'owner ; `key` est la sentinelle factice. */
 export async function keyedWorld(
   b: AiBench,
-  options: { defaultModel?: string; app?: INestApplication } = {},
+  options: { defaultModel?: string; app?: INestApplication; freeze?: boolean } = {},
 ): Promise<{ world: World; key: string }> {
   const world = await createWorld(b.database);
+  // `ai.proposeFeatures` lit le dossier figé (idea-vN) : sans version figée, il refuse (422).
+  if (options.freeze !== false) await freezeIdea(b.database, world);
   const key = makeSentinel();
   await setKey(options.app ?? b.app, world, key, options.defaultModel);
   return { world, key };
@@ -410,7 +410,21 @@ export async function setKey(
   if (res.status !== 200) throw new Error(`set : ${JSON.stringify(res.body)}`);
 }
 
-/** Client HTTP des quatre procédures (cookie de session, en-têtes facultatifs). */
+/** Dossier figé minimal (`idea-v1`) dont la page « vision » porte `content` : la donnée non fiable que lit `ai.proposeFeatures` (TK-102). */
+export async function freezeDossier(
+  database: TestDatabase,
+  world: { organizationId: string; projectId: string },
+  content: string,
+): Promise<void> {
+  await database.query(
+    `INSERT INTO idea_pages (id, organization_id, project_id, slug, title, position, origin, status, content_md, version, updated_at)
+     VALUES ($1, $2, $3, 'vision', 'Vision', 1, 'user', 'stable', $4, 1, now())`,
+    [randomUUID(), world.organizationId, world.projectId, content],
+  );
+  await freezeIdea(database, world, 1, { vision: 1 });
+}
+
+/** Client HTTP des procédures (cookie de session, en-têtes facultatifs). */
 export function aiApi(
   app: INestApplication,
   actor: Pick<Actor, "cookie"> | undefined,
@@ -423,16 +437,9 @@ export function aiApi(
     return req.send(body);
   };
   return {
-    draftBrief: (projectId: string, over: Record<string, unknown> = {}) =>
-      post(AI_ROUTES.draftBrief(projectId), {
-        projectId,
-        idea: "Une application de suivi",
-        ...over,
-      }),
     proposeFeatures: (projectId: string, over: Record<string, unknown> = {}) =>
       post(AI_ROUTES.proposeFeatures(projectId), {
         projectId,
-        brief: "Un brief de projet",
         ...over,
       }),
     proposeCriteria: (projectId: string, over: Record<string, unknown> = {}) =>
@@ -459,14 +466,6 @@ export const modelFeature = (over: Record<string, unknown> = {}) => ({
 export const featuresReply = (...features: Record<string, unknown>[]) => ({
   features: features.length === 0 ? [modelFeature()] : features,
 });
-export const BRIEF_REPLY = {
-  title: "Suivi de projet",
-  problem: "Les équipes perdent la trace des demandes.",
-  users: "Chefs de projet et développeurs.",
-  expectedOutcome: "Une vue unique de l'avancement.",
-  constraints: "Livraison en un trimestre.",
-  openQuestions: ["Quel outil actuel ?"],
-};
 export const criteriaReply = (...criteria: Record<string, unknown>[]) => ({
   criteria: criteria.length === 0 ? [CRITERION] : criteria,
 });

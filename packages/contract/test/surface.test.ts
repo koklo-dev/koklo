@@ -21,7 +21,6 @@ const GROUPS: Record<string, string[]> = {
   installation: ["list", "start"],
   llmCredential: ["invalidate", "list", "remove", "set", "verify"],
   ai: [
-    "draftBrief",
     "ideaChat",
     "ideaGaps",
     "ideaSynthesis",
@@ -136,7 +135,6 @@ const AI_PAIRS = [
   "POST /projects/{projectId}/ai/idea/synthesis",
   "POST /projects/{projectId}/idea/freeze",
   "GET /projects/{projectId}/idea/synthesis",
-  "POST /projects/{projectId}/ai/brief",
   "POST /projects/{projectId}/ai/features",
   "POST /projects/{projectId}/ai/criteria",
   "POST /llm-credentials/{provider}/verify",
@@ -278,7 +276,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /projects/{projectId}/spec/items/{type}/{id}",
     "GET /projects/{projectId}/spec/refs",
   ];
-  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a et les 5 de TK-100 et TK-101 sont présentes (129 routes)", async () => {
+  it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a et les 5 de TK-100 et TK-101 sont présentes (128 routes)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
       Object.keys(ops).map((m) => `${m.toUpperCase()} ${p}`),
@@ -301,7 +299,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(129);
+    expect(pairs).toHaveLength(128);
   });
 });
 

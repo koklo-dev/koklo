@@ -17,7 +17,6 @@ import {
   AI_ACTIONS,
   aiApi,
   aiAuditRows,
-  BRIEF_REPLY,
   credentialState,
   featuresReply,
   GatedLlm,
@@ -26,6 +25,7 @@ import {
   setKey,
 } from "./helpers/ai-bench.ts";
 import { OTHER_ENCRYPTION_KEY } from "./helpers/installations.ts";
+import { freezeIdea } from "./helpers/proposals.ts";
 import { send } from "./helpers/tickets.ts";
 
 /**
@@ -36,9 +36,8 @@ import { send } from "./helpers/tickets.ts";
 const bench = installAiBench({ beforeAll, afterAll, beforeEach });
 const diag = { operation: "complete", provider: "anthropic" } as const;
 
-type Call = "draftBrief" | "proposeFeatures" | "verify";
+type Call = "proposeFeatures" | "verify";
 const CALLS: [Call, unknown][] = [
-  ["draftBrief", BRIEF_REPLY],
   ["proposeFeatures", featuresReply()],
   ["verify", "OK"],
 ];
@@ -62,6 +61,7 @@ describe("clé absente, invalidée, indéchiffrable ou sans porte-clés : aucun 
       const b = bench();
       const { createWorld } = await import("./helpers/tickets.ts");
       const world = await createWorld(b.database);
+      await freezeIdea(b.database, world);
       const fake = FakeLlm.replying(reply);
       b.use(fake);
 
@@ -134,9 +134,9 @@ describe("clé absente, invalidée, indéchiffrable ou sans porte-clés : aucun 
       provider: "anthropic",
     });
     await setKey(b.app, world, "FAKE-KEY-NOT-REAL-NEUVE-0501");
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(b.provider.keysSeen).toEqual(["FAKE-KEY-NOT-REAL-NEUVE-0501"]);
@@ -161,7 +161,7 @@ describe("markUsed", () => {
     const { world } = await keyedWorld(b);
     b.use(FakeLlm.failing(new LlmProviderUnavailableError({ ...diag, status: 529 })));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect((await credentialState(b.database, world.organizationId))?.last_used_at).toBeNull();
@@ -170,7 +170,7 @@ describe("markUsed", () => {
   it("un échec de markUsed (meilleur effort) ne change pas la réponse ; il est journalisé par nom d'erreur", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     await b.database.query(`
       CREATE OR REPLACE FUNCTION markused_refuse() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN RAISE EXCEPTION 'markUsed refusé pour le test'; END $$`);
@@ -178,10 +178,10 @@ describe("markUsed", () => {
       "CREATE TRIGGER markused_refuse_trigger BEFORE UPDATE ON llm_provider_credentials FOR EACH ROW EXECUTE FUNCTION markused_refuse()",
     );
     try {
-      const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+      const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
       expect(res.status, JSON.stringify(res.body)).toBe(200);
-      expect(res.body.brief).toEqual(BRIEF_REPLY);
+      expect(res.body.features).toHaveLength(featuresReply().features.length);
       expect(b.lines.join("\n")).toContain("LlmCredentialStoreError");
     } finally {
       await b.database.query("DROP TRIGGER markused_refuse_trigger ON llm_provider_credentials");
@@ -255,7 +255,7 @@ describe("LlmAuthError : 401 invalide la clé (avec audit), 403 non", () => {
     const { world } = await keyedWorld(b);
     b.use(FakeLlm.failing(new LlmAuthError(diag)));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect((await credentialState(b.database, world.organizationId))?.invalidated_at).toBeNull();
@@ -279,7 +279,7 @@ describe("D7 : compare-and-swap, une rotation concurrente n'est pas invalidée",
     return { b, world, newKey, res };
   }
 
-  it.each(["draftBrief", "verify"] as const)(
+  it.each(["proposeFeatures", "verify"] as const)(
     "%s : la nouvelle clé reste valide, aucun audit d'invalidation",
     async (call) => {
       const { b, world, newKey, res } = await rotateDuringCall(call);
@@ -294,7 +294,7 @@ describe("D7 : compare-and-swap, une rotation concurrente n'est pas invalidée",
       expect(rows).toHaveLength(0);
 
       // L'appel suivant utilise la nouvelle clé et réussit.
-      b.use(FakeLlm.replying(call === "verify" ? "OK" : BRIEF_REPLY));
+      b.use(FakeLlm.replying(call === "verify" ? "OK" : featuresReply()));
       const next = await run(b, world, call);
       expect(next.status, JSON.stringify(next.body)).toBe(200);
       expect(b.provider.keysSeen.at(-1)).toBe(newKey);
@@ -389,7 +389,7 @@ describe("table d'erreurs du port -> erreurs typées du contrat", () => {
     const { world } = await keyedWorld(b);
     b.use(FakeLlm.failing(error()));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(status);
     expect(res.body.code).toBe(code);

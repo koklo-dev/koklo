@@ -6,6 +6,11 @@ import { instantSchema } from "./schemas-tickets.ts";
 export const featureStatusSchema = z.enum(["brouillon", "specifiee", "implementee", "adoptee"]);
 export const featurePrioritySchema = z.enum(["must", "should", "could", "wont"]);
 export const stepTypeSchema = z.enum(["etant_donne", "quand", "alors", "et"]);
+/** Mêmes valeurs que `clientValidationSchema` (schemas-client-space.ts, qui importe ce module : pas de cycle). */
+export const featureValidationSchema = z.enum(["validated", "to_validate", "to_revise"]);
+/** Zone du produit (texte brut, 1 à 80 caractères) : écrite dans le fichier de la fonctionnalité (3.0.0). */
+export const FEATURE_ZONE_MAX_LENGTH = 80;
+export const featureZoneSchema = z.string().min(1).max(FEATURE_ZONE_MAX_LENGTH);
 export const specIndexStatusSchema = z.enum(["building", "ready", "failed"]);
 export const specBatchStatusSchema = z.enum([
   "queued",
@@ -91,6 +96,7 @@ export const featureListInputSchema = z
     projectId: z.uuid(),
     status: featureStatusSchema.optional(),
     priority: featurePrioritySchema.optional(),
+    validation: featureValidationSchema.optional(),
     ...revisionFields,
     ...listInputShape(featureIdSchema),
   })
@@ -103,6 +109,7 @@ export const featureSummarySchema = z.object({
   priority: featurePrioritySchema,
   filePath: z.string(),
   criteriaCount: z.number().int().min(0),
+  validation: featureValidationSchema,
 });
 
 export const featureGetInputSchema = z.object({ projectId: z.uuid(), specId: featureIdSchema });
@@ -112,6 +119,7 @@ export const featureDetailSchema = z.object({
   status: featureStatusSchema,
   priority: featurePrioritySchema,
   description: z.string(),
+  zone: featureZoneSchema.optional(),
   criteria: z.array(
     z.object({
       specId: criterionIdSchema,
@@ -137,6 +145,7 @@ const featureFields = {
   status: featureStatusSchema,
   priority: featurePrioritySchema,
   description: z.string(),
+  zone: featureZoneSchema,
   criteria: z.array(z.object({ title: z.string().min(1), steps: z.array(stepSchema) })),
   tables: z.array(tableLink),
   endpoints: z.array(endpointLink),

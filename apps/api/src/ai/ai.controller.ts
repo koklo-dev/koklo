@@ -25,21 +25,6 @@ export class AiController {
 
   @UseGuards(SessionGuard, RoleGuard)
   @Roles(...SPEC_BATCH_ROLES)
-  @Implement(contract.ai.draftBrief)
-  draftBrief(@Req() request: Request) {
-    return implement(contract.ai.draftBrief).handler(({ input, errors }) =>
-      inProject(
-        request,
-        errors,
-        input.projectId,
-        (scope) => this.service.draftBrief(scope, input, requestIdOf(request)),
-        this.access,
-      ),
-    );
-  }
-
-  @UseGuards(SessionGuard, RoleGuard)
-  @Roles(...SPEC_BATCH_ROLES)
   @Implement(contract.ai.proposeFeatures)
   proposeFeatures(@Req() request: Request) {
     return implement(contract.ai.proposeFeatures).handler(({ input, errors }) =>

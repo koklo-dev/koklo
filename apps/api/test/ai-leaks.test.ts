@@ -5,9 +5,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import {
   aiApi,
   allAuditText,
-  BRIEF_REPLY,
   featuresReply,
   flatten,
+  freezeDossier,
   installAiBench,
   keyedWorld,
 } from "./helpers/ai-bench.ts";
@@ -16,21 +16,21 @@ import { OTHER_ENCRYPTION_KEY } from "./helpers/installations.ts";
 vi.mock("@sentry/node", () => ({ init: vi.fn(), captureException: vi.fn() }));
 
 /**
- * TK-54b (CDC §15) : la clé BYOK, le brief, le prompt, la sortie du modèle, le nonce et les
+ * TK-54b (CDC §15) : la clé BYOK, le dossier lu, le prompt, la sortie du modèle, le nonce et les
  * messages du fournisseur ne sortent jamais : ni réponses HTTP (corps et en-têtes), ni erreurs
  * typées, ni journaux, ni Sentry (`captureError`), ni audit. Chaque scénario pose des sentinelles.
  */
 const bench = installAiBench({ beforeAll, afterAll, beforeEach });
 beforeEach(() => vi.clearAllMocks());
 
-const BRIEF_SENTINEL = "BRIEF-SENTINELLE-LEAK-11";
+const DOSSIER_SENTINEL = "BRIEF-SENTINELLE-LEAK-11";
 const OUTPUT_SENTINEL = "SORTIE-SENTINELLE-LEAK-22";
 const PROVIDER_SENTINEL = "MESSAGE-FOURNISSEUR-SENTINELLE-33";
 
 class NoisyProviderError extends LlmProviderUnavailableError {
   constructor(secret: string) {
     super({ operation: "complete", provider: "anthropic", status: 529 });
-    this.message = `${PROVIDER_SENTINEL} ${secret} ${BRIEF_SENTINEL}`;
+    this.message = `${PROVIDER_SENTINEL} ${secret} ${DOSSIER_SENTINEL}`;
     Object.defineProperty(this, "hidden", {
       value: `${PROVIDER_SENTINEL} ${secret}`,
       enumerable: false,
@@ -44,10 +44,10 @@ class NoisyProviderError extends LlmProviderUnavailableError {
 
 type Scenario = [string, (key: string) => FakeLlm | { id: "fake"; complete: () => Promise<never> }];
 const SCENARIOS: Scenario[] = [
-  ["succès", () => FakeLlm.replying(BRIEF_REPLY)],
+  ["succès", () => FakeLlm.replying(featuresReply())],
   [
     "sortie invalide portant des sentinelles",
-    () => FakeLlm.replying({ ...BRIEF_REPLY, problem: `https://evil.test/${OUTPUT_SENTINEL}` }),
+    () => FakeLlm.replying({ ...featuresReply(), problem: `https://evil.test/${OUTPUT_SENTINEL}` }),
   ],
   [
     "erreur du port qui porte le message, une cause et un champ caché",
@@ -58,12 +58,12 @@ const SCENARIOS: Scenario[] = [
     () => FakeLlm.failing(new LlmRateLimitedError({ operation: "complete", retryAfterMs: 1000 })),
   ],
   [
-    "exception inattendue contenant la clé, le brief et le prompt",
+    "exception inattendue contenant la clé, le dossier et le prompt",
     (key) => ({
       id: "fake",
       complete: () =>
         Promise.reject(
-          Object.assign(new Error(`${key} ${BRIEF_SENTINEL} ${OUTPUT_SENTINEL}`), {
+          Object.assign(new Error(`${key} ${DOSSIER_SENTINEL} ${OUTPUT_SENTINEL}`), {
             cause: { key },
           }),
         ),
@@ -75,14 +75,12 @@ const SCENARIOS: Scenario[] = [
 describe("la clé et les contenus ne sortent par aucun canal", () => {
   it.each(SCENARIOS)("%s", async (_label, build) => {
     const b = bench();
-    const { world, key } = await keyedWorld(b);
+    const { world, key } = await keyedWorld(b, { freeze: false });
+    await freezeDossier(b.database, world, DOSSIER_SENTINEL);
     b.use(build(key));
     b.nonces.push("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId, {
-      idea: BRIEF_SENTINEL,
-      answers: [BRIEF_SENTINEL],
-    });
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect([200, 429, 502]).toContain(res.status);
     const channels = {
@@ -98,7 +96,7 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
         key,
         key.slice(0, 16),
         key.slice(-16),
-        BRIEF_SENTINEL,
+        DOSSIER_SENTINEL,
         PROVIDER_SENTINEL,
         "deadbeefdeadbeef",
       ]) {
@@ -123,7 +121,7 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
     const { world, key } = await keyedWorld(b);
     b.use({ id: "fake", complete: () => Promise.reject(new Error(`${key} panne`)) });
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect(res.body.code).toBe("LLM_PROVIDER_ERROR");
@@ -135,7 +133,7 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
     const { world, key } = await keyedWorld(b);
     b.use(FakeLlm.failing(new NoisyProviderError(key)));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect(res.body.code).toBe("LLM_PROVIDER_ERROR");
@@ -144,7 +142,8 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
 
   it("le journal d'un appel réussi ne porte que des compteurs et des noms (jamais de contenu)", async () => {
     const b = bench();
-    const { world, key } = await keyedWorld(b);
+    const { world, key } = await keyedWorld(b, { freeze: false });
+    await freezeDossier(b.database, world, DOSSIER_SENTINEL);
     b.use(
       FakeLlm.replying(
         featuresReply({
@@ -167,12 +166,12 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
 
     const res = await aiApi(b.app, world.actors.dev, {
       "x-request-id": "req-leak-1",
-    }).proposeFeatures(world.projectId, { brief: BRIEF_SENTINEL });
+    }).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(200);
     const logs = b.lines.join("\n");
     expect(logs).not.toContain(OUTPUT_SENTINEL);
-    expect(logs).not.toContain(BRIEF_SENTINEL);
+    expect(logs).not.toContain(DOSSIER_SENTINEL);
     expect(logs).not.toContain(key);
     const events = b.lines
       .map((line) => JSON.parse(line) as Record<string, unknown>)
@@ -195,9 +194,9 @@ describe("la clé et les contenus ne sortent par aucun canal", () => {
     const b = bench();
     const { world, key } = await keyedWorld(b);
     const other = await b.makeApp({ encryptionKey: OTHER_ENCRYPTION_KEY });
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
-    const res = await aiApi(other, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(other, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(409);
     const everything = `${JSON.stringify(res.body)}${b.lines.join("")}`;
@@ -210,10 +209,10 @@ describe("la clé n'est jamais lue ailleurs que par l'adaptateur", () => {
   it("le double reçoit la clé en clair (c'est son rôle) ; le prompt, lui, ne la contient pas", async () => {
     const b = bench();
     const { world, key } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(b.provider.keysSeen).toEqual([key]);
     for (const call of fake.calls) {

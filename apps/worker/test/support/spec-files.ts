@@ -4,6 +4,8 @@ import type { Scene } from "./spec-write-bench.ts";
 export interface FeatureOptions {
   status?: string;
   priority?: string;
+  /** Zone du produit (TK-102) : ligne `zone:` du front matter. */
+  zone?: string;
   criteria?: readonly string[];
   tables?: readonly string[];
   endpoints?: readonly string[];
@@ -23,6 +25,7 @@ export function featureMd(id: string, title: string, options: FeatureOptions = {
     `titre: ${title}`,
     `statut: ${options.status ?? "specifiee"}`,
     `priorite: ${options.priority ?? "must"}`,
+    ...(options.zone === undefined ? [] : [`zone: ${options.zone}`]),
     `tables: ${list(options.tables)}`,
     `endpoints: ${list(options.endpoints)}`,
     "---",

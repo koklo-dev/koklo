@@ -5,9 +5,9 @@ import {
   aiApi,
   aiAuditRows,
   allAuditText,
-  BRIEF_REPLY,
   credentialState,
   featuresReply,
+  freezeDossier,
   GatedLlm,
   installAiBench,
   keyedWorld,
@@ -23,33 +23,21 @@ const bench = installAiBench({ beforeAll, afterAll, beforeEach });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("une ligne par appel : action, cible, acteur", () => {
-  it("draftBrief : ai.brief.draft sur le projet, acteur = utilisateur de la session", async () => {
-    const b = bench();
-    const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-
-    await aiApi(b.app, world.actors.designer).draftBrief(world.projectId);
-
-    const rows = await aiAuditRows(b.database, world.organizationId);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      action: AI_ACTIONS.draftBrief,
-      target_kind: "project",
-      target_id: world.projectId,
-      actor_id: world.actors.designer.userId,
-    });
-  });
-
-  it("proposeFeatures : ai.features.propose sur le projet", async () => {
+  it("proposeFeatures : ai.features.propose sur le projet, acteur = utilisateur de la session", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
     b.use(FakeLlm.replying(featuresReply()));
 
-    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
+    await aiApi(b.app, world.actors.designer).proposeFeatures(world.projectId);
 
-    expect(await aiAuditRows(b.database, world.organizationId)).toMatchObject([
-      { action: AI_ACTIONS.proposeFeatures, target_kind: "project", target_id: world.projectId },
-    ]);
+    const rows = await aiAuditRows(b.database, world.organizationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      action: AI_ACTIONS.proposeFeatures,
+      target_kind: "project",
+      target_id: world.projectId,
+      actor_id: world.actors.designer.userId,
+    });
   });
 
   it("proposeCriteria : ai.criteria.propose sur le projet", async () => {
@@ -102,21 +90,21 @@ describe("une ligne par appel : action, cible, acteur", () => {
   it("audit.list restitue les lignes ai.* pour un owner", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    b.use(FakeLlm.replying(featuresReply()));
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     const { send } = await import("./helpers/tickets.ts");
 
     const listed = await send(
       b.app,
       world.actors.owner.cookie,
       "get",
-      `/projects/${world.projectId}/audit?action=${AI_ACTIONS.draftBrief}`,
+      `/projects/${world.projectId}/audit?action=${AI_ACTIONS.proposeFeatures}`,
     );
 
     expect(listed.status, JSON.stringify(listed.body)).toBe(200);
     expect(listed.body.items).toHaveLength(1);
     expect(listed.body.items[0]).toMatchObject({
-      action: AI_ACTIONS.draftBrief,
+      action: AI_ACTIONS.proposeFeatures,
       targetKind: "project",
       targetId: world.projectId,
     });
@@ -128,7 +116,7 @@ describe("écrite AVANT l'appel au modèle", () => {
   it("quand le modèle est appelé, la ligne existe déjà (et le réseau n'est pas dans une transaction)", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const gated = new GatedLlm(FakeLlm.replying(BRIEF_REPLY));
+    const gated = new GatedLlm(FakeLlm.replying(featuresReply()));
     let rowsAtCall = -1;
     let openTransactions = -1;
     gated.onCall = async () => {
@@ -139,7 +127,7 @@ describe("écrite AVANT l'appel au modèle", () => {
     gated.release();
     b.use(gated);
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(rowsAtCall).toBe(1);
@@ -152,7 +140,7 @@ describe("écrite AVANT l'appel au modèle", () => {
     const { LlmTimeoutError } = await import("@koklo/domain");
     b.use(FakeLlm.failing(new LlmTimeoutError({ operation: "complete" })));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect(await aiAuditRows(b.database, world.organizationId)).toHaveLength(1);
@@ -163,7 +151,7 @@ describe("écrite AVANT l'appel au modèle", () => {
     const { world } = await keyedWorld(b);
     b.use(FakeLlm.replying({ n: "importe quoi" }));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect(await aiAuditRows(b.database, world.organizationId)).toHaveLength(1);
@@ -172,11 +160,13 @@ describe("écrite AVANT l'appel au modèle", () => {
   it("audit en échec : l'appel échoue (500 INTERNAL) et le modèle n'est JAMAIS appelé", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
-    await b.database.query("INSERT INTO audit_fail (action) VALUES ($1)", [AI_ACTIONS.draftBrief]);
+    await b.database.query("INSERT INTO audit_fail (action) VALUES ($1)", [
+      AI_ACTIONS.proposeFeatures,
+    ]);
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(500);
     expect(res.body.code).toBe("INTERNAL");
@@ -220,15 +210,16 @@ describe("aucune ligne quand rien n'est dépensé", () => {
 });
 
 describe("aucun contenu dans l'audit", () => {
-  it("ni brief, ni idée, ni titres, ni sortie du modèle, ni modèle servi ne figurent dans audit_log", async () => {
+  it("ni dossier lu, ni titres, ni sortie du modèle, ni modèle servi ne figurent dans audit_log", async () => {
     const b = bench();
-    const { world } = await keyedWorld(b);
-    const idea = "IDEE-SENTINELLE-AUDIT-91";
-    const brief = "BRIEF-SENTINELLE-AUDIT-92";
+    const { world } = await keyedWorld(b, { freeze: false });
+    const dossier = "DOSSIER-SENTINELLE-AUDIT-91";
+    const synthese = "TITRE-SENTINELLE-AUDIT-92";
+    await freezeDossier(b.database, world, `${dossier} ${synthese}`);
     const output = "SORTIE-SENTINELLE-AUDIT-93";
     b.use(
       new FakeLlm().script([
-        { reply: { ...BRIEF_REPLY, title: output } },
+        { reply: { ...featuresReply(), title: output } },
         {
           reply: featuresReply({
             title: output,
@@ -251,12 +242,12 @@ describe("aucun contenu dans l'audit", () => {
     );
     const dev = aiApi(b.app, world.actors.dev);
 
-    await dev.draftBrief(world.projectId, { idea, answers: [idea] });
-    await dev.proposeFeatures(world.projectId, { brief });
+    await dev.proposeFeatures(world.projectId);
+    await dev.proposeFeatures(world.projectId, { maxFeatures: 2 });
     await aiApi(b.app, world.actors.owner).verify();
 
     const text = await allAuditText(b.database, world.organizationId);
-    for (const sentinel of [idea, brief, output, "ping", "FAKE-KEY"]) {
+    for (const sentinel of [dossier, synthese, output, "ping", "FAKE-KEY"]) {
       expect(text, sentinel).not.toContain(sentinel);
     }
     expect(await aiAuditRows(b.database, world.organizationId)).toHaveLength(3);

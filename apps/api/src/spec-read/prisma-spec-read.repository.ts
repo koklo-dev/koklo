@@ -10,8 +10,9 @@ import {
   featureSelect,
   featureSource,
   featureWhere,
-  toSummary,
+  toHead,
 } from "./feature-list.ts";
+import { readFeatureValidations, validationOfFeature } from "./feature-validation.ts";
 import { type Snapshot, SpecHeadResolver } from "./spec-head-resolver.ts";
 import type {
   EntityReference,
@@ -72,11 +73,16 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
       const { snapshot } = found;
       if (snapshot.status === "failed") return failureOf(snapshot);
       const ids = q === undefined ? null : await this.search.ids("specFeature", snapshot.id, q);
-      const source = featureSource(tx, snapshot.id, featureWhere(snapshot.id, filter, ids));
-      const window = await loadWindow(source, request);
-      const facets = await featureFacets(tx, snapshot.id, filter, ids);
+      const validations = await readFeatureValidations(tx, scope.projectId, snapshot);
+      const where = featureWhere(snapshot.id, filter, ids, validations);
+      const window = await loadWindow(featureSource(tx, snapshot.id, where), request);
+      const facets = await featureFacets(tx, snapshot.id, filter, ids, validations);
       const { rows, ...position } = window;
-      return { kind: "page", page: { items: rows.map(toSummary), ...position, facets } };
+      const items = rows.map((row) => ({
+        ...toHead(row),
+        validation: validationOfFeature(validations, row.specId),
+      }));
+      return { kind: "page", page: { items, ...position, facets } };
     });
   }
 
@@ -92,7 +98,7 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
         where: { snapshotId: snapshot.id },
         select: featureSelect,
       });
-      return { kind: "rows", rows: rows.map(toSummary) };
+      return { kind: "rows", rows: rows.map(toHead) };
     });
   }
 

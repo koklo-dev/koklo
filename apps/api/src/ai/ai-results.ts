@@ -1,4 +1,3 @@
-import type { FeatureSummary } from "@koklo/contract";
 import type { AiResponse } from "@koklo/domain";
 
 /** Fournisseur et modèle réellement SERVIS (secours compris) et consommation ; aucun coût. */
@@ -21,7 +20,7 @@ const normalized = (title: string): string => title.trim().toLowerCase();
  */
 export function duplicatesOf(
   proposed: readonly { title: string }[],
-  existing: readonly FeatureSummary[],
+  existing: readonly { title: string; specId: string }[],
 ): { index: number; specId: string }[] {
   const byTitle = new Map<string, string>();
   for (const feature of existing) {

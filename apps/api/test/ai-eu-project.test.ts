@@ -1,6 +1,6 @@
 import { FakeLlm } from "@koklo/domain/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { aiApi, BRIEF_REPLY, installAiBench, keyedWorld } from "./helpers/ai-bench.ts";
+import { aiApi, featuresReply, installAiBench, keyedWorld } from "./helpers/ai-bench.ts";
 import { makeSentinel } from "./helpers/llm-credentials.ts";
 import { send, type World } from "./helpers/tickets.ts";
 
@@ -38,8 +38,8 @@ async function scene(columns: string, values: string) {
   const { world } = await keyedWorld(b);
   await keyFor(world, "openrouter");
   await settings(world, columns, values);
-  const openrouter = FakeLlm.replying(BRIEF_REPLY);
-  const anthropic = FakeLlm.replying(BRIEF_REPLY);
+  const openrouter = FakeLlm.replying(featuresReply());
+  const anthropic = FakeLlm.replying(featuresReply());
   b.useFor("openrouter", openrouter);
   b.useFor("anthropic", anthropic);
   return { b, world, openrouter, anthropic };
@@ -49,7 +49,7 @@ describe("TK-93 projet en UE : le moteur exclut OpenRouter", () => {
   it("OpenRouter en principal : projet UE, l'adaptateur OpenRouter n'est jamais appelé", async () => {
     const { b, world, openrouter, anthropic } = await scene("primary_provider", "'openrouter'");
     await setEu(world, true);
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(openrouter.calls).toHaveLength(0);
     expect(anthropic.calls.length).toBeGreaterThan(0);
@@ -60,7 +60,7 @@ describe("TK-93 projet en UE : le moteur exclut OpenRouter", () => {
     const { world } = await keyedWorld(b);
     await keyFor(world, "openrouter");
     await settings(world, "primary_provider, fallback_provider", "'anthropic', 'openrouter'");
-    const openrouter = FakeLlm.replying(BRIEF_REPLY);
+    const openrouter = FakeLlm.replying(featuresReply());
     const { LlmRateLimitedError } = await import("@koklo/domain");
     b.useFor(
       "anthropic",
@@ -70,7 +70,7 @@ describe("TK-93 projet en UE : le moteur exclut OpenRouter", () => {
     );
     b.useFor("openrouter", openrouter);
     await setEu(world, true);
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     expect(res.status).not.toBe(200);
     expect(openrouter.calls).toHaveLength(0);
   });
@@ -78,7 +78,7 @@ describe("TK-93 projet en UE : le moteur exclut OpenRouter", () => {
   it("sans UE : OpenRouter reste utilisable comme principal", async () => {
     const { b, world, openrouter } = await scene("primary_provider", "'openrouter'");
     await setEu(world, false);
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(openrouter.calls.length).toBeGreaterThan(0);
   });
@@ -86,7 +86,7 @@ describe("TK-93 projet en UE : le moteur exclut OpenRouter", () => {
   it("un projet inconnu est traité en UE par prudence (jamais OpenRouter)", async () => {
     const { b, world, openrouter } = await scene("primary_provider", "'openrouter'");
     await b.database.query("DELETE FROM projects WHERE id = $1", [world.projectId]);
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     expect(res.status).not.toBe(200);
     expect(openrouter.calls).toHaveLength(0);
   });

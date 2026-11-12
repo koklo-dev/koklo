@@ -8,7 +8,6 @@ import {
   AI_ACTIONS,
   aiApi,
   aiAuditRows,
-  BRIEF_REPLY,
   criteriaReply,
   featuresReply,
   installAiBench,
@@ -16,6 +15,7 @@ import {
   ROLE_LIST,
   setKey,
 } from "./helpers/ai-bench.ts";
+import { freezeIdea } from "./helpers/proposals.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
 import { createWorld } from "./helpers/tickets.ts";
 
@@ -40,19 +40,19 @@ describe("matrice de rôles : constantes", () => {
 });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
-describe("ai.draftBrief et ai.proposeFeatures : rôles", () => {
+describe("ai.proposeFeatures et ai.proposeCriteria : rôles", () => {
   it.each(AI_ALLOWED)("%s : 200 sur les deux procédures", async (role) => {
     const b = bench();
     const { world } = await keyedWorld(b);
     const api = aiApi(b.app, world.actors[role]);
 
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    const brief = await api.draftBrief(world.projectId);
     b.use(FakeLlm.replying(featuresReply()));
     const features = await api.proposeFeatures(world.projectId);
+    b.use(FakeLlm.replying(criteriaReply()));
+    const criteria = await api.proposeCriteria(world.projectId);
 
-    expect(brief.status, JSON.stringify(brief.body)).toBe(200);
     expect(features.status, JSON.stringify(features.body)).toBe(200);
+    expect(criteria.status, JSON.stringify(criteria.body)).not.toBe(403);
   });
 
   it.each(AI_DENIED)(
@@ -60,12 +60,11 @@ describe("ai.draftBrief et ai.proposeFeatures : rôles", () => {
     async (role) => {
       const b = bench();
       const { world } = await keyedWorld(b);
-      const fake = FakeLlm.replying(BRIEF_REPLY);
+      const fake = FakeLlm.replying(featuresReply());
       b.use(fake);
       const api = aiApi(b.app, world.actors[role]);
 
       const responses = [
-        await api.draftBrief(world.projectId),
         await api.proposeFeatures(world.projectId),
         await api.proposeCriteria(world.projectId),
       ];
@@ -82,12 +81,11 @@ describe("ai.draftBrief et ai.proposeFeatures : rôles", () => {
   it("sans session : 401 UNAUTHORIZED, aucun appel", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
     const api = aiApi(b.app, undefined);
 
     for (const res of [
-      await api.draftBrief(world.projectId),
       await api.proposeFeatures(world.projectId),
       await api.proposeCriteria(world.projectId),
       await api.verify(),
@@ -163,12 +161,12 @@ describe("isolation multi-tenant", () => {
     const b = bench();
     const mine = await keyedWorld(b);
     const theirs = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
     const api = aiApi(b.app, mine.world.actors.owner);
 
     for (const res of [
-      await api.draftBrief(theirs.world.projectId),
+      await api.proposeFeatures(theirs.world.projectId),
       await api.proposeFeatures(theirs.world.projectId),
       await api.proposeCriteria(theirs.world.projectId),
     ]) {
@@ -187,7 +185,7 @@ describe("isolation multi-tenant", () => {
       const b = bench();
       const mine = await keyedWorld(b);
       const theirs = await keyedWorld(b);
-      const fake = FakeLlm.replying(BRIEF_REPLY);
+      const fake = FakeLlm.replying(featuresReply());
       b.use(fake);
       const api = aiApi(b.app, mine.world.actors[role]);
       const unknownProject = "00000000-0000-4000-8000-000000000000";
@@ -195,7 +193,7 @@ describe("isolation multi-tenant", () => {
 
       for (const projectId of [theirs.world.projectId, unknownProject]) {
         for (const res of [
-          await api.draftBrief(projectId),
+          await api.proposeFeatures(projectId),
           await api.proposeFeatures(projectId),
           await api.proposeCriteria(projectId),
         ]) {
@@ -213,9 +211,9 @@ describe("isolation multi-tenant", () => {
   it("un projet inexistant : 404 NOT_FOUND", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
-    const res = await aiApi(b.app, world.actors.owner).draftBrief(
+    const res = await aiApi(b.app, world.actors.owner).proposeFeatures(
       "00000000-0000-4000-8000-000000000000",
     );
 
@@ -227,10 +225,11 @@ describe("isolation multi-tenant", () => {
     const b = bench();
     await keyedWorld(b);
     const world = await createWorld(b.database);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    await freezeIdea(b.database, world);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
-    const res = await aiApi(b.app, world.actors.owner).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.owner).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(409);
     expect(res.body.code).toBe("LLM_NOT_CONFIGURED");
@@ -256,7 +255,7 @@ describe("isolation multi-tenant", () => {
 describe("cohérence contrôleur <-> constantes de rôles", () => {
   const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
 
-  it.each(["draftBrief", "proposeFeatures", "proposeCriteria"])(
+  it.each(["proposeFeatures", "proposeCriteria"])(
     "ai.%s : session, garde de rôle et SPEC_BATCH_ROLES, devant l'implémentation",
     (name) => {
       const source = read("../src/ai/ai.controller.ts");
@@ -268,9 +267,9 @@ describe("cohérence contrôleur <-> constantes de rôles", () => {
     },
   );
 
-  it("le contrôleur ai n'ouvre aucune procédure à un rôle nommé en dur (quatre : brief, features, critères, préremplissage TK-101)", () => {
+  it("le contrôleur ai n'ouvre aucune procédure à un rôle nommé en dur (trois : features, critères, préremplissage TK-101)", () => {
     const source = read("../src/ai/ai.controller.ts");
-    expect(source.match(/@Roles\(/g)).toHaveLength(4);
+    expect(source.match(/@Roles\(/g)).toHaveLength(3);
     expect(source).not.toMatch(/@Roles\(\s*"/);
   });
 
@@ -283,15 +282,10 @@ describe("cohérence contrôleur <-> constantes de rôles", () => {
     expect(decorators).toContain("@Roles(...MANAGER_ROLES)");
   });
 
-  it("la matrice de docs/api-contract.md cite les quatre procédures et leurs rôles", () => {
+  it("la matrice de docs/api-contract.md cite les procédures et leurs rôles", () => {
     const doc = read("../../../docs/api-contract.md");
     expect(doc).toContain("0.9.0");
-    for (const name of [
-      "ai.draftBrief",
-      "ai.proposeFeatures",
-      "ai.proposeCriteria",
-      "llmCredential.verify",
-    ]) {
+    for (const name of ["ai.proposeFeatures", "ai.proposeCriteria", "llmCredential.verify"]) {
       expect(doc, name).toContain(name);
     }
     expect(AI_ACTIONS.verify).toBe("llm_credential.verify");

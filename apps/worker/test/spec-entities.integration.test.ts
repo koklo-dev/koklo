@@ -87,6 +87,25 @@ beforeEach(async () => {
   scene = await bench.scene();
 });
 
+describe("zone d'une fonctionnalité (TK-102)", () => {
+  it("une fonctionnalité qui porte une zone est indexée sans erreur (TK-102)", async () => {
+    await bench.push(scene, {
+      after: await bench.commit(scene, {
+        [featurePath("F-001", "inscription")]: featureMd("F-001", "Inscription", {
+          zone: "Authentification",
+          criteria: ["Un"],
+        }),
+      }),
+    });
+
+    const snapshot = await lastSnapshot();
+    expect(snapshot?.status).toBe("ready");
+    expect((await entities(snapshot?.id)).map((r) => `${r.kind}:${r.spec_id}`)).toEqual([
+      "feature:F-001",
+    ]);
+  });
+});
+
 describe("index d'un commit", () => {
   it("une ligne par élément du modèle, zone, chemin, tri et hachage sha256 ; layout et hors modèle exclus", async () => {
     await bench.push(scene, { after: await bench.commit(scene, SPEC) });

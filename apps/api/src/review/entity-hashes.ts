@@ -14,13 +14,18 @@ export async function entityHashesOf(tx: Tx, snapshotId: string): Promise<Entity
   return rows.map((row) => ({ kind: row.kind, specId: row.specId, hash: row.contentHash }));
 }
 
-/** Hachage courant de chaque fonctionnalité, par snapshot (lecture groupée des lecteurs de validation). */
+/** Hachage courant de chaque fonctionnalité (ou des seules `specIds`), par snapshot (lecture groupée des lecteurs de validation). */
 export async function featureHashesOf(
   tx: Tx,
   snapshotIds: readonly string[],
+  specIds?: readonly string[],
 ): Promise<Map<string, Map<string, string>>> {
   const rows = await tx.specEntity.findMany({
-    where: { snapshotId: { in: [...snapshotIds] }, kind: "feature" },
+    where: {
+      snapshotId: { in: [...snapshotIds] },
+      kind: "feature",
+      ...(specIds ? { specId: { in: [...specIds] } } : {}),
+    },
     select: { snapshotId: true, specId: true, contentHash: true },
     take: MAX_ENTITY_ROWS,
   });

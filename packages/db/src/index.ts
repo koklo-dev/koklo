@@ -11,6 +11,20 @@ export {
   raiseCounterTo,
   type TenantTx,
 } from "./counters.ts";
+export {
+  type CurrentFeature,
+  currentFeatures,
+  type DossierClient,
+  type DossierSources,
+  type FrozenPage,
+  frozenPages,
+  frozenVersion,
+  previousVersion,
+  publishedSynthesis,
+  RISKS_SLUG,
+  readFrozenDossier,
+  versionsOf,
+} from "./dossier-sources.ts";
 export { SEARCH_LIMIT, type SearchTarget, searchIds, tsqueryOf } from "./full-text.ts";
 export type { Prisma } from "./generated/client.ts";
 export { latestMigration, type RollbackPorts, rollbackLatest } from "./rollback.ts";

@@ -2,7 +2,6 @@ import { FakeLlm } from "@koklo/domain/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   aiApi,
-  BRIEF_REPLY,
   CRITERION,
   credentialState,
   featuresReply,
@@ -135,16 +134,13 @@ const FIELDS: [string, (text: string) => Record<string, unknown>][] = [
   ],
 ];
 
-async function expectInvalid(
-  reply: unknown,
-  call = "proposeFeatures" as "proposeFeatures" | "draftBrief",
-) {
+async function expectInvalid(reply: unknown) {
   const b = bench();
   const { world } = await keyedWorld(b);
   b.use(FakeLlm.replying(reply));
   const before = await writeCounters(b.database, world.organizationId);
 
-  const res = await aiApi(b.app, world.actors.dev)[call](world.projectId);
+  const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
   expect(res.status, JSON.stringify(res.body)).toBe(502);
   expect(res.body.code).toBe("LLM_OUTPUT_INVALID");
@@ -273,38 +269,6 @@ describe("ordre des étapes : Étant donné -> Quand -> Alors", () => {
     );
 
     const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
-
-    expect(res.status, JSON.stringify(res.body)).toBe(200);
-  });
-});
-
-describe("draftBrief : sortie hostile", () => {
-  const BAD_BRIEFS: [string, unknown][] = [
-    ["chaîne", `Un brief en vrac ${LEAK}`],
-    ["champ manquant", { ...BRIEF_REPLY, problem: undefined }],
-    ["champ supplémentaire", { ...BRIEF_REPLY, secret: LEAK }],
-    ["titre de 201 caractères", { ...BRIEF_REPLY, title: "t".repeat(201) }],
-    ["11 questions ouvertes", { ...BRIEF_REPLY, openQuestions: Array(11).fill("q") }],
-    ["question de 501 caractères", { ...BRIEF_REPLY, openQuestions: ["q".repeat(501)] }],
-    ["URL dans le problème", { ...BRIEF_REPLY, problem: `voir https://evil.test/${LEAK}` }],
-    [
-      "HTML dans les utilisateurs",
-      { ...BRIEF_REPLY, users: `<img src=x onerror=alert(1)> ${LEAK}` },
-    ],
-    ["image markdown dans le résultat", { ...BRIEF_REPLY, expectedOutcome: `![a](x) ${LEAK}` }],
-    ["URL dans une question", { ...BRIEF_REPLY, openQuestions: [`http://evil.test ${LEAK}`] }],
-  ];
-
-  it.each(BAD_BRIEFS)("%s -> LLM_OUTPUT_INVALID", async (_label, reply) => {
-    await expectInvalid(reply, "draftBrief");
-  });
-
-  it("des contraintes vides sont acceptées (le modèle n'en voit pas toujours)", async () => {
-    const b = bench();
-    const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying({ ...BRIEF_REPLY, constraints: "", openQuestions: [] }));
-
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
   });

@@ -1,4 +1,5 @@
 export * from "./agent-launch.ts";
+export * from "./agent-sources.ts";
 export * from "./ai-provider.ts";
 export * from "./ai-usage.ts";
 export * from "./deliverable-impact.ts";

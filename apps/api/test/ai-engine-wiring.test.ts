@@ -98,7 +98,6 @@ describe("retrait des fuites de fournisseur codé en dur", () => {
     expect(code).not.toMatch(/DEFAULT_MODELS|PROPOSAL_PROVIDER|LlmProviderRegistry/);
     const service = strip(readFileSync(join(API, "src/ai/ai.service.ts"), "utf8"));
     expect(service).not.toMatch(/PROPOSAL_PROVIDER/);
-    expect(service).toContain('usage: "idea_space"');
     expect(service.match(/usage: "spec_deliverables"/g)).toHaveLength(2);
   });
 });

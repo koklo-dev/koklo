@@ -331,6 +331,142 @@ describe("T10 lien direct hors première page (around)", () => {
   });
 });
 
+/**
+ * TK-102 (contrat 3.0.0) : `validation` par ligne (dernière review de la fonctionnalité sur le contenu courant) et filtre
+ * serveur sur la liste entière, y compris les éléments non chargés ; la facette de validation ignore son propre filtre.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("T11 validation par ligne et filtre", () => {
+  const OLD_SHA = "a".repeat(40);
+  let reviewed: World;
+
+  async function review(
+    target: World,
+    specId: string,
+    status: "approved" | "changes_requested",
+    sha: string,
+    at: string,
+  ) {
+    const [repo] = await database.query<{ id: string }>(
+      "SELECT id FROM project_repos WHERE project_id = $1 LIMIT 1",
+      [target.projectId],
+    );
+    await database.query(
+      `INSERT INTO reviews (id, organization_id, project_id, repo_id, target_kind, target_ref, sha, status,
+                            author_user_id, author_role, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'feature', $5, $6, $7, $8, 'owner', $9::timestamptz, $9::timestamptz)`,
+      [
+        randomUUID(),
+        target.organizationId,
+        target.projectId,
+        repo?.id,
+        specId,
+        sha,
+        status,
+        target.actors.owner.userId,
+        at,
+      ],
+    );
+  }
+
+  beforeAll(async () => {
+    reviewed = await volumeWorld(database);
+    const [head] = await database.query<{ commit_sha: string }>(
+      `SELECT s.commit_sha FROM spec_snapshots s JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 ORDER BY s.indexed_at DESC LIMIT 1`,
+      [reviewed.projectId],
+    );
+    const sha = head?.commit_sha as string;
+    await review(reviewed, "F-001", "approved", sha, "2026-11-01T10:00:00Z");
+    await review(reviewed, "F-002", "changes_requested", sha, "2026-11-01T10:00:00Z");
+    await review(reviewed, "F-003", "approved", OLD_SHA, "2026-11-01T10:00:00Z");
+    await review(reviewed, "F-004", "changes_requested", sha, "2026-11-01T10:00:00Z");
+    await review(reviewed, "F-004", "approved", sha, "2026-11-02T10:00:00Z");
+  });
+
+  const listReviewed = (query = "") => list(query, reviewed);
+
+  it("chaque ligne porte sa validation : validée, à revoir, ou à valider (sans review ou périmée) ; la plus récente fait foi", async () => {
+    const res = await listReviewed("?limit=5");
+    const byId = Object.fromEntries(
+      res.body.items.map((item: { specId: string; validation: string }) => [
+        item.specId,
+        item.validation,
+      ]),
+    );
+    expect(byId).toEqual({
+      "F-001": "validated",
+      "F-002": "to_revise",
+      "F-003": "to_validate",
+      "F-004": "validated",
+      "F-005": "to_validate",
+    });
+  });
+
+  it("la facette de validation compte toute la liste, et chaque dimension ignore son propre filtre", async () => {
+    const all = await listReviewed("?limit=1");
+    expect(all.body.facets.validation).toEqual({ validated: 2, to_revise: 1, to_validate: 997 });
+    const filtered = await listReviewed("?validation=validated&limit=1");
+    expect(filtered.body.facets.validation).toEqual({
+      validated: 2,
+      to_revise: 1,
+      to_validate: 997,
+    });
+    expect(sum(filtered.body.facets.status)).toBe(2);
+    expect(sum(filtered.body.facets.priority)).toBe(2);
+  });
+
+  it("filtre validation=validated : le total est celui de la liste entière, pas des éléments chargés", async () => {
+    const res = await listReviewed("?validation=validated&limit=1");
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.total).toBe(2);
+    expect(specIds(res.body)).toEqual(["F-001"]);
+    const next = await listReviewed(`?validation=validated&limit=1&cursor=${res.body.nextCursor}`);
+    expect(specIds(next.body)).toEqual(["F-004"]);
+    expect(next.body.nextCursor).toBeNull();
+  });
+
+  it("filtre validation=to_validate : 997 fonctionnalités, y compris la review périmée ; F-002 en est exclue", async () => {
+    const res = await listReviewed("?validation=to_validate&limit=100");
+    expect(res.body.total).toBe(997);
+    expect(specIds(res.body)).toContain("F-003");
+    expect(specIds(res.body)).not.toContain("F-002");
+    const revise = await listReviewed("?validation=to_revise");
+    expect(specIds(revise.body)).toEqual(["F-002"]);
+  });
+
+  it("le filtre se combine à la recherche et aux autres filtres ; around reste dans la liste filtrée", async () => {
+    const [row] = await database.query<{ status: string }>(
+      `SELECT f.status FROM spec_features f JOIN spec_snapshots s ON s.id = f.snapshot_id
+         JOIN project_repos r ON r.id = s.repo_id WHERE r.project_id = $1 AND f.spec_id = 'F-001'`,
+      [reviewed.projectId],
+    );
+    const both = await listReviewed(`?validation=validated&status=${row?.status}`);
+    expect(specIds(both.body)).toEqual(expect.arrayContaining(["F-001"]));
+    expect(both.body.items.every((i: { validation: string }) => i.validation === "validated")).toBe(
+      true,
+    );
+    const around = await listReviewed("?validation=validated&around=F-004&limit=1");
+    expect(specIds(around.body)).toEqual(["F-004"]);
+    expect(around.body.offset).toBe(1);
+    const none = await listReviewed("?validation=to_revise&q=zzzz-introuvable");
+    expect(none.body.total).toBe(0);
+    expect(none.body.items).toEqual([]);
+  });
+
+  it("une valeur inconnue est refusée : 422 VALIDATION", async () => {
+    const res = await listReviewed("?validation=approved");
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe("VALIDATION");
+  });
+
+  it("sans review, tout est à valider ; une autre organisation ne voit pas ces reviews", async () => {
+    const res = await list("?limit=1");
+    expect(res.body.facets.validation).toEqual({ to_validate: 1000 });
+    expect(res.body.items[0].validation).toBe("to_validate");
+  });
+});
+
 describe("cloisonnement : une autre organisation ne voit rien du volume", () => {
   it("les totaux, les facettes et around d'une autre organisation ne fuient pas", async () => {
     const other = await volumeWorld(database);

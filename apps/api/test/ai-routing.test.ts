@@ -4,7 +4,6 @@ import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   aiApi,
-  BRIEF_REPLY,
   CRITERION,
   credentialState,
   criteriaReply,
@@ -78,17 +77,12 @@ const audit = (world: World, action: string) =>
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("rattachement des procédures aux usages (B46)", () => {
-  it("draftBrief -> Espace Idée ; proposeFeatures et proposeCriteria -> Livrables de la spec", async () => {
+  it("proposeFeatures -> Livrables de la spec, jamais l'Espace Idée (draftBrief est retirée en 3.0.0)", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
     await usageRow(world, "idea_space", "anthropic", "modele-idee-1");
     await usageRow(world, "spec_deliverables", "anthropic", "modele-livrables-1");
     const api = aiApi(b.app, world.actors.dev);
-
-    const brief = FakeLlm.replying(BRIEF_REPLY);
-    b.use(brief);
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
-    expect(brief.calls.map((c) => c.model)).toEqual(["modele-idee-1"]);
 
     const features = FakeLlm.replying(featuresReply());
     b.use(features);
@@ -131,9 +125,9 @@ describe("rattachement des procédures aux usages (B46)", () => {
   it("sans ligne d'usage ni réglage : Anthropic Sonnet (A4), modèle de la clé s'il existe", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     expect(fake.calls.map((c) => c.model)).toEqual(["claude-sonnet-5-5"]);
   });
 });
@@ -151,9 +145,9 @@ describe("secours de bout en bout", () => {
   it("limite du principal : la demande repart chez le secours, la réponse nomme le fournisseur servi", async () => {
     const { b, world, key, openaiKey } = await scene();
     b.useFor("anthropic", FakeLlm.failing(new LlmRateLimitedError({ ...call, retryAfterMs: 0 })));
-    b.useFor("openai", FakeLlm.replying(BRIEF_REPLY, { servedModel: "modele-servi-secours" }));
+    b.useFor("openai", FakeLlm.replying(featuresReply(), { servedModel: "modele-servi-secours" }));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.meta.provider).toBe("openai");
@@ -173,10 +167,10 @@ describe("secours de bout en bout", () => {
       [world.organizationId],
     );
     b.useFor("anthropic", FakeLlm.failing(new LlmProviderUnavailableError(call)));
-    const openai = FakeLlm.replying(BRIEF_REPLY);
+    const openai = FakeLlm.replying(featuresReply());
     b.useFor("openai", openai);
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect(res.body.data).toEqual({ reason: "unavailable" });
@@ -187,9 +181,9 @@ describe("secours de bout en bout", () => {
   it("401 du principal : sa clé est invalidée (audit signé de l'utilisateur), le secours répond", async () => {
     const { b, world } = await scene();
     b.useFor("anthropic", FakeLlm.failing(new LlmAuthError({ ...call, status: 401 })));
-    b.useFor("openai", FakeLlm.replying(BRIEF_REPLY));
+    b.useFor("openai", FakeLlm.replying(featuresReply()));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(200);
     expect(
@@ -205,8 +199,8 @@ describe("comptage et plafond mensuel", () => {
   it("un appel réussi persiste ses jetons et son coût chez le fournisseur servi", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    b.use(FakeLlm.replying(featuresReply()));
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     const [row, ...others] = await monthly(world);
     expect(others).toEqual([]);
     expect(row?.provider).toBe("anthropic");
@@ -219,7 +213,7 @@ describe("comptage et plafond mensuel", () => {
     const b = bench();
     const { world } = await keyedWorld(b);
     b.use(FakeLlm.failing(new LlmProviderUnavailableError(call)));
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
     expect(await monthly(world)).toEqual([]);
   });
 
@@ -228,12 +222,12 @@ describe("comptage et plafond mensuel", () => {
     const { world, key } = await keyedWorld(b);
     await settings(world, "primary_provider, monthly_cap_micro_usd|'anthropic', 1000");
     await seedCost(world, 1_000);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
     const api = aiApi(b.app, world.actors.dev);
 
     for (const res of [
-      await api.draftBrief(world.projectId),
+      await api.proposeFeatures(world.projectId),
       await api.proposeFeatures(world.projectId),
     ]) {
       expect(res.status, JSON.stringify(res.body)).toBe(409);
@@ -243,7 +237,7 @@ describe("comptage et plafond mensuel", () => {
     }
     expect(fake.calls).toHaveLength(0);
     expect(b.provider.keysSeen).toEqual([]);
-    expect(await audit(world, "ai.brief.draft")).toEqual([]);
+    expect(await audit(world, "ai.features.propose")).toEqual([]);
 
     b.use(FakeLlm.replying("OK"));
     expect((await aiApi(b.app, world.actors.owner).verify()).status).toBe(200);
@@ -254,20 +248,22 @@ describe("comptage et plafond mensuel", () => {
     const { world } = await keyedWorld(b);
     await settings(world, "primary_provider, monthly_cap_micro_usd|'anthropic', 1000");
     await seedCost(world, 1_000);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     const api = aiApi(b.app, world.actors.dev);
-    expect((await api.draftBrief(world.projectId)).status).toBe(409);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(409);
 
     b.clock.advance(32 * 24 * 3600 * 1000);
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
   });
 
   it("sans plafond saisi, aucune suspension quelle que soit la consommation (A1)", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
     await seedCost(world, 900_000_000_000);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    expect((await aiApi(b.app, world.actors.dev).draftBrief(world.projectId)).status).toBe(200);
+    b.use(FakeLlm.replying(featuresReply()));
+    expect((await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId)).status).toBe(
+      200,
+    );
   });
 
   it("à 80 % : une seule ligne d'audit ai.cap_warning par mois, signée de l'utilisateur", async () => {
@@ -275,11 +271,11 @@ describe("comptage et plafond mensuel", () => {
     const { world } = await keyedWorld(b);
     await settings(world, "primary_provider, monthly_cap_micro_usd|'anthropic', 1000000");
     await seedCost(world, 800_000);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     const api = aiApi(b.app, world.actors.dev);
 
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
-    expect((await api.draftBrief(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
+    expect((await api.proposeFeatures(world.projectId)).status).toBe(200);
 
     const rows = await audit(world, "ai.cap_warning");
     expect(rows).toEqual([

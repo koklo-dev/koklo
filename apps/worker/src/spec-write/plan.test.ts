@@ -62,6 +62,39 @@ describe("planBatch : changements", () => {
   });
 });
 
+describe("planBatch : zone (TK-102)", () => {
+  const contentOf = (result: ReturnType<typeof plan>) =>
+    "changes" in result ? (result.changes[0] as { content: string }).content : "";
+
+  it("create écrit la zone dans le front matter, après la priorité", () => {
+    const content = contentOf(
+      plan([op("feature.create", "F-002", { title: "Réserver", priority: "must", zone: "Accès" })]),
+    );
+    expect(content).toContain("priorite: must\nzone: Accès\ntables: []");
+  });
+
+  it("update pose ou remplace la zone ; sans zone dans le payload, la zone existante est conservée", () => {
+    const withZone = [
+      {
+        ...feature("F-001"),
+        content: contentOf(plan([op("feature.update", "F-001", { zone: "Paiement" })])),
+      },
+    ];
+    expect(withZone[0]?.content).toContain("zone: Paiement");
+    const kept = contentOf(plan([op("feature.update", "F-001", { title: "Autre" })], withZone));
+    expect(kept).toContain("zone: Paiement");
+    const replaced = contentOf(plan([op("feature.update", "F-001", { zone: "Compte" })], withZone));
+    expect(replaced).toContain("zone: Compte");
+    expect(replaced).not.toContain("Paiement");
+  });
+
+  it("une zone de 81 caractères est refusée (SPEC_INVALID), rien n'est écrit", () => {
+    expect(plan([op("feature.update", "F-001", { zone: "x".repeat(81) })])).toMatchObject({
+      outcome: { errorCode: "SPEC_INVALID" },
+    });
+  });
+});
+
 describe("planBatch : designer, validation, émetteur", () => {
   it("designer : FORBIDDEN hors des features liées à un écran", () => {
     const files = [feature("F-001", ["S-a"]), feature("F-002")];
