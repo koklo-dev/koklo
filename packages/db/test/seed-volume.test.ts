@@ -216,6 +216,7 @@ describe("TK-94 seed:planche", () => {
   }, 120_000);
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("TK-99a seed:large : 400 propositions de l'agent", () => {
   it("insère un lancement terminé et 400 propositions en 3 groupes de plus de 30, statuts mêlés", async () => {
     await seedLarge(db.url);
@@ -253,10 +254,47 @@ describe("TK-99a seed:large : 400 propositions de l'agent", () => {
     expect(await count("agent_launches", "project_id", id)).toBe(1);
   }, 120_000);
 
-  it("seed:planche n'insère aucune proposition", async () => {
+  it("seed:planche insère 355 propositions : 248 fonctionnalités en 6 zones, 86 règles en 3 zones, 3 rôles, 18 parcours (TK-105, B365)", async () => {
     await seedPlanche(db.url);
     const project = await projectByName("Volume · planche");
-    expect(await count("agent_proposals", "project_id", project?.id as string)).toBe(0);
+    const id = project?.id as string;
+    expect(SEED_VOLUMES.planche.proposals).toBe(355);
+    expect(await count("agent_proposals", "project_id", id)).toBe(355);
+    const groups = await db.query<{ kind: string; zone: string; n: number; pending: number }>(
+      `SELECT kind, zone, count(*)::int AS n, count(*) FILTER (WHERE status = 'pending')::int AS pending
+         FROM agent_proposals WHERE project_id = $1 GROUP BY kind, zone ORDER BY kind, zone`,
+      [id],
+    );
+    const zonesOf = (kind: string) => groups.filter((g) => g.kind === kind).map((g) => g.zone);
+    const totalOf = (kind: string) =>
+      groups.filter((g) => g.kind === kind).reduce((sum, g) => sum + g.n, 0);
+    expect(zonesOf("feature").sort()).toEqual(
+      ["Catalogue", "Clients", "Notifications", "Paiement", "Personnel", "Réservation"].sort(),
+    );
+    expect(zonesOf("rule").sort()).toEqual(["Calculs", "Contraintes", "Workflows à états"]);
+    expect([totalOf("feature"), totalOf("rule"), totalOf("role"), totalOf("flow")]).toEqual([
+      248, 86, 3, 18,
+    ]);
+    // Au-delà du seuil de 30, les onglets Fonctionnalités et Règles sont groupés ; statuts mêlés dans chaque zone.
+    expect(totalOf("feature")).toBeGreaterThan(30);
+    expect(totalOf("rule")).toBeGreaterThan(30);
+    for (const group of groups.filter((g) => g.n > 5)) {
+      expect(group.pending, `${group.kind}/${group.zone}`).toBeGreaterThan(0);
+      expect(group.pending, `${group.kind}/${group.zone}`).toBeLessThan(group.n);
+    }
+  }, 120_000);
+
+  it("seed:planche : un second chargement ne duplique rien, les charges respectent le type de règle de la zone", async () => {
+    await seedPlanche(db.url);
+    const project = await projectByName("Volume · planche");
+    const id = project?.id as string;
+    expect(await count("agent_proposals", "project_id", id)).toBe(355);
+    const mismatched = await db.query(
+      `SELECT 1 FROM agent_proposals WHERE project_id = $1 AND kind = 'rule'
+          AND payload->>'type' <> CASE zone WHEN 'Contraintes' THEN 'contrainte' WHEN 'Calculs' THEN 'calcul' ELSE 'workflow' END`,
+      [id],
+    );
+    expect(mismatched).toEqual([]);
   }, 120_000);
 });
 

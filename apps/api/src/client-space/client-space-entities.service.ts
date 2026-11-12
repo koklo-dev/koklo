@@ -27,9 +27,18 @@ type Roles = z.output<typeof clientSpaceRolesOutputSchema>;
 /** Même masque que les fonctionnalités : index absent ou en échec, aucun détail. */
 const notReady = () => new ORPCError("SPACE_NOT_READY");
 
-const requestOf = (input: { limit?: number; cursor?: string }): EntityListRequest => ({
+interface ListInput {
+  limit?: number | undefined;
+  cursor?: string | undefined;
+  q?: string | undefined;
+  type?: string | undefined;
+}
+
+const requestOf = (input: ListInput): EntityListRequest => ({
   limit: input.limit ?? DEFAULT_PAGE_SIZE,
   cursor: input.cursor,
+  q: input.q,
+  type: input.type,
 });
 
 /**
@@ -60,7 +69,7 @@ export class ClientSpaceEntitiesService {
     };
   }
 
-  async flows(scope: ProjectScope, input: { limit?: number; cursor?: string }): Promise<Flows> {
+  async flows(scope: ProjectScope, input: ListInput): Promise<Flows> {
     const read = await this.repository.flows(scope, requestOf(input));
     if (read === null) throw notReady();
     const { window, headSha, verdicts } = read;
@@ -73,7 +82,7 @@ export class ClientSpaceEntitiesService {
     };
   }
 
-  async rules(scope: ProjectScope, input: { limit?: number; cursor?: string }): Promise<Rules> {
+  async rules(scope: ProjectScope, input: ListInput): Promise<Rules> {
     const read = await this.repository.rules(scope, requestOf(input));
     if (read === null) throw notReady();
     return {

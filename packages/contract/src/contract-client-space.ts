@@ -13,6 +13,7 @@ import {
   clientSpaceProjectsOutputSchema,
   clientSpaceRolesInputSchema,
   clientSpaceRolesOutputSchema,
+  clientSpaceRulesInputSchema,
   clientSpaceRulesOutputSchema,
 } from "./schemas-client-space.ts";
 
@@ -42,7 +43,7 @@ export const clientSpace = {
     .output(clientSpaceFlowsOutputSchema),
   rules: route("GET", "/client-space/projects/{projectId}/rules")
     .errors(spaceReadErrors)
-    .input(clientSpaceListInputSchema)
+    .input(clientSpaceRulesInputSchema)
     .output(clientSpaceRulesOutputSchema),
   roles: route("GET", "/client-space/projects/{projectId}/roles")
     .errors(spaceReadErrors)
