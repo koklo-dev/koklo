@@ -1,4 +1,10 @@
-import type { FeatureSummary, SpecHeadOutput } from "@koklo/contract";
+import type {
+  FeatureSummary,
+  SpecHeadOutput,
+  SpecItem,
+  SpecRefsSearchOutput,
+} from "@koklo/contract";
+
 import type { ProjectScope } from "../tracker/scope.ts";
 
 export const SPEC_READ_REPOSITORY = Symbol("SPEC_READ_REPOSITORY");
@@ -61,6 +67,11 @@ export type FeatureSource =
       installation: { id: string; externalId: string; active: boolean };
     };
 
+/** Élément de l'index générique cité ou trouvé par l'autocomplétion (TK-101). */
+export type EntityReference = SpecItem["referencedBy"]["items"][number];
+/** Résultat de l'autocomplétion : les six genres qu'on peut lier. */
+export type RefHit = SpecRefsSearchOutput["items"][number];
+
 /** Lectures de l'index de la spec ; chaque méthode est une transaction courte, sans réseau. */
 export interface SpecReadRepository {
   /** `NOT_FOUND` si le projet n'est pas de l'organisation ; `null` si la révision n'est pas indexée. */
@@ -79,4 +90,11 @@ export interface SpecReadRepository {
   features(scope: ProjectScope, revision: Revision): Promise<IndexedFeatures | null>;
   /** Feature de la tête par défaut du projet ; `null` si absente de l'instantané courant. */
   featureSource(scope: ProjectScope, specId: string): Promise<FeatureSource | null>;
+  /**
+   * Éléments de la tête dont l'identifiant commence par `q` ou dont le titre en contient les mots (20 au plus, par rang).
+   * Liste vide quand les entités de la tête ne sont pas indexées (`entities_indexed_at` nul) ou l'index en échec.
+   */
+  searchRefs(scope: ProjectScope, kinds: readonly RefHit["kind"][], q: string): Promise<RefHit[]>;
+  /** Éléments de la tête qui citent `specId` (jeton exact), 20 au plus ; `total` les compte tous. */
+  referencedBy(scope: ProjectScope, specId: string): Promise<SpecItem["referencedBy"]>;
 }

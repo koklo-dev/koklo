@@ -183,6 +183,54 @@ function specStatements(profile: VolumeProfile, target: VolumeTarget): SeedState
   return sql.map((statement) => statementOf(statement, target));
 }
 
+/** Hachage de contenu d'une entité : 64 hexadécimaux déterministes, dérivés de son genre, son identifiant et son titre. */
+const entityHash = (kind: string, id: string, title: string) =>
+  `encode(sha256(convert_to('${kind}:' || ${id} || ':' || ${title}, 'UTF8')), 'hex')`;
+
+/**
+ * Index générique `spec_entities` (TK-101, B329 e) : une ligne par fonctionnalité, table et point d'accès du jeu, avec
+ * `titre`, chemin, rang et hachage, puis `entities_indexed_at` sur l'instantané (sans lui, `spec.refs.search` rend une liste
+ * vide). Mêmes identifiants et mêmes titres que `spec_features`, `spec_tables` et `spec_endpoints`.
+ */
+function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
+  const volume = SEED_VOLUMES[profile];
+  const at = "$3::timestamptz";
+  const entity = (kind: string, count: number, spec: string, title: string, path: string) => {
+    const id = `${spec} || ${pad()}`;
+    return `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
+     SELECT ${nth(`entity:${kind}`)}, $2, ${own("snapshot")}, '${kind}', ${id}, NULL, ${path},
+            jsonb_build_object('titre', ${title}), ${entityHash(kind, id, title)}, n, ${at}, ${at}
+       FROM generate_series(1, ${count}) AS n
+     ON CONFLICT (snapshot_id, kind, spec_id) DO UPDATE SET path = EXCLUDED.path, data = EXCLUDED.data,
+       content_hash = EXCLUDED.content_hash, sort = EXCLUDED.sort`;
+  };
+  const sql = [
+    entity(
+      "feature",
+      volume.features,
+      "'F-'",
+      titleOf(profile, "feature"),
+      `'features/F-' || ${pad()} || '.md'`,
+    ),
+    entity(
+      "table",
+      volume.tables,
+      "'T-table-'",
+      `'Table ' || ${pad()}`,
+      `'data/tables/table-' || ${pad()} || '.yaml'`,
+    ),
+    entity(
+      "endpoint",
+      volume.endpoints,
+      "'E-endpoint-'",
+      `(${pick(METHODS, "n % 5")}) || ' /ressource-' || ${pad()}`,
+      `'api/endpoint-' || ${pad()} || '.yaml'`,
+    ),
+    `UPDATE spec_snapshots SET entities_indexed_at = ${at} WHERE id = ${own("snapshot")} AND organization_id = $2`,
+  ];
+  return sql.map((statement) => statementOf(statement, target));
+}
+
 function trackerStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
   const total = SEED_VOLUMES[profile].tickets;
   const at = "$3::timestamptz";
@@ -263,6 +311,7 @@ export function buildVolumeStatements(
   return [
     ...repositoryStatements(target),
     ...specStatements(profile, target),
+    ...entityStatements(profile, target),
     ...trackerStatements(profile, target),
     ...proposalStatements(profile, target),
   ];

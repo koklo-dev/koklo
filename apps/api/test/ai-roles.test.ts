@@ -268,9 +268,9 @@ describe("cohérence contrôleur <-> constantes de rôles", () => {
     },
   );
 
-  it("le contrôleur ai n'ouvre aucune procédure à un rôle nommé en dur", () => {
+  it("le contrôleur ai n'ouvre aucune procédure à un rôle nommé en dur (quatre : brief, features, critères, préremplissage TK-101)", () => {
     const source = read("../src/ai/ai.controller.ts");
-    expect(source.match(/@Roles\(/g)).toHaveLength(3);
+    expect(source.match(/@Roles\(/g)).toHaveLength(4);
     expect(source).not.toMatch(/@Roles\(\s*"/);
   });
 

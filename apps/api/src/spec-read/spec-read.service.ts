@@ -1,4 +1,11 @@
-import type { FeatureDetail, FeatureSummary, SpecHeadOutput } from "@koklo/contract";
+import type {
+  FeatureDetail,
+  FeatureSummary,
+  SpecHeadOutput,
+  SpecItem,
+  SpecRefsSearchInput,
+  SpecRefsSearchOutput,
+} from "@koklo/contract";
 import { parseFeatureMarkdown } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
@@ -102,5 +109,15 @@ export class SpecReadService {
     const parsed = parseFeatureMarkdown(source.filePath, file.content);
     if (!parsed.ok) throw new Error("indexed feature file is not parseable");
     return detailOf(parsed.value, source.filePath, source.commitSha);
+  }
+
+  /** Éléments de la tête qui citent `specId` (TK-101) : lecture de l'index d'entités, aucun réseau. */
+  referencedBy(scope: ProjectScope, specId: string): Promise<SpecItem["referencedBy"]> {
+    return this.repository.referencedBy(scope, specId);
+  }
+
+  /** Autocomplétion des liens du panneau d'édition (TK-101) : 20 éléments au plus, liste vide si non indexé. */
+  async searchRefs(scope: ProjectScope, input: SpecRefsSearchInput): Promise<SpecRefsSearchOutput> {
+    return { items: await this.repository.searchRefs(scope, input.kinds, input.q) };
   }
 }

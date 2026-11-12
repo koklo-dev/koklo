@@ -39,6 +39,7 @@ import { ReviewModule } from "./review/review.module.ts";
 import { SearchModule } from "./search/search.module.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SpecDeliverablesModule } from "./spec-deliverables/spec-deliverables.module.ts";
+import { SpecItemModule } from "./spec-item/spec-item.module.ts";
 import { SpecReadModule } from "./spec-read/spec-read.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
 import { SprintImportModule } from "./sprint-import/sprint-import.module.ts";
@@ -69,7 +70,7 @@ const SETTINGS_MODULES = [MemberModule, InvitationModule, MeModule];
 const PROJECT_MODULES = [ProjectModule, ProjectOverviewModule];
 
 /** Lecture de la spec (TK-48d) puis livrables de la spec (TK-100). */
-const SPEC_MODULES = [SpecReadModule, SpecDeliverablesModule];
+const SPEC_MODULES = [SpecReadModule, SpecDeliverablesModule, SpecItemModule];
 
 /** IA (TK-95) puis propositions de l'agent (TK-99a) : le second dépend du premier. */
 const AI_MODULES = [AiModule, ProposalModule];

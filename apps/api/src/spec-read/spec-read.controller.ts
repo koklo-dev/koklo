@@ -3,7 +3,7 @@ import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
-import { SPEC_READ_ROLES } from "../auth/roles.ts";
+import { SPEC_BATCH_ROLES, SPEC_READ_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { inProject } from "../tracker/scope.ts";
@@ -60,6 +60,22 @@ export class SpecReadController {
         errors,
         input.projectId,
         (scope) => this.service.getFeature(scope, input.specId),
+        this.access,
+      ),
+    );
+  }
+
+  /** Autocomplétion des liens du panneau d'édition (TK-101) : `SPEC_BATCH_ROLES` seuls, client et business 403. */
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.refs.search)
+  searchRefs(@Req() request: Request) {
+    return implement(contract.spec.refs.search).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.searchRefs(scope, input),
         this.access,
       ),
     );

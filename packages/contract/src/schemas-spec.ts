@@ -209,3 +209,51 @@ export const specBatchSchema = z.object({
   committedAt: instantSchema.nullable(),
 });
 export const specBatchGetInputSchema = z.object({ projectId: z.uuid(), batchId: z.uuid() });
+
+/**
+ * Panneau d'édition d'un élément (TK-101, 2.11.0, B329 b, c, e). Seule la fonctionnalité a un formulaire pour l'instant :
+ * `type` n'accepte que `feature`, les autres genres arriveront avec leurs formulaires.
+ */
+export const SPEC_REFS_MAX = 20;
+export const specRefKindSchema = z.enum(["feature", "rule", "flow", "table", "endpoint", "screen"]);
+/** Genres d'entités de l'index générique (`spec_entities`) : un élément peut en citer un autre quel que soit son genre. */
+const specEntityKindSchema = z.enum([
+  "feature",
+  "rule",
+  "roles",
+  "flow",
+  "relations",
+  "table",
+  "endpoint",
+  "screen",
+  "test",
+]);
+const refShape = { specId: z.string().min(1).max(100), title: z.string().max(300) };
+export const specRefSchema = z.object({ kind: specRefKindSchema, ...refShape });
+
+export const specItemGetInputSchema = z.object({
+  projectId: z.uuid(),
+  type: z.literal("feature"),
+  id: featureIdSchema,
+});
+export const specItemSchema = z.object({
+  type: z.literal("feature"),
+  id: featureIdSchema,
+  values: featureDetailSchema,
+  /** Le livrable Fonctionnel est validé : modifier l'élément l'invalidera (avertissement du panneau). */
+  validated: z.boolean(),
+  /** Éléments de la tête qui citent celui-ci (jeton exact), 20 au plus ; `total` les compte tous. */
+  referencedBy: z.object({
+    items: z.array(z.object({ kind: specEntityKindSchema, ...refShape })).max(SPEC_REFS_MAX),
+    total: z.number().int().min(0),
+  }),
+});
+
+export const specRefsSearchInputSchema = z.object({
+  projectId: z.uuid(),
+  kinds: z.array(specRefKindSchema).min(1).max(6),
+  q: z.string().max(100),
+});
+export const specRefsSearchOutputSchema = z.object({
+  items: z.array(specRefSchema).max(SPEC_REFS_MAX),
+});

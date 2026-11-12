@@ -59,6 +59,7 @@ import {
   projectSchema,
   type roleSchema,
 } from "./schemas.ts";
+import type { aiPrefillItemInputSchema, aiPrefillItemOutputSchema } from "./schemas-ai.ts";
 import type {
   ideaFreezeOutputSchema,
   ideaListOutputSchema,
@@ -108,7 +109,10 @@ import type {
   specBatchSchema,
   specBatchSubmitInputSchema,
   specHeadSchema,
+  specItemSchema,
   specOperationSchema,
+  specRefsSearchInputSchema,
+  specRefsSearchOutputSchema,
   validationReportSchema,
 } from "./schemas-spec.ts";
 
@@ -236,6 +240,9 @@ export type InstallationOutput = z.output<typeof installationSchema>;
 export type SpecHeadOutput = z.output<typeof specHeadSchema>;
 export type FeatureSummary = z.output<typeof featureSummarySchema>;
 export type FeatureDetail = z.output<typeof featureDetailSchema>;
+export type SpecItem = z.output<typeof specItemSchema>;
+export type SpecRefsSearchInput = z.input<typeof specRefsSearchInputSchema>;
+export type SpecRefsSearchOutput = z.output<typeof specRefsSearchOutputSchema>;
 export type SpecOperation = z.input<typeof specOperationSchema>;
 export type SpecBatchSubmitInput = z.input<typeof specBatchSubmitInputSchema>;
 export type SpecBatchOutput = z.output<typeof specBatchSchema>;
@@ -257,6 +264,8 @@ export type AiProposeDeliverableInput = z.input<typeof aiProposeDeliverableInput
 export type AiProposeDeliverableOutput = z.output<typeof aiProposeDeliverableOutputSchema>;
 export type AiProposeOptionsInput = z.input<typeof aiProposeOptionsInputSchema>;
 export type AiProposeOptionsOutput = z.output<typeof aiProposeOptionsOutputSchema>;
+export type AiPrefillItemInput = z.input<typeof aiPrefillItemInputSchema>;
+export type AiPrefillItemOutput = z.output<typeof aiPrefillItemOutputSchema>;
 export type AiReviseProposalInput = z.input<typeof aiReviseProposalInputSchema>;
 export type AgentProposal = z.output<typeof proposalSchema>;
 export type ProposalListInput = z.output<typeof proposalListInputSchema>;

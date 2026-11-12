@@ -26,6 +26,12 @@ export {
 } from "./seed-volume.ts";
 export { PENDING_VOLUMES, SEED_VOLUMES } from "./seed-volumes.ts";
 export {
+  type EntityRef,
+  entitiesReferencing,
+  likePrefixOf,
+  searchEntityRefs,
+} from "./spec-entity-queries.ts";
+export {
   currentOrganizationId,
   MissingOrganizationContextError,
   OrganizationMismatchError,

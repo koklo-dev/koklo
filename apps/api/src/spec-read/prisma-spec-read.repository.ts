@@ -1,8 +1,9 @@
-import type { SpecHeadOutput } from "@koklo/contract";
+import type { SpecHeadOutput, SpecItem } from "@koklo/contract";
+import { SPEC_REFS_MAX } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
 import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { loadWindow } from "../tracker/long-list.ts";
-import { ProjectTransactions } from "../tracker/project-transactions.ts";
+import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import {
   featureFacets,
@@ -13,10 +14,12 @@ import {
 } from "./feature-list.ts";
 import { type Snapshot, SpecHeadResolver } from "./spec-head-resolver.ts";
 import type {
+  EntityReference,
   FeatureListRequest,
   FeatureSource,
   IndexedFeaturePage,
   IndexedFeatures,
+  RefHit,
   Revision,
   SpecReadRepository,
 } from "./spec-read.repository.ts";
@@ -122,6 +125,34 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
           active: installation.status === "active",
         },
       };
+    });
+  }
+
+  /** Instantané de tête dont les entités sont indexées et lisibles, sinon `null` (pas de dépôt, échec, jamais indexé). */
+  private entitySnapshot(tx: Tx, scope: ProjectScope): Promise<string | null> {
+    return this.resolver.resolve(tx, scope, {}).then((found) => {
+      const snapshot = found?.snapshot;
+      return snapshot && snapshot.status !== "failed" && snapshot.entitiesIndexedAt !== null
+        ? snapshot.id
+        : null;
+    });
+  }
+
+  searchRefs(scope: ProjectScope, kinds: readonly RefHit["kind"][], q: string): Promise<RefHit[]> {
+    return this.transactions.run(scope, async (tx) => {
+      const snapshotId = await this.entitySnapshot(tx, scope);
+      if (snapshotId === null) return [];
+      const rows = await this.search.refs(snapshotId, kinds, q, SPEC_REFS_MAX);
+      return rows as RefHit[];
+    });
+  }
+
+  referencedBy(scope: ProjectScope, specId: string): Promise<SpecItem["referencedBy"]> {
+    return this.transactions.run(scope, async (tx) => {
+      const snapshotId = await this.entitySnapshot(tx, scope);
+      if (snapshotId === null) return { items: [], total: 0 };
+      const found = await this.search.referencing(snapshotId, specId, SPEC_REFS_MAX);
+      return { items: found.items as EntityReference[], total: found.total };
     });
   }
 }

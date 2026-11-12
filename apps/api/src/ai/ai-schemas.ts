@@ -65,3 +65,21 @@ export const criteriaOutputSchema = z.object({ criteria: criteriaListSchema }).s
 export const briefOutputSchema = briefSchema;
 
 export { jsonSchemaOf } from "@koklo/schema";
+
+/**
+ * Préremplissage d'une fonctionnalité (TK-101, B329 d) : tout est facultatif, texte brut (D6) ; aucun identifiant ni statut.
+ * Les liens sont des références à des éléments existants, que l'humain contrôle avant d'enregistrer.
+ */
+export const itemPrefillInputSchema = safeText({ min: 1, max: 500, multiline: true });
+export const itemPrefillOutputSchema = z
+  .object({
+    title: safeText({ min: 1, max: 200 }).optional(),
+    priority: z.enum(["must", "should", "could", "wont"]).optional(),
+    description: safeText({ min: 0, max: 4000, multiline: true }).optional(),
+    criteria: criteriaListSchema.optional(),
+    links: z
+      .array(safeText({ min: 1, max: 100 }))
+      .max(30)
+      .optional(),
+  })
+  .strict();

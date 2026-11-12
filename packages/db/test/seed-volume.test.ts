@@ -260,6 +260,85 @@ describe("TK-99a seed:large : 400 propositions de l'agent", () => {
   }, 120_000);
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, entities_indexed_at)", () => {
+  const entityCounts = (projectId: string) =>
+    db.query<{ kind: string; n: number }>(
+      `SELECT e.kind, count(*)::int AS n FROM spec_entities e
+         JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 GROUP BY e.kind ORDER BY e.kind`,
+      [projectId],
+    );
+
+  it("seed:large indexe les 1 000 fonctionnalités, 80 tables et les points d'accès, et pose entities_indexed_at", async () => {
+    await seedLarge(db.url);
+    const id = (await projectByName("Volume · charge"))?.id as string;
+
+    const counts = Object.fromEntries((await entityCounts(id)).map((row) => [row.kind, row.n]));
+    expect(counts).toEqual({
+      endpoint: SEED_VOLUMES.large.endpoints,
+      feature: 1000,
+      table: 80,
+    });
+    const [snapshot] = await db.query<{ entities_indexed_at: Date | null }>(
+      `SELECT s.entities_indexed_at FROM spec_snapshots s JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1`,
+      [id],
+    );
+    expect(snapshot?.entities_indexed_at).not.toBeNull();
+  }, 120_000);
+
+  it("chaque entité porte un titre, un chemin, un rang et un hachage valides ; F-987 est trouvable par préfixe et par mot", async () => {
+    const id = (await projectByName("Volume · charge"))?.id as string;
+    const [shape] = await db.query<{ bad: number }>(
+      `SELECT count(*)::int AS bad FROM spec_entities e
+         JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 AND (coalesce(e.data ->> 'titre', '') = '' OR e.path = ''
+          OR e.content_hash !~ '^[0-9a-f]{64}$' OR e.sort < 1)`,
+      [id],
+    );
+    expect(shape?.bad).toBe(0);
+    const found = await db.query<{ spec_id: string }>(
+      `SELECT e.spec_id FROM spec_entities e
+         JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 AND e.kind = 'feature'
+          AND (e.spec_id ILIKE 'F-987%' OR e.search @@ to_tsquery('french', 'annul:* & group:*'))
+        ORDER BY e.sort`,
+      [id],
+    );
+    expect(found.map((row) => row.spec_id)).toEqual(["F-703", "F-987"]);
+  });
+
+  it("les identifiants des entités sont ceux des tables d'index (spec_features, spec_tables, spec_endpoints)", async () => {
+    const id = (await projectByName("Volume · charge"))?.id as string;
+    const [gap] = await db.query<{ missing: number }>(
+      `SELECT count(*)::int AS missing FROM (
+         SELECT f.spec_id, f.snapshot_id FROM spec_features f
+         UNION ALL SELECT t.spec_id, t.snapshot_id FROM spec_tables t
+         UNION ALL SELECT p.spec_id, p.snapshot_id FROM spec_endpoints p) i
+         JOIN spec_snapshots s ON s.id = i.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1
+          AND NOT EXISTS (SELECT 1 FROM spec_entities e WHERE e.snapshot_id = i.snapshot_id AND e.spec_id = i.spec_id)`,
+      [id],
+    );
+    expect(gap?.missing).toBe(0);
+  });
+
+  it("est idempotent : un second chargement ne duplique rien ; seed:planche indexe aussi ses 248 fonctionnalités", async () => {
+    const id = (await projectByName("Volume · charge"))?.id as string;
+    const before = await entityCounts(id);
+    await seedLarge(db.url);
+    expect(await entityCounts(id)).toEqual(before);
+
+    await seedPlanche(db.url);
+    const planche = (await projectByName("Volume · planche"))?.id as string;
+    const counts = Object.fromEntries(
+      (await entityCounts(planche)).map((row) => [row.kind, row.n]),
+    );
+    expect(counts).toMatchObject({ feature: 248, table: 65, endpoint: 47 });
+  }, 120_000);
+});
+
 describe("TK-94 volumes déclarés des modèles à venir (lecture prudente, B34)", () => {
   it("déclare les volumes de la passation 07 §6 et 08 §4 avec le ticket qui créera le modèle", () => {
     expect(PENDING_VOLUMES.large).toMatchObject({ rules: { count: 300 } });

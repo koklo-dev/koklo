@@ -18,6 +18,7 @@ import { AiCallRunner } from "./ai-call.ts";
 import { AuditAiEventSink } from "./ai-event-sink.ts";
 import { CredentialKeyHooks } from "./ai-key-hooks.ts";
 import { AiLedger } from "./ai-ledger.ts";
+import { AiPrefillService } from "./ai-prefill.service.ts";
 import { AiProvidersController } from "./ai-providers.controller.ts";
 import { AiProvidersService } from "./ai-providers.service.ts";
 import { AiSettingsController } from "./ai-settings.controller.ts";
@@ -63,6 +64,7 @@ function sdkAdapters(): AiAdapterFactory {
   controllers: [AiController, AiProvidersController, AiSettingsController],
   providers: [
     AiService,
+    AiPrefillService,
     AiCallRunner,
     { provide: PROJECT_POLICY, useClass: PrismaProjectPolicy },
     AiLedger,

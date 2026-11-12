@@ -228,6 +228,7 @@ export class PurposeLlm implements LlmProvider {
       "idea-propose": { proposals: [] },
       "idea-gaps": { items: [] },
       "idea-synthesis": { contentMd: "## Résumé\n\nUne synthèse." },
+      "item-prefill": { title: "Annuler une réservation", priority: "must" },
       "proposal-revise": { ...modelFeature({ title: "Proposition révisée" }) },
     };
     const reply = replies[request.trace.purpose];
