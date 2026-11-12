@@ -217,6 +217,8 @@ export const specOperationSchema = z.discriminatedUnion("kind", [
 
 /** 200 opérations par lot depuis 2.9.0 (TK-99a) : un groupe de propositions se soumet en un commit. */
 export const SPEC_BATCH_OPERATIONS_MAX = 200;
+/** Plafond du corps de `specBatch.submit` lu par l'API (4 Mio) ; le client découpe ses lots en dessous. */
+export const SPEC_BATCH_MAX_BODY_BYTES = 4 * 1024 * 1024;
 export const SPEC_BATCH_PROPOSALS_MAX = 200;
 /** L'auteur et les trailers du commit viennent de la session : jamais de l'entrée. */
 export const specBatchSubmitInputSchema = z.object({

@@ -18,6 +18,7 @@ import {
   type ProposalReviewCounts,
   type ProposalReviewGroup,
   type ProposalReviewItem,
+  type ProposalSaveProgress,
 } from "./proposal-review-types.ts";
 
 export interface ProposalReviewProps {
@@ -35,6 +36,8 @@ export interface ProposalReviewProps {
   onLoadMore?: (groupKey: string) => void;
   onSave?: () => void;
   saving?: boolean;
+  /** Avancement pendant l'enregistrement : la barre du bandeau se remplit en vert, lot après lot. */
+  saveProgress?: ProposalSaveProgress | undefined;
   onLeave: () => void;
   /** Annonce polie (« F-012 acceptée ») : la seule région d'état de la vue. */
   announcement?: string;
@@ -170,6 +173,7 @@ export function ProposalReview(props: ProposalReviewProps) {
         counts={counts}
         onSave={props.onSave}
         saving={props.saving}
+        saveProgress={props.saveProgress}
         onLeave={props.onLeave}
       />
       <div className="flex min-h-0 flex-wrap">

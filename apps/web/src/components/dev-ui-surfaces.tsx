@@ -84,6 +84,18 @@ function ProgressFrame() {
           ))}
         </div>
       ))}
+      <div className="flex flex-col gap-2">
+        <DevUiNote>
+          Teinte success et part en cours (enregistrement par lots : 200 écrites, 200 en cours sur
+          512)
+        </DevUiNote>
+        <ProgressBar
+          tone="success"
+          value={(200 / 512) * 100}
+          pending={(200 / 512) * 100}
+          aria-label="Enregistrement : 200 sur 512"
+        />
+      </div>
     </DevUiFrame>
   );
 }

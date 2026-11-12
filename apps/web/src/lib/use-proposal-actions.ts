@@ -146,7 +146,7 @@ function useSaveAll(
     setSummary(text);
     announce(text);
   };
-  return { save, saving: saver.saving, summary };
+  return { save, saving: saver.saving, progress: saver.progress, summary };
 }
 
 /**
@@ -190,6 +190,7 @@ export function useProposalActions(
     reviseBusy: revise.busy,
     summary: saved.summary,
     saving: saved.saving,
+    saveProgress: saved.progress,
     decide: guarded(decide),
     acceptGroup: guarded(acceptGroup),
     revise: revise.revise,

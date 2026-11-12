@@ -24,6 +24,27 @@ describe("ProgressBar split", () => {
     expect(rejected.style.width).toBe("20%");
   });
 
+  it("teinte success : remplissage vert de « Validé », part en cours à 50 % qui pulse sauf mouvement réduit", () => {
+    render(<ProgressBar aria-label="Enregistrement" tone="success" value={40} pending={30} />);
+    const bar = screen.getByRole("progressbar", { name: "Enregistrement" });
+    const [done, running] = Array.from(bar.children) as HTMLElement[];
+    expect(done).toHaveClass("bg-status-validated-foreground");
+    expect(done?.style.width).toBe("40%");
+    expect(running).toHaveClass(
+      "bg-status-validated-foreground",
+      "opacity-50",
+      "motion-safe:animate-pulse",
+    );
+    expect(running?.style.width).toBe("30%");
+    expect(bar).toHaveAttribute("aria-valuenow", "40");
+  });
+
+  it("la part en cours ne dépasse jamais 100 % avec la valeur", () => {
+    render(<ProgressBar aria-label="Enregistrement" value={90} pending={40} />);
+    const running = screen.getByRole("progressbar").children[1] as HTMLElement;
+    expect(running.style.width).toBe("10%");
+  });
+
   it("la variante par défaut garde un seul segment", () => {
     render(<ProgressBar aria-label="Avancement" value={40} />);
     expect(screen.getByRole("progressbar").children).toHaveLength(1);
