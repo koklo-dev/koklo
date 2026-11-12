@@ -1,7 +1,7 @@
 ---
 id: S-feature-form
 titre: Formulaire d'une fonctionnalité (création, modification, suppression)
-version: 1.3
+version: 2.0
 ---
 ## 1. Utilisateurs et objectif
 - **Vue équipe qui écrit** : propriétaire, administrateur, développeur, designer (`SPEC_BATCH_ROLES`, `docs/api-contract.md`). Le designer est limité par opération : il n'enregistre que des fonctionnalités **liées à au moins un écran** (avant et après l'opération ; pour une création, dans l'opération elle-même). Le serveur reste l'autorité ; l'écran l'explique et le contrôle d'avance (§5.4).
@@ -229,6 +229,7 @@ Aucune ne bloque le développement ; l'option la plus conforme à `DESIGN.md` et
 | 1.1 | 2026-11-01 | TK-48 (48e-1, refactor) | États réellement livrés (création et modification, **sans suppression**, reportée en 48e-2 : ni bouton « Supprimer », ni §4.8, ni capture `delete-confirm`) conformes à la fiche en clair, sombre et 375 px. Quatre arbitrages : (a) la région d'état unique passe dans le panneau tant qu'il est ouvert (la page est `aria-hidden` sous un dialogue modal) ; (b) la liste « pas encore à jour » est relue toutes les 5 s pendant 2 minutes par la page, y compris panneau fermé (§4.6) ; (c) pied : « Enregistrer » à gauche puis « Fermer », ordre visuel = DOM = tabulation (§6, §7) ; (d) `deriveFeaturesView` n'attend plus le rôle pour afficher une spec lue, sans effet de sécurité (voir `docs/architecture.md`). |
 | 1.2 | 2026-11-01 | TK-48 (48e-1, revue) | Brouillon et marqueur cloisonnés par compte et par organisation, effacés à l'expiration de session, validés champ par champ à la lecture (§5.5) ; après un `INTERNAL` de `submit`, « Réessayer » reprend la même clé pour une saisie identique (§4.7). |
 | 1.3 | 2026-11-01 | TK-48 (48e-2, refactor) | Suppression livrée (§4.8) : confirmation en ligne dans le panneau, textes propres, « Réessayer » sans nouvelle confirmation, refus préalable du designer, `SPEC_INVALID` d'une suppression avec un texte adapté (§4.7), captures `delete-confirm` (clair, sombre, 375 px). |
+| 2.0 | 2026-11-12 | TK-101 | Le formulaire est rendu par `SpecItemSheet` (540 px, maquette 16, voir S-spec-item-sheet) : préremplissage par l'agent, avertissement d'invalidation, confirmation de fermeture, liens en puces avec autocomplétion, toast avec le commit. Comportements de cette fiche conservés (brouillon, suivi, conflit). Les 440 px de §3.2 deviennent 540. |
 
 ## 11. Plan d'implémentation web et tests (brief développeur, 48e)
 Aucun changement de contrat (0.7.0), aucune dépendance. Un composant `Textarea` à ajouter à `@koklo/ui` (équivalent shadcn, mêmes tokens que `Input`, `aria-invalid` stylé) : seule addition de la bibliothèque ; aucune icône nouvelle (`add`, `edit_note`, `keyboard_arrow_up`, `keyboard_arrow_down`, `warning`, `schedule`, `check_circle`, `play_circle`, `radio_button_unchecked`, `link` existent). Fichiers sous `apps/web/src`, chacun <= 300 lignes.

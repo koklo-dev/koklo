@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **2.10.0** (TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **2.11.0** (TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -1475,6 +1475,33 @@ written before the test (documented exception in `audit-coverage.test.ts`: two l
 seven writes as denied to a client.
 
 ## Version history
+- **2.11.0** (TK-101, lot A): editing panel, server side (B329). **Additive**, nothing removed or changed; 3 new routes, 129 routes and
+  103 paths in all. The fingerprint of 2.10.0 is frozen in `openapi/versions.json` and in `test/contract.test.ts`.
+  - `ai.prefillItem` (`POST /projects/{projectId}/ai/item/prefill`): takes `{ projectId, type: "feature", description }`
+    (`description` 1 to 500 characters, not blank; the server also applies the plain-text policy to it: a link or a tag is a
+    422 `VALIDATION` before any spend) and returns `{ type, values }` where `values` holds only what the model could infer, all
+    optional and plain text: `title`, `priority`, `description`, `criteria` (`{ title, steps }`, same bounds and step order as a
+    proposal) and `links` (references such as `R-001`, 30 at most). Nothing is written: no spec batch, no `agent_proposals` row, no
+    `agent_launches` row. Same engine as the other `ai.*` (usage `spec_deliverables`, quota `ai`, audit `ai.item.prefill` on the
+    project, purpose `item-prefill`); errors are those of the proposals (`LLM_OUTPUT_INVALID` when the output holds a link, a
+    tag, a direction character or an unknown field). Roles: `SPEC_BATCH_ROLES`; client and business get 403
+    (`client-write-matrix`: denied; `audit-coverage`: one line).
+  - `spec.item.get` (`GET /projects/{projectId}/spec/items/{type}/{id}`, `type` is `feature` for now, `id` is `F-nnn`): returns
+    `{ type, id, values, validated, referencedBy }`. `values` is exactly the output of `spec.getFeature` (read from git at the
+    indexed commit, same errors); `validated` is true when the Functional deliverable of `spec.deliverables` is `validated`
+    (modifying the element would invalidate it); `referencedBy` is `{ items: [{ kind, specId, title }] (20 at most), total }`:
+    the elements of the head that quote the identifier, as an exact token (`F-0031` does not quote `F-003`), the element itself
+    excluded, ordered by rank then identifier. `SPEC_BATCH_ROLES` only (client and business: 403, before the project check).
+  - `spec.refs.search` (`GET /projects/{projectId}/spec/refs`): takes `{ projectId, kinds, q }` (`kinds` 1 to 6 of `feature`,
+    `rule`, `flow`, `table`, `endpoint`, `screen`; `q` 0 to 100 characters; arrays are sent in bracket notation, `kinds[]=...`)
+    and returns `{ items: [{ kind, specId, title }] }`, 20 at most, no cursor. It reads the generic entity index of the head
+    (`spec_entities`): the elements whose identifier starts with `q` (`ILIKE`, the characters `%`, `_` and `\` are literal) or
+    whose identifier and title contain its words (`french`), ordered by rank then identifier; an empty `q` returns the first 20.
+    A head whose entities are not indexed (`spec_snapshots.entities_indexed_at` null) or whose index failed gives an empty
+    list, not an error. `SPEC_BATCH_ROLES` only.
+  - `seed:large` and `seed:planche` now fill `spec_entities` (features, tables, endpoints: `titre`, path, rank, hash) and set
+    `entities_indexed_at`, so the autocomplete finds an element beyond the first page (`F-987`). No migration.
+  Migration note: none for existing clients; the editing panel of the web needs the 2.11.0 contract.
 - **2.10.0** (TK-100, lot C, same version, not yet released): upstream impact, no new field. `spec.deliverables` now fills
   `staleBecause: { idea, changedPages }` and sets the status to `revise` for every dependent deliverable already validated or recorded
   (a decision exists) before the latest `idea-vN` and affected by it (graph of sources: Functional <- idea, Data and Design <-
