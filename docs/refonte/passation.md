@@ -53,6 +53,14 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
   mort) ; ils arrivent avec TK-90 et TK-91. L'Assistant de cadrage actuel et le brief sont retirés au sprint 022.
 - Tout en français ; jamais le nom du fournisseur d'IA dans l'interface ; aucune donnée réelle ni secret ; WCAG 2.2 AA,
   375 px, axe sans violation. Ne jamais cocher une case du sprint sans que chaque critère soit vérifié.
+- Lecteur de diagramme (2026-11-13, TK-108) : **SVG maison** dans `packages/ui` (`DiagramViewer` partagé par les lots 6,
+  7 et 9 ; `SequenceDiagram` à part) ; placement automatique sans `_layout.yaml` par **`@dagrejs/dagre`**, seule
+  dépendance ajoutée (ADR avec TK-108) ; React Flow et rendu Mermaid écartés (fidélité aux maquettes, accessibilité,
+  lot 7 hors de leur usage). API générique dès TK-108 : **types de nœud libres** et **groupes imbriqués** (cadres qui en
+  contiennent d'autres, placés par dagre en mode `compound`), prévus mais non construits tant qu'aucun écran ne les
+  demande. Usage futur visé : diagramme d'infra (hors périmètre tant qu'il n'a ni maquette ni accord de l'utilisateur).
+- Maquette 11, volume réel : la zone détaillée **« Prise de rendez-vous »** fait foi pour toute zone ouverte ; les autres
+  zones de la planche (grille 210 px, champs factices) sont du remplissage de démonstration, à ne pas reproduire.
 - Jamais de commit de `.project/`, jamais `--no-verify`, jamais d'amend, jamais de push direct sur `develop`.
 
 ## Économie de jetons (demande du 2026-11-08)
