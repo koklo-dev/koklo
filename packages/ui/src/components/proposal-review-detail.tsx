@@ -182,25 +182,33 @@ export function ProposalCriterion({ id, title, steps }: ProposalCriterionProps) 
   );
 }
 
-/** Liste de lignes à icône (« Permissions », « Étapes ») : cadre rayon 8, icône muted 18. */
+/**
+ * Liste de lignes à icône (« Permissions », « Étapes ») : cadre rayon 8, icône muted 18. `plain` : lignes nues de la
+ * fiche ancrée (maquette 10 l.211, critères d'acceptation) ; `ordered` : liste numérotée sémantiquement (`ol`).
+ */
 export function ProposalDetailLines({
   lines,
   className,
+  plain = false,
+  ordered = false,
 }: {
-  lines: readonly { icon: IconName; text: string }[];
+  lines: readonly { icon: IconName; text: ReactNode; key?: string }[];
   className?: string;
+  plain?: boolean;
+  ordered?: boolean;
 }) {
+  const List = ordered ? "ol" : "ul";
   return (
-    <ul className={cn("m-0 flex list-none flex-col gap-1.5 p-0", className)}>
-      {lines.map((line) => (
+    <List className={cn("m-0 flex list-none flex-col p-0", plain ? "gap-2" : "gap-1.5", className)}>
+      {lines.map((line, index) => (
         <li
-          key={`${line.icon}-${line.text}`}
-          className="flex gap-2.5 rounded-lg border px-3 py-2 text-body"
+          key={line.key ?? `${line.icon}-${typeof line.text === "string" ? line.text : index}`}
+          className={cn("flex gap-2.5 text-body", !plain && "rounded-lg border px-3 py-2")}
         >
-          <Icon name={line.icon} size={18} tone="muted" />
-          <span>{line.text}</span>
+          <Icon name={line.icon} size={18} tone="muted" className={plain ? "mt-0.5" : undefined} />
+          <span className="min-w-0">{line.text}</span>
         </li>
       ))}
-    </ul>
+    </List>
   );
 }

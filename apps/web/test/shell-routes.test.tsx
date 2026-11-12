@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -133,12 +135,13 @@ describe("pages d'un projet", () => {
     );
     expect(await Page(params({ projectId: ID }))).toMatchObject({ props: { projectId: ID } });
   });
+});
 
-  it("framing : assistant de cadrage du projet de l'URL", async () => {
-    const { default: Page } = await import(
-      "../src/app/(shell)/projects/[projectId]/framing/page.tsx"
-    );
-    expect(await Page(params({ projectId: ID }))).toMatchObject({ props: { projectId: ID } });
+describe("Assistant de cadrage retiré (TK-102)", () => {
+  it("plus de page /projects/[projectId]/framing : le proxy redirige vers le cahier fonctionnel", () => {
+    expect(
+      existsSync(resolve(import.meta.dirname, "../src/app/(shell)/projects/[projectId]/framing")),
+    ).toBe(false);
   });
 });
 

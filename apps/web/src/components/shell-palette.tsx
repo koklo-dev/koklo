@@ -13,7 +13,6 @@ import { useMemo, useState } from "react";
 import { orpc } from "../lib/orpc.ts";
 import {
   featuresPath,
-  framingPath,
   ideaPath,
   PROJECTS_PATH,
   type SpecSlug,
@@ -46,7 +45,6 @@ function pagesOf(
     ...(projectId
       ? [
           { title: "Idée", href: ideaPath(projectId) },
-          { title: "Assistant de cadrage", href: framingPath(projectId) },
           ...available.map((slug) => ({ title: spec[slug], href: specPath(projectId, slug) })),
           { title: "Tickets", href: ticketsPath(projectId) },
         ]

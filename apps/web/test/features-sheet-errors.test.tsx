@@ -40,7 +40,7 @@ async function openWith(error: () => Promise<never>, role: Parameters<typeof ser
   serve(role);
   procedures.specGetFeature.mockImplementation(error);
   renderFeatures({ search: "?feature=F-001" });
-  const dialog = await findRole("dialog");
+  const dialog = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
   const alert = await findRole("alert", { from: dialog });
   return { dialog, alert };
 }
@@ -57,7 +57,7 @@ describe("PROVIDER_UNAVAILABLE (503)", () => {
     expect(
       within(dialog).getByLabelText("Avancement : Spécifiée, étape 2 sur 6"),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText("Indispensable")).toBeInTheDocument();
+    expect(within(dialog).getByText("Validée")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Fonctionnalités", hidden: true })).toBeInTheDocument();
   });
 
@@ -65,7 +65,7 @@ describe("PROVIDER_UNAVAILABLE (503)", () => {
     const { dialog, alert } = await openWith(reject("PROVIDER_UNAVAILABLE"));
     procedures.specGetFeature.mockResolvedValue(DETAIL);
     await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
-    expect(await within(dialog).findByText("Description")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Critères d'acceptation")).toBeInTheDocument();
     expect(procedures.specGetFeature).toHaveBeenCalledTimes(2);
     expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -141,10 +141,12 @@ describe("NOT_FOUND (la fonctionnalité a disparu de la spec)", () => {
     await waitFor(() =>
       expect(procedures.specListFeatures.mock.calls.length).toBeGreaterThanOrEqual(2),
     );
-    await userEvent.click(
-      within(dialog).getAllByRole("button", { name: "Fermer" })[0] as HTMLElement,
+    await userEvent.click(within(dialog).getByRole("button", { name: "Fermer la fiche" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+      ).not.toBeInTheDocument(),
     );
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(window.location.search).toBe("?tab=features");
   });
 });

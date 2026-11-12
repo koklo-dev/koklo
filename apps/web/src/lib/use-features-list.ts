@@ -63,7 +63,7 @@ export function useFilterActions(url: Url, announce: (text: string) => void) {
     },
     onClear: () => {
       announce("");
-      url.setFilters({ status: null, priority: null });
+      url.setFilters({ status: null, priority: null, validation: null });
       statusRef.current?.focus();
     },
   };

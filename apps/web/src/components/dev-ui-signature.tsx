@@ -35,6 +35,11 @@ function Entities() {
           />
         ))}
       </DevUiRow>
+      <DevUiNote>Sans cible (fiche de fonctionnalité) : étiquette, ni lien ni focus</DevUiNote>
+      <DevUiRow>
+        <EntityChip kind="table" id="T-reservation" />
+        <EntityChip kind="nfr" id="NFR-latence" />
+      </DevUiRow>
       <DevUiNote>Aperçu ouvert (rendu statique)</DevUiNote>
       <div className={hoverCardSurface}>
         <EntityPreviewBody {...ENTITY_PREVIEW} />

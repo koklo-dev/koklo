@@ -94,6 +94,7 @@ export interface WriteOptions {
   filters: () => {
     status?: string | undefined;
     priority?: string | undefined;
+    validation?: string | undefined;
     q?: string | undefined;
   };
 }

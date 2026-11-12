@@ -11,9 +11,9 @@ import {
 import { useState } from "react";
 import type { AiErrorView } from "../lib/ai-errors.ts";
 import type { FormIssue } from "../lib/feature-form.ts";
-import type { EditValues } from "../lib/framing-validation.ts";
 import { editedContentOf, editValuesOf, issuesOf } from "../lib/proposal-edit.ts";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
+import type { EditValues } from "../lib/proposal-validation.ts";
 import { AiErrorNotice } from "./ai-error-notice.tsx";
 import { ProposalCriteriaEditor } from "./proposal-criteria-editor.tsx";
 import { ProposalEditor } from "./proposal-editor.tsx";

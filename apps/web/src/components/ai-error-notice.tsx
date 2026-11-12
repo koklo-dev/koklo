@@ -1,7 +1,7 @@
 import { Alert, Button, Icon } from "@koklo/ui";
 import type { AiErrorView } from "../lib/ai-errors.ts";
 import { formatRetry } from "../lib/ai-errors.ts";
-import { IDS } from "../lib/framing-ids.ts";
+import { AI_ERROR_ID } from "../lib/proposal-ids.ts";
 import { canManage } from "../lib/roles.ts";
 import { useActiveOrganization } from "../lib/use-active-organization.ts";
 
@@ -44,7 +44,7 @@ function Action({ view }: { view: AiErrorView }) {
  */
 export function AiErrorNotice({ view, remaining, onRetry }: Props) {
   return (
-    <Alert variant="destructive" id={IDS.error} tabIndex={-1} className="outline-none">
+    <Alert variant="destructive" id={AI_ERROR_ID} tabIndex={-1} className="outline-none">
       <Icon name={view.icon} size={20} />
       <div className="flex flex-col items-start gap-2">
         <p className="font-medium">

@@ -3,18 +3,24 @@
 import {
   Alert,
   AlertDescription,
+  Button,
   CountBar,
   EmptyState,
   Icon,
   InlineAlert,
+  SpecCollection,
   VirtualList,
 } from "@koklo/ui";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { purgeFramingDrafts } from "../lib/feature-draft.ts";
+import { type HeaderAction, headerStateOf } from "../lib/features-header-state.ts";
 import { readFeaturesTab } from "../lib/features-tab.ts";
 import { GENERIC_ERROR } from "../lib/form-errors.ts";
 import { canManage } from "../lib/roles.ts";
 import { type FeaturesPageModel, useFeaturesPage } from "../lib/use-features-page.ts";
 import { useProjectShell } from "../lib/use-project-shell.ts";
+import { useSpecDeliverables } from "../lib/use-spec-deliverables.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FeatureFormSheet } from "./feature-form-sheet.tsx";
 import { FeatureSheet } from "./feature-sheet.tsx";
@@ -195,7 +201,8 @@ function Body({ page }: { page: FeaturesPageModel }) {
   }
 }
 
-function Sheet({ page }: { page: FeaturesPageModel }) {
+/** Fiche ancrée de la fonctionnalité choisie (`?sel=`), contenu de la région de `SpecCollection`. */
+function Detail({ page }: { page: FeaturesPageModel }) {
   const { url, data } = page;
   if (!page.sheetOpen || !url.feature) return null;
   return (
@@ -205,9 +212,7 @@ function Sheet({ page }: { page: FeaturesPageModel }) {
       specId={url.feature}
       summary={data.features.items.find((item) => item.specId === url.feature)}
       role={data.role}
-      onClose={url.closeFeature}
       onGone={page.sheet.refetchList}
-      onReturnFocus={page.sheet.returnFocus}
       onEdit={
         page.form.canWrite ? () => page.form.openEdit(url.feature as string, true) : undefined
       }
@@ -281,23 +286,15 @@ function StatusBlock({ page }: { page: FeaturesPageModel }) {
   );
 }
 
-/** Filtres puis, selon l'adresse, la relecture des propositions (`?view=review`) ou le corps de la liste. */
-function MainView({ page, projectId }: { page: FeaturesPageModel; projectId: string }) {
-  if (page.propose.reviewing) {
-    return (
-      <FeaturesReview
-        projectId={projectId}
-        branch={page.data.head?.branch}
-        onLeave={page.url.closeReview}
-      />
-    );
-  }
+/** Filtres puis corps de la liste, dans la colonne de gauche de la collection ; la fiche est à droite. */
+function ListColumn({ page }: { page: FeaturesPageModel }) {
   return (
     <>
       {page.showFilters ? (
         <FeaturesFilters
           status={page.url.status}
           priority={page.url.priority}
+          validation={page.url.validation}
           onChange={page.filters.onChange}
           onClear={page.filters.onClear}
           statusRef={page.filters.statusRef}
@@ -309,34 +306,143 @@ function MainView({ page, projectId }: { page: FeaturesPageModel; projectId: str
   );
 }
 
-/** Corps de l'onglet Fonctionnalités : liste, filtres, fiche, formulaire et relecture (design/screens/S-features.md). */
+/** Fiche refermée (croix, Échap, Retour) : le focus revient au lien de la ligne d'origine, ou au titre de la page. */
+function useReturnFocus(page: FeaturesPageModel): void {
+  const { feature } = page.url;
+  const previous = useRef<string | undefined>(undefined);
+  const { returnFocus } = page.sheet;
+  useEffect(() => {
+    const closed = previous.current;
+    previous.current = feature;
+    if (closed && !feature) returnFocus(closed);
+  }, [feature, returnFocus]);
+}
+
+/** Collection de la spec (maquette 10 l.179-221) : liste à gauche, fiche ancrée de `?sel=` à droite. */
+function Collection({ page }: { page: FeaturesPageModel }) {
+  const open = page.sheetOpen && page.url.feature;
+  useReturnFocus(page);
+  return (
+    <SpecCollection
+      list={<ListColumn page={page} />}
+      {...(open ? { detail: <Detail page={page} /> } : {})}
+      detailLabel="Fiche de la fonctionnalité"
+      onCloseDetail={page.url.closeFeature}
+    />
+  );
+}
+
+/** Relecture : en bandes pleine largeur sous les onglets (maquette 10 l.114-134), sans le cadre de page. */
+function ReviewView({ page, projectId }: { page: FeaturesPageModel; projectId: string }) {
+  return (
+    <>
+      <FeaturesReview
+        projectId={projectId}
+        branch={page.data.head?.branch}
+        onLeave={page.url.closeReview}
+      />
+      {page.propose.enabled ? <ProposeDialog launch={page.propose.launch} /> : null}
+    </>
+  );
+}
+
+const NEW_FEATURE = "Nouvelle fonctionnalité";
+
+/** Bouton d'une action de l'en-tête (maquette 10 l.637-658) ; `create` est la seule action primaire. */
+function HeaderActionButton({ action, page }: { action: HeaderAction; page: FeaturesPageModel }) {
+  const create = page.form.openCreate;
+  switch (action) {
+    case "propose":
+      return <ProposeEntry page={page} />;
+    case "add":
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          data-new-feature
+          className="h-11 w-full md:h-9 md:w-auto"
+          onClick={create}
+        >
+          <Icon name="add" size={20} />
+          Ajouter
+        </Button>
+      );
+    case "repropose":
+      return (
+        <Button
+          type="button"
+          className="h-11 w-full md:h-9 md:w-auto"
+          onClick={() => page.propose.launch.setOpen(true)}
+        >
+          <Icon name="wand_stars" size={20} />
+          Reproposer
+        </Button>
+      );
+    case "create":
+      return (
+        <Button
+          type="button"
+          data-new-feature
+          className="h-11 w-full md:h-9 md:w-auto"
+          onClick={create}
+        >
+          <Icon name="add" size={20} />
+          {NEW_FEATURE}
+        </Button>
+      );
+  }
+}
+
+/** État de l'en-tête (statut, résumé, actions, compteur de l'onglet) déduit de l'état de la page. */
+function useHeaderState(page: FeaturesPageModel, projectId: string) {
+  const { data, propose } = page;
+  const deliverables = useSpecDeliverables(projectId);
+  const functional = deliverables.data?.deliverables.find((item) => item.key === "functional");
+  const { status } = propose;
+  return headerStateOf({
+    team: page.team,
+    canWrite: page.form.canWrite,
+    agent: propose.enabled,
+    reviewing: propose.reviewing,
+    generating: status.active && status.counts.total === 0,
+    pending: status.counts.pending,
+    viewKind: data.view.kind,
+    total: data.head?.counts.features,
+    deliverable: functional?.status,
+  });
+}
+
+/** Corps de l'onglet Fonctionnalités : liste, filtres, fiche, formulaire et relecture (design/screens/S-spec-functional.md). */
 function FeaturesTab({ projectId }: { projectId: string }) {
   const page = useFeaturesPage(projectId);
   const { head, projectName } = page.data;
-  const reviewing = page.propose.reviewing;
-  // État Prêt (maquette 10 l.640) : la carte de l'agent porte les deux actions, l'en-tête n'en montre aucune.
-  const agentCard =
-    !reviewing && page.data.view.kind === "empty" && page.propose.enabled && page.form.canWrite;
+  const header = useHeaderState(page, projectId);
+  const primary = header.actions.includes("create");
+  const secondary = header.actions.filter((action) => action !== "create");
   return (
     <>
       <FeaturesHeader
         projectId={projectId}
         name={projectName}
         titleRef={page.titleRef}
-        onCreate={page.form.canWrite && !agentCard ? page.form.openCreate : undefined}
-        proposeAction={
-          page.propose.enabled && !agentCard ? <ProposeEntry page={page} /> : undefined
-        }
+        status={header.status}
+        statusLabel={header.statusLabel}
+        summary={header.summary}
+        tabCount={header.tabCount}
+        {...(secondary.length > 0
+          ? {
+              secondaryActions: secondary.map((action) => (
+                <HeaderActionButton key={action} action={action} page={page} />
+              )),
+            }
+          : {})}
+        {...(primary ? { primaryAction: <HeaderActionButton action="create" page={page} /> } : {})}
         tab="features"
         head={head ?? undefined}
         team={page.team}
       />
-      {reviewing ? (
-        <>
-          {/* Relecture en bandes pleine largeur sous les onglets (maquette 10 l.114-134), sans le cadre de page. */}
-          <MainView page={page} projectId={projectId} />
-          {page.propose.enabled ? <ProposeDialog launch={page.propose.launch} /> : null}
-        </>
+      {page.propose.reviewing ? (
+        <ReviewView page={page} projectId={projectId} />
       ) : (
         <PageBody>
           <div className="flex flex-col gap-4">
@@ -344,9 +450,8 @@ function FeaturesTab({ projectId }: { projectId: string }) {
               <UpdatedLine indexedAt={head.indexedAt} />
             ) : null}
             <StatusBlock page={page} />
-            <MainView page={page} projectId={projectId} />
+            <Collection page={page} />
             {page.propose.enabled ? <ProposeDialog launch={page.propose.launch} /> : null}
-            <Sheet page={page} />
             <FormSheet page={page} />
           </div>
         </PageBody>
@@ -370,7 +475,6 @@ function SoonTab({ projectId, tab }: { projectId: string; tab: keyof typeof SOON
         projectId={projectId}
         name={shell.data?.name}
         titleRef={null}
-        onCreate={undefined}
         tab={tab}
         head={undefined}
         team={false}
@@ -392,6 +496,8 @@ function SoonTab({ projectId, tab }: { projectId: string; tab: keyof typeof SOON
  * en lecture et en écriture ; les trois autres sont « Bientôt ». Un `tab` inconnu ouvre les fonctionnalités.
  */
 export function FeaturesPage({ projectId }: { projectId: string }) {
+  // Les brouillons de l'ancien Assistant de cadrage (retiré en TK-102) ne servent plus.
+  useEffect(purgeFramingDrafts, []);
   const tab = readFeaturesTab(useSearchParams().toString());
   return tab === "features" ? (
     <FeaturesTab projectId={projectId} />

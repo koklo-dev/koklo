@@ -14,6 +14,7 @@ import { DevUiProjects } from "./dev-ui-projects.tsx";
 import { DevUiProposals } from "./dev-ui-proposals.tsx";
 import { DevUiShell } from "./dev-ui-shell.tsx";
 import { DevUiSignature } from "./dev-ui-signature.tsx";
+import { DevUiSpecCollection } from "./dev-ui-spec-collection.tsx";
 import { DevUiSpecItemSheet } from "./dev-ui-spec-item-sheet.tsx";
 import { DevUiStatuses } from "./dev-ui-statuses.tsx";
 import { DevUiSurfacesA } from "./dev-ui-surfaces.tsx";
@@ -102,6 +103,7 @@ export function DevUiGallery() {
         <DevUiProjects />
         <DevUiProposals />
         <DevUiSpecItemSheet />
+        <DevUiSpecCollection />
       </main>
     </div>
   );

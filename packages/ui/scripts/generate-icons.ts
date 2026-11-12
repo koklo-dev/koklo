@@ -103,6 +103,7 @@ export const ICON_NAMES = [
   "sync_problem",
   "arrow_forward",
   "admin_panel_settings",
+  "route",
   "speed",
   "description",
   "subdirectory_arrow_right",

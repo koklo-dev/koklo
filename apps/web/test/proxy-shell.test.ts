@@ -30,7 +30,6 @@ const matched = (path: string) => config.matcher.filter((pattern) => toRegExp(pa
 const GUARDED = [
   `/projects/${ID}`,
   `/projects/${ID}/idea`,
-  `/projects/${ID}/framing`,
   `/projects/${ID}/tickets`,
   `/projects/${ID}/activity`,
   `/projects/${ID}/spec/functional`,
@@ -59,6 +58,15 @@ describe("proxy — routes de la coquille", () => {
     const response = await call(path);
     expect(response.headers.get("location")).toBeNull();
     expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("/framing reste gardé et couvert par le matcher, mais redirige vers le cahier (TK-102)", async () => {
+    const framing = `/projects/${ID}/framing`;
+    withSession(false);
+    expect(where(await call(framing))).toBe("/login");
+    withSession(true, true);
+    expect(where(await call(framing))).toBe(`/projects/${ID}/spec/functional`);
+    expect(matched(framing).length).toBeGreaterThan(0);
   });
 
   it.each(GUARDED)("%s est couvert par le matcher", (path) => {

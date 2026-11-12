@@ -118,11 +118,9 @@ describe("EntityChip", () => {
     await waitFor(() => expect(screen.queryByText(PREVIEW.summary)).toBeNull());
   });
 
-  it("refuse au type un type d'entité inconnu et un lien absent", () => {
-    // @ts-expect-error union fermée des 8 types
+  it("refuse au type un type d'entité inconnu", () => {
+    // @ts-expect-error union fermée des types d'entité
     render(<EntityChip kind="bug" id="B-1" href="#" />);
-    // @ts-expect-error href obligatoire : toujours un vrai lien
-    render(<EntityChip kind="feature" id="F-001" />);
   });
 });
 
@@ -133,5 +131,15 @@ describe("HoverCard (primitive)", () => {
       expect(ui, name).toHaveProperty(name);
     }
     expect(typeof HoverCard).toBe("function");
+  });
+});
+
+describe("EntityChip sans href", () => {
+  it("n'est qu'une étiquette : ni lien ni arrêt de tabulation, type lu, id mono", () => {
+    render(<EntityChip kind="nfr" id="NFR-001" />);
+    expect(screen.queryByRole("link")).toBeNull();
+    const chip = document.querySelector("[data-slot='entity-chip']") as HTMLElement;
+    expect(chip.tagName).toBe("SPAN");
+    expect(chip).toHaveTextContent("Exigence non fonctionnelle NFR-001");
   });
 });

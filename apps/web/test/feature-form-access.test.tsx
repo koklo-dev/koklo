@@ -210,7 +210,9 @@ describe("Client et business : adresses d'écriture ignorées (AC-48-27)", () =>
     async (role) => {
       serveWrite(role);
       renderFeatures({ search: "?edit=F-001" });
-      const panel = await findNamed("dialog", "Connexion par e-mail");
+      const panel = await screen.findByRole("complementary", {
+        name: "Fiche de la fonctionnalité",
+      });
       expect(within(panel).queryByRole("button", { name: /Modifier|Enregistrer/ })).toBeNull();
       expect(within(panel).queryByRole("textbox")).toBeNull();
       await waitFor(() => {
@@ -225,7 +227,7 @@ describe("Client et business : adresses d'écriture ignorées (AC-48-27)", () =>
   it.each(CLIENT_SIDE)("%s : la fiche n'a pas de bouton « Modifier »", async (role) => {
     serveWrite(role);
     renderFeatures({ search: "?feature=F-001" });
-    const panel = await findNamed("dialog", "Connexion par e-mail");
+    const panel = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     await within(panel).findByText("Critères d'acceptation");
     expect(within(panel).queryByRole("button", { name: "Modifier" })).toBeNull();
   });
@@ -263,7 +265,7 @@ describe("Ouverture de la modification", () => {
 
   it("la fiche d'une équipe propose « Modifier » : la fiche est remplacée par le formulaire", async () => {
     renderFeatures({ search: "?feature=F-001" });
-    const sheet = await findNamed("dialog", "Connexion par e-mail");
+    const sheet = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     await userEvent.click(await within(sheet).findByRole("button", { name: "Modifier" }));
     const panel = await findNamed("dialog", "Modifier la fonctionnalité");
     expect(panel).toBeVisible();
@@ -275,7 +277,7 @@ describe("Ouverture de la modification", () => {
 
   it("Retour du navigateur depuis le formulaire revient à la fiche", async () => {
     renderFeatures({ search: "?feature=F-001" });
-    const sheet = await findNamed("dialog", "Connexion par e-mail");
+    const sheet = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     await userEvent.click(await within(sheet).findByRole("button", { name: "Modifier" }));
     await findNamed("dialog", "Modifier la fonctionnalité");
     window.history.back();
@@ -288,7 +290,10 @@ describe("Ouverture de la modification", () => {
       },
     );
     await waitFor(
-      () => expect(screen.getByRole("dialog", { name: "Connexion par e-mail" })).toBeVisible(),
+      () =>
+        expect(
+          screen.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+        ).toBeVisible(),
       { timeout: 8000 },
     );
     expect(new URLSearchParams(window.location.search).get("sel")).toBe("F-001");

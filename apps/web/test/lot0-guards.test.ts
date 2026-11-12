@@ -98,13 +98,11 @@ describe("CA5 (5.2) : h2, h3 et titres de Sheet sur l'échelle v2", () => {
   });
 });
 
-/** Écrans du lot C (S-features, S-framing, S-kanban, S-github). */
+/** Écrans du lot C (S-features, S-kanban, S-github). */
 const SCREENS = [
   "components/features-list.tsx",
   "components/feature-sheet.tsx",
   "components/feature-status.tsx",
-  "components/framing-proposal-parts.tsx",
-  "components/framing-proposal-card.tsx",
   "components/kanban-card.tsx",
   "components/github-status.tsx",
   "components/github-installations.tsx",

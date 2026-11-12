@@ -1,9 +1,15 @@
-import { featurePrioritySchema, featureStatusSchema } from "@koklo/contract";
-import type { FeaturePriority, FeatureStatus } from "./feature-labels.ts";
+import {
+  featurePrioritySchema,
+  featureStatusSchema,
+  featureValidationSchema,
+} from "@koklo/contract";
+import type { FeaturePriority, FeatureStatus, FeatureValidation } from "./feature-labels.ts";
 
 export interface FeaturesUrlState {
   status?: FeatureStatus;
   priority?: FeaturePriority;
+  /** Validation du client (`?validation=`) : validated, to_validate ou to_revise. */
+  validation?: FeatureValidation;
   /** Recherche (`?q=`), 1 à 200 caractères comme le contrat. */
   q?: string;
   /** Identifiant `F-nnn` de la fiche ouverte (`?sel=` ; l'ancien `?feature=` est lu, jamais écrit). */
@@ -21,7 +27,7 @@ export type FeaturesUrlPatch = {
 };
 
 const FEATURE_ID = /^F-\d{3,}$/;
-const KEYS = ["status", "priority", "q", "edit"] as const;
+const KEYS = ["status", "priority", "validation", "q", "edit"] as const;
 /** Paramètre de la fiche ouverte ; `feature` est son ancien nom (liens déjà partagés). */
 const SELECTED = "sel";
 const LEGACY_SELECTED = "feature";
@@ -51,10 +57,12 @@ export function readFeaturesUrl(search: string): FeaturesUrlState {
   const params = new URLSearchParams(search);
   const status = featureStatusSchema.safeParse(params.get("status"));
   const priority = featurePrioritySchema.safeParse(params.get("priority"));
+  const validation = featureValidationSchema.safeParse(params.get("validation"));
   return {
     ...(params.get("view") === "review" ? { review: true as const } : {}),
     ...(status.success ? { status: status.data } : {}),
     ...(priority.success ? { priority: priority.data } : {}),
+    ...(validation.success ? { validation: validation.data } : {}),
     ...readQuery(params),
     ...readPanel(params),
   };

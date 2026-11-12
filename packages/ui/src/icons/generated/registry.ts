@@ -85,6 +85,7 @@ export const iconLoaders = {
   sync_problem: () => import("./sync_problem.ts"),
   arrow_forward: () => import("./arrow_forward.ts"),
   admin_panel_settings: () => import("./admin_panel_settings.ts"),
+  route: () => import("./route.ts"),
   speed: () => import("./speed.ts"),
   description: () => import("./description.ts"),
   subdirectory_arrow_right: () => import("./subdirectory_arrow_right.ts"),

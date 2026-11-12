@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import type { FeaturePriority, FeatureStatus } from "./feature-labels.ts";
+import type { FeaturePriority, FeatureStatus, FeatureValidation } from "./feature-labels.ts";
 import { deriveFeaturesView } from "./features-view.ts";
 import { orpc } from "./orpc.ts";
 import { canReadRepos } from "./roles.ts";
@@ -16,6 +16,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 interface Filters {
   status: FeatureStatus | undefined;
   priority: FeaturePriority | undefined;
+  validation: FeatureValidation | undefined;
   q: string | undefined;
   /** Fiche ouverte (`?sel=`) : à l'ouverture de l'écran, la liste s'ouvre sur la page qui la contient. */
   selected: string | undefined;
@@ -43,7 +44,10 @@ function useListRefresh(head: { status: string; commitSha: string } | null | und
 /** La liste, ouverte sur la page de la fiche d'un lien direct tant que les filtres sont ceux de l'ouverture. */
 function useFeaturesList(projectId: string, filters: Filters, options: { enabled: boolean }) {
   const { selected, ...search } = filters;
-  const deepLink = useDeepLink(selected, `${search.status}|${search.priority}|${search.q}`);
+  const deepLink = useDeepLink(
+    selected,
+    `${search.status}|${search.priority}|${search.validation}|${search.q}`,
+  );
   const features = useFeatures({ projectId, ...search, around: deepLink.around, ...options });
   const { aroundMissing } = features;
   const dropAround = deepLink.drop;
@@ -84,7 +88,7 @@ export function useFeaturesData(projectId: string, filters: Filters) {
     roleKnown: !organizations.isPending && !session.isPending,
     role,
     redirecting,
-    filtered: Boolean(filters.status || filters.priority || filters.q),
+    filtered: Boolean(filters.status || filters.priority || filters.validation || filters.q),
     head: head.query,
     repos,
     features: {

@@ -103,7 +103,10 @@ function ReviewNotices({ review, actions, onLeave }: Notices) {
         </InlineAlert>
       ) : null}
       {active ? (
-        <ProposalGenerationBanner onLeave={onLeave}>{GENERATING}</ProposalGenerationBanner>
+        // `ProposalReview` porte la région d'état de la relecture : le bandeau ne la double pas.
+        <ProposalGenerationBanner silent onLeave={onLeave}>
+          {GENERATING}
+        </ProposalGenerationBanner>
       ) : null}
       {counts.pending === 0 && counts.accepted > 0 && !active ? (
         <InlineAlert variant="neutral" icon="done_all">

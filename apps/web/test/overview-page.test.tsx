@@ -130,7 +130,7 @@ describe("phases", () => {
     );
     expect(within(rail).getByRole("link", { name: "Cadrage en cours" })).toHaveAttribute(
       "href",
-      `/projects/${PROJECT_ID}/framing`,
+      `/projects/${PROJECT_ID}/spec/functional`,
     );
     expect(within(rail).getAllByRole("link")).toHaveLength(2);
   });

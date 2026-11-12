@@ -12,8 +12,8 @@ import {
 } from "@koklo/ui";
 import type { FormIssue } from "../lib/feature-form.ts";
 import { priorityLabel } from "../lib/feature-labels.ts";
-import { proposalFieldId } from "../lib/framing-ids.ts";
-import type { EditValues } from "../lib/framing-validation.ts";
+import { proposalFieldId } from "../lib/proposal-ids.ts";
+import type { EditValues } from "../lib/proposal-validation.ts";
 import { FieldMessage } from "./feature-form-fields.tsx";
 import { ProposalCriteriaEditor } from "./proposal-criteria-editor.tsx";
 import { ProposalIssues } from "./proposal-issues.tsx";

@@ -49,7 +49,9 @@ interface State {
 
 const openFiche = async (page: Page) => {
   await page.getByRole("link", { name: FICHE_TITLE }).click();
-  await expect(page.getByRole("dialog", { name: FICHE_TITLE })).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+  ).toBeVisible();
 };
 const heading = (name: string) => (page: Page) =>
   expect(page.getByRole("heading", { name })).toBeVisible();
@@ -232,15 +234,15 @@ test("S-features : filtres dans l'adresse, requête relancée, « Effacer les fi
   await setScenario({ session: true, projects: "data" });
   await page.goto(PATH);
   await expect(rows(page)).toHaveCount(3);
-  await page.getByRole("combobox", { name: "Statut" }).click();
-  await page.getByRole("option", { name: "Brouillon" }).click();
+  await page.getByRole("button", { name: "Avancement" }).click();
+  await page.getByRole("menuitemradio", { name: "Brouillon" }).click();
   await expect(page).toHaveURL(/status=brouillon/);
   await expect(rows(page)).toHaveCount(1);
   await expect(page.getByRole("link", { name: FICHE_TITLE })).toBeVisible();
   await page.getByRole("button", { name: "Effacer les filtres" }).click();
   await expect(rows(page)).toHaveCount(3);
   await expect(page).not.toHaveURL(/status=/);
-  await expect(page.getByRole("combobox", { name: "Statut" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Validation" })).toBeFocused();
   const reads = await specReadsSeen();
   expect(reads.some((read) => read.includes("status=brouillon"))).toBe(true);
 });
@@ -254,7 +256,7 @@ test("S-features : fiche ouverte au clavier, lien partageable, Retour et Échap 
   await link.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/sel=F-001/);
-  const dialog = page.getByRole("dialog", { name: FICHE_TITLE });
+  const dialog = page.getByRole("complementary", { name: "Fiche de la fonctionnalité" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("heading", { name: FICHE_TITLE })).toBeFocused();
   await page.goBack();
@@ -265,10 +267,14 @@ test("S-features : fiche ouverte au clavier, lien partageable, Retour et Échap 
   await expect(dialog).toBeHidden();
   await expect(link).toBeFocused();
   await page.goto(`${PATH}?feature=F-002`);
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+  ).toBeVisible();
   await page.goto(`${PATH}?feature=F-1`);
   await expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "Fiche de la fonctionnalité" })).toHaveCount(
+    0,
+  );
 });
 
 test("S-features : « Charger la suite » ajoute la page suivante puis la liste se termine", async ({
@@ -360,8 +366,8 @@ test("S-features : AC-48-28, la vue client ne montre aucun terme git, chemin ni 
     /commit|branche|branch|\bSHA\b|version de la spec|\.ya?ml|\.koklo|dépôt git/i,
   );
   expect(html).not.toMatch(/a1b2c3d|\.koklo\/features|spec_too_large/);
-  expect(text).not.toMatch(/Tables|Endpoints|Exigences non fonctionnelles/);
-  await expect(page.getByText("Écrans")).toBeVisible();
+  expect(text).not.toMatch(/\bTable\b|Point d'accès|Exigence non fonctionnelle/);
+  await expect(page.getByText("S-login").first()).toBeVisible();
   await expect(page.getByText("Mise à jour le").first()).toBeVisible();
 });
 
@@ -373,7 +379,7 @@ test("S-features : l'équipe voit la version et le fichier", async ({ page }) =>
   await expect(page.getByText(/spec à jour/)).toBeVisible();
   await openFiche(page);
   await expect(page.getByText(".koklo/features/F-001.yaml")).toBeVisible();
-  await expect(page.getByText("Tables")).toBeVisible();
+  await expect(page.getByText("T-user").first()).toBeVisible();
 });
 
 test("S-features : liens d'erreur de la fiche (owner : /settings/github ; dev : texte seul)", async ({
@@ -422,8 +428,9 @@ test.describe("375 px", () => {
     await page.goto(PATH);
     const table = page.getByRole("list", { name: "Fonctionnalités" });
     await expect(table).toBeVisible();
-    // La ligne de 52 px garde l'identifiant et le titre ; avancement et priorité passent sous le titre (TK-87, B22).
-    await expect(table.getByLabel("Avancement : Spécifiée, étape 2 sur 6").first()).toBeVisible();
+    // La ligne de 52 px garde l'identifiant et le titre ; priorité et validation passent sous le titre (TK-87, B22).
+    // L'avancement n'est plus dans la ligne : il est dans la fiche (B336 c).
+    await expect(table.getByText("Indispensable").first()).toBeVisible();
     // Le sous-titre « N critères » reste visible à toute taille (maquette 12 l.62, TK-141).
     await expect(table.getByText("3 critères").first()).toBeVisible();
     expect(
@@ -442,7 +449,9 @@ test.describe("375 px", () => {
     await openFiche(page);
     // La fiche glisse depuis la droite : on mesure une fois l'animation terminée.
     await settle(page);
-    const box = await page.getByRole("dialog").boundingBox();
+    const box = await page
+      .getByRole("complementary", { name: "Fiche de la fonctionnalité" })
+      .boundingBox();
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(370);
     expect(
       await page.evaluate(

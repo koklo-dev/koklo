@@ -8,6 +8,8 @@ import {
   statusIcon,
   statusLabel,
   stepLabel,
+  validationLabel,
+  validationStatus,
 } from "../src/lib/feature-labels.ts";
 
 /** TK-48 / 48d : libellés, icônes de statut et de priorité (design/screens/S-features.md §3.3, §3.4). */
@@ -90,5 +92,21 @@ describe("criteriaLabel", () => {
     [12, "12 critères"],
   ])("%i : « %s »", (count, label) => {
     expect(criteriaLabel(count)).toBe(label);
+  });
+});
+
+describe("validation (TK-102)", () => {
+  it("libellés Validée, À valider, À revoir ; valeur inconnue : Autre", () => {
+    expect(validationLabel("validated")).toBe("Validée");
+    expect(validationLabel("to_validate")).toBe("À valider");
+    expect(validationLabel("to_revise")).toBe("À revoir");
+    expect(validationLabel("x")).toBe("Autre");
+  });
+
+  it("statut de pastille : validated, pending, revise ; inconnue : jamais validée", () => {
+    expect(validationStatus("validated")).toBe("validated");
+    expect(validationStatus("to_validate")).toBe("pending");
+    expect(validationStatus("to_revise")).toBe("revise");
+    expect(validationStatus("x")).toBe("pending");
   });
 });

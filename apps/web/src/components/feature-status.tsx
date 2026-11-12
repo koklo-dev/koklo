@@ -8,10 +8,12 @@ import { lifecycleStage, priorityLabel, priorityLevel } from "../lib/feature-lab
  */
 export function FeatureLifecycle({
   feature,
+  className,
 }: {
   feature: Pick<FeatureSummary, "status" | "criteriaCount">;
+  className?: string;
 }) {
-  return <LifecycleStatus stage={lifecycleStage(feature)} />;
+  return <LifecycleStatus stage={lifecycleStage(feature)} {...(className ? { className } : {})} />;
 }
 
 /** `barsOnly` : la ligne de liste n'affiche que les barres (planche 12), le libellé devient leur nom accessible. */

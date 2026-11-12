@@ -6,6 +6,7 @@ import {
   endFeatureSession,
   type FeatureDraft,
   pendingKey,
+  purgeFramingDrafts,
   readDraft,
   readPending,
   type StorageScope,
@@ -265,5 +266,36 @@ describe("validation stricte du marqueur relu", () => {
     stored(PENDING_KEY, pending(), change);
     expect(readPending(SCOPE, PROJECT_ID, NOW)).toBeNull();
     expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+  });
+});
+
+describe("TK-102 : brouillons de l'ancien Assistant de cadrage", () => {
+  const FRAMING_KEY = `koklo:framing-draft:${PROJECT_ID}`;
+
+  beforeEach(() => localStorage.clear());
+
+  it("supprime les clés koklo:framing-draft:* et laisse les autres brouillons intacts", () => {
+    localStorage.setItem(FRAMING_KEY, JSON.stringify({ briefTitle: "Ancien brief" }));
+    localStorage.setItem("koklo:framing-draft:autre-projet", "{}");
+    localStorage.setItem(draftKey(PROJECT_ID, "new"), "{}");
+    localStorage.setItem("koklo:idea-draft:x", "{}");
+
+    purgeFramingDrafts();
+
+    expect(localStorage.getItem(FRAMING_KEY)).toBeNull();
+    expect(localStorage.getItem("koklo:framing-draft:autre-projet")).toBeNull();
+    expect(localStorage.getItem(draftKey(PROJECT_ID, "new"))).toBe("{}");
+    expect(localStorage.getItem("koklo:idea-draft:x")).toBe("{}");
+  });
+
+  it("ne lève jamais quand le stockage est indisponible", () => {
+    const spy = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("stockage indisponible");
+    });
+    try {
+      expect(() => purgeFramingDrafts()).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

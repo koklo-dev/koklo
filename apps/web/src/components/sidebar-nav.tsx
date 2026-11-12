@@ -6,7 +6,6 @@ import { canManage, canWriteSpec } from "../lib/roles.ts";
 import { defaultSection } from "../lib/settings-sections.ts";
 import {
   activeSpecSlug,
-  framingPath,
   ideaPath,
   PROJECTS_PATH,
   projectPath,
@@ -14,12 +13,14 @@ import {
   specPath,
   ticketsPath,
 } from "../lib/shell-routes.ts";
+import { specBadges } from "../lib/spec-badges.ts";
 import { useProjectShell } from "../lib/use-project-shell.ts";
+import { useProposalStatus } from "../lib/use-proposal-status.ts";
 import { useSpecDeliverables } from "../lib/use-spec-deliverables.ts";
 import { ShellLink } from "./shell-link.tsx";
 import { SidebarProjectCard } from "./sidebar-project-card.tsx";
 
-/** Groupe « Projet » : carte du projet, Vue d'ensemble, Idée, Assistant de cadrage, SPEC, Tickets. */
+/** Groupe « Projet » : carte du projet, Vue d'ensemble, Idée, SPEC, Tickets. */
 export function ProjectNav({
   projectId,
   pathname,
@@ -31,6 +32,12 @@ export function ProjectNav({
 }) {
   const shell = useProjectShell(projectId);
   const spec = useSpecDeliverables(projectId);
+  // Même lecture que la page Fonctionnel (clé partagée) : le badge « … » suit le lancement de l'agent (maquette 10 l.686).
+  const functional = spec.data?.deliverables.find((item) => item.key === "functional");
+  const proposals = useProposalStatus(
+    projectId,
+    canWriteSpec(role) && functional?.available === true,
+  );
   const base = projectPath(projectId);
   // `spec.deliverables` en échec : aucune entrée SPEC n'est ouverte (fermé par défaut), la navigation reste.
   const hrefs = Object.fromEntries(
@@ -60,18 +67,13 @@ export function ProjectNav({
           active={is(ideaPath(projectId))}
           LinkComponent={ShellLink}
         />
-        {canWriteSpec(role) ? (
-          <ShellNavItem
-            href={framingPath(projectId)}
-            icon="smart_toy"
-            label="Assistant de cadrage"
-            active={is(framingPath(projectId))}
-            LinkComponent={ShellLink}
-          />
-        ) : null}
         <SpecNav
           hrefs={hrefs}
           {...(slug ? { activeKey: slug } : {})}
+          badges={specBadges(
+            spec.data?.deliverables,
+            proposals.active && proposals.counts.total === 0,
+          )}
           validatedCount={spec.data?.validatedCount ?? 0}
           loading={spec.isPending}
           LinkComponent={ShellLink}

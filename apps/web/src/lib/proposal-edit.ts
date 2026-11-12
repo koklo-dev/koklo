@@ -1,8 +1,7 @@
 import type { FormIssue } from "./feature-form.ts";
-import type { ProposedFeature } from "./framing-types.ts";
-import type { EditValues } from "./framing-validation.ts";
-import { fromEditValues, toEditValues, validateEdit } from "./framing-validation.ts";
-import type { ProposalOutput } from "./proposal-types.ts";
+import type { ProposalOutput, ProposedFeature } from "./proposal-types.ts";
+import type { EditValues } from "./proposal-validation.ts";
+import { fromEditValues, toEditValues, validateEdit } from "./proposal-validation.ts";
 
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
 

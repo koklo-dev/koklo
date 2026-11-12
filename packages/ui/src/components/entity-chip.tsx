@@ -13,7 +13,8 @@ export type EntityKind =
   | "table"
   | "rule"
   | "endpoint"
-  | "commit";
+  | "commit"
+  | "nfr";
 
 /** Icône (DESIGN.md v2 §4) et type lu par les lecteurs d'écran (questions.md B32). */
 const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
@@ -25,6 +26,7 @@ const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
   rule: { icon: "gavel", type: "Règle métier" },
   endpoint: { icon: "api", type: "Point d'accès" },
   commit: { icon: "commit", type: "Commit" },
+  nfr: { icon: "speed", type: "Exigence non fonctionnelle" },
 };
 
 export interface EntityPreview {
@@ -37,8 +39,11 @@ export interface EntityChipProps
   kind: EntityKind;
   id: string;
   title?: string;
-  /** Toujours un vrai lien : l'aperçu n'est jamais le seul accès à l'information. */
-  href: string;
+  /**
+   * Un vrai lien : l'aperçu n'est jamais le seul accès à l'information. Sans `href` (cible sans page, comme les liens
+   * d'une fiche vers des tables ou des exigences), la pastille n'est qu'une étiquette, ni lien ni focusable.
+   */
+  href?: string;
   preview?: EntityPreview;
 }
 
@@ -64,12 +69,14 @@ export function EntityChip({
 }: EntityChipProps) {
   // Type hors union (contournement du typage) : un simple lien plutôt qu'une exception au rendu.
   const { icon, type } = KIND[kind] ?? { icon: "link", type: "" };
+  const Tag = href === undefined ? "span" : "a";
   const chip = (
-    <a
+    <Tag
       data-slot="entity-chip"
-      href={href}
+      {...(href === undefined ? {} : { href })}
       className={cn(
-        "inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-md bg-secondary pr-2 pl-1.5 text-secondary-foreground motion-safe:transition-colors duration-150 hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-md bg-secondary pr-2 pl-1.5 text-secondary-foreground motion-safe:transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        href !== undefined && "hover:bg-secondary/80",
         className,
       )}
       {...props}
@@ -84,7 +91,7 @@ export function EntityChip({
           <span className="text-caption font-normal text-foreground">{title}</span>
         </>
       ) : null}
-    </a>
+    </Tag>
   );
   if (!preview) return chip;
   return (

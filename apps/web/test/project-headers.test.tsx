@@ -4,12 +4,11 @@ import { render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { FeaturesHeader } from "../src/components/features-header.tsx";
-import { FramingHeader } from "../src/components/framing-header.tsx";
 import { readFeaturesTab } from "../src/lib/features-tab.ts";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
-/** TK-88 (C5, C10) : ProjectHeader sur Cahier fonctionnel et Assistant de cadrage ; plus de fil d'Ariane v1. */
+/** TK-88 (C5, C10) : ProjectHeader sur Cahier fonctionnel ; plus de fil d'Ariane v1. */
 const ID = "7d1f6c1e-0b0a-4c55-9d63-1d2f7d6a1b01";
 const HEAD = {
   commitSha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
@@ -25,7 +24,8 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
         projectId={ID}
         name="Portail"
         titleRef={createRef()}
-        onCreate={() => undefined}
+        summary="12 fonctionnalités"
+        tabCount={{ value: 12 }}
         tab="features"
         head={HEAD}
         team
@@ -59,21 +59,21 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
   });
 
   it("client : ni SHA ni résumé", () => {
-    renderHeader({ team: false });
+    renderHeader({ team: false, summary: undefined });
     expect(screen.queryByText("a1b2c3d")).toBeNull();
     expect(screen.queryByText(/fonctionnalités$/)).toBeNull();
     expect(screen.queryByText(/spec à jour/)).toBeNull();
   });
 
   it("sans lecture de la spec : ni SHA ni résumé, sans trou", () => {
-    renderHeader({ head: undefined });
+    renderHeader({ head: undefined, summary: undefined, tabCount: undefined });
     expect(screen.queryByText(/spec à jour/)).toBeNull();
     expect(screen.queryByText(/fonctionnalités$/)).toBeNull();
   });
 
   it("onglets en liens : Fonctionnalités (avec compteur), Règles métier, Rôles et permissions, Parcours", () => {
     renderHeader();
-    const tabs = screen.getByRole("navigation", { name: "Onglets du cahier fonctionnel" });
+    const tabs = screen.getByRole("navigation", { name: "Sections du cahier fonctionnel" });
     const links = within(tabs).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
       "Fonctionnalités12",
@@ -92,7 +92,7 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
 
   it("l'onglet actif suit la prop tab", () => {
     renderHeader({ tab: "roles" });
-    const tabs = screen.getByRole("navigation", { name: "Onglets du cahier fonctionnel" });
+    const tabs = screen.getByRole("navigation", { name: "Sections du cahier fonctionnel" });
     expect(within(tabs).getByRole("link", { name: "Rôles et permissions" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -102,8 +102,11 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
     );
   });
 
-  it("actions de l'équipe : « Proposer avec l'agent » en premier, « Nouvelle fonctionnalité » en contour ; plus de lien de cadrage", () => {
-    renderHeader({ proposeAction: <button type="button">Proposer avec l'agent</button> });
+  it("actions de l'équipe : l'agent dans la zone visuellement première, « Nouvelle fonctionnalité » primaire ; plus de lien de cadrage", () => {
+    renderHeader({
+      secondaryActions: <button type="button">Proposer avec l'agent</button>,
+      primaryAction: <button type="button">Nouvelle fonctionnalité</button>,
+    });
     // L'agent est dans la zone visuellement première (order-1), « Nouvelle fonctionnalité » dans la seconde.
     const first = screen.getByRole("button", { name: "Proposer avec l'agent" }).parentElement;
     expect(first).toHaveClass("order-1");
@@ -112,9 +115,32 @@ describe("FeaturesHeader (Spec · Fonctionnel)", () => {
   });
 
   it("sans droit d'écriture : aucune action", () => {
-    renderHeader({ onCreate: undefined });
+    renderHeader();
     expect(screen.queryByRole("button", { name: /Nouvelle fonctionnalité/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Cadrer/ })).toBeNull();
+  });
+
+  it.each([
+    ["ready", "Prêt"],
+    ["generating", "Génération"],
+    ["in_progress", "En cours"],
+    ["pending", "À valider"],
+  ] as const)("statut %s : pastille « %s » à côté du titre", (status, label) => {
+    renderHeader({ status });
+    expect(screen.getByText(label).closest("[data-slot='deliverable-status']")).toHaveAttribute(
+      "data-status",
+      status,
+    );
+  });
+
+  it("onglet Fonctionnalités : « 3 à relire » en pastille pleine pendant la relecture, « … » en génération", () => {
+    renderHeader({ tabCount: { value: "3 à relire", tone: "primary" } });
+    expect(screen.getByText("3 à relire").className).toContain("bg-primary");
+  });
+
+  it("sans statut : aucune pastille de livrable", () => {
+    renderHeader();
+    expect(document.querySelector("[data-slot='deliverable-status']")).toBeNull();
   });
 
   it("le titre reçoit la référence de focus", () => {
@@ -142,30 +168,6 @@ describe("readFeaturesTab", () => {
     ["?tab=Rules", "features"],
   ])("%s → %s", (search, expected) => {
     expect(readFeaturesTab(search)).toBe(expected);
-  });
-});
-
-describe("FramingHeader (Assistant de cadrage)", () => {
-  it("ProjectHeader : Portail / Assistant de cadrage, h1 sans onglets ni action", () => {
-    render(<FramingHeader projectId={ID} name="Portail" />);
-    const location = screen.getByRole("navigation", { name: "Emplacement" });
-    expect(within(location).getByRole("link", { name: "Portail" })).toHaveAttribute(
-      "href",
-      `/projects/${ID}`,
-    );
-    expect(within(location).getByText("Assistant de cadrage")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    const title = screen.getByRole("heading", { level: 1, name: "Assistant de cadrage" });
-    expect(title).toHaveAttribute("id");
-    expect(screen.queryByRole("navigation", { name: /onglets/i })).toBeNull();
-  });
-
-  it("garde la phrase d'aide et plus de fil d'Ariane v1", () => {
-    render(<FramingHeader projectId={ID} name="Portail" />);
-    expect(screen.queryByRole("navigation", { name: /fil d'ariane|breadcrumb/i })).toBeNull();
-    expect(screen.queryByText("Cadrage")).toBeNull();
   });
 });
 

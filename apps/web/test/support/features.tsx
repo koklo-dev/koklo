@@ -42,6 +42,7 @@ export const summary = (n: number, over: Record<string, unknown> = {}) => ({
   priority: "must",
   filePath: `.koklo/features/${featureId(n)}.yaml`,
   criteriaCount: 2,
+  validation: "to_validate",
   ...over,
 });
 
@@ -52,6 +53,7 @@ export const FEATURES = [
     status: "brouillon",
     priority: "must",
     criteriaCount: 3,
+    validation: "validated",
   }),
   summary(2, {
     title: "Tableau kanban",
@@ -64,6 +66,7 @@ export const FEATURES = [
     status: "adoptee",
     priority: "wont",
     criteriaCount: 0,
+    validation: "to_revise",
   }),
 ];
 

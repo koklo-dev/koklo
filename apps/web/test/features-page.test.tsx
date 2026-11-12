@@ -94,6 +94,19 @@ describe("Chargement (§4.1)", () => {
   });
 });
 
+describe("Brouillons de l'ancien Assistant de cadrage (TK-102)", () => {
+  it("le chargement du cahier supprime koklo:framing-draft:* et ne touche pas aux autres clés", async () => {
+    localStorage.setItem(`koklo:framing-draft:${PROJECT_ID}`, JSON.stringify({ briefTitle: "x" }));
+    localStorage.setItem("koklo:autre-reglage", "{}");
+
+    renderFeatures();
+    await findList();
+
+    expect(localStorage.getItem(`koklo:framing-draft:${PROJECT_ID}`)).toBeNull();
+    expect(localStorage.getItem("koklo:autre-reglage")).toBe("{}");
+  });
+});
+
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("En-tête (§3.1)", () => {
   it("h1 unique « Cahier fonctionnel » et, dans l'emplacement, le nom du projet", async () => {
@@ -131,7 +144,7 @@ describe("En-tête (§3.1)", () => {
   it("onglets en liens : Fonctionnalités (compteur de spec.head), les trois autres sans compteur", async () => {
     renderFeatures();
     await findList();
-    const tabs = screen.getByRole("navigation", { name: "Onglets du cahier fonctionnel" });
+    const tabs = screen.getByRole("navigation", { name: "Sections du cahier fonctionnel" });
     expect(within(tabs).getByRole("link", { name: /^Fonctionnalités/ })).toHaveTextContent("3");
     expect(
       within(tabs)
@@ -237,7 +250,7 @@ describe("Liste (§3.3, §4.2)", () => {
   });
 
   // TK-141 A5 (TK-94 n° 4, maquette 12 l.62) : IdTag, titre 500, sous-titre « N critères », priorité avant statut.
-  it("A5 : IdTag en tête, sous-titre « N critères », priorité avant avancement", async () => {
+  it("A5 : IdTag en tête, sous-titre « N critères », priorité libellée avant la validation", async () => {
     renderFeatures();
     await findList();
     const row = rowOf("Connexion par e-mail");
@@ -252,7 +265,7 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(subtitle.previousElementSibling?.textContent).toContain("Connexion par e-mail");
     for (const trail of row.querySelectorAll("[data-slot='priority-indicator']")) {
       const next = trail.compareDocumentPosition(
-        trail.parentElement?.querySelector("[data-slot='lifecycle-status']") as Element,
+        trail.parentElement?.querySelector("[data-slot='validation-status']") as Element,
       );
       expect(next & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
@@ -266,45 +279,41 @@ describe("Liste (§3.3, §4.2)", () => {
     expect(within(rowOf("Tableau kanban")).getAllByRole("link")).toHaveLength(1);
   });
 
-  // TK-87 (CA3, cas 3.1 ; H3, B22, B31) : LifecycleStatus (stade dérivé) et PriorityIndicator remplacent
-  // le badge « Brouillon / Spécifiée… » et la priorité en gras ou gris.
+  // TK-102 (maquette 10 l.188-195) : la ligne porte la priorité AVEC son libellé et la validation du client ;
+  // l'avancement (LifecycleStatus) est dans la fiche.
   it.each([
-    ["Connexion par e-mail", "Spécifiée, étape 2", "Indispensable", 3, "3 critères"],
-    ["Tableau kanban", "Implémentée, étape 4", "Importante", 2, "1 critère"],
-    ["Export des tickets", "Implémentée, étape 4", "Reportée", 0, "0 critère"],
+    ["Connexion par e-mail", "Indispensable", 3, "Validée", "3 critères"],
+    ["Tableau kanban", "Importante", 2, "À valider", "1 critère"],
+    ["Export des tickets", "Reportée", 0, "À revoir", "0 critère"],
   ] as const)(
-    "« %s » : avancement « %s sur 6 », priorité %s (%i barres), %s",
-    async (title, stage, priority, level, criteria) => {
+    "« %s » : priorité %s (%i barres) et validation %s, %s",
+    async (title, priority, level, validation, criteria) => {
       renderFeatures();
       await findList();
       const row = rowOf(title);
       // Deux rendus par ligne, identiques : la ligne méta mobile (md:hidden) et les cellules (hidden md:flex).
-      const lifecycles = within(row).getAllByLabelText(`Avancement : ${stage} sur 6`);
-      expect(lifecycles).toHaveLength(2);
-      for (const lifecycle of lifecycles) {
-        expect(lifecycle).toHaveAttribute("data-slot", "lifecycle-status");
-      }
       const indicators = row.querySelectorAll("[data-slot='priority-indicator']");
       expect(indicators, "PriorityIndicator").toHaveLength(2);
       for (const indicator of indicators) {
         expect(indicator).toHaveAttribute("data-level", String(level));
-        // Barres seules dans la liste (planche 12) : le libellé est le nom accessible, pas un texte visible.
-        expect(indicator).toHaveAttribute("aria-label", priority);
-        expect(indicator).toHaveAttribute("role", "img");
+        expect(indicator).toHaveTextContent(priority);
       }
-      // Les critères n'ont qu'une cellule (écran large) : sous 768 px la ligne de 52 px garde avancement et priorité.
+      const pills = row.querySelectorAll("[data-slot='validation-status']");
+      expect(pills).toHaveLength(2);
+      for (const pill of pills) expect(pill).toHaveTextContent(validation);
+      expect(row.querySelector("[data-slot='lifecycle-status']")).toBeNull();
+      // Les critères n'ont qu'une cellule (écran large) : sous 768 px la ligne garde priorité et validation.
       expect(within(row).getAllByText(criteria)).toHaveLength(1);
     },
   );
 
-  it("plus de badge de statut v1 ni de priorité en gras ou gris dans la liste", async () => {
+  it("plus de badge de statut v1 ; priorité en toutes lettres, jamais les barres seules", async () => {
     renderFeatures();
     await findList();
     const row = rowOf("Connexion par e-mail");
     expect(row.querySelector("[data-slot='badge']")).toBeNull();
-    // Barres seules (planche 12) : aucun libellé visible, le nom accessible porte le sens.
-    expect(within(row).queryByText("Indispensable")).toBeNull();
-    expect(within(row).getAllByRole("img", { name: "Indispensable" }).length).toBeGreaterThan(0);
+    expect(within(row).getAllByText("Indispensable").length).toBeGreaterThan(0);
+    expect(within(row).queryByRole("img", { name: "Indispensable" })).toBeNull();
     expect(within(row).queryByText("Brouillon")).toBeNull();
   });
 
@@ -395,45 +404,62 @@ describe("Vide (§4.3)", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Filtres (§3.2)", () => {
-  const statusSelect = () => screen.getByRole("combobox", { name: "Statut" });
-  const prioritySelect = () => screen.getByRole("combobox", { name: "Priorité" });
+  const statusSelect = () => screen.getByRole("button", { name: /^Avancement/ });
+  const prioritySelect = () => screen.getByRole("button", { name: /^Priorité/ });
+  const validationSelect = () => screen.getByRole("button", { name: /^Validation/ });
   const pick = async (select: HTMLElement, option: string) => {
     await userEvent.click(select);
-    await userEvent.click(await findNamed("option", option));
+    await userEvent.click(await findNamed("menuitemradio", option));
   };
 
-  it("deux Select à libellé visible, sans bouton « Appliquer », sur « Tous » / « Toutes »", async () => {
+  it("trois pastilles pointillées Validation, Priorité, Avancement, sans « Appliquer »", async () => {
     renderFeatures();
     await findList();
-    expect(statusSelect()).toHaveTextContent("Tous");
-    expect(prioritySelect()).toHaveTextContent("Toutes");
-    // « Statut » et « Priorité » sont aussi des en-têtes de colonne : on vise les libellés des filtres
-    expect(screen.getByText("Statut", { selector: "label" })).toBeVisible();
-    expect(screen.getByText("Priorité", { selector: "label" })).toBeVisible();
+    for (const [chip, label] of [
+      [validationSelect(), "Validation"],
+      [prioritySelect(), "Priorité"],
+      [statusSelect(), "Avancement"],
+    ] as const) {
+      expect(chip).toHaveTextContent(label);
+      expect(chip).toHaveAttribute("data-slot", "filter-chip");
+      expect(chip.className).toContain("border-dashed");
+    }
     expect(screen.queryByRole("button", { name: /appliquer/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Effacer les filtres" })).not.toBeInTheDocument();
   });
 
-  it("options du statut et de la priorité, en toutes lettres", async () => {
+  it("options de chaque filtre, en toutes lettres", async () => {
     renderFeatures();
     await findList();
+    const optionsOf = async () =>
+      (await screen.findAllByRole("menuitemradio")).map((o) => o.textContent);
+    await userEvent.click(validationSelect());
+    expect(await optionsOf()).toEqual(["Toutes", "Validée", "À valider", "À revoir"]);
+    await userEvent.keyboard("{Escape}");
     await userEvent.click(statusSelect());
-    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
-      "Tous",
-      "Brouillon",
-      "Spécifiée",
-      "Implémentée",
-      "Adoptée",
-    ]);
+    expect(await optionsOf()).toEqual(["Tous", "Brouillon", "Spécifiée", "Implémentée", "Adoptée"]);
     await userEvent.keyboard("{Escape}");
     await userEvent.click(prioritySelect());
-    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
+    expect(await optionsOf()).toEqual([
       "Toutes",
       "Indispensable",
       "Importante",
       "Souhaitable",
       "Reportée",
     ]);
+  });
+
+  it("choisir une validation envoie validation, l'écrit dans l'adresse et nomme la pastille", async () => {
+    renderFeatures();
+    await findList();
+    await pick(validationSelect(), "À valider");
+    await waitFor(() =>
+      expect(inputsOf(procedures.specListFeatures).at(-1)).toMatchObject({
+        validation: "to_validate",
+      }),
+    );
+    expect(new URLSearchParams(window.location.search).get("validation")).toBe("to_validate");
+    expect(screen.getByRole("button", { name: "Validation : À valider" })).toBeVisible();
   });
 
   it("choisir un statut relance la requête avec status, met à jour l'adresse sans empiler l'historique", async () => {
@@ -476,8 +502,8 @@ describe("Filtres (§3.2)", () => {
       status: "adoptee",
       priority: "wont",
     });
-    expect(statusSelect()).toHaveTextContent("Adoptée");
-    expect(prioritySelect()).toHaveTextContent("Reportée");
+    expect(statusSelect()).toHaveTextContent("Avancement : Adoptée");
+    expect(prioritySelect()).toHaveTextContent("Priorité : Reportée");
   });
 
   it("valeur d'adresse inconnue ignorée : requête sans filtre, pas d'« Effacer »", async () => {
@@ -506,7 +532,7 @@ describe("Filtres (§3.2)", () => {
     expect(countBar()).toHaveTextContent("312 fonctionnalités · 50 chargées");
   });
 
-  it("« Effacer les filtres » retire les paramètres, relance sans filtre et passe le focus au premier Select", async () => {
+  it("« Effacer les filtres » retire les paramètres, relance sans filtre et passe le focus à la première pastille", async () => {
     renderFeatures({ search: "?status=brouillon&priority=must" });
     await findList();
     await userEvent.click(screen.getByRole("button", { name: "Effacer les filtres" }));
@@ -515,7 +541,7 @@ describe("Filtres (§3.2)", () => {
     );
     expect(inputsOf(procedures.specListFeatures).at(-1)).not.toHaveProperty("priority");
     expect(window.location.search).toBe("?tab=features");
-    expect(statusSelect()).toHaveFocus();
+    expect(validationSelect()).toHaveFocus();
     expect(screen.queryByRole("button", { name: "Effacer les filtres" })).not.toBeInTheDocument();
   });
 
@@ -573,8 +599,8 @@ describe("Vide filtré (§4.4)", () => {
       ),
     );
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Statut" })).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Priorité" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Avancement/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Priorité/ })).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Effacer les filtres" }).length).toBeGreaterThan(
       0,
     );
@@ -583,7 +609,7 @@ describe("Vide filtré (§4.4)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("« Effacer les filtres » ramène la liste et le focus sur le premier Select", async () => {
+  it("« Effacer les filtres » ramène la liste et le focus sur la première pastille", async () => {
     renderFeatures({ search: "?status=adoptee" });
     await waitFor(() => expect(document.querySelector("[data-slot='empty-state']")).not.toBeNull());
     procedures.specListFeatures.mockResolvedValue(list(FEATURES));
@@ -592,7 +618,7 @@ describe("Vide filtré (§4.4)", () => {
     );
     await findList();
     expect(window.location.search).toBe("?tab=features");
-    expect(screen.getByRole("combobox", { name: "Statut" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: /^Validation/ })).toHaveFocus();
   });
 });
 

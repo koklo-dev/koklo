@@ -32,7 +32,6 @@ export const projectPath = (projectId: string): string => `/projects/${projectId
 /** Activité complète du projet (liste à curseur de `project.activity`). */
 export const activityPath = (projectId: string): string => `/projects/${projectId}/activity`;
 export const ideaPath = (projectId: string): string => `/projects/${projectId}/idea`;
-export const framingPath = (projectId: string): string => `/projects/${projectId}/framing`;
 export const ticketsPath = (projectId: string): string => `/projects/${projectId}/tickets`;
 export const specPath = (projectId: string, slug: SpecSlug): string =>
   `/projects/${projectId}/spec/${slug}`;

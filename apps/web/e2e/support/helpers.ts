@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
-import type { AiScenario } from "./stub-ai.ts";
 import type { ProvidersScenario } from "./stub-ai-providers.ts";
 import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
@@ -44,7 +43,6 @@ export async function setScenario(
   } & GithubScenario &
     SpecRepoScenario &
     FeaturesScenario &
-    AiScenario &
     ProposalsScenario &
     ProvidersScenario &
     ShellScenario &
@@ -145,14 +143,6 @@ export interface SpecWrite {
 }
 export const specWritesSeen = async (): Promise<SpecWrite[]> =>
   (await fetch(`${STUB}/__spec-writes`)).json();
-
-/** Appels `ai.draftBrief` (`brief`) et `ai.proposeFeatures` (`features`) reçus par le faux modèle, dans l'ordre. */
-export interface AiCall {
-  kind: "brief" | "features";
-  body: Record<string, unknown>;
-}
-export const aiCallsSeen = async (): Promise<AiCall[]> =>
-  (await fetch(`${STUB}/__ai-calls`)).json();
 
 /** Appels des fournisseurs d'IA reçus par le faux API (le corps de l'ajout porte la clé), dans l'ordre. */
 export interface ProviderCall {

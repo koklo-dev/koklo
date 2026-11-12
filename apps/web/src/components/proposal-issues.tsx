@@ -1,6 +1,6 @@
 import { Alert, Icon } from "@koklo/ui";
 import type { FormIssue } from "../lib/feature-form.ts";
-import { proposalFieldId } from "../lib/framing-ids.ts";
+import { proposalFieldId } from "../lib/proposal-ids.ts";
 
 const LABELS = { title: "Titre", description: "Description", priority: "Priorité" } as const;
 

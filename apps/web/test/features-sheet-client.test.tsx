@@ -1,4 +1,4 @@
-import { waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -66,8 +66,8 @@ function everythingVisible(): string {
 async function openFiche(role: (typeof CLIENT_SIDE)[number] | (typeof TEAM)[number]) {
   serve(role);
   renderFeatures({ search: "?feature=F-001" });
-  const dialog = await findRole("dialog");
-  await within(dialog).findByText("Description");
+  const dialog = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
+  await within(dialog).findByText("Critères d'acceptation");
   return dialog;
 }
 
@@ -99,12 +99,11 @@ describe("Vue client / business — fiche", () => {
     async (role) => {
       const dialog = await openFiche(role);
       expect(within(dialog).getByText("Première ligne.", { exact: false })).toBeInTheDocument();
-      expect(within(dialog).getByText("Connexion réussie")).toBeInTheDocument();
-      expect(within(dialog).getByText("Étant donné")).toBeInTheDocument();
+      expect(within(dialog).getByText(/Étant donné/)).toBeInTheDocument();
       for (const [group, value] of [
-        ["Écrans", "S-login"],
-        ["Rôles", "RL-owner"],
-        ["Règles", "R-001"],
+        ["Écran", "S-login"],
+        ["Rôle", "RL-owner"],
+        ["Règle métier", "R-001"],
       ]) {
         expect(within(dialog).getByText(group as string)).toBeInTheDocument();
         expect(within(dialog).getByText(value as string)).toBeInTheDocument();
@@ -117,9 +116,9 @@ describe("Vue client / business — fiche", () => {
     async (role) => {
       const dialog = await openFiche(role);
       for (const absent of [
-        "Tables",
-        "Endpoints",
-        "Exigences non fonctionnelles",
+        "Table",
+        "Point d'accès",
+        "Exigence non fonctionnelle",
         "T-user",
         "E-login",
         "NFR-latence",
@@ -143,30 +142,27 @@ describe("Vue client / business — fiche", () => {
     "%s : pas de pied « Version de la spec » ni de ligne « Fichier »",
     async (role) => {
       const dialog = await openFiche(role);
-      expect(within(dialog).queryByText("Fichier")).not.toBeInTheDocument();
+      expect(within(dialog).queryByText(/Enregistrée dans la spec/)).not.toBeInTheDocument();
       expect(within(dialog).queryByLabelText(/Version de la spec/)).not.toBeInTheDocument();
       expect(visibleText(dialog)).not.toContain("Version de la spec");
     },
   );
 
-  it.each(TEAM)(
-    "contrôle : %s voit tables, endpoints, exigences, version et fichier",
-    async (role) => {
-      const dialog = await openFiche(role);
-      for (const present of [
-        "Tables",
-        "T-user",
-        "Endpoints",
-        "E-login",
-        "Exigences non fonctionnelles",
-        "NFR-latence",
-        "Fichier",
-      ]) {
-        expect(within(dialog).getByText(present)).toBeInTheDocument();
-      }
-      expect(within(dialog).getByLabelText(/Version de la spec a1b2c3d/)).toBeInTheDocument();
-    },
-  );
+  it.each(TEAM)("contrôle : %s voit tables, endpoints, exigences et fichier", async (role) => {
+    const dialog = await openFiche(role);
+    for (const present of [
+      "Table",
+      "T-user",
+      "Point d'accès",
+      "E-login",
+      "Exigence non fonctionnelle",
+      "NFR-latence",
+      "Enregistrée dans la spec ·",
+    ]) {
+      expect(within(dialog).getByText(present, { exact: false })).toBeInTheDocument();
+    }
+    expect(within(dialog).queryByLabelText(/Version de la spec/)).not.toBeInTheDocument();
+  });
 });
 
 describe("Vue client / business — erreurs sans terme technique", () => {
@@ -191,7 +187,9 @@ describe("Vue client / business — erreurs sans terme technique", () => {
       serve("client");
       procedures.specGetFeature.mockRejectedValue(error);
       renderFeatures({ search: "?feature=F-001" });
-      const dialog = await findRole("dialog");
+      const dialog = await screen.findByRole("complementary", {
+        name: "Fiche de la fonctionnalité",
+      });
       await findRole("alert", { from: dialog });
       expect(everythingVisible()).not.toMatch(TECHNICAL_VALUE);
       expect(everythingVisible()).not.toMatch(/INTERNAL|NOT_FOUND|commit|SHA|branche/);
@@ -214,11 +212,11 @@ describe("Vue client / business — erreurs sans terme technique", () => {
     renderFeatures();
     await findList();
     await userEvent.click(titleLink("Connexion par e-mail"));
-    const dialog = await findRole("dialog");
-    await within(dialog).findByText("Description");
+    const dialog = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
+    await within(dialog).findByText("Critères d'acceptation");
     expect(inputsOf(procedures.specGetFeature)[0]).toMatchObject({ specId: "F-001" });
     expect(everythingVisible()).not.toMatch(TECHNICAL_VALUE);
-    await waitFor(() => expect(within(dialog).queryByText("Tables")).not.toBeInTheDocument());
+    await waitFor(() => expect(within(dialog).queryByText("Table")).not.toBeInTheDocument());
     expect(DETAIL.tables).toHaveLength(1);
   });
 });

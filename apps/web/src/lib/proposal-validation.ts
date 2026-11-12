@@ -1,10 +1,10 @@
 import type { CriterionValue } from "./feature-form.ts";
 import { EMPTY_VALUES, type FormIssue, validateFeatureForm } from "./feature-form.ts";
-import type { ProposedFeature } from "./framing-types.ts";
+import type { ProposedFeature } from "./proposal-types.ts";
 
 /**
  * Validation d'une proposition : les règles du formulaire de fonctionnalité (titre, critères, étapes), sans les
- * liens que l'écran de cadrage n'édite pas (S-framing §3.5).
+ * liens que la relecture des propositions n'édite pas.
  */
 const DESCRIPTION_MAX = 4000;
 export const ORDER_WARNING = "L'ordre habituel est Étant donné, Quand, Alors.";

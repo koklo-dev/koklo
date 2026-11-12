@@ -138,7 +138,9 @@ test.describe("palette ⌘K : recherche serveur (D2, D3, D4)", () => {
       .getByRole("option", { name: /Connexion par e-mail/ })
       .click();
     await expect(page).toHaveURL(new RegExp(`${SPEC}\\?tab=features&sel=F-001$`));
-    await expect(page.getByRole("dialog", { name: /Connexion par e-mail/ })).toBeVisible();
+    await expect(
+      page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+    ).toBeVisible();
   });
 
   test("les pages sont filtrées localement : Données (livrée) oui, Architecture (verrouillée) jamais", async ({
@@ -207,7 +209,9 @@ test.describe("clavier : ordre de focus, noms accessibles, états (D5)", () => {
     await hydrated(page);
     // Les entrées de SPEC et la carte projet naissent de project.shell : on attend qu'elles soient là.
     await expect(sidebarOf(page).getByRole("link", { name: "Fonctionnel" })).toBeVisible();
-    await expect(sidebarOf(page).getByRole("link", { name: "Assistant de cadrage" })).toBeVisible();
+    await expect(sidebarOf(page).getByRole("link", { name: "Assistant de cadrage" })).toHaveCount(
+      0,
+    );
     await sidebarOf(page).getByRole("button").first().focus();
     const order = await focusOrder(page);
     const names = [
@@ -215,7 +219,6 @@ test.describe("clavier : ordre de focus, noms accessibles, états (D5)", () => {
       /Atelier Lumière/,
       /^Vue d'ensemble/,
       /^Idée/,
-      /^Assistant de cadrage/,
       /^Fonctionnel/,
       /^Données/,
       /^Architecture/,
@@ -376,13 +379,12 @@ for (const theme of ["light", "dark"] as Theme[]) {
       expect((await scan(page)).violations).toEqual([]);
     });
 
-    test("coquille sur chaque écran, étendue : projets, fonctionnel, cadrage, tickets, Bientôt, réglages", async ({
+    test("coquille sur chaque écran, étendue : projets, fonctionnel, tickets, Bientôt, réglages", async ({
       page,
     }) => {
       for (const path of [
         "/projects",
         SPEC,
-        `${PROJECT}/framing`,
         `${PROJECT}/tickets`,
         `${PROJECT}/spec/data`,
         "/settings/members",
@@ -493,14 +495,13 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await shoot(page, "collapsed", theme);
   });
 
-  test(`captures S-app-shell : en-têtes Fonctionnel, Tickets, Cadrage et page « Bientôt » (${theme})`, async ({
+  test(`captures S-app-shell : en-têtes Fonctionnel, Tickets et page « Bientôt » (${theme})`, async ({
     page,
   }) => {
     await page.setViewportSize(SIZES.desktop);
     const pages: Array<[string, string, string]> = [
       ["header-features", SPEC, "Cahier fonctionnel"],
       ["header-tickets", `${PROJECT}/tickets`, "Tickets"],
-      ["header-framing", `${PROJECT}/framing`, "Assistant de cadrage"],
       ["soon-data", `${PROJECT}/spec/data`, "Données"],
     ];
     for (const [name, path, title] of pages) {
@@ -553,7 +554,6 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await page.keyboard.press("Escape");
     for (const [name, path] of [
       ["header-tickets", `${PROJECT}/tickets`],
-      ["header-framing", `${PROJECT}/framing`],
       ["soon-data", `${PROJECT}/spec/data`],
     ] as const) {
       await page.goto(path);
@@ -584,7 +584,6 @@ for (const theme of ["light", "dark"] as Theme[]) {
 const SCREENS: Array<[string, string]> = [
   ["S-projects", "/projects"],
   ["S-features", SPEC],
-  ["S-framing", `${PROJECT}/framing`],
   ["S-kanban", `${PROJECT}/tickets`],
   ["S-members", "/settings/members"],
   ["S-github", "/settings/github"],

@@ -7,8 +7,8 @@ import {
   removeAt,
 } from "../lib/feature-criteria.ts";
 import type { CriterionValue } from "../lib/feature-form.ts";
-import { proposalFieldId } from "../lib/framing-ids.ts";
-import { ORDER_WARNING, stepOrderBroken } from "../lib/framing-validation.ts";
+import { proposalFieldId } from "../lib/proposal-ids.ts";
+import { ORDER_WARNING, stepOrderBroken } from "../lib/proposal-validation.ts";
 import { CriterionItem } from "./criterion-item.tsx";
 
 interface Props {
