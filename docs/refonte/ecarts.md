@@ -394,3 +394,18 @@ Tests à réécrire avec ces retraits :
 | Boutons d'en-tête de l'espace Idée à 375 px : largeur naturelle, 36 px (l.61-62) | Pleine largeur, 44 px (B271) | Cible tactile WCAG 2.2 et fiche S-idea |
 | Planche 07 : six cartes de livrables, « quand les 6 sont validés » (l.129, l.339-345) | Sept cartes, « quand les 7 sont validés » (B282) | Décision 21 §0 : Sécurité est le 5e livrable |
 | Planche 07 : barre latérale, sélecteur de phase pointillé (l.30-64, l.71-75) | Barre de TK-88 ; pas de sélecteur | Périmés (décision 05 §2) ; le sélecteur est un outil de maquette |
+
+## TK-104, vue client et validation (2026-11-12)
+
+| Maquette | Réalisation | Raison |
+|---|---|---|
+| Filtre « Non traitées », « Aller à la suivante non traitée », bandeau « N éléments ont changé » absents de la planche 10 | Composés avec `FilterChip`, `Button` texte et `InlineAlert` `warning` | Demandés par le ticket (07 §1.4, 06 §5), B350 |
+| Confirmation de décision rouge en `role=status` (l.312, l.328) | `InlineAlert` variante `revise` (`role=status`) aux jetons `--status-revise-*` (l.440), `validated` aux jetons `--status-validated-*` | Pas de style local ; l'alerte d'erreur est `role=alert`, trop assertive pour une décision |
+| Note « 4 nov. · a1b2c3d » (l.216) | Date et 7 caractères du commit, seule exception à D7 | Critère du ticket, B348 |
+| Indicateur de validation par onglet (l.677 : icône `check_circle` ou `edit_note` près du compteur) | Compteur seul dans l'onglet ; le détail se lit dans le bandeau (« Fonctionnalités 12/248 · parcours 3/18 · règles et rôles 1/2 ») | `ProjectHeaderTab` n'a pas d'emplacement d'icône d'état ; le bandeau et l'en-tête portent la progression (B359) |
+| Recherche « Rechercher par titre ou F-nnn » (l.180) sur les 248 fonctionnalités | Filtre les lignes déjà chargées ; « Non traitées » et « suivante » interrogent le serveur (`untreated`, `around`) | `clientSpace.features` n'a pas de recherche serveur dans le contrat 3.2.0 (B359) |
+| « Relancer Marie » seul dans l'état Liste (l.655) | Plus « Valider à la place du client » quand aucun client n'est invité | Sans lui, la vue client de D1 n'a aucun accès (B358) |
+| Puces de filtre « Validation », « Priorité », « Avancement » (l.184, l.843) dans la vue client | Seule la puce « Non traitées » | Le contrat 3.2.0 n'a pas ces filtres ; l'avancement n'est pas lisible par le client (B362 a) |
+| Sous-titre de ligne « 2 critères · R-001, P-reserver » (l.569) | « 2 critères » sans identifiants liés | `clientFeatureSummarySchema` ne porte pas les liens ; ils figurent dans la fiche (B362 b) |
+| Auteur de la demande « Marie Lefèvre », initiales « ML » (l.207) | Prénom seul du client | Discrétion : aucun nom complet exposé à la vue client (B362 c) |
+| Onglets Règles et Parcours : compte et recherche sur toute la liste (l.227-228, l.277) | Recherche et filtre de type sur les cartes déjà chargées | Pas de recherche serveur dans le contrat 3.2.0 (B359, B362) |

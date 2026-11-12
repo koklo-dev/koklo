@@ -3,7 +3,7 @@ title: Architecture
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 covers_release: unreleased
 sources: []
 covers_commit: 5fa5b1c
@@ -1108,6 +1108,14 @@ payload of the wrong shape is stored `failed` / `invalid_payload` with an empty 
 enqueued. A replay answers the same 202 with no new row and no new job (the first payload wins). If
 the enqueue fails, the row is deleted and the answer is 503, so GitHub's redelivery starts afresh.
 
+The spec-batch route has its own, larger body parser (`apps/api/src/spec-batch/spec-batch-body-parser.ts`, commits 1899865f and
+e30875d). `POST /projects/{projectId}/spec/batches` reads its JSON body with a cap of `SPEC_BATCH_MAX_BODY_BYTES` (4 MiB, exported by
+`@koklo/contract`), mounted at the head of the Express stack by `SpecBatchModule.onModuleInit` with the same `mountFirst` helper as the
+webhook parser, so Express' 100 kB default never refuses (413, before the application and the logs) a save of 149 or more proposals;
+the global parser sees `request._body` and does not read the body again, and every other route keeps 100 kB. The web client plans its
+batches under 200 operations and under 3 MiB of operations (`planBatches`), then saves them one after the other and reports the
+progress batch by batch.
+
 Nothing sensitive reaches logs or errors: `serializeRequest` masks `x-hub-signature-256` and
 `x-hub-signature`, error bodies are fixed codes, and the enqueue error is logged without secret,
 signature or payload.
@@ -1904,6 +1912,27 @@ flowchart LR
 the Functional deliverable and Design; owner, admin, dev for the technical deliverables) from the project's `project_client_access`
 link, never from the input. A verdict is current when the hash it stored equals the target's current hash (`isCurrent`), else when its
 SHA is the head SHA. `ReviewStatusSource` replaces the lot A source of the deliverable statuses.
+
+### Client validation view (TK-104 lot A)
+```mermaid
+flowchart LR
+  rv[(reviews + review_versions)] --> facts[status-facts: entities, features, reviews]
+  facts --> prog[client-space-progress: units, treated, changed, next]
+  prog --> read[clientSpace.progress / flows / rules / roles]
+  prog --> gate{isCahierComplete}
+  submit[review.submit deliverable functional] --> pol[review-policy] --> gate
+  gate -->|incomplete| conflict[409 review_incomplete, nothing written]
+  gate -->|complete| rv
+  remind[review.remind owner/admin] --> notif[notifications review.reminded, 1 per client per day]
+  remind --> audit[audit review.remind]
+```
+A unit of the Functional book is a feature, a flow, the block of rules or the block of roles; `status-facts.ts` is the single read of
+the facts (entities, features, reviews of the head) shared by `spec.deliverables`, `clientSpace.progress` and the guard of "Validate
+the book" / "Send my requests" (`isCahierComplete`, after the per-target policy and before the insert, in the transaction of the write).
+`withdrawn` is a review like another (append-only journal): the latest review decides, and a withdrawn one puts the target back to
+"to validate". `review.remind` writes one `review.reminded` notification per linked client and per day (dedupe key with the date) and
+one audit entry per client reached; the overview activity shows it to the team only. The reads of flows, rules and roles
+(`prisma-client-space-entities.ts`) return plain language without file path or proposal.
 
 ## Upstream impact of a new idea version (TK-100 lot C)
 `packages/domain/src/deliverable-impact.ts` holds the graph of sources (`DELIVERABLE_SOURCES`, derived from B1), `staleLivrables(changed)`
