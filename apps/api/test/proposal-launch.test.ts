@@ -13,7 +13,7 @@ const bench = installAiBench({ beforeAll, afterAll, beforeEach });
 
 async function readyWorld() {
   const b = bench();
-  const { world } = await keyedWorld(b);
+  const { world } = await keyedWorld(b, { freeze: false });
   await freezeIdea(b.database, world);
   return { b, world };
 }
@@ -127,7 +127,7 @@ describe("ai.proposeDeliverable : refus avant lancement", () => {
 
   it("aucune version idea-vN figée : 422 VALIDATION", async () => {
     const b = bench();
-    const { world } = await keyedWorld(b);
+    const { world } = await keyedWorld(b, { freeze: false });
     const res = await proposalApi(b.app, world.actors.dev).propose(world.projectId);
     expect(res.status).toBe(422);
     expect(res.body.code).toBe("VALIDATION");
@@ -256,7 +256,7 @@ describe("droits (cas 8)", () => {
         role,
       ).toBe(200);
     }
-    const other = await keyedWorld(b);
+    const other = await keyedWorld(b, { freeze: false });
     const cross = await proposalApi(b.app, world.actors.dev).propose(other.world.projectId);
     expect(cross.status).toBe(404);
   });
@@ -264,7 +264,7 @@ describe("droits (cas 8)", () => {
 describe("ai.proposeOptions (cas 13)", () => {
   it("sans version figée : available false, raison no_frozen_idea, « L'agent lit » quand même listé", async () => {
     const b = bench();
-    const { world } = await keyedWorld(b);
+    const { world } = await keyedWorld(b, { freeze: false });
     const res = await proposalApi(b.app, world.actors.dev).options(world.projectId);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ available: false, reason: "no_frozen_idea", options: [] });
