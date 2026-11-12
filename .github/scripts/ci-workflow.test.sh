@@ -57,24 +57,61 @@ check "job 'skills in sync'" g 'name: skills in sync'
 check "job 'ci scripts'" g 'name: ci scripts'
 check "skills-sync-gate.sh appelé" g 'skills-sync-gate\.sh'
 check "skills-sync-gate.sh présent" test -f "$HERE/skills-sync-gate.sh"
-# T1.1
-check "ci: install" in_ci 'pnpm install --frozen-lockfile'
-check "ci: lint" in_ci 'pnpm lint'
-check "ci: typecheck" in_ci 'typecheck'
-check "ci: test" in_ci 'turbo run .*test|pnpm test'
-check "ci: build" in_ci 'turbo run .*build|pnpm build'
-check "ordre install < lint" before 'pnpm install' 'pnpm lint'
-check "ordre lint < typecheck" before 'pnpm lint' 'typecheck'
-check "ordre typecheck < test" before 'typecheck' 'turbo run .*test|pnpm test'
-check "ordre test < couverture" before 'turbo run .*test|pnpm test' 'check-coverage\.sh'
-check "ordre couverture < build" before 'check-coverage\.sh' 'turbo run .*build|pnpm build'
+# Jobs de la CI découpée : `checks` (lint, typecheck, build), `tests` (matrice de lots), `coverage`.
+blk() { job_block "$1"; }
+in_job() { local j="$1"; shift; blk "$j" | grep -Eq -- "$1"; }
+jrank() { blk "$1" | grep -nE -- "$2" | head -1 | cut -d: -f1; }
+jbefore() {
+    local a b
+    a="$(jrank "$1" "$2")"
+    b="$(jrank "$1" "$3")"
+    [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]
+}
+# T1.1 : lint, typecheck, build dans `checks` ; tests dans `tests` ; seuils dans `coverage`
+check "job checks" g '^  checks:'
+check "job tests" g '^  tests:'
+check "job coverage" g '^  coverage:'
+check "checks: install" in_job checks 'pnpm install --frozen-lockfile'
+check "checks: lint" in_job checks 'pnpm lint'
+check "checks: typecheck" in_job checks 'typecheck'
+check "checks: build" in_job checks 'turbo run .*build|pnpm build'
+check "checks: ordre install < lint" jbefore checks 'pnpm install' 'pnpm lint'
+check "checks: ordre lint < typecheck" jbefore checks 'pnpm lint' 'turbo run typecheck'
+check "checks: ordre typecheck < build" jbefore checks 'turbo run typecheck' 'turbo run .*build'
+check "checks: dépend de changes, déclenché par outputs.code" in_job checks "needs\.changes\.outputs\.code == 'true'"
+check "tests: dépend de changes, déclenché par outputs.code" in_job tests "needs\.changes\.outputs\.code == 'true'"
+check "tests: install" in_job tests 'pnpm install --frozen-lockfile'
+check "tests: turbo run test" in_job tests 'turbo run test'
+check "tests: matrice sans fail-fast (chaque lot va au bout)" in_job tests 'fail-fast: false'
+for lot in api web worker-db other; do
+    check "tests: lot $lot" in_job tests "name: $lot"
+done
+check "tests: le lot 'other' prend tout le reste (--except)" in_job tests -- '--except @koklo/api'
+check "tests: Postgres partagé postgres:17-alpine" in_job tests 'postgres:17-alpine'
+check "tests: TEST_DATABASE_URL défini pour les lots d'intégration" in_job tests 'TEST_DATABASE_URL:'
+check "tests: Postgres démarré avant les tests" jbefore tests 'Start Postgres' 'turbo run test \$FILTERS'
+check "tests: ordre plan < test" jbefore tests 'tests-planned\.sh' 'turbo run test \$FILTERS'
+check "tests: --affected sur PR" in_job tests -- '--affected'
+check "tests: publie les rapports de chaque lot" in_job tests 'actions/upload-artifact@v[0-9]+\.[0-9]+\.[0-9]+'
+check "turbo transmet TEST_DATABASE_URL aux tests (mode strict)" grep -q '"TEST_DATABASE_URL"' "$HERE/../../turbo.json"
+check "coverage: dépend de tests" in_job coverage 'needs:.*tests'
+check "coverage: télécharge les rapports des lots" in_job coverage 'actions/download-artifact@v[0-9]+\.[0-9]+\.[0-9]+'
+check "coverage: ordre fusion < seuils" jbefore coverage 'Merge coverage' 'check-coverage\.sh'
+check "job ci agrège checks (needs)" in_ci 'needs:.*checks'
+check "job ci agrège tests (needs)" in_ci 'needs:.*tests'
+check "job ci agrège coverage (needs)" in_ci 'needs:.*coverage'
+check "job ci : échec si checks est en failure ou cancelled" in_ci "needs\\.checks\\.result == 'failure' \\|\\| needs\\.checks\\.result == 'cancelled'"
+check "job ci : échec si tests est en failure ou cancelled" in_ci "needs\\.tests\\.result == 'failure' \\|\\| needs\\.tests\\.result == 'cancelled'"
+check "job ci : échec si coverage est en failure ou cancelled" in_ci "needs\\.coverage\\.result == 'failure' \\|\\| needs\\.coverage\\.result == 'cancelled'"
+ci_accepts_new_skipped() { ! job_block ci | grep -Eq "needs\\.(checks|tests|coverage)\\.result != 'success'"; }
+ci_is_light() { ! job_block ci | grep -Ev '^ *#' | grep -Eq 'pnpm|turbo'; }
+check "job ci : checks/tests/coverage skipped acceptés (pas de garde != 'success')" ci_accepts_new_skipped
+check "job ci : léger (ni pnpm ni turbo)" ci_is_light
 # T2.5
 check "couverture: --require-reports" g -- 'check-coverage\.sh --require-reports'
-check "couverture: exigée seulement si des tests sont planifiés" g 'PLANNED: .*steps\.plan\.outputs\.planned'
 check "couverture: un rapport par paquet testé (--expect)" g -- '--expect "\$PACKAGES"'
 check "tests-planned.sh appelé" g 'tests-planned\.sh'
 check "tests-planned.sh présent" test -f "$HERE/tests-planned.sh"
-check "ordre plan < test" before 'tests-planned\.sh' 'turbo run test \$TURBO_ARGS$'
 # T3.5 / T3.6
 check "--affected" g -- '--affected'
 check "detect-changes.sh appelé" g 'detect-changes\.sh'

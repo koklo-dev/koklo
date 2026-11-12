@@ -1,8 +1,10 @@
 # CI complète (vision §16.3, §19.2, §22 point 8, TK-4).
-# - `ci` est le check requis : son nom est stable et il s'exécute toujours ; seules
-#   ses étapes lourdes sont conditionnées à ce que `changes` détecte.
+# - `ci` est le check requis : son nom est stable et il s'exécute toujours. C'est un job final
+#   léger qui agrège tous les autres (il ne fait rien de lourd lui-même) : les vérifications
+#   (`checks`), les tests unitaires en parallèle (`tests`), la couverture, e2e, a11y, images…
+#   tournent chacune de leur côté dès que `changes` a répondu, sans s'attendre entre elles.
 # - Sur PR, turbo n'exécute que les paquets touchés (`--affected`) ; sur push, tout.
-# - Tant qu'il n'y a pas de package.json (workspace non posé), les étapes pnpm sont sautées.
+# - Tant qu'il n'y a pas de package.json (workspace non posé), les jobs pnpm sont sautés.
 name: CI
 
 on:
@@ -26,6 +28,7 @@ jobs:
       skills: ${{ steps.detect.outputs.skills }}
       ci: ${{ steps.detect.outputs.ci }}
       deploy: ${{ steps.detect.outputs.deploy }}
+      workspace: ${{ steps.detect.outputs.workspace }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -42,16 +45,184 @@ jobs:
           else
             printf 'code=true\nskills=true\nci=true\ndeploy=true\n' >> "$GITHUB_OUTPUT"
           fi
+          if [ -f package.json ]; then echo "workspace=true" >> "$GITHUB_OUTPUT"; else echo "workspace=false" >> "$GITHUB_OUTPUT"; fi
           cat "$GITHUB_OUTPUT"
 
+  # Lint, typecheck et build : rapides (~1 min), indépendants des tests et des jobs lourds.
+  checks:
+    name: lint, typecheck, build
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.workspace == 'true'
+    runs-on: ubuntu-latest
+    env:
+      TURBO_ARGS: ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6.1.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm exec turbo run typecheck $TURBO_ARGS
+
+      - name: Build
+        run: pnpm exec turbo run build $TURBO_ARGS
+
+  # Tests unitaires et d'intégration, découpés en lots parallèles (avant : un seul job de ~38 min).
+  # - Les lots sont disjoints et leur réunion couvre tous les paquets : `other` prend « tout le reste »
+  #   (--except), donc un nouveau paquet tombe dans un lot sans toucher au workflow.
+  # - Les suites d'intégration (`db: true`) partagent UN Postgres 17 démarré une fois par job, via
+  #   TEST_DATABASE_URL, au lieu d'un `docker run` par fichier de test. Chaque fichier garde sa
+  #   propre base (créée puis supprimée par createTestDatabase). Réglages de CI : fsync coupé,
+  #   datadir en tmpfs, plus de connexions que le défaut (plusieurs workers ouvrent des pools).
+  # - Sur PR, `--affected` détermine les paquets à tester ; tests-planned.sh en garde ceux du lot.
+  tests:
+    name: tests (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.workspace == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            db: true
+            select: --only @koklo/api
+          - name: web
+            db: false
+            select: --only @koklo/web
+          - name: worker-db
+            db: true
+            select: --only @koklo/worker,@koklo/db
+          - name: other
+            db: false
+            select: --except @koklo/api,@koklo/web,@koklo/worker,@koklo/db
+    env:
+      TURBO_ARGS: ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Start Postgres
+        if: matrix.db
+        run: |
+          docker run -d --name koklo-test-pg --tmpfs /var/lib/postgresql/data:rw \
+            -p 127.0.0.1:5432:5432 -e POSTGRES_PASSWORD=koklo-test \
+            postgres:17-alpine \
+            -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=500
+          for i in $(seq 1 60); do
+            docker exec koklo-test-pg pg_isready -U postgres && exit 0
+            sleep 1
+          done
+          docker logs koklo-test-pg
+          exit 1
+
+      - uses: pnpm/action-setup@v6.1.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Une PR qui ne touche que des fichiers racine (scripts, biome.json, workflows…) ne
+      # rattache aucun paquet à turbo : aucun test, donc aucun rapport à exiger.
+      - name: Plan unit tests
+        id: plan
+        run: pnpm exec turbo run test $TURBO_ARGS --dry=json | bash .github/scripts/tests-planned.sh ${{ matrix.select }} >> "$GITHUB_OUTPUT"
+
+      - name: Unit tests with coverage
+        if: steps.plan.outputs.planned == 'true'
+        env:
+          FILTERS: ${{ steps.plan.outputs.filters }}
+          TEST_DATABASE_URL: ${{ matrix.db && 'postgresql://postgres:koklo-test@127.0.0.1:5432/postgres' || '' }}
+        run: pnpm exec turbo run test $FILTERS
+
+      # Les seuils de couverture sont agrégés sur tous les paquets : ils ne peuvent pas être
+      # jugés lot par lot. Chaque lot publie ses rapports et la liste de ses paquets ; le job
+      # `coverage` les réunit.
+      - name: Pack coverage summaries
+        if: always() && steps.plan.outputs.planned == 'true'
+        env:
+          PACKAGES: ${{ steps.plan.outputs.packages }}
+        run: |
+          mkdir -p shard
+          printf '%s\n' "$PACKAGES" > "shard/${{ matrix.name }}.packages"
+          find apps packages -path '*/coverage/coverage-summary.json' -not -path '*/node_modules/*' > shard/files.txt
+          if [ -s shard/files.txt ]; then
+            tar czf "shard/${{ matrix.name }}.tgz" --files-from=shard/files.txt
+          fi
+          rm shard/files.txt
+
+      - name: Upload coverage shard
+        if: always() && steps.plan.outputs.planned == 'true'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coverage-shard-${{ matrix.name }}
+          path: shard/
+          if-no-files-found: ignore
+
+  # Seuils de couverture sur la réunion des lots (agrégats lignes/branches, seuils stricts domain/delivery).
+  coverage:
+    needs: [changes, tests]
+    if: needs.tests.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: coverage-shard-*
+          path: shard
+          merge-multiple: true
+
+      - name: Merge coverage summaries
+        run: |
+          shopt -s nullglob
+          for archive in shard/*.tgz; do tar xzf "$archive"; done
+
+      - name: Coverage thresholds
+        run: |
+          PACKAGES="$(cat shard/*.packages 2>/dev/null | tr '\n' ',' | sed -e 's/,\{2,\}/,/g' -e 's/^,//' -e 's/,$//')"
+          if [ -n "$PACKAGES" ]; then
+            bash .github/scripts/check-coverage.sh --require-reports --expect "$PACKAGES" .
+          else
+            bash .github/scripts/check-coverage.sh .
+          fi
+
+      - name: Upload coverage summaries
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coverage-summaries
+          path: |
+            apps/*/coverage/coverage-summary.json
+            packages/*/coverage/coverage-summary.json
+          if-no-files-found: ignore
+
+  # Check requis de `develop` : nom stable, toujours exécuté, léger. Il ne fait que juger le résultat
+  # des autres jobs.
   ci:
-    needs: [changes, e2e, a11y-web, images, deploy-check]
+    needs: [changes, checks, tests, coverage, e2e, a11y-web, images, deploy-check]
     # always() : si `changes` échoue, `ci` doit s'exécuter et échouer, pas être sauté —
     # un check requis sauté compte comme réussi.
     if: always()
     runs-on: ubuntu-latest
-    env:
-      TURBO_ARGS: ${{ github.event_name == 'pull_request' && '--affected' || '' }}
     steps:
       - name: Change detection succeeded
         if: needs.changes.result != 'success'
@@ -59,22 +230,42 @@ jobs:
           echo "::error::job 'changes' ended with '${{ needs.changes.result }}'"
           exit 1
 
-      # `ci` est la seule vérification requise : sans ce garde, un e2e rouge ne bloque pas
-      # le merge. `skipped` reste accepté (e2e n'a pas lieu quand code=false).
+      # `ci` est la seule vérification requise : sans ces gardes, un job rouge ne bloque pas le
+      # merge. `skipped` reste accepté partout (jobs sans objet quand `changes` ne les déclenche pas) ;
+      # un job `tests` en échec saute `coverage`, d'où le garde séparé sur chacun.
+      - name: Checks did not fail
+        if: needs.checks.result == 'failure' || needs.checks.result == 'cancelled'
+        run: |
+          echo "::error::job 'checks' ended with '${{ needs.checks.result }}'"
+          exit 1
+
+      - name: Tests did not fail
+        if: needs.tests.result == 'failure' || needs.tests.result == 'cancelled'
+        run: |
+          echo "::error::job 'tests' ended with '${{ needs.tests.result }}'"
+          exit 1
+
+      - name: Coverage did not fail
+        if: needs.coverage.result == 'failure' || needs.coverage.result == 'cancelled'
+        run: |
+          echo "::error::job 'coverage' ended with '${{ needs.coverage.result }}'"
+          exit 1
+
+      # Même logique : un e2e rouge ne doit pas passer. `skipped` reste accepté (e2e n'a pas lieu quand code=false).
       - name: E2E did not fail
         if: needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled'
         run: |
           echo "::error::job 'e2e' ended with '${{ needs.e2e.result }}'"
           exit 1
 
-      # Même logique que e2e : un écran qui viole WCAG 2.2 AA (axe) ne doit pas passer.
+      # Même logique : un écran qui viole WCAG 2.2 AA (axe) ne doit pas passer.
       - name: Accessibility did not fail
         if: needs.a11y-web.result == 'failure' || needs.a11y-web.result == 'cancelled'
         run: |
           echo "::error::job 'a11y-web' ended with '${{ needs.a11y-web.result }}'"
           exit 1
 
-      # Même logique que e2e : `ci` est le seul check requis, il doit refuser une image qui ne se construit pas.
+      # Même logique : `ci` doit refuser une image qui ne se construit pas.
       - name: Images did not fail
         if: needs.images.result == 'failure' || needs.images.result == 'cancelled'
         run: |
@@ -89,75 +280,9 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
 
       - name: Agent layer is valid
         run: jq -e '.loop.tickets == "vault"' .project/state.json
-
-      - name: Detect workspace
-        id: ws
-        if: needs.changes.outputs.code == 'true'
-        run: |
-          if [ -f package.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
-
-      - if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        uses: pnpm/action-setup@v6.1.1
-
-      - if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: pnpm lint
-
-      - name: Typecheck
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: pnpm exec turbo run typecheck $TURBO_ARGS
-
-      # Une PR qui ne touche que des fichiers racine (scripts, biome.json, workflows…) ne
-      # rattache aucun paquet à turbo : aucun test, donc aucun rapport à exiger.
-      - name: Plan unit tests
-        id: plan
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: pnpm exec turbo run test $TURBO_ARGS --dry=json | bash .github/scripts/tests-planned.sh >> "$GITHUB_OUTPUT"
-
-      - name: Unit tests with coverage
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: pnpm exec turbo run test $TURBO_ARGS
-
-      - name: Coverage thresholds
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        env:
-          PLANNED: ${{ steps.plan.outputs.planned }}
-          PACKAGES: ${{ steps.plan.outputs.packages }}
-        run: |
-          if [ "$PLANNED" = "true" ]; then
-            bash .github/scripts/check-coverage.sh --require-reports --expect "$PACKAGES" .
-          else
-            bash .github/scripts/check-coverage.sh .
-          fi
-
-      - name: Upload coverage summaries
-        if: always() && needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: coverage-summaries
-          path: |
-            apps/*/coverage/coverage-summary.json
-            packages/*/coverage/coverage-summary.json
-          if-no-files-found: ignore
-
-      - name: Build
-        if: needs.changes.outputs.code == 'true' && steps.ws.outputs.present == 'true'
-        run: pnpm exec turbo run build $TURBO_ARGS
 
   # Parcours sur le vrai stack (Postgres seedé + API + web), vision §16.3 / §19.1 (TK-15).
   # `pnpm e2e` gère Compose, migrate, seed, build et les serveurs ; secrets d'e2e factices,
