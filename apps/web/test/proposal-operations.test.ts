@@ -14,6 +14,12 @@ describe("operationOf", () => {
     expect(op).toMatchObject({ kind: "feature.create", title: "Titre", priority: "must" });
   });
 
+  it("feature : la zone de la proposition part dans feature.create, absente quand elle est vide (B366)", () => {
+    expect(operationOf(fake(1, { zone: "  Paiement " }))).toMatchObject({ zone: "Paiement" });
+    expect(operationOf(fake(1, { zone: "" }))).not.toHaveProperty("zone");
+    expect(operationOf(fake(1, { zone: "x".repeat(120) }))).toMatchObject({ zone: "x".repeat(80) });
+  });
+
   it("criteria -> feature.update de la fonctionnalité visée", () => {
     const op = operationOf(
       fake(1, { kind: "criteria", content: { specId: "F-004", criteria: [] } }),

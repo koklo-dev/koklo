@@ -1,11 +1,26 @@
 "use client";
 
+import type { ClientRule } from "@koklo/contract";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { errorCode } from "./api-error.ts";
 import { orpc } from "./orpc.ts";
 
 /** Pages de la vue client : 50 fonctionnalités, 6 parcours, 24 règles (mêmes tailles que la vue équipe). */
 export const CLIENT_PAGE_SIZE = { features: 50, flows: 6, rules: 24 } as const;
+
+/** Délai d'anti-rebond de la recherche serveur de la vue client (TK-105, B364). */
+export const CLIENT_SEARCH_DEBOUNCE_MS = 250;
+
+/** Saisie « posée » : la valeur suit l'entrée après un court délai, jamais à chaque frappe (une requête par recherche). */
+export function useDebouncedValue(value: string, delay = CLIENT_SEARCH_DEBOUNCE_MS): string {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
+}
 
 /** Progression du cahier pour le lecteur (`clientSpace.progress`) : compteurs d'onglet, suivante, éléments modifiés. */
 export function useClientProgress(projectId: string, enabled = true) {
@@ -18,18 +33,21 @@ export function useClientProgress(projectId: string, enabled = true) {
 interface FeaturesOptions {
   projectId: string;
   untreated: boolean;
+  /** Recherche serveur sur tout l'index (titre ou identifiant), déjà posée par l'anti-rebond. */
+  q?: string;
   /** Fonctionnalité à amener dans la page (la suivante non traitée, hors de la page chargée). */
   around: string | undefined;
 }
 
 /** Fonctionnalités (`clientSpace.features`) : curseur opaque, `total` du serveur, filtre « Non traitées », `around`. */
-export function useClientFeatures({ projectId, untreated, around }: FeaturesOptions) {
+export function useClientFeatures({ projectId, untreated, q, around }: FeaturesOptions) {
   const query = useInfiniteQuery({
     ...orpc.clientSpace.features.infiniteOptions({
       input: (cursor: string | undefined) => ({
         projectId,
         limit: CLIENT_PAGE_SIZE.features,
         ...(untreated ? { untreated: "true" as const } : {}),
+        ...(q ? { q } : {}),
         ...(cursor ? { cursor } : around ? { around } : {}),
       }),
       initialPageParam: undefined,
@@ -54,26 +72,42 @@ export function useClientFeature(projectId: string, featureId: string | undefine
   });
 }
 
-/** Parcours (`clientSpace.flows`, 6 par page) ou règles (`clientSpace.rules`, 24 par page) en pages à curseur. */
-export function useClientCards(projectId: string, tab: "flows" | "rules") {
-  const input = (cursor: string | undefined) => ({
+/** Filtres serveur d'une liste de cartes : recherche posée et, pour les règles, type. */
+export interface CardsFilter {
+  q?: string;
+  type?: ClientRule["type"];
+}
+
+/** Parcours (`clientSpace.flows`, 6 par page) ou règles (`clientSpace.rules`, 24 par page) en pages à curseur, filtrés par le serveur. */
+export function useClientCards(
+  projectId: string,
+  tab: "flows" | "rules",
+  filter: CardsFilter = {},
+) {
+  const base = (cursor: string | undefined) => ({
     projectId,
     limit: CLIENT_PAGE_SIZE[tab],
+    ...(filter.q ? { q: filter.q } : {}),
     ...(cursor ? { cursor } : {}),
   });
   const flows = useInfiniteQuery({
     ...orpc.clientSpace.flows.infiniteOptions({
-      input,
+      input: base,
       initialPageParam: undefined,
       getNextPageParam: (page) => page.nextCursor ?? undefined,
+      placeholderData: keepPreviousData,
     }),
     enabled: tab === "flows",
   });
   const rules = useInfiniteQuery({
     ...orpc.clientSpace.rules.infiniteOptions({
-      input,
+      input: (cursor: string | undefined) => ({
+        ...base(cursor),
+        ...(filter.type ? { type: filter.type } : {}),
+      }),
       initialPageParam: undefined,
       getNextPageParam: (page) => page.nextCursor ?? undefined,
+      placeholderData: keepPreviousData,
     }),
     enabled: tab === "rules",
   });

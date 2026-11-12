@@ -48,12 +48,11 @@ describe("Vue client : parcours", () => {
     });
   });
 
-  it("parcours : barre de compte et recherche locale (maquette l.277)", async () => {
+  it("parcours : barre de compte et recherche (maquette l.277), le filtrage est fait par le serveur", async () => {
     renderClient("?tab=flows");
     await screen.findByRole("region", { name: /P-reserver/ });
-    const search = screen.getByRole("searchbox", { name: "Rechercher un parcours" });
-    await userEvent.type(search, "zzzz");
-    expect(screen.queryByRole("region", { name: /P-reserver/ })).toBeNull();
+    expect(screen.getByRole("searchbox", { name: "Rechercher un parcours" })).toBeInTheDocument();
+    expect(screen.getByText(/2 parcours/)).toBeInTheDocument();
   });
 
   it("demander un changement ouvre « Que faut-il changer dans ce parcours ? »", async () => {
@@ -138,6 +137,7 @@ describe("Vue client : parcours", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Vue client : règles et rôles en bloc", () => {
   it("règles : cartes puis barre « Ces N règles décrivent-elles bien votre activité ? », valider envoie le bloc", async () => {
     renderClient("?tab=rules");
@@ -154,12 +154,13 @@ describe("Vue client : règles et rôles en bloc", () => {
     });
   });
 
-  it("règles : intro, légende des types, recherche et filtre locaux (maquette l.227-228)", async () => {
+  it("règles : intro, légende des types et recherche (maquette l.227-228), filtrage serveur", async () => {
     renderClient("?tab=rules");
     expect(await screen.findByText(RULE.title)).toBeInTheDocument();
     expect(screen.getByText(/Une règle métier est une vérité du domaine/)).toBeInTheDocument();
-    await userEvent.type(screen.getByRole("searchbox", { name: "Rechercher une règle" }), "zzzz");
-    expect(screen.queryByText(RULE.title)).toBeNull();
+    expect(
+      screen.getByRole("searchbox", { name: "Rechercher une règle ou R-nnn" }),
+    ).toBeInTheDocument();
   });
 
   it("rôles : cartes, matrice, barre ; une demande de changement envoie le texte", async () => {

@@ -58,6 +58,7 @@ beforeEach(() => {
 const TEAM_JARGON =
   /\blot\b|commit(?! à l'enregistrement| ?, relu dans l'historique)|branche|\bSHA\b|idempoten|payload|\bbatch\b/i;
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Dialogue, focus, étiquettes", () => {
   it("dialogue modal nommé par son h2, focus initial sur le titre", async () => {
     const panel = await openCreate();
@@ -103,7 +104,7 @@ describe("Dialogue, focus, étiquettes", () => {
     expect(root.className).toMatch(/md:max-w-\[540px\]/);
   });
 
-  it("ordre de tabulation = ordre visuel : titre, priorité, statut, description", async () => {
+  it("ordre de tabulation = ordre visuel : titre, priorité, statut, zone, description", async () => {
     const panel = await openCreate();
     titleField(panel).focus();
     const u = userEvent.setup();
@@ -118,6 +119,8 @@ describe("Dialogue, focus, étiquettes", () => {
     }
     expect(order[0]).toMatch(/Indispensable/);
     expect(order[1]).toMatch(/Brouillon/);
+    expect(document.activeElement).toBe(panel.getByRole("textbox", { name: /^Zone/ }));
+    await u.tab();
     expect((document.activeElement as HTMLElement).tagName).toBe("TEXTAREA");
   });
 });

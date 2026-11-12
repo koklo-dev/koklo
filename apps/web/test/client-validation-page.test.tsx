@@ -208,21 +208,24 @@ describe("Vue client : fonctionnalités", () => {
     ).toBeInTheDocument();
   });
 
-  it("la recherche filtre les lignes chargées par titre ou numéro", async () => {
-    procedures.clientSpaceFeatures.mockResolvedValue({
-      items: [feature(1, { title: "Connexion" }), feature(2, { title: "Paiement" })],
+  it("la recherche est envoyée au serveur (q), la liste affiche sa réponse", async () => {
+    procedures.clientSpaceFeatures.mockImplementation(async (input) => ({
+      items: (input as { q?: string }).q
+        ? [feature(2, { title: "Paiement" })]
+        : [feature(1, { title: "Connexion" }), feature(2, { title: "Paiement" })],
       nextCursor: null,
       version: "v1",
       total: 2,
       offset: 0,
-    });
+    }));
     renderClient();
     await userEvent.type(
       await screen.findByRole("searchbox", { name: "Rechercher une fonctionnalité" }),
       "paie",
     );
-    expect(screen.queryByRole("button", { name: /Connexion/ })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Connexion/ })).toBeNull());
     expect(screen.getByRole("button", { name: /Paiement/ })).toBeInTheDocument();
+    expect(procedures.clientSpaceFeatures.mock.calls.at(-1)?.[0]).toMatchObject({ q: "paie" });
   });
 
   it("aucune fonctionnalité : « Rien à valider pour l'instant »", async () => {
