@@ -3,9 +3,9 @@
 import type { ClientFlow } from "@koklo/contract";
 import { CountBar, EmptyState, FlowCard, ListFooter, SearchField } from "@koklo/ui";
 import { useState } from "react";
-import { footerState, useClientCards } from "../lib/use-client-space.ts";
+import { footerState, useClientCards, useDebouncedValue } from "../lib/use-client-space.ts";
 import { DecisionBlock, type ReviewActions } from "./client-decision.tsx";
-import { CardsSkeleton } from "./domain-list-parts.tsx";
+import { CardsSkeleton, DomainNoResults } from "./domain-list-parts.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 
 const NOUN = { one: "parcours", other: "parcours", masculine: true } as const;
@@ -53,7 +53,7 @@ function FlowItem({
   );
 }
 
-/** Barre de compte et recherche locale (maquette 10 l.277). */
+/** Barre de compte et recherche serveur (maquette 10 l.277). */
 function FlowsToolbar({
   total,
   loaded,
@@ -89,6 +89,31 @@ function FlowsToolbar({
   );
 }
 
+/** Pied de liste, absent sous l'état « aucun résultat » (DESIGN.md l.247). */
+function FlowsFooter({
+  query,
+  items,
+  total,
+}: {
+  query: Parameters<typeof footerState>[0] & { fetchNextPage: () => Promise<unknown> };
+  items: number;
+  total: number;
+}) {
+  if (items === 0) return null;
+  return (
+    <ListFooter
+      framed
+      state={footerState(query)}
+      pageSize={6}
+      loadedCount={items}
+      total={total}
+      noun={NOUN}
+      onLoadMore={() => void query.fetchNextPage()}
+      onRetry={() => void query.fetchNextPage()}
+    />
+  );
+}
+
 /** Parcours un par un (maquette 10 l.286-318) : la carte, puis la décision du client sous chacune. */
 export function ClientFlowsTab({
   projectId,
@@ -99,14 +124,11 @@ export function ClientFlowsTab({
   canValidate: boolean;
   actions: ReviewActions;
 }) {
-  const { flows } = useClientCards(projectId, "flows");
+  const [query, setQuery] = useState("");
+  const settled = useDebouncedValue(query.trim());
+  const { flows } = useClientCards(projectId, "flows", settled ? { q: settled } : {});
   const pages = flows.data?.pages ?? [];
   const items = pages.flatMap((page) => page.items);
-  const [query, setQuery] = useState("");
-  const needle = query.trim().toLowerCase();
-  const shown = items.filter(
-    (flow) => !needle || `${flow.id} ${flow.title} ${flow.actor}`.toLowerCase().includes(needle),
-  );
   const last = pages.at(-1);
   if (flows.isPending) return <CardsSkeleton label="Chargement des parcours" wide />;
   if (flows.isError && items.length === 0) {
@@ -116,7 +138,7 @@ export function ClientFlowsTab({
       </ErrorNotice>
     );
   }
-  if (items.length === 0 || !last) {
+  if ((items.length === 0 && !settled) || !last) {
     return (
       <EmptyState
         icon="route"
@@ -129,25 +151,25 @@ export function ClientFlowsTab({
   return (
     <div className="flex flex-col gap-3">
       <FlowsToolbar total={last.total} loaded={items.length} query={query} onQuery={setQuery} />
-      {shown.map((flow) => (
-        <FlowItem
-          key={flow.id}
-          flow={flow}
-          version={last.version}
-          canValidate={canValidate}
-          actions={actions}
+      {items.length === 0 ? (
+        <DomainNoResults
+          title={`Aucun parcours ne correspond à « ${settled} »`}
+          description="La recherche porte sur tous les parcours, pas seulement ceux affichés."
+          clearLabel="Effacer la recherche"
+          onClear={() => setQuery("")}
         />
-      ))}
-      <ListFooter
-        framed
-        state={footerState(flows)}
-        pageSize={6}
-        loadedCount={items.length}
-        total={last.total}
-        noun={NOUN}
-        onLoadMore={() => void flows.fetchNextPage()}
-        onRetry={() => void flows.fetchNextPage()}
-      />
+      ) : (
+        items.map((flow) => (
+          <FlowItem
+            key={flow.id}
+            flow={flow}
+            version={last.version}
+            canValidate={canValidate}
+            actions={actions}
+          />
+        ))
+      )}
+      <FlowsFooter query={flows} items={items.length} total={last.total} />
     </div>
   );
 }

@@ -11,6 +11,7 @@ export const FIELD_LABELS: Record<FieldKey, string> = {
   title: "Titre",
   priority: "Priorité",
   status: "Statut",
+  zone: "Zone",
   description: "Description",
   criteria: "Critères d'acceptation",
   screens: "Écrans",

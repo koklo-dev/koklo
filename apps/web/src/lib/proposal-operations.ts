@@ -2,6 +2,7 @@ import {
   SPEC_BATCH_MAX_BODY_BYTES,
   SPEC_BATCH_OPERATIONS_MAX,
   type SpecBatchSubmitInput,
+  FEATURE_ZONE_MAX_LENGTH as ZONE_MAX,
 } from "@koklo/contract";
 import type { ProposalOutput } from "./proposal-types.ts";
 
@@ -104,6 +105,7 @@ export function operationOf(proposal: ProposalOutput): Operation | null {
       title: str(content.title).trim(),
       priority: str(content.priority) as "must" | "should" | "could" | "wont",
       description: str(content.description),
+      ...optional("zone", proposal.zone.trim().slice(0, ZONE_MAX) || undefined),
       criteria: criteriaOf(content),
     };
   }

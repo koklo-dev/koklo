@@ -14,14 +14,16 @@ import {
   Skeleton,
   SpecCollection,
   ValidationStatus,
+  VirtualList,
 } from "@koklo/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { validationOf } from "../lib/client-validation-labels.ts";
 import { criteriaLabel, priorityLabel, priorityLevel } from "../lib/feature-labels.ts";
-import { footerState, useClientFeatures } from "../lib/use-client-space.ts";
+import { footerState, useClientFeatures, useDebouncedValue } from "../lib/use-client-space.ts";
 import type { ReviewActions } from "./client-decision.tsx";
 import { ClientFeatureSheet } from "./client-feature-sheet.tsx";
+import { DomainNoResults } from "./domain-list-parts.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 
 const TAB_OF_KIND = { feature: "features", flow: "flows", rules: "rules", roles: "roles" } as const;
@@ -188,6 +190,40 @@ function Toolbar({ list, progress, flow, search, untreated }: Omit<PaneProps, "i
   );
 }
 
+/** Liste en cadre de 600 px à défilement interne, pied dans le cadre (maquette 10 l.188, 197, 822). */
+function FeatureRows({ list, flow }: Pick<PaneProps, "list" | "flow">) {
+  return (
+    <VirtualList
+      label="Fonctionnalités"
+      items={list.items}
+      total={list.total}
+      getItemKey={(feature) => feature.id}
+      renderItem={(feature) => (
+        <Row feature={feature} selected={flow.selected === feature.id} onOpen={flow.setSelected} />
+      )}
+      onActivate={(feature) => flow.setSelected(feature.id)}
+      {...(flow.selected ? { selectedKey: flow.selected } : {})}
+      className="h-auto max-h-[600px]"
+      framed
+      hasMore={list.query.hasNextPage}
+      isLoadingMore={list.query.isFetchingNextPage}
+      onLoadMore={() => void list.query.fetchNextPage()}
+      footer={
+        <ListFooter
+          className="max-md:[&_button]:h-11 max-md:[&_button]:w-full"
+          state={footerState(list.query)}
+          pageSize={50}
+          loadedCount={list.items.length}
+          total={list.total}
+          noun={NOUN}
+          onLoadMore={() => void list.query.fetchNextPage()}
+          onRetry={() => void list.query.fetchNextPage()}
+        />
+      }
+    />
+  );
+}
+
 /** Colonne de gauche : barre d'outils, lignes, pied de liste. */
 function ListPane(props: PaneProps) {
   const { list, items, flow, search } = props;
@@ -196,43 +232,25 @@ function ListPane(props: PaneProps) {
     <>
       <Toolbar {...props} />
       {items.length === 0 ? (
-        <EmptyState
-          variant="inline"
-          bordered
-          icon={nothing ? "task_alt" : "search_off"}
-          title={nothing ? "Rien à valider pour l'instant" : "Aucune fonctionnalité trouvée"}
-          description={
-            nothing
-              ? "Aucune fonctionnalité n'attend votre décision."
-              : "Essayez un autre titre ou un autre numéro."
-          }
-        />
+        nothing ? (
+          <EmptyState
+            variant="inline"
+            bordered
+            icon="task_alt"
+            title="Rien à valider pour l'instant"
+            description="Aucune fonctionnalité n'attend votre décision."
+          />
+        ) : (
+          <DomainNoResults
+            title={`Aucune fonctionnalité ne correspond à « ${search.query.trim()} »`}
+            description="La recherche porte sur toutes les fonctionnalités, pas seulement celles affichées."
+            clearLabel="Effacer la recherche"
+            onClear={() => search.setQuery("")}
+          />
+        )
       ) : (
-        <ul
-          aria-label="Fonctionnalités"
-          className="m-0 list-none overflow-hidden rounded-xl border p-0"
-        >
-          {items.map((feature) => (
-            <li key={feature.id} className="border-t first:border-t-0">
-              <Row
-                feature={feature}
-                selected={flow.selected === feature.id}
-                onOpen={flow.setSelected}
-              />
-            </li>
-          ))}
-        </ul>
+        <FeatureRows list={list} flow={flow} />
       )}
-      <ListFooter
-        framed
-        state={footerState(list.query)}
-        pageSize={50}
-        loadedCount={list.items.length}
-        total={list.total}
-        noun={NOUN}
-        onLoadMore={() => void list.query.fetchNextPage()}
-        onRetry={() => void list.query.fetchNextPage()}
-      />
     </>
   );
 }
@@ -248,11 +266,14 @@ export function ClientFeaturesTab({
   const [untreated, setUntreated] = useState(false);
   const [query, setQuery] = useState("");
   const flow = useNextFeature(progress, progressUpdatedAt, useRouter());
-  const list = useClientFeatures({ projectId, untreated, around: flow.around });
-  const needle = query.trim().toLowerCase();
-  const items = list.items.filter(
-    (item) => !needle || `${item.id} ${item.title}`.toLowerCase().includes(needle),
-  );
+  const settled = useDebouncedValue(query.trim());
+  const list = useClientFeatures({
+    projectId,
+    untreated,
+    ...(settled ? { q: settled } : {}),
+    around: flow.around,
+  });
+  const items = list.items;
   if (list.query.isPending) return <Skeleton aria-busy="true" className="h-64 rounded-xl" />;
   if (list.query.isError && list.items.length === 0) {
     return (

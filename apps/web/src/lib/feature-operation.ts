@@ -13,17 +13,25 @@ import {
 /** Valeur d'un champ telle que le contrat l'attend (titre sans espaces, liens en tableaux, critères en bloc). */
 function fieldValue(values: FeatureFormValues, field: FieldKey): unknown {
   if (field === "title") return values.title.trim();
+  if (field === "zone") return values.zone.trim();
   if (field === "description") return normalizeText(values.description);
   if (field === "criteria") return normalizeCriteria(values.criteria);
   if (isLinkField(field)) return parseLinks(values[field]);
   return values[field];
 }
 
-const CREATE_OPTIONAL: readonly FieldKey[] = ["status", "description", "criteria", ...LINK_FIELDS];
+const CREATE_OPTIONAL: readonly FieldKey[] = [
+  "status",
+  "zone",
+  "description",
+  "criteria",
+  ...LINK_FIELDS,
+];
 
 /** Un champ facultatif n'est envoyé à la création que s'il diffère de sa valeur par défaut. */
 function isFilled(values: FeatureFormValues, field: FieldKey): boolean {
   if (field === "status") return values.status !== "brouillon";
+  if (field === "zone") return values.zone.trim() !== "";
   if (field === "description") return values.description.trim() !== "";
   if (field === "criteria") return values.criteria.length > 0;
   return isLinkField(field) && parseLinks(values[field]).length > 0;
