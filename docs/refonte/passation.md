@@ -67,7 +67,8 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
    d'y toucher.
 2. Gros ticket : `Workflow({ name: "koklo-ticket", args: { tk, branch, sprint: "sprint-NNN.md", date, sensitive, ui,
    notes } })` (script `.claude/workflows/koklo-ticket.js` : analyse → 1 à 3 lots → revue code (+ sécurité si
-   `sensitive`) et revue visuelle → un tour de correction). `notes` : périmètre des lots, dépendances autorisées,
+   `sensitive`) et revue visuelle en un seul tour → un tour de correction, revue de code seule rejouée ; si
+   `visualFixedUnchecked`, regarder soi-même les captures régénérées des états cités). `notes` : périmètre des lots, dépendances autorisées,
    hors périmètre. Coupure réseau : relancer avec `resumeFromRunId` et les mêmes `args` (les agents finis sont rejoués
    depuis le cache).
    - `args` est un **objet complet**, jamais `"TK-NN"` : `ui` (booléen) vaut `true` dès que la ligne du ticket a une
@@ -85,10 +86,13 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
    - test qui ne prouve pas le critère (ex. aller-retour testé sur des pages vides) ;
    - captures exigées « chaque état en clair, sombre et 375 px » : toutes produites ;
    - appels réseau refusés en boucle (ex. présence pour un rôle en lecture seule).
-4. Verrous locaux : `pnpm lint` ; `pnpm turbo run typecheck --concurrency=2` ; `pnpm build` ;
-   `pnpm --filter @koklo/ui exec vitest run --maxWorkers=4` ; `pnpm --filter @koklo/web exec vitest run --maxWorkers=3` ;
-   Playwright web complet en arrière-plan (`cd apps/web && pnpm exec playwright test --workers=1`, environ 20 min) ;
-   `.github/scripts/commitlint-local.sh`.
+4. Verrous locaux (machine légère, le poste gèle sous la charge, décision du 2026-11-12) : **aucune suite complète en
+   local**, la CI les fait. Seulement `pnpm lint` ; `pnpm --filter <paquet> typecheck` pour chaque paquet touché (tests
+   compris) ; les fichiers de test touchés et les tests de garde (`vitest run <fichiers> --maxWorkers=2`) ; au plus le
+   spec Playwright de l'écran (`--workers=1`) ; `.github/scripts/commitlint-local.sh`. Une commande à la fois.
+   Tests de garde qui ont cassé la CI de TK-102 : `contract-schema-parity` (champ ajouté à un schéma d'entité), tests
+   qui importent une aide modifiée de `apps/api/test/helpers/`, seuil de couverture d'un paquet quand un fichier source
+   nouveau n'a pas de test, et le typecheck des fichiers de test.
 5. Captures : l'e2e web réécrit **toutes** les captures. `python3 docs/refonte/outils/trier-captures.py --seuil 400
    --garder <écrans du ticket>`, puis regarder les plus gros écarts restants (souvent le survol de la souris ou une heure
    relative) avant de commiter.
