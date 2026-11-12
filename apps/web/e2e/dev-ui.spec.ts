@@ -726,10 +726,14 @@ for (const theme of ["light", "dark"] as Theme[]) {
         await page.screenshot({
           path: `${DIR}/spec-item-sheet-${mode.key}-${theme}${viewport.suffix}.png`,
         });
-        await dialog.getByRole("button", { name: "Annuler" }).click();
+        // Au clavier : à 375 px, le badge « Issues » de Next (mode dev, CI) couvre le pied du panneau et
+        // intercepte le pointeur ; le bouton reste le même, seule la manière de l'activer change.
+        await dialog.getByRole("button", { name: "Annuler" }).focus();
+        await page.keyboard.press("Enter");
         const confirm = page.getByRole("alertdialog");
         if (await confirm.isVisible()) {
-          await confirm.getByRole("button", { name: "Fermer sans enregistrer" }).click();
+          await confirm.getByRole("button", { name: "Fermer sans enregistrer" }).focus();
+          await page.keyboard.press("Enter");
         }
         await expect(dialog).toHaveCount(0);
       }
