@@ -1,6 +1,5 @@
 import type {
   FeatureDetail,
-  FeatureSummary,
   SpecHeadOutput,
   SpecItem,
   SpecRefsSearchInput,
@@ -18,6 +17,7 @@ import { detailOf } from "./feature-detail.ts";
 import { compareFeatures } from "./feature-page.ts";
 import {
   type FeatureFilter,
+  type FeatureHead,
   type FeatureListRequest,
   type FeaturePage,
   type Revision,
@@ -37,7 +37,7 @@ const EMPTY_PAGE: FeaturePage = {
   previousCursor: null,
   offset: 0,
   total: 0,
-  facets: { status: {}, priority: {} },
+  facets: { status: {}, priority: {}, validation: {} },
 };
 
 /**
@@ -63,11 +63,17 @@ export class SpecReadService {
       FeatureFilter &
       Omit<FeatureListRequest, "filter" | "limit"> & { limit?: number },
   ): Promise<FeaturePage> {
-    const { branch, commitSha, status, priority, limit, q, cursor, around } = input;
+    const { branch, commitSha, status, priority, validation, limit, q, cursor, around } = input;
     const indexed = await this.repository.featuresPage(
       scope,
       { branch, commitSha },
-      { filter: { status, priority }, q, cursor, around, limit: limit ?? DEFAULT_PAGE_SIZE },
+      {
+        filter: { status, priority, validation },
+        q,
+        cursor,
+        around,
+        limit: limit ?? DEFAULT_PAGE_SIZE,
+      },
     );
     if (indexed?.kind === "failed") throw indexFailed(indexed);
     return indexed?.page ?? EMPTY_PAGE;
@@ -78,7 +84,7 @@ export class SpecReadService {
    * Vide quand rien n'est indexé ou que l'index est en échec ; `NOT_FOUND` si le projet n'est pas
    * de l'organisation.
    */
-  async indexedFeatures(scope: ProjectScope): Promise<FeatureSummary[]> {
+  async indexedFeatures(scope: ProjectScope): Promise<FeatureHead[]> {
     const indexed = await this.repository.features(scope, {});
     return indexed?.kind === "rows" ? [...indexed.rows].sort(compareFeatures) : [];
   }

@@ -47,6 +47,7 @@ describe("spec.listFeatures : contenu d'un résumé", () => {
           priority: "must",
           filePath: "features/F-001-connexion.md",
           criteriaCount: 3,
+          validation: "to_validate",
         },
         {
           specId: "F-002",
@@ -55,6 +56,7 @@ describe("spec.listFeatures : contenu d'un résumé", () => {
           priority: "should",
           filePath: "features/F-002-sans-critere.md",
           criteriaCount: 0,
+          validation: "to_validate",
         },
       ],
       nextCursor: null,
@@ -64,6 +66,7 @@ describe("spec.listFeatures : contenu d'un résumé", () => {
       facets: {
         status: { brouillon: 1, specifiee: 1 },
         priority: { must: 1, should: 1 },
+        validation: { to_validate: 2 },
       },
     });
   });
@@ -84,7 +87,7 @@ describe("spec.listFeatures : contenu d'un résumé", () => {
         previousCursor: null,
         offset: 0,
         total: 0,
-        facets: { status: {}, priority: {} },
+        facets: { status: {}, priority: {}, validation: {} },
       });
     }
   });

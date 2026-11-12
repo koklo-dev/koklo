@@ -18,7 +18,6 @@ const VALIDATION_ROUTES = new Set([
   "DELETE /llm-credentials/{provider}",
   "POST /llm-credentials/{provider}/invalidate",
   "POST /llm-credentials/{provider}/verify",
-  "POST /projects/{projectId}/ai/brief",
   "POST /projects/{projectId}/ai/features",
   "POST /projects/{projectId}/ai/criteria",
   "GET /projects/{projectId}/clients",

@@ -3,17 +3,6 @@ import { z } from "zod";
 
 export const DEFAULT_MAX_FEATURES = 8;
 
-const briefSchema = z
-  .object({
-    title: safeText({ min: 1, max: 200 }),
-    problem: safeText({ min: 1, max: 2000, multiline: true }),
-    users: safeText({ min: 1, max: 2000, multiline: true }),
-    expectedOutcome: safeText({ min: 1, max: 2000, multiline: true }),
-    constraints: safeText({ min: 0, max: 2000, multiline: true }),
-    openQuestions: z.array(safeText({ min: 1, max: 500 })).max(10),
-  })
-  .strict();
-
 const IDEA_PROPOSALS_MAX = 3;
 const IDEA_CONTENT_TOTAL_MAX = 50_000;
 const ideaProposalSchema = z
@@ -62,7 +51,6 @@ export const featuresOutputSchema = (maxFeatures: number) =>
   z.object({ features: z.array(featureProposalSchema).min(1).max(maxFeatures) }).strict();
 
 export const criteriaOutputSchema = z.object({ criteria: criteriaListSchema }).strict();
-export const briefOutputSchema = briefSchema;
 
 export { jsonSchemaOf } from "@koklo/schema";
 

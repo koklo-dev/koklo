@@ -44,7 +44,6 @@ describe("AP1 surface : onze routes sous /ai", () => {
   it("aucun chemin /ai existant n'est modifié : les propositions restent sous /projects/{projectId}/ai", async () => {
     const paths = Object.keys((await doc()).paths).filter((p) => p.includes("/ai/"));
     expect(paths.filter((p) => p.startsWith("/projects/")).sort()).toEqual([
-      "/projects/{projectId}/ai/brief",
       "/projects/{projectId}/ai/criteria",
       "/projects/{projectId}/ai/deliverable/options",
       "/projects/{projectId}/ai/deliverable/propose",

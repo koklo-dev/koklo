@@ -3,7 +3,6 @@ import { PROPOSAL_BUDGETS, type ProposalPurpose } from "@koklo/llm";
 
 /** Finalités fixes (`trace.purpose`) : une par procédure. */
 export type AiPurpose =
-  | "brief-draft"
   | "features-propose"
   | "criteria-propose"
   | "credential-verify"
@@ -44,7 +43,6 @@ const IDEA = { maxPromptChars: 100_000, maxCostMicroUsd: 500_000 } as const;
 /** Budget serveur par appel : jamais lu de l'entrée, toujours sous les plafonds du domaine. */
 export const AI_BUDGETS: Readonly<Record<AiPurpose, LlmBudget>> = {
   "features-propose": { maxOutputTokens: 4000, timeoutMs: 60_000, ...COMMON },
-  "brief-draft": { maxOutputTokens: 1500, timeoutMs: 60_000, ...COMMON },
   "criteria-propose": { maxOutputTokens: 1500, timeoutMs: 60_000, ...COMMON },
   "credential-verify": { maxOutputTokens: 16, timeoutMs: 15_000, ...COMMON },
   "idea-chat": { maxOutputTokens: 1200, timeoutMs: 90_000, ...IDEA },

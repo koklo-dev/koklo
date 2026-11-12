@@ -9,7 +9,6 @@ import { errors, INSTANT, input, isValid, output, parsed, proc, UUID } from "./s
  * `.workflow/TK-54/02-decisions-54b.md` §2.
  */
 const NAMES = [
-  "draftBrief",
   "ideaChat",
   "ideaGaps",
   "ideaSynthesis",
@@ -38,14 +37,6 @@ const FEATURE = {
   description: "Afficher les tickets du projet.",
   criteria: [CRITERION],
 };
-const BRIEF = {
-  title: "Un titre",
-  problem: "Le problème.",
-  users: "Les utilisateurs.",
-  expectedOutcome: "Le résultat.",
-  constraints: "",
-  openQuestions: ["Quelle échéance ?"],
-};
 
 const submitWith = (operations: unknown[]) => ({
   projectId: UUID,
@@ -60,14 +51,13 @@ type Doc = {
 const doc = async () => (await generateOpenApi()) as unknown as Doc;
 
 describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
-  it("le routeur expose exactement draftBrief, ideaChat, ideaGaps, ideaSynthesis, prefillItem, proposeCriteria, proposeDeliverable, proposeFeatures, proposeOptions, reviseProposal", () => {
+  it("le routeur expose exactement ideaChat, ideaGaps, ideaSynthesis, prefillItem, proposeCriteria, proposeDeliverable, proposeFeatures, proposeOptions, reviseProposal", () => {
     const group = (api.contract as unknown as Record<string, object>).ai;
     expect(group).toBeDefined();
     expect(Object.keys(group ?? {}).sort()).toEqual(NAMES);
   });
 
   it.each([
-    ["ai.draftBrief", "post", "/projects/{projectId}/ai/brief"],
     ["ai.proposeFeatures", "post", "/projects/{projectId}/ai/features"],
     ["ai.proposeCriteria", "post", "/projects/{projectId}/ai/criteria"],
     ["llmCredential.verify", "post", "/llm-credentials/{provider}/verify"],
@@ -78,17 +68,18 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
 
   it("aucune de ces routes n'est une écriture de spec : pas de GET, pas de PUT ni DELETE", async () => {
     const d = await doc();
-    for (const path of [
-      "/projects/{projectId}/ai/brief",
-      "/projects/{projectId}/ai/features",
-      "/projects/{projectId}/ai/criteria",
-    ]) {
+    for (const path of ["/projects/{projectId}/ai/features", "/projects/{projectId}/ai/criteria"]) {
       expect(Object.keys(d.paths[path] ?? {})).toEqual(["post"]);
     }
   });
 
-  it("l'OpenAPI est en 2.11.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond, 2.0.0 projet explicite, 2.1.0 coquille, 2.2.0 réglages, 2.3.0 fournisseurs d'IA)", async () => {
-    expect((await doc()).info.version).toBe("2.11.0");
+  it("la route ai.draftBrief est retirée en 3.0.0 : plus de procédure ni de chemin /ai/brief", async () => {
+    expect(proc("ai.draftBrief")).toBeUndefined();
+    expect((await doc()).paths["/projects/{projectId}/ai/brief"]).toBeUndefined();
+  });
+
+  it("l'OpenAPI est en 3.0.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond, 2.0.0 projet explicite, 2.1.0 coquille, 2.2.0 réglages, 2.3.0 fournisseurs d'IA)", async () => {
+    expect((await doc()).info.version).toBe("3.0.0");
   });
 
   it("featureCreateSchema est exporté (parité avec specBatch.submit)", () => {
@@ -98,34 +89,22 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("AI2 entrées : aucune entrée ne choisit le modèle ni le budget", () => {
-  const brief = (over: Record<string, unknown>) =>
-    isValid(input("ai.draftBrief"), { projectId: UUID, idea: "Une idée", ...over });
-
-  it("draftBrief : idée 1 à 8000 caractères, réponses au plus 10 de 1000", async () => {
-    expect(await brief({})).toBe(true);
-    expect(await brief({ idea: "x".repeat(8000) })).toBe(true);
-    expect(await brief({ idea: "x".repeat(8001) })).toBe(false);
-    expect(await brief({ idea: "" })).toBe(false);
-    expect(await brief({ idea: "   \n\t " })).toBe(false);
-    expect(await brief({ answers: ["a"] })).toBe(true);
-    expect(await brief({ answers: Array.from({ length: 11 }, () => "a") })).toBe(false);
-    expect(await brief({ answers: ["x".repeat(1001)] })).toBe(false);
-    expect(await brief({ answers: [""] })).toBe(false);
-    expect(await isValid(input("ai.draftBrief"), { idea: "Une idée" })).toBe(false);
-    expect(await brief({ projectId: "pas-un-uuid" })).toBe(false);
-  });
-
-  it("proposeFeatures : brief 1 à 20000 caractères, maxFeatures entier 1 à 20", async () => {
+  it("proposeFeatures : maxFeatures entier 1 à 20, plus de brief (l'agent lit le dossier figé)", async () => {
     const run = (over: Record<string, unknown>) =>
-      isValid(input("ai.proposeFeatures"), { projectId: UUID, brief: "Un brief", ...over });
+      isValid(input("ai.proposeFeatures"), { projectId: UUID, ...over });
     expect(await run({})).toBe(true);
-    expect(await run({ brief: "x".repeat(20_000) })).toBe(true);
-    expect(await run({ brief: "x".repeat(20_001) })).toBe(false);
-    expect(await run({ brief: "  " })).toBe(false);
     for (const ok of [1, 8, 20]) expect(await run({ maxFeatures: ok }), String(ok)).toBe(true);
     for (const bad of [0, 21, 1.5, -1, "8"]) {
       expect(await run({ maxFeatures: bad }), String(bad)).toBe(false);
     }
+  });
+
+  it("proposeFeatures : un brief fourni est refusé (422), le champ est retiré en 3.0.0", async () => {
+    const run = (over: Record<string, unknown>) =>
+      isValid(input("ai.proposeFeatures"), { projectId: UUID, ...over });
+    expect(await run({ brief: "Un brief" })).toBe(false);
+    expect(await run({ brief: "" })).toBe(false);
+    expect(await run({ maxFeatures: 3, brief: "x" })).toBe(false);
   });
 
   it("proposeCriteria : specId au motif F-nnn", async () => {
@@ -137,14 +116,12 @@ describe("AI2 entrées : aucune entrée ne choisit le modèle ni le budget", () 
     }
   });
 
-  it.each(["ai.draftBrief", "ai.proposeFeatures", "ai.proposeCriteria"])(
+  it.each(["ai.proposeCriteria"])(
     "%s : model, budget, maxOutputTokens, provider, apiKey et nonce ne sont jamais conservés",
     async (name) => {
       const base: Record<string, unknown> = {
         projectId: UUID,
         specId: "F-001",
-        brief: "b",
-        idea: "i",
       };
       const value = await parsed(input(name), {
         ...base,
@@ -171,19 +148,6 @@ describe("AI2 entrées : aucune entrée ne choisit le modèle ni le budget", () 
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("AI3 sorties : des propositions directement soumettables", () => {
-  it("draftBrief : { brief, meta } aux champs bornés", async () => {
-    const out = output("ai.draftBrief");
-    expect(await isValid(out, { brief: BRIEF, meta: META })).toBe(true);
-    expect(await isValid(out, { brief: { ...BRIEF, title: "" }, meta: META })).toBe(false);
-    expect(await isValid(out, { brief: { ...BRIEF, title: "x".repeat(201) }, meta: META })).toBe(
-      false,
-    );
-    expect(
-      await isValid(out, { brief: { ...BRIEF, openQuestions: Array(11).fill("q") }, meta: META }),
-    ).toBe(false);
-    expect(await isValid(out, { brief: BRIEF })).toBe(false);
-  });
-
   it("proposeFeatures : 1 à 20 éléments feature.create, doublons signalés à part", async () => {
     const out = output("ai.proposeFeatures");
     expect(await isValid(out, { features: [FEATURE], duplicates: [], meta: META })).toBe(true);
@@ -276,21 +240,22 @@ describe("AI3 sorties : des propositions directement soumettables", () => {
   });
 
   it("meta : fournisseur du domaine, modèle, usage entier >= 0, aucun coût monétaire", async () => {
-    const out = output("ai.draftBrief");
+    const out = output("ai.proposeFeatures");
+    const body = { features: [FEATURE], duplicates: [] };
     expect(
       await isValid(out, {
-        brief: BRIEF,
+        ...body,
         meta: { ...META, usage: { inputTokens: -1, outputTokens: 0 } },
       }),
     ).toBe(false);
     expect(
       await isValid(out, {
-        brief: BRIEF,
+        ...body,
         meta: { ...META, usage: { inputTokens: 1.5, outputTokens: 0 } },
       }),
     ).toBe(false);
-    expect(await isValid(out, { brief: BRIEF, meta: { ...META, provider: "fake" } })).toBe(false);
-    const kept = (await parsed(out, { brief: BRIEF, meta: { ...META, costUsd: 0.3 } }))?.meta ?? {};
+    expect(await isValid(out, { ...body, meta: { ...META, provider: "fake" } })).toBe(false);
+    const kept = (await parsed(out, { ...body, meta: { ...META, costUsd: 0.3 } }))?.meta ?? {};
     expect(kept).not.toHaveProperty("costUsd");
   });
 
@@ -315,7 +280,7 @@ describe("AI3 sorties : des propositions directement soumettables", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("AI4 erreurs typées", () => {
-  const AI_ROUTES = ["ai.draftBrief", "ai.proposeFeatures", "ai.proposeCriteria"];
+  const AI_ROUTES = ["ai.proposeFeatures", "ai.proposeCriteria"];
 
   it.each(AI_ROUTES)("%s : les cinq erreurs LLM, 401, 403, 404, 422 et 503", (name) => {
     const map = errors(name);
@@ -386,7 +351,7 @@ describe("AI4 erreurs typées", () => {
   });
 
   it("les erreurs ne portent ni message du fournisseur, ni prompt, ni sortie, ni clé (data fermée)", async () => {
-    const map = errors("ai.draftBrief");
+    const map = errors("ai.proposeFeatures");
     for (const code of [
       "PROMPT_REJECTED",
       "LLM_PROVIDER_ERROR",
@@ -420,7 +385,6 @@ describe("AI5 aucun secret dans les schémas du groupe ai", () => {
   it("aucune propriété apiKey, token, secret, nonce ni prompt dans les chemins ai et verify", async () => {
     const d = await doc();
     const text = JSON.stringify([
-      d.paths["/projects/{projectId}/ai/brief"],
       d.paths["/projects/{projectId}/ai/features"],
       d.paths["/projects/{projectId}/ai/criteria"],
       d.paths["/llm-credentials/{provider}/verify"],

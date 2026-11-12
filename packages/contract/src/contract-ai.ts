@@ -18,8 +18,6 @@ import {
 } from "./errors-ai.ts";
 import { route, writeErrors } from "./route-helpers.ts";
 import {
-  aiDraftBriefInputSchema,
-  aiDraftBriefOutputSchema,
   aiIdeaChatEventSchema,
   aiIdeaChatInputSchema,
   aiIdeaGapsInputSchema,
@@ -65,10 +63,6 @@ const proposalErrors = {
  * relit puis soumet à `specBatch.submit`.
  */
 export const ai = {
-  draftBrief: route("POST", "/projects/{projectId}/ai/brief")
-    .errors(proposalErrors)
-    .input(aiDraftBriefInputSchema)
-    .output(aiDraftBriefOutputSchema),
   proposeFeatures: route("POST", "/projects/{projectId}/ai/features")
     .errors(proposalErrors)
     .input(aiProposeFeaturesInputSchema)

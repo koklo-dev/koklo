@@ -146,6 +146,13 @@ describe("S3 spec.getFeature", () => {
       expect(await isValid(o, { ...featureDetail, [field]: undefined }), field).toBe(false);
     }
   });
+  it("sortie : zone facultative, 1 à 80 caractères (3.0.0)", async () => {
+    const o = output("spec.getFeature");
+    expect(await isValid(o, { ...featureDetail, zone: "Authentification" })).toBe(true);
+    expect(await isValid(o, { ...featureDetail, zone: "x".repeat(80) })).toBe(true);
+    expect(await isValid(o, { ...featureDetail, zone: "" })).toBe(false);
+    expect(await isValid(o, { ...featureDetail, zone: "x".repeat(81) })).toBe(false);
+  });
   it("sortie : identifiants et énumérations contrôlés", async () => {
     const o = output("spec.getFeature");
     const withCriterion = (patch: object) => ({

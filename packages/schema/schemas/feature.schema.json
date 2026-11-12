@@ -127,6 +127,11 @@
     "titre": {
       "minLength": 1,
       "type": "string"
+    },
+    "zone": {
+      "maxLength": 80,
+      "minLength": 1,
+      "type": "string"
     }
   },
   "required": [

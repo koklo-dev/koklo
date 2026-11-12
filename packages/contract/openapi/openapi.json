@@ -1359,7 +1359,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "2.11.0"
+    "version": "3.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -7829,314 +7829,6 @@
         }
       }
     },
-    "/projects/{projectId}/ai/brief": {
-      "post": {
-        "operationId": "ai.draftBrief",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "projectId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "answers": {
-                    "items": {
-                      "maxLength": 1000,
-                      "minLength": 1,
-                      "type": "string"
-                    },
-                    "maxItems": 10,
-                    "type": "array"
-                  },
-                  "idea": {
-                    "maxLength": 8000,
-                    "minLength": 1,
-                    "type": "string"
-                  }
-                },
-                "required": ["idea"],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "brief": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "constraints": {
-                          "maxLength": 2000,
-                          "type": "string"
-                        },
-                        "expectedOutcome": {
-                          "maxLength": 2000,
-                          "minLength": 1,
-                          "type": "string"
-                        },
-                        "openQuestions": {
-                          "items": {
-                            "maxLength": 500,
-                            "minLength": 1,
-                            "type": "string"
-                          },
-                          "maxItems": 10,
-                          "type": "array"
-                        },
-                        "problem": {
-                          "maxLength": 2000,
-                          "minLength": 1,
-                          "type": "string"
-                        },
-                        "title": {
-                          "maxLength": 200,
-                          "minLength": 1,
-                          "type": "string"
-                        },
-                        "users": {
-                          "maxLength": 2000,
-                          "minLength": 1,
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "title",
-                        "problem",
-                        "users",
-                        "expectedOutcome",
-                        "constraints",
-                        "openQuestions"
-                      ],
-                      "type": "object"
-                    },
-                    "meta": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "model": {
-                          "minLength": 1,
-                          "type": "string"
-                        },
-                        "provider": {
-                          "enum": [
-                            "anthropic",
-                            "openai",
-                            "google",
-                            "mistral",
-                            "openrouter",
-                            "openai_compatible"
-                          ],
-                          "type": "string"
-                        },
-                        "usage": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "inputTokens": {
-                              "maximum": 9007199254740991,
-                              "minimum": 0,
-                              "type": "integer"
-                            },
-                            "outputTokens": {
-                              "maximum": 9007199254740991,
-                              "minimum": 0,
-                              "type": "integer"
-                            }
-                          },
-                          "required": ["inputTokens", "outputTokens"],
-                          "type": "object"
-                        }
-                      },
-                      "required": ["provider", "model", "usage"],
-                      "type": "object"
-                    }
-                  },
-                  "required": ["brief", "meta"],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Unauthorized"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Session absente ou expirée"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Forbidden2"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Accès refusé"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/NotFound"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Ressource introuvable"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/LlmNotConfigured"
-                    },
-                    {
-                      "$ref": "#/components/schemas/LlmCapReached"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Clé de fournisseur LLM absente, invalidée ou illisible, Le plafond mensuel des actions IA est atteint"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Validation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/PromptRejected"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Entrée invalide, Contenu refusé : il imite le délimiteur du prompt"
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/LlmRateLimited"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Limite d'appels au modèle atteinte"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Internal"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Erreur interne"
-          },
-          "502": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/LlmProviderError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/LlmOutputInvalid"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Le fournisseur du modèle a échoué, Sortie du modèle invalide"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/EncryptionUnavailable"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UndefinedError"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Chiffrement indisponible"
-          }
-        }
-      }
-    },
     "/projects/{projectId}/ai/criteria": {
       "post": {
         "operationId": "ai.proposeCriteria",
@@ -8897,9 +8589,7 @@
               "schema": {
                 "properties": {
                   "brief": {
-                    "maxLength": 20000,
-                    "minLength": 1,
-                    "type": "string"
+                    "not": {}
                   },
                   "maxFeatures": {
                     "maximum": 20,
@@ -8907,12 +8597,10 @@
                     "type": "integer"
                   }
                 },
-                "required": ["brief"],
                 "type": "object"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -19610,6 +19298,11 @@
                               "maxLength": 200,
                               "minLength": 1,
                               "type": "string"
+                            },
+                            "zone": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string"
                             }
                           },
                           "required": ["title", "priority", "kind"],
@@ -19710,6 +19403,11 @@
                             },
                             "title": {
                               "maxLength": 200,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "zone": {
+                              "maxLength": 80,
                               "minLength": 1,
                               "type": "string"
                             }
@@ -20824,6 +20522,16 @@
             "allowEmptyValue": true,
             "allowReserved": true,
             "in": "query",
+            "name": "validation",
+            "schema": {
+              "enum": ["validated", "to_validate", "to_revise"],
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
             "name": "branch",
             "schema": {
               "minLength": 1,
@@ -20933,6 +20641,10 @@
                           },
                           "title": {
                             "type": "string"
+                          },
+                          "validation": {
+                            "enum": ["validated", "to_validate", "to_revise"],
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -20941,7 +20653,8 @@
                           "status",
                           "priority",
                           "filePath",
-                          "criteriaCount"
+                          "criteriaCount",
+                          "validation"
                         ],
                         "type": "object"
                       },
@@ -21195,6 +20908,11 @@
                       "type": "array"
                     },
                     "title": {
+                      "type": "string"
+                    },
+                    "zone": {
+                      "maxLength": 80,
+                      "minLength": 1,
                       "type": "string"
                     }
                   },
@@ -21547,6 +21265,11 @@
                           "type": "array"
                         },
                         "title": {
+                          "type": "string"
+                        },
+                        "zone": {
+                          "maxLength": 80,
+                          "minLength": 1,
                           "type": "string"
                         }
                       },

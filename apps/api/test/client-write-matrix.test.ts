@@ -42,7 +42,6 @@ const ALLOWED = [
 /** Suppression de SON propre commentaire : droit d'auteur vérifié dans le service (comment-permissions). */
 const OWN_ONLY = ["comment.delete"];
 const DENIED = [
-  "ai.draftBrief",
   // TK-101 (contrat 2.11.0) : le préremplissage du panneau d'édition relève de l'équipe (SPEC_BATCH_ROLES).
   "ai.prefillItem",
   "ai.proposeCriteria",

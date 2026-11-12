@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { FakeLlm } from "@koklo/domain/testing";
 import { ANTHROPIC_DEFAULT_MODEL } from "@koklo/llm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -5,7 +6,6 @@ import { AI_BUDGETS } from "../src/ai/ai-budget.ts";
 import {
   aiApi,
   aiAuditRows,
-  BRIEF_REPLY,
   CRITERION,
   credentialState,
   criteriaReply,
@@ -16,6 +16,7 @@ import {
   setKey,
   writeCounters,
 } from "./helpers/ai-bench.ts";
+import { freezeIdea } from "./helpers/proposals.ts";
 import { type FeatureSeed, readScene, seedIndex } from "./helpers/spec-read.ts";
 
 /**
@@ -25,34 +26,146 @@ import { type FeatureSeed, readScene, seedIndex } from "./helpers/spec-read.ts";
  */
 const bench = installAiBench({ beforeAll, afterAll, beforeEach });
 
-describe("ai.draftBrief : nominal", () => {
-  it("200 { brief, meta } ; le prompt est celui de la finalité brief-draft, le budget celui du serveur", async () => {
+/** Page du dossier d'idée et version de contenu figée (TK-102) : le modèle ne lit que ce que le gel a fixé. */
+async function insertPage(
+  b: ReturnType<typeof bench>,
+  world: { organizationId: string; projectId: string },
+  page: { slug: string; title: string; content: string; version?: number; position?: number },
+) {
+  await b.database.query(
+    `INSERT INTO idea_pages (id, organization_id, project_id, slug, title, position, origin, status, content_md, version, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'user', 'stable', $7, $8, now())`,
+    [
+      randomUUID(),
+      world.organizationId,
+      world.projectId,
+      page.slug,
+      page.title,
+      page.position ?? 1,
+      page.content,
+      page.version ?? 1,
+    ],
+  );
+}
+
+async function publishSynthesis(
+  b: ReturnType<typeof bench>,
+  world: { organizationId: string; projectId: string },
+  content: string,
+  source: string | null,
+) {
+  await b.database.query(
+    `INSERT INTO idea_synthesis (id, organization_id, project_id, content_md, source, generated_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, now(), now())`,
+    [randomUUID(), world.organizationId, world.projectId, content, source],
+  );
+}
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("ai.proposeFeatures : lit le dossier figé (idea-vN), la Synthèse et les risques (3.0.0)", () => {
+  async function freshWorld() {
     const b = bench();
-    const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY, { servedModel: "modele-servi-1" });
+    const { world } = await keyedWorld(b, { freeze: false });
+    return { b, world };
+  }
+
+  it("le prompt porte les pages figées, la Synthèse publiée, la page des risques et le cahier actuel ; aucune entrée libre", async () => {
+    const { b, world } = await freshWorld();
+    await insertPage(b, world, { slug: "vision", title: "Vision", content: "VISION-FIGEE-ALPHA" });
+    await insertPage(b, world, {
+      slug: "hypotheses-risques",
+      title: "Hypothèses et risques",
+      content: "RISQUE-FIGE-BETA",
+      position: 2,
+    });
+    await freezeIdea(b.database, world, 1, { vision: 1, "hypotheses-risques": 1 });
+    await publishSynthesis(b, world, "SYNTHESE-GAMMA", "idea-v1");
+    const fake = FakeLlm.replying(featuresReply(), { servedModel: "modele-servi-1" });
     b.use(fake);
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId, {
-      idea: "Une idée brute",
-      answers: ["Pour les équipes", "En un trimestre"],
-    });
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({
-      brief: BRIEF_REPLY,
-      meta: {
-        provider: "anthropic",
-        model: "modele-servi-1",
-        usage: { inputTokens: expect.any(Number), outputTokens: expect.any(Number) },
-      },
+    expect(res.body.meta).toEqual({
+      provider: "anthropic",
+      model: "modele-servi-1",
+      usage: { inputTokens: expect.any(Number), outputTokens: expect.any(Number) },
     });
-    expect(fake.calls).toHaveLength(1);
     const [call] = fake.calls;
-    expect(call?.trace.purpose).toBe("brief-draft");
-    expect(call?.budget).toEqual(AI_BUDGETS["brief-draft"]);
-    expect(call?.output.kind).toBe("json");
-    expect(call?.prompt.user).toContain("Une idée brute");
-    expect(call?.prompt.user).toContain("Pour les équipes");
+    expect(call?.trace.purpose).toBe("features-propose");
+    expect(call?.budget).toEqual(AI_BUDGETS["features-propose"]);
+    const user = call?.prompt.user ?? "";
+    for (const expected of [
+      "Frozen dossier (idea-v1)",
+      "VISION-FIGEE-ALPHA",
+      "Synthesis",
+      "SYNTHESE-GAMMA",
+      "Assumptions and risks",
+      "RISQUE-FIGE-BETA",
+      "Current specification",
+    ]) {
+      expect(user, expected).toContain(expected);
+    }
+  });
+
+  it("une page modifiée depuis le gel et une Synthèse jamais publiée n'entrent pas dans le prompt", async () => {
+    const { b, world } = await freshWorld();
+    await insertPage(b, world, {
+      slug: "vision",
+      title: "Vision",
+      content: "CONTENU-MODIFIE-DEPUIS-LE-GEL",
+      version: 2,
+    });
+    await freezeIdea(b.database, world, 1, { vision: 1 });
+    await publishSynthesis(b, world, "APERCU-JAMAIS-PUBLIE", null);
+    const fake = FakeLlm.replying(featuresReply());
+    b.use(fake);
+
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const user = fake.calls[0]?.prompt.user ?? "";
+    expect(user).not.toContain("CONTENU-MODIFIE-DEPUIS-LE-GEL");
+    expect(user).not.toContain("APERCU-JAMAIS-PUBLIE");
+  });
+
+  it("sans version figée : 422 VALIDATION sur projectId, aucun appel au modèle, aucune ligne d'audit", async () => {
+    const { b, world } = await freshWorld();
+    const fake = FakeLlm.replying(featuresReply());
+    b.use(fake);
+
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
+
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe("VALIDATION");
+    expect(res.body.data.field).toBe("projectId");
+    expect(fake.calls).toHaveLength(0);
+    expect(await aiAuditRows(b.database, world.organizationId)).toEqual([]);
+  });
+
+  it("un brief fourni est refusé : 422 VALIDATION, le champ est retiré en 3.0.0", async () => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    const fake = FakeLlm.replying(featuresReply());
+    b.use(fake);
+
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId, {
+      brief: "Un brief",
+    });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(422);
+    expect(res.body.code).toBe("VALIDATION");
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("la route /ai/brief n'existe plus (ai.draftBrief retirée) : 404", async () => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    const res = await aiApi(b.app, world.actors.dev).raw(`/projects/${world.projectId}/ai/brief`, {
+      projectId: world.projectId,
+      idea: "Une idée",
+    });
+    expect(res.status).toBe(404);
   });
 });
 
@@ -67,7 +180,6 @@ describe("ai.proposeFeatures : nominal", () => {
     b.use(fake);
 
     const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId, {
-      brief: "Un brief",
       maxFeatures: 5,
     });
 
@@ -86,7 +198,7 @@ describe("ai.proposeFeatures : nominal", () => {
     const [call] = fake.calls;
     expect(call?.trace.purpose).toBe("features-propose");
     expect(call?.budget).toEqual(AI_BUDGETS["features-propose"]);
-    expect(call?.prompt.user).toContain("Un brief");
+    expect(call?.prompt.user).toContain("Frozen dossier (idea-v1)");
   });
 
   it("chaque proposition valide est acceptée telle quelle par specBatch.submit (parité d'entrée)", async () => {
@@ -150,10 +262,10 @@ describe("ai.* : le modèle et le budget ne viennent jamais de l'entrée", () =>
   it("sans defaultModel, le modèle de la requête est la constante de l'adaptateur", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(fake.calls[0]?.model).toBe(ANTHROPIC_DEFAULT_MODEL);
   });
@@ -161,10 +273,10 @@ describe("ai.* : le modèle et le budget ne viennent jamais de l'entrée", () =>
   it("avec un defaultModel BYOK, c'est lui qui est demandé", async () => {
     const b = bench();
     const { world } = await keyedWorld(b, { defaultModel: "modele-de-l-organisation-2" });
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(fake.calls[0]?.model).toBe("modele-de-l-organisation-2");
   });
@@ -172,10 +284,10 @@ describe("ai.* : le modèle et le budget ne viennent jamais de l'entrée", () =>
   it("model, budget et maxOutputTokens envoyés par le client sont ignorés", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId, {
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId, {
       model: "un-modele-cher",
       maxOutputTokens: 32_000,
       budget: {
@@ -189,7 +301,7 @@ describe("ai.* : le modèle et le budget ne viennent jamais de l'entrée", () =>
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(fake.calls[0]?.model).toBe(ANTHROPIC_DEFAULT_MODEL);
-    expect(fake.calls[0]?.budget).toEqual(AI_BUDGETS["brief-draft"]);
+    expect(fake.calls[0]?.budget).toEqual(AI_BUDGETS["features-propose"]);
     expect(fake.calls[0]?.temperature).toBeUndefined();
   });
 
@@ -201,7 +313,6 @@ describe("ai.* : le modèle et le budget ne viennent jamais de l'entrée", () =>
       expect(budget.maxCostMicroUsd).toBeLessThanOrEqual(5_000_000);
     }
     expect(AI_BUDGETS["features-propose"].maxOutputTokens).toBe(4000);
-    expect(AI_BUDGETS["brief-draft"].maxOutputTokens).toBe(1500);
     expect(AI_BUDGETS["criteria-propose"].maxOutputTokens).toBe(1500);
     expect(AI_BUDGETS["credential-verify"].maxOutputTokens).toBe(16);
     expect(AI_BUDGETS["credential-verify"].timeoutMs).toBe(15_000);
@@ -210,29 +321,24 @@ describe("ai.* : le modèle et le budget ne viennent jamais de l'entrée", () =>
   it("correlationId = x-request-id (motif du port), purpose fixe", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
-    await aiApi(b.app, world.actors.dev, { "x-request-id": "req-ai-42" }).draftBrief(
+    await aiApi(b.app, world.actors.dev, { "x-request-id": "req-ai-42" }).proposeFeatures(
       world.projectId,
     );
 
-    expect(fake.calls[0]?.trace).toEqual({ purpose: "brief-draft", correlationId: "req-ai-42" });
+    expect(fake.calls[0]?.trace).toEqual({
+      purpose: "features-propose",
+      correlationId: "req-ai-42",
+    });
   });
 });
 
 describe("ai.* : entrée invalide = 422 VALIDATION, sans appel ni ligne d'audit", () => {
-  const CASES: [
-    string,
-    "draftBrief" | "proposeFeatures" | "proposeCriteria",
-    Record<string, unknown>,
-  ][] = [
-    ["idée vide", "draftBrief", { idea: "" }],
-    ["idée blanche", "draftBrief", { idea: "  \n " }],
-    ["idée de 8001 caractères", "draftBrief", { idea: "x".repeat(8001) }],
-    ["11 réponses", "draftBrief", { answers: Array.from({ length: 11 }, () => "a") }],
-    ["brief vide", "proposeFeatures", { brief: "" }],
-    ["brief de 20001 caractères", "proposeFeatures", { brief: "x".repeat(20_001) }],
+  const CASES: [string, "proposeFeatures" | "proposeCriteria", Record<string, unknown>][] = [
+    ["brief vide (retiré en 3.0.0)", "proposeFeatures", { brief: "" }],
+    ["brief renseigné (retiré en 3.0.0)", "proposeFeatures", { brief: "Un brief" }],
     ["maxFeatures à 0", "proposeFeatures", { maxFeatures: 0 }],
     ["maxFeatures à 21", "proposeFeatures", { maxFeatures: 21 }],
     ["maxFeatures décimal", "proposeFeatures", { maxFeatures: 2.5 }],
@@ -243,7 +349,7 @@ describe("ai.* : entrée invalide = 422 VALIDATION, sans appel ni ligne d'audit"
   it.each(CASES)("%s", async (_label, name, over) => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    const fake = FakeLlm.replying(BRIEF_REPLY);
+    const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
 
     const res = await aiApi(b.app, world.actors.dev)[name](world.projectId, over);
@@ -256,54 +362,49 @@ describe("ai.* : entrée invalide = 422 VALIDATION, sans appel ni ligne d'audit"
 });
 
 describe("ai.* : une proposition n'écrit jamais (CDC §6.3)", () => {
-  it.each([
-    ["draftBrief", BRIEF_REPLY],
-    ["proposeFeatures", featuresReply()],
-  ] as const)(
-    "%s : aucun lot, aucune opération, aucun ticket, aucune feature, aucun commit",
-    async (name, reply) => {
-      const b = bench();
-      const { world } = await keyedWorld(b);
-      b.use(FakeLlm.replying(reply));
-      const before = await writeCounters(b.database, world.organizationId);
+  it("proposeFeatures : aucun lot, aucune opération, aucun ticket, aucune feature, aucun commit", async () => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    b.use(FakeLlm.replying(featuresReply()));
+    const before = await writeCounters(b.database, world.organizationId);
 
-      const res = await aiApi(b.app, world.actors.dev)[name](world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
-      expect(res.status, JSON.stringify(res.body)).toBe(200);
-      expect(await writeCounters(b.database, world.organizationId)).toEqual(before);
-      expect(b.harness.names().filter((method) => method === "writeCommit")).toEqual([]);
-      expect(b.harness.calls).toEqual([]);
-      const rows = await aiAuditRows(b.database, world.organizationId);
-      expect(rows).toHaveLength(1);
-    },
-  );
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(await writeCounters(b.database, world.organizationId)).toEqual(before);
+    expect(b.harness.names().filter((method) => method === "writeCommit")).toEqual([]);
+    expect(b.harness.calls).toEqual([]);
+    const rows = await aiAuditRows(b.database, world.organizationId);
+    expect(rows).toHaveLength(1);
+  });
 
   it("seuls l'audit et last_used_at changent (la clé a servi)", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
     expect((await credentialState(b.database, world.organizationId))?.last_used_at).toBeNull();
 
-    await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect((await credentialState(b.database, world.organizationId))?.last_used_at).not.toBeNull();
   });
 
-  it("le brief n'est pas persisté : aucune table ne contient son texte (D3)", async () => {
+  it("le contenu du dossier lu n'est pas persisté par l'appel : aucune ligne d'audit ne contient son texte", async () => {
     const b = bench();
-    const { world } = await keyedWorld(b);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
-    const idea = `IDEE-SENTINELLE-${Date.now()}`;
+    const { world } = await keyedWorld(b, { freeze: false });
+    const sentinel = `DOSSIER-SENTINELLE-${Date.now()}`;
+    await insertPage(b, world, { slug: "vision", title: "Vision", content: sentinel });
+    await freezeIdea(b.database, world, 1, { vision: 1 });
+    b.use(FakeLlm.replying(featuresReply()));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId, { idea });
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-
     const dump = await b.database.query<{ found: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM audit_log a WHERE a::text LIKE '%' || $1 || '%'
        ) AS found`,
-      [idea],
+      [sentinel],
     );
     expect(dump[0]?.found).toBe(false);
   });
@@ -316,13 +417,14 @@ describe("ai.proposeFeatures : features existantes de l'index", () => {
     { id: "F-002", titre: "Export CSV", statut: "brouillon", priorite: "could" },
   ];
 
-  it("les titres, statuts et priorités entrent dans le prompt (spec-file) ; rien d'autre de la feature", async () => {
+  it("les identifiants et titres du cahier entrent dans le prompt (spec-file) ; ni description, ni statut", async () => {
     const b = bench();
     const scene = await readScene(b);
     await seedIndex(b, scene, [
       { ...seeds[0], description: "DESCRIPTION-SECRETE-F1" } as FeatureSeed,
       seeds[1] as FeatureSeed,
     ]);
+    await freezeIdea(b.database, scene.world);
     await setKey(b.app, scene.world, "FAKE-KEY-NOT-REAL-0001");
     const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
@@ -336,6 +438,7 @@ describe("ai.proposeFeatures : features existantes de l'index", () => {
       expect(user, expected).toContain(expected);
     }
     expect(user).not.toContain("DESCRIPTION-SECRETE-F1");
+    expect(user).not.toContain("brouillon");
     expect(b.harness.calls).toEqual([]);
   });
 
@@ -343,6 +446,7 @@ describe("ai.proposeFeatures : features existantes de l'index", () => {
     const b = bench();
     const scene = await readScene(b);
     await seedIndex(b, scene, seeds);
+    await freezeIdea(b.database, scene.world);
     await setKey(b.app, scene.world, "FAKE-KEY-NOT-REAL-0002");
     b.use(
       FakeLlm.replying(
@@ -360,14 +464,15 @@ describe("ai.proposeFeatures : features existantes de l'index", () => {
     expect(res.body.duplicates).toEqual([{ index: 0, specId: "F-001" }]);
   });
 
-  it("au plus 100 features existantes entrent dans le prompt", async () => {
+  it("le cahier actuel est limité à 300 fonctionnalités, comme pour le job de l'agent (B316 f)", async () => {
     const b = bench();
     const scene = await readScene(b);
-    const many = Array.from({ length: 130 }, (_, i) => ({
+    const many = Array.from({ length: 800 }, (_, i) => ({
       id: `F-${String(i + 1).padStart(3, "0")}`,
       titre: `Titre numéro ${i + 1}`,
     }));
     await seedIndex(b, scene, many);
+    await freezeIdea(b.database, scene.world);
     await setKey(b.app, scene.world, "FAKE-KEY-NOT-REAL-0003");
     const fake = FakeLlm.replying(featuresReply());
     b.use(fake);
@@ -375,8 +480,11 @@ describe("ai.proposeFeatures : features existantes de l'index", () => {
     const res = await aiApi(b.app, scene.world.actors.dev).proposeFeatures(scene.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    const listed = (fake.calls[0]?.prompt.user.match(/Titre numéro \d+/g) ?? []).length;
-    expect(listed).toBe(100);
+    const user = fake.calls[0]?.prompt.user ?? "";
+    const current = user.slice(user.indexOf("Current specification"));
+    const listed = current.match(/Titre numéro \d+/g) ?? [];
+    expect(listed).toHaveLength(300);
+    expect(user).toContain("Titre numéro 1\n");
   });
 });
 

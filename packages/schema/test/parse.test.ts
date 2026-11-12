@@ -25,9 +25,9 @@ describe("CA8 parseSpecFiles : fixture valide", () => {
     expect(spec.rules.map((r) => r.value.id)).toEqual(["R-003"]);
   });
 
-  it("ignore les fichiers hors modèle (brief, architecture) sans issue", () => {
+  it("ignore les fichiers hors modèle (tech, architecture) sans issue", () => {
     const files = withFiles({
-      "brief/0001-idee-initiale.md": "# Idée\n",
+      "tech/cahier-technique.md": "# Cahier\n",
       "architecture/overview.md": "x: [",
     });
     expect(parseSpecFiles(files).issues).toEqual([]);

@@ -7,11 +7,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { loadConfig } from "../src/config.ts";
 import {
   aiApi,
-  BRIEF_REPLY,
   credentialState,
+  featuresReply,
+  freezeDossier,
   installAiBench,
   keyedWorld,
 } from "./helpers/ai-bench.ts";
+import { freezeIdea } from "./helpers/proposals.ts";
 
 /**
  * TK-54b, repris par TK-95 : câblage du moteur `AI_PROVIDER` (voir `ai-engine-wiring.test.ts`). Les adaptateurs sont
@@ -84,9 +86,13 @@ describe("source : le faux et le transport simulé n'entrent pas dans le code de
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("l'adaptateur de production sous un transport simulé (aucun réseau)", () => {
-  it("ai.draftBrief de bout en bout : POST sur l'URL fixe, clé en en-tête, aucune autre clé de corps que celles prévues", async () => {
+  it("ai.proposeFeatures de bout en bout : POST sur l'URL fixe, clé en en-tête, aucune autre clé de corps que celles prévues", async () => {
     const b = bench();
-    const { world, key } = await keyedWorld(b, { defaultModel: "claude-modele-org" });
+    const { world, key } = await keyedWorld(b, {
+      defaultModel: "claude-modele-org",
+      freeze: false,
+    });
+    await freezeDossier(b.database, world, "Un dossier pour le transport");
     let sentKey: string | undefined;
     const transport = new SimulatedAnthropicTransport({
       onRequest: (headers) => {
@@ -95,18 +101,16 @@ describe("l'adaptateur de production sous un transport simulé (aucun réseau)",
     });
     transport.enqueue({
       kind: "message",
-      text: JSON.stringify(BRIEF_REPLY),
+      text: JSON.stringify(featuresReply()),
       model: "claude-servi-1",
     });
     vi.stubGlobal("fetch", transport.fetch);
     const app = await b.makeApp({ defaultRegistry: true });
 
-    const res = await aiApi(app, world.actors.dev).draftBrief(world.projectId, {
-      idea: "Une idée pour le transport",
-    });
+    const res = await aiApi(app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body.brief).toEqual(BRIEF_REPLY);
+    expect(res.body.features).toHaveLength(featuresReply().features.length);
     expect(res.body.meta.model).toBe("claude-servi-1");
     expect(transport.calls()).toBe(1);
     const [request] = transport.requests;
@@ -122,8 +126,8 @@ describe("l'adaptateur de production sous un transport simulé (aucun réseau)",
       "system",
     ]);
     expect(body.model).toBe("claude-modele-org");
-    expect(body.max_tokens).toBe(1500);
-    expect(JSON.stringify(body.messages)).toContain("Une idée pour le transport");
+    expect(body.max_tokens).toBe(4000);
+    expect(JSON.stringify(body.messages)).toContain("Un dossier pour le transport");
     expect(JSON.stringify(request?.headers)).not.toContain(key);
   });
 
@@ -134,7 +138,7 @@ describe("l'adaptateur de production sous un transport simulé (aucun réseau)",
     vi.stubGlobal("fetch", transport.fetch);
     const app = await b.makeApp({ defaultRegistry: true });
 
-    const res = await aiApi(app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status, JSON.stringify(res.body)).toBe(502);
     expect(res.body.data).toEqual({ reason: "auth" });
@@ -170,9 +174,9 @@ describe("aucun appel réseau en test", () => {
       throw new Error("fetch global interdit en test");
     });
     vi.stubGlobal("fetch", fetchSpy);
-    b.use(FakeLlm.replying(BRIEF_REPLY));
+    b.use(FakeLlm.replying(featuresReply()));
 
-    const res = await aiApi(b.app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(b.app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(200);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -182,13 +186,14 @@ describe("aucun appel réseau en test", () => {
     const b = bench();
     const { createWorld } = await import("./helpers/tickets.ts");
     const world = await createWorld(b.database);
+    await freezeIdea(b.database, world);
     const fetchSpy = vi.fn(() => {
       throw new Error("fetch global interdit en test");
     });
     vi.stubGlobal("fetch", fetchSpy);
     const app = await b.makeApp({ defaultRegistry: true });
 
-    const res = await aiApi(app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(409);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -202,7 +207,7 @@ describe("aucun appel réseau en test", () => {
     });
     const app = await b.makeApp({ defaultRegistry: true });
 
-    const res = await aiApi(app, world.actors.dev).draftBrief(world.projectId);
+    const res = await aiApi(app, world.actors.dev).proposeFeatures(world.projectId);
 
     expect(res.status).toBe(502);
     expect(res.body.data).toEqual({ reason: "unavailable" });

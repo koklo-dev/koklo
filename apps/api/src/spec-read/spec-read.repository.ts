@@ -18,7 +18,11 @@ export interface Revision {
 export interface FeatureFilter {
   status?: FeatureSummary["status"];
   priority?: FeatureSummary["priority"];
+  validation?: FeatureSummary["validation"];
 }
+
+/** Résumé d'une fonctionnalité sans sa validation (prompts de l'agent, doublons) : aucune lecture des reviews. */
+export type FeatureHead = Omit<FeatureSummary, "validation">;
 
 /** Demande de page de `spec.listFeatures` : filtres, recherche, position (curseur ou `around`), taille. */
 export interface FeatureListRequest {
@@ -38,7 +42,11 @@ export interface FeaturePage {
   /** Rang de la première fonctionnalité dans la liste filtrée. */
   offset: number;
   total: number;
-  facets: { status: Record<string, number>; priority: Record<string, number> };
+  facets: {
+    status: Record<string, number>;
+    priority: Record<string, number>;
+    validation: Record<string, number>;
+  };
 }
 
 /** Page lue : `null` quand le projet n'a pas de dépôt de spec ou que la révision n'est pas indexée. */
@@ -49,7 +57,7 @@ export type IndexedFeaturePage =
 /** Instantané lu : `null` quand le projet n'a pas de dépôt de spec ou que la révision n'est pas indexée. */
 export type IndexedFeatures =
   | { kind: "failed"; errorCode: string; commitSha: string }
-  | { kind: "rows"; rows: FeatureSummary[] };
+  | { kind: "rows"; rows: FeatureHead[] };
 
 /** Ce qu'il faut pour lire une feature dans git, décidé sur l'index avant tout réseau. */
 export type FeatureSource =

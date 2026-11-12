@@ -7,6 +7,7 @@ interface FeaturePayload {
   status?: Feature["statut"];
   priority?: Feature["priorite"];
   description?: string;
+  zone?: string;
   criteria?: SubmittedCriterion[];
   tables?: string[];
   endpoints?: string[];
@@ -22,6 +23,7 @@ const COPIED = {
   status: "statut",
   priority: "priorite",
   description: "description",
+  zone: "zone",
   tables: "tables",
   endpoints: "endpoints",
   screens: "ecrans",

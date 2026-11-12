@@ -70,9 +70,9 @@ describe("idea : surface", () => {
     expect((await doc()).paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("le contrat courant est 2.11.0 (additif : version mineure)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("2.11.0");
-    expect((await doc()).info.version).toBe("2.11.0");
+  it("le contrat courant est 3.0.0 (rupture : version majeure)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.0.0");
+    expect((await doc()).info.version).toBe("3.0.0");
   });
 });
 

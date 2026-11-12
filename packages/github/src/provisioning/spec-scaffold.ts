@@ -32,14 +32,7 @@ const readme = (name: string): string =>
 Dépôt de spécification géré par Koklo : ne l'éditez pas à la main, les modifications passent par
 Koklo (lots d'écriture sur la branche \`cadrage\`).
 
-- \`brief/\` : l'idée de départ et les décisions de cadrage.
 - \`features/\`, \`data/\`, \`api/\`, \`design/\`, \`tests/\` : le modèle de spec validé par Koklo.
-`;
-
-const brief = (name: string): string =>
-  `# Idée initiale : ${name}
-
-À compléter pendant le cadrage : problème, utilisateurs, résultat attendu.
 `;
 
 const OVERVIEW = `# Architecture
@@ -70,7 +63,6 @@ repos: []
 `,
     },
     { path: "README.md", content: readme(name) },
-    { path: "brief/0001-idee-initiale.md", content: brief(name) },
     { path: "architecture/overview.md", content: OVERVIEW },
     { path: "tech/cahier-technique.md", content: TECH },
     { path: "domain/roles.yaml", content: "roles: []\n" },

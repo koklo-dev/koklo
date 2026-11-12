@@ -194,6 +194,7 @@ export const featureSummary = {
   priority: "must",
   filePath: "features/F-001.md",
   criteriaCount: 2,
+  validation: "to_validate",
 };
 
 export const featureDetail = {

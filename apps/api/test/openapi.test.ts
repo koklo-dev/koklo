@@ -56,7 +56,6 @@ describe("GET /openapi.json (C3.1)", () => {
       "/projects",
       "/projects/cards",
       "/projects/{projectId}/activity",
-      "/projects/{projectId}/ai/brief",
       "/projects/{projectId}/ai/criteria",
       "/projects/{projectId}/ai/deliverable/options",
       "/projects/{projectId}/ai/deliverable/propose",

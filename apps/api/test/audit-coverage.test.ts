@@ -215,7 +215,6 @@ function referencesGroup(source: string, group: string): boolean {
 const STANDALONE_PROCEDURES = ["health"];
 
 const EXPECTED_WRITE_PROCEDURES = [
-  "ai.draftBrief",
   "ai.ideaChat",
   "ai.ideaGaps",
   "ai.ideaSynthesis",
@@ -1250,24 +1249,6 @@ function aiScenarios(): Scenario[] {
     return {};
   };
   return [
-    {
-      procedure: "ai.draftBrief",
-      role: "dev",
-      prepare: keyed,
-      call: (ctx) => {
-        const projectId = ctx.world.projectId;
-        return call(ctx, "dev", AI_ROUTES.draftBrief(projectId), { projectId, idea: "Une idée" });
-      },
-      expected: onProject("ai.brief.draft"),
-      denied: (ctx) => {
-        const projectId = ctx.world.projectId;
-        return call(ctx, "client", AI_ROUTES.draftBrief(projectId), {
-          projectId,
-          idea: "Une idée",
-        });
-      },
-      deniedStatuses: [403],
-    },
     ...(["ideaChat", "ideaGaps", "ideaSynthesis"] as const).map((name): Scenario => {
       const segment = { ideaChat: "chat", ideaGaps: "gaps", ideaSynthesis: "synthesis" }[name];
       const action = {
@@ -1316,21 +1297,22 @@ function aiScenarios(): Scenario[] {
     {
       procedure: "ai.proposeFeatures",
       role: "dev",
-      prepare: keyed,
+      // 3.0.0 : l'agent lit le dossier figé, il en faut un.
+      prepare: async (ctx) => {
+        await freezeIdea(database, {
+          organizationId: ctx.world.organizationId,
+          projectId: ctx.world.projectId,
+        });
+        return keyed(ctx);
+      },
       call: (ctx) => {
         const projectId = ctx.world.projectId;
-        return call(ctx, "dev", AI_ROUTES.proposeFeatures(projectId), {
-          projectId,
-          brief: "Un brief",
-        });
+        return call(ctx, "dev", AI_ROUTES.proposeFeatures(projectId), { projectId });
       },
       expected: onProject("ai.features.propose"),
       denied: (ctx) => {
         const projectId = ctx.world.projectId;
-        return call(ctx, "business", AI_ROUTES.proposeFeatures(projectId), {
-          projectId,
-          brief: "Un brief",
-        });
+        return call(ctx, "business", AI_ROUTES.proposeFeatures(projectId), { projectId });
       },
       deniedStatuses: [403],
     },

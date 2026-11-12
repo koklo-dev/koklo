@@ -15,7 +15,6 @@ const INPUT = {
 const MARKERS = [
   "koklo.project.yaml",
   "README.md",
-  "brief/0001-idee-initiale.md",
   "architecture/overview.md",
   "tech/cahier-technique.md",
   "domain/roles.yaml",
@@ -44,6 +43,12 @@ describe("buildInitialSpecFiles : contenu", () => {
 
   it("pose les fichiers du squelette de l'annexe A §4.0", () => {
     for (const marker of MARKERS) expect(paths, marker).toContain(marker);
+  });
+
+  it("ne pose plus de brief : l'idée vit dans le dossier d'idée (TK-102, contrat 3.0.0)", () => {
+    expect(paths.some((path) => path.startsWith("brief/"))).toBe(false);
+    const readme = files.find((file) => file.path === "README.md")?.content ?? "";
+    expect(readme).not.toContain("brief");
   });
 
   it("garde les dossiers vides avec un .gitkeep", () => {

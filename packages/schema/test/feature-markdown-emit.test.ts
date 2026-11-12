@@ -374,3 +374,37 @@ describe("TK-44a erreurs typées", () => {
     expect(() => emitFeatureMarkdown(null as unknown as Feature)).toThrow(EmitFeatureError);
   });
 });
+
+describe("TK-102 zone facultative (texte brut de 1 à 80 caractères)", () => {
+  it("émet `zone` après `priorite` quand elle est renseignée, et la relit sans perte", () => {
+    const feature = base({ zone: "Authentification" });
+    const text = emitFeatureMarkdown(feature);
+    expect(text).toContain("priorite: should\nzone: Authentification\ntables: []");
+    expect(parsed("features/F-010-exemple.md", text)).toEqual(feature);
+    expect(emitFeatureMarkdown(parsed("features/F-010-exemple.md", text))).toBe(text);
+  });
+
+  it("n'émet aucune ligne `zone` sans zone : les fichiers existants restent identiques", () => {
+    expect(emitFeatureMarkdown(base())).not.toContain("zone");
+    expect(emitFeatureMarkdown(parsed(PATH, fixture))).toBe(fixture);
+  });
+
+  it("une zone à caractères spéciaux survit à la ronde parse / emit", () => {
+    const feature = base({ zone: "Accès : « rôles » # 2" });
+    const text = emitFeatureMarkdown(feature);
+    expect(parsed("features/F-010-exemple.md", text).zone).toBe("Accès : « rôles » # 2");
+  });
+
+  it("refuse une zone vide, de 81 caractères ou sur plusieurs lignes", () => {
+    expect(failure(base({ zone: "" })).path).toBe("/zone");
+    expect(failure(base({ zone: "x".repeat(81) })).path).toBe("/zone");
+    expect(failure(base({ zone: "Haut\nBas" })).path).toBe("/zone");
+  });
+
+  it("accepte 80 caractères au parse et refuse 81 (STRUCT)", () => {
+    const front = (zone: string) =>
+      `---\nid: F-010\ntitre: T\nstatut: brouillon\npriorite: should\nzone: ${zone}\ntables: []\nendpoints: []\necrans: []\nroles: []\nregles: []\nnfr: []\n---\n\n## Description\n\n## Critères d'acceptation\n`;
+    expect(parseFeatureMarkdown("features/F-010-t.md", front("x".repeat(80))).ok).toBe(true);
+    expect(parseFeatureMarkdown("features/F-010-t.md", front("x".repeat(81))).ok).toBe(false);
+  });
+});

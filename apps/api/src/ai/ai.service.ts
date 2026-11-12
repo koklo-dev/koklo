@@ -1,27 +1,23 @@
-import type {
-  AiDraftBriefInput,
-  AiProposeCriteriaInput,
-  AiProposeFeaturesInput,
-} from "@koklo/contract";
+import type { AiProposeCriteriaInput, AiProposeFeaturesInput } from "@koklo/contract";
+import { readFrozenDossier } from "@koklo/db";
 import type { LlmProviderId } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import { SpecReadService } from "../spec-read/spec-read.service.ts";
+import { validation } from "../tracker/api-errors.ts";
 import { ProjectTransactions } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { AiPurpose } from "./ai-budget.ts";
 import { AiCallRunner, correlationIdOf, validated } from "./ai-call.ts";
-import { briefPrompt, criteriaPrompt, featuresPrompt, verifyPrompt } from "./ai-prompts.ts";
+import { criteriaPrompt, featuresPrompt, verifyPrompt } from "./ai-prompts.ts";
 import { duplicatesOf, metaOf } from "./ai-results.ts";
 import {
-  briefOutputSchema,
   criteriaOutputSchema,
   DEFAULT_MAX_FEATURES,
   featuresOutputSchema,
   jsonSchemaOf,
 } from "./ai-schemas.ts";
 
-const BRIEF_SCHEMA = jsonSchemaOf(briefOutputSchema);
 const CRITERIA_SCHEMA = jsonSchemaOf(criteriaOutputSchema);
 const FEATURES_SCHEMA = jsonSchemaOf(featuresOutputSchema(DEFAULT_MAX_FEATURES));
 
@@ -38,28 +34,20 @@ export class AiService {
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
-  async draftBrief(scope: ProjectScope, input: AiDraftBriefInput, requestId: string) {
-    await this.transactions.run(scope, async () => undefined);
-    return this.runner.run({
-      ...this.base(scope, requestId, "brief-draft", "ai.brief.draft"),
-      usage: "idea_space" as const,
-      output: { kind: "json", schema: BRIEF_SCHEMA },
-      frame: (nonce) => briefPrompt(nonce, input),
-      settle: (response) => ({
-        brief: validated(response, (raw) => briefOutputSchema.parse(raw)),
-        meta: metaOf(response),
-      }),
-    });
-  }
-
   async proposeFeatures(scope: ProjectScope, input: AiProposeFeaturesInput, requestId: string) {
+    const sources = await this.transactions.run(scope, (tx) =>
+      readFrozenDossier(tx, scope.projectId),
+    );
+    if (sources === null) {
+      throw validation("projectId", "Le dossier d'idée n'a pas de version figée à lire");
+    }
     const existing = await this.specs.indexedFeatures(scope);
     const maxFeatures = input.maxFeatures ?? DEFAULT_MAX_FEATURES;
     return this.runner.run({
       ...this.base(scope, requestId, "features-propose", "ai.features.propose"),
       usage: "spec_deliverables" as const,
       output: { kind: "json", schema: FEATURES_SCHEMA },
-      frame: (nonce) => featuresPrompt(nonce, { brief: input.brief, maxFeatures, existing }),
+      frame: (nonce) => featuresPrompt(nonce, { sources, maxFeatures }),
       settle: (response) => {
         const { features } = validated(response, (raw) =>
           featuresOutputSchema(maxFeatures).parse(raw),

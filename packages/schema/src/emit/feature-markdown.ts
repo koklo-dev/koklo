@@ -88,6 +88,7 @@ export function emitFeatureMarkdown(feature: Feature): string {
   }
   const value = checked.data;
   assertSingleLine(value.titre, "/titre");
+  if (value.zone !== undefined) assertSingleLine(value.zone, "/zone");
   const description = value.description.trim();
   assertDescription(description);
   assertCriteria(value.criteres);
@@ -97,6 +98,7 @@ export function emitFeatureMarkdown(feature: Feature): string {
     `titre: ${yamlScalar(value.titre)}`,
     `statut: ${value.statut}`,
     `priorite: ${value.priorite}`,
+    ...(value.zone === undefined ? [] : [`zone: ${yamlScalar(value.zone)}`]),
     ...LINK_KEYS.map((key) => `${key}: [${value[key].join(", ")}]`),
     "---",
     "",

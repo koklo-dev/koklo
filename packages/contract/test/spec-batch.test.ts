@@ -106,6 +106,18 @@ describe("B2 specBatch.submit : opérations feature.*", () => {
     expect(await isValid(i(), one({ ...createOp, priority: "high" }))).toBe(false);
     expect(await isValid(i(), one({ ...createOp, status: "done" }))).toBe(false);
   });
+  it("feature.create / feature.update : zone facultative de 1 à 80 caractères (3.0.0)", async () => {
+    const create = (zone: unknown) =>
+      isValid(i(), one({ kind: "feature.create", title: "t", priority: "must", zone }));
+    expect(await create("Authentification")).toBe(true);
+    expect(await create("x".repeat(80))).toBe(true);
+    expect(await create("")).toBe(false);
+    expect(await create("x".repeat(81))).toBe(false);
+    expect(
+      await isValid(i(), one({ kind: "feature.update", specId: "F-001", zone: "Accès" })),
+    ).toBe(true);
+  });
+
   it("feature.create : l'identifiant F-nnn est attribué par le serveur", async () => {
     const value = (await parsed(i(), one({ ...createOp, specId: "F-999" }))) as
       | { operations: Record<string, unknown>[] }
