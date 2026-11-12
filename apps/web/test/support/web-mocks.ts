@@ -76,7 +76,6 @@ export const procedures = {
   specBatchSubmit: vi.fn(),
   specBatchGet: vi.fn(),
   // TK-59 : propositions de l'IA (contrat 0.9.0), jamais d'appel réel
-  aiDraftBrief: vi.fn(),
   aiProposeFeatures: vi.fn(),
   // TK-99b (contrat 2.9.0) : propositions de l'agent sur le Fonctionnel, jamais d'appel réel
   aiProposeOptions: vi.fn(),
@@ -245,7 +244,6 @@ export const orpc = {
   },
   ai: {
     key: () => ["ai"],
-    draftBrief: mutation(procedures.aiDraftBrief),
     proposeFeatures: mutation(procedures.aiProposeFeatures),
     prefillItem: mutationWithOptions(procedures.aiPrefillItem),
     proposeOptions: queryFull(["ai", "proposeOptions"], procedures.aiProposeOptions),

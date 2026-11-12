@@ -40,8 +40,10 @@ export interface TabsNavItem {
   label: string;
   href: string;
   active?: boolean;
-  /** Compteur en pastille ; absent quand il n'est pas connu. */
-  count?: number;
+  /** Compteur en pastille (nombre, « … » en génération, « 3 à relire ») ; absent quand il n'est pas connu. */
+  count?: number | string;
+  /** `primary` : pastille pleine pour « N à relire » (maquette 10 l.670-683) ; `soft` par défaut. */
+  countTone?: "soft" | "primary";
   icon?: IconName;
 }
 
@@ -75,7 +77,9 @@ export function TabsNav({
             >
               {tab.icon ? <Icon name={tab.icon} size={16} /> : null}
               {tab.label}
-              {tab.count === undefined ? null : <CountBadge>{tab.count}</CountBadge>}
+              {tab.count === undefined ? null : (
+                <CountBadge tone={tab.countTone ?? "soft"}>{tab.count}</CountBadge>
+              )}
             </Link>
           </li>
         ))}

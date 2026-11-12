@@ -83,6 +83,7 @@ export * from "./components/separator.tsx";
 export * from "./components/sheet.tsx";
 export * from "./components/sidebar.tsx";
 export * from "./components/skeleton.tsx";
+export * from "./components/spec-collection.tsx";
 export * from "./components/spec-item-sheet.tsx";
 export * from "./components/spec-nav.tsx";
 export * from "./components/spinner.tsx";

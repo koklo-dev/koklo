@@ -422,7 +422,7 @@ describe("Lien direct ?sel= (§2.1, B35)", () => {
     const row = rowsOf(listbox).find((item) => item.textContent?.includes("F-187")) as HTMLElement;
     expect(row).toHaveAttribute("aria-current", "true");
     expect(row).toHaveAttribute("aria-posinset", "187");
-    await findRole("dialog");
+    await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
   });
 
   it("remonter charge la page précédente (previousCursor) sans around", async () => {
@@ -451,13 +451,17 @@ describe("Lien direct ?sel= (§2.1, B35)", () => {
     procedures.specListFeatures.mockResolvedValue(firstPage());
     renderFeatures({ search: "?sel=F-187&status=adoptee" });
     await findHiddenList("F-001");
-    await findRole("dialog");
+    await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     const text = await screen.findByText(/n'apparaît pas avec les filtres actuels/);
     const note = text.closest("[data-slot='inline-alert']") as HTMLElement;
     expect(note).toHaveAttribute("role", "note");
     expect(note).toHaveTextContent("Cette fonctionnalité n'apparaît pas avec les filtres actuels.");
     await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+      ).toBeNull(),
+    );
     await userEvent.click(within(note).getByRole("button", { name: "Effacer les filtres" }));
     await waitFor(() =>
       expect(new URLSearchParams(window.location.search).has("status")).toBe(false),
@@ -478,7 +482,7 @@ describe("Lien direct ?sel= (§2.1, B35)", () => {
   it("l'ancien ?feature=F-002 est lu puis réécrit en ?sel=F-002", async () => {
     renderFeatures({ search: "?feature=F-002" });
     await findHiddenList("F-001");
-    await findRole("dialog");
+    await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
       expect(params.get("sel")).toBe("F-002");
@@ -491,7 +495,7 @@ describe("Lien direct ?sel= (§2.1, B35)", () => {
     const listbox = await findList();
     const length = window.history.length;
     await userEvent.click(within(listbox).getByRole("link", { name: "Fonctionnalité numéro 2" }));
-    await findRole("dialog");
+    await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     expect(new URLSearchParams(window.location.search).get("sel")).toBe("F-002");
     expect(window.history.length).toBe(length + 1);
     expect(procedures.specListFeatures).toHaveBeenCalledTimes(1);
@@ -504,7 +508,7 @@ describe("Lien direct ?sel= (§2.1, B35)", () => {
     const listbox = await findList();
     (rowsOf(listbox)[0] as HTMLElement).focus();
     await userEvent.keyboard("{Enter}");
-    await findRole("dialog");
+    await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     expect(new URLSearchParams(window.location.search).get("sel")).toBe("F-001");
   });
 });

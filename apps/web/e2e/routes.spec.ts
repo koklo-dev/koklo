@@ -79,7 +79,7 @@ test("pages « Bientôt » : un livrable, EmptyState sans action, onglet du cahi
   ).toBeVisible();
   await expect(
     page
-      .getByRole("navigation", { name: "Onglets du cahier fonctionnel" })
+      .getByRole("navigation", { name: "Sections du cahier fonctionnel" })
       .getByRole("link", { name: "Règles métier" }),
   ).toHaveAttribute("aria-current", "page");
   // Un `tab` inconnu ouvre les fonctionnalités.
@@ -87,14 +87,20 @@ test("pages « Bientôt » : un livrable, EmptyState sans action, onglet du cahi
   await expect(page.getByRole("list", { name: "Fonctionnalités" })).toBeVisible();
 });
 
-test("un client lié garde la coquille avec Réglages (Mon compte) mais sans Assistant de cadrage", async ({
-  page,
-}) => {
+test("un client lié garde la coquille avec Réglages (Mon compte)", async ({ page }) => {
   await setScenario({ session: true, projects: "data", role: "client" });
   await page.goto(`${PROJECT}/tickets`);
   const bar = page.locator('[data-slot="app-shell-sidebar"]');
   await expect(bar.getByRole("link", { name: /^Tickets/ })).toBeVisible();
   // B96 : « Réglages » est visible de tous ; le client n'y trouve que Mon compte.
   await expect(bar.getByRole("link", { name: "Réglages" })).toHaveCount(1);
-  await expect(bar.getByRole("link", { name: "Assistant de cadrage" })).toHaveCount(0);
+});
+
+test("l'ancienne adresse /framing mène au cahier fonctionnel, requête conservée (TK-102)", async ({
+  page,
+}) => {
+  await setScenario({ session: true, projects: "data" });
+  await page.goto(`${PROJECT}/framing?view=review`);
+  await expect(page).toHaveURL(new RegExp(`${PROJECT}/spec/functional\\?view=review$`));
+  await expect(page.getByRole("heading", { level: 1, name: "Cahier fonctionnel" })).toBeVisible();
 });

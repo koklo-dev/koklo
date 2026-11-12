@@ -29,4 +29,6 @@ export const STATUS_TONE = {
   revise: PILL_TONE.danger,
   unsubmitted: "bg-secondary text-muted-foreground",
   neutral: PILL_TONE.neutral,
+  /** « Prêt », « Génération » : fond `--secondary`, texte `--secondary-foreground` (maquette 10 l.637-658). */
+  soft: PILL_TONE.soft,
 } as const;

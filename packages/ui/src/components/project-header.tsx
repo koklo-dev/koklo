@@ -14,6 +14,8 @@ export interface ProjectHeaderProps {
   page: string;
   title: string;
   summary?: string;
+  /** Le résumé a sa propre ligne sous le titre, à toute largeur (maquette 10 l.77) ; sinon il rejoint la rangée du titre dès md. */
+  summaryOwnLine?: boolean;
   /** État du livrable à côté du titre (`ValidationStatus`, `DeliverableStatus`). */
   status?: ReactNode;
   /** Équipe seulement : SHA de 7 caractères et âge (« il y a 3 min »). */
@@ -97,6 +99,7 @@ export function ProjectHeader({
   page,
   title,
   summary,
+  summaryOwnLine = false,
   status,
   sha,
   meta,
@@ -131,7 +134,14 @@ export function ProjectHeader({
         </Heading>
         {status}
         {summary ? (
-          <p className="order-3 -mt-1.5 text-meta text-muted-foreground max-md:basis-full md:order-none md:mt-0 md:basis-auto">
+          <p
+            className={cn(
+              "order-3 -mt-1.5 text-meta text-muted-foreground",
+              summaryOwnLine
+                ? "basis-full"
+                : "max-md:basis-full md:order-none md:mt-0 md:basis-auto",
+            )}
+          >
             {summary}
           </p>
         ) : null}

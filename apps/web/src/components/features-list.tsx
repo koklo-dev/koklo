@@ -1,12 +1,24 @@
 "use client";
 
 import type { FeatureSummary } from "@koklo/contract";
-import { CountBar, IdTag, ListFooter, ListRow, VirtualList } from "@koklo/ui";
+import {
+  CountBar,
+  IdTag,
+  ListFooter,
+  ListRow,
+  PriorityIndicator,
+  ValidationStatus,
+  VirtualList,
+} from "@koklo/ui";
 import { type MouseEvent, type RefObject, useEffect, useRef, useState } from "react";
-import { criteriaLabel } from "../lib/feature-labels.ts";
+import {
+  criteriaLabel,
+  priorityLabel,
+  priorityLevel,
+  validationStatus,
+} from "../lib/feature-labels.ts";
 import { PAGE_SIZE } from "../lib/use-features.ts";
 import type { useListFooter } from "../lib/use-features-list.ts";
-import { FeatureLifecycle, FeaturePriority } from "./feature-status.tsx";
 
 type Footer = ReturnType<typeof useListFooter>;
 
@@ -23,9 +35,23 @@ function plainClick(event: MouseEvent): boolean {
   return event.button === 0 && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
 }
 
+/** Priorité avec son libellé (112 px) puis validation du client (maquette 10 l.193-194) : jamais une couleur seule. */
+function RowStatus({ feature }: { feature: FeatureSummary }) {
+  return (
+    <>
+      <PriorityIndicator
+        level={priorityLevel(feature.priority)}
+        label={priorityLabel(feature.priority)}
+        className="md:w-28"
+      />
+      <ValidationStatus status={validationStatus(feature.validation)} />
+    </>
+  );
+}
+
 /**
  * Contenu d'une ligne de 52 px (`ListRow as="div"` : l'`li` est celui de `VirtualList`) : `IdTag`, titre en lien,
- * sous-titre « N critères », puis priorité avant avancement. Sous 768 px, priorité et avancement passent sous le
+ * sous-titre « N critères », puis priorité libellée et validation. Sous 768 px, priorité et validation passent sous le
  * titre. Le lien sort de la tabulation (une seule entrée dans la liste, flèches entre les lignes) ; Entrée ou Espace
  * sur la ligne ouvre la fiche comme lui.
  */
@@ -54,16 +80,14 @@ function FeatureRow({ feature, href, onOpen }: RowProps) {
       subtitle={
         <>
           <span>{criteriaLabel(feature.criteriaCount)}</span>
-          <span className="flex items-center gap-x-2 md:hidden">
-            <FeaturePriority priority={feature.priority} barsOnly />
-            <FeatureLifecycle feature={feature} />
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 md:hidden">
+            <RowStatus feature={feature} />
           </span>
         </>
       }
       trailing={
-        <div className="hidden shrink-0 items-center gap-4 md:flex">
-          <FeaturePriority priority={feature.priority} barsOnly />
-          <FeatureLifecycle feature={feature} />
+        <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+          <RowStatus feature={feature} />
         </div>
       }
     />
@@ -156,7 +180,7 @@ export function FeaturesList({
         onActivate={(feature) => onOpen(feature.specId)}
         {...(selected ? { selectedKey: selected } : {})}
         {...(centerOn ? { centerOnKey: centerOn } : {})}
-        className="h-auto max-h-[70vh]"
+        className="h-auto max-h-[600px]"
         framed
         loadingRows={footer.state === "loading" ? 4 : 0}
         busy={stale}

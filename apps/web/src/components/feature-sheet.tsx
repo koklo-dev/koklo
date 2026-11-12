@@ -1,16 +1,17 @@
 "use client";
 
 import type { FeatureSummary, Role } from "@koklo/contract";
-import { Button, Icon, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@koklo/ui";
+import { Button, IdTag, ValidationStatus } from "@koklo/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { validationStatus } from "../lib/feature-labels.ts";
 import { orpc } from "../lib/orpc.ts";
 import { canReadRepos } from "../lib/roles.ts";
 import { describeFeatureError } from "../lib/spec-errors.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { FeatureDetail } from "./feature-detail.tsx";
 import { FeatureError } from "./feature-error.tsx";
-import { FeatureLifecycle, FeaturePriority } from "./feature-status.tsx";
+import { FeatureLifecycle } from "./feature-status.tsx";
 import { LoadingStatus } from "./loading-status.tsx";
 
 interface SheetProps {
@@ -19,11 +20,8 @@ interface SheetProps {
   /** Ligne de la liste : en-tête immédiat avant l'arrivée du détail. */
   summary: FeatureSummary | undefined;
   role: Role | undefined;
-  onClose: () => void;
   /** La fonctionnalité a disparu de la spec : la liste est relue en arrière-plan. */
   onGone: () => void;
-  /** Rend le focus au lien de la ligne d'origine (ou au titre de la page). */
-  onReturnFocus: (specId: string) => void;
   /** « Modifier » : présent seulement pour l'équipe qui écrit, quand la spec est lue. */
   onEdit: (() => void) | undefined;
 }
@@ -53,19 +51,11 @@ function useFeatureQuery(projectId: string, specId: string) {
 }
 
 /**
- * Fiche d'une fonctionnalité (`Sheet` modal). L'en-tête vient de la ligne de la liste, le détail de
- * `spec.getFeature`. Le focus initial va au titre (on lit d'abord), la fermeture le rend au lien d'origine.
+ * Fiche d'une fonctionnalité, contenu de la région ancrée de `SpecCollection` (maquette 10 l.199-221) : identifiant,
+ * validation et « Modifier », titre, avancement, puis le détail de `spec.getFeature`. L'en-tête vient de la ligne de
+ * la liste. Le focus initial va au titre (on lit d'abord).
  */
-export function FeatureSheet({
-  projectId,
-  specId,
-  summary,
-  role,
-  onClose,
-  onGone,
-  onReturnFocus,
-  onEdit,
-}: SheetProps) {
+export function FeatureSheet({ projectId, specId, summary, role, onGone, onEdit }: SheetProps) {
   const query = useFeatureQuery(projectId, specId);
   const title = useRef<HTMLHeadingElement>(null);
   useUnauthorizedRedirect(query.error);
@@ -73,56 +63,32 @@ export function FeatureSheet({
   useEffect(() => {
     if (gone) onGone();
   }, [gone, onGone]);
+  useEffect(() => title.current?.focus(), []);
 
   const shown = summary ?? query.data;
   const criteriaCount = summary?.criteriaCount ?? query.data?.criteria.length ?? 0;
   return (
-    <Sheet open onOpenChange={(open) => open || onClose()}>
-      <SheetContent
-        aria-describedby={undefined}
-        closeLabel="Fermer la fiche"
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          title.current?.focus();
-        }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          onReturnFocus(specId);
-        }}
-      >
-        <SheetHeader>
-          <span className="font-mono text-xs text-muted-foreground">{specId}</span>
-          <SheetTitle ref={title} tabIndex={-1} className="text-section-title outline-none">
-            {shown?.title ?? specId}
-          </SheetTitle>
-          {shown ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <FeatureLifecycle feature={{ status: shown.status, criteriaCount }} />
-              <FeaturePriority priority={shown.priority} />
-            </div>
-          ) : null}
-        </SheetHeader>
-        {/* Région défilante atteignable au clavier (axe `scrollable-region-focusable`) : Tab puis flèches. */}
-        <section
-          aria-label="Détail de la fonctionnalité"
-          // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante, doit pouvoir être lue au clavier
-          tabIndex={0}
-          className="flex-1 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Body query={query} role={role} />
-        </section>
-        <SheetFooter>
-          <Button variant="outline" className="h-11 md:h-9" onClick={onClose}>
-            Fermer
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <IdTag>{specId}</IdTag>
+        {summary ? <ValidationStatus status={validationStatus(summary.validation)} /> : null}
+        <span className="flex-1" />
+        {onEdit ? (
+          <Button variant="outline" size="sm" className="max-md:h-11" onClick={onEdit}>
+            Modifier
           </Button>
-          {onEdit ? (
-            <Button className="h-11 md:h-9" onClick={onEdit}>
-              <Icon name="edit_note" size={20} />
-              Modifier
-            </Button>
-          ) : null}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        ) : null}
+      </div>
+      <h2 ref={title} tabIndex={-1} className="text-settings-title outline-none">
+        {shown?.title ?? specId}
+      </h2>
+      {shown ? (
+        <FeatureLifecycle
+          className="self-start"
+          feature={{ status: shown.status, criteriaCount }}
+        />
+      ) : null}
+      <Body query={query} role={role} />
+    </>
   );
 }

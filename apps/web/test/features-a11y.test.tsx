@@ -115,7 +115,7 @@ describe("Gabarit de la route", () => {
   it("la barre est présente et le livrable Fonctionnel est en aria-current=page", async () => {
     await renderFramed();
     const bar = screen.getByRole("navigation", { name: "Navigation principale" });
-    const current = await findNamed("link", "Fonctionnel", { scope: within(bar) });
+    const current = await findNamed("link", /^Fonctionnel/, { scope: within(bar) });
     expect(current).toHaveAttribute("href", `/projects/${PROJECT_ID}/spec/functional`);
     expect(current).toHaveAttribute("aria-current", "page");
   });
@@ -129,13 +129,13 @@ describe("Accessibilité de la liste (§7)", () => {
     expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 
-  it("les deux Select ont un libellé visible lié", async () => {
+  it("les trois filtres sont des boutons nommés, à menu de choix unique", async () => {
     renderFeatures();
     await findList();
-    for (const name of ["Statut", "Priorité"]) {
-      const select = screen.getByRole("combobox", { name });
-      expect(select).toHaveAccessibleName(name);
-      expect(screen.getByLabelText(name)).toBe(select);
+    for (const name of ["Validation", "Priorité", "Avancement"]) {
+      const chip = screen.getByRole("button", { name });
+      expect(chip).toHaveAccessibleName(name);
+      expect(chip).toHaveAttribute("aria-haspopup", "menu");
     }
   });
 
@@ -163,7 +163,7 @@ describe("Accessibilité de la liste (§7)", () => {
       .map((el) => el.getAttribute("aria-label") ?? el.textContent?.trim() ?? el.id)
       .filter(Boolean);
     const at = (text: string) => order.findIndex((label) => label.includes(text));
-    expect(at("Statut")).toBeLessThan(at("Effacer les filtres"));
+    expect(at("Avancement")).toBeLessThan(at("Effacer les filtres"));
     expect(at("Effacer les filtres")).toBeLessThan(at("F-001"));
     // Une seule entrée dans la liste : les liens de titre n'entrent pas dans la tabulation (flèches entre lignes).
     const list = screen.getByRole("list", { name: "Fonctionnalités" });
@@ -185,18 +185,18 @@ describe("Accessibilité de la liste (§7)", () => {
 describe("Mobile 375 px (§6)", () => {
   beforeEach(() => setViewport(375));
 
-  it("sous le titre : critères en sous-titre, puis priorité et avancement en md:hidden (TK-87, TK-141)", async () => {
+  it("sous le titre : critères en sous-titre, puis priorité et validation en md:hidden (TK-87, TK-141)", async () => {
     renderFeatures();
     const table = await findList();
-    // La ligne de 52 px garde l'identifiant et le titre ; priorité puis avancement passent sous le titre.
+    // La ligne de 52 px garde l'identifiant et le titre ; priorité puis validation passent sous le titre.
     const meta = Array.from(table.querySelectorAll<HTMLElement>("span")).filter(
       (el) =>
         /\bmd:hidden\b/.test(el.className) &&
-        el.querySelector("[data-slot='priority-indicator'][aria-label='Indispensable']") !== null,
+        el.querySelector("[data-slot='priority-indicator']")?.textContent === "Indispensable",
     );
     expect(meta.length).toBeGreaterThan(0);
     const first = meta[0] as HTMLElement;
-    expect(first.querySelector("[data-slot='lifecycle-status']")).not.toBeNull();
+    expect(first.querySelector("[data-slot='validation-status']")).not.toBeNull();
     expect(first.querySelector("[data-slot='priority-indicator']")).not.toBeNull();
     // Le sous-titre « N critères » est visible à toute taille ; les cellules d'écran large (md:flex) portent la même
     // information de priorité et d'avancement.
@@ -204,7 +204,7 @@ describe("Mobile 375 px (§6)", () => {
     const wide = Array.from(table.querySelectorAll<HTMLElement>("div")).filter(
       (el) =>
         /\bmd:flex\b/.test(el.className) &&
-        el.querySelector("[data-slot='priority-indicator'][aria-label='Indispensable']") !== null,
+        el.querySelector("[data-slot='priority-indicator']")?.textContent === "Indispensable",
     );
     expect(wide.length).toBeGreaterThan(0);
   });
@@ -221,7 +221,7 @@ describe("Mobile 375 px (§6)", () => {
     expect(footer.className).toMatch(/max-md:\[&_button\]:h-11/);
     expect(footer.className).toMatch(/max-md:\[&_button\]:w-full/);
     expect(within(footer).getByRole("button", { name: "Charger la suite" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Statut" }).className).toMatch(
+    expect(screen.getByRole("button", { name: /^Avancement/ }).className).toMatch(
       /\bh-11\b|max-md:h-11/,
     );
   });

@@ -2,9 +2,11 @@
 
 import type { HTMLAttributes } from "react";
 import { primeIcon } from "../icons/cache.ts";
+import * as arrowForward from "../icons/generated/arrow_forward.ts";
 import * as checkCircle from "../icons/generated/check_circle.ts";
 import * as edit from "../icons/generated/edit.ts";
 import * as editNote from "../icons/generated/edit_note.ts";
+import * as progressActivity from "../icons/generated/progress_activity.ts";
 import * as radioButtonUnchecked from "../icons/generated/radio_button_unchecked.ts";
 import * as schedule from "../icons/generated/schedule.ts";
 import { Icon, type IconName } from "../icons/icon.tsx";
@@ -17,15 +19,26 @@ primeIcon("edit", edit);
 primeIcon("schedule", schedule);
 primeIcon("check_circle", checkCircle);
 primeIcon("edit_note", editNote);
+primeIcon("arrow_forward", arrowForward);
+primeIcon("progress_activity", progressActivity);
 
-export type DeliverableStatusValue = "todo" | "in_progress" | "pending" | "revise" | "validated";
+export type DeliverableStatusValue =
+  | "todo"
+  | "ready"
+  | "generating"
+  | "in_progress"
+  | "pending"
+  | "revise"
+  | "validated";
 
 const DELIVERABLE: Record<
   DeliverableStatusValue,
   { label: string; icon: IconName; tone: keyof typeof STATUS_TONE }
 > = {
   todo: { label: "À faire", icon: "radio_button_unchecked", tone: "neutral" },
-  in_progress: { label: "En cours", icon: "edit", tone: "neutral" },
+  ready: { label: "Prêt", icon: "arrow_forward", tone: "soft" },
+  generating: { label: "Génération", icon: "progress_activity", tone: "soft" },
+  in_progress: { label: "En cours", icon: "edit", tone: "soft" },
   pending: { label: "À valider", icon: "schedule", tone: "pending" },
   revise: { label: "À revoir", icon: "edit_note", tone: "revise" },
   validated: { label: "Validé", icon: "check_circle", tone: "validated" },
@@ -33,6 +46,8 @@ const DELIVERABLE: Record<
 
 type Common = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
   status: DeliverableStatusValue;
+  /** Libellé plus long que celui du statut (« À valider par le client · obligatoire », maquette 10 l.655). */
+  label?: string;
 };
 
 export type DeliverableStatusProps = Common &
@@ -50,10 +65,12 @@ export function DeliverableStatus({
   status,
   compact = false,
   hideLabel = false,
+  label: customLabel,
   className,
   ...props
 }: DeliverableStatusProps) {
-  const { label, icon, tone } = DELIVERABLE[status];
+  const { label: defaultLabel, icon, tone } = DELIVERABLE[status];
+  const label = customLabel ?? defaultLabel;
   return (
     <span
       data-slot="deliverable-status"
@@ -67,7 +84,12 @@ export function DeliverableStatus({
       )}
       {...props}
     >
-      <Icon name={icon} size={16} fill={tone !== "neutral"} />
+      <Icon
+        name={icon}
+        size={16}
+        fill={status !== "todo"}
+        className={status === "generating" ? "motion-safe:animate-spin" : undefined}
+      />
       <span className={hideLabel ? "sr-only" : undefined}>{label}</span>
     </span>
   );

@@ -4,6 +4,7 @@ import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { ITEM_ACTIVE, type ShellLink, useShell } from "./app-shell.tsx";
 import { Skeleton } from "./skeleton.tsx";
+import { PILL_TONE } from "./status-pill.ts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip.tsx";
 
 export type SpecKey =
@@ -49,10 +50,24 @@ export const SPEC_DELIVERABLES: readonly SpecDeliverable[] = [
   },
 ];
 
+/** Pastille d'une entrée (maquette 10 l.686-712) : `soft` (Prêt, …), `primary` (N à relire), `pending` (À valider, ambre). */
+export interface SpecBadge {
+  label: string;
+  tone: "soft" | "primary" | "pending";
+}
+
+const BADGE_TONE: Record<SpecBadge["tone"], string> = {
+  soft: PILL_TONE.soft,
+  primary: PILL_TONE.primary,
+  pending: PILL_TONE.warning,
+};
+
 export interface SpecNavProps {
   /** Lien de chaque livrable disponible ; une clé absente est verrouillée (fermé par défaut). */
   hrefs: Partial<Record<SpecKey, string>>;
   activeKey?: SpecKey;
+  /** Pastille par livrable disponible (un seul badge par entrée) ; absente : aucune pastille. */
+  badges?: Partial<Record<SpecKey, SpecBadge>>;
   /** Livrables validés sur sept ; 0 tant qu'aucun n'est validable. */
   validatedCount?: number;
   loading?: boolean;
@@ -124,25 +139,44 @@ function Rank({ rank }: { rank: number }) {
   );
 }
 
+function EntryBadge({ badge }: { badge: SpecBadge }) {
+  return (
+    <span
+      data-slot="spec-badge"
+      data-tone={badge.tone}
+      className={cn(
+        "shrink-0 whitespace-nowrap rounded-full px-[7px] py-px text-[11px] font-semibold",
+        BADGE_TONE[badge.tone],
+      )}
+    >
+      <span className="sr-only">{", "}</span>
+      {badge.label}
+    </span>
+  );
+}
+
 function AvailableEntry({
   deliverable,
   rank,
   href,
   active,
+  badge,
   Link,
 }: {
   deliverable: SpecDeliverable;
   rank: number;
   href: string;
   active: boolean;
+  badge: SpecBadge | undefined;
   Link: ShellLink;
 }) {
   const { collapsed } = useShell();
+  const collapsedName = `Spec · ${deliverable.label}${badge ? ` · ${badge.label}` : ""}`;
   const link = (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      aria-label={collapsed ? `Spec · ${deliverable.label}` : undefined}
+      aria-label={collapsed ? collapsedName : undefined}
       className={cn(
         "flex h-8 [@media(max-height:900px)]:h-7 w-full items-center gap-2 rounded-md border border-transparent px-2.5 text-meta text-sidebar-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         collapsed && "justify-center px-0",
@@ -157,13 +191,14 @@ function AvailableEntry({
         className={active ? "text-primary" : "text-muted-foreground"}
       />
       {collapsed ? null : <span className="min-w-0 flex-1 truncate">{deliverable.label}</span>}
+      {collapsed || !badge ? null : <EntryBadge badge={badge} />}
     </Link>
   );
   if (!collapsed) return link;
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">{`Spec · ${deliverable.label}`}</TooltipContent>
+      <TooltipContent side="right">{collapsedName}</TooltipContent>
     </Tooltip>
   );
 }
@@ -175,6 +210,7 @@ function AvailableEntry({
 export function SpecNav({
   hrefs,
   activeKey,
+  badges = {},
   validatedCount = 0,
   loading = false,
   LinkComponent: Link = "a" as unknown as ShellLink,
@@ -220,6 +256,7 @@ export function SpecNav({
                   rank={index + 1}
                   href={hrefs[deliverable.key] as string}
                   active={activeKey === deliverable.key}
+                  badge={badges[deliverable.key]}
                   Link={Link}
                 />
               ) : (

@@ -146,7 +146,8 @@ describe("Sondage et reprise", () => {
   it("propositions à relire au chargement : bouton « Relire N », relecture ouverte une fois, sans rouvrir après « Quitter »", async () => {
     serveProposals(many(3));
     renderTeam();
-    await findNamed("button", /Relire 3 propositions/);
+    // En relecture l'en-tête propose « Ajouter » et « Reproposer » (maquette 10 l.640-650), pas « Relire N ».
+    await findNamed("button", "Reproposer");
     await waitFor(() => expect(window.location.search).toContain("view=review"));
     await userEvent.click(await findNamed("button", "Quitter la relecture"));
     await waitFor(() => expect(window.location.search).not.toContain("view=review"));
@@ -168,6 +169,7 @@ describe("Données de départ", () => {
   it("une proposition seule suffit à rendre le bouton prêt (singulier)", async () => {
     serveProposals([fake(1)]);
     renderTeam();
+    await userEvent.click(await findNamed("button", "Quitter la relecture"));
     expect(await findNamed("button", /Relire 1 proposition/)).toBeVisible();
   });
 });

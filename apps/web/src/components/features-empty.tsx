@@ -31,7 +31,7 @@ export function FeaturesAgentEmpty({
   onCreate: () => void;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-3">
+    <div className="mx-auto mt-8 flex w-full max-w-[560px] flex-col gap-3">
       <EmptyState
         icon="task_alt"
         title="L'agent peut proposer le cahier fonctionnel"

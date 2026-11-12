@@ -7,6 +7,8 @@ export interface ProposalGenerationBannerProps {
   children: string;
   /** « Annuler l'attente » : quitte l'attente seulement, rien n'est annulé côté serveur. */
   onLeave?: () => void;
+  /** Sans `role="status"` : quand la page porte déjà sa région d'état (relecture), une seule annonce reste. */
+  silent?: boolean;
   className?: string;
 }
 
@@ -14,11 +16,12 @@ export interface ProposalGenerationBannerProps {
 export function ProposalGenerationBanner({
   children,
   onLeave,
+  silent = false,
   className,
 }: ProposalGenerationBannerProps) {
   return (
     <div
-      role="status"
+      role={silent ? undefined : "status"}
       data-slot="proposal-generation-banner"
       className={cn(
         "flex flex-wrap items-center gap-x-4 gap-y-2.5 border-b border-border bg-diff-bg px-4 py-2.5 text-meta md:px-7",

@@ -35,7 +35,7 @@ function useListSummary(
   data: ReturnType<typeof useFeaturesData>,
 ) {
   const { features, head, view } = data;
-  const filtered = Boolean(url.status || url.priority || url.q);
+  const filtered = Boolean(url.status || url.priority || url.validation || url.q);
   const countBar = showsCountBar(view);
   const resultText = useResultAnnouncement(
     countBar
@@ -110,10 +110,27 @@ function useProposals(
   return { enabled, status, launch, reviewing: enabled && Boolean(url.review) };
 }
 
+/** « Rouvrir le brouillon » après un échec arrivé formulaire fermé. */
+function reopenDraftOf(
+  write: ReturnType<typeof useFeatureWrite>,
+  form: ReturnType<typeof useFeatureFormPanel>,
+): () => void {
+  return () => {
+    const meta = write.meta;
+    if (meta && meta.kind !== "create" && meta.specId) form.openEdit(meta.specId);
+    else form.openCreate();
+  };
+}
+
 /** Tout ce que l'écran des fonctionnalités pilote : données, adresse, annonces, liste, fiche et visibilités. */
 export function useFeaturesPage(projectId: string) {
   const url = useFeaturesUrl();
-  const filters = { status: url.status, priority: url.priority, q: url.q };
+  const filters = {
+    status: url.status,
+    priority: url.priority,
+    validation: url.validation,
+    q: url.q,
+  };
   const data = useFeaturesData(projectId, { ...filters, selected: url.feature });
   const { announcement, announce } = useAnnouncements(data.view);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -145,12 +162,7 @@ export function useFeaturesPage(projectId: string) {
     sheet: useFeatureSheet(projectId, url, titleRef),
     write,
     form,
-    /** « Rouvrir le brouillon » après un échec arrivé formulaire fermé. */
-    reopenDraft: () => {
-      const meta = write.meta;
-      if (meta && meta.kind !== "create" && meta.specId) form.openEdit(meta.specId);
-      else form.openCreate();
-    },
+    reopenDraft: reopenDraftOf(write, form),
     keepFocus,
     announce,
     region: regionOf({

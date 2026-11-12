@@ -1,7 +1,7 @@
 import type { ProjectOverview } from "@koklo/contract";
 import { NextStep, PhaseRail, StatCard } from "@koklo/ui";
 import { statIcon } from "../lib/overview-labels.ts";
-import { framingPath, ideaPath, ticketsPath } from "../lib/shell-routes.ts";
+import { ideaPath, specPath, ticketsPath } from "../lib/shell-routes.ts";
 import { ShellLink } from "./shell-link.tsx";
 
 type StepKey = ProjectOverview["phaseSteps"][number]["key"];
@@ -9,7 +9,7 @@ type StepKey = ProjectOverview["phaseSteps"][number]["key"];
 /** Espace de chaque étape ; Baseline 0 n'a pas de page avant TK-100 (B272), donc pas d'adresse. */
 const STEP_PATHS: Partial<Record<StepKey, (projectId: string) => string>> = {
   idea: ideaPath,
-  framing: framingPath,
+  framing: (projectId) => specPath(projectId, "functional"),
   iterations: ticketsPath,
 };
 

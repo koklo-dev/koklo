@@ -70,3 +70,11 @@ describe("AgentProposePopover : en-tête", () => {
     expect(screen.queryByText(/\/ 500/)).toBeNull();
   });
 });
+
+describe("ProposalGenerationBanner silent (TK-102)", () => {
+  it("sans role=status quand la page a déjà sa région d'état", () => {
+    render(<ProposalGenerationBanner silent>L'agent rédige.</ProposalGenerationBanner>);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByText("L'agent rédige.")).toBeInTheDocument();
+  });
+});

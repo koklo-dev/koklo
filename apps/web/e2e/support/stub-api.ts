@@ -1,5 +1,4 @@
 import { createServer, type IncomingMessage } from "node:http";
-import { type AiScenario, handleAi, resetAi } from "./stub-ai.ts";
 import { handleProviders, type ProvidersScenario, resetProviders } from "./stub-ai-providers.ts";
 import {
   type FeaturesScenario,
@@ -43,7 +42,6 @@ type Scenario = {
   GithubScenario &
   SpecRepoScenario &
   FeaturesScenario &
-  AiScenario &
   ProposalsScenario &
   ProvidersScenario &
   ShellScenario &
@@ -170,7 +168,6 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetGithub();
     resetSpecRepo();
     resetFeatures();
-    resetAi();
     resetProposals(scenario);
     resetProviders();
     resetSettings();
@@ -200,7 +197,6 @@ const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
   handleSettings(req, url, { scenario, send, projects: allProjects }) ||
   handleProviders(req, url, { scenario, send, hold }) ||
   handleProposals(req, url, { scenario, send }) ||
-  handleAi(req, url, { scenario, knownProject, send, hold }) ||
   handleOverview(req, url, { scenario, send, hold }) ||
   handleShell(req, url, { scenario, projects: allProjects, send, hold });
 

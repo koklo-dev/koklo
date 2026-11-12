@@ -177,17 +177,16 @@ describe("page de projet", () => {
     expect(procedures.projectShell).toHaveBeenCalledWith({ projectId: PROJECT_ID });
   });
 
-  it("Projet : Vue d'ensemble, Idée, Assistant de cadrage, SPEC, Tickets, dans l'ordre", async () => {
+  it("Projet : Vue d'ensemble, Idée, SPEC, Tickets, dans l'ordre (plus d'Assistant de cadrage, TK-102)", async () => {
     asRole("owner");
     renderFrame(SPEC);
-    await within(nav()).findByRole("link", { name: "Données" });
+    await within(nav()).findByRole("link", { name: /^Données/ });
     expect(linkHrefs()).toEqual([
       ["Vue d'ensemble", `/projects/${PROJECT_ID}`],
       ["Idée", `/projects/${PROJECT_ID}/idea`],
-      ["Assistant de cadrage", `/projects/${PROJECT_ID}/framing`],
-      ["Fonctionnel", `/projects/${PROJECT_ID}/spec/functional`],
-      ["Données", `/projects/${PROJECT_ID}/spec/data`],
-      ["Design", `/projects/${PROJECT_ID}/spec/design`],
+      ["Fonctionnel, Prêt", `/projects/${PROJECT_ID}/spec/functional`],
+      ["Données, Prêt", `/projects/${PROJECT_ID}/spec/data`],
+      ["Design, Prêt", `/projects/${PROJECT_ID}/spec/design`],
       ["Tickets12", `/projects/${PROJECT_ID}/tickets`],
       ["Tous les projets", "/projects"],
       ["Réglages", "/settings/members"],
@@ -196,7 +195,7 @@ describe("page de projet", () => {
 
   it("lit spec.deliverables du projet de l'URL, une seule fois (barre et compteur SPEC)", async () => {
     renderFrame(SPEC);
-    await within(nav()).findByRole("link", { name: "Données" });
+    await within(nav()).findByRole("link", { name: /^Données/ });
     expect(procedures.specDeliverables).toHaveBeenCalledTimes(1);
     expect(procedures.specDeliverables).toHaveBeenCalledWith({ projectId: PROJECT_ID });
   });
@@ -216,7 +215,7 @@ describe("page de projet", () => {
     );
     renderFrame(SPEC);
     const group = await within(nav()).findByRole("group", { name: "Spec" });
-    await within(group).findByRole("link", { name: "Données" });
+    await within(group).findByRole("link", { name: /^Données/ });
     expect(group).toHaveTextContent("2/7");
     expect(
       within(group)
@@ -233,7 +232,7 @@ describe("page de projet", () => {
       name: "Architecture, disponible après les données",
     });
     expect(locked).toHaveAttribute("aria-disabled", "true");
-    expect(within(group).getByRole("link", { name: "Fonctionnel" })).toHaveAttribute(
+    expect(within(group).getByRole("link", { name: /^Fonctionnel/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -291,7 +290,7 @@ describe("page de projet", () => {
     procedures.projectShell.mockRejectedValue(new Error("500"));
     renderFrame(SPEC);
     const group = await within(nav()).findByRole("group", { name: "Spec" });
-    expect(await within(group).findByRole("link", { name: "Données" })).toBeInTheDocument();
+    expect(await within(group).findByRole("link", { name: /^Données/ })).toBeInTheDocument();
     expect(within(nav()).getByRole("link", { name: "Vue d'ensemble" })).toBeInTheDocument();
   });
 
@@ -359,7 +358,7 @@ describe("carte projet : projets récents (C9)", () => {
 });
 
 describe("droits (C8, C12, B82)", () => {
-  it("client : Réglages (vers Mon compte) sans Assistant de cadrage, avec la carte, SPEC et Tickets", async () => {
+  it("client : Réglages (vers Mon compte), avec la carte, SPEC et Tickets", async () => {
     asRole("client");
     renderFrame(SPEC);
     await within(nav()).findByRole("link", { name: /Tickets/ });
@@ -371,10 +370,10 @@ describe("droits (C8, C12, B82)", () => {
     expect(
       within(nav()).getByRole("button", { name: /Portail de réservation/ }),
     ).toBeInTheDocument();
-    expect(within(nav()).getByRole("link", { name: "Fonctionnel" })).toBeInTheDocument();
+    expect(within(nav()).getByRole("link", { name: /^Fonctionnel/ })).toBeInTheDocument();
   });
 
-  it("rôle inconnu (organization.list pas encore lu) : Réglages vers Mon compte, sans Assistant de cadrage", async () => {
+  it("rôle inconnu (organization.list pas encore lu) : Réglages vers Mon compte", async () => {
     procedures.organizationList.mockReturnValue(new Promise(() => undefined));
     renderFrame(SPEC);
     await within(nav()).findByRole("link", { name: /Tickets/ });
@@ -386,16 +385,16 @@ describe("droits (C8, C12, B82)", () => {
   });
 
   it.each(["owner", "admin", "dev", "designer"])(
-    "%s : Réglages et Assistant de cadrage",
+    "%s : Réglages, et plus d'entrée Assistant de cadrage (TK-102)",
     async (role) => {
       asRole(role);
       renderFrame(SPEC);
       expect(await within(nav()).findByRole("link", { name: "Réglages" })).toBeInTheDocument();
-      expect(within(nav()).getByRole("link", { name: "Assistant de cadrage" })).toBeInTheDocument();
+      expect(within(nav()).queryByRole("link", { name: /Assistant/ })).toBeNull();
     },
   );
 
-  it("business : Réglages (membres) mais pas l'Assistant de cadrage", async () => {
+  it("business : Réglages (membres)", async () => {
     asRole("business");
     renderFrame(SPEC);
     expect(await within(nav()).findByRole("link", { name: "Réglages" })).toBeInTheDocument();

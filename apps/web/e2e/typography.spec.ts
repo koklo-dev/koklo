@@ -37,7 +37,6 @@ const SCREENS: readonly Screen[] = [
     invitation: "ready",
   },
   { name: "features", path: `/projects/${FEATURE_PROJECT_ID}/spec/functional`, session: true },
-  { name: "framing", path: `/projects/${FEATURE_PROJECT_ID}/framing`, session: true },
 ];
 
 for (const { name, path, session, activeOrganization, organizations, invitation } of SCREENS) {

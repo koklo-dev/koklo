@@ -49,6 +49,13 @@ describe("proxy — /projects/<projectId>/features", () => {
     expect(new URL(response.headers.get("location") as string).search).toBe("?tab=features");
   });
 
+  it("conserve la requête et ajoute tab=features (/features?x → /spec/functional?tab=features&x)", async () => {
+    withSession(true, true);
+    const response = await call(`${FEATURES}?x=1`);
+    expect(redirectedTo(response)).toBe(`/projects/${ID}/spec/functional`);
+    expect(new URL(response.headers.get("location") as string).search).toBe("?tab=features&x=1");
+  });
+
   it("garde aussi un identifiant qui n'est pas un uuid", async () => {
     withSession(false);
     expect(redirectedTo(await call("/projects/pas-un-uuid/features"))).toBe("/login");
@@ -64,6 +71,39 @@ describe("proxy — /projects/<projectId>/features", () => {
       expect(response.headers.get("x-middleware-next")).toBe("1");
     },
   );
+});
+
+describe("proxy — /projects/<projectId>/framing (Assistant de cadrage retiré, TK-102)", () => {
+  const FRAMING = `/projects/${ID}/framing`;
+
+  it("redirige vers /login sans session, avant toute redirection d'ancien chemin", async () => {
+    withSession(false);
+    expect(redirectedTo(await call(FRAMING))).toBe("/login");
+  });
+
+  it("redirige vers /organizations avec session sans organisation active", async () => {
+    withSession(true, false);
+    expect(redirectedTo(await call(FRAMING))).toBe("/organizations");
+  });
+
+  it("avec session et organisation active, redirige en 307 vers le cahier fonctionnel", async () => {
+    withSession(true, true);
+    const response = await call(FRAMING);
+    expect(response.status).toBe(307);
+    expect(redirectedTo(response)).toBe(`/projects/${ID}/spec/functional`);
+    expect(new URL(response.headers.get("location") as string).search).toBe("");
+  });
+
+  it("conserve la requête (?view=review)", async () => {
+    withSession(true, true);
+    const response = await call(`${FRAMING}?view=review`);
+    expect(redirectedTo(response)).toBe(`/projects/${ID}/spec/functional`);
+    expect(new URL(response.headers.get("location") as string).search).toBe("?view=review");
+  });
+
+  it("le matcher couvre /projects/<un segment>/framing pour que la redirection ait lieu", () => {
+    expect(matched(FRAMING).length).toBeGreaterThan(0);
+  });
 });
 
 describe("matcher du proxy — route dynamique", () => {

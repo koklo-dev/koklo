@@ -95,6 +95,7 @@ interface Saved {
 interface Filters {
   status?: string | undefined;
   priority?: string | undefined;
+  validation?: string | undefined;
   q?: string | undefined;
 }
 
@@ -114,6 +115,7 @@ export async function reloadList(
   // Une recherche en cours : sans la ligne dans la liste, rien ne dit qu'elle y correspond.
   const visible =
     !filters.q &&
+    !filters.validation &&
     (!filters.status || filters.status === saved.status) &&
     (!filters.priority || filters.priority === saved.priority);
   if (!visible) return "filtered";

@@ -113,7 +113,7 @@ describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
     async (role) => {
       serveWrite(role);
       renderFeatures({ search: "?edit=F-001" });
-      await findNamed("dialog", "Connexion par e-mail", { text: "Connexion par e-mail" });
+      await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
       expect(deleteButton()).toBeNull();
       expect(screen.queryByRole("button", { name: /Supprimer|Modifier|Enregistrer/ })).toBeNull();
       expect(screen.queryAllByRole("textbox")).toHaveLength(0);
@@ -130,9 +130,7 @@ describe("Le bouton « Supprimer cette fonctionnalité » (accès)", () => {
 
   it("la fiche en lecture n'offre pas de suppression (elle passe par « Modifier »)", async () => {
     renderFeatures({ search: "?feature=F-001" });
-    const sheet = await findNamed("dialog", "Connexion par e-mail", {
-      text: "Connexion par e-mail",
-    });
+    const sheet = await screen.findByRole("complementary", { name: "Fiche de la fonctionnalité" });
     expect(within(sheet).queryByRole("button", { name: /Supprimer/ })).toBeNull();
   });
 

@@ -145,6 +145,13 @@ describe("HeaderTabs (aussi utilisé par Réglages)", () => {
     expect(tokens).toContain("md:basis-auto");
   });
 
+  it("`summaryOwnLine` : le résumé a sa propre ligne à toute largeur (maquette 10 l.77)", () => {
+    render(<ProjectHeader {...base} summary="4 sur 7" summaryOwnLine />);
+    const tokens = screen.getByText("4 sur 7").className.split(/\s+/);
+    expect(tokens).toContain("basis-full");
+    expect(tokens).not.toContain("md:basis-auto");
+  });
+
   it("le séparateur « / » de l'emplacement a une marge de 12 (mx-3)", () => {
     render(<ProjectHeader {...base} />);
     const nav = screen.getByRole("navigation", { name: "Emplacement" });

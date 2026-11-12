@@ -19,8 +19,9 @@ export function useFeatureSheet(
       featuresPath(projectId, withFeaturesUrl(`?${url.search}`, { feature: specId })),
     returnFocus: useCallback(
       (specId: string) => {
-        // « Modifier » remplace la fiche par le formulaire, qui prend le focus.
-        if (new URLSearchParams(window.location.search).has("edit")) return;
+        // « Modifier » et « Nouvelle fonctionnalité » remplacent la fiche par le formulaire, qui prend le focus.
+        const params = new URLSearchParams(window.location.search);
+        if (params.has("edit") || params.has("new")) return;
         const link = document.querySelector<HTMLElement>(`[data-feature-link="${specId}"]`);
         (link ?? titleRef.current)?.focus();
       },

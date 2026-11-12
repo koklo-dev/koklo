@@ -11,7 +11,7 @@ export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 const DRAFT_PREFIX = "koklo:feature-draft:";
 const PENDING_PREFIX = "koklo:feature-pending:";
-/** Brouillon de cadrage (TK-59) : même cycle de vie, purgé avec les autres à la fin de session. */
+/** Brouillon de l'ancien Assistant de cadrage (TK-59, retiré en TK-102) : purgé au chargement du cahier et à la fin de session. */
 export const FRAMING_DRAFT_PREFIX = "koklo:framing-draft:";
 /** Copie locale d'une page de l'espace Idée (TK-89) : même cycle de vie, purgée avec les autres. */
 export const IDEA_DRAFT_PREFIX = "koklo:idea-draft:";
@@ -141,6 +141,16 @@ function removeWhere(drop: (key: string, data: unknown) => boolean): void {
       if (!key || !OWNED_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
       if (drop(key, parse(localStorage.getItem(key) ?? ""))) removeStored(key);
     }
+  } catch {
+    // stockage indisponible : rien à effacer
+  }
+}
+
+/** Chargement du cahier fonctionnel : les brouillons de l'ancien Assistant de cadrage ne servent plus, ils sont effacés. */
+export function purgeFramingDrafts(): void {
+  try {
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+    for (const key of keys) if (key?.startsWith(FRAMING_DRAFT_PREFIX)) removeStored(key);
   } catch {
     // stockage indisponible : rien à effacer
   }

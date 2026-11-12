@@ -19,7 +19,7 @@ const DELIVERABLES = [
     status: "in_progress",
     label: "En cours",
     icon: "edit",
-    classes: ["bg-secondary", "text-foreground"],
+    classes: ["bg-secondary", "text-secondary-foreground"],
   },
   {
     status: "pending",
@@ -66,6 +66,11 @@ describe("DeliverableStatus", () => {
     const svg = el?.querySelector("svg");
     expect(svg).toHaveAttribute("aria-hidden", "true");
     expect(svg).toHaveAttribute("width", "16");
+  });
+
+  it("`label` remplace le libellé du statut (maquette 10 l.655)", () => {
+    render(<DeliverableStatus status="pending" label="À valider par le client · obligatoire" />);
+    expect(screen.getByText("À valider par le client · obligatoire")).toBeInTheDocument();
   });
 
   it.each(DELIVERABLES)("$status : icône $icon", async (d) => {

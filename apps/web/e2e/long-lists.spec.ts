@@ -126,7 +126,9 @@ const VIEWS: View[] = [
     spec: "large",
     path: `${PATH}?sel=F-187`,
     visible: async (page) => {
-      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+      ).toBeVisible();
       await expect(
         page.locator("[data-row-key='F-187']", { hasText: "Résiliation d'abonnement 187" }),
       ).toHaveAttribute("aria-current", "true", { timeout: 10_000 });
@@ -157,7 +159,7 @@ async function captureFooter(page: Page, view: View, theme: Theme, viewport: Vie
   }
   await settle(page);
   await page.screenshot({
-    path: `${CAPTURES_DIR}/S-features/${view.name}-foot-${theme}${viewport.name}.png`,
+    path: `${CAPTURES_DIR}/S-spec-functional/${view.name}-foot-${theme}${viewport.name}.png`,
   });
 }
 
@@ -208,7 +210,7 @@ for (const viewport of VIEWPORTS) {
         await expect(page.locator("html")).toHaveClass(
           theme === "dark" ? /dark/ : /^((?!dark).)*$/,
         );
-        await capture(page, "S-features", view.name, theme, viewport.name);
+        await capture(page, "S-spec-functional", view.name, theme, viewport.name);
         if (view.footer) {
           await captureFooter(page, view, theme, viewport);
           await view.visible(page);
@@ -253,17 +255,22 @@ test.describe("Liste des fonctionnalités : 1 000 éléments", () => {
     page,
   }) => {
     await search(page).focus();
-    await page.keyboard.press("Tab"); // Statut
+    await page.keyboard.press("Tab"); // Validation
     await page.keyboard.press("Tab"); // Priorité
+    await page.keyboard.press("Tab"); // Avancement
     await page.keyboard.press("Tab"); // première ligne de la liste
     const first = list(page).getByRole("listitem").first();
     await expect(first).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(list(page).getByRole("listitem").nth(1)).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(
+      page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(
+      page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+    ).toBeHidden();
     // Le focus revient au lien de la ligne ouverte ; les flèches continuent d'y fonctionner (l'événement remonte à la ligne).
     await expect(page.locator("[data-feature-link='F-002']")).toBeFocused();
     await page.keyboard.press("ArrowDown");
@@ -298,9 +305,13 @@ test.describe("Liste des fonctionnalités : 1 000 éléments", () => {
   }) => {
     await page.goto(`${PATH}?sel=F-187&status=adoptee`);
     // La fiche modale s'ouvre d'abord ; l'avis, derrière elle, apparaît à sa fermeture.
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(
+      page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(
+      page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
+    ).toBeHidden();
     const note = page
       .getByRole("note")
       .filter({ hasText: "n'apparaît pas avec les filtres actuels" });

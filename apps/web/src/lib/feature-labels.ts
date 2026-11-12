@@ -1,8 +1,9 @@
 import type { FeatureDetail, FeatureSummary } from "@koklo/contract";
-import type { IconName, LifecycleStage, PriorityLevel } from "@koklo/ui";
+import type { IconName, LifecycleStage, PriorityLevel, ValidationStatusValue } from "@koklo/ui";
 
 export type FeatureStatus = FeatureSummary["status"];
 export type FeaturePriority = FeatureSummary["priority"];
+export type FeatureValidation = FeatureSummary["validation"];
 export type StepType = FeatureDetail["criteria"][number]["steps"][number]["type"];
 
 /** Libellé neutre d'une valeur que cette version ne connaît pas : jamais la valeur brute. */
@@ -79,4 +80,20 @@ export function stepLabel(type: string): string {
 /** « N critère(s) » : singulier pour 0 et 1. */
 export function criteriaLabel(count: number): string {
   return count > 1 ? `${count} critères` : `${count} critère`;
+}
+
+const VALIDATIONS: Record<FeatureValidation, { label: string; status: ValidationStatusValue }> = {
+  validated: { label: "Validée", status: "validated" },
+  to_validate: { label: "À valider", status: "pending" },
+  to_revise: { label: "À revoir", status: "revise" },
+};
+
+/** Libellé de la validation client d'une fonctionnalité (Validée, À valider, À revoir). */
+export function validationLabel(validation: string): string {
+  return lookup(VALIDATIONS, validation)?.label ?? UNKNOWN;
+}
+
+/** Statut de `ValidationStatus` d'une validation ; une valeur inconnue reste « À valider » (jamais validée). */
+export function validationStatus(validation: string): ValidationStatusValue {
+  return lookup(VALIDATIONS, validation)?.status ?? "pending";
 }
