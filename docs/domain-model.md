@@ -3,7 +3,7 @@ title: Domain model
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-12
 covers_release: unreleased
 sources: []
 covers_commit: 5fa5b1c
@@ -258,7 +258,7 @@ Two tenant tables (`TENANT_MODELS`: `Review`, `Baseline`), migration `2026110111
 drops `baselines`, then the triggers, `reviews`, the function and the enums, in that order).
 - **`reviews`**: `id`, `organization_id`, `project_id`, `repo_id`, `target_kind` (enum
   `review_target_kind`: `feature`, `screen`, `baseline`), `target_ref`, `sha`, `status` (enum
-  `review_status`: `approved`, `changes_requested`), `author_user_id` (no foreign key, GDPR),
+  `review_status`: `approved`, `changes_requested`, and since TK-104 `withdrawn`, "Cancel" a decision: migration `20261112170000_review_withdrawn`, whose `down.sql` deletes the `withdrawn` rows with the journal trigger suspended, then recreates the type), `author_user_id` (no foreign key, GDPR),
   `author_role`, `comment`, `created_at`, `updated_at`. CHECKs: `sha` is 40/64 lowercase hex;
   `target_ref` 1 to 64 characters, `F-nnn` for a `feature`, `baseline-<n>` (`baseline-0` allowed) for a
   `baseline`, free for a `screen`; `comment` at most 2000; `author_role` null or 1 to 64 characters.
@@ -383,7 +383,7 @@ per proposal type (`feature`, `criteria`, `rule`, `role`, `flow`) and the plain-
 - **`agent_proposal_decisions`**: the journal, one row per decision (`accept`, `reject`, `reset`), `decided_by` (no
   foreign key), `edited` (the content was corrected first). Never modified.
 - **Keys**: `(organization_id, project_id)` and `(organization_id, launch_id)` / `(organization_id, proposal_id)`
-  `ON DELETE CASCADE`. `notifications` accepts the type `proposal.ready` and the subject `agent_launch`.
+  `ON DELETE CASCADE`. `notifications` accepts the type `proposal.ready` and the subject `agent_launch`, and since TK-104 the type `review.reminded` (reminder sent to a client by the team; same migration as `withdrawn`).
 - **`seed:large`**: one `done` launch and 400 proposals in three groups of more than 30 (120, 140, 140), statuses mixed.
 
 ### TK-51 summary: BYOK, suggestions, reviews, notifications
