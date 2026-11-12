@@ -23,6 +23,9 @@ export const ICON_NAMES = [
   "schedule",
   "edit_note",
   "fact_check",
+  "send",
+  "verified",
+  "notifications",
   "remove",
   // Livrables, entités et phases (TK-87)
   "edit",
