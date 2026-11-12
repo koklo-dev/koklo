@@ -513,6 +513,16 @@ stateDiagram-v2
   Expired --> [*]: releaseExpired
 ```
 
+### Spec deliverables and their availability (TK-100 lot A, `packages/domain`)
+Pure rule (`deliverables.ts`), no persistence. `DELIVERABLE_DEPENDENCIES` is the B1 graph of the seven deliverables (Functional;
+Data and Design after Functional; Architecture after Data; Technical after Architecture; Security after Technical; Quality after
+Technical, Security and Design); its keys follow `DELIVERABLE_KEYS` of `@koklo/contract` (the single ordered list, parity tested in the
+API). `deliverablesAvailabilityOf(facts)` returns the seven entries `{ key, status, available, forced, condition }`: Functional is
+open from `idea-v1` or once features are indexed; Data and Design as soon as Functional holds an indexed entity; the four others when
+every upstream deliverable is `validated`; a forcing (`deliverable_overrides`, owner or admin) opens one deliverable and never
+validates it. `condition` is "Disponible apres ..." while closed. The status comes from a replaceable `DeliverableStatusSource`
+(lot A: Functional from per-feature reviews, six others `todo`).
+
 ### Untrusted data, framed prompts and validated outputs (TK-50a, `packages/domain`)
 Pure value types (no persistence), see [ADR 0011](adr/0011-llm-port-and-untrusted-data.md).
 - **Untrusted** (`untrusted.ts`): content from outside Koklo plus its `origin`, one of `spec-file`,
@@ -985,3 +995,18 @@ treats them as locked (`locked` conflict). A waivable limit would be another tic
   or `TEST_DATABASE_URL`): `up` -> `down` -> `up`, then `migrate diff --exit-code`
   between the database and `schema.prisma` must be empty; plus snake_case, uuid key and
   timestamp checks.
+
+### Entity index, content hash and deliverable status (TK-100 lot B)
+`spec_entities(snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, search)` is the generic index of a snapshot (unique
+`(snapshot_id, kind, spec_id)`, CHECK on `kind` and on the hash format). `review_versions(review_id, content_hash)` keeps, one row per
+review and append only like `reviews`, the hash of the content a verdict was given on. Target hash: an element is its entity hash;
+`rules` is the ordered hash of all `R-*`; `roles` the hash of `domain/roles.yaml`; `deliverable` the hash of all its elements
+(`DELIVERABLE_ENTITY_KINDS` of `packages/domain`: Functional = feature, rule, roles, flow; Data = table, relations; the others none yet).
+`deliverableStatusOf(facts)` (`packages/domain`) gives the status: `todo` without entity, `revise` when a change request is current,
+`validated` when the whole deliverable or every element and block target is validated, `pending` otherwise.
+
+### Upstream impact (TK-100 lot C)
+`DELIVERABLE_SOURCES`: Functional reads `idea`; every other deliverable reads its B1 upstream. `staleLivrables(changed)` returns the
+transitive dependents of the changed sources in graph order (a changed deliverable is not its own dependent). `ideaPagesDiff(from, to)`
+returns `{ added, modified, removed, changedPages }` (sorted page identifiers). A deliverable is stale when it has a decision older than
+the latest frozen idea version; one never validated is untouched, and a forced one stays `revise`.

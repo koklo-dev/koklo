@@ -1873,3 +1873,52 @@ sequenceDiagram
   W->>DB: proposal.ready notification, done
   Web->>API: proposal.list / decide / specBatch.submit
 ```
+
+## Spec deliverables (TK-100 lot A)
+`apps/api/src/spec-deliverables/` serves `spec.deliverables` (any role with access to the project) and `spec.forceDeliverable` (owner and
+admin, audited `deliverable.force`). The service reads facts through a Prisma repository (`idea_versions`, indexed features,
+`deliverable_overrides`, pending `agent_proposals`; the client always gets 0 proposals), takes the status from a `DeliverableStatusSource`
+(lot A: `FunctionalStatusSource`; since lot B `ReviewStatusSource`, the per-element validation) and applies the B1 rule of `packages/domain`.
+`project.shell` and the SPEC bar of the web read the same service, so the availability is computed in one place.
+
+## Entity index and validation by element (TK-100 lot B)
+The worker writes, with each snapshot, a generic index `spec_entities` (`apps/worker/src/webhook/entity-rows.ts`): one row per model
+element (feature, rule, roles, journey, table, relations, endpoint, screen, scenario) with the sha256 of its canonical content
+(`canonicalize` of `@koklo/schema`). `_layout.yaml` and any file outside the model are never read, so a layout commit changes no hash.
+Journeys (`design/flows/P-*.json`) are indexed as raw JSON, without a Zod schema. The marker `spec_snapshots.entities_indexed_at` is set
+in the same transaction; a `ready` snapshot without it is re-indexed by the existing reconciliation pass (P4, same provider budget).
+
+```mermaid
+flowchart LR
+  push[push / P4 reconcile] --> idx[IndexWriter: snapshot + spec_features + spec_entities]
+  idx --> head[spec_heads]
+  submit[review.submit] --> pol[review-policy: D1 + role per target]
+  pol --> hash[target-hash: element / rules / roles / deliverable]
+  hash --> rv[(reviews + review_versions)]
+  head --> hash
+  rv --> st[ReviewStatusSource] --> deliv[spec.deliverables]
+```
+
+`apps/api/src/review/` decides who validates what in the pure `review-policy.ts` (client when one is invited, else owner or admin, for
+the Functional deliverable and Design; owner, admin, dev for the technical deliverables) from the project's `project_client_access`
+link, never from the input. A verdict is current when the hash it stored equals the target's current hash (`isCurrent`), else when its
+SHA is the head SHA. `ReviewStatusSource` replaces the lot A source of the deliverable statuses.
+
+## Upstream impact of a new idea version (TK-100 lot C)
+`packages/domain/src/deliverable-impact.ts` holds the graph of sources (`DELIVERABLE_SOURCES`, derived from B1), `staleLivrables(changed)`
+(transitive dependents in graph order) and `ideaPagesDiff(from, to)` (pages added, modified, removed between two `pages_versions`).
+`SpecDeliverablesService` compares the two latest frozen `idea_versions`; a deliverable whose latest decision (`reviews`, target
+`deliverable` or, for the Functional, an element or block) predates the latest version is `revise` with `staleBecause`. A forced
+deliverable is not masked. `ProposalLaunchService` asks the same service: `mode: "update"` without `staleBecause` is a 422, and the
+`update` option of `ai.proposeOptions` appears only then. In the worker, `readSources` gives the `update` prompt the diff only (changed
+pages, removed page identifiers), never the other pages nor the synthesis.
+
+```mermaid
+flowchart LR
+  v[idea-vN+1 frozen] --> diff[ideaPagesDiff vs idea-vN]
+  diff --> stale[staleLivrables: transitive dependents]
+  rv[(reviews: last decision per deliverable)] --> stale
+  stale --> sd[spec.deliverables: revise + staleBecause]
+  sd --> launch[ai.proposeDeliverable update / ai.proposeOptions]
+  launch --> w[worker prompt update: diff only]
+```
