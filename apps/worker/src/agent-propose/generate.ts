@@ -106,7 +106,13 @@ async function ask<T>(
 /** Références que le modèle peut viser : fonctionnalités et règles du cahier, tables du modèle actuel. */
 const dataRefs = (sources: LaunchSources) => ({
   specIds: new Set([...sources.features, ...sources.rules].map((item) => item.specId)),
-  tables: new Set((sources.tables ?? []).map((table) => table.specId)),
+  // Champs d'une table actuelle : au plus 100 lus (dossier-sources) ; au plafond, la liste peut être tronquée : non contrôlée.
+  tables: new Map<string, ReadonlySet<string> | null>(
+    (sources.tables ?? []).map((table) => [
+      table.specId,
+      table.fields.length >= 100 ? null : new Set(table.fields),
+    ]),
+  ),
 });
 
 /**

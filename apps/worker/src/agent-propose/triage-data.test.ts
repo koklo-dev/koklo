@@ -10,7 +10,10 @@ const context = (over: Partial<TriageContext> = {}): TriageContext => ({
   kinds: ["table", "relations", "fixtures"],
   titles: { table: new Set([titleKey("Salle")]) },
   missingCriteria: new Map(),
-  refs: { specIds: new Set(["F-001", "R-004"]), tables: new Set(["T-salle"]) },
+  refs: {
+    specIds: new Set(["F-001", "R-004"]),
+    tables: new Map<string, ReadonlySet<string> | null>([["T-salle", null]]),
+  },
   ...over,
 });
 const table = (name: string, over: Record<string, unknown> = {}) => ({
@@ -120,5 +123,38 @@ describe("triage des relations et des jeux", () => {
     const { accepted, discarded } = run([table("Réservation")], context({ kinds: ["fixtures"] }));
     expect(accepted).toHaveLength(0);
     expect(discarded).toBe(1);
+  });
+});
+
+describe("jeu d'exemple et champs de sa table (staging, 2026-11-13)", () => {
+  it("un jeu bâti sur une autre version d'une table déjà proposée est écarté", () => {
+    const result = run([
+      table("Absence"),
+      fixtures("Absences d'exemple", "T-absence", [{ id: "1", date_debut: "2025-02-03" }]),
+      fixtures("Absences valides", "T-absence", [{ id: "2", salle_id: "s1" }]),
+    ]);
+    expect(result.accepted.map((c) => c.title)).toEqual(["Absence", "Absences valides"]);
+    expect(result.discarded).toBe(1);
+  });
+
+  it("une table actuelle aux champs connus contrôle aussi ses jeux ; champs inconnus (null) : non contrôlés", () => {
+    const ctx = context({
+      refs: {
+        specIds: new Set(["F-001"]),
+        tables: new Map<string, ReadonlySet<string> | null>([
+          ["T-client", new Set(["id", "nom"])],
+          ["T-salle", null],
+        ]),
+      },
+    });
+    const result = run(
+      [
+        fixtures("Clients faux", "T-client", [{ id: "1", age: 3 }]),
+        fixtures("Clients", "T-client", [{ id: "1", nom: "Ada" }]),
+        fixtures("Salles", "T-salle", [{ id: "1", quoi: "x" }]),
+      ],
+      ctx,
+    );
+    expect(result.accepted.map((c) => c.title)).toEqual(["Clients", "Salles"]);
   });
 });
