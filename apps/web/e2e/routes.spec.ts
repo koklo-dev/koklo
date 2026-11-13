@@ -69,14 +69,14 @@ test("/ et /kanban ouvrent le dernier projet ouvert, sinon la liste des projets"
 test("pages « Bientôt » : un livrable, EmptyState sans action, onglet du cahier", async ({
   page,
 }) => {
-  await page.goto(`${PROJECT}/spec/data`);
-  await expect(page.getByRole("heading", { level: 1, name: "Données" })).toBeVisible();
+  // Les Données ont leur écran depuis TK-107 : le livrable « Bientôt » de ce test est l'Architecture.
+  await page.goto(`${PROJECT}/spec/architecture`);
+  await expect(page.getByRole("heading", { level: 1, name: "Architecture" })).toBeVisible();
   await expect(page.getByText("Bientôt")).toBeVisible();
   await expect(page.locator("main").getByRole("button")).toHaveCount(0);
   await page.goto(`${PROJECT}/spec/functional?tab=rules`);
-  await expect(
-    page.getByText("Les règles métier arrivent dans une prochaine version."),
-  ).toBeVisible();
+  // Les règles ont leur onglet depuis TK-103 : plus de « Bientôt » dans le cahier.
+  await expect(page.locator("[data-slot='rule-card']").first()).toBeVisible();
   await expect(
     page
       .getByRole("navigation", { name: "Sections du cahier fonctionnel" })

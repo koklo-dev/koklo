@@ -8,6 +8,7 @@ import {
   resetFeatureWrites,
   type WriteMode,
 } from "./stub-feature-write.ts";
+import { dataCounts, handleSpecData } from "./stub-spec-data.ts";
 import { domainCounts, handleSpecDomain } from "./stub-spec-domain.ts";
 import { handleSpecItem, type SpecItemScenario } from "./stub-spec-item.ts";
 
@@ -34,7 +35,9 @@ export type SpecMode =
   /** `large` dont la première requête avec curseur échoue (500), puis réussit. */
   | "largeMoreError"
   /** `large` dont les requêtes avec curseur sont retenues jusqu'à POST /__release. */
-  | "largeMoreSlow";
+  | "largeMoreSlow"
+  /** TK-107 : cahier fonctionnel rempli, aucune table (état Prêt de l'écran Données). */
+  | "dataEmpty";
 export type FeatureMode =
   | "ok"
   | "unavailable"
@@ -169,7 +172,18 @@ const effectiveMode = (scenario: FeaturesScenario): SpecMode => {
 };
 
 const head = (mode: SpecMode) => {
+  const raw = headOf(mode);
+  // Les compteurs des Données (3.5.0) suivent le mode : tables, relations et jeux d'exemple.
+  return raw ? { ...raw, counts: { ...raw.counts, ...dataCounts(mode) } } : raw;
+};
+
+const headOf = (mode: SpecMode) => {
   switch (mode) {
+    case "dataEmpty":
+      return {
+        ...baseHead(),
+        counts: { features: 7, tables: 0, endpoints: 0, rules: 4, roles: 3, flows: 2 },
+      };
     case "noSpec":
     case "noSpecRepo":
       return null;
@@ -342,6 +356,7 @@ export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boo
   }
   writeMode = h.scenario.write;
   if (handleSpecDomain(req, url, h, (h.scenario.spec ?? "ready").startsWith("large"))) return true;
+  if (handleSpecData(req, url, h, h.scenario.spec ?? "ready")) return true;
   if (h.scenario.feature === "loading" && /\/spec\/items\//.test(url.pathname)) {
     // Lecture d'édition retenue jusqu'à POST /__release : état « chargement de la fonctionnalité ».
     h.hold(() => handleSpecItem(req, url, h, h.scenario, (specId) => getFeature("ok", specId)));

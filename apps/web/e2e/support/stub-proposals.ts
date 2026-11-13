@@ -21,6 +21,8 @@ export type ProposalsMode =
   | "volume"
   /** TK-103 : 3 fonctionnalités, 1 règle, 1 rôle, 1 parcours à relire (un groupe par type). */
   | "mixed"
+  /** TK-107 : 4 tables, une proposition de relations et un jeu d'exemple à relire (Données). */
+  | "data"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -40,7 +42,7 @@ const HOSTILE =
 interface Item {
   id: string;
   launchId: string;
-  kind: "feature" | "rule" | "role" | "flow";
+  kind: "feature" | "rule" | "role" | "flow" | "table" | "relations" | "fixtures";
   zone: string;
   position: number;
   title: string;
@@ -137,6 +139,120 @@ function mixed(): Item[] {
   ];
 }
 
+const table = (
+  n: number,
+  name: string,
+  zone: string,
+  sources: string[],
+  fields: Array<Record<string, unknown>>,
+): Item => ({
+  ...make(n, 1),
+  kind: "table",
+  zone,
+  title: name,
+  rationale: `Déduite de ${sources.join(", ")}.`,
+  content: { name, sources, fields },
+});
+
+const ID_FIELD = { name: "id", type: "uuid", primaryKey: true };
+
+/** Six tables proposées, celles de la maquette 11 (l.571-582) : nom, zone, justifications, champs. */
+const TABLES: Array<[string, string, string[], Array<Record<string, unknown>>]> = [
+  [
+    "Client",
+    "Clients et fidélité",
+    ["F-001", "F-003"],
+    [
+      ID_FIELD,
+      { name: "nom", type: "texte(100)", constraints: "obligatoire", personalData: true },
+      { name: "telephone", type: "texte(20)", constraints: "unique", personalData: true },
+    ],
+  ],
+  [
+    "Réservation",
+    "Prise de rendez-vous",
+    ["F-001", "F-002"],
+    [
+      ID_FIELD,
+      { name: "client_id", type: "ref(T-client)" },
+      { name: "statut", type: "enum", values: ["confirmee", "honoree", "annulee"] },
+    ],
+  ],
+  [
+    "Service",
+    "Catalogue et stock",
+    ["F-004"],
+    [ID_FIELD, { name: "nom", type: "texte(80)" }, { name: "prix", type: "decimal" }],
+  ],
+  [
+    "Créneau",
+    "Prise de rendez-vous",
+    ["F-001", "F-006"],
+    [
+      ID_FIELD,
+      { name: "employe_id", type: "ref(T-employe)" },
+      { name: "debut", type: "horodatage" },
+    ],
+  ],
+  [
+    "Employé",
+    "Personnel",
+    ["F-006"],
+    [
+      ID_FIELD,
+      { name: "nom", type: "texte(100)", personalData: true },
+      { name: "actif", type: "booleen" },
+    ],
+  ],
+  [
+    "Rappel SMS",
+    "Communication",
+    ["F-003", "R-003"],
+    [
+      ID_FIELD,
+      { name: "reservation_id", type: "ref(T-reservation)" },
+      { name: "envoye_le", type: "horodatage" },
+    ],
+  ],
+];
+
+const dataTables = (): Item[] =>
+  TABLES.map(([name, zone, sources, fields], index) =>
+    table(index + 1, name, zone, sources, fields),
+  );
+
+const DATA_RELATIONS = [
+  { from: "T-reservation", to: "T-client", cardinality: "n → 1" },
+  { from: "T-rappel-sms", to: "T-reservation", cardinality: "n → 1" },
+];
+const DATA_ROWS = [
+  { nom: "Léa Martin", telephone: "+33 6 12 34 56 78" },
+  { nom: "Karim Haddad", telephone: "+33 7 98 76 54 32" },
+];
+
+/** Données proposées : quatre tables, les relations et un jeu d'exemple. */
+function dataItems(): Item[] {
+  return [
+    ...dataTables(),
+    {
+      ...make(7, 1),
+      kind: "relations",
+      zone: "",
+      title: "Relations",
+      rationale: "Déduites des clés étrangères proposées.",
+      content: { relations: DATA_RELATIONS },
+    },
+    {
+      ...make(8, 1),
+      kind: "fixtures",
+      zone: "",
+      title: "Clients",
+      rationale: "Pour alimenter les maquettes et les tests.",
+      content: { title: "Clients", table: "T-client", locale: "fr-FR", rows: DATA_ROWS },
+    },
+  ];
+}
+
 let items: Item[] = [];
 let launchStatus: "queued" | "running" | "done" = "done";
 let reads = 0;
@@ -152,6 +268,7 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   items = [];
   if (mode === "ready") items = Array.from({ length: 12 }, (_, i) => make(i + 1, 3));
   if (mode === "mixed") items = mixed();
+  if (mode === "data") items = dataItems();
   if (mode === "generating") {
     started = true;
     launchStatus = "running";
@@ -171,6 +288,9 @@ const LABELS: Record<string, string> = {
   rule: "Règles",
   role: "Rôles",
   flow: "Parcours",
+  table: "Tables",
+  relations: "Relations",
+  fixtures: "Jeux d'exemple",
 };
 
 function groups() {
@@ -228,7 +348,23 @@ function list(query: URLSearchParams, mode: ProposalsMode): Reply {
   });
 }
 
-function options(mode: ProposalsMode): Reply {
+function options(mode: ProposalsMode, deliverable: string | null): Reply {
+  if (deliverable === "data") {
+    return reply(200, {
+      options: [
+        { id: "complete", recommended: true },
+        { id: "all", recommended: false },
+      ],
+      reads: [
+        { id: "functional.features", label: "Cahier fonctionnel" },
+        { id: "functional.rules", label: "Règles" },
+        { id: "functional.roles", label: "Rôles" },
+        { id: "functional.flows", label: "Parcours" },
+        { id: "data.current", label: "Modèle actuel" },
+      ],
+      available: true,
+    });
+  }
   return reply(200, {
     options: [
       { id: "complete", recommended: true },
@@ -300,7 +436,7 @@ export function handleProposals(req: IncomingMessage, url: URL, h: Handlers): bo
   const mode = h.scenario.proposals ?? "none";
   const path = url.pathname;
   if (req.method === "GET") {
-    if (path.endsWith("/options")) h.send(options(mode));
+    if (path.endsWith("/options")) h.send(options(mode, url.searchParams.get("deliverable")));
     else h.send(list(url.searchParams, mode));
     return true;
   }
