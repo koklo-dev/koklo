@@ -52,10 +52,14 @@ const tableFieldSchema = z
   });
 const tableRelationSchema = z.object({ to: tableIdSchema, cardinality: cardinalitySchema });
 
+/** Phrases simples montrées au client (« Ce qu'on enregistre », 3.7.0) ; remplace la liste précédente. */
+const clientSummarySchema = z.array(text(200)).max(12);
+
 const tableFields = {
   name: text(120),
   zone: zoneSchema,
   description: z.string().max(2000),
+  clientSummary: clientSummarySchema,
   fields: z.array(tableFieldSchema).min(1).max(100),
   sources: z.array(sourceLink).max(50),
   relations: z.array(tableRelationSchema).max(50),
@@ -106,6 +110,7 @@ export const tableDetailSchema = z.object({
   name: z.string(),
   description: z.string(),
   zone: zoneSchema.optional(),
+  clientSummary: clientSummarySchema.optional(),
   sources: z.array(sourceLink),
   fields: z.array(
     z.object({

@@ -43,9 +43,9 @@ const PAGE = {
 };
 
 describe("PC1 version et surface 2.8.0", () => {
-  it("le contrat courant est 3.6.0 (additif : version mineure)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.6.0");
-    expect((await doc()).info.version).toBe("3.6.0");
+  it("le contrat courant est 3.7.0 (additif : version mineure)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.7.0");
+    expect((await doc()).info.version).toBe("3.7.0");
   });
 
   it("les 4 nouvelles routes ont leur méthode et leur chemin", async () => {

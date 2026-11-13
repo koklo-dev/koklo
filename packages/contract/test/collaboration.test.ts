@@ -54,6 +54,32 @@ describe("M1 comment.create : entrée", () => {
   });
 });
 
+describe("TK-109 (3.7.0) : commentaires de table (targetKind table + targetRef)", () => {
+  const onTable = { targetKind: "table", targetRef: "T-clients", body: "Bonjour" };
+  it("create : table exige targetRef (T-slug) sans targetId ; ticket exige targetId", async () => {
+    const i = input("comment.create");
+    expect(await isValid(i, onTable)).toBe(true);
+    expect(await isValid(i, { ...onTable, targetRef: undefined })).toBe(false);
+    expect(await isValid(i, { ...onTable, targetRef: "clients" })).toBe(false);
+    expect(await isValid(i, { ...onTable, targetRef: "T-Clients" })).toBe(false);
+    expect(await isValid(i, targetInput)).toBe(true);
+    expect(await isValid(i, { targetKind: "ticket", body: "x", targetRef: "T-a" })).toBe(false);
+  });
+  it("list : table exige targetRef, la cible est le projet", async () => {
+    const i = input("comment.list");
+    expect(await isValid(i, { targetKind: "table", targetRef: "T-clients" })).toBe(true);
+    expect(await isValid(i, { targetKind: "table" })).toBe(false);
+    expect(await isValid(i, { targetKind: "ticket", targetId: UUID })).toBe(true);
+  });
+  it("sortie : targetRef facultatif, de la forme T-slug", async () => {
+    const o = output("comment.create");
+    expect(await isValid(o, { ...comment, targetKind: "table", targetRef: "T-clients" })).toBe(
+      true,
+    );
+    expect(await isValid(o, { ...comment, targetKind: "table", targetRef: "clients" })).toBe(false);
+  });
+});
+
 describe("M2 commentSchema, comment.list, comment.delete", () => {
   it("sortie de create : commentaire complet, auteur d'un type connu", async () => {
     const o = output("comment.create");

@@ -148,6 +148,24 @@ describe("tables : table.create, table.update, table.delete", () => {
     });
   });
 
+  it("clientSummary : create l'écrit en resume_client, update le remplace, une liste vide le retire (3.7.0)", () => {
+    const summaryOf = (result: ReturnType<typeof plan>, path: string) =>
+      (
+        parseSpecFiles([MANIFEST, { path, content: contentOf(result, path) ?? "" }]).spec.tables[0]
+          ?.value as { resume_client?: string[] } | undefined
+      )?.resume_client;
+    const created = plan([
+      op("table.create", "T-reservation", { ...TABLE, clientSummary: ["Le nom du client"] }),
+    ]);
+    expect(summaryOf(created, "data/tables/reservation.yaml")).toEqual(["Le nom du client"]);
+    const client = "data/tables/client.yaml";
+    const update = (payload: Record<string, unknown>) =>
+      summaryOf(plan([op("table.update", "T-client", payload)]), client);
+    expect(update({ clientSummary: ["Une phrase", "Deux"] })).toEqual(["Une phrase", "Deux"]);
+    expect(update({ clientSummary: [] })).toBeUndefined();
+    expect(update({ zone: "Comptes" })).toBeUndefined();
+  });
+
   it("update de fields remplace la liste ; une description vide la retire", () => {
     const result = plan([
       op("table.update", "T-client", { fields: [{ name: "id", type: "uuid" }], description: "" }),

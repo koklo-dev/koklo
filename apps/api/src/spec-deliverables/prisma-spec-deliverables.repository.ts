@@ -6,6 +6,7 @@ import { recordAudit } from "../tracker/audit.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { IdeaImpact } from "./deliverable-impact.ts";
+import { readUpstreamFacts } from "./prisma-deliverable-upstream.ts";
 import type {
   DeliverableRecord,
   ForceResult,
@@ -101,6 +102,7 @@ export class PrismaSpecDeliverablesRepository implements SpecDeliverablesReposit
         ideaFrozen: facts.ideaVersions > 0,
         featureCount: facts.featureCount,
         impact: await ideaImpact(tx, scope.projectId),
+        upstream: await readUpstreamFacts(tx, this.resolver, scope),
         forced: overrides.map((row) => row.deliverable as DeliverableKey),
         pendingByDeliverable: withPending ? await pendingByDeliverable(tx, scope.projectId) : {},
       };

@@ -63,6 +63,8 @@ export interface ReviewPage {
   headSha: string | null;
   /** Hachage courant de chaque cible de la page (clé `kind:ref`), `null` quand l'index n'en a pas (repli sur le SHA). */
   currentHashes: Map<string, string | null>;
+  /** Prénom de chaque auteur de la page (clé : identifiant du compte) ; absent quand le compte n'existe plus. */
+  authorNames: Map<string, string>;
 }
 
 /**

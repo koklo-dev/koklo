@@ -40,7 +40,7 @@ export class CommentController {
         request,
         errors,
         input.projectId,
-        (scope) => this.service.list(scope, input),
+        (scope) => this.service.list(scope, requireSession(request).role, input),
         this.access,
       ),
     );

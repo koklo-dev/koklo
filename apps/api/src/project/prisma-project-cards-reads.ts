@@ -1,6 +1,7 @@
 import type { ReviewVerdict } from "../client-space/validation.ts";
 import {
   ACTIVITY_ACTIONS,
+  activityActionsFilter,
   CLIENT_ACTIVITY_ACTIONS,
 } from "../project-overview/overview-activity.ts";
 import {
@@ -254,7 +255,7 @@ export async function readActivity(
     where: {
       projectId: { in: projectIds },
       actorKind: { not: "system" },
-      action: { in: [...actions] },
+      ...activityActionsFilter(actions),
     },
     orderBy: [{ projectId: "asc" }, { occurredAt: "desc" }, { id: "desc" }],
     distinct: ["projectId"],

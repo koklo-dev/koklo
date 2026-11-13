@@ -4,6 +4,7 @@ import type { ProjectScope } from "../tracker/scope.ts";
 import {
   ACTIVITY_ACTIONS,
   type ActivityRow,
+  activityActionsFilter,
   CLIENT_ACTIVITY_ACTIONS,
 } from "./overview-activity.ts";
 import type { ActivityPage, Audience } from "./project-overview.repository.ts";
@@ -18,10 +19,14 @@ function whereOf(scope: ProjectScope, audience: Audience) {
   const actions = audience === "client" ? CLIENT_ACTIVITY_ACTIONS : ACTIVITY_ACTIONS;
   return {
     actorKind: { not: "system" as const },
-    action: { in: [...actions] },
-    OR: [
-      { projectId: scope.projectId },
-      { action: "project.create", targetKind: "project", targetId: scope.projectId },
+    AND: [
+      activityActionsFilter(actions),
+      {
+        OR: [
+          { projectId: scope.projectId },
+          { action: "project.create", targetKind: "project", targetId: scope.projectId },
+        ],
+      },
     ],
   };
 }
@@ -60,6 +65,21 @@ async function clientLabels(
   }
 }
 
+/** Commentaire de table (B454) : la cible de l'audit est le commentaire, le libellé l'identifiant `T-slug` de la table. */
+async function tableCommentLabels(
+  tx: Tx,
+  rows: AuditRow[],
+  labels: Map<string, string>,
+): Promise<void> {
+  const ids = idsOf(rows, (action) => action === "comment.create");
+  if (ids.length === 0) return;
+  const comments = await tx.ticketComment.findMany({
+    where: { id: { in: ids }, targetKind: "table" },
+    select: { id: true, targetRef: true },
+  });
+  for (const comment of comments) if (comment.targetRef) labels.set(comment.id, comment.targetRef);
+}
+
 /** Libellés des cibles citées : une requête par famille de cible, jamais une par ligne. */
 async function targetLabels(
   tx: Tx,
@@ -93,6 +113,7 @@ async function targetLabels(
   });
   for (const row of [...suggestions, ...sprints]) labels.set(row.id, row.key);
   await clientLabels(tx, scope, rows, labels);
+  await tableCommentLabels(tx, rows, labels);
   return labels;
 }
 

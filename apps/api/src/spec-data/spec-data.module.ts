@@ -17,5 +17,6 @@ import { SpecDataService } from "./spec-data.service.ts";
     GitAccess,
     { provide: SPEC_DATA_REPOSITORY, useClass: PrismaSpecDataRepository },
   ],
+  exports: [SpecDataService],
 })
 export class SpecDataModule {}

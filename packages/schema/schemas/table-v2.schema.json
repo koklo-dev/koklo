@@ -85,6 +85,15 @@
       },
       "type": "array"
     },
+    "resume_client": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 12,
+      "type": "array"
+    },
     "source": {
       "items": {
         "anyOf": [

@@ -98,6 +98,20 @@ describe("TK-100 A spec.deliverables", () => {
     expect(await isValid(out, { ...LIST, deliverables: bad })).toBe(false);
   });
 
+  it("staleUpstream optionnel (3.7.0) : identifiants F-nnn ou R-nnn des amonts modifiés", async () => {
+    const out = output("spec.deliverables");
+    const ok = [entry("data", { status: "revise", staleUpstream: ["F-002", "R-004"] })];
+    expect(await isValid(out, { ...LIST, deliverables: ok })).toBe(true);
+    const tooMany = Array.from({ length: 21 }, (_, i) => `F-${String(i + 1).padStart(3, "0")}`);
+    for (const staleUpstream of [["X-1"], [""], "F-002", tooMany]) {
+      const bad = [entry("data", { staleUpstream })];
+      expect(
+        await isValid(out, { ...LIST, deliverables: bad }),
+        JSON.stringify(staleUpstream),
+      ).toBe(false);
+    }
+  });
+
   it("erreurs : 401 et 404, pas de 403 (tout rôle ayant accès au projet lit)", () => {
     const declared = Object.keys(errors("spec.deliverables"));
     expect(declared).toEqual(expect.arrayContaining(["UNAUTHORIZED", "NOT_FOUND", "INTERNAL"]));

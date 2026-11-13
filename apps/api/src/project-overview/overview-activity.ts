@@ -21,7 +21,22 @@ export const ACTIVITY_ACTIONS = [
   "project_client.add",
   // TK-104 (B352) : relance du client ; réservée à l'équipe, jamais dans `CLIENT_ACTIVITY_ACTIONS`.
   "review.remind",
+  // TK-109 (B454) : commentaire d'une table de données ; seuls ceux sans ticket (les commentaires de ticket n'y sont pas).
+  "comment.create",
 ] as const;
+
+/**
+ * Filtre `audit_log` d'une liste d'événements : `comment.create` ne compte que sans ticket (commentaire de table), les
+ * commentaires de ticket restent hors du journal lisible.
+ */
+export function activityActionsFilter(actions: readonly string[]) {
+  return {
+    OR: [
+      { action: { in: actions.filter((action) => action !== "comment.create") } },
+      ...(actions.includes("comment.create") ? [{ action: "comment.create", ticketId: null }] : []),
+    ],
+  };
+}
 
 /** Un événement du journal et ce que la jointure en a retenu ; rien d'autre n'atteint le texte. */
 export interface ActivityRow {
@@ -49,6 +64,8 @@ const PHRASES: Record<string, Phrase> = {
   "project_client.add": () => "a donné accès au projet à un client",
   // La cible est le prénom du client relancé ; un lien disparu donne « le client ».
   "review.remind": (t) => `a relancé ${t ?? "le client"}`,
+  // La cible est l'identifiant `T-slug` de la table commentée ; un commentaire sans cible lisible reste une phrase complète.
+  "comment.create": (t) => (t ? `a commenté la table ${t}` : "a commenté une table"),
 };
 
 const AGENT = { kind: "agent", name: "L'agent", initials: "IA" } as const;

@@ -31,6 +31,8 @@ interface TablePayload {
   name?: string;
   zone?: string;
   description?: string;
+  /** Phrases « Ce qu'on enregistre » du client (3.7.0) ; une liste vide retire le résumé. */
+  clientSummary?: string[];
   fields?: PayloadField[];
   sources?: string[];
   relations?: { to: string; cardinality: (typeof CARDINALITES_V2)[number] }[];
@@ -61,12 +63,18 @@ const field = (value: PayloadField): TableV2["champs"][number] => ({
   ...(value.personalData === true ? { donnees_personnelles: true } : {}),
 });
 
+function applySummary(table: TableV2, summary: readonly string[]): void {
+  if (summary.length === 0) delete table.resume_client;
+  else table.resume_client = [...summary];
+}
+
 /** Applique les champs présents du payload (`undefined` : inchangé) ; une description vide est retirée. */
 function overlay(base: TableV2, payload: TablePayload): TableV2 {
   const { description, ...rest } = base;
   const next: TableV2 = { ...rest };
   const text = payload.description === undefined ? description : payload.description;
   if (text !== undefined && text !== "") next.description = text;
+  if (payload.clientSummary !== undefined) applySummary(next, payload.clientSummary);
   if (payload.name !== undefined) next.nom = payload.name;
   if (payload.zone !== undefined) next.zone = payload.zone;
   if (payload.fields !== undefined) next.champs = payload.fields.map(field);

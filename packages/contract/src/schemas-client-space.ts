@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LIST_QUERY_MAX_LENGTH, listOf } from "./schemas-lists.ts";
+import { LIST_QUERY_MAX_LENGTH, listOf, pageNumberOf } from "./schemas-lists.ts";
 import {
   criterionIdSchema,
   featureIdSchema,
@@ -193,3 +193,68 @@ export const clientSpaceRolesOutputSchema = z.object({
   actions: z.array(matrixActionSchema),
   ...blockState,
 });
+
+// --- TK-109 (3.7.0) : modèle de données validé, du point de vue du client ---
+const dataTableId = z.string().regex(/^T-[a-z0-9][a-z0-9-]*$/);
+const dataFixtureId = z.string().regex(/^FX-[a-z0-9][a-z0-9-]*$/);
+const cellValue = z.union([z.string(), z.number(), z.boolean()]);
+/** Bornes du modèle montré au client : au-delà, `truncated` (B452). */
+export const CLIENT_DATA_TABLES_MAX = 100;
+
+/** Champ vu du client : nom, type, clé et donnée personnelle seulement (ni contrainte, ni valeur, ni règle). */
+export const clientDataFieldSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+  primaryKey: z.boolean(),
+  personalData: z.boolean(),
+});
+export const clientDataTableSchema = z.object({
+  id: dataTableId,
+  name: z.string(),
+  zone: z.string().optional(),
+  description: z.string(),
+  fields: z.array(clientDataFieldSchema),
+  relations: z.array(
+    z.object({
+      to: dataTableId,
+      toName: z.string(),
+      cardinality: z.enum(["1 → 1", "1 → 0..1", "1 → n", "n → 1", "n ↔ n"]),
+    }),
+  ),
+  /** « Utilisée par » : fonctionnalités et règles, par libellé. */
+  usedBy: z.array(clientLinkSchema),
+  /** Phrases « Ce qu'on enregistre » ; vide quand l'équipe n'en a pas écrit. */
+  clientSummary: z.array(z.string()),
+});
+export const clientSpaceDataModelInputSchema = z.object({ projectId: z.uuid() });
+/** Non validé (ou à revoir) : `available` faux, aucune table, aucune position. */
+export const clientSpaceDataModelOutputSchema = z.object({
+  available: z.boolean(),
+  validation: clientValidationSchema,
+  truncated: z.boolean(),
+  items: z.array(clientDataTableSchema).max(CLIENT_DATA_TABLES_MAX),
+  positions: z.record(dataTableId, z.object({ x: z.number().int(), y: z.number().int() })),
+});
+
+export const clientSpaceDataFixturesInputSchema = z.object({ projectId: z.uuid() });
+export const clientSpaceDataFixturesOutputSchema = z.object({
+  items: z.array(
+    z.object({
+      specId: dataFixtureId,
+      title: z.string(),
+      table: dataTableId,
+      locale: z.string(),
+      rowCount: z.number().int().min(0),
+    }),
+  ),
+});
+/** Lignes d'un jeu, 25 par page (même tableau paginé que l'équipe). */
+export const clientSpaceDataFixtureRowsInputSchema = z.object({
+  projectId: z.uuid(),
+  fixtureId: dataFixtureId,
+  page: z.coerce.number().int().min(1),
+  size: z.coerce.number().pipe(z.literal(25)),
+});
+export const clientSpaceDataFixtureRowsOutputSchema = pageNumberOf(
+  z.record(z.string(), cellValue),
+).extend({ columns: z.array(z.string()) });

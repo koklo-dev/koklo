@@ -61,9 +61,13 @@ import {
 } from "./schemas.ts";
 import type { aiPrefillItemInputSchema, aiPrefillItemOutputSchema } from "./schemas-ai.ts";
 import type {
+  clientDataTableSchema,
   clientFeatureSummarySchema,
   clientFlowSchema,
   clientRuleSchema,
+  clientSpaceDataFixtureRowsOutputSchema,
+  clientSpaceDataFixturesOutputSchema,
+  clientSpaceDataModelOutputSchema,
   clientSpaceFeatureOutputSchema,
   clientSpaceProgressOutputSchema,
   clientSpaceRolesOutputSchema,
@@ -275,6 +279,10 @@ export type SpecHeadOutput = z.output<typeof specHeadSchema>;
 export type ClientSpaceProgress = z.output<typeof clientSpaceProgressOutputSchema>;
 export type ClientFeatureSummary = z.output<typeof clientFeatureSummarySchema>;
 export type ClientFeature = z.output<typeof clientSpaceFeatureOutputSchema>;
+export type ClientDataTable = z.output<typeof clientDataTableSchema>;
+export type ClientSpaceDataModel = z.output<typeof clientSpaceDataModelOutputSchema>;
+export type ClientSpaceDataFixtures = z.output<typeof clientSpaceDataFixturesOutputSchema>;
+export type ClientSpaceDataFixtureRows = z.output<typeof clientSpaceDataFixtureRowsOutputSchema>;
 export type ClientFlow = z.output<typeof clientFlowSchema>;
 export type ClientRule = z.output<typeof clientRuleSchema>;
 export type ClientRoles = z.output<typeof clientSpaceRolesOutputSchema>;

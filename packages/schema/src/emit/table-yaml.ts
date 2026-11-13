@@ -43,6 +43,7 @@ export function emitTableYaml(table: TableV2): string {
       id: value.id,
       nom: value.nom,
       ...(value.description === undefined ? {} : { description: value.description }),
+      ...(value.resume_client === undefined ? {} : { resume_client: [...value.resume_client] }),
       ...(value.source === undefined ? {} : { source: [...value.source] }),
       ...(value.zone === undefined ? {} : { zone: value.zone }),
       champs: value.champs.map(field),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { tableIdSchema } from "./schemas-spec-data.ts";
 import {
   instantSchema,
   pageInputSchema,
@@ -6,7 +7,13 @@ import {
   ticketKeySchema,
 } from "./schemas-tickets.ts";
 
-export const commentTargetKindSchema = z.enum(["ticket", "feature", "screen", "change_request"]);
+export const commentTargetKindSchema = z.enum([
+  "ticket",
+  "feature",
+  "screen",
+  "change_request",
+  "table",
+]);
 export const commentAuthorKindSchema = z.enum(["human", "agent", "client", "system"]);
 export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"]);
 
@@ -16,7 +23,10 @@ export const COMMENT_BODY_MAX = 8000;
 export const commentSchema = z.object({
   id: z.uuid(),
   targetKind: commentTargetKindSchema,
+  /** Pour une table de données : le projet (la table est repérée par `targetRef`). */
   targetId: z.uuid(),
+  /** `T-<slug>` d'un commentaire de table (3.7.0) ; absent pour un ticket. */
+  targetRef: tableIdSchema.optional(),
   authorKind: commentAuthorKindSchema,
   /** Null pour un commentaire système (aucun auteur). */
   authorId: z.string().min(1).nullable(),
@@ -24,19 +34,36 @@ export const commentSchema = z.object({
   createdAt: instantSchema,
 });
 
+/** Une cible `table` se désigne par `targetRef` (`T-<slug>`), les autres par `targetId` seul (3.7.0). */
+const targetShape = {
+  targetKind: commentTargetKindSchema,
+  targetId: z.uuid().optional(),
+  targetRef: tableIdSchema.optional(),
+};
+const hasCoherentTarget = (input: {
+  targetKind: string;
+  targetId?: string | undefined;
+  targetRef?: string | undefined;
+}) =>
+  input.targetKind === "table"
+    ? input.targetRef !== undefined
+    : input.targetId !== undefined && input.targetRef === undefined;
+const TARGET_MESSAGE = {
+  message: "table exige targetRef ; les autres cibles exigent targetId seul",
+  path: ["targetRef"],
+};
+
 /** L'auteur est déduit du jeton : il n'est jamais lu dans l'entrée. */
-export const commentCreateInputSchema = z.object({
-  ...projectScopeShape,
-  targetKind: commentTargetKindSchema,
-  targetId: z.uuid(),
-  body: z.string().min(1).max(COMMENT_BODY_MAX),
-});
-export const commentListInputSchema = z.object({
-  ...projectScopeShape,
-  targetKind: commentTargetKindSchema,
-  targetId: z.uuid(),
-  ...pageInputSchema,
-});
+export const commentCreateInputSchema = z
+  .object({
+    ...projectScopeShape,
+    ...targetShape,
+    body: z.string().min(1).max(COMMENT_BODY_MAX),
+  })
+  .refine(hasCoherentTarget, TARGET_MESSAGE);
+export const commentListInputSchema = z
+  .object({ ...projectScopeShape, ...targetShape, ...pageInputSchema })
+  .refine(hasCoherentTarget, TARGET_MESSAGE);
 /** Sortie de `comment.delete` : l'identifiant seul, sans le projet. */
 export const commentIdOutputSchema = z.object({ id: z.uuid() });
 export const commentIdInputSchema = z.object({

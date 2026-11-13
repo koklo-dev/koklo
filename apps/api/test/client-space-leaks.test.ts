@@ -7,7 +7,8 @@ import {
   seedReview,
 } from "./helpers/client-space.ts";
 import { installBench } from "./helpers/repo-scene.ts";
-import { type FeatureSeed, seedIndex } from "./helpers/spec-read.ts";
+import { reviewApi } from "./helpers/reviews.ts";
+import { entity, type FeatureSeed, seedIndex } from "./helpers/spec-read.ts";
 
 /**
  * TK-55b : fuite de vocabulaire technique, côté exécution. Le client ne voit jamais le vocabulaire
@@ -121,6 +122,63 @@ describe("clientSpace : réponses nominales", () => {
       expect(res.body.version).toBe(sha);
       expect(JSON.stringify(res.body).match(/[0-9a-f]{40}/g)).toEqual([sha]);
     }
+  });
+});
+
+describe("clientSpace : modèle de données (TK-109, 3.7.0)", () => {
+  it("modèle, jeux et lignes validés : aucun vocabulaire technique, aucun contenu réservé à l'équipe", async () => {
+    const { sha } = await seedIndex(bench(), scene.p1, [FEATURE], {
+      commit: true,
+      entities: [
+        entity("feature", "F-001", "a", { titre: "Connexion" }),
+        entity("table", "T-user", "a", {
+          nom: "Utilisateur",
+          source: ["F-001"],
+          resume_client: ["Le nom de la personne"],
+          champs: [
+            {
+              nom: "email",
+              type: "texte(255)",
+              contraintes: "secret-contrainte",
+              valeurs: ["secret-valeur"],
+              regle: "R-004",
+            },
+          ],
+        }),
+        entity("fixture", "FX-user", "a", {
+          titre: "Utilisateurs",
+          table: "T-user",
+          lignes: [{ email: "a@exemple.fr" }],
+        }),
+      ],
+    });
+    const owner = reviewApi(bench().app, scene.p1.world.actors.owner);
+    const validated = await owner.submit(scene.p1.projectId, sha, {
+      targetKind: "deliverable",
+      targetRef: "data",
+    });
+    expect(validated.status, JSON.stringify(validated.body)).toBe(200);
+    const space = clientSpaceApi(bench().app, scene.c1);
+    const secrets = [
+      scene.p1.ref.name,
+      scene.p1.installation.ownerLogin,
+      "secret-contrainte",
+      "secret-valeur",
+      "data/tables",
+      ".yaml",
+    ];
+
+    const responses = [
+      await space.dataModel(scene.p1.projectId),
+      await space.dataFixtures(scene.p1.projectId),
+      await space.dataFixtureRows(scene.p1.projectId, "FX-user"),
+    ];
+
+    for (const [index, res] of responses.entries()) {
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expectNoLeak(`données ${index}`, res, secrets);
+    }
+    expect(responses[0]?.body.items).toHaveLength(1);
   });
 });
 

@@ -12,6 +12,7 @@ import {
   DELIVERABLE_STATUS_SOURCE,
   type DeliverableStatusSource,
 } from "./deliverable-status-source.ts";
+import { staleUpstreamOf } from "./deliverable-upstream.ts";
 import {
   SPEC_DELIVERABLES_REPOSITORY,
   type SpecDeliverablesRepository,
@@ -33,6 +34,10 @@ const staleStatuses = (
     ]),
   ) as Record<DeliverableKey, DeliverableStatus>;
 
+/** Un amont cité modifié depuis la décision rend les Données « À revoir » (B449). */
+const withUpstream = (statuses: Record<DeliverableKey, DeliverableStatus>, stale: boolean) =>
+  stale ? { ...statuses, data: staleStatus(statuses.data, true) } : statuses;
+
 /**
  * Les sept livrables de la spec (TK-100) : faits lus en base, statut fourni par la source de statuts, disponibilité
  * calculée par le domaine (B1). Lu par `spec.deliverables` et par `project.shell`.
@@ -51,15 +56,17 @@ export class SpecDeliverablesService {
       this.statuses.statuses(scope),
     ]);
     const stale = staleBecauseOf(record.impact);
+    const staleUpstream = staleUpstreamOf(record.upstream);
     const deliverables: SpecDeliverable[] = deliverablesAvailabilityOf({
       ideaFrozen: record.ideaFrozen,
       functionalHasEntity: record.featureCount > 0,
-      statuses: staleStatuses(statuses, stale),
+      statuses: staleStatuses(withUpstream(statuses, staleUpstream.length > 0), stale),
       forced: record.forced,
     }).map((entry) => ({
       ...entry,
       pendingProposals: record.pendingByDeliverable[entry.key] ?? 0,
       ...(stale[entry.key] ? { staleBecause: stale[entry.key] } : {}),
+      ...(entry.key === "data" && staleUpstream.length > 0 ? { staleUpstream } : {}),
     }));
     return {
       deliverables,

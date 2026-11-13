@@ -36,6 +36,7 @@ export const tableProposalSchema = z
   .object({
     name: oneLine(120),
     description: safeText({ min: 1, max: 2000, multiline: true }).optional(),
+    clientSummary: z.array(oneLine(200)).max(12).optional(),
     sources: z.array(sourceLink).max(50).optional(),
     fields: z.array(fieldProposalSchema).min(1).max(100),
   })

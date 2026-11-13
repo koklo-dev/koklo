@@ -68,6 +68,13 @@ describe("prompts des Données (TK-107)", () => {
     expect(text).not.toContain('kind "feature"');
   });
 
+  it("la consigne demande clientSummary : phrases simples pour le client, sans identifiant technique (3.7.0)", () => {
+    const text = dataText();
+    expect(text).toContain("clientSummary");
+    expect(text).toContain("plain sentences");
+    expect(text).toContain("no technical identifier");
+  });
+
   it("le cahier fonctionnel et le modèle actuel entrent dans des blocs de données ; jamais le nom du fournisseur", () => {
     const text = dataText();
     for (const expected of [

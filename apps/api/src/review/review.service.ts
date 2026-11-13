@@ -77,6 +77,7 @@ export class ReviewService {
         sha: clientOnly ? null : record.sha,
         status: record.status,
         authorId: record.authorUserId,
+        authorName: clientOnly ? null : (page.authorNames.get(record.authorUserId) ?? null),
         authorRole: (record.authorRole ?? null) as ReviewList["items"][number]["authorRole"],
         comment: record.comment,
         createdAt: record.createdAt.toISOString(),
