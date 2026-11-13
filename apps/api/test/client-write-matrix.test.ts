@@ -97,6 +97,9 @@ const DENIED = [
   // TK-100 (contrat 2.10.0) : forcer l'ouverture d'un livrable relève d'owner et d'admin.
   "spec.forceDeliverable",
   "specBatch.submit",
+  // TK-106 (contrat 3.4.0) : la migration du format de spec et son retour arrière relèvent d'owner seul.
+  "specMigration.revert",
+  "specMigration.start",
   "sprint.activate",
   "sprint.close",
   "sprint.create",

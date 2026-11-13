@@ -8,6 +8,7 @@ import {
 } from "./idea-payload.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FEATURE_FILE = /^features\/(F-\d{3,})(?:-[^/]*)?\.md$/;
 export const OPERATION_KINDS = [
   "feature.create",
@@ -36,6 +37,18 @@ export const IDEA_OPERATION_KINDS = [
   "idea.synthesis.write",
   "idea.version.tag",
 ] as const;
+
+/** Migration v1 -> v2 (TK-106) et son retour arrière : un lot n'en porte qu'une seule, jamais mêlée à d'autres opérations. */
+export const MIGRATION_OPERATION_KINDS = ["spec.migrate", "spec.migrate.revert"] as const;
+
+export const isMigrationKind = (kind: string): boolean =>
+  (MIGRATION_OPERATION_KINDS as readonly string[]).includes(kind);
+
+/** Identifiant d'un lot (UUID) visé par le retour arrière, `undefined` si le payload n'en porte pas un. */
+export function migrationBatchIdOf(payload: BatchOperation["payload"]): string | undefined {
+  const id = payload.migrationBatchId;
+  return typeof id === "string" && UUID.test(id) ? id : undefined;
+}
 
 export const isIdeaKind = (kind: string): boolean =>
   (IDEA_OPERATION_KINDS as readonly string[]).includes(kind);
@@ -85,7 +98,20 @@ function ideaSlugOk(kind: string, payload: Record<string, unknown>): boolean {
   return kind !== "idea.page.write" || ideaDeleteSlug(payload) !== undefined;
 }
 
-function operationProblem(operation: BatchOperation, ideaLot: boolean): string | undefined {
+function migrationProblem(operation: BatchOperation, alone: boolean): string | undefined {
+  if (!alone || !isMigrationKind(operation.kind)) return "kind";
+  if (operation.kind === "spec.migrate") return undefined;
+  return migrationBatchIdOf(operation.payload) === undefined ? "payload" : undefined;
+}
+
+function operationProblem(
+  operation: BatchOperation,
+  lot: { idea: boolean; migration: boolean; alone: boolean },
+): string | undefined {
+  if (lot.migration || isMigrationKind(operation.kind)) {
+    return migrationProblem(operation, lot.migration && lot.alone);
+  }
+  const ideaLot = lot.idea;
   if (isIdeaKind(operation.kind)) return ideaLot ? ideaOperationProblem(operation) : "kind";
   if (ideaLot) return "kind";
   if (!(OPERATION_KINDS as readonly string[]).includes(operation.kind)) return "kind";
@@ -103,13 +129,17 @@ function operationProblem(operation: BatchOperation, ideaLot: boolean): string |
 export function integrityProblem(batch: LoadedBatch): string | undefined {
   if (!isValidBranchName(batch.branch)) return "branch";
   if (batch.repo.specPath !== null && !isSafeSpecPath(batch.repo.specPath)) return "specPath";
-  const ideaLot = batch.operations.some((operation) => isIdeaKind(operation.kind));
+  const lot = {
+    idea: batch.operations.some((operation) => isIdeaKind(operation.kind)),
+    migration: batch.operations.some((operation) => isMigrationKind(operation.kind)),
+    alone: batch.operations.length === 1,
+  };
   // Un lot ne pose jamais deux tags : un seul commit, une seule version.
   if (batch.operations.filter((operation) => operation.kind === "idea.version.tag").length > 1) {
     return "payload";
   }
   for (const operation of batch.operations) {
-    const problem = operationProblem(operation, ideaLot);
+    const problem = operationProblem(operation, lot);
     if (problem) return problem;
   }
   return undefined;

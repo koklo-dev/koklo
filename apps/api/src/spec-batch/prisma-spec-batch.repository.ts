@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
 import { isIdeaOperation } from "../idea/idea-batch.ts";
 import { carrierFilter } from "../repo/prisma-repo.repository.ts";
+import { isMigrationOperation } from "../spec-migration/migration-batch.ts";
 import { isUniqueViolation, orNotFound, validation } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
@@ -188,10 +189,11 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
     });
     const operations = [];
     for (const [index, operation] of batch.operations.entries()) {
-      // Les opérations de l'espace Idée ciblent une page, pas une feature : aucun F-nnn (compteur intact).
-      const targetSpecId = isIdeaOperation(operation.kind)
-        ? null
-        : (operation.specId ?? (await createdSpecId(tx, scope, operation)));
+      // Les opérations de l'espace Idée et de migration ne ciblent aucune feature : aucun F-nnn (compteur intact).
+      const targetSpecId =
+        isIdeaOperation(operation.kind) || isMigrationOperation(operation.kind)
+          ? null
+          : (operation.specId ?? (await createdSpecId(tx, scope, operation)));
       operations.push({
         organizationId,
         batchId: row.id,

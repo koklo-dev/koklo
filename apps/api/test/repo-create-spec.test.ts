@@ -83,7 +83,7 @@ describe("CA2 la structure posée est une spec valide", () => {
       [world.organizationId],
     );
     const manifest = parseSpecFiles(files).spec.project?.value;
-    expect(manifest).toMatchObject({ projet: "projet", organisation: org?.slug, spec_version: 1 });
+    expect(manifest).toMatchObject({ projet: "projet", organisation: org?.slug, spec_version: 2 });
   });
 });
 

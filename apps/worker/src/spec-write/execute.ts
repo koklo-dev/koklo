@@ -6,11 +6,12 @@ import {
   KOKLO_BOT_AUTHOR,
   type RepoRef,
 } from "@koklo/domain";
+import type { SpecFile } from "@koklo/schema";
 import { readSpecFiles } from "../spec-read/read-spec.ts";
 import { RECOVERY_WINDOW } from "./constants.ts";
 import { ideaTagOf } from "./idea-payload.ts";
 import { buildCommitMessage, hasOpsTrailer } from "./message.ts";
-import { relativeToSpec, withSpecPath } from "./paths.ts";
+import { isMigrationKind, migrationBatchIdOf, relativeToSpec, withSpecPath } from "./paths.ts";
 import { planBatch } from "./plan.ts";
 import {
   type BatchAuthor,
@@ -51,6 +52,35 @@ async function recover({ provider, auth, repo, batch }: Target): Promise<Outcome
   return unknown ? failed("INTERNAL") : undefined;
 }
 
+/**
+ * Retour arrière d'une migration : fichiers de la spec au PARENT du commit du lot visé (retrouvé par son trailer, dans la
+ * fenêtre de 50 commits). `undefined` : commit ou parent introuvable, le plan rend alors une erreur interne.
+ */
+async function parentFilesOf(target: Target): Promise<SpecFile[] | undefined> {
+  const { provider, auth, repo, batch } = target;
+  const migrated = migrationBatchIdOf(batch.operations[0]?.payload ?? {});
+  if (batch.operations[0]?.kind !== "spec.migrate.revert" || migrated === undefined)
+    return undefined;
+  const commits = await provider.listCommits({
+    auth,
+    repo,
+    ref: batch.branch,
+    limit: RECOVERY_WINDOW,
+  });
+  const index = commits.findIndex((commit) => hasOpsTrailer(commit.message, migrated));
+  const parent = index < 0 ? undefined : commits[index + 1];
+  if (parent === undefined) return undefined;
+  const listing = await provider.listFiles({ auth, repo, ref: parent.sha });
+  return readSpecFiles({
+    provider,
+    auth,
+    repo,
+    listing,
+    specPath: batch.repo.specPath,
+    migration: true,
+  });
+}
+
 const prefixed = (specPath: string | null, change: FileChange): FileChange =>
   change.delete === true
     ? { path: withSpecPath(specPath, change.path), delete: true }
@@ -61,18 +91,25 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
   const { provider, auth, repo, batch } = target;
   const listing = await provider.listFiles({ auth, repo, ref: batch.branch });
   if (batch.baseSha !== null && batch.baseSha !== listing.ref) return conflicted("stale_base");
+  const migration = batch.operations.some((operation) => isMigrationKind(operation.kind));
   const files = await readSpecFiles({
     provider,
     auth,
     repo,
     listing,
     specPath: batch.repo.specPath,
+    migration,
   });
   const treePaths = listing.files.flatMap((file) => {
     const path = relativeToSpec(batch.repo.specPath, file.path);
     return path === undefined ? [] : [path];
   });
-  const plan = planBatch(batch, files, treePaths);
+  const plan = planBatch(
+    batch,
+    files,
+    treePaths,
+    migration ? await parentFilesOf(target) : undefined,
+  );
   if ("outcome" in plan) return plan.outcome;
   await target.beforeWrite();
   const commit = await provider.writeCommit({
