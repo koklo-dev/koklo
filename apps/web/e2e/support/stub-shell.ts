@@ -146,7 +146,9 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
       available,
       forced: false,
       condition: after === null ? null : `Disponible après ${after}`,
-      pendingProposals: 0,
+      // Relecture des Données (scénario `proposals: "data"`) : la pastille de la barre dit « 8 à relire » (maquette 11 l.625).
+      pendingProposals:
+        key === "data" && "proposals" in h.scenario && h.scenario.proposals === "data" ? 8 : 0,
     })),
     validatedCount: 0,
   });

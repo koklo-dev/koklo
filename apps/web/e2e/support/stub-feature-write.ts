@@ -77,6 +77,7 @@ export function resetFeatureWrites(): void {
   batches = [];
   conflicted = false;
   deleted = [];
+  tablesCreated.length = 0;
   journal.length = 0;
 }
 /** Version de la spec lue par `spec.head` et `spec.getFeature` (l'index suit les commits). */
@@ -99,8 +100,41 @@ const slugOf = (text: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-/** Identifiant attribué à la création d'une règle, d'un rôle ou d'un parcours (TK-103). */
+/** Tables créées pendant le scénario (`table.create`, TK-107) : la page Données les relit. */
+export interface CreatedTable {
+  specId: string;
+  name: string;
+  zone: string;
+  description: string;
+  sources: string[];
+  fields: Array<{
+    name: string;
+    type: string;
+    primaryKey?: boolean;
+    constraints?: string;
+    personalData?: boolean;
+  }>;
+}
+const tablesCreated: CreatedTable[] = [];
+export const createdTables = (): CreatedTable[] => tablesCreated;
+
+function recordTable(op: Record<string, unknown>): string {
+  const specId = `T-${slugOf(String(op.name))}`;
+  tablesCreated.push({
+    specId,
+    name: String(op.name),
+    zone: String(op.zone),
+    description: typeof op.description === "string" ? op.description : "",
+    sources: Array.isArray(op.sources) ? (op.sources as string[]) : [],
+    fields: Array.isArray(op.fields) ? (op.fields as CreatedTable["fields"]) : [],
+  });
+  return specId;
+}
+
+/** Identifiant attribué à la création d'une règle, d'un rôle, d'un parcours (TK-103), d'une table ou d'un jeu (TK-107). */
 function domainCreateId(op: Record<string, unknown>): string | null {
+  if (op.kind === "table.create") return recordTable(op);
+  if (op.kind === "fixture.create") return `FX-${slugOf(String(op.title))}`;
   if (op.kind === "rule.create") return "R-005";
   if (op.kind === "role.create") return `RL-${slugOf(String(op.name))}`;
   if (op.kind === "flow.create") return `P-${slugOf(String(op.title))}`;
