@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 3.4.0 (137 routes, 111 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 3.5.0 (141 routes, 115 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -52,6 +52,10 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/shell",
   "GET /projects/{projectId}/spec",
   "GET /projects/{projectId}/spec/batches/{batchId}",
+  "GET /projects/{projectId}/spec/data/fixtures",
+  "GET /projects/{projectId}/spec/data/fixtures/{fixtureId}/rows",
+  "GET /projects/{projectId}/spec/data/mermaid",
+  "GET /projects/{projectId}/spec/data/tables",
   "GET /projects/{projectId}/spec/deliverables",
   "GET /projects/{projectId}/spec/features",
   "GET /projects/{projectId}/spec/features/{specId}",
@@ -222,6 +226,10 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/spec-repo",
   "/projects/{projectId}/spec/batches",
   "/projects/{projectId}/spec/batches/{batchId}",
+  "/projects/{projectId}/spec/data/fixtures",
+  "/projects/{projectId}/spec/data/fixtures/{fixtureId}/rows",
+  "/projects/{projectId}/spec/data/mermaid",
+  "/projects/{projectId}/spec/data/tables",
   "/projects/{projectId}/spec/deliverables",
   "/projects/{projectId}/spec/deliverables/{key}/force",
   "/projects/{projectId}/spec/features",

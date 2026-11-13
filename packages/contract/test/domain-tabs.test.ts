@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, UUID } from "./support.ts";
  * lectures `spec.functional.list` et `spec.roles.matrix`, `spec.item.get` étendu, compteurs `rules`, `roles`, `flows`.
  */
 describe("TK-103 A surface", () => {
-  it("version 3.4.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.4.0");
+  it("version 3.5.0", () => {
+    expect(CONTRACT_VERSION).toBe("3.5.0");
   });
 
   it.each([
@@ -277,7 +277,8 @@ describe("TK-103 A spec.item.get étendu et compteurs de tête", () => {
       expect(await isValid(i, { projectId: UUID, type, id }), type).toBe(true);
     }
     expect(await isValid(i, { projectId: UUID, type: "rule", id: "F-003" })).toBe(false);
-    expect(await isValid(i, { projectId: UUID, type: "table", id: "T-user" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, type: "table", id: "R-001" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, type: "endpoint", id: "T-user" })).toBe(false);
   });
 
   it("sortie : valeurs de règle, de rôle et de parcours", async () => {
@@ -346,7 +347,16 @@ describe("TK-103 A spec.item.get étendu et compteurs de tête", () => {
       status: "ready",
       errorCode: null,
       indexedAt: "2026-11-04T10:00:00.000Z",
-      counts: { features: 1, tables: 2, endpoints: 3, rules: 4, roles: 3, flows: 5 },
+      counts: {
+        features: 1,
+        tables: 2,
+        endpoints: 3,
+        rules: 4,
+        roles: 3,
+        flows: 5,
+        relations: 6,
+        fixtures: 2,
+      },
     };
     expect(await isValid(o, head)).toBe(true);
     expect(await isValid(o, { ...head, counts: { features: 1, tables: 2, endpoints: 3 } })).toBe(

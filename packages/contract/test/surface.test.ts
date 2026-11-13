@@ -40,6 +40,7 @@ const GROUPS: Record<string, string[]> = {
   clientSpace: ["feature", "features", "flows", "progress", "projects", "roles", "rules"],
   repo: ["createSpec", "link", "list"],
   spec: [
+    "data",
     "deliverables",
     "forceDeliverable",
     "functional",
@@ -294,6 +295,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     // TK-103 (3.1.0) : onglets Règles métier, Rôles et Parcours.
     "GET /projects/{projectId}/spec/functional",
     "GET /projects/{projectId}/spec/roles/matrix",
+    // TK-107 (3.5.0) : onglets Tables et Jeux d'exemple.
+    "GET /projects/{projectId}/spec/data/tables",
+    "GET /projects/{projectId}/spec/data/mermaid",
+    "GET /projects/{projectId}/spec/data/fixtures",
+    "GET /projects/{projectId}/spec/data/fixtures/{fixtureId}/rows",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -325,7 +331,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(137);
+    expect(pairs).toHaveLength(141);
   });
 });
 

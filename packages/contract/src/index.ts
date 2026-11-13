@@ -16,6 +16,12 @@ export type {
   ClientSpaceProgress,
   CommentCreateInput,
   CommentOutput,
+  DataFixtureRows,
+  DataFixtureRowsInput,
+  DataFixtureSummary,
+  DataMermaid,
+  DataTableSummary,
+  DataTablesListInput,
   DependencyAddInput,
   FeatureDetail,
   FeatureSummary,
@@ -88,6 +94,7 @@ export type {
   SpecRefsSearchOutput,
   SprintCreateInput,
   SprintOutput,
+  TableDetail,
   TicketCreateInput,
   TicketDetail,
   TicketOutput,
@@ -164,6 +171,7 @@ export * from "./schemas-review.ts";
 export * from "./schemas-settings.ts";
 export * from "./schemas-shell.ts";
 export * from "./schemas-spec.ts";
+export * from "./schemas-spec-data.ts";
 export * from "./schemas-spec-domain.ts";
 export * from "./schemas-suggestion.ts";
 export * from "./schemas-tickets.ts";

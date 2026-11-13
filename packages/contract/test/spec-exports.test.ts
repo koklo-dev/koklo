@@ -140,6 +140,8 @@ describe("N3 types inférés exportés", () => {
         rules: number;
         roles: number;
         flows: number;
+        relations: number;
+        fixtures: number;
       };
     } | null>();
     expectTypeOf<api.FeatureDetail>().toHaveProperty("criteria");
@@ -162,6 +164,10 @@ describe("N3 types inférés exportés", () => {
       | "flow.create"
       | "flow.update"
       | "flow.delete"
+      | "table.create"
+      | "table.update"
+      | "table.delete"
+      | "fixture.create"
     >();
     expectTypeOf<Extract<api.SpecOperation, { kind: "feature.delete" }>>().toEqualTypeOf<{
       kind: "feature.delete";

@@ -27,9 +27,10 @@ describe("TK-100 A surface : deux routes, chemins et méthodes", () => {
     expect(doc.paths[path]?.[method], `${method} ${path}`).toBeDefined();
   });
 
-  it("le groupe spec compte head, listFeatures, getFeature, deliverables, forceDeliverable, item (TK-101), refs (TK-101), functional et roles (TK-103)", async () => {
+  it("le groupe spec compte head, listFeatures, getFeature, deliverables, forceDeliverable, item (TK-101), refs (TK-101), functional et roles (TK-103), data (TK-107)", async () => {
     const { contract } = await import("../src/index.ts");
     expect(Object.keys((contract as unknown as Record<string, object>).spec ?? {}).sort()).toEqual([
+      "data",
       "deliverables",
       "forceDeliverable",
       "functional",

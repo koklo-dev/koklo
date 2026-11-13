@@ -16,7 +16,16 @@ export const PROPOSAL_INSTRUCTION_MAX = 500;
 
 /** Modes de lancement du Fonctionnel. */
 export const proposalModeSchema = z.enum(["complete", "criteria", "update", "all"]);
-export const proposalKindSchema = z.enum(["feature", "criteria", "rule", "role", "flow"]);
+export const proposalKindSchema = z.enum([
+  "feature",
+  "criteria",
+  "rule",
+  "role",
+  "flow",
+  "table",
+  "relations",
+  "fixtures",
+]);
 export const proposalStatusSchema = z.enum(["pending", "accepted", "rejected"]);
 export const launchStatusSchema = z.enum(["queued", "running", "done", "failed", "canceled"]);
 export const proposalDecisionSchema = z.enum(["accept", "reject", "reset"]);
