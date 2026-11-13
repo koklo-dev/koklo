@@ -294,3 +294,24 @@ describe("InlineAlert TK-139", () => {
     );
   });
 });
+
+describe("InlineAlert : lecture seule (TK-109, maquette 11 l.160-167)", () => {
+  it("role=note, fond et bordure du jeton neutre, icône de 20 px en ton muet, marges 12 14", () => {
+    render(
+      <InlineAlert variant="readonly" icon="visibility">
+        <strong>Lecture seule.</strong> Texte
+      </InlineAlert>,
+    );
+    const alert = screen.getByRole("note");
+    expect(alert).toHaveAttribute("data-variant", "readonly");
+    expect(alert.className).toMatch(/bg-surface/);
+    expect(alert.className).toMatch(/border-border/);
+    const svg = alert.querySelector("svg");
+    expect(svg).toHaveAttribute("width", "20");
+    expect(svg?.getAttribute("class")).toMatch(/text-muted-foreground/);
+    expect(alert.firstElementChild?.className).toMatch(/\bpy-3\b/);
+    expect(alert.firstElementChild?.className).toMatch(/\bpx-3\.5\b/);
+    expect(alert.firstElementChild?.className).toMatch(/\bgap-x-3\.5\b/);
+    expect(alert.firstElementChild?.className).toMatch(/\bflex-wrap\b/);
+  });
+});

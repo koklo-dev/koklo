@@ -13,7 +13,9 @@ export type InlineAlertVariant =
   | "warning"
   | "error"
   | "revise"
-  | "validated";
+  | "validated"
+  /** Bandeau « Lecture seule » (TK-109, maquette 11 l.160-167) : tons neutres, icône 20 muette, marges 12 14. */
+  | "readonly";
 
 /** Rôle dérivé de la variante : information, attente (compte à rebours), échec. */
 const ROLE: Record<InlineAlertVariant, "note" | "status" | "alert"> = {
@@ -26,6 +28,7 @@ const ROLE: Record<InlineAlertVariant, "note" | "status" | "alert"> = {
   revise: "status",
   /** Décision validée enregistrée (TK-104). */
   validated: "status",
+  readonly: "note",
 };
 
 /** Confirmations de décision (maquette 10 l.312, 328, 440-441) : fond plein du statut, sans bordure, 14 px, icône pleine. */
@@ -41,6 +44,7 @@ const inlineAlertVariants = cva("flex min-h-10 flex-col rounded-card border text
       error: "border-alert-error-border bg-alert-error text-alert-error-foreground",
       revise: "border-transparent bg-status-revise text-status-revise-foreground text-sm",
       validated: "border-transparent bg-status-validated text-status-validated-foreground text-sm",
+      readonly: "border-border bg-surface text-foreground",
     },
   },
 });
@@ -106,6 +110,7 @@ export function InlineAlert({
   const [open, setOpen] = useState(defaultOpen);
   const regionId = useId();
   const hasDetails = details !== undefined;
+  const readonly = variant === "readonly";
   return (
     <div
       data-slot="inline-alert"
@@ -116,12 +121,22 @@ export function InlineAlert({
     >
       <div
         className={cn(
-          "flex flex-1 items-center gap-2.5 py-1.5 pr-2 pl-3",
+          readonly
+            ? "flex flex-1 flex-wrap items-center gap-x-3.5 gap-y-2.5"
+            : "flex flex-1 items-center gap-2.5",
+          readonly ? "px-3.5 py-3" : "py-1.5 pr-2 pl-3",
           actions && "max-md:flex-wrap",
         )}
       >
-        <Icon name={icon} size={18} fill={SOLID.has(variant)} className="shrink-0" />
-        <div className="min-w-0 flex-1 py-1">{children}</div>
+        <Icon
+          name={icon}
+          size={readonly ? 20 : 18}
+          fill={SOLID.has(variant)}
+          className={cn("shrink-0", readonly && "text-muted-foreground")}
+        />
+        <div className={cn("min-w-0", readonly ? "flex-[1_1_300px]" : "flex-1 py-1")}>
+          {children}
+        </div>
         {action ? (
           <button type="button" className={ACTION} onClick={action.onClick}>
             {action.label}
