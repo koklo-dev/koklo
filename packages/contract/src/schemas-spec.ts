@@ -55,6 +55,7 @@ export const specOperationKindSchema = z.enum([
   "feature.delete",
   ...DOMAIN_OPERATION_KINDS,
   ...DATA_OPERATION_KINDS,
+  "layout.save",
   "idea.page.write",
   "idea.page.delete",
   "idea.index.write",

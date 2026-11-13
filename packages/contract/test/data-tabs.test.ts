@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, UUID } from "./support.ts";
  * lectures `spec.data.*`, `spec.item.get` de type `table`, compteurs `relations` et `fixtures`.
  */
 describe("TK-107 A surface", () => {
-  it("version 3.5.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.5.0");
+  it("version 3.6.0", () => {
+    expect(CONTRACT_VERSION).toBe("3.6.0");
   });
 
   it.each([
@@ -277,5 +277,131 @@ describe("TK-107 A spec.item.get table et compteurs", () => {
     expect(await isValid(output("spec.head"), head)).toBe(true);
     const { relations: _r, ...partial } = head.counts;
     expect(await isValid(output("spec.head"), { ...head, counts: partial })).toBe(false);
+  });
+});
+
+const POSITIONS = { "T-reservation": { x: 40, y: 120 }, "T-client": { x: 0, y: 0 } };
+const save = (positions: unknown, over: Record<string, unknown> = {}) => ({
+  projectId: UUID,
+  idempotencyKey: "k-layout-1",
+  positions,
+  ...over,
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("TK-108 B (contrat 3.6.0, additif, B417) : diagramme du modèle", () => {
+  it.each([
+    ["spec.data.layout.get", "get", "/projects/{projectId}/spec/data/layout"],
+    ["spec.data.layout.save", "post", "/projects/{projectId}/spec/data/layout"],
+    ["spec.data.tables.source", "get", "/projects/{projectId}/spec/data/tables/{tableId}/source"],
+  ])("%s : %s %s", async (name, method, path) => {
+    expect(proc(name), name).toBeDefined();
+    const doc = (await generateOpenApi()) as { paths: Record<string, Record<string, unknown>> };
+    expect(doc.paths[path]?.[method], `${method} ${path}`).toBeDefined();
+  });
+
+  it("lectures : 401, 403, 404, VALIDATION, SPEC_INDEX_FAILED ; layout.get et tables.source rendent le texte lu", () => {
+    for (const name of ["spec.data.layout.get", "spec.data.tables.source"]) {
+      expect(Object.keys(errors(name)), name).toEqual(
+        expect.arrayContaining([
+          "UNAUTHORIZED",
+          "FORBIDDEN",
+          "NOT_FOUND",
+          "VALIDATION",
+          "SPEC_INDEX_FAILED",
+        ]),
+      );
+    }
+  });
+
+  it("layout.save : erreurs d'écriture d'un lot (403, 404, VALIDATION, conflit, spec invalide, fournisseur)", () => {
+    expect(Object.keys(errors("spec.data.layout.save"))).toEqual(
+      expect.arrayContaining([
+        "UNAUTHORIZED",
+        "FORBIDDEN",
+        "NOT_FOUND",
+        "VALIDATION",
+        "SPEC_BATCH_CONFLICT",
+        "SPEC_INVALID",
+        "PROVIDER_UNAVAILABLE",
+      ]),
+    );
+  });
+
+  it("layout.save : positions entières 0 à 20000, identifiants T-slug, 500 entrées au plus, clé d'idempotence", async () => {
+    const schema = input("spec.data.layout.save");
+    expect(await isValid(schema, save(POSITIONS))).toBe(true);
+    expect(await isValid(schema, save({}))).toBe(true);
+    expect(await isValid(schema, save({ "T-a": { x: -1, y: 0 } }))).toBe(false);
+    expect(await isValid(schema, save({ "T-a": { x: 0, y: 20001 } }))).toBe(false);
+    expect(await isValid(schema, save({ "T-a": { x: 1.5, y: 0 } }))).toBe(false);
+    expect(await isValid(schema, save({ client: { x: 0, y: 0 } }))).toBe(false);
+    expect(await isValid(schema, save({ "T-a": { x: 0, y: 0, z: 1 } }))).toBe(false);
+    const many = Object.fromEntries(
+      Array.from({ length: 501 }, (_, index) => [`T-t${index}`, { x: 0, y: 0 }]),
+    );
+    expect(await isValid(schema, save(many))).toBe(false);
+    expect(
+      await isValid(schema, save(Object.fromEntries(Object.entries(many).slice(0, 500)))),
+    ).toBe(true);
+    expect(await isValid(schema, { projectId: UUID, positions: POSITIONS })).toBe(false);
+  });
+
+  it("layout.get et tables.source : révision exclusive ; source : identifiant T-slug dans le chemin", async () => {
+    const get = input("spec.data.layout.get");
+    expect(await isValid(get, { projectId: UUID })).toBe(true);
+    expect(await isValid(get, { projectId: UUID, branch: "cadrage" })).toBe(true);
+    expect(await isValid(get, { projectId: UUID, branch: "a", commitSha: "0".repeat(40) })).toBe(
+      false,
+    );
+    const source = input("spec.data.tables.source");
+    expect(await isValid(source, { projectId: UUID, tableId: "T-client" })).toBe(true);
+    expect(await isValid(source, { projectId: UUID, tableId: "client" })).toBe(false);
+  });
+
+  it("sorties : positions + commitSha ; commitSha seul (nul tant que le lot n'est pas commité) ; chemin, texte, généré", async () => {
+    const sha = "0".repeat(40);
+    expect(
+      await isValid(output("spec.data.layout.get"), { positions: POSITIONS, commitSha: sha }),
+    ).toBe(true);
+    expect(await isValid(output("spec.data.layout.get"), { positions: {}, commitSha: sha })).toBe(
+      true,
+    );
+    expect(await isValid(output("spec.data.layout.save"), { commitSha: sha })).toBe(true);
+    expect(await isValid(output("spec.data.layout.save"), { commitSha: null })).toBe(true);
+    expect(
+      await isValid(output("spec.data.tables.source"), {
+        path: "data/tables/client.yaml",
+        text: "id: T-client\n",
+        commitSha: sha,
+        generated: false,
+      }),
+    ).toBe(true);
+    expect(await isValid(output("spec.data.tables.source"), { text: "x" })).toBe(false);
+  });
+
+  it("l'opération layout.save est connue de specBatch.get mais n'est pas soumissible par specBatch.submit", async () => {
+    const sha = "0".repeat(40);
+    const stored = (kind: string) => ({
+      id: UUID,
+      branch: "cadrage",
+      status: "committed",
+      idempotencyKey: "k-1",
+      baseSha: null,
+      commitSha: sha,
+      errorCode: null,
+      report: null,
+      results: [{ position: 0, kind, specId: null }],
+      enqueuedAt: "2026-11-13T10:00:00.000Z",
+      committedAt: "2026-11-13T10:00:01.000Z",
+    });
+    expect(await isValid(output("specBatch.get"), stored("layout.save"))).toBe(true);
+    expect(
+      await isValid(input("specBatch.submit"), {
+        projectId: UUID,
+        idempotencyKey: "k-1",
+        operations: [{ kind: "layout.save", positions: POSITIONS }],
+      }),
+    ).toBe(false);
   });
 });

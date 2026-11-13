@@ -38,9 +38,19 @@ export class SpecBatchService {
     role: string,
     input: SpecBatchSubmitInput,
   ): Promise<SpecBatchOutput> {
-    const created = await this.register(scope, role, (plan) =>
-      prepareBatch(input, plan.defaultBranch),
-    );
+    return this.commitPrepared(scope, role, (plan) => prepareBatch(input, plan.defaultBranch));
+  }
+
+  /**
+   * Enregistre un lot déjà préparé par un autre module (sans passer par `SpecBatchSubmitInput`), l'enfile, puis attend au plus
+   * `SPEC_BATCH_WAIT_MS` que le worker le règle (positions du diagramme, TK-108). Mêmes refus et mêmes erreurs que `submit`.
+   */
+  async commitPrepared(
+    scope: ProjectScope,
+    role: string,
+    build: (plan: SpecBatchPlan) => PreparedBatch,
+  ): Promise<SpecBatchOutput> {
+    const created = await this.register(scope, role, build);
     const settled = await this.settle(scope, created);
     if (settled.status === "failed" || settled.status === "conflict") throw failureOf(settled);
     return outputOf(settled);

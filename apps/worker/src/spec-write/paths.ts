@@ -27,6 +27,7 @@ export const OPERATION_KINDS = [
   "table.update",
   "table.delete",
   "fixture.create",
+  "layout.save",
 ] as const;
 const TARGET_ID: Readonly<Record<string, RegExp>> = {
   rule: /^R-\d{3,}$/,
@@ -110,6 +111,17 @@ function migrationProblem(operation: BatchOperation, alone: boolean): string | u
   return migrationBatchIdOf(operation.payload) === undefined ? "payload" : undefined;
 }
 
+/** Identifiant cible : `layout.save` n'en a pas ; les autres genres suivent leur motif, les features `F-nnn`. */
+function targetProblem(operation: BatchOperation): string | undefined {
+  if (operation.kind === "layout.save")
+    return operation.targetSpecId === null ? undefined : "specId";
+  const pattern = TARGET_ID[operation.kind.split(".")[0] ?? ""];
+  if (pattern !== undefined) {
+    return pattern.test(operation.targetSpecId ?? "") ? undefined : "specId";
+  }
+  return isFeatureId(operation.targetSpecId) ? undefined : "specId";
+}
+
 function operationProblem(
   operation: BatchOperation,
   lot: { idea: boolean; migration: boolean; alone: boolean },
@@ -121,10 +133,7 @@ function operationProblem(
   if (isIdeaKind(operation.kind)) return ideaLot ? ideaOperationProblem(operation) : "kind";
   if (ideaLot) return "kind";
   if (!(OPERATION_KINDS as readonly string[]).includes(operation.kind)) return "kind";
-  const pattern = TARGET_ID[operation.kind.split(".")[0] ?? ""];
-  if (pattern !== undefined)
-    return pattern.test(operation.targetSpecId ?? "") ? undefined : "specId";
-  return isFeatureId(operation.targetSpecId) ? undefined : "specId";
+  return targetProblem(operation);
 }
 
 /**

@@ -185,9 +185,11 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
     });
     const operations = [];
     for (const [index, operation] of batch.operations.entries()) {
-      // Les opérations de l'espace Idée et de migration ne ciblent aucune feature : aucun F-nnn (compteur intact).
+      // Les opérations de l'espace Idée, de migration et de mise en page ne ciblent aucun élément : aucun F-nnn (compteur intact).
       const targetSpecId =
-        isIdeaOperation(operation.kind) || isMigrationOperation(operation.kind)
+        isIdeaOperation(operation.kind) ||
+        isMigrationOperation(operation.kind) ||
+        operation.kind === "layout.save"
           ? null
           : (operation.specId ?? (await createdSpecId(tx, scope, operation)));
       operations.push({

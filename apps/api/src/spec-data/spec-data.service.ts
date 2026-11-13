@@ -2,29 +2,42 @@ import type {
   DataFixtureRows,
   DataFixtureRowsInput,
   DataFixtureSummary,
+  DataLayout,
+  DataLayoutSaved,
   DataMermaid,
+  DataTableSource,
   DataTableSummary,
   DataTablesListInput,
 } from "@koklo/contract";
-import { GitNotFoundError } from "@koklo/domain";
-import { emitModelMermaid, type TableV2, TableV2Schema } from "@koklo/schema";
+import { GitNotFoundError, SCOPING_BRANCH } from "@koklo/domain";
+import {
+  emitModelMermaid,
+  emitTableYaml,
+  LAYOUT_PATH,
+  type LayoutPositions,
+  parseLayout,
+  type TableV2,
+  TableV2Schema,
+} from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { GitAccess } from "../repo/git-access.ts";
 import { mapProviderError } from "../repo/provider-errors.ts";
 import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
+import { SpecBatchService } from "../spec-batch/spec-batch.service.ts";
 import { indexFailed } from "../spec-read/index-failed.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { columnsOf, fixtureSummary, rowsOf, tableSummary } from "./data-values.ts";
 import {
-  type ModelSource,
+  type GitSource,
   SPEC_DATA_REPOSITORY,
   type SpecDataRepository,
 } from "./spec-data.repository.ts";
 
 const MODEL_PATH = "data/model.mmd";
 const ROWS_PER_PAGE = 25;
+const LAYOUT_MESSAGE = "Mise en page du diagramme";
 
 interface TablesPageOutput {
   items: DataTableSummary[];
@@ -66,6 +79,7 @@ export class SpecDataService {
     @Inject(SPEC_DATA_REPOSITORY) private readonly repository: SpecDataRepository,
     @Inject(GIT_PROVIDER) private readonly provider: GitProviderBinding,
     @Inject(GitAccess) private readonly access: GitAccess,
+    @Inject(SpecBatchService) private readonly batches: SpecBatchService,
   ) {}
 
   async tables(scope: ProjectScope, input: DataTablesListInput): Promise<TablesPageOutput> {
@@ -92,7 +106,7 @@ export class SpecDataService {
     const source = await this.repository.modelSource(scope, input);
     if (source?.kind === "failed") throw indexFailed(source);
     const found = orNotFound(source);
-    const committed = await this.committedModel(found);
+    const committed = await this.readCommitted(found, MODEL_PATH);
     if (committed !== undefined) {
       return { text: committed, generated: false, commitSha: found.commitSha };
     }
@@ -130,8 +144,62 @@ export class SpecDataService {
     };
   }
 
-  /** `data/model.mmd` au commit indexé ; `undefined` : absent, ou aucun fournisseur utilisable (le texte est alors généré). */
-  private async committedModel(source: ModelSource): Promise<string | undefined> {
+  /** Positions du diagramme : `data/_layout.yaml` au commit de tête ; absent ou illisible : aucune position. */
+  async layout(
+    scope: ProjectScope,
+    input: { branch?: string; commitSha?: string },
+  ): Promise<DataLayout> {
+    const source = await this.repository.headSource(scope, input);
+    if (source?.kind === "failed") throw indexFailed(source);
+    const found = orNotFound(source);
+    const text = await this.readCommitted(found, LAYOUT_PATH);
+    const parsed = text === undefined ? undefined : parseLayout(text);
+    return { positions: parsed?.ok ? parsed.positions : {}, commitSha: found.commitSha };
+  }
+
+  /**
+   * Enregistre les positions : un lot d'une opération `layout.save` sur `cadrage`, sans `baseSha` (le dernier écrit gagne,
+   * B418). Le worker écrit le fichier ; le lot est audité comme tout lot de spec.
+   */
+  async saveLayout(
+    scope: ProjectScope,
+    role: string,
+    input: { idempotencyKey: string; positions: LayoutPositions },
+  ): Promise<DataLayoutSaved> {
+    const batch = await this.batches.commitPrepared(scope, role, () => ({
+      idempotencyKey: input.idempotencyKey,
+      branch: SCOPING_BRANCH,
+      baseSha: null,
+      message: LAYOUT_MESSAGE,
+      operations: [{ kind: "layout.save", specId: null, payload: { positions: input.positions } }],
+    }));
+    return { commitSha: batch.commitSha };
+  }
+
+  /** Fichier d'une table au commit lu ; absent du dépôt : YAML généré depuis l'index ; table inconnue : 404. */
+  async tableSource(
+    scope: ProjectScope,
+    input: { tableId: string; branch?: string; commitSha?: string },
+  ): Promise<DataTableSource> {
+    const { tableId, ...revision } = input;
+    const source = await this.repository.tableSource(scope, revision, tableId);
+    if (source?.kind === "failed") throw indexFailed(source);
+    const found = orNotFound(source);
+    const committed = await this.readCommitted(found, found.path);
+    if (committed !== undefined) {
+      return { path: found.path, text: committed, commitSha: found.commitSha, generated: false };
+    }
+    const [table] = validTables([found.data]);
+    return {
+      path: found.path,
+      text: emitTableYaml(orNotFound(table)),
+      commitSha: found.commitSha,
+      generated: true,
+    };
+  }
+
+  /** Fichier de la spec au commit indexé ; `undefined` : absent, ou aucun fournisseur utilisable. */
+  private async readCommitted(source: GitSource, file: string): Promise<string | undefined> {
     const provider = this.provider;
     if (provider === null || !source.installation.active) return undefined;
     const auth = await this.access.installationAuth(provider, {
@@ -140,7 +208,7 @@ export class SpecDataService {
       ownerKind: source.owner.kind,
       ownerLogin: source.owner.login,
     });
-    const path = source.specPath === null ? MODEL_PATH : `${source.specPath}/${MODEL_PATH}`;
+    const path = source.specPath === null ? file : `${source.specPath}/${file}`;
     try {
       const file = await provider.readFile({
         auth,

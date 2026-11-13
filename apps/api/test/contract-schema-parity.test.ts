@@ -237,3 +237,36 @@ describe("D4b homologues dans les opérations", () => {
     }
   });
 });
+
+describe("TK-108 : positions du diagramme (contrat 3.6.0, sans entité de base)", () => {
+  it("plafonds du contrat = ceux de data/_layout.yaml (schema) : coordonnées 0 à 20000, 500 entrées", () => {
+    const source = read("packages/schema/src/entities/layout.ts");
+    expect(source).toContain("LAYOUT_COORD_MAX = 20000");
+    expect(source).toContain("LAYOUT_MAX_ENTRIES = 500");
+    const save = inputOf("spec.data.layout.save");
+    const wrap = (positions: unknown) => ({
+      projectId: "123e4567-e89b-42d3-a456-426614174000",
+      idempotencyKey: "k",
+      positions,
+    });
+    expect(accepts(save, wrap({ "T-a": { x: 0, y: 20000 } }))).toBe(true);
+    expect(accepts(save, wrap({ "T-a": { x: 0, y: 20001 } }))).toBe(false);
+    expect(accepts(save, wrap({ "T-a": { x: -1, y: 0 } }))).toBe(false);
+    const entries = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`T-t${i}`, { x: 0, y: 0 }]));
+    expect(accepts(save, wrap(entries(500)))).toBe(true);
+    expect(accepts(save, wrap(entries(501)))).toBe(false);
+  });
+
+  it("identifiants de table du contrat = ceux de schema (T-slug)", () => {
+    const save = inputOf("spec.data.layout.save");
+    const wrap = (id: string) => ({
+      projectId: "123e4567-e89b-42d3-a456-426614174000",
+      idempotencyKey: "k",
+      positions: { [id]: { x: 1, y: 1 } },
+    });
+    expect(accepts(save, wrap("T-client"))).toBe(true);
+    expect(accepts(save, wrap("T-"))).toBe(false);
+    expect(accepts(save, wrap("T-Client"))).toBe(false);
+  });
+});

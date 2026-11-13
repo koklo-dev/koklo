@@ -130,7 +130,11 @@ import type {
   dataFixtureRowsInputSchema,
   dataFixtureRowsSchema,
   dataFixtureSummarySchema,
+  dataLayoutSavedSchema,
+  dataLayoutSaveInputSchema,
+  dataLayoutSchema,
   dataMermaidSchema,
+  dataTableSourceSchema,
   dataTableSummarySchema,
   dataTablesListInputSchema,
   tableDetailSchema,
@@ -288,6 +292,10 @@ export type TableDetail = z.output<typeof tableDetailSchema>;
 export type DataTablesListInput = z.output<typeof dataTablesListInputSchema>;
 export type DataTableSummary = z.output<typeof dataTableSummarySchema>;
 export type DataMermaid = z.output<typeof dataMermaidSchema>;
+export type DataLayout = z.output<typeof dataLayoutSchema>;
+export type DataLayoutSaveInput = z.input<typeof dataLayoutSaveInputSchema>;
+export type DataLayoutSaved = z.output<typeof dataLayoutSavedSchema>;
+export type DataTableSource = z.output<typeof dataTableSourceSchema>;
 export type DataFixtureSummary = z.output<typeof dataFixtureSummarySchema>;
 export type DataFixtureRowsInput = z.output<typeof dataFixtureRowsInputSchema>;
 export type DataFixtureRows = z.output<typeof dataFixtureRowsSchema>;
