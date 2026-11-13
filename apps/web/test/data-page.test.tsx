@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_ID, renderData, serveData, tabNamed } from "./support/data.tsx";
+import { serveClientData } from "./support/data-client.tsx";
 import { SHORT_SHA } from "./support/features.tsx";
 import { fake, serveProposals } from "./support/proposals.tsx";
 import { findNamed } from "./support/wait.ts";
@@ -269,11 +270,12 @@ describe("Écran Données : droits", () => {
   });
 
   it.each(["client", "business"] as const)(
-    "%s : « réservée à l'équipe », aucune lecture des Données",
+    "%s : la vue client lit le modèle validé, plus « réservée à l'équipe », aucune lecture d'équipe",
     async (role) => {
-      serveData(role);
+      serveClientData(role);
       renderData();
-      expect(await screen.findByText("Cette page est réservée à l'équipe")).toBeInTheDocument();
+      expect(await screen.findByRole("note")).toHaveTextContent("Lecture seule.");
+      expect(screen.queryByText("Cette page est réservée à l'équipe")).toBeNull();
       expect(procedures.specDataTablesList).not.toHaveBeenCalled();
       expect(procedures.specDataMermaid).not.toHaveBeenCalled();
       expect(procedures.proposalList).not.toHaveBeenCalled();

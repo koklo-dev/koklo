@@ -7,6 +7,18 @@ import {
   tableValuesOf,
 } from "../src/lib/table-operations.ts";
 
+const TABLE_DETAIL_FOR_VALUES = {
+  specId: "T-client",
+  name: "Client",
+  description: "",
+  zone: "Clients",
+  sources: [],
+  fields: [{ name: "id", type: "uuid", primaryKey: true, personalData: false }],
+  relations: [],
+  filePath: "data/tables/client.yaml",
+  commitSha: "a".repeat(40),
+} as Parameters<typeof tableValuesOf>[0];
+
 /** TK-107 lot C : saisie, contrôle et opérations du formulaire Table (passation 11 §3, B385). */
 const FILLED = {
   ...EMPTY_TABLE,
@@ -17,6 +29,7 @@ const FILLED = {
     "id · uuid · clé primaire\nclient_id · ref(T-client) · obligatoire\nstatut · enum · confirmee, annulee",
   personal: "no" as const,
   sources: ["F-001", "R-004"],
+  clientSummaryText: "",
 };
 
 describe("parseFieldLines", () => {
@@ -86,6 +99,53 @@ describe("tableIssues", () => {
 
   it("une justification qui n'est ni F-nnn ni R-nnn est refusée", () => {
     expect(tableIssues({ ...FILLED, sources: ["X-1"] }).map((i) => i.field)).toEqual(["sources"]);
+  });
+});
+
+describe("Ce qu'on enregistre (clientSummary, B447)", () => {
+  const SUMMARY = "Le nom du client\nSon numéro de téléphone";
+
+  it("tableValuesOf : une phrase par ligne ; vide sans résumé", () => {
+    const detail = { ...TABLE_DETAIL_FOR_VALUES, clientSummary: ["Le nom", "Le téléphone"] };
+    expect(tableValuesOf(detail).clientSummaryText).toBe("Le nom\nLe téléphone");
+    expect(tableValuesOf(TABLE_DETAIL_FOR_VALUES).clientSummaryText).toBe("");
+    expect(EMPTY_TABLE.clientSummaryText).toBe("");
+  });
+
+  it("facultatif ; au plus 12 phrases et 200 caractères chacune, sur le champ « clientSummary »", () => {
+    expect(tableIssues({ ...FILLED, clientSummaryText: SUMMARY })).toEqual([]);
+    const many = Array.from({ length: 13 }, (_, i) => `Phrase ${i}`).join("\n");
+    expect(tableIssues({ ...FILLED, clientSummaryText: many }).map((i) => i.field)).toEqual([
+      "clientSummary",
+    ]);
+    const long = "x".repeat(201);
+    expect(tableIssues({ ...FILLED, clientSummaryText: long }).map((i) => i.field)).toEqual([
+      "clientSummary",
+    ]);
+  });
+
+  it("création : clientSummary porte les lignes non vides ; absent sans saisie", () => {
+    expect(tableOperationOf({ ...FILLED, clientSummaryText: `${SUMMARY}\n\n  ` })).toMatchObject({
+      clientSummary: ["Le nom du client", "Son numéro de téléphone"],
+    });
+    expect(tableOperationOf(FILLED)).not.toHaveProperty("clientSummary");
+  });
+
+  it("modification : clientSummary part seul quand il change, vide pour l'effacer", () => {
+    const baseline = { ...FILLED, clientSummaryText: SUMMARY };
+    expect(
+      tableOperationOf(
+        { ...baseline, clientSummaryText: "Le nom" },
+        { specId: "T-reservation", baseline },
+      ),
+    ).toEqual({ kind: "table.update", specId: "T-reservation", clientSummary: ["Le nom"] });
+    expect(
+      tableOperationOf(
+        { ...baseline, clientSummaryText: "" },
+        { specId: "T-reservation", baseline },
+      ),
+    ).toEqual({ kind: "table.update", specId: "T-reservation", clientSummary: [] });
+    expect(tableOperationOf(baseline, { specId: "T-reservation", baseline })).toBeNull();
   });
 });
 

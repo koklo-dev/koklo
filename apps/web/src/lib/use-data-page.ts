@@ -23,6 +23,7 @@ import { useSavedToast } from "./use-saved-toast.ts";
 import { useSpecDeliverables } from "./use-spec-deliverables.ts";
 import { type SpecSources, useSpecSources } from "./use-spec-sources.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
+import { useDataValidation, useValidateModel } from "./use-validate-model.ts";
 
 type DataHead = NonNullable<SpecSources["headData"]>;
 const LIST_KEYS = [() => orpc.spec.data.key(), () => orpc.spec.item.key()] as const;
@@ -88,6 +89,9 @@ function useSavedSync(
       queryClient.invalidateQueries({ queryKey: orpc.spec.data.key() }),
       queryClient.invalidateQueries({ queryKey: orpc.spec.item.key() }),
       queryClient.invalidateQueries({ queryKey: orpc.spec.head.key() }),
+      // Le statut du livrable suit le contenu des tables : « Validé » repasse « À valider » (TK-109, B445).
+      queryClient.invalidateQueries({ queryKey: orpc.spec.deliverables.key() }),
+      queryClient.invalidateQueries({ queryKey: orpc.project.shell.key() }),
     ]).then(() => {
       const row = specId
         ? document.querySelector<HTMLElement>(`[data-spec-id="${specId}"] button`)
@@ -168,6 +172,12 @@ function useDataView(projectId: string, url: DataUrl, sources: SpecSources) {
 type Deliverables = ReturnType<typeof useSpecDeliverables>["data"];
 const SETTLED = ["todo", "pending", "revise", "validated"] as const;
 
+/** Fonctionnalités et règles modifiées depuis la dernière décision (`staleUpstream`, B449) ; vide hors « À revoir ». */
+function upstreamOf(data: Deliverables): readonly string[] {
+  const entry = data?.deliverables.find((item) => item.key === "data");
+  return entry?.status === "revise" ? (entry.staleUpstream ?? []) : [];
+}
+
 /** Statut du livrable Données (`spec.deliverables`) : celui de l'état Liste. */
 function dataDeliverableStatus(data: Deliverables): DataHeaderInput["deliverable"] {
   const status = data?.deliverables.find((item) => item.key === "data")?.status;
@@ -189,6 +199,8 @@ function useDataHeader(
 ) {
   const { propose, head } = page;
   const deliverables = useSpecDeliverables(projectId);
+  const deliverable = dataDeliverableStatus(deliverables.data);
+  const validation = useDataValidation(projectId, page.team && deliverable === "validated");
   const generating = propose.status.active && propose.status.counts.total === 0;
   const counts = head
     ? {
@@ -209,9 +221,10 @@ function useDataHeader(
     viewKind: page.view.kind,
     tab: page.url.tab,
     counts,
-    deliverable: dataDeliverableStatus(deliverables.data),
+    deliverable,
+    validation,
   });
-  return { header, generating };
+  return { header, generating, upstream: upstreamOf(deliverables.data) };
 }
 
 interface RegionInput {
@@ -301,28 +314,25 @@ function useDataList(url: DataUrl, parts: ListParts) {
   };
 }
 
-/** Tout ce que pilote l'écran Données : données, adresse, annonces, relecture, formulaire, en-tête et visibilités. */
-export function useDataPage(projectId: string) {
-  const url = useDataUrl();
-  const sources = useSpecSources(projectId, LIST_KEYS);
+/** Agent (lancement, relecture des propositions) et en-tête par état : statut, actions, impact amont. */
+function useDataProposing(ctx: {
+  projectId: string;
+  url: DataUrl;
+  sources: SpecSources;
+  view: FeaturesView;
+}) {
+  const { projectId, url, sources, view } = ctx;
   const { role, headData } = sources;
-  const team = canReadRepos(role);
-  const { tables, view } = useDataView(projectId, url, sources);
-  const { announcement, announce } = useAnnouncements(view);
-  const { titleRef, write, form } = useDataWriting(projectId, url, sources, view);
   const propose = useProposals(
     projectId,
     url,
     { role, head: headData ?? null },
-    {
-      deliverable: "data",
-      canPropose: canWriteData,
-    },
+    { deliverable: "data", canPropose: canWriteData },
   );
   const review = useProposalReview(projectId, propose.reviewing, "data");
-  const { header, generating } = useDataHeader(
+  const header = useDataHeader(
     {
-      team,
+      team: canReadRepos(role),
       role,
       view,
       url,
@@ -332,6 +342,24 @@ export function useDataPage(projectId: string) {
     },
     projectId,
   );
+  return { propose, review, ...header };
+}
+
+/** Tout ce que pilote l'écran Données : données, adresse, annonces, relecture, formulaire, en-tête et visibilités. */
+export function useDataPage(projectId: string) {
+  const url = useDataUrl();
+  const sources = useSpecSources(projectId, LIST_KEYS);
+  const { role, headData } = sources;
+  const team = canReadRepos(role);
+  const { tables, view } = useDataView(projectId, url, sources);
+  const { announcement, announce } = useAnnouncements(view);
+  const { titleRef, write, form } = useDataWriting(projectId, url, sources, view);
+  const { propose, review, header, generating, upstream } = useDataProposing({
+    projectId,
+    url,
+    sources,
+    view,
+  });
   return {
     url,
     projectId,
@@ -347,6 +375,8 @@ export function useDataPage(projectId: string) {
     review,
     generating,
     header,
+    upstream,
+    validate: useValidateModel(projectId, headData?.commitSha, announce),
     titleRef,
     announce,
     ...useDataList(url, { tables, view, sources, write, form, announce, announcement }),

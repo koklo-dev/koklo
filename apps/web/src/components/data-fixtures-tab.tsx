@@ -22,13 +22,34 @@ import type { DataPageModel } from "../lib/use-data-page.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 
 type Fixture = z.infer<typeof dataFixtureSummarySchema>;
+/** Ce que la section lit d'un jeu : le client ne reçoit pas le chemin du fichier. */
+export type FixtureHead = Pick<Fixture, "specId" | "title" | "table" | "locale" | "rowCount">;
+/** Lignes de la page d'un jeu : une requête (équipe ou client), la page courante et son changement. */
+export interface FixtureRowsSource {
+  query: {
+    data?:
+      | { items: ReadonlyArray<Record<string, unknown>>; columns: readonly string[] }
+      | undefined;
+    isError: boolean;
+    isPending: boolean;
+    refetch: () => unknown;
+  };
+  page: number;
+  setPage: (page: number) => void;
+}
 
 const cell = (value: unknown): string =>
   value === undefined || value === "" ? "—" : String(value);
 
 /** Un jeu d'exemple (maquette 11 l.255-266) : en-tête, tableau aux colonnes mono, pagination numérotée de 25 lignes. */
-function FixtureSection({ projectId, fixture }: { projectId: string; fixture: Fixture }) {
-  const { query, page, setPage } = useFixtureRows(projectId, fixture.specId);
+export function FixtureBlock({
+  fixture,
+  rows: source,
+}: {
+  fixture: FixtureHead;
+  rows: FixtureRowsSource;
+}) {
+  const { query, page, setPage } = source;
   const rows = query.data?.items ?? [];
   const columns = query.data?.columns ?? [];
   const label = `Lignes du jeu ${fixture.title}`;
@@ -96,6 +117,12 @@ function FixtureSection({ projectId, fixture }: { projectId: string; fixture: Fi
       />
     </section>
   );
+}
+
+/** Jeu de l'équipe : les lignes viennent de `spec.data.fixtures.rows`. */
+function FixtureSection({ projectId, fixture }: { projectId: string; fixture: Fixture }) {
+  const rows = useFixtureRows(projectId, fixture.specId);
+  return <FixtureBlock fixture={fixture} rows={rows} />;
 }
 
 /** Lignes affichées d'un jeu proposé : le reste se lit une fois le jeu enregistré (25 par page). */

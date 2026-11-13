@@ -47,6 +47,11 @@ export function useDataUrl() {
       (sel: string) => write({ tab: "tables", sel, review: null }, "push"),
       [],
     ),
+    /** Fiche d'une table dans le diagramme (vue client : depuis une ligne de l'onglet Tables). */
+    openDiagram: useCallback(
+      (sel: string) => write({ tab: "diagram", sel, review: null }, "push"),
+      [],
+    ),
     dropSelection: useCallback(() => write({ sel: null }, "replace"), []),
     /** Table choisie dans le diagramme : portée par l'adresse (sans entrée d'historique) pour survivre à un remontage. */
     select: useCallback((sel: string | null) => write({ sel }, "replace"), []),

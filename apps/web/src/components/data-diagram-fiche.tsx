@@ -4,7 +4,6 @@ import type { SpecItem } from "@koklo/contract";
 import {
   Button,
   type DiagramRelation,
-  EntityChip,
   type ErTableField,
   IdTag,
   SegmentedControl,
@@ -20,7 +19,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { DiagramCard } from "../lib/data-mermaid.ts";
 import { orpc } from "../lib/orpc.ts";
+import { DataCommentsSection } from "./data-comments-section.tsx";
 import { ModelMermaid, TableYaml } from "./data-diagram-source.tsx";
+import { Relations, UsedBy } from "./data-fiche-parts.tsx";
 
 type Detail = Extract<SpecItem, { type: "table" }>["values"];
 type View = "fiche" | "yaml" | "mermaid";
@@ -30,8 +31,6 @@ const VIEWS = [
   { value: "yaml", label: "YAML" },
   { value: "mermaid", label: "Mermaid" },
 ] as const;
-
-const SECTION = "text-caption font-semibold uppercase tracking-[0.05em] text-muted-foreground";
 
 interface FieldRow {
   name: string;
@@ -92,54 +91,6 @@ function FieldsTable({ rows }: { rows: readonly FieldRow[] }) {
   );
 }
 
-/** Relations des deux sens, écrites « cardinalité Source → Cible » (B423 : aucune phrase inventée). */
-function Relations({
-  links,
-  nameOf,
-}: {
-  links: readonly DiagramRelation[];
-  nameOf: (id: string) => string;
-}) {
-  return (
-    <section aria-labelledby="fiche-relations" className="flex flex-col gap-1.5">
-      <span id="fiche-relations" className={SECTION}>
-        Relations
-      </span>
-      {links.length === 0 ? (
-        <p className="m-0 text-meta text-muted-foreground">Aucune relation</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {links.map((link) => (
-            <li key={link.id} className="flex items-center gap-2 text-meta">
-              <span className="min-w-[52px] shrink-0 whitespace-nowrap font-mono text-code text-muted-foreground">
-                {link.label}
-              </span>
-              <span>{`${nameOf(link.from)} → ${nameOf(link.to)}`}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** « Utilisée par » : une pastille par fonctionnalité ou règle citée (jamais le seul accès : pas de lien sans page). */
-function UsedBy({ sources }: { sources: readonly string[] }) {
-  if (sources.length === 0) return null;
-  return (
-    <section aria-labelledby="fiche-used-by" className="flex flex-col gap-1.5">
-      <span id="fiche-used-by" className={SECTION}>
-        Utilisée par
-      </span>
-      <div className="flex flex-wrap gap-1.5">
-        {sources.map((id) => (
-          <EntityChip key={id} kind={id.startsWith("R-") ? "rule" : "feature"} id={id} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 interface FicheViewProps {
   projectId: string;
   card: DiagramCard;
@@ -161,7 +112,8 @@ function SavedFiche({ projectId, card, links, nameOf }: FicheViewProps) {
       ) : null}
       <FieldsTable rows={values ? rowsOfDetail(values) : rowsOfCard(card.fields)} />
       <Relations links={links} nameOf={nameOf} />
-      <UsedBy sources={values?.sources ?? []} />
+      <UsedBy sources={(values?.sources ?? []).map((id) => ({ id }))} />
+      <DataCommentsSection projectId={projectId} tableId={card.id} />
     </>
   );
 }

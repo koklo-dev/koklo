@@ -217,3 +217,39 @@ describe("Fiche : panneau superposé sous 1280 px", () => {
     await waitFor(() => expect(document.activeElement).toBe(button));
   });
 });
+
+describe("Fiche : commentaires du client (TK-109, B448)", () => {
+  const remark = {
+    id: "00000000-0000-4000-8000-00000000c001",
+    targetKind: "table",
+    targetId: "00000000-0000-4000-8000-000000000001",
+    targetRef: "T-client",
+    authorKind: "client",
+    authorId: "user-client",
+    body: "Il manque le numéro de carte fidélité.",
+    createdAt: "2026-11-11T09:30:00.000Z",
+  };
+
+  it("l'équipe lit les commentaires de la table sélectionnée dans la vue Fiche", async () => {
+    serveData("owner");
+    procedures.commentList.mockResolvedValue({ items: [remark], nextCursor: null });
+    renderData();
+    const fiche = await pickTable("Client");
+    const section = await within(fiche).findByRole("region", { name: "Commentaires du client" });
+    expect(within(section).getByText("Il manque le numéro de carte fidélité.")).toBeInTheDocument();
+    expect(procedures.commentList.mock.calls[0]?.[0]).toMatchObject({
+      targetKind: "table",
+      targetRef: "T-client",
+    });
+  });
+
+  it("le designer lit aussi ; la vue YAML n'affiche pas les commentaires", async () => {
+    serveData("designer");
+    procedures.commentList.mockResolvedValue({ items: [remark], nextCursor: null });
+    renderData();
+    const fiche = await pickTable("Client");
+    await within(fiche).findByRole("region", { name: "Commentaires du client" });
+    await view(fiche, "YAML");
+    expect(within(fiche).queryByRole("region", { name: "Commentaires du client" })).toBeNull();
+  });
+});

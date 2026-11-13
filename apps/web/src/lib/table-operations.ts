@@ -15,6 +15,8 @@ export interface TableValues {
   zone: string;
   description: string;
   fieldsText: string;
+  /** « Ce qu'on enregistre » : une phrase simple par ligne, lue par le client (B447). */
+  clientSummaryText: string;
   personal: "yes" | "no";
   sources: string[];
 }
@@ -24,10 +26,13 @@ export const EMPTY_TABLE: TableValues = {
   zone: "",
   description: "",
   fieldsText: "",
+  clientSummaryText: "",
   personal: "no",
   sources: [],
 };
 
+const SUMMARY_MAX = 12;
+const SUMMARY_LINE_MAX = 200;
 const NAME_MAX = 120;
 const ZONE_MAX = 80;
 const FIELD_NAME = /^[a-z_][a-z0-9_]*$/;
@@ -118,6 +123,7 @@ export function tableValuesOf(item: Detail): TableValues {
     zone: item.zone ?? "",
     description: item.description,
     fieldsText: item.fields.map(lineOf).join("\n"),
+    clientSummaryText: (item.clientSummary ?? []).join("\n"),
     personal: item.fields.some((field) => field.personalData) ? "yes" : "no",
     sources: [...item.sources],
   };
@@ -139,7 +145,20 @@ function personalIssue(values: TableValues, fields: readonly FieldOp[]): FormIss
   return [];
 }
 
-/** Points à corriger, dans l'ordre du formulaire : nom, zone, champs, données personnelles, justifications. */
+const summaryLines = (text: string): string[] => text.split("\n").map(trimmed).filter(Boolean);
+
+function summaryIssue(text: string): FormIssue[] {
+  const lines = summaryLines(text);
+  if (lines.length > SUMMARY_MAX) {
+    return [issue("clientSummary", `${SUMMARY_MAX} phrases au plus : regroupez ou retirez-en.`)];
+  }
+  if (lines.some((line) => line.length > SUMMARY_LINE_MAX)) {
+    return [issue("clientSummary", `Une phrase fait ${SUMMARY_LINE_MAX} caractères au plus.`)];
+  }
+  return [];
+}
+
+/** Points à corriger, dans l'ordre du formulaire : nom, zone, résumé, champs, données personnelles, justifications. */
 export function tableIssues(values: TableValues): FormIssue[] {
   const parsed = parseFieldLines(values.fieldsText);
   const name = trimmed(values.name);
@@ -160,19 +179,21 @@ export function tableIssues(values: TableValues): FormIssue[] {
       : parsed.fields.length === 0
         ? [issue("fields")]
         : personalIssue(values, parsed.fields)),
+    ...summaryIssue(values.clientSummaryText),
     ...(values.sources.some((source) => !SOURCE.test(source))
       ? [issue("sources", "Une fonctionnalité (F-001) ou une règle (R-001) par puce.")]
       : []),
   ].sort((a, b) => ORDER.indexOf(a.field) - ORDER.indexOf(b.field));
 }
 
-const ORDER = ["name", "zone", "fields", "personal", "sources"];
+const ORDER = ["name", "zone", "clientSummary", "fields", "personal", "sources"];
 
 function fieldsOf(values: TableValues) {
   return {
     name: trimmed(values.name),
     zone: trimmed(values.zone),
     description: trimmed(values.description),
+    clientSummary: summaryLines(values.clientSummaryText),
     fields: parseFieldLines(values.fieldsText).fields,
     sources: values.sources,
   };
@@ -190,6 +211,7 @@ export function tableOperationOf(
       name: next.name,
       zone: next.zone,
       ...(next.description ? { description: next.description } : {}),
+      ...(next.clientSummary.length > 0 ? { clientSummary: next.clientSummary } : {}),
       ...(next.sources.length > 0 ? { sources: next.sources } : {}),
       fields: next.fields,
     };

@@ -91,8 +91,15 @@ export const procedures = {
   clientSpaceFlows: vi.fn(),
   clientSpaceRules: vi.fn(),
   clientSpaceRoles: vi.fn(),
+  // TK-109 (contrat 3.7.0) : modèle de données validé, vu du client
+  clientSpaceDataModel: vi.fn(),
+  clientSpaceDataFixtures: vi.fn(),
+  clientSpaceDataFixtureRows: vi.fn(),
   reviewSubmit: vi.fn(),
   reviewList: vi.fn(),
+  // TK-109 (contrat 3.7.0) : commentaires de table
+  commentCreate: vi.fn(),
+  commentList: vi.fn(),
   reviewRemind: vi.fn(),
   // TK-48e : écriture de la spec par lots (contrat 0.7.0)
   specBatchSubmit: vi.fn(),
@@ -291,6 +298,17 @@ export const orpc = {
     flows: queryFull(["clientSpace", "flows"], procedures.clientSpaceFlows),
     rules: queryFull(["clientSpace", "rules"], procedures.clientSpaceRules),
     roles: queryFull(["clientSpace", "roles"], procedures.clientSpaceRoles),
+    dataModel: queryFull(["clientSpace", "dataModel"], procedures.clientSpaceDataModel),
+    dataFixtures: queryFull(["clientSpace", "dataFixtures"], procedures.clientSpaceDataFixtures),
+    dataFixtureRows: queryFull(
+      ["clientSpace", "dataFixtureRows"],
+      procedures.clientSpaceDataFixtureRows,
+    ),
+  },
+  comment: {
+    key: () => ["comment"],
+    create: mutationWithOptions(procedures.commentCreate),
+    list: queryFull(["comment", "list"], procedures.commentList),
   },
   review: {
     key: () => ["review"],
@@ -448,12 +466,20 @@ export const projectShell = (over: Record<string, unknown> = {}) => ({
 
 /** Sortie de `spec.deliverables` (contrat 2.10.0) : Fonctionnel, Données et Design ouverts, les autres verrouillés (B1). */
 export const specDeliverables = (
-  over: { validated?: readonly string[]; open?: ReadonlySet<string> } = {},
+  over: {
+    validated?: readonly string[];
+    open?: ReadonlySet<string>;
+    /** Statut forcé par livrable (ex. `{ data: "pending" }`). */
+    status?: Readonly<Record<string, string>>;
+    /** Amont modifié depuis la dernière décision, par livrable (3.7.0). */
+    staleUpstream?: Readonly<Record<string, readonly string[]>>;
+  } = {},
 ) => {
   const open = over.open ?? AVAILABLE;
   const deliverables = DELIVERABLE_KEYS.map((key) => ({
     key,
-    status: over.validated?.includes(key) ? "validated" : "todo",
+    status: over.status?.[key] ?? (over.validated?.includes(key) ? "validated" : "todo"),
+    ...(over.staleUpstream?.[key] ? { staleUpstream: over.staleUpstream[key] } : {}),
     available: open.has(key),
     forced: false,
     condition: open.has(key) ? null : "Disponible après l'architecture",

@@ -1,18 +1,20 @@
 "use client";
 
-import { Button, Icon, Skeleton } from "@koklo/ui";
+import { Button, Icon, InlineAlert, Skeleton } from "@koklo/ui";
 import type { ReactNode } from "react";
 import type { DataHeaderAction } from "../lib/data-header-state.ts";
 import { withDataUrl } from "../lib/data-tab.ts";
 import { specPath } from "../lib/shell-routes.ts";
 import { type DataPageModel, useDataPage } from "../lib/use-data-page.ts";
+import { DataClientView } from "./data-client-view.tsx";
 import { DataDiagramTab } from "./data-diagram-tab.tsx";
-import { DataEmptyPlain, DataLocked, DataReady } from "./data-empty.tsx";
+import { DataEmptyPlain, DataReady } from "./data-empty.tsx";
 import { DataFixturesTab } from "./data-fixtures-tab.tsx";
 import { DataGenerating } from "./data-generating.tsx";
 import { DataHeader } from "./data-header.tsx";
 import { DataReviewBar, DataReviewView } from "./data-review-view.tsx";
 import { DataTablesTab } from "./data-tables-tab.tsx";
+import { DataUpstreamAlert } from "./data-upstream-alert.tsx";
 import { SpecBody } from "./features-body.tsx";
 import { ProposeEntry } from "./features-header-action.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
@@ -52,11 +54,24 @@ function ActionButton({ action, page }: { action: DataHeaderAction; page: DataPa
           Ajouter une table
         </Button>
       );
+    case "validate":
+      return (
+        <Button
+          type="button"
+          className={BUTTON}
+          disabled={page.validate.pending}
+          onClick={() => void page.validate.validate()}
+        >
+          <Icon name="verified" size={20} />
+          Valider le modèle
+        </Button>
+      );
     case "create":
       return (
         <Button
           type="button"
-          variant="outline"
+          // Validé : « Ajouter une table » devient le bouton primaire (maquette 11 l.595).
+          variant={page.header.status === "validated" ? "default" : "outline"}
           data-new-feature
           className={BUTTON}
           onClick={page.form.openCreate}
@@ -103,6 +118,31 @@ function Empty({ page }: { page: DataPageModel }) {
   return <DataEmptyPlain canWrite={page.form.canWrite} onCreate={page.form.openCreate} />;
 }
 
+/** Échec de « Valider le modèle » et impact amont d'un livrable « À revoir » (B449, B450). */
+function ValidationNotices({ page }: { page: DataPageModel }) {
+  const { validate, upstream, propose } = page;
+  const onPropose =
+    propose.enabled && page.form.canWrite
+      ? () =>
+          propose.launch.prefill(
+            "complete",
+            `Mettre le modèle à jour d'après ${upstream.join(", ")}`,
+          )
+      : undefined;
+  return (
+    <>
+      {validate.error ? (
+        <InlineAlert variant="error" icon="error">
+          {validate.error}
+        </InlineAlert>
+      ) : null}
+      {page.team && upstream.length > 0 ? (
+        <DataUpstreamAlert ids={upstream} {...(onPropose ? { onPropose } : {})} />
+      ) : null}
+    </>
+  );
+}
+
 /** Corps hors relecture : un seul état principal à la fois (design/screens/S-spec-data.md §4). */
 function ListBody({ page }: { page: DataPageModel }) {
   const { view, role, sources } = page;
@@ -111,6 +151,7 @@ function ListBody({ page }: { page: DataPageModel }) {
   return (
     <PageBody>
       <div className="flex flex-col gap-4">
+        <ValidationNotices page={page} />
         <StatusBlock
           formOpen={page.form.open}
           region={{
@@ -198,18 +239,13 @@ function FormSheet({ page }: { page: DataPageModel }) {
 const activeTabOf = (page: DataPageModel) =>
   page.generating && page.url.tab === "review" ? "diagram" : page.url.tab;
 
-/**
- * Écran Données d'un projet (`/projects/<id>/spec/data`, design/screens/S-spec-data.md) : Prêt, Génération, Relecture
- * et Liste · équipe, onglets Relecture, Diagramme, Tables et Jeux d'exemple. Client et business : « réservée à l'équipe ».
- */
-export function DataPage({ projectId }: { projectId: string }): ReactNode {
-  const page = useDataPage(projectId);
-  const locked = page.sources.roleKnown && !page.team;
+/** Écran de l'équipe : en-tête par état, puis liste ou relecture, modales et formulaire. */
+function TeamDataPage({ page }: { page: DataPageModel }) {
   const { header, head } = page;
   return (
     <>
       <DataHeader
-        projectId={projectId}
+        projectId={page.projectId}
         name={page.sources.projectName}
         titleRef={page.titleRef}
         status={header.status}
@@ -218,22 +254,36 @@ export function DataPage({ projectId }: { projectId: string }): ReactNode {
         summary={header.summary}
         tabCounts={header.tabCounts}
         reviewing={page.propose.reviewing && !page.generating}
-        {...(locked ? {} : headerActions(page))}
+        {...headerActions(page)}
         tab={activeTabOf(page)}
         head={head ?? undefined}
         team={page.team}
       />
-      {locked ? (
-        <DataLocked />
-      ) : page.propose.reviewing ? (
-        <ReviewBody page={page} />
-      ) : (
-        <ListBody page={page} />
-      )}
-      {locked ? null : <ProposeDialogs page={page} />}
-      {locked ? null : <FormSheet page={page} />}
+      {page.propose.reviewing ? <ReviewBody page={page} /> : <ListBody page={page} />}
+      <ProposeDialogs page={page} />
+      <FormSheet page={page} />
     </>
   );
+}
+
+/**
+ * Écran Données d'un projet (`/projects/<id>/spec/data`, design/screens/S-spec-data.md) : Prêt, Génération, Relecture
+ * et Liste · équipe, onglets Relecture, Diagramme, Tables et Jeux d'exemple. Client et business lisent le modèle validé
+ * dans la vue en lecture seule (TK-109, B447) ; le client y commente.
+ */
+export function DataPage({ projectId }: { projectId: string }): ReactNode {
+  const page = useDataPage(projectId);
+  if (page.sources.roleKnown && !page.team) {
+    return (
+      <DataClientView
+        projectId={projectId}
+        name={page.sources.projectName}
+        titleRef={page.titleRef}
+        canComment={page.role === "client"}
+      />
+    );
+  }
+  return <TeamDataPage page={page} />;
 }
 
 /** Modale de lancement : une seule instance par page, hors de la vue de relecture qui porte la sienne. */

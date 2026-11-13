@@ -2,9 +2,10 @@ import { type DeliverableStatusValue, formatCount, type IconName } from "@koklo/
 import { DATA_TABS, type DataTab } from "./data-tab.ts";
 import type { HeaderTabCount } from "./features-header-state.ts";
 import type { FeaturesView } from "./features-view.ts";
+import { shortDate } from "./overview-labels.ts";
 
 /** Actions de l'en-tête, dans l'ordre de la maquette 11 (l.598) ; `create` (Ajouter une table) est en contour comme `add`, AgentProposeButton reste le seul primaire (B409). */
-export type DataHeaderAction = "add" | "propose" | "repropose" | "create";
+export type DataHeaderAction = "add" | "propose" | "repropose" | "create" | "validate";
 
 export interface DataCounts {
   tables: number;
@@ -19,6 +20,13 @@ export interface DataHeaderState {
   summary?: string;
   actions: DataHeaderAction[];
   tabCounts?: Partial<Record<DataTab, HeaderTabCount>>;
+}
+
+/** Dernière décision « validé » du livrable : prénom (équipe seulement), date et SHA de la version validée. */
+export interface DataValidation {
+  name: string | null;
+  at: string;
+  sha: string | null;
 }
 
 export interface DataHeaderInput {
@@ -40,6 +48,15 @@ export interface DataHeaderInput {
   counts: DataCounts | undefined;
   /** Statut du livrable (`spec.deliverables`). */
   deliverable: "todo" | "pending" | "revise" | "validated" | undefined;
+  /** Décision « validé » en vigueur (`review.list`), pour « Validé par <prénom> le 5 nov. · version 3c7e1a9 ». */
+  validation?: DataValidation | undefined;
+}
+
+/** « Validé par Moussa le 5 nov. · version 3c7e1a9 » (maquette 11 l.595) ; sans prénom, « par l'équipe » (B451). */
+export function validationSummaryOf(validation: DataValidation): string {
+  const by = validation.name ? validation.name : "l'équipe";
+  const version = validation.sha ? ` · version ${validation.sha.slice(0, 7)}` : "";
+  return `Validé par ${by} le ${shortDate(validation.at)}${version}`;
 }
 
 const plural = (count: number, one: string, other: string): string =>
@@ -72,14 +89,23 @@ function listState(input: DataHeaderInput): DataHeaderState {
   const settled = deliverable === "validated" || deliverable === "revise";
   return {
     status: settled ? deliverable : "in_progress",
+    ...(deliverable === "validated" ? { statusLabel: "Validé par l'équipe" } : {}),
     ...(settled
       ? {}
       : {
           statusLabel: "Validation de l'équipe · le client lit et commente",
           statusIcon: "groups" as const,
         }),
-    ...(counts ? { summary: dataSummaryOf(counts) } : {}),
-    actions: input.agent ? ["propose", "create"] : ["create"],
+    ...(deliverable === "validated" && input.validation
+      ? { summary: validationSummaryOf(input.validation) }
+      : counts
+        ? { summary: dataSummaryOf(counts) }
+        : {}),
+    actions: [
+      ...(input.agent ? (["propose"] as const) : []),
+      "create",
+      ...(deliverable === "pending" || deliverable === "revise" ? (["validate"] as const) : []),
+    ],
   };
 }
 

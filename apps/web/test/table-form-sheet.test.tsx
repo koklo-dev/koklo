@@ -110,6 +110,44 @@ describe("Formulaire Table : création", () => {
     expect(submitInputs()).toHaveLength(0);
   });
 
+  it("« Ce qu'on enregistre » : champ facultatif, une phrase par ligne, partie dans clientSummary", async () => {
+    const dialog = await openCreate();
+    const area = dialog.getByRole("textbox", { name: /^Ce qu'on enregistre/ });
+    expect(area).toBeInTheDocument();
+    expect(dialog.getByText(/Une phrase par ligne/)).toBeInTheDocument();
+    await userEvent.type(dialog.getByRole("textbox", { name: /^Nom/ }), "Réservation");
+    await userEvent.type(dialog.getByRole("combobox", { name: /^Zone/ }), "Prise de rendez-vous");
+    await userEvent.type(
+      dialog.getByRole("textbox", { name: /^Champs/ }),
+      "id · uuid · clé primaire",
+    );
+    await userEvent.type(area, "Le créneau choisi{Enter}Le client concerné");
+    await save(dialog);
+    await waitFor(() => expect(submitInputs()).toHaveLength(1));
+    expect(lastSubmit().operations[0]).toMatchObject({
+      kind: "table.create",
+      clientSummary: ["Le créneau choisi", "Le client concerné"],
+    });
+    expect(specBatchSubmitInputSchema.safeParse(lastSubmit()).success).toBe(true);
+  });
+
+  it("13 phrases : « Ce qu'on enregistre » est refusé avant l'envoi", async () => {
+    const dialog = await openCreate();
+    await userEvent.type(dialog.getByRole("textbox", { name: /^Nom/ }), "Réservation");
+    await userEvent.type(dialog.getByRole("combobox", { name: /^Zone/ }), "Prise de rendez-vous");
+    await userEvent.type(
+      dialog.getByRole("textbox", { name: /^Champs/ }),
+      "id · uuid · clé primaire",
+    );
+    await userEvent.type(
+      dialog.getByRole("textbox", { name: /^Ce qu'on enregistre/ }),
+      Array.from({ length: 13 }, (_, i) => `P${i}`).join("{Enter}"),
+    );
+    await save(dialog);
+    expect(await dialog.findByText(/12 phrases au plus/)).toBeVisible();
+    expect(submitInputs()).toHaveLength(0);
+  });
+
   it("« Oui » sans champ marqué : le formulaire demande lequel", async () => {
     const dialog = await openCreate();
     await userEvent.type(dialog.getByRole("textbox", { name: /^Nom/ }), "Avis");
@@ -217,6 +255,7 @@ describe("Formulaire Table : création", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Formulaire Table : modification", () => {
   /** Le panneau de chargement est remplacé par celui du formulaire : toujours relire le dialogue. */
   const dialog = () => within(screen.getByRole("dialog"));
@@ -252,6 +291,27 @@ describe("Formulaire Table : modification", () => {
     });
     expect(lastSubmit().operations[0]).not.toHaveProperty("fields");
     expect(specBatchSubmitInputSchema.safeParse(lastSubmit()).success).toBe(true);
+  });
+
+  it("« Ce qu'on enregistre » se remplit depuis la fiche et se modifie seul", async () => {
+    const previous = procedures.specItemGet.getMockImplementation();
+    procedures.specItemGet.mockImplementation(async (input) => {
+      const result = (await previous?.(input)) as { values: Record<string, unknown> };
+      return { ...result, values: { ...result.values, clientSummary: ["Le nom du client"] } };
+    });
+    await openEdit();
+    const area = dialog().getByRole("textbox", { name: /^Ce qu'on enregistre/ });
+    expect(area).toHaveValue("Le nom du client");
+    await userEvent.type(area, "{Enter}Son téléphone");
+    await userEvent.click(dialog().getByRole("button", { name: "Enregistrer les modifications" }));
+    await waitFor(() => expect(submitInputs()).toHaveLength(1));
+    expect(lastSubmit().operations).toEqual([
+      {
+        kind: "table.update",
+        specId: "T-client",
+        clientSummary: ["Le nom du client", "Son téléphone"],
+      },
+    ]);
   });
 
   it("« Supprimer » demande confirmation et envoie table.delete", async () => {

@@ -7,9 +7,6 @@ export const DATA_PERSONAL_NOTE =
   "Les champs marqués « données personnelles » sont reliés à l'exigence NFR-001 (RGPD) du cahier technique.";
 export const DATA_FIXTURES_HELP =
   "Données fictives, typées d'après les tables. Elles alimentent les maquettes d'écrans (lot Design) et les tests.";
-export const DATA_LOCKED_TITLE = "Cette page est réservée à l'équipe";
-export const DATA_LOCKED_TEXT =
-  "Le modèle de données est tenu par l'équipe du projet. Le cahier fonctionnel reste ouvert à votre lecture.";
 
 const plural = (count: number, one: string, other: string): string =>
   `${formatCount(count)} ${count >= 2 ? other : one}`;
