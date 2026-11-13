@@ -3,6 +3,7 @@ import { join, relative, resolve } from "node:path";
 import type { Issue, SpecFile } from "../src/index.ts";
 
 const validDir = resolve(import.meta.dirname, "fixtures/valid");
+const v2Dir = resolve(import.meta.dirname, "fixtures/v2");
 
 function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -10,15 +11,20 @@ function walk(dir: string): string[] {
   );
 }
 
-/** La spec valide complète (mini-spec Civinat de l'annexe A), lue du disque, triée par chemin. */
-export function validFiles(): SpecFile[] {
-  return walk(validDir)
+function readTree(dir: string): SpecFile[] {
+  return walk(dir)
     .map((file) => ({
-      path: relative(validDir, file).split("\\").join("/"),
+      path: relative(dir, file).split("\\").join("/"),
       content: readFileSync(file, "utf8"),
     }))
     .sort((a, b) => (a.path < b.path ? -1 : 1));
 }
+
+/** La spec valide complète (mini-spec Civinat de l'annexe A), lue du disque, triée par chemin. */
+export const validFiles = (): SpecFile[] => readTree(validDir);
+
+/** Équivalent au format v2 de la spec valide (tables `<slug>.yaml`, endpoints `zone.verbe`, sans `relations.yaml`). */
+export const v2Files = (): SpecFile[] => readTree(v2Dir);
 
 export function validFile(path: string): string {
   const found = validFiles().find((f) => f.path === path);

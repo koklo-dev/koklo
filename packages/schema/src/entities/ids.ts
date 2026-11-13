@@ -7,7 +7,8 @@ export const PATTERNS = {
   feature: /^F-\d{3,}$/,
   criterion: /^AC-\d+$/,
   table: new RegExp(`^T-${slug}$`),
-  endpoint: new RegExp(`^E-${slug}$`),
+  /** Endpoint : `E-<slug>` (format v1) ou `<zone>.<verbe>` (format v2). */
+  endpoint: new RegExp(`^(E-${slug}|${slug}\\.${slug})$`),
   screen: new RegExp(`^S-${slug}$`),
   role: new RegExp(`^RL-${slug}$`),
   permission: new RegExp(`^PM-${slug}(\\.${slug})*$`),

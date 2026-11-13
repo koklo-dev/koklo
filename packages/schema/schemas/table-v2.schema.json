@@ -1,0 +1,115 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/table-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "champs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "cle": {
+            "const": "primaire",
+            "type": "string"
+          },
+          "contraintes": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "donnees_personnelles": {
+            "type": "boolean"
+          },
+          "nom": {
+            "pattern": "^[a-z_][a-z0-9_]*$",
+            "type": "string"
+          },
+          "regle": {
+            "pattern": "^R-\\d{3,}$",
+            "type": "string"
+          },
+          "type": {
+            "pattern": "^(uuid|texte\\(\\d+\\)|entier|decimal|booleen|horodatage|date|enum|json|ref\\(T-[a-z0-9][a-z0-9-]*\\))$",
+            "type": "string"
+          },
+          "valeurs": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "nom",
+          "type"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "description": {
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "nom": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "relations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "cardinalite": {
+            "enum": [
+              "1 → 1",
+              "1 → 0..1",
+              "1 → n",
+              "n → 1",
+              "n ↔ n"
+            ],
+            "type": "string"
+          },
+          "vers": {
+            "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vers",
+          "cardinalite"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "source": {
+      "items": {
+        "anyOf": [
+          {
+            "pattern": "^F-\\d{3,}$",
+            "type": "string"
+          },
+          {
+            "pattern": "^R-\\d{3,}$",
+            "type": "string"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "zone": {
+      "maxLength": 80,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "nom",
+    "champs"
+  ],
+  "type": "object"
+}

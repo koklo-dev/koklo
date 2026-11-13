@@ -25,6 +25,9 @@ function collectFromRelations(spec: ParsedSpec, used: Referenced): void {
     const ref = parseDataRef(side);
     if (ref.ok) used.tables.add(ref.table);
   }
+  for (const { value: t } of spec.tables) {
+    if ("relations" in t) for (const r of t.relations ?? []) used.tables.add(r.vers);
+  }
 }
 
 function collectReferences(spec: ParsedSpec): Referenced {

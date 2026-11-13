@@ -8,6 +8,7 @@ import {
   RolesFileSchema,
   ScreenSchema,
   TableSchema,
+  TableV2Schema,
   TestScenarioSchema,
 } from "./entities/index.ts";
 
@@ -22,6 +23,7 @@ const entities = {
   rule: BusinessRuleSchema,
   screen: ScreenSchema,
   table: TableSchema,
+  "table-v2": TableV2Schema,
   "test-scenario": TestScenarioSchema,
 } as const;
 

@@ -9,7 +9,7 @@ const RepoSchema = z.strictObject({
 export const ProjectManifestSchema = z.strictObject({
   projet: z.string().min(1),
   organisation: z.string().min(1),
-  spec_version: z.literal(1),
+  spec_version: z.literal([1, 2]),
   extends: z.array(z.string()).default([]),
   repos: z.array(RepoSchema).default([]),
 });

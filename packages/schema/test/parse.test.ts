@@ -142,8 +142,8 @@ describe("CA8 structure : autres fichiers", () => {
     expect(spec.screens).toEqual([]);
   });
 
-  it("spec_version 2 : STRUCT_UNSUPPORTED_SPEC_VERSION, refus net", () => {
-    const content = patch("koklo.project.yaml", "spec_version: 1", "spec_version: 2");
+  it("spec_version 3 : STRUCT_UNSUPPORTED_SPEC_VERSION, refus net", () => {
+    const content = patch("koklo.project.yaml", "spec_version: 1", "spec_version: 3");
     const { issues, spec } = parseOne("koklo.project.yaml", content);
     expect(codes(issues)).toEqual(["STRUCT_UNSUPPORTED_SPEC_VERSION"]);
     expect(issues[0]).toMatchObject({ path: "koklo.project.yaml", pointer: "/spec_version" });
@@ -241,6 +241,12 @@ describe("ISSUE_CODES", () => {
       "STRUCT_UNSUPPORTED_SPEC_VERSION",
       "STRUCT_ID_MISMATCH",
       "STRUCT_DUPLICATE_ID",
+      "STRUCT_UNKNOWN_TABLE_FILE",
+      "STRUCT_UNKNOWN_FILE",
+      "STRUCT_MIGRATION_ALREADY_V2",
+      "STRUCT_MIGRATION_SOURCE_INVALID",
+      "STRUCT_MIGRATION_UNKNOWN_REFERENCE",
+      "STRUCT_MIGRATION_TARGET_EXISTS",
     ];
     for (const code of expected) expect(ISSUE_CODES[code as keyof typeof ISSUE_CODES]).toBe(code);
     expect(Object.keys(ISSUE_CODES).sort()).toEqual([...expected].sort());

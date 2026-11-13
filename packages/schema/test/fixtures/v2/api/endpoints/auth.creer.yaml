@@ -1,0 +1,16 @@
+id: auth.creer
+zone: auth
+methode: POST
+chemin: /auth/register
+entree:
+  type: object
+  properties:
+    email: { type: string }
+    mot_de_passe: { type: string }
+sortie:
+  type: object
+  properties:
+    id: { type: string }
+erreurs:
+  - { statut: 409, code: EMAIL_DEJA_UTILISE }
+tables: [T-user]

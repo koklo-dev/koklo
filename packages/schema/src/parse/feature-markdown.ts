@@ -6,6 +6,7 @@ import { splitFrontMatter } from "./frontmatter.ts";
 import { parseCriteria, sectionLines } from "./markdown-sections.ts";
 import { loadYaml, tooLarge } from "./yaml.ts";
 import { type EntityParse, parseWithSchema, rawId } from "./zod-issues.ts";
+import { applyZoneAlias } from "./zone-alias.ts";
 
 function bodyIssues(path: string, id: string | undefined, body: readonly string[]) {
   const description = sectionLines(body, /^Description$/);
@@ -39,8 +40,10 @@ export function parseFeatureMarkdown(path: string, content: string): EntityParse
   const id = rawId(front.data);
   const body = bodyIssues(path, id, parts.body);
   if (body.issues.length > 0) return { ok: false, issues: body.issues };
+  const aliased = applyZoneAlias(path, front.data, id);
+  if (!aliased.ok) return aliased;
   const data = {
-    ...(front.data as object),
+    ...(aliased.data as object),
     description: body.description,
     criteres: body.criteres,
   };

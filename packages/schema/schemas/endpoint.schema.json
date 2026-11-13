@@ -38,7 +38,7 @@
       "type": "array"
     },
     "id": {
-      "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+      "pattern": "^(E-[a-z0-9][a-z0-9-]*|[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*)$",
       "type": "string"
     },
     "methode": {
@@ -64,6 +64,11 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "zone": {
+      "maxLength": 80,
+      "minLength": 1,
+      "type": "string"
     }
   },
   "required": [
