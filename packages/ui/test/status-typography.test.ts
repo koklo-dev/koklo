@@ -18,13 +18,16 @@ describe("CA4 - variables de statut (DESIGN.md §2.2)", () => {
     expect(norm(dark[`--status-${status}-fg`])).toBe(expected.darkFg);
   });
 
-  it("exactement 6 variables --status-* par thème, en hex, sans dérivation de --primary", () => {
+  it("6 variables --status-* par thème plus l'icône de clé (TK-107), en hex, sans dérivation de --primary", () => {
     const blocks = loadBlocks(cssPath.status);
     for (const selector of [":root", ".dark"]) {
       const vars = blocks[selector] ?? {};
       const statusVars = Object.keys(vars).filter((n) => n.startsWith("--status-"));
       expect(statusVars.sort()).toEqual(
-        STATUSES.flatMap((s) => [`--status-${s}-bg`, `--status-${s}-fg`]).sort(),
+        [
+          ...STATUSES.flatMap((s) => [`--status-${s}-bg`, `--status-${s}-fg`]),
+          "--status-pending-icon",
+        ].sort(),
       );
       for (const name of statusVars) expect(vars[name]).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
