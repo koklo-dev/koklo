@@ -12,6 +12,7 @@ import {
   switchToDark,
   type Theme,
 } from "./support/helpers.ts";
+import type { DataModelMode } from "./support/stub-data-model.ts";
 import { FEATURE_PROJECT_ID, type SpecMode } from "./support/stub-features.ts";
 import type { ProposalsMode } from "./support/stub-proposals.ts";
 
@@ -33,6 +34,9 @@ interface View {
   spec?: SpecMode;
   proposals?: ProposalsMode;
   role?: KanbanRole;
+  /** Statut du livrable Données et remarques du client (faux API stub-data-model.ts, TK-109). */
+  dataModel?: DataModelMode;
+  dataComments?: boolean;
   path: string;
   visible: (page: Page) => Promise<void>;
   /** Au plus une région `role=status` dans le document (une région vide est masquée, jamais doublée). */
@@ -181,6 +185,44 @@ const VIEWS: View[] = [
     },
   },
   {
+    // TK-109 : état Validation de l'équipe, « Valider le modèle » en dernier bouton (maquette 11 l.595).
+    name: "list-pending-diagram",
+    dataModel: "pending",
+    path: `${PATH}?tab=diagram`,
+    visible: async (page) => {
+      await diagramLoaded(page, 6);
+      await expect(page.getByRole("button", { name: "Valider le modèle" })).toBeVisible();
+    },
+  },
+  {
+    // Validé : « Validé par Moussa le 5 nov. · version 3c7e1a9 », fiche avec les remarques du client.
+    name: "list-validated-diagram-fiche",
+    dataModel: "validated",
+    dataComments: true,
+    path: `${PATH}?tab=diagram`,
+    visible: async (page) => {
+      await diagramLoaded(page, 6);
+      await expect(page.getByText("Validé par Moussa le 5 nov. · version 3c7e1a9")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Valider le modèle" })).toHaveCount(0);
+    },
+    act: (page) => pick(page, "Client"),
+    settled: (page) =>
+      expect(fiche(page).getByRole("region", { name: "Commentaires du client" })).toBeVisible(),
+  },
+  {
+    // À revoir : alerte d'avertissement et « Proposer les mises à jour » (ecarts.md, B449).
+    name: "list-revise-diagram",
+    dataModel: "revise",
+    path: `${PATH}?tab=diagram`,
+    visible: async (page) => {
+      await diagramLoaded(page, 6);
+      await expect(
+        page.getByText("Le cahier fonctionnel a changé : F-002, R-004 modifiées"),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Proposer les mises à jour" })).toBeVisible();
+    },
+  },
+  {
     name: "review-diagram",
     spec: "dataEmpty",
     proposals: "data",
@@ -247,12 +289,43 @@ const VIEWS: View[] = [
     },
   },
   {
-    name: "locked",
+    name: "client-diagram-fiche",
     role: "client",
+    dataModel: "validated",
+    path: `${PATH}?tab=diagram&sel=T-client`,
+    visible: async (page) => {
+      // La fiche s'ouvre en panneau modal sous 1280 px : le bandeau reste dans la page, masqué aux lecteurs d'écran.
+      await expect(page.locator("[role='note']")).toContainText("Lecture seule.");
+      await expect(page.getByText("Ce qu'on enregistre")).toBeVisible();
+    },
+  },
+  {
+    name: "client-tables",
+    role: "client",
+    dataModel: "validated",
+    path: `${PATH}?tab=tables`,
+    singleStatus: true,
+    visible: async (page) => {
+      await tablesLoaded(page, 6);
+      await expect(page.getByRole("note")).toContainText("Lecture seule.");
+    },
+  },
+  {
+    name: "client-fixtures",
+    role: "client",
+    dataModel: "validated",
+    path: `${PATH}?tab=fixtures`,
+    singleStatus: true,
+    visible: fixtureLoaded,
+  },
+  {
+    name: "client-not-validated",
+    role: "client",
+    dataModel: "pending",
     path: PATH,
     singleStatus: true,
     visible: async (page) => {
-      await expect(page.getByText("Cette page est réservée à l'équipe")).toBeVisible();
+      await expect(page.getByText("Le modèle de données n'est pas encore validé")).toBeVisible();
     },
   },
   {
@@ -281,6 +354,8 @@ for (const viewport of VIEWPORTS) {
           installations: "single",
           ...(view.spec ? { spec: view.spec } : {}),
           ...(view.role ? { role: view.role } : {}),
+          ...(view.dataModel ? { dataModel: view.dataModel } : {}),
+          ...(view.dataComments ? { dataComments: true } : {}),
           proposals: view.proposals ?? "none",
         });
         if (theme === "dark") {
@@ -590,12 +665,118 @@ test.describe("relecture et droits", () => {
     await expect(page.getByRole("button", { name: /^Modifier T-/ })).toHaveCount(0);
   });
 
-  test("client : « réservée à l'équipe », aucune lecture des Données", async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await setScenario({ session: true, projects: "data", role: "client", proposals: "none" });
-    await page.goto(PATH);
-    await expect(page.getByText("Cette page est réservée à l'équipe")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Ajouter une table" })).toHaveCount(0);
+  test("valider le modèle : statut « Validé par l'équipe », annonce, « Validé par Moussa » et plus de bouton", async ({
+    page,
+  }) => {
+    await setScenario({ session: true, projects: "data", dataModel: "pending", proposals: "none" });
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await page.getByRole("button", { name: "Valider le modèle" }).click();
+    await expect(page.getByText("Modèle validé")).toBeVisible();
+    await expect(page.getByText("Validé par Moussa le 5 nov. · version 3c7e1a9")).toBeVisible();
+    await expect(page.getByText("Validé par l'équipe", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Valider le modèle" })).toHaveCount(0);
+    // La barre latérale suit : Fonctionnel et Données validés.
+    await expect(page.getByText("2/7").first()).toBeVisible();
+  });
+
+  test("À revoir : « Proposer les mises à jour » ouvre la modale de l'agent préremplie", async ({
+    page,
+  }) => {
+    await setScenario({ session: true, projects: "data", dataModel: "revise", proposals: "none" });
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await page.getByRole("button", { name: "Proposer les mises à jour" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("dialog").getByRole("textbox")).toHaveValue(
+      "Mettre le modèle à jour d'après F-002, R-004",
+    );
+  });
+
+  test("designer : « Valider le modèle » absent, l'alerte À revoir se lit sans action", async ({
+    page,
+  }) => {
+    await setScenario({
+      session: true,
+      projects: "data",
+      role: "designer",
+      dataModel: "revise",
+      proposals: "none",
+    });
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await expect(page.getByText(/Le cahier fonctionnel a changé/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Valider le modèle|Proposer les mises/ }),
+    ).toHaveCount(0);
+  });
+
+  test("client : bandeau, onglets sans Relecture, fiche « Ce qu'on enregistre », aucune action d'équipe", async ({
+    page,
+  }) => {
+    await setScenario({
+      session: true,
+      projects: "data",
+      role: "client",
+      dataModel: "validated",
+      proposals: "none",
+    });
+    await page.goto(`${PATH}?tab=diagram`);
+    await expect(page.getByText("6 tables · lecture seule")).toBeVisible();
+    await expect(page.getByRole("note")).toContainText("Lecture seule.");
+    const tabs = page.getByRole("navigation", { name: "Sections du modèle de données" });
+    await expect(tabs.getByRole("link")).toHaveCount(3);
+    await expect(tabs.getByRole("link", { name: /Relecture/ })).toHaveCount(0);
+    await diagramLoaded(page, 6);
+    await page.getByRole("button", { name: /^Table Client,/ }).click();
+    const fiche = page.getByRole("complementary", { name: "Fiche de la table" });
+    await expect(fiche.getByText("Ce qu'on enregistre")).toBeVisible();
+    await expect(fiche.getByText("Son numéro de téléphone")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Modifier|Ajouter une table|Valider/ }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: /YAML|Mermaid/ })).toHaveCount(0);
+  });
+
+  test("client : « Commenter », envoi, annonce, Échap rend le focus au bouton", async ({
+    page,
+  }) => {
+    await setScenario({
+      session: true,
+      projects: "data",
+      role: "client",
+      dataModel: "validated",
+      proposals: "none",
+    });
+    await page.goto(`${PATH}?tab=diagram&sel=T-client`);
+    const fiche = page.getByRole("complementary", { name: "Fiche de la table" });
+    const open = fiche.getByRole("button", { name: "Commenter" });
+    await open.click();
+    const dialog = page.getByRole("dialog", { name: /Commenter la table/ });
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(open).toBeFocused();
+    await open.click();
+    await dialog
+      .getByRole("textbox", { name: "Votre commentaire" })
+      .fill("Il manque la date de naissance");
+    await dialog.getByRole("button", { name: "Envoyer" }).click();
+    await expect(page.getByText("Commentaire envoyé")).toBeAttached();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("business : lit le modèle validé sans « Commenter »", async ({ page }) => {
+    await setScenario({
+      session: true,
+      projects: "data",
+      role: "business",
+      dataModel: "validated",
+      proposals: "none",
+    });
+    await page.goto(`${PATH}?tab=tables`);
+    await tablesLoaded(page, 6);
+    await expect(page.getByRole("note")).toContainText("Lecture seule.");
+    await expect(page.getByRole("button", { name: "Commenter" })).toHaveCount(0);
   });
 
   test("375 px : aucun défilement horizontal de la page, tableau défilant dans sa région nommée", async ({

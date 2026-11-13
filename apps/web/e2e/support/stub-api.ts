@@ -5,6 +5,7 @@ import {
   handleClientSpace,
   resetClientSpace,
 } from "./stub-client-space.ts";
+import { handleDataModel, resetDataModel } from "./stub-data-model.ts";
 import {
   type FeaturesScenario,
   handleFeatures,
@@ -180,6 +181,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetSettings();
     resetMembers();
     resetShell(scenario);
+    resetDataModel(scenario);
     resetIdea(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     seedCreation(scenario, addProject);
@@ -212,6 +214,7 @@ type Sender = (reply: ReturnType<typeof json>) => void;
 /** Le reste du faux API : fonctionnalités, dépôt de spec, projets, kanban, GitHub, organisations. */
 function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
   const path = url.pathname;
+  if (handleDataModel(req, url, { scenario, send })) return;
   if (/^\/(client-space|projects\/[^/]+\/reviews)/.test(path) || path === "/__client-calls") {
     void handleClientSpace(req, url, { scenario, send });
     return;

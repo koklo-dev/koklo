@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { type DataModelScenario, dataDeliverable } from "./stub-data-model.ts";
 import { ideaPhase } from "./stub-idea-agent.ts";
 
 /**
@@ -7,7 +8,7 @@ import { ideaPhase } from "./stub-idea-agent.ts";
  * Les visites reçues s'ajoutent en tête des récents ; `GET /__visits` les rend, dans l'ordre.
  */
 export type ShellMode = "data" | "noSprint" | "internal" | "loading";
-export type ShellScenario = {
+export type ShellScenario = DataModelScenario & {
   shell?: ShellMode;
   /** Identifiants de projets déjà visités, du plus récent au plus ancien. */
   recent?: string[];
@@ -130,6 +131,14 @@ function shellResponse(projectId: string, h: Handlers): Reply {
   });
 }
 
+/** Statut d'un livrable : le scénario du modèle de données (TK-109) pilote Fonctionnel et Données, la vue client attend le Fonctionnel (TK-104). */
+function statusOf(key: string, scenario: ShellScenario): string {
+  const data = dataDeliverable(scenario);
+  if (data && key === "data") return data.status;
+  if (data && key === "functional") return "validated";
+  return key === "functional" && "clientSpace" in scenario ? "pending" : "todo";
+}
+
 function deliverablesResponse(projectId: string, h: Handlers): Reply {
   const mode = h.scenario.shell ?? "data";
   if (!h.projects().some((candidate) => candidate.id === projectId)) {
@@ -138,11 +147,21 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
   if (mode === "internal") {
     return reply(500, { defined: false, code: "INTERNAL", message: "Internal error" });
   }
+  const data = dataDeliverable(h.scenario);
+  const entries = DELIVERABLES.map(([key, available, after]) => ({
+    key,
+    // Un scénario de la vue client attend la validation du Fonctionnel (TK-104) ; celui du modèle de données le
+    // suppose validé (TK-109) et pilote le statut des Données.
+    status: statusOf(key, h.scenario),
+    ...(key === "data" && data?.staleUpstream ? { staleUpstream: data.staleUpstream } : {}),
+    available,
+    after,
+  }));
   return reply(200, {
-    deliverables: DELIVERABLES.map(([key, available, after]) => ({
+    deliverables: entries.map(({ key, status, staleUpstream, available, after }) => ({
       key,
-      // Un scénario de la vue client attend la validation du Fonctionnel (TK-104).
-      status: key === "functional" && "clientSpace" in h.scenario ? "pending" : "todo",
+      status,
+      ...(staleUpstream ? { staleUpstream } : {}),
       available,
       forced: false,
       condition: after === null ? null : `Disponible après ${after}`,
@@ -150,7 +169,7 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
       pendingProposals:
         key === "data" && "proposals" in h.scenario && h.scenario.proposals === "data" ? 8 : 0,
     })),
-    validatedCount: 0,
+    validatedCount: entries.filter((entry) => entry.status === "validated").length,
   });
 }
 
