@@ -1,6 +1,7 @@
 import { DevUiAgent } from "./dev-ui-agent.tsx";
 import { DevUiClientValidation } from "./dev-ui-client-validation.tsx";
 import { SURFACES, TYPE_SCALE } from "./dev-ui-data.ts";
+import { DevUiErTable } from "./dev-ui-er-table.tsx";
 import { DevUiFrame, DevUiSection } from "./dev-ui-frame.tsx";
 import { DevUiIdea } from "./dev-ui-idea.tsx";
 import { DevUiLists } from "./dev-ui-lists.tsx";
@@ -108,6 +109,7 @@ export function DevUiGallery() {
         <DevUiSpecCollection />
         <DevUiSpecCards />
         <DevUiClientValidation />
+        <DevUiErTable />
       </main>
     </div>
   );

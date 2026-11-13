@@ -41,6 +41,14 @@ export function canWriteSpec(role: Role | string | undefined): boolean {
 }
 
 /**
+ * Écrire le modèle de données et lancer l'agent des Données (B389, B400) : propriétaire, administrateur et développeur.
+ * Le designer lit le modèle sans l'écrire ; client et business n'y ont pas accès. Le serveur reste l'autorité (403).
+ */
+export function canWriteData(role: Role | string | undefined): boolean {
+  return role === "owner" || role === "admin" || role === "dev";
+}
+
+/**
  * Écrire un onglet du cahier (B340) : l'équipe écrit les fonctionnalités ; le designer écrit aussi les parcours mais ni
  * les règles ni les rôles (vision §14). Le serveur reste l'autorité (403).
  */

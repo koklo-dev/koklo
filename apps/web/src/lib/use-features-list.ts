@@ -90,7 +90,13 @@ export function useFilterActions(url: Url, announce: (text: string) => void) {
  * Champ de recherche : la saisie est locale, l'adresse (`?q=`) la suit après 200 ms. Un changement venu d'ailleurs
  * (« Effacer la recherche », retour arrière) remplace le texte ; la saisie en cours n'est jamais écrasée.
  */
-export function useSearchBox(url: Url) {
+/** Ce que la recherche lit de l'adresse : le texte (`?q=`) et son écriture. */
+export interface SearchUrl {
+  q?: string | undefined;
+  setQuery: (q: string | null) => void;
+}
+
+export function useSearchBox(url: SearchUrl) {
   const [text, setText] = useState(url.q ?? "");
   const written = useRef(url.q ?? "");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

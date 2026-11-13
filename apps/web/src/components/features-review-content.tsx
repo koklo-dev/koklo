@@ -1,5 +1,7 @@
 import { IdTag, ProposalDetailLines, ProposalDetailSection, WorkflowStates } from "@koklo/ui";
+import { isDataKind } from "../lib/proposal-data.ts";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
+import { DataProposalContent } from "./data-review-content.tsx";
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
@@ -104,10 +106,14 @@ function FlowContent({ content }: { content: Record<string, unknown> }) {
 
 /** Contenu en lecture d'une proposition de règle, de rôle ou de parcours : nœuds texte seulement (sortie du modèle). */
 export function DomainProposalContent({ proposal }: { proposal: ProposalOutput }) {
+  if (isDataKind(proposal.kind)) return <DataProposalContent proposal={proposal} />;
   if (proposal.kind === "rule") return <RuleContent content={proposal.content} />;
   if (proposal.kind === "role") return <RoleContent content={proposal.content} />;
   return <FlowContent content={proposal.content} />;
 }
 
 export const isDomainProposal = (proposal: ProposalOutput): boolean =>
-  proposal.kind === "rule" || proposal.kind === "role" || proposal.kind === "flow";
+  proposal.kind === "rule" ||
+  proposal.kind === "role" ||
+  proposal.kind === "flow" ||
+  isDataKind(proposal.kind);

@@ -18,7 +18,7 @@ import { FeatureError } from "./feature-error.tsx";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
 import { SaveProgress } from "./save-progress.tsx";
 
-type Type = "rule" | "role" | "flow";
+type Type = "rule" | "role" | "flow" | "table";
 /** Valeurs lues d'un élément : celles du type (`RuleDetail`…) et ce que tous portent (version, fichier). */
 type Values = { commitSha: string; filePath: string };
 interface Loaded<I extends Values> {
@@ -31,6 +31,8 @@ type Item<I extends Values> = Loaded<I>;
 /** Ce qui change d'un type à l'autre : cadre du panneau, valeurs, contrôle, opération et champs. */
 export interface DomainFormConfig<V, T extends Type, I extends Values> {
   type: T;
+  /** Livrable du sous-titre du panneau : « Fonctionnel » par défaut, « Données » pour une table. */
+  section?: string;
   icon: IconName;
   /** « règle », « rôle », « parcours » avec leur article pour les titres. */
   noun: { create: string; edit: string; loading: string };
@@ -85,7 +87,7 @@ function frameOf<V, T extends Type, I extends Values>(
     mode: props.mode,
     icon: config.icon,
     title: edit ? config.noun.edit : config.noun.create,
-    subtitle: `Fonctionnel · ${edit ? props.specId : "identifiant attribué à l'enregistrement"}`,
+    subtitle: `${config.section ?? "Fonctionnel"} · ${edit ? props.specId : "identifiant attribué à l'enregistrement"}`,
     ...(edit && props.specId ? { idTag: props.specId } : {}),
     closeLabel: "Fermer le formulaire",
     bodyLabel: config.bodyLabel,

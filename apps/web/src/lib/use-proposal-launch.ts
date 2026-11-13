@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { errorCode } from "./api-error.ts";
 import { orpc } from "./orpc.ts";
 import {
-  DELIVERABLE,
-  MODE_TEXTS,
+  DEFAULT_DELIVERABLE,
+  type Deliverable,
+  modeTextsOf,
   optionCountLabel,
   UNAVAILABLE_REASONS,
 } from "./proposal-labels.ts";
@@ -20,9 +21,9 @@ type Mode = "complete" | "criteria" | "update" | "all";
 const IN_PROGRESS_TEXT = "Une génération est déjà en cours pour ce livrable.";
 
 /** Choix de la modale, dans l'ordre du serveur ; une option à compte nul n'est jamais montrée. */
-function useLaunchOptions(projectId: string, enabled: boolean) {
+function useLaunchOptions(projectId: string, enabled: boolean, deliverable: Deliverable) {
   const query = useQuery({
-    ...orpc.ai.proposeOptions.queryOptions({ input: { projectId, deliverable: DELIVERABLE } }),
+    ...orpc.ai.proposeOptions.queryOptions({ input: { projectId, deliverable } }),
     enabled,
   });
   const data = query.data;
@@ -30,8 +31,8 @@ function useLaunchOptions(projectId: string, enabled: boolean) {
     .filter((option) => option.count !== 0)
     .map((option) => ({
       id: option.id,
-      title: MODE_TEXTS[option.id]?.title ?? option.id,
-      description: MODE_TEXTS[option.id]?.description,
+      title: modeTextsOf(deliverable)[option.id]?.title ?? option.id,
+      description: modeTextsOf(deliverable)[option.id]?.description,
       ...(option.count !== undefined
         ? { count: option.count, countLabel: optionCountLabel(option.id, option.count) }
         : {}),
@@ -48,7 +49,12 @@ function useLaunchOptions(projectId: string, enabled: boolean) {
 }
 
 /** Lancement : un 409 `PROPOSAL_IN_PROGRESS` n'est pas une erreur (bouton « en cours » et avis), le reste passe par `useAiCall`. */
-function useLaunchCall(projectId: string, onLaunched: () => void, onClose: () => void) {
+function useLaunchCall(
+  projectId: string,
+  deliverable: Deliverable,
+  onLaunched: () => void,
+  onClose: () => void,
+) {
   const queryClient = useQueryClient();
   const call = useAiCall();
   const mutation = useMutation(orpc.ai.proposeDeliverable.mutationOptions());
@@ -63,7 +69,7 @@ function useLaunchCall(projectId: string, onLaunched: () => void, onClose: () =>
         mutation
           .mutateAsync({
             projectId,
-            deliverable: DELIVERABLE,
+            deliverable,
             mode: mode as Mode,
             ...(trimmed ? { instruction: trimmed.slice(0, PROPOSAL_INSTRUCTION_MAX) } : {}),
           })
@@ -117,14 +123,15 @@ const stateOf = (flags: {
 export function useProposalLaunch(
   projectId: string,
   status: { active: boolean; counts: ProposalCounts },
-  options: { enabled: boolean; onLaunched: () => void },
+  options: { enabled: boolean; onLaunched: () => void; deliverable?: Deliverable },
 ) {
+  const deliverable = options.deliverable ?? DEFAULT_DELIVERABLE;
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<string | null>(null);
   const [instruction, setInstruction] = useState("");
   const [keyMissing, setKeyMissing] = useState(false);
-  const list = useLaunchOptions(projectId, options.enabled);
-  const run = useLaunchCall(projectId, options.onLaunched, () => setOpen(false));
+  const list = useLaunchOptions(projectId, options.enabled, deliverable);
+  const run = useLaunchCall(projectId, deliverable, options.onLaunched, () => setOpen(false));
   const { call } = run;
   const value = list.choices.find((c) => c.id === choice)?.id ?? list.choices[0]?.id;
   useInProgressRelease(status.active, () => run.setInProgress(false));

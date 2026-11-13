@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { type AiErrorView, describeAiError } from "./ai-errors.ts";
 import { conflictReason, errorCode, errorData } from "./api-error.ts";
 import { orpc } from "./orpc.ts";
+import { cascadeText } from "./proposal-data.ts";
 import {
   ADDED_TEXT,
   ARRIVED_TEXT,
@@ -142,7 +143,9 @@ function useSaveAll(
     const result = await saver.save(launchId, review.savable);
     if (!result) return;
     const breakdown = result.left === 0 ? savedBreakdown(kinds) : "";
-    const text = [SAVED_TEXT(result.saved, result.left), breakdown].filter(Boolean).join(" : ");
+    const text = [SAVED_TEXT(result.saved, result.left), breakdown, cascadeText(review.cascade)]
+      .filter(Boolean)
+      .join(" : ");
     setSummary(text);
     announce(text);
   };

@@ -4,10 +4,23 @@ import type { Role } from "@koklo/contract";
 import { useEffect, useRef } from "react";
 import type { TabNumbers } from "./features-header-state.ts";
 import { FEATURES_TABS, tabOfProposalKind } from "./features-tab.ts";
+import { DEFAULT_DELIVERABLE, type Deliverable } from "./proposal-labels.ts";
 import { canWriteSpec } from "./roles.ts";
-import type { useFeaturesUrl } from "./use-features-url.ts";
 import { useProposalLaunch } from "./use-proposal-launch.ts";
 import { useProposalStatus } from "./use-proposal-status.ts";
+
+/** Ce que la page lit de son adresse : relecture ouverte, ouverture automatique et ouverture au lancement. */
+export interface ProposalUrl {
+  review?: boolean | undefined;
+  autoOpenReview: () => void;
+  openReview: () => void;
+}
+
+interface ProposalOptions {
+  deliverable?: Deliverable;
+  /** Rôles qui lancent l'agent sur ce livrable (défaut : l'équipe qui écrit la spec). */
+  canPropose?: (role: Role | undefined) => boolean;
+}
 
 interface ProposalSources {
   role: Role | undefined;
@@ -28,12 +41,19 @@ export function pendingByTab(groups: ReadonlyArray<{ key: string; pending: numbe
  */
 export function useProposals(
   projectId: string,
-  url: ReturnType<typeof useFeaturesUrl>,
+  url: ProposalUrl,
   data: ProposalSources,
+  options: ProposalOptions = {},
 ) {
-  const enabled = canWriteSpec(data.role) && data.head?.status === "ready";
-  const status = useProposalStatus(projectId, enabled);
-  const launch = useProposalLaunch(projectId, status, { enabled, onLaunched: url.openReview });
+  const deliverable = options.deliverable ?? DEFAULT_DELIVERABLE;
+  const canPropose = options.canPropose ?? canWriteSpec;
+  const enabled = canPropose(data.role) && data.head?.status === "ready";
+  const status = useProposalStatus(projectId, enabled, deliverable);
+  const launch = useProposalLaunch(projectId, status, {
+    enabled,
+    onLaunched: url.openReview,
+    deliverable,
+  });
   const checked = useRef(false);
   const { autoOpenReview } = url;
   const { loaded, active, counts } = status;

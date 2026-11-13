@@ -45,7 +45,7 @@ interface FilterChipMenuProps {
  * Pastille de filtre pointillée (maquette 10 l.183) qui ouvre un menu à choix unique ; une fois un choix fait, la
  * pastille le nomme (« Priorité : Indispensable ») et reste pleine. « Tous » / « Toutes » remet le filtre à zéro.
  */
-function FilterChipMenu({
+export function FilterChipMenu({
   label,
   allLabel,
   value,

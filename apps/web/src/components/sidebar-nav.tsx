@@ -1,6 +1,6 @@
 "use client";
 
-import type { Role } from "@koklo/contract";
+import type { Role, SpecDeliverable } from "@koklo/contract";
 import { ShellNavGroup, ShellNavItem, type SpecKey, SpecNav } from "@koklo/ui";
 import { canManage, canWriteSpec } from "../lib/roles.ts";
 import { defaultSection } from "../lib/settings-sections.ts";
@@ -20,6 +20,23 @@ import { useSpecDeliverables } from "../lib/use-spec-deliverables.ts";
 import { ShellLink } from "./shell-link.tsx";
 import { SidebarProjectCard } from "./sidebar-project-card.tsx";
 
+/** Livrables dont un lancement de l'agent tourne sans rien à relire encore : leur pastille dit « … » (maquettes 10 l.686, 11 l.625). */
+function useGeneratingDeliverables(
+  projectId: string,
+  role: Role | undefined,
+  deliverables: readonly SpecDeliverable[] | undefined,
+): ReadonlySet<SpecKey> {
+  // Même lecture que les pages Fonctionnel et Données (clé partagée).
+  const open = (key: SpecKey) =>
+    canWriteSpec(role) && deliverables?.find((item) => item.key === key)?.available === true;
+  const functional = useProposalStatus(projectId, open("functional"));
+  const data = useProposalStatus(projectId, open("data"), "data");
+  const generating = new Set<SpecKey>();
+  if (functional.active && functional.counts.total === 0) generating.add("functional");
+  if (data.active && data.counts.total === 0) generating.add("data");
+  return generating;
+}
+
 /** Groupe « Projet » : carte du projet, Vue d'ensemble, Idée, SPEC, Tickets. */
 export function ProjectNav({
   projectId,
@@ -32,12 +49,7 @@ export function ProjectNav({
 }) {
   const shell = useProjectShell(projectId);
   const spec = useSpecDeliverables(projectId);
-  // Même lecture que la page Fonctionnel (clé partagée) : le badge « … » suit le lancement de l'agent (maquette 10 l.686).
-  const functional = spec.data?.deliverables.find((item) => item.key === "functional");
-  const proposals = useProposalStatus(
-    projectId,
-    canWriteSpec(role) && functional?.available === true,
-  );
+  const generating = useGeneratingDeliverables(projectId, role, spec.data?.deliverables);
   const base = projectPath(projectId);
   // `spec.deliverables` en échec : aucune entrée SPEC n'est ouverte (fermé par défaut), la navigation reste.
   const hrefs = Object.fromEntries(
@@ -70,10 +82,7 @@ export function ProjectNav({
         <SpecNav
           hrefs={hrefs}
           {...(slug ? { activeKey: slug } : {})}
-          badges={specBadges(
-            spec.data?.deliverables,
-            proposals.active && proposals.counts.total === 0,
-          )}
+          badges={specBadges(spec.data?.deliverables, generating)}
           validatedCount={spec.data?.validatedCount ?? 0}
           loading={spec.isPending}
           LinkComponent={ShellLink}

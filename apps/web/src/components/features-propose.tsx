@@ -73,19 +73,28 @@ const INSTRUCTION_PLACEHOLDER =
   "ex. « Se concentrer sur la réservation, laisser de côté la facturation. »";
 
 /** Modale de lancement : une seule instance par page, ouverte par l'état partagé du modèle. */
-export function ProposeDialog({ launch }: { launch: ProposalLaunch }) {
+export function ProposeDialog({
+  launch,
+  subtitle = SUBTITLE,
+  placeholder = INSTRUCTION_PLACEHOLDER,
+}: {
+  launch: ProposalLaunch;
+  /** Livrable proposé : le cahier fonctionnel par défaut. */
+  subtitle?: string;
+  placeholder?: string;
+}) {
   return (
     <AgentProposePopover
       open={launch.open}
       onOpenChange={launch.setOpen}
-      subtitle={SUBTITLE}
+      subtitle={subtitle}
       options={launch.choices}
       value={launch.value ?? ""}
       onValueChange={launch.setChoice}
       instruction={launch.instruction}
       onInstructionChange={launch.setInstruction}
       instructionMax={PROPOSAL_INSTRUCTION_MAX}
-      instructionPlaceholder={INSTRUCTION_PLACEHOLDER}
+      instructionPlaceholder={placeholder}
       reads={launch.reads}
       onLaunch={launch.launch}
       loading={launch.optionsLoading}
