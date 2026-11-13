@@ -166,7 +166,7 @@ export const dataTableSummarySchema = z.object({
 export const dataMermaidInputSchema = z
   .object({ projectId: z.uuid(), ...revision })
   .refine(exclusiveRevision, REVISION_MESSAGE);
-/** `generated` : `data/model.mmd` est absent de la tête, le texte est produit à la volée depuis les tables. */
+/** `generated` : toujours vrai depuis B476, le texte est produit depuis les tables indexées de la tête (jamais lu de `data/model.mmd`). */
 export const dataMermaidSchema = z.object({
   text: z.string(),
   generated: z.boolean(),

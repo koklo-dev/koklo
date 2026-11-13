@@ -35,7 +35,6 @@ import {
   type SpecDataRepository,
 } from "./spec-data.repository.ts";
 
-const MODEL_PATH = "data/model.mmd";
 const ROWS_PER_PAGE = 25;
 const LAYOUT_MESSAGE = "Mise en page du diagramme";
 
@@ -70,7 +69,7 @@ function validTables(rows: readonly unknown[]): TableV2[] {
 
 /**
  * Lectures de la page Données (TK-107) : tables, modèle Mermaid, jeux d'exemple et leurs lignes. Tout vient de l'index
- * d'entités ; seul le texte de `data/model.mmd` est lu chez le fournisseur au commit indexé (sinon généré), hors transaction.
+ * d'entités ; seuls `data/_layout.yaml` et le fichier d'une table sont lus chez le fournisseur au commit indexé, hors transaction.
  * Aucune écriture, aucune entrée d'audit.
  */
 @Injectable()
@@ -98,7 +97,11 @@ export class SpecDataService {
     };
   }
 
-  /** Texte Mermaid du modèle : `data/model.mmd` du commit de tête, sinon généré depuis les tables ; rien d'indexé : 404. */
+  /**
+   * Texte Mermaid du modèle, toujours généré depuis les tables indexées du commit de tête (B476) : `data/model.mmd`
+   * est un dérivé (B384) qui peut dater d'un émetteur antérieur (sans les relations des clés étrangères). Rien
+   * d'indexé : 404.
+   */
   async mermaid(
     scope: ProjectScope,
     input: { branch?: string; commitSha?: string },
@@ -106,10 +109,6 @@ export class SpecDataService {
     const source = await this.repository.modelSource(scope, input);
     if (source?.kind === "failed") throw indexFailed(source);
     const found = orNotFound(source);
-    const committed = await this.readCommitted(found, MODEL_PATH);
-    if (committed !== undefined) {
-      return { text: committed, generated: false, commitSha: found.commitSha };
-    }
     return {
       text: emitModelMermaid(validTables(found.tables)),
       generated: true,

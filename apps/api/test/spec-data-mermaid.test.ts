@@ -39,7 +39,7 @@ const mermaid = (s: SpecReadScene, actor = s.world.actors.dev, query = "") =>
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("spec.data.mermaid", () => {
-  it("rend le texte de data/model.mmd du commit de tête, tel qu'écrit (generated: false)", async () => {
+  it("data/model.mmd du commit ignoré : texte régénéré depuis les tables indexées (B476)", async () => {
     const s = await readScene(bench());
     const { snapshotId } = await seedIndex(bench(), s, [], { commit: true, entities: TABLES });
     const text = "%% Généré\nerDiagram\n  T_client {\n  }\n";
@@ -60,7 +60,10 @@ describe("spec.data.mermaid", () => {
     const res = await mermaid(s);
 
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body).toEqual({ text, generated: false, commitSha: commit.sha });
+    expect(res.body.generated).toBe(true);
+    expect(res.body.commitSha).toBe(commit.sha);
+    expect(res.body.text).not.toBe(text);
+    expect(res.body.text).toContain('T_reservation }o--|| T_client : "n → 1"');
   });
 
   it("absent du commit : généré à la volée depuis les tables indexées (generated: true)", async () => {

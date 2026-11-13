@@ -8,7 +8,7 @@ import { SpecDataController } from "./spec-data.controller.ts";
 import { SPEC_DATA_REPOSITORY } from "./spec-data.repository.ts";
 import { SpecDataService } from "./spec-data.service.ts";
 
-/** Page Données (TK-107) : tables, modèle Mermaid, jeux d'exemple. Lit l'index d'entités, jamais le réseau sauf `data/model.mmd`. */
+/** Page Données (TK-107) : tables, modèle Mermaid, jeux d'exemple. Lit l'index d'entités, le modèle Mermaid est généré depuis cet index (B476). */
 @Module({
   imports: [TrackerModule, SpecReadModule, SpecBatchModule],
   controllers: [SpecDataController],

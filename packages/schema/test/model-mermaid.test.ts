@@ -77,4 +77,21 @@ describe("emitModelMermaid", () => {
     };
     expect(emitModelMermaid([t])).toContain("uuid client_id PK, FK");
   });
+
+  it("clé étrangère sans relation déclarée : relation n → 1 déduite, jamais en double (B476)", () => {
+    const tache: TableV2 = {
+      id: "T-tache",
+      nom: "Tâche",
+      champs: [
+        { nom: "id", type: "uuid", cle: "primaire" },
+        { nom: "client_id", type: "ref(T-client)" },
+        { nom: "autre_client_id", type: "ref(T-client)" },
+        { nom: "parent_id", type: "ref(T-tache)" },
+      ],
+    };
+    const text = emitModelMermaid([client, tache, reservation]);
+    expect(text.match(/T_tache }o--\|\| T_client : "n → 1"/g)).toHaveLength(1);
+    expect(text).not.toContain("T_tache }o--|| T_tache");
+    expect(text.match(/T_reservation \S+ T_client/g)).toHaveLength(1);
+  });
 });

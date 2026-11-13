@@ -87,3 +87,49 @@ describe("layoutDiagram", () => {
     });
   });
 });
+
+/** B477 : un modèle large reste lisible, ni une seule colonne ni une seule ligne. */
+describe("layoutDiagram, grands modèles", () => {
+  const card = (id: string): LayoutNode => ({ id, width: 230, height: 120 });
+  const ratio = (plan: { width: number; height: number }) => plan.width / plan.height;
+
+  it("tables isolées : une grille au format d'un écran", () => {
+    const nodes = Array.from({ length: 40 }, (_, i) => card(`T-t${String(i).padStart(2, "0")}`));
+    const plan = layoutDiagram({ nodes, edges: [] });
+    expect(ratio(plan)).toBeGreaterThan(0.8);
+    expect(ratio(plan)).toBeLessThan(3);
+  });
+
+  it("une table référencée par 30 autres : son rang se replie en colonnes de 6 au plus", () => {
+    const children = Array.from({ length: 30 }, (_, i) => card(`T-c${String(i).padStart(2, "0")}`));
+    const nodes = [card("T-hub"), ...children];
+    const edges = children.map((child) => ({ from: child.id, to: "T-hub" }));
+    const { positions } = layoutDiagram({ nodes, edges });
+    const columns = new Map<number, number>();
+    for (const child of children) {
+      const x = positions[child.id]?.x ?? -1;
+      columns.set(x, (columns.get(x) ?? 0) + 1);
+    }
+    expect(columns.size).toBe(5);
+    expect(Math.max(...columns.values())).toBeLessThanOrEqual(6);
+    const hubX = positions["T-hub"]?.x ?? 0;
+    expect(Math.max(...columns.keys())).toBeLessThan(hubX);
+  });
+
+  it("aucun chevauchement entre deux cartes", () => {
+    const nodes = Array.from({ length: 25 }, (_, i) => card(`T-n${String(i).padStart(2, "0")}`));
+    const edges = nodes.slice(1, 12).map((n, i) => ({ from: n.id, to: nodes[i]?.id ?? "" }));
+    const { positions } = layoutDiagram({ nodes, edges });
+    const boxes = nodes.map((n) => ({
+      ...(positions[n.id] ?? { x: 0, y: 0 }),
+      w: n.width,
+      h: n.height,
+    }));
+    for (const [i, a] of boxes.entries()) {
+      for (const b of boxes.slice(i + 1)) {
+        const apart = a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+        expect(apart).toBe(true);
+      }
+    }
+  });
+});

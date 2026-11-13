@@ -41,7 +41,7 @@ export interface GitSource {
   installation: { id: string; externalId: string; active: boolean };
 }
 
-/** Ce qu'il faut pour lire `data/model.mmd` ou `data/_layout.yaml` dans git et, pour le modèle, le générer à défaut. */
+/** Ce qu'il faut pour générer le modèle Mermaid et lire `data/_layout.yaml` dans git. */
 export interface ModelSource extends GitSource {
   kind: "found";
   /** `data` des tables indexées, dans l'ordre de l'index. */
