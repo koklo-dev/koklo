@@ -8,7 +8,7 @@ import {
   resetFeatureWrites,
   type WriteMode,
 } from "./stub-feature-write.ts";
-import { dataCounts, handleSpecData } from "./stub-spec-data.ts";
+import { dataCounts, handleSpecData, resetLayout } from "./stub-spec-data.ts";
 import { domainCounts, handleSpecDomain } from "./stub-spec-domain.ts";
 import { handleSpecItem, type SpecItemScenario } from "./stub-spec-item.ts";
 
@@ -159,6 +159,7 @@ let specRepoCreated = false;
 
 export function resetFeatures(): void {
   resetFeatureWrites();
+  resetLayout();
   reads.length = 0;
   specRepoCreated = false;
 }

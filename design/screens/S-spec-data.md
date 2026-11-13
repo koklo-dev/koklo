@@ -1,7 +1,7 @@
 ---
 id: S-spec-data
 titre: Spec · Données (modèle de données : Prêt, Génération, Relecture, Liste · équipe)
-version: 2
+version: 3
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/11-Lot6Donnees.html` (`pnpm maquette 11`), passations 09 §1 à §3.4 et §5, 08 §2.2, 11 §3. Même socle que [S-spec-functional](S-spec-functional.md) (`ProposalReview`, `SpecCollection`, `SpecItemSheet`, listes longues). TK-107 livre le format, les états et les onglets Tables et Jeux d'exemple ; le diagramme interactif et la fiche (TK-108), la validation et la vue client (TK-109) viennent après.
 
@@ -37,8 +37,14 @@ Onglets en `nav` (`aria-current`) ; une seule région `role=status` par page (co
 ## 9. Questions ouvertes
 Aucune bloquante (B383 à B392).
 
-## 10. Historique
+## 10. Diagramme (TK-108)
+Pleine hauteur sous les onglets (marge 24), aide « Cliquez une table pour voir sa fiche. » + légende ; lecteur à trame de points, cartes 230 px, relations avec cardinalité, sélection en `--primary`, barre `role="toolbar"` de zoom (paliers 50 à 200, `Ctrl/⌘ + − 0`, molette, « Ajuster », mémorisé en stockage local). Fiche à droite : Fiche (description, champs, relations, « Utilisée par »), YAML (`data/tables/<slug>.yaml`, « Source de vérité »), Mermaid (`data/model.mmd`, « Généré », « Copier »), `pre` en texte brut ; YAML et Mermaid pour l'équipe seulement. Relecture : pointillés « À relire », rejetée estompée par jetons. Sous 1024 px onglet Tables par défaut, sous 768 px commandes 44 px et pas de glisser. Alternative textuelle : onglet Tables et fiche ; chaque carte est un `button` `aria-pressed`. Hors périmètre : validation, vue client (TK-109), zones et mini-carte (TK-110).
+
+Réalisation (lot C) : aucune table choisie à l'ouverture ; au premier clic la fiche s'ancre (`aside` 340 à 400 px dès 1280 px, feuille à droite en dessous, focus rendu à la carte par Échap). Glisser réservé à qui écrit les Données (owner, admin, dev), dépôt de toute la mise en page 600 ms après le dernier geste, toast d'erreur « Mise en page non enregistrée » en cas d'échec (la carte garde sa place). Aide sous le lecteur : « Cliquez une table… », celle de la relecture, ou « Zoom sous 60 % : seuls les noms des tables s'affichent. Zoomez pour voir les champs. ». Chargement : cadre squelette `role=status` ; erreur : `ErrorNotice` « Réessayer » ; vide : `EmptyState` `schema`. Captures : `design/screens/captures/S-spec-data/list-diagram{,-fiche,-yaml,-mermaid,-zoom-50,-zoom-200}-{light,dark}[-mobile].png` (yaml, mermaid et zooms au bureau seulement), `review-diagram-*` pour la relecture (pointillés, rejetée).
+
+## 11. Historique
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
+| 3 | 2026-11-13 | TK-108 | Diagramme interactif `DiagramViewer` (dagre, relations, sélection, zoom 50 à 200 %, glisser et Alt + flèches vers `_layout.yaml`, noms seuls sous 60 %), fiche ancrée Fiche / YAML / Mermaid (équipe), onglet Tables par défaut sous 1024 px, fiche en panneau sous 1280 px (B417 à B428). |
 | 2 | 2026-11-13 | TK-107 (lot C) | Réalisation : onglet Relecture caché pendant la génération et bandeau sur les trois autres onglets (B404) ; diagramme lu de `data/model.mmd` (B403) ; carte rejetée estompée par les jetons, pas par l'opacité (B405) ; formulaire Table à lignes de champs `nom · type · contrainte` et zone en saisie libre avec suggestions (B402) ; enregistrement des relations et cascade du rejet (B406). |
 | 1 | 2026-11-13 | TK-107 | Création : page Spec · Données (Prêt, Génération, Relecture, Liste · équipe), onglets Tables et Jeux d'exemple, Diagramme minimal, formulaire Table ; `ErTableCard` ajouté à `packages/ui` (DESIGN.md §5.18). |

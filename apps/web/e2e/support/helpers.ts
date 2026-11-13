@@ -146,6 +146,10 @@ export interface SpecWrite {
 export const specWritesSeen = async (): Promise<SpecWrite[]> =>
   (await fetch(`${STUB}/__spec-writes`)).json();
 
+/** Dépôts de positions du diagramme reçus par le faux API (`spec.data.layout.save` : corps), dans l'ordre. */
+export const layoutSavesSeen = async (): Promise<Array<{ positions: Record<string, unknown> }>> =>
+  (await fetch(`${STUB}/__layout-saves`)).json();
+
 /** Appels des fournisseurs d'IA reçus par le faux API (le corps de l'ajout porte la clé), dans l'ordre. */
 export interface ProviderCall {
   method: string;

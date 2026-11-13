@@ -376,11 +376,86 @@ interface Handlers {
   send: (reply: Reply) => void;
 }
 
+// --- Diagramme (TK-108, contrat 3.6.0) : positions enregistrées dans data/_layout.yaml et source d'une table ---
+type Position = { x: number; y: number };
+let layoutPositions: Record<string, Position> = {};
+const layoutSaves: Array<Record<string, unknown>> = [];
+
+/** Remet à zéro les positions et le journal des dépôts (changement de scénario). */
+export function resetLayout(): void {
+  layoutPositions = {};
+  layoutSaves.length = 0;
+}
+
+const LAYOUT_SHA = "b2c3d4e5f60718293a4b5c6d7e8f9012345678a1";
+
+const sourceYamlOf = (table: Table): string => {
+  const lines = [
+    `id: ${table.specId}`,
+    `nom: ${table.name}`,
+    "description: >",
+    `  ${table.description}`,
+    `source: [${table.sources.join(", ")}]`,
+    "champs:",
+  ];
+  for (const [name, type, constraint, kind, personal] of table.fields) {
+    lines.push(`  - nom: ${name}`, `    type: ${type}`);
+    lines.push(kind === "pk" ? "    cle: primaire" : `    contraintes: "${constraint}"`);
+    if (personal) lines.push("    donnees_personnelles: true   # NFR-001");
+  }
+  if (table.relations.length > 0) lines.push("relations:");
+  for (const relation of table.relations) {
+    lines.push(`  - vers: ${relation.to}`, `    cardinalite: "${relation.cardinality}"`);
+  }
+  return `${lines.join("\n")}\n`;
+};
+
+const LAYOUT = /^\/projects\/[^/]+\/spec\/data\/layout$/;
+const SOURCE = /^\/projects\/[^/]+\/spec\/data\/tables\/([^/]+)\/source$/;
+
+/** Lecture et dépôt des positions, source d'une table, journal des dépôts (`/__layout-saves`). */
+function handleDiagram(req: IncomingMessage, url: URL, h: Handlers, mode: string): boolean {
+  if (url.pathname === "/__layout-saves") {
+    h.send(reply(200, layoutSaves));
+    return true;
+  }
+  if (LAYOUT.test(url.pathname)) {
+    if (req.method === "POST") {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
+      req.on("end", () => {
+        const body = JSON.parse(raw || "{}") as { positions?: Record<string, Position> };
+        layoutSaves.push(body);
+        layoutPositions = body.positions ?? {};
+        h.send(reply(200, { commitSha: LAYOUT_SHA }));
+      });
+    } else h.send(reply(200, { positions: layoutPositions, commitSha: LAYOUT_SHA }));
+    return true;
+  }
+  const source = req.method === "GET" ? SOURCE.exec(url.pathname) : null;
+  if (!source) return false;
+  const found = tablesOf(mode).find((t) => t.specId === source[1]);
+  h.send(
+    found
+      ? reply(200, {
+          path: `data/tables/${found.specId.slice(2)}.yaml`,
+          text: sourceYamlOf(found),
+          commitSha: SHA,
+          generated: false,
+        })
+      : typed(404, "NOT_FOUND"),
+  );
+  return true;
+}
+
 const DATA = /^\/projects\/[^/]+\/spec\/data\/(tables|mermaid|fixtures)(?:\/([^/]+)\/rows)?$/;
 const ITEM = /^\/projects\/[^/]+\/spec\/items\/table\/([^/]+)$/;
 
 /** Répond aux lectures des onglets Données et à la lecture d'édition d'une table, `false` pour toute autre route. */
 export function handleSpecData(req: IncomingMessage, url: URL, h: Handlers, mode: string): boolean {
+  if (handleDiagram(req, url, h, mode)) return true;
   if (req.method !== "GET") return false;
   const item = ITEM.exec(url.pathname);
   if (item) {
