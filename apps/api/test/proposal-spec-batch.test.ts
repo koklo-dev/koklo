@@ -7,8 +7,10 @@ import {
   batchApi,
   batchRows,
   createOp,
+  fileOf,
   installSpecBench,
   specScene,
+  submitOk,
 } from "./helpers/spec-batch.ts";
 
 /**
@@ -164,4 +166,102 @@ describe("specBatch.submit : 200 opérations (cas 11)", () => {
     );
     expect(refused.status).toBe(400);
   }, 180_000);
+});
+
+/**
+ * TK-107 lot B (cas 12, B392) : accepter une table, des relations et un jeu d'exemple = UN lot (`table.create`,
+ * `table.update`, `fixture.create`) dont chaque proposition passe `appliedBatchId` ; le serveur refuse un lot qui laisse
+ * une référence pendante (la cascade du rejet est faite à l'écran, le serveur reste la garantie).
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("specBatch.submit avec des propositions de données (cas 12)", () => {
+  const field = (name: string, type: string) => ({
+    name,
+    type,
+    ...(name === "id" ? { primaryKey: true } : {}),
+  });
+  const salle = {
+    kind: "table.create",
+    name: "Salle",
+    zone: "Réservations",
+    fields: [field("id", "uuid")],
+  };
+  const reservation = {
+    kind: "table.create",
+    name: "Réservation",
+    zone: "Réservations",
+    fields: [field("id", "uuid"), field("salle_id", "ref(T-salle)")],
+  };
+  const relateTo = (target: string) => ({
+    kind: "table.update",
+    specId: "T-reservation",
+    relations: [{ to: target, cardinality: "n → 1" }],
+  });
+
+  /** Quatre propositions de données acceptées ; la table `Réservation` existe déjà (une relation la met à jour). */
+  async function accepted(b: ReturnType<typeof bench>, s: Awaited<ReturnType<typeof specScene>>) {
+    await submitOk(b, s, [{ ...reservation, fields: [field("id", "uuid")] }]);
+    const scope = { organizationId: s.world.organizationId, projectId: s.projectId };
+    const ids: string[] = [];
+    for (const [position, kind] of (["table", "relations", "fixtures"] as const).entries()) {
+      const { id } = await insertProposal(b.database, scope, {
+        deliverable: "data",
+        kind,
+        position,
+        status: "accepted",
+        title: kind,
+        payload: {},
+      });
+      ids.push(id);
+    }
+    return ids;
+  }
+
+  it("une table, des relations et un jeu : un seul lot committed, chaque proposition appliquée", async () => {
+    const b = bench();
+    const s = await specScene(b);
+    const proposalIds = await accepted(b, s);
+    const res = await batchApi(b.app, s.world.actors.dev).submit(
+      s.projectId,
+      batch(
+        [
+          salle,
+          relateTo("T-salle"),
+          {
+            kind: "fixture.create",
+            title: "Salles de démo",
+            table: "T-salle",
+            rows: [{ id: "s-1" }],
+          },
+        ],
+        { branch: BRANCH, proposalIds },
+      ),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.status).toBe("committed");
+    expect(res.body.results.map((r: { kind: string }) => r.kind)).toEqual([
+      "table.create",
+      "table.update",
+      "fixture.create",
+    ]);
+    for (const id of proposalIds)
+      expect((await appliedOf(b, id))?.applied_batch_id).toBe(res.body.id);
+    expect((await fileOf(b, s, "data/tables/reservation.yaml")).content).toContain("T-salle");
+  });
+
+  it("une relation vers une table absente du lot et de la spec (table rejetée) : SPEC_INVALID, aucune relation écrite", async () => {
+    const b = bench();
+    const s = await specScene(b);
+    const proposalIds = await accepted(b, s);
+    const res = await batchApi(b.app, s.world.actors.dev).submit(
+      s.projectId,
+      batch([relateTo("T-salle")], { branch: BRANCH, proposalIds }),
+    );
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe("SPEC_INVALID");
+    expect(
+      (await batchRows(b.database, s.projectId)).filter((row) => row.status === "committed"),
+    ).toHaveLength(1);
+    expect((await fileOf(b, s, "data/tables/reservation.yaml")).content).not.toContain("T-salle");
+  });
 });

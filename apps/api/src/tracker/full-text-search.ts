@@ -5,6 +5,9 @@ import {
   searchEntityIds,
   searchEntityRefs,
   searchIds,
+  tableRelationCounts,
+  tableRelationTotal,
+  tableZoneFacets,
 } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.module.ts";
@@ -40,5 +43,23 @@ export class FullTextSearch {
   /** Éléments d'un instantané qui citent `specId` (jeton exact), `total` compris (TK-101). */
   referencing(snapshotId: string, specId: string, limit: number) {
     return entitiesReferencing(this.database.raw, snapshotId, specId, limit);
+  }
+
+  /** Relations (déclarées et entrantes) des tables `ids` de l'instantané (TK-107, B384). */
+  tableRelationCounts(snapshotId: string, ids: readonly string[]): Promise<Map<string, number>> {
+    return tableRelationCounts(this.database.raw, snapshotId, ids);
+  }
+
+  /** Relations déclarées par toutes les tables de l'instantané (TK-107). */
+  tableRelationTotal(snapshotId: string): Promise<number> {
+    return tableRelationTotal(this.database.raw, snapshotId);
+  }
+
+  /** Comptes de tables par zone, restreints aux lignes `ids` d'une recherche (TK-107). */
+  tableZoneFacets(
+    snapshotId: string,
+    ids: readonly string[] | null,
+  ): Promise<Record<string, number>> {
+    return tableZoneFacets(this.database.raw, snapshotId, ids);
   }
 }

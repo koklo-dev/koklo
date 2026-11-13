@@ -8,7 +8,7 @@ import type { Tx } from "../tracker/project-transactions.ts";
  * plein texte (`ids`, `null` sans recherche).
  */
 type EntityWhere = Prisma.SpecEntityWhereInput;
-export type EntityKind = "rule" | "flow";
+export type EntityKind = "rule" | "flow" | "table";
 export const RULE_TYPES = ["contrainte", "calcul", "workflow"] as const;
 
 const select = { id: true, sort: true, specId: true, path: true, data: true } as const;

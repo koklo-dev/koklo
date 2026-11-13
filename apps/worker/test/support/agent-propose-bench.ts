@@ -183,8 +183,10 @@ export interface LaunchOver {
   lastSeenAt?: string | null;
   heartbeatAt?: string;
   instruction?: string | null;
-  /** Version d'idée lue par le lancement (1 par défaut). */
-  baseVersion?: number;
+  /** Version d'idée lue par le lancement (1 par défaut ; `null` pour les Données, qui n'en lisent pas). */
+  baseVersion?: number | null;
+  /** Livrable du lancement (`functional` par défaut). */
+  deliverable?: string;
 }
 
 /** Lancement `queued` posé comme l'API (SQL), puis enfilé `{ launchId }` seul. */
@@ -197,7 +199,7 @@ export async function launch(
   await bench.query(
     `INSERT INTO agent_launches (id, organization_id, project_id, deliverable, mode, instruction, status, requested_by,
                                  sources, base_version, last_seen_at, heartbeat_at, updated_at)
-     VALUES ($1, $2, $3, 'functional', $4, $5, $6, $7, '["idea.frozen"]'::jsonb, $10, $8, COALESCE($9::timestamptz, now()), now())`,
+     VALUES ($1, $2, $3, $11, $4, $5, $6, $7, '["idea.frozen"]'::jsonb, $10, $8, COALESCE($9::timestamptz, now()), now())`,
     [
       id,
       scene.organizationId,
@@ -208,7 +210,8 @@ export async function launch(
       scene.userId,
       over.lastSeenAt ?? null,
       over.heartbeatAt ?? null,
-      over.baseVersion ?? 1,
+      over.baseVersion === undefined ? 1 : over.baseVersion,
+      over.deliverable ?? "functional",
     ],
   );
   const worker = bench.worker;
@@ -291,4 +294,45 @@ export async function seedIdeaV2(bench: WorkerBench, scene: Scene): Promise<void
       JSON.stringify({ vision: 2, personas: 1, "hypotheses-risques": 1, perimetre: 1, annexes: 1 }),
     ],
   );
+}
+
+/**
+ * Modèle actuel et Fonctionnel indexé des Données (TK-107) : une règle, un rôle, un parcours et une table `Salle` (zone
+ * « Réservations », deux champs) dans l'instantané de la tête, plus un jeu `FX-salles`.
+ */
+export async function seedDataModel(bench: WorkerBench, scene: Scene): Promise<void> {
+  const [head] = await bench.query<{ snapshot_id: string }>(
+    "SELECT snapshot_id FROM spec_heads WHERE repo_id = $1 AND branch = 'cadrage'",
+    [scene.repoId],
+  );
+  const rows: [string, string, string | null, object][] = [
+    ["rule", "R-001", null, { titre: "Annulation tardive" }],
+    ["roles", "RL-roles", null, { roles: [{ id: "RL-admin", nom: "Administrateur" }] }],
+    ["flow", "P-inscription", null, { titre: "Inscription" }],
+    [
+      "table",
+      "T-salle",
+      "data",
+      { titre: "Salle", zone: "Réservations", champs: [{ nom: "id" }, { nom: "capacite_max" }] },
+    ],
+    ["fixture", "FX-salles", null, { titre: "Salles de démonstration", table: "T-salle" }],
+  ];
+  for (const [sort, [kind, specId, zone, data]] of rows.entries()) {
+    await bench.query(
+      `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, now(), now())`,
+      [
+        randomUUID(),
+        scene.organizationId,
+        head?.snapshot_id,
+        kind,
+        specId,
+        zone,
+        `${kind}/${specId}.yaml`,
+        JSON.stringify(data),
+        "a".repeat(64),
+        sort,
+      ],
+    );
+  }
 }

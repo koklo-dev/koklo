@@ -118,7 +118,7 @@ describe("ai.proposeDeliverable : refus avant lancement", () => {
   it("livrable non branché : 422 VALIDATION, aucun lancement", async () => {
     const { b, world } = await readyWorld();
     const res = await proposalApi(b.app, world.actors.dev).propose(world.projectId, {
-      deliverable: "data",
+      deliverable: "architecture",
     });
     expect(res.status).toBe(422);
     expect(res.body.code).toBe("VALIDATION");
@@ -278,7 +278,7 @@ describe("ai.proposeOptions (cas 13)", () => {
 
   it("livrable non branché : available false, raison not_wired", async () => {
     const { b, world } = await readyWorld();
-    const res = await proposalApi(b.app, world.actors.dev).options(world.projectId, "data");
+    const res = await proposalApi(b.app, world.actors.dev).options(world.projectId, "architecture");
     expect(res.body).toMatchObject({
       available: false,
       reason: "not_wired",

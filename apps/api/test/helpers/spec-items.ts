@@ -22,7 +22,7 @@ export function itemApi(app: INestApplication, actor: { cookie?: string } | unde
 }
 
 export interface ItemRow {
-  kind: "feature" | "rule" | "flow" | "table" | "endpoint" | "screen";
+  kind: "feature" | "rule" | "flow" | "table" | "fixture" | "endpoint" | "screen";
   specId: string;
   /** Contenu libre de l'entité (`data`), `titre` compris. */
   data: Record<string, unknown>;

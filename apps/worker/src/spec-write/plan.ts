@@ -3,19 +3,22 @@ import {
   checkSpec,
   EmitFeatureError,
   emitFeatureMarkdown,
+  emitModelMermaid,
   type Feature,
   parseFeatureMarkdown,
   parseSpecFiles,
   type SpecFile,
 } from "@koklo/schema";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
+import { applyFixture, fixtureIndex } from "./fixtures.ts";
 import { applyFlow, flowIndex } from "./flows.ts";
 import { featureIdOfPath, featurePathOf, isIdeaKind, isMigrationKind } from "./paths.ts";
 import { planIdeaBatch } from "./plan-idea.ts";
 import { planMigrationBatch } from "./plan-migration.ts";
 import { newIssues, toStoredReport } from "./report.ts";
-import { applyRole, roleIds } from "./roles.ts";
+import { applyRole } from "./roles.ts";
 import { applyRule, ruleIndex } from "./rules.ts";
+import { applyTable, tableIndex } from "./tables.ts";
 import {
   type BatchOperation,
   conflicted,
@@ -43,6 +46,8 @@ interface Index {
   readonly rules: Map<string, string>;
   readonly flows: { owned: Map<string, string>; taken: Set<string> };
   readonly roles: Set<string>;
+  readonly tables: Map<string, string>;
+  readonly fixtures: Set<string>;
 }
 
 function featureIndex(files: readonly SpecFile[]): Map<string, string> {
@@ -54,7 +59,7 @@ function featureIndex(files: readonly SpecFile[]): Map<string, string> {
   return index;
 }
 
-/** Genre d'une opération (`feature`, `rule`, `role`, `flow`) : le préfixe de son `kind`. */
+/** Genre d'une opération (`feature`, `rule`, `role`, `flow`, `table`, `fixture`) : le préfixe de son `kind`. */
 const genreOf = (operation: BatchOperation): string => operation.kind.split(".")[0] ?? "";
 
 function indexOf(files: readonly SpecFile[]): Index {
@@ -66,7 +71,14 @@ function indexOf(files: readonly SpecFile[]): Index {
       for (const role of file.value.roles) roles.add(role.id);
     }
   }
-  return { features: featureIndex(files), rules: ruleIndex(paths), flows: flowIndex(paths), roles };
+  return {
+    features: featureIndex(files),
+    rules: ruleIndex(paths),
+    flows: flowIndex(paths),
+    roles,
+    tables: tableIndex(paths),
+    fixtures: fixtureIndex(paths),
+  };
 }
 
 /** Une identité est-elle déjà prise sur la tête ? Un `.json` hérité occupe encore l'identifiant de son parcours. */
@@ -75,6 +87,8 @@ function present(index: Index, operation: BatchOperation): boolean {
   const genre = genreOf(operation);
   if (genre === "rule") return index.rules.has(id);
   if (genre === "role") return index.roles.has(id);
+  if (genre === "table") return index.tables.has(id);
+  if (genre === "fixture") return index.fixtures.has(id);
   if (genre === "flow") {
     const created = operation.kind === "flow.create";
     return created ? index.flows.taken.has(id) : index.flows.owned.has(id);
@@ -144,6 +158,14 @@ function applyOperation(workspace: Planned, operation: BatchOperation): void {
     applyFlow(workspace, operation, workspace.index.flows.owned.get(id));
     return;
   }
+  if (genre === "table") {
+    applyTable(workspace, operation, workspace.index.tables.get(id));
+    return;
+  }
+  if (genre === "fixture") {
+    applyFixture(workspace, operation);
+    return;
+  }
   const path = workspace.index.features.get(id) ?? "";
   if (operation.kind === "feature.create") {
     applyCreate(workspace, id, operation);
@@ -167,6 +189,19 @@ function validate(before: readonly SpecFile[], after: readonly SpecFile[]) {
 
 const toFiles = (files: Map<string, string>): SpecFile[] =>
   [...files].map(([path, content]) => ({ path, content }));
+
+const MODEL_PATH = "data/model.mmd";
+
+/**
+ * `data/model.mmd` est généré, jamais édité (B384) : quand un fichier de `data/tables/` change, le texte Mermaid du modèle est
+ * réécrit dans le même lot (donc le même commit) depuis les tables de l'état final.
+ */
+function refreshModel(workspace: Workspace): void {
+  if (![...workspace.changes.keys()].some((path) => path.startsWith("data/tables/"))) return;
+  const { spec } = parseSpecFiles(toFiles(workspace.files));
+  const tables = spec.tables.flatMap(({ value }) => ("nom" in value ? [value] : []));
+  writeFile(workspace, MODEL_PATH, emitModelMermaid(tables));
+}
 
 /**
  * Applique les opérations du lot, dans l'ordre, sur l'état lu (chemins relatifs à la spec) :
@@ -196,6 +231,7 @@ export function planBatch(
   };
   try {
     for (const operation of batch.operations) applyOperation(workspace, operation);
+    refreshModel(workspace);
     const report = validate(files, toFiles(workspace.files));
     return report
       ? { changes: [...workspace.changes.values()], report }

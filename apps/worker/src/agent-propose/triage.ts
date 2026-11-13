@@ -1,4 +1,4 @@
-import { AGENT_PROPOSE_LIMITS, type AgentProposalKind } from "@koklo/domain";
+import { AGENT_PROPOSE_LIMITS, type AgentProposalKind, slugOf } from "@koklo/domain";
 import { isSafeText, PROPOSAL_SCHEMAS } from "@koklo/schema";
 import { isRecord } from "../job-support.ts";
 import { OutputInvalidError } from "./errors.ts";
@@ -6,6 +6,8 @@ import { OutputInvalidError } from "./errors.ts";
 const TITLE_MAX = 200;
 const ZONE_MAX = 120;
 const RATIONALE_MAX = 500;
+/** Une seule proposition « relations » par lancement : son titre est fixe, un second est un doublon. */
+const RELATIONS_TITLE = "Relations";
 
 /** Proposition validée, prête à être publiée (le contenu a passé le schéma de son type et le texte brut). */
 export interface Candidate {
@@ -22,6 +24,11 @@ export interface TriageContext {
   readonly titles: Partial<Record<AgentProposalKind, Set<string>>>;
   /** Fonctionnalités sans critère (`F-nnn` vers titre) : seules cibles d'une proposition `criteria`, une fois chacune. */
   readonly missingCriteria: Map<string, string>;
+  /**
+   * Livrable Données : références que le modèle peut viser. `specIds` : fonctionnalités et règles du cahier ; `tables` :
+   * tables du modèle actuel, complétées au fil du tri par celles de la génération. Absent pour le Fonctionnel.
+   */
+  readonly refs?: { readonly specIds: ReadonlySet<string>; readonly tables: Set<string> };
 }
 
 /** Clé de comparaison de deux titres : forme NFKC, espaces repliés, casse ignorée. */
@@ -29,9 +36,55 @@ export const titleKey = (title: string): string =>
   title.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 
 const titleOf = (kind: AgentProposalKind, payload: Record<string, unknown>): string => {
-  const value = payload[kind === "role" ? "name" : "title"];
+  const value = payload[kind === "role" || kind === "table" ? "name" : "title"];
   return typeof value === "string" ? value.slice(0, TITLE_MAX) : "";
 };
+
+const tableIdOf = (name: string): string => `T-${slugOf(name, "table")}`;
+
+const recordsOf = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value) ? value.filter(isRecord) : [];
+const stringsOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+/** Table visée par un type de champ `ref(T-slug)` ; `undefined` pour tout autre type. */
+const refTarget = (type: unknown): string | undefined =>
+  typeof type === "string" ? /^ref\((T-[a-z0-9-]+)\)$/.exec(type)?.[1] : undefined;
+
+/** Références d'une table : `sources` et `rule` vers le cahier, `ref(T-x)` vers une table connue ou elle-même. */
+function tableReferencesKnown(
+  payload: Record<string, unknown>,
+  refs: NonNullable<TriageContext["refs"]>,
+) {
+  const own = tableIdOf(titleOf("table", payload));
+  const fields = recordsOf(payload.fields);
+  const ruleIds = fields.flatMap((field) => (typeof field.rule === "string" ? [field.rule] : []));
+  const targets = fields.flatMap((field) => refTarget(field.type) ?? []);
+  return (
+    [...stringsOf(payload.sources), ...ruleIds].every((id) => refs.specIds.has(id)) &&
+    targets.every((id) => id === own || refs.tables.has(id))
+  );
+}
+
+/** Les types des Données ne visent que des identifiants connus (cahier, modèle actuel, tables de la génération). */
+function referencesKnown(
+  kind: AgentProposalKind,
+  payload: Record<string, unknown>,
+  refs: TriageContext["refs"],
+): boolean {
+  if (kind !== "table" && kind !== "relations" && kind !== "fixtures") return true;
+  if (refs === undefined) return false;
+  if (kind === "table") return tableReferencesKnown(payload, refs);
+  if (kind === "fixtures")
+    return typeof payload.table === "string" && refs.tables.has(payload.table);
+  return recordsOf(payload.relations).every(
+    (relation) =>
+      typeof relation.from === "string" &&
+      typeof relation.to === "string" &&
+      refs.tables.has(relation.from) &&
+      refs.tables.has(relation.to),
+  );
+}
 
 /** Un type `criteria` n'a pas de titre propre : celui de la fonctionnalité visée, sous la forme `F-nnn · Titre`. */
 function criteriaTarget(
@@ -56,16 +109,25 @@ function candidateOf(entry: unknown, context: TriageContext): Candidate | undefi
   const parsed = PROPOSAL_SCHEMAS[asKind].safeParse(content);
   if (!parsed.success) return undefined;
   const payload = parsed.data as Record<string, unknown>;
-  if (asKind === "criteria") {
-    const title = criteriaTarget(payload, context);
-    return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
-  }
-  const title = titleOf(asKind, payload);
-  const known = context.titles[asKind] ?? new Set<string>();
-  context.titles[asKind] = known;
+  const title = titleFor(asKind, payload, context);
+  return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
+}
+
+/** Titre d'une proposition valide, `undefined` si elle doit être écartée (cible, doublon, référence inconnue). */
+function titleFor(
+  kind: AgentProposalKind,
+  payload: Record<string, unknown>,
+  context: TriageContext,
+): string | undefined {
+  if (kind === "criteria") return criteriaTarget(payload, context);
+  if (!referencesKnown(kind, payload, context.refs)) return undefined;
+  const title = kind === "relations" ? RELATIONS_TITLE : titleOf(kind, payload);
+  const known = context.titles[kind] ?? new Set<string>();
+  context.titles[kind] = known;
   if (known.has(titleKey(title))) return undefined;
   known.add(titleKey(title));
-  return { kind: asKind, title, rationale, payload };
+  if (kind === "table") context.refs?.tables.add(tableIdOf(title));
+  return title;
 }
 
 /**
@@ -89,14 +151,14 @@ export function triageProposals(
   return { accepted, discarded };
 }
 
-/** Titres de zones du modèle : texte brut d'une ligne, 120 caractères au plus, sans doublon, douze au plus. */
-export function zonesOf(raw: unknown): string[] {
+/** Titres de zones du modèle : texte brut d'une ligne, `maxLength` caractères au plus (120 ; 80 pour les Données), sans doublon, douze au plus. */
+export function zonesOf(raw: unknown, maxLength = ZONE_MAX): string[] {
   if (!isRecord(raw) || !Array.isArray(raw.zones)) throw new OutputInvalidError();
   const zones: string[] = [];
   for (const entry of raw.zones as unknown[]) {
     if (typeof entry !== "string") continue;
     const zone = entry.trim();
-    const valid = zone.length > 0 && zone.length <= ZONE_MAX && isSafeText(zone, false);
+    const valid = zone.length > 0 && zone.length <= maxLength && isSafeText(zone, false);
     if (valid && !zones.includes(zone)) zones.push(zone);
   }
   if (zones.length === 0) throw new OutputInvalidError();

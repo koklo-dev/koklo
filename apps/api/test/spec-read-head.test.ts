@@ -41,7 +41,16 @@ describe("spec.head : forme et comptes", () => {
       status: "ready",
       errorCode: null,
       indexedAt: "2026-10-31T10:00:00.000Z",
-      counts: { features: 2, tables: 1, endpoints: 3, rules: 0, roles: 0, flows: 0 },
+      counts: {
+        features: 2,
+        tables: 1,
+        endpoints: 3,
+        rules: 0,
+        roles: 0,
+        flows: 0,
+        relations: 0,
+        fixtures: 0,
+      },
     });
   });
 

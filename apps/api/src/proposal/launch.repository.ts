@@ -51,6 +51,8 @@ export interface LaunchRepository {
   /** Échec côté API (enfilage impossible) : le lancement passe `failed`, le verrou est libéré. */
   fail(scope: ProjectScope, launchId: string, errorCode: string, now: Date): Promise<void>;
   optionFacts(scope: ProjectScope): Promise<OptionFacts>;
+  /** Vrai si la tête de spec porte au moins une entité du Fonctionnel (fonctionnalité, règle, rôles, parcours). */
+  hasFunctionalEntities(scope: ProjectScope): Promise<boolean>;
   /** Le lancement désigné, ou le dernier du livrable ; `null` s'il n'y en a pas (ou hors du projet). */
   forList(
     scope: ProjectScope,

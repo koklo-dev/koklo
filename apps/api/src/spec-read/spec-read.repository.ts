@@ -131,12 +131,12 @@ export interface SpecReadRepository {
     request: FunctionalListRequest,
   ): Promise<IndexedFunctionalPage | null>;
   /**
-   * Une entité de la tête (`rule`, `flow` ou `roles`, dont `specId` est `roles`) avec son chemin et son contenu indexé ;
+   * Une entité de la tête (`rule`, `flow`, `table` ou `roles`, dont `specId` est `roles`) avec son chemin et son contenu indexé ;
    * `null` si elle est absente ou que les entités de la tête ne sont pas indexées.
    */
   entityItem(
     scope: ProjectScope,
-    kind: "rule" | "flow" | "roles",
+    kind: "rule" | "flow" | "roles" | "table",
     specId: string,
     revision?: Revision,
   ): Promise<EntityItem | null>;

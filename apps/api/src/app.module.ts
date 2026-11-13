@@ -38,6 +38,7 @@ import { serializeRequest, serializeResponse } from "./request-serializer.ts";
 import { ReviewModule } from "./review/review.module.ts";
 import { SearchModule } from "./search/search.module.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
+import { SpecDataModule } from "./spec-data/spec-data.module.ts";
 import { SpecDeliverablesModule } from "./spec-deliverables/spec-deliverables.module.ts";
 import { SpecItemModule } from "./spec-item/spec-item.module.ts";
 import { SpecMigrationModule } from "./spec-migration/spec-migration.module.ts";
@@ -77,6 +78,7 @@ const SPEC_MODULES = [
   SpecReadModule,
   SpecDeliverablesModule,
   SpecItemModule,
+  SpecDataModule,
 ];
 
 /** IA (TK-95) puis propositions de l'agent (TK-99a) : le second dépend du premier. */

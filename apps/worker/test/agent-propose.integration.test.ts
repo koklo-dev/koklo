@@ -7,6 +7,7 @@ import {
   launch,
   launchState,
   proposalsOf,
+  seedDataModel,
   seedIdeaV2,
   seedOtherProject,
   seedProject,
@@ -355,5 +356,79 @@ describe("résilience (cas 14)", () => {
       [id],
     );
     expect(rows[0]?.data).toEqual({ launchId: id });
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: un seul scénario de bout en bout, plusieurs vérifications
+describe("livrable Données (TK-107, cas 11)", () => {
+  const tableOf = (name: string, over: Record<string, unknown> = {}) => ({
+    kind: "table",
+    rationale: "Absente du modèle",
+    content: {
+      name,
+      sources: ["F-001"],
+      fields: [
+        { name: "id", type: "uuid", primaryKey: true },
+        { name: "salle_id", type: "ref(T-salle)" },
+      ],
+      ...over,
+    },
+  });
+
+  it("publie table, relations et fixtures avec leur zone ; sans version d'idée figée ; le modèle lit le Fonctionnel et le modèle actuel, jamais le dossier", async () => {
+    await seedDataModel(bench, scene);
+    ai.zones = ["Réservations"];
+    ai.batch = () => ({
+      proposals: [
+        tableOf("Réservation"),
+        tableOf("Salle"),
+        tableOf("Source", { sources: ["F-999"] }),
+        {
+          kind: "relations",
+          rationale: "Liens",
+          content: { relations: [{ from: "T-reservation", to: "T-salle", cardinality: "n → 1" }] },
+        },
+        {
+          kind: "fixtures",
+          rationale: "Démo",
+          content: {
+            title: "Réservations de démonstration",
+            table: "T-reservation",
+            rows: [{ id: "r-1" }],
+          },
+        },
+      ],
+    });
+    const id = await launch(bench, scene, { deliverable: "data", baseVersion: null });
+    const done = await finished(bench, id);
+    expect(done).toMatchObject({
+      status: "done",
+      error_code: null,
+      proposed_count: 3,
+      discarded_count: 2,
+    });
+    const rows = await proposalsOf(bench, id);
+    expect(rows.map((r) => [r.kind, r.zone, r.title])).toEqual([
+      ["table", "Réservations", "Réservation"],
+      ["relations", "Réservations", "Relations"],
+      ["fixtures", "Réservations", "Réservations de démonstration"],
+    ]);
+    const sent = ai.sent();
+    for (const present of [
+      "F-001",
+      "Connexion",
+      "R-001",
+      "Annulation tardive",
+      "Administrateur",
+      "Inscription",
+      "T-salle",
+      "capacite_max",
+      "FX-salles",
+    ]) {
+      expect(sent, present).toContain(present);
+    }
+    for (const absent of ["FROZEN-VISION", "SYNTH-OK", "SECRET-COMMENTAIRE"])
+      expect(sent, absent).not.toContain(absent);
+    expect(sent.toLowerCase()).not.toContain("anthropic");
   });
 });
