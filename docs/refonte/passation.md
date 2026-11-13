@@ -8,7 +8,7 @@ last_reviewed: 2026-11-10
 > fusionné, et ajouter ici toute nouvelle décision de méthode de l'utilisateur. Les décisions produit restent dans
 > `docs/refonte/questions.md` (une ligne B-nnn chacune) ; rien ne se décide « dans la conversation » sans être écrit.
 
-## État au 2026-11-12
+## État au 2026-11-13
 
 | Sprint | Ticket | État |
 | --- | --- | --- |
@@ -26,10 +26,10 @@ last_reviewed: 2026-11-10
 | 022 | TK-101 (`SpecItemSheet`, `ai.prefillItem`, `spec.item.get`, `spec.refs.search`, contrat 2.11.0) | ✅ fusionné (PR #184, `7ffe7c1`) ; décisions B329 à B332 |
 | 022 | TK-102 (cahier fonctionnel par état, onglet Fonctionnalités, retrait de l'Assistant et d'`ai.draftBrief`, contrat 3.0.0) | ✅ fusionné (PR #186, `6094e5d`) ; décisions B333 à B337 ; « Relancer » renvoyé à TK-104 |
 | 023 | TK-103 (Règles métier, Rôles et permissions, Parcours, contrat 3.1.0, `seed:large` à 300 règles) | ✅ fusionné (PR #187, `e02a57e`) ; décisions B338 à B346 |
-| 023 | TK-104 (vue client des 4 onglets, « Valider le cahier », annulation `withdrawn`, `review.remind`, contrat 3.2.0) | ✅ fusionné (PR #193, `67b2556`, remplace la #192) ; décisions B347 à B362 ; case du sprint non cochée : critères 9 (e2e `seed:large`) et 13 (axe après décision) partiels, acceptés par B361, à vérifier avec TK-105 |
-| 023 | TK-105 (volume réel : recherche serveur de la vue client, contrat 3.3.0, `seed:planche` à 355 propositions, champ Zone) | 🟡 branche `feat/tk-105-volume-reel`, lots A, B, C faits, non fusionné ; décisions B363 à B370 ; e2e web `volume-reel.spec.ts` (18 tests verts) ; e2e racine `e2e/tests/volume-reel.spec.ts` écrit et typé mais NON exécuté (pile complète, CI) ; critères 9 et 13 de TK-104 à confirmer par la CI |
+| 023 | TK-104 (vue client des 4 onglets, « Valider le cahier », annulation `withdrawn`, `review.remind`, contrat 3.2.0) | ✅ fusionné (PR #193, `67b2556`, remplace la #192) ; décisions B347 à B362 ; critères 9 et 13 prouvés par l'e2e racine de TK-105 en CI, case cochée |
+| 023 | TK-105 (volume réel : recherche serveur de la vue client, contrat 3.3.0, `seed:planche` à 355 propositions, champ Zone) | ✅ fusionné (PR #197, `a285bcc0`, remplace la #196) ; décisions B363 à B371 ; e2e racine `e2e/tests/volume-reel.spec.ts` vert en CI |
 
-Ticket en cours : TK-105 (volume réel), sprint 023, à relire et fusionner ; il vérifie les critères 9 et 13 de TK-104 (e2e racine avec `seed:planche`). DoD du sprint 022 (4 cases) encore à vérifier avant de la cocher.
+Ticket en cours : TK-106 (format de spec v2 et migration), sprint 024, branche `feat/tk-106-spec-v2`. DoD des sprints 022 et 023 (4 cases chacun) encore à vérifier avant de les cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
@@ -137,3 +137,6 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - TK-93 : le workflow a duré ~3 h 20 (3 lots) et la CI `ci` ~60 min sous charge. Non vérifié : `KOKLO_ENCRYPTION_KEY` injecté au service worker par `.deploy/manifest.yaml` (secret `generate` global supposé) ; à contrôler au premier déploiement staging. Après un rebase, relancer lint, typecheck et la suite web avant le push forcé.
 - TK-99a : non vérifié, `KOKLO_ENCRYPTION_KEY` et les clés d'IA injectés au service worker par `.deploy/manifest.yaml` (le worker déchiffre les clés BYOK comme l'API) ; à contrôler au premier déploiement staging. Le moteur réel du worker (`createAiEngine`) n'est couvert que par la compilation et `ai-persistence` côté API, pas par un lancement de bout en bout. Une proposition dont le lot de spec a échoué reste verrouillée par `appliedBatchId` (B315 h), à traiter avec TK-99b. `proposal.decide` lit puis écrit sans verrou de ligne : course étroite avec `specBatch.submit`, sans fuite ni écriture dans la spec.
 - e2e `proposals.spec.ts` « 400 propositions… défilement sans tâche longue » : sensible à la charge de la machine (échoue dans la suite complète, passe seul 2/2) ; le relancer seul avant de conclure (TK-99b).
+- Espace fonctionnel : quand des propositions attendent, la page ouvre d'office la relecture (`?view=review`, `use-proposals.ts`). Un e2e qui vise la liste clique d'abord « Quitter la relecture » (TK-105).
+- Un spec e2e racine écrit sans être lancé (machine légère) échoue presque toujours au premier tour de CI : lire l'`error-context.md` de l'artefact `playwright-report` (`gh run download <run> -n playwright-report`) plutôt que deviner.
+- `.github/scripts/commitlint-local.sh` avant **chaque** push, y compris un correctif d'une ligne (TK-105 : en-tête de 101 caractères, PR #196 recréée en #197).
