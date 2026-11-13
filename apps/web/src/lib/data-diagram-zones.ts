@@ -100,3 +100,62 @@ export function crossLinkCount(
 export const tablesLabel = (count: number) => plural(count, "table", "tables");
 export const linksLabel = (count: number) =>
   plural(count, "lien vers d'autres zones", "liens vers d'autres zones");
+
+/** Carte d'une zone voisine dans une zone ouverte (B480) : 260 × 96, nom et compte, un clic y passe. */
+export const NEIGHBOR_WIDTH = 260;
+export const NEIGHBOR_HEIGHT = 96;
+const NEIGHBOR_PREFIX = "zone:";
+
+export interface NeighborNode extends DiagramNode {
+  neighbor: { zone: string; tables: number; links: number };
+}
+
+export const isNeighborId = (id: string) => id.startsWith(NEIGHBOR_PREFIX);
+export const neighborZoneOf = (id: string) => id.slice(NEIGHBOR_PREFIX.length);
+
+/**
+ * Zones voisines d'une zone ouverte (B480) : une carte par zone reliée, et un trait par paire table de la zone →
+ * zone voisine (étiqueté par le nombre de relations au-delà d'une). On navigue ainsi de zone en zone sans perdre
+ * le détail des tables.
+ */
+export function neighborsOf(
+  zone: string,
+  relations: readonly DiagramRelation[],
+  cards: readonly DiagramCard[],
+): { nodes: NeighborNode[]; relations: DiagramRelation[] } {
+  const zoneOf = new Map(cards.map((card) => [card.id, zoneOfCard(card)]));
+  const sizes = new Map<string, number>();
+  for (const card of cards) sizes.set(zoneOfCard(card), (sizes.get(zoneOfCard(card)) ?? 0) + 1);
+  const pairs = new Map<string, { table: string; other: string; count: number }>();
+  for (const relation of relations) {
+    const a = zoneOf.get(relation.from);
+    const b = zoneOf.get(relation.to);
+    if (a === undefined || b === undefined || a === b || (a !== zone && b !== zone)) continue;
+    const [table, other] = a === zone ? [relation.from, b] : [relation.to, a];
+    const key = `${table}\u0000${other}`;
+    const entry = pairs.get(key) ?? { table, other, count: 0 };
+    entry.count += 1;
+    pairs.set(key, entry);
+  }
+  const links = new Map<string, number>();
+  for (const { other, count } of pairs.values()) links.set(other, (links.get(other) ?? 0) + count);
+  const nodes = [...links.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "fr"))
+    .map(([other, count]) => ({
+      id: `${NEIGHBOR_PREFIX}${other}`,
+      name: other,
+      width: NEIGHBOR_WIDTH,
+      height: NEIGHBOR_HEIGHT,
+      neighbor: { zone: other, tables: sizes.get(other) ?? 0, links: count },
+    }));
+  const edges = [...pairs.values()].map(({ table, other, count }) => ({
+    id: `${table}>${NEIGHBOR_PREFIX}${other}`,
+    from: table,
+    to: `${NEIGHBOR_PREFIX}${other}`,
+    dashed: true,
+    ...(count > 1
+      ? { label: plural(count, "relation", "relations"), labelFont: "sans" as const }
+      : {}),
+  }));
+  return { nodes, relations: edges };
+}

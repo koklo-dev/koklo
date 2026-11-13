@@ -80,8 +80,8 @@ describe("Onglet Diagramme : vue par zones", () => {
     expect(
       within(crumbs).getByText("· 10 tables · 2 liens vers d'autres zones"),
     ).toBeInTheDocument();
-    // La relation interne à la zone est tracée ; celles vers la Zone 3 ne le sont pas.
-    expect(document.querySelectorAll("[data-slot='diagram-viewer'] svg line")).toHaveLength(1);
+    // La relation interne à la zone, puis un trait par table reliée vers la carte de la Zone 3 (B480).
+    expect(document.querySelectorAll("[data-slot='diagram-viewer'] svg line")).toHaveLength(3);
     await userEvent.click(
       within(crumbs).getByRole("button", { name: "Toutes les zones · 30 tables" }),
     );
@@ -118,5 +118,36 @@ describe("Onglet Diagramme : vue par zones", () => {
     await zones();
     await userEvent.keyboard("/");
     expect(screen.getByRole("combobox", { name: "Aller à une table" })).toHaveFocus();
+  });
+
+  it("zone voisine (B480) : une carte par zone reliée, un clic y passe", async () => {
+    renderData({ search: "tab=diagram&zone=Zone%202" });
+    const region = await screen.findByRole("region", {
+      name: "Diagramme entité-relation, zone Zone 2",
+    });
+    const neighbor = within(region).getByRole("button", {
+      name: "Zone Zone 3 10 tables · 2 relations · ouvrir",
+    });
+    expect(within(region).getAllByRole("button", { name: /^Zone / })).toHaveLength(1);
+    await userEvent.click(neighbor);
+    expect(
+      await screen.findByRole("region", { name: "Diagramme entité-relation, zone Zone 3" }),
+    ).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("zone")).toBe("Zone 3");
+  });
+
+  it("plein écran (B479) : bouton bascule, calque sur toute la fenêtre, Échap le referme", async () => {
+    renderData({ search: "tab=diagram" });
+    await zones();
+    const toggle = screen.getByRole("button", { name: "Plein écran" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Plein écran" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(document.querySelector("[data-fullscreen]")).toHaveClass("fixed", "inset-0");
+    await userEvent.keyboard("{Escape}");
+    expect(document.querySelector("[data-fullscreen]")).toBeNull();
   });
 });

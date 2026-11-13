@@ -8,6 +8,8 @@ export interface DiagramZoomBarProps {
   onZoomOut: () => void;
   onReset: () => void;
   onFit: () => void;
+  /** Plein écran (B479) : présent, la barre gagne le bouton bascule « Plein écran » (`aria-pressed`). */
+  fullscreen?: { active: boolean; onToggle: () => void } | undefined;
 }
 
 const BUTTON =
@@ -17,20 +19,39 @@ function ZoomButton({
   icon,
   label,
   onClick,
+  pressed,
 }: {
   icon: IconName;
   label: string;
   onClick: () => void;
+  pressed?: boolean | undefined;
 }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={BUTTON}>
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      title={label}
+      onClick={onClick}
+      className={BUTTON}
+    >
       <Icon name={icon} size={18} />
     </button>
   );
 }
 
-/** Barre de zoom flottante du lecteur (maquette 11 l.199-205) : « − », pourcentage, « + », filet, « Ajuster ». */
-export function DiagramZoomBar({ zoom, onZoomIn, onZoomOut, onReset, onFit }: DiagramZoomBarProps) {
+/**
+ * Barre de zoom flottante du lecteur (maquette 11 l.199-205) : « − », pourcentage, « + », filet, « Ajuster », et
+ * « Plein écran » quand le lecteur le propose (B479).
+ */
+export function DiagramZoomBar({
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onReset,
+  onFit,
+  fullscreen,
+}: DiagramZoomBarProps) {
   return (
     <div
       role="toolbar"
@@ -51,6 +72,14 @@ export function DiagramZoomBar({ zoom, onZoomIn, onZoomOut, onReset, onFit }: Di
       <ZoomButton icon="add" label="Zoomer" onClick={onZoomIn} />
       <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-border" />
       <ZoomButton icon="fit_screen" label="Ajuster à l'écran" onClick={onFit} />
+      {fullscreen ? (
+        <ZoomButton
+          icon={fullscreen.active ? "fullscreen_exit" : "fullscreen"}
+          label="Plein écran"
+          pressed={fullscreen.active}
+          onClick={fullscreen.onToggle}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   crossLinkCount,
   NO_ZONE,
+  neighborsOf,
   usesZoneView,
   zoneRelationsOf,
   zonesOf,
@@ -52,5 +53,20 @@ describe("zones du diagramme", () => {
     const relations = [rel("T-a", "T-b"), rel("T-c", "T-a"), rel("T-b", "T-c")];
     expect(crossLinkCount("Paiement", relations, CARDS)).toBe(2);
     expect(crossLinkCount(NO_ZONE, relations, CARDS)).toBe(0);
+  });
+
+  it("neighborsOf (B480) : une carte par zone reliée, un trait par paire table → zone", () => {
+    const relations = [rel("T-a", "T-b"), rel("T-c", "T-a"), rel("T-a", "T-d"), rel("T-b", "T-c")];
+    const { nodes, relations: edges } = neighborsOf("Clients", relations, CARDS);
+    expect(nodes.map((node) => node.id)).toEqual(["zone:Paiement", `zone:${NO_ZONE}`]);
+    expect(nodes[0]?.neighbor).toEqual({ zone: "Paiement", tables: 2, links: 2 });
+    expect(edges).toHaveLength(2);
+    expect(edges[0]).toMatchObject({
+      from: "T-a",
+      to: "zone:Paiement",
+      label: "2 relations",
+      dashed: true,
+    });
+    expect(edges[1]?.label).toBeUndefined();
   });
 });

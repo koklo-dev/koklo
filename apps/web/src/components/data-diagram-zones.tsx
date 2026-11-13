@@ -2,7 +2,12 @@
 
 import { Kbd, SearchField, ZoneNode as ZoneCard } from "@koklo/ui";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
-import { linksLabel, tablesLabel, type ZoneNode } from "../lib/data-diagram-zones.ts";
+import {
+  linksLabel,
+  type NeighborNode,
+  tablesLabel,
+  type ZoneNode,
+} from "../lib/data-diagram-zones.ts";
 import type { DiagramCard } from "../lib/data-mermaid.ts";
 
 /** Aperçu de la carte de zone : 7 noms puis « +N » (maquette 11 l.484). */
@@ -28,6 +33,24 @@ export function renderZone(node: ZoneNode, context: { onSelect: () => void }, re
       onOpen={context.onSelect}
       style={{ height: node.height }}
       className="w-full overflow-hidden"
+    />
+  );
+}
+
+/** Carte d'une zone voisine dans une zone ouverte (B480) : nom, tables, relations ; un clic passe à cette zone. */
+export function renderNeighbor(node: NeighborNode, context: { onSelect: () => void }) {
+  const { zone, tables, links } = node.neighbor;
+  return (
+    <ZoneCard
+      name={zone}
+      icon="folder_open"
+      count={tables}
+      countLabel={tables > 1 ? "tables" : "table"}
+      detail={`${links > 1 ? `${links} relations` : "1 relation"} · ouvrir`}
+      arrow
+      onOpen={context.onSelect}
+      style={{ height: node.height }}
+      className="w-full overflow-hidden bg-surface"
     />
   );
 }

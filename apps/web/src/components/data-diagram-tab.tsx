@@ -1,9 +1,13 @@
 "use client";
 
-import { DiagramViewer, EmptyState, Skeleton } from "@koklo/ui";
+import { cn, DiagramViewer, EmptyState, Skeleton } from "@koklo/ui";
 import { useMemo } from "react";
 import {
   crossLinkCount,
+  isNeighborId,
+  type NeighborNode,
+  neighborsOf,
+  neighborZoneOf,
   usesZoneView,
   type ZoneNode,
   zoneNodeOf,
@@ -14,6 +18,7 @@ import {
 import { canWriteData } from "../lib/roles.ts";
 import { type TableNode, useDataDiagram } from "../lib/use-data-diagram.ts";
 import type { DataPageModel } from "../lib/use-data-page.ts";
+import { useDiagramFullscreen } from "../lib/use-diagram-fullscreen.ts";
 import { DiagramFiche } from "./data-diagram-fiche.tsx";
 import {
   FicheFrame,
@@ -23,7 +28,7 @@ import {
   useDiagramZoom,
   VIEWER_HEIGHT,
 } from "./data-diagram-parts.tsx";
-import { renderZone, ZoneBar, zoneHint } from "./data-diagram-zones.tsx";
+import { renderNeighbor, renderZone, ZoneBar, zoneHint } from "./data-diagram-zones.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 
 const HINT = "Cliquez une table pour voir sa fiche.";
@@ -87,6 +92,13 @@ function useZoneView(page: DataPageModel, diagram: Diagram) {
     nodes,
     count: nodes.length,
     crossLinks: open === null ? 0 : crossLinkCount(open, diagram.relations, diagram.cards),
+    neighbors: useMemo(
+      () =>
+        open === null
+          ? { nodes: [], relations: [] }
+          : neighborsOf(open, diagram.relations, diagram.cards),
+      [open, diagram.relations, diagram.cards],
+    ),
     zoneNodes: useMemo(() => zones.map(zoneNodeOf), [zones]),
     zoneRelations: useMemo(
       () => zoneRelationsOf(diagram.relations, diagram.cards),
@@ -97,43 +109,78 @@ function useZoneView(page: DataPageModel, diagram: Diagram) {
 
 type ZoneView = ReturnType<typeof useZoneView>;
 
-/** Lecteur des tables (toutes, ou celles de la zone ouverte) : sélection, glisser enregistré, mini-carte. */
+type Fullscreen = ReturnType<typeof useDiagramFullscreen>;
+type Shown = TableNode | NeighborNode;
+
+const renderShown = (node: Shown, context: Parameters<typeof renderTable>[1]) =>
+  "card" in node ? renderTable(node, context) : renderNeighbor(node, context);
+
+/** Plein écran : le lecteur prend la hauteur de la fenêtre, moins le fil et l'aide. */
+const FULL_HEIGHT = "h-[max(420px,calc(100dvh-112px))]";
+
+/**
+ * Lecteur des tables (toutes, ou celles de la zone ouverte et ses zones voisines, B480) : sélection, glisser
+ * enregistré (tables seulement), mini-carte, plein écran.
+ */
 function TablesViewer({
   page,
   diagram,
   view,
   zoom,
   selectedId,
+  fullscreen,
 }: {
   page: DataPageModel;
   diagram: Diagram;
   view: ZoneView;
   zoom: ReturnType<typeof useDiagramZoom>;
   selectedId: string | null;
+  fullscreen: Fullscreen;
 }) {
+  const nodes = useMemo<Shown[]>(
+    () => [...view.nodes, ...view.neighbors.nodes],
+    [view.nodes, view.neighbors],
+  );
+  const relations = useMemo(
+    () => [...diagram.relations, ...view.neighbors.relations],
+    [diagram.relations, view.neighbors],
+  );
+  const canMove = canWriteData(page.role);
   return (
-    <DiagramViewer<TableNode>
+    <DiagramViewer<Shown>
       key={view.open ?? "toutes"}
       label={
         view.open ? `Diagramme entité-relation, zone ${view.open}` : "Diagramme entité-relation"
       }
-      nodes={view.nodes}
-      relations={diagram.relations}
-      renderNode={renderTable}
+      nodes={nodes}
+      relations={relations}
+      renderNode={renderShown}
       selectedId={selectedId}
-      onSelect={page.url.select}
+      onSelect={(id) =>
+        isNeighborId(id) ? page.url.openZone(neighborZoneOf(id)) : page.url.select(id)
+      }
       positions={diagram.positions}
-      onMove={canWriteData(page.role) ? diagram.move : undefined}
+      // Une zone voisine se déplace à l'écran sans être enregistrée : `_layout.yaml` ne garde que des tables.
+      onMove={canMove ? (id, point) => isNeighborId(id) || diagram.move(id, point) : undefined}
       initialZoom={zoom.initialZoom}
       onZoomChange={zoom.onZoomChange}
       minimap
-      className={VIEWER_HEIGHT}
+      fullscreen={fullscreen}
+      className={fullscreen.active ? FULL_HEIGHT : VIEWER_HEIGHT}
     />
   );
 }
 
 /** Vue des zones : une carte par zone, reliées par le nombre de relations entre elles ; un clic ouvre la zone. */
-function ZonesViewer({ page, view }: { page: DataPageModel; view: ZoneView }) {
+function ZonesViewer({
+  page,
+  view,
+  fullscreen,
+}: {
+  page: DataPageModel;
+  view: ZoneView;
+  fullscreen: Fullscreen;
+}) {
   const reviewing = page.propose.reviewing;
   return (
     <DiagramViewer<ZoneNode>
@@ -144,30 +191,38 @@ function ZonesViewer({ page, view }: { page: DataPageModel; view: ZoneView }) {
       renderNode={(node, context) => renderZone(node, context, reviewing)}
       onSelect={(zone) => page.url.openZone(zone)}
       minimap
-      className={VIEWER_HEIGHT}
+      fullscreen={fullscreen}
+      className={fullscreen.active ? FULL_HEIGHT : VIEWER_HEIGHT}
     />
   );
+}
+
+/** Aide au-dessus du lecteur : vue des zones, zoom compact, relecture, ou consigne de sélection. */
+function hintOf(view: ZoneView, compact: boolean, reviewing: boolean, tables: number): string {
+  if (view.overview) return zoneHint(tables, view.zones.length);
+  if (compact) return HINT_COMPACT;
+  return reviewing ? HINT_REVIEW : HINT;
 }
 
 /** Lecteur, aide, légende et fiche : monté une fois le modèle lu (le zoom d'ouverture se décide ici, côté navigateur). */
 function DiagramReader({ page, diagram }: { page: DataPageModel; diagram: Diagram }) {
   const zoom = useDiagramZoom();
   const view = useZoneView(page, diagram);
+  const fullscreen = useDiagramFullscreen();
   // La sélection vit dans l'adresse (`?sel=`, sans entrée d'historique) : elle survit à un remontage du lecteur.
   const selectedId =
     !view.overview && view.nodes.some((node) => node.id === page.url.sel)
       ? (page.url.sel ?? null)
       : null;
-  const reviewing = page.propose.reviewing;
-  const hint = view.overview
-    ? zoneHint(diagram.cards.length, view.zones.length)
-    : zoom.compact
-      ? HINT_COMPACT
-      : reviewing
-        ? HINT_REVIEW
-        : HINT;
+  const hint = hintOf(view, zoom.compact, page.propose.reviewing, diagram.cards.length);
   return (
-    <div className="flex flex-wrap gap-4 xl:flex-nowrap">
+    <div
+      data-fullscreen={fullscreen.active || undefined}
+      className={cn(
+        "flex flex-wrap gap-4 xl:flex-nowrap",
+        fullscreen.active && "fixed inset-0 z-50 overflow-auto bg-background p-4",
+      )}
+    >
       <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-2.5">
         {view.zoned ? (
           <ZoneBar
@@ -185,7 +240,7 @@ function DiagramReader({ page, diagram }: { page: DataPageModel; diagram: Diagra
           {view.overview ? null : <Legend />}
         </div>
         {view.overview ? (
-          <ZonesViewer page={page} view={view} />
+          <ZonesViewer page={page} view={view} fullscreen={fullscreen} />
         ) : (
           <TablesViewer
             page={page}
@@ -193,6 +248,7 @@ function DiagramReader({ page, diagram }: { page: DataPageModel; diagram: Diagra
             view={view}
             zoom={zoom}
             selectedId={selectedId}
+            fullscreen={fullscreen}
           />
         )}
       </div>

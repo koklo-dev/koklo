@@ -52,6 +52,8 @@ export interface DiagramViewerProps<T extends DiagramNode> {
   /** Dépôt d'un déplacement (glisser ou Alt + flèches). Absent : lecteur sans déplacement (designer). */
   onMove?: ((id: string, point: DiagramPoint) => void) | undefined;
   initialZoom?: number | "fit" | undefined;
+  /** Plein écran (B479) : état et bascule tenus par l'écran, qui choisit ce qui passe en plein écran (lecteur, fil, fiche). */
+  fullscreen?: { active: boolean; onToggle: () => void } | undefined;
   /** Mini-carte en bas à gauche (DESIGN.md §5.3, schéma 1.3), masquée sous 768 px. */
   minimap?: boolean | undefined;
   onZoomChange?: ((zoom: number) => void) | undefined;
@@ -284,6 +286,7 @@ export function DiagramViewer<T extends DiagramNode>(props: DiagramViewerProps<T
         onZoomOut={zoom.zoomOut}
         onReset={zoom.reset}
         onFit={zoom.fit}
+        fullscreen={props.fullscreen}
       />
     </div>
   );
