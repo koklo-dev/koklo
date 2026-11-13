@@ -136,6 +136,8 @@ const LATER_OBJECTS: readonly string[] = [
   "audit_log_organization_id_project_id_occurred_at_idx",
   // TK-97 : unicité (organization_id, id) d'invitations, cible de la clé composite d'invitation_projects.
   "invitations_organization_id_id_key",
+  // TK-109 : index de lecture des commentaires de table (ticket_comments.target_ref).
+  "ticket_comments_target_kind_target_id_target_ref_idx",
 ];
 
 const deliveriesOf = (db: TestDatabase) =>
