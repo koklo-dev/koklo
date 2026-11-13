@@ -38,8 +38,8 @@ const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id, 
 
 const NODE_SEP = 40;
 const RANK_SEP = 80;
-/** Au-delà de 6 tables, un rang dagre se replie en colonnes voisines (B477) : un « hub » ne trace plus une ligne. */
-const MAX_PER_COLUMN = 6;
+/** Au-delà de 4 tables, un rang dagre se replie en colonnes voisines (B477) : un « hub » ne trace plus une ligne. */
+const MAX_PER_COLUMN = 4;
 /** Écart entre deux blocs (groupes de tables reliées, tables isolées). */
 const BLOCK_GAP = 80;
 /** Rapport largeur / hauteur visé pour l'ensemble : celui d'un cadre d'écran (B477). */
@@ -103,7 +103,7 @@ function stack(column: readonly LayoutNode[]) {
 }
 
 /**
- * Rang dagre trop long (plus de 6 tables) : replié en colonnes voisines, les rangs suivants décalés d'autant. Dès qu'un
+ * Rang dagre trop long (plus de 4 tables) : replié en colonnes voisines, les rangs suivants décalés d'autant. Dès qu'un
  * rang se replie, toutes les colonnes du groupe sont empilées et centrées sur une même ligne (les hauteurs dagre
  * d'origine n'ont plus de sens). Sinon, le placement dagre est gardé tel quel.
  */

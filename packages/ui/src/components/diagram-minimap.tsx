@@ -4,6 +4,8 @@ import type { HTMLAttributes, KeyboardEvent, MouseEvent } from "react";
 import { cn } from "../lib/cn.ts";
 
 const WIDTH = 150;
+/** Hauteur au plus (maquette 11 l.197 : 150 × 154) : un plan haut se réduit, il ne couvre pas le lecteur. */
+const MAX_HEIGHT = 154;
 
 export interface MinimapRect {
   x: number;
@@ -76,7 +78,7 @@ export function DiagramMinimap({
   className,
   ...props
 }: DiagramMinimapProps) {
-  const scale = WIDTH / world.width;
+  const scale = Math.min(WIDTH / world.width, MAX_HEIGHT / world.height);
   const onClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (event.detail === 0) return; // activation au clavier : les flèches font le travail
     onNavigate(pointAt(event, world));
@@ -102,7 +104,7 @@ export function DiagramMinimap({
       <button
         type="button"
         aria-label="Mini-carte du diagramme : cliquer ou utiliser les flèches pour déplacer la vue"
-        style={{ width: WIDTH, height: Math.round(world.height * scale) }}
+        style={{ width: Math.round(world.width * scale), height: Math.round(world.height * scale) }}
         className="relative block overflow-hidden rounded-md border bg-background shadow-floating focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={onClick}
         onKeyDown={onKeyDown}
