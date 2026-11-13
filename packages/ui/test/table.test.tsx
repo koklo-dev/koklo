@@ -5,6 +5,7 @@ import {
   Table,
   TableBody,
   TableCaption,
+  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -64,6 +65,26 @@ describe("Table", () => {
     expect(table.querySelector("thead")?.className).toContain("sticky");
     expect(table.querySelector("thead")?.className).toContain("top-0");
     expect(table.className).toContain("text-caption");
+  });
+
+  it("compact : cadre de rayon 10, texte 12, cellules 6 × 10", () => {
+    render(
+      <Table framed compact>
+        <TableBody>
+          <TableRow>
+            <TableHead scope="row">Champ</TableHead>
+            <TableCell>id</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const table = screen.getByRole("table");
+    expect((table.parentElement as HTMLElement).className).toContain("rounded-[10px]");
+    expect((table.parentElement as HTMLElement).className).not.toContain("rounded-xl");
+    expect(table.className).toContain("text-caption");
+    expect(screen.getByRole("cell", { name: "id" }).className).toContain("py-1.5");
+    expect(screen.getByRole("cell", { name: "id" }).className).toContain("px-2.5");
+    expect(screen.getByRole("rowheader", { name: "Champ" }).className).toContain("py-1.5");
   });
 
   it("légende sr-only et th scope=row", () => {
