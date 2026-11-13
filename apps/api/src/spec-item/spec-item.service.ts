@@ -1,14 +1,18 @@
 import type { SpecItem } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
+import { tableDetail } from "../spec-data/data-values.ts";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { flowDetail, roleDetail, ruleDetail } from "../spec-read/entity-values.ts";
 import { SpecReadService } from "../spec-read/spec-read.service.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 
+/** Livrable que modifier l'élément invaliderait : Données pour une table, Fonctionnel pour le reste. */
+const deliverableOf = (type: SpecItem["type"]) => (type === "table" ? "data" : "functional");
+
 /**
  * Lecture d'un élément pour le panneau d'édition (TK-101, B329 b, c) : les valeurs de la fiche lues comme `spec.getFeature`
- * (git au commit indexé), l'état « validé » du livrable Fonctionnel (celui qu'une modification invaliderait) et les éléments
+ * (git au commit indexé), l'état « validé » du livrable concerné (celui qu'une modification invaliderait : Données pour une table) et les éléments
  * de l'index qui citent celui-ci. Lecture seule, aucune entrée d'audit.
  */
 @Injectable()
@@ -29,12 +33,12 @@ export class SpecItemService {
       this.specs.referencedBy(scope, id),
       this.deliverables.list(scope, role),
     ]);
-    const functional = listed.deliverables.find((entry) => entry.key === "functional");
+    const deliverable = listed.deliverables.find((entry) => entry.key === deliverableOf(type));
     return {
       type,
       id,
       values,
-      validated: functional?.status === "validated",
+      validated: deliverable?.status === "validated",
       referencedBy,
     } as SpecItem;
   }
@@ -50,6 +54,7 @@ export class SpecItemService {
     }
     const entity = await this.specs.entity(scope, type, id);
     const where = { filePath: entity.path, commitSha: entity.commitSha };
+    if (type === "table") return tableDetail(id, entity.data, where);
     return type === "rule"
       ? ruleDetail(id, entity.data, where)
       : flowDetail(id, entity.data, where);

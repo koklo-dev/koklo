@@ -14,6 +14,9 @@ const KIND_LABELS: Record<AgentProposalKind, string> = {
   rule: "Règles",
   role: "Rôles",
   flow: "Parcours",
+  table: "Tables",
+  relations: "Relations",
+  fixtures: "Jeux d'exemple",
 };
 
 /** Nombre de propositions par (type, zone, statut), et position de la première de la zone. */

@@ -9,6 +9,7 @@ export type EntityKind =
   | "flow"
   | "relations"
   | "table"
+  | "fixture"
   | "endpoint"
   | "screen"
   | "test";
@@ -30,6 +31,7 @@ const ZONE_OF: Readonly<Record<EntityKind, EntityRow["zone"]>> = {
   roles: "functional",
   flow: "functional",
   table: "data",
+  fixture: "data",
   relations: "data",
   endpoint: null,
   screen: null,
@@ -93,6 +95,12 @@ const withTitle = (rule: BusinessRule): BusinessRule => ({
   titre: rule.titre ?? titleOfStatement(rule.enonce),
 });
 
+/** Table indexée avec un `titre` (B388) : son nom au format v2, son identifiant au format v1 (qui n'a pas de nom). */
+const withName = <T extends { id: string }>(table: T): T & { titre: string } => ({
+  ...table,
+  titre: "nom" in table && typeof table.nom === "string" ? table.nom : table.id,
+});
+
 type Candidate = { kind: EntityKind; specId: string; path: string; value: unknown };
 
 function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[] {
@@ -127,7 +135,12 @@ function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[]
         value: flow.data,
       }),
     ),
-    ...of("table", spec.tables, idOf),
+    ...of(
+      "table",
+      spec.tables.map(({ path, value }) => ({ path, value: withName(value) })),
+      idOf,
+    ),
+    ...of("fixture", spec.fixtures, idOf),
     ...of("relations", spec.relations, () => "relations"),
     ...of("endpoint", spec.endpoints, idOf),
     ...of("screen", spec.screens, idOf),

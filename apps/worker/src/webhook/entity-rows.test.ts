@@ -1,4 +1,11 @@
-import { emitFlowYaml, emitRolesYaml, emitRuleMarkdown, parseSpecFiles } from "@koklo/schema";
+import {
+  emitFixtureYaml,
+  emitFlowYaml,
+  emitRolesYaml,
+  emitRuleMarkdown,
+  emitTableYaml,
+  parseSpecFiles,
+} from "@koklo/schema";
 import { describe, expect, it } from "vitest";
 import { entityRowsOf } from "./entity-rows.ts";
 import { ruleCounterOf } from "./index-rows.ts";
@@ -101,5 +108,72 @@ describe("ruleCounterOf", () => {
     const { spec } = parseSpecFiles([rule(3), rule(12)]);
     expect(ruleCounterOf(spec)).toEqual({ raiseTo: 12, skipped: 0 });
     expect(ruleCounterOf(parseSpecFiles([]).spec)).toEqual({ skipped: 0 });
+  });
+});
+
+/** TK-107 lot A (B383, B388) : lignes `table` (titre = nom) et `fixture` ; fichier invalide ignoré sans échec d'index. */
+describe("entityRowsOf : tables v2 et jeux d'exemple", () => {
+  const manifest = {
+    path: "koklo.project.yaml",
+    content: "projet: demo\norganisation: acme\nspec_version: 2\n",
+  };
+  const table = {
+    path: "data/tables/client.yaml",
+    content: emitTableYaml({
+      id: "T-client",
+      nom: "Client",
+      zone: "Clients",
+      champs: [{ nom: "id", type: "uuid", cle: "primaire" }],
+    }),
+  };
+  const fixture = {
+    path: "data/fixtures/FX-clients.yaml",
+    content: emitFixtureYaml({
+      id: "FX-clients",
+      titre: "Clients",
+      table: "T-client",
+      locale: "fr-FR",
+      lignes: [{ id: "c-1" }],
+    }),
+  };
+
+  it("une table v2 porte `titre` = son nom, zone data ; le contenu complet reste dans data", () => {
+    const [row] = of(rowsFor([manifest, table]), "table");
+    expect(row).toMatchObject({
+      specId: "T-client",
+      zone: "data",
+      path: "data/tables/client.yaml",
+      data: {
+        id: "T-client",
+        titre: "Client",
+        nom: "Client",
+        zone: "Clients",
+        champs: [{ nom: "id" }],
+      },
+    });
+  });
+
+  it("un jeu d'exemple est une ligne fixture (zone data, titre du jeu), rang croissant", () => {
+    const rows = of(rowsFor([manifest, table, fixture]), "fixture");
+    expect(rows).toMatchObject([
+      {
+        specId: "FX-clients",
+        zone: "data",
+        path: "data/fixtures/FX-clients.yaml",
+        data: { titre: "Clients", table: "T-client" },
+        sort: 0,
+      },
+    ]);
+    expect(rows[0]?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("un fichier de table ou de jeu invalide est ignoré, sans échec d'index", () => {
+    const broken = [
+      { path: "data/tables/casse.yaml", content: "id: T-casse\nnom: [\n" },
+      { path: "data/fixtures/FX-casse.yaml", content: "id: FX-casse\nlignes: 3\n" },
+    ];
+    const rows = rowsFor([manifest, table, fixture, ...broken]);
+    expect(of(rows, "table").map((r) => r.specId)).toEqual(["T-client"]);
+    expect(of(rows, "fixture").map((r) => r.specId)).toEqual(["FX-clients"]);
   });
 });

@@ -23,11 +23,17 @@ export const OPERATION_KINDS = [
   "flow.create",
   "flow.update",
   "flow.delete",
+  "table.create",
+  "table.update",
+  "table.delete",
+  "fixture.create",
 ] as const;
 const TARGET_ID: Readonly<Record<string, RegExp>> = {
   rule: /^R-\d{3,}$/,
   role: /^RL-[a-z0-9][a-z0-9-]*$/,
   flow: /^P-[a-z0-9][a-z0-9-]*$/,
+  table: /^T-[a-z0-9][a-z0-9-]*$/,
+  fixture: /^FX-[a-z0-9][a-z0-9-]*$/,
 };
 /** Opérations de publication de l'espace Idée (TK-89) : un lot n'en mêle jamais avec des features. */
 export const IDEA_OPERATION_KINDS = [

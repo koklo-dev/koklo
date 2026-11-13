@@ -33,8 +33,16 @@ const KINDS_OF_MODE: Readonly<Record<string, readonly AgentProposalKind[]>> = {
   all: ["feature", "criteria", "rule", "role", "flow"],
 };
 
-export const kindsOfMode = (mode: string): readonly AgentProposalKind[] =>
-  KINDS_OF_MODE[mode] ?? KINDS_OF_MODE.complete ?? [];
+/** Données (TK-107, B387) : `complete` et `all` demandent les mêmes trois types, les tables d'abord. */
+const DATA_KINDS: readonly AgentProposalKind[] = ["table", "relations", "fixtures"];
+/** Longueur maximale d'une zone des Données : celle d'une table (`table.create`). */
+const DATA_ZONE_MAX = 80;
+
+export const kindsOfMode = (
+  mode: string,
+  deliverable = "functional",
+): readonly AgentProposalKind[] =>
+  deliverable === "data" ? DATA_KINDS : (KINDS_OF_MODE[mode] ?? KINDS_OF_MODE.complete ?? []);
 
 const ZONES_SCHEMA = {
   type: "object",
@@ -95,6 +103,12 @@ async function ask<T>(
   return validateLlmOutput(response.output, call.parse).value;
 }
 
+/** Références que le modèle peut viser : fonctionnalités et règles du cahier, tables du modèle actuel. */
+const dataRefs = (sources: LaunchSources) => ({
+  specIds: new Set([...sources.features, ...sources.rules].map((item) => item.specId)),
+  tables: new Set((sources.tables ?? []).map((table) => table.specId)),
+});
+
 /**
  * Déroulé d'un lancement : étape 1, les zones (douze au plus) ; étape 2, une zone par appel, chaque zone validée
  * publiée aussitôt. Retourne `false` si le lancement a été arrêté de l'extérieur (annulé, repris). Une zone dont
@@ -106,13 +120,14 @@ export async function generate(
   sources: LaunchSources,
   euOnly: boolean,
 ): Promise<boolean> {
-  const kinds = kindsOfMode(launch.mode);
+  const kinds = kindsOfMode(launch.mode, launch.deliverable);
+  const isData = launch.deliverable === "data";
   const started = deps.now().getTime();
   const zones = await ask(deps, launch, euOnly, {
     purpose: "proposal-zones",
     prompt: (nonce) => zonesPrompt(nonce, sources, launch.instruction),
     schema: ZONES_SCHEMA,
-    parse: zonesOf,
+    parse: (raw) => (isData ? zonesOf(raw, DATA_ZONE_MAX) : zonesOf(raw)),
   });
   const context = {
     kinds,
@@ -121,7 +136,10 @@ export async function generate(
       rule: new Set(sources.rules.map((rule) => titleKey(rule.title))),
       role: new Set(sources.roles.map((role) => titleKey(role.title))),
       flow: new Set(sources.flows.map((flow) => titleKey(flow.title))),
+      table: new Set((sources.tables ?? []).map((table) => titleKey(table.title))),
+      fixtures: new Set((sources.fixtures ?? []).map((fixture) => titleKey(fixture.title))),
     },
+    ...(isData ? { refs: dataRefs(sources) } : {}),
     missingCriteria: new Map(
       sources.features
         .filter((feature) => feature.criteria.length === 0)

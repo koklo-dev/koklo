@@ -118,6 +118,7 @@ export async function insertProposal(
   over: {
     launchId?: string;
     kind?: string;
+    deliverable?: string;
     zone?: string;
     position?: number;
     status?: string;
@@ -129,14 +130,20 @@ export async function insertProposal(
   if (over.launchId === undefined) {
     await database.query(
       `INSERT INTO agent_launches (id, organization_id, project_id, deliverable, mode, status, requested_by, sources, updated_at)
-       VALUES ($1, $2, $3, 'functional', 'complete', 'done', $4, '["idea.frozen"]'::jsonb, now())`,
-      [launchId, scope.organizationId, scope.projectId, scope.userId ?? randomUUID()],
+       VALUES ($1, $2, $3, $5, 'complete', 'done', $4, '["idea.frozen"]'::jsonb, now())`,
+      [
+        launchId,
+        scope.organizationId,
+        scope.projectId,
+        scope.userId ?? randomUUID(),
+        over.deliverable ?? "functional",
+      ],
     );
   }
   const id = randomUUID();
   await database.query(
     `INSERT INTO agent_proposals (id, organization_id, project_id, launch_id, deliverable, kind, zone, position, title, rationale, payload, status, updated_at)
-     VALUES ($1, $2, $3, $4, 'functional', $5, $6, $7, $8, 'Absent du cahier', $9::jsonb, $10, now())`,
+     VALUES ($1, $2, $3, $4, $11, $5, $6, $7, $8, 'Absent du cahier', $9::jsonb, $10, now())`,
     [
       id,
       scope.organizationId,
@@ -148,6 +155,7 @@ export async function insertProposal(
       over.title ?? "Annuler une réservation",
       JSON.stringify(over.payload ?? FEATURE_CONTENT),
       over.status ?? "pending",
+      over.deliverable ?? "functional",
     ],
   );
   return { id, launchId };

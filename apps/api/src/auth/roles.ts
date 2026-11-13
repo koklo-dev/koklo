@@ -100,6 +100,12 @@ export const SPEC_MIGRATION_ROLES = ["owner"] as const;
 export const PROPOSAL_ROLES = SPEC_BATCH_ROLES;
 
 /**
+ * Lancer l'agent sur les Données (`ai.proposeDeliverable` livrable `data`, TK-107) : ceux qui peuvent écrire `table.*` et
+ * `fixture.create`. Le designer lit le modèle mais ne l'écrit pas : 403 à l'amont plutôt qu'un lot refusé à l'aval.
+ */
+export const DATA_PROPOSAL_ROLES = ["owner", "admin", "dev"] as const;
+
+/**
  * Rôles qui voient toute l'organisation (CDC §14, TK-55a) : seul le `client` est cloisonné par
  * projet. Liste FERMÉE : un rôle absent ou inconnu n'en fait pas partie et est cloisonné comme un
  * client (fail-closed, `AuthSession.role` est optionnel).

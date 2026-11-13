@@ -1,6 +1,9 @@
 import {
   type CurrentDomainTitles,
   type CurrentFeature,
+  type CurrentTable,
+  type CurrentTitle,
+  currentDataModel,
   currentDomainTitles,
   currentFeatures,
   type FrozenPage,
@@ -33,6 +36,9 @@ export interface LaunchSources {
   readonly rules: CurrentDomainTitles["rules"];
   readonly roles: CurrentDomainTitles["roles"];
   readonly flows: CurrentDomainTitles["flows"];
+  /** Livrable Données (TK-107) : le modèle actuel ; absent pour le Fonctionnel. Sa présence choisit les prompts des Données. */
+  readonly tables?: readonly CurrentTable[];
+  readonly fixtures?: readonly CurrentTitle[];
 }
 
 /** Diff `idea-vN-1` vers `idea-vN` du mode `update` ; `null` sans version précédente, `undefined` hors mode `update`. */
@@ -48,11 +54,28 @@ async function updateDiff(
   return { ...diff, from: previous.tag };
 }
 
+/**
+ * Sources des Données (B387) : le Fonctionnel indexé (fonctionnalités, règles, rôles, parcours) et le modèle actuel ; ni
+ * dossier d'idée, ni synthèse, ni version figée (`tag` est celui du modèle).
+ */
+function readDataSources(client: TenantClient, launch: LaunchContext): Promise<LaunchSources> {
+  return withOrganization(launch.organizationId, async () => ({
+    tag: "model",
+    pages: [],
+    synthesis: null,
+    risks: null,
+    features: await currentFeatures(client, launch.projectId),
+    ...(await currentDomainTitles(client, launch.projectId)),
+    ...(await currentDataModel(client, launch.projectId)),
+  }));
+}
+
 /** Lit les sources du lancement ; `null` sans version figée (le lancement échoue, rien n'est envoyé). */
 export function readSources(
   client: TenantClient,
   launch: LaunchContext,
 ): Promise<LaunchSources | null> {
+  if (launch.deliverable === "data") return readDataSources(client, launch);
   return withOrganization(launch.organizationId, async () => {
     const version = await frozenVersion(client, launch.projectId, launch.baseVersion);
     if (!version) return null;

@@ -19,6 +19,7 @@ import type { ProjectScope } from "../tracker/scope.ts";
 import { buildMatrix } from "./entity-values.ts";
 import { detailOf } from "./feature-detail.ts";
 import { compareFeatures } from "./feature-page.ts";
+import { indexFailed } from "./index-failed.ts";
 import {
   type EntityItem,
   type FeatureFilter,
@@ -30,11 +31,6 @@ import {
   SPEC_READ_REPOSITORY,
   type SpecReadRepository,
 } from "./spec-read.repository.ts";
-
-const indexFailed = (failure: { errorCode: string; commitSha: string }) =>
-  new ORPCError("SPEC_INDEX_FAILED", {
-    data: { errorCode: failure.errorCode, commitSha: failure.commitSha },
-  });
 
 /** Page rendue quand la révision n'est pas indexée : une liste vide, pas une erreur. */
 const EMPTY_PAGE: FeaturePage = {
@@ -115,8 +111,8 @@ export class SpecReadService {
     return buildMatrix(file?.data, { group, q });
   }
 
-  /** Règle, parcours ou fichier de rôles de la tête, lus dans l'index d'entités (aucun réseau) ; `NOT_FOUND` si absent. */
-  async entity(scope: ProjectScope, kind: "rule" | "flow" | "roles", specId: string) {
+  /** Règle, parcours, table ou fichier de rôles de la tête, lus dans l'index d'entités (aucun réseau) ; `NOT_FOUND` si absent. */
+  async entity(scope: ProjectScope, kind: "rule" | "flow" | "roles" | "table", specId: string) {
     const item: EntityItem | null = await this.repository.entityItem(scope, kind, specId);
     if (item?.kind === "failed") throw indexFailed(item);
     return orNotFound(item);

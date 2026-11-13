@@ -4,7 +4,7 @@ import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
 import { PROPOSAL_ROLES } from "../auth/roles.ts";
-import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
+import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { requestIdOf } from "../request-context.ts";
 import { inProject } from "../tracker/scope.ts";
@@ -34,7 +34,8 @@ export class ProposalController {
         request,
         errors,
         input.projectId,
-        (scope) => this.launches.propose(scope, input, requestIdOf(request)),
+        (scope) =>
+          this.launches.propose(scope, input, requestIdOf(request), requireSession(request).role),
         this.access,
       ),
     );

@@ -57,12 +57,9 @@ const recordOf = (row: Row): BatchRecord => ({
   })),
 });
 
-/** Les types de proposition qui ont une opération de spec : fonctionnalités et critères, règles, rôles et parcours (TK-103). */
-const APPLICABLE_KINDS = ["feature", "criteria", "rule", "role", "flow"];
-
 /**
  * Preuve serveur que les opérations viennent de propositions acceptées (TK-99a) : chacune est du projet, `accepted`,
- * d'un type enregistrable et pas déjà appliquée ; elle reçoit le lot dans la transaction de l'enfilage. Une course
+ * pas déjà appliquée (tout type de proposition a une opération de spec : TK-103, TK-107) ; elle reçoit le lot dans la transaction de l'enfilage. Une course
  * entre deux lots sur la même proposition est tranchée par la condition de l'écriture (tout ou rien).
  */
 async function applyProposals(
@@ -76,7 +73,6 @@ async function applyProposals(
     id: { in: [...ids] },
     projectId: scope.projectId,
     status: "accepted",
-    kind: { in: APPLICABLE_KINDS },
     appliedBatchId: null,
   };
   const applied = await tx.agentProposal.updateMany({ where, data: { appliedBatchId: batchId } });

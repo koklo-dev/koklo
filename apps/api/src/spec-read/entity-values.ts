@@ -13,11 +13,11 @@ import type {
  */
 type Json = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is Json =>
+export const isRecord = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
-const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-const texts = (value: unknown): string[] =>
+export const text = (value: unknown): string => (typeof value === "string" ? value : "");
+export const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+export const texts = (value: unknown): string[] =>
   list(value).filter((item): item is string => typeof item === "string" && item !== "");
 const SCREEN = /^S-[a-z0-9][a-z0-9-]*$/;
 const FEATURE = /^F-\d{3,}$/;

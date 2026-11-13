@@ -78,6 +78,26 @@ describe("TK-99a groupes de propositions", () => {
     ]);
   });
 
+  it("types des Données (TK-107) : libellés français, ordre table, relations, jeux ; clés de groupe valides", () => {
+    const groups = buildGroups(
+      [
+        count("fixtures", "A", "pending", 20, 2),
+        count("relations", "A", "pending", 1, 1),
+        count("table", "A", "pending", 20, 0),
+      ],
+      "type",
+    );
+    expect(groups.map((g) => [g.key, g.label, g.total])).toEqual([
+      ["table", "Tables", 20],
+      ["relations", "Relations", 1],
+      ["fixtures", "Jeux d'exemple", 20],
+    ]);
+    expect(groupFilterOf("fixtures:Réservations")).toEqual({
+      kind: "fixtures",
+      zone: "Réservations",
+    });
+  });
+
   it("clé et filtre de groupe : aller-retour, zone contenant « : », « all », clé inconnue", () => {
     expect(groupKeyOf("feature", "A:B", "type_zone")).toBe("feature:A:B");
     expect(groupFilterOf("feature:A:B")).toEqual({ kind: "feature", zone: "A:B" });

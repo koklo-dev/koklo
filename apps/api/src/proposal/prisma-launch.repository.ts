@@ -117,6 +117,20 @@ export class PrismaLaunchRepository implements LaunchRepository {
     }));
   }
 
+  hasFunctionalEntities(scope: ProjectScope): Promise<boolean> {
+    return this.transactions.run(scope, async (tx) => {
+      const found = await this.resolver.resolve(tx, scope, {});
+      if (!found || found.snapshot.status === "failed") return false;
+      const snapshotId = found.snapshot.id;
+      if ((await tx.specFeature.count({ where: { snapshotId } })) > 0) return true;
+      return (
+        (await tx.specEntity.count({
+          where: { snapshotId, kind: { in: ["rule", "roles", "flow"] } },
+        })) > 0
+      );
+    });
+  }
+
   forList(
     scope: ProjectScope,
     deliverable: string | undefined,

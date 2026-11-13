@@ -6,6 +6,7 @@ import {
   trusted,
   Untrusted,
 } from "@koklo/domain";
+import { dataBatchPrompt, dataZonesPrompt } from "./prompts-data.ts";
 import type { LaunchSources } from "./sources.ts";
 
 /**
@@ -34,6 +35,7 @@ export function zonesPrompt(
   sources: LaunchSources,
   instruction: string | null,
 ): FramedPrompt {
+  if (sources.tables !== undefined) return dataZonesPrompt(nonce, sources, instruction);
   return framePrompt({
     instructions: sources.diff === undefined ? ZONES_INSTRUCTIONS : UPDATE_ZONES_INSTRUCTIONS,
     nonce,
@@ -84,6 +86,7 @@ export function batchPrompt(
     kinds: readonly AgentProposalKind[];
   },
 ): FramedPrompt {
+  if (input.sources.tables !== undefined) return dataBatchPrompt(nonce, input);
   return framePrompt({
     instructions: batchInstructions(input.kinds, input.sources.diff !== undefined),
     nonce,
