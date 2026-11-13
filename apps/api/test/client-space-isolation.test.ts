@@ -30,8 +30,16 @@ const both = async (actor: { cookie: string }, projectId: string) => [
   await as(actor).feature(projectId, "F-001"),
 ];
 
+/** TK-109 (3.7.0) : les trois lectures du modèle de données obéissent au même cloisonnement. */
+const dataRoutes = async (actor: { cookie: string }, projectId: string) => [
+  await as(actor).dataModel(projectId),
+  await as(actor).dataFixtures(projectId),
+  await as(actor).dataFixtureRows(projectId, "FX-clients"),
+];
+
 const UNIFORM_404 = { status: 404, body: { code: "NOT_FOUND" } };
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("clientSpace : un client lié lit son projet et seulement lui", () => {
   it("c1 lit p1 (liste et détail), sans rien de p2", async () => {
     const [list, one] = await both(scene.c1, scene.p1.projectId);
@@ -49,6 +57,19 @@ describe("clientSpace : un client lié lit son projet et seulement lui", () => {
     for (const res of await both(scene.c1, projectId())) {
       expect(res?.status).toBe(404);
       expect(res?.body.code).toBe("NOT_FOUND");
+    }
+  });
+
+  it.each([
+    ["autre projet de la même organisation", () => scene.p2.projectId],
+    ["projet d'une autre organisation", () => scene.foreign.projectId],
+    ["projet inexistant", () => UNKNOWN_PROJECT],
+  ])("modèle de données : c1 sur un %s, 404 uniforme", async (_label, projectId) => {
+    for (const res of await dataRoutes(scene.c1, projectId())) {
+      expect(shapeOf(res as { status: number; body: unknown })).toMatchObject(UNIFORM_404);
+    }
+    for (const res of await dataRoutes(scene.c3, scene.p1.projectId)) {
+      expect(shapeOf(res as { status: number; body: unknown })).toMatchObject(UNIFORM_404);
     }
   });
 

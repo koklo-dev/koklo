@@ -14,6 +14,7 @@ const table: TableV2 = {
   id: "T-reservation",
   nom: "Réservation",
   description: "Un rendez-vous pris par un client.",
+  resume_client: ["Le nom du client", "La date du rendez-vous"],
   source: ["F-001", "R-004"],
   zone: "Rendez-vous",
   champs: [
@@ -46,9 +47,29 @@ describe("emitTableYaml", () => {
   it("idempotent et clés dans un ordre fixe", () => {
     const content = emitTableYaml(table);
     expect(emitTableYaml(table)).toBe(content);
-    const order = ["id:", "nom:", "description:", "source:", "zone:", "champs:", "relations:"];
+    const order = [
+      "id:",
+      "nom:",
+      "description:",
+      "resume_client:",
+      "source:",
+      "zone:",
+      "champs:",
+      "relations:",
+    ];
     const positions = order.map((key) => content.indexOf(`\n${key}`) + (key === "id:" ? 1 : 0));
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
+  it("resume_client : 12 phrases au plus, non vides, 200 caractères au plus", () => {
+    const refused = (resume_client: string[]) =>
+      expect(() => emitTableYaml({ ...table, resume_client })).toThrow(EmitTableError);
+    refused(Array.from({ length: 13 }, (_, i) => `Phrase ${i}`));
+    refused([""]);
+    refused(["x".repeat(201)]);
+    expect(emitTableYaml({ ...table, resume_client: ["x".repeat(200)] })).toContain(
+      "resume_client:",
+    );
   });
 
   it("table invalide : EmitTableError avec pointeur", () => {

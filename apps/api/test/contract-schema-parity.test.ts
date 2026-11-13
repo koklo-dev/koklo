@@ -270,3 +270,28 @@ describe("TK-108 : positions du diagramme (contrat 3.6.0, sans entité de base)"
     expect(accepts(save, wrap("T-Client"))).toBe(false);
   });
 });
+
+describe("TK-109 : résumé client des tables (contrat 3.7.0)", () => {
+  it("plafonds de clientSummary du contrat = ceux de resume_client (schema) : 12 phrases de 1 à 200 caractères", () => {
+    const source = read("packages/schema/src/entities/data-v2.ts");
+    expect(source).toContain("resume_client: z.array(z.string().min(1).max(200)).max(12)");
+    const update = inputOf("specBatch.submit");
+    const op = (clientSummary: string[]) => ({
+      projectId: "123e4567-e89b-42d3-a456-426614174000",
+      idempotencyKey: "k",
+      operations: [{ kind: "table.update", specId: "T-client", clientSummary }],
+    });
+    expect(accepts(update, op(Array.from({ length: 12 }, () => "x".repeat(200))))).toBe(true);
+    expect(accepts(update, op(Array.from({ length: 13 }, () => "x")))).toBe(false);
+    expect(accepts(update, op(["x".repeat(201)]))).toBe(false);
+    expect(accepts(update, op([""]))).toBe(false);
+  });
+
+  it("commentaire de table : valeur d'enum et colonne alignées sur la base", () => {
+    expect(prismaEnum("CommentTargetKind")).toContain("table");
+    expect(options(api.commentTargetKindSchema)).toContain("table");
+    expect(read("packages/db/prisma/schema.prisma")).toContain(
+      'targetRef      String?           @map("target_ref")',
+    );
+  });
+});

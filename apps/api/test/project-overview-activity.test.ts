@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { installAiBench } from "./helpers/ai-bench.ts";
+import { commentsFor } from "./helpers/comments.ts";
 import { insertActor } from "./helpers/organizations.ts";
 import { insertAudit, insertAuditBulk, keyed, overviewApi } from "./helpers/overview.ts";
-import { readScene, seedIndex } from "./helpers/spec-read.ts";
-import { createWorld, type World } from "./helpers/tickets.ts";
+import { entity, readScene, seedIndex } from "./helpers/spec-read.ts";
+import { createWorld, seedTicket, type World } from "./helpers/tickets.ts";
 
 /**
  * TK-92 lot A : l'activité de `project.overview` (aperçu de 5 entrées) et de `project.activity` (liste à
@@ -127,6 +128,27 @@ describe("aperçu de l'activité : projection lisible", () => {
     });
     const { items } = await overview(w);
     expect(items.map((item) => item.text)).toEqual([`${w.actors.owner.name} a créé le projet`]);
+  });
+
+  it("commentaire de table (B454) : l'équipe lit « a commenté la table T-… », jamais le client, jamais un commentaire de ticket", async () => {
+    const w = await world();
+    const scene = await readScene(bench(), { world: w });
+    await seedIndex(bench(), scene, [], {
+      entities: [entity("table", "T-clients", "a", { nom: "Clients" })],
+    });
+    const ticket = await seedTicket(bench().app, w.actors.dev, w.projectId);
+    await commentsFor(bench().app, w.actors.dev, w.projectId).create(ticket.id, "Un ticket");
+    const posted = await commentsFor(bench().app, w.actors.designer, w.projectId).createOnTable(
+      "T-clients",
+      "Une remarque",
+    );
+    expect(posted.status, JSON.stringify(posted.body)).toBe(200);
+
+    const team = await overview(w);
+    expect(team.items.map((item) => item.text)).toEqual([
+      expect.stringMatching(/a commenté la table T-clients$/),
+    ]);
+    expect((await overview(w, "client")).items).toEqual([]);
   });
 
   it("un acteur supprimé ne casse pas la phrase", async () => {

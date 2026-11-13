@@ -23,6 +23,20 @@ export function commentsFor(
         "get",
         at(`/comments?targetKind=${targetKind}&targetId=${targetId}${query ? `&${query}` : ""}`),
       ),
+    /** Commentaire de table de données (3.7.0) : la cible est le projet, la table se désigne par `targetRef`. */
+    createOnTable: (
+      targetRef: string,
+      body = "Un commentaire",
+      over: Record<string, unknown> = {},
+    ) =>
+      send(app, cookie, "post", at("/comments"), { targetKind: "table", targetRef, body, ...over }),
+    listOnTable: (targetRef: string, query = "") =>
+      send(
+        app,
+        cookie,
+        "get",
+        at(`/comments?targetKind=table&targetRef=${targetRef}${query ? `&${query}` : ""}`),
+      ),
     remove: (id: string) => send(app, cookie, "delete", at(`/comments/${id}`)),
     listAudit: (query = "") => send(app, cookie, "get", at(`/audit${query ? `?${query}` : ""}`)),
   };
@@ -32,6 +46,7 @@ export interface CommentRow {
   id: string;
   target_kind: string;
   target_id: string;
+  target_ref: string | null;
   author_kind: string;
   author_id: string | null;
   body: string;
@@ -45,7 +60,7 @@ export function commentRows(
   targetId?: string,
 ): Promise<CommentRow[]> {
   return database.query<CommentRow>(
-    `SELECT id, target_kind, target_id, author_kind, author_id, body, deleted_at, created_at
+    `SELECT id, target_kind, target_id, target_ref, author_kind, author_id, body, deleted_at, created_at
        FROM ticket_comments
       WHERE organization_id = $1 AND ($2::uuid IS NULL OR target_id = $2::uuid)
       ORDER BY created_at, id`,

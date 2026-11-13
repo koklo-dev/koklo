@@ -19,23 +19,29 @@ describe("rôles des procédures clientSpace.*", () => {
     );
   });
 
-  it.each(["projects", "features", "feature", "progress", "flows", "rules", "roles"])(
-    "%s : session, garde de rôle et CLIENT_SPACE_READ_ROLES",
-    (name) => {
-      const source = read(CONTROLLER);
-      const at = source.indexOf(`@Implement(contract.clientSpace.${name})`);
-      expect(at, `@Implement(contract.clientSpace.${name}) absent du contrôleur`).toBeGreaterThan(
-        -1,
-      );
-      const decorators = source.slice(Math.max(0, at - 200), at);
-      expect(decorators).toContain("@UseGuards(SessionGuard, RoleGuard)");
-      expect(decorators).toContain("@Roles(...CLIENT_SPACE_READ_ROLES)");
-    },
-  );
+  it.each([
+    "projects",
+    "features",
+    "feature",
+    "progress",
+    "flows",
+    "rules",
+    "roles",
+    "dataModel",
+    "dataFixtures",
+    "dataFixtureRows",
+  ])("%s : session, garde de rôle et CLIENT_SPACE_READ_ROLES", (name) => {
+    const source = read(CONTROLLER);
+    const at = source.indexOf(`@Implement(contract.clientSpace.${name})`);
+    expect(at, `@Implement(contract.clientSpace.${name}) absent du contrôleur`).toBeGreaterThan(-1);
+    const decorators = source.slice(Math.max(0, at - 200), at);
+    expect(decorators).toContain("@UseGuards(SessionGuard, RoleGuard)");
+    expect(decorators).toContain("@Roles(...CLIENT_SPACE_READ_ROLES)");
+  });
 
   it("aucun rôle nommé en dur, et le cloisonnement central (PROJECT_ACCESS) est injecté", () => {
     const source = read(CONTROLLER);
-    expect(source.match(/@Roles\(/g)).toHaveLength(7); // projects, features, feature, puis progress, flows, rules, roles (TK-104)
+    expect(source.match(/@Roles\(/g)).toHaveLength(10); // projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109)
     expect(source).not.toMatch(/@Roles\(\s*"/);
     expect(source).toContain("PROJECT_ACCESS");
   });

@@ -1,6 +1,12 @@
 import { spaceNotReadyError, validationError } from "./errors.ts";
 import { readErrors, readOneErrors, route } from "./route-helpers.ts";
 import {
+  clientSpaceDataFixtureRowsInputSchema,
+  clientSpaceDataFixtureRowsOutputSchema,
+  clientSpaceDataFixturesInputSchema,
+  clientSpaceDataFixturesOutputSchema,
+  clientSpaceDataModelInputSchema,
+  clientSpaceDataModelOutputSchema,
   clientSpaceFeatureInputSchema,
   clientSpaceFeatureOutputSchema,
   clientSpaceFeaturesInputSchema,
@@ -49,4 +55,17 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceRolesInputSchema)
     .output(clientSpaceRolesOutputSchema),
+  /** Modèle de données validé (TK-109, 3.7.0) : tables, relations, positions ; jamais le contenu technique. */
+  dataModel: route("GET", "/client-space/projects/{projectId}/data/model")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataModelInputSchema)
+    .output(clientSpaceDataModelOutputSchema),
+  dataFixtures: route("GET", "/client-space/projects/{projectId}/data/fixtures")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataFixturesInputSchema)
+    .output(clientSpaceDataFixturesOutputSchema),
+  dataFixtureRows: route("GET", "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataFixtureRowsInputSchema)
+    .output(clientSpaceDataFixtureRowsOutputSchema),
 };

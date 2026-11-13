@@ -80,6 +80,8 @@ export const reviewSchema = z.object({
   sha: commitShaSchema.nullable(),
   status: reviewStatusSchema,
   authorId: z.uuid(),
+  /** Prénom de l'auteur pour l'équipe (3.7.0) ; `null` pour le client et quand le compte n'existe plus. */
+  authorName: z.string().min(1).nullable(),
   authorRole: roleSchema.nullable(),
   comment: z.string().nullable(),
   createdAt: z.iso.datetime(),

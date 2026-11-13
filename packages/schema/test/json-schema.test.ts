@@ -59,6 +59,15 @@ describe("CA2 JSON Schema généré", () => {
     expect(pattern.test("f-001")).toBe(false);
   });
 
+  it("table-v2 : resume_client facultatif, tableau de 12 phrases au plus", () => {
+    const table = schemas["table-v2"] as JsonSchema & {
+      properties: Record<string, { type?: string; maxItems?: number }>;
+    };
+    expect(table.properties.resume_client?.type).toBe("array");
+    expect(table.properties.resume_client?.maxItems).toBe(12);
+    expect(table.required).not.toContain("resume_client");
+  });
+
   it("roles : fichier fermé, listes facultatives, enum d'actions", () => {
     const roles = schemas.roles as JsonSchema;
     expect(Object.keys(roles.properties ?? {}).sort()).toEqual(["permissions", "roles"]);

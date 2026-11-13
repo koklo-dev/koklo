@@ -21,6 +21,7 @@ const p1 = () => scene.p1.projectId;
 const client = () => reviewApi(bench().app, scene.c1);
 const owner = () => reviewApi(bench().app, scene.p1.world.actors.owner);
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("contenu", () => {
   it("chaque ligne porte id, cible, sha, statut, auteur, rôle, commentaire, date, current", async () => {
     const sent = await client().submit(p1(), scene.headP1, { comment: "Merci" });
@@ -37,6 +38,7 @@ describe("contenu", () => {
         sha: scene.headP1,
         status: "approved",
         authorId: scene.c1.userId,
+        authorName: "Nom",
         authorRole: "client",
         comment: "Merci",
         createdAt: sent.body.createdAt,
@@ -44,6 +46,20 @@ describe("contenu", () => {
         onBehalf: false,
       },
     ]);
+  });
+
+  it("authorName : le prénom seul pour l'équipe, null pour le client (3.7.0)", async () => {
+    await bench().database.query("UPDATE users SET name = $2 WHERE id = $1", [
+      scene.c1.userId,
+      "Léa Martin",
+    ]);
+    await client().submit(p1(), scene.headP1);
+
+    const team = await owner().list(p1());
+    const own = await client().list(p1());
+
+    expect(team.body.items[0].authorName).toBe("Léa");
+    expect(own.body.items[0].authorName).toBeNull();
   });
 
   it("current passe à faux quand la spec avance, la ligne reste dans le journal", async () => {

@@ -79,11 +79,13 @@ export function tableDetail(
 ): TableDetail {
   const json = record(data);
   const zone = zoneOf(json);
+  const clientSummary = texts(json.resume_client);
   return {
     specId,
     name: text(json.nom) || text(json.titre) || specId,
     description: text(json.description),
     ...(zone === undefined ? {} : { zone }),
+    ...(clientSummary.length === 0 ? {} : { clientSummary }),
     sources: sourcesOf(json),
     fields: fieldsOf(json),
     relations: relationsOf(json),

@@ -5,6 +5,7 @@ import { insertActor } from "./helpers/organizations.ts";
 import { installBench } from "./helpers/repo-scene.ts";
 import { createReviewScene, type ReviewScene, reviewApi } from "./helpers/reviews.ts";
 import { shellApi } from "./helpers/shell.ts";
+import { entity, seedIndex } from "./helpers/spec-read.ts";
 import { suggestionApi } from "./helpers/suggestions.ts";
 import { type HttpMethod, seedTicket, send } from "./helpers/tickets.ts";
 
@@ -274,6 +275,7 @@ describe("TK-96 : le rôle insuffisant reste 403 quel que soit le projet désign
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("les seules écritures du client : suggérer, retirer, valider, commenter", () => {
   it("suggestion.create et suggestion.withdraw : 200", async () => {
     const api = suggestionApi(bench().app, scene.c1);
@@ -317,6 +319,17 @@ describe("les seules écritures du client : suggérer, retirer, valider, comment
     const ticket = await seedTicket(bench().app, scene.p1.world.actors.owner, scene.p1.projectId);
     const res = await commentsFor(bench().app, scene.c1, scene.p1.projectId).create(ticket.id);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
+  });
+
+  it("comment.create sur une table de données (3.7.0) : 200 pour le client, 403 pour le business", async () => {
+    await seedIndex(bench(), scene.p1, [], {
+      entities: [entity("table", "T-clients", "a", { nom: "Clients" })],
+    });
+    const client = commentsFor(bench().app, scene.c1, scene.p1.projectId);
+    const res = await client.createOnTable("T-clients", "Il manque le téléphone");
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const business = commentsFor(bench().app, scene.p1.world.actors.business, scene.p1.projectId);
+    expect((await business.createOnTable("T-clients")).status).toBe(403);
   });
 
   it("et rien d'autre ne passe : suggestion.accept sur sa propre suggestion reste 403", async () => {

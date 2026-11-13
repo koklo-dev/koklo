@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, UUID } from "./support.ts";
  * lectures `spec.data.*`, `spec.item.get` de type `table`, compteurs `relations` et `fixtures`.
  */
 describe("TK-107 A surface", () => {
-  it("version 3.6.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.6.0");
+  it("version 3.7.0", () => {
+    expect(CONTRACT_VERSION).toBe("3.7.0");
   });
 
   it.each([
@@ -286,6 +286,24 @@ const save = (positions: unknown, over: Record<string, unknown> = {}) => ({
   idempotencyKey: "k-layout-1",
   positions,
   ...over,
+});
+
+describe("TK-109 (contrat 3.7.0) : clientSummary des opérations de table", () => {
+  const create = {
+    kind: "table.create",
+    name: "Client",
+    zone: "Comptes",
+    fields: [{ name: "id", type: "uuid" }],
+  };
+  it("table.create et table.update acceptent 12 phrases de 200 caractères au plus", async () => {
+    expect(await ok({ ...create, clientSummary: ["Le nom du client"] })).toBe(true);
+    expect(await ok({ kind: "table.update", specId: "T-client", clientSummary: [] })).toBe(true);
+    expect(await ok({ ...create, clientSummary: Array.from({ length: 13 }, () => "x") })).toBe(
+      false,
+    );
+    expect(await ok({ ...create, clientSummary: [""] })).toBe(false);
+    expect(await ok({ ...create, clientSummary: ["x".repeat(201)] })).toBe(false);
+  });
 });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement

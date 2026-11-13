@@ -85,7 +85,7 @@ describe("CT-4 chemins explicites", () => {
     const pairs = Object.entries(doc.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${path}`),
     );
-    expect(pairs).toHaveLength(144);
+    expect(pairs).toHaveLength(147);
     expect(new Set(pairs).size).toBe(pairs.length);
     expect(pairs.sort()).toEqual(ALL_PAIRS);
   });
@@ -126,7 +126,7 @@ describe("CT-5 erreurs typées", () => {
 });
 
 describe("CT-6 génération OpenAPI", () => {
-  it("produit un document OpenAPI 3.x avec les 117 chemins (144 routes)", async () => {
+  it("produit un document OpenAPI 3.x avec les 120 chemins (147 routes)", async () => {
     const doc = (await generateOpenApi()) as {
       openapi: string;
       info: { title: string; version: string };
@@ -204,9 +204,9 @@ describe("CT-8b garde de version", () => {
 });
 
 describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106)", () => {
-  it("est en 3.6.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("3.6.0");
-    expect(CONTRACT_VERSION).toBe("3.6.0");
+  it("est en 3.7.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("3.7.0");
+    expect(CONTRACT_VERSION).toBe("3.7.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -244,6 +244,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "3.4.0",
       "3.5.0",
       "3.6.0",
+      "3.7.0",
     ]);
   });
 });
@@ -454,12 +455,16 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["3.0.0"]).not.toBe(versions["2.11.0"]);
   });
 
-  it("l'empreinte 3.6.0 est celle du document généré ; 3.1.0 à 3.5.0 restent figées (TK-103 à TK-108)", async () => {
+  it("l'empreinte 3.7.0 est celle du document généré ; 3.1.0 à 3.6.0 restent figées (TK-103 à TK-109)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["3.6.0"]).toBe(hash);
+    expect(versions["3.7.0"]).toBe(hash);
+    expect(versions["3.7.0"]).not.toBe(versions["3.6.0"]);
+    expect(versions["3.6.0"]).toBe(
+      "2f16444edc676a1376cef80ed1aecb7aeba63f09bebe01e8c1ea9c8a9ce2e90f",
+    );
     expect(versions["3.6.0"]).not.toBe(versions["3.5.0"]);
     expect(versions["3.5.0"]).toBe(
       "8fc7ee5921e5b559a11a785605a0ba0089bd4f718e034734cbb8adc698fedf9f",

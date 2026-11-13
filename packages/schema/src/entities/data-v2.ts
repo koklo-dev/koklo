@@ -34,6 +34,8 @@ export const TableV2Schema = z.strictObject({
   id: tableId,
   nom: z.string().min(1),
   description: z.string().optional(),
+  /** Phrases simples, lues telles quelles par le client (« Ce qu'on enregistre ») : aucun identifiant technique. */
+  resume_client: z.array(z.string().min(1).max(200)).max(12).optional(),
   source: z.array(z.union([featureId, ruleId])).optional(),
   zone: z.string().min(1).max(FEATURE_ZONE_MAX_LENGTH).optional(),
   champs: z.array(FieldV2Schema),

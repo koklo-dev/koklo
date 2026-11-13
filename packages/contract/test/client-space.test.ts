@@ -9,7 +9,18 @@ import { leaksOf, vocabularyOf } from "./vocabulary.ts";
  * ouvertes aux six rôles (le cloisonnement par projet est côté API). Vocabulaire métier seulement :
  * le jeton `version` est opaque, aucune clé ni valeur d'énumération ne parle de git.
  */
-const NAMES = ["feature", "features", "flows", "progress", "projects", "roles", "rules"];
+const NAMES = [
+  "dataFixtureRows",
+  "dataFixtures",
+  "dataModel",
+  "feature",
+  "features",
+  "flows",
+  "progress",
+  "projects",
+  "roles",
+  "rules",
+];
 const PROJECT = { id: UUID, name: "Refonte du site", phase: "framing" };
 const SUMMARY = {
   id: "F-001",
@@ -85,15 +96,21 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     ["clientSpace.flows", "/client-space/projects/{projectId}/flows"],
     ["clientSpace.rules", "/client-space/projects/{projectId}/rules"],
     ["clientSpace.roles", "/client-space/projects/{projectId}/roles"],
+    ["clientSpace.dataModel", "/client-space/projects/{projectId}/data/model"],
+    ["clientSpace.dataFixtures", "/client-space/projects/{projectId}/data/fixtures"],
+    [
+      "clientSpace.dataFixtureRows",
+      "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows",
+    ],
   ])("%s : GET %s dans l'OpenAPI, lecture seule", async (name, path) => {
     expect(proc(name)).toBeDefined();
     const d = await doc();
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 3.6.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.6.0");
-    expect((await doc()).info.version).toBe("3.6.0");
+  it("le contrat courant est 3.7.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.7.0");
+    expect((await doc()).info.version).toBe("3.7.0");
   });
 });
 
@@ -281,9 +298,12 @@ describe("CS5 fuite de vocabulaire technique dans le contrat publié", () => {
     "/client-space/projects/{projectId}/flows",
     "/client-space/projects/{projectId}/rules",
     "/client-space/projects/{projectId}/roles",
+    "/client-space/projects/{projectId}/data/model",
+    "/client-space/projects/{projectId}/data/fixtures",
+    "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows",
   ];
 
-  it("les sept chemins sont présents (la garde ne couvre pas du vide)", async () => {
+  it("les dix chemins sont présents (la garde ne couvre pas du vide)", async () => {
     const d = await doc();
     for (const path of PATHS) expect(d.paths[path]?.get, path).toBeDefined();
   });
@@ -408,5 +428,91 @@ describe("TK-105 (3.4.0) : recherche serveur de l'espace client", () => {
       type: "calcul",
     });
     expect(JSON.stringify(parsedFlows)).not.toContain("calcul");
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("TK-109 (3.7.0) : modèle de données du point de vue du client", () => {
+  const TABLE = {
+    id: "T-client",
+    name: "Client",
+    zone: "Comptes",
+    description: "Une personne qui réserve.",
+    fields: [{ name: "id", type: "uuid", primaryKey: true, personalData: false }],
+    relations: [{ to: "T-reservation", toName: "Réservation", cardinality: "1 → n" }],
+    usedBy: [{ id: "F-001", label: "Connexion" }],
+    clientSummary: ["Le nom du client"],
+  };
+  const MODEL = {
+    available: true,
+    validation: "validated",
+    truncated: false,
+    items: [TABLE],
+    positions: { "T-client": { x: 10, y: 20 } },
+  };
+
+  it("dataModel : tables et positions ; non validé = available faux et aucune table", async () => {
+    const o = output("clientSpace.dataModel");
+    expect(await isValid(o, MODEL)).toBe(true);
+    expect(
+      await isValid(o, {
+        ...MODEL,
+        available: false,
+        validation: "to_validate",
+        items: [],
+        positions: {},
+      }),
+    ).toBe(true);
+    expect(await isValid(o, { ...MODEL, validation: "ok" })).toBe(false);
+    expect(await isValid(input("clientSpace.dataModel"), { projectId: UUID })).toBe(true);
+  });
+
+  it("dataModel : jamais de contrainte, de valeur, de règle par champ, de chemin ni de SHA", async () => {
+    const value = await parsed(output("clientSpace.dataModel"), {
+      ...MODEL,
+      items: [
+        {
+          ...TABLE,
+          filePath: "data/tables/client.yaml",
+          fields: [{ ...TABLE.fields[0], constraints: "x", values: ["a"], rule: "R-004" }],
+        },
+      ],
+    });
+    const [item] = (value?.items ?? []) as Record<string, unknown>[];
+    expect(Object.keys(item ?? {})).not.toContain("filePath");
+    const [field] = (item?.fields ?? []) as Record<string, unknown>[];
+    expect(Object.keys(field ?? {}).sort()).toEqual(["name", "personalData", "primaryKey", "type"]);
+  });
+
+  it("dataFixtures et dataFixtureRows : jeux et lignes paginées par 25", async () => {
+    const list = output("clientSpace.dataFixtures");
+    const item = {
+      specId: "FX-clients",
+      title: "Clients",
+      table: "T-client",
+      locale: "fr-FR",
+      rowCount: 3,
+    };
+    expect(await isValid(list, { items: [item] })).toBe(true);
+    expect(await isValid(list, { items: [{ ...item, filePath: "x" }] })).toBe(true);
+    const rows = input("clientSpace.dataFixtureRows");
+    expect(
+      await isValid(rows, { projectId: UUID, fixtureId: "FX-clients", page: 1, size: 25 }),
+    ).toBe(true);
+    expect(
+      await isValid(rows, { projectId: UUID, fixtureId: "FX-clients", page: 1, size: 10 }),
+    ).toBe(false);
+    expect(
+      await isValid(rows, { projectId: UUID, fixtureId: "T-clients", page: 1, size: 25 }),
+    ).toBe(false);
+  });
+
+  it("les trois lectures ne déclarent aucun mot interdit côté client", async () => {
+    const d = await doc();
+    for (const route of ["data/model", "data/fixtures", "data/fixtures/{fixtureId}/rows"]) {
+      const names = vocabularyOf(d.paths[`/client-space/projects/{projectId}/${route}`]?.get, d);
+      expect(names.length, route).toBeGreaterThan(0);
+      expect(leaksOf(names), route).toEqual([]);
+    }
   });
 });

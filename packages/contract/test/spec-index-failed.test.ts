@@ -57,9 +57,9 @@ describe("SF3 OpenAPI et empreinte", () => {
     expect(codes("/projects/{projectId}/spec/features/{specId}")).toContain("409");
     expect(codes("/projects/{projectId}/spec")).not.toContain("409");
   });
-  it("le contrat compte 144 routes (3 de TK-108 en 3.6.0, 4 de TK-107 en 3.5.0, 2 de TK-106 en 3.4.0, 5 de TK-104 en 3.2.0, la route ai.draftBrief de TK-54b est retirée en 3.0.0) (3 de TK-101 en 2.11.0, 2 de TK-100 en 2.10.0, 6 de TK-99a en 2.9.0, 4 de TK-93 en 2.8.0, 2 de TK-92 en 2.7.0, 3 de TK-91 en 2.6.0, 6 de TK-90 en 2.5.0, 11 de TK-89 en 2.4.0, 11 de TK-98 en 2.3.0, 4 de llmCredential en 0.8.0, 4 de TK-54b en 0.9.0, 3 de projectClient en 0.10.0, 3 de clientSpace en 0.11.0, 5 de suggestion en 0.12.0, 2 de review en 0.13.0)", async () => {
+  it("le contrat compte 147 routes (3 de TK-109 en 3.7.0, 3 de TK-108 en 3.6.0, 4 de TK-107 en 3.5.0, 2 de TK-106 en 3.4.0, 5 de TK-104 en 3.2.0, la route ai.draftBrief de TK-54b est retirée en 3.0.0) (3 de TK-101 en 2.11.0, 2 de TK-100 en 2.10.0, 6 de TK-99a en 2.9.0, 4 de TK-93 en 2.8.0, 2 de TK-92 en 2.7.0, 3 de TK-91 en 2.6.0, 6 de TK-90 en 2.5.0, 11 de TK-89 en 2.4.0, 11 de TK-98 en 2.3.0, 4 de llmCredential en 0.8.0, 4 de TK-54b en 0.9.0, 3 de projectClient en 0.10.0, 3 de clientSpace en 0.11.0, 5 de suggestion en 0.12.0, 2 de review en 0.13.0)", async () => {
     const d = (await generateOpenApi()) as Doc;
     const operations = Object.values(d.paths).flatMap((methods) => Object.keys(methods));
-    expect(operations).toHaveLength(144);
+    expect(operations).toHaveLength(147);
   });
 });

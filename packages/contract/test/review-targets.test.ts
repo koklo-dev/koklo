@@ -23,6 +23,7 @@ const LISTED = {
   status: "approved",
   authorId: UUID2,
   authorRole: "owner",
+  authorName: null,
   comment: null,
   createdAt: "2026-11-04T10:00:00.000Z",
   current: true,

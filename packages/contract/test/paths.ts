@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 3.6.0 (144 routes, 117 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 3.7.0 (147 routes, 120 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -15,6 +15,9 @@ export const ALL_PAIRS: string[] = [
   "GET /ai/settings",
   "GET /ai/usage",
   "GET /client-space/projects",
+  "GET /client-space/projects/{projectId}/data/fixtures",
+  "GET /client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows",
+  "GET /client-space/projects/{projectId}/data/model",
   "GET /client-space/projects/{projectId}/features",
   "GET /client-space/projects/{projectId}/features/{featureId}",
   "GET /client-space/projects/{projectId}/flows",
@@ -157,6 +160,9 @@ export const ALL_PATHS: string[] = [
   "/ai/usage",
   "/ai/usages/{usage}",
   "/client-space/projects",
+  "/client-space/projects/{projectId}/data/fixtures",
+  "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows",
+  "/client-space/projects/{projectId}/data/model",
   "/client-space/projects/{projectId}/features",
   "/client-space/projects/{projectId}/features/{featureId}",
   "/client-space/projects/{projectId}/flows",

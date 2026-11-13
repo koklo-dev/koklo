@@ -85,6 +85,27 @@ function assertBaselineAllowsDecision(
     throw conflict("baseline_not_open");
   }
 }
+/** Prénom (premier mot du nom) des auteurs de la page, lu par l'appartenance à l'organisation. */
+async function authorNamesOf(
+  tx: Tx,
+  records: readonly ReviewRecord[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(records.map((record) => record.authorUserId))];
+  if (ids.length === 0) return new Map();
+  const members = await tx.member.findMany({
+    where: { userId: { in: ids } },
+    select: { userId: true, user: { select: { name: true } } },
+    take: ids.length,
+  });
+  return new Map(
+    members.flatMap((member) => {
+      const first = member.user.name.trim().split(/\s+/)[0];
+      return first ? [[member.userId, first] as const] : [];
+    }),
+  );
+}
+const dependsOnUpstream = (input: SubmitReview) =>
+  input.targetKind === "deliverable" && input.targetRef === "data";
 const baselineNumber = (ref: string) => Number(ref.slice("baseline-".length));
 
 /**
@@ -167,6 +188,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       return {
         records: page.items,
         nextCursor: page.nextCursor,
+        authorNames: await authorNamesOf(tx, page.items),
         headSha: usable?.snapshot.commitSha ?? null,
         currentHashes: new Map(
           page.items.map((record) => [
@@ -340,9 +362,12 @@ export class PrismaReviewRepository implements ReviewRepository {
     });
     if (last === null) return null;
     const sameContent =
-      current.hash !== null && last.version !== null
+      (current.hash !== null && last.version !== null
         ? last.version.contentHash === current.hash
-        : last.sha === current.headSha;
+        : last.sha === current.headSha) &&
+      // Les Données dépendent aussi de leurs amonts (B449) : sur une autre tête, une décision identique est une nouvelle
+      // décision (elle fait repartir la comparaison de l'impact amont).
+      (!dependsOnUpstream(input) || last.sha === current.headSha);
     const identical =
       sameContent && last.status === input.status && last.comment === (input.comment ?? null);
     return identical ? recordOf(last) : null;

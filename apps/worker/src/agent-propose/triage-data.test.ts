@@ -66,6 +66,17 @@ describe("triage des tables", () => {
     expect(discarded).toBe(6);
   });
 
+  it("clientSummary : phrases simples acceptées ; lien, balise ou 13 phrases écartés (3.7.0)", () => {
+    const { accepted, discarded } = run([
+      table("Réservation", { clientSummary: ["Le nom du client", "Sa date de réservation"] }),
+      table("Lien", { clientSummary: ["voir https://exemple.fr"] }),
+      table("Balise", { clientSummary: ["<b>gras</b>"] }),
+      table("Trop", { clientSummary: Array.from({ length: 13 }, (_, i) => `Phrase ${i}`) }),
+    ]);
+    expect(accepted.map((a) => a.title)).toEqual(["Réservation"]);
+    expect(discarded).toBe(3);
+  });
+
   it("une table peut viser une table de la même génération, et elle-même", () => {
     const { accepted } = run([
       table("Client", { fields: [{ name: "id", type: "uuid", primaryKey: true }] }),

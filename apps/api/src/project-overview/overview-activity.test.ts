@@ -18,9 +18,10 @@ const row = (over: Partial<ActivityRow> = {}): ActivityRow => ({
 });
 
 describe("listes fermées d'événements (B279)", () => {
-  it("l'équipe lit onze événements, le client trois familles seulement", () => {
+  it("l'équipe lit douze événements, le client trois familles seulement", () => {
     expect([...ACTIVITY_ACTIONS].sort()).toEqual(
       [
+        "comment.create",
         "idea.freeze",
         "idea.proposal.accept",
         "project.create",
@@ -40,6 +41,7 @@ describe("listes fermées d'événements (B279)", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("activityItemOf : phrases complètes, jamais un identifiant seul", () => {
   it.each([
     ["review.approve", "Marie Lefèvre a validé F-001 Réserver un créneau"],
@@ -55,11 +57,13 @@ describe("activityItemOf : phrases complètes, jamais un identifiant seul", () =
     ["spec.batch.submit", "Marie Lefèvre a enregistré des modifications de la spec"],
     ["project.create", "Marie Lefèvre a créé le projet"],
     ["project_client.add", "Marie Lefèvre a donné accès au projet à un client"],
+    ["comment.create", "Marie Lefèvre a commenté la table T-reservation"],
   ])("%s", (action, text) => {
     const target = {
       "suggestion.create": "SG-3",
       "sprint.activate": "SP-7",
       "sprint.close": "SP-7",
+      "comment.create": "T-reservation",
     }[action];
     const item = activityItemOf(row({ action, ...(target ? { target } : {}) }));
     expect(item.text).toBe(text);
@@ -95,6 +99,9 @@ describe("activityItemOf : phrases complètes, jamais un identifiant seul", () =
     );
     expect(activityItemOf(row({ action: "suggestion.create", target: null })).text).toBe(
       "Marie Lefèvre a ajouté une suggestion",
+    );
+    expect(activityItemOf(row({ action: "comment.create", target: null })).text).toBe(
+      "Marie Lefèvre a commenté une table",
     );
   });
 });

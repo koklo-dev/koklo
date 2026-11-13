@@ -24,6 +24,18 @@ export function clientSpaceApi(app: INestApplication, actor: Pick<Actor, "cookie
       send(app, cookie, "get", `/client-space/projects/${projectId}/rules${query}`),
     roles: (projectId: string) =>
       send(app, cookie, "get", `/client-space/projects/${projectId}/roles`),
+    // TK-109 (contrat 3.7.0) : modèle de données validé, jeux d'exemple et leurs lignes.
+    dataModel: (projectId: string) =>
+      send(app, cookie, "get", `/client-space/projects/${projectId}/data/model`),
+    dataFixtures: (projectId: string) =>
+      send(app, cookie, "get", `/client-space/projects/${projectId}/data/fixtures`),
+    dataFixtureRows: (projectId: string, fixtureId: string, page = 1) =>
+      send(
+        app,
+        cookie,
+        "get",
+        `/client-space/projects/${projectId}/data/fixtures/${fixtureId}/rows?page=${page}&size=25`,
+      ),
   };
 }
 

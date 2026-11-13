@@ -1,6 +1,7 @@
 import type { DeliverableKey } from "@koklo/domain";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { IdeaImpact } from "./deliverable-impact.ts";
+import type { UpstreamFacts } from "./deliverable-upstream.ts";
 
 export const SPEC_DELIVERABLES_REPOSITORY = Symbol("SPEC_DELIVERABLES_REPOSITORY");
 
@@ -14,6 +15,8 @@ export interface DeliverableRecord {
   forced: DeliverableKey[];
   /** Impact de la dernière version d'idée figée ; `null` sans version précédente ou sans page changée. */
   impact: IdeaImpact | null;
+  /** Amonts cités par les tables et leurs hachages (impact amont des Données, B449) ; `null` : rien à comparer. */
+  upstream: UpstreamFacts | null;
   /** Propositions de l'agent en attente, par livrable (vide si `withPending` est faux). */
   pendingByDeliverable: Partial<Record<DeliverableKey, number>>;
 }

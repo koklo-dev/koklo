@@ -12,6 +12,7 @@ const TABLE = {
   name: "Réservation",
   description: "Une réservation de salle.",
   sources: ["F-001", "R-004"],
+  clientSummary: ["Le nom du client", "La date de la réservation"],
   fields: [
     { name: "id", type: "uuid", primaryKey: true },
     { name: "statut", type: "enum", values: ["en_attente", "confirmee"] },
@@ -62,6 +63,18 @@ describe("tableProposalSchema", () => {
     expect(tableProposalSchema.safeParse({ ...TABLE, name: "<b>x</b>" }).success).toBe(false);
     expect(tableProposalSchema.safeParse({ ...TABLE, name: "a\nb" }).success).toBe(false);
     expect(tableProposalSchema.safeParse({ ...TABLE, sources: ["X-1"] }).success).toBe(false);
+  });
+});
+
+describe("tableProposalSchema : clientSummary", () => {
+  it("12 phrases simples au plus, sans lien ni balise ni saut de ligne", () => {
+    const parse = (clientSummary: string[]) =>
+      tableProposalSchema.safeParse({ ...TABLE, clientSummary }).success;
+    expect(parse(["Le nom du client"])).toBe(true);
+    expect(parse(Array.from({ length: 13 }, (_, i) => `Phrase ${i}`))).toBe(false);
+    expect(parse([""])).toBe(false);
+    expect(parse(["voir https://x.fr"])).toBe(false);
+    expect(parse(["a\nb"])).toBe(false);
   });
 });
 

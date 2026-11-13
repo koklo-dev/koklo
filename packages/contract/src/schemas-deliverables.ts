@@ -17,6 +17,11 @@ export const specDeliverableSchema = z.object({
   condition: z.string().nullable(),
   pendingProposals: z.number().int().min(0),
   staleBecause: z.object({ idea: z.string(), changedPages: z.number().int().min(0) }).optional(),
+  /** Fonctionnalités et règles citées par la source du livrable et modifiées depuis sa dernière décision (3.7.0, Données). */
+  staleUpstream: z
+    .array(z.string().regex(/^(F-\d{3,}|R-\d{3,})$/))
+    .max(20)
+    .optional(),
 });
 
 export const specDeliverablesInputSchema = z.object({ projectId: z.uuid() });

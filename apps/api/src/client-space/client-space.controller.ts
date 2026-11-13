@@ -9,6 +9,7 @@ import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts
 import { guard, requestIdOf } from "../request-context.ts";
 import { inProject } from "../tracker/scope.ts";
 import { ClientSpaceService } from "./client-space.service.ts";
+import { ClientSpaceDataService } from "./client-space-data.service.ts";
 import { ClientSpaceEntitiesService } from "./client-space-entities.service.ts";
 
 /**
@@ -20,6 +21,7 @@ export class ClientSpaceController {
   constructor(
     @Inject(ClientSpaceService) private readonly service: ClientSpaceService,
     @Inject(ClientSpaceEntitiesService) private readonly entities: ClientSpaceEntitiesService,
+    @Inject(ClientSpaceDataService) private readonly data: ClientSpaceDataService,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -122,6 +124,45 @@ export class ClientSpaceController {
         errors,
         input.projectId,
         (scope) => this.entities.roles(scope),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataModel)
+  dataModel(@Req() request: Request) {
+    return implement(contract.clientSpace.dataModel).handler(({ input, errors }) =>
+      inProject(request, errors, input.projectId, (scope) => this.data.model(scope), this.access),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataFixtures)
+  dataFixtures(@Req() request: Request) {
+    return implement(contract.clientSpace.dataFixtures).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.data.fixtures(scope),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataFixtureRows)
+  dataFixtureRows(@Req() request: Request) {
+    return implement(contract.clientSpace.dataFixtureRows).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.data.fixtureRows(scope, input),
         this.access,
       ),
     );

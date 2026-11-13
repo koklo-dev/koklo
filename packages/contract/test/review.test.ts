@@ -26,6 +26,7 @@ const LISTED = {
   sha: SHA40,
   status: "approved",
   authorId: UUID2,
+  authorName: "Léa",
   authorRole: "client",
   comment: "Parfait",
   createdAt: "2026-11-04T10:00:00.000Z",
@@ -63,9 +64,9 @@ describe("RV1 surface : exactement list et submit", () => {
     expect(Object.keys(d.paths[COLLECTION] ?? {}).sort()).toEqual(["get", "post"]);
   });
 
-  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 3.6.0 (TK-94, projet explicite TK-96)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.6.0");
-    expect((await doc()).info.version).toBe("3.6.0");
+  it("le groupe review est apparu en 0.13.0 ; le contrat courant est 3.7.0 (TK-94, projet explicite TK-96)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.7.0");
+    expect((await doc()).info.version).toBe("3.7.0");
   });
 });
 
@@ -179,6 +180,7 @@ describe("RV3 entrée de list : filtres et pagination bornés", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("RV4 sorties", () => {
   it("submit : id, status, validation, createdAt exactement, ni SHA ni auteur", async () => {
     const o = output("review.submit");
@@ -221,6 +223,18 @@ describe("RV4 sorties", () => {
     });
     const [item] = (value?.items ?? []) as Record<string, unknown>[];
     expect(Object.keys(item ?? {}).sort()).toEqual(Object.keys(LISTED).sort());
+  });
+
+  it("list : authorName obligatoire, prénom ou null (jamais montré au client, 3.7.0)", async () => {
+    const o = output("review.list");
+    const item = (over: Record<string, unknown>) => ({
+      items: [{ ...LISTED, ...over }],
+      nextCursor: null,
+    });
+    expect(await isValid(o, item({ authorName: null }))).toBe(true);
+    expect(await isValid(o, item({ authorName: "" }))).toBe(false);
+    const { authorName: _omitted, ...without } = LISTED;
+    expect(await isValid(o, { items: [without], nextCursor: null })).toBe(false);
   });
 
   it("list : comment et authorRole nullables, sha de 40 hexadécimaux, cible feature ou baseline", async () => {
