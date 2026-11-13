@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { orpc } from "./orpc.ts";
-import { DELIVERABLE } from "./proposal-labels.ts";
+import { DEFAULT_DELIVERABLE, type Deliverable } from "./proposal-labels.ts";
 import type { ProposalGroupOutput, ProposalListOutput } from "./proposal-types.ts";
 
 /** Rythme de lecture tant que le lancement tourne : le serveur n'expose pas de flux (B319 f). */
@@ -34,16 +34,21 @@ export function countsOf(groups: readonly ProposalGroupOutput[]): ProposalCounts
 export const listInput = (
   projectId: string,
   over: { status?: "pending" | "all"; group?: string; limit: number; cursor?: string },
-) => ({ projectId, deliverable: DELIVERABLE, groupBy: "type_zone" as const, ...over });
+  deliverable: Deliverable = DEFAULT_DELIVERABLE,
+) => ({ projectId, deliverable, groupBy: "type_zone" as const, ...over });
 
 /**
  * Dernier lancement et comptes par groupe (une seule ligne lue) : sonde toutes les 2 s tant que le lancement est
  * en file ou en cours, s'arrête à `done`, `failed` et `canceled`.
  */
-export function useProposalStatus(projectId: string, enabled: boolean) {
+export function useProposalStatus(
+  projectId: string,
+  enabled: boolean,
+  deliverable: Deliverable = DEFAULT_DELIVERABLE,
+) {
   const query = useQuery({
     ...orpc.proposal.list.queryOptions({
-      input: listInput(projectId, { status: "all", limit: 1 }),
+      input: listInput(projectId, { status: "all", limit: 1 }, deliverable),
       refetchInterval: (state: { state: { data?: ProposalListOutput } }) =>
         isActiveLaunch(state.state.data?.launch?.status) ? PROPOSAL_POLL_MS : false,
     }),

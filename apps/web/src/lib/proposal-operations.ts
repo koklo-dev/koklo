@@ -4,6 +4,7 @@ import {
   type SpecBatchSubmitInput,
   FEATURE_ZONE_MAX_LENGTH as ZONE_MAX,
 } from "@koklo/contract";
+import { isDataKind } from "./proposal-data.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
 type Operation = SpecBatchSubmitInput["operations"][number];
@@ -90,6 +91,61 @@ function flowOperation(content: Record<string, unknown>): Operation {
   };
 }
 
+const records = (value: unknown): Array<Record<string, unknown>> =>
+  (Array.isArray(value) ? value : []).filter(
+    (item): item is Record<string, unknown> => typeof item === "object" && item !== null,
+  );
+
+type Cardinality = "1 → 1" | "1 → 0..1" | "1 → n" | "n → 1" | "n ↔ n";
+const relationsOf = (value: unknown) =>
+  records(value).map((r) => ({ to: str(r.to), cardinality: str(r.cardinality) as Cardinality }));
+
+/** `table.create` : zone de la proposition, relations déjà rattachées par `prepareDataProposals`. */
+function tableOperation(proposal: ProposalOutput): Operation {
+  const { content } = proposal;
+  const description = str(content.description).trim();
+  const relations = relationsOf(content.relationsOut);
+  return {
+    kind: "table.create",
+    name: str(content.name).trim(),
+    zone: proposal.zone.trim().slice(0, ZONE_MAX),
+    ...optional("description", description || undefined),
+    ...optional("sources", strings(content.sources)),
+    fields: records(content.fields) as Extract<Operation, { kind: "table.create" }>["fields"],
+    ...optional("relations", relations),
+  };
+}
+
+/** Opérations des propositions de données : la table, le jeu, ou les mises à jour de relations des tables enregistrées. */
+function dataOperations(proposal: ProposalOutput): Operation[] {
+  const { content } = proposal;
+  if (proposal.kind === "table") return [tableOperation(proposal)];
+  if (proposal.kind === "fixtures") {
+    const locale = str(content.locale);
+    return [
+      {
+        kind: "fixture.create",
+        title: str(content.title).trim(),
+        table: str(content.table),
+        ...optional("locale", locale || undefined),
+        rows: records(content.rows) as Extract<Operation, { kind: "fixture.create" }>["rows"],
+      },
+    ];
+  }
+  return records(content.updates).map((update) => ({
+    kind: "table.update" as const,
+    specId: str(update.specId),
+    relations: relationsOf(update.relations),
+  }));
+}
+
+/** Opérations d'une proposition acceptée (une seule, sauf `relations` : une mise à jour par table de départ). */
+export function operationsOf(proposal: ProposalOutput): Operation[] {
+  if (isDataKind(proposal.kind)) return dataOperations(proposal);
+  const op = operationOf(proposal);
+  return op ? [op] : [];
+}
+
 /**
  * Opération d'une proposition acceptée : `feature` crée une fonctionnalité, `criteria` ajoute des critères à une
  * fonctionnalité existante (B314 d), `rule`, `role` et `flow` créent l'élément (TK-103).
@@ -119,7 +175,7 @@ export function operationOf(proposal: ProposalOutput): Operation | null {
 export const isSavable = (proposal: ProposalOutput): boolean =>
   proposal.status === "accepted" &&
   proposal.appliedBatchId === null &&
-  operationOf(proposal) !== null;
+  operationsOf(proposal).length > 0;
 
 const slug = (text: string): string =>
   text
@@ -143,23 +199,27 @@ export const BATCH_BYTES_BUDGET = Math.floor((SPEC_BATCH_MAX_BODY_BYTES * 3) / 4
 
 const encoder = new TextEncoder();
 const bytesOf = (proposal: ProposalOutput): number =>
-  encoder.encode(JSON.stringify(operationOf(proposal))).length;
+  encoder.encode(JSON.stringify(operationsOf(proposal))).length;
 
 /** Coupe une suite en tranches de 200 opérations et de `BATCH_BYTES_BUDGET` octets au plus, dans l'ordre. */
 function slices(items: ProposalOutput[], budget: number): ProposalOutput[][] {
   const out: ProposalOutput[][] = [];
   let current: ProposalOutput[] = [];
   let size = 0;
+  let count = 0;
   for (const item of items) {
     const bytes = bytesOf(item);
-    const full = current.length >= SPEC_BATCH_OPERATIONS_MAX || size + bytes > budget;
+    const ops = operationsOf(item).length;
+    const full = count + ops > SPEC_BATCH_OPERATIONS_MAX || size + bytes > budget;
     if (current.length > 0 && full) {
       out.push(current);
       current = [];
       size = 0;
+      count = 0;
     }
     current.push(item);
     size += bytes;
+    count += ops;
   }
   if (current.length > 0) out.push(current);
   return out;
@@ -194,7 +254,7 @@ export function planBatches(
     const ids = items.map((item) => item.id);
     return {
       key: `proposal-${launchId}-${slug(group)}-${index + 1}-${fingerprint(ids)}`,
-      operations: items.map((item) => operationOf(item) as Operation),
+      operations: items.flatMap(operationsOf),
       proposalIds: ids,
     };
   });

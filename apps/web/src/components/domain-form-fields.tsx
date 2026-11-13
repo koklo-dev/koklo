@@ -89,25 +89,38 @@ export function TextField({
   onChange,
   placeholder,
   maxLength,
+  suggestions,
   ...common
 }: Common & {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   maxLength?: number;
+  /** Valeurs déjà utilisées (zones des tables) : proposées à la saisie, une valeur nouvelle reste permise. */
+  suggestions?: readonly string[];
 }) {
   return (
     <DomainField {...common}>
       {({ labelId: _label, ...control }) => (
-        <Input
-          {...control}
-          className="max-md:h-11"
-          value={value}
-          readOnly={common.readOnly}
-          placeholder={placeholder}
-          maxLength={maxLength}
-          onChange={(event) => onChange(event.target.value)}
-        />
+        <>
+          <Input
+            {...control}
+            className="max-md:h-11"
+            value={value}
+            readOnly={common.readOnly}
+            placeholder={placeholder}
+            maxLength={maxLength}
+            {...(suggestions ? { list: `${control.id}-options` } : {})}
+            onChange={(event) => onChange(event.target.value)}
+          />
+          {suggestions ? (
+            <datalist id={`${control.id}-options`}>
+              {suggestions.map((suggestion) => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
+          ) : null}
+        </>
       )}
     </DomainField>
   );

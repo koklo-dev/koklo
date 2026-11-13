@@ -8,7 +8,7 @@ const uuid = (n: number): string => `0190bbbb-0000-7000-8000-${String(n).padStar
 export interface Fake {
   id: string;
   launchId: string;
-  kind: "feature" | "criteria" | "rule" | "role" | "flow";
+  kind: "feature" | "criteria" | "rule" | "role" | "flow" | "table" | "relations" | "fixtures";
   zone: string;
   position: number;
   title: string;

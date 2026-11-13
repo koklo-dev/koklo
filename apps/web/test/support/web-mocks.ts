@@ -67,6 +67,11 @@ export const procedures = {
   specGetFeature: vi.fn(),
   // TK-101 (contrat 2.11.0) : lecture d'édition, autocomplétion des liens et préremplissage
   specItemGet: vi.fn(),
+  // TK-107 (contrat 3.5.0) : onglets Tables et Jeux d'exemple, diagramme minimal
+  specDataTablesList: vi.fn(),
+  specDataMermaid: vi.fn(),
+  specDataFixturesList: vi.fn(),
+  specDataFixturesRows: vi.fn(),
   specRefsSearch: vi.fn(),
   // TK-103 (contrat 3.1.0) : règles métier, parcours (liste paginée) et matrice des rôles
   specFunctionalList: vi.fn(),
@@ -239,7 +244,21 @@ export const orpc = {
     getFeature: queryFull(["spec", "getFeature"], procedures.specGetFeature),
     item: {
       key: () => ["spec", "item"],
-      get: queryFull(["spec", "item", "get"], procedures.specItemGet),
+      get: {
+        ...queryFull(["spec", "item", "get"], procedures.specItemGet),
+        call: (input?: unknown) => procedures.specItemGet(input),
+      },
+    },
+    data: {
+      key: () => ["spec", "data"],
+      tables: {
+        list: queryFull(["spec", "data", "tables", "list"], procedures.specDataTablesList),
+      },
+      mermaid: queryFull(["spec", "data", "mermaid"], procedures.specDataMermaid),
+      fixtures: {
+        list: queryFull(["spec", "data", "fixtures", "list"], procedures.specDataFixturesList),
+        rows: queryFull(["spec", "data", "fixtures", "rows"], procedures.specDataFixturesRows),
+      },
     },
     functional: {
       key: () => ["spec", "functional"],

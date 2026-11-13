@@ -1,9 +1,12 @@
 import { priorityLabel } from "./feature-labels.ts";
 import { FEATURES_TABS, tabOfProposalKind } from "./features-tab.ts";
+import { tableRefOf } from "./proposal-data.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
-/** Livrable branché par TK-99b : le cahier fonctionnel (les six autres suivent TK-100). */
-export const DELIVERABLE = "functional" as const;
+/** Livrables dont l'agent propose le contenu : le cahier fonctionnel (TK-99b) et le modèle de données (TK-107). */
+export type Deliverable = "functional" | "data";
+/** Livrable des écrans qui ne le précisent pas : le cahier fonctionnel. */
+export const DEFAULT_DELIVERABLE: Deliverable = "functional";
 
 /** Textes des choix de la modale, par mode serveur (maquette 21 : « Ce que l'agent va faire »). */
 export const MODE_TEXTS: Record<
@@ -31,7 +34,26 @@ export const MODE_TEXTS: Record<
   },
 };
 
+/** Textes de la modale du modèle de données (maquette 11 : « Ce que l'agent va faire »). */
+const DATA_MODE_TEXTS: typeof MODE_TEXTS = {
+  complete: {
+    title: "Compléter le modèle",
+    description: "Tables, champs et relations qu'exigent les fonctionnalités enregistrées.",
+  },
+  all: {
+    title: "Tout reproposer",
+    description: "Repart du cahier fonctionnel ; ce qui est enregistré reste.",
+  },
+};
+
+/** Textes des choix de la modale pour un livrable. */
+export const modeTextsOf = (deliverable: Deliverable): typeof MODE_TEXTS =>
+  deliverable === "data" ? DATA_MODE_TEXTS : MODE_TEXTS;
+
 export const KIND_LABELS: Record<string, string> = {
+  table: "Table",
+  relations: "Relations",
+  fixtures: "Jeux d'exemple",
   feature: "Fonctionnalité",
   criteria: "Critères",
   rule: "Règle",
@@ -92,10 +114,16 @@ const text = (value: unknown): string => (typeof value === "string" ? value : ""
 
 /** Préfixe du rang quand la proposition n'a pas d'identifiant : un rôle ne prend jamais `P-` (parcours). */
 const RANK_PREFIX: Record<string, string> = { rule: "R", role: "RL", flow: "P" };
+/** Identifiant des propositions de données sans fiche : une table `T-<slug>`, « REL » pour les relations, « FX » pour un jeu. */
+const DATA_REFS: Record<string, string> = { relations: "REL" };
 
 /** Identifiant lisible : celui de la fiche visée, sinon rang dans le lancement (`P-007`, `RL-002`). */
 export function refOf(proposal: ProposalOutput): string {
   const specId = text(proposal.content.specId);
+  if (proposal.kind === "table") return tableRefOf(text(proposal.content.name));
+  if (proposal.kind === "fixtures")
+    return `FX-${tableRefOf(text(proposal.content.title)).slice(2)}`;
+  if (proposal.kind === "relations") return DATA_REFS.relations ?? "REL";
   return (
     specId ||
     `${RANK_PREFIX[proposal.kind] ?? "P"}-${String(proposal.position + 1).padStart(3, "0")}`
@@ -111,10 +139,30 @@ const RULE_TYPE_TEXT: Record<string, string> = {
 const countOf = (value: unknown): number => (Array.isArray(value) ? value.length : 0);
 const plural = (n: number, one: string, other: string): string => `${n} ${n >= 2 ? other : one}`;
 
+/** « Table · 5 champs · ← F-001, F-002 » (maquette 11 l.571). */
+function dataSubtitle(content: Record<string, unknown>): string {
+  const sources = Array.isArray(content.sources)
+    ? content.sources.filter((s) => typeof s === "string")
+    : [];
+  return [
+    `Table · ${plural(countOf(content.fields), "champ", "champs")}`,
+    ...(sources.length > 0 ? [`← ${sources.join(", ")}`] : []),
+  ].join(" · ");
+}
+
 /** Ligne secondaire : « Fonctionnalité · Haute · 2 critères », « Règle · calcul », « Rôle · 4 permissions », « Parcours · 5 étapes ». */
 export function subtitleOf(proposal: ProposalOutput): string {
   const { content } = proposal;
   const label = KIND_LABELS[proposal.kind] ?? proposal.kind;
+  if (proposal.kind === "table") return dataSubtitle(content);
+  if (proposal.kind === "relations")
+    return plural(
+      countOf(content.relations),
+      "relation entre les tables",
+      "relations entre les tables",
+    );
+  if (proposal.kind === "fixtures")
+    return `${label} · ${plural(countOf(content.rows), "ligne", "lignes")} · ${text(content.table)}`;
   if (proposal.kind === "rule")
     return `${label} · ${RULE_TYPE_TEXT[text(content.type)] ?? "contrainte"}`;
   if (proposal.kind === "role")

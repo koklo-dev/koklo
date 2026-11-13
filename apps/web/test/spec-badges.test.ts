@@ -35,13 +35,16 @@ describe("specBadges", () => {
   });
 
   it("génération en cours : « … » en soft sur le Fonctionnel ouvert, avant « N à relire »", () => {
-    expect(specBadges([base({ pendingProposals: 2 })], true)).toEqual({
+    expect(specBadges([base({ pendingProposals: 2 })], new Set(["functional"]))).toEqual({
       functional: { label: "…", tone: "soft" },
     });
-    expect(specBadges([base({ key: "data" })], true)).toEqual({
+    expect(specBadges([base({ key: "data" })], new Set(["functional"]))).toEqual({
       data: { label: "Prêt", tone: "soft" },
     });
-    expect(specBadges([base({ available: false })], true)).toEqual({});
+    expect(specBadges([base({ key: "data" })], new Set(["data"]))).toEqual({
+      data: { label: "…", tone: "soft" },
+    });
+    expect(specBadges([base({ available: false })], new Set(["functional"]))).toEqual({});
   });
 
   it("validé, verrouillé ou sans donnée : aucune pastille", () => {

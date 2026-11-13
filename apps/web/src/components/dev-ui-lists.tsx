@@ -171,6 +171,14 @@ function Paginations() {
       <Pagination {...common} page={1} />
       <Pagination {...common} page={20} />
       <Pagination {...common} page={50} />
+      <Pagination
+        page={2}
+        size={25}
+        total={100}
+        density="sm"
+        onPageChange={noop}
+        aria-label="Pagination dense"
+      />
     </DevUiFrame>
   );
 }
