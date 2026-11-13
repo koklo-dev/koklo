@@ -85,7 +85,7 @@ describe("CT-4 chemins explicites", () => {
     const pairs = Object.entries(doc.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${path}`),
     );
-    expect(pairs).toHaveLength(135);
+    expect(pairs).toHaveLength(137);
     expect(new Set(pairs).size).toBe(pairs.length);
     expect(pairs.sort()).toEqual(ALL_PAIRS);
   });
@@ -126,7 +126,7 @@ describe("CT-5 erreurs typées", () => {
 });
 
 describe("CT-6 génération OpenAPI", () => {
-  it("produit un document OpenAPI 3.x avec les 109 chemins (135 routes)", async () => {
+  it("produit un document OpenAPI 3.x avec les 111 chemins (137 routes)", async () => {
     const doc = (await generateOpenApi()) as {
       openapi: string;
       info: { title: string; version: string };
@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105)", () => {
-  it("est en 3.3.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("3.3.0");
-    expect(CONTRACT_VERSION).toBe("3.3.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106)", () => {
+  it("est en 3.4.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("3.4.0");
+    expect(CONTRACT_VERSION).toBe("3.4.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -241,6 +241,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "3.1.0",
       "3.2.0",
       "3.3.0",
+      "3.4.0",
     ]);
   });
 });
@@ -451,12 +452,16 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["3.0.0"]).not.toBe(versions["2.11.0"]);
   });
 
-  it("l'empreinte 3.3.0 est celle du document généré ; 3.1.0 et 3.2.0 restent figées (TK-103, TK-104, TK-105)", async () => {
+  it("l'empreinte 3.4.0 est celle du document généré ; 3.1.0 à 3.3.0 restent figées (TK-103 à TK-106)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["3.3.0"]).toBe(hash);
+    expect(versions["3.4.0"]).toBe(hash);
+    expect(versions["3.4.0"]).not.toBe(versions["3.3.0"]);
+    expect(versions["3.3.0"]).toBe(
+      "2d983924cfb08886ae5f9806ded8ac588fda29ee1509e94ef3c6f40846736348",
+    );
     expect(versions["3.3.0"]).not.toBe(versions["3.2.0"]);
     expect(versions["3.2.0"]).toBe(
       "2d01ad97c777a650c1c3e10289de11a9ee0b37ca10ae895822cf9f456f736dfd",

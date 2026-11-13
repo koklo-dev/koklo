@@ -12,7 +12,7 @@ import { installation, repo } from "./contract-provider.ts";
 import { review } from "./contract-review.ts";
 import { invitation, me, memberSettings, org } from "./contract-settings.ts";
 import { projectShell, search } from "./contract-shell.ts";
-import { spec, specBatch } from "./contract-spec.ts";
+import { spec, specBatch, specMigration } from "./contract-spec.ts";
 import { suggestion } from "./contract-suggestion.ts";
 import { dependency, sprint, ticket } from "./contract-tickets.ts";
 import {
@@ -118,6 +118,9 @@ import type {
   specBatchSubmitInputSchema,
   specHeadSchema,
   specItemSchema,
+  specMigrationOutputSchema,
+  specMigrationRevertInputSchema,
+  specMigrationStartInputSchema,
   specOperationSchema,
   specRefsSearchInputSchema,
   specRefsSearchOutputSchema,
@@ -209,6 +212,7 @@ export const contract = {
   repo,
   spec,
   specBatch,
+  specMigration,
 };
 
 export type HealthInput = z.input<typeof healthInputSchema>;
@@ -276,6 +280,9 @@ export type SpecRefsSearchOutput = z.output<typeof specRefsSearchOutputSchema>;
 export type SpecOperation = z.input<typeof specOperationSchema>;
 export type SpecBatchSubmitInput = z.input<typeof specBatchSubmitInputSchema>;
 export type SpecBatchOutput = z.output<typeof specBatchSchema>;
+export type SpecMigrationStartInput = z.input<typeof specMigrationStartInputSchema>;
+export type SpecMigrationRevertInput = z.input<typeof specMigrationRevertInputSchema>;
+export type SpecMigrationOutput = z.output<typeof specMigrationOutputSchema>;
 export type ValidationReport = z.output<typeof validationReportSchema>;
 export type ProjectClient = z.output<typeof projectClientSchema>;
 export type IdeaPage = z.output<typeof ideaPageSchema>;

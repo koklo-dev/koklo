@@ -56,9 +56,9 @@ describe("SH1 surface additive", () => {
     ]);
   });
 
-  it("le contrat est en 3.3.0 (version majeure : ai.draftBrief retirée)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.3.0");
-    expect((await doc()).info.version).toBe("3.3.0");
+  it("le contrat est en 3.4.0 (lien d'endpoint élargi à zone.verbe, TK-106)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.4.0");
+    expect((await doc()).info.version).toBe("3.4.0");
   });
 });
 
