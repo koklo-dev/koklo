@@ -8,6 +8,7 @@ import {
   type NeighborNode,
   neighborsOf,
   neighborZoneOf,
+  positionsForView,
   usesZoneView,
   type ZoneNode,
   zoneNodeOf,
@@ -146,6 +147,14 @@ function TablesViewer({
     [diagram.relations, view.neighbors],
   );
   const canMove = canWriteData(page.role);
+  const positions = useMemo(
+    () =>
+      positionsForView(
+        diagram.positions,
+        view.nodes.map((node) => node.id),
+      ),
+    [diagram.positions, view.nodes],
+  );
   return (
     <DiagramViewer<Shown>
       key={view.open ?? "toutes"}
@@ -159,9 +168,16 @@ function TablesViewer({
       onSelect={(id) =>
         isNeighborId(id) ? page.url.openZone(neighborZoneOf(id)) : page.url.select(id)
       }
-      positions={diagram.positions}
-      // Une zone voisine se déplace à l'écran sans être enregistrée : `_layout.yaml` ne garde que des tables.
-      onMove={canMove ? (id, point) => isNeighborId(id) || diagram.move(id, point) : undefined}
+      positions={positions}
+      // Toute la vue est enregistrée (B481) ; une zone voisine se déplace à l'écran sans l'être : `_layout.yaml`
+      // ne garde que des tables.
+      onMove={
+        canMove
+          ? (id, point, plan) => {
+              if (!isNeighborId(id)) diagram.move(id, point, plan);
+            }
+          : undefined
+      }
       initialZoom={zoom.initialZoom}
       onZoomChange={zoom.onZoomChange}
       minimap

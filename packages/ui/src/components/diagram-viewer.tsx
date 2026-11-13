@@ -1,6 +1,6 @@
 "use client";
 
-import { type PointerEvent, type ReactNode, useCallback, useMemo, useState } from "react";
+import { type PointerEvent, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/cn.ts";
 import {
   clampPoint,
@@ -49,8 +49,13 @@ export interface DiagramViewerProps<T extends DiagramNode> {
   onSelect?: ((id: string) => void) | undefined;
   /** Positions enregistrées (coin haut gauche) : elles priment sur le placement automatique. */
   positions?: Readonly<Record<string, DiagramPoint>> | undefined;
-  /** Dépôt d'un déplacement (glisser ou Alt + flèches). Absent : lecteur sans déplacement (designer). */
-  onMove?: ((id: string, point: DiagramPoint) => void) | undefined;
+  /**
+   * Dépôt d'un déplacement (glisser ou Alt + flèches). `plan` : coin haut gauche de chaque nœud affiché après le
+   * déplacement, pour enregistrer toute la vue d'un coup (B481). Absent : lecteur sans déplacement (designer).
+   */
+  onMove?:
+    | ((id: string, point: DiagramPoint, plan: Readonly<Record<string, DiagramPoint>>) => void)
+    | undefined;
   initialZoom?: number | "fit" | undefined;
   /** Plein écran (B479) : état et bascule tenus par l'écran, qui choisit ce qui passe en plein écran (lecteur, fil, fiche). */
   fullscreen?: { active: boolean; onToggle: () => void } | undefined;
@@ -103,13 +108,15 @@ function useDiagramModel<T extends DiagramNode>(props: DiagramViewerProps<T>) {
   const [announce, setAnnounce] = useState<{ text: string; zoom: number } | null>(null);
   const plan = usePlan(nodes, relations, positions, moved);
   const zoom = useDiagramZoom({ initialZoom, plan, onZoomChange });
+  const planRef = useRef(plan);
+  planRef.current = plan;
 
   const commit = useCallback(
     (id: string, point: DiagramPoint) => {
       const name = nodes.find((node) => node.id === id)?.name ?? id;
       setMoved((prev) => ({ ...prev, [id]: point }));
       setAnnounce({ text: `${name} déplacée`, zoom: zoom.zoomRef.current });
-      onMove?.(id, point);
+      onMove?.(id, point, { ...planRef.current.positions, [id]: point });
     },
     [nodes, onMove, zoom.zoomRef],
   );

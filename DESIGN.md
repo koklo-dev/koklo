@@ -527,6 +527,8 @@ Galerie : `/dev/ui`, section « 21. Diagramme » (lecteur équipe avec états, p
 
 **Zones voisines et plein écran (v2.26, B479, B480)** : dans une zone ouverte, chaque zone reliée est une carte `ZoneNode` 260 × 96 sur `--surface` (nom, « N tables · k relations · ouvrir », `arrow_forward`), reliée en pointillés à chaque table de la zone qui la vise (étiquette « 2 relations » au-delà d'une) ; un clic passe à cette zone (`?zone=`), on navigue ainsi de zone en zone au détail des tables. Ces cartes se déplacent à l'écran sans être enregistrées. « Plein écran » : l'onglet (fil, aide, lecteur, fiche) devient un calque `fixed inset-0` sur `--background`, marges 16, lecteur à la hauteur de la fenêtre moins 112 ; le navigateur passe en plein écran au mieux (document entier, pour que la fiche en panneau reste visible). Échap ou la sortie du plein écran du navigateur le referme ; une fenêtre de dialogue ouverte garde son Échap. Le compteur de relations de l'en-tête et la colonne Relations comptent aussi les clés `ref(T-…)` (une fois par paire de tables), comme le diagramme.
 
+**Positions par vue (v2.27, B481)** : une vue (toutes les tables, ou une zone) n'applique les positions de `data/_layout.yaml` que si chacune de ses tables en a une ; sinon le placement automatique, jamais un mélange (qui superposait des cartes). Un déplacement enregistre le coin de toutes les tables de la vue, placement automatique compris : la vue devient entièrement manuelle.
+
 ### 5.20 Validation du modèle et vue client des Données (v2.24, TK-109, passation 09 §3.5, §3.6, §4, §6, §7, maquette 11 l.160-167, 209-219, 595-596, 625-648, B444 à B455)
 
 | Composant | Règle |
@@ -613,3 +615,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 13/11/2026 | v2.24 (TK-109, passation 09 §3.5-3.6 et §6, B444 à B455, maquette 11) : §5.20 validation du modèle, vue client en lecture seule, état « À revoir » (sans planche : teintes de la l.652) ; lot C : `InlineAlert readonly`, icône `add_comment`, `DataClientView` |
 | 13/11/2026 | v2.25 (correctif staging, B476 à B478, maquette 11) : diagramme lisible (blocs, rangs repliés, étagères), relations des clés étrangères, vue des zones, fil, « Aller à une table… », mini-carte ; `ZoneNode` gagne `previewLimit`, `detail`, `arrow` |
 | 13/11/2026 | v2.26 (correctif staging, B479, B480) : zones voisines dans une zone ouverte, plein écran du diagramme (icônes `fullscreen`, `fullscreen_exit`), compteurs de relations alignés sur le diagramme |
+| 13/11/2026 | v2.27 (correctif staging, B481) : positions enregistrées appliquées par vue entière, un déplacement enregistre toute la vue |
