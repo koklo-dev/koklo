@@ -116,7 +116,17 @@ describe("lectures agrégées des tables", () => {
     expect(calls[0]?.values).toContainEqual(["row-1"]);
   });
 
-  it("tableRelationTotal : somme des relations déclarées ; tableZoneFacets : comptes par zone", async () => {
+  it("B476 : les clés ref(T-…) comptent, une fois par paire de tables, sans boucle", async () => {
+    const { raw, calls } = capture([{ n: 44 }]);
+    expect(await withOrganization(ORG, () => tableRelationTotal(raw, "snap"))).toBe(44);
+    const sql = calls[0]?.sql ?? "";
+    expect(sql).toContain("'champs'");
+    expect(sql).toContain("^ref\\((T-[a-z0-9-]+)\\)$");
+    expect(sql).toContain("UNION");
+    expect(sql).toContain("dst <> src");
+  });
+
+  it("tableRelationTotal : relations de l'instantané ; tableZoneFacets : comptes par zone", async () => {
     const total = capture([{ n: 79 }]);
     expect(await withOrganization(ORG, () => tableRelationTotal(total.raw, "snap"))).toBe(79);
     const facets = capture([
