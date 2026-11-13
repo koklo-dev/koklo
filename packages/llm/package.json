@@ -21,14 +21,14 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "4.0.98",
-    "@ai-sdk/google": "4.0.113",
-    "@ai-sdk/mistral": "4.0.80",
-    "@ai-sdk/openai": "4.0.110",
-    "@ai-sdk/openai-compatible": "3.0.86",
+    "@ai-sdk/anthropic": "4.0.99",
+    "@ai-sdk/google": "4.0.114",
+    "@ai-sdk/mistral": "4.0.81",
+    "@ai-sdk/openai": "4.0.111",
+    "@ai-sdk/openai-compatible": "3.0.87",
     "@koklo/domain": "workspace:*",
     "@openrouter/ai-sdk-provider": "3.1.0",
-    "ai": "7.0.164"
+    "ai": "7.0.166"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
