@@ -36,16 +36,22 @@ export interface PaginationProps
   /** Estimation : faux quand le serveur sait qu'il n'y a plus de suite. */
   hasNext?: boolean;
   onPageChange: (page: number) => void;
-  onSizeChange: (size: PageSize) => void;
+  /** Taille choisie par l'appelant ; absente, la taille est imposée (« 25 lignes par page », sans choix). */
+  onSizeChange?: ((size: PageSize) => void) | undefined;
+  /** `sm` : boutons de 28 px (44 sous 768 px), texte de 12, chevrons de 16 (jeux d'exemple, maquette 11 l.561). */
+  density?: Density;
 }
 
+type Density = "md" | "sm";
+
 const SIZE_OPTIONS = PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) }));
-const CELL =
-  "inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 font-mono text-meta";
-const PAGE_BUTTON = cn(
-  CELL,
-  "border border-border bg-background text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors",
-);
+const CELLS = {
+  md: "inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 font-mono text-meta",
+  // Maquette 11 l.561 : 28 × 28, mono 12 ; 44 sous 768 px (cible tactile, fiche §10).
+  sm: "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 font-mono text-caption max-md:h-11 max-md:min-w-11",
+};
+const PAGE_BUTTON =
+  "border border-border bg-background text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors";
 const CURRENT = "border-0 bg-primary text-primary-foreground hover:bg-primary/90";
 
 function rangeText(page: number, size: number, total: number, estimate: boolean): string {
@@ -60,13 +66,16 @@ function Numbers({
   page,
   pageCount,
   onPageChange,
+  density,
 }: {
   page: number;
   pageCount: number;
   onPageChange: (p: number) => void;
+  density: Density;
 }) {
+  const cell = CELLS[density];
   return (
-    <ol className="flex flex-wrap items-center gap-3">
+    <ol className={cn("flex flex-wrap items-center", density === "sm" ? "gap-2" : "gap-3")}>
       {pageItems(page, pageCount).map((item, index) =>
         item === "gap" ? (
           <li
@@ -74,7 +83,7 @@ function Numbers({
             key={`gap-${index}`}
             data-slot="pagination-gap"
             aria-hidden="true"
-            className={cn(CELL, "text-muted-foreground")}
+            className={cn(cell, "text-muted-foreground")}
           >
             …
           </li>
@@ -84,7 +93,7 @@ function Numbers({
               type="button"
               aria-label={`Page ${item}`}
               aria-current={item === page ? "page" : undefined}
-              className={cn(PAGE_BUTTON, item === page && CURRENT)}
+              className={cn(cell, PAGE_BUTTON, item === page && CURRENT)}
               onClick={() => onPageChange(item)}
             >
               {item}
@@ -101,7 +110,9 @@ function StepButton({
   icon,
   disabled,
   onClick,
+  density,
 }: {
+  density: Density;
   label: string;
   icon: "chevron_left" | "chevron_right";
   disabled: boolean;
@@ -112,12 +123,12 @@ function StepButton({
     <Button
       variant="outline"
       size="sm"
-      className="w-8 px-0"
+      className={density === "sm" ? "size-7 px-0 max-md:size-11" : "w-8 px-0"}
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={18} />
+      <Icon name={icon} size={density === "sm" ? 16 : 18} />
     </Button>
   );
 }
@@ -131,6 +142,7 @@ export function Pagination({
   hasNext,
   onPageChange,
   onSizeChange,
+  density = "md",
   className,
   ...props
 }: PaginationProps) {
@@ -142,33 +154,50 @@ export function Pagination({
       aria-label="Pagination"
       data-slot="pagination"
       className={cn(
-        "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t bg-surface px-3.5 py-2.5 text-meta",
+        "flex flex-wrap items-center justify-between gap-y-2 border-t bg-surface px-3.5",
+        density === "sm" ? "gap-x-2 py-2 text-caption" : "gap-x-3 py-2.5 text-meta",
         className,
       )}
       {...props}
     >
       <p className="text-muted-foreground">{rangeText(page, size, total, totalIsEstimate)}</p>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-          <span aria-hidden="true">Lignes par page</span>
-          <SegmentedControl
-            size="xs"
-            aria-label="Lignes par page"
-            options={SIZE_OPTIONS}
-            value={String(size)}
-            onValueChange={(value) => onSizeChange(Number(value) as PageSize)}
-          />
-        </span>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-y-2",
+          density === "sm" ? "gap-x-2" : "gap-x-3",
+        )}
+      >
+        {onSizeChange ? (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <span aria-hidden="true">Lignes par page</span>
+            <SegmentedControl
+              size="xs"
+              aria-label="Lignes par page"
+              options={SIZE_OPTIONS}
+              value={String(size)}
+              onValueChange={(value) => onSizeChange(Number(value) as PageSize)}
+            />
+          </span>
+        ) : (
+          <span className="text-muted-foreground">{`${size} lignes par page`}</span>
+        )}
         <StepButton
+          density={density}
           label="Page précédente"
           icon="chevron_left"
           disabled={first}
           onClick={() => onPageChange(page - 1)}
         />
         {totalIsEstimate ? null : (
-          <Numbers page={page} pageCount={pageCount} onPageChange={onPageChange} />
+          <Numbers
+            page={page}
+            pageCount={pageCount}
+            onPageChange={onPageChange}
+            density={density}
+          />
         )}
         <StepButton
+          density={density}
           label="Page suivante"
           icon="chevron_right"
           disabled={last}

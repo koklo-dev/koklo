@@ -41,6 +41,8 @@ export const ICON_NAMES = [
   "history",
   // Données et technique
   "database",
+  "dataset",
+  "schema",
   "api",
   "palette",
   "smart_toy",

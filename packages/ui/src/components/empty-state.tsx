@@ -25,8 +25,8 @@ export interface EmptyStateProps
 }
 
 const FRAME: Record<EmptyStateVariant, string> = {
-  framed: "rounded-xl border border-dashed border-border-strong bg-surface px-5 py-7",
-  inline: "gap-2 px-6 py-16",
+  framed: "rounded-xl border border-dashed border-border-strong bg-surface px-7 py-8",
+  inline: "px-6 py-16",
 };
 
 /**
@@ -52,7 +52,8 @@ export function EmptyState({
       data-slot="empty-state"
       data-variant={variant}
       className={cn(
-        "flex flex-col items-center gap-2.5 text-center",
+        "flex flex-col items-center text-center",
+        variant === "framed" ? "gap-3" : "gap-2",
         FRAME[variant],
         variant === "inline" && bordered && "rounded-xl border border-border bg-background",
         className,
@@ -64,7 +65,14 @@ export function EmptyState({
       ) : (
         <Icon name={icon} size={28} className="text-muted-foreground" />
       )}
-      <p className="text-subsection-title text-foreground">{title}</p>
+      <p
+        className={cn(
+          "text-foreground",
+          variant === "framed" ? "text-card-title font-semibold" : "text-subsection-title",
+        )}
+      >
+        {title}
+      </p>
       <p
         className={cn(
           "text-meta text-muted-foreground",
@@ -74,12 +82,7 @@ export function EmptyState({
         {description}
       </p>
       {action || secondaryAction ? (
-        <div
-          className={cn(
-            "flex flex-wrap items-center justify-center gap-2",
-            variant === "inline" && "mt-1",
-          )}
-        >
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
           {action}
           {secondaryAction}
         </div>

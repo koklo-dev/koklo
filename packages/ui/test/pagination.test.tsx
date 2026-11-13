@@ -178,4 +178,21 @@ describe("Pagination : écarts de la planche 12 l.84", () => {
     expect(nav).toHaveClass("gap-x-3");
     expect(nav.querySelector("ol")).toHaveClass("gap-3");
   });
+
+  it("density sm : 28 px (44 sous 768 px), gap 8, texte 12 (maquette 11 l.561)", () => {
+    render(<Pagination page={2} size={25} total={100} density="sm" onPageChange={vi.fn()} />);
+    const nav = screen.getByRole("navigation", { name: "Pagination" });
+    expect(nav).toHaveClass("gap-x-2", "text-caption", "py-2");
+    expect(nav.querySelector("ol")).toHaveClass("gap-2");
+    expect(screen.getByRole("button", { name: "Page 1" })).toHaveClass(
+      "h-7",
+      "min-w-7",
+      "max-md:h-11",
+      "max-md:min-w-11",
+    );
+    expect(screen.getByRole("button", { name: "Page précédente" })).toHaveClass(
+      "size-7",
+      "max-md:size-11",
+    );
+  });
 });

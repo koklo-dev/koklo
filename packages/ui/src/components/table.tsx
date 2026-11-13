@@ -20,6 +20,8 @@ export type TableProps = ComponentProps<"table"> & {
   stickyHeader?: boolean;
   /** Classes du cadre (hauteur maximale d'un tableau à en-tête collant, par exemple). */
   frameClassName?: string;
+  /** Nom de la région défilante focusable d'un tableau encadré (« Tables du modèle de données »). */
+  frameLabel?: string;
 };
 
 export function Table({
@@ -28,6 +30,7 @@ export function Table({
   dense = false,
   stickyHeader = false,
   frameClassName,
+  frameLabel,
   ...props
 }: TableProps) {
   return (
@@ -35,6 +38,7 @@ export function Table({
       {/* Un cadre qui défile doit être atteignable au clavier (WCAG 2.1.1) : tabIndex seulement s'il est encadré. */}
       <div
         tabIndex={framed ? 0 : undefined}
+        {...(framed && frameLabel ? { role: "region", "aria-label": frameLabel } : {})}
         className={cn(
           "relative w-full overflow-auto",
           framed &&

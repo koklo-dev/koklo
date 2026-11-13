@@ -6,6 +6,7 @@
   --status-validated-fg: #166534;
   --status-pending-bg: #fef3c7;
   --status-pending-fg: #92400e;
+  --status-pending-icon: #b45309;
   --status-revise-bg: #fee2e2;
   --status-revise-fg: #991b1b;
 
@@ -28,6 +29,7 @@
   --status-validated-fg: #bbf7d0;
   --status-pending-bg: #78350f;
   --status-pending-fg: #fde68a;
+  --status-pending-icon: #fde68a;
   --status-revise-bg: #7f1d1d;
   --status-revise-fg: #fecaca;
 
