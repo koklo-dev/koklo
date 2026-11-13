@@ -3,6 +3,7 @@ import {
   BusinessRuleSchema,
   EndpointSchema,
   FeatureSchema,
+  FixtureSchema,
   ProjectManifestSchema,
   RelationSchema,
   RolesFileSchema,
@@ -17,6 +18,7 @@ const BASE = "https://koklo.dev/schemas/spec/v1";
 const entities = {
   endpoint: EndpointSchema,
   feature: FeatureSchema,
+  fixture: FixtureSchema,
   project: ProjectManifestSchema,
   relation: RelationSchema,
   roles: RolesFileSchema,

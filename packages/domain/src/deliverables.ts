@@ -91,7 +91,7 @@ export function deliverablesAvailabilityOf(facts: DeliverableFacts): Deliverable
 /** Genres d'entités indexées (`spec_entities.kind`) qui composent chaque livrable (B325 c) ; les autres zones n'ont encore rien d'indexé. */
 export const DELIVERABLE_ENTITY_KINDS: Readonly<Record<DeliverableKey, readonly string[]>> = {
   functional: ["feature", "rule", "roles", "flow"],
-  data: ["table", "relations"],
+  data: ["table", "relations", "fixture"],
   architecture: [],
   technical: [],
   security: [],

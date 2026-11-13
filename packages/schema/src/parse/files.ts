@@ -1,4 +1,4 @@
-import type { BusinessRule, Feature, Flow, RolesFile } from "../entities/index.ts";
+import type { BusinessRule, Feature, Fixture, Flow, RolesFile } from "../entities/index.ts";
 import { compare, sortIssues, structIssue } from "../issue.ts";
 import type { Issue, Parsed, ParsedSpec, SpecFile } from "../types.ts";
 import { parseFeatureMarkdown } from "./feature-markdown.ts";
@@ -92,7 +92,15 @@ const stem = (path: string) => path.replace(/\.[^./]*$/, "");
 const byPath = (a: SpecFile, b: SpecFile) =>
   compare(stem(a.path), stem(b.path)) || compare(a.path, b.path);
 
-const IDENTIFIED = new Set<Kind>(["feature", "table", "endpoint", "screen", "rule", "flow"]);
+const IDENTIFIED = new Set<Kind>([
+  "feature",
+  "table",
+  "endpoint",
+  "screen",
+  "rule",
+  "flow",
+  "fixture",
+]);
 
 const empty = (): ParsedSpec => ({
   features: [],
@@ -104,6 +112,7 @@ const empty = (): ParsedSpec => ({
   roles: [],
   rules: [],
   flows: [],
+  fixtures: [],
 });
 
 /** Range une entité valide dans la bonne liste du snapshot. */
@@ -118,6 +127,7 @@ function place(spec: ParsedSpec, kind: Kind, path: string, value: unknown): void
   else if (kind === "roles") spec.roles.push(entry as Parsed<RolesFile>);
   else if (kind === "rule") spec.rules.push(entry as Parsed<BusinessRule>);
   else if (kind === "flow") spec.flows.push(entry as Parsed<Flow>);
+  else if (kind === "fixture") spec.fixtures.push(entry as Parsed<Fixture>);
   else spec.tests.push(entry);
 }
 

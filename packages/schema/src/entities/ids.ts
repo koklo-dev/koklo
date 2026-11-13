@@ -7,6 +7,7 @@ export const PATTERNS = {
   feature: /^F-\d{3,}$/,
   criterion: /^AC-\d+$/,
   table: new RegExp(`^T-${slug}$`),
+  fixture: new RegExp(`^FX-${slug}$`),
   /** Endpoint : `E-<slug>` (format v1) ou `<zone>.<verbe>` (format v2). */
   endpoint: new RegExp(`^(E-${slug}|${slug}\\.${slug})$`),
   screen: new RegExp(`^S-${slug}$`),
@@ -22,6 +23,7 @@ export const PATTERNS = {
 export const featureId = z.string().regex(PATTERNS.feature);
 export const criterionId = z.string().regex(PATTERNS.criterion);
 export const tableId = z.string().regex(PATTERNS.table);
+export const fixtureId = z.string().regex(PATTERNS.fixture);
 export const endpointId = z.string().regex(PATTERNS.endpoint);
 export const screenId = z.string().regex(PATTERNS.screen);
 export const roleId = z.string().regex(PATTERNS.role);

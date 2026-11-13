@@ -316,6 +316,7 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
     expect(counts).toEqual({
       endpoint: SEED_VOLUMES.large.endpoints,
       feature: 1000,
+      fixture: 2,
       flow: 18,
       roles: 1,
       rule: 300,
@@ -328,6 +329,63 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
     );
     expect(snapshot?.entities_indexed_at).not.toBeNull();
   }, 120_000);
+
+  it("TK-107 : les 80 tables sont au format TableV2 (titre = nom, zone, champs, relations, source) et deux jeux d'exemple sont indexés", async () => {
+    const id = (await projectByName("Volume · charge"))?.id as string;
+    expect(SEED_VOLUMES.large.fixtures).toBe(2);
+    const entities = (kind: string) =>
+      db.query<{
+        spec_id: string;
+        zone: string | null;
+        path: string;
+        data: Record<string, unknown>;
+      }>(
+        `SELECT e.spec_id, e.zone, e.path, e.data FROM spec_entities e
+           JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+          WHERE r.project_id = $1 AND e.kind = $2 ORDER BY e.sort`,
+        [id, kind],
+      );
+    const tables = await entities("table");
+    expect(tables).toHaveLength(80);
+    const zones = new Set<unknown>();
+    for (const row of tables) {
+      const data = row.data as {
+        id: string;
+        nom: string;
+        titre: string;
+        zone: string;
+        champs: { nom: string; type: string }[];
+        relations?: { vers: string; cardinalite: string }[];
+        source: string[];
+      };
+      expect(data.id).toBe(row.spec_id);
+      expect(data.titre).toBe(data.nom);
+      expect(data.zone.length).toBeGreaterThan(0);
+      zones.add(data.zone);
+      expect(data.champs.length).toBeGreaterThanOrEqual(3);
+      expect(data.champs[0]).toMatchObject({ nom: "id", type: "uuid", cle: "primaire" });
+      expect(data.source.every((ref) => /^(F|R)-\d{3,}$/.test(ref))).toBe(true);
+      expect(row.path).toBe(`data/tables/${row.spec_id.slice(2)}.yaml`);
+    }
+    expect(zones.size).toBeGreaterThanOrEqual(5);
+    const known = new Set(tables.map((row) => row.spec_id));
+    const links = tables.flatMap(
+      (row) => (row.data as { relations?: { vers: string }[] }).relations ?? [],
+    );
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.every((link) => known.has(link.vers))).toBe(true);
+    expect(tables.find((row) => row.spec_id === "T-table-070")?.data.nom).toBe("Table 070");
+
+    const fixtures = await entities("fixture");
+    expect(fixtures.map((row) => row.spec_id)).toEqual(["FX-table-001", "FX-table-002"]);
+    for (const row of fixtures) {
+      const data = row.data as { id: string; titre: string; table: string; lignes: unknown[] };
+      expect(known.has(data.table)).toBe(true);
+      expect(data.lignes).toHaveLength(3);
+      expect(JSON.stringify(data.lignes)).not.toMatch(/@(?!exemple\.fr|example\.)/);
+      expect(row.path).toBe(`data/fixtures/${row.spec_id}.yaml`);
+    }
+  });
 
   it("chaque entité porte un titre, un chemin, un rang et un hachage valides ; F-987 est trouvable par préfixe et par mot", async () => {
     const id = (await projectByName("Volume · charge"))?.id as string;
@@ -376,7 +434,14 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
     const counts = Object.fromEntries(
       (await entityCounts(planche)).map((row) => [row.kind, row.n]),
     );
-    expect(counts).toMatchObject({ feature: 248, table: 65, endpoint: 47, rule: 86, flow: 18 });
+    expect(counts).toMatchObject({
+      feature: 248,
+      table: 65,
+      fixture: 2,
+      endpoint: 47,
+      rule: 86,
+      flow: 18,
+    });
   }, 120_000);
 });
 

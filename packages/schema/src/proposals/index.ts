@@ -1,7 +1,13 @@
+import { fixturesProposalSchema, relationsProposalSchema, tableProposalSchema } from "./data.ts";
 import { criteriaProposalSchema, featureProposalSchema } from "./feature.ts";
 import { flowProposalSchema, roleProposalSchema, ruleProposalSchema } from "./others.ts";
 
 export { isSafeText, safeText } from "./ai-text-policy.ts";
+export {
+  fixturesProposalSchema,
+  relationsProposalSchema,
+  tableProposalSchema,
+} from "./data.ts";
 export {
   CRITERIA_MAX,
   criteriaListSchema,
@@ -18,4 +24,7 @@ export const PROPOSAL_SCHEMAS = {
   rule: ruleProposalSchema,
   role: roleProposalSchema,
   flow: flowProposalSchema,
+  table: tableProposalSchema,
+  relations: relationsProposalSchema,
+  fixtures: fixturesProposalSchema,
 } as const;

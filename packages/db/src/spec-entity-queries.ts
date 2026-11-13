@@ -25,6 +25,9 @@ const organizationOf = (): string => {
 export const likePrefixOf = (input: string): string =>
   `${input.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
 
+/** Motif « contient » : comme `likePrefixOf`, les jokers de la saisie deviennent des caractères ordinaires. */
+const likeContainsOf = (input: string): string => `%${likePrefixOf(input).slice(0, -1)}%`;
+
 /**
  * Éléments de l'instantané des `kinds` dont l'identifiant commence par `q` OU dont l'identifiant et le titre contiennent
  * ses mots (`french`), triés par rang puis identifiant. `q` vide : les premiers éléments. Au plus `limit` lignes.
@@ -66,7 +69,7 @@ export async function entitiesReferencing(
     SELECT kind, spec_id, COALESCE(data ->> 'titre', '') AS title, (count(*) OVER ())::int AS total
       FROM spec_entities
      WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid
-       AND NOT (kind = 'feature' AND spec_id = ${specId})
+       AND spec_id <> ${specId}
        AND data::text ~ ('(^|[^A-Za-z0-9-])' || ${specId} || '([^A-Za-z0-9-]|$)')
      ORDER BY sort, spec_id, kind
      LIMIT ${limit}`;
@@ -78,7 +81,7 @@ export async function entitiesReferencing(
 
 /**
  * Identifiants (`id` de ligne) des éléments d'un genre de l'instantané dont l'identifiant commence par `q` OU dont l'identifiant
- * et le titre contiennent ses mots (`french`, le dernier en préfixe) : la recherche des listes de règles et de parcours, que
+ * et le titre contiennent ses mots (`french`, le dernier en préfixe), ou, pour une table, dont un champ contient `q` : la recherche des listes de règles, de parcours et de tables, que
  * Prisma ne sait pas filtrer (colonne `tsvector`). `q` sans mot ni préfixe cherchable : liste vide. Au plus `SEARCH_LIMIT` lignes.
  */
 export async function searchEntityIds(
@@ -89,10 +92,61 @@ export async function searchEntityIds(
 ): Promise<string[]> {
   const organizationId = organizationOf();
   const query = tsqueryOf(q);
+  // Une table se trouve aussi par le nom de l'un de ses champs (TK-107, B388) : `data -> 'champs'`, motif lié en paramètre.
   const rows = await raw.$queryRaw<{ id: string }[]>`
     SELECT id FROM spec_entities
      WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = ${kind}
-       AND (spec_id ILIKE ${likePrefixOf(q.trim())} OR (${query}::text IS NOT NULL AND search @@ to_tsquery('french', ${query})))
+       AND (spec_id ILIKE ${likePrefixOf(q.trim())} OR (${query}::text IS NOT NULL AND search @@ to_tsquery('french', ${query}))
+            OR (${kind} = 'table' AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(data -> 'champs') = 'array' THEN data -> 'champs' ELSE '[]'::jsonb END
+                  ) AS field WHERE field ->> 'nom' ILIKE ${likeContainsOf(q.trim())})))
      LIMIT ${SEARCH_LIMIT}`;
   return rows.map((row) => row.id);
+}
+
+/** Nombre de relations de chaque table (lignes `ids` de `spec_entities`) : déclarées par la table + déclarées par d'autres vers elle (B384). */
+export async function tableRelationCounts(
+  raw: PrismaClient,
+  snapshotId: string,
+  ids: readonly string[],
+): Promise<Map<string, number>> {
+  const organizationId = organizationOf();
+  const rows = await raw.$queryRaw<{ id: string; n: number }[]>`
+    SELECT t.id, (
+             CASE WHEN jsonb_typeof(t.data -> 'relations') = 'array' THEN jsonb_array_length(t.data -> 'relations') ELSE 0 END
+             + (SELECT count(*) FROM spec_entities o,
+                       jsonb_array_elements(CASE WHEN jsonb_typeof(o.data -> 'relations') = 'array' THEN o.data -> 'relations' ELSE '[]'::jsonb END) AS relation
+                 WHERE o.organization_id = ${organizationId}::uuid AND o.snapshot_id = ${snapshotId}::uuid
+                   AND o.kind = 'table' AND o.id <> t.id AND relation ->> 'vers' = t.spec_id)
+           )::int AS n
+      FROM spec_entities t
+     WHERE t.organization_id = ${organizationId}::uuid AND t.snapshot_id = ${snapshotId}::uuid
+       AND t.kind = 'table' AND t.id = ANY(${[...ids]}::uuid[])`;
+  return new Map(rows.map((row) => [row.id, row.n]));
+}
+
+/** Relations déclarées par l'ensemble des tables de l'instantané (compteur d'en-tête de la page Données). */
+export async function tableRelationTotal(raw: PrismaClient, snapshotId: string): Promise<number> {
+  const organizationId = organizationOf();
+  const [row] = await raw.$queryRaw<{ n: number }[]>`
+    SELECT COALESCE(sum(CASE WHEN jsonb_typeof(data -> 'relations') = 'array' THEN jsonb_array_length(data -> 'relations') ELSE 0 END), 0)::int AS n
+      FROM spec_entities
+     WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = 'table'`;
+  return row?.n ?? 0;
+}
+
+/** Comptes de tables par zone (`data.zone`), restreints aux lignes `ids` quand elles sont données (recherche en cours). */
+export async function tableZoneFacets(
+  raw: PrismaClient,
+  snapshotId: string,
+  ids: readonly string[] | null,
+): Promise<Record<string, number>> {
+  const organizationId = organizationOf();
+  const rows = await raw.$queryRaw<{ zone: string; n: number }[]>`
+    SELECT data ->> 'zone' AS zone, count(*)::int AS n FROM spec_entities
+     WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = 'table'
+       AND data ->> 'zone' IS NOT NULL AND (${ids === null ? null : [...ids]}::uuid[] IS NULL OR id = ANY(${ids === null ? null : [...ids]}::uuid[]))
+     GROUP BY 1 ORDER BY 1`;
+  return Object.fromEntries(rows.map((row) => [row.zone, row.n]));
 }

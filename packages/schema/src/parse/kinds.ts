@@ -2,6 +2,7 @@ import type { z } from "zod";
 import {
   BusinessRuleSchema,
   EndpointSchema,
+  FixtureSchema,
   FlowSchema,
   ProjectManifestSchema,
   RelationsFileSchema,
@@ -22,7 +23,8 @@ export type Kind =
   | "test"
   | "roles"
   | "rule"
-  | "flow";
+  | "flow"
+  | "fixture";
 
 const SLUG = "[a-z0-9][a-z0-9-]*";
 /** Table : `<slug>.yaml` (v2) ou `T-<slug>.yaml` (v1, toujours lu). */
@@ -41,6 +43,7 @@ export function kindOf(path: string): Kind | undefined {
   if (/^design\/screens\/S-[^/]*\.json$/.test(path)) return "screen";
   if (/^domain\/rules\/R-[^/]*\.md$/.test(path)) return "rule";
   if (/^design\/flows\/P-[^/]*\.yaml$/.test(path)) return "flow";
+  if (/^data\/fixtures\/FX-[^/]*\.yaml$/.test(path)) return "fixture";
   if (/^(tests|quality)\/scenarios\/[^/]*\.yaml$/.test(path)) return "test";
   return undefined;
 }
@@ -66,6 +69,7 @@ export const SCHEMAS = {
   roles: RolesFileSchema,
   rule: BusinessRuleSchema,
   flow: FlowSchema,
+  fixture: FixtureSchema,
 } as const satisfies Record<string, z.ZodType>;
 
 /** Schéma d'un type de fichier selon la version de spec (seule la table change de forme). */
