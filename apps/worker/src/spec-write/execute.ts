@@ -8,6 +8,7 @@ import {
 } from "@koklo/domain";
 import type { SpecFile } from "@koklo/schema";
 import { readSpecFiles } from "../spec-read/read-spec.ts";
+import { touchesData } from "./auto-migrate.ts";
 import { RECOVERY_WINDOW } from "./constants.ts";
 import { ideaTagOf } from "./idea-payload.ts";
 import { buildCommitMessage, hasOpsTrailer } from "./message.ts";
@@ -98,7 +99,8 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
     repo,
     listing,
     specPath: batch.repo.specPath,
-    migration,
+    // Un lot de Données sur un dépôt v1 le migre d'abord (auto-migrate.ts) : il lit les mêmes fichiers qu'une migration.
+    migration: migration || touchesData(batch.operations),
   });
   const treePaths = listing.files.flatMap((file) => {
     const path = relativeToSpec(batch.repo.specPath, file.path);

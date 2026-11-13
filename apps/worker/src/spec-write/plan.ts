@@ -9,6 +9,7 @@ import {
   parseSpecFiles,
   type SpecFile,
 } from "@koklo/schema";
+import { startingPoint } from "./auto-migrate.ts";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
 import { applyFixture, fixtureIndex } from "./fixtures.ts";
 import { applyFlow, flowIndex } from "./flows.ts";
@@ -227,19 +228,21 @@ export function planBatch(
   if (batch.operations.some((operation) => isIdeaKind(operation.kind))) {
     return planIdeaBatch(batch.operations, treePaths);
   }
-  const index = indexOf(files);
+  const start = startingPoint(batch.operations, files);
+  if ("outcome" in start) return start;
+  const index = indexOf(start.files);
   const conflict = conflictOf(batch.operations, index);
   if (conflict) return { outcome: conflict };
   const workspace: Planned = {
     designer: batch.authorRole === "designer",
-    files: new Map(files.map((file) => [file.path, file.content])),
-    changes: new Map(),
+    files: new Map(start.files.map((file) => [file.path, file.content])),
+    changes: new Map(start.changes.map((change) => [change.path, change])),
     index,
   };
   try {
     for (const operation of batch.operations) applyOperation(workspace, operation);
     refreshModel(workspace);
-    const report = validate(files, toFiles(workspace.files));
+    const report = validate(start.files, toFiles(workspace.files));
     return report
       ? { changes: [...workspace.changes.values()], report }
       : { changes: [...workspace.changes.values()] };
