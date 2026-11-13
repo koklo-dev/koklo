@@ -3,15 +3,16 @@ import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
-import { SPEC_BATCH_ROLES } from "../auth/roles.ts";
-import { RoleGuard, Roles, SessionGuard } from "../auth/session.guard.ts";
+import { DATA_PROPOSAL_ROLES, SPEC_BATCH_ROLES } from "../auth/roles.ts";
+import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { inProject } from "../tracker/scope.ts";
 import { SpecDataService } from "./spec-data.service.ts";
 
 /**
  * Page Données (TK-107, B389) : owner, admin, développeur et designer en lecture ; client et business 403. Le rôle est refusé
- * avant le contrôle du projet (404).
+ * avant le contrôle du projet (404). Diagramme (TK-108, B417) : `layout.get` et `tables.source` en lecture (mêmes rôles),
+ * `layout.save` pour ceux qui écrivent les tables (`DATA_PROPOSAL_ROLES` : le designer, le client et le business reçoivent 403).
  */
 @Controller()
 export class SpecDataController {
@@ -75,6 +76,51 @@ export class SpecDataController {
         errors,
         input.projectId,
         (scope) => this.service.fixtureRows(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.data.tables.source)
+  tableSource(@Req() request: Request) {
+    return implement(contract.spec.data.tables.source).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.tableSource(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.data.layout.get)
+  layout(@Req() request: Request) {
+    return implement(contract.spec.data.layout.get).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.layout(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...DATA_PROPOSAL_ROLES)
+  @Implement(contract.spec.data.layout.save)
+  saveLayout(@Req() request: Request) {
+    return implement(contract.spec.data.layout.save).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.saveLayout(scope, requireSession(request).role ?? "", input),
         this.access,
       ),
     );

@@ -36,8 +36,14 @@ import {
   dataFixtureRowsSchema,
   dataFixturesListInputSchema,
   dataFixturesListSchema,
+  dataLayoutGetInputSchema,
+  dataLayoutSavedSchema,
+  dataLayoutSaveInputSchema,
+  dataLayoutSchema,
   dataMermaidInputSchema,
   dataMermaidSchema,
+  dataTableSourceInputSchema,
+  dataTableSourceSchema,
   dataTableSummarySchema,
   dataTablesListInputSchema,
 } from "./schemas-spec-data.ts";
@@ -88,6 +94,41 @@ const spec = {
         .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
         .input(dataTablesListInputSchema)
         .output(listOf(dataTableSummarySchema)),
+      /** Fichier `data/tables/<slug>.yaml` au commit lu, sinon YAML généré (3.6.0, B417). Équipe et designer seulement. */
+      source: route("GET", "/projects/{projectId}/spec/data/tables/{tableId}/source")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...specIndexFailedError,
+          ...providerErrors,
+        })
+        .input(dataTableSourceInputSchema)
+        .output(dataTableSourceSchema),
+    },
+    /**
+     * Positions des tables du diagramme (TK-108, 3.6.0, B417, B418) : `get` lit `data/_layout.yaml` (équipe et designer) ;
+     * `save` l'écrit par un lot du worker (owner, admin et développeur ; 403 pour les autres), dernier écrit gagne.
+     */
+    layout: {
+      get: route("GET", "/projects/{projectId}/spec/data/layout")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...specIndexFailedError,
+          ...providerErrors,
+        })
+        .input(dataLayoutGetInputSchema)
+        .output(dataLayoutSchema),
+      save: route("POST", "/projects/{projectId}/spec/data/layout")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...providerErrors,
+          ...specBatchConflictError,
+          ...specInvalidError,
+        })
+        .input(dataLayoutSaveInputSchema)
+        .output(dataLayoutSavedSchema),
     },
     mermaid: route("GET", "/projects/{projectId}/spec/data/mermaid")
       .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })

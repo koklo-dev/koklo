@@ -8,9 +8,11 @@ import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
   EntityRowData,
+  GitSource,
   IndexFailure,
   ModelSource,
   SpecDataRepository,
+  TableSource,
   TablesPage,
   TablesRequest,
 } from "./spec-data.repository.ts";
@@ -20,6 +22,8 @@ const failureOf = (snapshot: Snapshot): IndexFailure => ({
   errorCode: snapshot.errorCode ?? "unknown",
   commitSha: snapshot.commitSha,
 });
+
+type Found = NonNullable<Awaited<ReturnType<SpecHeadResolver["resolve"]>>>;
 
 const rowOf = (row: { specId: string; path: string; data: unknown }): EntityRowData => ({
   specId: row.specId,
@@ -81,14 +85,38 @@ export class PrismaSpecDataRepository implements SpecDataRepository {
     });
   }
 
+  /** Où lire git pour l'instantané lisible : commit, dossier de spec, dépôt, propriétaire et installation. */
+  private async gitSource(tx: Tx, found: Found, snapshot: Snapshot): Promise<GitSource> {
+    const installation = await tx.providerInstallation.findFirst({
+      where: { id: found.repo.installationId },
+    });
+    return {
+      commitSha: snapshot.commitSha,
+      specPath: found.repo.specPath,
+      repoName: found.repo.name,
+      owner: { kind: installation?.ownerKind ?? "organization", login: found.repo.ownerLogin },
+      installation: {
+        id: installation?.id ?? "",
+        externalId: installation?.externalId ?? "",
+        active: installation?.status === "active",
+      },
+    };
+  }
+
+  headSource(scope: ProjectScope, revision: Revision) {
+    return this.transactions.run(scope, async (tx) => {
+      const readable = await this.readable(tx, scope, revision);
+      if (readable === null || "kind" in readable) return readable;
+      const { found, snapshot } = readable;
+      return { kind: "found" as const, ...(await this.gitSource(tx, found, snapshot)) };
+    });
+  }
+
   modelSource(scope: ProjectScope, revision: Revision): Promise<IndexFailure | ModelSource | null> {
     return this.transactions.run(scope, async (tx) => {
       const readable = await this.readable(tx, scope, revision);
       if (readable === null || "kind" in readable) return readable;
       const { found, snapshot } = readable;
-      const installation = await tx.providerInstallation.findFirst({
-        where: { id: found.repo.installationId },
-      });
       const tables = await tx.specEntity.findMany({
         where: { snapshotId: snapshot.id, kind: "table" },
         orderBy: [{ sort: "asc" }, { id: "asc" }],
@@ -96,16 +124,30 @@ export class PrismaSpecDataRepository implements SpecDataRepository {
       });
       return {
         kind: "found" as const,
-        commitSha: snapshot.commitSha,
-        specPath: found.repo.specPath,
-        repoName: found.repo.name,
-        owner: { kind: installation?.ownerKind ?? "organization", login: found.repo.ownerLogin },
-        installation: {
-          id: installation?.id ?? "",
-          externalId: installation?.externalId ?? "",
-          active: installation?.status === "active",
-        },
+        ...(await this.gitSource(tx, found, snapshot)),
         tables: tables.map((row) => row.data),
+      };
+    });
+  }
+
+  tableSource(
+    scope: ProjectScope,
+    revision: Revision,
+    specId: string,
+  ): Promise<IndexFailure | TableSource | null> {
+    return this.transactions.run(scope, async (tx) => {
+      const readable = await this.readable(tx, scope, revision);
+      if (readable === null || "kind" in readable) return readable;
+      const { found, snapshot } = readable;
+      const row = await tx.specEntity.findFirst({
+        where: { snapshotId: snapshot.id, kind: "table", specId },
+        select: { specId: true, path: true, data: true },
+      });
+      if (!row) return null;
+      return {
+        kind: "found" as const,
+        ...(await this.gitSource(tx, found, snapshot)),
+        ...rowOf(row),
       };
     });
   }

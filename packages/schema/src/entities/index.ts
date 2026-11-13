@@ -5,5 +5,6 @@ export * from "./feature.ts";
 export * from "./fixture.ts";
 export * from "./flow.ts";
 export * from "./ids.ts";
+export * from "./layout.ts";
 export * from "./project.ts";
 export * from "./screen.ts";

@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { GitAccess } from "../repo/git-access.ts";
+import { SpecBatchModule } from "../spec-batch/spec-batch.module.ts";
 import { SpecReadModule } from "../spec-read/spec-read.module.ts";
 import { TrackerModule } from "../tracker/tracker.module.ts";
 import { PrismaSpecDataRepository } from "./prisma-spec-data.repository.ts";
@@ -9,7 +10,7 @@ import { SpecDataService } from "./spec-data.service.ts";
 
 /** Page Données (TK-107) : tables, modèle Mermaid, jeux d'exemple. Lit l'index d'entités, jamais le réseau sauf `data/model.mmd`. */
 @Module({
-  imports: [TrackerModule, SpecReadModule],
+  imports: [TrackerModule, SpecReadModule, SpecBatchModule],
   controllers: [SpecDataController],
   providers: [
     SpecDataService,

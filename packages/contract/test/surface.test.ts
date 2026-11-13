@@ -300,6 +300,10 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /projects/{projectId}/spec/data/mermaid",
     "GET /projects/{projectId}/spec/data/fixtures",
     "GET /projects/{projectId}/spec/data/fixtures/{fixtureId}/rows",
+    // TK-108 (3.6.0) : diagramme du modèle (positions des tables, source d'une table).
+    "GET /projects/{projectId}/spec/data/layout",
+    "POST /projects/{projectId}/spec/data/layout",
+    "GET /projects/{projectId}/spec/data/tables/{tableId}/source",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -331,7 +335,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(141);
+    expect(pairs).toHaveLength(144);
   });
 });
 

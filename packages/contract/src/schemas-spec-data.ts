@@ -192,3 +192,44 @@ export const dataFixtureRowsInputSchema = z
 export const dataFixtureRowsSchema = pageNumberOf(z.record(z.string(), cellSchema)).extend({
   columns: z.array(z.string()),
 });
+
+// --- Diagramme du modèle (TK-108, contrat 3.6.0, B417, B418) ---
+/** Même clé d'idempotence que `specBatch.submit`. */
+const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
+export const LAYOUT_COORD_MAX = 20000;
+export const LAYOUT_MAX_ENTRIES = 500;
+const coordinateSchema = z.number().int().min(0).max(LAYOUT_COORD_MAX);
+const commitShaSchema = z.string().regex(/^[0-9a-f]{40}$/);
+
+/** Positions des tables déplacées, par identifiant `T-<slug>` ; `data/_layout.yaml` (mêmes bornes que @koklo/schema). */
+export const layoutPositionsSchema = z
+  .record(tableIdSchema, z.strictObject({ x: coordinateSchema, y: coordinateSchema }))
+  .refine((positions) => Object.keys(positions).length <= LAYOUT_MAX_ENTRIES, {
+    message: `au plus ${LAYOUT_MAX_ENTRIES} tables positionnées`,
+  });
+
+export const dataLayoutGetInputSchema = dataMermaidInputSchema;
+/** Fichier absent de la tête : `positions` vide. */
+export const dataLayoutSchema = z.object({
+  positions: layoutPositionsSchema,
+  commitSha: commitShaSchema,
+});
+/** Le client écrit tout le plan à chaque dépôt (dernier écrit gagne, aucun `baseSha`). */
+export const dataLayoutSaveInputSchema = z.object({
+  projectId: z.uuid(),
+  idempotencyKey: idempotencyKeySchema,
+  positions: layoutPositionsSchema,
+});
+/** `commitSha` nul : le lot est enregistré mais le worker ne l'a pas encore commité (délai d'attente dépassé). */
+export const dataLayoutSavedSchema = z.object({ commitSha: commitShaSchema.nullable() });
+
+export const dataTableSourceInputSchema = z
+  .object({ projectId: z.uuid(), tableId: tableIdSchema, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+/** `generated` : le fichier est absent du dépôt, le YAML est produit depuis l'index (jamais rendu à un client). */
+export const dataTableSourceSchema = z.object({
+  path: z.string(),
+  text: z.string(),
+  commitSha: commitShaSchema,
+  generated: z.boolean(),
+});
