@@ -40,6 +40,8 @@ export function useReviewActions(projectId: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: orpc.clientSpace.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.spec.deliverables.key() }),
+        // Barre latérale : compteur « SPEC N/7 » et cadenas des livrables (TK-109).
+        queryClient.invalidateQueries({ queryKey: orpc.project.shell.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.review.key() }),
       ]),
   });

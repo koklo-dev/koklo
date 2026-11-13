@@ -32,7 +32,7 @@ import { TABLES_PAGE_SIZE } from "../lib/use-data-tables.ts";
 import { FilterChipMenu } from "./features-filters.tsx";
 
 /** Pastille « Oui · NFR-001 » (ambre = `--status-pending-*`) ou « Non » : texte et teinte, jamais la couleur seule. */
-function PersonalPill({ personal }: { personal: boolean }) {
+export function PersonalPill({ personal }: { personal: boolean }) {
   return personal ? (
     <Pill size="md" tone="warning">
       Oui · NFR-001

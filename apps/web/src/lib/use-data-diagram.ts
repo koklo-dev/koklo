@@ -25,7 +25,7 @@ export interface TableNode extends DiagramNode {
   card: DiagramCard;
 }
 
-const nodeOf = (card: DiagramCard): TableNode => ({
+export const nodeOf = (card: DiagramCard): TableNode => ({
   id: card.id,
   name: card.name,
   width: CARD_WIDTH,

@@ -215,6 +215,9 @@ export function serveData(
   procedures.specDataFixturesRows.mockImplementation(async (input: unknown) =>
     fixtureRows(Number((input as { page: number }).page)),
   );
+  // TK-109 : décisions du livrable (Validé par) et commentaires de table, vides par défaut
+  procedures.reviewList.mockResolvedValue({ items: [], nextCursor: null });
+  procedures.commentList.mockResolvedValue({ items: [], nextCursor: null });
   serveProposals([]);
 }
 

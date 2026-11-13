@@ -103,4 +103,51 @@ describe("dataHeaderStateOf", () => {
     expect(state.summary).toBeUndefined();
     expect(state.actions).toEqual(["propose", "create"]);
   });
+
+  it("Validation de l'équipe (pending) : « Valider le modèle » en dernier, pour qui écrit", () => {
+    const state = dataHeaderStateOf({ ...base, deliverable: "pending" });
+    expect(state.status).toBe("in_progress");
+    expect(state.actions).toEqual(["propose", "create", "validate"]);
+  });
+
+  it("À revoir : statut revise et « Valider le modèle » (on peut revalider)", () => {
+    const state = dataHeaderStateOf({ ...base, deliverable: "revise" });
+    expect(state.status).toBe("revise");
+    expect(state.actions).toContain("validate");
+  });
+
+  it("Validé : « Validé par Moussa le 5 nov. · version 3c7e1a9 », sans « Valider le modèle »", () => {
+    const state = dataHeaderStateOf({
+      ...base,
+      deliverable: "validated",
+      validation: {
+        name: "Moussa",
+        at: "2026-11-05T10:00:00.000Z",
+        sha: "3c7e1a9".padEnd(40, "0"),
+      },
+    });
+    expect(state.status).toBe("validated");
+    expect(state.summary).toBe("Validé par Moussa le 5 nov. · version 3c7e1a9");
+    expect(state.actions).toEqual(["propose", "create"]);
+  });
+
+  it("Validé sans prénom ni SHA : « Validé par l'équipe le 5 nov. »", () => {
+    const state = dataHeaderStateOf({
+      ...base,
+      deliverable: "validated",
+      validation: { name: null, at: "2026-11-05T10:00:00.000Z", sha: null },
+    });
+    expect(state.summary).toBe("Validé par l'équipe le 5 nov.");
+  });
+
+  it("Validé sans décision lue : les compteurs restent le résumé", () => {
+    expect(dataHeaderStateOf({ ...base, deliverable: "validated" }).summary).toBe(
+      "6 tables · 6 relations · 2 jeux d'exemple",
+    );
+  });
+
+  it("designer : jamais « Valider le modèle »", () => {
+    const state = dataHeaderStateOf({ ...base, canWrite: false, deliverable: "pending" });
+    expect(state.actions).toEqual([]);
+  });
 });

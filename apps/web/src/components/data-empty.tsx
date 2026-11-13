@@ -2,7 +2,6 @@
 
 import { Button, EmptyState, formatCount } from "@koklo/ui";
 import type { ReactElement } from "react";
-import { DATA_LOCKED_TEXT, DATA_LOCKED_TITLE } from "../lib/data-labels.ts";
 
 const count = (n: number, one: string, other: string): string =>
   `${formatCount(n)} ${n === 1 ? one : other}`;
@@ -77,19 +76,5 @@ export function DataEmptyPlain({
           }
         : {})}
     />
-  );
-}
-
-/** Client et business : les lectures `spec.data.*` leur sont refusées (B389), la page le dit au lieu d'échouer. */
-export function DataLocked() {
-  return (
-    <div className="mx-auto mt-8 flex w-full max-w-[560px] flex-col gap-3 px-4">
-      <EmptyState
-        icon="lock"
-        title={DATA_LOCKED_TITLE}
-        description={DATA_LOCKED_TEXT}
-        wideDescription
-      />
-    </div>
   );
 }

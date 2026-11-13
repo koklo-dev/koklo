@@ -157,6 +157,14 @@ export function useProposalLaunch(
         call.clear();
       }
     },
+    /** Ouvre la modale avec un choix et une consigne préremplis (« Proposer les mises à jour », B450). */
+    prefill: (id: string, text: string) => {
+      setChoice(id);
+      setInstruction(text);
+      run.clearNotice();
+      call.clear();
+      setOpen(true);
+    },
     choices: list.choices,
     value,
     setChoice,

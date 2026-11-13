@@ -28,6 +28,9 @@ const PERSONAL = [
 const FIELDS_HINT =
   "Un par ligne : nom · type · contrainte. Types : uuid, texte(n), entier, decimal, booleen, horodatage, date, enum, ref(T-…). Ajoutez « clé primaire » ou « données personnelles » à une ligne.";
 
+const SUMMARY_HINT =
+  "Ce que le client lit sur cette table. Une phrase par ligne, sans mot technique.";
+
 const sourceTag = (tag: string): string | null =>
   /^(F|R)-\d{3,}$/.test(tag)
     ? null
@@ -75,6 +78,16 @@ function TableIdentity({ projectId, values, set, issues, readOnly }: FieldsConte
         rows={2}
         value={values.description}
         onChange={(description) => set({ description })}
+      />
+      <AreaField
+        {...common}
+        field="clientSummary"
+        label="Ce qu'on enregistre"
+        optional
+        rows={3}
+        value={values.clientSummaryText}
+        hint={SUMMARY_HINT}
+        onChange={(clientSummaryText) => set({ clientSummaryText })}
       />
     </>
   );
@@ -150,6 +163,7 @@ const CONFIG: DomainFormConfig<TableValues, "table", Detail> = {
     name: "Nom",
     zone: "Zone",
     description: "Description",
+    clientSummary: "Ce qu'on enregistre",
     fields: "Champs",
     personal: "Données personnelles",
     sources: "Justifiée par",
