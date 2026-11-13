@@ -141,7 +141,7 @@ describe("TK-28 C7 parité des valeurs fermées avec @koklo/domain", () => {
     ["ticket_dependencies", "type", DEPENDENCY_TYPES],
     ["leases", "holder_kind", HOLDER_KINDS],
     ["sprints", "status", ["planned", "active", "closed"]],
-    ["ticket_comments", "target_kind", ["ticket", "feature", "screen", "change_request"]],
+    ["ticket_comments", "target_kind", ["ticket", "feature", "screen", "change_request", "table"]],
     ["ticket_comments", "author_kind", ["human", "agent", "client", "system"]],
     ["audit_log", "actor_kind", ["human", "agent", "runner", "system"]],
     ["project_counters", "name", ["ticket", "sprint", "feature", "suggestion", "rule"]],

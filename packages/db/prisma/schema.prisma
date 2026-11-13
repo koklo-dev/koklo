@@ -313,6 +313,7 @@ enum CommentTargetKind {
   feature
   screen
   change_request
+  table
 
   @@map("comment_target_kind")
 }
@@ -525,6 +526,8 @@ model TicketComment {
   organizationId String            @map("organization_id") @db.Uuid
   targetKind     CommentTargetKind @map("target_kind")
   targetId       String            @map("target_id") @db.Uuid
+  /// Identifiant lisible de la cible (`T-<slug>` pour une table de données) ; NULL pour un ticket.
+  targetRef      String?           @map("target_ref")
   authorKind     CommentAuthorKind @map("author_kind")
   authorId       String?           @map("author_id")
   body           String
@@ -536,6 +539,7 @@ model TicketComment {
 
   @@index([organizationId])
   @@index([targetKind, targetId])
+  @@index([targetKind, targetId, targetRef])
   @@map("ticket_comments")
 }
 
