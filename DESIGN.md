@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.15)
+# Koklo : design (v2.22)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -493,6 +493,21 @@ Galerie : `/dev/ui`, section « 19. Règles, rôles et parcours » (`RuleCard`, 
 
 Galerie : `/dev/ui`, section « 20. Vue client » (`ValidationBanner`, `ValidationPrompt`, `InlineAlert revise`, `ReviewComment`).
 
+### 5.18 Modèle de données (v2.22, TK-107, passation 09 §3, 11 §3, 08 §2.2, B383 à B392, maquette 11 l.91-122, 168-260, 404-412)
+
+| Composant | Règle |
+|---|---|
+| `ErTableCard` | Carte de table du diagramme entité-relation : `li` nommé « Table Réservation, 6 champs », largeur 230, rayon 10, bordure 1 `--border`, fond `--background`, marge basse 6, rognée. En-tête (marges 8 10, écart 8, filet bas `--border`) : icône `table` 16, nom 13/600, identifiant mono 10 à 80 %, fond `--secondary` et texte `--secondary-foreground`. Une ligne de 22 par champ (marges 0 10, écart 6, 12) : icône 14 (`key` remplie ambre `--status-pending-icon` (#b45309 clair, #fde68a sombre, maquette 11 l.410) = clé primaire, `link` `--primary` = référence, `shield` `--muted-foreground` = donnée personnelle, sinon vide), nom mono, type mono 11 `--muted-foreground` (`ref(T-client)` rendu `→T-client`). États : `review` bordure en pointillés, `rejected` estompée par les jetons (fond `--surface`, texte `--muted-foreground`, nom barré ; jamais par l'opacité, un texte à 40 % échoue au contraste AA : écart assumé de la maquette 11 l.409) et doublée de la pastille texte « Rejetée », `selected` (TK-108) en-tête `--primary`, bordure 2, `--shadow-floating`. Réutilisée par le lecteur de TK-108. |
+| Pastille « Données personnelles » | `Pill` md `warning` « Oui · NFR-001 », `outline` « Non » ; aucun style local. |
+| Onglet Tables | `CountBar` + `SearchField` « Rechercher une table ou un champ », `Table` à en-tête collant (`--surface`, 12), lignes de 52, `IdTag` + nom, défilement interne (700 max), pages de 50, `ListFooter`. |
+| Onglet Jeux d'exemple | Phrase d'aide 13, une section par jeu (rayon 12) : en-tête (`IdTag` `FX-…`, titre 600, méta « 3 lignes · T-client · locale fr-FR »), `Table` à colonnes mono, `Pagination` numérotée (25 par page). Données fictives. |
+
+Compléments (TK-107, correction 1) : `CountBar` accepte `trailing` (contenu à droite de la même rangée : recherche de l'onglet Tables) ; `ListFooter` variante `attached` (pied dans le cadre du tableau, sans bord haut, coins bas arrondis, sous un `Table` `frameClassName="rounded-b-none"`) ; `Pagination` prop `density="sm"` (boutons 28, 44 sous 768 px, mono 12, écart 8, chevrons 16) ; `EmptyState` cadré : marges 32 / 28, écart 12, titre 15/600, marge haute 4 sur les boutons (maquettes 10 l.93 et 11 l.93) ; jeton `--status-pending-icon`. Les en-têtes de la liste ont un seul bouton primaire (l'agent) : « Ajouter une table » est en contour.
+
+Compléments (TK-107, lot C) : `Pagination` sans `onSizeChange` impose la taille (« 25 lignes par page », jeux d'exemple) ; `DeliverableStatus` accepte `icon` (`groups` : « Validation de l'équipe · le client lit et commente ») ; `ProposalReview` accepte `summaryText` (bandeau « Mode relecture · l'agent propose N éléments depuis le cahier fonctionnel · A acceptés · P à relire ») ; `Table` encadré accepte `frameLabel` (région défilante focusable et nommée, 375 px).
+
+Galerie : `/dev/ui`, section « 20. Modèle de données » (`ErTableCard` dans ses états, onglets Tables et Jeux). Icônes ajoutées au registre si absentes : `database`, `dataset`, `rate_review`, `verified` (non utilisé ici), `groups`.
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -504,6 +519,7 @@ Galerie : `/dev/ui`, section « 20. Vue client » (`ValidationBanner`, `Validati
 | Fondations v2 (jetons, statuts, composants signature) | Planche « Lot 0 · Fondations v2 », clair et sombre ; galerie `/dev/ui` |
 | Liste des projets et création | Planche « Lot 4 · Projets » (`08-Lot4Projects.html`) ; fiche `S-projects` v7 |
 | Vue d'ensemble du projet | Planche « Lot 3 · Vue d'ensemble » (`07-Lot3Overview.html`) ; fiche `S-overview` |
+| Modèle de données (Prêt, Génération, Relecture, Liste · équipe, onglets Tables et Jeux d'exemple) | Planche « Lot 6 · Données » (`11-Lot6Donnees.html`) ; fiche `S-spec-data` |
 | Cahier fonctionnel (Prêt, Génération, Relecture, Liste · équipe) | Planche « Lot 5 · Fonctionnel » (`10-Lot5Fonctionnel.html`) ; fiche `S-spec-functional` |
 | Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
@@ -560,3 +576,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 12/11/2026 | v2.19 : `ProgressBar` teinte `success` et part en cours `pending` ; avancement de l'enregistrement par lots dans le bandeau de relecture (sortie bloquée pendant l'écriture) |
 | 12/11/2026 | v2.20 (TK-104, passation 06 §4.5, maquette 10) : §5.17 vue client et validation (`ValidationBanner`, `ValidationPrompt`, `InlineAlert revise`, `ReviewComment`) ; note de version « date · sha » seule exception au vocabulaire sans git (B348) |
 | 13/11/2026 | v2.21 (TK-105, B364, B366, maquette 10 volume réel) : vue client, la recherche des fonctionnalités, règles (+ type) et parcours est faite par le serveur sur tout l'index (anti-rebond 250 ms, compte « N chargées » du serveur, « Aucune règle ne correspond à « x » ») ; formulaire d'élément : champ « Zone » facultatif (texte libre, 80 caractères, `Field` existant) ; aucun composant de `packages/ui` ajouté |
+| 13/11/2026 | v2.22 (TK-107, passation 09, B383 à B392, maquette 11) : §5.18 modèle de données (`ErTableCard`, pastille de données personnelles, onglets Tables et Jeux d'exemple) ; diagramme interactif, fiche et validation renvoyés à TK-108 et TK-109 |
