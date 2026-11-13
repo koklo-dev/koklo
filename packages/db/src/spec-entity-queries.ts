@@ -105,7 +105,12 @@ export async function searchEntityIds(
   return rows.map((row) => row.id);
 }
 
-/** Nombre de relations de chaque table (lignes `ids` de `spec_entities`) : déclarées par la table + déclarées par d'autres vers elle (B384). */
+/*
+ * Liens d'une table vers une autre (B476) : relations déclarées (`relations[].vers`) et clés étrangères
+ * (`champs[].type` en `ref(T-…)`), une seule fois par paire, sans boucle. C'est ce que trace le diagramme.
+ */
+
+/** Nombre de relations de chaque table (lignes `ids` de `spec_entities`) : liens qui partent d'elle ou la visent (B384, B476). */
 export async function tableRelationCounts(
   raw: PrismaClient,
   snapshotId: string,
@@ -113,26 +118,38 @@ export async function tableRelationCounts(
 ): Promise<Map<string, number>> {
   const organizationId = organizationOf();
   const rows = await raw.$queryRaw<{ id: string; n: number }[]>`
-    SELECT t.id, (
-             CASE WHEN jsonb_typeof(t.data -> 'relations') = 'array' THEN jsonb_array_length(t.data -> 'relations') ELSE 0 END
-             + (SELECT count(*) FROM spec_entities o,
-                       jsonb_array_elements(CASE WHEN jsonb_typeof(o.data -> 'relations') = 'array' THEN o.data -> 'relations' ELSE '[]'::jsonb END) AS relation
-                 WHERE o.organization_id = ${organizationId}::uuid AND o.snapshot_id = ${snapshotId}::uuid
-                   AND o.kind = 'table' AND o.id <> t.id AND relation ->> 'vers' = t.spec_id)
-           )::int AS n
-      FROM spec_entities t
-     WHERE t.organization_id = ${organizationId}::uuid AND t.snapshot_id = ${snapshotId}::uuid
-       AND t.kind = 'table' AND t.id = ANY(${[...ids]}::uuid[])`;
+    WITH tables AS (
+      SELECT id, spec_id, data FROM spec_entities
+       WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = 'table'
+    ), links AS (
+      SELECT t.spec_id AS src, relation ->> 'vers' AS dst FROM tables t,
+             jsonb_array_elements(CASE WHEN jsonb_typeof(t.data -> 'relations') = 'array' THEN t.data -> 'relations' ELSE '[]'::jsonb END) AS relation
+      UNION
+      SELECT t.spec_id, substring(field ->> 'type' FROM '^ref\\((T-[a-z0-9-]+)\\)$') FROM tables t,
+             jsonb_array_elements(CASE WHEN jsonb_typeof(t.data -> 'champs') = 'array' THEN t.data -> 'champs' ELSE '[]'::jsonb END) AS field
+    )
+    SELECT t.id, (SELECT count(*) FROM links l
+                   WHERE l.dst IS NOT NULL AND l.dst <> l.src AND (l.src = t.spec_id OR l.dst = t.spec_id))::int AS n
+      FROM tables t
+     WHERE t.id = ANY(${[...ids]}::uuid[])`;
   return new Map(rows.map((row) => [row.id, row.n]));
 }
 
-/** Relations déclarées par l'ensemble des tables de l'instantané (compteur d'en-tête de la page Données). */
+/** Relations de l'ensemble des tables de l'instantané, clés étrangères comprises (compteur d'en-tête de la page Données, B476). */
 export async function tableRelationTotal(raw: PrismaClient, snapshotId: string): Promise<number> {
   const organizationId = organizationOf();
   const [row] = await raw.$queryRaw<{ n: number }[]>`
-    SELECT COALESCE(sum(CASE WHEN jsonb_typeof(data -> 'relations') = 'array' THEN jsonb_array_length(data -> 'relations') ELSE 0 END), 0)::int AS n
-      FROM spec_entities
-     WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = 'table'`;
+    WITH tables AS (
+      SELECT spec_id, data FROM spec_entities
+       WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid AND kind = 'table'
+    ), links AS (
+      SELECT t.spec_id AS src, relation ->> 'vers' AS dst FROM tables t,
+             jsonb_array_elements(CASE WHEN jsonb_typeof(t.data -> 'relations') = 'array' THEN t.data -> 'relations' ELSE '[]'::jsonb END) AS relation
+      UNION
+      SELECT t.spec_id, substring(field ->> 'type' FROM '^ref\\((T-[a-z0-9-]+)\\)$') FROM tables t,
+             jsonb_array_elements(CASE WHEN jsonb_typeof(t.data -> 'champs') = 'array' THEN t.data -> 'champs' ELSE '[]'::jsonb END) AS field
+    )
+    SELECT count(*)::int AS n FROM links WHERE dst IS NOT NULL AND dst <> src`;
   return row?.n ?? 0;
 }
 
