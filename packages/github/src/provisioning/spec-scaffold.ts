@@ -20,7 +20,7 @@ const EMPTY_DIRECTORIES = [
   "design/flows",
   "design/fixtures",
   "design/assets",
-  "tests/scenarios",
+  "quality/scenarios",
 ] as const;
 
 /** Chaîne YAML entre guillemets : un slug comme `null` ou `123` ne devient pas un autre type. */
@@ -32,15 +32,15 @@ const readme = (name: string): string =>
 Dépôt de spécification géré par Koklo : ne l'éditez pas à la main, les modifications passent par
 Koklo (lots d'écriture sur la branche \`cadrage\`).
 
-- \`features/\`, \`data/\`, \`api/\`, \`design/\`, \`tests/\` : le modèle de spec validé par Koklo.
+- \`features/\`, \`data/\`, \`api/\`, \`design/\`, \`quality/\` : le modèle de spec validé par Koklo.
 `;
 
-const OVERVIEW = `# Architecture
+const OVERVIEW = `# Architecture : contexte
 
 À compléter pendant le cadrage : contexte, composants principaux, dépendances externes.
 `;
 
-const TECH = `# Cahier technique
+const TECH = `# Cahier technique : objet
 
 À compléter pendant le cadrage : pile retenue, contraintes, environnements.
 `;
@@ -57,17 +57,16 @@ export function buildInitialSpecFiles(input: SpecScaffoldInput): FileWrite[] {
       path: "koklo.project.yaml",
       content: `projet: ${quoted(input.projectSlug)}
 organisation: ${quoted(input.organizationSlug)}
-spec_version: 1
+spec_version: 2
 extends: []
 repos: []
 `,
     },
     { path: "README.md", content: readme(name) },
-    { path: "architecture/overview.md", content: OVERVIEW },
-    { path: "tech/cahier-technique.md", content: TECH },
+    { path: "architecture/overview/01-contexte.md", content: OVERVIEW },
+    { path: "tech/cahier-technique/01-objet.md", content: TECH },
     { path: "domain/roles.yaml", content: "roles: []\n" },
-    { path: "data/relations.yaml", content: "relations: []\n" },
-    { path: ".koklo/rules.yaml", content: "version: 1\n" },
+    { path: "design/rules.yaml", content: "version: 1\n" },
     ...EMPTY_DIRECTORIES.map((directory) => ({ path: `${directory}/.gitkeep`, content: "" })),
   ];
 }

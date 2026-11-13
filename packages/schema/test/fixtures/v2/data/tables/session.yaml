@@ -1,0 +1,7 @@
+id: T-session
+nom: Session
+champs:
+  - { nom: id, type: uuid, cle: primaire }
+  - { nom: user_id, type: ref(T-user), contraintes: Obligatoire }
+relations:
+  - { vers: T-user, cardinalite: "n → 1" }

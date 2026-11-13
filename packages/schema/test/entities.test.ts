@@ -202,10 +202,10 @@ describe("CA1 identifiants et énumérations", () => {
     expect(FeatureSchema.safeParse({ ...feature, criteres }).success).toBe(false);
   });
 
-  it('ProjectManifest refuse spec_version 2 et la chaîne "1"', () => {
-    const v2 = ProjectManifestSchema.safeParse({ ...project, spec_version: 2 });
-    expect(v2.success).toBe(false);
-    expect(v2.error?.issues[0]?.path).toEqual(["spec_version"]);
+  it('ProjectManifest refuse spec_version 3 et la chaîne "1"', () => {
+    const v3 = ProjectManifestSchema.safeParse({ ...project, spec_version: 3 });
+    expect(v3.success).toBe(false);
+    expect(v3.error?.issues[0]?.path).toEqual(["spec_version"]);
     expect(ProjectManifestSchema.safeParse({ ...project, spec_version: "1" }).success).toBe(false);
   });
 

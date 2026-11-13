@@ -13,6 +13,7 @@ const NAMES = [
   "rule",
   "screen",
   "table",
+  "table-v2",
   "test-scenario",
 ];
 
@@ -85,16 +86,16 @@ describe("CA2 JSON Schema généré", () => {
     expect(screen.required).not.toContain("roles");
   });
 
-  it("project : spec_version est la constante 1", () => {
+  it("project : spec_version vaut 1 ou 2", () => {
     const project = schemas.project as JsonSchema;
     expect(project.required).toEqual(
       expect.arrayContaining(["projet", "organisation", "spec_version"]),
     );
-    expect(JSON.stringify(project.properties?.spec_version)).toMatch(/"(const|enum)":\s*(1|\[1\])/);
+    expect(JSON.stringify(project.properties?.spec_version)).toMatch(/"enum":\s*\[1,\s*2\]/);
   });
 
   it("anti-dérive : les fichiers publiés dans schemas/ sont identiques à la génération, octet à octet", () => {
-    expect(readdirSync(schemasDir).sort()).toEqual(NAMES.map((n) => `${n}.schema.json`));
+    expect(readdirSync(schemasDir).sort()).toEqual(NAMES.map((n) => `${n}.schema.json`).sort());
     for (const name of NAMES) {
       const onDisk = readFileSync(resolve(schemasDir, `${name}.schema.json`), "utf8");
       expect(

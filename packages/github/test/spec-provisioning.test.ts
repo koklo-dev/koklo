@@ -52,6 +52,27 @@ const authOf = async (provider: GitProvider) => {
   return { create: auth, write: auth };
 };
 
+describe("TK-106 structure initiale au format v2", () => {
+  it("manifeste spec_version 2, sections 01-*, design/rules.yaml, quality/scenarios, sans relations.yaml", () => {
+    const written = files();
+    const paths = written.map((file) => file.path);
+    expect(written.find((file) => file.path === "koklo.project.yaml")?.content).toContain(
+      "spec_version: 2\n",
+    );
+    for (const expected of [
+      "architecture/overview/01-contexte.md",
+      "tech/cahier-technique/01-objet.md",
+      "design/rules.yaml",
+      "quality/scenarios/.gitkeep",
+    ]) {
+      expect(paths).toContain(expected);
+    }
+    for (const gone of ["data/relations.yaml", ".koklo/rules.yaml", "tests/scenarios/.gitkeep"]) {
+      expect(paths).not.toContain(gone);
+    }
+  });
+});
+
 describe("TK-93 noms de dépôt", () => {
   it("par défaut : <slug du projet>-spec ; le slug est borné pour laisser place au suffixe", () => {
     expect(specRepoName("Refonte du Portail", undefined)).toBe("refonte-du-portail-spec");

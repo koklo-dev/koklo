@@ -1,0 +1,7 @@
+id: T-user
+nom: Utilisateur
+zone: Comptes
+champs:
+  - { nom: id, type: uuid, cle: primaire }
+  - { nom: email, type: texte(255), contraintes: "Obligatoire, unique" }
+  - { nom: mot_de_passe_hash, type: texte(255), contraintes: Obligatoire }

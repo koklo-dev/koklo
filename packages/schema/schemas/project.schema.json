@@ -46,7 +46,10 @@
       "type": "array"
     },
     "spec_version": {
-      "const": 1,
+      "enum": [
+        1,
+        2
+      ],
       "type": "number"
     }
   },

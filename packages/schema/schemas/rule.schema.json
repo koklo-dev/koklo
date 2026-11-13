@@ -6,7 +6,7 @@
     "endpoints": {
       "default": [],
       "items": {
-        "pattern": "^E-[a-z0-9][a-z0-9-]*$",
+        "pattern": "^(E-[a-z0-9][a-z0-9-]*|[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*)$",
         "type": "string"
       },
       "type": "array"

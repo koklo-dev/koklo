@@ -1,0 +1,4 @@
+feature: F-001
+type: e2e
+fichier: e2e/inscription.spec.ts
+criteres: [AC-1, AC-2, AC-3]

@@ -12,29 +12,38 @@ le paquet rend des entités typées et un rapport trié.
 
 ## Entités
 
-| Fichier du dépôt de spec  | Type                                                        | Schéma Zod                               |
-| ------------------------- | ----------------------------------------------------------- | ---------------------------------------- |
-| `koklo.project.yaml`      | manifeste projet                                            | `ProjectManifestSchema`                  |
-| `features/F-*.md`         | feature (front matter + `## Description` + critères `AC-n`) | `FeatureSchema`                          |
-| `data/tables/T-*.yaml`    | table                                                       | `TableSchema`                            |
-| `data/relations.yaml`     | relations entre champs                                      | `RelationsFileSchema` / `RelationSchema` |
-| `api/endpoints/E-*.yaml`  | endpoint                                                    | `EndpointSchema`                         |
-| `design/screens/S-*.json` | écran (arbre de nœuds annotés)                              | `ScreenSchema`                           |
-| `tests/scenarios/*.yaml`  | scénario de test lié à une feature                          | `TestScenarioSchema`                     |
-| `domain/roles.yaml`       | rôles produit (`RL-`) et permissions (`PM-`)                | `RolesFileSchema`                        |
-| `domain/rules/R-*.md`     | règle métier (front matter + `## Énoncé` + `## Exemples`)   | `BusinessRuleSchema`                     |
+| Fichier du dépôt de spec           | Type                                                        | Schéma Zod                               |
+| ---------------------------------- | ----------------------------------------------------------- | ---------------------------------------- |
+| `koklo.project.yaml`               | manifeste projet                                            | `ProjectManifestSchema`                  |
+| `features/F-*.md`                  | feature (front matter + `## Description` + critères `AC-n`) | `FeatureSchema`                          |
+| `data/tables/<slug>.yaml`          | table, format v2 (`id: T-<slug>`)                           | `TableV2Schema`                          |
+| `data/tables/T-*.yaml`             | table, format v1 (toujours lue)                             | `TableSchema`                            |
+| `data/relations.yaml`              | relations entre champs (v1 seulement)                       | `RelationsFileSchema` / `RelationSchema` |
+| `api/endpoints/*.yaml`             | endpoint : `E-<slug>` (v1) ou `<zone>.<verbe>` (v2)         | `EndpointSchema`                         |
+| `design/screens/S-*.json`          | écran (arbre de nœuds annotés)                              | `ScreenSchema`                           |
+| `{tests,quality}/scenarios/*.yaml` | scénario de test lié à une feature                          | `TestScenarioSchema`                     |
+| `domain/roles.yaml`                | rôles produit (`RL-`) et permissions (`PM-`)                | `RolesFileSchema`                        |
+| `domain/rules/R-*.md`              | règle métier (front matter + `## Énoncé` + `## Exemples`)   | `BusinessRuleSchema`                     |
 
 Tous les objets sont des `z.strictObject` (clé inconnue refusée), sauf le nœud d'écran
 (`z.looseObject`) : seules les clés utiles aux règles sont typées, les autres passent. Le type de
 fichier se déduit du chemin (`parse/kinds.ts`) ; un fichier hors modèle est ignoré. Le nom du
-fichier doit être l'identifiant de l'entité (ou commencer par `<id>-`).
+fichier doit être l'identifiant de l'entité (ou commencer par `<id>-`) ; pour une table, le slug
+suffit (`T-x` -> `x.yaml`).
+
+Format de spec (TK-106) : `spec_version` du manifeste vaut 1 ou 2 (défaut 1 ; autre valeur :
+`STRUCT_UNSUPPORTED_SPEC_VERSION`). En v2 les tables suivent `TableV2Schema` (`nom`, `zone`, champs
+typés `texte(n)`, `ref(T-x)`, `enum`, `relations: [{vers, cardinalite}]`) et `data/relations.yaml`
+est refusé (`STRUCT_UNKNOWN_FILE`). `domaine:` est lu comme alias de `zone:` (tables, endpoints,
+fonctionnalités) ; les deux clés différentes sont une violation de schéma. Tout fichier de
+`data/tables/` hors format (hors `.gitkeep`) est signalé (`STRUCT_UNKNOWN_TABLE_FILE`).
 
 ## JSON Schema générés
 
 `src/json-schemas.ts` produit un JSON Schema draft 2020-12 par entité avec `z.toJSONSchema`
-(`io: "input"`, `$id` = `https://koklo.dev/schemas/spec/v1/<nom>.schema.json`). Les neuf fichiers
+(`io: "input"`, `$id` = `https://koklo.dev/schemas/spec/v1/<nom>.schema.json`). Les dix fichiers
 sont versionnés dans `schemas/` (`endpoint`, `feature`, `project`, `relation`, `roles`, `rule`,
-`screen`, `table`, `test-scenario`) et régénérés par :
+`screen`, `table`, `table-v2`, `test-scenario`) et régénérés par :
 
 ```bash
 pnpm --filter @koklo/schema schemas:generate
@@ -98,15 +107,15 @@ circulaire) lève une `CanonicalizeError` dont `path` est le pointeur JSON fauti
 
 Le rapport est une liste d'`Issue` `{ rule, code, severity, path, pointer, entityId?, message }`,
 triée par `path`, `pointer`, `code`, `message`. `ok` vaut `true` s'il n'y a aucune erreur ; les
-avertissements (règle 7) ne le font pas échouer. Les 33 codes de `ISSUE_CODES` font partie du
+avertissements (règle 7) ne le font pas échouer. Les 39 codes de `ISSUE_CODES` font partie du
 contrat public.
 
-| Règle                                                                                                                                                              | Gravité       | Codes                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4 : tout lien pointe vers une entité existante                                                                                                                     | erreur        | `R4_UNKNOWN_FEATURE`, `R4_UNKNOWN_CRITERION`, `R4_UNKNOWN_TABLE`, `R4_UNKNOWN_FIELD`, `R4_UNKNOWN_ENDPOINT`, `R4_UNKNOWN_SCREEN`, `R4_MALFORMED_DATA_REF`, `R4_UNKNOWN_ROLE`, `R4_UNKNOWN_PERMISSION`, `R4_UNKNOWN_RULE`                                                                                                      |
-| 5 : `specifiee` a un écran ou un endpoint, `implementee` un test par critère ; dès `specifiee`, chaque critère a ses étapes dans l'ordre Étant donné, Quand, Alors | erreur        | `R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT`, `R5_IMPLEMENTED_CRITERION_WITHOUT_TEST`, `R5_IMPLEMENTED_WITHOUT_CRITERIA`, `R5_CRITERION_INCOMPLETE`                                                                                                                                                                              |
-| 7 : aucune entité orpheline                                                                                                                                        | avertissement | `R7_ORPHAN_TABLE`, `R7_ORPHAN_ENDPOINT`, `R7_ORPHAN_SCREEN`, `R7_ORPHAN_TEST`, `R7_ORPHAN_ROLE`, `R7_ORPHAN_PERMISSION`, `R7_ORPHAN_RULE`                                                                                                                                                                                     |
-| structure                                                                                                                                                          | erreur        | `STRUCT_YAML_SYNTAX`, `STRUCT_DUPLICATE_KEY`, `STRUCT_YAML_FORBIDDEN_FEATURE`, `STRUCT_MULTIPLE_DOCUMENTS`, `STRUCT_FILE_TOO_LARGE`, `STRUCT_JSON_SYNTAX`, `STRUCT_FRONT_MATTER_MISSING`, `STRUCT_MARKDOWN_SYNTAX`, `STRUCT_SCHEMA_VIOLATION`, `STRUCT_UNSUPPORTED_SPEC_VERSION`, `STRUCT_ID_MISMATCH`, `STRUCT_DUPLICATE_ID` |
+| Règle                                                                                                                                                              | Gravité       | Codes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4 : tout lien pointe vers une entité existante                                                                                                                     | erreur        | `R4_UNKNOWN_FEATURE`, `R4_UNKNOWN_CRITERION`, `R4_UNKNOWN_TABLE`, `R4_UNKNOWN_FIELD`, `R4_UNKNOWN_ENDPOINT`, `R4_UNKNOWN_SCREEN`, `R4_MALFORMED_DATA_REF`, `R4_UNKNOWN_ROLE`, `R4_UNKNOWN_PERMISSION`, `R4_UNKNOWN_RULE`                                                                                                                                                                                                                                                                                                    |
+| 5 : `specifiee` a un écran ou un endpoint, `implementee` un test par critère ; dès `specifiee`, chaque critère a ses étapes dans l'ordre Étant donné, Quand, Alors | erreur        | `R5_SPECIFIED_WITHOUT_SCREEN_OR_ENDPOINT`, `R5_IMPLEMENTED_CRITERION_WITHOUT_TEST`, `R5_IMPLEMENTED_WITHOUT_CRITERIA`, `R5_CRITERION_INCOMPLETE`                                                                                                                                                                                                                                                                                                                                                                            |
+| 7 : aucune entité orpheline                                                                                                                                        | avertissement | `R7_ORPHAN_TABLE`, `R7_ORPHAN_ENDPOINT`, `R7_ORPHAN_SCREEN`, `R7_ORPHAN_TEST`, `R7_ORPHAN_ROLE`, `R7_ORPHAN_PERMISSION`, `R7_ORPHAN_RULE`                                                                                                                                                                                                                                                                                                                                                                                   |
+| structure                                                                                                                                                          | erreur        | `STRUCT_YAML_SYNTAX`, `STRUCT_DUPLICATE_KEY`, `STRUCT_YAML_FORBIDDEN_FEATURE`, `STRUCT_MULTIPLE_DOCUMENTS`, `STRUCT_FILE_TOO_LARGE`, `STRUCT_JSON_SYNTAX`, `STRUCT_FRONT_MATTER_MISSING`, `STRUCT_MARKDOWN_SYNTAX`, `STRUCT_SCHEMA_VIOLATION`, `STRUCT_UNSUPPORTED_SPEC_VERSION`, `STRUCT_ID_MISMATCH`, `STRUCT_DUPLICATE_ID`, `STRUCT_UNKNOWN_TABLE_FILE`, `STRUCT_UNKNOWN_FILE`, `STRUCT_MIGRATION_ALREADY_V2`, `STRUCT_MIGRATION_SOURCE_INVALID`, `STRUCT_MIGRATION_UNKNOWN_REFERENCE`, `STRUCT_MIGRATION_TARGET_EXISTS` |
 
 Une référence de donnée vaut `T-table` ou `T-table.champ`. Une entité qui échoue au parsing est
 exclue du snapshot (`ParsedSpec`) et signalée ; les règles 4, 5 et 7 s'exécutent sur le reste.
@@ -178,3 +187,11 @@ critère (la première faute) : pointeur `/criteres/<i>/etapes/<j>` pour une ét
 `/criteres/<i>/etapes` pour un rôle manquant ou une liste vide. Les `brouillon` restent tolérés ;
 le parseur Markdown et le schéma Zod n'ajoutent aucune contrainte. `splitFrontMatter`
 (`src/parse/frontmatter.ts`) est partagé par les parseurs de feature (usage interne).
+
+## Migration v1 vers v2 (TK-106)
+
+`migrateSpecToV2(files)` (`src/migrate/`, pure, aucune E/S) rend `{ changes, issues }` : les écritures et suppressions
+qui font passer une spec v1 au format v2 (tables `<slug>.yaml` avec relations rangées dans la table source,
+endpoints `<zone>.<verbe>` et références réécrites, scénarios sous `quality/`, `design/rules.yaml`, sections `01-*`,
+`spec_version: 2`). Tout ou rien : une issue (`STRUCT_MIGRATION_*`, erreur de `checkSpec`) vide `changes`. Le résultat
+est vérifié par `checkSpec`. `MIGRATION_EXTRA_PATHS` liste les fichiers hors entités que l'appelant doit lire en plus.

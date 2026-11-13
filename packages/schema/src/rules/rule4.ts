@@ -118,6 +118,18 @@ function dataLinks(spec: ParsedSpec, index: SpecIndex, at: Collect): void {
       at(path, e.id),
     );
   }
+  for (const { path, value: t } of spec.tables) {
+    if (!("relations" in t)) continue;
+    const emit = at(path, t.id);
+    (t.relations ?? []).forEach((r, i) => {
+      if (index.tables.has(r.vers)) return;
+      emit(
+        "R4_UNKNOWN_TABLE",
+        `/relations/${i}/vers`,
+        `La table ${r.vers} citée par la relation n'existe pas.`,
+      );
+    });
+  }
   for (const { path, value: file } of spec.relations) {
     file.relations.forEach((r, i) => {
       const emit = at(path, r.from.split(".")[0] ?? "");

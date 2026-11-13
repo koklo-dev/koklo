@@ -84,8 +84,8 @@ describe("compatibilité : la spec valide complète", () => {
     expect(validateSpec(deepFreeze(spec))).toEqual(checkSpec(validFiles()));
   });
 
-  it("ISSUE_CODES : 33 codes dont les six nouveaux, README et docs à jour", () => {
-    expect(Object.keys(ISSUE_CODES)).toHaveLength(33);
+  it("ISSUE_CODES : 39 codes dont les six nouveaux, README et docs à jour", () => {
+    expect(Object.keys(ISSUE_CODES)).toHaveLength(39);
     for (const code of [
       "R4_UNKNOWN_ROLE",
       "R4_UNKNOWN_PERMISSION",
@@ -96,7 +96,7 @@ describe("compatibilité : la spec valide complète", () => {
     ])
       expect(ISSUE_CODES[code as keyof typeof ISSUE_CODES], code).toBe(code);
     const readme = readFileSync(resolve(import.meta.dirname, "../README.md"), "utf8");
-    expect(readme).toContain("Les 33 codes de `ISSUE_CODES`");
+    expect(readme).toContain("Les 39 codes de `ISSUE_CODES`");
     for (const code of [
       "R4_UNKNOWN_ROLE",
       "R4_UNKNOWN_PERMISSION",
@@ -107,7 +107,7 @@ describe("compatibilité : la spec valide complète", () => {
     ])
       expect(readme, code).toContain(code);
     const domainDoc = readFileSync(resolve(SPEC_ROOT, "docs/domain-model.md"), "utf8");
-    expect(domainDoc).toContain("the 33 issue codes");
+    expect(domainDoc).toContain("the 39 issue codes");
     expect(domainDoc).not.toContain("the 27 issue codes");
   });
 
