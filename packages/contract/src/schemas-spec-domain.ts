@@ -24,7 +24,8 @@ export const specIdSchema = z
 
 const featureLink = z.string().regex(/^F-\d{3,}$/);
 const tableLink = z.string().regex(new RegExp(`^T-${slug}$`));
-const endpointLink = z.string().regex(new RegExp(`^E-${slug}$`));
+/** Endpoint : `E-<slug>` (format v1) ou `<zone>.<verbe>` (format v2, 3.4.0). */
+export const endpointLink = z.string().regex(new RegExp(`^(E-${slug}|${slug}\\.${slug})$`));
 const screenLink = z.string().regex(new RegExp(`^S-${slug}$`));
 const text = (max: number) => z.string().min(1).max(max);
 

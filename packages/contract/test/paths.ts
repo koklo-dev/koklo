@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 3.3.0 (135 routes, 109 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 3.4.0 (137 routes, 111 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -114,6 +114,8 @@ export const ALL_PAIRS: string[] = [
   "POST /projects/{projectId}/spec-repo",
   "POST /projects/{projectId}/spec/batches",
   "POST /projects/{projectId}/spec/deliverables/{key}/force",
+  "POST /projects/{projectId}/spec/migration",
+  "POST /projects/{projectId}/spec/migration/revert",
   "POST /projects/{projectId}/sprints",
   "POST /projects/{projectId}/sprints/{key}/activate",
   "POST /projects/{projectId}/sprints/{key}/close",
@@ -226,6 +228,8 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/spec/features/{specId}",
   "/projects/{projectId}/spec/functional",
   "/projects/{projectId}/spec/items/{type}/{id}",
+  "/projects/{projectId}/spec/migration",
+  "/projects/{projectId}/spec/migration/revert",
   "/projects/{projectId}/spec/refs",
   "/projects/{projectId}/spec/roles/matrix",
   "/projects/{projectId}/sprints",

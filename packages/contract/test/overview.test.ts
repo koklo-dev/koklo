@@ -160,9 +160,9 @@ describe("OV2 project.activity : liste à curseur", () => {
 });
 
 describe("OV3 version et surface 2.7.0", () => {
-  it("le contrat courant est 3.3.0 (additif : version mineure), égal à package.json", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.3.0");
-    expect((await doc()).info.version).toBe("3.3.0");
+  it("le contrat courant est 3.4.0 (additif : version mineure), égal à package.json", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.4.0");
+    expect((await doc()).info.version).toBe("3.4.0");
   });
 
   it("l'OpenAPI expose GET /projects/{projectId}/overview et /activity", async () => {

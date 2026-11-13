@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
 import {
   DOMAIN_OPERATION_KINDS,
+  endpointLink,
   flowCreateSchema,
   flowDeleteSchema,
   flowDetailSchema,
@@ -49,13 +50,14 @@ export const specOperationKindSchema = z.enum([
   "idea.index.write",
   "idea.synthesis.write",
   "idea.version.tag",
+  "spec.migrate",
+  "spec.migrate.revert",
 ]);
 
 const slug = "[a-z0-9][a-z0-9-]*";
 export const featureIdSchema = z.string().regex(/^F-\d{3,}$/);
 export const criterionIdSchema = z.string().regex(/^AC-\d+$/);
 const tableLink = z.string().regex(new RegExp(`^T-${slug}$`));
-const endpointLink = z.string().regex(new RegExp(`^E-${slug}$`));
 const screenLink = z.string().regex(new RegExp(`^S-${slug}$`));
 const roleLink = z.string().regex(new RegExp(`^RL-${slug}$`));
 const ruleLink = z.string().regex(/^R-\d{3,}$/);
@@ -252,6 +254,22 @@ export const specBatchSchema = z.object({
   enqueuedAt: instantSchema,
   committedAt: instantSchema.nullable(),
 });
+/**
+ * Migration du format de spec v1 vers v2 (TK-106, 3.4.0) : un seul lot du bot sur la branche de travail (`cadrage` par
+ * défaut), suivi par `specBatch.get`. `revert` annule un lot de migration déjà commité (retour arrière, un commit).
+ */
+export const specMigrationStartInputSchema = z.object({
+  projectId: z.uuid(),
+  idempotencyKey: specBatchSubmitInputSchema.shape.idempotencyKey,
+  branch: branchSchema.optional(),
+});
+export const specMigrationRevertInputSchema = z.object({
+  projectId: z.uuid(),
+  idempotencyKey: specBatchSubmitInputSchema.shape.idempotencyKey,
+  migrationBatchId: z.uuid(),
+});
+export const specMigrationOutputSchema = z.object({ batchId: z.uuid() });
+
 export const specBatchGetInputSchema = z.object({ projectId: z.uuid(), batchId: z.uuid() });
 
 /**

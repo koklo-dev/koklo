@@ -91,9 +91,9 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 3.3.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.3.0");
-    expect((await doc()).info.version).toBe("3.3.0");
+  it("le contrat courant est 3.4.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.4.0");
+    expect((await doc()).info.version).toBe("3.4.0");
   });
 });
 
@@ -381,7 +381,7 @@ describe("CS5 TK-104 : progression, parcours, règles et rôles", () => {
   });
 });
 
-describe("TK-105 (3.3.0) : recherche serveur de l'espace client", () => {
+describe("TK-105 (3.4.0) : recherche serveur de l'espace client", () => {
   const search = async (path: string, extra: Record<string, unknown> = {}) => {
     const i = input(path);
     expect(await isValid(i, { projectId: UUID, q: "R-0", ...extra }), path).toBe(true);

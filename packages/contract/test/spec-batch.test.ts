@@ -142,6 +142,22 @@ describe("B2 specBatch.submit : opérations feature.*", () => {
   });
 });
 
+describe("B2c specBatch.submit : liens d'endpoint v1 et v2", () => {
+  it("liens d'endpoint : E-<slug> (v1) ou <zone>.<verbe> (v2), rien d'autre (3.4.0)", async () => {
+    const link = (endpoint: string) =>
+      isValid(
+        input("specBatch.submit"),
+        submit({ operations: [{ ...createOp, endpoints: [endpoint] }] }),
+      );
+    expect(await link("E-login")).toBe(true);
+    expect(await link("reservation.lister")).toBe(true);
+    expect(await link("reservation.lister-2")).toBe(true);
+    expect(await link("reservation")).toBe(false);
+    expect(await link("Reservation.lister")).toBe(false);
+    expect(await link("a.b.c")).toBe(false);
+  });
+});
+
 describe("B2b specBatch.submit : feature.update, feature.delete, kind", () => {
   const i = () => input("specBatch.submit");
   const one = (op: object) => submit({ operations: [op] });

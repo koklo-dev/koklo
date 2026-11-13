@@ -25,6 +25,9 @@ import {
   specHeadSchema,
   specItemGetInputSchema,
   specItemSchema,
+  specMigrationOutputSchema,
+  specMigrationRevertInputSchema,
+  specMigrationStartInputSchema,
   specRefsSearchInputSchema,
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
@@ -114,4 +117,27 @@ const specBatch = {
     .output(specBatchSchema),
 };
 
-export { spec, specBatch };
+/**
+ * Migration v1 -> v2 (TK-106, 3.4.0) : owner seulement (403 sinon, garde de rôle avant le projet), audité comme tout lot.
+ * Mêmes erreurs que `idea.publish`, plus la validation de l'entrée ; un défaut de la spec est rendu par `specBatch.get`
+ * (lot `failed`, `SPEC_INVALID`, rapport).
+ */
+const migrationErrors = {
+  ...writeOneErrors,
+  ...validationError,
+  ...providerErrors,
+  ...specBatchConflictError,
+} as const;
+
+const specMigration = {
+  start: route("POST", "/projects/{projectId}/spec/migration")
+    .errors(migrationErrors)
+    .input(specMigrationStartInputSchema)
+    .output(specMigrationOutputSchema),
+  revert: route("POST", "/projects/{projectId}/spec/migration/revert")
+    .errors(migrationErrors)
+    .input(specMigrationRevertInputSchema)
+    .output(specMigrationOutputSchema),
+};
+
+export { spec, specBatch, specMigration };
