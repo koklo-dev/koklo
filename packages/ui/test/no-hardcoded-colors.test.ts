@@ -39,9 +39,14 @@ const FORBIDDEN: Array<[string, RegExp]> = [
   ["SVG en ligne (icônes via <Icon>)", /<svg\b/],
 ];
 
+/** Dessins de diagramme en SVG (ADR 0022) : la règle « SVG en ligne » vise les icônes, pas ces tracés. */
+const SVG_DRAWINGS = new Set(["src/components/diagram-relations.tsx"]);
+
 /** Violations d'un source : libellés des règles enfreintes. */
-function violations(code: string): string[] {
-  return FORBIDDEN.filter(([, re]) => re.test(code)).map(([label]) => label);
+function violations(code: string, rel = ""): string[] {
+  return FORBIDDEN.filter(
+    ([label, re]) => re.test(code) && !(label.startsWith("SVG") && SVG_DRAWINGS.has(rel)),
+  ).map(([label]) => label);
 }
 
 const files = walk(componentsDir, []).filter((f) => /\.(tsx?|css)$/.test(f));
@@ -59,7 +64,7 @@ describe("CA1 (TK-87) : le garde de @koklo/ui parcourt src/components/** par glo
   it.each(files.map((f) => relative(uiRoot, f)))(
     "%s : ni couleur en dur ni SVG en ligne",
     (rel) => {
-      expect(violations(readFileSync(join(uiRoot, rel), "utf8")), rel).toEqual([]);
+      expect(violations(readFileSync(join(uiRoot, rel), "utf8"), rel), rel).toEqual([]);
     },
   );
 });
