@@ -103,6 +103,18 @@ describe("DiagramMinimap", () => {
     );
   });
 
+  it("plan haut : hauteur bornée à 154 px, largeur réduite d'autant", () => {
+    render(
+      <DiagramMinimap
+        {...props}
+        world={{ width: 600, height: 1800 }}
+        onNavigate={() => undefined}
+      />,
+    );
+    const map = screen.getByRole("button", { name: /Mini-carte du diagramme/ });
+    expect(map).toHaveStyle({ width: "51px", height: "154px" });
+  });
+
   it("un rectangle par nœud, la zone active en --primary, les autres en --border-strong", () => {
     render(<DiagramMinimap {...props} onNavigate={() => undefined} />);
     const nodes = document.querySelectorAll("[data-minimap-node]");

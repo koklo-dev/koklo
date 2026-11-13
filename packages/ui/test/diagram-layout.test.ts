@@ -100,7 +100,7 @@ describe("layoutDiagram, grands modèles", () => {
     expect(ratio(plan)).toBeLessThan(3);
   });
 
-  it("une table référencée par 30 autres : son rang se replie en colonnes de 6 au plus", () => {
+  it("une table référencée par 30 autres : son rang se replie en colonnes de 4 au plus", () => {
     const children = Array.from({ length: 30 }, (_, i) => card(`T-c${String(i).padStart(2, "0")}`));
     const nodes = [card("T-hub"), ...children];
     const edges = children.map((child) => ({ from: child.id, to: "T-hub" }));
@@ -110,8 +110,8 @@ describe("layoutDiagram, grands modèles", () => {
       const x = positions[child.id]?.x ?? -1;
       columns.set(x, (columns.get(x) ?? 0) + 1);
     }
-    expect(columns.size).toBe(5);
-    expect(Math.max(...columns.values())).toBeLessThanOrEqual(6);
+    expect(columns.size).toBe(8);
+    expect(Math.max(...columns.values())).toBeLessThanOrEqual(4);
     const hubX = positions["T-hub"]?.x ?? 0;
     expect(Math.max(...columns.keys())).toBeLessThan(hubX);
   });
@@ -131,5 +131,14 @@ describe("layoutDiagram, grands modèles", () => {
         expect(apart).toBe(true);
       }
     }
+  });
+
+  it("une étoile de 6 tables : deux colonnes de 3, pas une colonne de 6", () => {
+    const leaves = Array.from({ length: 6 }, (_, i) => card(`T-f${i}`));
+    const { positions } = layoutDiagram({
+      nodes: [card("T-centre"), ...leaves],
+      edges: leaves.map((leaf) => ({ from: leaf.id, to: "T-centre" })),
+    });
+    expect(new Set(leaves.map((leaf) => positions[leaf.id]?.x)).size).toBe(2);
   });
 });
