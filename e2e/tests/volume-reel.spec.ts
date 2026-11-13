@@ -75,6 +75,14 @@ const pendingProposals = (): Promise<number> =>
     ),
   );
 
+/** Avec des propositions en attente, l'écran ouvre la relecture à l'arrivée (TK-99b) : on revient à la liste. */
+async function leaveReview(page: Page): Promise<void> {
+  const quit = page.getByRole("button", { name: "Quitter la relecture" });
+  await expect(quit).toBeVisible();
+  await quit.click();
+  await expect(page.getByRole("region", { name: "Relecture des propositions" })).toHaveCount(0);
+}
+
 async function expectForbidden(api: APIRequestContext, path: string): Promise<void> {
   expect((await api.get(`${ORPC}${path}`)).status()).toBe(403);
 }
@@ -84,13 +92,16 @@ test("équipe : 248 fonctionnalités, 50 chargées, recherche hors de la page, l
 }) => {
   await signIn(page, admin);
   await page.goto(PATH);
+  await leaveReview(page);
   await expect(page.locator("[data-slot='count-bar']")).toContainText(
     "248 fonctionnalités · 50 chargées",
   );
   await axeClean(page);
   await page.goto(`${PATH}?q=F-200`);
+  await leaveReview(page);
   await expect(page.locator("[data-row-key='F-200']")).toBeVisible();
   await page.goto(`${PATH}?sel=F-200`);
+  await leaveReview(page);
   await expect(
     page.getByRole("complementary", { name: "Fiche de la fonctionnalité" }),
   ).toBeVisible();
@@ -106,10 +117,10 @@ test("équipe : relecture groupée, « Accepter les N » ne touche que son group
   await page.goto(`${PATH}?view=review`);
   const review = page.getByRole("region", { name: "Relecture des propositions" });
   await expect(review).toBeVisible();
-  await expect(review.getByText(/À relire · 355/)).toBeVisible();
+  const before = await pendingProposals();
+  await expect(review.getByRole("button", { name: `À relire · ${before}` })).toBeVisible();
   expect(await review.locator("li").count()).toBeLessThan(300);
   await axeClean(page);
-  const before = await pendingProposals();
   const accept = review.getByRole("button", { name: /^Accepter les \d+ restantes? de / }).first();
   const label = (await accept.getAttribute("aria-label")) ?? "";
   const group = Number(/Accepter les (\d+)/.exec(label)?.[1]);
