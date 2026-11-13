@@ -4,6 +4,7 @@ import {
   AXE_TAGS,
   CAPTURES_DIR,
   type KanbanRole,
+  layoutSavesSeen,
   releaseHeld,
   setScenario,
   settle,
@@ -15,7 +16,7 @@ import { FEATURE_PROJECT_ID, type SpecMode } from "./support/stub-features.ts";
 import type { ProposalsMode } from "./support/stub-proposals.ts";
 
 /**
- * TK-107 lot C, écran Données (design/screens/S-spec-data.md v1, maquette 11) : chaque état (Prêt, Génération, Relecture,
+ * TK-107 lot C et TK-108 lot C, écran Données (design/screens/S-spec-data.md v3, maquette 11) : chaque état (Prêt, Génération, Relecture,
  * Liste · équipe) sur les onglets Tables et Jeux d'exemple, plus Diagramme, Relecture, volume de 80 tables, recherche
  * vide, formulaire et droits, en clair, sombre et à 375 px, avec axe et sans défilement horizontal de page. Pile locale :
  * faux API (support/stub-spec-data.ts). Captures dans design/screens/captures/S-spec-data/<état>-<onglet>-<thème>[-mobile].png.
@@ -36,6 +37,12 @@ interface View {
   visible: (page: Page) => Promise<void>;
   /** Au plus une région `role=status` dans le document (une région vide est masquée, jamais doublée). */
   singleStatus?: boolean;
+  /** Geste après l'état visible (sélection d'une table, vue YAML, zoom) : la capture le montre. */
+  act?: (page: Page) => Promise<void>;
+  /** Ré-affirmé juste avant la capture, après stabilisation de la page. */
+  settled?: (page: Page) => Promise<void>;
+  /** Capture du bureau seulement (vues YAML, Mermaid et zooms). */
+  desktopOnly?: boolean;
 }
 
 const tablesLoaded = async (page: Page, rows: number) => {
@@ -47,8 +54,22 @@ const fixtureLoaded = async (page: Page) => {
   await expect(page.getByRole("table", { name: "Lignes du jeu Clients" })).toBeVisible();
 };
 const diagramLoaded = async (page: Page, cards: number) => {
-  await expect(page.getByRole("list", { name: "Diagramme entité-relation" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Diagramme entité-relation" })).toBeVisible();
   await expect(page.locator("[data-slot='er-table-card']")).toHaveCount(cards);
+};
+const card = (page: Page, name: string) =>
+  page.getByRole("button", { name: new RegExp(`^Table ${name},`) });
+const fiche = (page: Page) =>
+  page
+    .getByRole("complementary", { name: "Fiche de la table" })
+    .or(page.getByRole("dialog", { name: "Fiche de la table" }));
+const pick = async (page: Page, name: string) => {
+  await card(page, name).click();
+  await expect(fiche(page).getByRole("heading", { level: 2, name })).toBeVisible();
+};
+const zoom = async (page: Page, label: "Zoomer" | "Dézoomer", times: number) => {
+  for (let i = 0; i < times; i += 1)
+    await page.getByRole("button", { name: label, exact: true }).click();
 };
 const ready = async (page: Page) => {
   await expect(page.getByText("L'agent peut proposer le modèle de données")).toBeVisible();
@@ -106,8 +127,58 @@ const VIEWS: View[] = [
   {
     name: "list-diagram",
     path: `${PATH}?tab=diagram`,
-    singleStatus: true,
     visible: (page) => diagramLoaded(page, 6),
+  },
+  {
+    name: "list-diagram-fiche",
+    path: `${PATH}?tab=diagram`,
+    visible: (page) => diagramLoaded(page, 6),
+    act: (page) => pick(page, "Réservation"),
+    // La fiche doit toujours être là au moment de la capture (la sélection vit dans l'adresse).
+    settled: (page) =>
+      expect(fiche(page).getByRole("heading", { level: 2, name: "Réservation" })).toBeVisible(),
+  },
+  {
+    name: "list-diagram-yaml",
+    path: `${PATH}?tab=diagram`,
+    desktopOnly: true,
+    visible: (page) => diagramLoaded(page, 6),
+    act: async (page) => {
+      await pick(page, "Réservation");
+      await fiche(page).getByRole("button", { name: "YAML" }).click();
+      await expect(fiche(page).getByText("Source de vérité")).toBeVisible();
+    },
+  },
+  {
+    name: "list-diagram-mermaid",
+    path: `${PATH}?tab=diagram`,
+    desktopOnly: true,
+    visible: (page) => diagramLoaded(page, 6),
+    act: async (page) => {
+      await pick(page, "Réservation");
+      await fiche(page).getByRole("button", { name: "Mermaid" }).click();
+      await expect(fiche(page).getByText("data/model.mmd")).toBeVisible();
+    },
+  },
+  {
+    name: "list-diagram-zoom-50",
+    path: `${PATH}?tab=diagram`,
+    desktopOnly: true,
+    visible: (page) => diagramLoaded(page, 6),
+    act: async (page) => {
+      await zoom(page, "Dézoomer", 4);
+      await expect(page.getByText(/Zoom sous 60 %/)).toBeVisible();
+    },
+  },
+  {
+    name: "list-diagram-zoom-200",
+    path: `${PATH}?tab=diagram`,
+    desktopOnly: true,
+    visible: (page) => diagramLoaded(page, 6),
+    act: async (page) => {
+      await zoom(page, "Zoomer", 4);
+      await expect(page.getByRole("button", { name: "200 %, revenir à 100 %" })).toBeVisible();
+    },
   },
   {
     name: "review-diagram",
@@ -117,6 +188,26 @@ const VIEWS: View[] = [
     visible: async (page) => {
       await diagramLoaded(page, 6);
       await expect(page.getByText("Pointillés : proposition à relire")).toBeVisible();
+    },
+  },
+  {
+    name: "review-diagram-rejected",
+    spec: "dataEmpty",
+    proposals: "data",
+    path: `${PATH}?tab=diagram&view=review`,
+    visible: (page) => diagramLoaded(page, 6),
+    act: async (page) => {
+      // Les décisions se prennent dans l'onglet Relecture : rejeter « Client », puis revenir au diagramme.
+      await page.getByRole("link", { name: /^Relecture/ }).click();
+      await expect(page.getByRole("region", { name: "Diagramme entité-relation" })).toHaveCount(0);
+      await page
+        .getByRole("button", { name: /Client/ })
+        .first()
+        .click();
+      await page.getByRole("button", { name: /^Rejeter/ }).click();
+      await page.getByRole("link", { name: /^Diagramme/ }).click();
+      await diagramLoaded(page, 6);
+      await expect(page.getByText("Rejetée").first()).toBeVisible();
     },
   },
   {
@@ -178,6 +269,7 @@ const VIEWS: View[] = [
 for (const viewport of VIEWPORTS) {
   for (const theme of THEMES) {
     for (const view of VIEWS) {
+      if (view.desktopOnly && viewport.name) continue;
       test(`S-spec-data ${view.name} (${theme}${viewport.name}) : état, axe sans violation, capture`, async ({
         page,
       }) => {
@@ -197,12 +289,14 @@ for (const viewport of VIEWPORTS) {
         }
         await page.goto(view.path);
         await view.visible(page);
+        await view.act?.(page);
         await expect(page.locator("html")).toHaveClass(
           theme === "dark" ? /dark/ : /^((?!dark).)*$/,
         );
         if (view.singleStatus)
           expect(await page.locator("[role='status']").count()).toBeLessThanOrEqual(1);
         await settle(page);
+        await view.settled?.(page);
         await page.screenshot({
           path: `${CAPTURES_DIR}/S-spec-data/${view.name}-${theme}${viewport.name}.png`,
           fullPage: true,
@@ -350,6 +444,92 @@ test.describe("parcours de l'écran Données", () => {
         ],
       },
     ]);
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+test.describe("diagramme du modèle (TK-108)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setScenario({ session: true, projects: "data", proposals: "none" });
+  });
+
+  test("sélection : la table est pressée, sa fiche s'ancre avec Fiche, YAML et Mermaid", async ({
+    page,
+  }) => {
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await pick(page, "Réservation");
+    await expect(card(page, "Réservation")).toHaveAttribute("aria-pressed", "true");
+    await expect(fiche(page).getByRole("table", { name: "Champs de la table" })).toBeVisible();
+    await fiche(page).getByRole("button", { name: "YAML" }).click();
+    await expect(fiche(page).locator("pre")).toContainText("id: T-reservation");
+    await fiche(page).getByRole("button", { name: "Mermaid" }).click();
+    await expect(fiche(page).locator("pre")).toContainText("erDiagram");
+  });
+
+  test("glisser une table enregistre toute la mise en page une seule fois", async ({ page }) => {
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await page.getByRole("button", { name: "Ajuster à l'écran" }).click();
+    const box = await card(page, "Service").boundingBox();
+    if (!box) throw new Error("carte Service introuvable");
+    await page.mouse.move(box.x + 40, box.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 140, box.y + 60, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(async () => (await layoutSavesSeen()).length, { timeout: 5000 }).toBe(1);
+    const [saved] = await layoutSavesSeen();
+    expect(Object.keys(saved?.positions ?? {})).toEqual(["T-service"]);
+  });
+
+  test("Alt + flèche déplace la table de 20 px (alternative au glisser) et enregistre", async ({
+    page,
+  }) => {
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await card(page, "Client").focus();
+    await page.keyboard.press("Alt+ArrowRight");
+    await expect(page.getByText("Client déplacée")).toBeAttached();
+    await expect.poll(async () => (await layoutSavesSeen()).length, { timeout: 5000 }).toBe(1);
+  });
+
+  test("zoom mémorisé par navigateur : rouvert au rechargement", async ({ page }) => {
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await zoom(page, "Zoomer", 1);
+    await expect(page.getByRole("button", { name: "110 %, revenir à 100 %" })).toBeVisible();
+    await page.reload();
+    await diagramLoaded(page, 6);
+    await expect(page.getByRole("button", { name: "110 %, revenir à 100 %" })).toBeVisible();
+  });
+
+  test("sous 1024 px, Tables s'ouvre par défaut", async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.goto(PATH);
+    await tablesLoaded(page, 6);
+    await expect(page.getByRole("region", { name: "Diagramme entité-relation" })).toHaveCount(0);
+  });
+
+  test("designer : lecture seule, pas de glisser ni de « Modifier », YAML visible", async ({
+    page,
+  }) => {
+    await setScenario({ session: true, projects: "data", role: "designer", proposals: "none" });
+    await page.goto(`${PATH}?tab=diagram`);
+    await diagramLoaded(page, 6);
+    await page.getByRole("button", { name: "Ajuster à l'écran" }).click();
+    const box = await card(page, "Service").boundingBox();
+    if (!box) throw new Error("carte Service introuvable");
+    await page.mouse.move(box.x + 40, box.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 140, box.y + 60, { steps: 8 });
+    await page.mouse.up();
+    await pick(page, "Service");
+    await expect(fiche(page).getByRole("button", { name: "Modifier" })).toHaveCount(0);
+    await fiche(page).getByRole("button", { name: "YAML" }).click();
+    await expect(fiche(page).getByText("Source de vérité")).toBeVisible();
+    await page.waitForTimeout(1000);
+    expect(await layoutSavesSeen()).toHaveLength(0);
   });
 });
 
