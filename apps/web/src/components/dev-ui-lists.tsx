@@ -276,6 +276,27 @@ function Diagrams() {
               onOpen={noop}
             />
           ))}
+          {/* Variante du diagramme des Données (maquette 11, B478) : 7 noms, flèche, « cliquez pour ouvrir ». */}
+          <ZoneNode
+            name="Paiement et caisse"
+            icon="folder_open"
+            count={14}
+            countLabel="tables"
+            detail="cliquez pour ouvrir"
+            preview={[
+              "paiement",
+              "facture",
+              "ligne_facture",
+              "remboursement",
+              "avoir",
+              "acompte",
+              "caisse",
+              "cloture",
+            ]}
+            previewLimit={7}
+            arrow
+            onOpen={noop}
+          />
         </div>
       </DevUiFrame>
       <DevUiFrame title="DiagramMinimap">

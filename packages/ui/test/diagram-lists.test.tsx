@@ -156,3 +156,30 @@ describe("DiagramMinimap", () => {
     expect(onNavigate.mock.calls[1]?.[0]).toEqual({ x: 450, y: 225 + 70 });
   });
 });
+
+/** B478 : variante du diagramme des Données (maquette 11) : 7 noms d'aperçu, flèche, détail dans le nom accessible. */
+describe("ZoneNode, variante Données", () => {
+  it("previewLimit, detail et arrow", () => {
+    const names = Array.from({ length: 9 }, (_, i) => `t${i}`);
+    render(
+      <ZoneNode
+        name="Paiement"
+        icon="folder_open"
+        count={9}
+        countLabel="tables"
+        preview={names}
+        previewLimit={7}
+        detail="cliquez pour ouvrir"
+        arrow
+        onOpen={() => undefined}
+      />,
+    );
+    const button = screen.getByRole("button", {
+      name: "Zone Paiement 9 tables · cliquez pour ouvrir",
+    });
+    expect(button).toHaveTextContent("9 tables · cliquez pour ouvrir");
+    expect(screen.getByText("t6")).toBeInTheDocument();
+    expect(screen.queryByText("t7")).toBeNull();
+    expect(screen.getByText("+2")).toBeInTheDocument();
+  });
+});

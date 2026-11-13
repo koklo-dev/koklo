@@ -12,7 +12,7 @@ import {
 } from "./data-mermaid.ts";
 import { orpc } from "./orpc.ts";
 
-/** Noms des tables : la première centaine de `spec.data.tables.list` ; au-delà, le nom se déduit de l'identifiant. */
+/** Noms et zones des tables : la première centaine de `spec.data.tables.list` ; au-delà, le nom se déduit de l'identifiant et la zone manque. */
 const NAMES_LIMIT = 100;
 /** Largeur d'une carte (maquette 11 l.376-388). */
 export const CARD_WIDTH = 230;
@@ -104,8 +104,10 @@ export function useDataDiagram(projectId: string, proposedNow: readonly DiagramC
   const { positions, move } = useLayoutSave(projectId, layout.data?.positions);
   const text = mermaid.data?.text ?? "";
   const cards = useMemo(() => {
-    const nameOf = new Map((names.data?.items ?? []).map((item) => [item.specId, item.name]));
-    return diagramOf(parseModelMermaid(text), nameOf, proposed);
+    const items = names.data?.items ?? [];
+    const nameOf = new Map(items.map((item) => [item.specId, item.name]));
+    const zoneOf = new Map(items.flatMap((item) => (item.zone ? [[item.specId, item.zone]] : [])));
+    return diagramOf(parseModelMermaid(text), nameOf, proposed, zoneOf);
   }, [text, names.data, proposed]);
   const links = useMemo(() => parseModelRelations(text), [text]);
   return {

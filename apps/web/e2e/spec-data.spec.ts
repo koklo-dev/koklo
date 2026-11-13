@@ -271,6 +271,27 @@ const VIEWS: View[] = [
     },
   },
   {
+    // B478 : plus de 25 tables en plusieurs zones, le diagramme s'ouvre par zones (maquette 11, DESIGN §5.3 schéma 1.3).
+    name: "list-diagram-zones",
+    spec: "large",
+    path: `${PATH}?tab=diagram`,
+    visible: async (page) => {
+      await expect(page.getByRole("region", { name: "Diagramme par zones" })).toBeVisible();
+      await expect(page.getByText(/^Toutes les zones · 80 tables$/)).toBeVisible();
+    },
+  },
+  {
+    name: "list-diagram-zone-open",
+    spec: "large",
+    path: `${PATH}?tab=diagram&zone=${encodeURIComponent("Prise de rendez-vous")}`,
+    visible: async (page) => {
+      await expect(
+        page.getByRole("region", { name: "Diagramme entité-relation, zone Prise de rendez-vous" }),
+      ).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Fil du diagramme" })).toBeVisible();
+    },
+  },
+  {
     name: "list-tables-search-empty",
     path: `${PATH}?tab=tables&q=zzzz`,
     singleStatus: true,

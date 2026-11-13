@@ -11,8 +11,10 @@ import {
 } from "../lib/diagram-layout.ts";
 import { zoomPercent } from "../lib/diagram-zoom.ts";
 import { useDiagramDrag } from "../lib/use-diagram-drag.ts";
+import { useDiagramViewport } from "../lib/use-diagram-viewport.ts";
 import { useDiagramZoom } from "../lib/use-diagram-zoom.ts";
 import { useIsMobile } from "../lib/use-mobile.ts";
+import { DiagramMinimap } from "./diagram-minimap.tsx";
 import { type DiagramRelation, DiagramRelations } from "./diagram-relations.tsx";
 import { DiagramZoomBar } from "./diagram-zoom-bar.tsx";
 
@@ -50,6 +52,8 @@ export interface DiagramViewerProps<T extends DiagramNode> {
   /** Dépôt d'un déplacement (glisser ou Alt + flèches). Absent : lecteur sans déplacement (designer). */
   onMove?: ((id: string, point: DiagramPoint) => void) | undefined;
   initialZoom?: number | "fit" | undefined;
+  /** Mini-carte en bas à gauche (DESIGN.md §5.3, schéma 1.3), masquée sous 768 px. */
+  minimap?: boolean | undefined;
   onZoomChange?: ((zoom: number) => void) | undefined;
   className?: string | undefined;
 }
@@ -178,6 +182,43 @@ function NodeSlot<T extends DiagramNode>({
   );
 }
 
+/** Mini-carte du plan : un rectangle par nœud, la sélection en `--primary`, le cadre visible cliquable. */
+function ViewerMinimap<T extends DiagramNode>({
+  nodes,
+  model,
+  selectedId,
+}: {
+  nodes: readonly T[];
+  model: Model;
+  selectedId: string | null | undefined;
+}) {
+  const { plan, zoom } = model;
+  const viewport = useDiagramViewport(zoom.scrollRef, zoom.zoom, plan);
+  const boxes = nodes.flatMap((node) => {
+    const at = plan.positions[node.id];
+    return at
+      ? [
+          {
+            id: node.id,
+            ...at,
+            width: node.width,
+            height: node.height,
+            active: node.id === selectedId,
+          },
+        ]
+      : [];
+  });
+  return (
+    <DiagramMinimap
+      className="max-md:hidden"
+      world={{ width: plan.width, height: plan.height }}
+      nodes={boxes}
+      viewport={viewport.rect}
+      onNavigate={viewport.center}
+    />
+  );
+}
+
 /**
  * Lecteur de diagramme SVG (DESIGN.md §5.19, ADR 0022) : trame de points, placement dagre, relations étiquetées,
  * zoom 50 à 200 %, sélection, glisser (équipe) et son alternative clavier Alt + flèches (WCAG 2.5.7). Les nœuds sont
@@ -233,6 +274,7 @@ export function DiagramViewer<T extends DiagramNode>(props: DiagramViewerProps<T
           </div>
         </div>
       </div>
+      {props.minimap ? <ViewerMinimap nodes={nodes} model={model} selectedId={selectedId} /> : null}
       <span role="status" className="sr-only">
         {model.status}
       </span>

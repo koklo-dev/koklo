@@ -7,6 +7,7 @@ type Decision = "pending" | "accepted" | "rejected";
 /** Contenu d'une proposition `table` (B397) : seuls les champs lus par le diagramme. */
 export interface ProposedTable {
   name: string;
+  zone?: string | undefined;
   description?: string | undefined;
   fields: ReadonlyArray<{
     name: string;
@@ -23,6 +24,21 @@ function kindOf(field: ProposedTable["fields"][number]): ErFieldKind {
   return field.personalData ? "personal" : "plain";
 }
 
+const REF = /^ref\((T-[a-z0-9-]+)\)$/;
+
+/** Relations déclarées, puis une `n → 1` par clé `ref(T-…)` vers une table pas encore reliée (B476, comme le Mermaid). */
+function proposedRelations(id: string, table: ProposedTable) {
+  const declared = [...(table.relations ?? [])];
+  const linked = new Set(declared.map((relation) => relation.to));
+  for (const field of table.fields) {
+    const target = REF.exec(field.type)?.[1];
+    if (target === undefined || target === id || linked.has(target)) continue;
+    linked.add(target);
+    declared.push({ to: target, cardinality: "n → 1" });
+  }
+  return declared;
+}
+
 /** Carte d'une table proposée : à relire en pointillés, rejetée estompée, acceptée comme une table enregistrée. */
 export function proposedTableOf(table: ProposedTable, decision: Decision): DiagramCard {
   const fields: ErTableField[] = table.fields.map((field) => ({
@@ -30,12 +46,15 @@ export function proposedTableOf(table: ProposedTable, decision: Decision): Diagr
     type: field.type,
     kind: kindOf(field),
   }));
+  const id = tableRefOf(table.name);
+  const relations = proposedRelations(id, table);
   return {
-    id: tableRefOf(table.name),
+    id,
     name: table.name,
     fields,
+    ...(table.zone ? { zone: table.zone } : {}),
     ...(table.description ? { description: table.description } : {}),
-    ...(table.relations?.length ? { relations: table.relations } : {}),
+    ...(relations.length ? { relations } : {}),
     ...(decision === "pending"
       ? { state: "review" as const }
       : decision === "rejected"

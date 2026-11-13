@@ -115,8 +115,10 @@ function proposedCards(review: ReturnType<typeof useProposalReview>): DiagramCar
   return review.proposals
     .filter((proposal) => proposal.kind === "table")
     .map((proposal) => {
+      const content = proposal.content as unknown as Parameters<typeof proposedTableOf>[0];
+      // Zone de la table proposée, sinon celle de la proposition (B478).
       const card = proposedTableOf(
-        proposal.content as unknown as Parameters<typeof proposedTableOf>[0],
+        { zone: proposal.zone || undefined, ...content },
         proposal.status,
       );
       const out = links
