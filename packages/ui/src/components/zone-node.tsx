@@ -18,6 +18,12 @@ export interface ZoneNodeProps
   preview?: readonly string[];
   /** Résumé des liens sortants : « → 12 liens vers Clients, Paiement… ». */
   links?: string;
+  /** Nombre de noms d'aperçu affichés avant « +N » (4 par défaut ; 7 dans le diagramme des Données, maquette 11). */
+  previewLimit?: number;
+  /** Suite de la ligne du compte : « 3 à relire · cliquez pour ouvrir ». */
+  detail?: string;
+  /** Flèche `arrow_forward` après le nom : la carte ouvre une vue (maquette 11 l.193). */
+  arrow?: boolean;
   /** Zone ouverte dans la vue. */
   current?: boolean;
   onOpen: () => void;
@@ -31,12 +37,15 @@ export function ZoneNode({
   countLabel,
   preview = [],
   links,
+  previewLimit = PREVIEW_LIMIT,
+  detail,
+  arrow,
   current,
   onOpen,
   className,
   ...props
 }: ZoneNodeProps) {
-  const hidden = preview.length - PREVIEW_LIMIT;
+  const hidden = preview.length - previewLimit;
   return (
     <div
       data-slot="zone-node"
@@ -50,20 +59,26 @@ export function ZoneNode({
       {/* Le bouton ne porte que le nom et le compte (Label in Name, 2.5.3) ; son ::after couvre toute la carte. */}
       <button
         type="button"
-        aria-label={`Zone ${name} ${formatCount(count)} ${countLabel}`}
+        aria-label={`Zone ${name} ${formatCount(count)} ${countLabel}${detail ? ` · ${detail}` : ""}`}
         aria-pressed={current}
-        className="flex flex-col items-start gap-1 text-left after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
+        className="flex w-full flex-col items-start gap-1 text-left after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
         onClick={onOpen}
       >
-        <span className="flex items-center gap-2 text-subsection-title text-foreground">
-          <Icon name={icon} size={20} className="text-primary" />
-          {name}
+        <span className="flex w-full items-center gap-2 text-subsection-title text-foreground">
+          <Icon name={icon} size={20} className="shrink-0 text-primary" />
+          <span className="min-w-0 flex-1">{name}</span>
+          {arrow ? (
+            <Icon name="arrow_forward" size={18} className="shrink-0 text-muted-foreground" />
+          ) : null}
         </span>{" "}
-        <span className="text-meta text-muted-foreground">{`${formatCount(count)} ${countLabel}`}</span>
+        <span className="text-meta text-muted-foreground">
+          {`${formatCount(count)} ${countLabel}`}
+          {detail ? ` · ${detail}` : null}
+        </span>
       </button>
       {preview.length > 0 ? (
         <span className="flex flex-wrap gap-1">
-          {preview.slice(0, PREVIEW_LIMIT).map((item) => (
+          {preview.slice(0, previewLimit).map((item) => (
             <span
               key={item}
               className="rounded-sm border bg-surface px-1.5 font-mono text-code text-muted-foreground"

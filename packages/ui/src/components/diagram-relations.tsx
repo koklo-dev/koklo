@@ -9,6 +9,10 @@ export interface DiagramRelation {
   label?: string | undefined;
   /** Pointillés « 5 4 » (par exemple `n ↔ n`). */
   dashed?: boolean | undefined;
+  /** Épaisseur du trait (1,5 par défaut) : entre deux zones, elle croît avec le nombre de relations (maquette 11). */
+  weight?: number | undefined;
+  /** Étiquette en texte courant (« 4 relations ») plutôt qu'en mono (cardinalité). */
+  labelFont?: "mono" | "sans" | undefined;
 }
 
 export interface DiagramRelationsProps {
@@ -62,7 +66,7 @@ export function DiagramRelations(props: DiagramRelationsProps) {
             y1={from.y}
             x2={to.x}
             y2={to.y}
-            strokeWidth={linked ? 2 : 1.5}
+            strokeWidth={linked ? Math.max(2, relation.weight ?? 0) : (relation.weight ?? 1.5)}
             strokeDasharray={relation.dashed ? "5 4" : undefined}
             className={linked ? "stroke-primary" : "stroke-border-strong"}
           />
@@ -74,7 +78,8 @@ export function DiagramRelations(props: DiagramRelationsProps) {
             key={relation.id}
             style={{ left: (from.x + to.x) / 2, top: (from.y + to.y) / 2 }}
             className={cn(
-              "absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-[5px] border bg-background px-1.5 py-px font-mono text-code-sm",
+              "absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-[5px] border bg-background px-1.5 py-px",
+              relation.labelFont === "sans" ? "text-caption" : "font-mono text-code-sm",
               linked ? "border-primary text-primary" : "border-border text-muted-foreground",
             )}
           >

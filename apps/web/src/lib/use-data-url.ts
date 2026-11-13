@@ -52,6 +52,11 @@ export function useDataUrl() {
       (sel: string) => write({ tab: "diagram", sel, review: null }, "push"),
       [],
     ),
+    /** Diagramme par zones (B478) : ouvre une zone, ou revient à la vue des zones (`null`) ; « Retour » la referme. */
+    openZone: useCallback(
+      (zone: string | null, sel?: string) => write({ zone, sel: sel ?? null }, "push"),
+      [],
+    ),
     dropSelection: useCallback(() => write({ sel: null }, "replace"), []),
     /** Table choisie dans le diagramme : portée par l'adresse (sans entrée d'historique) pour survivre à un remontage. */
     select: useCallback((sel: string | null) => write({ sel }, "replace"), []),

@@ -146,3 +146,39 @@ describe("relationsOf (TK-108)", () => {
     ]);
   });
 });
+
+/** B476, B478 : relations des clés étrangères d'une table proposée, zones des cartes. */
+describe("proposedTableOf et diagramOf, clés et zones", () => {
+  it("une clé ref(T-…) sans relation déclarée devient une relation n → 1, sans doublon ni boucle", () => {
+    const card = proposedTableOf(
+      {
+        name: "Tache",
+        zone: "Tâches",
+        fields: [
+          { name: "id", type: "uuid", primaryKey: true },
+          { name: "client_id", type: "ref(T-client)" },
+          { name: "autre_id", type: "ref(T-client)" },
+          { name: "parent_id", type: "ref(T-tache)" },
+          { name: "service_id", type: "ref(T-service)" },
+        ],
+        relations: [{ to: "T-service", cardinality: "1 → 1" }],
+      },
+      "pending",
+    );
+    expect(card.zone).toBe("Tâches");
+    expect(card.relations).toEqual([
+      { to: "T-service", cardinality: "1 → 1" },
+      { to: "T-client", cardinality: "n → 1" },
+    ]);
+  });
+
+  it("diagramOf porte la zone lue de la liste des tables", () => {
+    const cards = diagramOf(
+      parseModelMermaid("erDiagram\n  T_client {\n    uuid id PK\n  }\n"),
+      new Map(),
+      [],
+      new Map([["T-client", "Clients"]]),
+    );
+    expect(cards[0]?.zone).toBe("Clients");
+  });
+});

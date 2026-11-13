@@ -371,3 +371,37 @@ describe("DiagramViewer", () => {
     expect(container.querySelectorAll("svg line")).toHaveLength(0);
   });
 });
+
+/** B478 : mini-carte du lecteur (DESIGN.md §5.3, schéma 1.3) et traits pondérés entre zones. */
+describe("DiagramViewer, mini-carte et traits pondérés", () => {
+  it("mini-carte : un rectangle par nœud, le choisi en --primary", () => {
+    viewer({ minimap: true, selectedId: "T-client" });
+    const map = screen.getByRole("button", { name: /^Mini-carte du diagramme/ });
+    const boxes = map.querySelectorAll("[data-minimap-node]");
+    expect(boxes).toHaveLength(3);
+    expect([...boxes].filter((box) => box.classList.contains("bg-primary"))).toHaveLength(1);
+  });
+
+  it("sans `minimap` : pas de mini-carte", () => {
+    viewer();
+    expect(screen.queryByRole("button", { name: /^Mini-carte du diagramme/ })).toBeNull();
+  });
+
+  it("`weight` règle l'épaisseur, `labelFont: sans` l'étiquette en texte courant", () => {
+    viewer({
+      relations: [
+        {
+          id: "z",
+          from: "T-client",
+          to: "T-rappel",
+          label: "4 relations",
+          weight: 3,
+          labelFont: "sans",
+        },
+      ],
+    });
+    expect(document.querySelector("line[data-relation='z']")).toHaveAttribute("stroke-width", "3");
+    expect(screen.getByText("4 relations")).toHaveClass("text-caption");
+    expect(screen.getByText("4 relations")).not.toHaveClass("font-mono");
+  });
+});

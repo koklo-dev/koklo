@@ -87,6 +87,8 @@ export interface DiagramCard {
   state?: ErTableState | undefined;
   /** Description d'une table proposée (la fiche d'une table enregistrée la lit dans le dépôt). */
   description?: string | undefined;
+  /** Zone de la table (`zone` du fichier ou de la proposition) : regroupe le diagramme des grands modèles (B478). */
+  zone?: string | undefined;
   /** Relations déclarées par une table proposée (une table enregistrée tire les siennes du Mermaid). */
   relations?: ReadonlyArray<{ to: string; cardinality: string }> | undefined;
 }
@@ -95,21 +97,26 @@ export interface DiagramCard {
 const nameFromId = (id: string): string => id.replace(/^T-/, "").replaceAll("-", " ");
 
 /**
- * Cartes du diagramme : les tables du modèle enregistré (noms d'après la liste), puis les tables proposées qui n'y
+ * Cartes du diagramme : les tables du modèle enregistré (noms et zones d'après la liste), puis les tables proposées qui n'y
  * sont pas encore. Une table proposée en doublon d'une table enregistrée est celle du modèle (le tri l'écarte).
  */
 export function diagramOf(
   saved: readonly DiagramTable[],
   names: ReadonlyMap<string, string>,
   proposed: readonly DiagramCard[],
+  zones: ReadonlyMap<string, string> = new Map(),
 ): DiagramCard[] {
   const known = new Set(saved.map((table) => table.id));
   return [
-    ...saved.map((table) => ({
-      id: table.id,
-      name: names.get(table.id) ?? nameFromId(table.id),
-      fields: table.fields,
-    })),
+    ...saved.map((table) => {
+      const zone = zones.get(table.id);
+      return {
+        id: table.id,
+        name: names.get(table.id) ?? nameFromId(table.id),
+        fields: table.fields,
+        ...(zone ? { zone } : {}),
+      };
+    }),
     ...proposed.filter((card) => !known.has(card.id)),
   ];
 }
