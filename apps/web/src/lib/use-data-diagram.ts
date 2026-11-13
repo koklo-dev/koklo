@@ -63,11 +63,18 @@ function useLayoutSave(
     }
   }, [projectId, toast]);
 
+  /**
+   * Un déplacement enregistre toute la vue affichée (B481) : `view` donne le coin de chaque table visible, placement
+   * automatique compris, pour que la vue devienne entièrement manuelle et ne mélange jamais deux placements.
+   */
   const move = useCallback(
-    (id: string, point: DiagramPoint) => {
-      const next = { x: clamp(point.x), y: clamp(point.y) };
-      plan.current = { ...plan.current, [id]: next };
-      setMoved((prev) => ({ ...prev, [id]: next }));
+    (id: string, point: DiagramPoint, view: Readonly<Record<string, DiagramPoint>> = {}) => {
+      const next: Record<string, DiagramPoint> = {};
+      for (const [key, at] of Object.entries({ ...view, [id]: point })) {
+        if (key.startsWith("T-")) next[key] = { x: clamp(at.x), y: clamp(at.y) };
+      }
+      plan.current = { ...plan.current, ...next };
+      setMoved((prev) => ({ ...prev, ...next }));
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), SAVE_DELAY_MS);
     },

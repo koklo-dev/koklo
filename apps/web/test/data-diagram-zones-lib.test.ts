@@ -3,6 +3,7 @@ import {
   crossLinkCount,
   NO_ZONE,
   neighborsOf,
+  positionsForView,
   usesZoneView,
   zoneRelationsOf,
   zonesOf,
@@ -68,5 +69,12 @@ describe("zones du diagramme", () => {
       dashed: true,
     });
     expect(edges[1]?.label).toBeUndefined();
+  });
+
+  it("positionsForView (B481) : appliquées seulement si chaque table de la vue en a une", () => {
+    const saved = { "T-a": { x: 1, y: 2 }, "T-b": { x: 3, y: 4 } };
+    expect(positionsForView(saved, ["T-a", "T-b"])).toBe(saved);
+    expect(positionsForView(saved, ["T-a", "T-c"])).toEqual({});
+    expect(positionsForView(saved, [])).toEqual({});
   });
 });

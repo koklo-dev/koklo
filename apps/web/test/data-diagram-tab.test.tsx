@@ -86,16 +86,37 @@ describe("Onglet Diagramme : lecteur", () => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Onglet Diagramme : positions enregistrées", () => {
-  it("lit les positions du dépôt et les applique à la table", async () => {
+  const ALL_SAVED = {
+    "T-client": { x: 400, y: 300 },
+    "T-reservation": { x: 700, y: 300 },
+    "T-service": { x: 100, y: 100 },
+  };
+  const slotOf = async (name: string) =>
+    (await card(name)).closest("[data-slot='diagram-node']") as HTMLElement;
+
+  it("positions du dépôt pour toutes les tables de la vue : appliquées (B481)", async () => {
+    serveData("owner");
+    procedures.specDataLayoutGet.mockResolvedValue({
+      positions: ALL_SAVED,
+      commitSha: "a".repeat(40),
+    });
+    renderData();
+    const slot = await slotOf("Client");
+    await waitFor(() => expect(slot.style.left).toBe("400px"));
+    expect(slot.style.top).toBe("300px");
+  });
+
+  it("positions du dépôt pour une partie des tables seulement : placement automatique, sans mélange (B481)", async () => {
     serveData("owner");
     procedures.specDataLayoutGet.mockResolvedValue({
       positions: { "T-client": { x: 400, y: 300 } },
       commitSha: "a".repeat(40),
     });
     renderData();
-    const slot = (await card("Client")).closest("[data-slot='diagram-node']") as HTMLElement;
-    await waitFor(() => expect(slot.style.left).toBe("400px"));
-    expect(slot.style.top).toBe("300px");
+    await waitFor(() => expect(procedures.specDataLayoutGet).toHaveBeenCalled());
+    const slot = await slotOf("Client");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(slot.style.left).not.toBe("400px");
   });
 
   it("Alt + flèche déplace la table de 20 px et un seul dépôt part 600 ms après le dernier geste", async () => {
@@ -113,7 +134,8 @@ describe("Onglet Diagramme : positions enregistrées", () => {
       positions: Record<string, { x: number; y: number }>;
     };
     expect(input.idempotencyKey).toMatch(/^[A-Za-z0-9._:-]{1,128}$/);
-    expect(Object.keys(input.positions)).toEqual(["T-client"]);
+    // Toute la vue est enregistrée (B481) : les trois tables, placement automatique compris.
+    expect(Object.keys(input.positions).sort()).toEqual(["T-client", "T-reservation", "T-service"]);
     expect(Number.isInteger(input.positions["T-client"]?.x)).toBe(true);
     expect(await screen.findByText("Client déplacée")).toBeInTheDocument();
   });
@@ -121,25 +143,21 @@ describe("Onglet Diagramme : positions enregistrées", () => {
   it("le dépôt envoie tout le plan : les positions du dépôt et la table déplacée", async () => {
     serveData("owner");
     procedures.specDataLayoutGet.mockResolvedValue({
-      positions: { "T-service": { x: 100, y: 100 } },
+      positions: ALL_SAVED,
       commitSha: "a".repeat(40),
     });
     renderData();
-    const service = await card("Service");
-    await waitFor(() =>
-      expect((service.closest("[data-slot='diagram-node']") as HTMLElement).style.left).toBe(
-        "100px",
-      ),
-    );
+    const service = await slotOf("Service");
+    await waitFor(() => expect(service.style.left).toBe("100px"));
     (await card("Client")).focus();
     await userEvent.keyboard("{Alt>}{ArrowDown}{/Alt}");
     await waitFor(() => expect(procedures.specDataLayoutSave).toHaveBeenCalledTimes(1), {
       timeout: 3000,
     });
     const input = procedures.specDataLayoutSave.mock.calls[0]?.[0] as {
-      positions: Record<string, unknown>;
+      positions: Record<string, { x: number; y: number }>;
     };
-    expect(Object.keys(input.positions).sort()).toEqual(["T-client", "T-service"]);
+    expect(input.positions).toEqual({ ...ALL_SAVED, "T-client": { x: 400, y: 320 } });
   });
 
   it("échec du dépôt : toast d'erreur, la table garde sa place, nouvelle tentative au dépôt suivant", async () => {

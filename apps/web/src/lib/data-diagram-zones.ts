@@ -1,4 +1,4 @@
-import type { DiagramNode, DiagramRelation } from "@koklo/ui";
+import type { DiagramNode, DiagramPoint, DiagramRelation } from "@koklo/ui";
 import type { DiagramCard } from "./data-mermaid.ts";
 
 /** Zone des tables qui n'en déclarent pas (ou au-delà des 100 noms lus). */
@@ -158,4 +158,15 @@ export function neighborsOf(
       : {}),
   }));
   return { nodes, relations: edges };
+}
+
+/**
+ * Positions enregistrées appliquées à une vue (B481) : seulement si chaque table affichée en a une ; sinon le
+ * placement automatique, pour ne jamais mélanger des coins enregistrés dans une autre vue avec le placement calculé.
+ */
+export function positionsForView(
+  saved: Readonly<Record<string, DiagramPoint>>,
+  tableIds: readonly string[],
+): Readonly<Record<string, DiagramPoint>> {
+  return tableIds.length > 0 && tableIds.every((id) => saved[id] !== undefined) ? saved : {};
 }

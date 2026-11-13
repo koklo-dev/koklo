@@ -267,7 +267,7 @@ describe("DiagramViewer", () => {
     viewer({ onMove });
     drag(node("Client"), [100, 100], [160, 130]);
     expect(onMove).toHaveBeenCalledTimes(1);
-    expect(onMove).toHaveBeenCalledWith("T-client", { x: 80, y: 50 });
+    expect(onMove).toHaveBeenCalledWith("T-client", { x: 80, y: 50 }, expect.anything());
     expect(status()).toHaveTextContent("Client déplacée");
   });
 
@@ -275,7 +275,7 @@ describe("DiagramViewer", () => {
     const onMove = vi.fn();
     viewer({ onMove, initialZoom: 2 });
     drag(node("Client"), [100, 100], [160, 130]);
-    expect(onMove).toHaveBeenCalledWith("T-client", { x: 50, y: 35 });
+    expect(onMove).toHaveBeenCalledWith("T-client", { x: 50, y: 35 }, expect.anything());
   });
 
   it("un simple clic (moins de 4 px) sélectionne sans déplacer", async () => {
@@ -309,13 +309,13 @@ describe("DiagramViewer", () => {
     const user = userEvent.setup();
     node("Réservation").focus();
     await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 320, y: 20 });
+    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 320, y: 20 }, expect.anything());
     await user.keyboard("{Alt>}{ArrowDown}{/Alt}");
-    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 320, y: 40 });
+    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 320, y: 40 }, expect.anything());
     await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
-    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 300, y: 40 });
+    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 300, y: 40 }, expect.anything());
     await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
-    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 300, y: 20 });
+    expect(onMove).toHaveBeenLastCalledWith("T-reservation", { x: 300, y: 20 }, expect.anything());
     expect(status()).toHaveTextContent("Réservation déplacée");
   });
 
@@ -329,7 +329,7 @@ describe("DiagramViewer", () => {
     const user = userEvent.setup();
     node("Client").focus();
     await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
-    expect(onMove).toHaveBeenLastCalledWith("T-client", { x: 0, y: 5 });
+    expect(onMove).toHaveBeenLastCalledWith("T-client", { x: 0, y: 5 }, expect.anything());
     unmount();
     const silent = vi.fn();
     viewer();
@@ -412,5 +412,17 @@ describe("DiagramViewer, mini-carte et traits pondérés", () => {
     expect(button).toHaveAttribute("aria-pressed", "false");
     await userEvent.click(button);
     expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it("onMove reçoit aussi le plan de toute la vue après le déplacement (B481)", async () => {
+    const onMove = vi.fn();
+    viewer({ onMove });
+    node("Réservation").focus();
+    await userEvent.setup().keyboard("{Alt>}{ArrowRight}{/Alt}");
+    expect(onMove.mock.calls[0]?.[2]).toEqual({
+      "T-client": { x: 20, y: 20 },
+      "T-reservation": { x: 320, y: 20 },
+      "T-rappel": { x: 580, y: 20 },
+    });
   });
 });
