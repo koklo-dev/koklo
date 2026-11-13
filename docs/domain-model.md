@@ -61,7 +61,9 @@ screen `S-*` (annotated node tree), test scenario (feature + criteria covered), 
 enforced as issues: rule 4 (every link resolves, roles, permissions and rules included, even when `roles: []`), rule 5 (`specifiee` has a screen or endpoint,
 `implementee` has a test per criterion; from `specifiee`, each criterion has Given, When, Then
 steps in that order, `R5_CRITERION_INCOMPLETE`), rule 7 (no orphan entity, role, permission or rule, warning). See
-`packages/schema/README.md` for the 33 issue codes.
+`packages/schema/README.md` for the 39 issue codes. Spec format v2 (TK-106): table `data/tables/<slug>.yaml` with
+`id: T-<slug>`, endpoint `<zone>.<verb>`, no `data/relations.yaml` (relations live in the source table); `migrateSpecToV2`
+(`packages/schema/src/migrate`, pure) turns a v1 spec into v2 and the worker applies it as one bot batch (`spec.migrate`).
 
 ## Relationships and cardinalities
 

@@ -16,7 +16,7 @@ it. `apps/api` (NestJS + `@orpc/nest`) implements it; see [ADR 0002](adr/0002-pr
 
 ## Exposed resources and operations
 
-Contract version **3.3.0** (TK-105, lot A: additive, `q` on `clientSpace.features|flows|rules` and `type` on `clientSpace.rules`, applied to the whole index; 3.2.0, TK-104, lot A: additive, `clientSpace.progress|flows|rules|roles`, `review.remind`, the review status `withdrawn`, `untreated` and `around` on `clientSpace.features`, labelled links and a version note on `clientSpace.feature`; 3.1.0, TK-103, lot A: additive, the operations `rule.*`, `role.*` and `flow.*` of `specBatch.submit`, `spec.functional.list`, `spec.roles.matrix`, `spec.item.get` for rules, roles and flows, the counters `rules`, `roles` and `flows` of `spec.head`; 3.0.0, TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
+Contract version **3.4.0** (TK-106, lots A and B: additive, the endpoint links of the spec schemas also accept `<zone>.<verb>` (spec format v2); `specMigration.start` and `specMigration.revert`, owner only; 3.3.0, TK-105, lot A: additive, `q` on `clientSpace.features|flows|rules` and `type` on `clientSpace.rules`, applied to the whole index; 3.2.0, TK-104, lot A: additive, `clientSpace.progress|flows|rules|roles`, `review.remind`, the review status `withdrawn`, `untreated` and `around` on `clientSpace.features`, labelled links and a version note on `clientSpace.feature`; 3.1.0, TK-103, lot A: additive, the operations `rule.*`, `role.*` and `flow.*` of `specBatch.submit`, `spec.functional.list`, `spec.roles.matrix`, `spec.item.get` for rules, roles and flows, the counters `rules`, `roles` and `flows` of `spec.head`; 3.0.0, TK-102, lot A: **breaking**, `ai.draftBrief` and the `brief` field of `ai.proposeFeatures` are removed; `validation` per feature, filter and facet on `spec.listFeatures`, optional `zone` on features; 2.11.0, TK-101, lot A: the editing panel, `ai.prefillItem`, `spec.item.get` and `spec.refs.search`; 2.10.0, TK-100, lot A: `spec.deliverables` and `spec.forceDeliverable`; 2.9.0 / 2.8.1, oRPC beta.48: the PATCH bodies of `sprint.update` and `ticket.update` now declare `additionalProperties: false`; TK-99a: agent proposals, `ai.proposeDeliverable`, `ai.proposeOptions`, `ai.reviseProposal` and the group `proposal`; TK-93: project cards, one-step creation and EU data, `project.cards`, `project.creationStatus`, `project.retryRepo`, `project.setEuOnly`; TK-92: project overview, `project.overview` and `project.activity`; TK-91: idea maturity, Synthesis, `idea-vN` versions and the move to framing; TK-90: idea agent, proposals and `ai.ideaChat`; TK-89: group `idea`; see the version history below; TK-98: groups `aiProvider`, `aiModel`, `aiUsage`, `aiSettings`; see the version history below for 0.9.0 to 2.2.0; TK-54b: group `ai` and `llmCredential.verify`; 0.8.0 added the group `llmCredential`, TK-52b; routes otherwise unchanged since 0.5.0, TK-42). The router shape is
 `{ health, organization, member, project, ticket, dependency, sprint, comment, projectState, lease, audit, installation, llmCredential, ai, repo, spec, specBatch }`:
 51 routes on 37 paths (8 from TK-21, 25 from TK-29, 10 from TK-42, 4 from TK-52b, 4 from TK-54b; see "Provider, spec and feature batches (TK-42)", "BYOK LLM credentials (TK-52b)" and "AI proposals and key verification (TK-54b)"). Method and path are explicit on every
 route, via the `route(method, path)` helper (`src/route-helpers.ts`, wrapping
@@ -847,6 +847,33 @@ reconciliation (TK-46).
 operations and the counter. A replay, a refusal (role, validation, project) and `specBatch.get` write
 none, nor do the worker transitions (the batch is its own journal).
 
+## Spec migration (TK-106, contract 3.4.0)
+
+Moves a project's spec repository from format v1 to v2 in ONE bot batch, and undoes it.
+
+| Procedure | Route | Input | Output |
+| --- | --- | --- | --- |
+| `specMigration.start` | `POST /projects/{projectId}/spec/migration` | `{ idempotencyKey, branch? }` | `{ batchId }` |
+| `specMigration.revert` | `POST /projects/{projectId}/spec/migration/revert` | `{ idempotencyKey, migrationBatchId }` | `{ batchId }` |
+
+- **Rights**: the organization `owner` only (`SPEC_MIGRATION_ROLES`). Role guard first (403 for admin, dev, designer,
+  business, client, an unknown role and any agent-like role), then the project is resolved (uniform 404). Checked on the
+  server, never by a screen. The client-write matrix classifies both as writes denied to the client.
+- **One batch**: the route only registers the batch (kind `spec.migrate` or `spec.migrate.revert`, no target id, no
+  `F-nnn` counter used) and enqueues it; the worker commits once, as `Koklo`, with the `Koklo-Ops` trailer, on the working
+  branch (`cadrage` by default, never the default branch: 422 `VALIDATION`). The client follows it with `specBatch.get`.
+  The commit is "reviewed before recording" by the human merge to the default branch.
+- **All or nothing**: a defect (repository already v2, unknown endpoint reference, target file already present, `checkSpec`
+  error in the source or in the result) ends the batch `failed` / `SPEC_INVALID` with a report (codes
+  `STRUCT_MIGRATION_*`), and nothing is committed.
+- **Revert**: `migrationBatchId` must be a `committed` `spec.migrate` batch of the project (404 if unknown, 422 on
+  `migrationBatchId` otherwise). The worker finds the commit by its trailer in the last 50 commits, replays the
+  migration on its parent's files and inverts it. A file changed since the migration ends the batch `conflict` /
+  `write_conflict`; nothing is written. One commit.
+- **Errors**: those of `idea.publish` (write, provider, batch conflict: replaying the same key with the same content
+  returns the same batch, another content is `SPEC_BATCH_CONFLICT`) plus `VALIDATION`.
+- **Audit**: the batch is audited as `spec.batch.submit`, like any batch.
+
 ## Spec reads in the API (TK-45c2)
 `spec.head`, `spec.listFeatures` and `spec.getFeature` are implemented in `apps/api/src/spec-read`.
 Contract 0.6.0 adds one typed error and no route (still 43 routes): `SPEC_INDEX_FAILED` (409,
@@ -1521,6 +1548,11 @@ Additive. 135 routes on 109 paths (4 reads in `clientSpace`, 1 write in `review`
   (commit e30875d), so a save of several hundred proposals is several batches, not a 413.
 
 ## Version history
+- **3.4.0** (TK-106, lot A, additive): the endpoint links carried by `specBatch.submit` operations (`endpoints` of features,
+  rules and role permissions) accept `E-<slug>` (spec format v1) and `<zone>.<verb>` (spec format v2, for example
+  `reservation.lister`). Lot B adds the routes `specMigration.start` and `specMigration.revert` and the operation kinds
+  `spec.migrate` and `spec.migrate.revert` (see "Spec migration (TK-106, contract 3.4.0)"). The fingerprint of 3.3.0
+  stays frozen; 3.4.0 is not published yet, its fingerprint is regenerated by each lot.
 - **3.3.0** (TK-105, lot A, additive): `clientSpace.features`, `clientSpace.flows` and `clientSpace.rules` take an optional
   `q` (1 to 200 characters, full-text search over the whole index, never only the loaded items) and `clientSpace.rules` an
   optional `type` (`contrainte|calcul|workflow`). `total` is the filtered total. The fingerprint of 3.2.0 stays frozen.
