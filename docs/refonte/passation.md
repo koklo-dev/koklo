@@ -28,8 +28,9 @@ last_reviewed: 2026-11-10
 | 023 | TK-103 (Règles métier, Rôles et permissions, Parcours, contrat 3.1.0, `seed:large` à 300 règles) | ✅ fusionné (PR #187, `e02a57e`) ; décisions B338 à B346 |
 | 023 | TK-104 (vue client des 4 onglets, « Valider le cahier », annulation `withdrawn`, `review.remind`, contrat 3.2.0) | ✅ fusionné (PR #193, `67b2556`, remplace la #192) ; décisions B347 à B362 ; critères 9 et 13 prouvés par l'e2e racine de TK-105 en CI, case cochée |
 | 023 | TK-105 (volume réel : recherche serveur de la vue client, contrat 3.3.0, `seed:planche` à 355 propositions, champ Zone) | ✅ fusionné (PR #197, `a285bcc0`, remplace la #196) ; décisions B363 à B371 ; e2e racine `e2e/tests/volume-reel.spec.ts` vert en CI |
+| 024 | TK-106 (format de spec v2 : `data/tables/<slug>.yaml`, alias `domaine:`, endpoints `zone.verbe` ; migration v1 → v2 en un lot du bot, retour arrière, owner seul ; contrat 3.4.0) | ✅ fusionné (PR #199, `e20aaef9`) ; décisions B372 à B382 (B8, B9, C4 tranchées en autonomie) ; point d'API seul, sans écran |
 
-Ticket en cours : TK-106 (format de spec v2 et migration), sprint 024, branche `feat/tk-106-spec-v2`. DoD des sprints 022 et 023 (4 cases chacun) encore à vérifier avant de les cocher.
+Ticket en cours : TK-107 (Données : Tables et Jeux d'exemple), sprint 024. Puis TK-108 (lecteur de diagramme SVG + dagre). DoD des sprints 022 et 023 (4 cases chacun) encore à vérifier avant de les cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
@@ -140,3 +141,4 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - Espace fonctionnel : quand des propositions attendent, la page ouvre d'office la relecture (`?view=review`, `use-proposals.ts`). Un e2e qui vise la liste clique d'abord « Quitter la relecture » (TK-105).
 - Un spec e2e racine écrit sans être lancé (machine légère) échoue presque toujours au premier tour de CI : lire l'`error-context.md` de l'artefact `playwright-report` (`gh run download <run> -n playwright-report`) plutôt que deviner.
 - `.github/scripts/commitlint-local.sh` avant **chaque** push, y compris un correctif d'une ligne (TK-105 : en-tête de 101 caractères, PR #196 recréée en #197).
+- `apps/web/e2e/features.spec.ts -g client` : 6 échecs locaux déjà présents sur `develop` (vue client « Aucune fonctionnalité à afficher », `unavailable-client`, `feature-sheet-client`, `repo.list`, AC-48-28), constatés le 2026-11-13 pendant TK-107 ; la CI ne les signale pas. À examiner dans un ticket de correction.
