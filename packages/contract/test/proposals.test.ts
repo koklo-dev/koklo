@@ -98,6 +98,33 @@ describe("TK-99a ai.proposeDeliverable", () => {
   });
 });
 
+describe("TK-107 lot B : types de proposition des Données", () => {
+  it("proposal.list : table, relations et fixtures sont des types valides ; un type inconnu est refusé", async () => {
+    const out = output("proposal.list");
+    const base = {
+      nextCursor: null,
+      previousCursor: null,
+      offset: 0,
+      total: 1,
+      groups: [],
+      launch: null,
+    };
+    expect(out).toBeDefined();
+    for (const kind of ["table", "relations", "fixtures"]) {
+      expect(await isValid(out, { ...base, items: [{ ...PROPOSAL, kind }] }), kind).toBe(true);
+    }
+    expect(await isValid(out, { ...base, items: [{ ...PROPOSAL, kind: "dessin" }] })).toBe(false);
+    expect(
+      await isValid(input("proposal.list"), {
+        projectId: UUID,
+        deliverable: "data",
+        groupBy: "type",
+        group: "fixtures",
+      }),
+    ).toBe(true);
+  });
+});
+
 describe("TK-99a ai.proposeOptions", () => {
   it("{ options, reads, available, reason? }", async () => {
     expect(

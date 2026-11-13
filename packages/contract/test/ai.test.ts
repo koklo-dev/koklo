@@ -78,8 +78,8 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
     expect((await doc()).paths["/projects/{projectId}/ai/brief"]).toBeUndefined();
   });
 
-  it("l'OpenAPI est en 3.4.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond, 2.0.0 projet explicite, 2.1.0 coquille, 2.2.0 réglages, 2.3.0 fournisseurs d'IA)", async () => {
-    expect((await doc()).info.version).toBe("3.4.0");
+  it("l'OpenAPI est en 3.5.0 (le groupe ai est apparu en 0.9.0, 0.10.0 ajoute projectClient, 0.11.0 clientSpace, 0.12.0 suggestion, 0.13.0 review, 0.14.0 FORBIDDEN client_only, 1.0.0 listes longues, 1.1.0 six fournisseurs et plafond, 2.0.0 projet explicite, 2.1.0 coquille, 2.2.0 réglages, 2.3.0 fournisseurs d'IA)", async () => {
+    expect((await doc()).info.version).toBe("3.5.0");
   });
 
   it("featureCreateSchema est exporté (parité avec specBatch.submit)", () => {
@@ -87,7 +87,6 @@ describe("AI1 surface : le groupe ai et llmCredential.verify", () => {
   });
 });
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("AI2 entrées : aucune entrée ne choisit le modèle ni le budget", () => {
   it("proposeFeatures : maxFeatures entier 1 à 20, plus de brief (l'agent lit le dossier figé)", async () => {
     const run = (over: Record<string, unknown>) =>

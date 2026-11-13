@@ -243,7 +243,7 @@ describe("B3 lot : sortie de submit et de get", () => {
       expect(
         await isValid(o, {
           ...batch,
-          results: [{ position: 0, kind: "table.create", specId: null }],
+          results: [{ position: 0, kind: "endpoint.create", specId: null }],
         }),
       ).toBe(false);
       expect(

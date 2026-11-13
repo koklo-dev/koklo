@@ -32,6 +32,16 @@ import {
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
 import {
+  dataFixtureRowsInputSchema,
+  dataFixtureRowsSchema,
+  dataFixturesListInputSchema,
+  dataFixturesListSchema,
+  dataMermaidInputSchema,
+  dataMermaidSchema,
+  dataTableSummarySchema,
+  dataTablesListInputSchema,
+} from "./schemas-spec-data.ts";
+import {
   functionalItemSchema,
   functionalListInputSchema,
   rolesMatrixInputSchema,
@@ -66,6 +76,33 @@ const spec = {
       .errors({ ...readIndexErrors, ...specIndexFailedError })
       .input(rolesMatrixInputSchema)
       .output(rolesMatrixSchema),
+  },
+  /**
+   * Page Données (TK-107, 3.5.0, B388, B389) : tables (liste à curseur, `q` sur le nom et les champs, `zone`, `around`),
+   * texte Mermaid du modèle, jeux d'exemple et leurs lignes (25 par page). Équipe et designer en lecture (403 client et
+   * business). Erreurs de `spec.listFeatures`.
+   */
+  data: {
+    tables: {
+      list: route("GET", "/projects/{projectId}/spec/data/tables")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(dataTablesListInputSchema)
+        .output(listOf(dataTableSummarySchema)),
+    },
+    mermaid: route("GET", "/projects/{projectId}/spec/data/mermaid")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(dataMermaidInputSchema)
+      .output(dataMermaidSchema),
+    fixtures: {
+      list: route("GET", "/projects/{projectId}/spec/data/fixtures")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(dataFixturesListInputSchema)
+        .output(dataFixturesListSchema),
+      rows: route("GET", "/projects/{projectId}/spec/data/fixtures/{fixtureId}/rows")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(dataFixtureRowsInputSchema)
+        .output(dataFixtureRowsSchema),
+    },
   },
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })

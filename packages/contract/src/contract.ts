@@ -127,6 +127,15 @@ import type {
   validationReportSchema,
 } from "./schemas-spec.ts";
 import type {
+  dataFixtureRowsInputSchema,
+  dataFixtureRowsSchema,
+  dataFixtureSummarySchema,
+  dataMermaidSchema,
+  dataTableSummarySchema,
+  dataTablesListInputSchema,
+  tableDetailSchema,
+} from "./schemas-spec-data.ts";
+import type {
   flowDetailSchema,
   functionalItemSchema,
   functionalListInputSchema,
@@ -275,6 +284,13 @@ export type RolesMatrixInput = z.input<typeof rolesMatrixInputSchema>;
 export type RuleDetail = z.output<typeof ruleDetailSchema>;
 export type RoleDetail = z.output<typeof roleDetailSchema>;
 export type FlowDetail = z.output<typeof flowDetailSchema>;
+export type TableDetail = z.output<typeof tableDetailSchema>;
+export type DataTablesListInput = z.output<typeof dataTablesListInputSchema>;
+export type DataTableSummary = z.output<typeof dataTableSummarySchema>;
+export type DataMermaid = z.output<typeof dataMermaidSchema>;
+export type DataFixtureSummary = z.output<typeof dataFixtureSummarySchema>;
+export type DataFixtureRowsInput = z.output<typeof dataFixtureRowsInputSchema>;
+export type DataFixtureRows = z.output<typeof dataFixtureRowsSchema>;
 export type SpecRefsSearchInput = z.input<typeof specRefsSearchInputSchema>;
 export type SpecRefsSearchOutput = z.output<typeof specRefsSearchOutputSchema>;
 export type SpecOperation = z.input<typeof specOperationSchema>;

@@ -1779,7 +1779,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "3.4.0"
+    "version": "3.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -12462,7 +12462,10 @@
                         "criteria",
                         "rule",
                         "role",
-                        "flow"
+                        "flow",
+                        "table",
+                        "relations",
+                        "fixtures"
                       ],
                       "type": "string"
                     },
@@ -19972,7 +19975,10 @@
                               "criteria",
                               "rule",
                               "role",
-                              "flow"
+                              "flow",
+                              "table",
+                              "relations",
+                              "fixtures"
                             ],
                             "type": "string"
                           },
@@ -20474,7 +20480,10 @@
                         "criteria",
                         "rule",
                         "role",
-                        "flow"
+                        "flow",
+                        "table",
+                        "relations",
+                        "fixtures"
                       ],
                       "type": "string"
                     },
@@ -21938,7 +21947,17 @@
                               "minimum": 0,
                               "type": "integer"
                             },
+                            "fixtures": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
                             "flows": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "relations": {
                               "maximum": 9007199254740991,
                               "minimum": 0,
                               "type": "integer"
@@ -21965,7 +21984,9 @@
                             "endpoints",
                             "rules",
                             "roles",
-                            "flows"
+                            "flows",
+                            "relations",
+                            "fixtures"
                           ],
                           "type": "object"
                         },
@@ -23143,6 +23164,293 @@
                             "specId"
                           ],
                           "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "description": {
+                              "maxLength": 2000,
+                              "type": "string"
+                            },
+                            "fields": {
+                              "items": {
+                                "properties": {
+                                  "constraints": {
+                                    "maxLength": 300,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "pattern": "^[a-z_][a-z0-9_]*$",
+                                    "type": "string"
+                                  },
+                                  "personalData": {
+                                    "type": "boolean"
+                                  },
+                                  "primaryKey": {
+                                    "type": "boolean"
+                                  },
+                                  "rule": {
+                                    "pattern": "^R-\\d{3,}$",
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "pattern": "^(uuid|texte\\(\\d+\\)|entier|decimal|booleen|horodatage|date|enum|json|ref\\(T-[a-z0-9][a-z0-9-]*\\))$",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "items": {
+                                      "maxLength": 100,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "maxItems": 50,
+                                    "minItems": 1,
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "type"
+                                ],
+                                "type": "object"
+                              },
+                              "maxItems": 100,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "kind": {
+                              "const": "table.create",
+                              "type": "string"
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "relations": {
+                              "items": {
+                                "properties": {
+                                  "cardinality": {
+                                    "enum": [
+                                      "1 → 1",
+                                      "1 → 0..1",
+                                      "1 → n",
+                                      "n → 1",
+                                      "n ↔ n"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "to": {
+                                    "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to",
+                                  "cardinality"
+                                ],
+                                "type": "object"
+                              },
+                              "maxItems": 50,
+                              "type": "array"
+                            },
+                            "sources": {
+                              "items": {
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,})$",
+                                "type": "string"
+                              },
+                              "maxItems": 50,
+                              "type": "array"
+                            },
+                            "zone": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "zone",
+                            "fields",
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "description": {
+                              "maxLength": 2000,
+                              "type": "string"
+                            },
+                            "fields": {
+                              "items": {
+                                "properties": {
+                                  "constraints": {
+                                    "maxLength": 300,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "pattern": "^[a-z_][a-z0-9_]*$",
+                                    "type": "string"
+                                  },
+                                  "personalData": {
+                                    "type": "boolean"
+                                  },
+                                  "primaryKey": {
+                                    "type": "boolean"
+                                  },
+                                  "rule": {
+                                    "pattern": "^R-\\d{3,}$",
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "pattern": "^(uuid|texte\\(\\d+\\)|entier|decimal|booleen|horodatage|date|enum|json|ref\\(T-[a-z0-9][a-z0-9-]*\\))$",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "items": {
+                                      "maxLength": 100,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "maxItems": 50,
+                                    "minItems": 1,
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "type"
+                                ],
+                                "type": "object"
+                              },
+                              "maxItems": 100,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "kind": {
+                              "const": "table.update",
+                              "type": "string"
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "relations": {
+                              "items": {
+                                "properties": {
+                                  "cardinality": {
+                                    "enum": [
+                                      "1 → 1",
+                                      "1 → 0..1",
+                                      "1 → n",
+                                      "n → 1",
+                                      "n ↔ n"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "to": {
+                                    "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to",
+                                  "cardinality"
+                                ],
+                                "type": "object"
+                              },
+                              "maxItems": 50,
+                              "type": "array"
+                            },
+                            "sources": {
+                              "items": {
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,})$",
+                                "type": "string"
+                              },
+                              "maxItems": 50,
+                              "type": "array"
+                            },
+                            "specId": {
+                              "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                              "type": "string"
+                            },
+                            "zone": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "specId"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "table.delete",
+                              "type": "string"
+                            },
+                            "specId": {
+                              "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "specId"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "fixture.create",
+                              "type": "string"
+                            },
+                            "locale": {
+                              "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+                              "type": "string"
+                            },
+                            "rows": {
+                              "items": {
+                                "additionalProperties": {
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean"
+                                  ]
+                                },
+                                "propertyNames": {
+                                  "pattern": "^[a-z_][a-z0-9_]*$",
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "maxItems": 200,
+                              "type": "array"
+                            },
+                            "table": {
+                              "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                              "type": "string"
+                            },
+                            "title": {
+                              "maxLength": 200,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "title",
+                            "table",
+                            "rows"
+                          ],
+                          "type": "object"
                         }
                       ]
                     },
@@ -23357,6 +23665,10 @@
                               "flow.create",
                               "flow.update",
                               "flow.delete",
+                              "table.create",
+                              "table.update",
+                              "table.delete",
+                              "fixture.create",
                               "idea.page.write",
                               "idea.page.delete",
                               "idea.index.write",
@@ -23375,7 +23687,7 @@
                           "specId": {
                             "anyOf": [
                               {
-                                "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*)$",
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*|T-[a-z0-9][a-z0-9-]*|FX-[a-z0-9][a-z0-9-]*)$",
                                 "type": "string"
                               },
                               {
@@ -23780,6 +24092,10 @@
                               "flow.create",
                               "flow.update",
                               "flow.delete",
+                              "table.create",
+                              "table.update",
+                              "table.delete",
+                              "fixture.create",
                               "idea.page.write",
                               "idea.page.delete",
                               "idea.index.write",
@@ -23798,7 +24114,7 @@
                           "specId": {
                             "anyOf": [
                               {
-                                "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*)$",
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*|T-[a-z0-9][a-z0-9-]*|FX-[a-z0-9][a-z0-9-]*)$",
                                 "type": "string"
                               },
                               {
@@ -23896,6 +24212,898 @@
               }
             },
             "description": "Ressource introuvable"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Internal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Erreur interne"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/spec/data/fixtures": {
+      "get": {
+        "operationId": "spec.data.fixtures.list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "commitSha",
+            "schema": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "filePath": {
+                            "type": "string"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "rowCount": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "specId": {
+                            "pattern": "^FX-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          },
+                          "table": {
+                            "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "specId",
+                          "title",
+                          "table",
+                          "locale",
+                          "rowCount",
+                          "filePath"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Unauthorized"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Session absente ou expirée"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Forbidden2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Accès refusé"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NotFound"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Ressource introuvable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SpecIndexFailed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "L'index de la spec est en échec pour cette révision"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Validation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Entrée invalide"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Internal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Erreur interne"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/spec/data/fixtures/{fixtureId}/rows": {
+      "get": {
+        "operationId": "spec.data.fixtures.rows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fixtureId",
+            "required": true,
+            "schema": {
+              "pattern": "^FX-[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "page",
+            "required": true,
+            "schema": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "size",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "commitSha",
+            "schema": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "columns": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "totalIsEstimate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "totalIsEstimate",
+                    "columns"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Unauthorized"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Session absente ou expirée"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Forbidden2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Accès refusé"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NotFound"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Ressource introuvable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SpecIndexFailed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "L'index de la spec est en échec pour cette révision"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Validation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Entrée invalide"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Internal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Erreur interne"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/spec/data/mermaid": {
+      "get": {
+        "operationId": "spec.data.mermaid",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "commitSha",
+            "schema": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "commitSha": {
+                      "pattern": "^[0-9a-f]{40}$",
+                      "type": "string"
+                    },
+                    "generated": {
+                      "type": "boolean"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "generated",
+                    "commitSha"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Unauthorized"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Session absente ou expirée"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Forbidden2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Accès refusé"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NotFound"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Ressource introuvable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SpecIndexFailed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "L'index de la spec est en échec pour cette révision"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Validation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Entrée invalide"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Internal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Erreur interne"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/spec/data/tables": {
+      "get": {
+        "operationId": "spec.data.tables.list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "zone",
+            "schema": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "commitSha",
+            "schema": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "in": "query",
+            "name": "around",
+            "schema": {
+              "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "facets": {
+                      "additionalProperties": {
+                        "additionalProperties": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "fieldCount": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "filePath": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "personalData": {
+                            "type": "boolean"
+                          },
+                          "relationCount": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "specId": {
+                            "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          },
+                          "usedBy": {
+                            "items": {
+                              "pattern": "^(F-\\d{3,}|R-\\d{3,})$",
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "zone": {
+                            "maxLength": 80,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "specId",
+                          "name",
+                          "fieldCount",
+                          "relationCount",
+                          "usedBy",
+                          "personalData",
+                          "filePath"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "offset": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "previousCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "total": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor",
+                    "previousCursor",
+                    "offset",
+                    "total"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Unauthorized"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Session absente ou expirée"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Forbidden2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Accès refusé"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/NotFound"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Ressource introuvable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SpecIndexFailed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "L'index de la spec est en échec pour cette révision"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Validation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UndefinedError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Entrée invalide"
           },
           "500": {
             "content": {
@@ -25389,7 +26597,8 @@
                 "feature",
                 "rule",
                 "role",
-                "flow"
+                "flow",
+                "table"
               ],
               "type": "string"
             }
@@ -25432,6 +26641,7 @@
                                       "roles",
                                       "flow",
                                       "relations",
+                                      "fixture",
                                       "table",
                                       "endpoint",
                                       "screen",
@@ -25666,6 +26876,7 @@
                                       "roles",
                                       "flow",
                                       "relations",
+                                      "fixture",
                                       "table",
                                       "endpoint",
                                       "screen",
@@ -25820,6 +27031,7 @@
                                       "roles",
                                       "flow",
                                       "relations",
+                                      "fixture",
                                       "table",
                                       "endpoint",
                                       "screen",
@@ -25947,6 +27159,7 @@
                                       "roles",
                                       "flow",
                                       "relations",
+                                      "fixture",
                                       "table",
                                       "endpoint",
                                       "screen",
@@ -26091,6 +27304,196 @@
                             "steps",
                             "errors",
                             "features",
+                            "filePath",
+                            "commitSha"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "id",
+                        "values",
+                        "validated",
+                        "referencedBy"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                          "type": "string"
+                        },
+                        "referencedBy": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "items": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "feature",
+                                      "rule",
+                                      "roles",
+                                      "flow",
+                                      "relations",
+                                      "fixture",
+                                      "table",
+                                      "endpoint",
+                                      "screen",
+                                      "test"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "specId": {
+                                    "maxLength": 100,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "maxLength": 300,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "specId",
+                                  "title"
+                                ],
+                                "type": "object"
+                              },
+                              "maxItems": 20,
+                              "type": "array"
+                            },
+                            "total": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "total"
+                          ],
+                          "type": "object"
+                        },
+                        "type": {
+                          "const": "table",
+                          "type": "string"
+                        },
+                        "validated": {
+                          "type": "boolean"
+                        },
+                        "values": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "commitSha": {
+                              "pattern": "^[0-9a-f]{40}$",
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "fields": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "constraints": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "personalData": {
+                                    "type": "boolean"
+                                  },
+                                  "primaryKey": {
+                                    "type": "boolean"
+                                  },
+                                  "rule": {
+                                    "pattern": "^R-\\d{3,}$",
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "type",
+                                  "primaryKey",
+                                  "personalData"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "filePath": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "relations": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "cardinality": {
+                                    "enum": [
+                                      "1 → 1",
+                                      "1 → 0..1",
+                                      "1 → n",
+                                      "n → 1",
+                                      "n ↔ n"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "to": {
+                                    "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to",
+                                  "cardinality"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "sources": {
+                              "items": {
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,})$",
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "specId": {
+                              "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+                              "type": "string"
+                            },
+                            "zone": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "specId",
+                            "name",
+                            "description",
+                            "sources",
+                            "fields",
+                            "relations",
                             "filePath",
                             "commitSha"
                           ],

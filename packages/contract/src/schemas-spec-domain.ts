@@ -17,10 +17,10 @@ export const ruleIdSchema = z.string().regex(/^R-\d{3,}$/);
 export const roleIdSchema = z.string().regex(new RegExp(`^RL-${slug}$`));
 export const flowIdSchema = z.string().regex(new RegExp(`^P-${slug}$`));
 export const permissionIdSchema = z.string().regex(new RegExp(`^PM-${slug}(\\.${slug})*$`));
-/** Un identifiant d'élément écrit par un lot : fonctionnalité, règle, rôle ou parcours. */
+/** Un identifiant d'élément écrit par un lot : fonctionnalité, règle, rôle, parcours, table ou jeu d'exemple (3.5.0). */
 export const specIdSchema = z
   .string()
-  .regex(new RegExp(`^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug})$`));
+  .regex(new RegExp(`^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug})$`));
 
 const featureLink = z.string().regex(/^F-\d{3,}$/);
 const tableLink = z.string().regex(new RegExp(`^T-${slug}$`));
