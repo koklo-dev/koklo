@@ -1,4 +1,4 @@
-import { isIdeaKind } from "./paths.ts";
+import { isIdeaKind, isMigrationKind } from "./paths.ts";
 import type { BatchAuthor, BatchOperation } from "./types.ts";
 
 const MAX_SUBJECT = 200;
@@ -30,6 +30,10 @@ export function defaultSubject(operations: readonly BatchOperation[]): string {
   if (operations.some((operation) => isIdeaKind(operation.kind))) {
     const written = operations.filter((operation) => operation.kind === "idea.page.write");
     return `idea: publié ${plural(written.length)}`;
+  }
+  if (operations.some((operation) => isMigrationKind(operation.kind))) {
+    const back = operations.some((operation) => operation.kind === "spec.migrate.revert");
+    return back ? "spec: retour arrière de la migration v2" : "spec: migration vers le format v2";
   }
   const byVerb = new Map<string, string[]>();
   for (const operation of operations) {

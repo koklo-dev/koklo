@@ -10,7 +10,7 @@ const hasLineBreak = (text: string): boolean =>
   [...text].some((char) => "\r\n\0\u2028\u2029".includes(char));
 
 /** Branche de travail : celle du lot, sinon `cadrage` ; jamais la branche par défaut du dépôt (H3). */
-function branchOf(requested: string | undefined, defaultBranch: string): string {
+export function branchOf(requested: string | undefined, defaultBranch: string): string {
   const branch = requested ?? SCOPING_BRANCH;
   if (!isValidBranchName(branch)) {
     throw validation("branch", "Nom de branche invalide.");

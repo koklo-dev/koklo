@@ -1,5 +1,11 @@
 import type { GitAuth, GitProvider, RepoRef } from "@koklo/domain";
-import { isFlowPath, kindOf, type SpecFile } from "@koklo/schema";
+import {
+  isFlowPath,
+  isTableDirPath,
+  kindOf,
+  MIGRATION_EXTRA_PATHS,
+  type SpecFile,
+} from "@koklo/schema";
 import { READ_CONCURRENCY } from "../spec-write/constants.ts";
 import { relativeToSpec, withSpecPath } from "../spec-write/paths.ts";
 
@@ -18,18 +24,25 @@ export type ReadSpecInput = {
   readonly specPath: string | null;
   /** Lire aussi les parcours `design/flows/P-*.json` (indexeur d'entités, TK-100) ; faux pour l'écriture de lots. */
   readonly flows?: boolean;
+  /** Lire aussi les fichiers que la migration v1 -> v2 déplace ou crée (règles de design, sections) : lots de migration seulement. */
+  readonly migration?: boolean;
 };
 
-/** Chemins (relatifs à la racine de la spec) des fichiers que le schéma reconnaît. */
+/** Chemins (relatifs à la racine de la spec) des fichiers que le schéma reconnaît ou signale. */
 export function recognizedSpecPaths(
   specPath: string | null,
   files: readonly { path: string }[],
-  options: { flows?: boolean } = {},
+  options: { flows?: boolean; migration?: boolean } = {},
 ): string[] {
   return files.flatMap((file) => {
     const path = relativeToSpec(specPath, file.path);
     if (path === undefined) return [];
-    const known = kindOf(path) !== undefined || (options.flows === true && isFlowPath(path));
+    // Les fichiers de `data/tables/` hors format sont lus aussi : le schéma les signale (STRUCT_UNKNOWN_TABLE_FILE).
+    const known =
+      kindOf(path) !== undefined ||
+      isTableDirPath(path) ||
+      (options.flows === true && isFlowPath(path)) ||
+      (options.migration === true && MIGRATION_EXTRA_PATHS.includes(path));
     return known ? [path] : [];
   });
 }
@@ -46,8 +59,9 @@ export async function readSpecFiles({
   listing,
   specPath,
   flows,
+  migration,
 }: ReadSpecInput): Promise<SpecFile[]> {
-  const paths = recognizedSpecPaths(specPath, listing.files, { flows });
+  const paths = recognizedSpecPaths(specPath, listing.files, { flows, migration });
   const files: SpecFile[] = [];
   for (let start = 0; start < paths.length; start += READ_CONCURRENCY) {
     const chunk = paths.slice(start, start + READ_CONCURRENCY);

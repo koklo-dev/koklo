@@ -177,8 +177,10 @@ const WRITE_GROUPS = [
 /**
  * Groupes dont les écritures sont journalisées et prouvées par une suite dédiée (`idea-audit.test.ts`, TK-89) : leurs
  * procédures sont imbriquées (`idea.page.*`), ce que l'énumération à deux niveaux ci-dessus ne parcourt pas.
+ * `specMigration` (TK-106) : le lot enregistré est audité comme `specBatch.submit` (`spec.batch.submit`), prouvé par
+ * `spec-migration.test.ts` (un audit à `start`, un de plus à `revert`, aucun sur un refus).
  */
-const DEDICATED_AUDIT_GROUPS = ["idea"];
+const DEDICATED_AUDIT_GROUPS = ["idea", "specMigration"];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
 const READ_ONLY_GROUPS = ["audit", "clientSpace", "search", "aiModel"];
 /**

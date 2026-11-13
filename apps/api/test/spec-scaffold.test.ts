@@ -15,11 +15,10 @@ const INPUT = {
 const MARKERS = [
   "koklo.project.yaml",
   "README.md",
-  "architecture/overview.md",
-  "tech/cahier-technique.md",
+  "architecture/overview/01-contexte.md",
+  "tech/cahier-technique/01-objet.md",
   "domain/roles.yaml",
-  "data/relations.yaml",
-  ".koklo/rules.yaml",
+  "design/rules.yaml",
 ];
 const KEPT_DIRECTORIES = [
   "features",
@@ -34,7 +33,7 @@ const KEPT_DIRECTORIES = [
   "design/flows",
   "design/fixtures",
   "design/assets",
-  "tests/scenarios",
+  "quality/scenarios",
 ];
 
 describe("buildInitialSpecFiles : contenu", () => {
@@ -43,6 +42,18 @@ describe("buildInitialSpecFiles : contenu", () => {
 
   it("pose les fichiers du squelette de l'annexe A §4.0", () => {
     for (const marker of MARKERS) expect(paths, marker).toContain(marker);
+  });
+
+  it("format v2 : ni relations.yaml, ni .koklo/rules.yaml, ni tests/scenarios, ni sections à plat", () => {
+    for (const gone of [
+      "data/relations.yaml",
+      ".koklo/rules.yaml",
+      "tests/scenarios/.gitkeep",
+      "architecture/overview.md",
+      "tech/cahier-technique.md",
+    ]) {
+      expect(paths, gone).not.toContain(gone);
+    }
   });
 
   it("ne pose plus de brief : l'idée vit dans le dossier d'idée (TK-102, contrat 3.0.0)", () => {
@@ -83,14 +94,14 @@ describe("buildInitialSpecFiles : contenu", () => {
 });
 
 describe("buildInitialSpecFiles : validité (@koklo/schema)", () => {
-  it("le manifeste porte projet, organisation et spec_version 1, et checkSpec ne rend aucune erreur", async () => {
+  it("le manifeste porte projet, organisation et spec_version 2, et checkSpec ne rend aucune erreur", async () => {
     const { checkSpec, parseSpecFiles } = await import("@koklo/schema");
     const files = buildInitialSpecFiles(INPUT);
     const manifest = parseSpecFiles(files).spec.project?.value;
     expect(manifest).toMatchObject({
       projet: "civinat",
       organisation: "atelier-lumiere",
-      spec_version: 1,
+      spec_version: 2,
       extends: [],
       repos: [],
     });

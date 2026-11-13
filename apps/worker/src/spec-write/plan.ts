@@ -10,8 +10,9 @@ import {
 } from "@koklo/schema";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
 import { applyFlow, flowIndex } from "./flows.ts";
-import { featureIdOfPath, featurePathOf, isIdeaKind } from "./paths.ts";
+import { featureIdOfPath, featurePathOf, isIdeaKind, isMigrationKind } from "./paths.ts";
 import { planIdeaBatch } from "./plan-idea.ts";
+import { planMigrationBatch } from "./plan-migration.ts";
 import { newIssues, toStoredReport } from "./report.ts";
 import { applyRole, roleIds } from "./roles.ts";
 import { applyRule, ruleIndex } from "./rules.ts";
@@ -170,13 +171,17 @@ const toFiles = (files: Map<string, string>): SpecFile[] =>
 /**
  * Applique les opérations du lot, dans l'ordre, sur l'état lu (chemins relatifs à la spec) :
  * conflits d'abord, puis contrôle du designer opération par opération, puis validation. Pur, tout
- * ou rien : un résultat métier n'a jamais de changement.
+ * ou rien : un résultat métier n'a jamais de changement. `parentFiles` : l'état au parent du commit d'une migration (retour arrière).
  */
 export function planBatch(
   batch: Pick<LoadedBatch, "operations" | "authorRole">,
   files: readonly SpecFile[],
   treePaths: readonly string[] = files.map((file) => file.path),
+  parentFiles?: readonly SpecFile[],
 ): Plan {
+  if (batch.operations.some((operation) => isMigrationKind(operation.kind))) {
+    return planMigrationBatch(batch.operations, files, parentFiles);
+  }
   if (batch.operations.some((operation) => isIdeaKind(operation.kind))) {
     return planIdeaBatch(batch.operations, treePaths);
   }

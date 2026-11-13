@@ -93,6 +93,31 @@ describe("readSpecFiles", () => {
   });
 });
 
+describe("readSpecFiles : format v2 (TK-106)", () => {
+  it("format v2 : tables <slug>.yaml, endpoints zone.verbe, quality/scenarios, et fichiers de table hors format (TK-106)", async () => {
+    const { readSpecFiles } = await load();
+    const { inner, auth, listing } = await seed({
+      "koklo.project.yaml": "projet: p\nspec_version: 2\n",
+      "data/tables/reservation.yaml": "id: T-reservation\n",
+      "data/tables/notes.txt": "hors format",
+      "data/tables/.gitkeep": "",
+      "api/endpoints/reservation.lister.yaml": "id: reservation.lister\n",
+      "quality/scenarios/F-001-a.yaml": "feature: F-001\n",
+      "docs/notes.txt": "ignoré",
+    });
+
+    const files = await readSpecFiles({ provider: inner, auth, repo, listing, specPath: null });
+
+    expect(files.map((file) => file.path).sort()).toEqual([
+      "api/endpoints/reservation.lister.yaml",
+      "data/tables/notes.txt",
+      "data/tables/reservation.yaml",
+      "koklo.project.yaml",
+      "quality/scenarios/F-001-a.yaml",
+    ]);
+  });
+});
+
 describe("readFile : concurrence et pannes", () => {
   it("lectures bornées à 8 simultanées, toutes effectuées", async () => {
     const { readSpecFiles } = await load();

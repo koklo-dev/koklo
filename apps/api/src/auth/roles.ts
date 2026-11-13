@@ -86,6 +86,13 @@ export const REPO_READ_ROLES = ["owner", "admin", "dev", "designer"] as const;
 export const SPEC_BATCH_ROLES = ["owner", "admin", "dev", "designer"] as const;
 
 /**
+ * Migrer le format de la spec v1 vers v2 et annuler cette migration (`specMigration.start|revert`, TK-106, D11) : le
+ * propriétaire de l'organisation seul. L'écriture touche toute la spec d'un dépôt client en un lot ; un rôle d'agent
+ * (aucun jeton n'existe encore, TK-12x) reste exclu.
+ */
+export const SPEC_MIGRATION_ROLES = ["owner"] as const;
+
+/**
  * Lancer, relire et décider les propositions de l'agent (`ai.proposeDeliverable|proposeOptions|reviseProposal`,
  * `proposal.*`, TK-99a) : ceux de `specBatch`, qui seuls peuvent les appliquer. Client et business : 403 partout
  * (jamais de proposition en attente côté client).
