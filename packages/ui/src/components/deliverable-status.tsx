@@ -48,6 +48,8 @@ type Common = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
   status: DeliverableStatusValue;
   /** Libellé plus long que celui du statut (« À valider par le client · obligatoire », maquette 10 l.655). */
   label?: string;
+  /** Icône propre à l'état affiché (« groups » : validation de l'équipe, maquette 11 l.598), au lieu de celle du statut. */
+  icon?: IconName;
 };
 
 export type DeliverableStatusProps = Common &
@@ -66,10 +68,12 @@ export function DeliverableStatus({
   compact = false,
   hideLabel = false,
   label: customLabel,
+  icon: customIcon,
   className,
   ...props
 }: DeliverableStatusProps) {
-  const { label: defaultLabel, icon, tone } = DELIVERABLE[status];
+  const { label: defaultLabel, icon: defaultIcon, tone } = DELIVERABLE[status];
+  const icon = customIcon ?? defaultIcon;
   const label = customLabel ?? defaultLabel;
   return (
     <span

@@ -39,6 +39,8 @@ export interface ProposalReviewProps {
   /** Avancement pendant l'enregistrement : la barre du bandeau se remplit en vert, lot après lot. */
   saveProgress?: ProposalSaveProgress | undefined;
   onLeave: () => void;
+  /** Décompte du bandeau propre à un livrable ; absent : « N propositions · N acceptées · … ». */
+  summaryText?: string | undefined;
   /** Annonce polie (« F-012 acceptée ») : la seule région d'état de la vue. */
   announcement?: string;
   /** Le détail : un `ProposalDetail` pour la proposition choisie. */
@@ -175,6 +177,7 @@ export function ProposalReview(props: ProposalReviewProps) {
         saving={props.saving}
         saveProgress={props.saveProgress}
         onLeave={props.onLeave}
+        summaryText={props.summaryText}
       />
       <div className="flex min-h-0 flex-wrap">
         <ProposalReviewList

@@ -34,6 +34,8 @@ export interface ListFooterProps
   variant?: "full" | "compact";
   /** Plein, cadré : cadre bordé, rayon 10, 12 px, icône 16 (cartes des règles, rôles et parcours, maquette 10 l.243). */
   framed?: boolean;
+  /** Pied rattaché au bas d'un tableau cadré (maquette 11 l.241) : sans bord haut, coins bas arrondis, à placer sous un `Table` `rounded-b-none`. */
+  attached?: boolean;
 }
 
 const FRAME = "border-border bg-surface text-muted-foreground";
@@ -168,10 +170,12 @@ function CompactBody({
  */
 export function ListFooter({
   variant = "full",
-  framed = false,
+  framed: framedProp = false,
+  attached = false,
   className,
   ...props
 }: ListFooterProps) {
+  const framed = framedProp || attached;
   const {
     state,
     pageSize,
@@ -213,9 +217,11 @@ export function ListFooter({
         state === "error" && ERROR_FRAME,
         compact
           ? cn(COMPACT_FRAME, "flex flex-wrap items-center justify-center gap-2 px-3 py-2")
-          : framed
-            ? "flex flex-wrap items-center gap-2 rounded-[10px] border px-4 py-2.5 text-caption font-normal"
-            : "flex flex-wrap items-center gap-2.5 border-t px-4 py-3",
+          : attached
+            ? "flex flex-wrap items-center gap-2 rounded-b-xl border border-t-0 px-4 py-2.5 text-caption font-normal"
+            : framed
+              ? "flex flex-wrap items-center gap-2 rounded-[10px] border px-4 py-2.5 text-caption font-normal"
+              : "flex flex-wrap items-center gap-2.5 border-t px-4 py-3",
         className,
       )}
       {...attrs}

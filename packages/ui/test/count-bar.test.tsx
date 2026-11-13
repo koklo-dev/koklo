@@ -188,3 +188,20 @@ describe("CountBar : showAllLoaded (TK-103)", () => {
     expect(container).not.toHaveTextContent("toutes chargées");
   });
 });
+
+describe("CountBar : trailing (TK-107)", () => {
+  it("place le contenu à droite de la même rangée, hors de la région d'état", () => {
+    render(
+      <CountBar
+        total={6}
+        loaded={6}
+        noun={{ one: "table", other: "tables" }}
+        trailing={<input aria-label="Rechercher" />}
+      />,
+    );
+    const slot = document.querySelector("[data-slot='count-bar-trailing']");
+    expect(slot).toHaveClass("ml-auto");
+    expect(slot?.querySelector("input")).not.toBeNull();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+});

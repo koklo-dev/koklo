@@ -19,6 +19,8 @@ export interface CountBarProps extends Omit<HTMLAttributes<HTMLDivElement>, "chi
   query?: string;
   /** Liste entièrement chargée : « · toutes chargées » après le total (maquette 10 l.501). */
   showAllLoaded?: boolean;
+  /** Contenu à droite de la même rangée (champ de recherche de l'onglet Tables, maquette 11 l.236). */
+  trailing?: ReactNode;
   /** Version de colonne (kanban) : le total seul. */
   compact?: boolean;
   /** Recherche en cours : la barre est atténuée. */
@@ -94,6 +96,7 @@ export function CountBar({
   query,
   sort,
   showAllLoaded,
+  trailing,
   compact = false,
   busy = false,
   announcement,
@@ -131,6 +134,14 @@ export function CountBar({
           <span>Tri : {sort}</span>
           <Icon name="swap_vert" size={16} />
         </span>
+      ) : null}
+      {trailing && !compact ? (
+        <div
+          data-slot="count-bar-trailing"
+          className="ml-auto flex min-w-0 items-center gap-2 max-md:w-full"
+        >
+          {trailing}
+        </div>
       ) : null}
       <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement ?? arrival}

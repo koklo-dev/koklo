@@ -83,6 +83,20 @@ describe("SpecCollection", () => {
 });
 
 describe("DeliverableStatus Prêt et Génération", () => {
+  it("icon remplace l'icône du statut sans changer son libellé ni sa teinte", () => {
+    const { container } = render(
+      <DeliverableStatus
+        status="in_progress"
+        icon="groups"
+        label="Validation de l'équipe · le client lit et commente"
+      />,
+    );
+    expect(
+      screen.getByText("Validation de l'équipe · le client lit et commente"),
+    ).toBeInTheDocument();
+    expect(container.querySelector("[data-status='in_progress']")).not.toBeNull();
+  });
+
   it("Prêt : flèche, fond --secondary", () => {
     render(<DeliverableStatus status="ready" />);
     const pill = screen.getByText("Prêt").closest("[data-slot='deliverable-status']");

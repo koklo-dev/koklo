@@ -11,6 +11,21 @@ import {
   type ProposalStatus,
 } from "../src/index.ts";
 
+/** TK-107 lot C : texte du bandeau propre à un livrable (Données, maquette 11 l.113-122). */
+describe("ProposalReview : texte du bandeau", () => {
+  it("summaryText remplace le décompte par défaut", () => {
+    setup({
+      summaryText:
+        " · l'agent propose 12 éléments depuis le cahier fonctionnel · 3 acceptés · 7 à relire",
+    });
+    const banner = screen.getByRole("group", { name: "Mode relecture" });
+    expect(banner).toHaveTextContent(
+      "Mode relecture · l'agent propose 12 éléments depuis le cahier fonctionnel · 3 acceptés · 7 à relire",
+    );
+    expect(banner).not.toHaveTextContent("rejetées");
+  });
+});
+
 /** TK-99b lot A, cas 7 (maquette 10 l.114-168, 506-560, 819-826) : relecture à plat (30 propositions au plus). */
 const STATUSES: ProposalStatus[] = ["accepted", "accepted", "accepted", "rejected", "rejected"];
 

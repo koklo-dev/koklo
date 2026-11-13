@@ -29,6 +29,7 @@ export * from "./components/dialog.tsx";
 export * from "./components/dropdown-menu.tsx";
 export * from "./components/empty-state.tsx";
 export * from "./components/entity-chip.tsx";
+export * from "./components/er-table-card.tsx";
 export * from "./components/field.tsx";
 export * from "./components/filter-chip.tsx";
 export * from "./components/flow-card.tsx";

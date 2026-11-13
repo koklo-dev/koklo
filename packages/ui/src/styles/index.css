@@ -45,6 +45,7 @@
   --color-status-validated-foreground: var(--status-validated-fg);
   --color-status-pending: var(--status-pending-bg);
   --color-status-pending-foreground: var(--status-pending-fg);
+  --color-status-pending-icon: var(--status-pending-icon);
   --color-status-revise: var(--status-revise-bg);
   --color-status-revise-foreground: var(--status-revise-fg);
 

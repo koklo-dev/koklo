@@ -42,10 +42,10 @@ describe("EmptyState", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("TK-139 : écart 10, tuile IconTile 48 décorative", () => {
+  it("TK-139 et TK-107 : écart 12, tuile IconTile 48 décorative", () => {
     const { container } = render(<EmptyState {...props} />);
     const root = container.querySelector("[data-slot='empty-state']");
-    expect(root).toHaveClass("gap-2.5");
+    expect(root).toHaveClass("gap-3");
     expect(root).toHaveAttribute("data-variant", "framed");
     const tile = root?.querySelector("[data-slot='icon-tile']");
     expect(tile).toHaveAttribute("data-size", "48");

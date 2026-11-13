@@ -180,4 +180,9 @@ describe("ListFooter : variante encadrée et accord (TK-103)", () => {
     expect(footer()).toHaveClass("rounded-[10px]", "border", "text-caption", "font-normal");
     expect(footer()).not.toHaveClass("border-t");
   });
+  it("attached : sous un tableau cadré, sans bord haut, coins bas arrondis (maquette 11 l.241)", () => {
+    render(<ListFooter state="end" total={3} attached />);
+    expect(footer()).toHaveClass("rounded-b-xl", "border", "border-t-0", "text-caption");
+    expect(footer()).not.toHaveClass("rounded-[10px]");
+  });
 });

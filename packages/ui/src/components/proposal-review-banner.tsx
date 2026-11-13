@@ -11,6 +11,8 @@ export interface ProposalReviewBannerProps {
   /** Pendant l'enregistrement : la barre passe en vert (part écrite, puis part en cours qui pulse). */
   saveProgress?: ProposalSaveProgress | undefined;
   onLeave: () => void;
+  /** Décompte propre à un livrable, après « Mode relecture » (` · l'agent propose 12 éléments depuis le cahier…`). */
+  summaryText?: string | undefined;
   className?: string;
 }
 
@@ -71,6 +73,7 @@ export function ProposalReviewBanner({
   saving,
   saveProgress,
   onLeave,
+  summaryText,
   className,
 }: ProposalReviewBannerProps) {
   const progress = saving ? saveProgress : undefined;
@@ -88,7 +91,7 @@ export function ProposalReviewBanner({
       <Icon name="wand_stars" size={18} tone="primary" />
       <span className="text-meta">
         <strong className="font-semibold">Mode relecture</strong>
-        {summary(counts)}
+        {summaryText ?? summary(counts)}
       </span>
       {progress ? (
         <span data-slot="proposal-save-progress" className="text-meta text-muted-foreground">
