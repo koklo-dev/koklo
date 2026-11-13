@@ -364,3 +364,40 @@ describe("intégrité des opérations de données", () => {
     expect(check([op("fixture.create", "T-clients")])).toBe("specId");
   });
 });
+
+describe("dépôt encore en v1 (projet créé avant TK-106) : migration dans le même lot", () => {
+  const V1 = [
+    { path: "koklo.project.yaml", content: "projet: demo\norganisation: acme\nspec_version: 1\n" },
+    feature("F-001"),
+    rule("R-004"),
+    { path: "data/relations.yaml", content: "relations: []\n" },
+    {
+      path: "data/tables/T-client.yaml",
+      content:
+        "id: T-client\nchamps:\n  - { nom: id, type: uuid, nullable: false, unique: true }\n",
+    },
+  ];
+
+  it("table.create migre la spec en v2 puis écrit la table : un seul lot, aucune erreur", () => {
+    const result = plan([op("table.create", "T-reservation", TABLE)], V1);
+    expect("outcome" in result ? result.outcome : undefined).toBeUndefined();
+    expect(contentOf(result, "koklo.project.yaml")).toContain("spec_version: 2");
+    expect(changes(result)).toContainEqual({ path: "data/relations.yaml", delete: true });
+    expect(changes(result)).toContainEqual({ path: "data/tables/T-client.yaml", delete: true });
+    expect(paths(result)).toContain("data/tables/client.yaml");
+    expect(paths(result)).toContain("data/tables/reservation.yaml");
+    expect(paths(result)).toContain("data/model.mmd");
+  });
+
+  it("une spec v1 déjà en erreur n'est pas migrée : SPEC_INVALID, rien n'est écrit", () => {
+    const broken = [...V1, { path: "data/tables/T-x.yaml", content: "id: T-x\n" }];
+    const result = plan([op("table.create", "T-reservation", TABLE)], broken);
+    expect("outcome" in result ? result.outcome.status : undefined).toBe("failed");
+    expect(changes(result)).toEqual([]);
+  });
+
+  it("un lot sans Données ne touche pas au format", () => {
+    const result = plan([op("feature.delete", "F-001")], V1);
+    expect(paths(result)).not.toContain("koklo.project.yaml");
+  });
+});

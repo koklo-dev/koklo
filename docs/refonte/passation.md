@@ -57,6 +57,7 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
   mort) ; ils arrivent avec TK-90 et TK-91. L'Assistant de cadrage actuel et le brief sont retirés au sprint 022.
 - Tout en français ; jamais le nom du fournisseur d'IA dans l'interface ; aucune donnée réelle ni secret ; WCAG 2.2 AA,
   375 px, axe sans violation. Ne jamais cocher une case du sprint sans que chaque critère soit vérifié.
+- Dépôts de spec v1 (2026-11-13, C4) : **migration automatique**. Un lot qui écrit des Données sur un dépôt encore en `spec_version: 1` le migre en v2 dans le même commit (B474, `apps/worker/src/spec-write/auto-migrate.ts`).
 - Lecteur de diagramme (2026-11-13, TK-108) : **SVG maison** dans `packages/ui` (`DiagramViewer` partagé par les lots 6,
   7 et 9 ; `SequenceDiagram` à part) ; placement automatique sans `_layout.yaml` par **`@dagrejs/dagre`**, seule
   dépendance ajoutée (ADR avec TK-108) ; React Flow et rendu Mermaid écartés (fidélité aux maquettes, accessibilité,
