@@ -497,3 +497,73 @@ export function handleSpecData(req: IncomingMessage, url: URL, h: Handlers, mode
   }
   return true;
 }
+
+const CLIENT_DATA = /^\/client-space\/projects\/[^/]+\/data\/(model|fixtures)(?:\/([^/]+)\/rows)?$/;
+const CLIENT_SUMMARIES: Record<string, string[]> = {
+  "T-client": ["Le nom du client", "Son numéro de téléphone", "Son adresse e-mail"],
+  "T-reservation": ["Le créneau choisi", "Le service réservé", "L'état de la réservation"],
+};
+const USED_BY_LABELS: Record<string, string> = {
+  "F-001": "Réserver un créneau",
+  "F-002": "Gérer son profil",
+  "F-003": "Recevoir un rappel",
+  "R-004": "Un créneau n'est réservé qu'une fois",
+};
+
+/** Ce que le client lit d'une table : ni contrainte, ni valeur, ni chemin (contrat 3.7.0, `clientSpace.dataModel`). */
+function clientTableOf(table: Table, names: ReadonlyMap<string, string>) {
+  return {
+    id: table.specId,
+    name: table.name,
+    zone: table.zone,
+    description: table.description,
+    fields: table.fields.map(([name, type, , kind, personal]) => ({
+      name,
+      type,
+      primaryKey: kind === "pk",
+      personalData: personal,
+    })),
+    relations: table.relations.map((relation) => ({
+      to: relation.to,
+      toName: names.get(relation.to) ?? relation.to,
+      cardinality: relation.cardinality,
+    })),
+    usedBy: table.sources.map((id) => ({
+      id,
+      label: USED_BY_LABELS[id] ?? `Fonctionnalité ${id}`,
+    })),
+    clientSummary: CLIENT_SUMMARIES[table.specId] ?? [],
+  };
+}
+
+/**
+ * Lectures client du modèle validé (`clientSpace.dataModel|dataFixtures|dataFixtureRows`, TK-109) ; `available` faux :
+ * aucune table. `null` pour toute autre route.
+ */
+export function clientDataReply(url: URL, mode: string, available: boolean): Reply | null {
+  const match = CLIENT_DATA.exec(url.pathname);
+  if (!match) return null;
+  if (match[2]) return rowsOf(url, mode, match[2]);
+  const tables = available ? tablesOf(mode).slice(0, 100) : [];
+  if (match[1] === "fixtures") {
+    return reply(200, {
+      items: available
+        ? fixturesOf(mode).map(({ specId, title, table, locale, rowCount }) => ({
+            specId,
+            title,
+            table,
+            locale,
+            rowCount,
+          }))
+        : [],
+    });
+  }
+  const names = new Map(tablesOf(mode).map((table) => [table.specId, table.name]));
+  return reply(200, {
+    available,
+    validation: available ? "validated" : "to_validate",
+    truncated: available && tablesOf(mode).length > 100,
+    items: tables.map((table) => clientTableOf(table, names)),
+    positions: {},
+  });
+}

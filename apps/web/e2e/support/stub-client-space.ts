@@ -399,6 +399,7 @@ function reviewList(url: URL, send: Send): void {
     status: "changes_requested",
     authorId: "01900000-0000-7000-8000-0000000000c3",
     authorRole: "client",
+    authorName: null,
     comment: REQUEST_COMMENT,
     createdAt: "2026-11-12T10:00:00.000Z",
     current: true,
