@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { proposedTableOf } from "../src/lib/data-diagram.ts";
-import { diagramOf, parseModelMermaid } from "../src/lib/data-mermaid.ts";
+import { proposedTableOf, relationsOf } from "../src/lib/data-diagram.ts";
+import { diagramOf, parseModelMermaid, parseModelRelations } from "../src/lib/data-mermaid.ts";
 
 /** TK-107 lot C : lecture du `data/model.mmd` (B384) et cartes du diagramme minimal. */
 const MODEL = `%% Généré par koklo depuis data/tables : ne pas modifier à la main.
@@ -92,5 +92,57 @@ describe("diagramOf", () => {
     );
     expect(card.fields.map((f) => f.kind)).toEqual(["primary", "reference", "personal", "plain"]);
     expect(card.fields[1]?.type).toBe("ref(T-client)");
+  });
+});
+
+describe("parseModelRelations (TK-108)", () => {
+  it("lit chaque relation : source, cible et cardinalité entre guillemets", () => {
+    const text = `${MODEL}  T_client ||--o{ T_service : "1 → n"\n  T_service }o--o{ T_client : "n ↔ n"\n`;
+    expect(parseModelRelations(text)).toEqual([
+      { id: "r0", from: "T-reservation", to: "T-client", cardinality: "n → 1" },
+      { id: "r1", from: "T-client", to: "T-service", cardinality: "1 → n" },
+      { id: "r2", from: "T-service", to: "T-client", cardinality: "n ↔ n" },
+    ]);
+  });
+
+  it("ignore les entités, les attributs et les commentaires", () => {
+    expect(
+      parseModelRelations('%% T_a }o--|| T_b : "n → 1"\nerDiagram\n  T_a {\n    uuid id PK\n  }\n'),
+    ).toEqual([]);
+  });
+});
+
+describe("relationsOf (TK-108)", () => {
+  const cards = [
+    { id: "T-client", name: "Client", fields: [] },
+    { id: "T-reservation", name: "Réservation", fields: [] },
+    { id: "T-avis", name: "Avis", fields: [], state: "review" as const },
+    { id: "T-facture", name: "Facture", fields: [], state: "rejected" as const },
+  ];
+
+  it("trait étiqueté de la cardinalité, en pointillés pour n ↔ n, sans extrémité inconnue", () => {
+    const links = [
+      { id: "r0", from: "T-reservation", to: "T-client", cardinality: "n → 1" },
+      { id: "r1", from: "T-client", to: "T-reservation", cardinality: "n ↔ n" },
+      { id: "r2", from: "T-client", to: "T-absente", cardinality: "1 → n" },
+    ];
+    expect(relationsOf(links, cards)).toEqual([
+      { id: "r0", from: "T-reservation", to: "T-client", label: "n → 1", dashed: false },
+      { id: "r1", from: "T-client", to: "T-reservation", label: "n ↔ n", dashed: true },
+    ]);
+  });
+
+  it("les relations d'une table proposée s'ajoutent, celles d'une table rejetée sont retirées", () => {
+    const withRelations = cards.map((card) =>
+      card.id === "T-avis"
+        ? { ...card, relations: [{ to: "T-client", cardinality: "n → 1" }] }
+        : card.id === "T-facture"
+          ? { ...card, relations: [{ to: "T-client", cardinality: "n → 1" }] }
+          : card,
+    );
+    const links = [{ id: "r0", from: "T-client", to: "T-facture", cardinality: "1 → n" }];
+    expect(relationsOf(links, withRelations)).toEqual([
+      { id: "T-avis>T-client>0", from: "T-avis", to: "T-client", label: "n → 1", dashed: false },
+    ]);
   });
 });

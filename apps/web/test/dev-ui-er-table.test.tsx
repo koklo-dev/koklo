@@ -9,9 +9,9 @@ describe("Galerie : modèle de données", () => {
     expect(container.querySelector("#dev-ui-er-table")).toHaveTextContent("20. Modèle de données");
   });
 
-  it("montre la carte dans ses trois états, pastilles texte comprises", () => {
+  it("montre la carte dans ses quatre états, pastilles texte comprises", () => {
     render(<DevUiErTable />);
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Table / })).toHaveLength(4);
     expect(screen.getByText("À relire")).toBeInTheDocument();
     expect(screen.getByText("Rejetée")).toBeInTheDocument();
   });

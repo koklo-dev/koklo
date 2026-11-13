@@ -126,6 +126,37 @@ function MembersFrame() {
   );
 }
 
+function CompactFrame() {
+  return (
+    <DevUiFrame title="Table compact (fiche)">
+      <DevUiNote>
+        12 px, cellules 6 × 10, cadre de rayon 10 (champs d'une table, maquette 11)
+      </DevUiNote>
+      <Table framed compact aria-label="Champs de la table (démonstration)">
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Champ</TableHead>
+            <TableHead scope="col">Type</TableHead>
+            <TableHead scope="col">Contraintes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell className="font-mono">id</TableCell>
+            <TableCell className="font-mono text-muted-foreground">uuid</TableCell>
+            <TableCell>Clé primaire</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-mono">client</TableCell>
+            <TableCell className="font-mono text-muted-foreground">→ T-client</TableCell>
+            <TableCell>—</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </DevUiFrame>
+  );
+}
+
 function MatrixFrame() {
   return (
     <DevUiFrame title="Table dense, stickyHeader et YesNoCell">
@@ -170,6 +201,7 @@ export function DevUiSurfacesC() {
       <TabsFrame />
       <MembersFrame />
       <MatrixFrame />
+      <CompactFrame />
     </DevUiSection>
   );
 }

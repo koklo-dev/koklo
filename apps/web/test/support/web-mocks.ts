@@ -70,6 +70,10 @@ export const procedures = {
   // TK-107 (contrat 3.5.0) : onglets Tables et Jeux d'exemple, diagramme minimal
   specDataTablesList: vi.fn(),
   specDataMermaid: vi.fn(),
+  // TK-108 (contrat 3.6.0) : positions du diagramme et source d'une table
+  specDataLayoutGet: vi.fn(),
+  specDataLayoutSave: vi.fn(),
+  specDataTablesSource: vi.fn(),
   specDataFixturesList: vi.fn(),
   specDataFixturesRows: vi.fn(),
   specRefsSearch: vi.fn(),
@@ -253,8 +257,16 @@ export const orpc = {
       key: () => ["spec", "data"],
       tables: {
         list: queryFull(["spec", "data", "tables", "list"], procedures.specDataTablesList),
+        source: queryFull(["spec", "data", "tables", "source"], procedures.specDataTablesSource),
       },
       mermaid: queryFull(["spec", "data", "mermaid"], procedures.specDataMermaid),
+      layout: {
+        get: queryFull(["spec", "data", "layout", "get"], procedures.specDataLayoutGet),
+        save: {
+          ...mutation(procedures.specDataLayoutSave),
+          call: (input?: unknown) => procedures.specDataLayoutSave(input),
+        },
+      },
       fixtures: {
         list: queryFull(["spec", "data", "fixtures", "list"], procedures.specDataFixturesList),
         rows: queryFull(["spec", "data", "fixtures", "rows"], procedures.specDataFixturesRows),

@@ -97,16 +97,29 @@ function useSavedSync(
   }, [saved, formOpen, queryClient, titleRef]);
 }
 
-/** Tables, relations et jeux proposés par l'agent : cartes du diagramme, avec la décision de relecture de chacune. */
+/** Tables proposées : cartes du diagramme, avec la décision de relecture de chacune et leurs relations. */
 function proposedCards(review: ReturnType<typeof useProposalReview>): DiagramCard[] {
+  // B397 : les relations ne sont pas dans la charge d'une table ; celles des propositions « relations » non rejetées
+  // s'ajoutent à la carte de départ (B440).
+  const links = review.proposals
+    .filter((proposal) => proposal.kind === "relations" && proposal.status !== "rejected")
+    .flatMap((proposal) => {
+      const list = (proposal.content as { relations?: unknown }).relations;
+      return Array.isArray(list) ? (list as Array<Record<string, unknown>>) : [];
+    })
+    .filter((link) => typeof link.from === "string" && typeof link.to === "string");
   return review.proposals
     .filter((proposal) => proposal.kind === "table")
-    .map((proposal) =>
-      proposedTableOf(
+    .map((proposal) => {
+      const card = proposedTableOf(
         proposal.content as unknown as Parameters<typeof proposedTableOf>[0],
         proposal.status,
-      ),
-    );
+      );
+      const out = links
+        .filter((link) => link.from === card.id)
+        .map((link) => ({ to: String(link.to), cardinality: String(link.cardinality ?? "") }));
+      return out.length > 0 ? { ...card, relations: [...(card.relations ?? []), ...out] } : card;
+    });
 }
 
 /** Tables et jeux proposés, pour les compteurs d'onglet de la relecture. */
