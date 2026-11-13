@@ -111,6 +111,7 @@ export const iconLoaders = {
   calculate: () => import("./calculate.ts"),
   shield_person: () => import("./shield_person.ts"),
   support_agent: () => import("./support_agent.ts"),
+  add_comment: () => import("./add_comment.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;
