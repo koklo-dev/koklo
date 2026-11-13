@@ -5,7 +5,7 @@ import { serveProposals } from "./proposals.tsx";
 import { renderWithQuery } from "./render.tsx";
 import { procedures, setUrl } from "./web-mocks.ts";
 
-/** Faux serveur du modèle de données (contrat 3.5.0) : tables, diagramme, jeux d'exemple, propositions. */
+/** Faux serveur du modèle de données (contrat 3.6.0) : tables, diagramme, positions, jeux d'exemple, propositions. */
 export { PROJECT_ID };
 export const SHA40 = "a".repeat(40);
 
@@ -112,6 +112,15 @@ export const TABLE_DETAIL = {
   commitSha: SHA40,
 };
 
+/** Source d'une table (`spec.data.tables.source`) : le fichier du dépôt, ou le YAML généré. */
+export const TABLE_YAML = `id: T-client
+nom: Client
+champs:
+  - nom: id
+    type: uuid
+    cle: primaire
+`;
+
 interface TablesOptions {
   rows?: ReadonlyArray<ReturnType<typeof tableRow>>;
   /** Fait échouer la lecture de la liste. */
@@ -191,6 +200,17 @@ export function serveData(
     };
   });
   procedures.specDataMermaid.mockResolvedValue({ text: MODEL, generated: false, commitSha: SHA40 });
+  procedures.specDataLayoutGet.mockResolvedValue({ positions: {}, commitSha: SHA40 });
+  procedures.specDataLayoutSave.mockResolvedValue({ commitSha: SHA40 });
+  procedures.specDataTablesSource.mockImplementation(async (input: unknown) => {
+    const { tableId } = input as { tableId: string };
+    return {
+      path: `data/tables/${tableId.slice(2)}.yaml`,
+      text: TABLE_YAML,
+      commitSha: SHA40,
+      generated: false,
+    };
+  });
   procedures.specDataFixturesList.mockResolvedValue({ items: FIXTURES });
   procedures.specDataFixturesRows.mockImplementation(async (input: unknown) =>
     fixtureRows(Number((input as { page: number }).page)),

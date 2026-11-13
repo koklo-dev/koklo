@@ -18,12 +18,13 @@ const CLIENT: readonly ErTableField[] = [
 export function DevUiErTable() {
   return (
     <DevUiSection id="dev-ui-er-table" title="20. Modèle de données">
-      <DevUiFrame title="ErTableCard : enregistrée, à relire, rejetée" wide>
-        <ul aria-label="Cartes de table" className="m-0 flex list-none flex-wrap gap-4 p-0">
+      <DevUiFrame title="ErTableCard : enregistrée, sélectionnée, à relire, rejetée" wide>
+        <div className="flex flex-wrap gap-4">
           <ErTableCard id="T-reservation" name="Réservation" fields={RESERVATION} />
+          <ErTableCard id="T-service" name="Service" fields={CLIENT} selected />
           <ErTableCard id="T-client" name="Client" fields={CLIENT} state="review" />
           <ErTableCard id="T-avis" name="Avis" fields={CLIENT} state="rejected" />
-        </ul>
+        </div>
       </DevUiFrame>
       <DevUiFrame title="ListFooter attached : pied dans le cadre du tableau">
         <div className="rounded-t-xl border border-border border-b-0 bg-surface p-3 text-meta">

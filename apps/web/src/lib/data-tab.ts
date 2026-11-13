@@ -42,17 +42,20 @@ const tableId = (value: string | null): string | undefined =>
   value && TABLE_ID.test(value) ? value : undefined;
 const nonEmpty = (value: string | null): string | undefined => value?.trim() || undefined;
 
-/** Lit l'adresse : onglet inconnu = Diagramme ; Relecture seulement si `view=review` ; identifiants invalides ignorés. */
-export function readDataUrl(search: string): DataUrl {
+/**
+ * Lit l'adresse : onglet inconnu = Diagramme, ou Tables sous 1024 px (`narrow`, B425) ; Relecture seulement si
+ * `view=review` ; identifiants invalides ignorés.
+ */
+export function readDataUrl(
+  search: string,
+  { narrow = false }: { narrow?: boolean } = {},
+): DataUrl {
   const params = new URLSearchParams(search);
   const review = params.get("view") === "review";
   const asked = DATA_TABS.find((tab) => tab === params.get("tab"));
+  const fallback: DataTab = narrow ? "tables" : "diagram";
   const tab =
-    asked === "review"
-      ? review
-        ? "review"
-        : "diagram"
-      : (asked ?? (review ? "review" : "diagram"));
+    asked === "review" ? (review ? "review" : fallback) : (asked ?? (review ? "review" : fallback));
   return {
     tab,
     review,

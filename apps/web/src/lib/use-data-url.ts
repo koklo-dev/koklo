@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { type DataTab, type DataUrlPatch, readDataUrl, withDataUrl } from "./data-tab.ts";
+import { NARROW_MAX, useMaxWidth } from "./use-max-width.ts";
 
 function write(patch: DataUrlPatch, mode: "push" | "replace"): void {
   const { pathname, search } = window.location;
@@ -18,7 +19,8 @@ function write(patch: DataUrlPatch, mode: "push" | "replace"): void {
  */
 export function useDataUrl() {
   const search = useSearchParams().toString();
-  const state = useMemo(() => readDataUrl(search), [search]);
+  const narrow = useMaxWidth(NARROW_MAX);
+  const state = useMemo(() => readDataUrl(search, { narrow }), [search, narrow]);
   return {
     ...state,
     search,
@@ -46,6 +48,8 @@ export function useDataUrl() {
       [],
     ),
     dropSelection: useCallback(() => write({ sel: null }, "replace"), []),
+    /** Table choisie dans le diagramme : portée par l'adresse (sans entrée d'historique) pour survivre à un remontage. */
+    select: useCallback((sel: string | null) => write({ sel }, "replace"), []),
   };
 }
 

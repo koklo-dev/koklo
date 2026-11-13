@@ -83,3 +83,17 @@ describe("visibleDataTabs", () => {
     });
   });
 });
+
+describe("onglet par défaut sous 1024 px (TK-108, B425)", () => {
+  it("sans onglet demandé, le Diagramme sur grand écran et les Tables sur petit écran", () => {
+    expect(readDataUrl("").tab).toBe("diagram");
+    expect(readDataUrl("", { narrow: false }).tab).toBe("diagram");
+    expect(readDataUrl("", { narrow: true }).tab).toBe("tables");
+  });
+
+  it("un onglet demandé ou la relecture priment sur la largeur", () => {
+    expect(readDataUrl("?tab=diagram", { narrow: true }).tab).toBe("diagram");
+    expect(readDataUrl("?tab=fixtures", { narrow: true }).tab).toBe("fixtures");
+    expect(readDataUrl("?view=review", { narrow: true }).tab).toBe("review");
+  });
+});

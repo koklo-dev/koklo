@@ -34,7 +34,7 @@ const section = () => screen.getByRole("region", { name: /Onglets et tableaux ·
 describe("galerie : section « Onglets et tableaux · C » (S-dev-ui)", () => {
   it("h2 dans la section dev-ui-surf-c, puis un h3 par cadre", () => {
     expect(section()).toHaveAttribute("aria-labelledby", "dev-ui-surf-c");
-    expect(within(section()).getAllByRole("heading", { level: 3 }).length).toBe(3);
+    expect(within(section()).getAllByRole("heading", { level: 3 }).length).toBe(4);
   });
 
   it("onglets en lien, tablist, tableau encadré et matrice Oui / Non", () => {

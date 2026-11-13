@@ -85,24 +85,24 @@ describe("Écran Données : Liste · équipe", () => {
     expect(within(nav).queryByRole("link", { name: /Relecture/ })).toBeNull();
   });
 
-  it("sans paramètre, l'onglet Diagramme s'ouvre avec ses cartes de table en liste nommée", async () => {
+  it("sans paramètre, l'onglet Diagramme s'ouvre sur le lecteur, une carte bouton par table", async () => {
     serveData("owner");
     renderData();
-    const list = await screen.findByRole("list", { name: "Diagramme entité-relation" });
-    const cards = within(list).getAllByRole("listitem");
-    expect(cards).toHaveLength(3);
+    const region = await screen.findByRole("region", { name: "Diagramme entité-relation" });
+    expect(within(region).getAllByRole("button", { name: /^Table / })).toHaveLength(3);
     expect(
-      within(list).getByRole("listitem", { name: "Table Client, 3 champs" }),
+      within(region).getByRole("button", { name: "Table Client, 3 champs" }),
     ).toBeInTheDocument();
     expect(document.querySelector("[data-kind='reference']")).not.toBeNull();
   });
 
-  it("le diagramme n'a ni zoom, ni trait, ni bouton mort", async () => {
+  it("le diagramme a sa barre de zoom et ses traits, sans bouton « Valider » ni « Commenter »", async () => {
     serveData("owner");
     renderData();
-    await screen.findByRole("list", { name: "Diagramme entité-relation" });
-    expect(screen.queryByRole("button", { name: /zoom|Valider|Commenter/i })).toBeNull();
-    expect(document.querySelector("svg line, svg path[data-edge]")).toBeNull();
+    await screen.findByRole("region", { name: "Diagramme entité-relation" });
+    expect(screen.getByRole("toolbar", { name: "Zoom du diagramme" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Valider|Commenter/i })).toBeNull();
+    expect(document.querySelector("svg line")).not.toBeNull();
   });
 });
 
@@ -192,18 +192,51 @@ describe("Écran Données : Génération et Relecture", () => {
     rejected.status = "rejected";
     serveProposals([table("Avis", PROJECT_ID, 1), rejected]);
     renderData({ search: "view=review&tab=diagram" });
-    const list = await screen.findByRole("list", { name: "Diagramme entité-relation" });
-    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(5));
-    expect(within(list).getByRole("listitem", { name: "Table Avis, 2 champs" })).toHaveClass(
-      "border-dashed",
+    const list = await screen.findByRole("region", { name: "Diagramme entité-relation" });
+    await waitFor(() =>
+      expect(within(list).getAllByRole("button", { name: /^Table / })).toHaveLength(5),
     );
-    expect(within(list).getByRole("listitem", { name: "Table Facture, 2 champs" })).toHaveClass(
-      "text-muted-foreground",
-    );
+    expect(
+      within(list)
+        .getByRole("button", { name: "Table Avis, 2 champs" })
+        .closest("[data-slot='er-table-card']"),
+    ).toHaveClass("border-dashed");
+    expect(
+      within(list)
+        .getByRole("button", { name: "Table Facture, 2 champs" })
+        .closest("[data-slot='er-table-card']"),
+    ).toHaveClass("text-muted-foreground");
     expect(within(list).getByText("À relire")).toBeInTheDocument();
     expect(within(list).getByText("Rejetée")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Mode relecture" })).toBeInTheDocument();
     expect(screen.getByText(/Pointillés : proposition à relire/)).toBeInTheDocument();
+  });
+
+  it("Relecture : les relations proposées relient les cartes proposées, sauf si la proposition est rejetée", async () => {
+    serveData("owner");
+    const relations = (status: "pending" | "rejected") => ({
+      ...fake(3, { kind: "relations" }),
+      status,
+      content: { relations: [{ from: "T-avis", to: "T-facture", cardinality: "n → 1" }] },
+    });
+    for (const [status, expected] of [
+      ["pending", 1],
+      ["rejected", 0],
+    ] as const) {
+      serveProposals([
+        table("Avis", PROJECT_ID, 1),
+        table("Facture", PROJECT_ID, 2),
+        relations(status),
+      ]);
+      const view = renderData({ search: "view=review&tab=diagram" });
+      const list = await screen.findByRole("region", { name: "Diagramme entité-relation" });
+      await userEvent.click(
+        await within(list).findByRole("button", { name: "Table Avis, 2 champs" }),
+      );
+      const fiche = await screen.findByRole("complementary", { name: "Fiche de la table" });
+      expect(within(fiche).queryAllByText("Avis → Facture")).toHaveLength(expected);
+      view.unmount();
+    }
   });
 
   it("« Quitter la relecture » retire view=review et revient à la liste", async () => {
@@ -213,7 +246,7 @@ describe("Écran Données : Génération et Relecture", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Quitter la relecture" }));
     await waitFor(() => expect(window.location.search).toBe(""));
     expect(
-      await screen.findByRole("list", { name: "Diagramme entité-relation" }),
+      await screen.findByRole("region", { name: "Diagramme entité-relation" }),
     ).toBeInTheDocument();
   });
 
@@ -229,7 +262,7 @@ describe("Écran Données : droits", () => {
   it("designer : il lit le modèle, sans « Ajouter une table » ni « Proposer »", async () => {
     serveData("designer");
     renderData();
-    await screen.findByRole("list", { name: "Diagramme entité-relation" });
+    await screen.findByRole("region", { name: "Diagramme entité-relation" });
     expect(screen.queryByRole("button", { name: "Ajouter une table" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Proposer/ })).toBeNull();
     expect(procedures.aiProposeOptions).not.toHaveBeenCalled();
