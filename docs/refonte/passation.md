@@ -30,8 +30,9 @@ last_reviewed: 2026-11-10
 | 023 | TK-105 (volume réel : recherche serveur de la vue client, contrat 3.3.0, `seed:planche` à 355 propositions, champ Zone) | ✅ fusionné (PR #197, `a285bcc0`, remplace la #196) ; décisions B363 à B371 ; e2e racine `e2e/tests/volume-reel.spec.ts` vert en CI |
 | 024 | TK-106 (format de spec v2 : `data/tables/<slug>.yaml`, alias `domaine:`, endpoints `zone.verbe` ; migration v1 → v2 en un lot du bot, retour arrière, owner seul ; contrat 3.4.0) | ✅ fusionné (PR #199, `e20aaef9`) ; décisions B372 à B382 (B8, B9, C4 tranchées en autonomie) ; point d'API seul, sans écran |
 | 024 | TK-107 (Données : onglets Tables et Jeux d'exemple, feuille Table, `ErTableCard`, contrat 3.5.0) | ✅ fusionné (PR #200, `f8dc74b2`) ; décisions B383 à B416 ; CI : gardes de typographie (h3 sur `text-subsection-title`, jeton `--status-pending-icon`) |
+| 024 | TK-108 (Données : lecteur `DiagramViewer` SVG + dagre 3.1.3, ADR 0022, `spec.data.layout.save`, fiche Fiche/YAML/Mermaid ; contrat 3.6.0) | ✅ fusionné (PR #202, `d516799b`) ; décisions B417 à B443 ; CI : titre de PR en minuscule, garde `no-hardcoded-colors` (tracés SVG du diagramme admis) |
 
-Ticket en cours : TK-108 (Données : lecteur `DiagramViewer` SVG + dagre 3.1.3, `spec.data.layout.save`, fiche Fiche/YAML/Mermaid ; contrat 3.6.0 ; décisions B417 à B440), sprint 024. Puis TK-109 (validation par l'équipe et vue client), TK-110 (volume réel). DoD des sprints 022 et 023 (4 cases chacun) encore à vérifier avant de les cocher.
+Ticket en cours : TK-109 (Données : « Valider le modèle », vue client en lecture seule avec commentaires de table, impact amont « À revoir » ; contrat 3.7.0 ; migration additive des commentaires de table ; décisions B444 à B473), sprint 024. Ensuite TK-110 (volume réel), **pas encore lancé : l'utilisateur a demandé d'arrêter l'enchaînement après TK-109 (2026-11-13)**. DoD des sprints 022 et 023 (4 cases chacun) encore à vérifier avant de les cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 

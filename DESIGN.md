@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.23)
+# Koklo : design (v2.24)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -325,7 +325,7 @@ Galerie : `/dev/ui`, sections « Surfaces » (lot A), « Superpositions » (lot 
 | `Card` | `variant` : `panel` (défaut : rayon 12, bordure `--border`, `--background`, marges 16 / 18), `inset` (rayon 10 `--radius-card`, marges 12 / 14, `--surface`), `interactive` (lien ou bouton entier, focus visible, sélection bordure `--primary`), `proposal` (bordure pointillée `--primary`, `--diff-bg`), `dashed` (bordure pointillée `--border-strong`), `warning` (bordure `--alert-warning-border`). Titre `text-card-title` 15/600, description 13 muted, action à droite. |
 | `StatCard` | `Card panel` : libellé 13 muted avec icône 18, valeur `text-stat`, jauge `ProgressBar` facultative, note 12 muted. Grille d'appel `auto-fit minmax(200px,1fr)`, écart 16. |
 | `ProgressBar` | Piste `--border-strong`, `md` 6 (rayon 3) ou `lg` 8 (rayon 4), remplissage `--primary`, `role="progressbar"`, `aria-valuenow` / `min` / `max`, nom accessible obligatoire. Valeur en texte à côté (jamais seule en couleur). Variante `split` (v2.15, relecture) : second segment `--muted-foreground` à 50 %, 6 de haut. Teinte `success` (v2.19) : remplissage `--status-validated-fg` ; `pending` : part en cours à la suite, même teinte à 50 %, qui pulse (`motion-safe`). Pendant « Enregistrer N dans la spec », la barre du bandeau de relecture passe en `success` (écrites, puis lot en cours), doublée du texte « Enregistrement · lot 2 sur 3 · 200 sur 512 » ; « Quitter la relecture » est inactif jusqu'à la fin. |
-| `InlineAlert` | Rayon 10, écart 10, icône 18. Tons `neutral`, `warning`, `error`, `success` (`--alert-success-*`), `revise` et `validated` (confirmations de décision du client : fond plein `--status-revise-*` / `--status-validated-*`, sans bordure, texte 14 px, icône pleine ; `role=status`, TK-104), `agent` (`--diff-bg`, bordure pointillée `--primary`). Actions : lien souligné (28) ou un à deux `Button sm` (`inherit` dans un ton coloré). `Alert` est déprécié : on migre vers `InlineAlert neutral`. |
+| `InlineAlert` | Rayon 10, écart 10, icône 18. Tons `neutral`, `warning`, `error`, `success` (`--alert-success-*`), `readonly` (bandeau « Lecture seule » : tons neutres, icône 20 muette, marges 12 14, TK-109), `revise` et `validated` (confirmations de décision du client : fond plein `--status-revise-*` / `--status-validated-*`, sans bordure, texte 14 px, icône pleine ; `role=status`, TK-104), `agent` (`--diff-bg`, bordure pointillée `--primary`). Actions : lien souligné (28) ou un à deux `Button sm` (`inherit` dans un ton coloré). `Alert` est déprécié : on migre vers `InlineAlert neutral`. |
 | `EmptyState` | Écart 10. Variantes `framed` (défaut) et `inline` (sans cadre ni tuile, icône 28 `--muted-foreground`, dans une liste). Une action principale plus au plus une secondaire (I20). |
 | `Skeleton`, `SkeletonRow` | Bloc `motion-safe:animate-pulse`. `SkeletonRow` : hauteur 52, pavé 48 × 18 `--secondary` puis barre de 14 à 60, 45, 70 ou 52 %, `aria-hidden`. |
 | `Toast` | Radix Toast, en bas au centre (`bottom` 24), marges 10 / 14, rayon 10, fond `--foreground`, texte `--background`, `--shadow-toast`, icône `check_circle` 18 (`error` pour l'erreur), action « OK » ou « Annuler » soulignée 13/600 (24 de haut, marges 6). Largeur au contenu, jamais étirée (planche 22). Région annoncée : polite (succès, information), assertive (erreur). Durée 5 s (8 s en erreur), suspendue au survol et au focus. Fermeture au clavier. Mouvement réduit respecté. |
@@ -523,6 +523,19 @@ API : `DiagramViewer<T extends DiagramNode>` (`label`, `nodes`, `relations`, `re
 
 Galerie : `/dev/ui`, section « 21. Diagramme » (lecteur équipe avec états, puis lecture seule à 50 %).
 
+### 5.20 Validation du modèle et vue client des Données (v2.24, TK-109, passation 09 §3.5, §3.6, §4, §6, §7, maquette 11 l.160-167, 209-219, 595-596, 625-648, B444 à B455)
+
+| Composant | Règle |
+|---|---|
+| « Valider le modèle » | `Button` primaire, icône `verified` 20, première action de l'en-tête tant que le livrable est « À valider » (l'agent passe en outline) ; absent pour le designer, le client et le business. Validé : `DeliverableStatus` `validated` « Validé par l'équipe » + résumé « Validé par <prénom> le 5 nov. · version 3c7e1a9 » (équipe seulement). |
+| Impact amont | `InlineAlert warning` (jetons `--alert-warning-*`, teintes de la maquette 11 l.652) : « Le cahier fonctionnel a changé : F-002, R-004 modifiées » + action « Proposer les mises à jour » ; statut `DeliverableStatus` `revise`. |
+| Lecture seule | `InlineAlert` variante **`readonly`** (ajoutée, TK-109) : `role="note"`, fond `--surface`, bordure `--border`, dans les deux thèmes, icône `visibility` **20** `--muted-foreground`, rayon 10, marges 12 14 (`py-3 px-3.5`), écarts 10 / 14 avec retour à la ligne (texte en base 300 px : sous l'icône à 375 px), texte 13 avec « Lecture seule. » en 600 ; marges extérieures de la page (16 / 32 par `PageBody`). Le business lit la même phrase sans l'invitation à commenter. |
+| Fiche client | Même `aside` que la fiche équipe (§5.19) sans « Modifier » ni sélecteur Fiche / YAML / Mermaid ; « Ce qu'on enregistre » (13/600) en liste à puces 14 depuis `clientSummary` ; « Commenter » = `Button` outline 30, icône `add_comment` 16, ouvre un dialogue (textarea, « Envoyer »). |
+
+| Vue client | `DataClientView` : en-tête « Validé par l'équipe » + « N tables · lecture seule » + « Commenter » (44 sous 768 px ; vise la table choisie, sinon la première), onglets Diagramme / Tables / Jeux d'exemple sans Relecture, bandeau `readonly`. Non validé : `EmptyState` `schedule` « Le modèle de données n'est pas encore validé », sans onglet lu. Tables : même tableau que l'équipe, le nom ouvre la fiche dans le diagramme (« Voir la fiche de T-client, Client »). Dialogue « Commenter la table « X » » : `Dialog` + `Textarea` « Votre commentaire », « Envoyer » / « Annuler », échec en `InlineAlert error` avec focus au champ, annonce « Commentaire envoyé » dans l'unique `role="status"` de la page. Icône `add_comment` ajoutée au registre. |
+
+Galerie : `/dev/ui`, section « 22. Vue client des Données » (id `dev-ui-data-client` : bandeau Lecture seule, fiche client).
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -534,7 +547,7 @@ Galerie : `/dev/ui`, section « 21. Diagramme » (lecteur équipe avec états, p
 | Fondations v2 (jetons, statuts, composants signature) | Planche « Lot 0 · Fondations v2 », clair et sombre ; galerie `/dev/ui` |
 | Liste des projets et création | Planche « Lot 4 · Projets » (`08-Lot4Projects.html`) ; fiche `S-projects` v7 |
 | Vue d'ensemble du projet | Planche « Lot 3 · Vue d'ensemble » (`07-Lot3Overview.html`) ; fiche `S-overview` |
-| Modèle de données (Prêt, Génération, Relecture, Liste · équipe, onglets Tables et Jeux d'exemple) | Planche « Lot 6 · Données » (`11-Lot6Donnees.html`) ; fiche `S-spec-data` |
+| Modèle de données (Prêt, Génération, Relecture, Liste · équipe, Validé, À revoir, Vue client, onglets Diagramme, Tables et Jeux d'exemple) | Planche « Lot 6 · Données » (`11-Lot6Donnees.html`) ; fiche `S-spec-data` |
 | Cahier fonctionnel (Prêt, Génération, Relecture, Liste · équipe) | Planche « Lot 5 · Fonctionnel » (`10-Lot5Fonctionnel.html`) ; fiche `S-spec-functional` |
 | Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
@@ -593,3 +606,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 13/11/2026 | v2.21 (TK-105, B364, B366, maquette 10 volume réel) : vue client, la recherche des fonctionnalités, règles (+ type) et parcours est faite par le serveur sur tout l'index (anti-rebond 250 ms, compte « N chargées » du serveur, « Aucune règle ne correspond à « x » ») ; formulaire d'élément : champ « Zone » facultatif (texte libre, 80 caractères, `Field` existant) ; aucun composant de `packages/ui` ajouté |
 | 13/11/2026 | v2.22 (TK-107, passation 09, B383 à B392, maquette 11) : §5.18 modèle de données (`ErTableCard`, pastille de données personnelles, onglets Tables et Jeux d'exemple) ; diagramme interactif, fiche et validation renvoyés à TK-108 et TK-109 |
 | 13/11/2026 | v2.23 (TK-108, passation 09 §3.4, B417 à B428, maquette 11) : §5.19 lecteur de diagramme (`DiagramViewer`, barre de zoom, fiche ancrée) ; `ErTableCard` devient un `button` sélectionnable |
+| 13/11/2026 | v2.24 (TK-109, passation 09 §3.5-3.6 et §6, B444 à B455, maquette 11) : §5.20 validation du modèle, vue client en lecture seule, état « À revoir » (sans planche : teintes de la l.652) ; lot C : `InlineAlert readonly`, icône `add_comment`, `DataClientView` |
