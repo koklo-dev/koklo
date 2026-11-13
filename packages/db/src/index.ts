@@ -12,9 +12,12 @@ export {
   type TenantTx,
 } from "./counters.ts";
 export {
+  type CurrentDataModel,
   type CurrentDomainTitles,
   type CurrentFeature,
+  type CurrentTable,
   type CurrentTitle,
+  currentDataModel,
   currentDomainTitles,
   currentFeatures,
   type DossierClient,
@@ -48,6 +51,9 @@ export {
   likePrefixOf,
   searchEntityIds,
   searchEntityRefs,
+  tableRelationCounts,
+  tableRelationTotal,
+  tableZoneFacets,
 } from "./spec-entity-queries.ts";
 export {
   currentOrganizationId,

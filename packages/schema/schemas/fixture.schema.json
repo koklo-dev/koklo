@@ -1,0 +1,49 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/fixture.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "pattern": "^FX-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "lignes": {
+      "items": {
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "propertyNames": {
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "maxItems": 200,
+      "type": "array"
+    },
+    "locale": {
+      "default": "fr-FR",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+      "type": "string"
+    },
+    "table": {
+      "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "titre": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "titre",
+    "table",
+    "lignes"
+  ],
+  "type": "object"
+}

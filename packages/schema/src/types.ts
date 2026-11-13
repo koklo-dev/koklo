@@ -2,6 +2,7 @@ import type {
   BusinessRule,
   Endpoint,
   Feature,
+  Fixture,
   Flow,
   ProjectManifest,
   RelationsFile,
@@ -43,4 +44,5 @@ export type ParsedSpec = {
   roles: Parsed<RolesFile>[];
   rules: Parsed<BusinessRule>[];
   flows: Parsed<Flow>[];
+  fixtures: Parsed<Fixture>[];
 };

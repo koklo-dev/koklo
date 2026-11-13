@@ -48,7 +48,16 @@ describe("politique de texte brut (déplacée depuis l'API)", () => {
 
 describe("schémas de proposition par type", () => {
   it("expose un schéma par type, dans l'ordre du vocabulaire", () => {
-    expect(Object.keys(PROPOSAL_SCHEMAS)).toEqual(["feature", "criteria", "rule", "role", "flow"]);
+    expect(Object.keys(PROPOSAL_SCHEMAS)).toEqual([
+      "feature",
+      "criteria",
+      "rule",
+      "role",
+      "flow",
+      "table",
+      "relations",
+      "fixtures",
+    ]);
   });
 
   it("feature : accepte une proposition valide et refuse champ inconnu, lien, balise, critères mal ordonnés", () => {

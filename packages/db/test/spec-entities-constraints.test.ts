@@ -58,6 +58,7 @@ describe("spec_entities : contraintes", () => {
       "flow",
       "relations",
       "table",
+      "fixture",
       "endpoint",
       "screen",
       "test",

@@ -17,6 +17,8 @@ export interface SeededVolume {
   permissions: number;
   /** Propositions de l'agent (TK-99a, TK-105) : un lancement terminé et ses propositions, groupées par type et par zone. */
   proposals: number;
+  /** Jeux d'exemple `data/fixtures/FX-*.yaml` indexés (TK-107, B383) ; le volume réel de lignes reste à TK-110. */
+  fixtures: number;
 }
 
 export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
@@ -30,6 +32,7 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     roles: 3,
     permissions: 47,
     proposals: 400,
+    fixtures: 2,
   },
   // 47 « actions » de la planche = points d'accès ; la planche ne donne aucun volume de tickets,
   // 60 permettent d'exercer le kanban à l'écran (lecture prudente, B34).
@@ -44,6 +47,7 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     permissions: 47,
     // 248 fonctionnalités + 86 règles + 3 rôles + 18 parcours relus (TK-105, B365).
     proposals: 355,
+    fixtures: 2,
   },
 };
 

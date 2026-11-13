@@ -28,7 +28,16 @@ export type FunctionalMode = (typeof FUNCTIONAL_MODES)[number];
 export const AGENT_LAUNCH_STATUSES = ["queued", "running", "done", "failed", "canceled"] as const;
 export type AgentLaunchStatus = (typeof AGENT_LAUNCH_STATUSES)[number];
 
-export const AGENT_PROPOSAL_KINDS = ["feature", "criteria", "rule", "role", "flow"] as const;
+export const AGENT_PROPOSAL_KINDS = [
+  "feature",
+  "criteria",
+  "rule",
+  "role",
+  "flow",
+  "table",
+  "relations",
+  "fixtures",
+] as const;
 export type AgentProposalKind = (typeof AGENT_PROPOSAL_KINDS)[number];
 
 export const AGENT_PROPOSAL_STATUSES = ["pending", "accepted", "rejected"] as const;
@@ -45,6 +54,14 @@ export const AGENT_PROPOSE_LIMITS = {
 /** Ce que l'agent lit pour chaque livrable (« L'agent lit ») : jamais rien d'autre n'est envoyé au modèle. */
 export const AGENT_READS = {
   functional: ["idea.frozen", "idea.synthesis", "idea.risks", "functional.current"],
+  /** Données (TK-107, B387) : le Fonctionnel indexé et le modèle actuel ; ni dossier d'idée, ni version figée. */
+  data: [
+    "functional.features",
+    "functional.rules",
+    "functional.roles",
+    "functional.flows",
+    "data.current",
+  ],
 } as const;
 
 /** Un lancement `running` sans signal depuis plus de 5 minutes est perdu : son verrou est repris. */

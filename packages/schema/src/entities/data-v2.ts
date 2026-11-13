@@ -3,7 +3,7 @@ import { FEATURE_ZONE_MAX_LENGTH } from "./feature.ts";
 import { featureId, PATTERNS, ruleId, tableId } from "./ids.ts";
 
 /** Types de champ du format v2 : `texte(n)`, `ref(T-slug)` et le vocabulaire fermé. */
-const FIELD_TYPE =
+export const FIELD_TYPE =
   /^(uuid|texte\(\d+\)|entier|decimal|booleen|horodatage|date|enum|json|ref\(T-[a-z0-9][a-z0-9-]*\))$/;
 
 /** Cardinalités d'une relation de table (la forme `n → 1` complète la liste de la passation). */

@@ -7,6 +7,7 @@ const schemasDir = resolve(import.meta.dirname, "../schemas");
 const NAMES = [
   "endpoint",
   "feature",
+  "fixture",
   "project",
   "relation",
   "roles",

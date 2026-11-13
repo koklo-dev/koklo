@@ -41,6 +41,19 @@ export interface CurrentDomainTitles {
   readonly flows: readonly CurrentTitle[];
 }
 
+/** Table du modèle actuel (TK-107) : identifiant, nom, zone et noms des champs, jamais le contenu des jeux ni les contraintes. */
+export interface CurrentTable {
+  readonly specId: string;
+  readonly title: string;
+  readonly zone: string | null;
+  readonly fields: readonly string[];
+}
+
+export interface CurrentDataModel {
+  readonly tables: readonly CurrentTable[];
+  readonly fixtures: readonly CurrentTitle[];
+}
+
 export interface DossierSources {
   readonly tag: string;
   readonly pages: readonly FrozenPage[];
@@ -202,6 +215,47 @@ export async function currentDomainTitles(
     rules: titled("rule"),
     roles: rows.filter((row) => row.kind === "roles").flatMap((row) => rolesOf(row.data)),
     flows: titled("flow"),
+  };
+}
+
+const TABLES_MAX = 200;
+const FIELDS_PER_TABLE_MAX = 100;
+
+const tableOf = (row: { specId: string; data: unknown }): CurrentTable => {
+  const data = recordOf(row.data);
+  const fields = Array.isArray(data.champs) ? data.champs : [];
+  return {
+    specId: row.specId,
+    title: textOf(data.titre),
+    zone: textOf(data.zone) || null,
+    fields: fields
+      .slice(0, FIELDS_PER_TABLE_MAX)
+      .map((field) => textOf(recordOf(field).nom))
+      .filter((name) => name !== ""),
+  };
+};
+
+/** Tables et jeux d'exemple de la tête de spec (index d'entités) : seuls les noms, jamais les lignes (TK-107, B387). */
+export async function currentDataModel(
+  client: DossierClient,
+  projectId: string,
+): Promise<CurrentDataModel> {
+  const snapshotId = await headSnapshotId(client, projectId);
+  if (snapshotId === null) return { tables: [], fixtures: [] };
+  const rows = await client.specEntity.findMany({
+    where: { snapshotId, kind: { in: ["table", "fixture"] } },
+    orderBy: [{ kind: "asc" }, { sort: "asc" }, { id: "asc" }],
+    select: { kind: true, specId: true, data: true },
+  });
+  return {
+    tables: rows
+      .filter((row) => row.kind === "table")
+      .slice(0, TABLES_MAX)
+      .map(tableOf),
+    fixtures: rows
+      .filter((row) => row.kind === "fixture")
+      .slice(0, DOMAIN_TITLES_MAX)
+      .map((row) => ({ specId: row.specId, title: textOf(recordOf(row.data).titre) })),
   };
 }
 

@@ -14,6 +14,7 @@ import {
   PROPOSAL_NOTIFY_AFTER_MS,
 } from "../src/index.ts";
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("TK-99a constantes et règles du lancement d'agent", () => {
   it("file `agent-propose`, singleton par lancement", () => {
     expect(AGENT_PROPOSE_QUEUE).toBe("agent-propose");
@@ -35,7 +36,16 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
   it("modes du Fonctionnel, statuts, types et plafonds de la fiche", () => {
     expect([...FUNCTIONAL_MODES]).toEqual(["complete", "criteria", "update", "all"]);
     expect([...AGENT_LAUNCH_STATUSES]).toEqual(["queued", "running", "done", "failed", "canceled"]);
-    expect([...AGENT_PROPOSAL_KINDS]).toEqual(["feature", "criteria", "rule", "role", "flow"]);
+    expect([...AGENT_PROPOSAL_KINDS]).toEqual([
+      "feature",
+      "criteria",
+      "rule",
+      "role",
+      "flow",
+      "table",
+      "relations",
+      "fixtures",
+    ]);
     expect(AGENT_PROPOSE_LIMITS).toEqual({
       zones: 12,
       perZone: 25,
@@ -50,6 +60,16 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       "idea.synthesis",
       "idea.risks",
       "functional.current",
+    ]);
+  });
+
+  it("L'agent lit, pour les Données : cahier fonctionnel, règles, rôles, parcours, modèle actuel (TK-107)", () => {
+    expect([...AGENT_READS.data]).toEqual([
+      "functional.features",
+      "functional.rules",
+      "functional.roles",
+      "functional.flows",
+      "data.current",
     ]);
   });
 

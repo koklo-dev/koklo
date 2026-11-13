@@ -11,9 +11,9 @@ import {
  * de ses cibles (éléments, bloc, livrable entier). Règle pure.
  */
 describe("entités d'un livrable (B325 c)", () => {
-  it("Fonctionnel = feature, rule, roles, flow ; Données = table, relations ; les autres sans entité indexée", () => {
+  it("Fonctionnel = feature, rule, roles, flow ; Données = table, relations, fixture ; les autres sans entité indexée", () => {
     expect(DELIVERABLE_ENTITY_KINDS.functional).toEqual(["feature", "rule", "roles", "flow"]);
-    expect(DELIVERABLE_ENTITY_KINDS.data).toEqual(["table", "relations"]);
+    expect(DELIVERABLE_ENTITY_KINDS.data).toEqual(["table", "relations", "fixture"]);
     for (const key of ["architecture", "technical", "security", "design", "quality"] as const) {
       expect(DELIVERABLE_ENTITY_KINDS[key]).toEqual([]);
     }

@@ -38,6 +38,7 @@ function collectReferences(spec: ParsedSpec): Referenced {
   }
   for (const { value: e } of spec.endpoints) for (const t of e.tables ?? []) used.tables.add(t);
   collectFromRelations(spec, used);
+  for (const { value: fixture } of spec.fixtures) used.tables.add(fixture.table);
   for (const { value: s } of spec.screens) collectFromNode(s.arbre, used);
   return used;
 }
