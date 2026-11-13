@@ -35,7 +35,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
     "@koklo/domain": "workspace:*",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "@types/pg": "8.23.1",
     "@vitest/coverage-v8": "5.1.0",
     "prisma": "7.10.1",
