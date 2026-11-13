@@ -26,9 +26,13 @@ export interface TriageContext {
   readonly missingCriteria: Map<string, string>;
   /**
    * Livrable Données : références que le modèle peut viser. `specIds` : fonctionnalités et règles du cahier ; `tables` :
-   * tables du modèle actuel, complétées au fil du tri par celles de la génération. Absent pour le Fonctionnel.
+   * tables du modèle actuel, complétées au fil du tri par celles de la génération, avec leurs noms de champs (`null` :
+   * champs inconnus, jeu non contrôlé). Absent pour le Fonctionnel.
    */
-  readonly refs?: { readonly specIds: ReadonlySet<string>; readonly tables: Set<string> };
+  readonly refs?: {
+    readonly specIds: ReadonlySet<string>;
+    readonly tables: Map<string, ReadonlySet<string> | null>;
+  };
 }
 
 /** Clé de comparaison de deux titres : forme NFKC, espaces repliés, casse ignorée. */
@@ -41,6 +45,14 @@ const titleOf = (kind: AgentProposalKind, payload: Record<string, unknown>): str
 };
 
 const tableIdOf = (name: string): string => `T-${slugOf(name, "table")}`;
+
+/** Noms des champs d'une table proposée. */
+const fieldNamesOf = (payload: Record<string, unknown>): ReadonlySet<string> =>
+  new Set(
+    recordsOf(payload.fields).flatMap((field) =>
+      typeof field.name === "string" ? [field.name] : [],
+    ),
+  );
 
 const recordsOf = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter(isRecord) : [];
@@ -66,6 +78,21 @@ function tableReferencesKnown(
   );
 }
 
+/**
+ * Un jeu vise une table connue et n'emploie que ses champs. L'agent traite le cahier zone par zone : deux zones peuvent
+ * décrire la même table avec des champs différents ; seule la première est gardée (doublon de titre), et le jeu bâti sur
+ * l'autre version ferait échouer tout l'enregistrement (`R4_UNKNOWN_FIELD`). Il est donc écarté ici.
+ */
+function fixtureFitsTable(
+  payload: Record<string, unknown>,
+  refs: NonNullable<TriageContext["refs"]>,
+): boolean {
+  if (typeof payload.table !== "string" || !refs.tables.has(payload.table)) return false;
+  const fields = refs.tables.get(payload.table);
+  if (fields === null || fields === undefined) return true;
+  return recordsOf(payload.rows).every((row) => Object.keys(row).every((key) => fields.has(key)));
+}
+
 /** Les types des Données ne visent que des identifiants connus (cahier, modèle actuel, tables de la génération). */
 function referencesKnown(
   kind: AgentProposalKind,
@@ -75,8 +102,7 @@ function referencesKnown(
   if (kind !== "table" && kind !== "relations" && kind !== "fixtures") return true;
   if (refs === undefined) return false;
   if (kind === "table") return tableReferencesKnown(payload, refs);
-  if (kind === "fixtures")
-    return typeof payload.table === "string" && refs.tables.has(payload.table);
+  if (kind === "fixtures") return fixtureFitsTable(payload, refs);
   return recordsOf(payload.relations).every(
     (relation) =>
       typeof relation.from === "string" &&
@@ -126,7 +152,7 @@ function titleFor(
   context.titles[kind] = known;
   if (known.has(titleKey(title))) return undefined;
   known.add(titleKey(title));
-  if (kind === "table") context.refs?.tables.add(tableIdOf(title));
+  if (kind === "table") context.refs?.tables.set(tableIdOf(title), fieldNamesOf(payload));
   return title;
 }
 
