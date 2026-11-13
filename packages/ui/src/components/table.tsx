@@ -7,15 +7,22 @@ import { cn } from "../lib/cn.ts";
 interface TableStyle {
   framed: boolean;
   stickyHeader: boolean;
+  compact: boolean;
 }
 
-const TableStyleContext = createContext<TableStyle>({ framed: false, stickyHeader: false });
+const TableStyleContext = createContext<TableStyle>({
+  framed: false,
+  stickyHeader: false,
+  compact: false,
+});
 
 export type TableProps = ComponentProps<"table"> & {
   /** Cadre `--border` de rayon 12 : le tableau défile dans son cadre, pas la page. */
   framed?: boolean;
   /** Texte de 12 px. */
   dense?: boolean;
+  /** Tableau d'une fiche (maquette 11) : texte de 12 px, cellules 6 × 10, cadre de rayon 10. */
+  compact?: boolean;
   /** En-tête collant en haut du cadre. */
   stickyHeader?: boolean;
   /** Classes du cadre (hauteur maximale d'un tableau à en-tête collant, par exemple). */
@@ -28,26 +35,32 @@ export function Table({
   className,
   framed = false,
   dense = false,
+  compact = false,
   stickyHeader = false,
   frameClassName,
   frameLabel,
   ...props
 }: TableProps) {
   return (
-    <TableStyleContext.Provider value={{ framed, stickyHeader }}>
+    <TableStyleContext.Provider value={{ framed, stickyHeader, compact }}>
       {/* Un cadre qui défile doit être atteignable au clavier (WCAG 2.1.1) : tabIndex seulement s'il est encadré. */}
       <div
         tabIndex={framed ? 0 : undefined}
         {...(framed && frameLabel ? { role: "region", "aria-label": frameLabel } : {})}
         className={cn(
           "relative w-full overflow-auto",
+          framed && (compact ? "rounded-[10px]" : "rounded-xl"),
           framed &&
-            "rounded-xl border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           frameClassName,
         )}
       >
         <table
-          className={cn("w-full caption-bottom", dense ? "text-caption" : "text-meta", className)}
+          className={cn(
+            "w-full caption-bottom",
+            dense || compact ? "text-caption" : "text-meta",
+            className,
+          )}
           {...props}
         />
       </div>
@@ -56,6 +69,7 @@ export function Table({
 }
 
 const FRAMED_CELL = "px-2 first:pl-4 last:pr-4";
+const COMPACT_CELL = "px-2.5 py-1.5";
 
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   const { framed, stickyHeader } = useContext(TableStyleContext);
@@ -98,12 +112,12 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
 }
 
 export function TableHead({ className, ...props }: ComponentProps<"th">) {
-  const { framed } = useContext(TableStyleContext);
+  const { framed, compact } = useContext(TableStyleContext);
   return (
     <th
       className={cn(
         "text-left align-middle text-caption font-medium text-muted-foreground",
-        framed ? ["py-2.5", FRAMED_CELL] : "h-10 px-3",
+        compact ? COMPACT_CELL : framed ? ["py-2.5", FRAMED_CELL] : "h-10 px-3",
         className,
       )}
       {...props}
@@ -112,10 +126,14 @@ export function TableHead({ className, ...props }: ComponentProps<"th">) {
 }
 
 export function TableCell({ className, ...props }: ComponentProps<"td">) {
-  const { framed } = useContext(TableStyleContext);
+  const { framed, compact } = useContext(TableStyleContext);
   return (
     <td
-      className={cn("py-2.5 align-middle", framed ? FRAMED_CELL : "px-3", className)}
+      className={cn(
+        "align-middle",
+        compact ? COMPACT_CELL : ["py-2.5", framed ? FRAMED_CELL : "px-3"],
+        className,
+      )}
       {...props}
     />
   );
