@@ -85,6 +85,8 @@ export const ICON_NAMES = [
   "arrow_upward",
   "swap_vert",
   "fit_screen",
+  "fullscreen",
+  "fullscreen_exit",
   // Coquille de l'application (TK-88, DESIGN.md §5.4)
   "menu",
   "space_dashboard",

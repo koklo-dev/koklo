@@ -404,4 +404,13 @@ describe("DiagramViewer, mini-carte et traits pondérés", () => {
     expect(screen.getByText("4 relations")).toHaveClass("text-caption");
     expect(screen.getByText("4 relations")).not.toHaveClass("font-mono");
   });
+
+  it("`fullscreen` : bouton bascule « Plein écran » dans la barre de zoom (B479)", async () => {
+    const onToggle = vi.fn();
+    viewer({ fullscreen: { active: false, onToggle } });
+    const button = within(zoomBar()).getByRole("button", { name: "Plein écran" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(button);
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
 });
