@@ -40,7 +40,7 @@ function FixtureSection({ projectId, fixture }: { projectId: string; fixture: Fi
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-2.5">
         <IdTag>{fixture.specId}</IdTag>
-        <h3 className="m-0 text-body font-semibold">{fixture.title}</h3>
+        <h3 className="m-0 text-subsection-title">{fixture.title}</h3>
         <span className="flex-1" />
         <span className="text-caption text-muted-foreground">
           {fixtureMeta(fixture.rowCount, fixture.table, fixture.locale)}
@@ -122,7 +122,7 @@ function ProposedFixtures({ page }: { page: DataPageModel }) {
             )}
           >
             <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-2.5">
-              <h3 className="m-0 text-body font-semibold">{proposal.title}</h3>
+              <h3 className="m-0 text-subsection-title">{proposal.title}</h3>
               <Pill size="xs" tone={proposal.status === "rejected" ? "outline" : "soft"}>
                 {proposal.status === "rejected" ? "Rejeté" : "À relire"}
               </Pill>
