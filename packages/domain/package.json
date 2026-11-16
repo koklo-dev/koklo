@@ -20,7 +20,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.7",
     "@koklo/config": "workspace:*",
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.1.0",
