@@ -3,6 +3,159 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "generation": {
+      "additionalProperties": false,
+      "properties": {
+        "graine": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "regles": {
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "debut": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "prefixe": {
+                    "maxLength": 40,
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "sequence",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "choix",
+                    "type": "string"
+                  },
+                  "valeurs": {
+                    "items": {
+                      "maxLength": 100,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 50,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "type",
+                  "valeurs"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "max": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  "min": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  "type": {
+                    "const": "entier",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "min",
+                  "max"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "debut": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  },
+                  "jours": {
+                    "maximum": 36500,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": {
+                    "const": "date",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "debut",
+                  "jours"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "nom",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "email",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "propertyNames": {
+            "pattern": "^[a-z_][a-z0-9_]*$",
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "total": {
+          "maximum": 100000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "graine",
+        "total",
+        "regles"
+      ],
+      "type": "object"
+    },
     "id": {
       "pattern": "^FX-[a-z0-9][a-z0-9-]*$",
       "type": "string"
