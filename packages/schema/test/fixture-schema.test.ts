@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import {
+  checkSpec,
+  emitFixtureYaml,
   FixtureSchema,
   fixtureId,
   jsonSchemas,
@@ -167,5 +170,116 @@ describe("TableV2Schema", () => {
     expect(ok.spec.tables.map((t) => t.value.id)).toEqual(["T-reservation"]);
     const bad = parseSpecFiles([{ path: "data/tables/Reservation Finale.yaml", content }]);
     expect(codes(bad.issues)).toEqual(["STRUCT_UNKNOWN_TABLE_FILE"]);
+  });
+});
+
+/** TK-110 lot A (B485) : bloc facultatif `generation`, lignes stockées d'abord, générées ensuite. */
+describe("FixtureSchema, bloc generation", () => {
+  const GENERATION = {
+    graine: 1240,
+    total: 1240,
+    regles: {
+      id: { type: "sequence", prefixe: "RDV-", debut: 1 },
+      statut: { type: "choix", valeurs: ["a", "b"] },
+      age: { type: "entier", min: 18, max: 90 },
+      jour: { type: "date", debut: "2026-01-01", jours: 365 },
+      nom: { type: "nom" },
+      email: { type: "email" },
+    },
+  };
+  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ n: i }));
+
+  it("accepte un jeu généré ; les six règles fermées sont reconnues", () => {
+    const parsed = FixtureSchema.safeParse({ ...FIXTURE, lignes: rows(3), generation: GENERATION });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("generation facultatif : un jeu sans bloc reste valide", () => {
+    expect(FixtureSchema.parse(FIXTURE).generation).toBeUndefined();
+  });
+
+  it("avec generation, 50 lignes stockées au plus ; sans, 200", () => {
+    expect(
+      FixtureSchema.safeParse({ ...FIXTURE, lignes: rows(50), generation: GENERATION }).success,
+    ).toBe(true);
+    const tooMany = FixtureSchema.safeParse({
+      ...FIXTURE,
+      lignes: rows(51),
+      generation: GENERATION,
+    });
+    expect(tooMany.success).toBe(false);
+    if (!tooMany.success) expect(tooMany.error.issues[0]?.path).toEqual(["lignes"]);
+  });
+
+  it.each([0, 100001, 1.5])("total hors bornes refusé : %s", (total) => {
+    expect(
+      FixtureSchema.safeParse({ ...FIXTURE, generation: { ...GENERATION, total } }).success,
+    ).toBe(false);
+  });
+
+  it("total 1 et 100 000 acceptés", () => {
+    for (const total of [1, 100000]) {
+      expect(
+        FixtureSchema.safeParse({ ...FIXTURE, lignes: [], generation: { ...GENERATION, total } })
+          .success,
+      ).toBe(true);
+    }
+  });
+
+  it("le total ne peut pas être inférieur aux lignes stockées", () => {
+    const result = FixtureSchema.safeParse({
+      ...FIXTURE,
+      lignes: rows(5),
+      generation: { ...GENERATION, total: 4 },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it.each([
+    ["règle inconnue", { x: { type: "uuid" } }],
+    ["choix vide", { x: { type: "choix", valeurs: [] } }],
+    ["choix de 51 valeurs", { x: { type: "choix", valeurs: Array.from({ length: 51 }, String) } }],
+    ["entier sans max", { x: { type: "entier", min: 1 } }],
+    ["date mal formée", { x: { type: "date", debut: "01/01/2026", jours: 3 } }],
+    ["clé en trop", { x: { type: "nom", extra: 1 } }],
+    ["nom de champ invalide", { "Nom Client": { type: "nom" } }],
+  ])("règle refusée : %s", (_label, regles) => {
+    expect(
+      FixtureSchema.safeParse({ ...FIXTURE, generation: { ...GENERATION, regles } }).success,
+    ).toBe(false);
+  });
+
+  it("graine négative ou décimale refusée", () => {
+    for (const graine of [-1, 1.5]) {
+      expect(
+        FixtureSchema.safeParse({ ...FIXTURE, generation: { ...GENERATION, graine } }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("R4 : une clé de regles hors table est refusée avec son chemin", () => {
+    const table = `id: T-client\nchamps:\n  - { nom: nom, type: text, nullable: false, unique: false }\n`;
+    const fixture = `id: FX-clients\ntitre: C\ntable: T-client\nlignes: []\ngeneration:\n  graine: 1\n  total: 10\n  regles:\n    inconnu: { type: nom }\n`;
+    const { issues } = checkSpec([
+      { path: "data/tables/T-client.yaml", content: table },
+      { path: "data/fixtures/FX-clients.yaml", content: fixture },
+    ]);
+    expect(issues.map((issue) => [issue.code, issue.pointer])).toContainEqual([
+      "R4_UNKNOWN_FIELD",
+      "/generation/regles/inconnu",
+    ]);
+  });
+
+  it("emitFixtureYaml écrit generation après lignes et relit le même jeu", () => {
+    const fixture = FixtureSchema.parse({ ...FIXTURE, generation: GENERATION });
+    const text = emitFixtureYaml(fixture);
+    expect(text.indexOf("lignes:")).toBeLessThan(text.indexOf("generation:"));
+    expect(text).toContain("graine: 1240");
+    expect(FixtureSchema.parse(parse(text))).toEqual(fixture);
+  });
+
+  it("le JSON Schema expose generation", () => {
+    const schema = jsonSchemas.fixture as { properties?: Record<string, unknown> };
+    expect(Object.keys(schema.properties ?? {})).toContain("generation");
   });
 });

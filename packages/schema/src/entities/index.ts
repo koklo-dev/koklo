@@ -8,3 +8,4 @@ export * from "./ids.ts";
 export * from "./layout.ts";
 export * from "./project.ts";
 export * from "./screen.ts";
+export * from "./zones.ts";
