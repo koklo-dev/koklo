@@ -26,6 +26,8 @@ export interface ZoneNodeProps
   arrow?: boolean;
   /** Zone ouverte dans la vue. */
   current?: boolean;
+  /** `diagram` : carte du diagramme des Données (maquette 11 l.194, l.486) ; `default` : galerie. */
+  variant?: "default" | "diagram";
   onOpen: () => void;
 }
 
@@ -41,16 +43,24 @@ export function ZoneNode({
   detail,
   arrow,
   current,
+  variant = "default",
   onOpen,
   className,
   ...props
 }: ZoneNodeProps) {
-  const hidden = preview.length - previewLimit;
+  const diagram = variant === "diagram";
+  const hidden = Math.max(count, preview.length) - Math.min(preview.length, previewLimit);
+  const chip = diagram
+    ? "rounded-[4px] bg-secondary px-[5px] py-px font-mono text-[10px] leading-4 text-secondary-foreground"
+    : "rounded-sm border bg-surface px-1.5 font-mono text-code text-muted-foreground";
   return (
     <div
       data-slot="zone-node"
       className={cn(
-        "relative flex min-w-0 flex-col items-start gap-1 rounded-xl border border-dashed border-border-strong bg-background p-3 text-left hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring motion-safe:transition-colors",
+        "relative flex min-w-0 flex-col items-start border-dashed border-border-strong bg-background text-left hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring motion-safe:transition-colors",
+        diagram
+          ? "gap-0.5 rounded-[14px] border-[1.5px] px-4 py-3.5"
+          : "gap-1 rounded-xl border p-3",
         current && "border-primary bg-secondary",
         className,
       )}
@@ -61,10 +71,15 @@ export function ZoneNode({
         type="button"
         aria-label={`Zone ${name} ${formatCount(count)} ${countLabel}${detail ? ` · ${detail}` : ""}`}
         aria-pressed={current}
-        className="flex w-full flex-col items-start gap-1 text-left after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
+        className="flex w-full flex-col items-start gap-1 text-left after:absolute after:inset-0 after:rounded-[inherit] focus-visible:outline-none"
         onClick={onOpen}
       >
-        <span className="flex w-full items-center gap-2 text-subsection-title text-foreground">
+        <span
+          className={cn(
+            "flex w-full items-center gap-2 text-foreground",
+            diagram ? "text-card-title" : "text-subsection-title",
+          )}
+        >
           <Icon name={icon} size={20} className="shrink-0 text-primary" />
           <span className="min-w-0 flex-1">{name}</span>
           {arrow ? (
@@ -77,17 +92,18 @@ export function ZoneNode({
         </span>
       </button>
       {preview.length > 0 ? (
-        <span className="flex flex-wrap gap-1">
+        <span className={cn("flex flex-wrap gap-1", diagram && "mt-2")}>
           {preview.slice(0, previewLimit).map((item) => (
-            <span
-              key={item}
-              className="rounded-sm border bg-surface px-1.5 font-mono text-code text-muted-foreground"
-            >
+            <span key={item} className={chip}>
               {item}
             </span>
           ))}
           {hidden > 0 ? (
-            <span className="rounded-sm px-1.5 font-mono text-code text-muted-foreground">{`+${hidden}`}</span>
+            <span
+              className={
+                diagram ? chip : "rounded-sm px-1.5 font-mono text-code text-muted-foreground"
+              }
+            >{`+${hidden}`}</span>
           ) : null}
         </span>
       ) : null}

@@ -19,7 +19,11 @@ export interface ProposalReviewListProps {
   onSelect: (id: string) => void;
   onAcceptGroup?: ((key: string) => void) | undefined;
   onLoadMore?: ((key: string) => void) | undefined;
+  /** Note à droite des filtres (défaut « Groupé par type puis par zone » ; « Groupées par zone » en maquette 11). */
+  groupNote?: string | undefined;
 }
+
+const DEFAULT_GROUP_NOTE = "Groupé par type puis par zone";
 
 function EmptyNote({ counts }: { counts: ProposalReviewCounts }) {
   return (
@@ -46,7 +50,7 @@ function Filters(props: ProposalReviewListProps) {
       </FilterChip>
       <span className="flex-1" />
       <span className="text-[11px] font-normal text-muted-foreground">
-        Groupé par type puis par zone
+        {props.groupNote ?? DEFAULT_GROUP_NOTE}
       </span>
     </div>
   );
