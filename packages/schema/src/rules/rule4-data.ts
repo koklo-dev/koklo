@@ -69,5 +69,13 @@ export function checkDataLinks(spec: ParsedSpec, index: SpecIndex, at: Collect):
         );
       }
     });
+    for (const key of Object.keys(fixture.generation?.regles ?? {})) {
+      if (fields.has(key)) continue;
+      emit(
+        "R4_UNKNOWN_FIELD",
+        `/generation/regles/${key}`,
+        `Le champ « ${key} » n'existe pas dans la table ${fixture.table}.`,
+      );
+    }
   }
 }
