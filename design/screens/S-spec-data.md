@@ -1,7 +1,7 @@
 ---
 id: S-spec-data
 titre: Spec · Données (modèle de données : Prêt, Génération, Relecture, Liste · équipe)
-version: 4
+version: 5
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/11-Lot6Donnees.html` (`pnpm maquette 11`), passations 09 §1 à §3.4 et §5, 08 §2.2, 11 §3. Même socle que [S-spec-functional](S-spec-functional.md) (`ProposalReview`, `SpecCollection`, `SpecItemSheet`, listes longues). TK-107 livre le format, les états et les onglets Tables et Jeux d'exemple ; le diagramme interactif et la fiche (TK-108), la validation et la vue client (TK-109) viennent après.
 
@@ -47,9 +47,13 @@ Réalisation (lot C) : aucune table choisie à l'ouverture ; au premier clic la 
 **Client et business** (`clientSpace.data*`) : bandeau `InlineAlert` neutre `role="note"` « Lecture seule. » (l.160-167), en-tête « Validé par l'équipe · N tables · lecture seule » + « Commenter » (client seulement), onglets Diagramme, Tables, Jeux d'exemple sans glisser, sans « Modifier », sans YAML ni Mermaid ; fiche : description, « Ce qu'on enregistre » (`clientSummary`), Relations, « Utilisée par », « Commenter » (dialogue : `textarea` 2000 caractères, « Envoyer », focus rendu au bouton, annonce « Commentaire envoyé » dans la région `status`). Modèle non validé : `EmptyState` `schedule` « Le modèle de données est en cours de validation par l'équipe » ; aucune table n'est chargée. Erreur : `ErrorNotice` + « Réessayer ».
 **Annonces et clavier.** Statut de validation et envoi de commentaire dans l'unique `role="status"` de la page ; Échap ferme le dialogue ; 375 px : actions de l'en-tête pleine largeur 44 px, onglet Tables par défaut sous 1024 px, fiche en feuille.
 
-## 12. Historique
+## 12. Volume réel (TK-110)
+Maquette 11 en « Volume réel » (l.171-205, 232-262, 393-396, 474-488, 575-584, 753-760). **Zones** : calculées par le serveur dès 25 tables (carte 300 × 180, fil « Toutes les zones · 65 tables / Zone · N tables · M liens vers d'autres zones », « Aller à une table… » touche `/`, mini-carte, zoom < 60 % = noms seuls) ; client : mêmes vues sur le modèle validé. **États** : chargement = 6 cartes squelettes `motion-safe` ; erreur des zones = `InlineAlert` + « Réessayer », le reste de la page reste utilisable ; recherche vide = `EmptyState` `search_off` ; modèle non validé (client) = écran « pas encore validé » existant. **Clavier et annonces** : `/` ouvre la recherche, Entrée ouvre la zone et sélectionne, Échap ferme ; `role="status"` « Zone X ouverte · 9 tables » et « Page 2 sur 50 » ; zone = bouton nommé « Zone X, 9 tables ». **375 px** : fil et recherche en colonne, cartes de zone en colonne, pagination 44 px, tableau défilant en interne, aucun défilement horizontal de page. **Jeux** : taille 25 / 50 / 100 mémorisée, « 26–50 sur 1 240 ». **Relecture** : groupes par zone + « Relations et jeux d'exemple ». États à capturer (clair, sombre, 375 px) : vue des zones, zone « Prise de rendez-vous », zoom 50 %, page 2 d'un jeu, relecture groupée, recherche vide ou erreur.
+
+## 13. Historique
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
+| 5 | 2026-11-20 | TK-110 | Volume réel : zones, zone et recherche venues du serveur, jeux à lignes générées pagination 25 / 50 / 100, groupe « Relations et jeux d'exemple » (B482 à B491). |
 | 4 | 2026-11-13 | TK-109 | « Valider le modèle », statut « Validé par l'équipe », état « À revoir » (impact amont), vue client (Lecture seule, « Ce qu'on enregistre », « Commenter »), commentaires visibles de l'équipe dans la fiche (B444 à B455). |
 | 3 | 2026-11-13 | TK-108 | Diagramme interactif `DiagramViewer` (dagre, relations, sélection, zoom 50 à 200 %, glisser et Alt + flèches vers `_layout.yaml`, noms seuls sous 60 %), fiche ancrée Fiche / YAML / Mermaid (équipe), onglet Tables par défaut sous 1024 px, fiche en panneau sous 1280 px (B417 à B428). |
 | 2 | 2026-11-13 | TK-107 (lot C) | Réalisation : onglet Relecture caché pendant la génération et bandeau sur les trois autres onglets (B404) ; diagramme lu de `data/model.mmd` (B403) ; carte rejetée estompée par les jetons, pas par l'opacité (B405) ; formulaire Table à lignes de champs `nom · type · contrainte` et zone en saisie libre avec suggestions (B402) ; enregistrement des relations et cascade du rejet (B406). |
