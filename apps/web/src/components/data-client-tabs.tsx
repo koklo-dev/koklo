@@ -17,16 +17,18 @@ import {
 import { useMemo } from "react";
 import { TRUNCATED_NOTE } from "../lib/data-client-labels.ts";
 import { clientCardsOf, clientRelationsOf } from "../lib/data-client-model.ts";
+import { usesZoneView } from "../lib/data-diagram-zones.ts";
 import {
   DATA_FIXTURES_HELP,
   DATA_PERSONAL_NOTE,
   TABLES_TABLE_LABEL,
   usedByText,
 } from "../lib/data-labels.ts";
-import { useClientFixtureRows, useClientFixtures } from "../lib/use-client-data.ts";
+import { useClientFixtureRows, useClientFixtures, useClientZones } from "../lib/use-client-data.ts";
 import { nodeOf, type TableNode } from "../lib/use-data-diagram.ts";
 import type { DataUrl } from "../lib/use-data-url.ts";
 import { DataClientFiche } from "./data-client-fiche.tsx";
+import { ClientZonedDiagram } from "./data-client-zones.tsx";
 import {
   FicheFrame,
   HINT_COMPACT,
@@ -42,6 +44,7 @@ import { ErrorNotice } from "./error-notice.tsx";
 const HINT = "Cliquez une table pour voir sa fiche.";
 
 interface DiagramProps {
+  projectId: string;
   model: ClientSpaceDataModel;
   url: DataUrl;
   /** Absent pour qui ne peut pas commenter (business). */
@@ -49,7 +52,7 @@ interface DiagramProps {
 }
 
 /** Onglet Diagramme (maquette 11 l.168-228) : lecteur en lecture seule, positions de l'équipe, fiche de la table choisie. */
-export function ClientDiagram({ model, url, onComment }: DiagramProps) {
+function ClientFlatDiagram({ model, url, onComment }: Omit<DiagramProps, "projectId">) {
   const { items, positions } = model;
   const cards = useMemo(() => clientCardsOf(items), [items]);
   const nodes = useMemo(() => cards.map(nodeOf), [cards]);
@@ -102,6 +105,30 @@ export function ClientDiagram({ model, url, onComment }: DiagramProps) {
       ) : null}
     </div>
   );
+}
+
+/**
+ * Onglet Diagramme du client : au-delà de 25 tables en plusieurs zones, la vue des zones lue du serveur (TK-110) ;
+ * sinon toutes les tables du modèle validé. Une lecture des zones en échec laisse le diagramme de toutes les tables.
+ */
+export function ClientDiagram({ projectId, ...props }: DiagramProps) {
+  const zones = useClientZones(projectId);
+  if (zones.isPending)
+    return <Skeleton aria-busy="true" className={`${VIEWER_HEIGHT} w-full rounded-xl`} />;
+  const data = zones.data;
+  if (data?.available && usesZoneView(data.tableCount, data.zones.length)) {
+    return (
+      <ClientZonedDiagram
+        projectId={projectId}
+        zones={data.zones}
+        tableCount={data.tableCount}
+        known={props.model.items}
+        url={props.url}
+        onComment={props.onComment}
+      />
+    );
+  }
+  return <ClientFlatDiagram {...props} />;
 }
 
 const countOf = (n: number): string => `${n} ${n >= 2 ? "tables" : "table"}`;
@@ -176,13 +203,27 @@ export function ClientTables({
 
 type Fixture = NonNullable<ReturnType<typeof useClientFixtures>["data"]>["items"][number];
 
-function ClientFixture({ projectId, fixture }: { projectId: string; fixture: Fixture }) {
+function ClientFixture({
+  projectId,
+  fixture,
+  announce,
+}: {
+  projectId: string;
+  fixture: Fixture;
+  announce: (text: string) => void;
+}) {
   const rows = useClientFixtureRows(projectId, fixture.specId);
-  return <FixtureBlock fixture={fixture} rows={rows} />;
+  return <FixtureBlock fixture={fixture} rows={rows} announce={announce} />;
 }
 
-/** Onglet Jeux d'exemple (maquette 11 l.248-261) : phrase d'aide, une section par jeu, lignes fictives paginées par 25. */
-export function ClientFixtures({ projectId }: { projectId: string }) {
+/** Onglet Jeux d'exemple (maquette 11 l.248-261) : phrase d'aide, une section par jeu, lignes fictives paginées par 25, 50 ou 100. */
+export function ClientFixtures({
+  projectId,
+  announce,
+}: {
+  projectId: string;
+  announce: (text: string) => void;
+}) {
   const fixtures = useClientFixtures(projectId, true);
   return (
     <div className="flex flex-col gap-4">
@@ -206,7 +247,12 @@ export function ClientFixtures({ projectId }: { projectId: string }) {
         />
       ) : (
         fixtures.data.items.map((fixture) => (
-          <ClientFixture key={fixture.specId} projectId={projectId} fixture={fixture} />
+          <ClientFixture
+            key={fixture.specId}
+            projectId={projectId}
+            fixture={fixture}
+            announce={announce}
+          />
         ))
       )}
     </div>

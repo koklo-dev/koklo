@@ -244,9 +244,11 @@ function regionOf({ view, url, expired, announcement, write, formOpen, resultTex
   const writeText = writeRegionText(write, formOpen);
   const countBar = view.kind === "list" || view.kind === "empty-filtered";
   return {
-    text: [regionText({ view, expired, noun: "du modèle de données" }), announcement, writeText]
+    text: [regionText({ view, expired, noun: "du modèle de données" }), writeText]
       .filter(Boolean)
       .join(" "),
+    /** Annonce pour les lecteurs d'écran seulement : la maquette 11 n'affiche rien au-dessus du fil. */
+    srText: announcement,
     countText: [resultText, announcement, writeText, writeNoticeText(write)]
       .filter(Boolean)
       .join(" "),

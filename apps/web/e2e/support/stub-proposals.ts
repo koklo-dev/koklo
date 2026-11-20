@@ -23,6 +23,8 @@ export type ProposalsMode =
   | "mixed"
   /** TK-107 : 4 tables, une proposition de relations et un jeu d'exemple à relire (Données). */
   | "data"
+  /** TK-110 : 67 propositions des Données (60 tables sur 6 zones, relations, jeux) : groupes par zone et « Relations et jeux d'exemple ». */
+  | "dataVolume"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -253,7 +255,44 @@ function dataItems(): Item[] {
   ];
 }
 
+const VOLUME_ZONES = [
+  "Prise de rendez-vous",
+  "Clients et fidélité",
+  "Catalogue et stock",
+  "Paiements",
+  "Personnel",
+  "Communication",
+];
+
+/** 60 tables sur 6 zones, une proposition de relations, six jeux d'exemple : 67 propositions (au-delà de 30 : groupes). */
+function dataVolumeItems(): Item[] {
+  const tables = Array.from({ length: 60 }, (_, i) =>
+    table(
+      i + 1,
+      `Table ${String(i + 1).padStart(3, "0")}`,
+      VOLUME_ZONES[i % VOLUME_ZONES.length] as string,
+      ["F-001"],
+      [ID_FIELD, { name: "nom", type: "texte(80)" }],
+    ),
+  );
+  const links: Item[] = [
+    {
+      ...(dataItems()[6] as Item),
+      id: `0190bbbb-0000-7000-8000-${"1".padStart(12, "9")}`,
+      position: 60,
+    },
+    ...Array.from({ length: 6 }, (_, i) => ({
+      ...(dataItems()[7] as Item),
+      id: `0190bbbb-0000-7000-8000-${String(i + 1).padStart(12, "8")}`,
+      position: 61 + i,
+      title: `Jeu ${i + 1}`,
+    })),
+  ];
+  return [...tables, ...links];
+}
+
 let items: Item[] = [];
+let volumeData = false;
 let launchStatus: "queued" | "running" | "done" = "done";
 let reads = 0;
 let started = false;
@@ -266,9 +305,11 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   started = false;
   launchStatus = "done";
   items = [];
+  volumeData = mode === "dataVolume";
   if (mode === "ready") items = Array.from({ length: 12 }, (_, i) => make(i + 1, 3));
   if (mode === "mixed") items = mixed();
   if (mode === "data") items = dataItems();
+  if (mode === "dataVolume") items = dataVolumeItems();
   if (mode === "generating") {
     started = true;
     launchStatus = "running";
@@ -277,7 +318,11 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   if (mode === "hostile") items = [make(1, 1, true)];
 }
 
-const keyOf = (item: Item): string => `${item.kind}:${item.zone}`;
+/** Livrable Données au-delà de 30 propositions : relations et jeux dans le groupe `links` (comme le serveur, B487). */
+const keyOf = (item: Item): string =>
+  volumeData && (item.kind === "relations" || item.kind === "fixtures")
+    ? "links"
+    : `${item.kind}:${item.zone}`;
 /** Jusqu'à 30 propositions d'un seul type : un groupe « all » ; avec plusieurs types, un groupe par type. */
 const MIXED_FLAT = (): boolean =>
   items.length <= 30 && items.some((item) => item.kind !== "feature");
@@ -293,6 +338,14 @@ const LABELS: Record<string, string> = {
   fixtures: "Jeux d'exemple",
 };
 
+/** Libellé d'un groupe : relecture groupée des Données (TK-110), types à plat, ou fonctionnalités par zone. */
+function labelOf(key: string, flat: boolean): string {
+  if (volumeData)
+    return key === "links" ? "Relations et jeux d'exemple" : `Zone ${key.split(":")[1]}`;
+  if (MIXED_FLAT()) return LABELS[key] ?? key;
+  return flat ? "Fonctionnalités" : `Fonctionnalités · ${key.split(":")[1]}`;
+}
+
 function groups() {
   const flat = items.length <= 30;
   const keys = MIXED_FLAT() || !flat ? [...new Set(items.map(groupKeyOf))] : ["all"];
@@ -301,11 +354,7 @@ function groups() {
     const count = (status: string) => own.filter((item) => item.status === status).length;
     return {
       key,
-      label: MIXED_FLAT()
-        ? (LABELS[key] ?? key)
-        : flat
-          ? "Fonctionnalités"
-          : `Fonctionnalités · ${key.split(":")[1]}`,
+      label: labelOf(key, flat),
       total: own.length,
       accepted: count("accepted"),
       rejected: count("rejected"),
