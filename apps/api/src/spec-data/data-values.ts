@@ -1,4 +1,10 @@
-import type { DataFixtureSummary, DataTableSummary, TableDetail } from "@koklo/contract";
+import type {
+  DataFixtureSummary,
+  DataSearch,
+  DataTableSummary,
+  TableDetail,
+} from "@koklo/contract";
+import { type Fixture, FixtureSchema, fixtureRowCount, generateFixturePage } from "@koklo/schema";
 import { isRecord, list, text, texts } from "../spec-read/entity-values.ts";
 
 /**
@@ -16,7 +22,8 @@ const CARDINALITIES = ["1 → 1", "1 → 0..1", "1 → n", "n → 1", "n ↔ n"]
 
 const record = (value: unknown): Json => (isRecord(value) ? value : {});
 const sourcesOf = (data: Json): string[] => texts(data.source).filter((id) => SOURCE.test(id));
-const zoneOf = (data: Json): string | undefined => text(data.zone).slice(0, 80) || undefined;
+export const zoneOf = (data: unknown): string | undefined =>
+  text(record(data).zone).slice(0, 80) || undefined;
 
 type Field = TableDetail["fields"][number];
 
@@ -37,17 +44,21 @@ function fieldOf(value: unknown): Field | undefined {
   };
 }
 
-const fieldsOf = (data: Json): Field[] =>
-  list(data.champs).flatMap((entry) => fieldOf(entry) ?? []);
+export const fieldsOf = (data: unknown): Field[] =>
+  list(record(data).champs).flatMap((entry) => fieldOf(entry) ?? []);
 
-function relationsOf(data: Json): TableDetail["relations"] {
-  return list(data.relations).flatMap((entry) => {
+export function relationsOf(data: unknown): TableDetail["relations"] {
+  return list(record(data).relations).flatMap((entry) => {
     const relation = record(entry);
     const to = text(relation.vers);
     const cardinality = CARDINALITIES.find((value) => value === relation.cardinalite);
     return TABLE.test(to) && cardinality !== undefined ? [{ to, cardinality }] : [];
   });
 }
+
+/** Nom d'une table : `nom`, sinon `titre` de l'index, sinon l'identifiant. */
+export const tableName = (specId: string, data: unknown): string =>
+  text(record(data).nom) || text(record(data).titre) || specId;
 
 /** Ligne du tableau Tables : `relationCount` compte les relations déclarées et celles qui visent la table (B384). */
 export function tableSummary(
@@ -69,6 +80,12 @@ export function tableSummary(
     personalData: fields.some((field) => field.personalData),
     filePath: path,
   };
+}
+
+/** Résultat de la recherche d'une table : identifiant, nom et zone (tout ce que le client peut en voir). */
+export function tableSearchItem(specId: string, data: unknown): DataSearch["items"][number] {
+  const zone = zoneOf(data);
+  return { id: specId, name: tableName(specId, data), ...(zone === undefined ? {} : { zone }) };
 }
 
 /** Valeurs de la fiche d'une table (panneau d'édition). */
@@ -117,6 +134,46 @@ export function columnsOf(rows: readonly Record<string, Cell>[]): string[] {
   return [...columns];
 }
 
+/** Identité neutre : un jeu indexé sans `id`, `titre` ou `table` reste lisible (seules les lignes et `generation` comptent ici). */
+const NEUTRAL_IDENTITY = { id: "FX-index", titre: "Jeu", table: "T-index", lignes: [] };
+
+/** Jeu relu selon le schéma ; un contenu hors schéma (bloc `generation` illisible) retombe sur les lignes stockées. */
+const fixtureOf = (data: unknown): Fixture | undefined => {
+  const parsed = FixtureSchema.safeParse({ ...NEUTRAL_IDENTITY, ...record(data) });
+  return parsed.success ? parsed.data : undefined;
+};
+
+/** Nombre de lignes d'un jeu : `generation.total` quand le bloc est lisible, sinon les lignes stockées. */
+export const rowCountOf = (data: unknown): number => {
+  const fixture = fixtureOf(data);
+  return fixture === undefined ? rowsOf(data).length : fixtureRowCount(fixture);
+};
+
+/**
+ * Une page d'un jeu (TK-110, B485) : lignes stockées d'abord, générées ensuite (accès direct, O(taille)). Colonnes : celles des
+ * lignes stockées puis celles des règles, donc stables d'une page à l'autre. Mêmes lignes pour l'équipe et le client.
+ */
+export function fixturePage(
+  data: unknown,
+  page: number,
+  size: number,
+): { columns: string[]; items: Record<string, Cell>[]; total: number } {
+  const fixture = fixtureOf(data);
+  if (fixture === undefined) {
+    const rows = rowsOf(data);
+    const start = (page - 1) * size;
+    return { columns: columnsOf(rows), items: rows.slice(start, start + size), total: rows.length };
+  }
+  return {
+    columns: columnsOf([
+      ...fixture.lignes,
+      Object.fromEntries(Object.keys(fixture.generation?.regles ?? {}).map((key) => [key, ""])),
+    ]),
+    items: generateFixturePage(fixture, page, size),
+    total: fixtureRowCount(fixture),
+  };
+}
+
 export function fixtureSummary(specId: string, path: string, data: unknown): DataFixtureSummary {
   const json = record(data);
   return {
@@ -124,7 +181,7 @@ export function fixtureSummary(specId: string, path: string, data: unknown): Dat
     title: text(json.titre) || specId,
     table: text(json.table),
     locale: text(json.locale) || "fr-FR",
-    rowCount: list(json.lignes).length,
+    rowCount: rowCountOf(data),
     filePath: path,
   };
 }

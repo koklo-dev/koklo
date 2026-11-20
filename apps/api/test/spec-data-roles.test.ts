@@ -36,6 +36,11 @@ const ROUTES = (s: { projectId: string }) => [
   // TK-108 (3.6.0) : diagramme.
   `/projects/${s.projectId}/spec/data/layout`,
   `/projects/${s.projectId}/spec/data/tables/T-client/source`,
+  // TK-110 (3.8.0) : volume réel.
+  `/projects/${s.projectId}/spec/data/zones`,
+  `/projects/${s.projectId}/spec/data/zone?zone=sans-zone`,
+  `/projects/${s.projectId}/spec/data/search?q=client`,
+  `/projects/${s.projectId}/spec/data/fixtures/FX-clients/page?page=1&size=50`,
 ];
 
 describe("lectures de la page Données", () => {
@@ -64,7 +69,7 @@ describe("lectures de la page Données", () => {
   );
 
   it.each(["client", "business"] as const)(
-    "%s reçoit 403 sur chacune des sept lectures",
+    "%s reçoit 403 sur chacune des onze lectures",
     async (role) => {
       const s = await readScene(read());
       await seedIndex(read(), s, [], {

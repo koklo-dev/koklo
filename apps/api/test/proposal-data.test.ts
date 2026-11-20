@@ -161,3 +161,93 @@ describe("proposal.decide sur une table (cas 12)", () => {
     expect(ok.body).toMatchObject({ kind: "table", title: "Séjour", status: "accepted" });
   });
 });
+
+/**
+ * TK-110 lot A (B487) : 67 propositions des Données (> 30) = groupes par zone de table + « Relations et jeux d'exemple » ;
+ * « Accepter les N » du groupe ne décide que les relations et les jeux, jamais les tables.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("proposal.list et decideMany : groupe « links » des Données", () => {
+  async function dataLaunch() {
+    const { b, world } = await dataScene();
+    const scope = { organizationId: world.organizationId, projectId: world.projectId };
+    let launchId: string | undefined;
+    let position = 0;
+    const add = async (kind: string, zone: string, count: number) => {
+      for (let i = 0; i < count; i += 1) {
+        const made = await insertProposal(b.database, scope, {
+          launchId,
+          deliverable: "data",
+          kind,
+          zone,
+          position: position++,
+          title: `${kind} ${zone} ${i}`,
+          payload: TABLE,
+        });
+        launchId = made.launchId;
+      }
+    };
+    await add("table", "Rendez-vous", 20);
+    await add("table", "Clients", 20);
+    await add("table", "Paiements", 20);
+    await add("relations", "Rendez-vous", 4);
+    await add("fixtures", "Clients", 3);
+    return { b, world, launchId: launchId as string };
+  }
+
+  it("67 propositions : trois groupes de tables par zone puis « links », relations et jeux ensemble", async () => {
+    const { b, world } = await dataLaunch();
+    const api = proposalApi(b.app, world.actors.dev);
+    const res = await api.list(world.projectId, { deliverable: "data", limit: "5" });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.groups.map((g: { key: string; total: number }) => [g.key, g.total])).toEqual([
+      ["table:Rendez-vous", 20],
+      ["table:Clients", 20],
+      ["table:Paiements", 20],
+      ["links", 7],
+    ]);
+    expect(res.body.groups[3].label).toBe("Relations et jeux d'exemple");
+    const links = await api.list(world.projectId, {
+      deliverable: "data",
+      group: "links",
+      limit: "100",
+    });
+    expect(links.body.total).toBe(7);
+    expect(links.body.items.map((item: { kind: string }) => item.kind).sort()).toEqual([
+      "fixtures",
+      "fixtures",
+      "fixtures",
+      "relations",
+      "relations",
+      "relations",
+      "relations",
+    ]);
+  });
+
+  it("« Accepter les 7 » du groupe links : relations et jeux acceptés, tables intactes ; N périmé refusé", async () => {
+    const { b, world, launchId } = await dataLaunch();
+    const api = proposalApi(b.app, world.actors.dev);
+    const stale = await api.decideMany(world.projectId, {
+      launchId,
+      group: "links",
+      expectedPending: 8,
+    });
+    expect(stale.status).toBe(409);
+    const ok = await api.decideMany(world.projectId, {
+      launchId,
+      group: "links",
+      expectedPending: 7,
+    });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body).toEqual({ decided: 7 });
+    const rows = await b.database.query<{ kind: string; status: string; n: number }>(
+      `SELECT kind, status, count(*)::int AS n FROM agent_proposals WHERE project_id = $1 GROUP BY kind, status ORDER BY kind, status`,
+      [world.projectId],
+    );
+    expect(rows.map((r) => [r.kind, r.status, r.n])).toEqual([
+      ["fixtures", "accepted", 3],
+      ["relations", "accepted", 4],
+      ["table", "pending", 60],
+    ]);
+  });
+});

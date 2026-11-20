@@ -30,6 +30,10 @@ describe("rôles des procédures clientSpace.*", () => {
     "dataModel",
     "dataFixtures",
     "dataFixtureRows",
+    "dataZones",
+    "dataZone",
+    "dataSearch",
+    "dataFixturePage",
   ])("%s : session, garde de rôle et CLIENT_SPACE_READ_ROLES", (name) => {
     const source = read(CONTROLLER);
     const at = source.indexOf(`@Implement(contract.clientSpace.${name})`);
@@ -41,7 +45,7 @@ describe("rôles des procédures clientSpace.*", () => {
 
   it("aucun rôle nommé en dur, et le cloisonnement central (PROJECT_ACCESS) est injecté", () => {
     const source = read(CONTROLLER);
-    expect(source.match(/@Roles\(/g)).toHaveLength(10); // projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109)
+    expect(source.match(/@Roles\(/g)).toHaveLength(14); // projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109), dataZones, dataZone, dataSearch, dataFixturePage (TK-110)
     expect(source).not.toMatch(/@Roles\(\s*"/);
     expect(source).toContain("PROJECT_ACCESS");
   });

@@ -13,6 +13,7 @@ import { SpecDataService } from "./spec-data.service.ts";
  * Page Données (TK-107, B389) : owner, admin, développeur et designer en lecture ; client et business 403. Le rôle est refusé
  * avant le contrôle du projet (404). Diagramme (TK-108, B417) : `layout.get` et `tables.source` en lecture (mêmes rôles),
  * `layout.save` pour ceux qui écrivent les tables (`DATA_PROPOSAL_ROLES` : le designer, le client et le business reçoivent 403).
+ * Volume réel (TK-110, B482) : `zones`, `zone`, `search` et `fixtures.page` en lecture, mêmes rôles que les autres lectures.
  */
 @Controller()
 export class SpecDataController {
@@ -121,6 +122,66 @@ export class SpecDataController {
         errors,
         input.projectId,
         (scope) => this.service.saveLayout(scope, requireSession(request).role ?? "", input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.data.zones)
+  zones(@Req() request: Request) {
+    return implement(contract.spec.data.zones).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.zones(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.data.zone)
+  zone(@Req() request: Request) {
+    return implement(contract.spec.data.zone).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.zone(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.data.search)
+  search(@Req() request: Request) {
+    return implement(contract.spec.data.search).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.search(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.data.fixtures.page)
+  fixturePage(@Req() request: Request) {
+    return implement(contract.spec.data.fixtures.page).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.fixturePage(scope, input),
         this.access,
       ),
     );

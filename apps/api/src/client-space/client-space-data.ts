@@ -1,4 +1,5 @@
 import type { ClientDataTable, ClientSpaceDataFixtures } from "@koklo/contract";
+import { rowCountOf } from "../spec-data/data-values.ts";
 import { isRecord, list, text, texts } from "../spec-read/entity-values.ts";
 
 /**
@@ -33,6 +34,10 @@ const relationOf = (value: unknown, names: ReadonlyMap<string, string>) => {
     : [];
 };
 
+/** `F-nnn` et `R-nnn` cités par `source` (les liens « Utilisée par »). */
+export const sourceIdsOf = (data: unknown): string[] =>
+  texts(record(data).source).filter((id) => SOURCE.test(id));
+
 export function clientTableOf(
   row: { specId: string; data: unknown },
   labels: ReadonlyMap<string, string>,
@@ -47,8 +52,8 @@ export function clientTableOf(
     description: text(data.description),
     fields: list(data.champs).flatMap(fieldOf),
     relations: list(data.relations).flatMap((relation) => relationOf(relation, names)),
-    usedBy: texts(data.source)
-      .filter((id) => SOURCE.test(id) && labels.has(id))
+    usedBy: sourceIdsOf(data)
+      .filter((id) => labels.has(id))
       .map((id) => ({ id, label: labels.get(id) as string })),
     clientSummary: texts(data.resume_client),
   };
@@ -65,6 +70,6 @@ export function clientFixtureOf(row: {
     title: text(data.titre) || row.specId,
     table: text(data.table),
     locale: text(data.locale) || "fr-FR",
-    rowCount: list(data.lignes).length,
+    rowCount: rowCountOf(row.data),
   };
 }
