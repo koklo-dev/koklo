@@ -31,6 +31,7 @@ export function emitFixtureYaml(fixture: Fixture): string {
       table: value.table,
       locale: value.locale,
       lignes: value.lignes.map((row) => ({ ...row })),
+      ...(value.generation === undefined ? {} : { generation: value.generation }),
     },
     { lineWidth: 0 },
   );

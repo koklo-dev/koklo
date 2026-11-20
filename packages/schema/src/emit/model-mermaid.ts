@@ -1,6 +1,11 @@
 import type { TableV2 } from "../entities/index.ts";
 
 type Field = TableV2["champs"][number];
+type Cardinality = NonNullable<TableV2["relations"]>[number]["cardinalite"];
+export interface TableRelation {
+  vers: string;
+  cardinalite: Cardinality;
+}
 
 const GLYPH: Record<string, string> = {
   "1 → n": "||--o{",
@@ -46,10 +51,15 @@ const REF = /^ref\((T-[a-z0-9-]+)\)$/;
  * Relations de la table : celles déclarées, puis une `n → 1` par clé étrangère `ref(T-…)` vers une table que la
  * table ne relie pas déjà (B476) : un modèle dont les relations ne sont portées que par ses clés se dessine relié.
  */
-function relationsOf(table: TableV2): { vers: string; cardinalite: string }[] {
+export function tableRelations(
+  table: Pick<TableV2, "id"> & {
+    champs: readonly { type: string }[];
+    relations?: readonly TableRelation[] | undefined;
+  },
+): TableRelation[] {
   const declared = (table.relations ?? []).map(({ vers, cardinalite }) => ({ vers, cardinalite }));
   const linked = new Set(declared.map((r) => r.vers));
-  const implied: { vers: string; cardinalite: string }[] = [];
+  const implied: TableRelation[] = [];
   for (const field of table.champs) {
     const target = REF.exec(field.type)?.[1];
     if (target === undefined || target === table.id || linked.has(target)) continue;
@@ -69,7 +79,7 @@ export function emitModelMermaid(tables: readonly TableV2[]): string {
     [`  ${entity(table.id)} {`, ...table.champs.map(attribute), "  }"].join("\n"),
   );
   const relations = sorted.flatMap((table) =>
-    relationsOf(table).map(
+    tableRelations(table).map(
       (r) =>
         `  ${entity(table.id)} ${GLYPH[r.cardinalite] ?? "||--||"} ${entity(r.vers)} : "${r.cardinalite}"`,
     ),

@@ -15,11 +15,17 @@ export {
   type IdeaPageFileStatus,
   type IdeaSynthesisFile,
 } from "./emit/idea.ts";
-export { emitModelMermaid } from "./emit/model-mermaid.ts";
+export { emitModelMermaid, type TableRelation, tableRelations } from "./emit/model-mermaid.ts";
 export { EmitRolesError, emitRolesYaml } from "./emit/roles-yaml.ts";
 export { EmitRuleError, emitRuleMarkdown } from "./emit/rule-markdown.ts";
 export { EmitTableError, emitTableYaml } from "./emit/table-yaml.ts";
 export * from "./entities/index.ts";
+export {
+  type FixtureRow,
+  fixtureRowCount,
+  generateFixturePage,
+  generateFixtureRow,
+} from "./fixture-generator.ts";
 export { jsonSchemas, type SchemaName } from "./json-schemas.ts";
 export {
   MIGRATION_EXTRA_PATHS,
