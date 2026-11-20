@@ -1,6 +1,6 @@
 ---
 doc_version: 1
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-20
 ---
 # Passation de la refonte : état, méthode, décisions
 
@@ -8,7 +8,7 @@ last_reviewed: 2026-11-10
 > fusionné, et ajouter ici toute nouvelle décision de méthode de l'utilisateur. Les décisions produit restent dans
 > `docs/refonte/questions.md` (une ligne B-nnn chacune) ; rien ne se décide « dans la conversation » sans être écrit.
 
-## État au 2026-11-13
+## État au 2026-11-20
 
 | Sprint | Ticket | État |
 | --- | --- | --- |
@@ -31,8 +31,11 @@ last_reviewed: 2026-11-10
 | 024 | TK-106 (format de spec v2 : `data/tables/<slug>.yaml`, alias `domaine:`, endpoints `zone.verbe` ; migration v1 → v2 en un lot du bot, retour arrière, owner seul ; contrat 3.4.0) | ✅ fusionné (PR #199, `e20aaef9`) ; décisions B372 à B382 (B8, B9, C4 tranchées en autonomie) ; point d'API seul, sans écran |
 | 024 | TK-107 (Données : onglets Tables et Jeux d'exemple, feuille Table, `ErTableCard`, contrat 3.5.0) | ✅ fusionné (PR #200, `f8dc74b2`) ; décisions B383 à B416 ; CI : gardes de typographie (h3 sur `text-subsection-title`, jeton `--status-pending-icon`) |
 | 024 | TK-108 (Données : lecteur `DiagramViewer` SVG + dagre 3.1.3, ADR 0022, `spec.data.layout.save`, fiche Fiche/YAML/Mermaid ; contrat 3.6.0) | ✅ fusionné (PR #202, `d516799b`) ; décisions B417 à B443 ; CI : titre de PR en minuscule, garde `no-hardcoded-colors` (tracés SVG du diagramme admis) |
+| 024 | TK-109 (Données : « Valider le modèle », vue client en lecture seule avec commentaires de table, impact amont « À revoir » ; contrat 3.7.0 ; migration additive des commentaires de table) | ✅ fusionné (PR #203, jusqu'à `4bf8b6f1`) ; décisions B444 à B473 |
+| 024 | Suites de TK-108 et TK-109 poussées directement sur `develop` le 2026-11-13, sans numéro de ticket (80d405e5 à fa6f5a50, 498eda10, 5874ea85) : vue des zones côté client, fil, « Aller à une table », mini-carte, plein écran, migration v1 → v2 automatique | ✅ sur `develop` ; décisions B474 à B481 ; la CI de `develop` est restée rouge du 13 au 20/11 (voir « Pièges connus ») |
+| 024 | TK-110 (Données en volume réel : contrat 3.8.0, `spec.data.zones`, `zone`, `search`, `fixtures.page` 25/50/100 et équivalents `clientSpace.*`, jeux générés par le bloc `generation` de `FX-*.yaml`, `data/_zones.yaml`, groupe de relecture « Relations et jeux d'exemple », `seed:planche` à 1 240 lignes, `seed:large` à 5 000) | ✅ fusionné (PR #217, `d4ded097` ; les PR #214 à #216 sont des tentatives fermées, voir « Pièges connus ») ; décisions B482 à B505 ; DESIGN §5.21, `S-spec-data` v5. **Case du sprint 024 non cochée** : les corrections de la revue visuelle Opus (carte de zone, « +N », grille, légende, champ « Aller à une table », liste à 375 px) n'ont pas été revérifiées et les 30 captures Volume réel n'ont été regardées par personne. Compris : correction de `tableRelationCounts` (339 ms → 18 ms) et override `effect` 3.22.1 (CVE-2026-121707, transitif par `@prisma/config`) |
 
-Ticket en cours : TK-109 (Données : « Valider le modèle », vue client en lecture seule avec commentaires de table, impact amont « À revoir » ; contrat 3.7.0 ; migration additive des commentaires de table ; décisions B444 à B473), sprint 024. Ensuite TK-110 (volume réel), **pas encore lancé : l'utilisateur a demandé d'arrêter l'enchaînement après TK-109 (2026-11-13)**. DoD des sprints 022 et 023 (4 cases chacun) encore à vérifier avant de les cocher.
+Ticket en cours : aucun. Prochain : TK-111 (sprint 025, Architecture : formats, Mermaid, états, Document), **pas encore lancé**. Le sprint 024 n'est pas clos : case de TK-110 à cocher après relecture des captures (voir ci-dessus). DoD des sprints 022, 023 et 024 encore à vérifier avant de les cocher.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
@@ -146,3 +149,9 @@ Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour
 - `.github/scripts/commitlint-local.sh` avant **chaque** push, y compris un correctif d'une ligne (TK-105 : en-tête de 101 caractères, PR #196 recréée en #197).
 - `apps/web/e2e/features.spec.ts -g client` : 6 échecs locaux déjà présents sur `develop` (vue client « Aucune fonctionnalité à afficher », `unavailable-client`, `feature-sheet-client`, `repo.list`, AC-48-28), constatés le 2026-11-13 pendant TK-107 ; la CI ne les signale pas. À examiner dans un ticket de correction.
 - Garde `apps/web/test/lot0-guards.test.ts` (CA5) : tout `h3` porte `text-subsection-title` ou `sr-only`, tout `SheetTitle` avec classe `text-section-title` ou `sr-only`. Un libellé de section en petites majuscules (« Relations », « Liens ») est un `span` qui étiquette sa `section`, pas un `h3`. Les workflows l'oublient : lancer ce test avant de pousser un écran.
+- TK-110 : quatre PR pour un seul ticket (#214 à #217), toutes à cause de commitlint, qui contrôle **chaque** commit de la PR (la fusion est un rebase, les messages restent tels quels) : titre de 108 caractères (#214, #215), puis ligne de corps de plus de 100 caractères (#216). Sans amend ni push forcé, la seule issue est de rejouer la série par cherry-pick sur une nouvelle branche et de recréer la PR, ce qui relance toute la CI (~12 min). Lancer `.github/scripts/commitlint-local.sh` **avant le premier push** d'une série de commits, corps compris, et entourer d'un retour à la ligne chaque ligne de corps.
+- TK-110 : un test de chronomètre rouge en CI (`spec-data-tables`, « première page sous 300 ms ») signalait une vraie lenteur, pas du bruit : `tableRelationCounts` (`packages/db/src/spec-entity-queries.ts`) rejouait l'expansion JSON des relations de toutes les tables pour chaque table de la page (sous-requête corrélée sur une CTE non matérialisée). Mesurer en local sans couverture, requête de base et page de 1 ligne comme références (21 ms, 18 ms, contre 339 ms pour 50 lignes), avant de relâcher un seuil. Le CI `tests (api-3)` était rouge sur `develop` depuis le 13/11 ; une relance du job n'y changeait rien.
+- Commits poussés directement sur `develop` (80d405e5 à fa6f5a50) : contraire à la règle « jamais de push direct sur `develop` » ; ils ont laissé la CI de `develop` rouge une semaine sans que personne ne la regarde. Avant de lancer un ticket, lire `gh run list --branch develop --workflow CI` : une base rouge se diagnostique d'abord.
+- Gates locales : le verrou `~/.claude/bin/gate.sh` est partagé entre sessions et un seul projet (une boucle de transcription du projet hyperframes-studio) l'a tenu plus d'une heure ; `gate.sh` abandonne alors avec « verrou non obtenu » après une longue attente et la commande ne s'est pas exécutée (vérifier la sortie, un `exit 0` du `tail` masque l'échec). Les commandes légères (Biome sur un fichier, `pnpm install --lockfile-only`) peuvent se lancer directement avec `nice`.
+- Playwright sans le headless shell : lancer avec `PLAYWRIGHT_CHANNEL=chrome` ; les captures existantes sortent alors avec un rendu différent, ne restaurer (`git checkout`) que celles qui ne devraient pas bouger (B504, 52 captures restaurées pour TK-110).
+- Biome : une ligne de test de plus de 100 caractères passe en `pnpm --filter … typecheck` mais échoue à `pnpm lint` ; `apps/web/node_modules/.bin/biome ci --config-path=../.. <fichier>` depuis `apps/web` vérifie un seul fichier.
