@@ -10,6 +10,7 @@ import {
   VERBS,
   type VolumeTarget,
 } from "./seed-volume-sql.ts";
+import { fixtureData, tableData } from "./seed-volume-tables.ts";
 import { SEED_VOLUMES, type VolumeProfile } from "./seed-volumes.ts";
 
 /**
@@ -148,50 +149,6 @@ function specStatements(profile: VolumeProfile, target: VolumeTarget): SeedState
 const entityHash = (kind: string, id: string, title: string) =>
   `encode(sha256(convert_to('${kind}:' || ${id} || ':' || ${title}, 'UTF8')), 'hex')`;
 
-/** Zones du jeu de tables : huit zones du produit, tournantes. */
-const TABLE_ZONES = [
-  "Clients",
-  "Rendez-vous",
-  "Paiements",
-  "Comptes",
-  "Documents",
-  "Notifications",
-  "Équipes",
-  "Paramètres",
-] as const;
-
-/**
- * Contenu d'une table au format v2 (TK-107, B385) : `titre` = nom, zone tournante, champs (clé primaire, nom, horodatage,
- * référence vers la table précédente, e-mail personnel une fois sur quatre), une relation `n → 1` vers la précédente et une
- * fonctionnalité en `source`. Les identifiants cités existent tous dans le jeu.
- */
-const tableData = (features: number): string => {
-  const previous = pad("(n - 1)");
-  const field = (name: string, type: string, extra = "") =>
-    `jsonb_build_object('nom', '${name}', 'type', ${type}${extra})`;
-  return `jsonb_build_object(
-    'id', 'T-table-' || ${pad()}, 'titre', 'Table ' || ${pad()}, 'nom', 'Table ' || ${pad()},
-    'description', 'Table de volume ' || ${pad()}, 'zone', ${pick(TABLE_ZONES, "n % 8")},
-    'source', jsonb_build_array('F-' || ${pad(`(1 + n % ${features})`)}),
-    'champs', jsonb_build_array(
-        ${field("id", "'uuid'", ", 'cle', 'primaire'")},
-        ${field("nom", "'texte(120)'", ", 'contraintes', 'Obligatoire'")},
-        ${field("cree_le", "'horodatage'")})
-      || CASE WHEN n > 1 THEN jsonb_build_array(${field("parent_id", `'ref(T-table-' || ${previous} || ')'`)}) ELSE '[]'::jsonb END
-      || CASE WHEN n % 4 = 0 THEN jsonb_build_array(${field("email", "'texte(255)'", ", 'donnees_personnelles', true")}) ELSE '[]'::jsonb END,
-    'relations', CASE WHEN n > 1
-      THEN jsonb_build_array(jsonb_build_object('vers', 'T-table-' || ${previous}, 'cardinalite', 'n → 1'))
-      ELSE '[]'::jsonb END)`;
-};
-
-/** Contenu d'un jeu d'exemple : trois lignes fictives sur le champ `nom` de la table du même rang. */
-const fixtureData = (): string =>
-  `jsonb_build_object('id', 'FX-table-' || ${pad()}, 'titre', 'Jeu d''exemple ' || ${pad()},
-    'table', 'T-table-' || ${pad()}, 'locale', 'fr-FR',
-    'lignes', jsonb_build_array(
-      jsonb_build_object('nom', 'Léa Martin'), jsonb_build_object('nom', 'Karim Haddad'),
-      jsonb_build_object('nom', 'Sophie Dubois')))`;
-
 /**
  * Index générique `spec_entities` (TK-101, B329 e) : une ligne par fonctionnalité, table et point d'accès du jeu, avec
  * `titre`, chemin, rang et hachage, puis `entities_indexed_at` sur l'instantané (sans lui, `spec.refs.search` rend une liste
@@ -230,7 +187,7 @@ function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedSta
       "'T-table-'",
       `'Table ' || ${pad()}`,
       `'data/tables/table-' || ${pad()} || '.yaml'`,
-      tableData(volume.features),
+      tableData(profile, volume.features),
     ),
     entity(
       "fixture",
@@ -238,7 +195,7 @@ function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedSta
       "'FX-table-'",
       `'Jeu d''exemple ' || ${pad()}`,
       `'data/fixtures/FX-table-' || ${pad()} || '.yaml'`,
-      fixtureData(),
+      fixtureData(profile),
     ),
     entity(
       "endpoint",
