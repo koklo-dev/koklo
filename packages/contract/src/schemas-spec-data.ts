@@ -194,6 +194,9 @@ export const dataFixtureRowsInputSchema = z
     ...revision,
   })
   .refine(exclusiveRevision, REVISION_MESSAGE);
+export const dataFixturePageSchema = pageNumberOf(z.record(z.string(), cellSchema)).extend({
+  columns: z.array(z.string()),
+});
 export const dataFixtureRowsSchema = pageNumberOf(z.record(z.string(), cellSchema)).extend({
   columns: z.array(z.string()),
 });
@@ -238,3 +241,100 @@ export const dataTableSourceSchema = z.object({
   commitSha: commitShaSchema,
   generated: z.boolean(),
 });
+
+// --- Volume réel (TK-110, contrat 3.8.0, B482 à B485) ---
+/** Tailles de page d'un jeu : 25 (défaut de la maquette), 50 et 100 ; mémorisée par l'utilisateur, jamais dans l'URL. */
+export const FIXTURE_PAGE_SIZES = [25, 50, 100] as const;
+/** Bornes des lectures : aperçu d'une carte de zone, tables d'une zone ouverte, résultats de recherche. */
+export const ZONE_PREVIEW_MAX = 7;
+export const ZONE_TABLES_MAX = 200;
+export const DATA_SEARCH_MAX = 20;
+
+/** Identifiant d'une zone : dérivé de son libellé par le serveur (`sans-zone` pour les tables sans zone). */
+export const zoneIdSchema = z.string().min(1).max(DATA_ZONE_MAX_LENGTH);
+export const zoneSummaryShape = {
+  id: zoneIdSchema,
+  name: zoneSchema,
+  /** Nom d'icône du registre (`data/_zones.yaml`), `folder_open` sans fichier. */
+  icon: z.string().min(1).max(64),
+  tableCount: z.number().int().min(0),
+};
+export const zoneSummarySchema = z.object(zoneSummaryShape);
+/** Lien d'une zone vers une autre : nombre de relations entre leurs tables. */
+export const zoneLinkSchema = z.object({ to: zoneIdSchema, count: z.number().int().min(1) });
+export const zoneEntrySchema = zoneSummarySchema.extend({
+  /** Noms des premières tables, 7 au plus (carte de la vue des zones). */
+  preview: z.array(z.string()).max(ZONE_PREVIEW_MAX),
+  links: z.array(zoneLinkSchema),
+});
+export const zoneRelationSchema = z.object({
+  from: tableIdSchema,
+  to: tableIdSchema,
+  cardinality: cardinalitySchema,
+});
+/** Relations de la zone ouverte vers les autres zones. */
+export const zoneOutgoingSchema = z.object({ zone: zoneIdSchema, count: z.number().int().min(1) });
+export const dataSearchItemSchema = z.object({
+  id: tableIdSchema,
+  name: z.string(),
+  zone: zoneSchema.optional(),
+});
+/** Taille d'une page de jeu, reçue en chaîne dans l'URL. */
+export const fixturePageSizeSchema = z.coerce
+  .number()
+  .pipe(z.union([z.literal(25), z.literal(50), z.literal(100)]));
+export const searchQuerySchema = z.string().trim().min(1).max(100);
+
+/** Zones du modèle : une carte par zone, comptes et liens calculés sur toute la tête. */
+export const dataZonesInputSchema = dataMermaidInputSchema;
+export const dataZonesSchema = z.object({
+  zones: z.array(zoneEntrySchema),
+  tableCount: z.number().int().min(0),
+  commitSha: commitShaSchema,
+});
+
+/** Une zone ouverte : ses tables (200 au plus, `truncated` au-delà), leurs relations et ses liens vers les autres zones. */
+export const dataZoneInputSchema = z
+  .object({ projectId: z.uuid(), zone: zoneIdSchema, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+export const dataZoneTableSchema = z.object({
+  specId: tableIdSchema,
+  name: z.string(),
+  zone: zoneSchema.optional(),
+  fields: z.array(
+    z.object({
+      name: z.string(),
+      type: z.string(),
+      primaryKey: z.boolean(),
+      personalData: z.boolean(),
+    }),
+  ),
+  personalData: z.boolean(),
+});
+export const dataZoneSchema = z.object({
+  zone: zoneSummarySchema,
+  tables: z.array(dataZoneTableSchema).max(ZONE_TABLES_MAX),
+  relations: z.array(zoneRelationSchema),
+  outgoing: z.array(zoneOutgoingSchema),
+  truncated: z.boolean(),
+  commitSha: commitShaSchema,
+});
+
+/** Recherche d'une table par nom ou par champ, parmi toutes les tables de la tête (pas seulement celles chargées). */
+export const dataSearchInputSchema = z
+  .object({ projectId: z.uuid(), q: searchQuerySchema, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+export const dataSearchSchema = z.object({
+  items: z.array(dataSearchItemSchema).max(DATA_SEARCH_MAX),
+});
+
+/** Page de 25, 50 ou 100 lignes d'un jeu, stockées puis générées (`generation`, B485) ; `rows` reste en taille 25 (déprécié). */
+export const dataFixturePageInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    fixtureId: fixtureIdSchema,
+    page: z.coerce.number().int().min(1),
+    size: fixturePageSizeSchema,
+    ...revision,
+  })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
