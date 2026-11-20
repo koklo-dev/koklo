@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Icon } from "../src/index.ts";
+import { Icon, iconNameOr, isIconName } from "../src/index.ts";
 
 function svgOf(container: HTMLElement): SVGSVGElement {
   const svg = container.querySelector("svg");
@@ -21,6 +21,17 @@ describe("Icon (Material Symbols Rounded, SVG)", () => {
       expect(svg).toHaveAttribute("viewBox", "0 -960 960 960");
     },
   );
+
+  it("registre : event et payments (zones du volume réel, TK-110) ; une icône inconnue retombe sur le repli", () => {
+    expect(isIconName("event")).toBe(true);
+    expect(isIconName("payments")).toBe(true);
+    expect(isIconName("n_importe_quoi")).toBe(false);
+    expect(iconNameOr("payments", "folder_open")).toBe("payments");
+    expect(iconNameOr("n_importe_quoi", "folder_open")).toBe("folder_open");
+    expect(iconNameOr(undefined, "folder_open")).toBe("folder_open");
+    const { container } = render(<Icon name="event" />);
+    expect(svgOf(container)).toHaveAttribute("viewBox", "0 -960 960 960");
+  });
 
   it("taille par défaut 20", () => {
     const { container } = render(<Icon name="check" />);

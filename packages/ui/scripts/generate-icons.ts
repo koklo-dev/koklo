@@ -92,6 +92,9 @@ export const ICON_NAMES = [
   "space_dashboard",
   "shield",
   "folder_open",
+  // Volume réel des Données (TK-110) : icônes de zone de la planche
+  "event",
+  "payments",
   // Primitives de base (TK-138, DESIGN.md §4 et §5.5)
   "wand_stars",
   "progress_activity",

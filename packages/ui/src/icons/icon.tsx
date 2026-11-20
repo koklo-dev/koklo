@@ -3,9 +3,16 @@
 import { type SVGAttributes, useEffect, useReducer } from "react";
 import { cn } from "../lib/cn.ts";
 import { loadIcon, readIcon } from "./cache.ts";
-import type { IconName } from "./generated/registry.ts";
+import { type IconName, iconLoaders } from "./generated/registry.ts";
 
 export type { IconName };
+
+/** Le nom est-il dans le registre ? Sert aux noms qui viennent d'un fichier (`data/_zones.yaml`). */
+export const isIconName = (name: string): name is IconName => Object.hasOwn(iconLoaders, name);
+
+/** Nom d'icône du registre, ou le repli quand le nom manque ou n'y est pas. */
+export const iconNameOr = (name: string | undefined, fallback: IconName): IconName =>
+  name !== undefined && isIconName(name) ? name : fallback;
 
 /** Échelle de tailles de DESIGN.md §4 (14 pastille, 16 badge, 18 statut, 20 bouton, 22 navigation, 24 étape, 28 galerie). */
 export type IconSize = 14 | 16 | 18 | 20 | 22 | 24 | 28;
