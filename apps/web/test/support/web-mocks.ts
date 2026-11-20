@@ -76,6 +76,11 @@ export const procedures = {
   specDataTablesSource: vi.fn(),
   specDataFixturesList: vi.fn(),
   specDataFixturesRows: vi.fn(),
+  // TK-110 (contrat 3.8.0) : zones, zone ouverte, recherche d'une table, pages de jeu de 25, 50 ou 100
+  specDataZones: vi.fn(),
+  specDataZone: vi.fn(),
+  specDataSearch: vi.fn(),
+  specDataFixturesPage: vi.fn(),
   specRefsSearch: vi.fn(),
   // TK-103 (contrat 3.1.0) : règles métier, parcours (liste paginée) et matrice des rôles
   specFunctionalList: vi.fn(),
@@ -95,6 +100,10 @@ export const procedures = {
   clientSpaceDataModel: vi.fn(),
   clientSpaceDataFixtures: vi.fn(),
   clientSpaceDataFixtureRows: vi.fn(),
+  clientSpaceDataZones: vi.fn(),
+  clientSpaceDataZone: vi.fn(),
+  clientSpaceDataSearch: vi.fn(),
+  clientSpaceDataFixturePage: vi.fn(),
   reviewSubmit: vi.fn(),
   reviewList: vi.fn(),
   // TK-109 (contrat 3.7.0) : commentaires de table
@@ -277,7 +286,11 @@ export const orpc = {
       fixtures: {
         list: queryFull(["spec", "data", "fixtures", "list"], procedures.specDataFixturesList),
         rows: queryFull(["spec", "data", "fixtures", "rows"], procedures.specDataFixturesRows),
+        page: queryFull(["spec", "data", "fixtures", "page"], procedures.specDataFixturesPage),
       },
+      zones: queryFull(["spec", "data", "zones"], procedures.specDataZones),
+      zone: queryFull(["spec", "data", "zone"], procedures.specDataZone),
+      search: queryFull(["spec", "data", "search"], procedures.specDataSearch),
     },
     functional: {
       key: () => ["spec", "functional"],
@@ -303,6 +316,13 @@ export const orpc = {
     dataFixtureRows: queryFull(
       ["clientSpace", "dataFixtureRows"],
       procedures.clientSpaceDataFixtureRows,
+    ),
+    dataZones: queryFull(["clientSpace", "dataZones"], procedures.clientSpaceDataZones),
+    dataZone: queryFull(["clientSpace", "dataZone"], procedures.clientSpaceDataZone),
+    dataSearch: queryFull(["clientSpace", "dataSearch"], procedures.clientSpaceDataSearch),
+    dataFixturePage: queryFull(
+      ["clientSpace", "dataFixturePage"],
+      procedures.clientSpaceDataFixturePage,
     ),
   },
   comment: {

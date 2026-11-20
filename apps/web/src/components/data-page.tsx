@@ -158,6 +158,7 @@ function ListBody({ page }: { page: DataPageModel }) {
             countBar: page.region.showCount,
             busy: page.region.busy,
             text: page.region.text,
+            srText: page.region.srText,
           }}
           write={page.write}
           role={role}

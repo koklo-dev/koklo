@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { DevUiDiagram } from "../src/components/dev-ui-diagram.tsx";
@@ -29,5 +29,17 @@ describe("Galerie : diagramme", () => {
       "aria-pressed",
       "false",
     );
+  });
+
+  it("TK-110 : vue des zones de la planche, six cartes, « à relire », 17 relations entre deux zones", () => {
+    render(<DevUiDiagram />);
+    const zones = screen.getByRole("region", { name: "Diagramme par zones, démonstration" });
+    expect(within(zones).getAllByRole("button", { name: /^Zone / })).toHaveLength(6);
+    expect(
+      within(zones).getByRole("button", {
+        name: "Zone Prise de rendez-vous 9 tables · 4 à relire · cliquez pour ouvrir",
+      }),
+    ).toBeInTheDocument();
+    expect(within(zones).getByText("17 relations")).toBeInTheDocument();
   });
 });

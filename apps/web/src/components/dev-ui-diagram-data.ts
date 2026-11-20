@@ -4,6 +4,7 @@ import {
   type ErTableField,
   erTableHeight,
 } from "@koklo/ui";
+import type { ZoneEntry } from "../lib/data-diagram-zones.ts";
 
 /** Tables fictives de la planche « Prise de rendez-vous » (maquette 11 l.376-383) : aucune donnée réelle. */
 export interface DevUiTable extends DiagramNode {
@@ -87,3 +88,71 @@ export const DEV_UI_TABLES_SAVED = DEV_UI_TABLES.filter((t) => !t.state);
 export const DEV_UI_RELATIONS_SAVED = DEV_UI_RELATIONS.filter(
   (r) => r.from !== "T-rappel" && r.to !== "T-rappel",
 );
+
+/** Zones de la planche « Volume réel » (maquette 11 l.393 : 6, 9, 18, 7, 14, 11 tables), avec les icônes `event` et `payments`. */
+export const DEV_UI_ZONES: readonly ZoneEntry[] = [
+  {
+    id: "prise-de-rendez-vous",
+    name: "Prise de rendez-vous",
+    icon: "event",
+    tableCount: 9,
+    preview: [
+      "Réservation",
+      "Créneau",
+      "Rappel SMS",
+      "Liste d'attente",
+      "Annulation",
+      "Rendez-vous",
+      "Absence",
+    ],
+    links: [{ to: "paiement-et-caisse", count: 17 }],
+  },
+  {
+    id: "paiement-et-caisse",
+    name: "Paiement et caisse",
+    icon: "payments",
+    tableCount: 18,
+    preview: [
+      "Facture",
+      "Paiement",
+      "Remboursement",
+      "Caisse",
+      "Avoir",
+      "Acompte",
+      "Moyen de paiement",
+    ],
+    links: [{ to: "prise-de-rendez-vous", count: 17 }],
+  },
+  {
+    id: "clients-et-fidelite",
+    name: "Clients et fidélité",
+    icon: "folder_open",
+    tableCount: 6,
+    preview: ["Client", "Carte", "Offre"],
+    links: [],
+  },
+  {
+    id: "catalogue-et-stock",
+    name: "Catalogue et stock",
+    icon: "folder_open",
+    tableCount: 7,
+    preview: ["Service", "Produit", "Stock"],
+    links: [],
+  },
+  {
+    id: "personnel",
+    name: "Personnel",
+    icon: "folder_open",
+    tableCount: 14,
+    preview: ["Employé", "Planning", "Congé"],
+    links: [],
+  },
+  {
+    id: "communication",
+    name: "Communication",
+    icon: "folder_open",
+    tableCount: 11,
+    preview: ["Message", "Modèle", "Envoi"],
+    links: [],
+  },
+];
