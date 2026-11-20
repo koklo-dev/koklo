@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderData, serveData } from "./support/data.tsx";
+import { FIXTURES, fixtureRows, renderData, serveData } from "./support/data.tsx";
 import { inputsOf } from "./support/features.tsx";
 import {
   apiError,
@@ -31,6 +31,7 @@ beforeEach(() => {
   resetWebMocks();
   polyfillRadix();
   watchUrl();
+  window.localStorage.clear();
 });
 
 const section = () => screen.findByRole("region", { name: "Jeu d'exemple Clients" });
@@ -63,7 +64,7 @@ describe("Onglet Jeux d'exemple", () => {
     ).toEqual(["nom", "telephone", "email"]);
     expect(within(grid).getAllByRole("row")).toHaveLength(26);
     expect(within(grid).getByText("client1@exemple.fr")).toBeInTheDocument();
-    expect(inputsOf(procedures.specDataFixturesRows)[0]).toMatchObject({
+    expect(inputsOf(procedures.specDataFixturesPage)[0]).toMatchObject({
       fixtureId: "FX-clients",
       page: 1,
       size: 25,
@@ -76,15 +77,67 @@ describe("Onglet Jeux d'exemple", () => {
     const box = await section();
     const nav = within(box).getByRole("navigation", { name: "Pagination du jeu Clients" });
     expect(within(nav).getByText(/1.25 sur 60/)).toBeInTheDocument();
-    expect(within(nav).getByText("25 lignes par page")).toBeInTheDocument();
+    const sizes = within(nav).getByRole("group", { name: "Lignes par page" });
+    expect(within(sizes).getByRole("button", { name: "25" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(within(nav).getByRole("button", { name: "Page précédente" })).toBeDisabled();
     await userEvent.click(within(nav).getByRole("button", { name: "Page suivante" }));
     expect(await within(box).findByText("client26@exemple.fr")).toBeInTheDocument();
     expect(within(nav).getByText(/26.50 sur 60/)).toBeInTheDocument();
-    expect(inputsOf(procedures.specDataFixturesRows).some((i) => i.page === 2)).toBe(true);
+    expect(inputsOf(procedures.specDataFixturesPage).some((i) => i.page === 2)).toBe(true);
     await userEvent.click(within(nav).getByRole("button", { name: "Page 3" }));
     await waitFor(() => expect(within(nav).getByText(/51.60 sur 60/)).toBeInTheDocument());
     expect(within(nav).getByRole("button", { name: "Page suivante" })).toBeDisabled();
+  });
+
+  it("taille 25 / 50 / 100 : 50 lignes lues, page 1, taille mémorisée pour l'utilisateur, jamais dans l'adresse", async () => {
+    serveData("owner");
+    const first = renderData({ search: "tab=fixtures" });
+    const box = await section();
+    const nav = within(box).getByRole("navigation", { name: "Pagination du jeu Clients" });
+    await userEvent.click(within(nav).getByRole("button", { name: "Page suivante" }));
+    await within(box).findByText("client26@exemple.fr");
+    await userEvent.click(within(nav).getByRole("button", { name: "50" }));
+    await waitFor(() => expect(within(nav).getByText(/1.50 sur 60/)).toBeInTheDocument());
+    expect(inputsOf(procedures.specDataFixturesPage).at(-1)).toMatchObject({ page: 1, size: 50 });
+    expect(window.localStorage.getItem("koklo.fixtures.size")).toBe("50");
+    expect(window.location.search).not.toContain("size");
+    first.unmount();
+    renderData({ search: "tab=fixtures" });
+    const again = within(await section()).getByRole("navigation", {
+      name: "Pagination du jeu Clients",
+    });
+    expect(within(again).getByRole("button", { name: "50" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await waitFor(() =>
+      expect(inputsOf(procedures.specDataFixturesPage).at(-1)).toMatchObject({ size: 50 }),
+    );
+  });
+
+  it("jeu de 1 240 lignes : page 2 « 26–50 sur 1 240 », page courante aria-current, annonce « Page 2 sur 50 »", async () => {
+    serveData("owner");
+    procedures.specDataFixturesList.mockResolvedValue({
+      items: FIXTURES.map((fixture) => ({ ...fixture, rowCount: 1240 })),
+    });
+    procedures.specDataFixturesPage.mockImplementation(async (input: unknown) => {
+      const { page, size } = input as { page: number; size: number };
+      return fixtureRows(page, size, 1240);
+    });
+    renderData({ search: "tab=fixtures" });
+    const box = await section();
+    const nav = within(box).getByRole("navigation", { name: "Pagination du jeu Clients" });
+    expect(within(nav).getByText(/1.25 sur 1.240/)).toBeInTheDocument();
+    await userEvent.click(within(nav).getByRole("button", { name: "Page suivante" }));
+    await waitFor(() => expect(within(nav).getByText(/26.50 sur 1.240/)).toBeInTheDocument());
+    expect(within(nav).getByRole("button", { name: "Page 2" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect((await screen.findByText(/Page 2 sur 50/)).closest("[role='status']")).not.toBeNull();
   });
 
   it("aucun jeu : état vide sans action", async () => {

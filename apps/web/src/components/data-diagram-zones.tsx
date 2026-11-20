@@ -1,14 +1,13 @@
 "use client";
 
-import { Kbd, SearchField, ZoneNode as ZoneCard } from "@koklo/ui";
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { EmptyState, iconNameOr, Kbd, SearchField, ZoneNode as ZoneCard } from "@koklo/ui";
+import { type FormEvent, useEffect, useId, useRef } from "react";
 import {
   linksLabel,
   type NeighborNode,
   tablesLabel,
   type ZoneNode,
 } from "../lib/data-diagram-zones.ts";
-import type { DiagramCard } from "../lib/data-mermaid.ts";
 
 /** Aperçu de la carte de zone : 7 noms puis « +N » (maquette 11 l.484). */
 const PREVIEW = 7;
@@ -17,23 +16,55 @@ export const zoneHint = (tables: number, zones: number) =>
   `Vue des zones : ${tablesLabel(tables)} réparties en ${zones} zones. Cliquez une zone pour voir ses tables.`;
 
 /** Carte d'une zone dans la vue des zones : cadre pointillé, compte, aperçu ; un clic ouvre la zone. */
-export function renderZone(node: ZoneNode, context: { onSelect: () => void }, reviewing: boolean) {
+export function renderZone(
+  node: ZoneNode,
+  context: { onSelect: () => void },
+  reviewing: boolean,
+  sized = true,
+) {
   const { zone } = node;
   const pending = reviewing && zone.pending > 0 ? `${zone.pending} à relire · ` : "";
   return (
     <ZoneCard
-      name={zone.id}
-      icon="folder_open"
-      count={zone.tableIds.length}
-      countLabel={zone.tableIds.length > 1 ? "tables" : "table"}
+      name={zone.name}
+      icon={iconNameOr(zone.icon, "folder_open")}
+      count={zone.tableCount}
+      countLabel={zone.tableCount > 1 ? "tables" : "table"}
       detail={`${pending}cliquez pour ouvrir`}
-      preview={zone.names}
+      preview={zone.preview}
       previewLimit={PREVIEW}
+      variant="diagram"
       arrow
       onOpen={context.onSelect}
-      style={{ height: node.height }}
+      style={sized ? { height: node.height } : undefined}
       className="w-full overflow-hidden"
     />
+  );
+}
+
+/** 375 px : les cartes de zone en une colonne, sans lecteur (fiche §7) ; le lecteur est masqué sous `md`. */
+export function ZoneCardList({
+  nodes,
+  reviewing,
+  onOpen,
+}: {
+  nodes: readonly ZoneNode[];
+  reviewing: boolean;
+  onOpen: (name: string) => void;
+}) {
+  return (
+    <ul
+      // biome-ignore lint/a11y/noRedundantRoles: `list-style: none` retire la sémantique de liste dans Safari / VoiceOver
+      role="list"
+      aria-label="Zones"
+      className="m-0 grid list-none grid-cols-1 gap-3 p-0 md:hidden"
+    >
+      {nodes.map((node) => (
+        <li key={node.id} className="min-h-[180px]">
+          {renderZone(node, { onSelect: () => onOpen(node.zone.name) }, reviewing, false)}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -47,6 +78,7 @@ export function renderNeighbor(node: NeighborNode, context: { onSelect: () => vo
       count={tables}
       countLabel={tables > 1 ? "tables" : "table"}
       detail={`${links > 1 ? `${links} relations` : "1 relation"} · ouvrir`}
+      variant="diagram"
       arrow
       onOpen={context.onSelect}
       style={{ height: node.height }}
@@ -100,17 +132,32 @@ function ZoneCrumbs({
   );
 }
 
-/** « Aller à une table… » : nom ou identifiant d'une table du modèle, `/` y amène le focus. */
+/** Résultat de la recherche d'une table (`spec.data.search` ou `clientSpace.dataSearch`). */
+export interface JumpItem {
+  id: string;
+  name: string;
+  zone?: string | undefined;
+}
+export interface JumpResult {
+  /** Texte réellement interrogé (après l'anti-rebond). */
+  q: string;
+  items: readonly JumpItem[];
+}
+/** « Aller à une table… » : recherche serveur sur toute la tête, `/` y amène le focus, Entrée ouvre. */
 function TableJump({
-  cards,
-  onPick,
+  value,
+  items,
+  listId,
+  onChange,
+  onSubmit,
 }: {
-  cards: readonly DiagramCard[];
-  onPick: (card: DiagramCard) => void;
+  value: string;
+  items: readonly JumpItem[];
+  listId: string;
+  onChange: (value: string, chosen: boolean) => void;
+  onSubmit: () => void;
 }) {
-  const listId = useId();
   const ref = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState("");
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -122,39 +169,28 @@ function TableJump({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
-  const find = (text: string) => {
-    const wanted = text.trim().toLocaleLowerCase("fr");
-    return cards.find(
-      (card) => card.name.toLocaleLowerCase("fr") === wanted || card.id.toLowerCase() === wanted,
-    );
-  };
-  const pick = (text: string) => {
-    const card = find(text);
-    if (!card) return false;
-    onPick(card);
-    setValue("");
-    return true;
-  };
-  const onSubmit = (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
-    pick(value);
+    onSubmit();
   };
   return (
-    <form onSubmit={onSubmit} className="relative w-[260px] max-sm:w-full">
+    <form onSubmit={submit} className="relative w-[260px] max-sm:w-full">
       <SearchField
         ref={ref}
         label="Aller à une table"
+        fieldSize="xs"
         placeholder="Aller à une table…"
         list={listId}
         value={value}
         autoComplete="off"
         className="[&_input]:pr-8"
         onChange={(event) => {
-          const next = event.currentTarget.value;
           // Une suggestion choisie dans la liste (pas une frappe) remplit le champ d'un nom exact : on y va tout de suite.
           const typed = (event.nativeEvent as InputEvent).inputType;
-          const chosen = typed === undefined || typed === "insertReplacementText";
-          if (!(chosen && pick(next))) setValue(next);
+          onChange(
+            event.currentTarget.value,
+            typed === undefined || typed === "insertReplacementText",
+          );
         }}
       />
       <Kbd
@@ -164,9 +200,9 @@ function TableJump({
         /
       </Kbd>
       <datalist id={listId}>
-        {cards.map((card) => (
-          <option key={card.id} value={card.name}>
-            {card.id}
+        {items.map((item) => (
+          <option key={item.id} value={item.name}>
+            {item.id}
           </option>
         ))}
       </datalist>
@@ -174,21 +210,59 @@ function TableJump({
   );
 }
 
-/** Barre au-dessus du diagramme par zones : fil et « Aller à une table… ». */
+/** Barre au-dessus du diagramme par zones : fil et « Aller à une table… » (recherche serveur, 200 ms de calme). */
 export function ZoneBar(props: {
   total: number;
   zone: string | null;
   count: number;
   crossLinks: number;
-  cards: readonly DiagramCard[];
+  /** Texte saisi (état du parent, qui interroge le serveur) et résultats du texte interrogé. */
+  value: string;
+  onValueChange: (value: string) => void;
+  result: JumpResult;
   onAll: () => void;
-  onPick: (card: DiagramCard) => void;
+  onPick: (item: JumpItem) => void;
 }) {
+  const { value, onValueChange, result, onPick } = props;
+  const listId = useId();
+  const text = value.trim();
+  // Les résultats d'une saisie plus ancienne ne comptent pas : on attend ceux du texte affiché.
+  const fresh = result.q === text ? result.items : [];
+  const pick = (wanted: string) => {
+    const key = wanted.trim().toLocaleLowerCase("fr");
+    const item =
+      fresh.find(
+        (entry) => entry.name.toLocaleLowerCase("fr") === key || entry.id.toLowerCase() === key,
+      ) ?? fresh[0];
+    if (!item) return false;
+    onPick(item);
+    onValueChange("");
+    return true;
+  };
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-meta">
-      <ZoneCrumbs {...props} />
-      <span className="flex-1" />
-      <TableJump cards={props.cards} onPick={props.onPick} />
-    </div>
+    <>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-meta">
+        <ZoneCrumbs {...props} />
+        <span className="flex-1" />
+        <TableJump
+          value={value}
+          items={fresh}
+          listId={listId}
+          onChange={(next, chosen) => {
+            if (!(chosen && pick(next))) onValueChange(next);
+          }}
+          onSubmit={() => void pick(value)}
+        />
+      </div>
+      {text !== "" && result.q === text && result.items.length === 0 ? (
+        <EmptyState
+          variant="inline"
+          bordered
+          icon="search_off"
+          title={`Aucune table ne correspond à « ${text} »`}
+          description="Essayez un autre nom de table ou de champ."
+        />
+      ) : null}
+    </>
   );
 }

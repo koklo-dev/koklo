@@ -74,15 +74,15 @@ export const FIXTURES = [
   },
 ];
 
-/** Page `n` des 60 lignes du jeu « Clients » : 25 par page. */
-export const fixtureRows = (page: number) => {
-  const all = Array.from({ length: 60 }, (_, i) => ({
+/** Page `n` des lignes du jeu « Clients » (60 par défaut) : 25, 50 ou 100 par page. */
+export const fixtureRows = (page: number, size = 25, total = 60) => {
+  const all = Array.from({ length: total }, (_, i) => ({
     nom: `Client ${i + 1}`,
     telephone: `+33 6 00 00 00 ${String(i + 1).padStart(2, "0")}`,
     email: `client${i + 1}@exemple.fr`,
   }));
   return {
-    items: all.slice((page - 1) * 25, page * 25),
+    items: all.slice((page - 1) * size, page * size),
     total: all.length,
     totalIsEstimate: false,
     columns: ["nom", "telephone", "email"],
@@ -122,6 +122,8 @@ champs:
 `;
 
 interface TablesOptions {
+  /** Relations entre tables (`[de, vers]`), pour les liens des zones. */
+  links?: ReadonlyArray<readonly [string, string]>;
   rows?: ReadonlyArray<ReturnType<typeof tableRow>>;
   /** Fait échouer la lecture de la liste. */
   fail?: Error;
@@ -215,6 +217,11 @@ export function serveData(
   procedures.specDataFixturesRows.mockImplementation(async (input: unknown) =>
     fixtureRows(Number((input as { page: number }).page)),
   );
+  procedures.specDataFixturesPage.mockImplementation(async (input: unknown) => {
+    const { page, size } = input as { page: number; size: number };
+    return fixtureRows(Number(page), Number(size));
+  });
+  serveZones(options.rows ?? TABLES, options.links);
   // TK-109 : décisions du livrable (Validé par) et commentaires de table, vides par défaut
   procedures.reviewList.mockResolvedValue({ items: [], nextCursor: null });
   procedures.commentList.mockResolvedValue({ items: [], nextCursor: null });
@@ -229,3 +236,85 @@ export function renderData({ search = "" }: { search?: string } = {}) {
 
 export const tabNamed = (name: RegExp | string): HTMLElement =>
   screen.getByRole("link", { name, hidden: true });
+
+/** Identifiant d'une zone : son libellé en minuscules, sans accent, tirets (comme le serveur). */
+export const zoneIdOf = (name: string): string =>
+  name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/**
+ * Faux serveur des zones (contrat 3.8.0) d'après les lignes de `tables.list` : `spec.data.zones` (cartes, aperçu de 7
+ * noms, liens), `spec.data.zone` (tables, relations internes, liens sortants) et `spec.data.search` (20 au plus).
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: faux serveur des trois lectures de zones
+export function serveZones(
+  rows: readonly Row[],
+  links: ReadonlyArray<readonly [string, string]> = [],
+): void {
+  const zoneOf = new Map(rows.map((row) => [row.specId, row.zone]));
+  const names = [...new Set(rows.map((row) => row.zone))].sort((a, b) => a.localeCompare(b, "fr"));
+  const between = (name: string) => {
+    const counts = new Map<string, number>();
+    for (const [from, to] of links) {
+      const a = zoneOf.get(from);
+      const b = zoneOf.get(to);
+      if (!a || !b || a === b || (a !== name && b !== name)) continue;
+      const other = zoneIdOf(a === name ? b : a);
+      counts.set(other, (counts.get(other) ?? 0) + 1);
+    }
+    return [...counts].map(([to, count]) => ({ to, count }));
+  };
+  const summary = (name: string) => ({
+    id: zoneIdOf(name),
+    name,
+    icon: "folder_open",
+    tableCount: rows.filter((row) => row.zone === name).length,
+  });
+  procedures.specDataZones.mockResolvedValue({
+    zones: names.map((name) => ({
+      ...summary(name),
+      preview: rows
+        .filter((row) => row.zone === name)
+        .slice(0, 7)
+        .map((row) => row.name),
+      links: between(name),
+    })),
+    tableCount: rows.length,
+    commitSha: SHA40,
+  });
+  procedures.specDataZone.mockImplementation(async (input: unknown) => {
+    const name = names.find((entry) => zoneIdOf(entry) === (input as { zone: string }).zone);
+    if (!name) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND" });
+    const members = rows.filter((row) => row.zone === name);
+    const ids = new Set(members.map((row) => row.specId));
+    return {
+      zone: summary(name),
+      tables: members.map((row) => ({
+        specId: row.specId,
+        name: row.name,
+        zone: row.zone,
+        fields: [{ name: "id", type: "uuid", primaryKey: true, personalData: false }],
+        personalData: false,
+      })),
+      relations: links
+        .filter(([from, to]) => ids.has(from) && ids.has(to))
+        .map(([from, to]) => ({ from, to, cardinality: "n → 1" })),
+      outgoing: between(name).map(({ to, count }) => ({ zone: to, count })),
+      truncated: false,
+      commitSha: SHA40,
+    };
+  });
+  procedures.specDataSearch.mockImplementation(async (input: unknown) => {
+    const q = String((input as { q: string }).q).toLowerCase();
+    return {
+      items: rows
+        .filter((row) => row.name.toLowerCase().includes(q))
+        .slice(0, 20)
+        .map((row) => ({ id: row.specId, name: row.name, zone: row.zone })),
+    };
+  });
+}

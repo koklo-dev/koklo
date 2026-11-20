@@ -276,7 +276,13 @@ const VIEWS: View[] = [
     spec: "large",
     path: `${PATH}?tab=diagram`,
     visible: async (page) => {
-      await expect(page.getByRole("region", { name: "Diagramme par zones" })).toBeVisible();
+      // Sous 768 px : une colonne de cartes sans lecteur (fiche §7).
+      const narrow = (page.viewportSize()?.width ?? 1280) < 768;
+      await expect(
+        narrow
+          ? page.getByRole("list", { name: "Zones" })
+          : page.getByRole("region", { name: "Diagramme par zones" }),
+      ).toBeVisible();
       await expect(page.getByText(/^Toutes les zones · 80 tables$/)).toBeVisible();
     },
   },
@@ -489,7 +495,12 @@ test.describe("parcours de l'écran Données", () => {
     await section.getByRole("button", { name: "Page suivante" }).click();
     await expect(section.getByText(/26.50 sur 312/)).toBeVisible();
     await expect(section.locator("tbody tr")).toHaveCount(25);
-    await expect(section.getByText("25 lignes par page")).toBeVisible();
+    // TK-110 : la taille se choisit (25, 50 ou 100) ; 25 reste la taille d'ouverture.
+    await expect(
+      section
+        .getByRole("group", { name: "Lignes par page" })
+        .getByRole("button", { name: "25", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   test("clavier : « / » va à la recherche, Tab atteint la région défilante, Échap ferme le formulaire", async ({
@@ -564,7 +575,9 @@ test.describe("diagramme du modèle (TK-108)", () => {
     await expect(fiche(page).locator("pre")).toContainText("erDiagram");
   });
 
-  test("glisser une table enregistre toute la mise en page une seule fois", async ({ page }) => {
+  test("glisser une table enregistre toute la mise en page (B481) une seule fois", async ({
+    page,
+  }) => {
     await page.goto(`${PATH}?tab=diagram`);
     await diagramLoaded(page, 6);
     await page.getByRole("button", { name: "Ajuster à l'écran" }).click();
@@ -576,7 +589,15 @@ test.describe("diagramme du modèle (TK-108)", () => {
     await page.mouse.up();
     await expect.poll(async () => (await layoutSavesSeen()).length, { timeout: 5000 }).toBe(1);
     const [saved] = await layoutSavesSeen();
-    expect(Object.keys(saved?.positions ?? {})).toEqual(["T-service"]);
+    // B481 : un déplacement enregistre toute la vue affichée (les six tables), pas la seule table déplacée.
+    expect(Object.keys(saved?.positions ?? {}).sort()).toEqual([
+      "T-client",
+      "T-creneau",
+      "T-employe",
+      "T-rappel",
+      "T-reservation",
+      "T-service",
+    ]);
   });
 
   test("Alt + flèche déplace la table de 20 px (alternative au glisser) et enregistre", async ({

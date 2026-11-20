@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_ID, renderData } from "./support/data.tsx";
-import { serveClientData } from "./support/data-client.tsx";
+import { clientTable, serveClientData, serveClientZones } from "./support/data-client.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 import { DESKTOP, setViewport } from "./viewport.ts";
 
@@ -99,6 +99,7 @@ describe("Vue client des Données : en-tête et bandeau", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Vue client des Données : onglets", () => {
   it("Diagramme : la fiche d'une table dit « Ce qu'on enregistre », ses relations et « Utilisée par »", async () => {
     serveClientData("client");
@@ -139,13 +140,81 @@ describe("Vue client des Données : onglets", () => {
     renderData({ search: "tab=fixtures" });
     const section = await screen.findByRole("region", { name: "Jeu d'exemple Clients" });
     expect(await within(section).findByText("Moussa")).toBeInTheDocument();
-    expect(procedures.clientSpaceDataFixtureRows).toHaveBeenCalledWith({
+    expect(procedures.clientSpaceDataFixturePage).toHaveBeenCalledWith({
       projectId: PROJECT_ID,
       fixtureId: "FX-clients",
       page: 1,
       size: 25,
     });
-    expect(procedures.specDataFixturesRows).not.toHaveBeenCalled();
+    expect(procedures.specDataFixturesPage).not.toHaveBeenCalled();
+    // Pagination 25 / 50 / 100 comme l'équipe ; la taille choisie est celle du navigateur (TK-110).
+    const nav = within(section).getByRole("navigation", { name: "Pagination du jeu Clients" });
+    await userEvent.click(within(nav).getByRole("button", { name: "100" }));
+    await waitFor(() =>
+      expect(procedures.clientSpaceDataFixturePage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, size: 100 }),
+      ),
+    );
+    expect(window.localStorage.getItem("koklo.fixtures.size")).toBe("100");
+  });
+});
+
+describe("Vue client des Données : volume réel (TK-110)", () => {
+  const MANY = Array.from({ length: 30 }, (_, i) =>
+    clientTable(
+      `T-table-${String(i + 1).padStart(3, "0")}`,
+      `Table ${String(i + 1).padStart(3, "0")}`,
+      {
+        zone: `Zone ${(i % 3) + 1}`,
+      },
+    ),
+  );
+
+  it("au-delà de 25 tables : vue des zones lue de `clientSpace.dataZones`, une zone s'ouvre sans contrainte ni chemin", async () => {
+    serveClientData("client", { tables: MANY });
+    serveClientZones(MANY);
+    renderData();
+    const zones = await screen.findByRole("region", { name: "Diagramme par zones" });
+    expect(within(zones).getAllByRole("button", { name: /^Zone / })).toHaveLength(3);
+    expect(
+      screen.getByText(/^Vue des zones : 30 tables réparties en 3 zones\./),
+    ).toBeInTheDocument();
+    await userEvent.click(within(zones).getByRole("button", { name: /^Zone Zone 2 / }));
+    const region = await screen.findByRole("region", {
+      name: "Diagramme entité-relation, zone Zone 2",
+    });
+    expect(within(region).getAllByRole("button", { name: /^Table / })).toHaveLength(10);
+    expect(procedures.clientSpaceDataZone).toHaveBeenCalledWith({
+      projectId: PROJECT_ID,
+      zone: "zone-2",
+    });
+    expect(screen.queryByRole("button", { name: "Plein écran" })).not.toBeNull();
+  });
+
+  it("recherche d'une table : `clientSpace.dataSearch`, Entrée ouvre la zone et choisit la table", async () => {
+    serveClientData("client", { tables: MANY });
+    serveClientZones(MANY);
+    renderData();
+    await screen.findByRole("region", { name: "Diagramme par zones" });
+    await userEvent.type(screen.getByRole("combobox", { name: "Aller à une table" }), "Table 007");
+    await waitFor(() =>
+      expect(procedures.clientSpaceDataSearch).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        q: "Table 007",
+      }),
+    );
+    await waitFor(() =>
+      expect(document.querySelector('datalist option[value="Table 007"]')).not.toBeNull(),
+    );
+    await userEvent.keyboard("{Enter}");
+    const region = await screen.findByRole("region", {
+      name: "Diagramme entité-relation, zone Zone 1",
+    });
+    expect(within(region).getByRole("button", { name: /^Table Table 007,/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(procedures.specDataZones).not.toHaveBeenCalled();
   });
 });
 
