@@ -59,7 +59,19 @@ check "skills-sync-gate.sh appelé" g 'skills-sync-gate\.sh'
 check "skills-sync-gate.sh présent" test -f "$HERE/skills-sync-gate.sh"
 # Jobs de la CI découpée : `checks` (lint, typecheck, build), `tests` (matrice de lots), `coverage`.
 blk() { job_block "$1"; }
-in_job() { local j="$1"; shift; blk "$j" | grep -Eq -- "$1"; }
+# Diagnostic (CI `ci scripts` rouge sur develop depuis le 13/11, vert en local) : même résultat qu'avant, mais un échec
+# écrit les statuts du tube (awk, grep), la taille du bloc et la version d'awk, pour distinguer un SIGPIPE (141), un bloc
+# vide et un motif absent. À retirer avec la correction.
+in_job() {
+    local j="$1"
+    shift
+    blk "$j" | grep -Eq -- "$1"
+    local st=("${PIPESTATUS[@]}")
+    if [ "${st[0]}" -ne 0 ] || [ "${st[1]}" -ne 0 ]; then
+        echo "DIAG in_job job=$j motif=/$1/ statut_awk=${st[0]} statut_grep=${st[1]} lignes_bloc=$(blk "$j" | wc -l) awk=$(awk -W version 2>&1 | head -1)" >&2
+    fi
+    [ "${st[0]}" -eq 0 ] && [ "${st[1]}" -eq 0 ]
+}
 jrank() { blk "$1" | grep -nE -- "$2" | head -1 | cut -d: -f1; }
 jbefore() {
     local a b
