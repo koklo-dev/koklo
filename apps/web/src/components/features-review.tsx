@@ -177,7 +177,7 @@ export function FeaturesReview({
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
-        {...(data ? { summaryText: dataSummary(counts) } : {})}
+        {...(data ? { summaryText: dataSummary(counts), groupNote: "Groupées par zone" } : {})}
         announcement={actions.announcement}
       >
         {selected && item ? (

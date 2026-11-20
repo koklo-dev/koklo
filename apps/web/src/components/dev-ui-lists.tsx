@@ -294,6 +294,7 @@ function Diagrams() {
               "cloture",
             ]}
             previewLimit={7}
+            variant="diagram"
             arrow
             onOpen={noop}
           />

@@ -11,6 +11,7 @@ import {
   parseModelRelations,
 } from "./data-mermaid.ts";
 import { orpc } from "./orpc.ts";
+import { useZonedDiagram } from "./use-zoned-diagram.ts";
 
 /** Noms et zones des tables : la première centaine de `spec.data.tables.list` ; au-delà, le nom se déduit de l'identifiant et la zone manque. */
 const NAMES_LIMIT = 100;
@@ -93,40 +94,59 @@ function useLayoutSave(
   return { positions, move };
 }
 
+/** Adresse du diagramme : `?zone=` (libellé de la zone ouverte) et `?sel=` (table choisie). */
+interface DiagramUrl {
+  zone?: string | undefined;
+  sel?: string | undefined;
+}
+
 /**
  * Données de l'onglet Diagramme : le modèle de la tête (`spec.data.mermaid`, un seul appel : tables, relations et
- * texte Mermaid de la fiche) nommé d'après la liste des tables, les tables proposées quand une relecture est ouverte,
- * et les positions enregistrées (`spec.data.layout.get`, vides si le fichier est absent).
+ * texte Mermaid de la fiche), les tables proposées quand une relecture est ouverte et les positions enregistrées
+ * (`spec.data.layout.get`, vides si le fichier est absent). Au-delà de 25 tables en plusieurs zones, les zones et les
+ * tables de la zone ouverte viennent du serveur (`useZonedDiagram`) ; sinon les noms viennent de la liste des tables.
  */
-export function useDataDiagram(projectId: string, proposedNow: readonly DiagramCard[]) {
+export function useDataDiagram(
+  projectId: string,
+  proposedNow: readonly DiagramCard[],
+  url: DiagramUrl = {},
+) {
   // Les propositions se recalculent à chaque rendu : on garde la même liste tant que leur contenu ne change pas.
   const proposedKey = JSON.stringify(proposedNow);
   // biome-ignore lint/correctness/useExhaustiveDependencies: la clé est le contenu de `proposedNow`
   const proposed = useMemo(() => proposedNow, [proposedKey]);
   const mermaid = useQuery(orpc.spec.data.mermaid.queryOptions({ input: { projectId } }));
-  const names = useQuery(
-    orpc.spec.data.tables.list.queryOptions({ input: { projectId, limit: NAMES_LIMIT } }),
-  );
+  const text = mermaid.data?.text ?? "";
+  const links = useMemo(() => parseModelRelations(text), [text]);
+  const proposedNew = useMemo(() => {
+    const saved = new Set(parseModelMermaid(text).map((table) => table.id));
+    return proposed.filter((card) => !saved.has(card.id));
+  }, [text, proposed]);
+  const zoned = useZonedDiagram({ projectId, proposedNew, zone: url.zone, sel: url.sel });
+  const names = useQuery({
+    ...orpc.spec.data.tables.list.queryOptions({ input: { projectId, limit: NAMES_LIMIT } }),
+    enabled: !zoned.pending && !zoned.zoned,
+  });
   const layout = useQuery(orpc.spec.data.layout.get.queryOptions({ input: { projectId } }));
   const { positions, move } = useLayoutSave(projectId, layout.data?.positions);
-  const text = mermaid.data?.text ?? "";
-  const cards = useMemo(() => {
+  const flat = useMemo(() => {
     const items = names.data?.items ?? [];
     const nameOf = new Map(items.map((item) => [item.specId, item.name]));
     const zoneOf = new Map(items.flatMap((item) => (item.zone ? [[item.specId, item.zone]] : [])));
     return diagramOf(parseModelMermaid(text), nameOf, proposed, zoneOf);
   }, [text, names.data, proposed]);
-  const links = useMemo(() => parseModelRelations(text), [text]);
+  const cards = zoned.zoned ? zoned.cards : flat;
+  const allLinks = zoned.zoned ? zoned.links : links;
   return {
+    zoned,
     cards,
     nodes: useMemo(() => cards.map(nodeOf), [cards]),
-    links,
-    relations: useMemo(() => relationsOf(links, cards), [links, cards]),
+    relations: useMemo(() => relationsOf(allLinks, cards), [allLinks, cards]),
     mermaidText: text,
     positions,
     move,
-    loading: mermaid.isPending,
-    error: mermaid.isError,
+    loading: zoned.pending || (!zoned.zoned && (mermaid.isPending || names.isPending)),
+    error: !zoned.zoned && mermaid.isError,
     retry: () => void mermaid.refetch(),
   };
 }

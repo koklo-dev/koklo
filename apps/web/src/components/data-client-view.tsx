@@ -43,6 +43,8 @@ interface SharedProps {
   url: ReturnType<typeof useDataUrl>;
   canComment: boolean;
   onComment: (tableId: string) => void;
+  /** Annonce dans l'unique région d'état de la page (changement de page d'un jeu). */
+  announce: (text: string) => void;
 }
 
 function TabBody({
@@ -52,10 +54,18 @@ function TabBody({
   url,
   canComment,
   onComment,
+  announce,
 }: SharedProps & { model: ClientSpaceDataModel }) {
   if (tab === "tables") return <ClientTables model={model} onOpen={url.openDiagram} />;
-  if (tab === "fixtures") return <ClientFixtures projectId={projectId} />;
-  return <ClientDiagram model={model} url={url} onComment={canComment ? onComment : undefined} />;
+  if (tab === "fixtures") return <ClientFixtures projectId={projectId} announce={announce} />;
+  return (
+    <ClientDiagram
+      projectId={projectId}
+      model={model}
+      url={url}
+      onComment={canComment ? onComment : undefined}
+    />
+  );
 }
 
 /** Corps de la vue : chargement, erreur, « pas encore validé », ou bandeau et onglet choisi. */
@@ -97,6 +107,7 @@ function useCommentFlow(projectId: string, items: ClientSpaceDataModel["items"])
   const opener = useRef<HTMLElement | null>(null);
   return {
     announcement,
+    announce: setAnnouncement,
     tableName: items.find((table) => table.id === target)?.name,
     pending: comment.pending,
     failed: comment.failed,
@@ -209,6 +220,7 @@ export function DataClientView({
           url={url}
           canComment={canComment}
           onComment={flow.open}
+          announce={flow.announce}
         />
       </PageBody>
       <span role="status" className="sr-only">

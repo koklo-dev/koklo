@@ -1,7 +1,7 @@
-import type { DiagramNode, DiagramPoint, DiagramRelation } from "@koklo/ui";
+import type { DiagramNode, DiagramPoint, DiagramRelation, ErTableField } from "@koklo/ui";
 import type { DiagramCard } from "./data-mermaid.ts";
 
-/** Zone des tables qui n'en déclarent pas (ou au-delà des 100 noms lus). */
+/** Zone des tables qui n'en déclarent pas. */
 export const NO_ZONE = "Sans zone";
 /** Schéma 1.3 de DESIGN.md §5.3 : au-delà de 25 tables réparties en au moins deux zones, le diagramme s'ouvre par zones. */
 export const ZONE_VIEW_ABOVE = 25;
@@ -9,14 +9,29 @@ export const ZONE_VIEW_ABOVE = 25;
 export const ZONE_WIDTH = 300;
 export const ZONE_HEIGHT = 180;
 
-export interface DiagramZone {
-  /** Libellé de la zone, tel qu'écrit dans les fichiers : il sert aussi de clé dans l'adresse (`?zone=`). */
+/** Une zone telle que le serveur la décrit (`spec.data.zones`, `clientSpace.dataZones`). */
+export interface ZoneEntry {
   id: string;
-  tableIds: string[];
-  /** Noms des tables, dans l'ordre des identifiants (aperçu de la carte). */
-  names: string[];
-  /** Tables proposées encore à relire. */
+  name: string;
+  icon: string;
+  tableCount: number;
+  /** Noms des 7 premières tables. */
+  preview: readonly string[];
+  links: ReadonlyArray<{ to: string; count: number }>;
+}
+
+export interface DiagramZone {
+  /** Identifiant serveur (`data.zone` le prend) ; le libellé d'une zone proposée absente de l'index pour les autres. */
+  id: string;
+  /** Libellé, tel qu'écrit dans les fichiers : il sert de clé dans l'adresse (`?zone=`). */
+  name: string;
+  icon: string;
+  tableCount: number;
+  preview: readonly string[];
+  /** Tables proposées encore à relire (vue de relecture). */
   pending: number;
+  /** Faux : zone qui n'existe que dans les propositions, rien à lire du serveur. */
+  saved: boolean;
 }
 
 export interface ZoneNode extends DiagramNode {
@@ -25,27 +40,64 @@ export interface ZoneNode extends DiagramNode {
 
 export const zoneOfCard = (card: DiagramCard): string => card.zone ?? NO_ZONE;
 
-/** Zones du modèle affiché (tables rejetées comprises : elles restent visibles, estompées), triées par libellé. */
-export function zonesOf(cards: readonly DiagramCard[]): DiagramZone[] {
-  const byZone = new Map<string, DiagramZone>();
-  for (const card of [...cards].sort((a, b) => a.id.localeCompare(b.id, "en"))) {
-    const id = zoneOfCard(card);
-    const zone = byZone.get(id) ?? { id, tableIds: [], names: [], pending: 0 };
-    zone.tableIds.push(card.id);
-    zone.names.push(card.name);
-    if (card.state === "review") zone.pending += 1;
-    byZone.set(id, zone);
+const fr = (a: string, b: string) => a.localeCompare(b, "fr");
+
+/**
+ * Cartes de la vue des zones : celles du serveur, triées par libellé, avec le nombre de tables proposées à relire ;
+ * une zone proposée absente de l'index est ajoutée (carte sans aperçu enregistré).
+ */
+export function zoneNodesOf(
+  entries: readonly ZoneEntry[],
+  proposed: readonly DiagramCard[],
+): ZoneNode[] {
+  const pending = new Map<string, number>();
+  const added = new Map<string, string[]>();
+  const known = new Set(entries.map((entry) => entry.name));
+  for (const card of proposed) {
+    if (card.state === "rejected") continue;
+    const name = card.zone ?? NO_ZONE;
+    if (card.state === "review") pending.set(name, (pending.get(name) ?? 0) + 1);
+    if (!known.has(name)) added.set(name, [...(added.get(name) ?? []), card.name]);
   }
-  return [...byZone.values()].sort((a, b) => a.id.localeCompare(b.id, "fr"));
+  const zones: DiagramZone[] = [
+    ...entries.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      icon: entry.icon,
+      tableCount: entry.tableCount,
+      preview: entry.preview,
+      pending: pending.get(entry.name) ?? 0,
+      saved: true,
+    })),
+    ...[...added].map(([name, names]) => ({
+      id: name,
+      name,
+      icon: "folder_open",
+      tableCount: names.length,
+      preview: names,
+      pending: pending.get(name) ?? 0,
+      saved: false,
+    })),
+  ];
+  return zones.sort((a, b) => fr(a.name, b.name)).map(zoneNodeOf);
 }
 
 /** Le diagramme s'ouvre-t-il par zones ? Plus de 25 tables et au moins deux zones (B478). */
-export const usesZoneView = (cards: readonly DiagramCard[], zones: readonly DiagramZone[]) =>
-  cards.length > ZONE_VIEW_ABOVE && zones.length >= 2;
+export const usesZoneView = (tables: number, zones: number) =>
+  tables > ZONE_VIEW_ABOVE && zones >= 2;
+
+/** Grille à 2 colonnes de la vue des zones (maquette 11 l.476) : x = 40 + (i % 2) × 400, y = 30 + ⌊i / 2⌋ × 270. */
+export const zoneGridPositions = (nodes: readonly DiagramNode[]): Record<string, DiagramPoint> =>
+  Object.fromEntries(
+    nodes.map((node, index) => [
+      node.id,
+      { x: 40 + (index % 2) * 400, y: 30 + Math.floor(index / 2) * 270 },
+    ]),
+  );
 
 export const zoneNodeOf = (zone: DiagramZone): ZoneNode => ({
   id: zone.id,
-  name: zone.id,
+  name: zone.name,
   width: ZONE_WIDTH,
   height: ZONE_HEIGHT,
   zone,
@@ -54,48 +106,36 @@ export const zoneNodeOf = (zone: DiagramZone): ZoneNode => ({
 const plural = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
 
 /**
- * Traits entre zones (maquette 11 l.477) : une relation par paire de zones, étiquetée « 4 relations », d'autant plus
- * épaisse qu'elle en compte. Les relations internes à une zone ne sont pas tracées dans cette vue.
+ * Traits entre zones (maquette 11 l.477) : un par paire de zones, étiqueté « 4 relations », d'autant plus épais qu'elle
+ * en compte. Le serveur donne les liens des deux côtés ; la paire n'est tracée qu'une fois.
  */
-export function zoneRelationsOf(
-  relations: readonly DiagramRelation[],
-  cards: readonly DiagramCard[],
-): DiagramRelation[] {
-  const zoneOf = new Map(cards.map((card) => [card.id, zoneOfCard(card)]));
-  const counts = new Map<string, { from: string; to: string; count: number }>();
-  for (const relation of relations) {
-    const a = zoneOf.get(relation.from);
-    const b = zoneOf.get(relation.to);
-    if (a === undefined || b === undefined || a === b) continue;
-    const [from, to] = a.localeCompare(b, "fr") < 0 ? [a, b] : [b, a];
-    const key = `${from}\u0000${to}`;
-    const entry = counts.get(key) ?? { from, to, count: 0 };
-    entry.count += 1;
-    counts.set(key, entry);
+export function zoneRelationsOf(entries: readonly ZoneEntry[]): DiagramRelation[] {
+  const ids = new Set(entries.map((entry) => entry.id));
+  const seen = new Set<string>();
+  const relations: DiagramRelation[] = [];
+  for (const entry of entries) {
+    for (const { to, count } of entry.links) {
+      if (!ids.has(to)) continue;
+      const [from, other] = entry.id < to ? [entry.id, to] : [to, entry.id];
+      const id = `${from}>${other}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      relations.push({
+        id,
+        from,
+        to: other,
+        label: plural(count, "relation", "relations"),
+        labelFont: "sans" as const,
+        weight: Math.min(6, 1 + count / 3),
+      });
+    }
   }
-  return [...counts.values()].map(({ from, to, count }) => ({
-    id: `${from}>${to}`,
-    from,
-    to,
-    label: plural(count, "relation", "relations"),
-    labelFont: "sans" as const,
-    weight: Math.min(6, 1 + count / 3),
-  }));
+  return relations;
 }
 
 /** Relations d'une zone vers les autres zones (« 17 liens vers d'autres zones », maquette 11 l.755). */
-export function crossLinkCount(
-  zone: string,
-  relations: readonly DiagramRelation[],
-  cards: readonly DiagramCard[],
-): number {
-  const zoneOf = new Map(cards.map((card) => [card.id, zoneOfCard(card)]));
-  return relations.filter((relation) => {
-    const a = zoneOf.get(relation.from);
-    const b = zoneOf.get(relation.to);
-    return a !== b && (a === zone || b === zone);
-  }).length;
-}
+export const crossLinkCount = (outgoing: ReadonlyArray<{ zone?: string; count: number }>): number =>
+  outgoing.reduce((total, link) => total + link.count, 0);
 
 export const tablesLabel = (count: number) => plural(count, "table", "tables");
 export const linksLabel = (count: number) =>
@@ -114,50 +154,60 @@ export const isNeighborId = (id: string) => id.startsWith(NEIGHBOR_PREFIX);
 export const neighborZoneOf = (id: string) => id.slice(NEIGHBOR_PREFIX.length);
 
 /**
- * Zones voisines d'une zone ouverte (B480) : une carte par zone reliée, et un trait par paire table de la zone →
- * zone voisine (étiqueté par le nombre de relations au-delà d'une). On navigue ainsi de zone en zone sans perdre
- * le détail des tables.
+ * Zones voisines d'une zone ouverte (B480) : une carte par zone liée, avec ses tables et le nombre de relations ; un
+ * clic y passe, sans perdre le détail des tables. Le serveur ne donne que le compte par zone : pas de trait par table.
  */
 export function neighborsOf(
-  zone: string,
-  relations: readonly DiagramRelation[],
-  cards: readonly DiagramCard[],
-): { nodes: NeighborNode[]; relations: DiagramRelation[] } {
-  const zoneOf = new Map(cards.map((card) => [card.id, zoneOfCard(card)]));
-  const sizes = new Map<string, number>();
-  for (const card of cards) sizes.set(zoneOfCard(card), (sizes.get(zoneOfCard(card)) ?? 0) + 1);
-  const pairs = new Map<string, { table: string; other: string; count: number }>();
-  for (const relation of relations) {
-    const a = zoneOf.get(relation.from);
-    const b = zoneOf.get(relation.to);
-    if (a === undefined || b === undefined || a === b || (a !== zone && b !== zone)) continue;
-    const [table, other] = a === zone ? [relation.from, b] : [relation.to, a];
-    const key = `${table}\u0000${other}`;
-    const entry = pairs.get(key) ?? { table, other, count: 0 };
-    entry.count += 1;
-    pairs.set(key, entry);
-  }
-  const links = new Map<string, number>();
-  for (const { other, count } of pairs.values()) links.set(other, (links.get(other) ?? 0) + count);
-  const nodes = [...links.entries()]
-    .sort(([a], [b]) => a.localeCompare(b, "fr"))
-    .map(([other, count]) => ({
-      id: `${NEIGHBOR_PREFIX}${other}`,
-      name: other,
+  outgoing: ReadonlyArray<{ zone: string; count: number }>,
+  entries: readonly ZoneEntry[],
+): NeighborNode[] {
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  return outgoing
+    .flatMap(({ zone, count }) => {
+      const entry = byId.get(zone);
+      return entry ? [{ entry, count }] : [];
+    })
+    .sort((a, b) => fr(a.entry.name, b.entry.name))
+    .map(({ entry, count }) => ({
+      id: `${NEIGHBOR_PREFIX}${entry.name}`,
+      name: entry.name,
       width: NEIGHBOR_WIDTH,
       height: NEIGHBOR_HEIGHT,
-      neighbor: { zone: other, tables: sizes.get(other) ?? 0, links: count },
+      neighbor: { zone: entry.name, tables: entry.tableCount, links: count },
     }));
-  const edges = [...pairs.values()].map(({ table, other, count }) => ({
-    id: `${table}>${NEIGHBOR_PREFIX}${other}`,
-    from: table,
-    to: `${NEIGHBOR_PREFIX}${other}`,
-    dashed: true,
-    ...(count > 1
-      ? { label: plural(count, "relation", "relations"), labelFont: "sans" as const }
-      : {}),
+}
+
+/** Tables d'une zone ouverte (`spec.data.zone`) en cartes du diagramme, puis les tables proposées de la zone. */
+export function zoneCardsOf(
+  data: { tables: ReadonlyArray<ZoneTableLike> } | undefined,
+  proposed: readonly DiagramCard[],
+): DiagramCard[] {
+  const saved = (data?.tables ?? []).map((table) => ({
+    id: table.specId,
+    name: table.name,
+    fields: table.fields.map<ErTableField>((field) => ({
+      name: field.name,
+      type: field.type,
+      kind: field.primaryKey ? "primary" : "plain",
+    })),
+    ...(table.zone ? { zone: table.zone } : {}),
   }));
-  return { nodes, relations: edges };
+  const known = new Set(saved.map((card) => card.id));
+  return [...saved, ...proposed.filter((card) => !known.has(card.id))];
+}
+
+/** Ce que la carte lit d'une table de zone (équipe : `specId`, client : même forme après conversion). */
+export interface ZoneTableLike {
+  specId: string;
+  name: string;
+  zone?: string | undefined;
+  personalData?: boolean;
+  fields: ReadonlyArray<{
+    name: string;
+    type: string;
+    primaryKey: boolean;
+    personalData?: boolean;
+  }>;
 }
 
 /**

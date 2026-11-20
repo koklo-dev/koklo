@@ -450,7 +450,109 @@ function handleDiagram(req: IncomingMessage, url: URL, h: Handlers, mode: string
   return true;
 }
 
-const DATA = /^\/projects\/[^/]+\/spec\/data\/(tables|mermaid|fixtures)(?:\/([^/]+)\/rows)?$/;
+// --- Volume réel (TK-110, contrat 3.8.0) : zones, zone ouverte, recherche ; `fixtures/{id}/page` répond comme `rows` ---
+/** Icônes des zones (pas de git en pile locale : le faux API tient lieu de `data/_zones.yaml`). */
+const ZONE_ICONS: Record<string, string> = {
+  "Prise de rendez-vous": "event",
+  "Paiement et caisse": "payments",
+  "Clients et fidélité": "person",
+  "Catalogue et stock": "inventory_2",
+  Personnel: "badge",
+  Communication: "notifications",
+};
+const slugOf = (name: string): string =>
+  name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+const zoneNameOf = (table: Table): string => table.zone || "Sans zone";
+
+const summaryOfZone = (name: string, tables: Table[]) => ({
+  id: slugOf(name),
+  name,
+  icon: ZONE_ICONS[name] ?? "folder_open",
+  tableCount: tables.filter((t) => zoneNameOf(t) === name).length,
+});
+
+/** Relations entre zones : un compte par zone liée, des deux côtés (comme le serveur). */
+function linksOfZone(name: string, tables: Table[]): Array<{ to: string; count: number }> {
+  const zoneOf = new Map(tables.map((t) => [t.specId, zoneNameOf(t)]));
+  const counts = new Map<string, number>();
+  for (const table of tables) {
+    for (const relation of table.relations) {
+      const a = zoneOf.get(table.specId);
+      const b = zoneOf.get(relation.to);
+      if (!a || !b || a === b || (a !== name && b !== name)) continue;
+      const other = slugOf(a === name ? b : a);
+      counts.set(other, (counts.get(other) ?? 0) + 1);
+    }
+  }
+  return [...counts].map(([to, count]) => ({ to, count }));
+}
+
+const zoneNames = (tables: Table[]): string[] => [...new Set(tables.map(zoneNameOf))];
+
+function zonesOf(tables: Table[]) {
+  return {
+    zones: zoneNames(tables).map((name) => ({
+      ...summaryOfZone(name, tables),
+      preview: tables
+        .filter((t) => zoneNameOf(t) === name)
+        .slice(0, 7)
+        .map((t) => t.name),
+      links: linksOfZone(name, tables),
+    })),
+    tableCount: tables.length,
+    commitSha: SHA,
+  };
+}
+
+function zoneReply(url: URL, tables: Table[]): Reply {
+  const name = zoneNames(tables).find((entry) => slugOf(entry) === url.searchParams.get("zone"));
+  if (!name) return typed(404, "NOT_FOUND");
+  const members = tables.filter((t) => zoneNameOf(t) === name);
+  const ids = new Set(members.map((t) => t.specId));
+  return reply(200, {
+    zone: summaryOfZone(name, tables),
+    tables: members.map((t) => ({
+      specId: t.specId,
+      name: t.name,
+      zone: t.zone,
+      fields: t.fields.map((f) => ({
+        name: f[0],
+        type: f[1],
+        primaryKey: f[3] === "pk",
+        personalData: f[4],
+      })),
+      personalData: t.fields.some((f) => f[4]),
+    })),
+    relations: members.flatMap((t) =>
+      t.relations
+        .filter((r) => ids.has(r.to))
+        .map((r) => ({ from: t.specId, to: r.to, cardinality: r.cardinality })),
+    ),
+    outgoing: linksOfZone(name, tables).map(({ to, count }) => ({ zone: to, count })),
+    truncated: false,
+    commitSha: SHA,
+  });
+}
+
+/** Nom de table ou de champ, 20 au plus (comme `spec.data.search`). */
+function searchOf(url: URL, tables: Table[]) {
+  const q = (url.searchParams.get("q") ?? "").toLowerCase();
+  return tables
+    .filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) || t.fields.some((f) => f[0].toLowerCase().includes(q)),
+    )
+    .slice(0, 20)
+    .map((t) => ({ id: t.specId, name: t.name, zone: t.zone }));
+}
+
+const DATA =
+  /^\/projects\/[^/]+\/spec\/data\/(tables|mermaid|fixtures|zones|zone|search)(?:\/([^/]+)\/(?:rows|page))?$/;
 const ITEM = /^\/projects\/[^/]+\/spec\/items\/table\/([^/]+)$/;
 
 /** Répond aux lectures des onglets Données et à la lecture d'édition d'une table, `false` pour toute autre route. */
@@ -476,6 +578,9 @@ export function handleSpecData(req: IncomingMessage, url: URL, h: Handlers, mode
   const match = DATA.exec(url.pathname);
   if (!match) return false;
   if (match[1] === "tables") h.send(listTables(url, mode));
+  else if (match[1] === "zones") h.send(reply(200, zonesOf(tablesOf(mode))));
+  else if (match[1] === "zone") h.send(zoneReply(url, tablesOf(mode)));
+  else if (match[1] === "search") h.send(reply(200, { items: searchOf(url, tablesOf(mode)) }));
   else if (match[1] === "mermaid") {
     h.send(reply(200, { text: mermaidOf(tablesOf(mode)), generated: false, commitSha: SHA }));
   } else if (match[2]) h.send(rowsOf(url, mode, match[2]));
@@ -498,7 +603,8 @@ export function handleSpecData(req: IncomingMessage, url: URL, h: Handlers, mode
   return true;
 }
 
-const CLIENT_DATA = /^\/client-space\/projects\/[^/]+\/data\/(model|fixtures)(?:\/([^/]+)\/rows)?$/;
+const CLIENT_DATA =
+  /^\/client-space\/projects\/[^/]+\/data\/(model|fixtures|zones|zone|search)(?:\/([^/]+)\/(?:rows|page))?$/;
 const CLIENT_SUMMARIES: Record<string, string[]> = {
   "T-client": ["Le nom du client", "Son numéro de téléphone", "Son adresse e-mail"],
   "T-reservation": ["Le créneau choisi", "Le service réservé", "L'état de la réservation"],
@@ -536,6 +642,25 @@ function clientTableOf(table: Table, names: ReadonlyMap<string, string>) {
   };
 }
 
+/** `clientSpace.dataZone` : les tables de la zone au vocabulaire client, relations et liens sortants. */
+function clientZoneReply(
+  url: URL,
+  all: Table[],
+  state: { available: boolean; validation: string },
+): Reply {
+  const opened = JSON.parse(zoneReply(url, all).body) as Record<string, unknown>;
+  const names = new Map(all.map((table) => [table.specId, table.name]));
+  const members = all.filter((t) => slugOf(zoneNameOf(t)) === url.searchParams.get("zone"));
+  return reply(200, {
+    ...state,
+    ...(opened.zone ? { zone: opened.zone } : {}),
+    items: members.map((table) => clientTableOf(table, names)),
+    relations: opened.relations ?? [],
+    outgoing: opened.outgoing ?? [],
+    truncated: false,
+  });
+}
+
 /**
  * Lectures client du modèle validé (`clientSpace.dataModel|dataFixtures|dataFixtureRows`, TK-109) ; `available` faux :
  * aucune table. `null` pour toute autre route.
@@ -544,6 +669,12 @@ export function clientDataReply(url: URL, mode: string, available: boolean): Rep
   const match = CLIENT_DATA.exec(url.pathname);
   if (!match) return null;
   if (match[2]) return rowsOf(url, mode, match[2]);
+  const validation = available ? "validated" : "to_validate";
+  const all = available ? tablesOf(mode) : [];
+  if (match[1] === "zones")
+    return reply(200, { available, validation, ...zonesOf(all), commitSha: undefined });
+  if (match[1] === "search") return reply(200, { available, items: searchOf(url, all) });
+  if (match[1] === "zone") return clientZoneReply(url, all, { available, validation });
   const tables = available ? tablesOf(mode).slice(0, 100) : [];
   if (match[1] === "fixtures") {
     return reply(200, {

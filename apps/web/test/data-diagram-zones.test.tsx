@@ -1,7 +1,7 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderData, SHA40, serveData, tableRow } from "./support/data.tsx";
+import { renderData, SHA40, serveData, serveZones, tableRow } from "./support/data.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 import { DESKTOP, setViewport } from "./viewport.ts";
 
@@ -33,16 +33,24 @@ const MODEL = [
   `  ${entity(1)} }o--|| ${entity(4)} : "n → 1"`,
 ].join("\n");
 
+// Mêmes liens que le Mermaid : 2 relations entre Zone 2 et Zone 3, une interne à Zone 2.
+const LINKS = [
+  ["T-table-001", "T-table-002"],
+  ["T-table-004", "T-table-002"],
+  ["T-table-001", "T-table-004"],
+] as const;
+
 beforeEach(() => {
   resetWebMocks();
   polyfillRadix();
   watchUrl();
   setViewport(DESKTOP);
   window.localStorage.clear();
-  serveData("owner", { rows: ROWS });
+  serveData("owner", { rows: ROWS, links: LINKS });
   procedures.specDataMermaid.mockResolvedValue({ text: MODEL, generated: true, commitSha: SHA40 });
 });
 
+const optionFor = (value: string) => document.querySelector(`datalist option[value="${value}"]`);
 const zones = () => screen.findByRole("region", { name: "Diagramme par zones" });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
@@ -65,6 +73,29 @@ describe("Onglet Diagramme : vue par zones", () => {
     ).toBeInTheDocument();
     expect(within(region).getByText("2 relations")).toBeInTheDocument();
     expect(document.querySelectorAll("[data-slot='diagram-viewer'] svg line")).toHaveLength(1);
+    // Les zones viennent du serveur, pas des 100 premiers noms de la liste (TK-110).
+    expect(procedures.specDataZones).toHaveBeenCalled();
+    expect(
+      procedures.specDataTablesList.mock.calls.some(
+        ([input]) => (input as { limit?: number }).limit === 100,
+      ),
+    ).toBe(false);
+  });
+
+  it("375 px : une colonne de cartes sans lecteur ; la légende reste ; l'annonce n'est pas visible", async () => {
+    renderData({ search: "tab=diagram" });
+    await zones();
+    const list = screen.getByRole("list", { name: "Zones" });
+    expect(list.className).toMatch(/grid-cols-1/);
+    expect(list.className).toMatch(/md:hidden/);
+    expect(within(list).getAllByRole("button", { name: /^Zone / })).toHaveLength(3);
+    expect(document.querySelector("[data-slot='diagram-viewer']")?.className).toMatch(
+      /max-md:hidden/,
+    );
+    expect(screen.getByText("1 → n")).toBeInTheDocument();
+    await userEvent.click(within(list).getByRole("button", { name: /^Zone Zone 2 / }));
+    const announced = await screen.findByText(/Zone Zone 2 ouverte · 10 tables/);
+    expect(announced).toHaveClass("sr-only");
   });
 
   it("ouvrir une zone : ses tables seules, liens sortants comptés, retour à toutes les zones", async () => {
@@ -80,8 +111,14 @@ describe("Onglet Diagramme : vue par zones", () => {
     expect(
       within(crumbs).getByText("· 10 tables · 2 liens vers d'autres zones"),
     ).toBeInTheDocument();
-    // La relation interne à la zone, puis un trait par table reliée vers la carte de la Zone 3 (B480).
-    expect(document.querySelectorAll("[data-slot='diagram-viewer'] svg line")).toHaveLength(3);
+    // Les tables et leurs relations viennent de `spec.data.zone` ; la zone voisine est une carte sans trait par table.
+    expect(procedures.specDataZone).toHaveBeenCalledWith(
+      expect.objectContaining({ zone: "zone-2" }),
+    );
+    expect(document.querySelectorAll("[data-slot='diagram-viewer'] svg line")).toHaveLength(1);
+    // Annonce dans le `role="status"` unique de la page.
+    const announced = await screen.findByText(/Zone Zone 2 ouverte · 10 tables/);
+    expect(announced.closest("[role='status']")).not.toBeNull();
     await userEvent.click(
       within(crumbs).getByRole("button", { name: "Toutes les zones · 30 tables" }),
     );
@@ -99,11 +136,20 @@ describe("Onglet Diagramme : vue par zones", () => {
     );
   });
 
-  it("« Aller à une table… » : nom exact puis Entrée, la zone s'ouvre sur la table", async () => {
+  it("« Aller à une table… » : recherche serveur (anti-rebond 200 ms), Entrée ouvre la zone et choisit la table", async () => {
     renderData({ search: "tab=diagram" });
     await zones();
     const jump = screen.getByRole("combobox", { name: "Aller à une table" });
-    await userEvent.type(jump, "Table 007{Enter}");
+    await userEvent.type(jump, "Table 007");
+    await waitFor(() =>
+      expect(procedures.specDataSearch).toHaveBeenCalledWith(
+        expect.objectContaining({ q: "Table 007" }),
+      ),
+    );
+    // Une rafale de frappes : une seule requête, sur le texte entier.
+    expect(procedures.specDataSearch).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(optionFor("Table 007")).not.toBeNull());
+    await userEvent.keyboard("{Enter}");
     const region = await screen.findByRole("region", {
       name: "Diagramme entité-relation, zone Zone 2",
     });
@@ -111,6 +157,53 @@ describe("Onglet Diagramme : vue par zones", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  it("une table au-delà des 100 premières se trouve par la recherche serveur", async () => {
+    const many = Array.from({ length: 130 }, (_, i) => tableRow(i + 1));
+    serveData("owner", { rows: many });
+    procedures.specDataMermaid.mockResolvedValue({
+      text: "erDiagram",
+      generated: true,
+      commitSha: SHA40,
+    });
+    renderData({ search: "tab=diagram" });
+    await zones();
+    await userEvent.type(screen.getByRole("combobox", { name: "Aller à une table" }), "Table 125");
+    await waitFor(() => expect(optionFor("Table 125")).not.toBeNull());
+    await userEvent.keyboard("{Enter}");
+    const region = await screen.findByRole("region", {
+      name: "Diagramme entité-relation, zone Zone 3",
+    });
+    expect(within(region).getByRole("button", { name: /^Table Table 125,/ })).toBeInTheDocument();
+  });
+
+  it("recherche sans résultat : état vide « Aucune table ne correspond »", async () => {
+    renderData({ search: "tab=diagram" });
+    await zones();
+    await userEvent.type(screen.getByRole("combobox", { name: "Aller à une table" }), "zzz");
+    expect(await screen.findByText("Aucune table ne correspond à « zzz »")).toBeInTheDocument();
+  });
+
+  it("erreur de `spec.data.zones` : avis et « Réessayer », le diagramme des tables reste", async () => {
+    procedures.specDataZones.mockRejectedValue(new Error("boom"));
+    renderData({ search: "tab=diagram" });
+    expect(await screen.findByText(/Impossible de charger les zones/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Diagramme entité-relation" }),
+    ).toBeInTheDocument();
+    serveZones(ROWS, LINKS);
+    await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await zones()).toBeInTheDocument();
+  });
+
+  it("chargement des zones : six cartes squelettes, annoncées une fois", async () => {
+    procedures.specDataZones.mockReturnValue(new Promise(() => {}));
+    renderData({ search: "tab=diagram" });
+    const note = await screen.findByText("Chargement du diagramme…");
+    const status = note.closest("[role='status']") as HTMLElement;
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(status.querySelectorAll("[data-slot='skeleton']")).toHaveLength(6);
   });
 
   it("« / » amène le focus dans « Aller à une table… »", async () => {

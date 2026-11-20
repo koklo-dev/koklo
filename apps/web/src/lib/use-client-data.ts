@@ -1,9 +1,9 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { orpc } from "./orpc.ts";
-import { FIXTURE_PAGE_SIZE } from "./use-data-fixtures.ts";
+import { useFixturePager } from "./use-data-fixtures.ts";
+import { useDebounced } from "./use-data-zones.ts";
 
 /** Modèle de données validé (`clientSpace.dataModel`) : tables, positions et validation, sans rien de l'équipe. */
 export function useClientDataModel(projectId: string) {
@@ -18,16 +18,41 @@ export function useClientFixtures(projectId: string, enabled: boolean) {
   });
 }
 
-/** Lignes d'un jeu, 25 par page (`clientSpace.dataFixtureRows`) ; la page précédente reste affichée pendant le changement. */
+/** Lignes d'un jeu, 25, 50 ou 100 par page (`clientSpace.dataFixturePage`) ; la page précédente reste affichée pendant le changement. */
 export function useClientFixtureRows(projectId: string, fixtureId: string) {
-  const [page, setPage] = useState(1);
+  const pager = useFixturePager();
   const query = useQuery({
-    ...orpc.clientSpace.dataFixtureRows.queryOptions({
-      input: { projectId, fixtureId, page, size: FIXTURE_PAGE_SIZE },
+    ...orpc.clientSpace.dataFixturePage.queryOptions({
+      input: { projectId, fixtureId, page: pager.page, size: pager.size },
     }),
+    enabled: pager.ready,
     placeholderData: keepPreviousData,
   });
-  return { query, page, setPage };
+  return { query, ...pager };
+}
+
+/** Zones du modèle validé (`clientSpace.dataZones`) : non validé, `available` faux et aucune zone. */
+export function useClientZones(projectId: string) {
+  return useQuery(orpc.clientSpace.dataZones.queryOptions({ input: { projectId } }));
+}
+
+/** Une zone ouverte (`clientSpace.dataZone`, vocabulaire client) ; rien n'est lu tant qu'aucune zone n'est ouverte. */
+export function useClientZone(projectId: string, zone: string | null) {
+  return useQuery({
+    ...orpc.clientSpace.dataZone.queryOptions({ input: { projectId, zone: zone ?? "" } }),
+    enabled: zone !== null,
+  });
+}
+
+/** Recherche d'une table du modèle validé (`clientSpace.dataSearch`), mêmes règles que l'équipe (20 au plus, 200 ms). */
+export function useClientSearch(projectId: string, text: string) {
+  const q = useDebounced(text.trim());
+  const query = useQuery({
+    ...orpc.clientSpace.dataSearch.queryOptions({ input: { projectId, q } }),
+    enabled: q.length > 0,
+    placeholderData: keepPreviousData,
+  });
+  return { q, items: q.length > 0 ? (query.data?.items ?? []) : [] };
 }
 
 /**
