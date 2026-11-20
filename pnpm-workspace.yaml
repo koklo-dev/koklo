@@ -38,3 +38,5 @@ minimumReleaseAgeExclude:
 
 overrides:
   multer: 2.5.0
+  # CVE-2026-121707 (ReDoS, effect < 3.22.1) : transitif via @prisma/config ; a retirer quand Prisma releve sa version.
+  effect: 3.22.1
