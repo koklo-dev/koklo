@@ -6,7 +6,10 @@ import { createApp, createSeededDatabase } from "./helpers/app.ts";
 import { volumeWorld } from "./helpers/long-lists.ts";
 import { send, type World } from "./helpers/tickets.ts";
 
-/** TK-107 lot A : `spec.data.fixtures.list` et `spec.data.fixtures.rows` (25 par page) sur `seed:large` et un jeu de 60 lignes. */
+/**
+ * TK-107 lot A : `spec.data.fixtures.list` et `spec.data.fixtures.rows` (25 par page) sur `seed:large` et un jeu de 60 lignes.
+ * TK-110 lot A (B485) : `spec.data.fixtures.page` (25, 50 ou 100 lignes), lignes stockées puis générées (FX-table-001 : 5 000).
+ */
 let database: TestDatabase;
 let app: INestApplication;
 let world: World;
@@ -55,7 +58,7 @@ describe("spec.data.fixtures.list", () => {
       title: "Jeu d'exemple 001",
       table: "T-table-001",
       locale: "fr-FR",
-      rowCount: 3,
+      rowCount: 5000,
       filePath: "data/fixtures/FX-table-001.yaml",
     });
     expect(res.body.items[2].rowCount).toBe(60);
@@ -80,7 +83,7 @@ describe("spec.data.fixtures.rows", () => {
   it("dernière page partielle, page au-delà : liste vide, jeu de 3 lignes en une page", async () => {
     expect((await rows("FX-grand", 3)).body.items).toHaveLength(10);
     expect((await rows("FX-grand", 9)).body.items).toEqual([]);
-    const small = await rows("FX-table-001", 1);
+    const small = await rows("FX-table-002", 1);
     expect(small.body.total).toBe(3);
     expect(small.body.items).toEqual([
       { nom: "Léa Martin" },
@@ -94,5 +97,79 @@ describe("spec.data.fixtures.rows", () => {
     expect((await rows("FX-grand", 1, 30)).status).toBe(400);
     expect((await rows("FX-grand", 0)).status).toBe(400);
     expect((await rows("grand", 1)).status).toBe(400);
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("spec.data.fixtures.page", () => {
+  const page = (id: string, n: number, size: number) =>
+    get(`fixtures/${id}/page?page=${n}&size=${size}`);
+
+  it("jeu généré : 5 000 lignes, trois lignes stockées d'abord, les suivantes générées", async () => {
+    const res = await page("FX-table-001", 1, 25);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toMatchObject({
+      total: 5000,
+      totalIsEstimate: false,
+      columns: ["nom", "cree_le"],
+    });
+    expect(res.body.items).toHaveLength(25);
+    expect(res.body.items.slice(0, 3)).toEqual([
+      { nom: "Léa Martin" },
+      { nom: "Karim Haddad" },
+      { nom: "Sophie Dubois" },
+    ]);
+    expect(res.body.items[3]).toEqual({
+      nom: expect.any(String),
+      cree_le: expect.stringMatching(/^2026-/),
+    });
+  });
+
+  it("pages de 25, 50 et 100 cohérentes : mêmes lignes, mêmes rangs ; deux appels rendent la même page", async () => {
+    const wide = (await page("FX-table-001", 2, 100)).body.items;
+    const mid = (await page("FX-table-001", 4, 50)).body.items;
+    const small = (await page("FX-table-001", 8, 25)).body.items;
+    expect(mid).toEqual(wide.slice(50, 100));
+    expect(small).toEqual(wide.slice(75, 100));
+    expect((await page("FX-table-001", 2, 100)).body.items).toEqual(wide);
+  });
+
+  it("fin de jeu : dernière page de 100 sur 5 000, au-delà vide", async () => {
+    const last = await page("FX-table-001", 50, 100);
+    expect(last.body.items).toHaveLength(100);
+    expect((await page("FX-table-001", 51, 100)).body.items).toEqual([]);
+  });
+
+  it("jeu stocké : mêmes lignes qu'avant, taille 50 acceptée", async () => {
+    const res = await page("FX-grand", 1, 50);
+    expect(res.body.total).toBe(60);
+    expect(res.body.items).toHaveLength(50);
+    expect(res.body.items[49]).toEqual({ n: 50, nom: "Ligne 50" });
+  });
+
+  it("jeu inconnu : 404 ; taille hors 25, 50 et 100, page 0, identifiant mal formé : 400", async () => {
+    expect((await page("FX-absent", 1, 25)).status).toBe(404);
+    for (const size of [10, 30, 101, 200]) {
+      expect((await page("FX-grand", 1, size)).status, `taille ${size}`).toBe(400);
+    }
+    expect((await page("FX-grand", 0, 25)).status).toBe(400);
+    expect((await page("grand", 1, 25)).status).toBe(400);
+  });
+
+  it("première page d'un jeu de 5 000 lignes sous 300 ms", async () => {
+    await page("FX-table-001", 1, 100);
+    const timings: number[] = [];
+    for (let run = 0; run < 3; run += 1) {
+      const start = performance.now();
+      await page("FX-table-001", 40, 100);
+      timings.push(performance.now() - start);
+    }
+    expect(Math.min(...timings)).toBeLessThan(300);
+  });
+
+  it("l'ancienne route rows reste en taille 25 et rend aussi les lignes générées", async () => {
+    const res = await get("fixtures/FX-table-001/rows?page=3&size=25");
+    expect(res.body.total).toBe(5000);
+    expect(res.body.items).toHaveLength(25);
   });
 });

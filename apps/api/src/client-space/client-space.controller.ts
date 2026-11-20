@@ -167,4 +167,58 @@ export class ClientSpaceController {
       ),
     );
   }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataZones)
+  dataZones(@Req() request: Request) {
+    return implement(contract.clientSpace.dataZones).handler(({ input, errors }) =>
+      inProject(request, errors, input.projectId, (scope) => this.data.zones(scope), this.access),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataZone)
+  dataZone(@Req() request: Request) {
+    return implement(contract.clientSpace.dataZone).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.data.zone(scope, input.zone),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataSearch)
+  dataSearch(@Req() request: Request) {
+    return implement(contract.clientSpace.dataSearch).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.data.search(scope, input.q),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.dataFixturePage)
+  dataFixturePage(@Req() request: Request) {
+    return implement(contract.clientSpace.dataFixturePage).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.data.fixturePage(scope, input),
+        this.access,
+      ),
+    );
+  }
 }

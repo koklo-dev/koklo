@@ -61,6 +61,7 @@ const STATUS_OF: Record<Decision, "pending" | "accepted" | "rejected"> = {
 
 const groupWhere = (group: GroupFilter) => ({
   ...(group.kind === undefined ? {} : { kind: group.kind }),
+  ...(group.kinds === undefined ? {} : { kind: { in: [...group.kinds] } }),
   ...(group.zone === undefined ? {} : { zone: group.zone }),
 });
 
