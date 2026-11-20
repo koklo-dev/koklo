@@ -39,6 +39,30 @@ describe("ZoneNode", () => {
     expect(node.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("« +N » : le compte dépasse l'aperçu renvoyé (14 tables, 7 noms, « +7 »)", () => {
+    const names = ["a", "b", "c", "d", "e", "f", "g"];
+    render(
+      <ZoneNode
+        {...zone}
+        preview={names}
+        previewLimit={7}
+        variant="diagram"
+        onOpen={() => undefined}
+      />,
+    );
+    expect(screen.getByText("+7")).toBeVisible();
+  });
+
+  it("variante diagram : rayon 14, bordure 1,5 px, nom 15/600, puces --secondary de 10 px", () => {
+    render(<ZoneNode {...zone} preview={["a"]} variant="diagram" onOpen={() => undefined} />);
+    const node = document.querySelector("[data-slot='zone-node']") as HTMLElement;
+    expect(node.className).toMatch(/rounded-\[14px\]/);
+    expect(node.className).toMatch(/border-\[1\.5px\]/);
+    expect(node.querySelector(".text-card-title")).not.toBeNull();
+    expect(screen.getByText("a").className).toMatch(/text-\[10px\]/);
+    expect(screen.getByText("a").className).toMatch(/bg-secondary/);
+  });
+
   it("aperçu : au plus 4 noms de tables puis le reste", () => {
     render(
       <ZoneNode
@@ -50,7 +74,7 @@ describe("ZoneNode", () => {
     expect(screen.getByText("reservation")).toBeVisible();
     expect(screen.getByText("salle")).toBeVisible();
     expect(screen.queryByText("horaire")).toBeNull();
-    expect(screen.getByText("+2")).toBeVisible();
+    expect(screen.getByText("+10")).toBeVisible();
   });
 
   it("résumé des liens sortants", () => {

@@ -41,6 +41,8 @@ export interface ProposalReviewProps {
   onLeave: () => void;
   /** Décompte du bandeau propre à un livrable ; absent : « N propositions · N acceptées · … ». */
   summaryText?: string | undefined;
+  /** Note à droite des filtres de la liste (« Groupées par zone » pour le livrable data, maquette 11). */
+  groupNote?: string | undefined;
   /** Annonce polie (« F-012 acceptée ») : la seule région d'état de la vue. */
   announcement?: string;
   /** Le détail : un `ProposalDetail` pour la proposition choisie. */
@@ -192,6 +194,7 @@ export function ProposalReview(props: ProposalReviewProps) {
           onSelect={onSelect}
           onAcceptGroup={props.onAcceptGroup}
           onLoadMore={props.onLoadMore}
+          groupNote={props.groupNote}
         />
         {props.children}
       </div>
