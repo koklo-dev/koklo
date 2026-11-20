@@ -1,12 +1,20 @@
 import { spaceNotReadyError, validationError } from "./errors.ts";
 import { readErrors, readOneErrors, route } from "./route-helpers.ts";
 import {
+  clientSpaceDataFixturePageInputSchema,
+  clientSpaceDataFixturePageOutputSchema,
   clientSpaceDataFixtureRowsInputSchema,
   clientSpaceDataFixtureRowsOutputSchema,
   clientSpaceDataFixturesInputSchema,
   clientSpaceDataFixturesOutputSchema,
   clientSpaceDataModelInputSchema,
   clientSpaceDataModelOutputSchema,
+  clientSpaceDataSearchInputSchema,
+  clientSpaceDataSearchOutputSchema,
+  clientSpaceDataZoneInputSchema,
+  clientSpaceDataZoneOutputSchema,
+  clientSpaceDataZonesInputSchema,
+  clientSpaceDataZonesOutputSchema,
   clientSpaceFeatureInputSchema,
   clientSpaceFeatureOutputSchema,
   clientSpaceFeaturesInputSchema,
@@ -64,8 +72,26 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceDataFixturesInputSchema)
     .output(clientSpaceDataFixturesOutputSchema),
+  /** Lignes d'un jeu, 25 par page ; déprécié en 3.8.0 au profit de `dataFixturePage` (25, 50 ou 100). */
   dataFixtureRows: route("GET", "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows")
     .errors(spaceReadErrors)
     .input(clientSpaceDataFixtureRowsInputSchema)
     .output(clientSpaceDataFixtureRowsOutputSchema),
+  /** Volume réel (TK-110, 3.8.0) : zones, zone ouverte, recherche d'une table et page d'un jeu ; modèle validé seulement. */
+  dataZones: route("GET", "/client-space/projects/{projectId}/data/zones")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataZonesInputSchema)
+    .output(clientSpaceDataZonesOutputSchema),
+  dataZone: route("GET", "/client-space/projects/{projectId}/data/zone")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataZoneInputSchema)
+    .output(clientSpaceDataZoneOutputSchema),
+  dataSearch: route("GET", "/client-space/projects/{projectId}/data/search")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataSearchInputSchema)
+    .output(clientSpaceDataSearchOutputSchema),
+  dataFixturePage: route("GET", "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/page")
+    .errors(spaceReadErrors)
+    .input(clientSpaceDataFixturePageInputSchema)
+    .output(clientSpaceDataFixturePageOutputSchema),
 };
