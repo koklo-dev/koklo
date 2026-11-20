@@ -10,9 +10,13 @@ import { leaksOf, vocabularyOf } from "./vocabulary.ts";
  * le jeton `version` est opaque, aucune clé ni valeur d'énumération ne parle de git.
  */
 const NAMES = [
+  "dataFixturePage",
   "dataFixtureRows",
   "dataFixtures",
   "dataModel",
+  "dataSearch",
+  "dataZone",
+  "dataZones",
   "feature",
   "features",
   "flows",
@@ -108,9 +112,9 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 3.7.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.7.0");
-    expect((await doc()).info.version).toBe("3.7.0");
+  it("le contrat courant est 3.8.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.8.0");
+    expect((await doc()).info.version).toBe("3.8.0");
   });
 });
 
@@ -301,9 +305,13 @@ describe("CS5 fuite de vocabulaire technique dans le contrat publié", () => {
     "/client-space/projects/{projectId}/data/model",
     "/client-space/projects/{projectId}/data/fixtures",
     "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows",
+    "/client-space/projects/{projectId}/data/zones",
+    "/client-space/projects/{projectId}/data/zone",
+    "/client-space/projects/{projectId}/data/search",
+    "/client-space/projects/{projectId}/data/fixtures/{fixtureId}/page",
   ];
 
-  it("les dix chemins sont présents (la garde ne couvre pas du vide)", async () => {
+  it("les quatorze chemins sont présents (la garde ne couvre pas du vide)", async () => {
     const d = await doc();
     for (const path of PATHS) expect(d.paths[path]?.get, path).toBeDefined();
   });
@@ -514,5 +522,82 @@ describe("TK-109 (3.7.0) : modèle de données du point de vue du client", () =>
       expect(names.length, route).toBeGreaterThan(0);
       expect(leaksOf(names), route).toEqual([]);
     }
+  });
+});
+
+/** TK-110 (3.8.0, B482) : volume réel du modèle de données, du point de vue du client (modèle validé seulement). */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
+describe("TK-110 : zones, zone, recherche et page d'un jeu côté client", () => {
+  const ZONE = { id: "rendez-vous", name: "Rendez-vous", icon: "event", tableCount: 9 };
+  const ZONES = {
+    available: true,
+    validation: "validated",
+    tableCount: 9,
+    zones: [{ ...ZONE, preview: ["Client"], links: [{ to: "clients", count: 3 }] }],
+  };
+
+  it("zones : modèle non validé = available faux et aucune zone", async () => {
+    const o = output("clientSpace.dataZones");
+    expect(await isValid(o, ZONES)).toBe(true);
+    expect(
+      await isValid(o, {
+        ...ZONES,
+        available: false,
+        validation: "to_validate",
+        zones: [],
+        tableCount: 0,
+      }),
+    ).toBe(true);
+    expect(
+      await isValid(o, { ...ZONES, zones: [{ ...ZONES.zones[0], preview: Array(8).fill("T") }] }),
+    ).toBe(false);
+    expect(await isValid(input("clientSpace.dataZones"), { projectId: UUID })).toBe(true);
+  });
+
+  it("zone : tables au vocabulaire client, 200 au plus, relations et liens sortants", async () => {
+    const o = output("clientSpace.dataZone");
+    const table = {
+      id: "T-client",
+      name: "Client",
+      description: "",
+      fields: [],
+      relations: [],
+      usedBy: [],
+      clientSummary: [],
+    };
+    const zone = {
+      available: true,
+      validation: "validated",
+      zone: ZONE,
+      items: [table],
+      relations: [{ from: "T-client", to: "T-rdv", cardinality: "1 → n" }],
+      outgoing: [{ zone: "clients", count: 3 }],
+      truncated: false,
+    };
+    expect(await isValid(o, zone)).toBe(true);
+    expect(await isValid(o, { ...zone, items: Array(201).fill(table) })).toBe(false);
+    expect(
+      await isValid(input("clientSpace.dataZone"), { projectId: UUID, zone: "rendez-vous" }),
+    ).toBe(true);
+    expect(await isValid(input("clientSpace.dataZone"), { projectId: UUID })).toBe(false);
+  });
+
+  it("search : 20 résultats au plus, q obligatoire", async () => {
+    const o = output("clientSpace.dataSearch");
+    const item = { id: "T-client", name: "Client", zone: "Clients" };
+    expect(await isValid(o, { available: true, items: [item] })).toBe(true);
+    expect(await isValid(o, { available: true, items: Array(21).fill(item) })).toBe(false);
+    const i = input("clientSpace.dataSearch");
+    expect(await isValid(i, { projectId: UUID, q: "res" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, q: "" })).toBe(false);
+  });
+
+  it("fixturePage : tailles 25, 50 et 100 seulement", async () => {
+    const i = input("clientSpace.dataFixturePage");
+    const base = { projectId: UUID, fixtureId: "FX-clients", page: "2" };
+    for (const size of ["25", "50", "100"]) expect(await isValid(i, { ...base, size })).toBe(true);
+    for (const size of ["30", "200", "0"]) expect(await isValid(i, { ...base, size })).toBe(false);
+    const out = { columns: ["nom"], items: [{ nom: "Léa" }], total: 1240, totalIsEstimate: false };
+    expect(await isValid(output("clientSpace.dataFixturePage"), out)).toBe(true);
   });
 });

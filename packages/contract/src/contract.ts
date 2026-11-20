@@ -68,6 +68,9 @@ import type {
   clientSpaceDataFixtureRowsOutputSchema,
   clientSpaceDataFixturesOutputSchema,
   clientSpaceDataModelOutputSchema,
+  clientSpaceDataSearchOutputSchema,
+  clientSpaceDataZoneOutputSchema,
+  clientSpaceDataZonesOutputSchema,
   clientSpaceFeatureOutputSchema,
   clientSpaceProgressOutputSchema,
   clientSpaceRolesOutputSchema,
@@ -131,6 +134,8 @@ import type {
   validationReportSchema,
 } from "./schemas-spec.ts";
 import type {
+  dataFixturePageInputSchema,
+  dataFixturePageSchema,
   dataFixtureRowsInputSchema,
   dataFixtureRowsSchema,
   dataFixtureSummarySchema,
@@ -138,9 +143,14 @@ import type {
   dataLayoutSaveInputSchema,
   dataLayoutSchema,
   dataMermaidSchema,
+  dataSearchInputSchema,
+  dataSearchSchema,
   dataTableSourceSchema,
   dataTableSummarySchema,
   dataTablesListInputSchema,
+  dataZoneInputSchema,
+  dataZoneSchema,
+  dataZonesSchema,
   tableDetailSchema,
 } from "./schemas-spec-data.ts";
 import type {
@@ -283,6 +293,9 @@ export type ClientDataTable = z.output<typeof clientDataTableSchema>;
 export type ClientSpaceDataModel = z.output<typeof clientSpaceDataModelOutputSchema>;
 export type ClientSpaceDataFixtures = z.output<typeof clientSpaceDataFixturesOutputSchema>;
 export type ClientSpaceDataFixtureRows = z.output<typeof clientSpaceDataFixtureRowsOutputSchema>;
+export type ClientSpaceDataZones = z.output<typeof clientSpaceDataZonesOutputSchema>;
+export type ClientSpaceDataZone = z.output<typeof clientSpaceDataZoneOutputSchema>;
+export type ClientSpaceDataSearch = z.output<typeof clientSpaceDataSearchOutputSchema>;
 export type ClientFlow = z.output<typeof clientFlowSchema>;
 export type ClientRule = z.output<typeof clientRuleSchema>;
 export type ClientRoles = z.output<typeof clientSpaceRolesOutputSchema>;
@@ -307,6 +320,13 @@ export type DataTableSource = z.output<typeof dataTableSourceSchema>;
 export type DataFixtureSummary = z.output<typeof dataFixtureSummarySchema>;
 export type DataFixtureRowsInput = z.output<typeof dataFixtureRowsInputSchema>;
 export type DataFixtureRows = z.output<typeof dataFixtureRowsSchema>;
+export type DataFixturePageInput = z.output<typeof dataFixturePageInputSchema>;
+export type DataFixturePage = z.output<typeof dataFixturePageSchema>;
+export type DataZones = z.output<typeof dataZonesSchema>;
+export type DataZone = z.output<typeof dataZoneSchema>;
+export type DataZoneInput = z.output<typeof dataZoneInputSchema>;
+export type DataSearch = z.output<typeof dataSearchSchema>;
+export type DataSearchInput = z.output<typeof dataSearchInputSchema>;
 export type SpecRefsSearchInput = z.input<typeof specRefsSearchInputSchema>;
 export type SpecRefsSearchOutput = z.output<typeof specRefsSearchOutputSchema>;
 export type SpecOperation = z.input<typeof specOperationSchema>;

@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, UUID } from "./support.ts";
  * lectures `spec.data.*`, `spec.item.get` de type `table`, compteurs `relations` et `fixtures`.
  */
 describe("TK-107 A surface", () => {
-  it("version 3.7.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.7.0");
+  it("version 3.8.0", () => {
+    expect(CONTRACT_VERSION).toBe("3.8.0");
   });
 
   it.each([
@@ -421,5 +421,109 @@ describe("TK-108 B (contrat 3.6.0, additif, B417) : diagramme du modèle", () =>
         operations: [{ kind: "layout.save", positions: POSITIONS }],
       }),
     ).toBe(false);
+  });
+});
+
+/** TK-110 (3.8.0, B482 à B485) : volume réel des Données, lectures de l'équipe. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
+describe("TK-110 A spec.data.zones, zone, search et fixtures.page", () => {
+  const ZONE = { id: "rendez-vous", name: "Rendez-vous", icon: "event", tableCount: 9 };
+  const SHA = "a".repeat(40);
+
+  it.each([
+    ["spec.data.zones", "/projects/{projectId}/spec/data/zones"],
+    ["spec.data.zone", "/projects/{projectId}/spec/data/zone"],
+    ["spec.data.search", "/projects/{projectId}/spec/data/search"],
+    ["spec.data.fixtures.page", "/projects/{projectId}/spec/data/fixtures/{fixtureId}/page"],
+  ])("%s : GET %s, erreurs d'une lecture d'équipe", async (name, path) => {
+    const doc = (await generateOpenApi()) as { paths: Record<string, Record<string, unknown>> };
+    expect(Object.keys(doc.paths[path] ?? {})).toEqual(["get"]);
+    expect(Object.keys(errors(name)), name).toEqual(
+      expect.arrayContaining([
+        "UNAUTHORIZED",
+        "FORBIDDEN",
+        "NOT_FOUND",
+        "VALIDATION",
+        "SPEC_INDEX_FAILED",
+      ]),
+    );
+  });
+
+  it("zones : comptes, aperçu de 7 noms au plus, liens entre zones, commit", async () => {
+    const out = {
+      zones: [{ ...ZONE, preview: ["Client"], links: [{ to: "clients", count: 17 }] }],
+      tableCount: 65,
+      commitSha: SHA,
+    };
+    const schema = output("spec.data.zones");
+    expect(await isValid(schema, out)).toBe(true);
+    expect(
+      await isValid(schema, { ...out, zones: [{ ...out.zones[0], preview: Array(8).fill("T") }] }),
+    ).toBe(false);
+    expect(await isValid(schema, { ...out, zones: [{ ...out.zones[0], tableCount: -1 }] })).toBe(
+      false,
+    );
+    expect(await isValid(input("spec.data.zones"), { projectId: UUID })).toBe(true);
+    expect(
+      await isValid(input("spec.data.zones"), { projectId: UUID, branch: "b", commitSha: SHA }),
+    ).toBe(false);
+  });
+
+  it("zone : paramètre zone obligatoire ; sortie bornée à 200 tables, relations, sortants, truncated", async () => {
+    const i = input("spec.data.zone");
+    expect(await isValid(i, { projectId: UUID, zone: "rendez-vous" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID })).toBe(false);
+    const table = { specId: "T-client", name: "Client", fields: [], personalData: false };
+    const out = {
+      zone: ZONE,
+      tables: [table],
+      relations: [{ from: "T-client", to: "T-rdv", cardinality: "1 → n" }],
+      outgoing: [{ zone: "clients", count: 17 }],
+      truncated: false,
+      commitSha: SHA,
+    };
+    const schema = output("spec.data.zone");
+    expect(await isValid(schema, out)).toBe(true);
+    expect(await isValid(schema, { ...out, tables: Array(201).fill(table) })).toBe(false);
+    expect(
+      await isValid(schema, { ...out, relations: [{ from: "T-a", to: "T-b", cardinality: "x" }] }),
+    ).toBe(false);
+  });
+
+  it("search : q obligatoire, 20 résultats au plus", async () => {
+    const i = input("spec.data.search");
+    expect(await isValid(i, { projectId: UUID, q: "rendez" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, q: "" })).toBe(false);
+    const item = { id: "T-client", name: "Client", zone: "Clients" };
+    expect(await isValid(output("spec.data.search"), { items: [item] })).toBe(true);
+    expect(await isValid(output("spec.data.search"), { items: Array(21).fill(item) })).toBe(false);
+  });
+
+  it("fixtures.page : tailles 25, 50 et 100 ; autre taille, page 0 ou identifiant mal formé refusés", async () => {
+    const i = input("spec.data.fixtures.page");
+    const base = { projectId: UUID, fixtureId: "FX-clients", page: "2" };
+    for (const size of ["25", "50", "100"]) expect(await isValid(i, { ...base, size })).toBe(true);
+    for (const size of ["10", "30", "101"]) expect(await isValid(i, { ...base, size })).toBe(false);
+    expect(await isValid(i, { ...base, size: "25", page: "0" })).toBe(false);
+    expect(await isValid(i, { ...base, size: "25", fixtureId: "clients" })).toBe(false);
+    const out = { columns: ["nom"], items: [{ nom: "Léa" }], total: 1240, totalIsEstimate: false };
+    expect(await isValid(output("spec.data.fixtures.page"), out)).toBe(true);
+  });
+
+  it("fixtures.rows reste en taille 25 (dépréciée) ; fixtures.list : rowCount compte les lignes générées", async () => {
+    const rows = input("spec.data.fixtures.rows");
+    const base = { projectId: UUID, fixtureId: "FX-clients", page: "1" };
+    expect(await isValid(rows, { ...base, size: "25" })).toBe(true);
+    expect(await isValid(rows, { ...base, size: "50" })).toBe(false);
+    const item = {
+      specId: "FX-clients",
+      title: "C",
+      table: "T-client",
+      locale: "fr-FR",
+      rowCount: 100000,
+      filePath: "f",
+    };
+    expect(await isValid(output("spec.data.fixtures.list"), { items: [item] })).toBe(true);
   });
 });

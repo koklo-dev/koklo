@@ -7,6 +7,18 @@ import {
   stepSchema,
 } from "./schemas-spec.ts";
 import {
+  DATA_SEARCH_MAX,
+  dataSearchItemSchema,
+  fixturePageSizeSchema,
+  searchQuerySchema,
+  ZONE_TABLES_MAX,
+  zoneEntrySchema,
+  zoneIdSchema,
+  zoneOutgoingSchema,
+  zoneRelationSchema,
+  zoneSummarySchema,
+} from "./schemas-spec-data.ts";
+import {
   flowErrorSchema,
   flowIdSchema,
   flowStepSchema,
@@ -258,3 +270,43 @@ export const clientSpaceDataFixtureRowsInputSchema = z.object({
 export const clientSpaceDataFixtureRowsOutputSchema = pageNumberOf(
   z.record(z.string(), cellValue),
 ).extend({ columns: z.array(z.string()) });
+
+// --- TK-110 (3.8.0) : volume réel du modèle, du point de vue du client (modèle validé seulement, B482) ---
+const clientDataAvailability = { available: z.boolean(), validation: clientValidationSchema };
+
+/** Zones du modèle validé : non validé = `available` faux et aucune zone. */
+export const clientSpaceDataZonesInputSchema = z.object({ projectId: z.uuid() });
+export const clientSpaceDataZonesOutputSchema = z.object({
+  ...clientDataAvailability,
+  zones: z.array(zoneEntrySchema),
+  tableCount: z.number().int().min(0),
+});
+
+/** Une zone ouverte : ses tables au vocabulaire client (200 au plus), leurs relations et les liens vers les autres zones. */
+export const clientSpaceDataZoneInputSchema = z.object({ projectId: z.uuid(), zone: zoneIdSchema });
+export const clientSpaceDataZoneOutputSchema = z.object({
+  ...clientDataAvailability,
+  zone: zoneSummarySchema.optional(),
+  items: z.array(clientDataTableSchema).max(ZONE_TABLES_MAX),
+  relations: z.array(zoneRelationSchema),
+  outgoing: z.array(zoneOutgoingSchema),
+  truncated: z.boolean(),
+});
+
+export const clientSpaceDataSearchInputSchema = z.object({
+  projectId: z.uuid(),
+  q: searchQuerySchema,
+});
+export const clientSpaceDataSearchOutputSchema = z.object({
+  available: z.boolean(),
+  items: z.array(dataSearchItemSchema).max(DATA_SEARCH_MAX),
+});
+
+/** Page de 25, 50 ou 100 lignes d'un jeu (mêmes lignes que l'équipe). */
+export const clientSpaceDataFixturePageInputSchema = z.object({
+  projectId: z.uuid(),
+  fixtureId: dataFixtureId,
+  page: z.coerce.number().int().min(1),
+  size: fixturePageSizeSchema,
+});
+export const clientSpaceDataFixturePageOutputSchema = clientSpaceDataFixtureRowsOutputSchema;
