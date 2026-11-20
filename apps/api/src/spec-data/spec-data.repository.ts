@@ -44,8 +44,8 @@ export interface GitSource {
 /** Ce qu'il faut pour générer le modèle Mermaid et lire `data/_layout.yaml` dans git. */
 export interface ModelSource extends GitSource {
   kind: "found";
-  /** `data` des tables indexées, dans l'ordre de l'index. */
-  tables: unknown[];
+  /** Tables indexées (identifiant et `data`), dans l'ordre de l'index. */
+  tables: { specId: string; data: unknown }[];
 }
 
 /** Une table indexée et de quoi lire son fichier dans git. */
@@ -80,6 +80,13 @@ export interface SpecDataRepository {
     revision: Revision,
     specId: string,
   ): Promise<IndexFailure | TableSource | null>;
+  /** Tables dont le nom ou un champ correspond à `q`, `limit` au plus, dans l'ordre de l'index (TK-110, B483). */
+  searchTables(
+    scope: ProjectScope,
+    revision: Revision,
+    q: string,
+    limit: number,
+  ): Promise<IndexFailure | { kind: "found"; commitSha: string; rows: EntityRowData[] } | null>;
   fixtures(
     scope: ProjectScope,
     revision: Revision,

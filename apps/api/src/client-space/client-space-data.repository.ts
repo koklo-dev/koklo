@@ -20,6 +20,16 @@ export interface ClientFixtureRead {
 export interface ClientSpaceDataRepository {
   /** `null` : aucune spec indexée ou index en échec. */
   model(scope: ProjectScope, max: number): Promise<ClientModelRead | null>;
+  /** Toutes les tables de la tête, sans la borne du modèle (zones, TK-110) ; `null` : aucune spec indexée ou index en échec. */
+  tables(scope: ProjectScope): Promise<{ specId: string; data: unknown }[] | null>;
+  /** Libellés des fonctionnalités et règles `ids` (`F-nnn`, `R-nnn`) ; un amont absent de l'index n'y figure pas. */
+  labels(scope: ProjectScope, ids: readonly string[]): Promise<Map<string, string>>;
+  /** Tables dont le nom ou un champ correspond à `q`, `limit` au plus ; rien d'indexé : liste vide. */
+  searchTables(
+    scope: ProjectScope,
+    q: string,
+    limit: number,
+  ): Promise<{ specId: string; data: unknown }[]>;
   fixtures(scope: ProjectScope): Promise<ClientFixtureRead[]>;
   fixture(scope: ProjectScope, specId: string): Promise<ClientFixtureRead | null>;
 }

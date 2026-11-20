@@ -125,33 +125,38 @@ describe("clientSpace : réponses nominales", () => {
   });
 });
 
+async function seedDataModel(): Promise<string> {
+  const { sha } = await seedIndex(bench(), scene.p1, [FEATURE], {
+    commit: true,
+    entities: [
+      entity("feature", "F-001", "a", { titre: "Connexion" }),
+      entity("table", "T-user", "a", {
+        nom: "Utilisateur",
+        source: ["F-001"],
+        resume_client: ["Le nom de la personne"],
+        champs: [
+          {
+            nom: "email",
+            type: "texte(255)",
+            contraintes: "secret-contrainte",
+            valeurs: ["secret-valeur"],
+            regle: "R-004",
+          },
+        ],
+      }),
+      entity("fixture", "FX-user", "a", {
+        titre: "Utilisateurs",
+        table: "T-user",
+        lignes: [{ email: "a@exemple.fr" }],
+      }),
+    ],
+  });
+  return sha;
+}
+
 describe("clientSpace : modèle de données (TK-109, 3.7.0)", () => {
   it("modèle, jeux et lignes validés : aucun vocabulaire technique, aucun contenu réservé à l'équipe", async () => {
-    const { sha } = await seedIndex(bench(), scene.p1, [FEATURE], {
-      commit: true,
-      entities: [
-        entity("feature", "F-001", "a", { titre: "Connexion" }),
-        entity("table", "T-user", "a", {
-          nom: "Utilisateur",
-          source: ["F-001"],
-          resume_client: ["Le nom de la personne"],
-          champs: [
-            {
-              nom: "email",
-              type: "texte(255)",
-              contraintes: "secret-contrainte",
-              valeurs: ["secret-valeur"],
-              regle: "R-004",
-            },
-          ],
-        }),
-        entity("fixture", "FX-user", "a", {
-          titre: "Utilisateurs",
-          table: "T-user",
-          lignes: [{ email: "a@exemple.fr" }],
-        }),
-      ],
-    });
+    const sha = await seedDataModel();
     const owner = reviewApi(bench().app, scene.p1.world.actors.owner);
     const validated = await owner.submit(scene.p1.projectId, sha, {
       targetKind: "deliverable",
@@ -172,6 +177,11 @@ describe("clientSpace : modèle de données (TK-109, 3.7.0)", () => {
       await space.dataModel(scene.p1.projectId),
       await space.dataFixtures(scene.p1.projectId),
       await space.dataFixtureRows(scene.p1.projectId, "FX-user"),
+      // TK-110 (3.8.0) : zones, zone ouverte, recherche et page d'un jeu.
+      await space.dataZones(scene.p1.projectId),
+      await space.dataZone(scene.p1.projectId, "sans-zone"),
+      await space.dataSearch(scene.p1.projectId, "user"),
+      await space.dataFixturePage(scene.p1.projectId, "FX-user", 1, 50),
     ];
 
     for (const [index, res] of responses.entries()) {
