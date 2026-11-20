@@ -8,7 +8,7 @@ import { WriteFailure, WriteNotice } from "./saved-notice.tsx";
 
 export interface StatusBlockProps {
   formOpen: boolean;
-  region: { countBar: boolean; busy: boolean; text: string };
+  region: { countBar: boolean; busy: boolean; text: string; srText?: string | undefined };
   write: FeatureWrite;
   role: Role | undefined;
   hrefFor: (specId: string) => string;
@@ -28,11 +28,16 @@ export function StatusBlock(props: StatusBlockProps) {
         // barre de compte, c'est la sienne (elle annonce aussi les avis d'écriture que ce bloc affiche).
         role={formOpen || region.countBar ? undefined : "status"}
         aria-busy={region.busy || undefined}
-        className="text-meta text-muted-foreground empty:hidden"
+        className="text-meta text-muted-foreground empty:hidden [&:has(>[data-slot=announce]:only-child)]:sr-only"
       >
         {formOpen ? null : (
           <>
             {region.countBar ? null : region.text}
+            {!region.countBar && region.srText ? (
+              <span data-slot="announce" className="sr-only">
+                {region.srText}
+              </span>
+            ) : null}
             <WriteNotice write={write} role={role} hrefFor={props.hrefFor} onOpen={props.onOpen} />
           </>
         )}

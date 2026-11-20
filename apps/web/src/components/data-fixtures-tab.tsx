@@ -5,6 +5,7 @@ import {
   cn,
   EmptyState,
   IdTag,
+  type PageSize,
   Pagination,
   Pill,
   Skeleton,
@@ -15,9 +16,10 @@ import {
   TableHeader,
   TableRow,
 } from "@koklo/ui";
+import { useEffect, useRef } from "react";
 import type { z } from "zod";
 import { DATA_FIXTURES_HELP, fixtureMeta } from "../lib/data-labels.ts";
-import { FIXTURE_PAGE_SIZE, useDataFixtures, useFixtureRows } from "../lib/use-data-fixtures.ts";
+import { useDataFixtures, useFixtureRows } from "../lib/use-data-fixtures.ts";
 import type { DataPageModel } from "../lib/use-data-page.ts";
 import { ErrorNotice } from "./error-notice.tsx";
 
@@ -36,20 +38,39 @@ export interface FixtureRowsSource {
   };
   page: number;
   setPage: (page: number) => void;
+  /** Lignes par page : 25, 50 ou 100, mémorisées par utilisateur. */
+  size: PageSize;
+  setSize: (size: PageSize) => void;
 }
 
 const cell = (value: unknown): string =>
   value === undefined || value === "" ? "—" : String(value);
 
-/** Un jeu d'exemple (maquette 11 l.255-266) : en-tête, tableau aux colonnes mono, pagination numérotée de 25 lignes. */
+/** Annonce « Page 2 sur 50 » dans la région d'état de la page, à chaque changement de page (pas à l'arrivée). */
+function usePageAnnouncement(
+  announce: ((text: string) => void) | undefined,
+  page: number,
+  pageCount: number,
+) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) first.current = false;
+    else announce?.(`Page ${page} sur ${pageCount}`);
+  }, [announce, page, pageCount]);
+}
+
+/** Un jeu d'exemple (maquette 11 l.255-266) : en-tête, tableau aux colonnes mono, pagination numérotée de 25, 50 ou 100 lignes. */
 export function FixtureBlock({
   fixture,
   rows: source,
+  announce,
 }: {
   fixture: FixtureHead;
   rows: FixtureRowsSource;
+  announce?: ((text: string) => void) | undefined;
 }) {
-  const { query, page, setPage } = source;
+  const { query, page, setPage, size, setSize } = source;
+  usePageAnnouncement(announce, page, Math.max(1, Math.ceil(fixture.rowCount / size)));
   const rows = query.data?.items ?? [];
   const columns = query.data?.columns ?? [];
   const label = `Lignes du jeu ${fixture.title}`;
@@ -110,19 +131,28 @@ export function FixtureBlock({
       <Pagination
         page={page}
         density="sm"
-        size={FIXTURE_PAGE_SIZE}
+        size={size}
         total={fixture.rowCount}
         onPageChange={setPage}
+        onSizeChange={setSize}
         aria-label={`Pagination du jeu ${fixture.title}`}
       />
     </section>
   );
 }
 
-/** Jeu de l'équipe : les lignes viennent de `spec.data.fixtures.rows`. */
-function FixtureSection({ projectId, fixture }: { projectId: string; fixture: Fixture }) {
+/** Jeu de l'équipe : les lignes viennent de `spec.data.fixtures.page`. */
+function FixtureSection({
+  projectId,
+  fixture,
+  announce,
+}: {
+  projectId: string;
+  fixture: Fixture;
+  announce: (text: string) => void;
+}) {
   const rows = useFixtureRows(projectId, fixture.specId);
-  return <FixtureBlock fixture={fixture} rows={rows} />;
+  return <FixtureBlock fixture={fixture} rows={rows} announce={announce} />;
 }
 
 /** Lignes affichées d'un jeu proposé : le reste se lit une fois le jeu enregistré (25 par page). */
@@ -193,8 +223,8 @@ function ProposedFixtures({ page }: { page: DataPageModel }) {
 }
 
 /**
- * Onglet Jeux d'exemple (maquette 11 l.248-285) : phrase d'aide, une section par jeu, lignes fictives paginées par 25.
- * Les jeux viennent de `spec.data.fixtures.list` ; les lignes d'une page, de `spec.data.fixtures.rows`.
+ * Onglet Jeux d'exemple (maquette 11 l.248-285) : phrase d'aide, une section par jeu, lignes fictives paginées par 25, 50 ou 100.
+ * Les jeux viennent de `spec.data.fixtures.list` ; les lignes d'une page, de `spec.data.fixtures.page`.
  */
 export function DataFixturesTab({ page }: { page: DataPageModel }) {
   const fixtures = useDataFixtures(page.projectId, true);
@@ -220,7 +250,12 @@ export function DataFixturesTab({ page }: { page: DataPageModel }) {
         />
       ) : (
         fixtures.data.items.map((fixture) => (
-          <FixtureSection key={fixture.specId} projectId={page.projectId} fixture={fixture} />
+          <FixtureSection
+            key={fixture.specId}
+            projectId={page.projectId}
+            fixture={fixture}
+            announce={page.announce}
+          />
         ))
       )}
       <ProposedFixtures page={page} />
