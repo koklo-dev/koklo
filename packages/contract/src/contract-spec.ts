@@ -32,6 +32,8 @@ import {
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
 import {
+  dataFixturePageInputSchema,
+  dataFixturePageSchema,
   dataFixtureRowsInputSchema,
   dataFixtureRowsSchema,
   dataFixturesListInputSchema,
@@ -42,10 +44,16 @@ import {
   dataLayoutSchema,
   dataMermaidInputSchema,
   dataMermaidSchema,
+  dataSearchInputSchema,
+  dataSearchSchema,
   dataTableSourceInputSchema,
   dataTableSourceSchema,
   dataTableSummarySchema,
   dataTablesListInputSchema,
+  dataZoneInputSchema,
+  dataZoneSchema,
+  dataZonesInputSchema,
+  dataZonesSchema,
 } from "./schemas-spec-data.ts";
 import {
   functionalItemSchema,
@@ -130,6 +138,19 @@ const spec = {
         .input(dataLayoutSaveInputSchema)
         .output(dataLayoutSavedSchema),
     },
+    /** Volume réel (TK-110, 3.8.0, B482, B483) : zones, une zone ouverte, recherche d'une table. Équipe et designer. */
+    zones: route("GET", "/projects/{projectId}/spec/data/zones")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(dataZonesInputSchema)
+      .output(dataZonesSchema),
+    zone: route("GET", "/projects/{projectId}/spec/data/zone")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(dataZoneInputSchema)
+      .output(dataZoneSchema),
+    search: route("GET", "/projects/{projectId}/spec/data/search")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(dataSearchInputSchema)
+      .output(dataSearchSchema),
     mermaid: route("GET", "/projects/{projectId}/spec/data/mermaid")
       .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
       .input(dataMermaidInputSchema)
@@ -139,10 +160,16 @@ const spec = {
         .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
         .input(dataFixturesListInputSchema)
         .output(dataFixturesListSchema),
+      /** Page de 25 lignes ; déprécié en 3.8.0 au profit de `page` (25, 50 ou 100). */
       rows: route("GET", "/projects/{projectId}/spec/data/fixtures/{fixtureId}/rows")
         .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
         .input(dataFixtureRowsInputSchema)
         .output(dataFixtureRowsSchema),
+      /** Page de 25, 50 ou 100 lignes, stockées puis générées (TK-110, 3.8.0, B485). */
+      page: route("GET", "/projects/{projectId}/spec/data/fixtures/{fixtureId}/page")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(dataFixturePageInputSchema)
+        .output(dataFixturePageSchema),
     },
   },
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")

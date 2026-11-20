@@ -38,9 +38,13 @@ const GROUPS: Record<string, string[]> = {
   aiSettings: ["get", "update"],
   projectClient: ["add", "list", "remove"],
   clientSpace: [
+    "dataFixturePage",
     "dataFixtureRows",
     "dataFixtures",
     "dataModel",
+    "dataSearch",
+    "dataZone",
+    "dataZones",
     "feature",
     "features",
     "flows",
@@ -319,6 +323,15 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /client-space/projects/{projectId}/data/model",
     "GET /client-space/projects/{projectId}/data/fixtures",
     "GET /client-space/projects/{projectId}/data/fixtures/{fixtureId}/rows",
+    // TK-110 (3.8.0) : volume réel des Données (zones, zone, recherche, page d'un jeu), équipe puis client.
+    "GET /projects/{projectId}/spec/data/zones",
+    "GET /projects/{projectId}/spec/data/zone",
+    "GET /projects/{projectId}/spec/data/search",
+    "GET /projects/{projectId}/spec/data/fixtures/{fixtureId}/page",
+    "GET /client-space/projects/{projectId}/data/zones",
+    "GET /client-space/projects/{projectId}/data/zone",
+    "GET /client-space/projects/{projectId}/data/search",
+    "GET /client-space/projects/{projectId}/data/fixtures/{fixtureId}/page",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -350,7 +363,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(147);
+    expect(pairs).toHaveLength(155);
   });
 });
 
