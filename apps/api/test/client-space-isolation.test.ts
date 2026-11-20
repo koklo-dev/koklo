@@ -35,6 +35,11 @@ const dataRoutes = async (actor: { cookie: string }, projectId: string) => [
   await as(actor).dataModel(projectId),
   await as(actor).dataFixtures(projectId),
   await as(actor).dataFixtureRows(projectId, "FX-clients"),
+  // TK-110 (3.8.0) : mêmes règles de cloisonnement pour les quatre lectures du volume réel.
+  await as(actor).dataZones(projectId),
+  await as(actor).dataZone(projectId, "comptes"),
+  await as(actor).dataSearch(projectId, "client"),
+  await as(actor).dataFixturePage(projectId, "FX-clients", 1, 50),
 ];
 
 const UNIFORM_404 = { status: 404, body: { code: "NOT_FOUND" } };

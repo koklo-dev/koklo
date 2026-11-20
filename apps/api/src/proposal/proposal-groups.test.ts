@@ -107,3 +107,42 @@ describe("TK-99a groupes de propositions", () => {
     expect(groupFilterOf("inconnu:Zone")).toBeNull();
   });
 });
+
+/** TK-110 (B487) : relations et jeux d'exemple se relisent ensemble, dans le groupe « Relations et jeux d'exemple ». */
+describe("TK-110 groupe « links »", () => {
+  const data = [
+    count("table", "Rendez-vous", "pending", 20, 0),
+    count("table", "Clients", "pending", 20, 20),
+    count("relations", "Rendez-vous", "pending", 4, 40),
+    count("relations", "Clients", "accepted", 2, 44),
+    count("fixtures", "Rendez-vous", "pending", 21, 46),
+  ];
+
+  it("par type et zone : relations et jeux fusionnent sous la clé links, après les tables", () => {
+    const groups = buildGroups(data, "type_zone");
+    expect(groups.map((g) => [g.key, g.label, g.total, g.pending, g.accepted])).toEqual([
+      ["table:Rendez-vous", "Zone Rendez-vous", 20, 20, 0],
+      ["table:Clients", "Zone Clients", 20, 20, 0],
+      ["links", "Relations et jeux d'exemple", 27, 25, 2],
+    ]);
+  });
+
+  it("clé links : la clé de groupe d'une relation ou d'un jeu, quelle que soit la zone ; autres types inchangés", () => {
+    expect(groupKeyOf("relations", "Clients", "type_zone")).toBe("links");
+    expect(groupKeyOf("fixtures", "A", "type_zone")).toBe("links");
+    expect(groupKeyOf("table", "A", "type_zone")).toBe("table:A");
+    expect(groupKeyOf("relations", "A", "type")).toBe("relations");
+  });
+
+  it("par type : relations et jeux restent deux groupes", () => {
+    expect(buildGroups(data, "type").map((g) => g.key)).toEqual(["table", "relations", "fixtures"]);
+  });
+
+  it("filtre de la clé links : les types relations et jeux d'exemple, sans zone", () => {
+    expect(groupFilterOf("links")).toEqual({ kinds: ["relations", "fixtures"] });
+  });
+
+  it("sous le seuil : toujours un seul groupe « all »", () => {
+    expect(buildGroups([count("relations", "A", "pending", 3)], "type_zone")[0]?.key).toBe("all");
+  });
+});

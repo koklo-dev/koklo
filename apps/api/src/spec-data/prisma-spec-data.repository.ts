@@ -120,12 +120,12 @@ export class PrismaSpecDataRepository implements SpecDataRepository {
       const tables = await tx.specEntity.findMany({
         where: { snapshotId: snapshot.id, kind: "table" },
         orderBy: [{ sort: "asc" }, { id: "asc" }],
-        select: { data: true },
+        select: { specId: true, data: true },
       });
       return {
         kind: "found" as const,
         ...(await this.gitSource(tx, found, snapshot)),
-        tables: tables.map((row) => row.data),
+        tables: tables.map(({ specId, data }) => ({ specId, data })),
       };
     });
   }
@@ -149,6 +149,25 @@ export class PrismaSpecDataRepository implements SpecDataRepository {
         ...(await this.gitSource(tx, found, snapshot)),
         ...rowOf(row),
       };
+    });
+  }
+
+  searchTables(scope: ProjectScope, revision: Revision, q: string, limit: number) {
+    return this.transactions.run(scope, async (tx) => {
+      const readable = await this.readable(tx, scope, revision);
+      if (readable === null || "kind" in readable) return readable;
+      const { id: snapshotId, commitSha } = readable.snapshot;
+      const ids = await this.search.entityIds(snapshotId, "table", q);
+      const rows =
+        ids.length === 0
+          ? []
+          : await tx.specEntity.findMany({
+              where: entityWhere(snapshotId, "table", ids),
+              orderBy: [{ sort: "asc" }, { id: "asc" }],
+              select: { specId: true, path: true, data: true },
+              take: limit,
+            });
+      return { kind: "found" as const, commitSha, rows: rows.map(rowOf) };
     });
   }
 

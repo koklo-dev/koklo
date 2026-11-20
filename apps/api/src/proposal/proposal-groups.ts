@@ -37,14 +37,28 @@ export interface ProposalGroup {
   pending: number;
 }
 
-/** Ce qu'un groupe désigne : un type, éventuellement une zone ; `{}` = toutes les propositions. */
+/**
+ * Clé du groupe « Relations et jeux d'exemple » (TK-110, B487) : les propositions `relations` et `fixtures` du livrable Données se
+ * relisent ensemble (par type et zone, une relation ou un jeu n'a pas de zone propre à relire).
+ */
+export const LINKS_GROUP_KEY = "links";
+export const LINKS_GROUP_LABEL = "Relations et jeux d'exemple";
+const LINKS_KINDS = ["relations", "fixtures"] as const satisfies readonly AgentProposalKind[];
+
+/** Ce qu'un groupe désigne : un type (ou plusieurs), éventuellement une zone ; `{}` = toutes les propositions. */
 export interface GroupFilter {
   kind?: AgentProposalKind;
+  kinds?: readonly AgentProposalKind[];
   zone?: string;
 }
 
-export const groupKeyOf = (kind: AgentProposalKind, zone: string, by: GroupBy): string =>
-  by === "type" ? kind : `${kind}:${zone}`;
+const isLinksKind = (kind: AgentProposalKind): boolean =>
+  (LINKS_KINDS as readonly string[]).includes(kind);
+
+export const groupKeyOf = (kind: AgentProposalKind, zone: string, by: GroupBy): string => {
+  if (by === "type") return kind;
+  return isLinksKind(kind) ? LINKS_GROUP_KEY : `${kind}:${zone}`;
+};
 
 const isKind = (value: string): value is AgentProposalKind =>
   (AGENT_PROPOSAL_KINDS as readonly string[]).includes(value);
@@ -52,6 +66,7 @@ const isKind = (value: string): value is AgentProposalKind =>
 /** Filtre d'une clé de groupe ; `null` pour une clé que ce module n'a pas pu émettre. */
 export function groupFilterOf(key: string): GroupFilter | null {
   if (key === ALL_GROUP_KEY) return {};
+  if (key === LINKS_GROUP_KEY) return { kinds: LINKS_KINDS };
   const cut = key.indexOf(":");
   const kind = cut === -1 ? key : key.slice(0, cut);
   if (!isKind(kind)) return null;
@@ -67,6 +82,12 @@ const emptyGroup = (key: string, label: string): ProposalGroup => ({
   pending: 0,
 });
 
+const labelOf = (row: GroupCount, by: GroupBy): string => {
+  if (by === "type") return KIND_LABELS[row.kind];
+  if (isLinksKind(row.kind)) return LINKS_GROUP_LABEL;
+  return row.kind === "table" ? `Zone ${row.zone}` : row.zone;
+};
+
 /** Groupes d'un lancement, dans l'ordre des types puis de la première position ; un seul groupe sous le seuil. */
 export function buildGroups(counts: readonly GroupCount[], by: GroupBy): ProposalGroup[] {
   const total = counts.reduce((sum, row) => sum + row.n, 0);
@@ -79,11 +100,7 @@ export function buildGroups(counts: readonly GroupCount[], by: GroupBy): Proposa
   for (const row of ordered) {
     const single = total <= GROUPING_THRESHOLD;
     const key = single ? ALL_GROUP_KEY : groupKeyOf(row.kind, row.zone, by);
-    const label = single
-      ? "Toutes les propositions"
-      : by === "type"
-        ? KIND_LABELS[row.kind]
-        : row.zone;
+    const label = single ? "Toutes les propositions" : labelOf(row, by);
     const group = groups.get(key) ?? emptyGroup(key, label);
     group.total += row.n;
     group[row.status] += row.n;
