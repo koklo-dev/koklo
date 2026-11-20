@@ -8,34 +8,29 @@ import { createWorld, insertProject, linkClient, send } from "./tickets.ts";
 
 /** Client HTTP des trois procédures `clientSpace.*` du contrat 0.11.0. */
 export function clientSpaceApi(app: INestApplication, actor: Pick<Actor, "cookie"> | undefined) {
-  const cookie = actor?.cookie;
+  const get = (projectId: string, path: string) =>
+    send(app, actor?.cookie, "get", `/client-space/projects/${projectId}/${path}`);
+  const enc = encodeURIComponent;
   return {
-    projects: () => send(app, cookie, "get", "/client-space/projects"),
-    features: (projectId: string, query = "") =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/features${query}`),
-    feature: (projectId: string, featureId: string) =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/features/${featureId}`),
+    projects: () => send(app, actor?.cookie, "get", "/client-space/projects"),
+    features: (projectId: string, query = "") => get(projectId, `features${query}`),
+    feature: (projectId: string, featureId: string) => get(projectId, `features/${featureId}`),
     // TK-104 (contrat 3.2.0) : progression, parcours, règles et rôles.
-    progress: (projectId: string) =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/progress`),
-    flows: (projectId: string, query = "") =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/flows${query}`),
-    rules: (projectId: string, query = "") =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/rules${query}`),
-    roles: (projectId: string) =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/roles`),
+    progress: (projectId: string) => get(projectId, "progress"),
+    flows: (projectId: string, query = "") => get(projectId, `flows${query}`),
+    rules: (projectId: string, query = "") => get(projectId, `rules${query}`),
+    roles: (projectId: string) => get(projectId, "roles"),
     // TK-109 (contrat 3.7.0) : modèle de données validé, jeux d'exemple et leurs lignes.
-    dataModel: (projectId: string) =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/data/model`),
-    dataFixtures: (projectId: string) =>
-      send(app, cookie, "get", `/client-space/projects/${projectId}/data/fixtures`),
+    dataModel: (projectId: string) => get(projectId, "data/model"),
+    dataFixtures: (projectId: string) => get(projectId, "data/fixtures"),
+    // TK-110 (contrat 3.8.0) : zones, zone ouverte, recherche d'une table et page d'un jeu (25, 50 ou 100 lignes).
+    dataZones: (projectId: string) => get(projectId, "data/zones"),
+    dataZone: (projectId: string, zone: string) => get(projectId, `data/zone?zone=${enc(zone)}`),
+    dataSearch: (projectId: string, q: string) => get(projectId, `data/search?q=${enc(q)}`),
+    dataFixturePage: (projectId: string, fixtureId: string, page = 1, size = 25) =>
+      get(projectId, `data/fixtures/${fixtureId}/page?page=${page}&size=${size}`),
     dataFixtureRows: (projectId: string, fixtureId: string, page = 1) =>
-      send(
-        app,
-        cookie,
-        "get",
-        `/client-space/projects/${projectId}/data/fixtures/${fixtureId}/rows?page=${page}&size=25`,
-      ),
+      get(projectId, `data/fixtures/${fixtureId}/rows?page=${page}&size=25`),
   };
 }
 
