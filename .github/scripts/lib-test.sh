@@ -10,6 +10,8 @@ check() { # check "nom" commande...
     if "$@" >/dev/null 2>&1; then ok "$name"; else ko "$name"; fi
 }
 finish() {
+    local diag="${CI_DIAG_LOG:-/tmp/ci-scripts-diag.log}"
+    [ -f "$diag" ] && { cat "$diag"; rm -f "$diag"; }
     echo "$PASS passed, $FAIL failed"
     [ "$FAIL" -eq 0 ]
 }

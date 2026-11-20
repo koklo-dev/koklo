@@ -59,18 +59,20 @@ check "skills-sync-gate.sh appelé" g 'skills-sync-gate\.sh'
 check "skills-sync-gate.sh présent" test -f "$HERE/skills-sync-gate.sh"
 # Jobs de la CI découpée : `checks` (lint, typecheck, build), `tests` (matrice de lots), `coverage`.
 blk() { job_block "$1"; }
-# Diagnostic (CI `ci scripts` rouge sur develop depuis le 13/11, vert en local) : même résultat qu'avant, mais un échec
-# écrit les statuts du tube (awk, grep), la taille du bloc et la version d'awk, pour distinguer un SIGPIPE (141), un bloc
-# vide et un motif absent. À retirer avec la correction.
+# Le bloc du job est lu dans une variable puis cherché : un tube `blk | grep -q` fait quitter grep au premier résultat,
+# awk reçoit un SIGPIPE et, sous `set -o pipefail`, la vérification peut échouer au hasard (`ci scripts` rouge sur develop
+# depuis le 13/11, vert en local). `check` jette stdout et stderr : un échec est donc écrit dans `CI_DIAG_LOG`, que
+# `finish` (lib-test.sh) affiche en fin de script.
 in_job() {
-    local j="$1"
+    local j="$1" block rc=0
     shift
-    blk "$j" | grep -Eq -- "$1"
-    local st=("${PIPESTATUS[@]}")
-    if [ "${st[0]}" -ne 0 ] || [ "${st[1]}" -ne 0 ]; then
-        echo "DIAG in_job job=$j motif=/$1/ statut_awk=${st[0]} statut_grep=${st[1]} lignes_bloc=$(blk "$j" | wc -l) awk=$(awk -W version 2>&1 | head -1)" >&2
+    block="$(blk "$j")"
+    grep -Eq -- "$1" <<<"$block" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf 'DIAG in_job job=%s motif=/%s/ statut_grep=%s lignes_bloc=%s awk=%s\n' \
+            "$j" "$1" "$rc" "$(wc -l <<<"$block")" "$(awk -W version 2>&1 | head -1)" >>"${CI_DIAG_LOG:-/tmp/ci-scripts-diag.log}"
     fi
-    [ "${st[0]}" -eq 0 ] && [ "${st[1]}" -eq 0 ]
+    return "$rc"
 }
 jrank() { blk "$1" | grep -nE -- "$2" | head -1 | cut -d: -f1; }
 jbefore() {
