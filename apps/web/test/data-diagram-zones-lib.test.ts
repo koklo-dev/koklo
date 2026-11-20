@@ -144,7 +144,12 @@ describe("zones du diagramme (serveur)", () => {
 
 describe("grille de la vue des zones (maquette 11 l.476)", () => {
   it("deux colonnes : x = 40 + (i % 2) × 400, y = 30 + ⌊i / 2⌋ × 270", () => {
-    const nodes = ["a", "b", "c", "d", "e"].map((id) => ({ id, name: id, width: 300, height: 180 }));
+    const nodes = ["a", "b", "c", "d", "e"].map((id) => ({
+      id,
+      name: id,
+      width: 300,
+      height: 180,
+    }));
     expect(zoneGridPositions(nodes)).toEqual({
       a: { x: 40, y: 30 },
       b: { x: 440, y: 30 },
