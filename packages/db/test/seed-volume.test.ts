@@ -451,7 +451,8 @@ describe("TK-94 volumes déclarés des modèles à venir (lecture prudente, B34)
     expect(PENDING_VOLUMES.large).not.toHaveProperty("rules");
     // TK-99a : les 400 propositions sont désormais insérées, plus seulement déclarées.
     expect(PENDING_VOLUMES.large).not.toHaveProperty("proposals");
-    expect(PENDING_VOLUMES.planche).toMatchObject({ sampleRows: { count: 1240 } });
+    // TK-110 : les 1 240 lignes de la planche sont désormais générées par `generation` (B488), plus seulement déclarées.
+    expect(PENDING_VOLUMES.planche).not.toHaveProperty("sampleRows");
     expect(PENDING_VOLUMES.planche).not.toHaveProperty("journeys");
     for (const profile of Object.values(PENDING_VOLUMES)) {
       for (const [type, declared] of Object.entries(profile)) {
@@ -469,4 +470,121 @@ describe("TK-94 volumes déclarés des modèles à venir (lecture prudente, B34)
       `modèle(s) apparu(s) dans le schéma : étendre seed:large et seed:planche puis retirer de PENDING_MODELS`,
     ).toEqual([]);
   });
+});
+
+/**
+ * TK-110 lot A (B488) : `seed:planche` reproduit les 6 zones de la maquette (6, 9, 18, 7, 14, 11 tables) avec leurs liens, et
+ * `FX-table-001` porte un bloc `generation` (1 240 lignes sur la planche, 5 000 sur `large`). Idempotent.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
+describe("TK-110 : zones et lignes générées des jeux de volume", () => {
+  const entities = async (projectName: string, kind: string) => {
+    const project = await projectByName(projectName);
+    return db.query<{ spec_id: string; data: Record<string, unknown> }>(
+      `SELECT e.spec_id, e.data FROM spec_entities e
+         JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 AND e.kind = $2 ORDER BY e.sort`,
+      [project?.id, kind],
+    );
+  };
+  type TableData = {
+    zone: string;
+    relations: { vers: string }[];
+    champs: { nom: string; type: string }[];
+  };
+
+  it("planche : 65 tables en 6 zones de 6, 9, 18, 7, 14 et 11 tables, dans l'ordre de la maquette", async () => {
+    await seedPlanche(db.url);
+    const tables = await entities("Volume · planche", "table");
+    expect(tables).toHaveLength(65);
+    const order: string[] = [];
+    const sizes = new Map<string, number>();
+    for (const row of tables) {
+      const zone = (row.data as unknown as TableData).zone;
+      if (!sizes.has(zone)) order.push(zone);
+      sizes.set(zone, (sizes.get(zone) ?? 0) + 1);
+    }
+    expect(order).toEqual([
+      "Prise de rendez-vous",
+      "Clients et fidélité",
+      "Catalogue et stock",
+      "Personnel",
+      "Paiement et caisse",
+      "Communication",
+    ]);
+    expect(order.map((zone) => sizes.get(zone))).toEqual([6, 9, 18, 7, 14, 11]);
+  }, 120_000);
+
+  it("planche : les liens entre zones sont ceux de la maquette (17 depuis les rendez-vous), les relations ciblent des tables du jeu", async () => {
+    await seedPlanche(db.url);
+    const tables = await entities("Volume · planche", "table");
+    const zoneOf = new Map(
+      tables.map((row) => [row.spec_id, (row.data as unknown as TableData).zone]),
+    );
+    const pairs = new Set<string>();
+    const counts = new Map<string, number>();
+    for (const row of tables) {
+      const data = row.data as unknown as TableData;
+      const targets = [
+        ...data.relations.map((relation) => relation.vers),
+        ...data.champs.flatMap((field) => /^ref\((T-.+)\)$/.exec(field.type)?.[1] ?? []),
+      ];
+      for (const target of targets) {
+        expect(zoneOf.has(target), `${row.spec_id} -> ${target}`).toBe(true);
+        const [a, b] = [data.zone, zoneOf.get(target) as string];
+        const key = [row.spec_id, target].sort().join("|");
+        if (a === b || pairs.has(key)) continue;
+        pairs.add(key);
+        for (const zone of [a, b]) counts.set(zone, (counts.get(zone) ?? 0) + 1);
+      }
+    }
+    expect(counts.get("Prise de rendez-vous")).toBe(17);
+    expect(counts.get("Clients et fidélité")).toBe(4 + 6 + 4);
+    expect(counts.get("Catalogue et stock")).toBe(3 + 7 + 2);
+    expect(counts.get("Personnel")).toBe(2 + 2);
+    expect(counts.get("Paiement et caisse")).toBe(5 + 4 + 7);
+    expect(counts.get("Communication")).toBe(3 + 6);
+  }, 120_000);
+
+  it("FX-table-001 : generation de 1 240 lignes sur la planche (graine 1240), 5 000 sur large, règles sur des champs de la table", async () => {
+    await seedPlanche(db.url);
+    await seedLarge(db.url);
+    for (const [name, total] of [
+      ["Volume · planche", 1240],
+      ["Volume · charge", 5000],
+    ] as const) {
+      const [first, second] = await entities(name, "fixture");
+      type Generated = {
+        table: string;
+        generation?: { graine: number; total: number; regles: object };
+      };
+      const fixture = (first?.data ?? {}) as Generated;
+      const generation = fixture.generation;
+      expect(generation?.total, name).toBe(total);
+      expect(generation?.graine).toBeGreaterThanOrEqual(0);
+      const tables = await entities(name, "table");
+      const table = tables.find((row) => row.spec_id === fixture.table);
+      const fields = ((table?.data ?? { champs: [] }) as unknown as TableData).champs.map(
+        (field) => field.nom,
+      );
+      for (const key of Object.keys(generation?.regles ?? {})) expect(fields).toContain(key);
+      expect(Object.keys(generation?.regles ?? {}).length).toBeGreaterThan(0);
+      expect(second?.data).not.toHaveProperty("generation");
+    }
+  }, 120_000);
+
+  it("un second chargement de la planche ne change ni les zones ni les jeux", async () => {
+    await seedPlanche(db.url);
+    const before = JSON.stringify([
+      await entities("Volume · planche", "table"),
+      await entities("Volume · planche", "fixture"),
+    ]);
+    await seedPlanche(db.url);
+    expect(
+      JSON.stringify([
+        await entities("Volume · planche", "table"),
+        await entities("Volume · planche", "fixture"),
+      ]),
+    ).toBe(before);
+  }, 120_000);
 });

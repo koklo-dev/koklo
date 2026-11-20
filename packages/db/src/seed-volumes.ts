@@ -17,7 +17,7 @@ export interface SeededVolume {
   permissions: number;
   /** Propositions de l'agent (TK-99a, TK-105) : un lancement terminé et ses propositions, groupées par type et par zone. */
   proposals: number;
-  /** Jeux d'exemple `data/fixtures/FX-*.yaml` indexés (TK-107, B383) ; le volume réel de lignes reste à TK-110. */
+  /** Jeux d'exemple `data/fixtures/FX-*.yaml` indexés (TK-107, B383) ; le premier génère 1 240 (planche) ou 5 000 (large) lignes (TK-110, B488). */
   fixtures: number;
 }
 
@@ -57,7 +57,7 @@ export interface PendingVolume {
   ticket: string;
 }
 
-type PendingProfile = Partial<Record<"sampleRows", PendingVolume>>;
+type PendingProfile = Record<string, PendingVolume>;
 
 /**
  * Volumes demandés par les passations pour des modèles absents du schéma : déclarés, jamais insérés
@@ -65,9 +65,8 @@ type PendingProfile = Partial<Record<"sampleRows", PendingVolume>>;
  */
 export const PENDING_VOLUMES: Record<VolumeProfile, PendingProfile> = {
   large: {},
-  planche: {
-    sampleRows: { count: 1240, ticket: "ticket du lot 6 (jeux d'exemple)" },
-  },
+  // TK-110 : les 1 240 lignes d'exemple de la planche sont générées (bloc `generation` de FX-table-001), plus déclarées.
+  planche: {},
 };
 
 /**
