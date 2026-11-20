@@ -110,7 +110,11 @@ export async function searchEntityIds(
  * (`champs[].type` en `ref(T-…)`), une seule fois par paire, sans boucle. C'est ce que trace le diagramme.
  */
 
-/** Nombre de relations de chaque table (lignes `ids` de `spec_entities`) : liens qui partent d'elle ou la visent (B384, B476). */
+/**
+ * Nombre de relations de chaque table (lignes `ids` de `spec_entities`) : liens qui partent d'elle ou la visent (B384, B476).
+ * Les liens sont calculés une seule fois puis comptés par table : une sous-requête corrélée rejouait l'expansion JSON
+ * de toutes les tables pour chaque ligne de la page (340 ms pour 50 tables sur 80).
+ */
 export async function tableRelationCounts(
   raw: PrismaClient,
   snapshotId: string,
@@ -127,10 +131,15 @@ export async function tableRelationCounts(
       UNION
       SELECT t.spec_id, substring(field ->> 'type' FROM '^ref\\((T-[a-z0-9-]+)\\)$') FROM tables t,
              jsonb_array_elements(CASE WHEN jsonb_typeof(t.data -> 'champs') = 'array' THEN t.data -> 'champs' ELSE '[]'::jsonb END) AS field
+    ), valid AS (
+      SELECT src, dst FROM links WHERE dst IS NOT NULL AND dst <> src
+    ), counts AS (
+      SELECT spec_id, count(*)::int AS n
+        FROM (SELECT src AS spec_id FROM valid UNION ALL SELECT dst FROM valid) ends
+       GROUP BY spec_id
     )
-    SELECT t.id, (SELECT count(*) FROM links l
-                   WHERE l.dst IS NOT NULL AND l.dst <> l.src AND (l.src = t.spec_id OR l.dst = t.spec_id))::int AS n
-      FROM tables t
+    SELECT t.id, coalesce(c.n, 0)::int AS n
+      FROM tables t LEFT JOIN counts c ON c.spec_id = t.spec_id
      WHERE t.id = ANY(${[...ids]}::uuid[])`;
   return new Map(rows.map((row) => [row.id, row.n]));
 }
