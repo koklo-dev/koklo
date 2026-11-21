@@ -1,6 +1,6 @@
 ---
 doc_version: 1
-last_reviewed: 2026-11-20
+last_reviewed: 2026-11-21
 ---
 # Passation de la refonte : état, méthode, décisions
 
@@ -8,7 +8,7 @@ last_reviewed: 2026-11-20
 > fusionné, et ajouter ici toute nouvelle décision de méthode de l'utilisateur. Les décisions produit restent dans
 > `docs/refonte/questions.md` (une ligne B-nnn chacune) ; rien ne se décide « dans la conversation » sans être écrit.
 
-## État au 2026-11-20
+## État au 2026-11-21
 
 | Sprint | Ticket | État |
 | --- | --- | --- |
@@ -37,8 +37,9 @@ last_reviewed: 2026-11-20
 | 025 | TK-111 (Architecture : formats `architecture/`, ids `C-`/`ADR-`, `.mmd` générés dans le commit du lot, contrat 3.9.0, `ai.proposeDeliverable` « architecture », états Prêt/Génération/Relecture, onglets Document et Composants, `SpecItemSheet` Composant) | ✅ fusionné (PR #222, `2de9b725` et `93fb73fc`) ; décisions B506 à B540 ; DESIGN §5.22 ; `packages/ui` : `DocSectionStatus`, `ProposedPageCard` variante section, `EmptyState` callout. Schéma, Flux, Décisions : TK-112 et TK-113 |
 | 025 | TK-112 (contrat 3.10.0 : zones, `layout.save`, `flows.*`, `source` YAML/Mermaid équipe ; onglets Schéma et Flux ; `SequenceDiagram`, `ArchNodeCard`) | ✅ fusionné (PR #223, `78cfde4c`, `c958a208`, `a8f4e142`) ; décisions B541 à B574 ; B538 (ligne Composants vers Schéma) reportée à TK-113 (B573) ; DESIGN §5.23 |
 | 025 | TK-113 (contrat 3.11.0 : `adr.list|byId`, impact amont étendu, commentaires composant/décision/flux, `clientSpace.architecture*` ; onglet Décisions, « Valider l'architecture », À revoir, vue client ; ligne Composants vers Schéma) | ✅ fusionné (PR #224, `6b5bd424`, `1700ee5e`) ; décisions B575 à B606 ; `adr.list` triée par ordre d'index et non par date (B593) ; DESIGN §5.24 |
+| 025 | TK-114 (marges des encadrés pointillés portées par `ProposedPageCard`/`ProposedPageList`/`ProposalDiff`, raison de « Valider le cahier » dans le résumé de l'en-tête) | ✅ fusionné (PR #225, `a54488d9`) ; décisions B608 à B612 ; DESIGN v2.29. **Sprint 025 : quatre tickets fusionnés ; cases de DoD du sprint non cochées** (captures comparées à la planche, axe, `seed:large` : vérifiés ticket par ticket, pas de relecture d'ensemble) |
 
-Ticket en cours : TK-114 (sprint 025, marges des encadrés et en-têtes des livrables), dernier du sprint 025. Suivant : TK-115 (sprint 026), à vérifier dans le vault. Le sprint 024 n'est pas clos : case de TK-110 à cocher après relecture des captures (voir ci-dessus). DoD des sprints 022 à 025 encore à vérifier avant de les cocher.
+Ticket en cours : aucun. Prochain : TK-115 (sprint 026, Technique : formats, états, Stack, Environnements), **pas encore lancé**. DoD des sprints 022 à 025 encore à vérifier avant de les cocher ; case de TK-110 (sprint 024) à cocher après relecture des captures.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
