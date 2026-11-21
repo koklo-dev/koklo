@@ -45,6 +45,10 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       "table",
       "relations",
       "fixtures",
+      "component",
+      "archflow",
+      "adr",
+      "doc_section",
     ]);
     expect(AGENT_PROPOSE_LIMITS).toEqual({
       zones: 12,
@@ -70,6 +74,18 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       "functional.roles",
       "functional.flows",
       "data.current",
+    ]);
+  });
+
+  it("L'agent lit, pour l'Architecture : Fonctionnel, tables, architecture actuelle, exigences connues (TK-111)", () => {
+    expect([...AGENT_READS.architecture]).toEqual([
+      "functional.features",
+      "functional.rules",
+      "functional.roles",
+      "functional.flows",
+      "data.tables",
+      "architecture.current",
+      "nfr.known",
     ]);
   });
 

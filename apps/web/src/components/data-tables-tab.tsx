@@ -27,6 +27,7 @@ import {
   usedByText,
 } from "../lib/data-labels.ts";
 import type { DiagramCard } from "../lib/data-mermaid.ts";
+import { useAutoLoad } from "../lib/use-auto-load.ts";
 import type { DataPageModel } from "../lib/use-data-page.ts";
 import { TABLES_PAGE_SIZE } from "../lib/use-data-tables.ts";
 import { FilterChipMenu } from "./features-filters.tsx";
@@ -158,21 +159,6 @@ function proposedRows(cards: readonly DiagramCard[], saved: ReadonlySet<string>)
       personal: card.fields.some((field) => field.kind === "personal"),
       state: card.state ?? "review",
     }));
-}
-
-/** Défilement vers la suite : le pied de liste charge la page suivante quand il entre dans l'écran. */
-function useAutoLoad(onLoadMore: () => void, enabled: boolean) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || !enabled || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [onLoadMore, enabled]);
-  return ref;
 }
 
 /** Recherche (260 × 32, 44 sous 768 px) puis filtre de zone, à droite de la barre de compte (maquette 11 l.236). */

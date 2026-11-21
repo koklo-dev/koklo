@@ -42,7 +42,7 @@ export function resetShell(scenario: ShellScenario): void {
 }
 
 type Handlers = {
-  scenario: ShellScenario & { board?: string };
+  scenario: ShellScenario & { board?: string; architecture?: string };
   projects: () => Array<{ id: string; name: string }>;
   send: Send;
   hold: (release: () => void) => void;
@@ -125,19 +125,34 @@ function shellResponse(projectId: string, h: Handlers): Reply {
     id: project.id,
     name: project.name,
     phase: ideaPhase(),
-    deliverables: DELIVERABLES.map(([key, available, after]) => ({ key, available, after })),
+    deliverables: DELIVERABLES.map(([key, available, after]) => ({
+      key,
+      available: availableOf(key, available, h.scenario),
+      after,
+    })),
     validatedCount: 0,
     ticketCount: noSprint ? null : 8,
   });
 }
 
 /** Statut d'un livrable : le scénario du modèle de données (TK-109) pilote Fonctionnel et Données, la vue client attend le Fonctionnel (TK-104). */
-function statusOf(key: string, scenario: ShellScenario): string {
+/** Un scénario de l'écran Architecture (TK-111) suppose les Données validées : le livrable s'ouvre. */
+const availableOf = (key: string, available: boolean, scenario: { architecture?: string }) =>
+  key === "architecture" && scenario.architecture !== undefined ? true : available;
+
+function statusOf(key: string, scenario: ShellScenario & { architecture?: string }): string {
   const data = dataDeliverable(scenario);
   if (data && key === "data") return data.status;
   if (data && key === "functional") return "validated";
+  if (key === "architecture" && scenario.architecture !== undefined) return "pending";
   return key === "functional" && "clientSpace" in scenario ? "pending" : "todo";
 }
+
+const pendingOf = (key: string, scenario: object): number => {
+  const mode = "proposals" in scenario ? scenario.proposals : undefined;
+  if (key === "data" && mode === "data") return 8;
+  return key === "architecture" && mode === "architecture" ? 9 : 0;
+};
 
 function deliverablesResponse(projectId: string, h: Handlers): Reply {
   const mode = h.scenario.shell ?? "data";
@@ -154,7 +169,7 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
     // suppose validé (TK-109) et pilote le statut des Données.
     status: statusOf(key, h.scenario),
     ...(key === "data" && data?.staleUpstream ? { staleUpstream: data.staleUpstream } : {}),
-    available,
+    available: availableOf(key, available, h.scenario),
     after,
   }));
   return reply(200, {
@@ -166,8 +181,7 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
       forced: false,
       condition: after === null ? null : `Disponible après ${after}`,
       // Relecture des Données (scénario `proposals: "data"`) : la pastille de la barre dit « 8 à relire » (maquette 11 l.625).
-      pendingProposals:
-        key === "data" && "proposals" in h.scenario && h.scenario.proposals === "data" ? 8 : 0,
+      pendingProposals: pendingOf(key, h.scenario),
     })),
     validatedCount: entries.filter((entry) => entry.status === "validated").length,
   });

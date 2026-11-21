@@ -112,7 +112,11 @@ export class SpecReadService {
   }
 
   /** Règle, parcours, table ou fichier de rôles de la tête, lus dans l'index d'entités (aucun réseau) ; `NOT_FOUND` si absent. */
-  async entity(scope: ProjectScope, kind: "rule" | "flow" | "roles" | "table", specId: string) {
+  async entity(
+    scope: ProjectScope,
+    kind: "rule" | "flow" | "roles" | "table" | "component",
+    specId: string,
+  ) {
     const item: EntityItem | null = await this.repository.entityItem(scope, kind, specId);
     if (item?.kind === "failed") throw indexFailed(item);
     return orNotFound(item);

@@ -9,7 +9,12 @@ import {
   parseSpecFiles,
   type SpecFile,
 } from "@koklo/schema";
+import { adrIndex, applyAdr } from "./adrs.ts";
+import { applyArchFlow, archFlowIndex } from "./archflows.ts";
+import { refreshArchitecture } from "./architecture-generated.ts";
 import { startingPoint } from "./auto-migrate.ts";
+import { applyComponent, componentIndex } from "./components.ts";
+import { applyDocSection, type DocSections, docSectionIndex } from "./doc-sections.ts";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
 import { applyFixture, fixtureIndex } from "./fixtures.ts";
 import { applyFlow, flowIndex } from "./flows.ts";
@@ -41,6 +46,10 @@ export type Plan =
 interface Planned extends Workspace {
   /** Fichiers de la tête, par genre : identifiant -> chemin (les créations du lot n'y figurent pas). */
   readonly index: Index;
+  /** Jour de l'enfilage du lot (AAAA-MM-JJ) : date d'une décision nouvelle. */
+  readonly today: string;
+  /** Sections du document, avec le prochain numéro libre (consommé par les créations du lot). */
+  readonly docs: DocSections & { next: number };
 }
 
 interface Index {
@@ -50,6 +59,10 @@ interface Index {
   readonly roles: Set<string>;
   readonly tables: Map<string, string>;
   readonly fixtures: Set<string>;
+  readonly components: Map<string, string>;
+  readonly archflows: Map<string, string>;
+  readonly adrs: Map<string, string>;
+  readonly docs: DocSections;
 }
 
 function featureIndex(files: readonly SpecFile[]): Map<string, string> {
@@ -64,7 +77,7 @@ function featureIndex(files: readonly SpecFile[]): Map<string, string> {
 /** Genre d'une opération (`feature`, `rule`, `role`, `flow`, `table`, `fixture`, `layout`) : le préfixe de son `kind`. */
 const genreOf = (operation: BatchOperation): string => operation.kind.split(".")[0] ?? "";
 
-function indexOf(files: readonly SpecFile[]): Index {
+function indexOf(files: readonly SpecFile[], tree: readonly string[]): Index {
   const paths = files.map((file) => file.path);
   const roles = new Set<string>();
   if (paths.includes("domain/roles.yaml")) {
@@ -80,6 +93,10 @@ function indexOf(files: readonly SpecFile[]): Index {
     roles,
     tables: tableIndex(paths),
     fixtures: fixtureIndex(paths),
+    components: componentIndex(paths),
+    archflows: archFlowIndex(paths),
+    adrs: adrIndex(paths),
+    docs: docSectionIndex([...new Set([...tree, ...paths])]),
   };
 }
 
@@ -91,6 +108,10 @@ function present(index: Index, operation: BatchOperation): boolean {
   if (genre === "role") return index.roles.has(id);
   if (genre === "table") return index.tables.has(id);
   if (genre === "fixture") return index.fixtures.has(id);
+  if (genre === "component") return index.components.has(id);
+  if (genre === "archflow") return index.archflows.has(id);
+  if (genre === "adr") return index.adrs.has(id);
+  if (genre === "doc") return index.docs.byId.has(id);
   if (genre === "flow") {
     const created = operation.kind === "flow.create";
     return created ? index.flows.taken.has(id) : index.flows.owned.has(id);
@@ -170,6 +191,22 @@ function applyOperation(workspace: Planned, operation: BatchOperation): void {
     applyFixture(workspace, operation);
     return;
   }
+  if (genre === "component") {
+    applyComponent(workspace, operation, workspace.index.components.get(id));
+    return;
+  }
+  if (genre === "archflow") {
+    applyArchFlow(workspace, operation, workspace.index.archflows.get(id));
+    return;
+  }
+  if (genre === "adr") {
+    applyAdr(workspace, operation, workspace.index.adrs.get(id), workspace.today);
+    return;
+  }
+  if (genre === "doc") {
+    applyDocSection(workspace, operation, workspace.docs);
+    return;
+  }
   if (genre === "layout") {
     applyLayout(workspace, operation);
     return;
@@ -217,7 +254,7 @@ function refreshModel(workspace: Workspace): void {
  * ou rien : un résultat métier n'a jamais de changement. `parentFiles` : l'état au parent du commit d'une migration (retour arrière).
  */
 export function planBatch(
-  batch: Pick<LoadedBatch, "operations" | "authorRole">,
+  batch: Pick<LoadedBatch, "operations" | "authorRole" | "enqueuedAt">,
   files: readonly SpecFile[],
   treePaths: readonly string[] = files.map((file) => file.path),
   parentFiles?: readonly SpecFile[],
@@ -230,7 +267,7 @@ export function planBatch(
   }
   const start = startingPoint(batch.operations, files);
   if ("outcome" in start) return start;
-  const index = indexOf(start.files);
+  const index = indexOf(start.files, treePaths);
   const conflict = conflictOf(batch.operations, index);
   if (conflict) return { outcome: conflict };
   const workspace: Planned = {
@@ -238,10 +275,13 @@ export function planBatch(
     files: new Map(start.files.map((file) => [file.path, file.content])),
     changes: new Map(start.changes.map((change) => [change.path, change])),
     index,
+    today: (batch.enqueuedAt ?? new Date()).toISOString().slice(0, 10),
+    docs: { ...index.docs, byId: new Map(index.docs.byId), next: index.docs.last + 1 },
   };
   try {
     for (const operation of batch.operations) applyOperation(workspace, operation);
     refreshModel(workspace);
+    refreshArchitecture(workspace, treePaths);
     const report = validate(start.files, toFiles(workspace.files));
     return report
       ? { changes: [...workspace.changes.values()], report }

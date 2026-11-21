@@ -17,7 +17,22 @@ const KIND_LABELS: Record<AgentProposalKind, string> = {
   table: "Tables",
   relations: "Relations",
   fixtures: "Jeux d'exemple",
+  component: "Composants",
+  archflow: "Flux",
+  adr: "Décisions",
+  doc_section: "Document · vue d'ensemble",
 };
+
+/**
+ * L'Architecture (TK-111) se relit par type, jamais par zone : le document d'abord, puis composants, flux, décisions (maquette
+ * 13). Pour les autres livrables, l'ordre est celui de `AGENT_PROPOSAL_KINDS`.
+ */
+const BY_TYPE_ONLY: readonly AgentProposalKind[] = ["doc_section", "component", "archflow", "adr"];
+const isByTypeOnly = (kind: AgentProposalKind): boolean => BY_TYPE_ONLY.includes(kind);
+const rankOf = (kind: AgentProposalKind): number =>
+  isByTypeOnly(kind)
+    ? AGENT_PROPOSAL_KINDS.length + BY_TYPE_ONLY.indexOf(kind) - BY_TYPE_ONLY.length
+    : AGENT_PROPOSAL_KINDS.indexOf(kind);
 
 /** Nombre de propositions par (type, zone, statut), et position de la première de la zone. */
 export interface GroupCount {
@@ -56,7 +71,7 @@ const isLinksKind = (kind: AgentProposalKind): boolean =>
   (LINKS_KINDS as readonly string[]).includes(kind);
 
 export const groupKeyOf = (kind: AgentProposalKind, zone: string, by: GroupBy): string => {
-  if (by === "type") return kind;
+  if (by === "type" || isByTypeOnly(kind)) return kind;
   return isLinksKind(kind) ? LINKS_GROUP_KEY : `${kind}:${zone}`;
 };
 
@@ -83,7 +98,7 @@ const emptyGroup = (key: string, label: string): ProposalGroup => ({
 });
 
 const labelOf = (row: GroupCount, by: GroupBy): string => {
-  if (by === "type") return KIND_LABELS[row.kind];
+  if (by === "type" || isByTypeOnly(row.kind)) return KIND_LABELS[row.kind];
   if (isLinksKind(row.kind)) return LINKS_GROUP_LABEL;
   return row.kind === "table" ? `Zone ${row.zone}` : row.zone;
 };
@@ -91,11 +106,7 @@ const labelOf = (row: GroupCount, by: GroupBy): string => {
 /** Groupes d'un lancement, dans l'ordre des types puis de la première position ; un seul groupe sous le seuil. */
 export function buildGroups(counts: readonly GroupCount[], by: GroupBy): ProposalGroup[] {
   const total = counts.reduce((sum, row) => sum + row.n, 0);
-  const ordered = [...counts].sort(
-    (a, b) =>
-      AGENT_PROPOSAL_KINDS.indexOf(a.kind) - AGENT_PROPOSAL_KINDS.indexOf(b.kind) ||
-      a.first - b.first,
-  );
+  const ordered = [...counts].sort((a, b) => rankOf(a.kind) - rankOf(b.kind) || a.first - b.first);
   const groups = new Map<string, ProposalGroup>();
   for (const row of ordered) {
     const single = total <= GROUPING_THRESHOLD;

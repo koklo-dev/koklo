@@ -52,7 +52,7 @@ describe("TK-103 migration rule_counter", () => {
   }, 180_000);
 
   it("down.sql retire rule sans toucher aux autres compteurs, et rejoue (up, down, up)", async () => {
-    expect(await labels()).toEqual(["ticket", "sprint", "feature", "suggestion", "rule"]);
+    expect(await labels()).toEqual(["ticket", "sprint", "feature", "suggestion", "rule", "adr"]);
     await db.query(sqlOf("down.sql"));
     expect(await labels()).toEqual(["ticket", "sprint", "feature", "suggestion"]);
     await db.query(sqlOf("migration.sql"));

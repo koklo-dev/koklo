@@ -5,6 +5,7 @@
  * db, comme `packages/db/test/spec-enum-parity.test.ts`.
  */
 import * as contract from "@koklo/contract";
+import * as schema from "@koklo/schema";
 import { describe, expect, it } from "vitest";
 import {
   accepts,
@@ -293,5 +294,79 @@ describe("TK-109 : résumé client des tables (contrat 3.7.0)", () => {
     expect(read("packages/db/prisma/schema.prisma")).toContain(
       'targetRef      String?           @map("target_ref")',
     );
+  });
+});
+
+/** TK-111 : l'Architecture du contrat 3.9.0 recopie les vocabulaires et les motifs de @koklo/schema. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même livrable, un test par comportement
+describe("TK-111 : architecture (contrat 3.9.0)", () => {
+  const op = (operation: Record<string, unknown>) => ({
+    projectId: "123e4567-e89b-42d3-a456-426614174000",
+    idempotencyKey: "k",
+    operations: [operation],
+  });
+  const submit = inputOf("specBatch.submit");
+
+  it("types de composant, statuts de décision et de section du contrat = ceux de schema", () => {
+    expect(sorted(options(api.componentTypeSchema))).toEqual(sorted([...schema.COMPONENT_TYPES]));
+    expect(sorted(options(api.adrStatusSchema))).toEqual(sorted([...schema.ADR_STATUSES]));
+    expect(sorted(options(api.docSectionStatusSchema))).toEqual(
+      sorted([...schema.DOC_SECTION_STATUSES]),
+    );
+  });
+
+  it("identifiants C-<slug> et ADR-nnn du contrat = ceux de schema", () => {
+    for (const [pattern, id] of [
+      [schema.PATTERNS.component, "C-api"],
+      [schema.PATTERNS.component, "C-Api"],
+      [schema.PATTERNS.adr, "ADR-001"],
+      [schema.PATTERNS.adr, "ADR-1"],
+    ] as const) {
+      const operation = { kind: "component.delete", specId: id };
+      const accepted = accepts(
+        submit,
+        op(id.startsWith("ADR") ? { kind: "adr.delete", specId: id } : operation),
+      );
+      expect(accepted, id).toBe(pattern.test(id));
+    }
+  });
+
+  it("types de propositions : un champ par champ des schémas de proposition de schema (component, archflow, adr, doc_section)", () => {
+    const kinds = ["component", "archflow", "adr", "doc_section"];
+    for (const kind of kinds) expect(options(api.proposalKindSchema)).toContain(kind);
+    expect(Object.keys(schema.PROPOSAL_SCHEMAS)).toEqual(expect.arrayContaining(kinds));
+  });
+
+  it("codes d'avertissement du contrat = codes ARCH_ de ISSUE_CODES (les six avertissements, sans les erreurs de référence)", () => {
+    const warnings = Object.values(schema.ISSUE_CODES).filter(
+      (code) => code.startsWith("ARCH_") && !code.startsWith("ARCH_UNKNOWN_"),
+    );
+    expect(sorted([...contract.ARCHITECTURE_CHECK_CODES])).toEqual(sorted(warnings));
+  });
+
+  it("plafonds du contrat = ceux des schémas de proposition : nom de composant 120, responsabilité 500, 30 dépendances", () => {
+    const create = (over: Record<string, unknown>) =>
+      op({
+        kind: "component.create",
+        name: "A",
+        type: "app",
+        zone: "Z",
+        responsibility: "R",
+        ...over,
+      });
+    expect(accepts(submit, create({ name: "x".repeat(120) }))).toBe(true);
+    expect(accepts(submit, create({ name: "x".repeat(121) }))).toBe(false);
+    expect(accepts(submit, create({ responsibility: "x".repeat(501) }))).toBe(false);
+    const link = { to: "C-b", via: "HTTP" };
+    expect(accepts(submit, create({ dependsOn: Array.from({ length: 30 }, () => link) }))).toBe(
+      true,
+    );
+    expect(accepts(submit, create({ dependsOn: Array.from({ length: 31 }, () => link) }))).toBe(
+      false,
+    );
+    const proposal = schema.PROPOSAL_SCHEMAS.component;
+    const valid = { name: "x".repeat(120), type: "app", zone: "Z", responsibility: "R" };
+    expect(proposal.safeParse(valid).success).toBe(true);
+    expect(proposal.safeParse({ ...valid, name: "x".repeat(121) }).success).toBe(false);
   });
 });

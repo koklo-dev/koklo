@@ -27,6 +27,7 @@ export * from "./components/deliverable-status.tsx";
 export * from "./components/diagram-minimap.tsx";
 export * from "./components/diagram-viewer.tsx";
 export * from "./components/dialog.tsx";
+export * from "./components/doc-section-status.tsx";
 export * from "./components/dropdown-menu.tsx";
 export * from "./components/empty-state.tsx";
 export * from "./components/entity-chip.tsx";

@@ -8,11 +8,14 @@ import {
   ProposalSkeleton,
   Skeleton,
 } from "@koklo/ui";
+import type { ReactNode } from "react";
 import { errorCode } from "../lib/api-error.ts";
+import { ARCHITECTURE_GENERATING } from "../lib/architecture-labels.ts";
 import type { FeaturesTab } from "../lib/features-tab.ts";
 import { NO_ACCESS } from "../lib/proposal-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import { type ProposalReviewModel, useProposalReview } from "../lib/use-proposal-review.ts";
+import { ArchitectureGenerating } from "./architecture-generating.tsx";
 import { DataGenerating } from "./data-generating.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { ReviewDetail } from "./features-review-detail.tsx";
@@ -28,6 +31,12 @@ export const DATA_GENERATING =
 const dataSummary = ({ total, accepted, pending }: ProposalReviewModel["counts"]): string =>
   ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis le cahier fonctionnel · ${accepted} ${accepted >= 2 ? "acceptés" : "accepté"} · ${pending} à relire`;
 
+/** « · l'agent propose 12 éléments depuis le fonctionnel et les données · 3 acceptés · 7 à relire » (maquette 13 l.113). */
+const architectureSummary = ({ total, accepted, pending }: ProposalReviewModel["counts"]): string =>
+  ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis le fonctionnel et les données · ${accepted} ${accepted >= 2 ? "acceptés" : "accepté"} · ${pending} à relire`;
+
+type ReviewTab = FeaturesTab | "data" | "architecture";
+
 function Loading() {
   return (
     <div role="status" aria-busy="true" className="flex flex-col gap-2 p-4 md:p-7">
@@ -40,8 +49,9 @@ function Loading() {
 }
 
 /** Génération en cours, rien d'arrivé : bande d'état, « Annuler l'attente » (quitte l'attente seulement), 6 squelettes. */
-function Generating({ onLeave, data }: { onLeave: () => void; data: boolean }) {
-  if (data) return <DataGenerating onLeave={onLeave} />;
+function Generating({ onLeave, tab }: { onLeave: () => void; tab: ReviewTab }) {
+  if (tab === "data") return <DataGenerating onLeave={onLeave} />;
+  if (tab === "architecture") return <ArchitectureGenerating onLeave={onLeave} />;
   return (
     <>
       <ProposalGenerationBanner onLeave={onLeave}>{GENERATING}</ProposalGenerationBanner>
@@ -75,7 +85,7 @@ const failureText = (error: unknown): string =>
   errorCode(error) === "FORBIDDEN" ? NO_ACCESS : "L'action a échoué. Réessayez dans un instant.";
 
 /** Tout ce qui remplace la relecture : erreur de lecture, chargement, génération sans rien arrivé, rien à relire. */
-function placeholderOf(review: ProposalReviewModel, onLeave: () => void, data: boolean) {
+function placeholderOf(review: ProposalReviewModel, onLeave: () => void, tab: ReviewTab) {
   if (review.error) {
     const forbidden = errorCode(review.error) === "FORBIDDEN";
     return (
@@ -88,7 +98,7 @@ function placeholderOf(review: ProposalReviewModel, onLeave: () => void, data: b
   }
   if (!review.status.loaded) return <Loading />;
   if (review.counts.total > 0) return null;
-  if (review.active) return <Generating onLeave={onLeave} data={data} />;
+  if (review.active) return <Generating onLeave={onLeave} tab={tab} />;
   return (
     <Notice title="Aucune proposition à relire" onLeave={onLeave}>
       Lancez l'agent depuis le bouton « Proposer avec l'agent ».
@@ -96,15 +106,19 @@ function placeholderOf(review: ProposalReviewModel, onLeave: () => void, data: b
   );
 }
 
+/** Phrase du bandeau d'attente de chaque livrable. */
+const generatingText = (tab: ReviewTab): string =>
+  tab === "data" ? DATA_GENERATING : tab === "architecture" ? ARCHITECTURE_GENERATING : GENERATING;
+
 interface Notices {
-  data: boolean;
+  tab: ReviewTab;
   review: ProposalReviewModel;
   actions: ReturnType<typeof useProposalActions>;
   onLeave: () => void;
 }
 
 /** Avis au-dessus de la relecture : erreur d'action, récapitulatif d'enregistrement, attente, « tout est relu ». */
-function ReviewNotices({ review, actions, onLeave, data }: Notices) {
+function ReviewNotices({ review, actions, onLeave, tab }: Notices) {
   const { counts, active } = review;
   return (
     <div className="flex flex-col gap-2 px-4 pt-3 empty:hidden md:px-7">
@@ -117,7 +131,7 @@ function ReviewNotices({ review, actions, onLeave, data }: Notices) {
       {active ? (
         // `ProposalReview` porte la région d'état de la relecture : le bandeau ne la double pas.
         <ProposalGenerationBanner silent onLeave={onLeave}>
-          {data ? DATA_GENERATING : GENERATING}
+          {generatingText(tab)}
         </ProposalGenerationBanner>
       ) : null}
       {counts.pending === 0 && counts.accepted > 0 && !active ? (
@@ -137,19 +151,21 @@ export function FeaturesReview({
   projectId,
   branch,
   tab = "features",
+  notice,
   onLeave,
 }: {
   projectId: string;
   branch: string | undefined;
   /** Onglet affiché : la liste relit les propositions de son type (maquette 10 l.532) ; `data` : toutes celles des Données. */
-  tab?: FeaturesTab | "data";
+  tab?: ReviewTab;
+  /** Encadré sous le bandeau de relecture (avertissements d'architecture). */
+  notice?: ReactNode;
   onLeave: () => void;
 }) {
   const review = useProposalReview(projectId, true, tab);
   const actions = useProposalActions(projectId, review, branch);
   const { counts } = review;
-  const data = tab === "data";
-  const placeholder = placeholderOf(review, onLeave, data);
+  const placeholder = placeholderOf(review, onLeave, tab);
   if (placeholder) return placeholder;
   if (review.groups.length === 0) {
     return (
@@ -162,7 +178,7 @@ export function FeaturesReview({
   const item = review.groups.flatMap((group) => group.items).find((i) => i.id === selected?.id);
   return (
     <div className="flex flex-col">
-      <ReviewNotices data={data} review={review} actions={actions} onLeave={onLeave} />
+      <ReviewNotices tab={tab} review={review} actions={actions} onLeave={onLeave} />
       <ProposalReview
         counts={counts}
         groups={review.groups}
@@ -177,8 +193,14 @@ export function FeaturesReview({
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
-        {...(data ? { summaryText: dataSummary(counts), groupNote: "Groupées par zone" } : {})}
+        {...(tab === "data"
+          ? { summaryText: dataSummary(counts), groupNote: "Groupées par zone" }
+          : {})}
+        {...(tab === "architecture"
+          ? { summaryText: architectureSummary(counts), groupNote: "Groupées par type" }
+          : {})}
         announcement={actions.announcement}
+        notice={notice}
       >
         {selected && item ? (
           <ReviewDetail

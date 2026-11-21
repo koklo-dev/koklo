@@ -49,6 +49,13 @@ export function canWriteData(role: Role | string | undefined): boolean {
 }
 
 /**
+ * Écrire l'architecture et lancer l'agent (B510) : propriétaire, administrateur et développeur, comme les Données. Le
+ * designer lit sans écrire ; client et business n'ont aucun accès (403 sur `spec.architecture.*`). Le serveur reste
+ * l'autorité.
+ */
+export const canWriteArchitecture = canWriteData;
+
+/**
  * Écrire un onglet du cahier (B340) : l'équipe écrit les fonctionnalités ; le designer écrit aussi les parcours mais ni
  * les règles ni les rôles (vision §14). Le serveur reste l'autorité (403).
  */

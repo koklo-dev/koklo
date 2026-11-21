@@ -134,6 +134,14 @@ import type {
   validationReportSchema,
 } from "./schemas-spec.ts";
 import type {
+  architectureChecksSchema,
+  architectureComponentSummarySchema,
+  architectureComponentsListInputSchema,
+  architectureDocSectionSchema,
+  architectureDocumentSchema,
+  componentDetailSchema,
+} from "./schemas-spec-architecture.ts";
+import type {
   dataFixturePageInputSchema,
   dataFixturePageSchema,
   dataFixtureRowsInputSchema,
@@ -310,6 +318,14 @@ export type RuleDetail = z.output<typeof ruleDetailSchema>;
 export type RoleDetail = z.output<typeof roleDetailSchema>;
 export type FlowDetail = z.output<typeof flowDetailSchema>;
 export type TableDetail = z.output<typeof tableDetailSchema>;
+export type ComponentDetail = z.output<typeof componentDetailSchema>;
+export type ArchitectureComponentsListInput = z.output<
+  typeof architectureComponentsListInputSchema
+>;
+export type ArchitectureComponentSummary = z.output<typeof architectureComponentSummarySchema>;
+export type ArchitectureDocSection = z.output<typeof architectureDocSectionSchema>;
+export type ArchitectureDocument = z.output<typeof architectureDocumentSchema>;
+export type ArchitectureChecks = z.output<typeof architectureChecksSchema>;
 export type DataTablesListInput = z.output<typeof dataTablesListInputSchema>;
 export type DataTableSummary = z.output<typeof dataTableSummarySchema>;
 export type DataMermaid = z.output<typeof dataMermaidSchema>;

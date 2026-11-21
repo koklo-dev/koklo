@@ -9,6 +9,7 @@ import {
   DecisionNotice,
   InlineAlert,
   ProposalDiff,
+  ProposedPageCard,
   ProposedPageList,
 } from "@koklo/ui";
 import { useState } from "react";
@@ -99,6 +100,17 @@ export function DevUiAgent() {
       <DevUiFrame title="Pages proposées (3 visibles puis « N autres »)">
         <div className="w-[264px] max-w-full">
           <ProposedPageList items={PAGES} onAccept={noop} onIgnore={noop} />
+        </div>
+      </DevUiFrame>
+      <DevUiFrame title="Section proposée (document d'architecture, variante « section »)">
+        <div className="w-[264px] max-w-full">
+          <ProposedPageCard
+            label="section"
+            title="Observabilité"
+            rationale="NFR-005 demande une alerte en moins de 5 min, aucune section ne la décrit."
+            onAccept={noop}
+            onIgnore={noop}
+          />
         </div>
       </DevUiFrame>
       <DevUiFrame title="Mention de confidentialité (ligne nue, « Détails » déplie)">

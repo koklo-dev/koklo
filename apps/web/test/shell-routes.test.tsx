@@ -102,16 +102,33 @@ describe("pages « Bientôt » (C4)", () => {
     expect(element.props.children.props).toEqual({ projectId: ID });
   });
 
-  it.each(["data", "architecture", "technical", "security", "design", "quality"])(
+  it.each(["data", "technical", "security", "design", "quality"])(
     "spec/%s est une page « Bientôt »",
     async (slug) => {
       const { default: Page } = await import(
         "../src/app/(shell)/projects/[projectId]/spec/[slug]/page.tsx"
       );
+
       const element = await Page(params({ projectId: ID, slug }));
       expect(element).toMatchObject({ props: { projectId: ID, slug } });
     },
   );
+
+  it("spec/architecture a sa route dédiée (TK-111) : `[slug]` ne la sert plus", async () => {
+    const { default: Page } = await import(
+      "../src/app/(shell)/projects/[projectId]/spec/[slug]/page.tsx"
+    );
+    await expect(Page(params({ projectId: ID, slug: "architecture" }))).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
+    const { default: Architecture } = await import(
+      "../src/app/(shell)/projects/[projectId]/spec/architecture/page.tsx"
+    );
+    const element = (await Architecture(params({ projectId: ID }))) as {
+      props: { projectId: string };
+    };
+    expect(element.props).toEqual({ projectId: ID });
+  });
 
   it.each(["inconnu", "functional-x", "Data"])("spec/%s : 404", async (slug) => {
     const { default: Page } = await import(

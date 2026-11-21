@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  currentArchitecture,
   currentFeatures,
   type DossierClient,
   frozenPages,
@@ -20,6 +21,7 @@ interface Fake {
   repo?: { id: string; defaultBranch: string } | null;
   heads?: Record<string, { snapshot: { id: string; status: string } }>;
   features?: { specId: string; title: string; criteria: { title: string }[] }[];
+  entities?: { kind: string; specId: string; data: unknown }[];
 }
 
 /** Client factice : chaque délégué rend la donnée de la scène, les appels sont observables. */
@@ -35,6 +37,11 @@ function fakeClient(scene: Fake) {
       ),
     },
     specFeature: { findMany: vi.fn(async (_args: unknown) => scene.features ?? []) },
+    specEntity: {
+      findMany: vi.fn(async ({ where }: { where: { kind: { in: string[] } } }) =>
+        (scene.entities ?? []).filter((entity) => where.kind.in.includes(entity.kind)),
+      ),
+    },
   };
   return { client, typed: client as unknown as DossierClient };
 }
@@ -187,5 +194,53 @@ describe("readFrozenDossier", () => {
       pages: [{ slug: "vision", title: "Vision", contentMd: "v", version: 1 }],
     });
     expect((await readFrozenDossier(typed, PROJECT))?.risks).toBeNull();
+  });
+});
+
+/** TK-111 (B512) : ce que l'agent lit de l'architecture actuelle et des exigences connues ; titres seulement, jamais le contenu. */
+describe("currentArchitecture", () => {
+  const head = {
+    repo: { id: "r-1", defaultBranch: "main" },
+    heads: { cadrage: { snapshot: { id: "s-1", status: "ready" } } },
+  };
+
+  it("composants (nom, zone, type), flux, décisions et exigences connues des fonctionnalités", async () => {
+    const { typed } = fakeClient({
+      ...head,
+      entities: [
+        {
+          kind: "component",
+          specId: "C-api",
+          data: { titre: "API", zone: "Noyau", type: "service", responsabilite: "secret interne" },
+        },
+        { kind: "archflow", specId: "P-reserver", data: { titre: "P-reserver" } },
+        {
+          kind: "adr",
+          specId: "ADR-001",
+          data: { titre: "Base relationnelle", statut: "acceptee" },
+        },
+        { kind: "feature", specId: "F-001", data: { nfr: ["NFR-002", "NFR-001"] } },
+        { kind: "feature", specId: "F-002", data: { nfr: ["NFR-001"] } },
+        { kind: "feature", specId: "F-003", data: {} },
+      ],
+    });
+    const result = await currentArchitecture(typed, PROJECT);
+    expect(result).toEqual({
+      components: [{ specId: "C-api", title: "API", zone: "Noyau", type: "service" }],
+      archflows: [{ specId: "P-reserver", title: "P-reserver" }],
+      decisions: [{ specId: "ADR-001", title: "Base relationnelle" }],
+      nfr: ["NFR-001", "NFR-002"],
+    });
+    expect(JSON.stringify(result)).not.toContain("secret interne");
+  });
+
+  it("sans tête de spec : rien", async () => {
+    const { typed } = fakeClient({});
+    expect(await currentArchitecture(typed, PROJECT)).toEqual({
+      components: [],
+      archflows: [],
+      decisions: [],
+      nfr: [],
+    });
   });
 });

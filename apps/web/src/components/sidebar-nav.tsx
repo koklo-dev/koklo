@@ -2,7 +2,7 @@
 
 import type { Role, SpecDeliverable } from "@koklo/contract";
 import { ShellNavGroup, ShellNavItem, type SpecKey, SpecNav } from "@koklo/ui";
-import { canManage, canWriteSpec } from "../lib/roles.ts";
+import { canManage, canWriteArchitecture, canWriteSpec } from "../lib/roles.ts";
 import { defaultSection } from "../lib/settings-sections.ts";
 import {
   activeSpecSlug,
@@ -31,9 +31,16 @@ function useGeneratingDeliverables(
     canWriteSpec(role) && deliverables?.find((item) => item.key === key)?.available === true;
   const functional = useProposalStatus(projectId, open("functional"));
   const data = useProposalStatus(projectId, open("data"), "data");
+  // Le designer lit l'architecture sans lancer l'agent : sa lecture des propositions serait refusée (B510).
+  const architecture = useProposalStatus(
+    projectId,
+    canWriteArchitecture(role) && open("architecture"),
+    "architecture",
+  );
   const generating = new Set<SpecKey>();
   if (functional.active && functional.counts.total === 0) generating.add("functional");
   if (data.active && data.counts.total === 0) generating.add("data");
+  if (architecture.active && architecture.counts.total === 0) generating.add("architecture");
   return generating;
 }
 

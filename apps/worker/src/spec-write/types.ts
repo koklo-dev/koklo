@@ -21,6 +21,8 @@ export interface LoadedBatch {
   readonly message: string | null;
   readonly authorRole: string | null;
   readonly authorUserId: string | null;
+  /** Enfilage du lot : date des décisions nouvelles (le rejeu d'un lot garde le même jour). */
+  readonly enqueuedAt?: Date;
   readonly operations: readonly BatchOperation[];
   readonly repo: {
     readonly id: string;

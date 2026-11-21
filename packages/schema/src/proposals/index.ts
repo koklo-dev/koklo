@@ -1,8 +1,20 @@
+import {
+  adrProposalSchema,
+  archflowProposalSchema,
+  componentProposalSchema,
+  docSectionProposalSchema,
+} from "./architecture.ts";
 import { fixturesProposalSchema, relationsProposalSchema, tableProposalSchema } from "./data.ts";
 import { criteriaProposalSchema, featureProposalSchema } from "./feature.ts";
 import { flowProposalSchema, roleProposalSchema, ruleProposalSchema } from "./others.ts";
 
 export { isSafeText, safeText } from "./ai-text-policy.ts";
+export {
+  adrProposalSchema,
+  archflowProposalSchema,
+  componentProposalSchema,
+  docSectionProposalSchema,
+} from "./architecture.ts";
 export {
   fixturesProposalSchema,
   relationsProposalSchema,
@@ -27,4 +39,8 @@ export const PROPOSAL_SCHEMAS = {
   table: tableProposalSchema,
   relations: relationsProposalSchema,
   fixtures: fixturesProposalSchema,
+  component: componentProposalSchema,
+  archflow: archflowProposalSchema,
+  adr: adrProposalSchema,
+  doc_section: docSectionProposalSchema,
 } as const;

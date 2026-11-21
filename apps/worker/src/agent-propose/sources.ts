@@ -1,8 +1,10 @@
 import {
+  type CurrentArchitecture,
   type CurrentDomainTitles,
   type CurrentFeature,
   type CurrentTable,
   type CurrentTitle,
+  currentArchitecture,
   currentDataModel,
   currentDomainTitles,
   currentFeatures,
@@ -39,6 +41,8 @@ export interface LaunchSources {
   /** Livrable Données (TK-107) : le modèle actuel ; absent pour le Fonctionnel. Sa présence choisit les prompts des Données. */
   readonly tables?: readonly CurrentTable[];
   readonly fixtures?: readonly CurrentTitle[];
+  /** Livrable Architecture (TK-111) : composants, flux, décisions et exigences connues ; sa présence choisit les prompts de l'architecture. */
+  readonly architecture?: CurrentArchitecture;
 }
 
 /** Diff `idea-vN-1` vers `idea-vN` du mode `update` ; `null` sans version précédente, `undefined` hors mode `update`. */
@@ -70,12 +74,33 @@ function readDataSources(client: TenantClient, launch: LaunchContext): Promise<L
   }));
 }
 
+/**
+ * Sources de l'Architecture (B512) : le Fonctionnel indexé, les tables, l'architecture actuelle et les exigences connues ; ni
+ * dossier d'idée, ni synthèse, ni lignes de jeux (`tag` est celui de l'architecture).
+ */
+function readArchitectureSources(
+  client: TenantClient,
+  launch: LaunchContext,
+): Promise<LaunchSources> {
+  return withOrganization(launch.organizationId, async () => ({
+    tag: "architecture",
+    pages: [],
+    synthesis: null,
+    risks: null,
+    features: await currentFeatures(client, launch.projectId),
+    ...(await currentDomainTitles(client, launch.projectId)),
+    tables: (await currentDataModel(client, launch.projectId)).tables,
+    architecture: await currentArchitecture(client, launch.projectId),
+  }));
+}
+
 /** Lit les sources du lancement ; `null` sans version figée (le lancement échoue, rien n'est envoyé). */
 export function readSources(
   client: TenantClient,
   launch: LaunchContext,
 ): Promise<LaunchSources | null> {
   if (launch.deliverable === "data") return readDataSources(client, launch);
+  if (launch.deliverable === "architecture") return readArchitectureSources(client, launch);
   return withOrganization(launch.organizationId, async () => {
     const version = await frozenVersion(client, launch.projectId, launch.baseVersion);
     if (!version) return null;

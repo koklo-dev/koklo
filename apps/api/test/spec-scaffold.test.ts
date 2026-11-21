@@ -23,6 +23,8 @@ const MARKERS = [
 const KEPT_DIRECTORIES = [
   "features",
   "architecture/adr",
+  "architecture/components",
+  "architecture/flows",
   "data/tables",
   "domain/rules",
   "nfr",

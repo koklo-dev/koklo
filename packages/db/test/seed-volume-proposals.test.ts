@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  ARCHITECTURE_PROPOSAL_SEGMENTS,
+  architectureProposalStatements,
+} from "../src/seed-volume-architecture.ts";
 import { PROPOSAL_SEGMENTS, proposalStatements } from "../src/seed-volume-proposals.ts";
 import { SEED_VOLUMES, type VolumeProfile } from "../src/seed-volumes.ts";
 
@@ -26,5 +30,31 @@ describe("seed-volume-proposals", () => {
     const statements = proposalStatements(profile, TARGET);
     expect(statements).toHaveLength(2);
     expect(statements[1]?.sql).toContain("INSERT INTO agent_proposals");
+  });
+});
+
+/** TK-111 (B515) : les propositions de l'architecture couvrent exactement le volume déclaré ; `large` n'en porte aucune. */
+describe("seed-volume-architecture", () => {
+  it.each(profiles)("%s : les segments totalisent le volume déclaré", (profile) => {
+    const sum = ARCHITECTURE_PROPOSAL_SEGMENTS[profile].reduce((total, s) => total + s.count, 0);
+    expect(sum).toBe(SEED_VOLUMES[profile].architectureProposals);
+  });
+
+  it("planche : 34 composants, 18 flux, 12 décisions, 16 sections ; un lancement et une insertion", () => {
+    const of = (kind: string) =>
+      ARCHITECTURE_PROPOSAL_SEGMENTS.planche
+        .filter((s) => s.kind === kind)
+        .reduce((n, s) => n + s.count, 0);
+    expect([of("component"), of("archflow"), of("adr"), of("doc_section")]).toEqual([
+      34, 18, 12, 16,
+    ]);
+    const statements = architectureProposalStatements("planche", TARGET);
+    expect(statements).toHaveLength(2);
+    expect(statements[0]?.sql).toContain("'architecture'");
+    expect(statements[1]?.sql).toContain("INSERT INTO agent_proposals");
+  });
+
+  it("large : aucune instruction", () => {
+    expect(architectureProposalStatements("large", TARGET)).toEqual([]);
   });
 });

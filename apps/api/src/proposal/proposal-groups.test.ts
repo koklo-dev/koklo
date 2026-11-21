@@ -146,3 +146,35 @@ describe("TK-110 groupe « links »", () => {
     expect(buildGroups([count("relations", "A", "pending", 3)], "type_zone")[0]?.key).toBe("all");
   });
 });
+
+/** TK-111 : l'Architecture se relit par type (maquette 13 : Document, Composants, Flux, Décisions), quelle que soit la zone. */
+describe("TK-111 groupes de l'Architecture", () => {
+  const data = [
+    count("adr", "Noyau", "pending", 4, 40),
+    count("archflow", "Noyau", "pending", 6, 34),
+    count("component", "Noyau", "pending", 20, 0),
+    count("component", "Interfaces", "accepted", 10, 20),
+    count("doc_section", "Noyau", "pending", 3, 31),
+  ];
+
+  it("par type et zone : un groupe par type, libellés français, document d'abord", () => {
+    const groups = buildGroups(data, "type_zone");
+    expect(groups.map((g) => [g.key, g.label, g.total])).toEqual([
+      ["doc_section", "Document · vue d'ensemble", 3],
+      ["component", "Composants", 30],
+      ["archflow", "Flux", 6],
+      ["adr", "Décisions", 4],
+    ]);
+  });
+
+  it("clé de groupe : le type seul, zone ignorée ; le filtre rend le type", () => {
+    expect(groupKeyOf("component", "Interfaces", "type_zone")).toBe("component");
+    expect(groupKeyOf("adr", "A", "type")).toBe("adr");
+    expect(groupFilterOf("doc_section")).toEqual({ kind: "doc_section" });
+    expect(groupFilterOf("component")).toEqual({ kind: "component" });
+  });
+
+  it("sous le seuil : un seul groupe « all »", () => {
+    expect(buildGroups([count("component", "A", "pending", 3)], "type_zone")[0]?.key).toBe("all");
+  });
+});

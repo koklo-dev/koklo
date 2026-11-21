@@ -45,6 +45,8 @@ export interface ProposalReviewProps {
   groupNote?: string | undefined;
   /** Annonce polie (« F-012 acceptée ») : la seule région d'état de la vue. */
   announcement?: string;
+  /** Encadré sous le bandeau (avertissements, alerte de péremption : maquette 13 l.122-123). */
+  notice?: ReactNode;
   /** Le détail : un `ProposalDetail` pour la proposition choisie. */
   children?: ReactNode;
   className?: string;
@@ -181,6 +183,7 @@ export function ProposalReview(props: ProposalReviewProps) {
         onLeave={props.onLeave}
         summaryText={props.summaryText}
       />
+      {props.notice}
       <div className="flex min-h-0 flex-wrap">
         <ProposalReviewList
           counts={counts}

@@ -16,6 +16,10 @@ export const PATTERNS = {
   rule: /^R-\d{3,}$/,
   flow: new RegExp(`^P-${slug}$`),
   nfr: new RegExp(`^NFR-${slug}$`),
+  /** Composant d'architecture `C-<slug>` (TK-111). */
+  component: new RegExp(`^C-${slug}$`),
+  /** Décision d'architecture `ADR-<nnn>` (TK-111, compteur `adr`). */
+  adr: /^ADR-\d{3,}$/,
   tableField: new RegExp(`^T-${slug}\\.${field}$`),
   fieldName: new RegExp(`^${field}$`),
 } as const;
@@ -30,3 +34,5 @@ export const roleId = z.string().regex(PATTERNS.role);
 export const permissionId = z.string().regex(PATTERNS.permission);
 export const ruleId = z.string().regex(PATTERNS.rule);
 export const flowId = z.string().regex(PATTERNS.flow);
+export const componentId = z.string().regex(PATTERNS.component);
+export const adrId = z.string().regex(PATTERNS.adr);

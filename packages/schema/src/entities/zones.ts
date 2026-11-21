@@ -1,7 +1,10 @@
 import { parse } from "yaml";
 
-/** Libellé et icône des zones du modèle de données (TK-110, B484) : hors modèle, `kindOf` l'ignore, jamais indexé. */
+/** Libellé et icône des zones d'un dossier (modèle de données TK-110, B484 ; architecture TK-111) : hors modèle, `kindOf` l'ignore, jamais indexé. */
 export const ZONES_PATH = "data/_zones.yaml";
+/** Zones et acteurs de l'architecture (TK-111, B513) : tolérants comme `data/_zones.yaml`, hors modèle, jamais indexés. */
+export const ARCH_ZONES_PATH = "architecture/_zones.yaml";
+export const ARCH_ACTORS_PATH = "architecture/actors.yaml";
 export const ZONE_ICON_DEFAULT = "folder_open";
 export const ZONE_NAME_MAX = 80;
 const ICON = /^[a-z][a-z0-9_]{0,63}$/;

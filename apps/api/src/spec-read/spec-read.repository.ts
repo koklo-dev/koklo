@@ -136,7 +136,7 @@ export interface SpecReadRepository {
    */
   entityItem(
     scope: ProjectScope,
-    kind: "rule" | "flow" | "roles" | "table",
+    kind: "rule" | "flow" | "roles" | "table" | "component",
     specId: string,
     revision?: Revision,
   ): Promise<EntityItem | null>;

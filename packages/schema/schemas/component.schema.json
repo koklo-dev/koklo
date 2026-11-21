@@ -1,0 +1,98 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/component.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decisions": {
+      "default": [],
+      "items": {
+        "pattern": "^ADR-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "depend_de": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "const": "asynchrone",
+            "type": "string"
+          },
+          "vers": {
+            "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "via": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "vers",
+          "via"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "nom": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "possede": {
+      "default": [],
+      "items": {
+        "pattern": "^T-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "responsabilite": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "resume_client": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "sert": {
+      "default": [],
+      "items": {
+        "pattern": "^F-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "type": {
+      "enum": [
+        "app",
+        "service",
+        "store",
+        "queue",
+        "ext"
+      ],
+      "type": "string"
+    },
+    "zone": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "nom",
+    "type",
+    "zone",
+    "responsabilite"
+  ],
+  "type": "object"
+}

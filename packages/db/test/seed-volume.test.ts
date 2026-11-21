@@ -33,6 +33,15 @@ const projectByName = async (name: string) => {
   return row;
 };
 
+/** Lancements et propositions du Fonctionnel seulement : l'Architecture (TK-111) a les siens sur la planche. */
+const countFunctional = async (table: string, projectId: string) => {
+  const [row] = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM ${table} WHERE project_id = $1 AND deliverable = 'functional'`,
+    [projectId],
+  );
+  return row?.n ?? 0;
+};
+
 const count = async (table: string, projectColumn: string, projectId: string) => {
   const [row] = await db.query<{ n: number }>(
     `SELECT count(*)::int AS n FROM ${table} WHERE ${projectColumn} = $1`,
@@ -227,13 +236,14 @@ describe("TK-99a seed:large : 400 propositions de l'agent", () => {
       status: string;
       proposed_count: number;
       deliverable: string;
-    }>("SELECT status, proposed_count, deliverable FROM agent_launches WHERE project_id = $1", [
-      id,
-    ]);
+    }>(
+      "SELECT status, proposed_count, deliverable FROM agent_launches WHERE project_id = $1 AND deliverable = 'functional'",
+      [id],
+    );
     expect(launches).toEqual([{ status: "done", proposed_count: 400, deliverable: "functional" }]);
     const groups = await db.query<{ kind: string; zone: string; n: number; pending: number }>(
       `SELECT kind, zone, count(*)::int AS n, count(*) FILTER (WHERE status = 'pending')::int AS pending
-         FROM agent_proposals WHERE project_id = $1 GROUP BY kind, zone ORDER BY zone`,
+         FROM agent_proposals WHERE project_id = $1 AND deliverable = 'functional' GROUP BY kind, zone ORDER BY zone`,
       [id],
     );
     expect(groups).toHaveLength(3);
@@ -243,15 +253,15 @@ describe("TK-99a seed:large : 400 propositions de l'agent", () => {
       expect(group.pending).toBeGreaterThan(0);
       expect(group.pending).toBeLessThan(group.n);
     }
-    expect(await count("agent_proposals", "project_id", id)).toBe(400);
+    expect(await countFunctional("agent_proposals", id)).toBe(400);
   }, 120_000);
 
   it("est idempotent : un second chargement ne duplique rien", async () => {
     await seedLarge(db.url);
     const project = await projectByName("Volume · charge");
     const id = project?.id as string;
-    expect(await count("agent_proposals", "project_id", id)).toBe(400);
-    expect(await count("agent_launches", "project_id", id)).toBe(1);
+    expect(await countFunctional("agent_proposals", id)).toBe(400);
+    expect(await countFunctional("agent_launches", id)).toBe(1);
   }, 120_000);
 
   it("seed:planche insère 355 propositions : 248 fonctionnalités en 6 zones, 86 règles en 3 zones, 3 rôles, 18 parcours (TK-105, B365)", async () => {
@@ -259,10 +269,10 @@ describe("TK-99a seed:large : 400 propositions de l'agent", () => {
     const project = await projectByName("Volume · planche");
     const id = project?.id as string;
     expect(SEED_VOLUMES.planche.proposals).toBe(355);
-    expect(await count("agent_proposals", "project_id", id)).toBe(355);
+    expect(await countFunctional("agent_proposals", id)).toBe(355);
     const groups = await db.query<{ kind: string; zone: string; n: number; pending: number }>(
       `SELECT kind, zone, count(*)::int AS n, count(*) FILTER (WHERE status = 'pending')::int AS pending
-         FROM agent_proposals WHERE project_id = $1 GROUP BY kind, zone ORDER BY kind, zone`,
+         FROM agent_proposals WHERE project_id = $1 AND deliverable = 'functional' GROUP BY kind, zone ORDER BY kind, zone`,
       [id],
     );
     const zonesOf = (kind: string) => groups.filter((g) => g.kind === kind).map((g) => g.zone);
@@ -288,7 +298,7 @@ describe("TK-99a seed:large : 400 propositions de l'agent", () => {
     await seedPlanche(db.url);
     const project = await projectByName("Volume · planche");
     const id = project?.id as string;
-    expect(await count("agent_proposals", "project_id", id)).toBe(355);
+    expect(await countFunctional("agent_proposals", id)).toBe(355);
     const mismatched = await db.query(
       `SELECT 1 FROM agent_proposals WHERE project_id = $1 AND kind = 'rule'
           AND payload->>'type' <> CASE zone WHEN 'Contraintes' THEN 'contrainte' WHEN 'Calculs' THEN 'calcul' ELSE 'workflow' END`,
@@ -321,6 +331,7 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
       roles: 1,
       rule: 300,
       table: 80,
+      component: SEED_VOLUMES.large.components,
     });
     const [snapshot] = await db.query<{ entities_indexed_at: Date | null }>(
       `SELECT s.entities_indexed_at FROM spec_snapshots s JOIN project_repos r ON r.id = s.repo_id
@@ -586,5 +597,76 @@ describe("TK-110 : zones et lignes générées des jeux de volume", () => {
         await entities("Volume · planche", "fixture"),
       ]),
     ).toBe(before);
+  }, 120_000);
+});
+
+/** TK-111 (B515) : composants d'architecture des jeux de volume, et les 80 propositions de l'architecture de la planche. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même jeu de volume, un test par comportement
+describe("TK-111 composants et propositions d'architecture", () => {
+  const componentsOf = async (name: string) => {
+    const id = (await projectByName(name))?.id as string;
+    return db.query<{ spec_id: string; path: string; data: Record<string, unknown> }>(
+      `SELECT e.spec_id, e.path, e.data FROM spec_entities e
+         JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 AND e.kind = 'component' ORDER BY e.sort`,
+      [id],
+    );
+  };
+
+  it("planche : 34 composants en 6 zones (9, 4, 6, 7, 3, 5), dépendances vers des composants connus, jamais circulaires", async () => {
+    await seedPlanche(db.url);
+    const rows = await componentsOf("Volume · planche");
+    expect(SEED_VOLUMES.planche.components).toBe(34);
+    expect(rows).toHaveLength(34);
+    const zones = new Map<string, number>();
+    for (const row of rows) {
+      const zone = String(row.data.zone);
+      zones.set(zone, (zones.get(zone) ?? 0) + 1);
+    }
+    expect([...zones.values()]).toEqual([9, 4, 6, 7, 3, 5]);
+    const known = new Set(rows.map((row) => row.spec_id));
+    for (const row of rows) {
+      expect(row.data.id).toBe(row.spec_id);
+      expect(row.data.titre).toBe(row.data.nom);
+      expect(row.path).toBe(`architecture/components/${row.spec_id.slice(2)}.yaml`);
+      for (const link of row.data.depend_de as { vers: string }[]) {
+        expect(known.has(link.vers)).toBe(true);
+        expect(Number(link.vers.slice(-3))).toBeLessThan(Number(row.spec_id.slice(-3)));
+      }
+    }
+  }, 120_000);
+
+  it("large : 120 composants ; aucune proposition d'architecture", async () => {
+    await seedLarge(db.url);
+    expect(SEED_VOLUMES.large.components).toBe(120);
+    expect(await componentsOf("Volume · charge")).toHaveLength(120);
+    const id = (await projectByName("Volume · charge"))?.id as string;
+    expect(await count("agent_proposals", "project_id", id)).toBe(400);
+  }, 120_000);
+
+  it("planche : 80 propositions d'architecture (34 composants, 18 flux, 12 décisions, 16 sections), statuts mêlés, un second chargement ne duplique rien", async () => {
+    await seedPlanche(db.url);
+    await seedPlanche(db.url);
+    const id = (await projectByName("Volume · planche"))?.id as string;
+    expect(SEED_VOLUMES.planche.architectureProposals).toBe(80);
+    const kinds = await db.query<{ kind: string; n: number; pending: number }>(
+      `SELECT kind, count(*)::int AS n, count(*) FILTER (WHERE status = 'pending')::int AS pending
+         FROM agent_proposals WHERE project_id = $1 AND deliverable = 'architecture'
+        GROUP BY kind ORDER BY kind`,
+      [id],
+    );
+    expect(kinds.map((row) => [row.kind, row.n])).toEqual([
+      ["adr", 12],
+      ["archflow", 18],
+      ["component", 34],
+      ["doc_section", 16],
+    ]);
+    expect(kinds.every((row) => row.pending > 0 && row.pending < row.n)).toBe(true);
+    expect(
+      await db.query(
+        "SELECT 1 FROM agent_launches WHERE project_id = $1 AND deliverable = 'architecture'",
+        [id],
+      ),
+    ).toHaveLength(1);
   }, 120_000);
 });

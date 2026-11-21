@@ -1,5 +1,6 @@
 import type { GitAuth, GitProvider, RepoRef } from "@koklo/domain";
 import {
+  docSectionSlugOf,
   isFlowPath,
   isTableDirPath,
   kindOf,
@@ -26,13 +27,15 @@ export type ReadSpecInput = {
   readonly flows?: boolean;
   /** Lire aussi les fichiers que la migration v1 -> v2 déplace ou crée (règles de design, sections) : lots de migration seulement. */
   readonly migration?: boolean;
+  /** Lire aussi les sections du document d'architecture (`architecture/overview/NN-*.md`, non indexées) : lots `doc.section.*`. */
+  readonly docs?: boolean;
 };
 
 /** Chemins (relatifs à la racine de la spec) des fichiers que le schéma reconnaît ou signale. */
 export function recognizedSpecPaths(
   specPath: string | null,
   files: readonly { path: string }[],
-  options: { flows?: boolean; migration?: boolean } = {},
+  options: { flows?: boolean; migration?: boolean; docs?: boolean } = {},
 ): string[] {
   return files.flatMap((file) => {
     const path = relativeToSpec(specPath, file.path);
@@ -42,7 +45,8 @@ export function recognizedSpecPaths(
       kindOf(path) !== undefined ||
       isTableDirPath(path) ||
       (options.flows === true && isFlowPath(path)) ||
-      (options.migration === true && MIGRATION_EXTRA_PATHS.includes(path));
+      (options.migration === true && MIGRATION_EXTRA_PATHS.includes(path)) ||
+      (options.docs === true && docSectionSlugOf(path) !== undefined);
     return known ? [path] : [];
   });
 }
@@ -60,8 +64,9 @@ export async function readSpecFiles({
   specPath,
   flows,
   migration,
+  docs,
 }: ReadSpecInput): Promise<SpecFile[]> {
-  const paths = recognizedSpecPaths(specPath, listing.files, { flows, migration });
+  const paths = recognizedSpecPaths(specPath, listing.files, { flows, migration, docs });
   const files: SpecFile[] = [];
   for (let start = 0; start < paths.length; start += READ_CONCURRENCY) {
     const chunk = paths.slice(start, start + READ_CONCURRENCY);

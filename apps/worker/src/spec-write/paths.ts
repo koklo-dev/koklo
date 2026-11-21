@@ -28,6 +28,18 @@ export const OPERATION_KINDS = [
   "table.delete",
   "fixture.create",
   "layout.save",
+  "component.create",
+  "component.update",
+  "component.delete",
+  "archflow.create",
+  "archflow.update",
+  "archflow.delete",
+  "adr.create",
+  "adr.update",
+  "adr.delete",
+  "doc.section.create",
+  "doc.section.update",
+  "doc.section.delete",
 ] as const;
 const TARGET_ID: Readonly<Record<string, RegExp>> = {
   rule: /^R-\d{3,}$/,
@@ -35,6 +47,10 @@ const TARGET_ID: Readonly<Record<string, RegExp>> = {
   flow: /^P-[a-z0-9][a-z0-9-]*$/,
   table: /^T-[a-z0-9][a-z0-9-]*$/,
   fixture: /^FX-[a-z0-9][a-z0-9-]*$/,
+  component: /^C-[a-z0-9][a-z0-9-]*$/,
+  archflow: /^P-[a-z0-9][a-z0-9-]*$/,
+  adr: /^ADR-\d{3,}$/,
+  doc: /^DOC-[a-z0-9][a-z0-9-]*$/,
 };
 /** Opérations de publication de l'espace Idée (TK-89) : un lot n'en mêle jamais avec des features. */
 export const IDEA_OPERATION_KINDS = [

@@ -37,6 +37,11 @@ export const AGENT_PROPOSAL_KINDS = [
   "table",
   "relations",
   "fixtures",
+  /** Architecture (TK-111) : composant, flux technique, décision et section du document. */
+  "component",
+  "archflow",
+  "adr",
+  "doc_section",
 ] as const;
 export type AgentProposalKind = (typeof AGENT_PROPOSAL_KINDS)[number];
 
@@ -61,6 +66,16 @@ export const AGENT_READS = {
     "functional.roles",
     "functional.flows",
     "data.current",
+  ],
+  /** Architecture (TK-111, B512) : le Fonctionnel, les tables, l'architecture actuelle et les exigences connues (lues tolérantes). */
+  architecture: [
+    "functional.features",
+    "functional.rules",
+    "functional.roles",
+    "functional.flows",
+    "data.tables",
+    "architecture.current",
+    "nfr.known",
   ],
 } as const;
 

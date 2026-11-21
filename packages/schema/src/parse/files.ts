@@ -1,6 +1,7 @@
-import type { BusinessRule, Feature, Fixture, Flow, RolesFile } from "../entities/index.ts";
+import type { RolesFile } from "../entities/index.ts";
 import { compare, sortIssues, structIssue } from "../issue.ts";
 import type { Issue, Parsed, ParsedSpec, SpecFile } from "../types.ts";
+import { parseAdrMarkdown } from "./adr-markdown.ts";
 import { parseFeatureMarkdown } from "./feature-markdown.ts";
 import {
   idKey,
@@ -61,9 +62,15 @@ function parseData(file: SpecFile, kind: Kind, version: SpecVersion): FileResult
     : { ok: true, value: result.value, id };
 }
 
+const MARKDOWN_PARSERS = {
+  feature: parseFeatureMarkdown,
+  rule: parseRuleMarkdown,
+  adr: parseAdrMarkdown,
+} as const;
+
 function parseOne(file: SpecFile, kind: Kind, version: SpecVersion): FileResult {
-  if (kind === "feature" || kind === "rule") {
-    const parse = kind === "feature" ? parseFeatureMarkdown : parseRuleMarkdown;
+  if (kind === "feature" || kind === "rule" || kind === "adr") {
+    const parse = MARKDOWN_PARSERS[kind];
     const result = parse(file.path, file.content);
     return result.ok ? { ok: true, value: result.value, id: result.value.id } : result;
   }
@@ -100,6 +107,9 @@ const IDENTIFIED = new Set<Kind>([
   "rule",
   "flow",
   "fixture",
+  "component",
+  "archflow",
+  "adr",
 ]);
 
 const empty = (): ParsedSpec => ({
@@ -113,22 +123,33 @@ const empty = (): ParsedSpec => ({
   rules: [],
   flows: [],
   fixtures: [],
+  components: [],
+  archFlows: [],
+  adrs: [],
 });
+
+/** Liste du snapshot qui reçoit chaque genre d'entité (`project` est un champ à part). */
+const LIST_OF = {
+  feature: "features",
+  table: "tables",
+  relations: "relations",
+  endpoint: "endpoints",
+  screen: "screens",
+  test: "tests",
+  roles: "roles",
+  rule: "rules",
+  flow: "flows",
+  fixture: "fixtures",
+  component: "components",
+  archflow: "archFlows",
+  adr: "adrs",
+} as const satisfies Record<Exclude<Kind, "project">, keyof ParsedSpec>;
 
 /** Range une entité valide dans la bonne liste du snapshot. */
 function place(spec: ParsedSpec, kind: Kind, path: string, value: unknown): void {
   const entry = { path, value } as Parsed<never>;
   if (kind === "project") spec.project = entry;
-  else if (kind === "feature") spec.features.push(entry as Parsed<Feature>);
-  else if (kind === "table") spec.tables.push(entry);
-  else if (kind === "relations") spec.relations.push(entry);
-  else if (kind === "endpoint") spec.endpoints.push(entry);
-  else if (kind === "screen") spec.screens.push(entry);
-  else if (kind === "roles") spec.roles.push(entry as Parsed<RolesFile>);
-  else if (kind === "rule") spec.rules.push(entry as Parsed<BusinessRule>);
-  else if (kind === "flow") spec.flows.push(entry as Parsed<Flow>);
-  else if (kind === "fixture") spec.fixtures.push(entry as Parsed<Fixture>);
-  else spec.tests.push(entry);
+  else spec[LIST_OF[kind]].push(entry);
 }
 
 /** Identifiant en désaccord avec le nom du fichier, ou déjà pris : l'entité est exclue. Sinon réserve l'identifiant. */

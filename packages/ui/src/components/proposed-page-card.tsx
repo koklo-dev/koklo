@@ -12,6 +12,20 @@ export type ProposedPageCardProps = {
   onIgnore: () => void;
   busy?: boolean;
   className?: string;
+  /** Nom du groupe et libellé du bouton d'ajout : « page » par défaut, « section » pour le document d'architecture. */
+  label?: ProposedPageLabel;
+};
+
+/** Variante « section » (maquette 13 l.256-262) : encadré de la colonne Sections, marges 14 px au-dessus et 2 px sur les côtés. */
+export type ProposedPageLabel = "page" | "section";
+
+const LABELS: Record<ProposedPageLabel, { group: string; accept: string; spacing: string }> = {
+  page: { group: "Page proposée par l'agent", accept: "Ajouter la page", spacing: "" },
+  section: {
+    group: "Section proposée par l'agent",
+    accept: "Ajouter la section",
+    spacing: "mx-0.5 mt-3.5",
+  },
 };
 
 /** Page proposée par l'agent, dans l'arborescence (maquette 06 l.88-98) : cadre pointillé, décision humaine. */
@@ -22,15 +36,18 @@ export function ProposedPageCard({
   onIgnore,
   busy = false,
   className,
+  label = "page",
 }: ProposedPageCardProps) {
+  const text = LABELS[label];
   return (
     // biome-ignore lint/a11y/useSemanticElements: groupe nommé sans légende de formulaire (fieldset inadapté)
     <div
       role="group"
-      aria-label="Page proposée par l'agent"
+      aria-label={text.group}
       data-slot="proposed-page-card"
       className={cn(
         "flex flex-col gap-1.5 rounded-lg border border-primary border-dashed bg-diff-bg py-3 pr-3 pl-3.5",
+        text.spacing,
         className,
       )}
     >
@@ -41,7 +58,7 @@ export function ProposedPageCard({
       <span className="text-caption font-normal text-muted-foreground">{rationale}</span>
       <span className="flex gap-1.5">
         <Button size="xs" loading={busy} onClick={onAccept}>
-          Ajouter la page
+          {text.accept}
         </Button>
         <Button variant="ghost" size="xs" disabled={busy} onClick={onIgnore}>
           Ignorer

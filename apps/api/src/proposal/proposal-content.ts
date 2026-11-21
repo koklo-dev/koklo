@@ -5,13 +5,21 @@ import type { RevisedContent } from "./proposal.repository.ts";
 
 const TITLE_MAX = 200;
 
-/** Titre affiché d'une proposition : celui de son contenu (`name` pour un rôle ou une table), sinon l'ancien (critères, relations). */
+/** Champ qui porte le titre : le nom (rôle, table, composant), le parcours détaillé (flux), sinon `title`. */
+const TITLE_FIELD: Partial<Record<AgentProposalKind, string>> = {
+  role: "name",
+  table: "name",
+  component: "name",
+  archflow: "flow",
+};
+
+/** Titre affiché d'une proposition : celui de son contenu (`name` pour un rôle, une table ou un composant), sinon l'ancien (critères, relations). */
 export function titleOf(
   kind: AgentProposalKind,
   content: Record<string, unknown>,
   fallback: string,
 ) {
-  const value = content[kind === "role" || kind === "table" ? "name" : "title"];
+  const value = content[TITLE_FIELD[kind] ?? "title"];
   return typeof value === "string" && value.length > 0 ? value.slice(0, TITLE_MAX) : fallback;
 }
 

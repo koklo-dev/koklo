@@ -386,7 +386,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
         "/projects",
         SPEC,
         `${PROJECT}/tickets`,
-        `${PROJECT}/spec/architecture`,
+        `${PROJECT}/spec/technical`,
         "/settings/members",
       ]) {
         await page.goto(path);
@@ -502,7 +502,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
     const pages: Array<[string, string, string]> = [
       ["header-features", SPEC, "Cahier fonctionnel"],
       ["header-tickets", `${PROJECT}/tickets`, "Tickets"],
-      ["soon-architecture", `${PROJECT}/spec/architecture`, "Architecture"],
+      ["soon-technical", `${PROJECT}/spec/technical`, "Technique"],
     ];
     for (const [name, path, title] of pages) {
       await page.goto(path);
@@ -554,7 +554,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await page.keyboard.press("Escape");
     for (const [name, path] of [
       ["header-tickets", `${PROJECT}/tickets`],
-      ["soon-architecture", `${PROJECT}/spec/architecture`],
+      ["soon-technical", `${PROJECT}/spec/technical`],
     ] as const) {
       await page.goto(path);
       await hydrated(page);

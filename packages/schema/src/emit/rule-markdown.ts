@@ -1,6 +1,6 @@
-import { stringify } from "yaml";
 import { type BusinessRule, BusinessRuleSchema } from "../entities/index.ts";
 import { toPointer } from "../parse/zod-issues.ts";
+import { inlineList, isOneLine, yamlScalar } from "./yaml-inline.ts";
 
 /** Erreur typée : `path` est le pointeur JSON de la valeur refusée. */
 export class EmitRuleError extends Error {
@@ -13,23 +13,8 @@ export class EmitRuleError extends Error {
   }
 }
 
-/** Élément de liste en style flux : nu s'il est sûr, sinon cité en JSON (une virgule ou un crochet couperait la liste). */
-const item = (value: string): string =>
-  /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) ? value : JSON.stringify(value);
-
-const flow = (items: readonly string[] | undefined): string =>
-  `[${(items ?? []).map(item).join(", ")}]`;
-
-/** Scalaire YAML sûr sur une ligne (JSON en repli : YAML valide). */
-function scalar(value: string): string {
-  const text = stringify(value, { lineWidth: 0 }).trimEnd();
-  return text.includes("\n") ? JSON.stringify(value) : text;
-}
-
 function assertLine(value: string, path: string): void {
-  if (/[\r\n\0\u2028\u2029]/.test(value) || value !== value.trim()) {
-    throw new EmitRuleError("une seule ligne, sans espace de bord", path);
-  }
+  if (!isOneLine(value)) throw new EmitRuleError("une seule ligne, sans espace de bord", path);
 }
 
 function assertStatement(text: string): void {
@@ -62,14 +47,14 @@ export function emitRuleMarkdown(rule: BusinessRule): string {
   const lines = [
     "---",
     `id: ${value.id}`,
-    ...(value.titre === undefined ? [] : [`titre: ${scalar(value.titre)}`]),
+    ...(value.titre === undefined ? [] : [`titre: ${yamlScalar(value.titre)}`]),
     `type: ${value.type}`,
-    `tables: ${flow(value.tables)}`,
-    `endpoints: ${flow(value.endpoints)}`,
-    ...(value.etats === undefined ? [] : [`etats: ${flow(value.etats)}`]),
+    `tables: ${inlineList(value.tables)}`,
+    `endpoints: ${inlineList(value.endpoints)}`,
+    ...(value.etats === undefined ? [] : [`etats: ${inlineList(value.etats)}`]),
     ...(value.fonctionnalites === undefined
       ? []
-      : [`fonctionnalites: ${flow(value.fonctionnalites)}`]),
+      : [`fonctionnalites: ${inlineList(value.fonctionnalites)}`]),
     "---",
     "",
     "## Énoncé",

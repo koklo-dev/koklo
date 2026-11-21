@@ -120,6 +120,7 @@ describe("N2 callback GitHub : exports partagés, hors oRPC et hors OpenAPI", ()
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même livrable, un test par comportement
 describe("N3 types inférés exportés", () => {
   it("types de sortie", () => {
     expectTypeOf<api.RepoOutput>().toHaveProperty("defaultBranch");
@@ -142,6 +143,7 @@ describe("N3 types inférés exportés", () => {
         flows: number;
         relations: number;
         fixtures: number;
+        components: number;
       };
     } | null>();
     expectTypeOf<api.FeatureDetail>().toHaveProperty("criteria");
@@ -168,6 +170,18 @@ describe("N3 types inférés exportés", () => {
       | "table.update"
       | "table.delete"
       | "fixture.create"
+      | "component.create"
+      | "component.update"
+      | "component.delete"
+      | "archflow.create"
+      | "archflow.update"
+      | "archflow.delete"
+      | "adr.create"
+      | "adr.update"
+      | "adr.delete"
+      | "doc.section.create"
+      | "doc.section.update"
+      | "doc.section.delete"
     >();
     expectTypeOf<Extract<api.SpecOperation, { kind: "feature.delete" }>>().toEqualTypeOf<{
       kind: "feature.delete";

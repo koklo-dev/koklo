@@ -5,6 +5,9 @@ import { canonicalize, jsonSchemas } from "../src/index.ts";
 
 const schemasDir = resolve(import.meta.dirname, "../schemas");
 const NAMES = [
+  "adr",
+  "archflow",
+  "component",
   "endpoint",
   "feature",
   "fixture",

@@ -16,7 +16,7 @@ import { useAiCall } from "./use-ai-call.ts";
 import type { ProposalCounts } from "./use-proposal-status.ts";
 
 export type ProposeState = "idle" | "open" | "running" | "ready" | "unavailable";
-type Mode = "complete" | "criteria" | "update" | "all";
+type Mode = "complete" | "criteria" | "update" | "decision" | "document" | "all";
 
 const IN_PROGRESS_TEXT = "Une génération est déjà en cours pour ce livrable.";
 

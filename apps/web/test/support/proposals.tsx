@@ -8,7 +8,19 @@ const uuid = (n: number): string => `0190bbbb-0000-7000-8000-${String(n).padStar
 export interface Fake {
   id: string;
   launchId: string;
-  kind: "feature" | "criteria" | "rule" | "role" | "flow" | "table" | "relations" | "fixtures";
+  kind:
+    | "feature"
+    | "criteria"
+    | "rule"
+    | "role"
+    | "flow"
+    | "table"
+    | "relations"
+    | "fixtures"
+    | "component"
+    | "archflow"
+    | "adr"
+    | "doc_section";
   zone: string;
   position: number;
   title: string;
@@ -65,6 +77,10 @@ const KIND_LABEL: Record<string, string> = {
   rule: "Règles",
   role: "Rôles",
   flow: "Parcours",
+  doc_section: "Document · vue d'ensemble",
+  component: "Composants",
+  archflow: "Flux",
+  adr: "Décisions",
 };
 
 const keyOf = (p: Fake): string => `${p.kind}:${p.zone}`;

@@ -1,0 +1,200 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/archflow.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decisions": {
+      "default": [],
+      "items": {
+        "pattern": "^ADR-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "fonctionnalites": {
+      "default": [],
+      "items": {
+        "pattern": "^F-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^P-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "messages": {
+      "items": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "de": {
+                "anyOf": [
+                  {
+                    "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                    "type": "string"
+                  },
+                  {
+                    "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                    "type": "string"
+                  }
+                ]
+              },
+              "erreur": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "retour": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "texte": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "vers": {
+                "anyOf": [
+                  {
+                    "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                    "type": "string"
+                  },
+                  {
+                    "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "de",
+              "vers",
+              "texte"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bloc": {
+                "const": "alt",
+                "type": "string"
+              },
+              "libelle": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "messages": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "de": {
+                      "anyOf": [
+                        {
+                          "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                          "type": "string"
+                        },
+                        {
+                          "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "erreur": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "retour": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "texte": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "vers": {
+                      "anyOf": [
+                        {
+                          "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                          "type": "string"
+                        },
+                        {
+                          "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "de",
+                    "vers",
+                    "texte"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "bloc",
+              "libelle",
+              "messages"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bloc": {
+                "const": "separateur",
+                "type": "string"
+              },
+              "libelle": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "bloc",
+              "libelle"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "participants": {
+      "items": {
+        "anyOf": [
+          {
+            "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          {
+            "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "regles": {
+      "default": [],
+      "items": {
+        "pattern": "^R-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "participants",
+    "messages"
+  ],
+  "type": "object"
+}

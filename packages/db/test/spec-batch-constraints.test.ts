@@ -208,6 +208,7 @@ describe("TK-44a compteur de features", () => {
       "feature",
       "suggestion",
       "rule",
+      "adr",
     ]);
   });
 

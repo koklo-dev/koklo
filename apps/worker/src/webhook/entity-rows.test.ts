@@ -1,4 +1,7 @@
 import {
+  emitAdrMarkdown,
+  emitArchFlowYaml,
+  emitComponentYaml,
   emitFixtureYaml,
   emitFlowYaml,
   emitRolesYaml,
@@ -8,7 +11,7 @@ import {
 } from "@koklo/schema";
 import { describe, expect, it } from "vitest";
 import { entityRowsOf } from "./entity-rows.ts";
-import { ruleCounterOf } from "./index-rows.ts";
+import { adrCounterOf, ruleCounterOf } from "./index-rows.ts";
 
 /** TK-103 lot A : lignes `spec_entities` des règles (tri numérique), rôles, parcours YAML et JSON hérité ; jamais d'échec d'index. */
 const rule = (n: number, over: Record<string, unknown> = {}) => ({
@@ -103,6 +106,32 @@ describe("entityRowsOf : règles, rôles, parcours", () => {
   });
 });
 
+describe("adrCounterOf (TK-111, B514)", () => {
+  const adr = (n: number) => ({
+    path: `architecture/adr/ADR-${String(n).padStart(3, "0")}-x.md`,
+    content: emitAdrMarkdown({
+      id: `ADR-${String(n).padStart(3, "0")}`,
+      titre: `Décision ${n}`,
+      statut: "proposee",
+      date: "2026-11-21",
+      decideurs: [],
+      liens: [],
+      contexte: "Contexte.",
+      decision: "Décision.",
+      consequences: { positives: [], a_accepter: [] },
+      alternatives: [],
+    }),
+  });
+
+  it("relève le compteur au plus grand ADR-nnn, rien à relever sans décision", () => {
+    expect(adrCounterOf(parseSpecFiles([adr(2), adr(11)]).spec)).toEqual({
+      raiseTo: 11,
+      skipped: 0,
+    });
+    expect(adrCounterOf(parseSpecFiles([]).spec)).toEqual({ skipped: 0 });
+  });
+});
+
 describe("ruleCounterOf", () => {
   it("relève le compteur au plus grand R-nnn et compte les identifiants trop grands", () => {
     const { spec } = parseSpecFiles([rule(3), rule(12)]);
@@ -175,5 +204,90 @@ describe("entityRowsOf : tables v2 et jeux d'exemple", () => {
     const rows = rowsFor([manifest, table, fixture, ...broken]);
     expect(of(rows, "table").map((r) => r.specId)).toEqual(["T-client"]);
     expect(of(rows, "fixture").map((r) => r.specId)).toEqual(["FX-clients"]);
+  });
+});
+
+/** TK-111 lot B : composants, flux techniques et décisions sont indexés (zone architecture) ; les sections ne le sont pas (B508). */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même livrable, un test par comportement
+describe("entityRowsOf : architecture", () => {
+  const manifest = {
+    path: "koklo.project.yaml",
+    content: "projet: demo\norganisation: acme\nspec_version: 2\n",
+  };
+  const component = (slug: string) => ({
+    path: `architecture/components/${slug}.yaml`,
+    content: emitComponentYaml({
+      id: `C-${slug}`,
+      nom: `Composant ${slug}`,
+      type: "service",
+      zone: "Noyau",
+      responsabilite: "Fait son travail.",
+      possede: [],
+      sert: [],
+      depend_de: [],
+      decisions: [],
+    }),
+  });
+  const archFlow = {
+    path: "architecture/flows/P-reserver.yaml",
+    content: emitArchFlowYaml({
+      id: "P-reserver",
+      participants: ["RL-a", "C-api"],
+      messages: [{ de: "RL-a", vers: "C-api", texte: "Réserve" }],
+      fonctionnalites: [],
+      regles: [],
+      decisions: [],
+    }),
+  };
+  const adr = {
+    path: "architecture/adr/ADR-001-base.md",
+    content: emitAdrMarkdown({
+      id: "ADR-001",
+      titre: "Base relationnelle",
+      statut: "acceptee",
+      date: "2026-11-21",
+      decideurs: [],
+      liens: [],
+      contexte: "Contexte.",
+      decision: "Décision.",
+      consequences: { positives: [], a_accepter: [] },
+      alternatives: [],
+    }),
+  };
+
+  it("un composant est une ligne component (zone architecture, titre = nom), rang croissant", () => {
+    const rows = of(rowsFor([manifest, component("api"), component("db")]), "component");
+    expect(rows).toMatchObject([
+      {
+        specId: "C-api",
+        zone: "architecture",
+        path: "architecture/components/api.yaml",
+        data: { titre: "Composant api", nom: "Composant api", type: "service" },
+        sort: 0,
+      },
+      { specId: "C-db", sort: 1 },
+    ]);
+    expect(rows[0]?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("un flux technique est une ligne archflow (identifiant du parcours), une décision une ligne adr", () => {
+    const rows = rowsFor([manifest, archFlow, adr]);
+    expect(of(rows, "archflow")).toMatchObject([
+      { specId: "P-reserver", zone: "architecture", data: { titre: "P-reserver" } },
+    ]);
+    expect(of(rows, "adr")).toMatchObject([
+      { specId: "ADR-001", zone: "architecture", data: { titre: "Base relationnelle" } },
+    ]);
+  });
+
+  it("un fichier invalide est ignoré, une section du document n'est jamais indexée", () => {
+    const broken = { path: "architecture/components/casse.yaml", content: "id: C-casse\nnom: [\n" };
+    const section = {
+      path: "architecture/overview/01-contexte.md",
+      content: "# Contexte\n\nTexte.\n",
+    };
+    const rows = rowsFor([manifest, component("api"), broken, section]);
+    expect(of(rows, "component").map((r) => r.specId)).toEqual(["C-api"]);
+    expect(rows.some((r) => r.path.startsWith("architecture/overview/"))).toBe(false);
   });
 });

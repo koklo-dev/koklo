@@ -62,7 +62,7 @@ describe("TK-99a ai.proposeDeliverable", () => {
         deliverable,
       ).toBe(true);
     }
-    for (const mode of ["complete", "criteria", "update", "all"]) {
+    for (const mode of ["complete", "criteria", "update", "all", "decision", "document"]) {
       expect(await isValid(i, { projectId: UUID, deliverable: "functional", mode }), mode).toBe(
         true,
       );

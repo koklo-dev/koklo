@@ -101,6 +101,7 @@ async function attempt(target: Target, author: BatchAuthor | null): Promise<Outc
     specPath: batch.repo.specPath,
     // Un lot de Données sur un dépôt v1 le migre d'abord (auto-migrate.ts) : il lit les mêmes fichiers qu'une migration.
     migration: migration || touchesData(batch.operations),
+    docs: batch.operations.some((operation) => operation.kind.startsWith("doc.section.")),
   });
   const treePaths = listing.files.flatMap((file) => {
     const path = relativeToSpec(batch.repo.specPath, file.path);

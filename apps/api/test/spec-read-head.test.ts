@@ -19,6 +19,7 @@ const B = { id: "F-002", titre: "Deux" };
 const headOf = (s: SpecReadScene, query = "") =>
   specReadApi(bench().app, s.world.actors.dev).head(s.projectId, query);
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("spec.head : forme et comptes", () => {
   it("rend { branch, commitSha, status, errorCode, indexedAt, counts } d'après l'index", async () => {
     const s = await readScene(bench());
@@ -50,6 +51,7 @@ describe("spec.head : forme et comptes", () => {
         flows: 0,
         relations: 0,
         fixtures: 0,
+        components: 0,
       },
     });
   });

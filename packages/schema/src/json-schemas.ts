@@ -1,6 +1,9 @@
 import { z } from "zod";
 import {
+  AdrSchema,
+  ArchFlowSchema,
   BusinessRuleSchema,
+  ComponentSchema,
   EndpointSchema,
   FeatureSchema,
   FixtureSchema,
@@ -16,6 +19,9 @@ import {
 const BASE = "https://koklo.dev/schemas/spec/v1";
 
 const entities = {
+  adr: AdrSchema,
+  archflow: ArchFlowSchema,
+  component: ComponentSchema,
   endpoint: EndpointSchema,
   feature: FeatureSchema,
   fixture: FixtureSchema,

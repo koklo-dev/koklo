@@ -73,6 +73,20 @@ describe("TK-106 structure initiale au format v2", () => {
   });
 });
 
+describe("TK-111 dossiers de l'architecture", () => {
+  it("composants, flux et décisions : dossiers vides gardés par un .gitkeep, aucune entité d'exemple", () => {
+    const paths = files().map((file) => file.path);
+    for (const directory of ["architecture/components", "architecture/flows", "architecture/adr"]) {
+      expect(paths, directory).toContain(`${directory}/.gitkeep`);
+    }
+    const entities = paths.filter((path) =>
+      /^architecture\/(components|flows|adr)\/(?!\.gitkeep$)/.test(path),
+    );
+    expect(entities).toEqual([]);
+    expect(paths).toContain("architecture/overview/01-contexte.md");
+  });
+});
+
 describe("TK-93 noms de dépôt", () => {
   it("par défaut : <slug du projet>-spec ; le slug est borné pour laisser place au suffixe", () => {
     expect(specRepoName("Refonte du Portail", undefined)).toBe("refonte-du-portail-spec");

@@ -154,6 +154,9 @@ export interface EntitySeed {
     | "relations"
     | "table"
     | "fixture"
+    | "component"
+    | "archflow"
+    | "adr"
     | "endpoint"
     | "screen"
     | "test";

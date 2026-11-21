@@ -37,6 +37,7 @@ import { useRequestLogger } from "./request-logger.ts";
 import { serializeRequest, serializeResponse } from "./request-serializer.ts";
 import { ReviewModule } from "./review/review.module.ts";
 import { SearchModule } from "./search/search.module.ts";
+import { SpecArchitectureModule } from "./spec-architecture/spec-architecture.module.ts";
 import { SpecBatchModule } from "./spec-batch/spec-batch.module.ts";
 import { SpecDataModule } from "./spec-data/spec-data.module.ts";
 import { SpecDeliverablesModule } from "./spec-deliverables/spec-deliverables.module.ts";
@@ -78,6 +79,7 @@ const SPEC_MODULES = [
   SpecReadModule,
   SpecDeliverablesModule,
   SpecItemModule,
+  SpecArchitectureModule,
   SpecDataModule,
 ];
 

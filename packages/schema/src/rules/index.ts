@@ -26,6 +26,10 @@ export type SpecIndex = {
   roles: Set<string>;
   permissions: Set<string>;
   rules: Set<string>;
+  components: Set<string>;
+  adrs: Set<string>;
+  /** Parcours métier `P-` (`design/flows`) : un flux technique en porte l'identifiant. */
+  flows: Set<string>;
 };
 
 export function buildIndex(spec: ParsedSpec): SpecIndex {
@@ -48,5 +52,8 @@ export function buildIndex(spec: ParsedSpec): SpecIndex {
     roles: new Set(spec.roles.flatMap((f) => f.value.roles.map((r) => r.id))),
     permissions: new Set(spec.roles.flatMap((f) => f.value.permissions.map((p) => p.id))),
     rules: new Set(spec.rules.map((r) => r.value.id)),
+    components: new Set(spec.components.map((c) => c.value.id)),
+    adrs: new Set(spec.adrs.map((a) => a.value.id)),
+    flows: new Set(spec.flows.map((f) => f.value.id)),
   };
 }
