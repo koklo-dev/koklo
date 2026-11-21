@@ -1,11 +1,27 @@
 import { z } from "zod";
-import { LIST_QUERY_MAX_LENGTH, listOf, pageNumberOf } from "./schemas-lists.ts";
+import {
+  AROUND_WITH_CURSOR_MESSAGE,
+  LIST_QUERY_MAX_LENGTH,
+  listInputShape,
+  listOf,
+  noAroundWithCursor,
+  pageNumberOf,
+} from "./schemas-lists.ts";
 import {
   criterionIdSchema,
   featureIdSchema,
   featurePrioritySchema,
   stepSchema,
 } from "./schemas-spec.ts";
+import {
+  adrIdSchema,
+  adrStatusSchema,
+  archFlowIdSchema,
+  archflowDetailSchema,
+  architectureFlowSummarySchema,
+  componentIdSchema,
+  componentTypeSchema,
+} from "./schemas-spec-architecture.ts";
 import {
   DATA_SEARCH_MAX,
   dataSearchItemSchema,
@@ -310,3 +326,93 @@ export const clientSpaceDataFixturePageInputSchema = z.object({
   size: fixturePageSizeSchema,
 });
 export const clientSpaceDataFixturePageOutputSchema = clientSpaceDataFixtureRowsOutputSchema;
+
+// --- TK-113 (3.11.0) : architecture validée, du point de vue du client (B575 à B592) ---
+// Aucun YAML, Mermaid, chemin, SHA, proposition ni `source` : seuls des libellés et des phrases simples. Tant que le livrable
+// Architecture n'est pas `validated`, `available` est faux et rien d'autre n'est rendu.
+/** Bornes de la vue client : au-delà, `truncated` (comme le modèle de données, B452). */
+export const CLIENT_ARCHITECTURE_COMPONENTS_MAX = 100;
+
+export const clientArchitectureComponentSchema = z.object({
+  id: componentIdSchema,
+  name: z.string(),
+  type: componentTypeSchema,
+  zone: z.string().optional(),
+  /** Phrases « Ce que ça fait » (`resume_client`) ; vide quand l'équipe n'en a pas écrit. */
+  summary: z.array(z.string()),
+  /** « Sert » : fonctionnalités, par libellé. */
+  serves: z.array(clientLinkSchema),
+  /** Composants appelés, par nom, avec le moyen (« HTTP ») ; `async` : appel asynchrone. */
+  dependsOn: z.array(
+    z.object({
+      id: componentIdSchema,
+      name: z.string(),
+      via: z.string(),
+      async: z.boolean().optional(),
+    }),
+  ),
+});
+export const clientSpaceArchitectureInputSchema = z.object({ projectId: z.uuid() });
+export const clientSpaceArchitectureOutputSchema = z.object({
+  available: z.boolean(),
+  validation: clientValidationSchema,
+  truncated: z.boolean(),
+  items: z.array(clientArchitectureComponentSchema).max(CLIENT_ARCHITECTURE_COMPONENTS_MAX),
+  /** Positions des nœuds déplacés (`architecture/_layout.yaml`), vide sans fichier. */
+  positions: z.record(componentIdSchema, z.object({ x: z.number().int(), y: z.number().int() })),
+});
+
+const clientArchitectureList = z.object({
+  available: z.boolean(),
+  validation: clientValidationSchema,
+});
+export const clientSpaceAdrsInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    status: adrStatusSchema.optional(),
+    ...listInputShape(adrIdSchema),
+  })
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+export const clientAdrSummarySchema = z.object({
+  id: adrIdSchema,
+  title: z.string(),
+  status: adrStatusSchema,
+  date: z.string(),
+});
+export const clientSpaceAdrsOutputSchema = listOf(clientAdrSummarySchema).extend(
+  clientArchitectureList.shape,
+);
+
+export const clientSpaceAdrInputSchema = z.object({ projectId: z.uuid(), adrId: adrIdSchema });
+/** Décision au vocabulaire client : « En clair » (`plain`), jamais le chemin du fichier ni le SHA. */
+export const clientSpaceAdrOutputSchema = z.object({
+  id: adrIdSchema,
+  title: z.string(),
+  status: adrStatusSchema,
+  date: z.string(),
+  deciders: z.array(z.string()),
+  context: z.string(),
+  decision: z.string(),
+  consequences: z.object({ positive: z.array(z.string()), toAccept: z.array(z.string()) }),
+  alternatives: z.array(z.object({ name: z.string(), reason: z.string() })),
+  supersededBy: adrIdSchema.optional(),
+  supersededOn: z.string().optional(),
+  plain: z.string().optional(),
+});
+
+export const clientSpaceArchFlowsInputSchema = z
+  .object({ projectId: z.uuid(), ...listInputShape(archFlowIdSchema) })
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+export const clientSpaceArchFlowsOutputSchema = listOf(architectureFlowSummarySchema).extend(
+  clientArchitectureList.shape,
+);
+export const clientSpaceArchFlowInputSchema = z.object({
+  projectId: z.uuid(),
+  flowId: archFlowIdSchema,
+});
+/** Séquence d'un flux : participants et messages, sans liens vers les décisions, sans chemin ni SHA. */
+export const clientSpaceArchFlowOutputSchema = archflowDetailSchema.omit({
+  filePath: true,
+  commitSha: true,
+  decisions: true,
+});

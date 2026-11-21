@@ -102,7 +102,10 @@ export class PrismaSpecDeliverablesRepository implements SpecDeliverablesReposit
         ideaFrozen: facts.ideaVersions > 0,
         featureCount: facts.featureCount,
         impact: await ideaImpact(tx, scope.projectId),
-        upstream: await readUpstreamFacts(tx, this.resolver, scope),
+        upstream: {
+          data: await readUpstreamFacts(tx, this.resolver, scope, "data"),
+          architecture: await readUpstreamFacts(tx, this.resolver, scope, "architecture"),
+        },
         forced: overrides.map((row) => row.deliverable as DeliverableKey),
         pendingByDeliverable: withPending ? await pendingByDeliverable(tx, scope.projectId) : {},
       };

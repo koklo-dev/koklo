@@ -207,20 +207,24 @@ const start = async (
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 test.describe("parcours de l'écran Architecture", () => {
-  test("en-tête et onglets : Schéma, Document, Composants et Flux, jamais Décisions", async ({
-    page,
-  }) => {
+  test("en-tête et onglets : Schéma, Document, Composants, Décisions et Flux", async ({ page }) => {
     await start(page);
     await page.goto(PATH);
     await expect(page.getByRole("heading", { level: 1, name: "Architecture" })).toBeVisible();
     const tabs = page.getByRole("navigation", { name: "Sections de l'architecture" });
-    await expect(tabs.getByRole("link")).toHaveText(["Schéma", "Document", /^Composants/, /^Flux/]);
+    await expect(tabs.getByRole("link")).toHaveText([
+      "Schéma",
+      "Document",
+      /^Composants/,
+      /^Décisions/,
+      /^Flux/,
+    ]);
     await expect(tabs.getByRole("link", { name: "Schéma" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    await expect(page.getByText("8 composants · 18 flux").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /Valider l'architecture/ })).toHaveCount(0);
+    await expect(page.getByText("8 composants · 23 décisions · 18 flux").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Valider l'architecture" })).toBeVisible();
   });
 
   test("Document : choisir une section l'ouvre, la légende reste en bas, les statuts sont écrits", async ({
@@ -256,6 +260,16 @@ test.describe("parcours de l'écran Architecture", () => {
     );
   });
 
+  test("Composants : une ligne ouvre le Schéma sur la zone du composant, composant choisi (B585)", async ({
+    page,
+  }) => {
+    await start(page);
+    await page.goto(`${PATH}?tab=components`);
+    await page.getByRole("button", { name: "Ouvrir dans le schéma C-api, API" }).click();
+    await expect(page).toHaveURL(/tab=schema/);
+    await expect(page).toHaveURL(/sel=C-api/);
+  });
+
   test("Composants : pied « Fin de la liste · 8 composants » sur la démo", async ({ page }) => {
     await start(page);
     await page.goto(`${PATH}?tab=components`);
@@ -266,6 +280,8 @@ test.describe("parcours de l'écran Architecture", () => {
     page,
   }) => {
     await start(page);
+    // Sous 1024 px, une ligne ouvre la fiche en feuille ; dès 1024 px elle ouvre le Schéma (B585).
+    await page.setViewportSize({ width: 900, height: 900 });
     await page.goto(`${PATH}?tab=components`);
     const create = page.getByRole("button", { name: "Nouveau composant" });
     await create.click();
@@ -327,10 +343,22 @@ test.describe("parcours de l'écran Architecture", () => {
     await expect(page.getByRole("button", { name: "Marquer comme validée" })).toHaveCount(0);
   });
 
-  test("client : aucun accès, retour à la vue d'ensemble du projet", async ({ page }) => {
+  test("client : vue en lecture seule du livrable validé, sans redirection (TK-113)", async ({
+    page,
+  }) => {
     await start(page, { role: "client" });
+    await setScenario({
+      session: true,
+      projects: "data",
+      installations: "single",
+      architecture: "demo",
+      archState: "validated",
+      role: "client",
+      proposals: "none",
+    });
     await page.goto(PATH);
-    await expect(page).toHaveURL(new RegExp(`/projects/${FEATURE_PROJECT_ID}$`));
-    await expect(page.getByRole("heading", { level: 1, name: "Architecture" })).toHaveCount(0);
+    await expect(page.getByRole("note")).toContainText("Lecture seule.");
+    await expect(page).toHaveURL(new RegExp(`/projects/${FEATURE_PROJECT_ID}/spec/architecture$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Architecture" })).toBeVisible();
   });
 });

@@ -24,7 +24,9 @@ import {
 
 interface Props {
   open: boolean;
-  tableName: string;
+  /** Table visée (« Commenter la table « X » ») ; `title` nomme une autre cible (composant, décision, flux). */
+  tableName?: string;
+  title?: string;
   pending: boolean;
   /** Le dernier envoi a échoué : l'alerte s'affiche et le champ reprend le focus, le texte reste. */
   failed: boolean;
@@ -41,7 +43,8 @@ interface Props {
  */
 export function DataCommentDialog({
   open,
-  tableName,
+  tableName = "",
+  title,
   pending,
   failed,
   onOpenChange,
@@ -64,7 +67,7 @@ export function DataCommentDialog({
         }}
       >
         <DialogHeader icon="add_comment">
-          <DialogTitle>{commentTitleOf(tableName)}</DialogTitle>
+          <DialogTitle>{title ?? commentTitleOf(tableName)}</DialogTitle>
           <DialogDescription>{COMMENT_HELP}</DialogDescription>
         </DialogHeader>
         <DialogBody>

@@ -2,17 +2,35 @@ import { type DeliverableStatusValue, formatCount, type IconName } from "@koklo/
 import type { ArchitectureTab } from "./architecture-tab.ts";
 import type { HeaderTabCount } from "./features-header-state.ts";
 import type { FeaturesView } from "./features-view.ts";
+import { shortDate } from "./overview-labels.ts";
 
 /**
  * Actions de l'en-tête, dans l'ordre de la maquette 13 (l.859-866). `add` (« Ajouter », génération et relecture) et
  * `create` (« Nouveau composant », liste) ouvrent la même feuille ; l'agent reste le seul bouton primaire.
  */
-export type ArchitectureHeaderAction = "add" | "propose" | "repropose" | "create" | "create-flow";
+export type ArchitectureHeaderAction =
+  | "add"
+  | "propose"
+  | "propose-updates"
+  | "repropose"
+  | "create"
+  | "create-flow"
+  | "create-decision"
+  | "validate";
 
 export interface ArchitectureCounts {
   components: number;
   /** Flux (`flows.list`, total) : absent tant qu'il n'est pas lu (B548 : « N composants · N flux »). */
   flows?: number;
+  /** Décisions (`adr.list`, total) : absent tant qu'il n'est pas lu (B591 : « N composants · N décisions · N flux »). */
+  decisions?: number;
+}
+
+/** Dernière décision « validé » du livrable : prénom (équipe seulement), date et SHA de la version validée (B591). */
+export interface ArchitectureValidation {
+  name: string | null;
+  at: string;
+  sha: string | null;
 }
 
 export interface ArchitectureHeaderState {
@@ -42,15 +60,25 @@ export interface ArchitectureHeaderInput {
   counts: ArchitectureCounts | undefined;
   /** Statut du livrable (`spec.deliverables`). */
   deliverable: "todo" | "pending" | "revise" | "validated" | undefined;
+  /** Décision « validé » en vigueur (`review.list`), pour « Validé par Moussa le 5 nov. · version 8f2d41c ». */
+  validation?: ArchitectureValidation | undefined;
+}
+
+/** « Validé par Moussa le 5 nov. · version 8f2d41c » (maquette 13 l.862) ; sans prénom, « par l'équipe ». */
+export function architectureValidationSummary(validation: ArchitectureValidation): string {
+  const by = validation.name ? validation.name : "l'équipe";
+  const version = validation.sha ? ` · version ${validation.sha.slice(0, 7)}` : "";
+  return `Validé par ${by} le ${shortDate(validation.at)}${version}`;
 }
 
 const plural = (count: number, one: string, other: string): string =>
   `${formatCount(count)} ${count === 1 ? one : other}`;
 
-/** « 34 composants · 18 flux » : les décisions s'y ajouteront avec TK-113. */
+/** « 34 composants · 23 décisions · 18 flux » (maquette 13 l.861, B591). */
 export const architectureSummaryOf = (counts: ArchitectureCounts): string =>
   [
     plural(counts.components, "composant", "composants"),
+    ...(counts.decisions === undefined ? [] : [plural(counts.decisions, "décision", "décisions")]),
     ...(counts.flows === undefined ? [] : [plural(counts.flows, "flux", "flux")]),
   ].join(" · ");
 
@@ -60,6 +88,7 @@ function tabCountsOf(input: ArchitectureHeaderInput): ArchitectureHeaderState["t
   const proposed = input.reviewing ? (input.proposedComponents ?? 0) : 0;
   const totals: ArchitectureHeaderState["tabCounts"] = {
     components: { value: counts.components + proposed },
+    ...(counts.decisions === undefined ? {} : { decisions: { value: counts.decisions } }),
     ...(counts.flows === undefined ? {} : { flows: { value: counts.flows } }),
   };
   if (input.reviewing && !input.generating) {
@@ -68,8 +97,24 @@ function tabCountsOf(input: ArchitectureHeaderInput): ArchitectureHeaderState["t
   return totals;
 }
 
+/** Résumé de l'état Liste : validation en vigueur (validé, à revoir) ou comptes. */
+function listSummary(input: ArchitectureHeaderInput): string | undefined {
+  const { deliverable, validation, counts } = input;
+  if (deliverable === "validated" && validation) return architectureValidationSummary(validation);
+  if (deliverable === "revise" && validation) {
+    return `Validé le ${shortDate(validation.at)}, l'amont a changé depuis`;
+  }
+  return counts ? architectureSummaryOf(counts) : undefined;
+}
+
+const createActionOf = (tab: ArchitectureTab): ArchitectureHeaderAction[] =>
+  tab === "document"
+    ? []
+    : [tab === "flows" ? "create-flow" : tab === "decisions" ? "create-decision" : "create"];
+
 function listState(input: ArchitectureHeaderInput): ArchitectureHeaderState {
-  const { deliverable, counts } = input;
+  const { deliverable } = input;
+  const summary = listSummary(input);
   const settled = deliverable === "validated" || deliverable === "revise";
   return {
     status: settled ? deliverable : "in_progress",
@@ -80,15 +125,20 @@ function listState(input: ArchitectureHeaderInput): ArchitectureHeaderState {
           statusLabel: "Validation de l'équipe · le client lit et commente",
           statusIcon: "groups" as const,
         }),
-    ...(counts ? { summary: architectureSummaryOf(counts) } : {}),
-    actions: [
-      ...(input.agent ? (["propose"] as const) : []),
-      ...(input.tab === "document"
-        ? []
-        : input.tab === "flows"
-          ? (["create-flow"] as const)
-          : (["create"] as const)),
-    ],
+    ...(summary ? { summary } : {}),
+    // À revoir (maquette 13 l.864) : création puis « Proposer les mises à jour » en primaire ; Valider reste (B592 bis).
+    actions:
+      deliverable === "revise"
+        ? [
+            ...createActionOf(input.tab),
+            ...(input.agent ? (["propose-updates"] as const) : []),
+            "validate",
+          ]
+        : [
+            ...(input.agent ? (["propose"] as const) : []),
+            ...createActionOf(input.tab),
+            ...(deliverable === "pending" ? (["validate"] as const) : []),
+          ],
   };
 }
 
@@ -128,7 +178,7 @@ function stateOf(input: ArchitectureHeaderInput): ArchitectureHeaderState {
 /**
  * En-tête de l'écran Architecture par état (maquette 13 l.58-88, 859-866) : statut, résumé, actions et compteurs
  * d'onglet. Prêt n'a aucune action (l'état vide porte les deux) ; hors équipe, rien n'est dit ni proposé ; le designer
- * lit sans bouton d'écriture ; jamais de « Valider l'architecture » avant TK-114.
+ * lit sans bouton d'écriture ; « Valider l'architecture » seulement tant que le livrable est à valider ou à revoir (B577).
  */
 export function architectureHeaderStateOf(input: ArchitectureHeaderInput): ArchitectureHeaderState {
   if (!input.team) return { actions: [] };

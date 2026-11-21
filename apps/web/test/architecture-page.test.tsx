@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   COMPONENTS,
   componentRow,
-  PROJECT_ID,
   renderArchitecture,
   serveArchitecture,
 } from "./support/architecture.tsx";
+import { serveClientArchitecture } from "./support/architecture-client.tsx";
 import { fake, LAUNCH_ID, serveProposals } from "./support/proposals.tsx";
 import { polyfillRadix, procedures, resetWebMocks, router, watchUrl } from "./support/web-mocks.ts";
 
@@ -52,20 +52,20 @@ const proposedComponent = (n: number, name: string) =>
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Écran Architecture : Liste · équipe", () => {
-  it("en-tête : titre, statut, résumé, Proposer puis Nouveau composant ; jamais « Valider »", async () => {
+  it("en-tête : titre, statut, résumé, Proposer, Nouveau composant puis Valider l'architecture", async () => {
     serveArchitecture("owner");
     renderArchitecture();
     await heading();
     expect(
       await screen.findByText("Validation de l'équipe · le client lit et commente"),
     ).toBeInTheDocument();
-    expect(await screen.findByText("3 composants · 2 flux")).toBeInTheDocument();
+    expect(await screen.findByText("3 composants · 3 décisions · 2 flux")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Proposer avec l'agent/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "Nouveau composant" })).toBeVisible();
-    expect(screen.queryByText(/Valider l'architecture/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Valider l'architecture" })).toBeVisible();
   });
 
-  it("onglets Schéma, Document, Composants et Flux ; Schéma par défaut ; jamais Décisions ni Relecture", async () => {
+  it("onglets Schéma, Document, Composants, Décisions et Flux ; Schéma par défaut ; jamais Relecture", async () => {
     serveArchitecture("owner");
     renderArchitecture({ wide: true });
     await heading();
@@ -74,13 +74,13 @@ describe("Écran Architecture : Liste · équipe", () => {
         within(tabsNav())
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Schéma", "Document", "Composants3", "Flux2"]),
+      ).toEqual(["Schéma", "Document", "Composants3", "Décisions3", "Flux2"]),
     );
     expect(within(tabsNav()).getByRole("link", { name: /Schéma/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    for (const absent of [/Décisions/, /Relecture/]) {
+    for (const absent of [/Relecture/]) {
       expect(within(tabsNav()).queryByRole("link", { name: absent })).toBeNull();
     }
   });
@@ -252,7 +252,7 @@ describe("Écran Architecture : Génération et Relecture", () => {
         within(tabsNav())
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Relecture2", "Schéma", "Document", "Composants4", "Flux2"]),
+      ).toEqual(["Relecture2", "Schéma", "Document", "Composants4", "Décisions3", "Flux2"]),
     );
     expect(within(tabsNav()).getAllByRole("link")[0]).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("group", { name: "Mode relecture" })).toHaveTextContent(
@@ -313,14 +313,21 @@ describe("Écran Architecture : Génération et Relecture", () => {
 
 describe("Écran Architecture : droits", () => {
   it.each(["client", "business"] as const)(
-    "%s : aucune lecture d'architecture, retour à la vue d'ensemble",
+    "%s : vue en lecture seule (clientSpace), aucune lecture spec.architecture, pas de redirection",
     async (role) => {
-      serveArchitecture(role);
+      serveClientArchitecture(role);
       renderArchitecture();
-      await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/projects/${PROJECT_ID}`));
-      expect(procedures.specArchitectureComponentsList).not.toHaveBeenCalled();
-      expect(procedures.specArchitectureDocument).not.toHaveBeenCalled();
-      expect(screen.queryByRole("heading", { level: 1, name: "Architecture" })).toBeNull();
+      expect(await screen.findByText(/Lecture seule\./)).toBeVisible();
+      expect(router.replace).not.toHaveBeenCalled();
+      for (const name of [
+        "specArchitectureComponentsList",
+        "specArchitectureDocument",
+        "specArchitectureAdrList",
+        "specArchitectureFlowsList",
+        "specArchitectureSource",
+      ] as const) {
+        expect(procedures[name]).not.toHaveBeenCalled();
+      }
     },
   );
 

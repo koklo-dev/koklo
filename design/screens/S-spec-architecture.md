@@ -1,7 +1,7 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 3
+version: 4
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
@@ -39,6 +39,7 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 | 1 | 2026-11-21 | TK-111 | Création : page Spec · Architecture, états Prêt, Génération, Relecture, onglets Document et Composants ; `DocSectionStatus` ajouté à `packages/ui` (DESIGN.md §5.22). |
 | 2 | 2026-11-21 | TK-111 | Lot C : colonne Agent sans conversation, pas de glisser ni d'éditeur de section, client et business renvoyés à la vue d'ensemble (B532 à B539). |
 | 3 | 2026-11-21 | TK-112 | Schéma en couches et Flux en séquence (§11) ; `SequenceDiagram`, `ArchNodeCard`, props `bands` et `ghostIds` du `DiagramViewer` ajoutés à `packages/ui` (DESIGN.md §5.23) ; onglet par défaut Schéma ≥ 1024 px (B541 à B550). |
+| 4 | 2026-11-21 | TK-113 | Décisions, « Valider l'architecture », « À revoir » (impact amont des lots 5 et 6), vue client en lecture seule avec commentaires (§12) ; `DecisionStatus` et prop `stale` de `ArchNodeCard` ajoutés à `packages/ui` (DESIGN.md §5.24) ; ligne Composants vers Schéma (B585) (B575 à B592). |
 
 ## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
 - **Schéma** : lecteur du lot 6 ; au-delà de 25 composants, vue des zones (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone. Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
@@ -47,3 +48,14 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 - **Accessibilité** : nœud = `button` `aria-pressed` (« Service API »), Alt + flèches déplace avec annonce, `/` focalise la recherche, SVG `aria-hidden` ; séquence `role="img"` « Diagramme de séquence X, N messages » + `details` « Lire les messages » (liste numérotée) ; défilement horizontal focusable.
 - **375 px** : Composants remplace le Schéma (< 1024 px), Flux liste puis détail « ← Liste », séquence défilante, commandes 44 px.
 - **États comparés à la maquette** (clair, sombre, 375 px) : vue des zones ; zone ouverte avec fiche ; zoom 50 % ; Flux diagramme ; Flux YAML ou Mermaid ; Schéma vide ou en erreur.
+
+## 12. Décisions, validation, À revoir et vue client (TK-113, maquette 13 l.120-137, 225-229, 375-401, 589-601, 802-810, 860-866)
+- **Utilisateurs** : équipe (owner, admin, développeur écrivent ; designer lit) ; client (lit et commente) ; business (lit). Le client et le business ne lisent que le modèle validé, par `clientSpace.*`.
+- **Décisions** : liste (recherche anti-rebond 200 ms, filtres Statut / Composant / Date côté serveur, barre de compte `role="status"`, pages de 50 « Afficher 50 de plus ») et fiche ; lien direct `?tab=decisions&d=ADR-nnn` ; « Nouvelle décision » et « Modifier » ouvrent `SpecItemSheet` (formulaire Décision) ; « Remplacée par ADR-… le … » en encadré.
+- **Valider l'architecture** : `review.submit` sur le livrable ; échec lisible sous l'en-tête ; annonce « Architecture validée » dans la région d'état ; Technique passe « Prêt ». Toute modification invalide la validation (le serveur recalcule).
+- **À revoir** : bandeau `role="alert"` avec les éléments amont modifiés (« T-avis ajoutée, T-rappel modifiée »), composants et flux concernés ; « Voir les changements » ouvre l'écran amont ; « Proposer les mises à jour » ouvre la modale de l'agent (équipe qui écrit seulement). Comme pour les Données (TK-109), « Valider l'architecture » reste proposé en « À revoir » : une nouvelle validation repose la référence de l'impact amont (écart avec la maquette l.864, qui ne l'affiche pas ; sans lui l'équipe ne pourrait pas lever l'alerte).
+- **Vue client** : bandeau « Lecture seule » ; fiche de composant « En clair » + « Sert » ; décision : encadré « En clair » puis le reste en lecture ; flux : diagramme de séquence et liste des messages ; « Commenter » (fenêtre `DataCommentDialog` généralisée, un champ, « Envoyer », annonce « Commentaire envoyé ») ; non validé : `EmptyState` `schedule` « en cours de validation par l'équipe ».
+- **États** : chargement (squelettes), vide (« Aucune décision » / « Aucune décision ne correspond », avec « Effacer les filtres »), erreur (`ErrorNotice` + Réessayer), droits (designer sans écriture ; business sans « Commenter »), indisponible (modèle non validé).
+- **Clavier et annonces** : lignes de liste = boutons `aria-current` ; flèches haut/bas entre lignes ; Échap ferme la fenêtre de commentaire et rend le focus au bouton d'origine ; fiche de décision en `article` `aria-label="Décision"` ; annonces dans l'unique région `role="status"` de la page (compte après filtre, « Architecture validée », « Commentaire envoyé »).
+- **375 px** : liste puis fiche « ← Liste », commandes 44 px, filtres sur plusieurs lignes, « Valider l'architecture » et « Commenter » pleine largeur, aucun défilement horizontal de page.
+- **États comparés à la maquette** (clair, sombre, 375 px) : Décisions (liste + fiche) ; À revoir (bandeau, schéma avec contours ambre) ; Vue client Décision « En clair » ; Vue client Schéma ; Décisions vide ou erreur ; liste validée « Validé par l'équipe ».

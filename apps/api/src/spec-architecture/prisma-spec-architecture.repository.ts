@@ -1,3 +1,4 @@
+import type { Prisma } from "@koklo/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { entitySource, entityWhere } from "../spec-read/entity-list.ts";
 import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
@@ -6,11 +7,15 @@ import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { loadWindow } from "../tracker/long-list.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { adrFilter, supersededByOfData } from "./architecture-adrs.ts";
 import { gitSourceOf, readableHead } from "./readable-head.ts";
 import type {
+  AdrFound,
+  AdrsRequest,
   ChecksFacts,
   ComponentsPage,
   ComponentsRequest,
+  IndexFailure,
   SpecArchitectureRepository,
 } from "./spec-architecture.repository.ts";
 
@@ -53,6 +58,84 @@ export class PrismaSpecArchitectureRepository implements SpecArchitectureReposit
         facets: { zone: await this.zoneFacets(tx, snapshotId, ids) },
       };
       return { kind: "page" as const, page };
+    });
+  }
+
+  adrsPage(scope: ProjectScope, revision: Revision, request: AdrsRequest) {
+    const { q, status, component, from, to, ...window } = request;
+    return this.transactions.run(scope, async (tx) => {
+      const readable = await this.readable(tx, scope, revision);
+      if (readable === null || "kind" in readable) return readable;
+      const { id: snapshotId } = readable.snapshot;
+      const ids = q === undefined ? null : await this.search.entityIds(snapshotId, "adr", q);
+      const cited =
+        component === undefined ? [] : await this.decisionsOf(tx, snapshotId, component);
+      const base = adrFilter({ component, from, to }, cited);
+      const where = {
+        ...entityWhere(snapshotId, "adr", ids),
+        AND: [...base, ...adrFilter({ status })],
+      };
+      const { rows, ...position } = await loadWindow(
+        entitySource(tx, snapshotId, "adr", where),
+        window,
+      );
+      const page: ComponentsPage = {
+        items: rows.map(({ specId, path, data }) => ({ specId, path, data })),
+        ...position,
+        facets: {
+          status: await this.statusFacets(tx, {
+            ...entityWhere(snapshotId, "adr", ids),
+            AND: base,
+          }),
+        },
+      };
+      return { kind: "page" as const, page };
+    });
+  }
+
+  /** Décisions que le composant cite dans ses `decisions` (l'autre sens du lien, B580). */
+  private async decisionsOf(tx: Tx, snapshotId: string, component: string): Promise<string[]> {
+    const row = await tx.specEntity.findFirst({
+      where: { snapshotId, kind: "component", specId: component },
+      select: { data: true },
+    });
+    const decisions = (row?.data as { decisions?: unknown } | null)?.decisions;
+    return Array.isArray(decisions)
+      ? decisions.filter((id): id is string => typeof id === "string" && /^ADR-\d{3,}$/.test(id))
+      : [];
+  }
+
+  /** Décisions par statut, sans tenir compte du filtre de statut (les compteurs de la barre de filtres restent justes). */
+  private async statusFacets(tx: Tx, where: Prisma.SpecEntityWhereInput) {
+    const rows = await tx.specEntity.findMany({ where, select: { data: true } });
+    const counts = new Map<string, number>();
+    for (const { data } of rows) {
+      const status = (data as { statut?: unknown } | null)?.statut;
+      if (typeof status === "string") counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+    return Object.fromEntries([...counts].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  }
+
+  adr(scope: ProjectScope, revision: Revision, adrId: string) {
+    return this.transactions.run(scope, async (tx): Promise<IndexFailure | AdrFound | null> => {
+      const readable = await this.readable(tx, scope, revision);
+      if (readable === null || "kind" in readable) return readable;
+      const { id: snapshotId, commitSha } = readable.snapshot;
+      const select = { specId: true, path: true, data: true } as const;
+      const adr = await tx.specEntity.findFirst({
+        where: { snapshotId, kind: "adr", specId: adrId },
+        select,
+      });
+      if (!adr) return null;
+      const by = supersededByOfData(adr.data);
+      const replacedBy =
+        by === undefined
+          ? null
+          : await tx.specEntity.findFirst({
+              where: { snapshotId, kind: "adr", specId: by },
+              select,
+            });
+      return { kind: "found", adr, replacedBy, commitSha };
     });
   }
 

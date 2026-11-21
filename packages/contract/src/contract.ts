@@ -61,10 +61,16 @@ import {
 } from "./schemas.ts";
 import type { aiPrefillItemInputSchema, aiPrefillItemOutputSchema } from "./schemas-ai.ts";
 import type {
+  clientArchitectureComponentSchema,
   clientDataTableSchema,
   clientFeatureSummarySchema,
   clientFlowSchema,
   clientRuleSchema,
+  clientSpaceAdrOutputSchema,
+  clientSpaceAdrsOutputSchema,
+  clientSpaceArchFlowOutputSchema,
+  clientSpaceArchFlowsOutputSchema,
+  clientSpaceArchitectureOutputSchema,
   clientSpaceDataFixtureRowsOutputSchema,
   clientSpaceDataFixturesOutputSchema,
   clientSpaceDataModelOutputSchema,
@@ -134,6 +140,10 @@ import type {
   validationReportSchema,
 } from "./schemas-spec.ts";
 import type {
+  adrByIdInputSchema,
+  adrDetailSchema,
+  adrListInputSchema,
+  adrSummarySchema,
   archflowDetailSchema,
   architectureChecksSchema,
   architectureComponentSummarySchema,
@@ -312,6 +322,13 @@ export type ClientFeatureSummary = z.output<typeof clientFeatureSummarySchema>;
 export type ClientFeature = z.output<typeof clientSpaceFeatureOutputSchema>;
 export type ClientDataTable = z.output<typeof clientDataTableSchema>;
 export type ClientSpaceDataModel = z.output<typeof clientSpaceDataModelOutputSchema>;
+export type ClientArchitectureComponent = z.output<typeof clientArchitectureComponentSchema>;
+export type ClientSpaceArchitecture = z.output<typeof clientSpaceArchitectureOutputSchema>;
+export type ClientSpaceAdrs = z.output<typeof clientSpaceAdrsOutputSchema>;
+export type ClientSpaceAdr = z.output<typeof clientSpaceAdrOutputSchema>;
+export type ClientSpaceArchFlows = z.output<typeof clientSpaceArchFlowsOutputSchema>;
+export type ClientSpaceArchFlow = z.output<typeof clientSpaceArchFlowOutputSchema>;
+
 export type ClientSpaceDataFixtures = z.output<typeof clientSpaceDataFixturesOutputSchema>;
 export type ClientSpaceDataFixtureRows = z.output<typeof clientSpaceDataFixtureRowsOutputSchema>;
 export type ClientSpaceDataZones = z.output<typeof clientSpaceDataZonesOutputSchema>;
@@ -350,6 +367,10 @@ export type ArchitectureFlowsListInput = z.output<typeof architectureFlowsListIn
 export type ArchitectureFlowSummary = z.output<typeof architectureFlowSummarySchema>;
 export type ArchitectureFlowsByIdInput = z.output<typeof architectureFlowsByIdInputSchema>;
 export type ArchflowDetail = z.output<typeof archflowDetailSchema>;
+export type AdrListInput = z.output<typeof adrListInputSchema>;
+export type AdrSummary = z.output<typeof adrSummarySchema>;
+export type AdrByIdInput = z.output<typeof adrByIdInputSchema>;
+export type AdrDetail = z.output<typeof adrDetailSchema>;
 export type ArchitectureSourceInput = z.output<typeof architectureSourceInputSchema>;
 export type ArchitectureSource = z.output<typeof architectureSourceSchema>;
 export type DataTablesListInput = z.output<typeof dataTablesListInputSchema>;

@@ -31,6 +31,7 @@ import type { ProposalOutput } from "../lib/proposal-types.ts";
 import { COMPONENTS_PAGE_SIZE } from "../lib/use-architecture-components.ts";
 import type { ArchitecturePageModel } from "../lib/use-architecture-page.ts";
 import { useAutoLoad } from "../lib/use-auto-load.ts";
+import { NARROW_MAX, useMaxWidth } from "../lib/use-max-width.ts";
 import { FilterChipMenu } from "./features-filters.tsx";
 
 type RowState = "review" | "accepted" | "rejected";
@@ -66,10 +67,12 @@ function NameCell({
   id,
   name,
   onEdit,
+  verb,
 }: {
   id: string;
   name: string;
   onEdit: (() => void) | undefined;
+  verb: string;
 }) {
   return (
     <span className="flex items-center gap-2">
@@ -78,7 +81,7 @@ function NameCell({
         <button
           type="button"
           onClick={onEdit}
-          aria-label={`Modifier ${id}, ${name}`}
+          aria-label={`${verb} ${id}, ${name}`}
           className="rounded-sm text-left font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11"
         >
           {name}
@@ -95,10 +98,12 @@ function ComponentRow({
   row,
   selected,
   onEdit,
+  verb,
 }: {
   row: Row;
   selected: boolean;
   onEdit: ((id: string) => void) | undefined;
+  verb: string;
 }) {
   const ref = useRef<HTMLTableRowElement>(null);
   useEffect(() => {
@@ -121,6 +126,7 @@ function ComponentRow({
           id={row.id}
           name={row.name}
           onEdit={state || !onEdit ? undefined : () => onEdit(row.id)}
+          verb={verb}
         />
         {state ? (
           <Pill size="xs" tone={state === "rejected" ? "outline" : "soft"} className="mt-1">
@@ -274,6 +280,14 @@ function rowsOf(page: ArchitecturePageModel): Row[] {
 function ComponentsGrid({ page, rows }: { page: ArchitecturePageModel; rows: readonly Row[] }) {
   const { components, footer, url, form } = page;
   const sentinel = useAutoLoad(footer.onLoadMore, footer.state === "more");
+  // B585 : dès 1024 px, une ligne ouvre le Schéma sur la zone du composant ; en dessous, la fiche en feuille (écriture).
+  const wide = !useMaxWidth(NARROW_MAX);
+  const zoneOf = new Map(rows.map((row) => [row.id, row.zone]));
+  const open = wide
+    ? (id: string) => url.openSchemaZone(zoneOf.get(id) ?? "", id)
+    : form.canWrite
+      ? form.openEdit
+      : undefined;
   return (
     <div>
       <Table
@@ -299,7 +313,8 @@ function ComponentsGrid({ page, rows }: { page: ArchitecturePageModel; rows: rea
               key={`${row.state ?? "saved"}-${row.id}`}
               row={row}
               selected={row.id === url.c}
-              onEdit={form.canWrite ? form.openEdit : undefined}
+              onEdit={open}
+              verb={wide ? "Ouvrir dans le schéma" : "Modifier"}
             />
           ))}
         </TableBody>

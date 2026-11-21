@@ -1,10 +1,18 @@
 "use client";
 
 import type { SpecItem } from "@koklo/contract";
-import { Button, EntityChip, IdTag, Pill, SegmentedControl, Skeleton } from "@koklo/ui";
+import {
+  Button,
+  EntityChip,
+  IdTag,
+  InlineAlert,
+  Pill,
+  SegmentedControl,
+  Skeleton,
+} from "@koklo/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { componentTypeLabel } from "../lib/architecture-labels.ts";
+import { componentTypeLabel, staleNoteOf } from "../lib/architecture-labels.ts";
 import { orpc } from "../lib/orpc.ts";
 import { useArchitectureSource } from "../lib/use-architecture-flows.ts";
 import { CopyAction, SourceBlock } from "./data-diagram-source.tsx";
@@ -78,7 +86,15 @@ function Groups({ groups }: { groups: readonly Group[] }) {
 }
 
 /** Vue Fiche d'un composant enregistré : responsabilité et liens, lus dans le dépôt (`spec.item.get`). */
-function ComponentFiche({ projectId, id }: { projectId: string; id: string }) {
+function ComponentFiche({
+  projectId,
+  id,
+  staleIds,
+}: {
+  projectId: string;
+  id: string;
+  staleIds: readonly string[] | undefined;
+}) {
   const detail = useQuery(
     orpc.spec.item.get.queryOptions({ input: { projectId, type: "component", id } }),
   );
@@ -91,6 +107,11 @@ function ComponentFiche({ projectId, id }: { projectId: string; id: string }) {
     <>
       <p className="m-0 text-body leading-[1.55]">{values.responsibility}</p>
       <Groups groups={groupsOf(values)} />
+      {staleIds ? (
+        <InlineAlert variant="warning" icon="sync_problem" role="note">
+          {staleNoteOf(staleIds, [...values.owns, ...values.serves])}
+        </InlineAlert>
+      ) : null}
     </>
   );
 }
@@ -157,6 +178,8 @@ export interface SchemaFicheProps {
   type: string | undefined;
   /** « Modifier » : équipe qui écrit, composant seulement. */
   onEdit: (() => void) | undefined;
+  /** Amont modifié qui concerne ce composant (architecture à revoir) : l'encadré ambre de la fiche (B587). */
+  staleIds?: readonly string[];
 }
 
 /**
@@ -164,7 +187,7 @@ export interface SchemaFicheProps {
  * Fiche · YAML · Mermaid puis la vue choisie. Un acteur (rôle du fonctionnel) n'a que sa fiche : pas de fichier de
  * composant. Équipe et designer lisent les trois vues (B550) ; le client n'a pas cet onglet.
  */
-export function SchemaFiche({ projectId, id, name, type, onEdit }: SchemaFicheProps) {
+export function SchemaFiche({ projectId, id, name, type, onEdit, staleIds }: SchemaFicheProps) {
   const [view, setView] = useState<View>("fiche");
   const actor = type === undefined;
   return (
@@ -197,7 +220,9 @@ export function SchemaFiche({ projectId, id, name, type, onEdit }: SchemaFichePr
           />
           {view === "yaml" ? <ComponentYaml projectId={projectId} id={id} /> : null}
           {view === "mermaid" ? <SchemaMermaid projectId={projectId} /> : null}
-          {view === "fiche" ? <ComponentFiche projectId={projectId} id={id} /> : null}
+          {view === "fiche" ? (
+            <ComponentFiche projectId={projectId} id={id} staleIds={staleIds} />
+          ) : null}
         </>
       )}
     </div>

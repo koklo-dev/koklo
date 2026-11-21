@@ -104,8 +104,10 @@ async function authorNamesOf(
     }),
   );
 }
+/** Données (B449) et Architecture (TK-113) dépendent de leurs amonts : leur décision se compare à la tête de la décision. */
 const dependsOnUpstream = (input: SubmitReview) =>
-  input.targetKind === "deliverable" && input.targetRef === "data";
+  input.targetKind === "deliverable" &&
+  (input.targetRef === "data" || input.targetRef === "architecture");
 const baselineNumber = (ref: string) => Number(ref.slice("baseline-".length));
 
 /**
@@ -365,7 +367,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       (current.hash !== null && last.version !== null
         ? last.version.contentHash === current.hash
         : last.sha === current.headSha) &&
-      // Les Données dépendent aussi de leurs amonts (B449) : sur une autre tête, une décision identique est une nouvelle
+      // Les Données et l'Architecture dépendent aussi de leurs amonts (B449, TK-113) : sur une autre tête, une décision identique est une nouvelle
       // décision (elle fait repartir la comparaison de l'impact amont).
       (!dependsOnUpstream(input) || last.sha === current.headSha);
     const identical =

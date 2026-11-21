@@ -47,6 +47,8 @@ export interface ArchNodeCardProps {
   selected?: boolean | undefined;
   /** Proposition à relire : contour en pointillés, doublé d'un texte dans le nom accessible. */
   pending?: boolean | undefined;
+  /** Nœud concerné par un changement en amont (architecture à revoir) : contour ambre de 2 px, doublé d'un texte dans le nom accessible. */
+  stale?: boolean | undefined;
   /** Zoom sous 60 % : seul le nom reste. */
   compact?: boolean | undefined;
   /** Nœud d'une autre zone : estompé, rond sans `aria-pressed`, il ouvre l'autre zone. */
@@ -68,9 +70,10 @@ const SHAPE: Record<ArchNodeKind, string> = {
 /** Contour : `--primary` de 2 px et ombre pour la sélection, sinon 1 px, en pointillés pour un externe, une proposition ou une autre zone. */
 function borderOf(
   kind: ArchNodeKind,
-  { selected, dashed }: { selected: boolean; dashed: boolean },
+  { selected, dashed, stale }: { selected: boolean; dashed: boolean; stale: boolean },
 ) {
   if (selected) return "border-2 border-primary shadow-floating";
+  if (stale) return "border-2 border-status-pending-icon";
   return cn(
     "border",
     kind === "ext" ? "border-dashed border-border-strong" : "border-border",
@@ -91,6 +94,7 @@ export function ArchNodeCard({
   subtitle,
   selected = false,
   pending = false,
+  stale = false,
   compact = false,
   ghost = false,
   onSelect,
@@ -101,7 +105,7 @@ export function ArchNodeCard({
   const size = SIZES[kind];
   const actor = kind === "actor";
   const tile = actor ? "size-7 rounded-full" : "size-8 rounded-lg";
-  const border = borderOf(kind, { selected, dashed: pending || ghost });
+  const border = borderOf(kind, { selected, dashed: pending || ghost, stale });
   return (
     <div
       data-slot="arch-node"
@@ -120,7 +124,10 @@ export function ArchNodeCard({
         type="button"
         {...(ghost ? {} : { "aria-pressed": selected })}
         aria-label={
-          [type, name].join(" ") + (pending ? ", à relire" : "") + (ghost ? ", autre zone" : "")
+          [type, name].join(" ") +
+          (pending ? ", à relire" : "") +
+          (stale ? ", à revoir" : "") +
+          (ghost ? ", autre zone" : "")
         }
         onClick={onSelect}
         className="absolute inset-0 z-10 cursor-pointer rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"

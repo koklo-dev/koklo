@@ -40,8 +40,10 @@ const withoutReviewKinds = (enums: string[]) =>
       entry.startsWith("counter_name:") ? "counter_name:ticket,sprint,feature,suggestion" : entry,
     )
     .map((entry) =>
-      // TK-109 : la valeur `table` de `comment_target_kind` est postérieure à cette migration.
-      entry.startsWith("comment_target_kind:") ? entry.replace(/,table$/, "") : entry,
+      // TK-109 et TK-113 : les valeurs `table`, `component`, `adr` et `archflow` de `comment_target_kind` sont postérieures.
+      entry.startsWith("comment_target_kind:")
+        ? entry.replace(/,table,component,adr,archflow$/, ",table").replace(/,table$/, "")
+        : entry,
     )
     .map((entry) =>
       // TK-104 : la valeur `withdrawn` de `review_status` est postérieure à cette migration.

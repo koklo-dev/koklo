@@ -83,3 +83,67 @@ export const DOC_AGENT_ACTIONS = [
     instruction: "Résumer le document en langage simple pour le client",
   },
 ] as const;
+
+/** Décisions (maquette 13 l.376-401, B583) : nom au compte et libellés de la liste. */
+export const DECISION_NOUN = { one: "décision", other: "décisions", masculine: false } as const;
+export const DECISIONS_SEARCH_LABEL = "Rechercher une décision";
+export const DECISIONS_SEARCH_PLACEHOLDER = "Rechercher une décision ou ADR-…";
+export const DECISIONS_LIST_LABEL = "Décisions de l'architecture";
+export const DECISION_PERIOD_LABELS = {
+  "30j": "30 derniers jours",
+  "90j": "90 derniers jours",
+  annee: "Cette année",
+} as const;
+
+const STATUS_PLURAL = {
+  acceptee: "acceptée",
+  proposee: "proposée",
+  remplacee: "remplacée",
+} as const;
+
+/** « 19 acceptées · 3 proposées » (B583, maquette 13 l.810) : acceptées et proposées seulement, les remplacées restent dans le filtre Statut. */
+export function decisionsScope(
+  facets: Partial<Record<keyof typeof STATUS_PLURAL, number>>,
+): string {
+  return (["acceptee", "proposee"] as const)
+    .flatMap((key) => {
+      const count = facets[key] ?? 0;
+      return count > 0
+        ? [`${formatCount(count)} ${STATUS_PLURAL[key]}${count > 1 ? "s" : ""}`]
+        : [];
+    })
+    .join(" · ");
+}
+
+/** « Remplacée par ADR-003 le 29 oct. » ; sans date de la remplaçante, « Remplacée par ADR-003 » (B584). */
+export const supersededText = (by: string, onText: string | undefined): string =>
+  onText ? `Remplacée par ${by} le ${onText}` : `Remplacée par ${by}`;
+
+/** Annonce d'un résultat de recherche ou de filtre des décisions. */
+export function decisionsResultText(options: {
+  q: string | undefined;
+  filtered: boolean;
+  total: number;
+}): string {
+  const { q, filtered, total } = options;
+  if (total === 0) {
+    return q ? `Aucune décision ne correspond à « ${q} »` : "Aucune décision pour ce filtre.";
+  }
+  if (!q && !filtered) return "";
+  return plural(total, "décision trouvée", "décisions trouvées");
+}
+
+/**
+ * Encadré ambre de la fiche d'un composant concerné (B587) : une table de l'amont que le composant ne possède pas
+ * « doit être possédée par un composant » (table ajoutée) ; sinon « <id> a changé ».
+ */
+export function staleNoteOf(upstream: readonly string[], cited: readonly string[]): string {
+  const known = new Set(cited);
+  const unowned = upstream.filter((id) => id.startsWith("T-") && !known.has(id));
+  const changed = upstream.filter((id) => known.has(id));
+  const parts = [
+    ...unowned.map((id) => `${id} doit être possédée par un composant`),
+    ...changed.map((id) => `${id} a changé`),
+  ];
+  return `Concerné par le changement : ${(parts.length > 0 ? parts : upstream.map((id) => `${id} a changé`)).join(" ; ")}.`;
+}

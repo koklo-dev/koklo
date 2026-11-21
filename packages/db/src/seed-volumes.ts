@@ -25,6 +25,8 @@ export interface SeededVolume {
   architectureProposals: number;
   /** Flux d'architecture `architecture/flows/P-flux-*.yaml` indexés (TK-112) : 18 sur la planche, 300 sur `large`. */
   archflows: number;
+  /** Décisions d'architecture `architecture/adr/ADR-*.md` indexées (TK-113) : 23 sur la planche, 300 sur `large`. */
+  adrs: number;
 }
 
 export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
@@ -42,6 +44,7 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     components: 120,
     architectureProposals: 0,
     archflows: 300,
+    adrs: 300,
   },
   // 47 « actions » de la planche = points d'accès ; la planche ne donne aucun volume de tickets,
   // 60 permettent d'exercer le kanban à l'écran (lecture prudente, B34).
@@ -61,6 +64,7 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     components: 34,
     architectureProposals: 80,
     archflows: 18,
+    adrs: 23,
   },
 };
 

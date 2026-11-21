@@ -65,4 +65,34 @@ export class SpecArchitectureController {
       ),
     );
   }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.architecture.adr.list)
+  adrs(@Req() request: Request) {
+    return implement(contract.spec.architecture.adr.list).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.adrs(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...SPEC_BATCH_ROLES)
+  @Implement(contract.spec.architecture.adr.byId)
+  adr(@Req() request: Request) {
+    return implement(contract.spec.architecture.adr.byId).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.service.adr(scope, input),
+        this.access,
+      ),
+    );
+  }
 }

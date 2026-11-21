@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { overviewDeliverableStatusSchema } from "./schemas-overview.ts";
 import { deliverableKeySchema } from "./schemas-shell.ts";
+import { archFlowIdSchema, componentIdSchema } from "./schemas-spec-architecture.ts";
 
 /**
  * Livrables de la spec (TK-100, contrat 2.10.0, additif). `status` reprend les quatre statuts de la vue d'ensemble ;
@@ -17,11 +18,17 @@ export const specDeliverableSchema = z.object({
   condition: z.string().nullable(),
   pendingProposals: z.number().int().min(0),
   staleBecause: z.object({ idea: z.string(), changedPages: z.number().int().min(0) }).optional(),
-  /** Fonctionnalités et règles citées par la source du livrable et modifiées depuis sa dernière décision (3.7.0, Données). */
+  /**
+   * Fonctionnalités, règles et tables citées par la source du livrable et modifiées (ou ajoutées, ou retirées) depuis sa dernière
+   * décision (3.7.0 Données, 3.11.0 Architecture : `T-` en plus).
+   */
   staleUpstream: z
-    .array(z.string().regex(/^(F-\d{3,}|R-\d{3,})$/))
+    .array(z.string().regex(/^(F|R)-\d{3,}$|^T-[a-z0-9-]+$/))
     .max(20)
     .optional(),
+  /** Architecture à revoir (3.11.0) : composants et flux concernés par ces changements, 50 au plus chacun. */
+  staleComponents: z.array(componentIdSchema).max(50).optional(),
+  staleFlows: z.array(archFlowIdSchema).max(50).optional(),
 });
 
 export const specDeliverablesInputSchema = z.object({ projectId: z.uuid() });

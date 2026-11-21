@@ -110,3 +110,29 @@ describe("Onglet Composants : pages de 50", () => {
     expect(screen.getByText("Fin de la liste · 70 composants")).toBeInTheDocument();
   });
 });
+
+describe("Onglet Composants : ligne vers le Schéma (B585)", () => {
+  it("dès 1024 px, une ligne ouvre le Schéma sur la zone du composant, composant choisi", async () => {
+    serveArchitecture("owner");
+    renderArchitecture({ search: "tab=components", wide: true });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Ouvrir dans le schéma C-sms, Fournisseur SMS" }),
+    );
+    await waitFor(() => expect(window.location.search).toContain("tab=schema"));
+    expect(window.location.search).toContain("zone=Communication");
+    expect(window.location.search).toContain("sel=C-sms");
+  });
+
+  it("le designer navigue aussi ; en dessous de 1024 px, la feuille de modification reste", async () => {
+    serveArchitecture("designer");
+    renderArchitecture({ search: "tab=components", wide: true });
+    expect(
+      await screen.findByRole("button", { name: "Ouvrir dans le schéma C-api, API" }),
+    ).toBeVisible();
+    serveArchitecture("owner");
+    renderArchitecture({ search: "tab=components", wide: false });
+    expect(await screen.findAllByRole("button", { name: "Modifier C-api, API" })).not.toHaveLength(
+      0,
+    );
+  });
+});

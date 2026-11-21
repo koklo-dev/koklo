@@ -55,7 +55,7 @@ describe("readArchitectureUrl", () => {
   });
 
   it("un onglet inconnu ouvre le défaut ; un identifiant qui n'est pas un composant est ignoré", () => {
-    expect(readArchitectureUrl("?tab=decisions").tab).toBe("schema");
+    expect(readArchitectureUrl("?tab=inconnu").tab).toBe("schema");
     expect(readArchitectureUrl("?c=T-client&edit=F-001&s=Pas%20un%20slug")).toMatchObject({
       c: undefined,
       edit: undefined,
@@ -107,23 +107,57 @@ describe("withArchitectureUrl", () => {
 
 describe("onglets visibles", () => {
   it("Schéma, Document, Composants et Flux hors relecture ; Relecture en tête pendant une relecture", () => {
-    expect(visibleArchitectureTabs(false)).toEqual(["schema", "document", "components", "flows"]);
+    expect(visibleArchitectureTabs(false)).toEqual([
+      "schema",
+      "document",
+      "components",
+      "decisions",
+      "flows",
+    ]);
     expect(visibleArchitectureTabs(true)).toEqual([
       "review",
       "schema",
       "document",
       "components",
+      "decisions",
       "flows",
     ]);
   });
 
-  it("jamais Décisions avant TK-113 : aucun bouton mort", () => {
+  it("Décisions : libellé, icône gavel, entre Composants et Flux (TK-113)", () => {
     expect(Object.values(ARCHITECTURE_TAB_LABELS)).toEqual([
       "Relecture",
       "Schéma",
       "Document",
       "Composants",
+      "Décisions",
       "Flux",
     ]);
+  });
+
+  it("lit la décision ouverte et ses filtres ; ignore ce qui n'est pas une ADR, un statut ou une période", () => {
+    expect(
+      readArchitectureUrl("?tab=decisions&d=ADR-003&status=acceptee&component=C-api&period=90j"),
+    ).toMatchObject({
+      tab: "decisions",
+      d: "ADR-003",
+      status: "acceptee",
+      component: "C-api",
+      period: "90j",
+    });
+    expect(readArchitectureUrl("?d=C-api&status=x&period=y&component=T-a")).toMatchObject({
+      d: undefined,
+      status: undefined,
+      period: undefined,
+      component: undefined,
+    });
+    expect(readArchitectureUrl("?edit=ADR-006").edit).toBe("ADR-006");
+  });
+
+  it("écrit et retire les paramètres des décisions", () => {
+    expect(withArchitectureUrl("", { tab: "decisions", d: "ADR-003", status: "proposee" })).toBe(
+      "?tab=decisions&d=ADR-003&status=proposee",
+    );
+    expect(withArchitectureUrl("?d=ADR-003&status=proposee", { d: null, status: null })).toBe("");
   });
 });

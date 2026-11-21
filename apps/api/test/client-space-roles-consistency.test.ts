@@ -45,7 +45,7 @@ describe("rôles des procédures clientSpace.*", () => {
 
   it("aucun rôle nommé en dur, et le cloisonnement central (PROJECT_ACCESS) est injecté", () => {
     const source = read(CONTROLLER);
-    expect(source.match(/@Roles\(/g)).toHaveLength(14); // projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109), dataZones, dataZone, dataSearch, dataFixturePage (TK-110)
+    expect(source.match(/@Roles\(/g)).toHaveLength(19); // projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109), dataZones, dataZone, dataSearch, dataFixturePage (TK-110), architecture, adrs, adr, archFlows, archFlow (TK-113)
     expect(source).not.toMatch(/@Roles\(\s*"/);
     expect(source).toContain("PROJECT_ACCESS");
   });

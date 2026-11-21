@@ -9,6 +9,7 @@ import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts
 import { guard, requestIdOf } from "../request-context.ts";
 import { inProject } from "../tracker/scope.ts";
 import { ClientSpaceService } from "./client-space.service.ts";
+import { ClientSpaceArchitectureService } from "./client-space-architecture.service.ts";
 import { ClientSpaceDataService } from "./client-space-data.service.ts";
 import { ClientSpaceEntitiesService } from "./client-space-entities.service.ts";
 
@@ -22,6 +23,8 @@ export class ClientSpaceController {
     @Inject(ClientSpaceService) private readonly service: ClientSpaceService,
     @Inject(ClientSpaceEntitiesService) private readonly entities: ClientSpaceEntitiesService,
     @Inject(ClientSpaceDataService) private readonly data: ClientSpaceDataService,
+    @Inject(ClientSpaceArchitectureService)
+    private readonly architecture: ClientSpaceArchitectureService,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -217,6 +220,81 @@ export class ClientSpaceController {
         errors,
         input.projectId,
         (scope) => this.data.fixturePage(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.architecture)
+  architectureModel(@Req() request: Request) {
+    return implement(contract.clientSpace.architecture).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.architecture.architecture(scope),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.adrs)
+  adrs(@Req() request: Request) {
+    return implement(contract.clientSpace.adrs).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.architecture.adrs(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.adr)
+  adr(@Req() request: Request) {
+    return implement(contract.clientSpace.adr).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.architecture.adr(scope, input.adrId),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.archFlows)
+  archFlows(@Req() request: Request) {
+    return implement(contract.clientSpace.archFlows).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.architecture.archFlows(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.archFlow)
+  archFlow(@Req() request: Request) {
+    return implement(contract.clientSpace.archFlow).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.architecture.archFlow(scope, input.flowId),
         this.access,
       ),
     );

@@ -56,7 +56,14 @@ const ACTION =
 /** Ton neutre ou agent : le bouton prend le contour ; ton coloré : il hérite de la couleur du texte. */
 const NEUTRAL_TONES: ReadonlySet<InlineAlertVariant> = new Set(["neutral", "agent"]);
 
-export type InlineAlertAction = { label: string; onClick: () => void };
+export type InlineAlertAction = {
+  label: string;
+  onClick: () => void;
+  /** Bouton plein (`--primary`) : l'action que la maquette met en avant dans le bandeau. */
+  primary?: boolean;
+  /** Icône de 18 avant le libellé. */
+  icon?: IconName;
+};
 
 type Common = Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
   variant: InlineAlertVariant;
@@ -148,9 +155,12 @@ export function InlineAlert({
               <Button
                 key={item.label}
                 size="sm"
-                variant={NEUTRAL_TONES.has(variant) ? "outline" : "inherit"}
+                variant={
+                  item.primary ? "default" : NEUTRAL_TONES.has(variant) ? "outline" : "inherit"
+                }
                 onClick={item.onClick}
               >
+                {item.icon ? <Icon name={item.icon} size={18} /> : null}
                 {item.label}
               </Button>
             ))}

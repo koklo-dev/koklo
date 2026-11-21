@@ -81,4 +81,17 @@ describe("ArchNodeCard", () => {
     expect(root().style.height).toBe("44px");
     expect(screen.getByRole("button", { name: "Service API" })).toBeVisible();
   });
+
+  it("stale : contour de 2 px --status-pending-icon et nom accessible « …, à revoir »", () => {
+    render(<ArchNodeCard kind="service" name="API" stale />);
+    expect(root().className).toContain("border-2");
+    expect(root().className).toContain("border-status-pending-icon");
+    expect(screen.getByRole("button", { name: "Service API, à revoir" })).toBeVisible();
+  });
+
+  it("stale n'écrase pas la sélection", () => {
+    render(<ArchNodeCard kind="service" name="API" stale selected />);
+    expect(root().className).toContain("border-primary");
+    expect(root().className).not.toContain("border-status-pending-icon");
+  });
 });

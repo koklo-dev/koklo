@@ -314,6 +314,9 @@ enum CommentTargetKind {
   screen
   change_request
   table
+  component
+  adr
+  archflow
 
   @@map("comment_target_kind")
 }

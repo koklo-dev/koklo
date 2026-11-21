@@ -1,5 +1,9 @@
 import type { IncomingMessage } from "node:http";
 import {
+  type ArchitectureReviewScenario,
+  handleArchitectureDecisions,
+} from "./stub-architecture-decisions.ts";
+import {
   createdFeatures,
   currentSha,
   deletedFeatures,
@@ -58,7 +62,8 @@ export type FeaturesScenario = {
   feature?: FeatureMode;
   write?: WriteMode;
 } & SpecItemScenario &
-  ArchitectureScenario;
+  ArchitectureScenario &
+  ArchitectureReviewScenario;
 
 type Reply = { status: number; body: string };
 type Send = (reply: Reply) => void;
@@ -360,6 +365,7 @@ const ROUTE = /^\/projects\/([^/]+)\/(spec|repos)(?:\/features(?:\/(F-\d+))?)?$/
 /** Lectures des écrans de la spec : domaine (règles, rôles, parcours), architecture puis données. */
 const handleSpecReads = (req: IncomingMessage, url: URL, h: Handlers): boolean =>
   handleSpecDomain(req, url, h, (h.scenario.spec ?? "ready").startsWith("large")) ||
+  handleArchitectureDecisions(req, url, h, h.scenario.architecture) ||
   handleSpecArchitecture(req, url, h, h.scenario.architecture) ||
   handleSpecData(req, url, h, h.scenario.spec ?? "ready");
 
