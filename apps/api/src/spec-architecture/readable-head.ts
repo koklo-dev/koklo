@@ -18,7 +18,7 @@ export async function readableHead(
   tx: Tx,
   scope: ProjectScope,
   revision: Revision,
-) {
+): Promise<null | IndexFailure | { found: Found; snapshot: Snapshot }> {
   const found = await resolver.resolve(tx, scope, revision);
   const snapshot = found?.snapshot;
   if (!found || !snapshot) return null;
