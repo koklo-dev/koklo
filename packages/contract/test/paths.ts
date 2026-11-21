@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 3.8.0 (155 routes, 128 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 3.9.0 (158 routes, 131 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",
@@ -58,6 +58,9 @@ export const ALL_PAIRS: string[] = [
   "GET /projects/{projectId}/reviews",
   "GET /projects/{projectId}/shell",
   "GET /projects/{projectId}/spec",
+  "GET /projects/{projectId}/spec/architecture/checks",
+  "GET /projects/{projectId}/spec/architecture/components",
+  "GET /projects/{projectId}/spec/architecture/document",
   "GET /projects/{projectId}/spec/batches/{batchId}",
   "GET /projects/{projectId}/spec/data/fixtures",
   "GET /projects/{projectId}/spec/data/fixtures/{fixtureId}/page",
@@ -245,6 +248,9 @@ export const ALL_PATHS: string[] = [
   "/projects/{projectId}/shell",
   "/projects/{projectId}/spec",
   "/projects/{projectId}/spec-repo",
+  "/projects/{projectId}/spec/architecture/checks",
+  "/projects/{projectId}/spec/architecture/components",
+  "/projects/{projectId}/spec/architecture/document",
   "/projects/{projectId}/spec/batches",
   "/projects/{projectId}/spec/batches/{batchId}",
   "/projects/{projectId}/spec/data/fixtures",

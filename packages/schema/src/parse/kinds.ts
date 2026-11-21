@@ -1,6 +1,9 @@
 import type { z } from "zod";
 import {
+  AdrSchema,
+  ArchFlowSchema,
   BusinessRuleSchema,
+  ComponentSchema,
   EndpointSchema,
   FixtureSchema,
   FlowSchema,
@@ -24,7 +27,10 @@ export type Kind =
   | "roles"
   | "rule"
   | "flow"
-  | "fixture";
+  | "fixture"
+  | "component"
+  | "archflow"
+  | "adr";
 
 const SLUG = "[a-z0-9][a-z0-9-]*";
 /** Table : `<slug>.yaml` (v2) ou `T-<slug>.yaml` (v1, toujours lu). */
@@ -43,6 +49,9 @@ export function kindOf(path: string): Kind | undefined {
   if (/^design\/screens\/S-[^/]*\.json$/.test(path)) return "screen";
   if (/^domain\/rules\/R-[^/]*\.md$/.test(path)) return "rule";
   if (/^design\/flows\/P-[^/]*\.yaml$/.test(path)) return "flow";
+  if (/^architecture\/components\/[^/]*\.yaml$/.test(path)) return "component";
+  if (/^architecture\/flows\/P-[^/]*\.yaml$/.test(path)) return "archflow";
+  if (/^architecture\/adr\/ADR-[^/]*\.md$/.test(path)) return "adr";
   if (/^data\/fixtures\/FX-[^/]*\.yaml$/.test(path)) return "fixture";
   if (/^(tests|quality)\/scenarios\/[^/]*\.yaml$/.test(path)) return "test";
   return undefined;
@@ -70,6 +79,9 @@ export const SCHEMAS = {
   rule: BusinessRuleSchema,
   flow: FlowSchema,
   fixture: FixtureSchema,
+  component: ComponentSchema,
+  archflow: ArchFlowSchema,
+  adr: AdrSchema,
 } as const satisfies Record<string, z.ZodType>;
 
 /** Schéma d'un type de fichier selon la version de spec (seule la table change de forme). */
@@ -83,8 +95,9 @@ export function idKey(kind: Kind): string {
   return kind === "test" ? "feature" : "id";
 }
 
-/** Le nom de fichier doit être l'identifiant (ou commencer par `<id>-`) ; pour une table, le slug suffit (`T-x` -> `x.yaml`). */
+/** Le nom de fichier doit être l'identifiant (ou commencer par `<id>-`) ; pour une table ou un composant, le slug suffit (`T-x` -> `x.yaml`). */
 export function idMatchesFile(path: string, id: string): boolean {
   const base = (path.split("/").pop() ?? "").replace(/\.[^.]+$/, "");
-  return base === id || base.startsWith(`${id}-`) || (id.startsWith("T-") && base === id.slice(2));
+  const slugOnly = (id.startsWith("T-") || id.startsWith("C-")) && base === id.slice(2);
+  return base === id || base.startsWith(`${id}-`) || slugOnly;
 }

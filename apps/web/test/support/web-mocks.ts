@@ -82,6 +82,10 @@ export const procedures = {
   specDataSearch: vi.fn(),
   specDataFixturesPage: vi.fn(),
   specRefsSearch: vi.fn(),
+  // TK-111 (contrat 3.9.0) : composants (pages de 50), document (sections lues en Git), avertissements
+  specArchitectureComponentsList: vi.fn(),
+  specArchitectureDocument: vi.fn(),
+  specArchitectureChecks: vi.fn(),
   // TK-103 (contrat 3.1.0) : règles métier, parcours (liste paginée) et matrice des rôles
   specFunctionalList: vi.fn(),
   specRolesMatrix: vi.fn(),
@@ -299,6 +303,20 @@ export const orpc = {
     roles: {
       key: () => ["spec", "roles"],
       matrix: queryFull(["spec", "roles", "matrix"], procedures.specRolesMatrix),
+    },
+    architecture: {
+      key: () => ["spec", "architecture"],
+      components: {
+        list: queryFull(
+          ["spec", "architecture", "components", "list"],
+          procedures.specArchitectureComponentsList,
+        ),
+      },
+      document: queryFull(
+        ["spec", "architecture", "document"],
+        procedures.specArchitectureDocument,
+      ),
+      checks: queryFull(["spec", "architecture", "checks"], procedures.specArchitectureChecks),
     },
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),

@@ -52,17 +52,27 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
       const found = await this.resolver.resolve(tx, scope, revision);
       if (!found) return null;
       const where = { snapshotId: found.snapshot.id };
-      const [features, tables, endpoints, rules, flows, fixtures, relations, rolesFile] =
-        await Promise.all([
-          tx.specFeature.count({ where }),
-          tx.specTable.count({ where }),
-          tx.specEndpoint.count({ where }),
-          tx.specEntity.count({ where: { ...where, kind: "rule" } }),
-          tx.specEntity.count({ where: { ...where, kind: "flow" } }),
-          tx.specEntity.count({ where: { ...where, kind: "fixture" } }),
-          this.search.tableRelationTotal(found.snapshot.id),
-          tx.specEntity.findFirst({ where: { ...where, kind: "roles" }, select: { data: true } }),
-        ]);
+      const [
+        features,
+        tables,
+        endpoints,
+        rules,
+        flows,
+        fixtures,
+        components,
+        relations,
+        rolesFile,
+      ] = await Promise.all([
+        tx.specFeature.count({ where }),
+        tx.specTable.count({ where }),
+        tx.specEndpoint.count({ where }),
+        tx.specEntity.count({ where: { ...where, kind: "rule" } }),
+        tx.specEntity.count({ where: { ...where, kind: "flow" } }),
+        tx.specEntity.count({ where: { ...where, kind: "fixture" } }),
+        tx.specEntity.count({ where: { ...where, kind: "component" } }),
+        this.search.tableRelationTotal(found.snapshot.id),
+        tx.specEntity.findFirst({ where: { ...where, kind: "roles" }, select: { data: true } }),
+      ]);
       const roleList = (rolesFile?.data as { roles?: unknown } | null)?.roles;
       return {
         branch: found.branch,
@@ -79,6 +89,7 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
           flows,
           relations,
           fixtures,
+          components,
         },
       };
     });
@@ -136,7 +147,7 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
 
   entityItem(
     scope: ProjectScope,
-    kind: "rule" | "flow" | "roles" | "table",
+    kind: "rule" | "flow" | "roles" | "table" | "component",
     specId: string,
     revision: Revision = {},
   ): Promise<EntityItem | null> {

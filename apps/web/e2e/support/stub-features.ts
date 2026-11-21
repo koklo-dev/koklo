@@ -8,6 +8,11 @@ import {
   resetFeatureWrites,
   type WriteMode,
 } from "./stub-feature-write.ts";
+import {
+  type ArchitectureScenario,
+  architectureCounts,
+  handleSpecArchitecture,
+} from "./stub-spec-architecture.ts";
 import { dataCounts, handleSpecData, resetLayout } from "./stub-spec-data.ts";
 import { domainCounts, handleSpecDomain } from "./stub-spec-domain.ts";
 import { handleSpecItem, type SpecItemScenario } from "./stub-spec-item.ts";
@@ -51,7 +56,8 @@ export type FeaturesScenario = {
   spec?: SpecMode;
   feature?: FeatureMode;
   write?: WriteMode;
-} & SpecItemScenario;
+} & SpecItemScenario &
+  ArchitectureScenario;
 
 type Reply = { status: number; body: string };
 type Send = (reply: Reply) => void;
@@ -349,6 +355,12 @@ interface Handlers {
 
 const ROUTE = /^\/projects\/([^/]+)\/(spec|repos)(?:\/features(?:\/(F-\d+))?)?$/;
 
+/** Lectures des écrans de la spec : domaine (règles, rôles, parcours), architecture puis données. */
+const handleSpecReads = (req: IncomingMessage, url: URL, h: Handlers): boolean =>
+  handleSpecDomain(req, url, h, (h.scenario.spec ?? "ready").startsWith("large")) ||
+  handleSpecArchitecture(req, url, h, h.scenario.architecture) ||
+  handleSpecData(req, url, h, h.scenario.spec ?? "ready");
+
 export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boolean {
   if (handleFeatureWrites(req, url, { mode: h.scenario.write ?? "ok", ...h })) return true;
   if (url.pathname === "/__spec-reads") {
@@ -356,8 +368,7 @@ export function handleFeatures(req: IncomingMessage, url: URL, h: Handlers): boo
     return true;
   }
   writeMode = h.scenario.write;
-  if (handleSpecDomain(req, url, h, (h.scenario.spec ?? "ready").startsWith("large"))) return true;
-  if (handleSpecData(req, url, h, h.scenario.spec ?? "ready")) return true;
+  if (handleSpecReads(req, url, h)) return true;
   if (h.scenario.feature === "loading" && /\/spec\/items\//.test(url.pathname)) {
     // Lecture d'édition retenue jusqu'à POST /__release : état « chargement de la fonctionnalité ».
     h.hold(() => handleSpecItem(req, url, h, h.scenario, (specId) => getFeature("ok", specId)));
@@ -403,7 +414,13 @@ function answerRead(
     answerList(h, mode, url.searchParams);
     return;
   }
-  const answer = reply(200, head(mode));
+  const raw = head(mode);
+  const answer = reply(
+    200,
+    raw
+      ? { ...raw, counts: { ...raw.counts, ...architectureCounts(h.scenario.architecture) } }
+      : raw,
+  );
   if (mode === "loading") h.hold(() => h.send(answer));
   else h.send(answer);
 }

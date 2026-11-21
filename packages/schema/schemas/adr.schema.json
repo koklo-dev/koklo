@@ -1,0 +1,113 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/adr.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "alternatives": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "nom": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "raison": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nom",
+          "raison"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "consequences": {
+      "additionalProperties": false,
+      "properties": {
+        "a_accepter": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "positives": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "contexte": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "date": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "type": "string"
+    },
+    "decideurs": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "decision": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "en_clair": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^ADR-\\d{3,}$",
+      "type": "string"
+    },
+    "liens": {
+      "default": [],
+      "items": {
+        "pattern": "^F-\\d{3,}$|^T-[a-z0-9][a-z0-9-]*$|^C-[a-z0-9][a-z0-9-]*$|^R-\\d{3,}$|^P-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "remplacee_par": {
+      "pattern": "^ADR-\\d{3,}$",
+      "type": "string"
+    },
+    "statut": {
+      "enum": [
+        "proposee",
+        "acceptee",
+        "remplacee"
+      ],
+      "type": "string"
+    },
+    "titre": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "titre",
+    "statut",
+    "date",
+    "contexte",
+    "decision",
+    "consequences"
+  ],
+  "type": "object"
+}

@@ -1,4 +1,5 @@
 import type { SeedStatement } from "./seed-statements.ts";
+import { architectureProposalStatements, componentData } from "./seed-volume-architecture.ts";
 import { proposalStatements } from "./seed-volume-proposals.ts";
 import {
   NOUNS,
@@ -149,30 +150,34 @@ function specStatements(profile: VolumeProfile, target: VolumeTarget): SeedState
 const entityHash = (kind: string, id: string, title: string) =>
   `encode(sha256(convert_to('${kind}:' || ${id} || ':' || ${title}, 'UTF8')), 'hex')`;
 
+/** Insertion des lignes `spec_entities` d'un genre : `count` éléments d'identifiant `spec` + rang, `data` par défaut `{ titre }`. */
+function entityInsert(
+  kind: string,
+  count: number,
+  spec: string,
+  title: string,
+  path: string,
+  data = `jsonb_build_object('titre', ${title})`,
+): string {
+  const at = "$3::timestamptz";
+  const id = `${spec} || ${pad()}`;
+  return `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
+     SELECT ${nth(`entity:${kind}`)}, $2, ${own("snapshot")}, '${kind}', ${id}, NULL, ${path},
+            ${data}, ${entityHash(kind, id, title)}, n, ${at}, ${at}
+       FROM generate_series(1, ${count}) AS n
+     ON CONFLICT (snapshot_id, kind, spec_id) DO UPDATE SET path = EXCLUDED.path, data = EXCLUDED.data,
+       content_hash = EXCLUDED.content_hash, sort = EXCLUDED.sort`;
+}
+
 /**
- * Index générique `spec_entities` (TK-101, B329 e) : une ligne par fonctionnalité, table et point d'accès du jeu, avec
+ * Index générique `spec_entities` (TK-101, B329 e) : une ligne par fonctionnalité, table, composant d'architecture (TK-111) et point d'accès du jeu, avec
  * `titre`, chemin, rang et hachage, puis `entities_indexed_at` sur l'instantané (sans lui, `spec.refs.search` rend une liste
  * vide). Mêmes identifiants et mêmes titres que `spec_features`, `spec_tables` et `spec_endpoints`.
  */
 function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedStatement[] {
   const volume = SEED_VOLUMES[profile];
   const at = "$3::timestamptz";
-  const entity = (
-    kind: string,
-    count: number,
-    spec: string,
-    title: string,
-    path: string,
-    data = `jsonb_build_object('titre', ${title})`,
-  ) => {
-    const id = `${spec} || ${pad()}`;
-    return `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
-     SELECT ${nth(`entity:${kind}`)}, $2, ${own("snapshot")}, '${kind}', ${id}, NULL, ${path},
-            ${data}, ${entityHash(kind, id, title)}, n, ${at}, ${at}
-       FROM generate_series(1, ${count}) AS n
-     ON CONFLICT (snapshot_id, kind, spec_id) DO UPDATE SET path = EXCLUDED.path, data = EXCLUDED.data,
-       content_hash = EXCLUDED.content_hash, sort = EXCLUDED.sort`;
-  };
+  const entity = entityInsert;
   const sql = [
     entity(
       "feature",
@@ -196,6 +201,14 @@ function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedSta
       `'Jeu d''exemple ' || ${pad()}`,
       `'data/fixtures/FX-table-' || ${pad()} || '.yaml'`,
       fixtureData(profile),
+    ),
+    entity(
+      "component",
+      volume.components,
+      "'C-composant-'",
+      `'Composant ' || ${pad()}`,
+      `'architecture/components/composant-' || ${pad()} || '.yaml'`,
+      componentData(profile, volume.features, volume.tables),
     ),
     entity(
       "endpoint",
@@ -391,5 +404,6 @@ export function buildVolumeStatements(
     ...domainStatements(profile, target),
     ...trackerStatements(profile, target),
     ...proposalStatements(profile, target),
+    ...architectureProposalStatements(profile, target),
   ];
 }

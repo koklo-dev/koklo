@@ -32,6 +32,14 @@ import {
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
 import {
+  architectureChecksInputSchema,
+  architectureChecksSchema,
+  architectureComponentSummarySchema,
+  architectureComponentsListInputSchema,
+  architectureDocumentInputSchema,
+  architectureDocumentSchema,
+} from "./schemas-spec-architecture.ts";
+import {
   dataFixturePageInputSchema,
   dataFixturePageSchema,
   dataFixtureRowsInputSchema,
@@ -171,6 +179,33 @@ const spec = {
         .input(dataFixturePageInputSchema)
         .output(dataFixturePageSchema),
     },
+  },
+  /**
+   * Page Architecture (TK-111, 3.9.0, B506 à B515) : composants (liste à curseur, `q` sur toute la tête, `zone`, `around`),
+   * document (sections lues en Git, jamais indexées) et avertissements. Équipe et designer en lecture (403 client et
+   * business : aucun YAML ni Mermaid ne sort). Erreurs de `spec.listFeatures`.
+   */
+  architecture: {
+    components: {
+      list: route("GET", "/projects/{projectId}/spec/architecture/components")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(architectureComponentsListInputSchema)
+        .output(listOf(architectureComponentSummarySchema)),
+    },
+    document: route("GET", "/projects/{projectId}/spec/architecture/document")
+      .errors({
+        ...writeOneErrors,
+        ...validationError,
+        ...specIndexFailedError,
+        ...providerErrors,
+      })
+      .input(architectureDocumentInputSchema)
+      .output(architectureDocumentSchema),
+    /** Avertissements non bloquants (`200` même s'il y en a) : index de tête plus propositions en attente du lancement ouvert. */
+    checks: route("GET", "/projects/{projectId}/spec/architecture/checks")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(architectureChecksInputSchema)
+      .output(architectureChecksSchema),
   },
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })

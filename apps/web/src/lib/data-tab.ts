@@ -1,4 +1,5 @@
 import type { IconName } from "@koklo/ui";
+import { applyReview, nonEmpty, setOrDelete } from "./spec-url.ts";
 
 /**
  * Onglets de l'écran Données (`/projects/<id>/spec/data`, maquette 11 l.588-598) : Relecture devant les trois onglets
@@ -40,7 +41,6 @@ export interface DataUrl {
 
 const tableId = (value: string | null): string | undefined =>
   value && TABLE_ID.test(value) ? value : undefined;
-const nonEmpty = (value: string | null): string | undefined => value?.trim() || undefined;
 
 /**
  * Lit l'adresse : onglet inconnu = Diagramme, ou Tables sous 1024 px (`narrow`, B425) ; Relecture seulement si
@@ -75,24 +75,6 @@ export interface DataUrlPatch {
   zone?: string | null;
   new?: boolean | null;
   edit?: string | null;
-}
-
-const setOrDelete = (params: URLSearchParams, name: string, value: string | null | undefined) => {
-  if (value === undefined) return;
-  if (value === null || value === "") params.delete(name);
-  else params.set(name, value);
-};
-
-/** `review: true` écrit `view=review` (et l'onglet Relecture sauf onglet demandé) ; `null` ou `false` les retire. */
-function applyReview(params: URLSearchParams, patch: DataUrlPatch): void {
-  if (patch.review === undefined) return;
-  if (patch.review === true) {
-    params.set("view", "review");
-    if (patch.tab === undefined) params.set("tab", "review");
-    return;
-  }
-  params.delete("view");
-  if (params.get("tab") === "review") params.delete("tab");
 }
 
 /** Applique un patch à la requête : `null` ou chaîne vide retire le paramètre ; renvoie `?…` ou `""`. */

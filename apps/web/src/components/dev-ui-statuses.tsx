@@ -1,6 +1,8 @@
 import {
   DeliverableStatus,
   type DeliverableStatusValue,
+  DocSectionLegend,
+  DocSectionStatus,
   LifecycleStatus,
   PriorityIndicator,
   ValidationStatus,
@@ -14,6 +16,7 @@ import {
 import { DevUiFrame, DevUiNote, DevUiRow, DevUiSection } from "./dev-ui-frame.tsx";
 
 const DELIVERABLES: DeliverableStatusValue[] = ["todo", "in_progress", "pending", "validated"];
+const DOC_SECTIONS = ["validee", "a_relire", "brouillon", "a_rediger"] as const;
 const VALIDATIONS = ["validated", "pending", "revise", "unsubmitted"] as const;
 
 /** Section 3 de la galerie : langage des statuts (S-dev-ui §3). */
@@ -61,6 +64,25 @@ export function DevUiStatuses() {
             <DeliverableStatus key={status} status={status} compact hideLabel />
           ))}
         </DevUiRow>
+      </DevUiFrame>
+      <DevUiFrame title="Statut d'une section du document">
+        <DevUiRow>
+          {DOC_SECTIONS.map((status) => (
+            <DocSectionStatus key={status} status={status} display="pill" />
+          ))}
+        </DevUiRow>
+        <DevUiNote>
+          Icône seule dans la colonne Sections (libellé lu par les lecteurs d'écran)
+        </DevUiNote>
+        <DevUiRow>
+          {DOC_SECTIONS.map((status) => (
+            <DocSectionStatus key={status} status={status} display="icon" />
+          ))}
+        </DevUiRow>
+        <DevUiNote>Légende, collée en bas de la colonne</DevUiNote>
+        <div className="w-[264px] max-w-full">
+          <DocSectionLegend />
+        </div>
       </DevUiFrame>
       <DevUiFrame title="Priorité">
         <DevUiRow>

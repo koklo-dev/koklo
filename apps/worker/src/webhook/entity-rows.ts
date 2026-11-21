@@ -10,6 +10,9 @@ export type EntityKind =
   | "relations"
   | "table"
   | "fixture"
+  | "component"
+  | "archflow"
+  | "adr"
   | "endpoint"
   | "screen"
   | "test";
@@ -17,7 +20,7 @@ export type EntityKind =
 export interface EntityRow {
   readonly kind: EntityKind;
   readonly specId: string;
-  readonly zone: "functional" | "data" | null;
+  readonly zone: "functional" | "data" | "architecture" | null;
   readonly path: string;
   readonly data: unknown;
   /** sha256 hexadécimal de la forme canonique du contenu (`{ kind, data }`) : ni chemin, ni mise en page. */
@@ -33,6 +36,9 @@ const ZONE_OF: Readonly<Record<EntityKind, EntityRow["zone"]>> = {
   table: "data",
   fixture: "data",
   relations: "data",
+  component: "architecture",
+  archflow: "architecture",
+  adr: "architecture",
   endpoint: null,
   screen: null,
   test: null,
@@ -101,18 +107,47 @@ const withName = <T extends { id: string }>(table: T): T & { titre: string } => 
   titre: "nom" in table && typeof table.nom === "string" ? table.nom : table.id,
 });
 
+/** Composant indexé avec un `titre` (son nom) : recherche, listes et références. */
+const withComponentTitle = <T extends { nom: string }>(component: T): T & { titre: string } => ({
+  ...component,
+  titre: component.nom,
+});
+
+/** Flux technique indexé avec un `titre` : l'identifiant du parcours qu'il détaille. */
+const withFlowTitle = <T extends { id: string }>(flow: T): T & { titre: string } => ({
+  ...flow,
+  titre: flow.id,
+});
+
 type Candidate = { kind: EntityKind; specId: string; path: string; value: unknown };
+
+const candidate =
+  (kind: EntityKind, id: (entry: { path: string; value: unknown }) => string) =>
+  (list: readonly { path: string; value: unknown }[]): Candidate[] =>
+    list.map((entry) => ({ kind, specId: id(entry), path: entry.path, value: entry.value }));
+const idOf = (entry: { value: unknown }) => (entry.value as { id: string }).id;
+
+/** Composants, flux techniques et décisions (TK-111) : les deux premiers portent un `titre` d'index. */
+function architectureCandidates(spec: ParsedSpec): Candidate[] {
+  return [
+    ...candidate(
+      "component",
+      idOf,
+    )(spec.components.map(({ path, value }) => ({ path, value: withComponentTitle(value) }))),
+    ...candidate(
+      "archflow",
+      idOf,
+    )(spec.archFlows.map(({ path, value }) => ({ path, value: withFlowTitle(value) }))),
+    ...candidate("adr", idOf)(spec.adrs),
+  ];
+}
 
 function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[] {
   const of = (
     kind: EntityKind,
     list: readonly { path: string; value: unknown }[],
     id: (entry: { path: string; value: unknown }) => string,
-  ) =>
-    list.map(
-      (entry): Candidate => ({ kind, specId: id(entry), path: entry.path, value: entry.value }),
-    );
-  const idOf = (entry: { value: unknown }) => (entry.value as { id: string }).id;
+  ) => candidate(kind, id)(list);
   const rules = [...spec.rules].sort((a, b) => ruleNumber(a.value.id) - ruleNumber(b.value.id));
   return [
     ...of("feature", spec.features, idOf),
@@ -141,6 +176,7 @@ function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[]
       idOf,
     ),
     ...of("fixture", spec.fixtures, idOf),
+    ...architectureCandidates(spec),
     ...of("relations", spec.relations, () => "relations"),
     ...of("endpoint", spec.endpoints, idOf),
     ...of("screen", spec.screens, idOf),

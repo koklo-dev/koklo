@@ -66,3 +66,4 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-overview](screens/S-overview.md) | 1 | TK-92 |
 | [S-spec-functional](screens/S-spec-functional.md) | 1 | TK-102 |
 | [S-spec-data](screens/S-spec-data.md) | 2 | TK-107 |
+| [S-spec-architecture](screens/S-spec-architecture.md) | 1 | TK-111 |

@@ -20,7 +20,11 @@ export const permissionIdSchema = z.string().regex(new RegExp(`^PM-${slug}(\\.${
 /** Un identifiant d'élément écrit par un lot : fonctionnalité, règle, rôle, parcours, table ou jeu d'exemple (3.5.0). */
 export const specIdSchema = z
   .string()
-  .regex(new RegExp(`^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug})$`));
+  .regex(
+    new RegExp(
+      `^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug}|C-${slug}|ADR-\\d{3,}|DOC-${slug})$`,
+    ),
+  );
 
 const featureLink = z.string().regex(/^F-\d{3,}$/);
 const tableLink = z.string().regex(new RegExp(`^T-${slug}$`));

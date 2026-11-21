@@ -12,6 +12,7 @@ import { batchPrompt, zonesPrompt } from "./prompts.ts";
 import type { LaunchSources } from "./sources.ts";
 import type { AgentProposeStore, LaunchContext } from "./store.ts";
 import { titleKey, triageProposals, zonesOf } from "./triage.ts";
+import type { ArchitectureRefs } from "./triage-architecture.ts";
 
 export interface GenerateDeps {
   readonly store: AgentProposeStore;
@@ -38,11 +39,24 @@ const DATA_KINDS: readonly AgentProposalKind[] = ["table", "relations", "fixture
 /** Longueur maximale d'une zone des Données : celle d'une table (`table.create`). */
 const DATA_ZONE_MAX = 80;
 
+/** Architecture (TK-111) : composants et flux (compléter), décision, section du document, ou les quatre (tout reproposer). */
+const ARCHITECTURE_KINDS_OF_MODE: Readonly<Record<string, readonly AgentProposalKind[]>> = {
+  complete: ["component", "archflow"],
+  decision: ["adr"],
+  document: ["doc_section"],
+  all: ["component", "archflow", "adr", "doc_section"],
+};
+
 export const kindsOfMode = (
   mode: string,
   deliverable = "functional",
-): readonly AgentProposalKind[] =>
-  deliverable === "data" ? DATA_KINDS : (KINDS_OF_MODE[mode] ?? KINDS_OF_MODE.complete ?? []);
+): readonly AgentProposalKind[] => {
+  if (deliverable === "data") return DATA_KINDS;
+  if (deliverable === "architecture") {
+    return ARCHITECTURE_KINDS_OF_MODE[mode] ?? ARCHITECTURE_KINDS_OF_MODE.complete ?? [];
+  }
+  return KINDS_OF_MODE[mode] ?? KINDS_OF_MODE.complete ?? [];
+};
 
 const ZONES_SCHEMA = {
   type: "object",
@@ -115,6 +129,23 @@ const dataRefs = (sources: LaunchSources) => ({
   ),
 });
 
+/** Références que le modèle peut viser pour l'Architecture : cahier, tables, parcours, rôles, composants et décisions connus. */
+const architectureRefs = (sources: LaunchSources): ArchitectureRefs => {
+  const ids = (items: readonly { specId: string }[] | undefined) =>
+    new Set((items ?? []).map((item) => item.specId));
+  const architecture = sources.architecture;
+  return {
+    features: ids(sources.features),
+    rules: ids(sources.rules),
+    tables: ids(sources.tables),
+    flows: ids(sources.flows),
+    roles: ids(sources.roles),
+    components: ids(architecture?.components),
+    decisions: ids(architecture?.decisions),
+    archflows: ids(architecture?.archflows),
+  };
+};
+
 /**
  * Déroulé d'un lancement : étape 1, les zones (douze au plus) ; étape 2, une zone par appel, chaque zone validée
  * publiée aussitôt. Retourne `false` si le lancement a été arrêté de l'extérieur (annulé, repris). Une zone dont
@@ -144,7 +175,15 @@ export async function generate(
       flow: new Set(sources.flows.map((flow) => titleKey(flow.title))),
       table: new Set((sources.tables ?? []).map((table) => titleKey(table.title))),
       fixtures: new Set((sources.fixtures ?? []).map((fixture) => titleKey(fixture.title))),
+      component: new Set(
+        (sources.architecture?.components ?? []).map((item) => titleKey(item.title)),
+      ),
+      archflow: new Set(
+        (sources.architecture?.archflows ?? []).map((item) => titleKey(item.title)),
+      ),
+      adr: new Set((sources.architecture?.decisions ?? []).map((item) => titleKey(item.title))),
     },
+    ...(sources.architecture === undefined ? {} : { arch: architectureRefs(sources) }),
     ...(isData ? { refs: dataRefs(sources) } : {}),
     missingCriteria: new Map(
       sources.features

@@ -92,7 +92,7 @@ export function deliverablesAvailabilityOf(facts: DeliverableFacts): Deliverable
 export const DELIVERABLE_ENTITY_KINDS: Readonly<Record<DeliverableKey, readonly string[]>> = {
   functional: ["feature", "rule", "roles", "flow"],
   data: ["table", "relations", "fixture"],
-  architecture: [],
+  architecture: ["component", "archflow", "adr"],
   technical: [],
   security: [],
   design: [],

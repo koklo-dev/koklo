@@ -7,6 +7,7 @@ import {
   launch,
   launchState,
   proposalsOf,
+  seedArchitectureModel,
   seedDataModel,
   seedIdeaV2,
   seedOtherProject,
@@ -429,6 +430,115 @@ describe("livrable Données (TK-107, cas 11)", () => {
     }
     for (const absent of ["FROZEN-VISION", "SYNTH-OK", "SECRET-COMMENTAIRE"])
       expect(sent, absent).not.toContain(absent);
+    expect(sent.toLowerCase()).not.toContain("anthropic");
+  });
+});
+
+/**
+ * TK-111 lot B (cas 1, 5, B511, B512) : un lancement `architecture` en mode `all` publie composants, flux, décisions et
+ * sections ; le triage écarte un doublon d'identifiant, une table inconnue, un parcours qui a déjà son flux ; le modèle lit le
+ * Fonctionnel, les tables, l'architecture actuelle et les exigences connues, jamais le dossier ni la responsabilité des composants.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: scénario de bout en bout d'un lancement, un seul test
+describe("agent-propose : livrable Architecture (TK-111)", () => {
+  const component = (name: string, over: Record<string, unknown> = {}) => ({
+    kind: "component",
+    rationale: "Absent de l'architecture",
+    content: {
+      name,
+      type: "store",
+      zone: "Noyau",
+      responsibility: "Garde les salles.",
+      owns: ["T-salle"],
+      serves: ["F-001"],
+      dependsOn: [{ to: "C-api", via: "SQL", async: true }],
+      ...over,
+    },
+  });
+
+  // biome-ignore lint/complexity/noExcessiveLinesPerFunction: scénario de bout en bout d'un lancement, un seul test
+  it("publie composant, flux, décision et section avec leur zone ; écarte doublon, référence inconnue et flux existant", async () => {
+    await seedArchitectureModel(bench, scene);
+    ai.zones = ["Noyau"];
+    ai.batch = () => ({
+      proposals: [
+        component("Base"),
+        component("API"),
+        component("Cache", { owns: ["T-absente"] }),
+        {
+          kind: "archflow",
+          rationale: "Parcours sans flux",
+          content: {
+            flow: "P-inscription",
+            participants: ["RL-admin", "C-api"],
+            messages: [{ from: "RL-admin", to: "C-api", text: "S'inscrit" }],
+          },
+        },
+        {
+          kind: "archflow",
+          rationale: "Déjà détaillé",
+          content: {
+            flow: "P-annuler",
+            participants: ["RL-admin", "C-api"],
+            messages: [{ from: "RL-admin", to: "C-api", text: "Annule" }],
+          },
+        },
+        {
+          kind: "adr",
+          rationale: "Choix structurant",
+          content: {
+            title: "Stockage des salles",
+            context: "Les salles sont liées.",
+            decision: "Une base relationnelle.",
+            alternatives: [{ name: "Fichiers", reason: "Pas d'intégrité" }],
+            links: ["C-base", "T-salle"],
+          },
+        },
+        {
+          kind: "doc_section",
+          rationale: "Section manquante",
+          content: { title: "Déploiement", markdown: "Un environnement de recette." },
+        },
+      ],
+    });
+    const id = await launch(bench, scene, {
+      deliverable: "architecture",
+      mode: "all",
+      baseVersion: null,
+    });
+    const done = await finished(bench, id);
+    expect(done).toMatchObject({
+      status: "done",
+      error_code: null,
+      proposed_count: 4,
+      discarded_count: 3,
+    });
+    const rows = await proposalsOf(bench, id);
+    expect(rows.map((r) => [r.kind, r.zone, r.title])).toEqual([
+      ["component", "Noyau", "Base"],
+      ["archflow", "Noyau", "P-inscription"],
+      ["adr", "Noyau", "Stockage des salles"],
+      ["doc_section", "Noyau", "Déploiement"],
+    ]);
+    const sent = ai.sent();
+    for (const present of [
+      "F-001",
+      "R-001",
+      "RL-admin",
+      "P-inscription",
+      "T-salle",
+      "C-api",
+      "Noyau",
+      "ADR-001",
+      "Base relationnelle",
+      "P-annuler",
+      "NFR-001",
+    ]) {
+      expect(sent, present).toContain(present);
+    }
+    for (const absent of ["FROZEN-VISION", "SYNTH-OK", "SECRET-COMMENTAIRE", "SECRET-RESP"]) {
+      expect(sent, absent).not.toContain(absent);
+    }
     expect(sent.toLowerCase()).not.toContain("anthropic");
   });
 });

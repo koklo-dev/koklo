@@ -25,6 +25,10 @@ export type ProposalsMode =
   | "data"
   /** TK-110 : 67 propositions des Données (60 tables sur 6 zones, relations, jeux) : groupes par zone et « Relations et jeux d'exemple ». */
   | "dataVolume"
+  /** TK-111 : 9 propositions de l'architecture (composants, flux, décisions, section du document), un groupe par type. */
+  | "architecture"
+  /** TK-111 : 66 propositions de l'architecture (au-delà de 30 : relecture groupée par type). */
+  | "architectureVolume"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -44,7 +48,18 @@ const HOSTILE =
 interface Item {
   id: string;
   launchId: string;
-  kind: "feature" | "rule" | "role" | "flow" | "table" | "relations" | "fixtures";
+  kind:
+    | "feature"
+    | "rule"
+    | "role"
+    | "flow"
+    | "table"
+    | "relations"
+    | "fixtures"
+    | "component"
+    | "archflow"
+    | "adr"
+    | "doc_section";
   zone: string;
   position: number;
   title: string;
@@ -291,7 +306,127 @@ function dataVolumeItems(): Item[] {
   return [...tables, ...links];
 }
 
+const component = (
+  n: number,
+  name: string,
+  type: string,
+  zone: string,
+  responsibility: string,
+  dependsOn: Array<{ to: string; via: string }> = [],
+): Item => ({
+  ...make(n, 1),
+  kind: "component",
+  zone,
+  title: name,
+  rationale: "Déduit de la zone du modèle de données et des parcours.",
+  content: { name, type, zone, responsibility, owns: [], dependsOn },
+});
+
+/** Section, flux et décisions proposés (maquette 13 l.644-661), hors composants. */
+const architectureDocument = (): Item => ({
+  ...make(1, 1),
+  kind: "doc_section",
+  zone: "",
+  title: "Observabilité",
+  rationale: "NFR-005 demande une alerte en moins de 5 min, aucune section ne la décrit.",
+  content: {
+    title: "Observabilité",
+    markdown: "Une alerte part en moins de 5 minutes quand le service ne répond plus.",
+  },
+});
+
+const flow = (n: number, title: string, id: string, messages: unknown[]): Item => ({
+  ...make(n, 1),
+  kind: "archflow",
+  zone: "",
+  title,
+  rationale: `Tiré du parcours ${id}.`,
+  content: { flow: id, participants: ["C-web", "C-api"], messages },
+});
+
+const decision = (n: number, title: string, context: string, choice: string, other: string[]) => ({
+  ...make(n, 1),
+  kind: "adr" as const,
+  zone: "",
+  title,
+  rationale: `Proposée pour répondre à : ${context.toLowerCase()}`,
+  content: {
+    title,
+    context,
+    decision: choice,
+    alternatives: [{ name: other[0], reason: other[1] }],
+  },
+});
+
+/** Neuf propositions de l'architecture : une section, quatre composants, deux flux, deux décisions. */
+function architectureItems(): Item[] {
+  return [
+    architectureDocument(),
+    component(
+      2,
+      "Passerelle SMS",
+      "service",
+      "Communication",
+      "Isole l'envoi des SMS derrière une interface remplaçable.",
+      [{ to: "C-sms", via: "HTTPS" }],
+    ),
+    component(3, "Cache", "store", "Prise de rendez-vous", "Garde les créneaux libres en mémoire."),
+    component(4, "Moteur de PDF", "service", "Paiement et caisse", "Génère les reçus en PDF."),
+    component(5, "Notifications", "queue", "Communication", "File des notifications à envoyer."),
+    flow(6, "Réserver un rendez-vous", "P-reserver", [
+      { from: "C-web", to: "C-api", text: "réserve un créneau" },
+      { from: "C-api", to: "C-web", text: "confirme la réservation" },
+    ]),
+    flow(7, "Annuler ou déplacer", "P-annuler", [
+      { from: "C-web", to: "C-api", text: "annule la réservation" },
+    ]),
+    decision(
+      8,
+      "PostgreSQL plutôt que MongoDB",
+      "Les données sont fortement relationnelles.",
+      "Une base relationnelle unique, PostgreSQL.",
+      ["MongoDB", "Pas de jointures ni de transactions simples."],
+    ),
+    decision(
+      9,
+      "Brevo plutôt que Twilio",
+      "Le choix du fournisseur de SMS.",
+      "Brevo : SMS et e-mail chez le même prestataire, données en UE.",
+      ["Twilio", "Données hors UE par défaut."],
+    ),
+  ];
+}
+
+/** 66 propositions : 1 section, 40 composants, 15 flux, 10 décisions (au-delà de 30 : un groupe par type). */
+function architectureVolumeItems(): Item[] {
+  const base = architectureItems();
+  const components = Array.from({ length: 40 }, (_, i) =>
+    component(
+      10 + i,
+      `Composant proposé ${String(i + 1).padStart(2, "0")}`,
+      ["service", "app", "store", "queue", "ext"][i % 5] as string,
+      VOLUME_ZONES[i % VOLUME_ZONES.length] as string,
+      `Responsabilité du composant proposé ${i + 1}.`,
+    ),
+  );
+  const flows = Array.from({ length: 15 }, (_, i) => ({
+    ...(base[5] as Item),
+    id: `0190bbbb-0000-7000-8000-${String(100 + i).padStart(12, "0")}`,
+    position: 60 + i,
+    title: `Flux ${i + 1}`,
+    content: { ...(base[5] as Item).content, flow: `P-parcours-${i + 1}` },
+  }));
+  const adrs = Array.from({ length: 10 }, (_, i) => ({
+    ...(base[7] as Item),
+    id: `0190bbbb-0000-7000-8000-${String(200 + i).padStart(12, "0")}`,
+    position: 80 + i,
+    title: `Décision ${i + 1}`,
+  }));
+  return [base[0] as Item, ...components, ...flows, ...adrs];
+}
+
 let items: Item[] = [];
+let architectureMode: ProposalsMode | undefined;
 let volumeData = false;
 let launchStatus: "queued" | "running" | "done" = "done";
 let reads = 0;
@@ -306,10 +441,13 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   launchStatus = "done";
   items = [];
   volumeData = mode === "dataVolume";
+  architectureMode = mode === "architecture" || mode === "architectureVolume" ? mode : undefined;
   if (mode === "ready") items = Array.from({ length: 12 }, (_, i) => make(i + 1, 3));
   if (mode === "mixed") items = mixed();
   if (mode === "data") items = dataItems();
   if (mode === "dataVolume") items = dataVolumeItems();
+  if (mode === "architecture") items = architectureItems();
+  if (mode === "architectureVolume") items = architectureVolumeItems();
   if (mode === "generating") {
     started = true;
     launchStatus = "running";
@@ -320,12 +458,14 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
 
 /** Livrable Données au-delà de 30 propositions : relations et jeux dans le groupe `links` (comme le serveur, B487). */
 const keyOf = (item: Item): string =>
-  volumeData && (item.kind === "relations" || item.kind === "fixtures")
-    ? "links"
-    : `${item.kind}:${item.zone}`;
+  architectureMode
+    ? item.kind
+    : volumeData && (item.kind === "relations" || item.kind === "fixtures")
+      ? "links"
+      : `${item.kind}:${item.zone}`;
 /** Jusqu'à 30 propositions d'un seul type : un groupe « all » ; avec plusieurs types, un groupe par type. */
 const MIXED_FLAT = (): boolean =>
-  items.length <= 30 && items.some((item) => item.kind !== "feature");
+  !architectureMode && items.length <= 30 && items.some((item) => item.kind !== "feature");
 const groupKeyOf = (item: Item): string => (MIXED_FLAT() ? item.kind : keyOf(item));
 
 const LABELS: Record<string, string> = {
@@ -336,21 +476,35 @@ const LABELS: Record<string, string> = {
   table: "Tables",
   relations: "Relations",
   fixtures: "Jeux d'exemple",
+  doc_section: "Document · vue d'ensemble",
+  component: "Composants",
+  archflow: "Flux",
+  adr: "Décisions",
 };
 
 /** Libellé d'un groupe : relecture groupée des Données (TK-110), types à plat, ou fonctionnalités par zone. */
 function labelOf(key: string, flat: boolean): string {
+  if (architectureMode) return LABELS[key] ?? key;
   if (volumeData)
     return key === "links" ? "Relations et jeux d'exemple" : `Zone ${key.split(":")[1]}`;
   if (MIXED_FLAT()) return LABELS[key] ?? key;
   return flat ? "Fonctionnalités" : `Fonctionnalités · ${key.split(":")[1]}`;
 }
 
+const ARCHITECTURE_ORDER = ["doc_section", "component", "archflow", "adr"];
+
 function groups() {
   const flat = items.length <= 30;
-  const keys = MIXED_FLAT() || !flat ? [...new Set(items.map(groupKeyOf))] : ["all"];
+  const keys = architectureMode
+    ? ARCHITECTURE_ORDER.filter((key) => items.some((item) => item.kind === key))
+    : MIXED_FLAT() || !flat
+      ? [...new Set(items.map(groupKeyOf))]
+      : ["all"];
   return keys.map((key) => {
-    const own = flat && !MIXED_FLAT() ? items : items.filter((item) => groupKeyOf(item) === key);
+    const own =
+      flat && !MIXED_FLAT() && !architectureMode
+        ? items
+        : items.filter((item) => groupKeyOf(item) === key);
     const count = (status: string) => own.filter((item) => item.status === status).length;
     return {
       key,
@@ -398,6 +552,22 @@ function list(query: URLSearchParams, mode: ProposalsMode): Reply {
 }
 
 function options(mode: ProposalsMode, deliverable: string | null): Reply {
+  if (deliverable === "architecture") {
+    return reply(200, {
+      options: [
+        { id: "complete", recommended: true },
+        { id: "decision", recommended: false },
+        { id: "document", count: 1, recommended: false },
+        { id: "all", recommended: false },
+      ],
+      reads: [
+        { id: "functional.features", label: "Fonctionnel" },
+        { id: "data.tables", label: "Données" },
+        { id: "nfr.known", label: "Exigences connues" },
+      ],
+      available: true,
+    });
+  }
   if (deliverable === "data") {
     return reply(200, {
       options: [

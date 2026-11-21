@@ -7,6 +7,11 @@ export type {
   AiProposeOptionsInput,
   AiProposeOptionsOutput,
   AiReviseProposalInput,
+  ArchitectureChecks,
+  ArchitectureComponentSummary,
+  ArchitectureComponentsListInput,
+  ArchitectureDocSection,
+  ArchitectureDocument,
   AuditEntry,
   ClientDataTable,
   ClientFeature,
@@ -23,6 +28,7 @@ export type {
   ClientSpaceProgress,
   CommentCreateInput,
   CommentOutput,
+  ComponentDetail,
   DataFixturePage,
   DataFixturePageInput,
   DataFixtureRows,
@@ -189,6 +195,7 @@ export * from "./schemas-review.ts";
 export * from "./schemas-settings.ts";
 export * from "./schemas-shell.ts";
 export * from "./schemas-spec.ts";
+export * from "./schemas-spec-architecture.ts";
 export * from "./schemas-spec-data.ts";
 export * from "./schemas-spec-domain.ts";
 export * from "./schemas-suggestion.ts";

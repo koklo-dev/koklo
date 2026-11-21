@@ -15,7 +15,15 @@ import { instantSchema } from "./schemas-tickets.ts";
 export const PROPOSAL_INSTRUCTION_MAX = 500;
 
 /** Modes de lancement du Fonctionnel. */
-export const proposalModeSchema = z.enum(["complete", "criteria", "update", "all"]);
+export const proposalModeSchema = z.enum([
+  "complete",
+  "criteria",
+  "update",
+  "all",
+  /** Architecture (3.9.0) : « Proposer une décision » et « Rédiger le document ». */
+  "decision",
+  "document",
+]);
 export const proposalKindSchema = z.enum([
   "feature",
   "criteria",
@@ -25,6 +33,10 @@ export const proposalKindSchema = z.enum([
   "table",
   "relations",
   "fixtures",
+  "component",
+  "archflow",
+  "adr",
+  "doc_section",
 ]);
 export const proposalStatusSchema = z.enum(["pending", "accepted", "rejected"]);
 export const launchStatusSchema = z.enum(["queued", "running", "done", "failed", "canceled"]);

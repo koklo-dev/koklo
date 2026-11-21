@@ -193,6 +193,7 @@ export const specHead = {
     flows: 2,
     relations: 1,
     fixtures: 0,
+    components: 0,
   },
 };
 

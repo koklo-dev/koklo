@@ -51,6 +51,7 @@ export class SpecWriteStore {
       message: row.message,
       authorRole: row.authorRole,
       authorUserId: row.authorUserId,
+      enqueuedAt: row.enqueuedAt,
       operations: row.operations.map((operation) => ({
         position: operation.position,
         kind: operation.kind,

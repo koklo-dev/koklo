@@ -19,6 +19,10 @@ export interface SeededVolume {
   proposals: number;
   /** Jeux d'exemple `data/fixtures/FX-*.yaml` indexés (TK-107, B383) ; le premier génère 1 240 (planche) ou 5 000 (large) lignes (TK-110, B488). */
   fixtures: number;
+  /** Composants d'architecture `architecture/components/*.yaml` indexés (TK-111, B515). */
+  components: number;
+  /** Propositions d'un lancement terminé de l'architecture (TK-111) : 80 sur la planche, aucune sur `large`. */
+  architectureProposals: number;
 }
 
 export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
@@ -33,6 +37,8 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     permissions: 47,
     proposals: 400,
     fixtures: 2,
+    components: 120,
+    architectureProposals: 0,
   },
   // 47 « actions » de la planche = points d'accès ; la planche ne donne aucun volume de tickets,
   // 60 permettent d'exercer le kanban à l'écran (lecture prudente, B34).
@@ -48,6 +54,9 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     // 248 fonctionnalités + 86 règles + 3 rôles + 18 parcours relus (TK-105, B365).
     proposals: 355,
     fixtures: 2,
+    // Six zones de la planche (9, 4, 6, 7, 3 et 5 composants) ; 34 composants + 18 flux + 12 décisions + 16 sections à relire.
+    components: 34,
+    architectureProposals: 80,
   },
 };
 

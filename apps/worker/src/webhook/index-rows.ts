@@ -9,6 +9,7 @@ export const FEATURE_COUNTER_MAX = 999_999;
 
 const FEATURE_NUMBER = /^F-(\d+)$/;
 const RULE_NUMBER = /^R-(\d+)$/;
+const ADR_NUMBER = /^ADR-(\d+)$/;
 
 export interface IndexRows {
   readonly features: readonly {
@@ -124,4 +125,11 @@ export const ruleCounterOf = (spec: ParsedSpec) =>
   counterOf(
     spec.rules.map(({ value }) => value.id),
     RULE_NUMBER,
+  );
+
+/** Même relevé pour les décisions `ADR-nnn` (compteur `adr`, TK-111, B514). */
+export const adrCounterOf = (spec: ParsedSpec) =>
+  counterOf(
+    spec.adrs.map(({ value }) => value.id),
+    ADR_NUMBER,
   );

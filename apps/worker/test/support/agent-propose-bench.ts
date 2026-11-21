@@ -336,3 +336,49 @@ export async function seedDataModel(bench: WorkerBench, scene: Scene): Promise<v
     );
   }
 }
+
+/**
+ * Architecture actuelle et Fonctionnel indexé de l'architecture (TK-111) : une règle, un rôle, deux parcours (`P-annuler` a déjà
+ * son flux technique), la table `Salle`, la fonctionnalité `F-001` qui cite `NFR-001`, le composant `API` (zone « Noyau »), un
+ * flux et la décision `ADR-001`, dans l'instantané de la tête.
+ */
+export async function seedArchitectureModel(bench: WorkerBench, scene: Scene): Promise<void> {
+  const [head] = await bench.query<{ snapshot_id: string }>(
+    "SELECT snapshot_id FROM spec_heads WHERE repo_id = $1 AND branch = 'cadrage'",
+    [scene.repoId],
+  );
+  const rows: [string, string, string | null, object][] = [
+    ["feature", "F-001", "functional", { titre: "Connexion", nfr: ["NFR-001"] }],
+    ["rule", "R-001", null, { titre: "Annulation tardive" }],
+    ["roles", "RL-roles", null, { roles: [{ id: "RL-admin", nom: "Administrateur" }] }],
+    ["flow", "P-inscription", null, { titre: "Inscription" }],
+    ["flow", "P-annuler", null, { titre: "Annulation" }],
+    ["table", "T-salle", "data", { titre: "Salle", zone: "Réservations", champs: [{ nom: "id" }] }],
+    [
+      "component",
+      "C-api",
+      "architecture",
+      { titre: "API", nom: "API", type: "service", zone: "Noyau", responsabilite: "SECRET-RESP" },
+    ],
+    ["archflow", "P-annuler", "architecture", { titre: "P-annuler" }],
+    ["adr", "ADR-001", "architecture", { titre: "Base relationnelle", statut: "acceptee" }],
+  ];
+  for (const [sort, [kind, specId, zone, data]] of rows.entries()) {
+    await bench.query(
+      `INSERT INTO spec_entities (id, organization_id, snapshot_id, kind, spec_id, zone, path, data, content_hash, sort, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, now(), now())`,
+      [
+        randomUUID(),
+        scene.organizationId,
+        head?.snapshot_id,
+        kind,
+        specId,
+        zone,
+        `${kind}/${specId}.yaml`,
+        JSON.stringify(data),
+        "a".repeat(64),
+        sort,
+      ],
+    );
+  }
+}

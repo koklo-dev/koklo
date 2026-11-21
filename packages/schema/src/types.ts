@@ -1,5 +1,8 @@
 import type {
+  Adr,
+  ArchFlow,
   BusinessRule,
+  Component,
   Endpoint,
   Feature,
   Fixture,
@@ -45,4 +48,7 @@ export type ParsedSpec = {
   rules: Parsed<BusinessRule>[];
   flows: Parsed<Flow>[];
   fixtures: Parsed<Fixture>[];
+  components: Parsed<Component>[];
+  archFlows: Parsed<ArchFlow>[];
+  adrs: Parsed<Adr>[];
 };

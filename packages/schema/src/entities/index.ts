@@ -1,3 +1,4 @@
+export * from "./architecture.ts";
 export * from "./data.ts";
 export * from "./data-v2.ts";
 export * from "./domain.ts";

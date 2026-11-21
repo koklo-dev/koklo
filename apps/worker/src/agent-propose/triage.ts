@@ -2,6 +2,12 @@ import { AGENT_PROPOSE_LIMITS, type AgentProposalKind, slugOf } from "@koklo/dom
 import { isSafeText, PROPOSAL_SCHEMAS } from "@koklo/schema";
 import { isRecord } from "../job-support.ts";
 import { OutputInvalidError } from "./errors.ts";
+import {
+  type ArchitectureRefs,
+  architectureKnown,
+  isArchitectureKind,
+  rememberAccepted,
+} from "./triage-architecture.ts";
 
 const TITLE_MAX = 200;
 const ZONE_MAX = 120;
@@ -33,14 +39,24 @@ export interface TriageContext {
     readonly specIds: ReadonlySet<string>;
     readonly tables: Map<string, ReadonlySet<string> | null>;
   };
+  /** Livrable Architecture (TK-111) : identifiants que le modèle peut viser ; absent pour les autres livrables. */
+  readonly arch?: ArchitectureRefs;
 }
 
 /** Clé de comparaison de deux titres : forme NFKC, espaces repliés, casse ignorée. */
 export const titleKey = (title: string): string =>
   title.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 
+/** Champ qui porte le titre : le nom (rôle, table, composant), l'identifiant du parcours (flux), sinon `title`. */
+const TITLE_FIELD: Partial<Record<AgentProposalKind, string>> = {
+  role: "name",
+  table: "name",
+  component: "name",
+  archflow: "flow",
+};
+
 const titleOf = (kind: AgentProposalKind, payload: Record<string, unknown>): string => {
-  const value = payload[kind === "role" || kind === "table" ? "name" : "title"];
+  const value = payload[TITLE_FIELD[kind] ?? "title"];
   return typeof value === "string" ? value.slice(0, TITLE_MAX) : "";
 };
 
@@ -147,12 +163,14 @@ function titleFor(
 ): string | undefined {
   if (kind === "criteria") return criteriaTarget(payload, context);
   if (!referencesKnown(kind, payload, context.refs)) return undefined;
+  if (isArchitectureKind(kind) && !architectureKnown(kind, payload, context.arch)) return undefined;
   const title = kind === "relations" ? RELATIONS_TITLE : titleOf(kind, payload);
   const known = context.titles[kind] ?? new Set<string>();
   context.titles[kind] = known;
   if (known.has(titleKey(title))) return undefined;
   known.add(titleKey(title));
   if (kind === "table") context.refs?.tables.set(tableIdOf(title), fieldNamesOf(payload));
+  rememberAccepted(kind, payload, context.arch);
   return title;
 }
 

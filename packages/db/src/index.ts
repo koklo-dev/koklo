@@ -12,11 +12,14 @@ export {
   type TenantTx,
 } from "./counters.ts";
 export {
+  type CurrentArchitecture,
+  type CurrentComponent,
   type CurrentDataModel,
   type CurrentDomainTitles,
   type CurrentFeature,
   type CurrentTable,
   type CurrentTitle,
+  currentArchitecture,
   currentDataModel,
   currentDomainTitles,
   currentFeatures,

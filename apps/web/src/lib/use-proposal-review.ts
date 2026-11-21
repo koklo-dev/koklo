@@ -17,6 +17,12 @@ import {
   useProposalStatus,
 } from "./use-proposal-status.ts";
 
+/** Livrable relu par un écran à part : les Données et l'Architecture relisent tous les types de leur lancement. */
+const DELIVERABLE_OF_TAB: Record<string, Deliverable> = {
+  data: "data",
+  architecture: "architecture",
+};
+
 export type ReviewFilter = "pending" | "all";
 const FLAT_LIMIT = PROPOSAL_GROUP_THRESHOLD;
 const BATCH_STALE_MS = 30_000;
@@ -157,6 +163,12 @@ function useGroupReads(reads: GroupReads) {
   });
 }
 
+/** Les Données et l'Architecture relisent tous leurs groupes ; un onglet du cahier ne relit que ses types. */
+const inTab = (groupKey: string, tab: FeaturesTab | "data" | "architecture"): boolean =>
+  tab === "data" ||
+  tab === "architecture" ||
+  tabOfProposalKind(groupKey.split(":")[0] ?? "") === tab;
+
 /**
  * Lecture de la relecture : un groupe par `proposal.list` (`group`), `status: pending` par défaut au-delà de 30,
  * 8 éléments puis 20 de plus par groupe ; sonde toutes les 2 s tant que le lancement tourne.
@@ -164,17 +176,15 @@ function useGroupReads(reads: GroupReads) {
 export function useProposalReview(
   projectId: string,
   enabled: boolean,
-  tab: FeaturesTab | "data" = "features",
+  tab: FeaturesTab | "data" | "architecture" = "features",
 ) {
-  const deliverable: Deliverable = tab === "data" ? "data" : "functional";
+  const deliverable: Deliverable = DELIVERABLE_OF_TAB[tab as string] ?? "functional";
   const status = useProposalStatus(projectId, enabled, deliverable);
   const [filter, setFilter] = useState<ReviewFilter>("pending");
   const { shown, loadMore } = useShown();
   const { counts, active } = status;
   // Chaque onglet relit les propositions de son type (maquette 10 l.532) ; les comptes du bandeau restent ceux du lancement.
-  const groups = status.groups.filter(
-    (group) => tab === "data" || tabOfProposalKind(group.key.split(":")[0] ?? "") === tab,
-  );
+  const groups = status.groups.filter((group) => inTab(group.key, tab));
   const grouped = counts.total > PROPOSAL_GROUP_THRESHOLD;
   const results = useGroupReads({
     projectId,

@@ -1,10 +1,15 @@
 import { priorityLabel } from "./feature-labels.ts";
 import { FEATURES_TABS, tabOfProposalKind } from "./features-tab.ts";
+import {
+  architectureRefOf,
+  architectureSubtitleOf,
+  isArchitectureKind,
+} from "./proposal-architecture.ts";
 import { tableRefOf } from "./proposal-data.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
-/** Livrables dont l'agent propose le contenu : le cahier fonctionnel (TK-99b) et le modèle de données (TK-107). */
-export type Deliverable = "functional" | "data";
+/** Livrables dont l'agent propose le contenu : le cahier fonctionnel (TK-99b), le modèle de données (TK-107) et l'architecture (TK-111). */
+export type Deliverable = "functional" | "data" | "architecture";
 /** Livrable des écrans qui ne le précisent pas : le cahier fonctionnel. */
 export const DEFAULT_DELIVERABLE: Deliverable = "functional";
 
@@ -46,9 +51,35 @@ const DATA_MODE_TEXTS: typeof MODE_TEXTS = {
   },
 };
 
+/** Textes de la modale de l'architecture (maquette 13 l.869-871), dans l'ordre du serveur. */
+const ARCHITECTURE_MODE_TEXTS: typeof MODE_TEXTS = {
+  complete: {
+    title: "Compléter l'architecture",
+    description: "Composants, décisions et flux qui manquent pour couvrir les parcours.",
+  },
+  decision: {
+    title: "Proposer une décision",
+    description: "Une ADR pour un choix encore ouvert, avec ses options.",
+  },
+  document: {
+    title: "Rédiger le document",
+    description: "Les sections à rédiger de la vue d'ensemble.",
+  },
+  all: {
+    title: "Tout reproposer",
+    description: "Repart des livrables validés ; ce qui est enregistré reste.",
+  },
+};
+
+const MODE_TEXTS_OF: Record<Deliverable, typeof MODE_TEXTS> = {
+  functional: MODE_TEXTS,
+  data: DATA_MODE_TEXTS,
+  architecture: ARCHITECTURE_MODE_TEXTS,
+};
+
 /** Textes des choix de la modale pour un livrable. */
 export const modeTextsOf = (deliverable: Deliverable): typeof MODE_TEXTS =>
-  deliverable === "data" ? DATA_MODE_TEXTS : MODE_TEXTS;
+  MODE_TEXTS_OF[deliverable];
 
 export const KIND_LABELS: Record<string, string> = {
   table: "Table",
@@ -59,6 +90,10 @@ export const KIND_LABELS: Record<string, string> = {
   rule: "Règle",
   role: "Rôle",
   flow: "Parcours",
+  component: "Composant",
+  archflow: "Flux",
+  adr: "Décision",
+  doc_section: "Section du document",
 };
 
 export const UNAVAILABLE_REASONS: Record<string, string> = {
@@ -120,6 +155,7 @@ const DATA_REFS: Record<string, string> = { relations: "REL" };
 /** Identifiant lisible : celui de la fiche visée, sinon rang dans le lancement (`P-007`, `RL-002`). */
 export function refOf(proposal: ProposalOutput): string {
   const specId = text(proposal.content.specId);
+  if (isArchitectureKind(proposal.kind)) return architectureRefOf(proposal);
   if (proposal.kind === "table") return tableRefOf(text(proposal.content.name));
   if (proposal.kind === "fixtures")
     return `FX-${tableRefOf(text(proposal.content.title)).slice(2)}`;
@@ -154,6 +190,7 @@ function dataSubtitle(content: Record<string, unknown>): string {
 export function subtitleOf(proposal: ProposalOutput): string {
   const { content } = proposal;
   const label = KIND_LABELS[proposal.kind] ?? proposal.kind;
+  if (isArchitectureKind(proposal.kind)) return architectureSubtitleOf(proposal);
   if (proposal.kind === "table") return dataSubtitle(content);
   if (proposal.kind === "relations")
     return plural(

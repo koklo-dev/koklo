@@ -1,5 +1,6 @@
 import type { SpecItem } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
+import { componentDetail } from "../spec-architecture/architecture-values.ts";
 import { tableDetail } from "../spec-data/data-values.ts";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { flowDetail, roleDetail, ruleDetail } from "../spec-read/entity-values.ts";
@@ -7,8 +8,11 @@ import { SpecReadService } from "../spec-read/spec-read.service.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 
-/** Livrable que modifier l'élément invaliderait : Données pour une table, Fonctionnel pour le reste. */
-const deliverableOf = (type: SpecItem["type"]) => (type === "table" ? "data" : "functional");
+/** Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant, Fonctionnel pour le reste. */
+const deliverableOf = (type: SpecItem["type"]) => {
+  if (type === "table") return "data";
+  return type === "component" ? "architecture" : "functional";
+};
 
 /**
  * Lecture d'un élément pour le panneau d'édition (TK-101, B329 b, c) : les valeurs de la fiche lues comme `spec.getFeature`
@@ -55,6 +59,7 @@ export class SpecItemService {
     const entity = await this.specs.entity(scope, type, id);
     const where = { filePath: entity.path, commitSha: entity.commitSha };
     if (type === "table") return tableDetail(id, entity.data, where);
+    if (type === "component") return componentDetail(id, entity.data, where);
     return type === "rule"
       ? ruleDetail(id, entity.data, where)
       : flowDetail(id, entity.data, where);

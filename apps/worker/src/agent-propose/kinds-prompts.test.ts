@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { kindsOfMode } from "./generate.ts";
-import { batchPrompt } from "./prompts.ts";
+import { batchPrompt, zonesPrompt } from "./prompts.ts";
 import type { LaunchSources } from "./sources.ts";
 
 /** TK-103 (B342) : types demandés par mode, et titres existants (règles, rôles, parcours) fournis au modèle comme données non fiables. */
@@ -105,5 +105,87 @@ describe("prompts du lot", () => {
 
   it("le mode criteria ne parle pas de règles", () => {
     expect(textOf(["criteria"])).not.toContain('kind "rule"');
+  });
+});
+
+describe("kindsOfMode pour l'Architecture (TK-111)", () => {
+  it("complete : composants et flux ; decision : décision ; document : section ; all : les quatre", () => {
+    expect(kindsOfMode("complete", "architecture")).toEqual(["component", "archflow"]);
+    expect(kindsOfMode("decision", "architecture")).toEqual(["adr"]);
+    expect(kindsOfMode("document", "architecture")).toEqual(["doc_section"]);
+    expect(kindsOfMode("all", "architecture")).toEqual([
+      "component",
+      "archflow",
+      "adr",
+      "doc_section",
+    ]);
+    expect(kindsOfMode("complete")).toEqual(["feature", "rule", "role", "flow"]);
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même livrable, un test par comportement
+describe("prompts de l'Architecture (TK-111)", () => {
+  const archSources: LaunchSources = {
+    ...sources,
+    features: [{ specId: "F-001", title: "Réserver une salle", criteria: [] }],
+    tables: [{ specId: "T-salle", title: "Salle", zone: "Réservations", fields: ["id", "nom"] }],
+    architecture: {
+      components: [{ specId: "C-api", title: "API", zone: "Noyau", type: "service" }],
+      archflows: [{ specId: "P-annuler", title: "P-annuler" }],
+      decisions: [{ specId: "ADR-001", title: "Base relationnelle" }],
+      nfr: ["NFR-001"],
+    },
+  };
+  const textOfArch = (kinds: Parameters<typeof batchPrompt>[1]["kinds"]) => {
+    const prompt = batchPrompt(NONCE, {
+      sources: archSources,
+      instruction: "Pas de microservices",
+      zone: "Noyau",
+      kinds,
+    });
+    return `${prompt.system}\n${prompt.user}`;
+  };
+
+  it("la consigne nomme les types demandés et seulement eux", () => {
+    const text = textOfArch(["component", "archflow"]);
+    expect(text).toContain('kind "component"');
+    expect(text).toContain('kind "archflow"');
+    expect(text).not.toContain('kind "adr"');
+    expect(text).not.toContain('kind "feature"');
+    expect(textOfArch(["adr"])).toContain('kind "adr"');
+    expect(textOfArch(["doc_section"])).toContain('kind "doc_section"');
+    const all = textOfArch(["component", "archflow", "adr", "doc_section"]);
+    for (const kind of ["component", "archflow", "adr", "doc_section"]) {
+      expect(all).toContain(`kind "${kind}"`);
+    }
+  });
+
+  it("le cahier, les tables, l'architecture actuelle et les exigences entrent comme données ; jamais le nom du fournisseur", () => {
+    const text = textOfArch(["component"]);
+    for (const expected of [
+      "F-001",
+      "Réserver une salle",
+      "T-salle",
+      "Annulation tardive",
+      "RL-admin",
+      "P-inscription",
+      "C-api",
+      "Noyau",
+      "ADR-001",
+      "Base relationnelle",
+      "P-annuler",
+      "NFR-001",
+      "Pas de microservices",
+    ]) {
+      expect(text, expected).toContain(expected);
+    }
+    expect(text.toLowerCase()).not.toContain("anthropic");
+  });
+
+  it("les zones : consigne d'architecture, sources en données", () => {
+    const prompt = zonesPrompt(NONCE, archSources, null);
+    const text = `${prompt.system}\n${prompt.user}`;
+    expect(text).toContain("architecture");
+    expect(text).toContain("C-api");
   });
 });

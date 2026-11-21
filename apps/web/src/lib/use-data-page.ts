@@ -1,7 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { type RefObject, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { proposedTableOf } from "./data-diagram.ts";
 import { type DataHeaderInput, dataHeaderStateOf } from "./data-header-state.ts";
 import { tablesResultText } from "./data-labels.ts";
@@ -21,85 +20,14 @@ import { useProposalReview } from "./use-proposal-review.ts";
 import { useProposals } from "./use-proposals.ts";
 import { useSavedToast } from "./use-saved-toast.ts";
 import { useSpecDeliverables } from "./use-spec-deliverables.ts";
+import { useSavedSync, useSpecForm } from "./use-spec-form.ts";
 import { type SpecSources, useSpecSources } from "./use-spec-sources.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
 import { useDataValidation, useValidateModel } from "./use-validate-model.ts";
 
 type DataHead = NonNullable<SpecSources["headData"]>;
 const LIST_KEYS = [() => orpc.spec.data.key(), () => orpc.spec.item.key()] as const;
-/** Vues où la spec est lue et le formulaire peut s'ouvrir. */
-const WRITABLE_VIEWS = ["list", "empty", "empty-filtered"];
-
-/**
- * Ouverture du formulaire par l'adresse (`?new=1`, `?edit=T-slug`) : seulement pour qui écrit les Données (le designer
- * lit) et quand `spec.head` est prêt ; sinon le paramètre est retiré. Une écriture terminée le referme.
- */
-function useDataForm(
-  url: DataUrl,
-  ctx: { role: string | undefined; ready: boolean; viewKind: string },
-  write: FeatureWrite,
-) {
-  const { role, ready, viewKind } = ctx;
-  const canWrite = canWriteData(role) && ready && WRITABLE_VIEWS.includes(viewKind);
-  const wanted = url.new || Boolean(url.edit);
-  const { closeForm } = url;
-  useEffect(() => {
-    if (role !== undefined && !canWriteData(role) && wanted) closeForm();
-  }, [role, wanted, closeForm]);
-  const open = canWrite && wanted;
-  const saved = write.saved;
-  useEffect(() => {
-    if (open && write.phase === "saved") {
-      closeForm(saved?.meta.kind === "delete" ? undefined : saved?.meta.specId);
-    }
-  }, [open, write.phase, saved, closeForm]);
-  return {
-    canWrite,
-    open,
-    mode: url.edit ? ("edit" as const) : ("create" as const),
-    specId: url.edit,
-    close: () => closeForm(),
-    openCreate: () => {
-      write.dismiss();
-      url.openCreate();
-    },
-    openEdit: (specId: string) => {
-      write.dismiss();
-      url.openEdit(specId);
-    },
-  };
-}
-
-/** Après un enregistrement : les lectures se relisent, puis le focus va à la ligne enregistrée ou au titre de la page. */
-function useSavedSync(
-  write: FeatureWrite,
-  formOpen: boolean,
-  titleRef: RefObject<HTMLHeadingElement | null>,
-) {
-  const queryClient = useQueryClient();
-  const done = useRef<string | null>(null);
-  const { saved } = write;
-  useEffect(() => {
-    if (!saved?.commitSha || formOpen) return;
-    const key = `${saved.meta.target}:${saved.commitSha}`;
-    if (done.current === key) return;
-    done.current = key;
-    const specId = saved.meta.kind === "delete" ? undefined : saved.meta.specId;
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: orpc.spec.data.key() }),
-      queryClient.invalidateQueries({ queryKey: orpc.spec.item.key() }),
-      queryClient.invalidateQueries({ queryKey: orpc.spec.head.key() }),
-      // Le statut du livrable suit le contenu des tables : « Validé » repasse « À valider » (TK-109, B445).
-      queryClient.invalidateQueries({ queryKey: orpc.spec.deliverables.key() }),
-      queryClient.invalidateQueries({ queryKey: orpc.project.shell.key() }),
-    ]).then(() => {
-      const row = specId
-        ? document.querySelector<HTMLElement>(`[data-spec-id="${specId}"] button`)
-        : null;
-      (row ?? titleRef.current)?.focus();
-    });
-  }, [saved, formOpen, queryClient, titleRef]);
-}
+const LIST_SYNC = [() => orpc.spec.data.key()] as const;
 
 /** Tables proposées : cartes du diagramme, avec la décision de relecture de chacune et leurs relations. */
 function proposedCards(review: ReturnType<typeof useProposalReview>): DiagramCard[] {
@@ -265,8 +193,12 @@ function useDataWriting(projectId: string, url: DataUrl, sources: SpecSources, v
   const write = useFeatureWrite({ projectId, filters: () => ({ q: url.q }) });
   usePendingResume(projectId, sources.role, write);
   const ready = sources.headData?.status === "ready";
-  const form = useDataForm(url, { role: sources.role, ready, viewKind: view.kind }, write);
-  useSavedSync(write, form.open, titleRef);
+  const form = useSpecForm(
+    url,
+    { role: sources.role, ready, viewKind: view.kind, canWrite: canWriteData },
+    write,
+  );
+  useSavedSync(write, form.open, titleRef, LIST_SYNC);
   useSavedToast(write);
   return { titleRef, write, form };
 }

@@ -55,6 +55,7 @@ const GROUPS: Record<string, string[]> = {
   ],
   repo: ["createSpec", "link", "list"],
   spec: [
+    "architecture",
     "data",
     "deliverables",
     "forceDeliverable",
@@ -332,6 +333,10 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /client-space/projects/{projectId}/data/zone",
     "GET /client-space/projects/{projectId}/data/search",
     "GET /client-space/projects/{projectId}/data/fixtures/{fixtureId}/page",
+    // TK-111 (3.9.0) : Architecture (composants, document, avertissements), équipe et designer seulement.
+    "GET /projects/{projectId}/spec/architecture/components",
+    "GET /projects/{projectId}/spec/architecture/document",
+    "GET /projects/{projectId}/spec/architecture/checks",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -363,7 +368,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(155);
+    expect(pairs).toHaveLength(158);
   });
 });
 

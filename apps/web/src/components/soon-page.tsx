@@ -7,16 +7,12 @@ import { PageBody } from "./page-body.tsx";
 import { ShellLink } from "./shell-link.tsx";
 
 /** Titre du livrable et phrase de la page « Bientôt » (DESIGN.md §5.4) : aucune promesse de date, aucune action. */
-const SOON: Record<SpecSlug, { title: string; sentence: string }> = {
+const SOON: Record<Exclude<SpecSlug, "architecture">, { title: string; sentence: string }> = {
   functional: {
     title: "Fonctionnel",
     sentence: "Le cahier fonctionnel arrive dans une prochaine version.",
   },
   data: { title: "Données", sentence: "Le cahier des données arrive dans une prochaine version." },
-  architecture: {
-    title: "Architecture",
-    sentence: "Le cahier d'architecture arrive dans une prochaine version.",
-  },
   technical: {
     title: "Technique",
     sentence: "Le cahier technique arrive dans une prochaine version.",
@@ -33,7 +29,13 @@ const SOON: Record<SpecSlug, { title: string; sentence: string }> = {
 };
 
 /** Page d'un livrable pas encore livré : en-tête de projet, puis `EmptyState` « Bientôt ». */
-export function SoonPage({ projectId, slug }: { projectId: string; slug: SpecSlug }) {
+export function SoonPage({
+  projectId,
+  slug,
+}: {
+  projectId: string;
+  slug: Exclude<SpecSlug, "architecture">;
+}) {
   const shell = useProjectShell(projectId);
   const { title, sentence } = SOON[slug];
   return (

@@ -166,6 +166,15 @@ function EmptyStatesFrame() {
           </Button>
         }
       />
+      <DevUiNote>
+        Callout : encadré pointillé aligné à gauche, sans icône (section à rédiger)
+      </DevUiNote>
+      <EmptyState
+        variant="callout"
+        title="Section à rédiger"
+        description="Personne n'a encore écrit cette section."
+        action={<Button>Rédiger avec l'agent</Button>}
+      />
       <DevUiNote>En ligne, dans une liste</DevUiNote>
       <div className="rounded-xl border">
         <EmptyState

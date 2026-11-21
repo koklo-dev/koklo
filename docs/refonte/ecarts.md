@@ -188,11 +188,12 @@
 | Élément (§) | État | Fichiers | Effort | Risque |
 |---|---|---|---|---|
 | Formats `components/`, `actors.yaml`, `flows/`, `adr/ADR-nnn-*.md`, `_zones.yaml` (§1) | absent | `spec-scaffold.ts` crée `architecture/adr/` vide ; identifiants `P-`, `C-`, `ADR-` absents de `packages/schema/src/entities/ids.ts` | M | — |
-| Document en sections `overview/NN-*.md` (12 §8.1) | **contraire** | `spec-scaffold.ts` écrit `architecture/overview.md` | S | — |
+| Document en sections `overview/NN-*.md` (12 §8.1) | scaffold conforme depuis TK-106 (`overview/01-contexte.md`) ; lecture et écriture des sections : TK-111 | `spec-scaffold.ts`, `moves.ts` | S | — |
 | Mermaid `schema.mmd`, `flows/*.mmd` (§1) | absent | — | S | — |
 | Vérifications (propriétaire unique, fonctionnalité servie, cycles) (§1) | absent | briques : `rules/index.ts`, `packages/domain/src/dependency-graph.ts` | S | — |
-| Schéma en couches, zones, fiche (§4.1) | absent | réutilise le lecteur du lot 6 | L | — |
-| Document, Composants, Décisions, Flux (séquence) (§4.2-4.5) | absent | — | L | — |
+| Schéma en couches, zones, fiche (§4.1) | absent (TK-112) | réutilise le lecteur du lot 6 | L | — |
+| Document, Composants (§4.2-4.3) | livrés par TK-111 lot C : `architecture-page.tsx`, `architecture-document-tab.tsx`, `architecture-components-tab.tsx` ; sans conversation ni éditeur en place du texte (B532, B533) | `apps/web/src/components/architecture-*.tsx` | L | — |
+| Décisions, Flux (séquence) (§4.4-4.5) | absent (TK-113) | — | L | — |
 | Validation par l'équipe, « À revoir » (§3, §5) | **contraire** / absent | comme lot 6 | M | — |
 
 ## Lot 8 · Technique (passation 12)

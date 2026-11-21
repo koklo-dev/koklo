@@ -10,6 +10,8 @@ export interface SpecScaffoldInput {
 const EMPTY_DIRECTORIES = [
   "features",
   "architecture/adr",
+  "architecture/components",
+  "architecture/flows",
   "data/tables",
   "domain/rules",
   "nfr",

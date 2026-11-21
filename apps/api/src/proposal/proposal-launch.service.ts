@@ -4,7 +4,7 @@ import type {
   AiProposeOptionsInput,
   AiProposeOptionsOutput,
 } from "@koklo/contract";
-import { AGENT_READS, type FunctionalMode } from "@koklo/domain";
+import { AGENT_READS } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { AiCallRunner, correlationIdOf } from "../ai/ai-call.ts";
@@ -17,8 +17,14 @@ import { forbidden, validation } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { LAUNCH_REPOSITORY, type LaunchRepository, type NewLaunch } from "./launch.repository.ts";
 
-/** Livrables branchés : le Fonctionnel (TK-99a) et les Données (TK-107) ; les cinq autres sont refusés (TK-100). */
-const WIRED_DELIVERABLES: readonly string[] = ["functional", "data"];
+/** Livrables branchés : le Fonctionnel (TK-99a), les Données (TK-107), l'Architecture (TK-111) ; les quatre autres sont refusés (TK-100). */
+const WIRED_DELIVERABLES: Readonly<Record<string, true>> = {
+  functional: true,
+  data: true,
+  architecture: true,
+};
+/** Modes de l'Architecture (TK-111) : compléter, une décision, le document, tout reproposer. */
+const ARCHITECTURE_MODES: readonly string[] = ["complete", "decision", "document", "all"];
 /** Modes des Données : « Proposer les mises à jour » viendra avec l'impact amont (TK-109, B387). */
 const DATA_MODES: readonly string[] = ["complete", "all"];
 
@@ -33,12 +39,23 @@ const READ_LABELS: Record<string, string> = {
   "functional.roles": "Rôles",
   "functional.flows": "Parcours",
   "data.current": "Modèle actuel",
+  "data.tables": "Modèle de données",
+  "architecture.current": "Architecture actuelle",
+  "nfr.known": "Exigences connues",
 };
 const readsOf = (ids: readonly string[]) => ids.map((id) => ({ id, label: READ_LABELS[id] ?? id }));
 
+const ARCHITECTURE_WINDOW_READS = [
+  { id: "functional.features", label: "Fonctionnel" },
+  { id: "data.tables", label: "Données" },
+  { id: "nfr.known", label: "Exigences connues" },
+];
+
 type Option = AiProposeOptionsOutput["options"][number];
-const option = (id: FunctionalMode, count?: number): Omit<Option, "recommended"> =>
-  count === undefined ? { id } : { id, count };
+const option = (
+  id: AiProposeOptionsOutput["options"][number]["id"],
+  count?: number,
+): Omit<Option, "recommended"> => (count === undefined ? { id } : { id, count });
 
 /**
  * Lancement d'une génération de propositions. Rapide : le modèle n'est pas appelé ici. Ordre : livrable branché et
@@ -61,13 +78,10 @@ export class ProposalLaunchService {
     requestId: string,
     role: string | undefined,
   ): Promise<AiProposeDeliverableOutput> {
-    if (!WIRED_DELIVERABLES.includes(input.deliverable)) {
+    if (!Object.hasOwn(WIRED_DELIVERABLES, input.deliverable)) {
       throw validation("deliverable", "Ce livrable n'est pas encore branché.");
     }
-    const draft =
-      input.deliverable === "data"
-        ? await this.dataLaunch(scope, input, role)
-        : await this.functionalLaunch(scope, input);
+    const draft = await this.draftOf(scope, input, role);
     const created = await this.launches.create(scope, draft, new Date(this.clock.now()));
     if (created.kind === "busy") {
       throw new ORPCError("PROPOSAL_IN_PROGRESS", { data: { launchId: created.launchId } });
@@ -76,6 +90,16 @@ export class ProposalLaunchService {
     await this.admitOrRelease(scope, launch.id, requestId);
     await this.enqueueOrFail(scope, launch.id);
     return { launchId: launch.id, status: "queued" };
+  }
+
+  private draftOf(
+    scope: ProjectScope,
+    input: AiProposeDeliverableInput,
+    role: string | undefined,
+  ): Promise<NewLaunch> {
+    if (input.deliverable === "data") return this.dataLaunch(scope, input, role);
+    if (input.deliverable === "architecture") return this.architectureLaunch(scope, input, role);
+    return this.functionalLaunch(scope, input);
   }
 
   async options(
@@ -89,6 +113,19 @@ export class ProposalLaunchService {
           { ...option("all"), recommended: false },
         ],
         reads: readsOf(AGENT_READS.data),
+        available: true,
+      };
+    }
+    if (input.deliverable === "architecture") {
+      return {
+        options: [
+          { ...option("complete"), recommended: true },
+          { ...option("decision"), recommended: false },
+          { ...option("document"), recommended: false },
+          { ...option("all"), recommended: false },
+        ],
+        // Les trois puces de la maquette 13 l.869 ; AGENT_READS.architecture reste le contexte réel de l'agent.
+        reads: ARCHITECTURE_WINDOW_READS,
         available: true,
       };
     }
@@ -164,6 +201,43 @@ export class ProposalLaunchService {
       mode: input.mode,
       instruction: input.instruction ?? null,
       sources: AGENT_READS.data,
+      baseVersion: null,
+    };
+  }
+
+  /**
+   * Architecture (TK-111) : rôles qui écrivent l'architecture, modes `complete`, `decision`, `document` et `all`, livrable
+   * ouvert (Données validées, ou forcé par owner ou admin) et au moins une entité du Fonctionnel ; aucune version d'idée.
+   */
+  private async architectureLaunch(
+    scope: ProjectScope,
+    input: AiProposeDeliverableInput,
+    role: string | undefined,
+  ): Promise<NewLaunch> {
+    if (!(DATA_PROPOSAL_ROLES as readonly (string | undefined)[]).includes(role)) {
+      throw forbidden();
+    }
+    if (!ARCHITECTURE_MODES.includes(input.mode)) {
+      throw validation("mode", "Ce mode n'existe pas pour l'Architecture.");
+    }
+    const { deliverables } = await this.deliverables.list(scope, role);
+    if (deliverables.find((entry) => entry.key === "architecture")?.available !== true) {
+      throw validation(
+        "deliverable",
+        "L'architecture s'ouvre quand les données sont validées : validez-les, ou ouvrez le livrable.",
+      );
+    }
+    if (!(await this.launches.hasFunctionalEntities(scope))) {
+      throw validation(
+        "deliverable",
+        "Le cahier fonctionnel est vide : enregistrez-en au moins un élément avant de proposer l'architecture.",
+      );
+    }
+    return {
+      deliverable: input.deliverable,
+      mode: input.mode,
+      instruction: input.instruction ?? null,
+      sources: AGENT_READS.architecture,
       baseVersion: null,
     };
   }

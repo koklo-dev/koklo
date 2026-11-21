@@ -4,6 +4,7 @@ import {
   type SpecBatchSubmitInput,
   FEATURE_ZONE_MAX_LENGTH as ZONE_MAX,
 } from "@koklo/contract";
+import { architectureOperationOf, isArchitectureKind } from "./proposal-architecture.ts";
 import { isDataKind } from "./proposal-data.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
@@ -142,6 +143,10 @@ function dataOperations(proposal: ProposalOutput): Operation[] {
 /** Opérations d'une proposition acceptée (une seule, sauf `relations` : une mise à jour par table de départ). */
 export function operationsOf(proposal: ProposalOutput): Operation[] {
   if (isDataKind(proposal.kind)) return dataOperations(proposal);
+  if (isArchitectureKind(proposal.kind)) {
+    const architecture = architectureOperationOf(proposal);
+    return architecture ? [architecture] : [];
+  }
   const op = operationOf(proposal);
   return op ? [op] : [];
 }

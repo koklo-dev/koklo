@@ -54,6 +54,22 @@ export interface CurrentDataModel {
   readonly fixtures: readonly CurrentTitle[];
 }
 
+/** Composant d'architecture du cahier actuel (TK-111) : identifiant, nom, zone et type, jamais la responsabilité ni les liens. */
+export interface CurrentComponent {
+  readonly specId: string;
+  readonly title: string;
+  readonly zone: string | null;
+  readonly type: string;
+}
+
+/** Ce que l'agent lit de l'architecture : composants, flux techniques, décisions, et exigences connues des fonctionnalités (B512). */
+export interface CurrentArchitecture {
+  readonly components: readonly CurrentComponent[];
+  readonly archflows: readonly CurrentTitle[];
+  readonly decisions: readonly CurrentTitle[];
+  readonly nfr: readonly string[];
+}
+
 export interface DossierSources {
   readonly tag: string;
   readonly pages: readonly FrozenPage[];
@@ -256,6 +272,54 @@ export async function currentDataModel(
       .filter((row) => row.kind === "fixture")
       .slice(0, DOMAIN_TITLES_MAX)
       .map((row) => ({ specId: row.specId, title: textOf(recordOf(row.data).titre) })),
+  };
+}
+
+const COMPONENTS_MAX = 200;
+const NFR_MAX = 100;
+
+/**
+ * Composants, flux techniques, décisions de la tête de spec (index d'entités) et exigences connues : les identifiants `NFR-` cités
+ * par les fonctionnalités (B512, les fichiers `nfr/` seront formalisés au lot 8). Seuls des titres, jamais le contenu (TK-111).
+ */
+export async function currentArchitecture(
+  client: DossierClient,
+  projectId: string,
+): Promise<CurrentArchitecture> {
+  const none = { components: [], archflows: [], decisions: [], nfr: [] };
+  const snapshotId = await headSnapshotId(client, projectId);
+  if (snapshotId === null) return none;
+  const rows = await client.specEntity.findMany({
+    where: { snapshotId, kind: { in: ["component", "archflow", "adr", "feature"] } },
+    orderBy: [{ kind: "asc" }, { sort: "asc" }, { id: "asc" }],
+    select: { kind: true, specId: true, data: true },
+  });
+  const of = (kind: string) => rows.filter((row) => row.kind === kind);
+  const titled = (kind: string) =>
+    of(kind)
+      .slice(0, DOMAIN_TITLES_MAX)
+      .map((row) => ({ specId: row.specId, title: textOf(recordOf(row.data).titre) }));
+  const nfr = new Set(
+    of("feature").flatMap((row) => {
+      const cited = recordOf(row.data).nfr;
+      return Array.isArray(cited) ? cited.filter((id): id is string => typeof id === "string") : [];
+    }),
+  );
+  return {
+    components: of("component")
+      .slice(0, COMPONENTS_MAX)
+      .map((row) => {
+        const data = recordOf(row.data);
+        return {
+          specId: row.specId,
+          title: textOf(data.titre),
+          zone: textOf(data.zone) || null,
+          type: textOf(data.type),
+        };
+      }),
+    archflows: titled("archflow"),
+    decisions: titled("adr"),
+    nfr: [...nfr].sort().slice(0, NFR_MAX),
   };
 }
 

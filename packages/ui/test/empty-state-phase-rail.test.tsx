@@ -25,6 +25,23 @@ describe("EmptyState", () => {
     expect(svg).toHaveAttribute("width", "28");
   });
 
+  it("variante callout : encadré pointillé aligné à gauche, sans icône, titre 15/600 et texte 14", () => {
+    const { container } = render(
+      <EmptyState
+        variant="callout"
+        title="Section à rédiger"
+        description="Personne n'a encore écrit cette section."
+        action={<Button>Rédiger avec l'agent</Button>}
+      />,
+    );
+    const root = container.querySelector("[data-slot='empty-state']");
+    expect(root).toHaveClass("border-dashed", "border-border-strong", "bg-surface", "items-start");
+    expect(root).toHaveClass("text-left", "gap-2.5", "px-5", "py-[18px]");
+    expect(root?.querySelector("svg")).toBeNull();
+    expect(screen.getByText("Section à rédiger")).toHaveClass("text-card-title", "font-semibold");
+    expect(screen.getByText("Personne n'a encore écrit cette section.")).toHaveClass("text-body");
+  });
+
   it("le titre n'est pas un titre de section (il ne casse pas le plan)", () => {
     render(<EmptyState {...props} />);
     expect(screen.queryByRole("heading")).toBeNull();

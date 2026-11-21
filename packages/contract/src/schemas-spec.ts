@@ -1,6 +1,23 @@
 import { z } from "zod";
 import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
 import {
+  ARCHITECTURE_OPERATION_KINDS,
+  adrCreateSchema,
+  adrDeleteSchema,
+  adrUpdateSchema,
+  archflowCreateSchema,
+  archflowDeleteSchema,
+  archflowUpdateSchema,
+  componentCreateSchema,
+  componentDeleteSchema,
+  componentDetailSchema,
+  componentIdSchema,
+  componentUpdateSchema,
+  docSectionCreateSchema,
+  docSectionDeleteSchema,
+  docSectionUpdateSchema,
+} from "./schemas-spec-architecture.ts";
+import {
   DATA_OPERATION_KINDS,
   fixtureCreateSchema,
   tableCreateSchema,
@@ -55,6 +72,7 @@ export const specOperationKindSchema = z.enum([
   "feature.delete",
   ...DOMAIN_OPERATION_KINDS,
   ...DATA_OPERATION_KINDS,
+  ...ARCHITECTURE_OPERATION_KINDS,
   "layout.save",
   "idea.page.write",
   "idea.page.delete",
@@ -127,6 +145,8 @@ export const specHeadSchema = z
       /** Relations déclarées et jeux d'exemple de la tête (3.5.0) : résumé d'en-tête de la page Données. */
       relations: z.number().int().min(0),
       fixtures: z.number().int().min(0),
+      /** Composants d'architecture de la tête (3.9.0) : compteur d'onglet et résumé d'en-tête de la page Architecture. */
+      components: z.number().int().min(0),
     }),
   })
   .nullable();
@@ -233,6 +253,18 @@ export const specOperationSchema = z.discriminatedUnion("kind", [
   tableUpdateSchema,
   tableDeleteSchema,
   fixtureCreateSchema,
+  componentCreateSchema,
+  componentUpdateSchema,
+  componentDeleteSchema,
+  archflowCreateSchema,
+  archflowUpdateSchema,
+  archflowDeleteSchema,
+  adrCreateSchema,
+  adrUpdateSchema,
+  adrDeleteSchema,
+  docSectionCreateSchema,
+  docSectionUpdateSchema,
+  docSectionDeleteSchema,
 ]);
 
 /** 200 opérations par lot depuis 2.9.0 (TK-99a) : un groupe de propositions se soumet en un commit. */
@@ -305,6 +337,9 @@ const specEntityKindSchema = z.enum([
   "relations",
   "fixture",
   "table",
+  "component",
+  "archflow",
+  "adr",
   "endpoint",
   "screen",
   "test",
@@ -312,13 +347,14 @@ const specEntityKindSchema = z.enum([
 const refShape = { specId: z.string().min(1).max(100), title: z.string().max(300) };
 export const specRefSchema = z.object({ kind: specRefKindSchema, ...refShape });
 
-export const SPEC_ITEM_TYPES = ["feature", "rule", "role", "flow", "table"] as const;
+export const SPEC_ITEM_TYPES = ["feature", "rule", "role", "flow", "table", "component"] as const;
 const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   feature: featureIdSchema,
   rule: ruleIdSchema,
   role: roleIdSchema,
   flow: flowIdSchema,
   table: tableIdSchema,
+  component: componentIdSchema,
 };
 export const specItemGetInputSchema = z
   .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
@@ -347,6 +383,7 @@ export const specItemSchema = z.discriminatedUnion("type", [
   itemOf("role", roleIdSchema, roleDetailSchema),
   itemOf("flow", flowIdSchema, flowDetailSchema),
   itemOf("table", tableIdSchema, tableDetailSchema),
+  itemOf("component", componentIdSchema, componentDetailSchema),
 ]);
 
 export const specRefsSearchInputSchema = z.object({

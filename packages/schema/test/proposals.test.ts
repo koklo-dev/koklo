@@ -57,6 +57,10 @@ describe("schémas de proposition par type", () => {
       "table",
       "relations",
       "fixtures",
+      "component",
+      "archflow",
+      "adr",
+      "doc_section",
     ]);
   });
 
