@@ -124,11 +124,10 @@ describe("propositions en attente", () => {
     const scene = await worldWithFeatures();
     const { database } = bench();
     const scope = { ...scene, userId: scene.world.actors.dev.userId };
-    await insertProposal(database, scope);
-    await insertProposal(database, scope);
-    await insertProposal(database, scope, { status: "accepted" });
-    const { id } = await insertProposal(database, scope);
-    await database.query("UPDATE agent_proposals SET deliverable = 'data' WHERE id = $1", [id]);
+    const { launchId } = await insertProposal(database, scope);
+    await insertProposal(database, scope, { launchId });
+    await insertProposal(database, scope, { launchId, status: "accepted" });
+    await insertProposal(database, scope, { deliverable: "data" });
     return scene;
   }
 
@@ -140,6 +139,17 @@ describe("propositions en attente", () => {
       expect(entries.data?.pendingProposals, role).toBe(1);
       expect(entries.quality?.pendingProposals, role).toBe(0);
     }
+  });
+
+  it("les restes d'un lancement antérieur ne comptent pas : seul le dernier lancement du livrable", async () => {
+    const scene = await worldWithFeatures();
+    const { database } = bench();
+    const scope = { ...scene, userId: scene.world.actors.dev.userId };
+    await insertProposal(database, scope);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await insertProposal(database, scope, { status: "accepted" });
+    const entries = byKey((await listOf(scene.world, "owner")).body);
+    expect(entries.functional?.pendingProposals).toBe(0);
   });
 
   it("le client ne voit jamais de propositions : 0 partout", async () => {

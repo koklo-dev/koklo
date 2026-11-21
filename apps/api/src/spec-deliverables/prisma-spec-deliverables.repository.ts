@@ -16,17 +16,35 @@ import type {
 /** Sept livrables au plus : toutes les lectures sont bornées. */
 const MAX_DELIVERABLES = 7;
 
+/**
+ * Propositions en attente par livrable : celles du dernier lancement de ce livrable, comme l'écran de relecture.
+ * Les restes d'un lancement antérieur ne comptent pas (sans lancement connu, toutes comptent).
+ */
 async function pendingByDeliverable(
   tx: Tx,
   projectId: string,
 ): Promise<DeliverableRecord["pendingByDeliverable"]> {
-  // Au plus sept groupes (CHECK sur la clé) : bornée sans `take`, que l'extension multi-tenant trie par `id`.
+  // Au plus sept livrables, donc sept lancements les plus récents : bornées sans `take`.
   const groups = await tx.agentProposal.groupBy({
-    by: ["deliverable"],
+    by: ["deliverable", "launchId"],
     where: { projectId, status: "pending" },
     _count: { _all: true },
   });
-  return Object.fromEntries(groups.map((group) => [group.deliverable, group._count._all]));
+  const counts: Record<string, number> = {};
+  for (const deliverable of new Set(groups.map((group) => group.deliverable))) {
+    const latest = await tx.agentLaunch.findFirst({
+      where: { projectId, deliverable },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true },
+    });
+    counts[deliverable] = groups
+      .filter(
+        (group) =>
+          group.deliverable === deliverable && (latest === null || group.launchId === latest.id),
+      )
+      .reduce((sum, group) => sum + group._count._all, 0);
+  }
+  return counts;
 }
 
 const ELEMENT_KINDS = ["feature", "flow", "rules", "roles"] as const;
