@@ -179,14 +179,12 @@ function PageProposals({ model }: { model: IdeaModel }) {
       focusAfterPageDecision(id, decision, proposal.title ?? "", next);
   };
   return (
-    <div className="mx-0.5 mt-3.5 mb-2.5">
-      <ProposedPageList
-        items={items}
-        busyId={decisions.busyId}
-        onAccept={(id) => void decide(id, "accept")}
-        onIgnore={(id) => void decide(id, "reject")}
-      />
-    </div>
+    <ProposedPageList
+      items={items}
+      busyId={decisions.busyId}
+      onAccept={(id) => void decide(id, "accept")}
+      onIgnore={(id) => void decide(id, "reject")}
+    />
   );
 }
 

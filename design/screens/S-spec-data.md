@@ -53,6 +53,7 @@ Maquette 11 en « Volume réel » (l.171-205, 232-262, 393-396, 474-488, 575-584
 ## 13. Historique
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
+| 6 | 2026-11-21 | TK-114 | En-tête vérifié contre la maquette 11 l.74-89 : résumé en ligne entière, actions à droite, libellés courts ; aucun changement de code (passation 12 §8.4). |
 | 5 | 2026-11-20 | TK-110 | Volume réel : zones, zone et recherche venues du serveur, jeux à lignes générées pagination 25 / 50 / 100, groupe « Relations et jeux d'exemple » (B482 à B491). |
 | 4 | 2026-11-13 | TK-109 | « Valider le modèle », statut « Validé par l'équipe », état « À revoir » (impact amont), vue client (Lecture seule, « Ce qu'on enregistre », « Commenter »), commentaires visibles de l'équipe dans la fiche (B444 à B455). |
 | 3 | 2026-11-13 | TK-108 | Diagramme interactif `DiagramViewer` (dagre, relations, sélection, zoom 50 à 200 %, glisser et Alt + flèches vers `_layout.yaml`, noms seuls sous 60 %), fiche ancrée Fiche / YAML / Mermaid (équipe), onglet Tables par défaut sous 1024 px, fiche en panneau sous 1280 px (B417 à B428). |

@@ -256,12 +256,28 @@ describe("Vue client : fonctionnalités", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Vue client : « Valider le cahier »", () => {
-  it("inactif avec sa raison tant qu'il reste des éléments, actif quand tout est traité", async () => {
+  it("inactif : la raison est dans le résumé, le bouton la référence par aria-describedby", async () => {
     renderClient();
     const button = await screen.findByRole("button", { name: "Valider le cahier" });
     expect(button).toBeDisabled();
-    expect(screen.getByText("Traitez chaque onglet pour finir")).toBeInTheDocument();
+    const summary = screen.getByText(/Traitez chaque onglet pour finir/);
+    expect(summary.textContent).toMatch(
+      /Fonctionnalités \d+\/\d+ · .* · Traitez chaque onglet pour finir/,
+    );
+    expect(summary.id).not.toBe("");
+    expect(button).toHaveAttribute("aria-describedby", summary.id);
+    expect(button.parentElement?.textContent).not.toContain("Traitez chaque onglet");
+  });
+
+  it("tout traité : bouton actif, résumé sans la raison", async () => {
+    serveClient("client", { untreated: 0, toRevise: 0 });
+    renderClient();
+    const button = await screen.findByRole("button", { name: "Valider le cahier" });
+    expect(button).toBeEnabled();
+    expect(button).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText(/Traitez chaque onglet/)).toBeNull();
   });
 
   it("actif : valide le livrable avec la version de la progression ; « Envoyer mes demandes » s'il existe une demande", async () => {
