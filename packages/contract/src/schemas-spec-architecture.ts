@@ -1,5 +1,14 @@
 import { z } from "zod";
 import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
+import {
+  idempotencyKeySchema,
+  LAYOUT_COORD_MAX,
+  LAYOUT_MAX_ENTRIES,
+  searchQuerySchema,
+  ZONE_PREVIEW_MAX,
+  ZONE_TABLES_MAX,
+  zoneIdSchema,
+} from "./schemas-spec-data.ts";
 
 /**
  * Architecture (TK-111, contrat 3.9.0, additif, B506 à B515). Valeurs et motifs identiques à ceux de @koklo/schema
@@ -268,4 +277,202 @@ export const architectureChecksSchema = z.object({
       message: z.string(),
     }),
   ),
+});
+
+// --- TK-112 (contrat 3.10.0, additif, B541 à B550) : schéma en couches et flux en séquence ---
+const roleLink = z.string().regex(new RegExp(`^RL-${slug}$`));
+/** Un nœud du schéma : un composant (`C-<slug>`) ou un acteur (`RL-<slug>`). */
+const nodeIdSchema = z.union([componentIdSchema, roleLink]);
+/** Bornes des lectures : celles de TK-110 (aperçu 7, composants d'une zone 200, résultats de recherche 20). */
+export const ARCHITECTURE_ZONE_PREVIEW_MAX = ZONE_PREVIEW_MAX;
+export const ARCHITECTURE_ZONE_COMPONENTS_MAX = ZONE_TABLES_MAX;
+export const ARCHITECTURE_SEARCH_MAX = 20;
+
+const zoneBase = {
+  id: zoneIdSchema,
+  name: z.string().min(1).max(120),
+  /** Nom d'icône du registre (`architecture/_zones.yaml`), `folder_open` sans fichier. */
+  icon: z.string().min(1).max(64),
+  componentCount: z.number().int().min(0),
+};
+
+export const architectureZonesInputSchema = architectureDocumentInputSchema;
+export const architectureZoneEntrySchema = z.object({
+  ...zoneBase,
+  /** Rôles `RL-` qui participent à un flux contenant un composant de la zone. */
+  actorCount: z.number().int().min(0),
+  /** Noms des premiers composants, 7 au plus. */
+  preview: z.array(z.string()).max(ARCHITECTURE_ZONE_PREVIEW_MAX),
+  /** Liens vers les autres zones : paires de composants reliés par `depend_de`. */
+  links: z.array(z.object({ to: zoneIdSchema, count: z.number().int().min(1) })),
+});
+export const architectureZonesSchema = z.object({
+  zones: z.array(architectureZoneEntrySchema),
+  componentCount: z.number().int().min(0),
+  commitSha: commitShaSchema,
+});
+
+export const architectureZoneInputSchema = z
+  .object({ projectId: z.uuid(), zone: zoneIdSchema, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+export const architectureZoneComponentSchema = z.object({
+  specId: componentIdSchema,
+  name: z.string(),
+  type: componentTypeSchema,
+  responsibility: z.string(),
+});
+export const architectureZoneSchema = z.object({
+  zone: z.object(zoneBase),
+  components: z.array(architectureZoneComponentSchema).max(ARCHITECTURE_ZONE_COMPONENTS_MAX),
+  /** Dépendances entre les composants rendus (`async` : appel asynchrone). */
+  relations: z.array(
+    z.object({
+      from: componentIdSchema,
+      to: componentIdSchema,
+      via: z.string(),
+      async: z.boolean().optional(),
+    }),
+  ),
+  actors: z.array(z.object({ id: roleLink, name: z.string() })),
+  outgoing: z.array(z.object({ zone: zoneIdSchema, count: z.number().int().min(1) })),
+  truncated: z.boolean(),
+  commitSha: commitShaSchema,
+});
+
+export const architectureSearchInputSchema = z
+  .object({ projectId: z.uuid(), q: searchQuerySchema, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+export const architectureSearchSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        specId: componentIdSchema,
+        name: z.string(),
+        type: componentTypeSchema,
+        zone: z.string().optional(),
+      }),
+    )
+    .max(ARCHITECTURE_SEARCH_MAX),
+});
+
+/** Positions des nœuds déplacés (`architecture/_layout.yaml`, mêmes bornes que les Données, B542). */
+const archCoordinateSchema = z.number().int().min(0).max(LAYOUT_COORD_MAX);
+export const architectureLayoutPositionsSchema = z
+  .record(nodeIdSchema, z.strictObject({ x: archCoordinateSchema, y: archCoordinateSchema }))
+  .refine((positions) => Object.keys(positions).length <= LAYOUT_MAX_ENTRIES, {
+    message: `au plus ${LAYOUT_MAX_ENTRIES} nœuds positionnés`,
+  });
+export const architectureLayoutGetInputSchema = architectureDocumentInputSchema;
+/** Fichier absent de la tête : `positions` vide. */
+export const architectureLayoutSchema = z.object({
+  positions: architectureLayoutPositionsSchema,
+  commitSha: commitShaSchema,
+});
+/** Le client écrit tout le plan à chaque dépôt (dernier écrit gagne, aucun `baseSha`). */
+export const architectureLayoutSaveInputSchema = z.object({
+  projectId: z.uuid(),
+  idempotencyKey: idempotencyKeySchema,
+  positions: architectureLayoutPositionsSchema,
+});
+/** `commitSha` nul : le lot est enregistré mais le worker ne l'a pas encore commité (délai d'attente dépassé). */
+export const architectureLayoutSavedSchema = z.object({ commitSha: commitShaSchema.nullable() });
+
+/** Liste des flux : pages de 50, `q` sur toute la tête, `around` amène un flux (`?f=P-xxx`). */
+export const architectureFlowsListInputSchema = z
+  .object({ projectId: z.uuid(), ...revision, ...listInputShape(flowLink) })
+  .refine(exclusiveRevision, REVISION_MESSAGE)
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+export const architectureFlowSummarySchema = z.object({
+  specId: flowLink,
+  /** Titre du parcours `P-` (repli : l'identifiant). */
+  title: z.string(),
+  /** Acteur du parcours (repli : le premier rôle participant). */
+  actor: z.string(),
+  componentCount: z.number().int().min(0),
+  externalCount: z.number().int().min(0),
+});
+
+export const ARCHITECTURE_PARTICIPANT_TYPES = [
+  "actor",
+  "app",
+  "service",
+  "store",
+  "queue",
+  "ext",
+] as const;
+const flowMessageShape = {
+  from: participantSchema,
+  to: participantSchema,
+  text: z.string(),
+  reply: z.string().optional(),
+  error: z.string().optional(),
+};
+const flowMessageSchema = z.object(flowMessageShape);
+export const architectureFlowItemSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("message"), ...flowMessageShape }),
+  z.object({
+    kind: z.literal("alt"),
+    label: z.string(),
+    messages: z.array(flowMessageSchema),
+  }),
+  z.object({ kind: z.literal("separator"), label: z.string() }),
+]);
+export const architectureFlowsByIdInputSchema = z
+  .object({ projectId: z.uuid(), flowId: flowLink, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+/** Détail d'un flux : lu par la page Flux et rendu par `spec.item.get` (type `archflow`, B545). */
+export const archflowDetailSchema = z.object({
+  specId: flowLink,
+  title: z.string(),
+  actor: z.string(),
+  participants: z.array(
+    z.object({
+      id: participantSchema,
+      name: z.string(),
+      type: z.enum(ARCHITECTURE_PARTICIPANT_TYPES),
+    }),
+  ),
+  items: z.array(architectureFlowItemSchema),
+  features: z.array(featureLink),
+  rules: z.array(ruleLink),
+  decisions: z.array(adrIdSchema),
+  filePath: z.string(),
+  commitSha: commitShaSchema,
+});
+
+export const ARCHITECTURE_SOURCE_KINDS = ["component", "flow", "schema"] as const;
+export const ARCHITECTURE_FLOW_FORMATS = ["yaml", "mermaid"] as const;
+const sourceTargetSchema = z.object({
+  kind: z.enum(ARCHITECTURE_SOURCE_KINDS),
+  id: z.string().min(1).max(100).optional(),
+});
+const SOURCE_ID: Record<"component" | "flow", z.ZodType<string>> = {
+  component: componentIdSchema,
+  flow: flowLink,
+};
+/**
+ * YAML d'un composant, YAML ou Mermaid d'un flux (`format`, YAML par défaut), Mermaid du schéma : équipe seulement (403
+ * client et business). `id` est requis pour un composant et un flux, absent pour le schéma.
+ */
+export const architectureSourceInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    target: sourceTargetSchema,
+    format: z.enum(ARCHITECTURE_FLOW_FORMATS).optional(),
+    ...revision,
+  })
+  .refine(exclusiveRevision, REVISION_MESSAGE)
+  .refine(
+    ({ target }) =>
+      target.kind === "schema"
+        ? target.id === undefined
+        : SOURCE_ID[target.kind].safeParse(target.id).success,
+    { message: "id ne correspond pas au type", path: ["target", "id"] },
+  );
+/** `generated` : le fichier est absent du dépôt, le texte est produit depuis l'index. */
+export const architectureSourceSchema = z.object({
+  path: z.string(),
+  text: z.string(),
+  commitSha: commitShaSchema,
+  generated: z.boolean(),
 });

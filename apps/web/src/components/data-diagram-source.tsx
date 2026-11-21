@@ -18,10 +18,21 @@ interface SourceBlockProps {
   code: string;
   note: string;
   action?: ReactNode;
+  /** Hauteur maximale du bloc : 560 (Données), 600 (fiche composant), 640 (flux) ; maquettes 11 et 13. */
+  maxHeight?: number;
 }
 
 /** Fichier source d'une table (maquette 11 l.507-531) : chemin et pastille, code en texte brut, note. */
-function SourceBlock({ icon, path, tag, label, code, note, action }: SourceBlockProps) {
+export function SourceBlock({
+  icon,
+  path,
+  tag,
+  label,
+  code,
+  note,
+  action,
+  maxHeight = 560,
+}: SourceBlockProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-caption text-muted-foreground">
@@ -37,7 +48,8 @@ function SourceBlock({ icon, path, tag, label, code, note, action }: SourceBlock
         aria-label={label}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: région défilante, atteignable au clavier
         tabIndex={0}
-        className="max-h-[560px] overflow-auto rounded-[10px] border bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        style={{ maxHeight }}
+        className="overflow-auto rounded-[10px] border bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <pre className="m-0 w-max min-w-full whitespace-pre px-3.5 py-3 font-mono text-code leading-[1.6]">
           {code}
@@ -76,8 +88,8 @@ export function TableYaml({ projectId, tableId }: { projectId: string; tableId: 
   );
 }
 
-/** Vue Mermaid : `data/model.mmd` entier (une seule lecture, partagée avec le diagramme), « Généré », « Copier ». */
-export function ModelMermaid({ text }: { text: string }) {
+/** « Copier » : le texte va au presse-papiers, un avis dit ce qui s'est passé. */
+export function CopyAction({ text }: { text: string }) {
   const { toast } = useToast();
   const copy = async () => {
     try {
@@ -87,6 +99,16 @@ export function ModelMermaid({ text }: { text: string }) {
       toast({ tone: "error", title: "Copie impossible" });
     }
   };
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
+      <Icon name="content_copy" size={16} />
+      Copier
+    </Button>
+  );
+}
+
+/** Vue Mermaid : `data/model.mmd` entier (une seule lecture, partagée avec le diagramme), « Généré », « Copier ». */
+export function ModelMermaid({ text }: { text: string }) {
   return (
     <SourceBlock
       icon="schema"
@@ -99,12 +121,7 @@ export function ModelMermaid({ text }: { text: string }) {
           Généré
         </Pill>
       }
-      action={
-        <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
-          <Icon name="content_copy" size={16} />
-          Copier
-        </Button>
-      }
+      action={<CopyAction text={text} />}
     />
   );
 }

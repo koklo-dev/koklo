@@ -558,12 +558,25 @@ Galerie : `/dev/ui`, section « 21. Diagramme » (vue des zones de la planche, i
 
 | Élément | Règle |
 |---|---|
-| Onglets | Relecture (en relecture), Document, Composants ; Schéma, Décisions et Flux absents jusqu'à TK-112 et TK-113 (pas de bouton mort) |
+| Onglets | Relecture (en relecture), Document, Composants ; Schéma et Flux : voir §5.23 ; Décisions absent jusqu'à TK-113 (pas de bouton mort) |
 | En-tête | Même gabarit que §5.20 (statut `DeliverableStatus`, résumé en ligne entière, actions courtes) ; Prêt : aucune action dans l'en-tête, tout est dans l'état vide |
 | Document | Colonne Sections 264 px, centre 680 px, colonne Agent 340 à 360 px sans conversation ; légende des statuts collée en bas (`margin-top:auto`) ; encadré de section proposée : bordure pointillée `--primary`, fond `--diff-bg`, marges 14 px au-dessus et 2 px sur les côtés, padding 12 × 14 |
 | `DocSectionStatus` | Icône 16 + libellé : Validée `check_circle` plein `--primary` dans la colonne, estompé `--muted-foreground` dans la légende (libellé 12 px en 400), À relire `rate_review`, Brouillon `edit`, À rédiger `radio_button_unchecked` (libellé `--muted-foreground`) ; jamais la seule icône |
 | Composants | `Table` à en-tête collant `--surface`, lignes 52 px, type en `Pill` (`soft`, Externe `dashed`), pages de 50, pied « Fin de la liste · N composants » |
 | Icône | `summarize` ajoutée au registre (action « Résumer pour le client ») |
+
+### 5.23 Architecture : schéma en couches et flux en séquence (v2.29, TK-112, passation 10 §4.1, §4.5, §8, maquette 13 l.175-239, 405-441, 576-752, 814-852, B541 à B550)
+
+| Élément | Règle |
+|---|---|
+| Onglets | Schéma (défaut ≥ 1024 px), Document, Composants, Flux ; Décisions absent jusqu'à TK-113 |
+| Couches | `DiagramViewer` prop `bands` : 4 bandes séparées d'un trait pointillé `--border-strong`, une sur deux teintée `--primary` à 4 %, libellé en capitales 10 px 600 `--muted-foreground` à droite |
+| `ArchNodeCard` | Tuile icône 32 `--soft` (28 et pilule pour un acteur), nom 13/600, type écrit 11 px ; acteur pilule 160 × 52, application 220 × 70, service 200 × 70, stockage 170 × 64 rayon 14, file 170 × 64 rayon 10, nœud estompé 240 × 70, externe 170 × 64 pointillé `--border-strong` sur `--surface` ; sélection : contour 2 px `--primary`, tuile `--primary` ; à relire : contour pointillé |
+| `ZoneNode` variante `architecture` | Famille `diagram` (300 × 180, rayon 14, bordure 1,5 px) avec sous-titre 12/400 et puces `--secondary` en sans-serif 11 px (1 px 6 px) ; `minHeight` 180 sur la carte elle-même sous 768 px |
+| Liens | `DiagramRelation` : étiquette du moyen au milieu, asynchrone en pointillés « 5 4 », liens du composant choisi en `--primary` 2 px |
+| Composant d'une autre zone | prop `ghostIds` : opacité .7, contour pointillé, carte « <zone voisine> · Hors zone » (le serveur ne rend que le compte de liens par zone), nom accessible « Service <zone>, autre zone », sans `aria-pressed` ; un clic ouvre l'autre zone |
+| Pastilles d'identifiant | `EntityChip` gagne les genres `component` (`widgets`), `decision` (`gavel`) et `flow` (`route`) ; icônes du registre ajoutées : `desktop_windows`, `hub`, `lists`, `cloud`, `sms`, `mail` (la maquette `smartphone` et `queue` n'existent pas dans le jeu Material : `desktop_windows` et `lists`) |
+| `SequenceDiagram` | Cadre `--surface` rayon 12, en-têtes 112 × 36 (pilule pour un acteur, pointillé pour un externe), lignes de vie pointillées `--border-strong`, messages numérotés (n° mono 10), appel plein `--foreground`, retour pointillé `--muted-foreground`, bloc `alt` pointillé fond `--destructive` atténué, séparateur pleine largeur ; `role="img"` + `details` « Lire les messages » |
 
 ## 6. Écrans maquettés
 

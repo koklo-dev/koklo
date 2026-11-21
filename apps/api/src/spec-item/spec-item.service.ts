@@ -1,6 +1,7 @@
 import type { SpecItem } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
 import { componentDetail } from "../spec-architecture/architecture-values.ts";
+import { SpecArchitectureDiagramService } from "../spec-architecture/spec-architecture-diagram.service.ts";
 import { tableDetail } from "../spec-data/data-values.ts";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { flowDetail, roleDetail, ruleDetail } from "../spec-read/entity-values.ts";
@@ -8,10 +9,10 @@ import { SpecReadService } from "../spec-read/spec-read.service.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 
-/** Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant, Fonctionnel pour le reste. */
+/** Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant ou un flux, Fonctionnel pour le reste. */
 const deliverableOf = (type: SpecItem["type"]) => {
   if (type === "table") return "data";
-  return type === "component" ? "architecture" : "functional";
+  return type === "component" || type === "archflow" ? "architecture" : "functional";
 };
 
 /**
@@ -24,6 +25,8 @@ export class SpecItemService {
   constructor(
     @Inject(SpecReadService) private readonly specs: SpecReadService,
     @Inject(SpecDeliverablesService) private readonly deliverables: SpecDeliverablesService,
+    @Inject(SpecArchitectureDiagramService)
+    private readonly architecture: SpecArchitectureDiagramService,
   ) {}
 
   async get(
@@ -56,6 +59,7 @@ export class SpecItemService {
         roleDetail(id, file.data, { filePath: file.path, commitSha: file.commitSha }),
       );
     }
+    if (type === "archflow") return this.architecture.flow(scope, { flowId: id });
     const entity = await this.specs.entity(scope, type, id);
     const where = { filePath: entity.path, commitSha: entity.commitSha };
     if (type === "table") return tableDetail(id, entity.data, where);

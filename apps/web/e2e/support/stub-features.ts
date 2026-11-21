@@ -12,6 +12,7 @@ import {
   type ArchitectureScenario,
   architectureCounts,
   handleSpecArchitecture,
+  resetArchitectureLayout,
 } from "./stub-spec-architecture.ts";
 import { dataCounts, handleSpecData, resetLayout } from "./stub-spec-data.ts";
 import { domainCounts, handleSpecDomain } from "./stub-spec-domain.ts";
@@ -166,6 +167,7 @@ let specRepoCreated = false;
 export function resetFeatures(): void {
   resetFeatureWrites();
   resetLayout();
+  resetArchitectureLayout();
   reads.length = 0;
   specRepoCreated = false;
 }

@@ -18,7 +18,7 @@ import { FeatureError } from "./feature-error.tsx";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
 import { SaveProgress } from "./save-progress.tsx";
 
-type Type = "rule" | "role" | "flow" | "table" | "component";
+type Type = "rule" | "role" | "flow" | "table" | "component" | "archflow";
 /** Valeurs lues d'un élément : celles du type (`RuleDetail`…) et ce que tous portent (version, fichier). */
 type Values = { commitSha: string; filePath: string };
 interface Loaded<I extends Values> {

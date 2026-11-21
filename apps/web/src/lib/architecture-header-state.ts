@@ -7,10 +7,12 @@ import type { FeaturesView } from "./features-view.ts";
  * Actions de l'en-tête, dans l'ordre de la maquette 13 (l.859-866). `add` (« Ajouter », génération et relecture) et
  * `create` (« Nouveau composant », liste) ouvrent la même feuille ; l'agent reste le seul bouton primaire.
  */
-export type ArchitectureHeaderAction = "add" | "propose" | "repropose" | "create";
+export type ArchitectureHeaderAction = "add" | "propose" | "repropose" | "create" | "create-flow";
 
 export interface ArchitectureCounts {
   components: number;
+  /** Flux (`flows.list`, total) : absent tant qu'il n'est pas lu (B548 : « N composants · N flux »). */
+  flows?: number;
 }
 
 export interface ArchitectureHeaderState {
@@ -45,9 +47,12 @@ export interface ArchitectureHeaderInput {
 const plural = (count: number, one: string, other: string): string =>
   `${formatCount(count)} ${count === 1 ? one : other}`;
 
-/** « 34 composants » : seuls les onglets livrés se comptent (Décisions et Flux : TK-112, TK-113). */
+/** « 34 composants · 18 flux » : les décisions s'y ajouteront avec TK-113. */
 export const architectureSummaryOf = (counts: ArchitectureCounts): string =>
-  plural(counts.components, "composant", "composants");
+  [
+    plural(counts.components, "composant", "composants"),
+    ...(counts.flows === undefined ? [] : [plural(counts.flows, "flux", "flux")]),
+  ].join(" · ");
 
 function tabCountsOf(input: ArchitectureHeaderInput): ArchitectureHeaderState["tabCounts"] {
   const { counts } = input;
@@ -55,6 +60,7 @@ function tabCountsOf(input: ArchitectureHeaderInput): ArchitectureHeaderState["t
   const proposed = input.reviewing ? (input.proposedComponents ?? 0) : 0;
   const totals: ArchitectureHeaderState["tabCounts"] = {
     components: { value: counts.components + proposed },
+    ...(counts.flows === undefined ? {} : { flows: { value: counts.flows } }),
   };
   if (input.reviewing && !input.generating) {
     return { review: { value: input.pending, tone: "primary" }, ...totals };
@@ -77,7 +83,11 @@ function listState(input: ArchitectureHeaderInput): ArchitectureHeaderState {
     ...(counts ? { summary: architectureSummaryOf(counts) } : {}),
     actions: [
       ...(input.agent ? (["propose"] as const) : []),
-      ...(input.tab === "document" ? [] : (["create"] as const)),
+      ...(input.tab === "document"
+        ? []
+        : input.tab === "flows"
+          ? (["create-flow"] as const)
+          : (["create"] as const)),
     ],
   };
 }

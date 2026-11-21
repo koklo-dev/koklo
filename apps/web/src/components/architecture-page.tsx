@@ -11,9 +11,12 @@ import { ArchitectureComponentSheet } from "./architecture-component-sheet.tsx";
 import { ArchitectureComponentsTab } from "./architecture-components-tab.tsx";
 import { ArchitectureDocumentTab } from "./architecture-document-tab.tsx";
 import { ArchitectureEmptyPlain, ArchitectureReady } from "./architecture-empty.tsx";
+import { ArchitectureFlowSheet } from "./architecture-flow-sheet.tsx";
+import { ArchitectureFlowsTab } from "./architecture-flows-tab.tsx";
 import { ArchitectureGenerating } from "./architecture-generating.tsx";
 import { ArchitectureHeader } from "./architecture-header.tsx";
 import { ArchitectureReviewBar, ArchitectureReviewView } from "./architecture-review-view.tsx";
+import { ArchitectureSchemaTab } from "./architecture-schema-tab.tsx";
 import { SpecBody } from "./features-body.tsx";
 import { ProposeEntry } from "./features-header-action.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
@@ -53,6 +56,22 @@ function ActionButton({
           Ajouter
         </Button>
       );
+    case "create-flow":
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          data-new-feature
+          className={BUTTON}
+          onClick={() => {
+            page.write.dismiss();
+            page.url.openCreateFlow();
+          }}
+        >
+          <Icon name="add" size={20} />
+          Nouveau flux
+        </Button>
+      );
     case "create":
       return (
         <Button
@@ -69,10 +88,18 @@ function ActionButton({
   }
 }
 
-/** Contenu de l'onglet Document ou Composants. */
+/** Contenu de l'onglet Schéma, Document, Composants ou Flux. */
 function TabContent({ page }: { page: ArchitecturePageModel }) {
-  if (page.url.tab === "document") return <ArchitectureDocumentTab page={page} />;
-  return <ArchitectureComponentsTab page={page} />;
+  switch (page.url.tab) {
+    case "schema":
+      return <ArchitectureSchemaTab page={page} />;
+    case "document":
+      return <ArchitectureDocumentTab page={page} />;
+    case "flows":
+      return <ArchitectureFlowsTab page={page} />;
+    default:
+      return <ArchitectureComponentsTab page={page} />;
+  }
 }
 
 function Empty({ page }: { page: ArchitecturePageModel }) {
@@ -189,8 +216,10 @@ function ReviewBody({ page }: { page: ArchitecturePageModel }) {
 function FormSheet({ page }: { page: ArchitecturePageModel }) {
   const { form, head, write } = page;
   if (!form.open || !head) return null;
+  const flow = form.specId ? form.specId.startsWith("P-") : page.url.tab === "flows";
+  const Sheet = flow ? ArchitectureFlowSheet : ArchitectureComponentSheet;
   return (
-    <ArchitectureComponentSheet
+    <Sheet
       projectId={page.projectId}
       mode={form.mode}
       specId={form.specId}

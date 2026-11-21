@@ -370,3 +370,57 @@ describe("TK-111 : architecture (contrat 3.9.0)", () => {
     expect(proposal.safeParse({ ...valid, name: "x".repeat(121) }).success).toBe(false);
   });
 });
+
+/** TK-112 : le schéma en couches du contrat 3.10.0 recopie les bornes, les motifs et les vocabulaires de @koklo/schema. */
+describe("TK-112 : mise en page et flux d'architecture (contrat 3.10.0)", () => {
+  const layout = inputOf("spec.architecture.layout.save");
+  const wrap = (positions: unknown) => ({
+    projectId: "123e4567-e89b-42d3-a456-426614174000",
+    idempotencyKey: "k",
+    positions,
+  });
+
+  it("plafonds du contrat = ceux de architecture/_layout.yaml (schema) : coordonnées 0 à 20000, 500 entrées", () => {
+    const source = read("packages/schema/src/entities/arch-layout.ts");
+    expect(source).toContain("LAYOUT_COORD_MAX");
+    expect(schema.LAYOUT_COORD_MAX).toBe(20000);
+    expect(schema.LAYOUT_MAX_ENTRIES).toBe(500);
+    expect(accepts(layout, wrap({ "C-a": { x: 0, y: 20000 } }))).toBe(true);
+    expect(accepts(layout, wrap({ "C-a": { x: 0, y: 20001 } }))).toBe(false);
+    expect(accepts(layout, wrap({ "C-a": { x: -1, y: 0 } }))).toBe(false);
+    const entries = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`C-c${i}`, { x: 0, y: 0 }]));
+    expect(accepts(layout, wrap(entries(500)))).toBe(true);
+    expect(accepts(layout, wrap(entries(501)))).toBe(false);
+  });
+
+  it("clés du plan : composants C-<slug> et acteurs RL-<slug>, comme le schéma ; jamais une table", () => {
+    for (const id of ["C-api", "RL-client", "C-Api", "RL-", "T-client", "api"]) {
+      const accepted = schema.parseArchLayout(`positions:\n  ${id}:\n    x: 1\n    y: 1\n`).ok;
+      expect(accepts(layout, wrap({ [id]: { x: 1, y: 1 } })), id).toBe(accepted);
+    }
+  });
+
+  it("types de participant d'un flux = acteur plus les types de composant de schema", () => {
+    expect(sorted([...contract.ARCHITECTURE_PARTICIPANT_TYPES])).toEqual(
+      sorted(["actor", ...schema.COMPONENT_TYPES]),
+    );
+  });
+
+  it("bornes des lectures : aperçu 7, composants d'une zone 200, recherche 20 (constantes de TK-110 réutilisées)", () => {
+    expect(contract.ARCHITECTURE_ZONE_PREVIEW_MAX).toBe(contract.ZONE_PREVIEW_MAX);
+    expect(contract.ARCHITECTURE_ZONE_COMPONENTS_MAX).toBe(contract.ZONE_TABLES_MAX);
+    expect(contract.ARCHITECTURE_SEARCH_MAX).toBe(contract.DATA_SEARCH_MAX);
+  });
+
+  it("identifiant de flux P-<slug> du contrat = celui de schema (flowId)", () => {
+    const detail = inputOf("spec.architecture.flows.byId");
+    for (const id of ["P-reserver", "P-", "P-Reserver", "reserver"]) {
+      const accepted = schema.PATTERNS.flow.test(id);
+      expect(
+        accepts(detail, { projectId: "123e4567-e89b-42d3-a456-426614174000", flowId: id }),
+        id,
+      ).toBe(accepted);
+    }
+  });
+});

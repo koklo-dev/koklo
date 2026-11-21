@@ -203,7 +203,7 @@ export const dataFixtureRowsSchema = pageNumberOf(z.record(z.string(), cellSchem
 
 // --- Diagramme du modèle (TK-108, contrat 3.6.0, B417, B418) ---
 /** Même clé d'idempotence que `specBatch.submit`. */
-const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
+export const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 export const LAYOUT_COORD_MAX = 20000;
 export const LAYOUT_MAX_ENTRIES = 500;
 const coordinateSchema = z.number().int().min(0).max(LAYOUT_COORD_MAX);

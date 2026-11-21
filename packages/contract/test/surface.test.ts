@@ -337,6 +337,15 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /projects/{projectId}/spec/architecture/components",
     "GET /projects/{projectId}/spec/architecture/document",
     "GET /projects/{projectId}/spec/architecture/checks",
+    // TK-112 (3.10.0) : schéma en couches et flux en séquence (zones, zone, recherche, mise en page, flux, source).
+    "GET /projects/{projectId}/spec/architecture/zones",
+    "GET /projects/{projectId}/spec/architecture/zone",
+    "GET /projects/{projectId}/spec/architecture/search",
+    "GET /projects/{projectId}/spec/architecture/layout",
+    "GET /projects/{projectId}/spec/architecture/flows",
+    "GET /projects/{projectId}/spec/architecture/flows/{flowId}",
+    "GET /projects/{projectId}/spec/architecture/source",
+    "POST /projects/{projectId}/spec/architecture/layout",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -368,7 +377,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(158);
+    expect(pairs).toHaveLength(166);
   });
 });
 

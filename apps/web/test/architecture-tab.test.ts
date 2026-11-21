@@ -7,13 +7,16 @@ import {
 } from "../src/lib/architecture-tab.ts";
 
 /** TK-111 lot C : adresse de l'écran Architecture (`?tab=`, `view=review`, `c`, `s`, `q`, `zone`, `new`, `edit`). */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("readArchitectureUrl", () => {
-  it("sans paramètre : onglet Composants (par défaut), rien d'ouvert", () => {
+  it("sans paramètre : onglet Schéma (par défaut, B548), rien d'ouvert", () => {
     expect(readArchitectureUrl("")).toEqual({
-      tab: "components",
+      tab: "schema",
       review: false,
       c: undefined,
       s: undefined,
+      sel: undefined,
+      f: undefined,
       q: undefined,
       zone: undefined,
       new: false,
@@ -33,8 +36,26 @@ describe("readArchitectureUrl", () => {
     });
   });
 
-  it("un onglet inconnu ouvre Composants ; un identifiant qui n'est pas un composant est ignoré", () => {
-    expect(readArchitectureUrl("?tab=schema").tab).toBe("components");
+  it("TK-112 : sous 1024 px le défaut est Composants, un onglet demandé prime (B548)", () => {
+    expect(readArchitectureUrl("", false).tab).toBe("components");
+    expect(readArchitectureUrl("?tab=schema", false).tab).toBe("schema");
+    expect(readArchitectureUrl("?tab=flows", true).tab).toBe("flows");
+    expect(readArchitectureUrl("?tab=components", true).tab).toBe("components");
+  });
+
+  it("TK-112 : ?sel= lit un composant ou un acteur, ?f= un flux, ?edit= un composant ou un flux", () => {
+    expect(readArchitectureUrl("?sel=C-api&f=P-reserver")).toMatchObject({
+      sel: "C-api",
+      f: "P-reserver",
+    });
+    expect(readArchitectureUrl("?sel=RL-client").sel).toBe("RL-client");
+    expect(readArchitectureUrl("?edit=P-reserver").edit).toBe("P-reserver");
+    expect(readArchitectureUrl("?sel=T-client&f=C-api").sel).toBeUndefined();
+    expect(readArchitectureUrl("?sel=T-client&f=C-api").f).toBeUndefined();
+  });
+
+  it("un onglet inconnu ouvre le défaut ; un identifiant qui n'est pas un composant est ignoré", () => {
+    expect(readArchitectureUrl("?tab=decisions").tab).toBe("schema");
     expect(readArchitectureUrl("?c=T-client&edit=F-001&s=Pas%20un%20slug")).toMatchObject({
       c: undefined,
       edit: undefined,
@@ -48,7 +69,7 @@ describe("readArchitectureUrl", () => {
       review: true,
       tab: "document",
     });
-    expect(readArchitectureUrl("?tab=review")).toMatchObject({ review: false, tab: "components" });
+    expect(readArchitectureUrl("?tab=review")).toMatchObject({ review: false, tab: "schema" });
   });
 
   it("lit le formulaire : ?new=1 et ?edit=C-api", () => {
@@ -73,6 +94,11 @@ describe("withArchitectureUrl", () => {
     expect(withArchitectureUrl("?view=review&tab=review", { review: null })).toBe("");
   });
 
+  it("TK-112 : sel et f s'écrivent et se retirent", () => {
+    expect(withArchitectureUrl("", { tab: "schema", sel: "C-api" })).toBe("?tab=schema&sel=C-api");
+    expect(withArchitectureUrl("?f=P-reserver", { f: null })).toBe("");
+  });
+
   it("new et edit : ?new=1, ?edit=C-api", () => {
     expect(withArchitectureUrl("", { new: true })).toBe("?new=1");
     expect(withArchitectureUrl("?new=1", { new: null, edit: "C-api" })).toBe("?edit=C-api");
@@ -80,12 +106,24 @@ describe("withArchitectureUrl", () => {
 });
 
 describe("onglets visibles", () => {
-  it("Document et Composants seulement hors relecture ; Relecture en tête pendant une relecture", () => {
-    expect(visibleArchitectureTabs(false)).toEqual(["document", "components"]);
-    expect(visibleArchitectureTabs(true)).toEqual(["review", "document", "components"]);
+  it("Schéma, Document, Composants et Flux hors relecture ; Relecture en tête pendant une relecture", () => {
+    expect(visibleArchitectureTabs(false)).toEqual(["schema", "document", "components", "flows"]);
+    expect(visibleArchitectureTabs(true)).toEqual([
+      "review",
+      "schema",
+      "document",
+      "components",
+      "flows",
+    ]);
   });
 
-  it("jamais Schéma, Décisions ni Flux (TK-112, TK-113)", () => {
-    expect(Object.values(ARCHITECTURE_TAB_LABELS)).toEqual(["Relecture", "Document", "Composants"]);
+  it("jamais Décisions avant TK-113 : aucun bouton mort", () => {
+    expect(Object.values(ARCHITECTURE_TAB_LABELS)).toEqual([
+      "Relecture",
+      "Schéma",
+      "Document",
+      "Composants",
+      "Flux",
+    ]);
   });
 });

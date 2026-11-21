@@ -32,8 +32,19 @@ export interface DiagramNode {
   parentId?: string | undefined;
 }
 
+/** Couche horizontale du plan (schéma d'architecture) : bande de fond, libellé en capitales à droite. */
+export interface DiagramBand {
+  id: string;
+  label: string;
+  /** Haut et hauteur dans le repère du plan. */
+  top: number;
+  height: number;
+}
+
 export interface DiagramNodeContext {
   selected: boolean;
+  /** Nœud d'une autre zone (`ghostIds`) : estompé, il n'a pas d'état sélectionné et ouvre cette zone. */
+  ghost: boolean;
   /** Zoom sous 60 % : le contenu se réduit au nom. */
   compact: boolean;
   onSelect: () => void;
@@ -47,6 +58,10 @@ export interface DiagramViewerProps<T extends DiagramNode> {
   renderNode: (node: T, context: DiagramNodeContext) => ReactNode;
   selectedId?: string | null | undefined;
   onSelect?: ((id: string) => void) | undefined;
+  /** Couches de fond, de haut en bas ; la bande impaire est teintée, le trait de séparation est en pointillés. */
+  bands?: readonly DiagramBand[] | undefined;
+  /** Nœuds d'une autre zone : estompés, jamais sélectionnés ; `onSelect` les reçoit pour ouvrir l'autre zone. */
+  ghostIds?: ReadonlySet<string> | undefined;
   /** Positions enregistrées (coin haut gauche) : elles priment sur le placement automatique. */
   positions?: Readonly<Record<string, DiagramPoint>> | undefined;
   /**
@@ -80,15 +95,17 @@ function usePlan<T extends DiagramNode>(
   relations: readonly DiagramRelation[],
   positions: DiagramViewerProps<T>["positions"],
   moved: Readonly<Record<string, DiagramPoint>>,
+  bands: DiagramViewerProps<T>["bands"],
 ) {
   const auto = useMemo(
     () => layoutDiagram({ nodes, edges: relations.map(({ from, to }) => ({ from, to })) }),
     [nodes, relations],
   );
-  return useMemo(
-    () => overlayPositions(auto.positions, nodes, { ...positions, ...moved }),
-    [auto, nodes, positions, moved],
-  );
+  return useMemo(() => {
+    const plan = overlayPositions(auto.positions, nodes, { ...positions, ...moved });
+    const bottom = Math.max(0, ...(bands ?? []).map((band) => band.top + band.height));
+    return bottom > plan.height ? { ...plan, height: bottom } : plan;
+  }, [auto, nodes, positions, moved, bands]);
 }
 
 function centersOf(nodes: readonly DiagramNode[], plan: DiagramLayout) {
@@ -106,7 +123,7 @@ function useDiagramModel<T extends DiagramNode>(props: DiagramViewerProps<T>) {
   const isMobile = useIsMobile();
   const [moved, setMoved] = useState<Record<string, DiagramPoint>>({});
   const [announce, setAnnounce] = useState<{ text: string; zoom: number } | null>(null);
-  const plan = usePlan(nodes, relations, positions, moved);
+  const plan = usePlan(nodes, relations, positions, moved, props.bands);
   const zoom = useDiagramZoom({ initialZoom, plan, onZoomChange });
   const planRef = useRef(plan);
   planRef.current = plan;
@@ -154,6 +171,7 @@ interface SlotProps<T extends DiagramNode> {
   node: T;
   model: Model;
   selected: boolean;
+  ghost: boolean;
   renderNode: DiagramViewerProps<T>["renderNode"];
   onSelect: (() => void) | undefined;
 }
@@ -163,6 +181,7 @@ function NodeSlot<T extends DiagramNode>({
   node,
   model,
   selected,
+  ghost,
   renderNode,
   onSelect,
 }: SlotProps<T>) {
@@ -183,10 +202,35 @@ function NodeSlot<T extends DiagramNode>({
       }}
     >
       {renderNode(node, {
-        selected,
+        selected: selected && !ghost,
+        ghost,
         compact: model.zoom.zoom < COMPACT_BELOW,
         onSelect: () => onSelect?.(),
       })}
+    </div>
+  );
+}
+
+/** Couches de fond du plan : sous les relations, jamais lues par les lecteurs d'écran (le type est écrit sur chaque nœud). */
+function Bands({ bands }: { bands: readonly DiagramBand[] }) {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {bands.map((band, index) => (
+        <div
+          key={band.id}
+          data-slot="diagram-band"
+          style={{ top: band.top, height: band.height }}
+          className={cn(
+            "absolute inset-x-0",
+            index > 0 && "border-border-strong border-t border-dashed",
+            index % 2 === 1 && "bg-primary/[0.04]",
+          )}
+        >
+          <span className="absolute top-1.5 right-2.5 font-semibold text-[10px] text-muted-foreground uppercase tracking-[0.06em]">
+            {band.label}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -263,6 +307,7 @@ export function DiagramViewer<T extends DiagramNode>(props: DiagramViewerProps<T
             className="absolute top-0 left-0 origin-top-left"
             style={{ width: plan.width, height: plan.height, transform: `scale(${zoom.zoom})` }}
           >
+            {props.bands ? <Bands bands={props.bands} /> : null}
             <DiagramRelations
               relations={relations}
               centers={model.centers}
@@ -276,6 +321,7 @@ export function DiagramViewer<T extends DiagramNode>(props: DiagramViewerProps<T
                 node={node}
                 model={model}
                 selected={selectedId === node.id}
+                ghost={props.ghostIds?.has(node.id) ?? false}
                 renderNode={renderNode}
                 onSelect={onSelect && (() => onSelect(node.id))}
               />

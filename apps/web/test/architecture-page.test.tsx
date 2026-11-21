@@ -59,28 +59,28 @@ describe("Écran Architecture : Liste · équipe", () => {
     expect(
       await screen.findByText("Validation de l'équipe · le client lit et commente"),
     ).toBeInTheDocument();
-    expect(screen.getByText("3 composants")).toBeInTheDocument();
+    expect(await screen.findByText("3 composants · 2 flux")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Proposer avec l'agent/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "Nouveau composant" })).toBeVisible();
     expect(screen.queryByText(/Valider l'architecture/)).toBeNull();
   });
 
-  it("onglets Document et Composants seulement, Composants par défaut ; jamais Schéma, Décisions ni Flux", async () => {
+  it("onglets Schéma, Document, Composants et Flux ; Schéma par défaut ; jamais Décisions ni Relecture", async () => {
     serveArchitecture("owner");
-    renderArchitecture();
+    renderArchitecture({ wide: true });
     await heading();
     await waitFor(() =>
       expect(
         within(tabsNav())
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Document", "Composants3"]),
+      ).toEqual(["Schéma", "Document", "Composants3", "Flux2"]),
     );
-    expect(within(tabsNav()).getByRole("link", { name: /Composants/ })).toHaveAttribute(
+    expect(within(tabsNav()).getByRole("link", { name: /Schéma/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    for (const absent of [/Schéma/, /Décisions/, /Flux/, /Relecture/]) {
+    for (const absent of [/Décisions/, /Relecture/]) {
       expect(within(tabsNav()).queryByRole("link", { name: absent })).toBeNull();
     }
   });
@@ -208,6 +208,24 @@ describe("Écran Architecture : Génération et Relecture", () => {
     expect(screen.queryByRole("link", { name: /Relecture/ })).toBeNull();
   });
 
+  it("TK-112 (B549) : « un parcours sans flux » (ARCH_FLOW_MISSING) s'affiche en relecture, jamais bloquant", async () => {
+    serveArchitecture("owner", {
+      warnings: [
+        {
+          code: "ARCH_FLOW_MISSING",
+          entityId: "P-reserver",
+          message: "Le parcours P-reserver n'a pas de flux.",
+        },
+      ],
+    });
+    serveProposals([proposedComponent(1, "Passerelle SMS")]);
+    renderArchitecture({ search: "view=review" });
+    expect(await screen.findByText("Le parcours P-reserver n'a pas de flux.")).toBeVisible();
+    expect(
+      screen.getByText("Avertissements d'architecture · 1 · Ils n'empêchent pas l'enregistrement."),
+    ).toBeVisible();
+  });
+
   it("Relecture : En cours, N propositions, onglet Relecture devant, bandeau, groupes par type, avertissements", async () => {
     serveArchitecture("owner", {
       warnings: [
@@ -234,7 +252,7 @@ describe("Écran Architecture : Génération et Relecture", () => {
         within(tabsNav())
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Relecture2", "Document", "Composants4"]),
+      ).toEqual(["Relecture2", "Schéma", "Document", "Composants4", "Flux2"]),
     );
     expect(within(tabsNav()).getAllByRole("link")[0]).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("group", { name: "Mode relecture" })).toHaveTextContent(

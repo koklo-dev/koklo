@@ -7,6 +7,7 @@ import {
   adrUpdateSchema,
   archflowCreateSchema,
   archflowDeleteSchema,
+  archflowDetailSchema,
   archflowUpdateSchema,
   componentCreateSchema,
   componentDeleteSchema,
@@ -74,6 +75,7 @@ export const specOperationKindSchema = z.enum([
   ...DATA_OPERATION_KINDS,
   ...ARCHITECTURE_OPERATION_KINDS,
   "layout.save",
+  "architecture.layout.save",
   "idea.page.write",
   "idea.page.delete",
   "idea.index.write",
@@ -347,7 +349,15 @@ const specEntityKindSchema = z.enum([
 const refShape = { specId: z.string().min(1).max(100), title: z.string().max(300) };
 export const specRefSchema = z.object({ kind: specRefKindSchema, ...refShape });
 
-export const SPEC_ITEM_TYPES = ["feature", "rule", "role", "flow", "table", "component"] as const;
+export const SPEC_ITEM_TYPES = [
+  "feature",
+  "rule",
+  "role",
+  "flow",
+  "table",
+  "component",
+  "archflow",
+] as const;
 const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   feature: featureIdSchema,
   rule: ruleIdSchema,
@@ -355,6 +365,7 @@ const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   flow: flowIdSchema,
   table: tableIdSchema,
   component: componentIdSchema,
+  archflow: flowIdSchema,
 };
 export const specItemGetInputSchema = z
   .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
@@ -384,6 +395,7 @@ export const specItemSchema = z.discriminatedUnion("type", [
   itemOf("flow", flowIdSchema, flowDetailSchema),
   itemOf("table", tableIdSchema, tableDetailSchema),
   itemOf("component", componentIdSchema, componentDetailSchema),
+  itemOf("archflow", flowIdSchema, archflowDetailSchema),
 ]);
 
 export const specRefsSearchInputSchema = z.object({

@@ -45,6 +45,32 @@ function dependenciesOf(data: Json): ComponentDetail["dependsOn"] {
   });
 }
 
+/** Composant vu par le schéma : lecture tolérante, la zone absente reste `undefined`. */
+export interface ComponentNode {
+  id: string;
+  name: string;
+  type: ComponentType;
+  zone: string | undefined;
+  responsibility: string;
+  dependsOn: { to: string; via: string; async: boolean }[];
+}
+
+export function componentNode(specId: string, data: unknown): ComponentNode {
+  const json = record(data);
+  return {
+    id: specId,
+    name: nameOf(specId, json),
+    type: typeOf(json.type),
+    zone: text(json.zone) || undefined,
+    responsibility: text(json.responsabilite).split("\n", 1)[0] ?? "",
+    dependsOn: dependenciesOf(json).map(({ to, via, async }) => ({
+      to,
+      via,
+      async: async === true,
+    })),
+  };
+}
+
 /** Ligne du tableau Composants : première ligne de la responsabilité, nombre de dépendances. */
 export function componentSummary(
   specId: string,

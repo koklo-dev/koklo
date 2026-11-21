@@ -8,6 +8,7 @@ import {
   readArchitectureUrl,
   withArchitectureUrl,
 } from "./architecture-tab.ts";
+import { NARROW_MAX, useMaxWidth } from "./use-max-width.ts";
 
 function write(patch: ArchitectureUrlPatch, mode: "push" | "replace"): void {
   const { pathname, search } = window.location;
@@ -23,12 +24,26 @@ function write(patch: ArchitectureUrlPatch, mode: "push" | "replace"): void {
  */
 export function useArchitectureUrl() {
   const search = useSearchParams().toString();
-  const state = useMemo(() => readArchitectureUrl(search), [search]);
+  // Sous 1024 px l'onglet par défaut est Composants (B548) ; un `tab=` explicite prime.
+  const wide = !useMaxWidth(NARROW_MAX);
+  const state = useMemo(() => readArchitectureUrl(search, wide), [search, wide]);
   return {
     ...state,
     search,
     setTab: useCallback((tab: ArchitectureTab) => write({ tab }, "replace"), []),
     setZone: useCallback((zone: string | null) => write({ zone, c: null }, "replace"), []),
+    /** Schéma : ouvre une zone (libellé) et, au choix, un nœud ; `null` revient à la vue des zones. */
+    openZone: useCallback(
+      (zone: string | null, sel?: string) => write({ zone, sel: sel ?? null, c: null }, "replace"),
+      [],
+    ),
+    /** Nœud choisi dans le schéma : sans entrée d'historique (il survit à un remontage du lecteur). */
+    select: useCallback((sel: string) => write({ sel }, "replace"), []),
+    selectFlow: useCallback((f: string | null) => write({ f }, "replace"), []),
+    openCreateFlow: useCallback(
+      () => write({ new: true, edit: null, f: null, tab: "flows" }, "push"),
+      [],
+    ),
     setQuery: useCallback((q: string | null) => write({ q, c: null }, "replace"), []),
     setSection: useCallback((s: string | null) => write({ s }, "replace"), []),
     /** Ouverture automatique au chargement : remplace l'entrée courante (pas de « Retour » vers un état sans relecture). */
@@ -54,7 +69,7 @@ export function useArchitectureUrl() {
       (c: string) => write({ tab: "components", c, review: null }, "push"),
       [],
     ),
-    dropSelection: useCallback(() => write({ c: null }, "replace"), []),
+    dropSelection: useCallback(() => write({ c: null, sel: null }, "replace"), []),
   };
 }
 

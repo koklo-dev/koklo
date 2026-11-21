@@ -98,6 +98,175 @@ export const COMPONENT_DETAIL = {
   commitSha: SHA40,
 };
 
+/** Zones du faux serveur (contrat 3.10.0) : « Prise de rendez-vous » (API, Application web) et « Communication » (SMS). */
+export const ZONE_ENTRIES = [
+  {
+    id: "Z-prise-de-rendez-vous",
+    name: "Prise de rendez-vous",
+    icon: "event",
+    componentCount: 2,
+    actorCount: 1,
+    preview: ["API", "Application web"],
+    links: [{ to: "Z-communication", count: 1 }],
+  },
+  {
+    id: "Z-communication",
+    name: "Communication",
+    icon: "notifications",
+    componentCount: 1,
+    actorCount: 0,
+    preview: ["Fournisseur SMS"],
+    links: [{ to: "Z-prise-de-rendez-vous", count: 1 }],
+  },
+];
+
+export const ZONE_DETAILS: Record<string, unknown> = {
+  "Z-prise-de-rendez-vous": {
+    zone: {
+      id: "Z-prise-de-rendez-vous",
+      name: "Prise de rendez-vous",
+      icon: "event",
+      componentCount: 2,
+    },
+    components: [
+      { specId: "C-api", name: "API", type: "service", responsibility: "Cœur du produit." },
+      {
+        specId: "C-web",
+        name: "Application web",
+        type: "app",
+        responsibility: "Réservation en ligne.",
+      },
+    ],
+    relations: [{ from: "C-web", to: "C-api", via: "HTTP" }],
+    actors: [{ id: "RL-client", name: "Client" }],
+    outgoing: [{ zone: "Z-communication", count: 1 }],
+    truncated: false,
+    commitSha: SHA40,
+  },
+  "Z-communication": {
+    zone: {
+      id: "Z-communication",
+      name: "Communication",
+      icon: "notifications",
+      componentCount: 1,
+    },
+    components: [
+      {
+        specId: "C-sms",
+        name: "Fournisseur SMS",
+        type: "ext",
+        responsibility: "Envoi des rappels.",
+      },
+    ],
+    relations: [],
+    actors: [],
+    outgoing: [{ zone: "Z-prise-de-rendez-vous", count: 1 }],
+    truncated: false,
+    commitSha: SHA40,
+  },
+};
+
+export const FLOW_ROWS = [
+  {
+    specId: "P-reserver",
+    title: "Réserver un rendez-vous",
+    actor: "Client",
+    componentCount: 3,
+    externalCount: 1,
+  },
+  {
+    specId: "P-annuler",
+    title: "Annuler ou déplacer",
+    actor: "Client",
+    componentCount: 2,
+    externalCount: 0,
+  },
+];
+
+export const FLOW_DETAIL = {
+  specId: "P-reserver",
+  title: "Réserver un rendez-vous",
+  actor: "Client",
+  participants: [
+    { id: "RL-client", name: "Client", type: "actor" },
+    { id: "C-web", name: "Application web", type: "app" },
+    { id: "C-api", name: "API", type: "service" },
+  ],
+  items: [
+    { kind: "message", from: "RL-client", to: "C-web", text: "Choisit un créneau" },
+    { kind: "message", from: "C-web", to: "C-api", text: "reservation.create", reply: "Confirmée" },
+    {
+      kind: "alt",
+      label: "sinon · créneau pris",
+      messages: [{ from: "C-api", to: "C-web", text: "Conflit", error: "409" }],
+    },
+    { kind: "separator", label: "La veille à 18 h" },
+  ],
+  features: ["F-001"],
+  rules: ["R-001"],
+  decisions: ["ADR-003"],
+  filePath: "architecture/flows/reserver.yaml",
+  commitSha: SHA40,
+};
+
+/** Lectures du schéma et des flux (3.10.0) : zones, zone, recherche, positions, flux, YAML et Mermaid. */
+export function serveSchema(
+  options: { flows?: readonly unknown[]; positions?: Record<string, unknown> } = {},
+): void {
+  const flows = options.flows ?? FLOW_ROWS;
+  procedures.specArchitectureZones.mockResolvedValue({
+    zones: ZONE_ENTRIES,
+    componentCount: 3,
+    commitSha: SHA40,
+  });
+  procedures.specArchitectureZone.mockImplementation(async (input: unknown) => {
+    const { zone } = input as { zone: string };
+    return ZONE_DETAILS[zone];
+  });
+  procedures.specArchitectureSearch.mockResolvedValue({ items: [] });
+  procedures.specArchitectureLayoutGet.mockResolvedValue({
+    positions: options.positions ?? {},
+    commitSha: SHA40,
+  });
+  procedures.specArchitectureLayoutSave.mockResolvedValue({ commitSha: SHA40 });
+  procedures.specArchitectureFlowsList.mockResolvedValue({
+    items: flows,
+    nextCursor: null,
+    previousCursor: null,
+    offset: 0,
+    total: flows.length,
+  });
+  procedures.specArchitectureFlowsById.mockImplementation(async (input: unknown) => ({
+    ...FLOW_DETAIL,
+    specId: (input as { flowId: string }).flowId,
+  }));
+  procedures.specArchitectureSource.mockImplementation(async (input: unknown) => {
+    const { target, format } = input as { target: { kind: string; id?: string }; format?: string };
+    if (target.kind === "schema") {
+      return {
+        path: "architecture/schema.mmd",
+        text: "flowchart TB\n",
+        commitSha: SHA40,
+        generated: true,
+      };
+    }
+    if (target.kind === "flow" && format === "mermaid") {
+      return {
+        path: `architecture/flows/${target.id}.mmd`,
+        text: "sequenceDiagram\n",
+        commitSha: SHA40,
+        generated: true,
+      };
+    }
+    return {
+      path: `architecture/${target.kind}s/${target.id}.yaml`,
+      text: `id: ${target.id}\n`,
+      commitSha: SHA40,
+      generated: false,
+    };
+  });
+}
+
 type Row = ReturnType<typeof componentRow>;
 
 interface Options {
@@ -165,6 +334,7 @@ export function serveArchitecture(
     }),
   );
   serveComponents(options);
+  serveSchema();
   procedures.specArchitectureDocument.mockResolvedValue({
     sections: options.sections ?? SECTIONS,
     commitSha: SHA40,
@@ -173,6 +343,15 @@ export function serveArchitecture(
   const previous = procedures.specItemGet.getMockImplementation();
   procedures.specItemGet.mockImplementation(async (input) => {
     const { type, id } = input as { type?: string; id: string };
+    if (type === "archflow") {
+      return {
+        type: "archflow",
+        id,
+        values: { ...FLOW_DETAIL, specId: id },
+        validated: false,
+        referencedBy: { items: [], total: 0 },
+      };
+    }
     if (type !== "component") return previous?.(input);
     return {
       type: "component",
@@ -198,7 +377,32 @@ export function serveArchitecture(
   serveProposals([]);
 }
 
-export function renderArchitecture({ search = "" }: { search?: string } = {}) {
+/** `(max-width: 1023px)` seulement : la fenêtre « étroite » où l'écran s'ouvre sur Composants (B548). */
+function setNarrow(narrow: boolean): void {
+  window.matchMedia = ((query: string) => ({
+    matches: narrow && query === "(max-width: 1023px)",
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+/**
+ * Écran Architecture à l'adresse donnée. Sans `tab=` ni `view=`, une fenêtre étroite : l'onglet par défaut est
+ * Composants (les tests de TK-111) ; le bureau ouvre Schéma depuis TK-112 (`renderArchitecture({ wide: true })`).
+ */
+export function renderArchitecture({
+  search = "",
+  wide = false,
+}: {
+  search?: string;
+  wide?: boolean;
+} = {}) {
+  setNarrow(!wide);
   const query = search && !search.startsWith("?") ? `?${search}` : search;
   setUrl(`/projects/${PROJECT_ID}/spec/architecture${query}`);
   return renderWithQuery(<ArchitecturePage projectId={PROJECT_ID} />);

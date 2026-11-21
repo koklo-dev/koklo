@@ -12,6 +12,19 @@ const NOUN = { one: "fonctionnalité", other: "fonctionnalités" };
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("CountBar", () => {
+  it("scope : précision après le total, avant « tous chargés »", () => {
+    render(
+      <CountBar
+        total={18}
+        loaded={18}
+        noun={{ one: "flux", other: "flux", masculine: true }}
+        scope="un par parcours"
+        showAllLoaded
+      />,
+    );
+    expect(screen.getByText(/· un par parcours · tous chargés/)).toBeTruthy();
+  });
+
   it("affiche le total du serveur en gras, les chargées et le compteur de filtre", () => {
     render(<CountBar total={1000} loaded={50} noun={NOUN} filterLabel="31 à valider" />);
     const bar = document.querySelector("[data-slot='count-bar']") as HTMLElement;

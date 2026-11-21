@@ -332,6 +332,7 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
       rule: 300,
       table: 80,
       component: SEED_VOLUMES.large.components,
+      archflow: SEED_VOLUMES.large.archflows,
     });
     const [snapshot] = await db.query<{ entities_indexed_at: Date | null }>(
       `SELECT s.entities_indexed_at FROM spec_snapshots s JOIN project_repos r ON r.id = s.repo_id

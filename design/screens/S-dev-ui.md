@@ -1,7 +1,7 @@
 ---
 id: S-dev-ui
 titre: Galerie des composants (/dev/ui, équipe, hors production)
-version: 1.6
+version: 1.7
 ---
 ## 1. Utilisateurs et objectif
 L'équipe Koklo (développeurs, designer, agents de développement et de revue) et les tests de captures. Ce n'est pas un écran du produit : aucun client ni rôle d'organisation n'y a affaire. Arrivée : adresse saisie `/dev/ui`, ou les tests `apps/web/e2e/dev-ui.spec.ts`.
@@ -121,6 +121,7 @@ Les boutons d'action des exemples (« Annuler », « Réessayer », « Commencer
 | 1.4 | 2026-11-07 | TK-140 | Sections « Listes · A » (mise à jour), « Listes · B » et « Navigation · C » : `Pagination`, `VirtualList`, `CountBar`, `ListFooter`, `GroupSection`, `ListPanel`, `ListRow`, `ProjectHeader`, `PageHeader`, `PhaseRail inline`, `ShellNavGroup`, `ShellNavItem count`, `SecondaryNav`. Détail : `.workflow/TK-140/00-fiche.md` |
 | 1.5 | 2026-11-11 | TK-99b | Section « 14. Propositions de l'agent » (id `dev-ui-proposals`) : `AgentProposeButton` (5 états), `AgentProposePopover`, `ProposalReview` (plate et en volume), en clair, en sombre et à 375 px. Détail : `.workflow/TK-99b/00-fiche.md` |
 | 1.6 | 2026-11-12 | TK-101 | Section « 17. Panneau d'édition » (id `dev-ui-spec-item-sheet`) : `SpecItemSheet` dans ses 4 modes (Création, Préremplie, Modification, Erreurs), `Field agentFilled`, `TagInput`, en clair, en sombre et à 375 px. |
+| 1.7 | 2026-11-21 | TK-112 | Section « 23. Schéma d'architecture » : `ArchNodeCard` (six types, sélectionné, à relire, autre zone, compact), `DiagramViewer` en couches (`bands`) avec zone voisine estompée (`ghostIds`), `SequenceDiagram` (appels, retours, échec, bloc `alt`, séparateur, « Lire les messages »). DESIGN.md §5.23. |
 
 ## 11. Captures (générées par `apps/web/e2e/dev-ui.spec.ts`)
 Dossier `design/screens/captures/S-dev-ui/` : `full-light.png`, `full-dark.png` (pleine page, 1280 px), `full-light-mobile.png`, `full-dark-mobile.png` (375 px), `hovercard-light.png`, `hovercard-dark.png`, `details-open-light.png`, `details-open-dark.png`. TK-94 : `lists-light.png`, `lists-dark.png`, `lists-light-mobile.png`, `lists-dark-mobile.png` (section « Listes longues »).

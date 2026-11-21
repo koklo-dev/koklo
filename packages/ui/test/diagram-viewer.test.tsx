@@ -373,6 +373,7 @@ describe("DiagramViewer", () => {
 });
 
 /** B478 : mini-carte du lecteur (DESIGN.md §5.3, schéma 1.3) et traits pondérés entre zones. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("DiagramViewer, mini-carte et traits pondérés", () => {
   it("mini-carte : un rectangle par nœud, le choisi en --primary", () => {
     viewer({ minimap: true, selectedId: "T-client" });
@@ -424,5 +425,48 @@ describe("DiagramViewer, mini-carte et traits pondérés", () => {
       "T-reservation": { x: 320, y: 20 },
       "T-rappel": { x: 580, y: 20 },
     });
+  });
+
+  it("TK-112 : bands dessine les couches (libellé en capitales, trait pointillé, bande impaire teintée) et agrandit le plan", () => {
+    viewer({
+      bands: [
+        { id: "a", label: "Utilisateurs", top: 0, height: 140 },
+        { id: "b", label: "Applications", top: 140, height: 900 },
+      ],
+    });
+    const bands = [...document.querySelectorAll("[data-slot='diagram-band']")];
+    expect(bands).toHaveLength(2);
+    expect(bands[0]?.className).not.toContain("border-dashed");
+    expect(bands[1]?.className).toContain("border-dashed");
+    expect(bands[1]?.className).toContain("bg-primary/[0.04]");
+    expect(bands[1]?.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(screen.getByText("Applications")).toBeInTheDocument();
+    const plan = document.querySelector("[data-slot='diagram-node']")?.parentElement as HTMLElement;
+    expect(Number.parseInt(plan.style.height, 10)).toBeGreaterThanOrEqual(1040);
+  });
+
+  it("TK-112 : ghostIds estompe le nœud, sans état sélectionné, et le clic remonte", async () => {
+    const onSelect = vi.fn();
+    viewer({
+      ghostIds: new Set(["T-rappel"]),
+      selectedId: "T-rappel",
+      onSelect,
+      renderNode: (node, ctx) => (
+        <button
+          type="button"
+          data-ghost={ctx.ghost}
+          aria-pressed={ctx.selected}
+          onClick={ctx.onSelect}
+        >
+          {node.name}
+        </button>
+      ),
+    });
+    const ghost = screen.getByRole("button", { name: "Rappel" });
+    expect(ghost).toHaveAttribute("data-ghost", "true");
+    expect(ghost).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Client" })).toHaveAttribute("data-ghost", "false");
+    await userEvent.click(ghost);
+    expect(onSelect).toHaveBeenCalledWith("T-rappel");
   });
 });

@@ -2,23 +2,27 @@ import type { IconName } from "@koklo/ui";
 import { applyReview, nonEmpty, setOrDelete } from "./spec-url.ts";
 
 /**
- * Onglets de l'écran Architecture (`/projects/<id>/spec/architecture`, maquette 13 l.58-88) : Relecture devant les
- * onglets de lecture tant qu'une relecture est ouverte (`view=review`). Schéma, Décisions et Flux arrivent avec
- * TK-112 et TK-113 : aucun bouton mort d'ici là (B509).
+ * Onglets de l'écran Architecture (`/projects/<id>/spec/architecture`, maquette 13 l.892) : Relecture devant les
+ * onglets de lecture tant qu'une relecture est ouverte (`view=review`). Décisions arrive avec TK-113 : aucun bouton
+ * mort d'ici là (B509).
  */
-export const ARCHITECTURE_TABS = ["review", "document", "components"] as const;
+export const ARCHITECTURE_TABS = ["review", "schema", "document", "components", "flows"] as const;
 export type ArchitectureTab = (typeof ARCHITECTURE_TABS)[number];
 
 export const ARCHITECTURE_TAB_LABELS: Record<ArchitectureTab, string> = {
   review: "Relecture",
+  schema: "Schéma",
   document: "Document",
   components: "Composants",
+  flows: "Flux",
 };
 
 export const ARCHITECTURE_TAB_ICONS: Record<ArchitectureTab, IconName> = {
   review: "rate_review",
+  schema: "hub",
   document: "description",
   components: "widgets",
+  flows: "swap_horiz",
 };
 
 /** Onglets affichés : « Relecture » en tête quand une relecture est ouverte, sinon absent. */
@@ -27,7 +31,9 @@ export const visibleArchitectureTabs = (reviewing: boolean): readonly Architectu
 
 const COMPONENT_ID = /^C-[a-z0-9][a-z0-9-]*$/;
 const SECTION_SLUG = /^[a-z0-9][a-z0-9-]*$/;
-const DEFAULT_TAB: ArchitectureTab = "components";
+const FLOW_ID = /^P-[a-z0-9][a-z0-9-]*$/;
+/** Nœud choisi dans le schéma : un composant ou un rôle acteur. */
+const NODE_ID = /^(C|RL)-[a-z0-9][a-z0-9-]*$/;
 
 export interface ArchitectureUrl {
   tab: ArchitectureTab;
@@ -36,31 +42,42 @@ export interface ArchitectureUrl {
   c: string | undefined;
   /** Section du document ouverte (`?s=slug`). */
   s: string | undefined;
+  /** Nœud choisi dans le schéma (`?sel=C-slug` ou `RL-slug`). */
+  sel: string | undefined;
+  /** Flux ouvert dans l'onglet Flux (`?f=P-slug`). */
+  f: string | undefined;
   q: string | undefined;
   zone: string | undefined;
   new: boolean;
   edit: string | undefined;
 }
 
+const COMPONENT_OR_FLOW = new RegExp(`${COMPONENT_ID.source}|${FLOW_ID.source}`);
+
 const matching = (value: string | null, pattern: RegExp): string | undefined =>
   value && pattern.test(value) ? value : undefined;
 
-/** Lit l'adresse : onglet inconnu = Composants ; Relecture seulement si `view=review` ; identifiants invalides ignorés. */
-export function readArchitectureUrl(search: string): ArchitectureUrl {
+/**
+ * Lit l'adresse : sans onglet, Schéma à partir de 1024 px (`wide`) et Composants en dessous (B548) ; un onglet demandé
+ * prime ; un onglet inconnu retombe sur le défaut ; Relecture seulement si `view=review` ; identifiants invalides ignorés.
+ */
+export function readArchitectureUrl(search: string, wide = true): ArchitectureUrl {
   const params = new URLSearchParams(search);
   const review = params.get("view") === "review";
   const asked = ARCHITECTURE_TABS.find((tab) => tab === params.get("tab"));
-  const fallback: ArchitectureTab = review ? "review" : DEFAULT_TAB;
+  const fallback: ArchitectureTab = review ? "review" : wide ? "schema" : "components";
   const tab = asked === "review" ? fallback : (asked ?? fallback);
   return {
     tab,
     review,
     c: matching(params.get("c"), COMPONENT_ID),
     s: matching(params.get("s"), SECTION_SLUG),
+    sel: matching(params.get("sel"), NODE_ID),
+    f: matching(params.get("f"), FLOW_ID),
     q: nonEmpty(params.get("q")),
     zone: nonEmpty(params.get("zone")),
     new: params.get("new") === "1",
-    edit: matching(params.get("edit"), COMPONENT_ID),
+    edit: matching(params.get("edit"), COMPONENT_OR_FLOW),
   };
 }
 
@@ -69,6 +86,8 @@ export interface ArchitectureUrlPatch {
   review?: boolean | null;
   c?: string | null;
   s?: string | null;
+  sel?: string | null;
+  f?: string | null;
   q?: string | null;
   zone?: string | null;
   new?: boolean | null;
@@ -81,6 +100,8 @@ export function withArchitectureUrl(search: string, patch: ArchitectureUrlPatch)
   setOrDelete(params, "tab", patch.tab);
   setOrDelete(params, "c", patch.c);
   setOrDelete(params, "s", patch.s);
+  setOrDelete(params, "sel", patch.sel);
+  setOrDelete(params, "f", patch.f);
   setOrDelete(params, "q", patch.q);
   setOrDelete(params, "zone", patch.zone);
   setOrDelete(params, "edit", patch.edit);
