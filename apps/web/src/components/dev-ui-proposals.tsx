@@ -100,6 +100,20 @@ function Generating() {
   );
 }
 
+/** Génération avec la ligne de détail du bilan en cours (TK-114b, DESIGN.md §5.25). */
+function GeneratingWithDetail() {
+  return (
+    <DevUiFrame title="Génération avec détail">
+      <ProposalGenerationBanner
+        onLeave={() => undefined}
+        detail="Zones traitées 4/9 · écartées 2 · couverture 38/174"
+      >
+        L'agent rédige l'architecture zone par zone. Vous pouvez quitter la page.
+      </ProposalGenerationBanner>
+    </DevUiFrame>
+  );
+}
+
 /** Section « 16. Propositions de l'agent » de la galerie (TK-99b, DESIGN.md §5.13). */
 export function DevUiProposals() {
   return (
@@ -107,6 +121,7 @@ export function DevUiProposals() {
       <ButtonStates />
       <Modal />
       <Generating />
+      <GeneratingWithDetail />
       <DevUiFrame title="Relecture à plat (12 propositions)" wide>
         <DemoReview count={12} />
       </DevUiFrame>

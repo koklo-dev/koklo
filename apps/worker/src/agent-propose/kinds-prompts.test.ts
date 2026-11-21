@@ -130,7 +130,16 @@ describe("prompts de l'Architecture (TK-111)", () => {
     features: [{ specId: "F-001", title: "Réserver une salle", criteria: [] }],
     tables: [{ specId: "T-salle", title: "Salle", zone: "Réservations", fields: ["id", "nom"] }],
     architecture: {
-      components: [{ specId: "C-api", title: "API", zone: "Noyau", type: "service" }],
+      components: [
+        {
+          specId: "C-api",
+          title: "API",
+          zone: "Noyau",
+          type: "service",
+          owns: ["T-secret-possede"],
+          serves: ["F-001"],
+        },
+      ],
       archflows: [{ specId: "P-annuler", title: "P-annuler" }],
       decisions: [{ specId: "ADR-001", title: "Base relationnelle" }],
       nfr: ["NFR-001"],
@@ -180,6 +189,8 @@ describe("prompts de l'Architecture (TK-111)", () => {
       expect(text, expected).toContain(expected);
     }
     expect(text.toLowerCase()).not.toContain("anthropic");
+    // TK-114b : les liens d'un composant indexé servent à la couverture, jamais envoyés au modèle.
+    expect(text).not.toContain("T-secret-possede");
   });
 
   it("les zones : consigne d'architecture, sources en données", () => {

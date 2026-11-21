@@ -119,6 +119,44 @@ export const proposalGroupSchema = z.object({
   pending: z.number().int().min(0),
 });
 
+/** Motifs fermés d'une zone écartée et d'arrêt d'un lancement (TK-114b, B618) : miroirs de `@koklo/domain`. */
+export const launchDiscardReasonSchema = z.enum([
+  "truncated",
+  "output_invalid",
+  "prompt_rejected",
+  "refused",
+]);
+export const launchStopReasonSchema = z.enum(["completed", "cap", "deadline", "cancelled"]);
+
+const counter = (max: number) => z.number().int().min(0).max(max);
+const coverageCountSchema = z.strictObject({
+  covered: z.number().int().min(0),
+  total: z.number().int().min(0),
+});
+const launchCoverageSchema = z.strictObject({
+  features: coverageCountSchema,
+  flows: coverageCountSchema,
+  tables: coverageCountSchema,
+});
+
+/**
+ * Bilan d'un lancement de l'Architecture (TK-114b, contrat 3.12.0, B619-B620) : zones demandées, traitées et écartées,
+ * motifs comptés, couverture avant et après, appels de couverture, motif d'arrêt. Que des nombres et des motifs fermés :
+ * jamais de texte du fournisseur. Absent pour les autres livrables.
+ */
+export const launchReportSchema = z.strictObject({
+  zonesRequested: counter(12),
+  zonesDone: counter(12),
+  zonesDiscarded: counter(12),
+  discardReasons: z
+    .array(z.strictObject({ reason: launchDiscardReasonSchema, count: z.number().int().min(1) }))
+    .max(4),
+  coverageBefore: launchCoverageSchema.optional(),
+  coverageAfter: launchCoverageSchema.optional(),
+  coverageCalls: counter(30),
+  stopReason: launchStopReasonSchema.optional(),
+});
+
 export const proposalLaunchSchema = z.object({
   id: z.uuid(),
   status: launchStatusSchema,
@@ -126,6 +164,7 @@ export const proposalLaunchSchema = z.object({
   discardedCount: z.number().int().min(0),
   errorCode: z.string().optional(),
   finishedAt: instantSchema.optional(),
+  report: launchReportSchema.optional(),
 });
 
 export const proposalListOutputSchema = listOf(proposalSchema).extend({

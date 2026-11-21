@@ -18,10 +18,18 @@ const ARCH_FRAMES = [
  * Génération de l'architecture (maquette 13 l.104-109) : bandeau d'état « Annuler l'attente » et sept cadres dans un
  * cadre de 440 de haut ; les cadres ne pulsent qu'avec `motion-safe`.
  */
-export function ArchitectureGenerating({ onLeave }: { onLeave: () => void }) {
+export function ArchitectureGenerating({
+  onLeave,
+  detail,
+}: {
+  onLeave: () => void;
+  /** « Zones traitées 4/9 · écartées 2 · couverture 38/174 » (S-spec-architecture §13). */
+  detail?: string | undefined;
+}) {
   return (
     <DataGenerating
       onLeave={onLeave}
+      detail={detail}
       text={ARCHITECTURE_GENERATING}
       heightClass="h-[440px]"
       frames={ARCH_FRAMES}

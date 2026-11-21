@@ -18,7 +18,8 @@ import type { ArchitectureMode } from "./support/stub-spec-architecture.ts";
  * TK-111 lot C, écran Architecture (design/screens/S-spec-architecture.md, maquette 13) : chaque état (Prêt, Génération,
  * Relecture, Liste · équipe) sur les onglets Document et Composants, en clair, sombre et à 375 px, avec axe et sans
  * défilement horizontal de page, plus la relecture groupée par type (66 propositions), le volume de 120 composants, la
- * feuille Composant et les droits. Pile locale : faux API (support/stub-spec-architecture.ts). Captures dans
+ * feuille Composant et les droits ; TK-114b : bilan du lancement (Génération avec détail, Relecture terminée ou arrêtée
+ * au délai). Pile locale : faux API (support/stub-spec-architecture.ts). Captures dans
  * design/screens/captures/S-spec-architecture/<état>-<onglet>-<thème>[-mobile].png.
  */
 const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/architecture`;
@@ -112,6 +113,46 @@ VIEWS.push(
     visible: async (page) => {
       await expect(reviewBanner(page)).toBeVisible();
       await expect(page.getByText("Groupées par type")).toBeVisible();
+    },
+  },
+  {
+    // TK-114b (S-spec-architecture §13) : bilan en cours dans la région d'état du bandeau de génération.
+    name: "generating-report",
+    architecture: "demo",
+    proposals: "architectureGeneratingReport",
+    path: `${PATH}?view=review`,
+    visible: async (page) => {
+      await generating(page);
+      await expect(
+        page
+          .getByRole("status")
+          .filter({ hasText: "Zones traitées 4/9 · écartées 2 · couverture 38/174" }),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: "review-report-done",
+    architecture: "demo",
+    proposals: "architectureReport",
+    path: `${PATH}?view=review`,
+    visible: async (page) => {
+      const note = page.getByRole("note");
+      await expect(note).toContainText(
+        "Bilan du lancement · zones traitées 9/9 · écartées 2 · couverture 174/174 · terminé",
+      );
+      await expect(note).toContainText("Zones écartées : réponse coupée (1), réponse invalide (1)");
+      await expect(page.getByText("Avertissements d'architecture", { exact: false })).toBeVisible();
+    },
+  },
+  {
+    name: "review-report-deadline",
+    architecture: "demo",
+    proposals: "architectureDeadline",
+    path: `${PATH}?view=review`,
+    visible: async (page) => {
+      await expect(page.getByRole("note")).toContainText(
+        "zones traitées 9/9 · écartées 0 · couverture 151/174 · arrêté au délai",
+      );
     },
   },
   {

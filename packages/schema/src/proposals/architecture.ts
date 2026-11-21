@@ -23,14 +23,22 @@ const adrLink = z
     ),
   );
 
+/** Liens d'un composant (B615) : 200 au plus, comme les opérations `component.create|update`. */
+const LINKS_MAX = 200;
+
+/**
+ * `specId` (TK-114b, B615) : posé par le code seul, quand la proposition complète les liens d'un composant déjà dans l'index ;
+ * le schéma envoyé au modèle l'omet et le tri du worker écarte toute sortie qui en porte un.
+ */
 export const componentProposalSchema = z
   .object({
+    specId: link(PATTERNS.component).optional(),
     name: oneLine(120),
     type: z.enum(COMPONENT_TYPES),
     zone: oneLine(120),
     responsibility: oneLine(500),
-    owns: z.array(link(PATTERNS.table)).max(50).optional(),
-    serves: z.array(link(PATTERNS.feature)).max(50).optional(),
+    owns: z.array(link(PATTERNS.table)).max(LINKS_MAX).optional(),
+    serves: z.array(link(PATTERNS.feature)).max(LINKS_MAX).optional(),
     dependsOn: z
       .array(
         z

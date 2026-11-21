@@ -182,6 +182,27 @@ describe("Écran Architecture : Prêt", () => {
   });
 });
 
+const cover = (covered: number, total: number) => ({ covered, total });
+const REPORT_RUNNING = {
+  zonesRequested: 9,
+  zonesDone: 2,
+  zonesDiscarded: 2,
+  discardReasons: [{ reason: "truncated", count: 2 }],
+  coverageBefore: { features: cover(0, 174), flows: cover(0, 22), tables: cover(0, 48) },
+  coverageAfter: { features: cover(38, 174), flows: cover(2, 22), tables: cover(10, 48) },
+  coverageCalls: 0,
+};
+const REPORT_DONE = {
+  zonesRequested: 9,
+  zonesDone: 8,
+  zonesDiscarded: 1,
+  discardReasons: [{ reason: "truncated", count: 1 }],
+  coverageBefore: { features: cover(0, 174), flows: cover(0, 22), tables: cover(0, 48) },
+  coverageAfter: { features: cover(174, 174), flows: cover(22, 22), tables: cover(48, 48) },
+  coverageCalls: 12,
+  stopReason: "completed",
+};
+
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Écran Architecture : Génération et Relecture", () => {
   it("Génération : bandeau d'état, sept cadres de 440, « Depuis le fonctionnel et les données »", async () => {
@@ -206,6 +227,84 @@ describe("Écran Architecture : Génération et Relecture", () => {
     expect(screen.getByRole("button", { name: "Annuler l'attente" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ajouter" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Relecture/ })).toBeNull();
+  });
+
+  it("TK-114b : Génération, ligne de détail du bilan dans la région d'état du bandeau", async () => {
+    serveArchitecture("owner");
+    procedures.proposalList.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      previousCursor: null,
+      offset: 0,
+      total: 0,
+      groups: [],
+      launch: {
+        id: LAUNCH_ID,
+        status: "running",
+        proposedCount: 0,
+        discardedCount: 0,
+        report: REPORT_RUNNING,
+      },
+    });
+    renderArchitecture({ search: "view=review" });
+    expect(
+      await screen.findByText("Zones traitées 4/9 · écartées 2 · couverture 38/174"),
+    ).toBeVisible();
+    const band = document.querySelector("[data-slot='proposal-generation-banner']");
+    expect(band).toHaveAttribute("role", "status");
+    expect(band).toHaveTextContent(/L'agent rédige l'architecture.*Zones traitées 4\/9/);
+  });
+
+  it("TK-114b : Relecture terminée, bilan neutre role=note au-dessus des avertissements", async () => {
+    serveArchitecture("owner", {
+      warnings: [
+        {
+          code: "ARCH_TABLE_UNOWNED",
+          entityId: "T-avis",
+          message: "La table T-avis n'a aucun propriétaire.",
+        },
+      ],
+    });
+    serveProposals([proposedComponent(1, "Passerelle SMS")], { report: REPORT_DONE });
+    renderArchitecture({ search: "view=review" });
+    const note = await screen.findByRole("note");
+    expect(note).toHaveTextContent(
+      "Bilan du lancement · zones traitées 9/9 · écartées 1 · couverture 174/174 · terminé",
+    );
+    expect(note).toHaveTextContent(
+      "Fonctionnalités servies 174/174 · parcours détaillés 22/22 · tables rattachées 48/48 · avant : 0/174, 0/22, 0/48",
+    );
+    expect(note).toHaveTextContent("Zones écartées : réponse coupée (1)");
+    const warning = screen.getByText("La table T-avis n'a aucun propriétaire.");
+    expect(note.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("TK-114b : Relecture pendant que l'agent continue : détail dans le bandeau, pas encore de bilan", async () => {
+    serveArchitecture("owner");
+    serveProposals([proposedComponent(1, "Passerelle SMS")], {
+      launchStatus: "running",
+      report: REPORT_RUNNING,
+    });
+    renderArchitecture({ search: "view=review" });
+    expect(
+      await screen.findByText("Zones traitées 4/9 · écartées 2 · couverture 38/174"),
+    ).toBeVisible();
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("TK-114b : Relecture arrêtée au délai, bilan en avertissement ; sans bilan, rien", async () => {
+    serveArchitecture("owner");
+    serveProposals([proposedComponent(1, "Passerelle SMS")], {
+      launchStatus: "failed",
+      report: { ...REPORT_DONE, stopReason: "deadline" },
+    });
+    const { unmount } = renderArchitecture({ search: "view=review" });
+    expect(await screen.findByRole("note")).toHaveTextContent(/· arrêté au délai/);
+    unmount();
+    serveProposals([proposedComponent(1, "Passerelle SMS")]);
+    renderArchitecture({ search: "view=review" });
+    expect(await screen.findByText("1 proposition à relire")).toBeInTheDocument();
+    expect(screen.queryByRole("note")).toBeNull();
   });
 
   it("TK-112 (B549) : « un parcours sans flux » (ARCH_FLOW_MISSING) s'affiche en relecture, jamais bloquant", async () => {

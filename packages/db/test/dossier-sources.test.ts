@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   currentArchitecture,
   currentFeatures,
+  currentTableIds,
   type DossierClient,
   frozenPages,
   frozenVersion,
@@ -211,7 +212,14 @@ describe("currentArchitecture", () => {
         {
           kind: "component",
           specId: "C-api",
-          data: { titre: "API", zone: "Noyau", type: "service", responsabilite: "secret interne" },
+          data: {
+            titre: "API",
+            zone: "Noyau",
+            type: "service",
+            responsabilite: "secret interne",
+            possede: ["T-user", 3],
+            sert: ["F-001"],
+          },
         },
         { kind: "archflow", specId: "P-reserver", data: { titre: "P-reserver" } },
         {
@@ -226,7 +234,16 @@ describe("currentArchitecture", () => {
     });
     const result = await currentArchitecture(typed, PROJECT);
     expect(result).toEqual({
-      components: [{ specId: "C-api", title: "API", zone: "Noyau", type: "service" }],
+      components: [
+        {
+          specId: "C-api",
+          title: "API",
+          zone: "Noyau",
+          type: "service",
+          owns: ["T-user"],
+          serves: ["F-001"],
+        },
+      ],
       archflows: [{ specId: "P-reserver", title: "P-reserver" }],
       decisions: [{ specId: "ADR-001", title: "Base relationnelle" }],
       nfr: ["NFR-001", "NFR-002"],
@@ -242,5 +259,25 @@ describe("currentArchitecture", () => {
       decisions: [],
       nfr: [],
     });
+  });
+});
+
+/** TK-114b (B616) : tous les identifiants de tables de la tête, sans le plafond de 200 des sources envoyées au modèle. */
+describe("currentTableIds", () => {
+  it("toutes les tables, au-delà de 200 ; sans tête : aucune", async () => {
+    const entities = Array.from({ length: 250 }, (_, i) => ({
+      kind: "table",
+      specId: `T-t${i}`,
+      data: { titre: `Table ${i}` },
+    }));
+    const { typed } = fakeClient({
+      repo: { id: "r-1", defaultBranch: "main" },
+      heads: { cadrage: { snapshot: { id: "s-1", status: "ready" } } },
+      entities: [...entities, { kind: "component", specId: "C-x", data: {} }],
+    });
+    const result = await currentTableIds(typed, PROJECT);
+    expect(result).toHaveLength(250);
+    expect(result[249]).toBe("T-t249");
+    expect(await currentTableIds(fakeClient({}).typed, PROJECT)).toEqual([]);
   });
 });

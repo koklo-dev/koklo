@@ -18,6 +18,14 @@ export const QUEUE_DEFAULTS: QueueSettings = {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Chaînes d'une liste (charge JSON), le reste ignoré ; `[]` si ce n'est pas une liste. */
+export const stringsOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+/** Objets d'une liste (charge JSON), le reste ignoré ; `[]` si ce n'est pas une liste. */
+export const recordsOf = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value) ? value.filter(isRecord) : [];
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Identifiant (UUID) porté par la clé `key` de la charge d'un job, `undefined` si absent ou mal formé. */

@@ -65,7 +65,7 @@ export const many = (count: number, zones = 1, over: (n: number) => Partial<Fake
     fake(i + 1, { zone: `Zone ${(i % zones) + 1}`, ...over(i + 1) }),
   );
 
-export const store: { items: Fake[]; launchStatus: string; options: unknown } = {
+export const store: { items: Fake[]; launchStatus: string; options: unknown; report?: unknown } = {
   items: [],
   launchStatus: "done",
   options: null,
@@ -122,6 +122,7 @@ function listAnswer(input: Record<string, unknown>) {
         status: store.launchStatus,
         proposedCount: store.items.length,
         discardedCount: 0,
+        ...(store.report === undefined ? {} : { report: store.report }),
       }
     : null;
   return {
@@ -136,9 +137,13 @@ function listAnswer(input: Record<string, unknown>) {
 }
 
 /** Installe le faux serveur : propositions de départ, options du modal, décisions qui modifient le magasin. */
-export function serveProposals(items: Fake[], over: { launchStatus?: string } = {}): void {
+export function serveProposals(
+  items: Fake[],
+  over: { launchStatus?: string; report?: unknown } = {},
+): void {
   store.items = items;
   store.launchStatus = over.launchStatus ?? "done";
+  store.report = over.report;
   procedures.proposalList.mockImplementation(async (input: unknown) =>
     listAnswer(input as Record<string, unknown>),
   );

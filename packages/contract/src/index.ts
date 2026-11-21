@@ -93,6 +93,7 @@ export type {
   InvitationCreateInput,
   InvitationListOutput,
   InvitationOutput,
+  LaunchReport,
   LeaseAcquireInput,
   LeaseOutput,
   MemberInviteInput,

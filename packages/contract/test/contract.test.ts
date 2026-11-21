@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113)", () => {
-  it("est en 3.11.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("3.11.0");
-    expect(CONTRACT_VERSION).toBe("3.11.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b)", () => {
+  it("est en 3.12.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("3.12.0");
+    expect(CONTRACT_VERSION).toBe("3.12.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -249,6 +249,7 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "3.9.0",
       "3.10.0",
       "3.11.0",
+      "3.12.0",
     ]);
   });
 });
@@ -459,12 +460,16 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["3.0.0"]).not.toBe(versions["2.11.0"]);
   });
 
-  it("l'empreinte 3.11.0 est celle du document généré ; 3.1.0 à 3.10.0 restent figées (TK-103 à TK-113)", async () => {
+  it("l'empreinte 3.12.0 est celle du document généré ; 3.1.0 à 3.11.0 restent figées (TK-103 à TK-114b)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["3.11.0"]).toBe(hash);
+    expect(versions["3.12.0"]).toBe(hash);
+    expect(versions["3.12.0"]).not.toBe(versions["3.11.0"]);
+    expect(versions["3.11.0"]).toBe(
+      "7632a56ed5804eb504b74d0bdbcff77b807f51744dd6d2f8f4831a32ec87a354",
+    );
     expect(versions["3.11.0"]).not.toBe(versions["3.10.0"]);
     expect(versions["3.10.0"]).toBe(
       "4c094fe99194546d9b896537b1080463cce960c67f4a60d82b5cc496df5e47f8",

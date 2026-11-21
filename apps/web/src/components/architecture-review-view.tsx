@@ -1,7 +1,9 @@
 "use client";
 
+import type { ProposalListOutput } from "@koklo/contract";
 import { InlineAlert, ProposalReviewBanner } from "@koklo/ui";
 import { CHECKS_NOTE, CHECKS_TITLE } from "../lib/architecture-labels.ts";
+import { launchReportOf } from "../lib/launch-report.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import { useProposalReview } from "../lib/use-proposal-review.ts";
 import type { useProposals } from "../lib/use-proposals.ts";
@@ -38,6 +40,28 @@ export function ArchitectureWarnings({ warnings }: { warnings: readonly Warning[
   );
 }
 
+/**
+ * Bilan du lancement en relecture (DESIGN §5.25, B619) : `role="note"`, aucune annonce ; neutre si terminé, avertissement
+ * sinon. Absent tant que l'agent travaille ou si le lancement n'a pas de bilan.
+ */
+export function LaunchReport({ launch }: { launch: ProposalListOutput["launch"] | undefined }) {
+  const report = launchReportOf(launch);
+  if (!report) return null;
+  const [summary, ...details] = report.lines;
+  return (
+    <div className="mx-4 mt-4 md:mx-7">
+      <InlineAlert variant={report.variant} icon={report.icon} role="note">
+        <p className="font-semibold">{summary}</p>
+        {details.map((line) => (
+          <p key={line} className="mt-1">
+            {line}
+          </p>
+        ))}
+      </InlineAlert>
+    </div>
+  );
+}
+
 /** Relecture : en bandes pleine largeur sous les onglets (maquette 13 l.111-170), sans le cadre de page. */
 export function ArchitectureReviewView({
   projectId,
@@ -58,7 +82,12 @@ export function ArchitectureReviewView({
         projectId={projectId}
         branch={branch}
         tab="architecture"
-        notice={<ArchitectureWarnings warnings={warnings} />}
+        notice={
+          <>
+            <LaunchReport launch={propose.status.launch} />
+            <ArchitectureWarnings warnings={warnings} />
+          </>
+        }
         onLeave={onLeave}
       />
       {propose.enabled ? (

@@ -48,13 +48,32 @@ export type AgentProposalKind = (typeof AGENT_PROPOSAL_KINDS)[number];
 export const AGENT_PROPOSAL_STATUSES = ["pending", "accepted", "rejected"] as const;
 export type AgentProposalStatus = (typeof AGENT_PROPOSAL_STATUSES)[number];
 
-/** Plafonds d'un lancement : zones, propositions par zone et par lancement, consigne libre. */
+/**
+ * Plafonds d'un lancement : zones, propositions par zone et par lancement, consigne libre. TK-114b : segments enchaînés d'un
+ * même lancement (B617), liens `owns`/`serves` d'un composant (B615), paquets et appels de la passe de couverture (B616).
+ */
 export const AGENT_PROPOSE_LIMITS = {
   zones: 12,
   perZone: 25,
   perLaunch: 500,
   instruction: 500,
+  segments: 8,
+  links: 200,
+  coverage: { features: 15, flows: 5, calls: 30 },
 } as const;
+
+/** Motif fermé d'une zone écartée (B618) : jamais le texte du fournisseur. */
+export const LAUNCH_DISCARD_REASONS = [
+  "truncated",
+  "output_invalid",
+  "prompt_rejected",
+  "refused",
+] as const;
+export type LaunchDiscardReason = (typeof LAUNCH_DISCARD_REASONS)[number];
+
+/** Motif d'arrêt d'un lancement (B618) : `completed` et `cap` finissent `done`, `deadline` finit `failed` (`timeout`). */
+export const LAUNCH_STOP_REASONS = ["completed", "cap", "deadline", "cancelled"] as const;
+export type LaunchStopReason = (typeof LAUNCH_STOP_REASONS)[number];
 
 /** Ce que l'agent lit pour chaque livrable (« L'agent lit ») : jamais rien d'autre n'est envoyé au modèle. */
 export const AGENT_READS = {

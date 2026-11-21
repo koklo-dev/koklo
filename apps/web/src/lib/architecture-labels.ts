@@ -18,6 +18,8 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export const componentTypeLabel = (type: string): string => COMPONENT_TYPE_LABELS[type] ?? type;
+/** Sous-ligne d'une proposition qui met à jour les liens d'un composant indexé (TK-114b, B615). */
+export const COMPONENT_UPDATE = "Mise à jour";
 
 /** Maquette 13 l.104-109 : bandeau de la génération. */
 export const ARCHITECTURE_GENERATING =

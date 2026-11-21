@@ -61,3 +61,14 @@ describe("galerie /dev/ui : section Propositions de l'agent", () => {
     expect(flat.getByRole("status")).toHaveTextContent("F-006 acceptée");
   });
 });
+
+describe("galerie /dev/ui : bandeau de génération avec détail (TK-114b)", () => {
+  it("génération avec ligne de détail (bilan en cours de l'Architecture)", () => {
+    render(<DevUiProposals />);
+    const frame = within(region()).getByRole("heading", { name: "Génération avec détail" })
+      .parentElement as HTMLElement;
+    expect(within(frame).getByRole("status")).toHaveTextContent(
+      "Zones traitées 4/9 · écartées 2 · couverture 38/174",
+    );
+  });
+});

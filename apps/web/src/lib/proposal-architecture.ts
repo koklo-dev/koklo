@@ -1,5 +1,5 @@
 import type { SpecBatchSubmitInput } from "@koklo/contract";
-import { componentTypeLabel } from "./architecture-labels.ts";
+import { COMPONENT_UPDATE, componentTypeLabel } from "./architecture-labels.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
 type Operation = SpecBatchSubmitInput["operations"][number];
@@ -37,8 +37,24 @@ const slugOf = (text: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** Identifiant du composant indexé que la proposition met à jour (B615, posé par le worker seul), sinon `undefined`. */
+const specIdOf = ({ content }: ProposalOutput): string | undefined => {
+  const specId = str(content.specId);
+  return /^C-[a-z0-9][a-z0-9-]*$/.test(specId) ? specId : undefined;
+};
+
 function componentOperation(proposal: ProposalOutput): Operation {
   const { content } = proposal;
+  const specId = specIdOf(proposal);
+  // Mise à jour d'un composant indexé : les liens seuls, complets (index ∪ ajouts), jamais le nom ni la responsabilité.
+  if (specId) {
+    return {
+      kind: "component.update",
+      specId,
+      owns: strings(content.owns),
+      serves: strings(content.serves),
+    };
+  }
   const dependsOn = records(content.dependsOn).map((link) => ({
     to: str(link.to),
     via: str(link.via),
@@ -123,7 +139,9 @@ const RANK_WIDTH = 3;
 /** Identifiant lisible : `C-<slug du nom>`, `P-` du parcours, `ADR-<rang>` (le serveur numérote), `DOC-<slug du titre>`. */
 export function architectureRefOf(proposal: ProposalOutput): string {
   const { content } = proposal;
-  if (proposal.kind === "component") return `C-${slugOf(str(content.name)) || "composant"}`;
+  if (proposal.kind === "component") {
+    return specIdOf(proposal) ?? `C-${slugOf(str(content.name)) || "composant"}`;
+  }
   if (proposal.kind === "archflow") return str(content.flow) || "P-flux";
   if (proposal.kind === "adr") {
     return `ADR-${String(proposal.position + 1).padStart(RANK_WIDTH, "0")}`;
@@ -145,7 +163,8 @@ export function architectureSubtitleOf(proposal: ProposalOutput): string {
   const { content } = proposal;
   if (proposal.kind === "component") {
     const zone = proposal.zone || str(content.zone);
-    return `${componentTypeLabel(str(content.type))} · zone ${zone}`;
+    const kind = specIdOf(proposal) ? COMPONENT_UPDATE : componentTypeLabel(str(content.type));
+    return `${kind} · zone ${zone}`;
   }
   if (proposal.kind === "archflow") {
     return `Flux · ${plural(messageCount(content.messages), "message", "messages")}`;

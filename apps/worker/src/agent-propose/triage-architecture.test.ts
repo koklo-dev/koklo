@@ -19,6 +19,7 @@ const context = (over: Partial<TriageContext> = {}): TriageContext => ({
     components: new Set(["C-api"]),
     decisions: new Set(["ADR-001"]),
     archflows: new Set(["P-annuler"]),
+    ownedTables: new Set<string>(),
   },
   ...over,
 });
@@ -181,5 +182,34 @@ describe("triage des flux, décisions et sections", () => {
       { kinds: ["component", "adr"], titles: {}, missingCriteria: new Map() },
     );
     expect(without).toMatchObject({ accepted: [], discarded: 2 });
+  });
+
+  it("TK-114b (B615) : un specId fourni par le modèle écarte l'entrée", () => {
+    const { accepted, discarded } = run([component("Base", { specId: "C-api" })]);
+    expect(accepted).toEqual([]);
+    expect(discarded).toBe(1);
+  });
+
+  it("TK-114b (B614) : une table déjà possédée reste à son premier déclarant, retirée des suivants", () => {
+    const base = context().arch;
+    if (base === undefined) throw new Error("contexte d'architecture attendu");
+    const arch = {
+      ...base,
+      tables: new Set(["T-client", "T-salle"]),
+      ownedTables: new Set(["T-client"]),
+    };
+    const owned = context({ arch });
+    const { accepted } = run(
+      [
+        component("Base", { owns: ["T-client", "T-salle"] }),
+        component("Cache", { owns: ["T-salle"] }),
+      ],
+      owned,
+    );
+    expect(accepted.map((a) => [a.title, a.payload.owns])).toEqual([
+      ["Base", ["T-salle"]],
+      ["Cache", []],
+    ]);
+    expect([...arch.ownedTables]).toEqual(["T-client", "T-salle"]);
   });
 });

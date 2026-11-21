@@ -102,6 +102,7 @@ import type {
   aiProposeOptionsInputSchema,
   aiProposeOptionsOutputSchema,
   aiReviseProposalInputSchema,
+  launchReportSchema,
   proposalDecideInputSchema,
   proposalDecideManyInputSchema,
   proposalDecideManyOutputSchema,
@@ -422,6 +423,7 @@ export type AiReviseProposalInput = z.input<typeof aiReviseProposalInputSchema>;
 export type AgentProposal = z.output<typeof proposalSchema>;
 export type ProposalListInput = z.output<typeof proposalListInputSchema>;
 export type ProposalListOutput = z.output<typeof proposalListOutputSchema>;
+export type LaunchReport = z.output<typeof launchReportSchema>;
 export type ProposalDecideInput = z.input<typeof proposalDecideInputSchema>;
 export type ProposalDecideManyInput = z.input<typeof proposalDecideManyInputSchema>;
 export type ProposalDecideManyOutput = z.output<typeof proposalDecideManyOutputSchema>;

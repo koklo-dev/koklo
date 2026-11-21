@@ -21,6 +21,23 @@ describe("ProposalGenerationBanner", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Annuler l'attente" }));
     expect(onLeave).toHaveBeenCalledOnce();
   });
+
+  it("TK-114b : prop detail, seconde ligne muette dans la même région role=status ; absente sans detail", () => {
+    const { rerender } = render(
+      <ProposalGenerationBanner detail="Zones traitées 4/9 · écartées 2 · couverture 38/174">
+        L'agent rédige l'architecture.
+      </ProposalGenerationBanner>,
+    );
+    const band = screen.getByRole("status");
+    const detail = band.querySelector("[data-slot='proposal-generation-detail']");
+    expect(detail).toHaveTextContent("Zones traitées 4/9 · écartées 2 · couverture 38/174");
+    expect(detail?.className).toContain("text-muted-foreground");
+    expect(detail?.className).toContain("text-meta");
+    expect(detail?.className).not.toMatch(/truncate|line-clamp/);
+    expect(band).toHaveTextContent("L'agent rédige l'architecture.");
+    rerender(<ProposalGenerationBanner>L'agent rédige l'architecture.</ProposalGenerationBanner>);
+    expect(document.querySelector("[data-slot='proposal-generation-detail']")).toBeNull();
+  });
 });
 
 describe("RadioCard choisie", () => {

@@ -1,7 +1,7 @@
 import { PROPOSAL_NOTIFY_AFTER_MS } from "@koklo/domain";
 import type { Logger } from "@koklo/observability";
 import { errorNameOf } from "../job-support.ts";
-import type { AgentProposeStore, LaunchContext } from "./store.ts";
+import type { LaunchContext, ProposeStore } from "./store.ts";
 
 /**
  * L'utilisateur est parti : la liste n'a pas été lue depuis plus de 30 secondes. Sans lecture du tout, on mesure
@@ -20,7 +20,7 @@ export function isAway(
  * notification impossible (membre retiré, doublon) n'est qu'une ligne de journal par nom d'erreur.
  */
 export async function notifyIfAway(
-  store: AgentProposeStore,
+  store: Pick<ProposeStore, "times" | "notifyReady">,
   launch: LaunchContext,
   now: Date,
   logger: Logger,

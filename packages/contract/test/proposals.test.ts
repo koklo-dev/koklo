@@ -282,3 +282,63 @@ describe("TK-99a specBatch.submit : 200 opérations et proposalIds", () => {
     expect(await isValid(i, submit({ proposalIds: ["x"] }))).toBe(false);
   });
 });
+
+describe("TK-114b (contrat 3.12.0, B620) : launch.report, bilan du lancement de l'Architecture", () => {
+  const COUNT = { covered: 38, total: 174 };
+  const REPORT = {
+    zonesRequested: 9,
+    zonesDone: 4,
+    zonesDiscarded: 2,
+    discardReasons: [
+      { reason: "truncated", count: 1 },
+      { reason: "output_invalid", count: 1 },
+    ],
+    coverageBefore: {
+      features: { covered: 0, total: 174 },
+      flows: { covered: 0, total: 22 },
+      tables: { covered: 0, total: 48 },
+    },
+    coverageAfter: {
+      features: COUNT,
+      flows: { covered: 3, total: 22 },
+      tables: { covered: 48, total: 48 },
+    },
+    coverageCalls: 2,
+    stopReason: "deadline",
+  };
+  const page = (launch: unknown) => ({
+    items: [],
+    nextCursor: null,
+    previousCursor: null,
+    offset: 0,
+    total: 0,
+    groups: [],
+    launch,
+  });
+  const valid = (report: unknown) => isValid(output("proposal.list"), page({ ...LAUNCH, report }));
+
+  it("report facultatif : absent (Fonctionnel, Données) ou complet ; couverture et motif d'arrêt facultatifs", async () => {
+    expect(await isValid(output("proposal.list"), page(LAUNCH))).toBe(true);
+    expect(await valid(REPORT)).toBe(true);
+    const kept = await parsed(output("proposal.list"), page({ ...LAUNCH, report: REPORT }));
+    expect(kept?.launch).toMatchObject({ report: REPORT });
+    const { coverageBefore, coverageAfter, stopReason, ...bare } = REPORT;
+    expect(await valid({ ...bare, discardReasons: [] })).toBe(true);
+    for (const stop of ["completed", "cap", "deadline", "cancelled"]) {
+      expect(await valid({ ...REPORT, stopReason: stop }), stop).toBe(true);
+    }
+  });
+
+  it("vocabulaires fermés et bornes : motif inconnu, compte nul, compteur négatif ou champ en trop refusés", async () => {
+    expect(await valid({ ...REPORT, stopReason: "timeout" })).toBe(false);
+    expect(await valid({ ...REPORT, discardReasons: [{ reason: "provider", count: 1 }] })).toBe(
+      false,
+    );
+    expect(await valid({ ...REPORT, discardReasons: [{ reason: "truncated", count: 0 }] })).toBe(
+      false,
+    );
+    expect(await valid({ ...REPORT, zonesDone: -1 })).toBe(false);
+    expect(await valid({ ...REPORT, coverageAfter: { features: COUNT } })).toBe(false);
+    expect(await valid({ ...REPORT, text: "sortie du fournisseur" })).toBe(false);
+  });
+});

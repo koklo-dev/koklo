@@ -210,3 +210,57 @@ describe("proposal.decide sur les types de l'architecture (cas 5)", () => {
     expect(accepted.body).toMatchObject({ kind: "doc_section", title: "Contexte" });
   });
 });
+
+describe("TK-114b (contrat 3.12.0, B620) : proposal.list rend le bilan du lancement de l'Architecture", () => {
+  const COVERAGE = {
+    features: { covered: 174, total: 174 },
+    flows: { covered: 22, total: 22 },
+    tables: { covered: 48, total: 48 },
+  };
+  const ZERO = {
+    features: { covered: 0, total: 174 },
+    flows: { covered: 0, total: 22 },
+    tables: { covered: 0, total: 48 },
+  };
+
+  it("Architecture : report lu des colonnes du lancement ; Fonctionnel : aucun report", async () => {
+    const { b, world } = await archScene();
+    const scope = { organizationId: world.organizationId, projectId: world.projectId };
+    const arch = await insertProposal(b.database, scope, {
+      deliverable: "architecture",
+      kind: "component",
+      zone: "Noyau",
+      title: "API",
+      payload: COMPONENT,
+    });
+    await b.database.query(
+      `UPDATE agent_launches SET zones = $2::jsonb, zones_done = 8, zones_discarded = 1,
+         discard_reasons = '{"truncated": 1}'::jsonb, coverage_calls = 12, segment = 5,
+         coverage_before = $3::jsonb, coverage_after = $4::jsonb, stop_reason = 'completed'
+       WHERE id = $1`,
+      [
+        arch.launchId,
+        JSON.stringify(Array.from({ length: 9 }, (_, i) => `Zone ${i}`)),
+        JSON.stringify(ZERO),
+        JSON.stringify(COVERAGE),
+      ],
+    );
+    const api = proposalApi(b.app, world.actors.dev);
+    const res = await api.list(world.projectId, { deliverable: "architecture" });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.launch.report).toEqual({
+      zonesRequested: 9,
+      zonesDone: 8,
+      zonesDiscarded: 1,
+      discardReasons: [{ reason: "truncated", count: 1 }],
+      coverageBefore: ZERO,
+      coverageAfter: COVERAGE,
+      coverageCalls: 12,
+      stopReason: "completed",
+    });
+    await insertProposal(b.database, scope, { deliverable: "functional" });
+    const functional = await api.list(world.projectId, { deliverable: "functional" });
+    expect(functional.status).toBe(200);
+    expect(functional.body.launch).not.toHaveProperty("report");
+  });
+});

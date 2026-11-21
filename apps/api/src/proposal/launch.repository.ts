@@ -15,6 +15,20 @@ export interface LaunchRecord {
   requestedBy: string;
   lastSeenAt: Date | null;
   finishedAt: Date | null;
+  /** Colonnes du bilan (TK-114b, B617-B618), telles qu'en base : `launchView` les valide avant de les rendre. */
+  progress: LaunchProgress;
+}
+
+/** Progression stockée d'un lancement : JSON lus tels quels, jamais de texte du fournisseur. */
+export interface LaunchProgress {
+  zones: unknown;
+  zonesDone: number;
+  zonesDiscarded: number;
+  discardReasons: unknown;
+  coverageCalls: number;
+  coverageBefore: unknown;
+  coverageAfter: unknown;
+  stopReason: string | null;
 }
 
 /** Ce que l'API fixe à la création d'un lancement ; le reste (statut, compteurs) a ses valeurs de départ. */
