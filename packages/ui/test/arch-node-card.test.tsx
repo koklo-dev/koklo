@@ -15,7 +15,7 @@ describe("ArchNodeCard", () => {
     ["app", 220, 70, "rounded-[10px]"],
     ["service", 200, 70, "rounded-[10px]"],
     ["store", 170, 64, "rounded-[14px]"],
-    ["queue", 170, 64, "rounded-[14px]"],
+    ["queue", 170, 64, "rounded-[10px]"],
     ["ext", 170, 64, "rounded-[10px]"],
   ] as const)("%s : %i x %i, forme %s", (kind, width, height, shape) => {
     render(<ArchNodeCard kind={kind} name="X" />);
