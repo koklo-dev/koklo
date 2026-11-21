@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adrIdSchema, archFlowIdSchema, componentIdSchema } from "./schemas-spec-architecture.ts";
 import { tableIdSchema } from "./schemas-spec-data.ts";
 import {
   instantSchema,
@@ -13,6 +14,9 @@ export const commentTargetKindSchema = z.enum([
   "screen",
   "change_request",
   "table",
+  "component",
+  "adr",
+  "archflow",
 ]);
 export const commentAuthorKindSchema = z.enum(["human", "agent", "client", "system"]);
 export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"]);
@@ -20,13 +24,23 @@ export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"
 /** 8 000 caractères : borne de réinjection d'un commentaire dans la session suivante (CDC §7.6). */
 export const COMMENT_BODY_MAX = 8000;
 
+/** Cibles désignées par `targetRef` : leur identifiant lisible, vérifié contre le genre (le projet est `targetId`). */
+const REF_KINDS = ["table", "component", "adr", "archflow"] as const;
+const REF_SCHEMA = {
+  table: tableIdSchema,
+  component: componentIdSchema,
+  adr: adrIdSchema,
+  archflow: archFlowIdSchema,
+} as const;
+const targetRefSchema = z.union([tableIdSchema, componentIdSchema, adrIdSchema, archFlowIdSchema]);
+
 export const commentSchema = z.object({
   id: z.uuid(),
   targetKind: commentTargetKindSchema,
   /** Pour une table de données : le projet (la table est repérée par `targetRef`). */
   targetId: z.uuid(),
-  /** `T-<slug>` d'un commentaire de table (3.7.0) ; absent pour un ticket. */
-  targetRef: tableIdSchema.optional(),
+  /** `T-<slug>` (table, 3.7.0), `C-<slug>` (composant), `ADR-<nnn>` (décision) ou `P-<slug>` (flux) en 3.11.0 ; absent pour un ticket. */
+  targetRef: targetRefSchema.optional(),
   authorKind: commentAuthorKindSchema,
   /** Null pour un commentaire système (aucun auteur). */
   authorId: z.string().min(1).nullable(),
@@ -34,22 +48,24 @@ export const commentSchema = z.object({
   createdAt: instantSchema,
 });
 
-/** Une cible `table` se désigne par `targetRef` (`T-<slug>`), les autres par `targetId` seul (3.7.0). */
+/** Une cible `table`, `component`, `adr` ou `archflow` se désigne par `targetRef`, les autres par `targetId` seul (3.7.0, 3.11.0). */
 const targetShape = {
   targetKind: commentTargetKindSchema,
   targetId: z.uuid().optional(),
-  targetRef: tableIdSchema.optional(),
+  targetRef: targetRefSchema.optional(),
 };
 const hasCoherentTarget = (input: {
   targetKind: string;
   targetId?: string | undefined;
   targetRef?: string | undefined;
-}) =>
-  input.targetKind === "table"
-    ? input.targetRef !== undefined
-    : input.targetId !== undefined && input.targetRef === undefined;
+}) => {
+  const schema = REF_SCHEMA[input.targetKind as (typeof REF_KINDS)[number]];
+  if (schema === undefined) return input.targetId !== undefined && input.targetRef === undefined;
+  return input.targetRef !== undefined && schema.safeParse(input.targetRef).success;
+};
 const TARGET_MESSAGE = {
-  message: "table exige targetRef ; les autres cibles exigent targetId seul",
+  message:
+    "table, component, adr et archflow exigent targetRef de leur forme ; les autres cibles exigent targetId seul",
   path: ["targetRef"],
 };
 

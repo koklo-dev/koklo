@@ -14,6 +14,7 @@ import {
   type CommentStore,
   type CommentTarget,
   type CommentTicket,
+  type RefKind,
 } from "./comment.repository.ts";
 
 /** Valeur de `authorId` d'un commentaire sans auteur (ligne système : `author_id` NULL). */
@@ -38,25 +39,34 @@ const outputOf = (comment: CommentRecord): CommentOutput => ({
   createdAt: comment.createdAt.toISOString(),
 });
 
-const TABLE_REF = /^T-[a-z0-9][a-z0-9-]*$/;
+/** Forme de l'identifiant de chaque genre de cible repérée par `targetRef`, et le message de l'erreur de validation. */
+const REF_SHAPES: Record<RefKind, { pattern: RegExp; label: string }> = {
+  table: { pattern: /^T-[a-z0-9][a-z0-9-]*$/, label: "de table (T-slug)" },
+  component: { pattern: /^C-[a-z0-9][a-z0-9-]*$/, label: "de composant (C-slug)" },
+  adr: { pattern: /^ADR-\d{3,}$/, label: "de décision (ADR-nnn)" },
+  archflow: { pattern: /^P-[a-z0-9][a-z0-9-]*$/, label: "de flux (P-slug)" },
+};
+const isRefKind = (kind: string): kind is RefKind => kind in REF_SHAPES;
 
 /**
- * Cible d'un commentaire : un ticket du projet courant, ou une table de la tête de spec (`NOT_FOUND` sinon, sans fuite). Le
- * contrat type la cible en chaîne libre : l'API la valide.
+ * Cible d'un commentaire : un ticket du projet, ou une table, un composant, une décision ou un flux de la tête de spec
+ * (`NOT_FOUND` sinon, sans fuite). Le contrat type la cible en chaîne libre : l'API la valide.
  */
 async function requireTarget(store: CommentStore, input: CommentListInput): Promise<CommentTarget> {
-  if (input.targetKind === "table") {
+  const kind = input.targetKind;
+  if (isRefKind(kind)) {
     const ref = input.targetRef;
-    if (ref === undefined || !TABLE_REF.test(ref)) {
-      throw validation("targetRef", "targetRef doit être un identifiant de table (T-slug)");
+    const shape = REF_SHAPES[kind];
+    if (ref === undefined || !shape.pattern.test(ref)) {
+      throw validation("targetRef", `targetRef doit être un identifiant ${shape.label}`);
     }
-    orNotFound((await store.tableExists(ref)) || null);
-    return { kind: "table", ref };
+    orNotFound((await store.refExists(kind, ref)) || null);
+    return { kind, ref };
   }
-  if (input.targetKind !== "ticket") {
+  if (kind !== "ticket") {
     throw validation(
       "targetKind",
-      "Seuls les commentaires de ticket et de table sont pris en charge",
+      "Seuls les commentaires de ticket, de table, de composant, de décision et de flux sont pris en charge",
     );
   }
   if (input.targetId === undefined || !isUuid(input.targetId)) {
@@ -66,8 +76,8 @@ async function requireTarget(store: CommentStore, input: CommentListInput): Prom
   return { kind: "ticket", ticketId: ticket.id };
 }
 
-/** Les commentaires de table sont les remarques du client à l'équipe : seule l'équipe qui les traite les liste. */
-const TABLE_READ_ROLES = ["owner", "admin", "dev", "designer"];
+/** Les commentaires sur la spec sont les remarques du client à l'équipe : seule l'équipe qui les traite les liste. */
+const REF_READ_ROLES = ["owner", "admin", "dev", "designer"];
 
 /** Le client commente en tant que `client`, les autres rôles en tant qu'humains (jamais de l'entrée). */
 const ticketOf = (target: CommentTarget) => (target.kind === "ticket" ? target.ticketId : null);
@@ -97,7 +107,7 @@ export class CommentService {
   }
 
   list(scope: ProjectScope, role: string | undefined, input: CommentListInput) {
-    if (input.targetKind === "table" && !TABLE_READ_ROLES.some((allowed) => allowed === role)) {
+    if (isRefKind(input.targetKind) && !REF_READ_ROLES.some((allowed) => allowed === role)) {
       throw new ORPCError("FORBIDDEN", { message: "Accès refusé" });
     }
     return this.repository.run(scope, async (store) => {
@@ -111,15 +121,15 @@ export class CommentService {
     });
   }
 
-  /** Un commentaire de table se supprime même si la table a quitté le modèle ; il doit être de ce projet. */
+  /** Un commentaire sur un élément de la spec se supprime même si l'élément a quitté la spec ; il doit être de ce projet. */
   private async deletionTarget(
     store: CommentStore,
     scope: ProjectScope,
     comment: CommentRecord,
   ): Promise<CommentTarget> {
-    if (comment.targetKind === "table") {
+    if (comment.targetKind !== "ticket") {
       orNotFound(comment.targetId === scope.projectId || null);
-      return { kind: "table", ref: comment.targetRef ?? "" };
+      return { kind: comment.targetKind, ref: comment.targetRef ?? "" };
     }
     return requireTarget(store, { targetKind: "ticket", targetId: comment.targetId });
   }

@@ -193,7 +193,8 @@
 | Vérifications (propriétaire unique, fonctionnalité servie, cycles) (§1) | absent | briques : `rules/index.ts`, `packages/domain/src/dependency-graph.ts` | S | — |
 | Schéma en couches, zones, fiche (§4.1) | absent (TK-112) | réutilise le lecteur du lot 6 | L | — |
 | Document, Composants (§4.2-4.3) | livrés par TK-111 lot C : `architecture-page.tsx`, `architecture-document-tab.tsx`, `architecture-components-tab.tsx` ; sans conversation ni éditeur en place du texte (B532, B533) | `apps/web/src/components/architecture-*.tsx` | L | — |
-| Décisions, Flux (séquence) (§4.4-4.5) | absent (TK-113) | — | L | — |
+| Décisions (§4.4) | TK-113 : liste, fiche, formulaire, vue client ; « Voir les changements » ouvre l'écran amont sans différences champ par champ (B579) ; Document absent de la vue client, zones client calculées sur 100 composants au plus (B581, B590) | `architecture-decisions-*.tsx` | L | — |
+| Flux (séquence) (§4.5) | livré par TK-112 | — | — | — |
 | Validation par l'équipe, « À revoir » (§3, §5) | **contraire** / absent | comme lot 6 | M | — |
 
 ## Lot 8 · Technique (passation 12)
@@ -414,3 +415,11 @@ Tests à réécrire avec ces retraits :
 | Passation 09 §6 : différences champ par champ (ajout vert, retrait barré, avant → après) dans la relecture des mises à jour | Non construites : « Proposer les mises à jour » ouvre la modale de l'agent préremplie ; l'équipe modifie une table par le formulaire | L'agent ne propose jamais le nom d'une table existante (B397) ; ticket de suivi à demander si l'utilisateur veut l'édition par l'agent (B450) |
 | Passation 09 §7 : le business commente | Le business lit la vue client sans bouton « Commenter » | `COMMENT_WRITE_ROLES` exclut le business (CDC §14) ; lecture la plus prudente (B448) |
 | Maquette 11 l.595 : « Proposer avec l'agent » en contour (`btnS`) dans l'en-tête de la liste | `AgentProposeButton` primaire à côté de « Valider le modèle » / « Ajouter une table » (deux primaires) | DESIGN v2.15 : le bouton de l'agent reste primaire, la maquette 21 l'emporte (B473) |
+| Maquette 13 l.802 : ligne d'une décision remplacée à 70 % (opacité de la ligne) | Seul le titre est à 70 % ; identifiant, date, statut à pleine opacité | Axe `color-contrast` (WCAG 1.4.3) échoue sur la ligne entière (B601) |
+| Maquette 13 l.864 : « Proposer les mises à jour » seul bouton primaire de l'en-tête À revoir, sans « Valider » | « Valider l'architecture » reste dans l'en-tête À revoir | Sans lui aucune action ne pose la nouvelle référence de l'impact amont (B592 bis) |
+| Maquette 13 l.122-130 : « Voir les changements » ouvre un diff | Ouvre l'écran amont sur le premier élément modifié | Aucun diff champ par champ n'existe (B579, B450) |
+| Maquette 13 l.176-239 (client) : vue des zones et zones voisines | Une seule vue par couches, 100 composants au plus | Aucune procédure de zones côté client (B590, B602) |
+| Maquette 13 l.864 : pastille « À revoir » ambre, `sync_problem` | `DeliverableStatus` `revise` (rouge, `edit_note`) | Même statut que les Données (B449) et la barre latérale (B606, B607) |
+| Maquette 13 l.385, l.379, l.389 : pied de liste sans « Revenir en haut », puces sans icône +, boutons de 30 px | « Revenir en haut » dès 21 lignes, icône + des puces `FilterChipMenu`, `Button` sm de 32 px | Socle TK-94 partagé ; pas de variante propre à cet écran (B607) |
+| Maquette 13 l.391 : titre de fiche 22 px, h3 15 px | 20 px et 14 px | Pas de 22 ni de 15 dans l'échelle v2 (B333, B607) |
+| Maquette 13 l.379 (client) : puces Statut, Composant, Date | Statut seul | L'entrée `clientSpace.adrs` n'a ni `from`/`to` ni `component`, la sortie pas de facettes (B607) |

@@ -8,15 +8,18 @@ export interface CommentTicket {
   id: string;
 }
 
-/** Cible d'un commentaire : un ticket du projet, ou une table de données (3.7.0, repérée par `T-<slug>`). */
-export type CommentTarget = { kind: "ticket"; ticketId: string } | { kind: "table"; ref: string };
+/** Genres de cible repérés par un identifiant lisible (`targetRef`) : table (3.7.0), composant, décision et flux (3.11.0). */
+export type RefKind = "table" | "component" | "adr" | "archflow";
+
+/** Cible d'un commentaire : un ticket du projet, ou un élément de la spec repéré par `T-<slug>`, `C-<slug>`, `ADR-<nnn>` ou `P-<slug>`. */
+export type CommentTarget = { kind: "ticket"; ticketId: string } | { kind: RefKind; ref: string };
 
 export interface CommentRecord {
   id: string;
-  targetKind: "ticket" | "table";
+  targetKind: "ticket" | RefKind;
   /** Le ticket, ou le projet pour une table. */
   targetId: string;
-  /** `T-<slug>` d'une table ; `null` pour un ticket. */
+  /** Identifiant lisible d'un élément de la spec ; `null` pour un ticket. */
   targetRef: string | null;
   authorKind: "human" | "agent" | "client" | "system";
   /** NULL en base pour un commentaire système. */
@@ -40,8 +43,8 @@ export interface CommentPage {
 /** Opérations d'une transaction de commentaires ; l'audit partage cette transaction. */
 export interface CommentStore {
   findTicket(id: string): Promise<CommentTicket | null>;
-  /** La table existe dans l'index de la tête de spec du projet. */
-  tableExists(ref: string): Promise<boolean>;
+  /** L'élément existe dans l'index de la tête de spec du projet. */
+  refExists(kind: RefKind, ref: string): Promise<boolean>;
   insert(comment: NewComment): Promise<CommentRecord>;
   /** Commentaire non supprimé, quel que soit son ticket (l'appartenance se vérifie ensuite). */
   find(id: string): Promise<CommentRecord | null>;

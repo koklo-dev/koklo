@@ -2,13 +2,17 @@
 
 import { Button, Icon, InlineAlert, Skeleton } from "@koklo/ui";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
 import type { ArchitectureHeaderAction } from "../lib/architecture-header-state.ts";
 import { withArchitectureUrl } from "../lib/architecture-tab.ts";
-import { projectPath, specPath } from "../lib/shell-routes.ts";
+import { upstreamTargetOf } from "../lib/architecture-upstream.ts";
+import { specPath } from "../lib/shell-routes.ts";
 import { type ArchitecturePageModel, useArchitecturePage } from "../lib/use-architecture-page.ts";
+import { ArchitectureClientView } from "./architecture-client-view.tsx";
 import { ArchitectureComponentSheet } from "./architecture-component-sheet.tsx";
 import { ArchitectureComponentsTab } from "./architecture-components-tab.tsx";
+import { ArchitectureDecisionSheet } from "./architecture-decision-sheet.tsx";
+import { ArchitectureDecisionsTab } from "./architecture-decisions-tab.tsx";
 import { ArchitectureDocumentTab } from "./architecture-document-tab.tsx";
 import { ArchitectureEmptyPlain, ArchitectureReady } from "./architecture-empty.tsx";
 import { ArchitectureFlowSheet } from "./architecture-flow-sheet.tsx";
@@ -17,6 +21,7 @@ import { ArchitectureGenerating } from "./architecture-generating.tsx";
 import { ArchitectureHeader } from "./architecture-header.tsx";
 import { ArchitectureReviewBar, ArchitectureReviewView } from "./architecture-review-view.tsx";
 import { ArchitectureSchemaTab } from "./architecture-schema-tab.tsx";
+import { ArchitectureUpstreamAlert } from "./architecture-upstream-alert.tsx";
 import { SpecBody } from "./features-body.tsx";
 import { ProposeEntry } from "./features-header-action.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
@@ -24,6 +29,18 @@ import { StatusBlock } from "./features-status-block.tsx";
 import { PageBody } from "./page-body.tsx";
 
 const BUTTON = "h-11 w-full md:h-9 md:w-auto";
+
+/** « Proposer les mises à jour » : demande préremplie sur les éléments amont modifiés (B580), partagée avec le bandeau. */
+function proposeUpdatesOf(page: ArchitecturePageModel): (() => void) | undefined {
+  const { propose, upstream } = page;
+  return propose.enabled && page.form.canWrite
+    ? () =>
+        propose.launch.prefill(
+          "complete",
+          `Mettre l'architecture à jour d'après ${upstream.ids.join(", ")}`,
+        )
+    : undefined;
+}
 
 /** Bouton d'une action de l'en-tête (maquette 13 l.859-866) ; l'agent reste le seul bouton primaire. */
 function ActionButton({
@@ -36,6 +53,13 @@ function ActionButton({
   switch (action) {
     case "propose":
       return <ProposeEntry propose={page.propose} onReview={page.url.openReview} />;
+    case "propose-updates":
+      return (
+        <Button type="button" className={BUTTON} onClick={() => proposeUpdatesOf(page)?.()}>
+          <Icon name="wand_stars" size={20} />
+          Proposer les mises à jour
+        </Button>
+      );
     case "repropose":
       return (
         <Button type="button" className={BUTTON} onClick={() => page.propose.launch.setOpen(true)}>
@@ -54,6 +78,48 @@ function ActionButton({
         >
           <Icon name="add" size={20} />
           Ajouter
+        </Button>
+      );
+    default:
+      return <WriteButton action={action} page={page} />;
+  }
+}
+
+/** Boutons d'écriture de l'en-tête : valider, puis créer un composant, une décision ou un flux. */
+function WriteButton({
+  action,
+  page,
+}: {
+  action: "validate" | "create-decision" | "create-flow" | "create";
+  page: ArchitecturePageModel;
+}) {
+  switch (action) {
+    case "validate":
+      return (
+        <Button
+          type="button"
+          className={BUTTON}
+          disabled={page.validate.pending}
+          onClick={() => void page.validate.validate()}
+        >
+          <Icon name="verified" size={20} />
+          Valider l'architecture
+        </Button>
+      );
+    case "create-decision":
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          data-new-feature
+          className={BUTTON}
+          onClick={() => {
+            page.write.dismiss();
+            page.url.openCreateDecision();
+          }}
+        >
+          <Icon name="add" size={20} />
+          Nouvelle décision
         </Button>
       );
     case "create-flow":
@@ -97,6 +163,8 @@ function TabContent({ page }: { page: ArchitecturePageModel }) {
       return <ArchitectureDocumentTab page={page} />;
     case "flows":
       return <ArchitectureFlowsTab page={page} />;
+    case "decisions":
+      return <ArchitectureDecisionsTab page={page} />;
     default:
       return <ArchitectureComponentsTab page={page} />;
   }
@@ -118,6 +186,32 @@ function Empty({ page }: { page: ArchitecturePageModel }) {
     );
   }
   return <ArchitectureEmptyPlain canWrite={page.form.canWrite} onCreate={page.form.openCreate} />;
+}
+
+/** Échec de « Valider l'architecture » et impact amont d'un livrable « À revoir » (B578 à B580). */
+function ValidationNotices({ page }: { page: ArchitecturePageModel }) {
+  const router = useRouter();
+  const { validate, upstream } = page;
+  const first = upstream.ids[0];
+  const onPropose = proposeUpdatesOf(page);
+  return (
+    <>
+      {validate.error ? (
+        <InlineAlert variant="error" icon="error">
+          {validate.error}
+        </InlineAlert>
+      ) : null}
+      {page.team && first ? (
+        <ArchitectureUpstreamAlert
+          ids={upstream.ids}
+          concerned={[...upstream.components, ...upstream.flows]}
+          version={page.validation?.sha}
+          onSee={() => router.push(upstreamTargetOf(page.projectId, first))}
+          onPropose={onPropose}
+        />
+      ) : null}
+    </>
+  );
 }
 
 /** Corps hors relecture : un seul état principal à la fois (design/screens/S-spec-architecture.md §4). */
@@ -142,6 +236,7 @@ function ListBody({ page }: { page: ArchitecturePageModel }) {
       proposeNotice={page.propose.enabled ? page.propose.launch.notice : undefined}
     />
   );
+  const notices = <ValidationNotices page={page} />;
   const body = (
     <SpecBody
       view={view}
@@ -164,7 +259,10 @@ function ListBody({ page }: { page: ArchitecturePageModel }) {
   if (page.url.tab === "document" && (view.kind === "list" || view.kind === "empty-filtered")) {
     return (
       <>
-        <PageBody>{status}</PageBody>
+        <PageBody>
+          {notices}
+          {status}
+        </PageBody>
         {body}
       </>
     );
@@ -172,6 +270,7 @@ function ListBody({ page }: { page: ArchitecturePageModel }) {
   return (
     <PageBody>
       <div className="flex flex-col gap-4">
+        {notices}
         {status}
         {body}
       </div>
@@ -213,11 +312,18 @@ function ReviewBody({ page }: { page: ArchitecturePageModel }) {
   );
 }
 
+/** Feuille du formulaire : la décision (`ADR-`), le flux (`P-`) ou le composant ; à la création, selon l'onglet. */
+function sheetOf(specId: string | undefined, tab: string) {
+  if (specId?.startsWith("ADR-") || (!specId && tab === "decisions"))
+    return ArchitectureDecisionSheet;
+  if (specId?.startsWith("P-") || (!specId && tab === "flows")) return ArchitectureFlowSheet;
+  return ArchitectureComponentSheet;
+}
+
 function FormSheet({ page }: { page: ArchitecturePageModel }) {
   const { form, head, write } = page;
   if (!form.open || !head) return null;
-  const flow = form.specId ? form.specId.startsWith("P-") : page.url.tab === "flows";
-  const Sheet = flow ? ArchitectureFlowSheet : ArchitectureComponentSheet;
+  const Sheet = sheetOf(form.specId, page.url.tab);
   return (
     <Sheet
       projectId={page.projectId}
@@ -279,25 +385,21 @@ function TeamArchitecturePage({ page }: { page: ArchitecturePageModel }) {
   );
 }
 
-/** Client et business n'ont aucun accès à l'architecture (B510, 403) : retour à la vue d'ensemble du projet. */
-function Forbidden({ projectId }: { projectId: string }) {
-  const router = useRouter();
-  useEffect(() => router.replace(projectPath(projectId)), [router, projectId]);
-  return (
-    <PageBody>
-      <InlineAlert variant="neutral" icon="lock">
-        Cette page est réservée à l'équipe du projet.
-      </InlineAlert>
-    </PageBody>
-  );
-}
-
 /**
  * Écran Architecture d'un projet (`/projects/<id>/spec/architecture`, design/screens/S-spec-architecture.md) : Prêt,
- * Génération, Relecture et Liste · équipe, onglets Relecture, Document et Composants. Client et business : aucun accès.
+ * Génération, Relecture et Liste · équipe, onglets Relecture, Document et Composants. Client et business : vue en lecture seule du livrable validé (TK-113, B581).
  */
 export function ArchitecturePage({ projectId }: { projectId: string }): ReactNode {
   const page = useArchitecturePage(projectId);
-  if (page.sources.roleKnown && !page.team) return <Forbidden projectId={projectId} />;
+  if (page.sources.roleKnown && !page.team) {
+    return (
+      <ArchitectureClientView
+        projectId={projectId}
+        name={page.sources.projectName}
+        titleRef={page.titleRef}
+        canComment={page.role === "client"}
+      />
+    );
+  }
   return <TeamArchitecturePage page={page} />;
 }

@@ -109,6 +109,8 @@ export interface ListRowProps {
   selected?: boolean;
   /** Ligne de 52 de haut. */
   fixedHeight?: boolean;
+  /** Titre et sous-titre à la ligne (interligne 1,3, marges 10/14, maquette 13 l.383 et l.803) au lieu d'être coupés. */
+  wrap?: boolean;
   href?: string;
   onSelect?: () => void;
   LinkComponent?: ShellLink;
@@ -117,6 +119,12 @@ export interface ListRowProps {
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+
+/** Marges d'une ligne : 16/12 par défaut, 20 en `comfortable`, 14/10 en `wrap` (maquette 13 l.803). */
+function insetOf(roomy: boolean, wrap: boolean | undefined) {
+  if (wrap) return { x: "px-3.5", y: "py-2.5" };
+  return { x: roomy ? "px-5" : "px-4", y: "py-3" };
+}
 
 /** Ligne d'un `ListPanel` (ou, avec `as="div"`, contenu d'une ligne de `VirtualList`) : lien, bouton ou statique. */
 export function ListRow({
@@ -127,12 +135,13 @@ export function ListRow({
   trailing,
   selected,
   fixedHeight,
+  wrap,
   href,
   onSelect,
   LinkComponent: Link = "a" as unknown as ShellLink,
   className,
 }: ListRowProps) {
-  const roomy = useContext(DensityContext) === "comfortable";
+  const roomy = useContext(DensityContext) === "comfortable" || Boolean(wrap);
   const clip = roomy ? undefined : "truncate";
   const body = (
     <>
@@ -147,7 +156,8 @@ export function ListRow({
       </span>
     </>
   );
-  const gap = roomy ? "gap-3.5" : "gap-3";
+  const gap = roomy && !wrap ? "gap-3.5" : "gap-3";
+  const inset = insetOf(roomy, wrap);
   const main = cn("flex min-w-0 flex-1 items-center self-stretch", gap, FOCUS);
   const current = selected ? ("true" as const) : undefined;
   const inPanel = Tag === "li";
@@ -157,8 +167,8 @@ export function ListRow({
       className={cn(
         "flex items-center",
         gap,
-        inPanel ? cn("border-t first:border-t-0", roomy ? "px-5" : "px-4") : "min-w-0 flex-1",
-        fixedHeight ? "h-[52px]" : inPanel && "py-3",
+        inPanel ? cn("border-t first:border-t-0", inset.x) : "min-w-0 flex-1",
+        fixedHeight ? "h-[52px]" : inPanel && inset.y,
         selected && "bg-secondary",
         className,
       )}

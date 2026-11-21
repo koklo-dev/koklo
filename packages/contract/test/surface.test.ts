@@ -38,6 +38,11 @@ const GROUPS: Record<string, string[]> = {
   aiSettings: ["get", "update"],
   projectClient: ["add", "list", "remove"],
   clientSpace: [
+    "adr",
+    "adrs",
+    "archFlow",
+    "archFlows",
+    "architecture",
     "dataFixturePage",
     "dataFixtureRows",
     "dataFixtures",
@@ -346,6 +351,14 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /projects/{projectId}/spec/architecture/flows/{flowId}",
     "GET /projects/{projectId}/spec/architecture/source",
     "POST /projects/{projectId}/spec/architecture/layout",
+    // TK-113 (3.11.0) : décisions d'architecture et vue client de l'architecture.
+    "GET /projects/{projectId}/spec/architecture/adr",
+    "GET /projects/{projectId}/spec/architecture/adr/{adrId}",
+    "GET /client-space/projects/{projectId}/architecture",
+    "GET /client-space/projects/{projectId}/architecture/adrs",
+    "GET /client-space/projects/{projectId}/architecture/adrs/{adrId}",
+    "GET /client-space/projects/{projectId}/architecture/flows",
+    "GET /client-space/projects/{projectId}/architecture/flows/{flowId}",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -377,7 +390,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(166);
+    expect(pairs).toHaveLength(173);
   });
 });
 

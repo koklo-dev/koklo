@@ -23,6 +23,7 @@ export * from "./components/command-palette.tsx";
 export * from "./components/count-badge.tsx";
 export * from "./components/count-bar.tsx";
 export * from "./components/decision-notice.tsx";
+export * from "./components/decision-status.tsx";
 export * from "./components/deliverable-card.tsx";
 export * from "./components/deliverable-status.tsx";
 export * from "./components/diagram-minimap.tsx";

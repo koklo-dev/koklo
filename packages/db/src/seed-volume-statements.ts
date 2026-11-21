@@ -1,4 +1,5 @@
 import type { SeedStatement } from "./seed-statements.ts";
+import { adrData } from "./seed-volume-adrs.ts";
 import {
   archflowData,
   architectureProposalStatements,
@@ -173,7 +174,7 @@ function entityInsert(
        content_hash = EXCLUDED.content_hash, sort = EXCLUDED.sort`;
 }
 
-/** Composants et flux d'architecture de l'index d'entités (TK-111, TK-112). */
+/** Composants, flux et décisions d'architecture de l'index d'entités (TK-111, TK-112, TK-113). */
 function architectureEntities(profile: VolumeProfile): string[] {
   const volume = SEED_VOLUMES[profile];
   return [
@@ -192,6 +193,14 @@ function architectureEntities(profile: VolumeProfile): string[] {
       `'P-flux-' || ${pad()}`,
       `'architecture/flows/P-flux-' || ${pad()} || '.yaml'`,
       archflowData(volume.components, volume.features, volume.rules),
+    ),
+    entityInsert(
+      "adr",
+      volume.adrs,
+      "'ADR-'",
+      `'Décision d''architecture ' || ${pad()}`,
+      `'architecture/adr/ADR-' || ${pad()} || '-decision-' || ${pad()} || '.md'`,
+      adrData(profile, volume.adrs, volume.components, volume.features),
     ),
   ];
 }

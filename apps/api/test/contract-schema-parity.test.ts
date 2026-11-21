@@ -424,3 +424,52 @@ describe("TK-112 : mise en page et flux d'architecture (contrat 3.10.0)", () => 
     }
   });
 });
+
+/** TK-113 : les décisions du contrat 3.11.0 recopient les statuts, les motifs et les liens de @koklo/schema ; la base suit l'enum. */
+describe("TK-113 : décisions d'architecture et cibles de commentaire (contrat 3.11.0)", () => {
+  const byId = inputOf("spec.architecture.adr.byId");
+  const project = "123e4567-e89b-42d3-a456-426614174000";
+
+  it("statuts d'une décision du contrat = ceux de schema", () => {
+    expect(sorted([...contract.ADR_STATUSES])).toEqual(sorted([...schema.ADR_STATUSES]));
+  });
+
+  it("identifiant ADR-<nnn> du contrat = celui de schema ; liens d'une décision = motifs de schema", () => {
+    for (const id of ["ADR-001", "ADR-1000", "ADR-01", "adr-001", "ADR-"]) {
+      expect(accepts(byId, { projectId: project, adrId: id }), id).toBe(
+        schema.PATTERNS.adr.test(id),
+      );
+    }
+    const link = (id: string) => contract.adrLinkSchema.safeParse(id).success;
+    const known = [
+      schema.PATTERNS.feature,
+      schema.PATTERNS.rule,
+      schema.PATTERNS.table,
+      schema.PATTERNS.component,
+      schema.PATTERNS.flow,
+    ];
+    for (const id of ["F-001", "R-002", "T-clients", "C-api", "P-signup", "ADR-001", "NFR-001"]) {
+      expect(link(id), id).toBe(known.some((pattern) => pattern.test(id)));
+    }
+  });
+
+  it("cibles de commentaire component, adr, archflow : valeurs du contrat = valeurs de l'enum de la base", () => {
+    for (const kind of ["table", "component", "adr", "archflow"]) {
+      expect(prismaEnum("CommentTargetKind")).toContain(kind);
+      expect(options(api.commentTargetKindSchema)).toContain(kind);
+    }
+    expect(sorted(options(api.commentTargetKindSchema))).toEqual(
+      sorted(prismaEnum("CommentTargetKind")),
+    );
+  });
+
+  it("l'amont d'une table du contrat (staleUpstream) suit le motif T-<slug> de schema", () => {
+    const out = contract.specDeliverableSchema.shape.staleUpstream;
+    for (const id of ["T-clients", "T-", "T-Clients", "F-001", "R-12", "E-x"]) {
+      const expected = [schema.PATTERNS.table, schema.PATTERNS.feature, schema.PATTERNS.rule].some(
+        (pattern) => pattern.test(id),
+      );
+      expect(out.safeParse([id]).success, id).toBe(expected);
+    }
+  });
+});

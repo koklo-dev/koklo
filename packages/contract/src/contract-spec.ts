@@ -32,6 +32,10 @@ import {
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
 import {
+  adrByIdInputSchema,
+  adrDetailSchema,
+  adrListInputSchema,
+  adrSummarySchema,
   archflowDetailSchema,
   architectureChecksInputSchema,
   architectureChecksSchema,
@@ -269,6 +273,20 @@ const spec = {
         .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
         .input(architectureFlowsByIdInputSchema)
         .output(archflowDetailSchema),
+    },
+    /**
+     * Décisions (TK-113, 3.11.0, B575 à B592) : liste à pages de 50 (`q`, `status`, `component`, `from`, `to`, `around`, facettes
+     * `status`) et fiche. Équipe et designer en lecture (403 client et business : ils lisent `clientSpace.architecture*`).
+     */
+    adr: {
+      list: route("GET", "/projects/{projectId}/spec/architecture/adr")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(adrListInputSchema)
+        .output(listOf(adrSummarySchema)),
+      byId: route("GET", "/projects/{projectId}/spec/architecture/adr/{adrId}")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(adrByIdInputSchema)
+        .output(adrDetailSchema),
     },
     /** YAML d'un composant, YAML ou Mermaid d'un flux, Mermaid du schéma : équipe et designer seulement. */
     source: route("GET", "/projects/{projectId}/spec/architecture/source")

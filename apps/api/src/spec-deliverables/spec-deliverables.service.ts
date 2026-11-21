@@ -12,7 +12,7 @@ import {
   DELIVERABLE_STATUS_SOURCE,
   type DeliverableStatusSource,
 } from "./deliverable-status-source.ts";
-import { staleUpstreamOf } from "./deliverable-upstream.ts";
+import { type StaleImpact, staleImpactOf } from "./deliverable-upstream.ts";
 import {
   SPEC_DELIVERABLES_REPOSITORY,
   type SpecDeliverablesRepository,
@@ -34,9 +34,29 @@ const staleStatuses = (
     ]),
   ) as Record<DeliverableKey, DeliverableStatus>;
 
-/** Un amont cité modifié depuis la décision rend les Données « À revoir » (B449). */
-const withUpstream = (statuses: Record<DeliverableKey, DeliverableStatus>, stale: boolean) =>
-  stale ? { ...statuses, data: staleStatus(statuses.data, true) } : statuses;
+/** Un amont cité modifié depuis la décision rend les Données (B449) ou l'Architecture (TK-113) « À revoir ». */
+const withUpstream = (
+  statuses: Record<DeliverableKey, DeliverableStatus>,
+  impacts: Record<"data" | "architecture", StaleImpact>,
+) => ({
+  ...statuses,
+  data: staleStatus(statuses.data, impacts.data.upstream.length > 0),
+  architecture: staleStatus(statuses.architecture, impacts.architecture.upstream.length > 0),
+});
+
+/** Ce que l'impact amont ajoute à l'entrée d'un livrable : les amonts, et pour l'Architecture les éléments concernés. */
+function impactFields(key: DeliverableKey, impacts: Record<"data" | "architecture", StaleImpact>) {
+  if (key !== "data" && key !== "architecture") return {};
+  const { upstream, components, flows } = impacts[key];
+  if (upstream.length === 0) return {};
+  return key === "data"
+    ? { staleUpstream: upstream }
+    : {
+        staleUpstream: upstream,
+        ...(components.length > 0 ? { staleComponents: components } : {}),
+        ...(flows.length > 0 ? { staleFlows: flows } : {}),
+      };
+}
 
 /**
  * Les sept livrables de la spec (TK-100) : faits lus en base, statut fourni par la source de statuts, disponibilité
@@ -56,17 +76,20 @@ export class SpecDeliverablesService {
       this.statuses.statuses(scope),
     ]);
     const stale = staleBecauseOf(record.impact);
-    const staleUpstream = staleUpstreamOf(record.upstream);
+    const impacts = {
+      data: staleImpactOf(record.upstream.data),
+      architecture: staleImpactOf(record.upstream.architecture),
+    };
     const deliverables: SpecDeliverable[] = deliverablesAvailabilityOf({
       ideaFrozen: record.ideaFrozen,
       functionalHasEntity: record.featureCount > 0,
-      statuses: staleStatuses(withUpstream(statuses, staleUpstream.length > 0), stale),
+      statuses: staleStatuses(withUpstream(statuses, impacts), stale),
       forced: record.forced,
     }).map((entry) => ({
       ...entry,
       pendingProposals: record.pendingByDeliverable[entry.key] ?? 0,
       ...(stale[entry.key] ? { staleBecause: stale[entry.key] } : {}),
-      ...(entry.key === "data" && staleUpstream.length > 0 ? { staleUpstream } : {}),
+      ...impactFields(entry.key, impacts),
     }));
     return {
       deliverables,

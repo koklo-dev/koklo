@@ -12,7 +12,10 @@ import type {
   CommentTarget,
   CommentTicket,
   NewComment,
+  RefKind,
 } from "./comment.repository.ts";
+
+const REF_KINDS: readonly string[] = ["table", "component", "adr", "archflow"];
 
 const toRecord = (row: {
   id: string;
@@ -25,7 +28,7 @@ const toRecord = (row: {
   createdAt: Date;
 }): CommentRecord => ({
   id: row.id,
-  targetKind: row.targetKind === "table" ? "table" : "ticket",
+  targetKind: REF_KINDS.includes(row.targetKind) ? (row.targetKind as RefKind) : "ticket",
   targetId: row.targetId,
   targetRef: row.targetRef,
   authorKind: row.authorKind,
@@ -48,21 +51,21 @@ class PrismaCommentStore implements CommentStore {
     });
   }
 
-  async tableExists(ref: string): Promise<boolean> {
+  async refExists(kind: RefKind, ref: string): Promise<boolean> {
     const head = await this.resolver.resolve(this.tx, this.scope, {});
     if (!head || head.snapshot.status === "failed") return false;
     const row = await this.tx.specEntity.findFirst({
-      where: { snapshotId: head.snapshot.id, kind: "table", specId: ref },
+      where: { snapshotId: head.snapshot.id, kind, specId: ref },
       select: { id: true },
     });
     return row !== null;
   }
 
-  /** Une table a le projet pour `target_id` et son `T-<slug>` pour `target_ref` ; un ticket n'a pas de `target_ref`. */
+  /** Un élément de la spec a le projet pour `target_id` et son identifiant lisible pour `target_ref` ; un ticket n'a pas de `target_ref`. */
   private targetColumns(target: CommentTarget) {
-    return target.kind === "table"
-      ? { targetKind: "table" as const, targetId: this.scope.projectId, targetRef: target.ref }
-      : { targetKind: "ticket" as const, targetId: target.ticketId, targetRef: null };
+    return target.kind === "ticket"
+      ? { targetKind: "ticket" as const, targetId: target.ticketId, targetRef: null }
+      : { targetKind: target.kind, targetId: this.scope.projectId, targetRef: target.ref };
   }
 
   async insert(comment: NewComment): Promise<CommentRecord> {

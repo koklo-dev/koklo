@@ -19,24 +19,33 @@ import { ShellLink } from "./shell-link.tsx";
 
 type TabCounts = Partial<Record<ArchitectureTab, HeaderTabCount>>;
 
-function tabsOf(projectId: string, active: ArchitectureTab, counts: TabCounts, reviewing: boolean) {
-  return visibleArchitectureTabs(reviewing).map<ProjectHeaderTab>((tab) => {
-    const count = counts[tab];
-    // La relecture suit l'onglet : chaque onglet garde `view=review` (l'architecture proposée s'y lit).
-    const query = `?tab=${tab}${reviewing ? "&view=review" : ""}`;
-    return {
-      label: ARCHITECTURE_TAB_LABELS[tab],
-      icon: ARCHITECTURE_TAB_ICONS[tab] satisfies IconName,
-      href: `${specPath(projectId, "architecture")}${query}`,
-      active: tab === active,
-      ...(count
-        ? {
-            count: typeof count.value === "number" ? formatCount(count.value) : count.value,
-            ...(count.tone ? { countTone: count.tone } : {}),
-          }
-        : {}),
-    };
-  });
+function tabsOf(
+  projectId: string,
+  active: ArchitectureTab,
+  counts: TabCounts,
+  reviewing: boolean,
+  client: boolean,
+) {
+  // Le client ne lit pas le Document : ses sections n'ont pas de « En clair » (B581).
+  return visibleArchitectureTabs(reviewing)
+    .filter((tab) => !(client && tab === "document"))
+    .map<ProjectHeaderTab>((tab) => {
+      const count = counts[tab];
+      // La relecture suit l'onglet : chaque onglet garde `view=review` (l'architecture proposée s'y lit).
+      const query = `?tab=${tab}${reviewing ? "&view=review" : ""}`;
+      return {
+        label: ARCHITECTURE_TAB_LABELS[tab],
+        icon: ARCHITECTURE_TAB_ICONS[tab] satisfies IconName,
+        href: `${specPath(projectId, "architecture")}${query}`,
+        active: tab === active,
+        ...(count
+          ? {
+              count: typeof count.value === "number" ? formatCount(count.value) : count.value,
+              ...(count.tone ? { countTone: count.tone } : {}),
+            }
+          : {}),
+      };
+    });
 }
 
 /**
@@ -57,6 +66,7 @@ export function ArchitectureHeader({
   tab,
   head,
   team,
+  client = false,
 }: {
   projectId: string;
   name: string | undefined;
@@ -71,6 +81,8 @@ export function ArchitectureHeader({
   tab: ArchitectureTab;
   head: { commitSha: string; indexedAt: string } | undefined;
   team: boolean;
+  /** Vue client : sans l'onglet Document. */
+  client?: boolean;
 }) {
   return (
     <ProjectHeader
@@ -95,7 +107,7 @@ export function ArchitectureHeader({
         ? { sha: { value: head.commitSha.slice(0, 7), age: ageOf(head.indexedAt) } }
         : {})}
       {...(secondaryActions ? { secondaryActions } : {})}
-      tabs={tabsOf(projectId, tab, tabCounts ?? {}, reviewing)}
+      tabs={tabsOf(projectId, tab, tabCounts ?? {}, reviewing, client)}
       tabsLabel="Sections de l'architecture"
       LinkComponent={ShellLink}
     />

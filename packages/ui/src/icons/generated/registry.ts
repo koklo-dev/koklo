@@ -123,6 +123,8 @@ export const iconLoaders = {
   sms: () => import("./sms.ts"),
   mail: () => import("./mail.ts"),
   cloud: () => import("./cloud.ts"),
+  add_circle: () => import("./add_circle.ts"),
+  do_not_disturb_on: () => import("./do_not_disturb_on.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

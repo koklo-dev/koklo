@@ -19,7 +19,7 @@ import {
 const slug = "[a-z0-9][a-z0-9-]*";
 export const componentIdSchema = z.string().regex(new RegExp(`^C-${slug}$`));
 export const adrIdSchema = z.string().regex(/^ADR-\d{3,}$/);
-const flowLink = z.string().regex(new RegExp(`^P-${slug}$`));
+export const archFlowIdSchema = z.string().regex(new RegExp(`^P-${slug}$`));
 const featureLink = z.string().regex(/^F-\d{3,}$/);
 const ruleLink = z.string().regex(/^R-\d{3,}$/);
 const tableLink = z.string().regex(new RegExp(`^T-${slug}$`));
@@ -33,7 +33,7 @@ const docSectionSlugSchema = z
   .string()
   .regex(new RegExp(`^${slug}$`))
   .max(60);
-const adrLinkSchema = z
+export const adrLinkSchema = z
   .string()
   .regex(new RegExp(`^(F-\\d{3,}|R-\\d{3,}|T-${slug}|C-${slug}|P-${slug})$`));
 
@@ -111,11 +111,11 @@ export const archflowCreateSchema = z
   .object(archflowFields)
   .partial()
   .required({ participants: true, messages: true })
-  .extend({ kind: z.literal("archflow.create"), flow: flowLink });
+  .extend({ kind: z.literal("archflow.create"), flow: archFlowIdSchema });
 export const archflowUpdateSchema = z
   .object(archflowFields)
   .partial()
-  .extend({ kind: z.literal("archflow.update"), specId: flowLink })
+  .extend({ kind: z.literal("archflow.update"), specId: archFlowIdSchema })
   .refine(
     (op) =>
       Object.keys(archflowFields).some((key) => (op as Record<string, unknown>)[key] !== undefined),
@@ -123,7 +123,7 @@ export const archflowUpdateSchema = z
   );
 export const archflowDeleteSchema = z.object({
   kind: z.literal("archflow.delete"),
-  specId: flowLink,
+  specId: archFlowIdSchema,
 });
 
 export const ADR_STATUSES = ["proposee", "acceptee", "remplacee"] as const;
@@ -379,11 +379,11 @@ export const architectureLayoutSavedSchema = z.object({ commitSha: commitShaSche
 
 /** Liste des flux : pages de 50, `q` sur toute la tête, `around` amène un flux (`?f=P-xxx`). */
 export const architectureFlowsListInputSchema = z
-  .object({ projectId: z.uuid(), ...revision, ...listInputShape(flowLink) })
+  .object({ projectId: z.uuid(), ...revision, ...listInputShape(archFlowIdSchema) })
   .refine(exclusiveRevision, REVISION_MESSAGE)
   .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
 export const architectureFlowSummarySchema = z.object({
-  specId: flowLink,
+  specId: archFlowIdSchema,
   /** Titre du parcours `P-` (repli : l'identifiant). */
   title: z.string(),
   /** Acteur du parcours (repli : le premier rôle participant). */
@@ -418,11 +418,11 @@ export const architectureFlowItemSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("separator"), label: z.string() }),
 ]);
 export const architectureFlowsByIdInputSchema = z
-  .object({ projectId: z.uuid(), flowId: flowLink, ...revision })
+  .object({ projectId: z.uuid(), flowId: archFlowIdSchema, ...revision })
   .refine(exclusiveRevision, REVISION_MESSAGE);
 /** Détail d'un flux : lu par la page Flux et rendu par `spec.item.get` (type `archflow`, B545). */
 export const archflowDetailSchema = z.object({
-  specId: flowLink,
+  specId: archFlowIdSchema,
   title: z.string(),
   actor: z.string(),
   participants: z.array(
@@ -448,7 +448,7 @@ const sourceTargetSchema = z.object({
 });
 const SOURCE_ID: Record<"component" | "flow", z.ZodType<string>> = {
   component: componentIdSchema,
-  flow: flowLink,
+  flow: archFlowIdSchema,
 };
 /**
  * YAML d'un composant, YAML ou Mermaid d'un flux (`format`, YAML par défaut), Mermaid du schéma : équipe seulement (403
@@ -475,4 +475,54 @@ export const architectureSourceSchema = z.object({
   text: z.string(),
   commitSha: commitShaSchema,
   generated: z.boolean(),
+});
+
+// --- TK-113 (contrat 3.11.0, additif, B575 à B592) : décisions d'architecture ---
+const adrDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** Liste des décisions : pages de 50, `q` sur toute la tête, filtres de statut, de composant et de période, `around` amène `?d=ADR-nnn`. */
+export const adrListInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    status: adrStatusSchema.optional(),
+    /** Décisions qui citent ce composant dans leurs liens, ou que ce composant cite. */
+    component: componentIdSchema.optional(),
+    from: adrDate.optional(),
+    to: adrDate.optional(),
+    ...revision,
+    ...listInputShape(adrIdSchema),
+  })
+  .refine(exclusiveRevision, REVISION_MESSAGE)
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+export const adrSummarySchema = z.object({
+  specId: adrIdSchema,
+  title: z.string(),
+  status: adrStatusSchema,
+  date: z.string(),
+  /** Liens de la décision (composants, fonctionnalités, règles, tables, parcours), dans l'ordre du fichier. */
+  links: z.array(adrLinkSchema),
+  supersededBy: adrIdSchema.optional(),
+  filePath: z.string(),
+});
+export const adrByIdInputSchema = z
+  .object({ projectId: z.uuid(), adrId: adrIdSchema, ...revision })
+  .refine(exclusiveRevision, REVISION_MESSAGE);
+/** Fiche d'une décision : lue par l'onglet Décisions et rendue par `spec.item.get` (type `adr`). Texte brut, jamais interprété. */
+export const adrDetailSchema = z.object({
+  specId: adrIdSchema,
+  title: z.string(),
+  status: adrStatusSchema,
+  date: z.string(),
+  deciders: z.array(z.string()),
+  context: z.string(),
+  decision: z.string(),
+  consequences: z.object({ positive: z.array(z.string()), toAccept: z.array(z.string()) }),
+  alternatives: z.array(z.object({ name: z.string(), reason: z.string() })),
+  links: z.array(adrLinkSchema),
+  /** Décision remplaçante, et sa date (celle de la remplaçante) pour la phrase « Remplacée par … le … ». */
+  supersededBy: adrIdSchema.optional(),
+  supersededOn: adrDate.optional(),
+  /** Explication « En clair » montrée au client. */
+  plain: z.string().optional(),
+  filePath: z.string(),
+  commitSha: commitShaSchema,
 });

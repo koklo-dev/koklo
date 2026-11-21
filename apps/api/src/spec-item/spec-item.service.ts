@@ -1,6 +1,7 @@
 import type { SpecItem } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
 import { componentDetail } from "../spec-architecture/architecture-values.ts";
+import { SpecArchitectureService } from "../spec-architecture/spec-architecture.service.ts";
 import { SpecArchitectureDiagramService } from "../spec-architecture/spec-architecture-diagram.service.ts";
 import { tableDetail } from "../spec-data/data-values.ts";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
@@ -9,10 +10,12 @@ import { SpecReadService } from "../spec-read/spec-read.service.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 
-/** Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant ou un flux, Fonctionnel pour le reste. */
+const ARCHITECTURE_TYPES: readonly SpecItem["type"][] = ["component", "archflow", "adr"];
+
+/** Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant, un flux ou une décision, Fonctionnel pour le reste. */
 const deliverableOf = (type: SpecItem["type"]) => {
   if (type === "table") return "data";
-  return type === "component" || type === "archflow" ? "architecture" : "functional";
+  return ARCHITECTURE_TYPES.includes(type) ? "architecture" : "functional";
 };
 
 /**
@@ -27,6 +30,7 @@ export class SpecItemService {
     @Inject(SpecDeliverablesService) private readonly deliverables: SpecDeliverablesService,
     @Inject(SpecArchitectureDiagramService)
     private readonly architecture: SpecArchitectureDiagramService,
+    @Inject(SpecArchitectureService) private readonly adrs: SpecArchitectureService,
   ) {}
 
   async get(
@@ -60,6 +64,7 @@ export class SpecItemService {
       );
     }
     if (type === "archflow") return this.architecture.flow(scope, { flowId: id });
+    if (type === "adr") return this.adrs.adr(scope, { adrId: id });
     const entity = await this.specs.entity(scope, type, id);
     const where = { filePath: entity.path, commitSha: entity.commitSha };
     if (type === "table") return tableDetail(id, entity.data, where);

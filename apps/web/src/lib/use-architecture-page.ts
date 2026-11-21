@@ -11,6 +11,7 @@ import { deriveFeaturesView, type FeaturesView } from "./features-view.ts";
 import { orpc } from "./orpc.ts";
 import { canReadRepos, canWriteArchitecture } from "./roles.ts";
 import { useArchitectureComponents } from "./use-architecture-components.ts";
+import { useArchitectureDecisions, useDecisionCount } from "./use-architecture-decisions.ts";
 import { useArchitectureChecks, useArchitectureDocument } from "./use-architecture-document.ts";
 import { useFlowCount } from "./use-architecture-flows.ts";
 import { type ArchitectureUrlModel, useArchitectureUrl } from "./use-architecture-url.ts";
@@ -26,11 +27,31 @@ import { useSpecDeliverables } from "./use-spec-deliverables.ts";
 import { useSavedSync, useSpecForm } from "./use-spec-form.ts";
 import { type SpecSources, useSpecSources } from "./use-spec-sources.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
+import { useDeliverableValidation, useValidateDeliverable } from "./use-validate-model.ts";
 
 type Head = NonNullable<SpecSources["headData"]>;
 const LIST_KEYS = [() => orpc.spec.architecture.key(), () => orpc.spec.item.key()] as const;
 const LIST_SYNC = [() => orpc.spec.architecture.key()] as const;
 const SETTLED = ["todo", "pending", "revise", "validated"] as const;
+type Deliverables = ReturnType<typeof useSpecDeliverables>["data"];
+
+/** Impact amont d'un livrable « À revoir » (`staleUpstream`, `staleComponents`, `staleFlows`, B578) ; vide sinon (B592). */
+export interface ArchitectureUpstream {
+  ids: readonly string[];
+  components: readonly string[];
+  flows: readonly string[];
+}
+const NO_UPSTREAM: ArchitectureUpstream = { ids: [], components: [], flows: [] };
+
+function upstreamOf(data: Deliverables): ArchitectureUpstream {
+  const entry = data?.deliverables.find((item) => item.key === "architecture");
+  if (entry?.status !== "revise") return NO_UPSTREAM;
+  return {
+    ids: entry.staleUpstream ?? [],
+    components: entry.staleComponents ?? [],
+    flows: entry.staleFlows ?? [],
+  };
+}
 
 /** Composants du projet et état principal de l'écran (chargement, erreur, vide, liste) d'après `spec.head`, les dépôts et la liste. */
 function useArchitectureView(projectId: string, url: ArchitectureUrlModel, sources: SpecSources) {
@@ -162,11 +183,11 @@ function useComponentsList(
   };
 }
 
-/** Statut du livrable Architecture (`spec.deliverables`) : celui de l'état Liste. */
+/** Statut du livrable Architecture (`spec.deliverables`) : celui de l'état Liste, et son impact amont. */
 function useArchitectureStatus(projectId: string) {
   const data = useSpecDeliverables(projectId).data;
   const status = data?.deliverables.find((item) => item.key === "architecture")?.status;
-  return SETTLED.find((value) => value === status);
+  return { deliverable: SETTLED.find((value) => value === status), upstream: upstreamOf(data) };
 }
 
 /** Agent (lancement, relecture des propositions) et en-tête par état : statut, actions, compteurs d'onglet. */
@@ -185,8 +206,15 @@ function useArchitectureProposing(ctx: {
     { deliverable: "architecture", canPropose: canWriteArchitecture },
   );
   const review = useProposalReview(projectId, propose.reviewing, "architecture");
-  const deliverable = useArchitectureStatus(projectId);
-  const flows = useFlowCount(projectId, canReadRepos(role) && sources.readable);
+  const { deliverable, upstream } = useArchitectureStatus(projectId);
+  const readable = canReadRepos(role) && sources.readable;
+  const flows = useFlowCount(projectId, readable);
+  const decisions = useDecisionCount(projectId, readable);
+  const validation = useDeliverableValidation(
+    "architecture",
+    projectId,
+    readable && (deliverable === "validated" || deliverable === "revise"),
+  );
   const generating = propose.status.active && propose.status.counts.total === 0;
   // Le total du groupe « Composants » du lancement, pas les seules propositions chargées (8 par groupe au-delà de 30).
   const proposedComponents = propose.status.groups
@@ -203,11 +231,37 @@ function useArchitectureProposing(ctx: {
     viewKind: view.kind,
     tab: url.tab,
     counts: headData
-      ? { components: headData.counts.components, ...(flows === undefined ? {} : { flows }) }
+      ? {
+          components: headData.counts.components,
+          ...(decisions === undefined ? {} : { decisions }),
+          ...(flows === undefined ? {} : { flows }),
+        }
       : undefined,
     deliverable,
+    validation,
   } satisfies ArchitectureHeaderInput);
-  return { propose, review, header, generating, proposedComponents };
+  return { propose, review, header, generating, proposedComponents, upstream, validation };
+}
+
+/** Onglet Décisions (B583) : liste filtrée par l'adresse ; `?d=` amène la décision d'un lien direct dans la première page. */
+function useDecisionsTab(projectId: string, url: ArchitectureUrlModel, readable: boolean) {
+  const deepLink = useDeepLink(url.d, `${url.q}|${url.status}|${url.component}|${url.period}`);
+  const decisions = useArchitectureDecisions({
+    projectId,
+    q: url.q,
+    status: url.status,
+    component: url.component,
+    period: url.period,
+    around: deepLink.around,
+    enabled: readable && url.tab === "decisions",
+  });
+  const { aroundMissing } = decisions;
+  const drop = deepLink.drop;
+  // Une décision introuvable (lien périmé) : on repart de la première page.
+  useEffect(() => {
+    if (aroundMissing) drop();
+  }, [aroundMissing, drop]);
+  return { decisions };
 }
 
 /** Tout ce que pilote l'écran Architecture : données, adresse, annonces, relecture, formulaire, en-tête et visibilités. */
@@ -221,6 +275,7 @@ export function useArchitecturePage(projectId: string) {
   const { titleRef, write, form } = useArchitectureWriting(projectId, url, sources, view);
   const proposing = useArchitectureProposing({ projectId, url, sources, view });
   const readable = sources.readable && team;
+  const { decisions } = useDecisionsTab(projectId, url, readable);
   return {
     url,
     projectId,
@@ -230,6 +285,8 @@ export function useArchitecturePage(projectId: string) {
     team,
     head: (headData ?? null) as Head | null,
     components,
+    decisions,
+    validate: useValidateDeliverable("architecture", projectId, headData?.commitSha, announce),
     write,
     form,
     ...proposing,

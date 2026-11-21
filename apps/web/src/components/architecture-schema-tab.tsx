@@ -59,20 +59,24 @@ function Legend() {
   );
 }
 
-const renderNode = (
-  node: ArchNode,
-  context: { selected: boolean; ghost: boolean; compact: boolean; onSelect: () => void },
-) => (
-  <ArchNodeCard
-    kind={node.kind}
-    name={node.name}
-    subtitle={node.subtitle}
-    selected={context.selected}
-    ghost={context.ghost}
-    compact={context.compact}
-    onSelect={context.onSelect}
-  />
-);
+/** Rendu d'un nœud ; ceux que l'impact amont concerne (architecture à revoir) portent le contour ambre (B587). */
+const nodeRenderer =
+  (stale: ReadonlySet<string>) =>
+  (
+    node: ArchNode,
+    context: { selected: boolean; ghost: boolean; compact: boolean; onSelect: () => void },
+  ) => (
+    <ArchNodeCard
+      kind={node.kind}
+      name={node.name}
+      subtitle={node.subtitle}
+      selected={context.selected}
+      ghost={context.ghost}
+      compact={context.compact}
+      stale={stale.has(node.id)}
+      onSelect={context.onSelect}
+    />
+  );
 
 /** Lecteur des nœuds : composants et acteurs par couches, zones voisines estompées, glisser enregistré (équipe). */
 function NodesViewer({
@@ -93,6 +97,10 @@ function NodesViewer({
     [diagram.nodes],
   );
   const canMove = canWriteArchitecture(page.role);
+  const renderNode = useMemo(
+    () => nodeRenderer(new Set(page.upstream.components)),
+    [page.upstream.components],
+  );
   return (
     <DiagramViewer<ArchNode>
       key={diagram.open ?? "tout"}
@@ -226,6 +234,7 @@ function FichePanel({
         name={node.name}
         type={node.kind === "actor" ? undefined : node.kind}
         onEdit={page.form.canWrite ? () => page.form.openEdit(node.id) : undefined}
+        {...(page.upstream.components.includes(node.id) ? { staleIds: page.upstream.ids } : {})}
       />
     </FicheFrame>
   );

@@ -206,3 +206,16 @@ describe("ListRow : sous-titre 12/400 et groupes empilés (12 l.61, 126)", () =>
     expect(screen.getByText("3 critères · R-012")).toHaveClass("text-caption", "font-normal");
   });
 });
+
+describe("ListRow wrap (13 l.383, 803)", () => {
+  it("titre et sous-titre sans coupure, interligne 1,3, marges 10/14", () => {
+    render(
+      <ListPanel label="Liste">
+        <ListRow wrap title="Un titre long" subtitle="12 oct." />
+      </ListPanel>,
+    );
+    expect(screen.getByText("Un titre long")).not.toHaveClass("truncate");
+    expect(screen.getByText("12 oct.")).not.toHaveClass("truncate");
+    expect(screen.getByRole("listitem")).toHaveClass("py-2.5", "px-3.5");
+  });
+});

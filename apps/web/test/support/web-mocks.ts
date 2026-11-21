@@ -94,6 +94,14 @@ export const procedures = {
   specArchitectureFlowsList: vi.fn(),
   specArchitectureFlowsById: vi.fn(),
   specArchitectureSource: vi.fn(),
+  // TK-113 (contrat 3.11.0) : décisions (pages de 50, fiche) et architecture validée vue du client
+  specArchitectureAdrList: vi.fn(),
+  specArchitectureAdrById: vi.fn(),
+  clientSpaceArchitecture: vi.fn(),
+  clientSpaceAdrs: vi.fn(),
+  clientSpaceAdr: vi.fn(),
+  clientSpaceArchFlows: vi.fn(),
+  clientSpaceArchFlow: vi.fn(),
   // TK-103 (contrat 3.1.0) : règles métier, parcours (liste paginée) et matrice des rôles
   specFunctionalList: vi.fn(),
   specRolesMatrix: vi.fn(),
@@ -350,6 +358,17 @@ export const orpc = {
         ),
       },
       source: queryFull(["spec", "architecture", "source"], procedures.specArchitectureSource),
+      adr: {
+        key: () => ["spec", "architecture", "adr"],
+        list: queryFull(
+          ["spec", "architecture", "adr", "list"],
+          procedures.specArchitectureAdrList,
+        ),
+        byId: queryFull(
+          ["spec", "architecture", "adr", "byId"],
+          procedures.specArchitectureAdrById,
+        ),
+      },
     },
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
@@ -362,6 +381,11 @@ export const orpc = {
     flows: queryFull(["clientSpace", "flows"], procedures.clientSpaceFlows),
     rules: queryFull(["clientSpace", "rules"], procedures.clientSpaceRules),
     roles: queryFull(["clientSpace", "roles"], procedures.clientSpaceRoles),
+    architecture: queryFull(["clientSpace", "architecture"], procedures.clientSpaceArchitecture),
+    adrs: queryFull(["clientSpace", "adrs"], procedures.clientSpaceAdrs),
+    adr: queryFull(["clientSpace", "adr"], procedures.clientSpaceAdr),
+    archFlows: queryFull(["clientSpace", "archFlows"], procedures.clientSpaceArchFlows),
+    archFlow: queryFull(["clientSpace", "archFlow"], procedures.clientSpaceArchFlow),
     dataModel: queryFull(["clientSpace", "dataModel"], procedures.clientSpaceDataModel),
     dataFixtures: queryFull(["clientSpace", "dataFixtures"], procedures.clientSpaceDataFixtures),
     dataFixtureRows: queryFull(

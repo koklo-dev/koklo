@@ -315,3 +315,24 @@ describe("InlineAlert : lecture seule (TK-109, maquette 11 l.160-167)", () => {
     expect(alert.firstElementChild?.className).toMatch(/\bflex-wrap\b/);
   });
 });
+
+describe("InlineAlert actions primaires (13 l.128)", () => {
+  it("primary : bouton plein, icône de 18 avant le libellé", () => {
+    render(
+      <InlineAlert
+        variant="warning"
+        icon="sync_problem"
+        actions={[
+          { label: "Voir", onClick: () => undefined },
+          { label: "Proposer", onClick: () => undefined, primary: true, icon: "wand_stars" },
+        ]}
+      >
+        Texte
+      </InlineAlert>,
+    );
+    const primary = screen.getByRole("button", { name: "Proposer" });
+    expect(primary).toHaveClass("bg-primary");
+    expect(primary.querySelector("svg, span")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Voir" })).not.toHaveClass("bg-primary");
+  });
+});

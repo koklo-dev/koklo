@@ -4,7 +4,12 @@ import {
   ARCH_NODE_LABELS,
   ArchNodeCard,
   type ArchNodeKind,
+  DecisionStatus,
   DiagramViewer,
+  IdTag,
+  InlineAlert,
+  ListPanel,
+  ListRow,
   SequenceDiagram,
   ZoneNode,
 } from "@koklo/ui";
@@ -80,6 +85,49 @@ const renderNode = (
   context: { selected: boolean; ghost: boolean; compact: boolean; onSelect: () => void },
 ) => <ArchNodeCard kind={node.kind} name={node.name} subtitle={node.subtitle} {...context} />;
 
+/** Démonstrations liées aux décisions : `DecisionStatus`, `ListRow wrap`, `InlineAlert` à actions. */
+function DevUiDecisionFrames() {
+  return (
+    <>
+      <DevUiFrame title="DecisionStatus : Acceptée, Proposée, Remplacée (libellé toujours écrit)">
+        <div className="flex flex-wrap items-center gap-3">
+          <DecisionStatus status="acceptee" />
+          <DecisionStatus status="proposee" />
+          <DecisionStatus status="remplacee" />
+        </div>
+      </DevUiFrame>
+      <DevUiFrame title="ListRow wrap : titre et sous-titre à la ligne, marges 10/14 (lignes de décisions)">
+        <ListPanel label="Décisions, démonstration" className="max-w-[420px]">
+          <ListRow
+            wrap
+            leading={<IdTag>ADR-007</IdTag>}
+            title="Rappels envoyés par une file de tâches plutôt que par un cron dans l'API"
+            subtitle="12 oct. · C-api, C-db, F-001"
+            trailing={<DecisionStatus status="acceptee" />}
+          />
+        </ListPanel>
+      </DevUiFrame>
+      <DevUiFrame title="InlineAlert actions : bouton primaire avec icône (bandeau À revoir)" wide>
+        <InlineAlert
+          variant="warning"
+          icon="sync_problem"
+          actions={[
+            { label: "Voir les changements", onClick: () => undefined },
+            {
+              label: "Proposer les mises à jour",
+              onClick: () => undefined,
+              primary: true,
+              icon: "wand_stars",
+            },
+          ]}
+        >
+          Le modèle de données a changé depuis la validation.
+        </InlineAlert>
+      </DevUiFrame>
+    </>
+  );
+}
+
 /** Section « 23. Schéma d'architecture » : `ArchNodeCard`, le lecteur en couches (bandes, zone voisine), `SequenceDiagram`. */
 export function DevUiArchitecture() {
   const nodes = useMemo(() => nodesOf([DETAIL], GHOSTS), []);
@@ -92,6 +140,7 @@ export function DevUiArchitecture() {
   );
   return (
     <DevUiSection id="dev-ui-architecture" title="23. Schéma d'architecture">
+      <DevUiDecisionFrames />
       <DevUiFrame title="ArchNodeCard : une forme par type, le type toujours écrit">
         <div className="flex flex-wrap items-start gap-3">
           {KINDS.map((kind) => (
@@ -99,6 +148,7 @@ export function DevUiArchitecture() {
           ))}
           <ArchNodeCard kind="service" name="Sélectionné" selected />
           <ArchNodeCard kind="app" name="À relire" pending />
+          <ArchNodeCard kind="service" name="À revoir" stale />
           <ArchNodeCard kind="service" name="Autre zone" subtitle="Hors zone" ghost />
           <ArchNodeCard kind="service" name="Compact" compact />
         </div>

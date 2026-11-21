@@ -4,6 +4,8 @@ import {
   ARCHITECTURE_OPERATION_KINDS,
   adrCreateSchema,
   adrDeleteSchema,
+  adrDetailSchema,
+  adrIdSchema,
   adrUpdateSchema,
   archflowCreateSchema,
   archflowDeleteSchema,
@@ -357,6 +359,7 @@ export const SPEC_ITEM_TYPES = [
   "table",
   "component",
   "archflow",
+  "adr",
 ] as const;
 const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   feature: featureIdSchema,
@@ -366,6 +369,7 @@ const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   table: tableIdSchema,
   component: componentIdSchema,
   archflow: flowIdSchema,
+  adr: adrIdSchema,
 };
 export const specItemGetInputSchema = z
   .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
@@ -396,6 +400,7 @@ export const specItemSchema = z.discriminatedUnion("type", [
   itemOf("table", tableIdSchema, tableDetailSchema),
   itemOf("component", componentIdSchema, componentDetailSchema),
   itemOf("archflow", flowIdSchema, archflowDetailSchema),
+  itemOf("adr", adrIdSchema, adrDetailSchema),
 ]);
 
 export const specRefsSearchInputSchema = z.object({

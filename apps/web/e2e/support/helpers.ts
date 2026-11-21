@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import type { ProvidersScenario } from "./stub-ai-providers.ts";
+import type { ArchitectureReviewScenario } from "./stub-architecture-decisions.ts";
 import type { ClientSpaceScenario } from "./stub-client-space.ts";
 import type { FeaturesScenario } from "./stub-features.ts";
 import type { GithubScenario } from "./stub-github.ts";
@@ -46,6 +47,7 @@ export async function setScenario(
     FeaturesScenario &
     ProposalsScenario &
     ClientSpaceScenario &
+    ArchitectureReviewScenario &
     ProvidersScenario &
     ShellScenario &
     OverviewScenario &

@@ -314,6 +314,117 @@ export function serveComponents({ rows = COMPONENTS, fail }: Options = {}): void
   });
 }
 
+const adrRow = (n: number, over: Record<string, unknown> = {}) => ({
+  specId: `ADR-${String(n).padStart(3, "0")}`,
+  title: `Décision ${n}`,
+  status: "acceptee",
+  date: `2026-10-${String(n).padStart(2, "0")}`,
+  links: ["C-api"],
+  filePath: `architecture/adr/ADR-${String(n).padStart(3, "0")}-decision.md`,
+  ...over,
+});
+
+/** Décisions du faux serveur (contrat 3.11.0) : deux acceptées, une proposée, une remplacée par ADR-003. */
+export const ADR_ROWS = [
+  adrRow(3, { title: "Un seul composant écrit en base", links: ["C-api", "C-db"] }),
+  adrRow(2, {
+    title: "Fournisseur SMS derrière une interface",
+    status: "proposee",
+    links: ["C-sms"],
+  }),
+  adrRow(1, { title: "Base PostgreSQL", status: "remplacee", supersededBy: "ADR-003" }),
+];
+
+export const ADR_DETAIL = {
+  specId: "ADR-003",
+  title: "Un seul composant écrit en base",
+  status: "acceptee",
+  date: "2026-10-03",
+  deciders: ["Moussa", "Awa"],
+  context: "Plusieurs composants pourraient écrire en base.",
+  decision: "Seule l'API écrit en base. <b>pas de balise</b>",
+  consequences: { positive: ["Un seul point de contrôle."], toAccept: ["L'API est un goulot."] },
+  alternatives: [{ name: "Écriture partout", reason: "Règles dispersées" }],
+  links: ["C-api", "C-db", "F-001"],
+  supersededBy: undefined,
+  filePath: "architecture/adr/ADR-003-un-seul-composant.md",
+  commitSha: SHA40,
+};
+
+type AdrRow = ReturnType<typeof adrRow>;
+
+const adrMatches = (row: AdrRow, args: Record<string, unknown>): boolean =>
+  (!args.status || row.status === args.status) &&
+  (!args.component || row.links.includes(String(args.component))) &&
+  (!args.q || `${row.specId} ${row.title}`.toLowerCase().includes(String(args.q).toLowerCase()));
+
+/** Début de la page : le curseur, sinon la page qui contient `around` (404 sinon), sinon le début. */
+function adrPageStart(items: readonly AdrRow[], args: Record<string, unknown>, size: number) {
+  if (args.cursor) return Number(args.cursor);
+  const at = args.around ? items.findIndex((row) => row.specId === args.around) : 0;
+  if (args.around && at === -1) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND" });
+  return Math.floor(Math.max(at, 0) / size) * size;
+}
+
+/** `spec.architecture.adr.list|byId` : pages à curseur, filtres `status`, `q`, `component`, `around`, facettes de statut. */
+export function serveDecisions(rows: readonly AdrRow[] = ADR_ROWS): void {
+  procedures.specArchitectureAdrList.mockImplementation(async (input: unknown) => {
+    const args = (input ?? {}) as Record<string, unknown>;
+    const size = Number(args.limit ?? 50);
+    const items = rows.filter((row) => adrMatches(row, args));
+    const from = adrPageStart(items, args, size);
+    const status: Record<string, number> = {};
+    for (const row of rows) status[row.status] = (status[row.status] ?? 0) + 1;
+    return {
+      items: items.slice(from, from + size),
+      nextCursor: from + size < items.length ? String(from + size) : null,
+      previousCursor: from > 0 ? String(Math.max(0, from - size)) : null,
+      offset: from,
+      total: items.length,
+      facets: { status },
+    };
+  });
+  procedures.specArchitectureAdrById.mockImplementation(async (input: unknown) => {
+    const { adrId } = input as { adrId: string };
+    const row = rows.find((entry) => entry.specId === adrId);
+    return { ...ADR_DETAIL, ...row, specId: adrId };
+  });
+}
+
+/** Fiches d'édition (`spec.item.get`) : composant, flux et décision ; le reste suit le faux serveur de départ. */
+function serveItems(): void {
+  const previous = procedures.specItemGet.getMockImplementation();
+  procedures.specItemGet.mockImplementation(async (input) => {
+    const { type, id } = input as { type?: string; id: string };
+    if (type === "archflow") {
+      return {
+        type: "archflow",
+        id,
+        values: { ...FLOW_DETAIL, specId: id },
+        validated: false,
+        referencedBy: { items: [], total: 0 },
+      };
+    }
+    if (type === "adr") {
+      return {
+        type: "adr",
+        id,
+        values: { ...ADR_DETAIL, specId: id },
+        validated: false,
+        referencedBy: { items: [], total: 0 },
+      };
+    }
+    if (type !== "component") return previous?.(input);
+    return {
+      type: "component",
+      id,
+      values: { ...COMPONENT_DETAIL, specId: id },
+      validated: false,
+      referencedBy: { items: [], total: 0 },
+    };
+  });
+}
+
 export function serveArchitecture(
   role: Parameters<typeof serve>[0] = "owner",
   options: Options = {},
@@ -335,32 +446,13 @@ export function serveArchitecture(
   );
   serveComponents(options);
   serveSchema();
+  serveDecisions();
   procedures.specArchitectureDocument.mockResolvedValue({
     sections: options.sections ?? SECTIONS,
     commitSha: SHA40,
   });
   procedures.specArchitectureChecks.mockResolvedValue({ warnings: options.warnings ?? [] });
-  const previous = procedures.specItemGet.getMockImplementation();
-  procedures.specItemGet.mockImplementation(async (input) => {
-    const { type, id } = input as { type?: string; id: string };
-    if (type === "archflow") {
-      return {
-        type: "archflow",
-        id,
-        values: { ...FLOW_DETAIL, specId: id },
-        validated: false,
-        referencedBy: { items: [], total: 0 },
-      };
-    }
-    if (type !== "component") return previous?.(input);
-    return {
-      type: "component",
-      id,
-      values: { ...COMPONENT_DETAIL, specId: id },
-      validated: false,
-      referencedBy: { items: [], total: 0 },
-    };
-  });
+  serveItems();
   procedures.reviewList.mockResolvedValue({ items: [], nextCursor: null });
   procedures.specDeliverables.mockResolvedValue({
     deliverables: [

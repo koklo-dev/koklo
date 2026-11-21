@@ -42,10 +42,17 @@ describe("TK-112 : onglets Schéma et Flux", () => {
     expect(architectureHeaderStateOf({ ...base, tab: "flows" }).actions).toEqual([
       "propose",
       "create-flow",
+      "validate",
     ]);
     expect(architectureHeaderStateOf({ ...base, tab: "schema" }).actions).toEqual([
       "propose",
       "create",
+      "validate",
+    ]);
+    expect(architectureHeaderStateOf({ ...base, tab: "decisions" }).actions).toEqual([
+      "propose",
+      "create-decision",
+      "validate",
     ]);
     expect(architectureHeaderStateOf({ ...base, tab: "flows", canWrite: false }).actions).toEqual(
       [],
@@ -95,19 +102,45 @@ describe("architectureHeaderStateOf", () => {
     expect(state.tabCounts?.document).toBeUndefined();
   });
 
-  it("Liste · équipe : validation de l'équipe, résumé, Proposer puis Nouveau composant ; pas de Valider (TK-114)", () => {
+  it("Liste · équipe : validation de l'équipe, résumé, Proposer, Nouveau composant puis Valider l'architecture (B577)", () => {
     const state = architectureHeaderStateOf(base);
     expect(state).toMatchObject({
       status: "in_progress",
       statusLabel: "Validation de l'équipe · le client lit et commente",
       summary: "34 composants",
-      actions: ["propose", "create"],
+      actions: ["propose", "create", "validate"],
     });
     expect(state.tabCounts).toEqual({ components: { value: 34 } });
   });
 
   it("onglet Document : aucun bouton d'ajout, l'agent reste proposé", () => {
-    expect(architectureHeaderStateOf({ ...base, tab: "document" }).actions).toEqual(["propose"]);
+    expect(architectureHeaderStateOf({ ...base, tab: "document" }).actions).toEqual([
+      "propose",
+      "validate",
+    ]);
+  });
+
+  it("« Valider » disparaît une fois validé et reste en « À revoir » ; résumé « Validé par … » (B591, B592 bis)", () => {
+    const validation = { name: "Moussa", at: "2026-11-05T10:00:00Z", sha: "8f2d41c0000" };
+    const validated = architectureHeaderStateOf({ ...base, deliverable: "validated", validation });
+    expect(validated.actions).toEqual(["propose", "create"]);
+    expect(validated.summary).toBe("Validé par Moussa le 5 nov. · version 8f2d41c");
+    const revise = architectureHeaderStateOf({ ...base, deliverable: "revise", validation });
+    expect(revise.actions).toEqual(["create", "propose-updates", "validate"]);
+    expect(
+      architectureHeaderStateOf({ ...base, deliverable: "revise", validation, agent: false })
+        .actions,
+    ).toEqual(["create", "validate"]);
+    expect(revise.summary).toContain("Validé le 5 nov.");
+  });
+
+  it("le résumé compte les décisions entre les composants et les flux (B591)", () => {
+    expect(architectureSummaryOf({ components: 34, decisions: 23, flows: 18 })).toBe(
+      "34 composants · 23 décisions · 18 flux",
+    );
+    expect(
+      architectureHeaderStateOf({ ...base, counts: { components: 3, decisions: 2 } }).tabCounts,
+    ).toEqual({ components: { value: 3 }, decisions: { value: 2 } });
   });
 
   it("validé et à revoir gardent leur statut serveur", () => {

@@ -569,7 +569,7 @@ Galerie : `/dev/ui`, section « 21. Diagramme » (vue des zones de la planche, i
 
 | Élément | Règle |
 |---|---|
-| Onglets | Schéma (défaut ≥ 1024 px), Document, Composants, Flux ; Décisions absent jusqu'à TK-113 |
+| Onglets | Schéma (défaut ≥ 1024 px), Document, Composants, Flux ; Décisions : voir §5.24 |
 | Couches | `DiagramViewer` prop `bands` : 4 bandes séparées d'un trait pointillé `--border-strong`, une sur deux teintée `--primary` à 4 %, libellé en capitales 10 px 600 `--muted-foreground` à droite |
 | `ArchNodeCard` | Tuile icône 32 `--soft` (28 et pilule pour un acteur), nom 13/600, type écrit 11 px ; acteur pilule 160 × 52, application 220 × 70, service 200 × 70, stockage 170 × 64 rayon 14, file 170 × 64 rayon 10, nœud estompé 240 × 70, externe 170 × 64 pointillé `--border-strong` sur `--surface` ; sélection : contour 2 px `--primary`, tuile `--primary` ; à relire : contour pointillé |
 | `ZoneNode` variante `architecture` | Famille `diagram` (300 × 180, rayon 14, bordure 1,5 px) avec sous-titre 12/400 et puces `--secondary` en sans-serif 11 px (1 px 6 px) ; `minHeight` 180 sur la carte elle-même sous 768 px |
@@ -577,6 +577,18 @@ Galerie : `/dev/ui`, section « 21. Diagramme » (vue des zones de la planche, i
 | Composant d'une autre zone | prop `ghostIds` : opacité .7, contour pointillé, carte « <zone voisine> · Hors zone » (le serveur ne rend que le compte de liens par zone), nom accessible « Service <zone>, autre zone », sans `aria-pressed` ; un clic ouvre l'autre zone |
 | Pastilles d'identifiant | `EntityChip` gagne les genres `component` (`widgets`), `decision` (`gavel`) et `flow` (`route`) ; icônes du registre ajoutées : `desktop_windows`, `hub`, `lists`, `cloud`, `sms`, `mail` (la maquette `smartphone` et `queue` n'existent pas dans le jeu Material : `desktop_windows` et `lists`) |
 | `SequenceDiagram` | Cadre `--surface` rayon 12, en-têtes 112 × 36 (pilule pour un acteur, pointillé pour un externe), lignes de vie pointillées `--border-strong`, messages numérotés (n° mono 10), appel plein `--foreground`, retour pointillé `--muted-foreground`, bloc `alt` pointillé fond `--destructive` atténué, séparateur pleine largeur ; `role="img"` + `details` « Lire les messages » |
+
+### 5.24 Architecture : décisions, validation, À revoir et vue client (v2.30, TK-113, passation 10 §3, §4.4, §5, §7, 11 §3, maquette 13 l.120-137, 225-229, 375-401, 589-601, 802-810, 860-866, B575 à B592)
+
+| Élément | Règle |
+|---|---|
+| Onglet Décisions | Liste 420-520 px (recherche, puces pointillées Statut / Composant / Date, barre de compte « N décisions · N acceptées · N proposées », lignes : chip `ADR`, titre, « date · liens », statut ; remplacée à 70 %) et fiche (id, statut, « date · décideurs », titre 22/600, encadré « Remplacée par … », Contexte, Décision, Conséquences, Alternatives écartées, liens, pied « Enregistrée dans la spec · chemin ») |
+| `DecisionStatus` | Pastille 24 px de la famille des statuts : Acceptée `success` `check_circle`, Proposée `warning` `schedule`, Remplacée `outline` `swap_horiz` ; libellé toujours écrit ; jamais la seule couleur |
+| Conséquences | `add_circle` vert « Positif : », `do_not_disturb_on` ambre « À accepter : » (icônes ajoutées au registre) ; alternatives en cartes bordées `block` « **Nom** · raison » |
+| Valider l'architecture | Bouton primaire `verified` de l'en-tête (liste équipe, livrable non validé) ; validé : « Validé par l'équipe » vert, résumé « Validé par <prénom> le <date> · version <sha> » |
+| `ListRow wrap` et `InlineAlert` primaire | `ListRow wrap` : titre et sous-titre à la ligne (interligne 1,3, marges 10/14), lignes de décisions ; `InlineAlert` `actions[].primary` (bouton plein `--primary`) et `actions[].icon` (18), bandeau À revoir |
+| À revoir | `InlineAlert` `warning` `role="alert"` `sync_problem` (« Le modèle de données a changé depuis la validation (version …) » + éléments + « Voir les changements » + « Proposer les mises à jour », deux boutons `sm`) ; `ArchNodeCard` prop `stale` (contour 2 px `--status-pending-icon`, nom accessible « …, à revoir ») ; encadré ambre dans la fiche du composant concerné |
+| Vue client | `InlineAlert` `readonly` `role="note"` `visibility` « Lecture seule. … » ; en-tête « Validé par l'équipe · … · lecture seule » + « Commenter » (`add_comment`, client seulement) ; fiches « En clair » (`--surface`), « Sert » seul, sans YAML ni Mermaid ni « Modifier » ; onglets Schéma, Composants, Décisions, Flux (pas de Document) |
 
 ## 6. Écrans maquettés
 

@@ -9,7 +9,7 @@ import type { IncomingMessage } from "node:http";
 export type ArchitectureMode = "empty" | "demo" | "volume";
 export type ArchitectureScenario = { architecture?: ArchitectureMode };
 
-type Reply = { status: number; body: string };
+export type Reply = { status: number; body: string };
 const reply = (status: number, body: unknown): Reply => ({ status, body: JSON.stringify(body) });
 const typed = (status: number, code: string): Reply =>
   reply(status, { defined: true, code, message: code });
@@ -25,7 +25,7 @@ const ZONES = [
 ];
 
 type Type = "app" | "service" | "store" | "queue" | "ext";
-interface Component {
+export interface Component {
   specId: string;
   name: string;
   type: Type;
@@ -154,7 +154,7 @@ const GENERATED: Component[] = Array.from({ length: VOLUME_COUNT - DEMO.length }
   };
 });
 
-const componentsOf = (mode: ArchitectureMode): Component[] =>
+export const componentsOf = (mode: ArchitectureMode): Component[] =>
   mode === "empty" ? [] : mode === "volume" ? [...DEMO, ...GENERATED] : DEMO;
 
 /** Compteur de `spec.head.counts.components` d'après le mode du scénario. */
@@ -404,7 +404,7 @@ const flowTitleOf = (n: number): string => FLOW_TITLES[n] ?? `Flux ${pad(n + 1)}
 const flowCountOf = (mode: ArchitectureMode): number =>
   mode === "empty" ? 0 : mode === "volume" ? 300 : FLOW_COUNT;
 
-function listFlows(url: URL, mode: ArchitectureMode): Reply {
+export function listFlows(url: URL, mode: ArchitectureMode): Reply {
   const total = flowCountOf(mode);
   const limit = Number(url.searchParams.get("limit") ?? PAGE) || PAGE;
   const around = url.searchParams.get("around");
@@ -433,7 +433,7 @@ function listFlows(url: URL, mode: ArchitectureMode): Reply {
   });
 }
 
-function flowDetail(mode: ArchitectureMode, id: string): Reply {
+export function flowDetail(mode: ArchitectureMode, id: string): Reply {
   const n = Array.from({ length: flowCountOf(mode) }, (_, i) => i).find((i) => flowIdOf(i) === id);
   if (n === undefined) return typed(404, "NOT_FOUND");
   return reply(200, {

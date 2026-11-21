@@ -211,12 +211,18 @@ test.describe("parcours des onglets Schéma et Flux", () => {
     await start(page);
     await page.goto(PATH);
     const tabs = page.getByRole("navigation", { name: "Sections de l'architecture" });
-    await expect(tabs.getByRole("link")).toHaveText(["Schéma", "Document", /^Composants/, /^Flux/]);
+    await expect(tabs.getByRole("link")).toHaveText([
+      "Schéma",
+      "Document",
+      /^Composants/,
+      /^Décisions/,
+      /^Flux/,
+    ]);
     await expect(tabs.getByRole("link", { name: "Schéma" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    await expect(page.getByText("8 composants · 18 flux").first()).toBeVisible();
+    await expect(page.getByText("8 composants · 23 décisions · 18 flux").first()).toBeVisible();
     await layersLoaded(page);
     for (const label of [
       "Utilisateurs",
@@ -228,7 +234,7 @@ test.describe("parcours des onglets Schéma et Flux", () => {
     }
     await expect(node(page, "Acteur Client")).toBeVisible();
     await expect(node(page, "Externe Fournisseur SMS")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Valider l'architecture/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Valider l'architecture" })).toBeVisible();
   });
 
   test("vue des zones (120 composants) → zone → fiche Fiche · YAML · Mermaid, zone voisine estompée", async ({

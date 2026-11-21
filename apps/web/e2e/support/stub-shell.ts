@@ -1,4 +1,8 @@
 import type { IncomingMessage } from "node:http";
+import {
+  type ArchitectureReviewScenario,
+  architectureDeliverable,
+} from "./stub-architecture-decisions.ts";
 import { type DataModelScenario, dataDeliverable } from "./stub-data-model.ts";
 import { ideaPhase } from "./stub-idea-agent.ts";
 
@@ -8,13 +12,14 @@ import { ideaPhase } from "./stub-idea-agent.ts";
  * Les visites reçues s'ajoutent en tête des récents ; `GET /__visits` les rend, dans l'ordre.
  */
 export type ShellMode = "data" | "noSprint" | "internal" | "loading";
-export type ShellScenario = DataModelScenario & {
-  shell?: ShellMode;
-  /** Identifiants de projets déjà visités, du plus récent au plus ancien. */
-  recent?: string[];
-  /** `search.query` : réponse normale (défaut), en échec (500) ou retenue jusqu'à `/__release`. */
-  search?: "data" | "error" | "loading";
-};
+export type ShellScenario = DataModelScenario &
+  ArchitectureReviewScenario & {
+    shell?: ShellMode;
+    /** Identifiants de projets déjà visités, du plus récent au plus ancien. */
+    recent?: string[];
+    /** `search.query` : réponse normale (défaut), en échec (500) ou retenue jusqu'à `/__release`. */
+    search?: "data" | "error" | "loading";
+  };
 
 type Reply = { status: number; body: string };
 type Send = (reply: Reply) => void;
@@ -144,6 +149,8 @@ function statusOf(key: string, scenario: ShellScenario & { architecture?: string
   const data = dataDeliverable(scenario);
   if (data && key === "data") return data.status;
   if (data && key === "functional") return "validated";
+  const architecture = architectureDeliverable(scenario);
+  if (key === "architecture" && architecture) return architecture.status;
   if (key === "architecture" && scenario.architecture !== undefined) return "pending";
   return key === "functional" && "clientSpace" in scenario ? "pending" : "todo";
 }
@@ -169,14 +176,22 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
     // suppose validé (TK-109) et pilote le statut des Données.
     status: statusOf(key, h.scenario),
     ...(key === "data" && data?.staleUpstream ? { staleUpstream: data.staleUpstream } : {}),
+    ...(key === "architecture" ? { stale: architectureDeliverable(h.scenario) } : {}),
     available: availableOf(key, available, h.scenario),
     after,
   }));
   return reply(200, {
-    deliverables: entries.map(({ key, status, staleUpstream, available, after }) => ({
+    deliverables: entries.map(({ key, status, staleUpstream, stale, available, after }) => ({
       key,
       status,
       ...(staleUpstream ? { staleUpstream } : {}),
+      ...(stale?.staleUpstream
+        ? {
+            staleUpstream: stale.staleUpstream,
+            staleComponents: stale.staleComponents,
+            staleFlows: stale.staleFlows,
+          }
+        : {}),
       available,
       forced: false,
       condition: after === null ? null : `Disponible après ${after}`,

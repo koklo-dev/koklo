@@ -1,4 +1,8 @@
 import type {
+  AdrByIdInput,
+  AdrDetail,
+  AdrListInput,
+  AdrSummary,
   ArchitectureChecks,
   ArchitectureComponentSummary,
   ArchitectureComponentsListInput,
@@ -13,6 +17,7 @@ import { indexFailed } from "../spec-read/index-failed.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { adrDetail, adrSummary, adrSupersession } from "./architecture-adrs.ts";
 import {
   checksInputOf,
   componentSummary,
@@ -47,6 +52,25 @@ const EMPTY_COMPONENTS: ComponentsPageOutput = {
   facets: { zone: {} },
 };
 
+interface AdrsPageOutput {
+  items: AdrSummary[];
+  nextCursor: string | null;
+  previousCursor: string | null;
+  offset: number;
+  total: number;
+  facets: Record<string, Record<string, number>>;
+}
+
+/** Page rendue pour une révision non indexée : liste vide, facettes vides. */
+const EMPTY_ADRS: AdrsPageOutput = {
+  items: [],
+  nextCursor: null,
+  previousCursor: null,
+  offset: 0,
+  total: 0,
+  facets: { status: {} },
+};
+
 /**
  * Lectures de la page Architecture (TK-111) : composants et avertissements viennent de l'index d'entités ; seul le document
  * (sections `architecture/overview/NN-<slug>.md`, jamais indexées, B508) est lu chez le fournisseur au commit indexé, hors
@@ -77,6 +101,43 @@ export class SpecArchitectureService {
       ...position,
       items: items.map((row) => componentSummary(row.specId, row.path, row.data)),
     };
+  }
+
+  /** Décisions (TK-113) : pages de 50, recherche et filtres sur toute la tête, `around` pour un lien direct. */
+  async adrs(scope: ProjectScope, input: AdrListInput): Promise<AdrsPageOutput> {
+    const { branch, commitSha, cursor, around, limit, ...filters } = input;
+    const indexed = await this.repository.adrsPage(
+      scope,
+      { branch, commitSha },
+      { ...filters, cursor, around, limit: limit ?? DEFAULT_PAGE_SIZE },
+    );
+    if (indexed?.kind === "failed") throw indexFailed(indexed);
+    if (indexed === null) return EMPTY_ADRS;
+    const { items, ...position } = indexed.page;
+    return {
+      ...position,
+      items: items.map((row) => adrSummary(row.specId, row.path, row.data)),
+    };
+  }
+
+  /** Fiche d'une décision, avec la date de sa remplaçante ; inconnue ou rien d'indexé : 404. */
+  async adr(
+    scope: ProjectScope,
+    input: Pick<AdrByIdInput, "adrId" | "branch" | "commitSha">,
+  ): Promise<AdrDetail> {
+    const { adrId, branch, commitSha } = input;
+    const found = await this.repository.adr(scope, { branch, commitSha }, adrId);
+    if (found?.kind === "failed") throw indexFailed(found);
+    const { adr, replacedBy, commitSha: sha } = orNotFound(found);
+    const dates = new Map<string, string>();
+    const date = (replacedBy?.data as { date?: unknown } | null | undefined)?.date;
+    if (replacedBy && typeof date === "string") dates.set(replacedBy.specId, date);
+    return adrDetail(
+      adr.specId,
+      adr.data,
+      { filePath: adr.path, commitSha: sha },
+      adrSupersession(adr.data, dates),
+    );
   }
 
   /** Sections du document lues dans git au commit indexé, dans l'ordre de leur numéro ; rien d'indexé : 404. */

@@ -6,11 +6,12 @@ import { orpc } from "./orpc.ts";
 import { useReviewActions } from "./use-review-actions.ts";
 
 /**
- * « Valider le modèle » (TK-109, B445) : `review.submit` sur le livrable `data`, au SHA de tête lu avec la page. Le
- * serveur reste l'autorité (droits owner, admin, développeur ; version). L'annonce « Modèle validé » passe par la
- * région d'état de la page ; l'échec se lit dans `error`.
+ * « Valider » un livrable (TK-109 Données, B445 ; TK-113 Architecture, B577) : `review.submit` sur le livrable, au SHA
+ * de tête lu avec la page. Le serveur reste l'autorité (droits owner, admin, développeur ; version). L'annonce
+ * (« Modèle validé », « Architecture validée ») passe par la région d'état de la page ; l'échec se lit dans `error`.
  */
-export function useValidateModel(
+export function useValidateDeliverable(
+  key: "data" | "architecture",
   projectId: string,
   sha: string | undefined,
   announce: (text: string) => void,
@@ -18,25 +19,36 @@ export function useValidateModel(
   const actions = useReviewActions(projectId);
   return {
     pending: actions.pending,
-    error: actions.errorFor("deliverable", "data"),
+    error: actions.errorFor("deliverable", key),
     validate: async () => {
       if (!sha) return;
       const done = await actions.decide({
         targetKind: "deliverable",
-        targetRef: "data",
+        targetRef: key,
         version: sha,
         status: "approved",
       });
-      if (done) announce("Modèle validé");
+      if (done) announce(key === "data" ? "Modèle validé" : "Architecture validée");
     },
   };
 }
 
-/** Décision « validé » en vigueur du livrable Données : prénom (équipe), date et SHA (B451). Lue seulement une fois validé. */
-export function useDataValidation(projectId: string, enabled: boolean): DataValidation | undefined {
+/** « Valider le modèle » (Données) : le livrable `data`. */
+export const useValidateModel = (
+  projectId: string,
+  sha: string | undefined,
+  announce: (text: string) => void,
+) => useValidateDeliverable("data", projectId, sha, announce);
+
+/** Décision « validé » en vigueur d'un livrable : prénom (équipe), date et SHA (B451, B591). Lue seulement une fois validé. */
+export function useDeliverableValidation(
+  key: "data" | "architecture",
+  projectId: string,
+  enabled: boolean,
+): DataValidation | undefined {
   const query = useQuery({
     ...orpc.review.list.queryOptions({
-      input: { projectId, targetKind: "deliverable", targetRef: "data", limit: 5 },
+      input: { projectId, targetKind: "deliverable", targetRef: key, limit: 5 },
     }),
     enabled,
   });
@@ -45,3 +57,7 @@ export function useDataValidation(projectId: string, enabled: boolean): DataVali
     ? { name: decision.authorName, at: decision.createdAt, sha: decision.sha }
     : undefined;
 }
+
+/** Décision « validé » en vigueur du livrable Données. */
+export const useDataValidation = (projectId: string, enabled: boolean) =>
+  useDeliverableValidation("data", projectId, enabled);

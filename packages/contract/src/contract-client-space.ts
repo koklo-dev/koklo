@@ -1,6 +1,16 @@
 import { spaceNotReadyError, validationError } from "./errors.ts";
 import { readErrors, readOneErrors, route } from "./route-helpers.ts";
 import {
+  clientSpaceAdrInputSchema,
+  clientSpaceAdrOutputSchema,
+  clientSpaceAdrsInputSchema,
+  clientSpaceAdrsOutputSchema,
+  clientSpaceArchFlowInputSchema,
+  clientSpaceArchFlowOutputSchema,
+  clientSpaceArchFlowsInputSchema,
+  clientSpaceArchFlowsOutputSchema,
+  clientSpaceArchitectureInputSchema,
+  clientSpaceArchitectureOutputSchema,
   clientSpaceDataFixturePageInputSchema,
   clientSpaceDataFixturePageOutputSchema,
   clientSpaceDataFixtureRowsInputSchema,
@@ -94,4 +104,28 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceDataFixturePageInputSchema)
     .output(clientSpaceDataFixturePageOutputSchema),
+  /**
+   * Architecture validée (TK-113, 3.11.0) : composants, décisions et flux au vocabulaire client, lecture seule ; commentaires par
+   * `comment.create`. Non validée : `available` faux et rien d'autre. Jamais de YAML, de Mermaid, de chemin ni de SHA.
+   */
+  architecture: route("GET", "/client-space/projects/{projectId}/architecture")
+    .errors(spaceReadErrors)
+    .input(clientSpaceArchitectureInputSchema)
+    .output(clientSpaceArchitectureOutputSchema),
+  adrs: route("GET", "/client-space/projects/{projectId}/architecture/adrs")
+    .errors(spaceReadErrors)
+    .input(clientSpaceAdrsInputSchema)
+    .output(clientSpaceAdrsOutputSchema),
+  adr: route("GET", "/client-space/projects/{projectId}/architecture/adrs/{adrId}")
+    .errors(spaceReadErrors)
+    .input(clientSpaceAdrInputSchema)
+    .output(clientSpaceAdrOutputSchema),
+  archFlows: route("GET", "/client-space/projects/{projectId}/architecture/flows")
+    .errors(spaceReadErrors)
+    .input(clientSpaceArchFlowsInputSchema)
+    .output(clientSpaceArchFlowsOutputSchema),
+  archFlow: route("GET", "/client-space/projects/{projectId}/architecture/flows/{flowId}")
+    .errors(spaceReadErrors)
+    .input(clientSpaceArchFlowInputSchema)
+    .output(clientSpaceArchFlowOutputSchema),
 };

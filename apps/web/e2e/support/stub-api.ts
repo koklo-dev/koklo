@@ -1,6 +1,10 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { handleProviders, type ProvidersScenario, resetProviders } from "./stub-ai-providers.ts";
 import {
+  handleArchitectureReview,
+  resetArchitectureReview,
+} from "./stub-architecture-decisions.ts";
+import {
   type ClientSpaceScenario,
   handleClientSpace,
   resetClientSpace,
@@ -182,6 +186,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetMembers();
     resetShell(scenario);
     resetDataModel(scenario);
+    resetArchitectureReview(scenario);
     resetIdea(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     seedCreation(scenario, addProject);
@@ -214,6 +219,7 @@ type Sender = (reply: ReturnType<typeof json>) => void;
 /** Le reste du faux API : fonctionnalités, dépôt de spec, projets, kanban, GitHub, organisations. */
 function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
   const path = url.pathname;
+  if (handleArchitectureReview(req, url, { scenario, send })) return;
   if (handleDataModel(req, url, { scenario, send })) return;
   if (/^\/(client-space|projects\/[^/]+\/reviews)/.test(path) || path === "/__client-calls") {
     void handleClientSpace(req, url, { scenario, send });
