@@ -21,6 +21,6 @@
     "maquette": "node packages/config/src/maquette-source.ts"
   },
   "devDependencies": {
-    "turbo": "2.11.10"
+    "turbo": "2.11.12"
   }
 }
