@@ -20,7 +20,11 @@ export type ProposedPageCardProps = {
 export type ProposedPageLabel = "page" | "section";
 
 const LABELS: Record<ProposedPageLabel, { group: string; accept: string; spacing: string }> = {
-  page: { group: "Page proposée par l'agent", accept: "Ajouter la page", spacing: "" },
+  page: {
+    group: "Page proposée par l'agent",
+    accept: "Ajouter la page",
+    spacing: "mx-0.5 mt-3.5 mb-2.5",
+  },
   section: {
     group: "Section proposée par l'agent",
     accept: "Ajouter la section",
@@ -70,7 +74,7 @@ export function ProposedPageCard({
 
 export type ProposedPageItem = { id: string; title: string; rationale: string };
 
-/** Trois cartes visibles, le reste derrière « N autres » (fiche TK-90 §5). */
+/** Trois cartes visibles, le reste derrière « N autres » (fiche TK-90 §5). La pile porte les marges une fois (14 / 2 / 10, maquette 06 l.89). */
 export function ProposedPageList({
   items,
   onAccept,
@@ -95,13 +99,14 @@ export function ProposedPageList({
   const shown = open ? items : items.slice(0, visible);
   const hidden = items.length - shown.length;
   return (
-    <div ref={list} className="flex flex-col gap-2.5">
+    <div ref={list} className="mx-0.5 mt-3.5 mb-2.5 flex flex-col gap-2.5">
       {shown.map((item) => (
         <ProposedPageCard
           key={item.id}
           title={item.title}
           rationale={item.rationale}
           busy={busyId === item.id}
+          className="m-0"
           onAccept={() => onAccept(item.id)}
           onIgnore={() => onIgnore(item.id)}
         />

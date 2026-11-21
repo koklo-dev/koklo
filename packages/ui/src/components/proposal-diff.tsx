@@ -102,7 +102,7 @@ export function ProposalDiff({
       tabIndex={-1}
       onKeyDown={shortcuts(onAccept, onReject, !stale && !busy)}
       className={cn(
-        "flex flex-col rounded-xl border border-primary border-dashed bg-diff-bg text-foreground",
+        "mx-0.5 my-2.5 flex flex-col rounded-xl border border-primary border-dashed bg-diff-bg text-foreground",
         className,
       )}
     >

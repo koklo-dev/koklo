@@ -1,8 +1,8 @@
 "use client";
 
 import type { ClientSpaceProgress } from "@koklo/contract";
-import { Button, Icon, InlineAlert } from "@koklo/ui";
-import { progressSummary } from "../lib/client-validation-labels.ts";
+import { Button, InlineAlert } from "@koklo/ui";
+import { headerSummary, SUMMARY_ID } from "../lib/client-validation-labels.ts";
 import type { HeaderTabCount } from "../lib/features-header-state.ts";
 import type { FeaturesTab } from "../lib/features-tab.ts";
 import type { useReviewActions } from "../lib/use-review-actions.ts";
@@ -19,16 +19,17 @@ function tabCounts(progress: ClientSpaceProgress | undefined) {
   return counts;
 }
 
-/** « Valider le cahier » (pointillé tant que tout n'est pas traité, raison dite) ou « Envoyer mes demandes » (maquette 10 l.643). */
+/** « Valider le cahier » (désactivé tant que tout n'est pas traité, raison dite dans le résumé) ou « Envoyer mes demandes » (maquette 10 l.643). */
 function FinishButton({ progress, actions }: { progress: ClientSpaceProgress; actions: Actions }) {
   const requested = progress.toRevise > 0;
   const done = progress.untreated === 0;
   return (
     <Button
       type="button"
+      icon={requested ? "send" : "verified"}
       className="h-11 w-full md:h-9 md:w-auto"
       disabled={!done || actions.pending}
-      {...(done ? {} : { disabledReason: "Traitez chaque onglet pour finir" })}
+      {...(done ? {} : { "aria-describedby": SUMMARY_ID })}
       onClick={() =>
         void actions.decide({
           targetKind: "deliverable",
@@ -38,7 +39,6 @@ function FinishButton({ progress, actions }: { progress: ClientSpaceProgress; ac
         })
       }
     >
-      <Icon name={requested ? "send" : "verified"} size={20} />
       {requested ? "Envoyer mes demandes" : "Valider le cahier"}
     </Button>
   );
@@ -94,7 +94,8 @@ export function ClientValidationHeader({
               : attended
                 ? "Validation attendue de votre part"
                 : "À valider par le client",
-            summary: progressSummary(progress),
+            summary: headerSummary(progress),
+            summaryId: SUMMARY_ID,
             tabCounts: tabCounts(progress),
           }
         : {})}

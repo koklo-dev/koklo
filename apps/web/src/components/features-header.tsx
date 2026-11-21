@@ -61,6 +61,7 @@ export function FeaturesHeader({
   status,
   statusLabel,
   summary,
+  summaryId,
   secondaryActions,
   primaryAction,
   tabCount,
@@ -78,6 +79,8 @@ export function FeaturesHeader({
   status?: DeliverableStatusValue | undefined;
   statusLabel?: string | undefined;
   summary?: string | undefined;
+  /** Identifiant du résumé, pour qu'un bouton désactivé s'y réfère (`aria-describedby`). */
+  summaryId?: string | undefined;
   /** Actions de l'équipe qui écrit, avant l'action primaire dans l'ordre visuel. */
   secondaryActions?: ReactNode;
   /** « Nouvelle fonctionnalité » : la seule action primaire. */
@@ -109,6 +112,7 @@ export function FeaturesHeader({
           }
         : {})}
       {...(summary ? { summary, summaryOwnLine: true } : {})}
+      {...(summary && summaryId ? { summaryId } : {})}
       {...(team && head
         ? { sha: { value: head.commitSha.slice(0, 7), age: ageOf(head.indexedAt) } }
         : {})}

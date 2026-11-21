@@ -16,6 +16,8 @@ export interface ProjectHeaderProps {
   summary?: string;
   /** Le résumé a sa propre ligne sous le titre, à toute largeur (maquette 10 l.77) ; sinon il rejoint la rangée du titre dès md. */
   summaryOwnLine?: boolean;
+  /** Identifiant du résumé : `aria-describedby` d'un bouton désactivé dont le résumé dit la raison (B611). */
+  summaryId?: string;
   /** État du livrable à côté du titre (`ValidationStatus`, `DeliverableStatus`). */
   status?: ReactNode;
   /** Équipe seulement : SHA de 7 caractères et âge (« il y a 3 min »). */
@@ -100,6 +102,7 @@ export function ProjectHeader({
   title,
   summary,
   summaryOwnLine = false,
+  summaryId,
   status,
   sha,
   meta,
@@ -135,6 +138,7 @@ export function ProjectHeader({
         {status}
         {summary ? (
           <p
+            id={summaryId}
             className={cn(
               "order-3 -mt-1.5 text-meta text-muted-foreground",
               summaryOwnLine

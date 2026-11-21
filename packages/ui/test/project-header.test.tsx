@@ -31,6 +31,13 @@ describe("ProjectHeader", () => {
     expect(within(nav).queryByRole("link", { name: "Fonctionnel" })).toBeNull();
   });
 
+  it("summaryId : posé en id sur le résumé, absent sans la prop", () => {
+    const { rerender } = render(<ProjectHeader {...base} summary="3/5" summaryId="resume" />);
+    expect(screen.getByText("3/5")).toHaveAttribute("id", "resume");
+    rerender(<ProjectHeader {...base} summary="3/5" />);
+    expect(screen.getByText("3/5")).not.toHaveAttribute("id");
+  });
+
   it("le titre reçoit une référence et un identifiant (cible du focus d'une page, TK-88 lot C)", () => {
     const ref = createRef<HTMLHeadingElement>();
     render(<ProjectHeader {...base} titleRef={ref} titleId="titre-page" />);

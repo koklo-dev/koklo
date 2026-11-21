@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IdeaEditor } from "../src/components/idea-editor.tsx";
 import { IdeaProposals } from "../src/components/idea-proposals.tsx";
+import { IdeaTreeDesktop } from "../src/components/idea-tree.tsx";
 import { useIdeaProposals } from "../src/lib/use-idea-proposals.ts";
 import { agentMocks, PAGE_ID, PROJECT, page, proposal } from "./support/idea-agent.tsx";
 
@@ -206,3 +207,35 @@ describe("useIdeaProposals", () => {
 });
 
 void PAGE_ID;
+
+describe("Arborescence Idée : propositions de pages", () => {
+  it("le groupe « Page proposée par l'agent » n'a plus de wrapper local de marges", () => {
+    const model = {
+      projectId: PROJECT,
+      canWrite: true,
+      synthesisOpen: false,
+      version: { latest: null },
+      pages: [],
+      trash: [],
+      current: null,
+      actions: { create: { isPending: false }, restore: { mutate: vi.fn() } },
+      pageProposals: [{ id: "q1", title: "Concurrence", rationale: "Trois concurrents cités." }],
+      decisions: { notices: [], busyId: null, decide: vi.fn() },
+    } as never;
+    const handlers = {
+      onRename: vi.fn(),
+      onInsertAfter: vi.fn(),
+      onMove: vi.fn(),
+      onAdd: vi.fn(),
+      deleting: null,
+      onAskDelete: vi.fn(),
+      onConfirmDelete: vi.fn(),
+    };
+    render(<IdeaTreeDesktop model={model} handlers={handlers} />);
+    const group = screen.getByRole("group", { name: "Page proposée par l'agent" });
+    // La pile porte les marges une fois (ProposedPageList) et se range directement dans la colonne : aucun wrapper local.
+    const stack = group.parentElement as HTMLElement;
+    expect(["mt-3.5", "mx-0.5", "mb-2.5"].every((c) => stack.classList.contains(c))).toBe(true);
+    expect(stack.parentElement?.tagName).toBe("NAV");
+  });
+});

@@ -326,6 +326,23 @@ describe("ProposalDiff", () => {
   });
 });
 
+describe("ProposalDiff : marges", () => {
+  const props = { rationale: "r", onAccept: vi.fn(), onReject: vi.fn(), op: "append" as const };
+
+  it("cadre en flux de document : mx-0.5 my-2.5 ; un className my-0 l'emporte", () => {
+    const { rerender } = render(<ProposalDiff {...props}>x</ProposalDiff>);
+    const frame = screen.getByRole("region", { name: "Proposition de l'agent" });
+    expect(["mx-0.5", "my-2.5"].every((c) => frame.classList.contains(c))).toBe(true);
+    rerender(
+      <ProposalDiff {...props} className="my-0">
+        x
+      </ProposalDiff>,
+    );
+    expect(frame.classList.contains("my-0")).toBe(true);
+    expect(frame.classList.contains("my-2.5")).toBe(false);
+  });
+});
+
 describe("DecisionNotice", () => {
   it("role=status, icône history, Annuler", async () => {
     const onUndo = vi.fn();

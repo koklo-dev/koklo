@@ -8,6 +8,18 @@ export function validationOf(
   return validation === "to_revise" ? "revise" : "pending";
 }
 
+/** Raison du « Valider le cahier » désactivé (maquette 10 l.644), dite dans le résumé de l'en-tête (B611). */
+export const FINISH_REASON = "Traitez chaque onglet pour finir";
+
+/** Identifiant du résumé de l'en-tête, référencé par le bouton désactivé. */
+export const SUMMARY_ID = "client-validation-summary";
+
+/** Résumé de l'en-tête : la progression, puis la raison tant qu'il reste des éléments à traiter. */
+export function headerSummary(progress: ClientSpaceProgress): string {
+  const base = progressSummary(progress);
+  return progress.untreated === 0 ? base : `${base} · ${FINISH_REASON}`;
+}
+
 /** « Fonctionnalités 12/248 · parcours 3/18 · règles et rôles 1/2 » (maquette 10 l.629). */
 export function progressSummary({ tabs }: ClientSpaceProgress): string {
   const blocks = {
