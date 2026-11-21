@@ -181,7 +181,7 @@ describe("volume réel de la planche : totaux, droits et propositions", () => {
       expect(JSON.stringify(res.body)).not.toMatch(/proposition/i);
     }
     const rows = await database.query<{ n: number }>(
-      "SELECT count(*)::int AS n FROM agent_proposals WHERE project_id = $1",
+      "SELECT count(*)::int AS n FROM agent_proposals WHERE project_id = $1 AND deliverable = 'functional'",
       [world.projectId],
     );
     expect(rows[0]?.n).toBe(355);

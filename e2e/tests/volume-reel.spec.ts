@@ -68,7 +68,7 @@ const pendingProposals = (): Promise<number> =>
     Number(
       (
         await db.query<{ n: string }>(
-          "SELECT count(*) AS n FROM agent_proposals WHERE project_id = $1 AND status = 'pending'",
+          "SELECT count(*) AS n FROM agent_proposals WHERE project_id = $1 AND deliverable = 'functional' AND status = 'pending'",
           [PLANCHE_PROJECT],
         )
       ).rows[0]?.n,
