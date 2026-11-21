@@ -32,12 +32,28 @@ import {
   specRefsSearchOutputSchema,
 } from "./schemas-spec.ts";
 import {
+  archflowDetailSchema,
   architectureChecksInputSchema,
   architectureChecksSchema,
   architectureComponentSummarySchema,
   architectureComponentsListInputSchema,
   architectureDocumentInputSchema,
   architectureDocumentSchema,
+  architectureFlowSummarySchema,
+  architectureFlowsByIdInputSchema,
+  architectureFlowsListInputSchema,
+  architectureLayoutGetInputSchema,
+  architectureLayoutSavedSchema,
+  architectureLayoutSaveInputSchema,
+  architectureLayoutSchema,
+  architectureSearchInputSchema,
+  architectureSearchSchema,
+  architectureSourceInputSchema,
+  architectureSourceSchema,
+  architectureZoneInputSchema,
+  architectureZoneSchema,
+  architectureZonesInputSchema,
+  architectureZonesSchema,
 } from "./schemas-spec-architecture.ts";
 import {
   dataFixturePageInputSchema,
@@ -206,6 +222,64 @@ const spec = {
       .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
       .input(architectureChecksInputSchema)
       .output(architectureChecksSchema),
+    /**
+     * Schéma en couches et flux en séquence (TK-112, 3.10.0, B541 à B550). Lectures de l'équipe et du designer (403 client et
+     * business : aucun YAML ni Mermaid hors équipe) ; `layout.save` pour owner, admin et développeur (403 designer, client,
+     * business), un lot `architecture.layout.save`, dernier écrit gagne. Erreurs de `spec.architecture.components.list`.
+     */
+    zones: route("GET", "/projects/{projectId}/spec/architecture/zones")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(architectureZonesInputSchema)
+      .output(architectureZonesSchema),
+    zone: route("GET", "/projects/{projectId}/spec/architecture/zone")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(architectureZoneInputSchema)
+      .output(architectureZoneSchema),
+    search: route("GET", "/projects/{projectId}/spec/architecture/search")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(architectureSearchInputSchema)
+      .output(architectureSearchSchema),
+    layout: {
+      get: route("GET", "/projects/{projectId}/spec/architecture/layout")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...specIndexFailedError,
+          ...providerErrors,
+        })
+        .input(architectureLayoutGetInputSchema)
+        .output(architectureLayoutSchema),
+      save: route("POST", "/projects/{projectId}/spec/architecture/layout")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...providerErrors,
+          ...specBatchConflictError,
+          ...specInvalidError,
+        })
+        .input(architectureLayoutSaveInputSchema)
+        .output(architectureLayoutSavedSchema),
+    },
+    flows: {
+      list: route("GET", "/projects/{projectId}/spec/architecture/flows")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(architectureFlowsListInputSchema)
+        .output(listOf(architectureFlowSummarySchema)),
+      byId: route("GET", "/projects/{projectId}/spec/architecture/flows/{flowId}")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(architectureFlowsByIdInputSchema)
+        .output(archflowDetailSchema),
+    },
+    /** YAML d'un composant, YAML ou Mermaid d'un flux, Mermaid du schéma : équipe et designer seulement. */
+    source: route("GET", "/projects/{projectId}/spec/architecture/source")
+      .errors({
+        ...writeOneErrors,
+        ...validationError,
+        ...specIndexFailedError,
+        ...providerErrors,
+      })
+      .input(architectureSourceInputSchema)
+      .output(architectureSourceSchema),
   },
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })

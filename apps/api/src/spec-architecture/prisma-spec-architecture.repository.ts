@@ -1,27 +1,18 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { entitySource, entityWhere } from "../spec-read/entity-list.ts";
-import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import type { Revision } from "../spec-read/spec-read.repository.ts";
 import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { loadWindow } from "../tracker/long-list.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { gitSourceOf, readableHead } from "./readable-head.ts";
 import type {
   ChecksFacts,
   ComponentsPage,
   ComponentsRequest,
-  GitSource,
-  IndexFailure,
   SpecArchitectureRepository,
 } from "./spec-architecture.repository.ts";
-
-const failureOf = (snapshot: Snapshot): IndexFailure => ({
-  kind: "failed",
-  errorCode: snapshot.errorCode ?? "unknown",
-  commitSha: snapshot.commitSha,
-});
-
-type Found = NonNullable<Awaited<ReturnType<SpecHeadResolver["resolve"]>>>;
 
 const zoneOf = (data: unknown): string | undefined => {
   const zone = (data as { zone?: unknown } | null)?.zone;
@@ -37,13 +28,8 @@ export class PrismaSpecArchitectureRepository implements SpecArchitectureReposit
     @Inject(FullTextSearch) private readonly search: FullTextSearch,
   ) {}
 
-  /** Instantané lisible : `null` (rien d'indexé), échec d'indexation, ou l'instantané dont les entités sont indexées. */
-  private async readable(tx: Tx, scope: ProjectScope, revision: Revision) {
-    const found = await this.resolver.resolve(tx, scope, revision);
-    const snapshot = found?.snapshot;
-    if (!found || !snapshot) return null;
-    if (snapshot.status === "failed") return failureOf(snapshot);
-    return snapshot.entitiesIndexedAt === null ? null : { found, snapshot };
+  private readable(tx: Tx, scope: ProjectScope, revision: Revision) {
+    return readableHead(this.resolver, tx, scope, revision);
   }
 
   componentsPage(scope: ProjectScope, revision: Revision, request: ComponentsRequest) {
@@ -84,30 +70,12 @@ export class PrismaSpecArchitectureRepository implements SpecArchitectureReposit
     return Object.fromEntries([...zones].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
   }
 
-  /** Où lire git pour l'instantané lisible. */
-  private async gitSource(tx: Tx, found: Found, snapshot: Snapshot): Promise<GitSource> {
-    const installation = await tx.providerInstallation.findFirst({
-      where: { id: found.repo.installationId },
-    });
-    return {
-      commitSha: snapshot.commitSha,
-      specPath: found.repo.specPath,
-      repoName: found.repo.name,
-      owner: { kind: installation?.ownerKind ?? "organization", login: found.repo.ownerLogin },
-      installation: {
-        id: installation?.id ?? "",
-        externalId: installation?.externalId ?? "",
-        active: installation?.status === "active",
-      },
-    };
-  }
-
   headSource(scope: ProjectScope, revision: Revision) {
     return this.transactions.run(scope, async (tx) => {
       const readable = await this.readable(tx, scope, revision);
       if (readable === null || "kind" in readable) return readable;
       const { found, snapshot } = readable;
-      return { kind: "found" as const, ...(await this.gitSource(tx, found, snapshot)) };
+      return { kind: "found" as const, ...(await gitSourceOf(tx, found, snapshot)) };
     });
   }
 

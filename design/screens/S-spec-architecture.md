@@ -1,9 +1,9 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 2
+version: 3
 ---
-> Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma, Décisions et Flux : TK-112 et TK-113.
+> Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
 ## 1. Utilisateurs et objectif
 Équipe : owner, admin, développeur écrivent ; designer lit. Client et business n'ont pas d'accès à ce ticket (403 ; la vue client vient avec la validation). Objectif : faire proposer par l'agent les composants, flux, décisions et sections du document depuis le fonctionnel et les données validés, relire, enregistrer en un lot (un commit, `schema.mmd` et `flows/*.mmd` régénérés).
@@ -38,3 +38,12 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 |---|---|---|---|
 | 1 | 2026-11-21 | TK-111 | Création : page Spec · Architecture, états Prêt, Génération, Relecture, onglets Document et Composants ; `DocSectionStatus` ajouté à `packages/ui` (DESIGN.md §5.22). |
 | 2 | 2026-11-21 | TK-111 | Lot C : colonne Agent sans conversation, pas de glisser ni d'éditeur de section, client et business renvoyés à la vue d'ensemble (B532 à B539). |
+| 3 | 2026-11-21 | TK-112 | Schéma en couches et Flux en séquence (§11) ; `SequenceDiagram`, `ArchNodeCard`, props `bands` et `ghostIds` du `DiagramViewer` ajoutés à `packages/ui` (DESIGN.md §5.23) ; onglet par défaut Schéma ≥ 1024 px (B541 à B550). |
+
+## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
+- **Schéma** : lecteur du lot 6 ; au-delà de 25 composants, vue des zones (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone. Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
+- **Flux** : liste (pages de 50, « N flux · un par parcours »), diagramme de séquence (appels pleins, retours pointillés, bloc `alt`, séparateur), sélecteur Diagramme · YAML · Mermaid (équipe), puces de liens ; « Nouveau flux » et « Modifier » ouvrent `SpecItemSheet`.
+- **États** : chargement (squelette de la hauteur du cadre), vide (« Aucun composant à afficher », « Aucun flux »), erreur (`InlineAlert` + Réessayer), droits (designer sans glisser ni Modifier ; client et business renvoyés à la vue d'ensemble).
+- **Accessibilité** : nœud = `button` `aria-pressed` (« Service API »), Alt + flèches déplace avec annonce, `/` focalise la recherche, SVG `aria-hidden` ; séquence `role="img"` « Diagramme de séquence X, N messages » + `details` « Lire les messages » (liste numérotée) ; défilement horizontal focusable.
+- **375 px** : Composants remplace le Schéma (< 1024 px), Flux liste puis détail « ← Liste », séquence défilante, commandes 44 px.
+- **États comparés à la maquette** (clair, sombre, 375 px) : vue des zones ; zone ouverte avec fiche ; zoom 50 % ; Flux diagramme ; Flux YAML ou Mermaid ; Schéma vide ou en erreur.

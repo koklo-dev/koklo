@@ -207,19 +207,19 @@ const start = async (
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 test.describe("parcours de l'écran Architecture", () => {
-  test("en-tête et onglets : Document et Composants, jamais Schéma, Décisions ni Flux", async ({
+  test("en-tête et onglets : Schéma, Document, Composants et Flux, jamais Décisions", async ({
     page,
   }) => {
     await start(page);
     await page.goto(PATH);
     await expect(page.getByRole("heading", { level: 1, name: "Architecture" })).toBeVisible();
     const tabs = page.getByRole("navigation", { name: "Sections de l'architecture" });
-    await expect(tabs.getByRole("link")).toHaveText(["Document", /^Composants/]);
-    await expect(tabs.getByRole("link", { name: /Composants/ })).toHaveAttribute(
+    await expect(tabs.getByRole("link")).toHaveText(["Schéma", "Document", /^Composants/, /^Flux/]);
+    await expect(tabs.getByRole("link", { name: "Schéma" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    await expect(page.getByText("8 composants").first()).toBeVisible();
+    await expect(page.getByText("8 composants · 18 flux").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Valider l'architecture/ })).toHaveCount(0);
   });
 

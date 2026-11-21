@@ -12,6 +12,7 @@ import { orpc } from "./orpc.ts";
 import { canReadRepos, canWriteArchitecture } from "./roles.ts";
 import { useArchitectureComponents } from "./use-architecture-components.ts";
 import { useArchitectureChecks, useArchitectureDocument } from "./use-architecture-document.ts";
+import { useFlowCount } from "./use-architecture-flows.ts";
 import { type ArchitectureUrlModel, useArchitectureUrl } from "./use-architecture-url.ts";
 import { type FeatureWrite, useFeatureWrite } from "./use-feature-submit.ts";
 import { useDeepLink } from "./use-features.ts";
@@ -185,6 +186,7 @@ function useArchitectureProposing(ctx: {
   );
   const review = useProposalReview(projectId, propose.reviewing, "architecture");
   const deliverable = useArchitectureStatus(projectId);
+  const flows = useFlowCount(projectId, canReadRepos(role) && sources.readable);
   const generating = propose.status.active && propose.status.counts.total === 0;
   // Le total du groupe « Composants » du lancement, pas les seules propositions chargées (8 par groupe au-delà de 30).
   const proposedComponents = propose.status.groups
@@ -200,7 +202,9 @@ function useArchitectureProposing(ctx: {
     proposedComponents,
     viewKind: view.kind,
     tab: url.tab,
-    counts: headData ? { components: headData.counts.components } : undefined,
+    counts: headData
+      ? { components: headData.counts.components, ...(flows === undefined ? {} : { flows }) }
+      : undefined,
     deliverable,
   } satisfies ArchitectureHeaderInput);
   return { propose, review, header, generating, proposedComponents };

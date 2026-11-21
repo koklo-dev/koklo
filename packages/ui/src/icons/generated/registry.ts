@@ -117,6 +117,12 @@ export const iconLoaders = {
   support_agent: () => import("./support_agent.ts"),
   add_comment: () => import("./add_comment.ts"),
   summarize: () => import("./summarize.ts"),
+  desktop_windows: () => import("./desktop_windows.ts"),
+  hub: () => import("./hub.ts"),
+  lists: () => import("./lists.ts"),
+  sms: () => import("./sms.ts"),
+  mail: () => import("./mail.ts"),
+  cloud: () => import("./cloud.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

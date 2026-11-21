@@ -6,6 +6,7 @@ import {
   ideaSynthesisPayload,
   ideaTagName,
 } from "./idea-payload.ts";
+import { isLayoutKind } from "./layout.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,6 +29,7 @@ export const OPERATION_KINDS = [
   "table.delete",
   "fixture.create",
   "layout.save",
+  "architecture.layout.save",
   "component.create",
   "component.update",
   "component.delete",
@@ -129,8 +131,7 @@ function migrationProblem(operation: BatchOperation, alone: boolean): string | u
 
 /** Identifiant cible : `layout.save` n'en a pas ; les autres genres suivent leur motif, les features `F-nnn`. */
 function targetProblem(operation: BatchOperation): string | undefined {
-  if (operation.kind === "layout.save")
-    return operation.targetSpecId === null ? undefined : "specId";
+  if (isLayoutKind(operation.kind)) return operation.targetSpecId === null ? undefined : "specId";
   const pattern = TARGET_ID[operation.kind.split(".")[0] ?? ""];
   if (pattern !== undefined) {
     return pattern.test(operation.targetSpecId ?? "") ? undefined : "specId";

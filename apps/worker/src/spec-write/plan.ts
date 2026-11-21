@@ -18,7 +18,7 @@ import { applyDocSection, type DocSections, docSectionIndex } from "./doc-sectio
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
 import { applyFixture, fixtureIndex } from "./fixtures.ts";
 import { applyFlow, flowIndex } from "./flows.ts";
-import { applyLayout, LAYOUT_KIND } from "./layout.ts";
+import { applyLayout, isLayoutKind } from "./layout.ts";
 import { featureIdOfPath, featurePathOf, isIdeaKind, isMigrationKind } from "./paths.ts";
 import { planIdeaBatch } from "./plan-idea.ts";
 import { planMigrationBatch } from "./plan-migration.ts";
@@ -74,7 +74,7 @@ function featureIndex(files: readonly SpecFile[]): Map<string, string> {
   return index;
 }
 
-/** Genre d'une opération (`feature`, `rule`, `role`, `flow`, `table`, `fixture`, `layout`) : le préfixe de son `kind`. */
+/** Genre d'une opération (`feature`, `rule`, `role`, `flow`, `table`, `fixture`, `layout`, `architecture` pour sa mise en page) : le préfixe de son `kind`. */
 const genreOf = (operation: BatchOperation): string => operation.kind.split(".")[0] ?? "";
 
 function indexOf(files: readonly SpecFile[], tree: readonly string[]): Index {
@@ -123,7 +123,7 @@ function present(index: Index, operation: BatchOperation): boolean {
 function conflictOf(operations: readonly BatchOperation[], index: Index) {
   for (const operation of operations) {
     // `layout.save` remplace le fichier s'il existe : le dernier écrit gagne, jamais de conflit (B418).
-    if (operation.kind === LAYOUT_KIND) continue;
+    if (isLayoutKind(operation.kind)) continue;
     if (operation.kind.endsWith(".create") === present(index, operation)) {
       return conflicted("write_conflict");
     }
@@ -207,7 +207,7 @@ function applyOperation(workspace: Planned, operation: BatchOperation): void {
     applyDocSection(workspace, operation, workspace.docs);
     return;
   }
-  if (genre === "layout") {
+  if (isLayoutKind(operation.kind)) {
     applyLayout(workspace, operation);
     return;
   }

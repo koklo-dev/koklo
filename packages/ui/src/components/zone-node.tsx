@@ -27,9 +27,29 @@ export interface ZoneNodeProps
   /** Zone ouverte dans la vue. */
   current?: boolean;
   /** `diagram` : carte du diagramme des Données (maquette 11 l.194, l.486) ; `default` : galerie. */
-  variant?: "default" | "diagram";
+  variant?: "default" | "diagram" | "architecture";
   onOpen: () => void;
 }
+
+const FRAME: Record<"default" | "diagram" | "architecture", string> = {
+  default: "gap-1 rounded-xl border p-3",
+  diagram: "gap-0.5 rounded-[14px] border-[1.5px] px-4 py-3.5",
+  architecture: "gap-0.5 rounded-[14px] border-[1.5px] px-4 py-3.5",
+};
+
+const SUBTITLE: Record<"default" | "diagram" | "architecture", string> = {
+  default: "text-meta",
+  diagram: "text-meta",
+  architecture: "text-caption font-normal",
+};
+
+const CHIP: Record<"default" | "diagram" | "architecture", string> = {
+  architecture:
+    "rounded-[4px] bg-secondary px-1.5 py-px text-[11px] leading-4 text-secondary-foreground",
+  diagram:
+    "rounded-[4px] bg-secondary px-[5px] py-px font-mono text-[10px] leading-4 text-secondary-foreground",
+  default: "rounded-sm border bg-surface px-1.5 font-mono text-code text-muted-foreground",
+};
 
 /** Zone d'un diagramme (DESIGN.md v2.1 §5.3, schéma 1.3) : cadre pointillé, nom, icône, compte, aperçu. */
 export function ZoneNode({
@@ -48,19 +68,15 @@ export function ZoneNode({
   className,
   ...props
 }: ZoneNodeProps) {
-  const diagram = variant === "diagram";
+  const diagram = variant !== "default";
   const hidden = Math.max(count, preview.length) - Math.min(preview.length, previewLimit);
-  const chip = diagram
-    ? "rounded-[4px] bg-secondary px-[5px] py-px font-mono text-[10px] leading-4 text-secondary-foreground"
-    : "rounded-sm border bg-surface px-1.5 font-mono text-code text-muted-foreground";
+  const chip = CHIP[variant];
   return (
     <div
       data-slot="zone-node"
       className={cn(
         "relative flex min-w-0 flex-col items-start border-dashed border-border-strong bg-background text-left hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring motion-safe:transition-colors",
-        diagram
-          ? "gap-0.5 rounded-[14px] border-[1.5px] px-4 py-3.5"
-          : "gap-1 rounded-xl border p-3",
+        FRAME[variant],
         current && "border-primary bg-secondary",
         className,
       )}
@@ -86,7 +102,7 @@ export function ZoneNode({
             <Icon name="arrow_forward" size={18} className="shrink-0 text-muted-foreground" />
           ) : null}
         </span>{" "}
-        <span className="text-meta text-muted-foreground">
+        <span className={cn("text-muted-foreground", SUBTITLE[variant])}>
           {`${formatCount(count)} ${countLabel}`}
           {detail ? ` · ${detail}` : null}
         </span>

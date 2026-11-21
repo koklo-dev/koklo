@@ -1,5 +1,9 @@
 import type { SeedStatement } from "./seed-statements.ts";
-import { architectureProposalStatements, componentData } from "./seed-volume-architecture.ts";
+import {
+  archflowData,
+  architectureProposalStatements,
+  componentData,
+} from "./seed-volume-architecture.ts";
 import { proposalStatements } from "./seed-volume-proposals.ts";
 import {
   NOUNS,
@@ -169,6 +173,29 @@ function entityInsert(
        content_hash = EXCLUDED.content_hash, sort = EXCLUDED.sort`;
 }
 
+/** Composants et flux d'architecture de l'index d'entités (TK-111, TK-112). */
+function architectureEntities(profile: VolumeProfile): string[] {
+  const volume = SEED_VOLUMES[profile];
+  return [
+    entityInsert(
+      "component",
+      volume.components,
+      "'C-composant-'",
+      `'Composant ' || ${pad()}`,
+      `'architecture/components/composant-' || ${pad()} || '.yaml'`,
+      componentData(profile, volume.features, volume.tables),
+    ),
+    entityInsert(
+      "archflow",
+      volume.archflows,
+      "'P-flux-'",
+      `'P-flux-' || ${pad()}`,
+      `'architecture/flows/P-flux-' || ${pad()} || '.yaml'`,
+      archflowData(volume.components, volume.features, volume.rules),
+    ),
+  ];
+}
+
 /**
  * Index générique `spec_entities` (TK-101, B329 e) : une ligne par fonctionnalité, table, composant d'architecture (TK-111) et point d'accès du jeu, avec
  * `titre`, chemin, rang et hachage, puis `entities_indexed_at` sur l'instantané (sans lui, `spec.refs.search` rend une liste
@@ -202,14 +229,7 @@ function entityStatements(profile: VolumeProfile, target: VolumeTarget): SeedSta
       `'data/fixtures/FX-table-' || ${pad()} || '.yaml'`,
       fixtureData(profile),
     ),
-    entity(
-      "component",
-      volume.components,
-      "'C-composant-'",
-      `'Composant ' || ${pad()}`,
-      `'architecture/components/composant-' || ${pad()} || '.yaml'`,
-      componentData(profile, volume.features, volume.tables),
-    ),
+    ...architectureEntities(profile),
     entity(
       "endpoint",
       volume.endpoints,

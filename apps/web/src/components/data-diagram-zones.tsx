@@ -87,6 +87,25 @@ export function renderNeighbor(node: NeighborNode, context: { onSelect: () => vo
   );
 }
 
+/** Ce que le fil et « Aller à… » disent de ce qu'ils comptent : les Données par défaut, l'Architecture la remplace (TK-112). */
+export interface ZoneNouns {
+  count: (count: number) => string;
+  links: (count: number) => string;
+  jumpLabel: string;
+  jumpPlaceholder: string;
+  nothingFound: { title: (text: string) => string; description: string };
+}
+export const DATA_NOUNS: ZoneNouns = {
+  count: tablesLabel,
+  links: linksLabel,
+  jumpLabel: "Aller à une table",
+  jumpPlaceholder: "Aller à une table…",
+  nothingFound: {
+    title: (text) => `Aucune table ne correspond à « ${text} »`,
+    description: "Essayez un autre nom de table ou de champ.",
+  },
+};
+
 /** Fil du diagramme (maquette 11 l.170) : « Toutes les zones · N tables » / zone ouverte · compte · liens sortants. */
 function ZoneCrumbs({
   total,
@@ -94,14 +113,16 @@ function ZoneCrumbs({
   count,
   crossLinks,
   onAll,
+  nouns,
 }: {
   total: number;
   zone: string | null;
   count: number;
   crossLinks: number;
   onAll: () => void;
+  nouns: ZoneNouns;
 }) {
-  const all = `Toutes les zones · ${tablesLabel(total)}`;
+  const all = `Toutes les zones · ${nouns.count(total)}`;
   return (
     <nav aria-label="Fil du diagramme" className="flex min-w-0 flex-wrap items-center gap-1.5">
       {zone === null ? (
@@ -124,7 +145,7 @@ function ZoneCrumbs({
             {zone}
           </span>
           <span className="text-caption text-muted-foreground">
-            {`· ${tablesLabel(count)}${crossLinks > 0 ? ` · ${linksLabel(crossLinks)}` : ""}`}
+            {`· ${nouns.count(count)}${crossLinks > 0 ? ` · ${nouns.links(crossLinks)}` : ""}`}
           </span>
         </>
       )}
@@ -148,12 +169,14 @@ function TableJump({
   value,
   items,
   listId,
+  nouns,
   onChange,
   onSubmit,
 }: {
   value: string;
   items: readonly JumpItem[];
   listId: string;
+  nouns: ZoneNouns;
   onChange: (value: string, chosen: boolean) => void;
   onSubmit: () => void;
 }) {
@@ -177,9 +200,9 @@ function TableJump({
     <form onSubmit={submit} className="relative w-[260px] max-sm:w-full">
       <SearchField
         ref={ref}
-        label="Aller à une table"
+        label={nouns.jumpLabel}
         fieldSize="xs"
-        placeholder="Aller à une table…"
+        placeholder={nouns.jumpPlaceholder}
         list={listId}
         value={value}
         autoComplete="off"
@@ -222,8 +245,12 @@ export function ZoneBar(props: {
   result: JumpResult;
   onAll: () => void;
   onPick: (item: JumpItem) => void;
+  /** Mots du fil et de la recherche ; ceux des Données par défaut. */
+  nouns?: ZoneNouns;
+  /** Fil « Toutes les zones » : masqué quand le schéma n'a pas de zones (maquette 13 l.178). */
+  crumbs?: boolean;
 }) {
-  const { value, onValueChange, result, onPick } = props;
+  const { value, onValueChange, result, onPick, nouns = DATA_NOUNS, crumbs = true } = props;
   const listId = useId();
   const text = value.trim();
   // Les résultats d'une saisie plus ancienne ne comptent pas : on attend ceux du texte affiché.
@@ -242,12 +269,22 @@ export function ZoneBar(props: {
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-meta">
-        <ZoneCrumbs {...props} />
+        {crumbs ? (
+          <ZoneCrumbs
+            total={props.total}
+            zone={props.zone}
+            count={props.count}
+            crossLinks={props.crossLinks}
+            onAll={props.onAll}
+            nouns={nouns}
+          />
+        ) : null}
         <span className="flex-1" />
         <TableJump
           value={value}
           items={fresh}
           listId={listId}
+          nouns={nouns}
           onChange={(next, chosen) => {
             if (!(chosen && pick(next))) onValueChange(next);
           }}
@@ -259,8 +296,8 @@ export function ZoneBar(props: {
           variant="inline"
           bordered
           icon="search_off"
-          title={`Aucune table ne correspond à « ${text} »`}
-          description="Essayez un autre nom de table ou de champ."
+          title={nouns.nothingFound.title(text)}
+          description={nouns.nothingFound.description}
         />
       ) : null}
     </>

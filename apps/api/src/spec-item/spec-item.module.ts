@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { SpecArchitectureModule } from "../spec-architecture/spec-architecture.module.ts";
 import { SpecDeliverablesModule } from "../spec-deliverables/spec-deliverables.module.ts";
 import { SpecReadModule } from "../spec-read/spec-read.module.ts";
 import { TrackerModule } from "../tracker/tracker.module.ts";
@@ -7,7 +8,7 @@ import { SpecItemService } from "./spec-item.service.ts";
 
 /** Lecture d'un élément pour le panneau d'édition (TK-101) : le seul module à lire à la fois l'index et les livrables. */
 @Module({
-  imports: [TrackerModule, SpecReadModule, SpecDeliverablesModule],
+  imports: [TrackerModule, SpecReadModule, SpecDeliverablesModule, SpecArchitectureModule],
   controllers: [SpecItemController],
   providers: [SpecItemService],
 })

@@ -134,11 +134,24 @@ import type {
   validationReportSchema,
 } from "./schemas-spec.ts";
 import type {
+  archflowDetailSchema,
   architectureChecksSchema,
   architectureComponentSummarySchema,
   architectureComponentsListInputSchema,
   architectureDocSectionSchema,
   architectureDocumentSchema,
+  architectureFlowSummarySchema,
+  architectureFlowsByIdInputSchema,
+  architectureFlowsListInputSchema,
+  architectureLayoutSavedSchema,
+  architectureLayoutSchema,
+  architectureSearchInputSchema,
+  architectureSearchSchema,
+  architectureSourceInputSchema,
+  architectureSourceSchema,
+  architectureZoneInputSchema,
+  architectureZoneSchema,
+  architectureZonesSchema,
   componentDetailSchema,
 } from "./schemas-spec-architecture.ts";
 import type {
@@ -326,6 +339,19 @@ export type ArchitectureComponentSummary = z.output<typeof architectureComponent
 export type ArchitectureDocSection = z.output<typeof architectureDocSectionSchema>;
 export type ArchitectureDocument = z.output<typeof architectureDocumentSchema>;
 export type ArchitectureChecks = z.output<typeof architectureChecksSchema>;
+export type ArchitectureZones = z.output<typeof architectureZonesSchema>;
+export type ArchitectureZoneInput = z.output<typeof architectureZoneInputSchema>;
+export type ArchitectureZone = z.output<typeof architectureZoneSchema>;
+export type ArchitectureSearchInput = z.output<typeof architectureSearchInputSchema>;
+export type ArchitectureSearch = z.output<typeof architectureSearchSchema>;
+export type ArchitectureLayout = z.output<typeof architectureLayoutSchema>;
+export type ArchitectureLayoutSaved = z.output<typeof architectureLayoutSavedSchema>;
+export type ArchitectureFlowsListInput = z.output<typeof architectureFlowsListInputSchema>;
+export type ArchitectureFlowSummary = z.output<typeof architectureFlowSummarySchema>;
+export type ArchitectureFlowsByIdInput = z.output<typeof architectureFlowsByIdInputSchema>;
+export type ArchflowDetail = z.output<typeof archflowDetailSchema>;
+export type ArchitectureSourceInput = z.output<typeof architectureSourceInputSchema>;
+export type ArchitectureSource = z.output<typeof architectureSourceSchema>;
 export type DataTablesListInput = z.output<typeof dataTablesListInputSchema>;
 export type DataTableSummary = z.output<typeof dataTableSummarySchema>;
 export type DataMermaid = z.output<typeof dataMermaidSchema>;

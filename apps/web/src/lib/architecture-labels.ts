@@ -2,6 +2,8 @@ import { formatCount } from "@koklo/ui";
 
 /** Libellés de l'écran Architecture (maquette 13) : un seul endroit, aucune phrase dans les composants de liste. */
 export const COMPONENT_NOUN = { one: "composant", other: "composants", masculine: true } as const;
+/** Nom d'un flux au compte et au pied de liste (maquette 13 l.410 : « 18 flux »). */
+export const FLOW_NOUN = { one: "flux", other: "flux", masculine: true } as const;
 export const COMPONENTS_SEARCH_LABEL = "Rechercher un composant";
 export const COMPONENTS_SEARCH_PLACEHOLDER = "Rechercher un composant ou C-…";
 export const COMPONENTS_TABLE_LABEL = "Composants de l'architecture";

@@ -16,7 +16,7 @@ import type {
   DataZoneInput,
   DataZones,
 } from "@koklo/contract";
-import { GitNotFoundError, SCOPING_BRANCH } from "@koklo/domain";
+import { SCOPING_BRANCH } from "@koklo/domain";
 import {
   emitModelMermaid,
   emitTableYaml,
@@ -31,13 +31,13 @@ import {
 } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { GitAccess } from "../repo/git-access.ts";
-import { mapProviderError } from "../repo/provider-errors.ts";
 import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
 import { SpecBatchService } from "../spec-batch/spec-batch.service.ts";
 import { indexFailed } from "../spec-read/index-failed.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { readCommittedFile } from "./committed-file.ts";
 import {
   fieldsOf,
   fixturePage,
@@ -298,27 +298,7 @@ export class SpecDataService {
   }
 
   /** Fichier de la spec au commit indexé ; `undefined` : absent, ou aucun fournisseur utilisable. */
-  private async readCommitted(source: GitSource, file: string): Promise<string | undefined> {
-    const provider = this.provider;
-    if (provider === null || !source.installation.active) return undefined;
-    const auth = await this.access.installationAuth(provider, {
-      id: source.installation.id,
-      externalId: source.installation.externalId,
-      ownerKind: source.owner.kind,
-      ownerLogin: source.owner.login,
-    });
-    const path = source.specPath === null ? file : `${source.specPath}/${file}`;
-    try {
-      const file = await provider.readFile({
-        auth,
-        repo: { owner: source.owner, name: source.repoName },
-        ref: source.commitSha,
-        path,
-      });
-      return file.content;
-    } catch (error) {
-      if (error instanceof GitNotFoundError) return undefined;
-      throw mapProviderError(error, "readFile");
-    }
+  private readCommitted(source: GitSource, file: string): Promise<string | undefined> {
+    return readCommittedFile(this.provider, this.access, source, file);
   }
 }

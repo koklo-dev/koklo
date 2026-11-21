@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { CONTRACT_VERSION, generateOpenApi } from "../src/index.ts";
-import { errors, input, isValid, output, proc, UUID } from "./support.ts";
+import { errors, input, isValid, output, proc, SHA, UUID } from "./support.ts";
 
 /**
  * TK-111 lot B (contrat 3.9.0, additif, B506 à B515) : opérations `component.*`, `archflow.*`, `adr.*`, `doc.section.*` de
  * `specBatch.submit`, lectures `spec.architecture.*`, `spec.item.get` de type `component`, compteur `components`.
  */
 describe("TK-111 surface", () => {
-  it("version 3.9.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.9.0");
+  it("version 3.10.0 (TK-112 est additif : mineure)", () => {
+    expect(CONTRACT_VERSION).toBe("3.10.0");
   });
 
   it.each([
@@ -261,5 +261,267 @@ describe("TK-111 lectures", () => {
         true,
       );
     }
+  });
+});
+
+/** TK-112 lot A (contrat 3.10.0, additif, B542 à B545) : schéma en couches et flux en séquence, lectures et mise en page. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
+describe("TK-112 A spec.architecture : zones, zone, search, layout, flows, source", () => {
+  const base = "/projects/{projectId}/spec/architecture";
+  const POSITIONS = { "C-api": { x: 10, y: 20 }, "RL-client": { x: 0, y: 8 } };
+
+  it.each([
+    ["spec.architecture.zones", `${base}/zones`],
+    ["spec.architecture.zone", `${base}/zone`],
+    ["spec.architecture.search", `${base}/search`],
+    ["spec.architecture.layout.get", `${base}/layout`],
+    ["spec.architecture.flows.list", `${base}/flows`],
+    ["spec.architecture.flows.byId", `${base}/flows/{flowId}`],
+    ["spec.architecture.source", `${base}/source`],
+  ])("%s : GET %s, 401, 403, 404, VALIDATION, SPEC_INDEX_FAILED", async (name, path) => {
+    expect(proc(name), name).toBeDefined();
+    const doc = (await generateOpenApi()) as { paths: Record<string, Record<string, unknown>> };
+    expect(doc.paths[path]?.get, path).toBeDefined();
+    expect(Object.keys(errors(name))).toEqual(
+      expect.arrayContaining(["UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "VALIDATION"]),
+    );
+    expect(Object.keys(errors(name))).toContain("SPEC_INDEX_FAILED");
+  });
+
+  it("layout.save : POST sur le même chemin, erreurs d'écriture d'un lot", async () => {
+    const doc = (await generateOpenApi()) as { paths: Record<string, Record<string, unknown>> };
+    expect(doc.paths[`${base}/layout`]?.post).toBeDefined();
+    expect(Object.keys(errors("spec.architecture.layout.save"))).toEqual(
+      expect.arrayContaining([
+        "UNAUTHORIZED",
+        "FORBIDDEN",
+        "NOT_FOUND",
+        "VALIDATION",
+        "SPEC_INVALID",
+      ]),
+    );
+  });
+
+  it("zones : révision exclusive ; sortie = zones (aperçu 7 au plus, liens, acteurs), total et commit", async () => {
+    const i = input("spec.architecture.zones");
+    expect(await isValid(i, { projectId: UUID })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, branch: "main", commitSha: SHA })).toBe(false);
+    const zone = {
+      id: "coeur",
+      name: "Coeur",
+      icon: "hub",
+      componentCount: 3,
+      actorCount: 2,
+      preview: ["API"],
+      links: [{ to: "donnees", count: 2 }],
+    };
+    const o = output("spec.architecture.zones");
+    expect(await isValid(o, { zones: [zone], componentCount: 3, commitSha: SHA })).toBe(true);
+    const long = Array.from({ length: 8 }, (_, n) => `C${n}`);
+    expect(
+      await isValid(o, {
+        zones: [{ ...zone, preview: long }],
+        componentCount: 3,
+        commitSha: SHA,
+      }),
+    ).toBe(false);
+    expect(
+      await isValid(o, {
+        zones: [{ ...zone, actorCount: undefined }],
+        componentCount: 3,
+        commitSha: SHA,
+      }),
+    ).toBe(false);
+  });
+
+  it("zone : identifiant de zone requis ; sortie = composants (200 au plus), liens, acteurs, truncated", async () => {
+    const i = input("spec.architecture.zone");
+    expect(await isValid(i, { projectId: UUID, zone: "coeur" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID })).toBe(false);
+    const view = {
+      zone: { id: "coeur", name: "Coeur", icon: "hub", componentCount: 1 },
+      components: [{ specId: "C-api", name: "API", type: "service", responsibility: "Expose" }],
+      relations: [{ from: "C-api", to: "C-db", via: "SQL" }],
+      actors: [{ id: "RL-client", name: "Client" }],
+      outgoing: [{ zone: "donnees", count: 1 }],
+      truncated: false,
+      commitSha: SHA,
+    };
+    const o = output("spec.architecture.zone");
+    expect(await isValid(o, view)).toBe(true);
+    expect(
+      await isValid(o, {
+        ...view,
+        relations: [{ from: "C-api", to: "C-db", via: "AMQP", async: true }],
+      }),
+    ).toBe(true);
+    const many = Array.from({ length: 201 }, (_, n) => ({
+      ...view.components[0],
+      specId: `C-c${n}`,
+    }));
+    expect(await isValid(o, { ...view, components: many })).toBe(false);
+    expect(
+      await isValid(o, { ...view, components: [{ ...view.components[0], type: "lambda" }] }),
+    ).toBe(false);
+  });
+
+  it("search : q de 1 à 100 caractères ; 20 résultats au plus", async () => {
+    const i = input("spec.architecture.search");
+    expect(await isValid(i, { projectId: UUID, q: "api" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, q: "" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, q: "x".repeat(101) })).toBe(false);
+    const item = { specId: "C-api", name: "API", type: "service", zone: "Coeur" };
+    const o = output("spec.architecture.search");
+    expect(await isValid(o, { items: [item] })).toBe(true);
+    expect(
+      await isValid(o, {
+        items: Array.from({ length: 21 }, (_, n) => ({ ...item, specId: `C-c${n}` })),
+      }),
+    ).toBe(false);
+  });
+
+  it("layout.get : positions C-slug ou RL-slug ; layout.save : entiers 0 à 20000, 500 au plus, clé d'idempotence", async () => {
+    const get = output("spec.architecture.layout.get");
+    expect(await isValid(get, { positions: POSITIONS, commitSha: SHA })).toBe(true);
+    expect(await isValid(get, { positions: {}, commitSha: SHA })).toBe(true);
+    const save = input("spec.architecture.layout.save");
+    const body = (positions: unknown) => ({ projectId: UUID, idempotencyKey: "k-1", positions });
+    expect(await isValid(save, body(POSITIONS))).toBe(true);
+    expect(await isValid(save, body({}))).toBe(true);
+    expect(await isValid(save, body({ "T-client": { x: 0, y: 0 } }))).toBe(false);
+    expect(await isValid(save, body({ "C-a": { x: -1, y: 0 } }))).toBe(false);
+    expect(await isValid(save, body({ "C-a": { x: 0, y: 20001 } }))).toBe(false);
+    expect(await isValid(save, body({ "C-a": { x: 0.5, y: 0 } }))).toBe(false);
+    const many = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, n) => [`C-c${n}`, { x: n, y: n }]));
+    expect(await isValid(save, body(many(500)))).toBe(true);
+    expect(await isValid(save, body(many(501)))).toBe(false);
+    expect(await isValid(save, { projectId: UUID, positions: POSITIONS })).toBe(false);
+    expect(await isValid(output("spec.architecture.layout.save"), { commitSha: null })).toBe(true);
+    expect(await isValid(output("spec.architecture.layout.save"), { commitSha: SHA })).toBe(true);
+  });
+
+  it("l'opération architecture.layout.save est connue de specBatch.get mais pas soumissible", async () => {
+    const stored = {
+      id: UUID,
+      branch: "cadrage",
+      status: "committed",
+      idempotencyKey: "k-1",
+      baseSha: null,
+      commitSha: SHA,
+      errorCode: null,
+      report: null,
+      results: [{ position: 0, kind: "architecture.layout.save", specId: null }],
+      enqueuedAt: "2026-11-21T10:00:00.000Z",
+      committedAt: "2026-11-21T10:00:01.000Z",
+    };
+    expect(await isValid(output("specBatch.get"), stored)).toBe(true);
+    expect(
+      await isValid(input("specBatch.submit"), {
+        projectId: UUID,
+        idempotencyKey: "k-1",
+        operations: [{ kind: "architecture.layout.save", positions: POSITIONS }],
+      }),
+    ).toBe(false);
+  });
+
+  it("flows.list : pages à curseur, q, around P-slug, révision exclusive ; ligne = parcours, acteur, comptes", async () => {
+    const i = input("spec.architecture.flows.list");
+    expect(await isValid(i, { projectId: UUID, q: "résa", limit: "50" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, around: "P-reserver" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, around: "C-api" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, around: "P-a", cursor: "x" })).toBe(false);
+    expect(await isValid(i, { projectId: UUID, branch: "b", commitSha: SHA })).toBe(false);
+    const row = {
+      specId: "P-reserver",
+      title: "Réserver",
+      actor: "Client",
+      componentCount: 3,
+      externalCount: 1,
+    };
+    const page = { items: [row], nextCursor: null, previousCursor: null, offset: 0, total: 1 };
+    expect(await isValid(output("spec.architecture.flows.list"), page)).toBe(true);
+    expect(
+      await isValid(output("spec.architecture.flows.list"), {
+        ...page,
+        items: [{ ...row, actor: undefined }],
+      }),
+    ).toBe(false);
+  });
+
+  it("flows.byId : P-slug dans le chemin ; participants typés, éléments message, alt et séparateur, liens", async () => {
+    const i = input("spec.architecture.flows.byId");
+    expect(await isValid(i, { projectId: UUID, flowId: "P-reserver" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, flowId: "C-api" })).toBe(false);
+    const detail = {
+      specId: "P-reserver",
+      title: "Réserver",
+      actor: "Client",
+      participants: [
+        { id: "RL-client", name: "Client", type: "actor" },
+        { id: "C-api", name: "API", type: "service" },
+        { id: "C-mail", name: "Courriel", type: "ext" },
+      ],
+      items: [
+        { kind: "message", from: "RL-client", to: "C-api", text: "Réserve", reply: "OK" },
+        {
+          kind: "alt",
+          label: "Si échec",
+          messages: [{ from: "C-api", to: "RL-client", text: "Refus", error: "409" }],
+        },
+        { kind: "separator", label: "Plus tard" },
+      ],
+      features: ["F-001"],
+      rules: ["R-001"],
+      decisions: ["ADR-001"],
+      filePath: "architecture/flows/P-reserver.yaml",
+      commitSha: SHA,
+    };
+    const o = output("spec.architecture.flows.byId");
+    expect(await isValid(o, detail)).toBe(true);
+    for (const type of ["actor", "app", "service", "store", "queue", "ext"]) {
+      expect(
+        await isValid(o, {
+          ...detail,
+          participants: [{ id: "C-api", name: "API", type }],
+        }),
+        type,
+      ).toBe(true);
+    }
+    expect(
+      await isValid(o, { ...detail, participants: [{ id: "C-api", name: "API", type: "lambda" }] }),
+    ).toBe(false);
+    expect(await isValid(o, { ...detail, items: [{ kind: "note", label: "x" }] })).toBe(false);
+  });
+
+  it("source : composant, flux ou schéma ; identifiant requis sauf pour le schéma ; format de flux", async () => {
+    const i = input("spec.architecture.source");
+    const ok = (target: unknown, extra: object = {}) =>
+      isValid(i, { projectId: UUID, target, ...extra });
+    expect(await ok({ kind: "component", id: "C-api" })).toBe(true);
+    expect(await ok({ kind: "flow", id: "P-reserver" })).toBe(true);
+    expect(await ok({ kind: "flow", id: "P-reserver" }, { format: "mermaid" })).toBe(true);
+    expect(await ok({ kind: "schema" })).toBe(true);
+    expect(await ok({ kind: "component" })).toBe(false);
+    expect(await ok({ kind: "component", id: "P-reserver" })).toBe(false);
+    expect(await ok({ kind: "flow", id: "C-api" })).toBe(false);
+    expect(await ok({ kind: "table", id: "T-a" })).toBe(false);
+    expect(await ok({ kind: "flow", id: "P-a" }, { format: "pdf" })).toBe(false);
+    expect(await ok({ kind: "schema" }, { branch: "b", commitSha: SHA })).toBe(false);
+    expect(
+      await isValid(output("spec.architecture.source"), {
+        path: "architecture/schema.mmd",
+        text: "flowchart LR\n",
+        commitSha: SHA,
+        generated: true,
+      }),
+    ).toBe(true);
+    expect(await isValid(output("spec.architecture.source"), { text: "x" })).toBe(false);
+  });
+
+  it("spec.item.get accepte archflow (P-slug) et rend le détail du flux", async () => {
+    const i = input("spec.item.get");
+    expect(await isValid(i, { projectId: UUID, type: "archflow", id: "P-reserver" })).toBe(true);
+    expect(await isValid(i, { projectId: UUID, type: "archflow", id: "C-api" })).toBe(false);
   });
 });

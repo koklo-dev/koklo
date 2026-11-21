@@ -40,7 +40,10 @@ const FORBIDDEN: Array<[string, RegExp]> = [
 ];
 
 /** Dessins de diagramme en SVG (ADR 0022) : la règle « SVG en ligne » vise les icônes, pas ces tracés. */
-const SVG_DRAWINGS = new Set(["src/components/diagram-relations.tsx"]);
+const SVG_DRAWINGS = new Set([
+  "src/components/diagram-relations.tsx",
+  "src/components/sequence-diagram.tsx",
+]);
 
 /** Violations d'un source : libellés des règles enfreintes. */
 function violations(code: string, rel = ""): string[] {

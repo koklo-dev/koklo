@@ -267,6 +267,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "repo.link",
   "review.remind",
   "review.submit",
+  "spec.architecture.layout.save",
   "spec.data.layout.save",
   "spec.forceDeliverable",
   "specBatch.submit",
@@ -1081,6 +1082,59 @@ const SCENARIOS: Scenario[] = [
           projectId: ctx.world.projectId,
           idempotencyKey: "audit-layout-refuse",
           positions: { "T-client": { x: 10, y: 20 } },
+        },
+      ),
+    deniedStatuses: [403],
+  },
+  {
+    // TK-112 (B542) : un lot d'une opération `architecture.layout.save`, audité comme `specBatch.submit` (`spec.batch.submit`) ; le
+    // `targetId` est le lot, relu en base (la réponse ne porte que le SHA du commit).
+    procedure: "spec.architecture.layout.save",
+    role: "dev",
+    prepare: async (ctx) => {
+      const state = await repoPrepare()(ctx);
+      await specWorkerOf();
+      const created = await repoApi((await repoRuntimeOf()).app, ctx.world.actors.owner).createSpec(
+        ctx.world.projectId,
+        state.installation.id,
+      );
+      expect(created.status, JSON.stringify(created.body)).toBe(200);
+      return state;
+    },
+    call: async (ctx) =>
+      send(
+        (await repoRuntimeOf()).app,
+        ctx.world.actors.dev.cookie,
+        "post",
+        `/projects/${ctx.world.projectId}/spec/architecture/layout`,
+        {
+          projectId: ctx.world.projectId,
+          idempotencyKey: `audit-arch-layout-${Date.now()}`,
+          positions: { "C-api": { x: 10, y: 20 } },
+        },
+      ),
+    expected: async (ctx) => {
+      const [batch] = await database.query<{ id: string }>(
+        "SELECT id FROM spec_write_batches WHERE project_id = $1 ORDER BY enqueued_at DESC LIMIT 1",
+        [ctx.world.projectId],
+      );
+      return {
+        action: "spec.batch.submit",
+        targetKind: "spec_batch",
+        targetId: batch?.id ?? "",
+        ticketId: null,
+      };
+    },
+    denied: async (ctx) =>
+      send(
+        (await repoRuntimeOf()).app,
+        ctx.world.actors.designer.cookie,
+        "post",
+        `/projects/${ctx.world.projectId}/spec/architecture/layout`,
+        {
+          projectId: ctx.world.projectId,
+          idempotencyKey: "audit-arch-layout-refuse",
+          positions: { "C-api": { x: 10, y: 20 } },
         },
       ),
     deniedStatuses: [403],

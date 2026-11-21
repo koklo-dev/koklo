@@ -86,6 +86,14 @@ export const procedures = {
   specArchitectureComponentsList: vi.fn(),
   specArchitectureDocument: vi.fn(),
   specArchitectureChecks: vi.fn(),
+  specArchitectureZones: vi.fn(),
+  specArchitectureZone: vi.fn(),
+  specArchitectureSearch: vi.fn(),
+  specArchitectureLayoutGet: vi.fn(),
+  specArchitectureLayoutSave: vi.fn(),
+  specArchitectureFlowsList: vi.fn(),
+  specArchitectureFlowsById: vi.fn(),
+  specArchitectureSource: vi.fn(),
   // TK-103 (contrat 3.1.0) : règles métier, parcours (liste paginée) et matrice des rôles
   specFunctionalList: vi.fn(),
   specRolesMatrix: vi.fn(),
@@ -317,6 +325,31 @@ export const orpc = {
         procedures.specArchitectureDocument,
       ),
       checks: queryFull(["spec", "architecture", "checks"], procedures.specArchitectureChecks),
+      zones: queryFull(["spec", "architecture", "zones"], procedures.specArchitectureZones),
+      zone: queryFull(["spec", "architecture", "zone"], procedures.specArchitectureZone),
+      search: queryFull(["spec", "architecture", "search"], procedures.specArchitectureSearch),
+      layout: {
+        get: queryFull(
+          ["spec", "architecture", "layout", "get"],
+          procedures.specArchitectureLayoutGet,
+        ),
+        save: {
+          ...mutation(procedures.specArchitectureLayoutSave),
+          call: (input?: unknown) => procedures.specArchitectureLayoutSave(input),
+        },
+      },
+      flows: {
+        key: () => ["spec", "architecture", "flows"],
+        list: queryFull(
+          ["spec", "architecture", "flows", "list"],
+          procedures.specArchitectureFlowsList,
+        ),
+        byId: queryFull(
+          ["spec", "architecture", "flows", "byId"],
+          procedures.specArchitectureFlowsById,
+        ),
+      },
+      source: queryFull(["spec", "architecture", "source"], procedures.specArchitectureSource),
     },
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),

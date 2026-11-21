@@ -14,7 +14,10 @@ export type EntityKind =
   | "rule"
   | "endpoint"
   | "commit"
-  | "nfr";
+  | "nfr"
+  | "component"
+  | "decision"
+  | "flow";
 
 /** Icône (DESIGN.md v2 §4) et type lu par les lecteurs d'écran (questions.md B32). */
 const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
@@ -27,6 +30,9 @@ const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
   endpoint: { icon: "api", type: "Point d'accès" },
   commit: { icon: "commit", type: "Commit" },
   nfr: { icon: "speed", type: "Exigence non fonctionnelle" },
+  component: { icon: "widgets", type: "Composant" },
+  decision: { icon: "gavel", type: "Décision d'architecture" },
+  flow: { icon: "route", type: "Flux" },
 };
 
 export interface EntityPreview {

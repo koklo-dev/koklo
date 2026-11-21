@@ -63,6 +63,16 @@ describe("ZoneNode", () => {
     expect(screen.getByText("a").className).toMatch(/bg-secondary/);
   });
 
+  it("variante architecture : puces sans-serif de 11 px, sous-titre de 12 px en graisse normale", () => {
+    render(<ZoneNode {...zone} preview={["a"]} variant="architecture" onOpen={() => undefined} />);
+    const node = document.querySelector("[data-slot='zone-node']") as HTMLElement;
+    expect(node.className).toMatch(/rounded-\[14px\]/);
+    const chip = screen.getByText("a");
+    expect(chip.className).toMatch(/text-\[11px\]/);
+    expect(chip.className).not.toMatch(/font-mono/);
+    expect(node.querySelector(".text-caption.font-normal")).not.toBeNull();
+  });
+
   it("aperçu : au plus 4 noms de tables puis le reste", () => {
     render(
       <ZoneNode

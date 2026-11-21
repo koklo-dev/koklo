@@ -24,6 +24,33 @@ describe("résumé", () => {
     expect(architectureSummaryOf({ components: 34 })).toBe("34 composants");
     expect(architectureSummaryOf({ components: 1 })).toBe("1 composant");
   });
+
+  it("TK-112 (B548) : « 34 composants · 18 flux » quand les flux sont lus", () => {
+    expect(architectureSummaryOf({ components: 34, flows: 18 })).toBe("34 composants · 18 flux");
+    expect(architectureSummaryOf({ components: 1, flows: 1 })).toBe("1 composant · 1 flux");
+  });
+});
+
+describe("TK-112 : onglets Schéma et Flux", () => {
+  it("le résumé et l'onglet Flux comptent les flux ; Schéma n'a pas de compteur", () => {
+    const state = architectureHeaderStateOf({ ...base, counts: { components: 34, flows: 18 } });
+    expect(state.summary).toBe("34 composants · 18 flux");
+    expect(state.tabCounts).toEqual({ components: { value: 34 }, flows: { value: 18 } });
+  });
+
+  it("onglet Flux : « Nouveau flux » remplace « Nouveau composant » ; le designer n'a aucun bouton", () => {
+    expect(architectureHeaderStateOf({ ...base, tab: "flows" }).actions).toEqual([
+      "propose",
+      "create-flow",
+    ]);
+    expect(architectureHeaderStateOf({ ...base, tab: "schema" }).actions).toEqual([
+      "propose",
+      "create",
+    ]);
+    expect(architectureHeaderStateOf({ ...base, tab: "flows", canWrite: false }).actions).toEqual(
+      [],
+    );
+  });
 });
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement

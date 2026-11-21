@@ -56,9 +56,9 @@ describe("SH1 surface additive", () => {
     ]);
   });
 
-  it("le contrat est en 3.9.0 (lien d'endpoint élargi à zone.verbe, TK-106)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.9.0");
-    expect((await doc()).info.version).toBe("3.9.0");
+  it("le contrat est en 3.10.0 (lien d'endpoint élargi à zone.verbe, TK-106)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.10.0");
+    expect((await doc()).info.version).toBe("3.10.0");
   });
 });
 

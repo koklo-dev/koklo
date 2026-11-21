@@ -99,6 +99,8 @@ const DENIED = [
   "spec.forceDeliverable",
   // TK-108 (contrat 3.6.0) : enregistrer les positions du diagramme relève d'owner, admin et développeur (B417).
   "spec.data.layout.save",
+  // TK-112 (contrat 3.10.0) : enregistrer les positions du schéma d'architecture relève d'owner, admin et développeur (B542).
+  "spec.architecture.layout.save",
   "specBatch.submit",
   // TK-106 (contrat 3.4.0) : la migration du format de spec et son retour arrière relèvent d'owner seul.
   "specMigration.revert",

@@ -69,16 +69,21 @@ export function FicheFrame({
   id,
   onClose,
   children,
+  label = "Fiche de la table",
+  description = "Champs, relations et fichiers de la table choisie dans le diagramme.",
 }: {
   id: string;
   onClose: () => void;
   children: ReactNode;
+  /** Nom de la fiche : « Fiche de la table » par défaut, « Fiche du composant » pour l'Architecture. */
+  label?: string;
+  description?: string;
 }) {
   const overlay = useMaxWidth(OVERLAY_MAX);
   if (!overlay) {
     return (
       <aside
-        aria-label="Fiche de la table"
+        aria-label={label}
         className="flex min-w-0 flex-[1_1_340px] flex-col gap-3 border-l pl-[22px] xl:max-w-[400px]"
       >
         {children}
@@ -96,10 +101,8 @@ export function FicheFrame({
           document.querySelector<HTMLElement>(`[data-spec-id="${id}"] button`)?.focus();
         }}
       >
-        <SheetTitle className="sr-only">Fiche de la table</SheetTitle>
-        <SheetDescription className="sr-only">
-          Champs, relations et fichiers de la table choisie dans le diagramme.
-        </SheetDescription>
+        <SheetTitle className="sr-only">{label}</SheetTitle>
+        <SheetDescription className="sr-only">{description}</SheetDescription>
         {children}
       </SheetContent>
     </Sheet>

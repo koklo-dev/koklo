@@ -69,6 +69,38 @@ export const componentData = (profile: VolumeProfile, features: number, tables: 
     'decisions', '[]'::jsonb)`;
 };
 
+/** Rôles du jeu (`RL-` de `domain/roles.yaml`) qui jouent l'acteur d'un flux, tour à tour. */
+const FLOW_ROLES = ["RL-administrateur", "RL-gestionnaire", "RL-lecteur"] as const;
+
+/**
+ * Contenu d'un flux d'architecture (TK-112) : un rôle, deux composants consécutifs du jeu, deux messages (avec retour), un bloc
+ * `alt` (erreur) un flux sur trois et un séparateur un flux sur quatre. `titre` = identifiant (comme le worker). Les
+ * identifiants cités existent tous dans le jeu.
+ */
+export const archflowData = (components: number, features: number, rules: number): string => {
+  const first = pad(`(1 + n % (${components} - 1))`);
+  const second = pad(`(2 + n % (${components} - 1))`);
+  const source = `'C-composant-' || ${first}`;
+  const target = `'C-composant-' || ${second}`;
+  const role = pick(FLOW_ROLES, "n % 3");
+  const message = (from: string, to: string, text: string, extra = "") =>
+    `jsonb_strip_nulls(jsonb_build_object('de', ${from}, 'vers', ${to}, 'texte', ${text}${extra}))`;
+  const alt = `jsonb_build_array(jsonb_build_object('bloc', 'alt', 'libelle', 'Sinon · refus de la demande',
+      'messages', jsonb_build_array(${message(target, source, "'Refuse la demande'", ", 'erreur', 'Conflit (409)'")})))`;
+  const separator = `jsonb_build_array(jsonb_build_object('bloc', 'separateur', 'libelle', 'Plus tard'))`;
+  return `jsonb_build_object(
+    'id', 'P-flux-' || ${pad()}, 'titre', 'P-flux-' || ${pad()},
+    'participants', jsonb_build_array(${role}, ${source}, ${target}),
+    'messages', jsonb_build_array(
+        ${message(role, source, `'Demande l''opération ' || ${pad()}`, ", 'retour', 'Résultat de l''opération'")},
+        ${message(source, target, "'Appelle le composant suivant'", ", 'retour', 'Répond'")})
+      || CASE WHEN n % 3 = 0 THEN ${alt} ELSE '[]'::jsonb END
+      || CASE WHEN n % 4 = 0 THEN ${separator} ELSE '[]'::jsonb END,
+    'fonctionnalites', jsonb_build_array('F-' || ${pad(`(1 + n % ${features})`)}),
+    'regles', jsonb_build_array('R-' || ${pad(`(1 + n % ${rules})`)}),
+    'decisions', '[]'::jsonb)`;
+};
+
 type Kind = "component" | "archflow" | "adr" | "doc_section";
 interface Segment {
   kind: Kind;

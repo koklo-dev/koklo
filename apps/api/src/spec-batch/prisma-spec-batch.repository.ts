@@ -4,6 +4,11 @@ import { DatabaseService } from "../database/database.module.ts";
 import { isIdeaOperation } from "../idea/idea-batch.ts";
 import { carrierFilter } from "../repo/prisma-repo.repository.ts";
 import { isMigrationOperation } from "../spec-migration/migration-batch.ts";
+
+/** Mises en page (Données, Architecture) : un lot sans cible, jamais de numéro attribué. */
+const isLayoutOperation = (kind: string): boolean =>
+  kind === "layout.save" || kind === "architecture.layout.save";
+
 import { isUniqueViolation, orNotFound, validation } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
@@ -189,7 +194,7 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
       const targetSpecId =
         isIdeaOperation(operation.kind) ||
         isMigrationOperation(operation.kind) ||
-        operation.kind === "layout.save"
+        isLayoutOperation(operation.kind)
           ? null
           : (operation.specId ?? (await createdSpecId(tx, scope, operation)));
       operations.push({
