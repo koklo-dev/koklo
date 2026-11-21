@@ -103,6 +103,13 @@ describe("TK-111 migration modes de lancement : up, down, up", () => {
     const scope = await notificationScope(db, "mode-keep");
     await launch(scope, "all");
     await launch(scope, "decision");
+    // Défait d'abord les migrations postérieures, de la plus récente à la plus ancienne.
+    for (const later of dirs()
+      .filter((d) => d > named())
+      .reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, later, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [later]);
+    }
     runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, named(), "down.sql")], db.url);
     await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [named()]);
     expect(await constraints(db)).toEqual(expected);
