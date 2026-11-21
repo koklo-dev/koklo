@@ -1717,25 +1717,40 @@ model ProjectCreation {
 /// `agent_launches_one_active` (écrit à la main : Prisma ne modélise pas les index partiels). `requestedBy` sans clé
 /// étrangère (RGPD). `sources` : liste des lectures de l'agent, en JSONB (aucune colonne liste, incident 6). Les listes fermées et les bornes sont des CHECK écrits à la main.
 model AgentLaunch {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  projectId      String    @map("project_id") @db.Uuid
-  deliverable    String
-  mode           String
-  instruction    String?
-  status         String
-  errorCode      String?   @map("error_code")
-  requestedBy    String    @map("requested_by") @db.Uuid
-  sources        Json      @default("[]") @db.JsonB
-  baseVersion    Int?      @map("base_version")
-  discardedCount Int       @default(0) @map("discarded_count")
-  proposedCount  Int       @default(0) @map("proposed_count")
-  heartbeatAt    DateTime  @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
-  lastSeenAt     DateTime? @map("last_seen_at") @db.Timestamptz(3)
-  startedAt      DateTime? @map("started_at") @db.Timestamptz(3)
-  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(3)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id              String    @id @default(uuid(7)) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  projectId       String    @map("project_id") @db.Uuid
+  deliverable     String
+  mode            String
+  instruction     String?
+  status          String
+  errorCode       String?   @map("error_code")
+  requestedBy     String    @map("requested_by") @db.Uuid
+  sources         Json      @default("[]") @db.JsonB
+  baseVersion     Int?      @map("base_version")
+  discardedCount  Int       @default(0) @map("discarded_count")
+  proposedCount   Int       @default(0) @map("proposed_count")
+  /// Bilan du lancement (TK-114b, B617-B618) : zones validées (12 au plus), zones traitées et écartées, motifs
+  /// `{ motif: n }`, appels de couverture (30 au plus), segment enchaîné (8 au plus), couverture avant/après
+  /// `{ features, flows, tables: { covered, total } }`, passage de relais en cours, motif d'arrêt.
+  zones           Json      @default("[]") @db.JsonB
+  zonesDone       Int       @default(0) @map("zones_done")
+  zonesDiscarded  Int       @default(0) @map("zones_discarded")
+  discardReasons  Json      @default("{}") @map("discard_reasons") @db.JsonB
+  coverageCalls   Int       @default(0) @map("coverage_calls")
+  /// Appels de couverture consécutifs sans trou comblé : une passe complète sans progrès arrête la couverture (`cap`).
+  coverageStalled Int       @default(0) @map("coverage_stalled")
+  segment         Int       @default(0)
+  coverageBefore  Json?     @map("coverage_before") @db.JsonB
+  coverageAfter   Json?     @map("coverage_after") @db.JsonB
+  handoffAt       DateTime? @map("handoff_at") @db.Timestamptz(3)
+  stopReason      String?   @map("stop_reason")
+  heartbeatAt     DateTime  @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
+  lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz(3)
+  startedAt       DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt      DateTime? @map("finished_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   project   Project         @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
   proposals AgentProposal[]

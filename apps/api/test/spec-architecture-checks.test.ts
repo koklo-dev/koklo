@@ -117,3 +117,31 @@ describe("spec.architecture.checks", () => {
     expect(codes((await checks(s)).body)).toEqual(["ARCH_TABLE_UNOWNED:T-b"]);
   });
 });
+
+describe("TK-114b (B615) : spec.architecture.checks et propositions de mise à jour", () => {
+  it("une proposition specId remplace le composant indexé : ni double propriétaire, ni table orpheline", async () => {
+    const s = await scene([
+      table("T-a"),
+      table("T-b"),
+      component("C-base", { type: "store", possede: ["T-a"], sert: ["F-001"] }),
+    ]);
+    const scope = { organizationId: s.organizationId, projectId: s.projectId };
+    expect(codes((await checks(s)).body)).toEqual(["ARCH_TABLE_UNOWNED:T-b"]);
+    await insertProposal(read().database, scope, {
+      deliverable: "architecture",
+      kind: "component",
+      zone: "Données",
+      title: "C-base",
+      payload: {
+        specId: "C-base",
+        name: "C-base",
+        type: "store",
+        zone: "Noyau",
+        responsibility: "Mise à jour des liens du composant.",
+        owns: ["T-a", "T-b"],
+        serves: ["F-001"],
+      },
+    });
+    expect(codes((await checks(s)).body)).toEqual([]);
+  });
+});

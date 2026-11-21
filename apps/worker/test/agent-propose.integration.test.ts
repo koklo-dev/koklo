@@ -329,8 +329,11 @@ describe("résilience (cas 14)", () => {
       agentPropose: { ai, deadlineMs: -1, retryLimit: 1, retryDelaySeconds: 1 },
     });
     try {
-      const failed = await finished(bench, await launch(bench, scene));
+      // TK-114b : chaque segment passe le relais sans appel, jusqu'au huitième (motif deadline).
+      const id = await launch(bench, scene);
+      const failed = await finished(bench, id, 30_000);
       expect(failed).toMatchObject({ status: "failed", error_code: "timeout", proposed_count: 0 });
+      expect(await reportOf(id)).toMatchObject({ stop_reason: "deadline", segment: 7 });
     } finally {
       await bench.start({ agentPropose: { ai, retryLimit: 1, retryDelaySeconds: 1 } });
     }
@@ -460,46 +463,50 @@ describe("agent-propose : livrable Architecture (TK-111)", () => {
   it("publie composant, flux, décision et section avec leur zone ; écarte doublon, référence inconnue et flux existant", async () => {
     await seedArchitectureModel(bench, scene);
     ai.zones = ["Noyau"];
-    ai.batch = () => ({
-      proposals: [
-        component("Base"),
-        component("API"),
-        component("Cache", { owns: ["T-absente"] }),
-        {
-          kind: "archflow",
-          rationale: "Parcours sans flux",
-          content: {
-            flow: "P-inscription",
-            participants: ["RL-admin", "C-api"],
-            messages: [{ from: "RL-admin", to: "C-api", text: "S'inscrit" }],
-          },
-        },
-        {
-          kind: "archflow",
-          rationale: "Déjà détaillé",
-          content: {
-            flow: "P-annuler",
-            participants: ["RL-admin", "C-api"],
-            messages: [{ from: "RL-admin", to: "C-api", text: "Annule" }],
-          },
-        },
-        {
-          kind: "adr",
-          rationale: "Choix structurant",
-          content: {
-            title: "Stockage des salles",
-            context: "Les salles sont liées.",
-            decision: "Une base relationnelle.",
-            alternatives: [{ name: "Fichiers", reason: "Pas d'intégrité" }],
-            links: ["C-base", "T-salle"],
-          },
-        },
-        {
-          kind: "doc_section",
-          rationale: "Section manquante",
-          content: { title: "Déploiement", markdown: "Un environnement de recette." },
-        },
-      ],
+    // TK-114b : l'appel suivant est celui de la couverture (F-002 non servie) ; il ne propose rien.
+    ai.batch = (call) => ({
+      proposals:
+        call > 1
+          ? []
+          : [
+              component("Base"),
+              component("API"),
+              component("Cache", { owns: ["T-absente"] }),
+              {
+                kind: "archflow",
+                rationale: "Parcours sans flux",
+                content: {
+                  flow: "P-inscription",
+                  participants: ["RL-admin", "C-api"],
+                  messages: [{ from: "RL-admin", to: "C-api", text: "S'inscrit" }],
+                },
+              },
+              {
+                kind: "archflow",
+                rationale: "Déjà détaillé",
+                content: {
+                  flow: "P-annuler",
+                  participants: ["RL-admin", "C-api"],
+                  messages: [{ from: "RL-admin", to: "C-api", text: "Annule" }],
+                },
+              },
+              {
+                kind: "adr",
+                rationale: "Choix structurant",
+                content: {
+                  title: "Stockage des salles",
+                  context: "Les salles sont liées.",
+                  decision: "Une base relationnelle.",
+                  alternatives: [{ name: "Fichiers", reason: "Pas d'intégrité" }],
+                  links: ["C-base", "T-salle"],
+                },
+              },
+              {
+                kind: "doc_section",
+                rationale: "Section manquante",
+                content: { title: "Déploiement", markdown: "Un environnement de recette." },
+              },
+            ],
     });
     const id = await launch(bench, scene, {
       deliverable: "architecture",
@@ -540,5 +547,87 @@ describe("agent-propose : livrable Architecture (TK-111)", () => {
       expect(sent, absent).not.toContain(absent);
     }
     expect(sent.toLowerCase()).not.toContain("anthropic");
+    expect(await reportOf(id)).toMatchObject({
+      zones: ["Noyau"],
+      zones_done: 1,
+      zones_discarded: 0,
+      coverage_calls: 1,
+      segment: 0,
+      handoff_at: null,
+      stop_reason: "cap",
+      coverage_after: {
+        features: { covered: 1, total: 2 },
+        flows: { covered: 2, total: 2 },
+        tables: { covered: 1, total: 1 },
+      },
+    });
+  });
+
+  it("TK-114b (B614) : table sans propriétaire rattachée par le code à « Base de données », sans appel de plus", async () => {
+    await seedArchitectureModel(bench, scene);
+    ai.zones = ["Noyau"];
+    ai.batch = () => ({ proposals: [] });
+    const id = await launch(bench, scene, {
+      deliverable: "architecture",
+      mode: "complete",
+      baseVersion: null,
+    });
+    expect(await finished(bench, id)).toMatchObject({ status: "done", proposed_count: 1 });
+    const rows = await proposalsOf(bench, id);
+    expect(rows.map((r) => [r.kind, r.zone, r.title, r.rationale])).toEqual([
+      ["component", "Données", "Base de données", "Tables sans composant propriétaire."],
+    ]);
+    expect(rows[0]?.payload).toMatchObject({ type: "store", owns: ["T-salle"] });
+    // Zones, une zone, un appel de couverture (F-001 et F-002 non servies) : la règle des tables n'appelle pas le modèle.
+    expect(ai.requests).toHaveLength(3);
+    expect(await reportOf(id)).toMatchObject({ coverage_calls: 1, stop_reason: "cap" });
+  });
+});
+
+/** Colonnes du bilan d'un lancement (TK-114b). */
+const reportOf = async (id: string) => {
+  const [row] = await bench.query<Record<string, unknown>>(
+    `SELECT zones, zones_done, zones_discarded, discard_reasons, coverage_calls, segment, handoff_at, stop_reason,
+            coverage_before, coverage_after
+       FROM agent_launches WHERE id = $1`,
+    [id],
+  );
+  return row;
+};
+
+describe("TK-114b : segments enchaînés (B617)", () => {
+  it("deadlineMs 1 ms : passage de relais, job de suite { launchId, segment }, done ; le bilan est tenu", async () => {
+    await bench.start({
+      agentPropose: { ai, deadlineMs: 1, retryLimit: 1, retryDelaySeconds: 1 },
+    });
+    try {
+      const id = await launch(bench, scene);
+      const done = await finished(bench, id, 30_000);
+      expect(done).toMatchObject({ status: "done", error_code: null, proposed_count: 2 });
+      const report = await reportOf(id);
+      expect(report).toMatchObject({
+        zones: ["Accès", "Facturation"],
+        zones_done: 2,
+        zones_discarded: 0,
+        discard_reasons: {},
+        handoff_at: null,
+        stop_reason: "completed",
+        coverage_before: null,
+      });
+      expect(report?.segment).toBeGreaterThan(0);
+      const jobs = await bench.query<{ data: { launchId: string; segment?: number } }>(
+        "SELECT data FROM pgboss.job WHERE name = 'agent-propose' AND data->>'launchId' = $1",
+        [id],
+      );
+      const segments = jobs.map((job) => job.data.segment ?? 0).sort();
+      expect(segments).toEqual(Array.from({ length: Number(report?.segment) + 1 }, (_, i) => i));
+      expect(
+        jobs.every((job) =>
+          Object.keys(job.data).every((k) => ["launchId", "segment"].includes(k)),
+        ),
+      ).toBe(true);
+    } finally {
+      await bench.start({ agentPropose: { ai, retryLimit: 1, retryDelaySeconds: 1 } });
+    }
   });
 });

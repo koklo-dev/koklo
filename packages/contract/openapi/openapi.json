@@ -1779,7 +1779,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "3.11.0"
+    "version": "3.12.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -22986,6 +22986,218 @@
                               "minimum": 0,
                               "type": "integer"
                             },
+                            "report": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "coverageAfter": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "features": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "flows": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "tables": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "features",
+                                    "flows",
+                                    "tables"
+                                  ],
+                                  "type": "object"
+                                },
+                                "coverageBefore": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "features": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "flows": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "tables": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "features",
+                                    "flows",
+                                    "tables"
+                                  ],
+                                  "type": "object"
+                                },
+                                "coverageCalls": {
+                                  "maximum": 30,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "discardReasons": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "count": {
+                                        "maximum": 9007199254740991,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      "reason": {
+                                        "enum": [
+                                          "truncated",
+                                          "output_invalid",
+                                          "prompt_rejected",
+                                          "refused"
+                                        ],
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "reason",
+                                      "count"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "maxItems": 4,
+                                  "type": "array"
+                                },
+                                "stopReason": {
+                                  "enum": [
+                                    "completed",
+                                    "cap",
+                                    "deadline",
+                                    "cancelled"
+                                  ],
+                                  "type": "string"
+                                },
+                                "zonesDiscarded": {
+                                  "maximum": 12,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "zonesDone": {
+                                  "maximum": 12,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "zonesRequested": {
+                                  "maximum": 12,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "zonesRequested",
+                                "zonesDone",
+                                "zonesDiscarded",
+                                "discardReasons",
+                                "coverageCalls"
+                              ],
+                              "type": "object"
+                            },
                             "status": {
                               "enum": [
                                 "queued",
@@ -29954,7 +30166,7 @@
                                 "pattern": "^T-[a-z0-9][a-z0-9-]*$",
                                 "type": "string"
                               },
-                              "maxItems": 50,
+                              "maxItems": 200,
                               "type": "array"
                             },
                             "responsibility": {
@@ -29967,7 +30179,7 @@
                                 "pattern": "^F-\\d{3,}$",
                                 "type": "string"
                               },
-                              "maxItems": 50,
+                              "maxItems": 200,
                               "type": "array"
                             },
                             "type": {
@@ -30053,7 +30265,7 @@
                                 "pattern": "^T-[a-z0-9][a-z0-9-]*$",
                                 "type": "string"
                               },
-                              "maxItems": 50,
+                              "maxItems": 200,
                               "type": "array"
                             },
                             "responsibility": {
@@ -30066,7 +30278,7 @@
                                 "pattern": "^F-\\d{3,}$",
                                 "type": "string"
                               },
-                              "maxItems": 50,
+                              "maxItems": 200,
                               "type": "array"
                             },
                             "specId": {

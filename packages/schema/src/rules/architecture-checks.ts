@@ -27,19 +27,73 @@ export type ArchitectureWarning = {
 
 type Warn = (code: ArchitectureWarningCode, entityId: string, message: string) => void;
 
-function checkTables(spec: ArchitectureInput, warn: Warn): void {
+/** Ce que la couverture lit (TK-114b, B616) : des identifiants, et des composants réduits à leurs liens. */
+export type ArchitectureCoverageInput = {
+  features: readonly { value: { id: string } }[];
+  tables: readonly { value: { id: string } }[];
+  flows: readonly { value: { id: string } }[];
+  components: readonly {
+    value: { id: string; possede: readonly string[]; sert: readonly string[] };
+  }[];
+  archFlows: readonly { value: { id: string } }[];
+};
+
+export type CoverageCount = { covered: number; total: number };
+
+/** Trous de l'architecture, dans l'ordre de l'entrée, et compteurs couverts / total. */
+export type ArchitectureCoverage = {
+  unservedFeatures: string[];
+  missingFlows: string[];
+  unownedTables: string[];
+  counts: { features: CoverageCount; flows: CoverageCount; tables: CoverageCount };
+};
+
+/** Propriétaires de chaque table, dans l'ordre des composants. */
+function ownersOf(spec: ArchitectureCoverageInput): Map<string, string[]> {
   const owners = new Map<string, string[]>();
   for (const { value } of spec.components) {
     for (const table of value.possede) owners.set(table, [...(owners.get(table) ?? []), value.id]);
   }
+  return owners;
+}
+
+const idsOf = (items: readonly { value: { id: string } }[]) => items.map(({ value }) => value.id);
+
+const countOf = (all: readonly unknown[], holes: readonly unknown[]): CoverageCount => ({
+  covered: all.length - holes.length,
+  total: all.length,
+});
+
+/**
+ * Couverture de l'architecture (TK-114b, B616) : fonctionnalités servies par aucun composant, parcours sans flux technique,
+ * tables sans propriétaire. Pure ; partagée par `architectureChecks` (avertissements) et la passe de couverture du worker.
+ */
+export function architectureCoverage(spec: ArchitectureCoverageInput): ArchitectureCoverage {
+  const served = new Set(spec.components.flatMap(({ value }) => value.sert));
+  const detailed = new Set(idsOf(spec.archFlows));
+  const owners = ownersOf(spec);
+  const unservedFeatures = idsOf(spec.features).filter((id) => !served.has(id));
+  const missingFlows = idsOf(spec.flows).filter((id) => !detailed.has(id));
+  const unownedTables = idsOf(spec.tables).filter((id) => (owners.get(id) ?? []).length === 0);
+  return {
+    unservedFeatures,
+    missingFlows,
+    unownedTables,
+    counts: {
+      features: countOf(spec.features, unservedFeatures),
+      flows: countOf(spec.flows, missingFlows),
+      tables: countOf(spec.tables, unownedTables),
+    },
+  };
+}
+
+function checkTables(spec: ArchitectureInput, warn: Warn): void {
+  const owners = ownersOf(spec);
+  for (const id of architectureCoverage(spec).unownedTables) {
+    warn("ARCH_TABLE_UNOWNED", id, `La table ${id} n'a aucun composant propriétaire.`);
+  }
   for (const { value: table } of spec.tables) {
     const own = owners.get(table.id) ?? [];
-    if (own.length === 0)
-      warn(
-        "ARCH_TABLE_UNOWNED",
-        table.id,
-        `La table ${table.id} n'a aucun composant propriétaire.`,
-      );
     if (own.length > 1) {
       warn(
         "ARCH_TABLE_MULTI_OWNER",
@@ -60,19 +114,12 @@ function checkTables(spec: ArchitectureInput, warn: Warn): void {
 }
 
 function checkCoverage(spec: ArchitectureInput, warn: Warn): void {
-  const served = new Set(spec.components.flatMap(({ value }) => value.sert));
-  for (const { value } of spec.features) {
-    if (!served.has(value.id))
-      warn(
-        "ARCH_FEATURE_UNSERVED",
-        value.id,
-        `La fonctionnalité ${value.id} n'est servie par aucun composant.`,
-      );
+  const coverage = architectureCoverage(spec);
+  for (const id of coverage.unservedFeatures) {
+    warn("ARCH_FEATURE_UNSERVED", id, `La fonctionnalité ${id} n'est servie par aucun composant.`);
   }
-  const detailed = new Set(spec.archFlows.map(({ value }) => value.id));
-  for (const { value } of spec.flows) {
-    if (!detailed.has(value.id))
-      warn("ARCH_FLOW_MISSING", value.id, `Le parcours ${value.id} n'a pas de flux technique.`);
+  for (const id of coverage.missingFlows) {
+    warn("ARCH_FLOW_MISSING", id, `Le parcours ${id} n'a pas de flux technique.`);
   }
 }
 

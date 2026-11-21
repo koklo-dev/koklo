@@ -8,6 +8,7 @@ import {
   currentDataModel,
   currentDomainTitles,
   currentFeatures,
+  currentTableIds,
   type FrozenPage,
   frozenPages,
   frozenVersion,
@@ -43,6 +44,8 @@ export interface LaunchSources {
   readonly fixtures?: readonly CurrentTitle[];
   /** Livrable Architecture (TK-111) : composants, flux, décisions et exigences connues ; sa présence choisit les prompts de l'architecture. */
   readonly architecture?: CurrentArchitecture;
+  /** Architecture (TK-114b) : identifiants de toutes les tables, pour la couverture ; jamais envoyés au modèle. */
+  readonly tableIds?: readonly string[];
 }
 
 /** Diff `idea-vN-1` vers `idea-vN` du mode `update` ; `null` sans version précédente, `undefined` hors mode `update`. */
@@ -91,6 +94,7 @@ function readArchitectureSources(
     ...(await currentDomainTitles(client, launch.projectId)),
     tables: (await currentDataModel(client, launch.projectId)).tables,
     architecture: await currentArchitecture(client, launch.projectId),
+    tableIds: await currentTableIds(client, launch.projectId),
   }));
 }
 

@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { errorCode } from "../lib/api-error.ts";
 import { ARCHITECTURE_GENERATING } from "../lib/architecture-labels.ts";
 import type { FeaturesTab } from "../lib/features-tab.ts";
+import { launchDetailOf } from "../lib/launch-report.ts";
 import { NO_ACCESS } from "../lib/proposal-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import { type ProposalReviewModel, useProposalReview } from "../lib/use-proposal-review.ts";
@@ -49,9 +50,17 @@ function Loading() {
 }
 
 /** Génération en cours, rien d'arrivé : bande d'état, « Annuler l'attente » (quitte l'attente seulement), 6 squelettes. */
-function Generating({ onLeave, tab }: { onLeave: () => void; tab: ReviewTab }) {
+function Generating({
+  onLeave,
+  tab,
+  detail,
+}: {
+  onLeave: () => void;
+  tab: ReviewTab;
+  detail: string | undefined;
+}) {
   if (tab === "data") return <DataGenerating onLeave={onLeave} />;
-  if (tab === "architecture") return <ArchitectureGenerating onLeave={onLeave} />;
+  if (tab === "architecture") return <ArchitectureGenerating onLeave={onLeave} detail={detail} />;
   return (
     <>
       <ProposalGenerationBanner onLeave={onLeave}>{GENERATING}</ProposalGenerationBanner>
@@ -98,13 +107,18 @@ function placeholderOf(review: ProposalReviewModel, onLeave: () => void, tab: Re
   }
   if (!review.status.loaded) return <Loading />;
   if (review.counts.total > 0) return null;
-  if (review.active) return <Generating onLeave={onLeave} tab={tab} />;
+  if (review.active) {
+    return <Generating onLeave={onLeave} tab={tab} detail={launchDetailOf(review.status.launch)} />;
+  }
   return (
     <Notice title="Aucune proposition à relire" onLeave={onLeave}>
       Lancez l'agent depuis le bouton « Proposer avec l'agent ».
     </Notice>
   );
 }
+
+/** Ligne de détail du bandeau (bilan en cours de l'Architecture, TK-114b) : seulement quand elle existe. */
+const detailProp = (detail: string | undefined) => (detail ? { detail } : {});
 
 /** Phrase du bandeau d'attente de chaque livrable. */
 const generatingText = (tab: ReviewTab): string =>
@@ -130,7 +144,11 @@ function ReviewNotices({ review, actions, onLeave, tab }: Notices) {
       ) : null}
       {active ? (
         // `ProposalReview` porte la région d'état de la relecture : le bandeau ne la double pas.
-        <ProposalGenerationBanner silent onLeave={onLeave}>
+        <ProposalGenerationBanner
+          silent
+          onLeave={onLeave}
+          {...detailProp(launchDetailOf(review.status.launch))}
+        >
           {generatingText(tab)}
         </ProposalGenerationBanner>
       ) : null}

@@ -62,10 +62,14 @@ export { parseRuleMarkdown } from "./parse/rule-markdown.ts";
 export { parseTableFile } from "./parse/table-file.ts";
 export * from "./proposals/index.ts";
 export {
+  type ArchitectureCoverage,
+  type ArchitectureCoverageInput,
   type ArchitectureInput,
   type ArchitectureWarning,
   type ArchitectureWarningCode,
   architectureChecks,
+  architectureCoverage,
+  type CoverageCount,
 } from "./rules/architecture-checks.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";

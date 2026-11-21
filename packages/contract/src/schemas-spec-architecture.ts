@@ -57,8 +57,9 @@ const componentFields = {
   type: componentTypeSchema,
   zone: text(120),
   responsibility: text(500),
-  owns: z.array(tableLink).max(50),
-  serves: z.array(featureLink).max(50),
+  /** 200 liens au plus (TK-114b, B615) : une mise à jour par l'agent porte l'index ∪ ajouts. */
+  owns: z.array(tableLink).max(200),
+  serves: z.array(featureLink).max(200),
   dependsOn: z.array(dependencySchema).max(30),
   decisions: z.array(adrIdSchema).max(20),
   /** Phrases simples montrées au client (vue client, TK-114) ; remplace la liste précédente. */

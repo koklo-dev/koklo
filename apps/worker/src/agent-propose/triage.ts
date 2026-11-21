@@ -1,12 +1,13 @@
 import { AGENT_PROPOSE_LIMITS, type AgentProposalKind, slugOf } from "@koklo/domain";
 import { isSafeText, PROPOSAL_SCHEMAS } from "@koklo/schema";
-import { isRecord } from "../job-support.ts";
+import { isRecord, recordsOf, stringsOf } from "../job-support.ts";
 import { OutputInvalidError } from "./errors.ts";
 import {
   type ArchitectureRefs,
   architectureKnown,
   isArchitectureKind,
   rememberAccepted,
+  withoutOwnedTables,
 } from "./triage-architecture.ts";
 
 const TITLE_MAX = 200;
@@ -21,6 +22,8 @@ export interface Candidate {
   readonly title: string;
   readonly rationale: string;
   readonly payload: Record<string, unknown>;
+  /** Zone de la ligne, quand elle n'est pas celle de l'appel (passe de couverture, règle des tables : TK-114b). */
+  readonly zone?: string;
 }
 
 export interface TriageContext {
@@ -69,11 +72,6 @@ const fieldNamesOf = (payload: Record<string, unknown>): ReadonlySet<string> =>
       typeof field.name === "string" ? [field.name] : [],
     ),
   );
-
-const recordsOf = (value: unknown): Record<string, unknown>[] =>
-  Array.isArray(value) ? value.filter(isRecord) : [];
-const stringsOf = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
 /** Table visée par un type de champ `ref(T-slug)` ; `undefined` pour tout autre type. */
 const refTarget = (type: unknown): string | undefined =>
@@ -150,7 +148,9 @@ function candidateOf(entry: unknown, context: TriageContext): Candidate | undefi
   const asKind = kind as AgentProposalKind;
   const parsed = PROPOSAL_SCHEMAS[asKind].safeParse(content);
   if (!parsed.success) return undefined;
-  const payload = parsed.data as Record<string, unknown>;
+  // `specId` n'est posé que par le code (B615) : une sortie du modèle qui en porte un est écartée.
+  if (asKind === "component" && "specId" in parsed.data) return undefined;
+  const payload = withoutOwnedTables(asKind, parsed.data as Record<string, unknown>, context.arch);
   const title = titleFor(asKind, payload, context);
   return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
 }
@@ -165,13 +165,50 @@ function titleFor(
   if (!referencesKnown(kind, payload, context.refs)) return undefined;
   if (isArchitectureKind(kind) && !architectureKnown(kind, payload, context.arch)) return undefined;
   const title = kind === "relations" ? RELATIONS_TITLE : titleOf(kind, payload);
+  if (knownTitles(context, kind).has(titleKey(title))) return undefined;
+  remember(context, kind, title, payload);
+  return title;
+}
+
+const knownTitles = (context: TriageContext, kind: AgentProposalKind): Set<string> => {
   const known = context.titles[kind] ?? new Set<string>();
   context.titles[kind] = known;
-  if (known.has(titleKey(title))) return undefined;
-  known.add(titleKey(title));
+  return known;
+};
+
+/** Une proposition gardée devient connue : titre, table et ses champs, composant, flux, tables possédées. */
+function remember(
+  context: TriageContext,
+  kind: AgentProposalKind,
+  title: string,
+  payload: Record<string, unknown>,
+): void {
+  knownTitles(context, kind).add(titleKey(title));
   if (kind === "table") context.refs?.tables.set(tableIdOf(title), fieldNamesOf(payload));
   rememberAccepted(kind, payload, context.arch);
-  return title;
+}
+
+/**
+ * Reprise d'un segment (TK-114b, B617) : le contexte de tri apprend les propositions déjà publiées du lancement. Les titres
+ * de tous les statuts (jamais reproposés) ; les références d'une proposition refusée ne sont pas reprises.
+ */
+export function rememberPublished(
+  context: TriageContext,
+  proposals: readonly {
+    kind: string;
+    title: string;
+    status: string;
+    payload: Record<string, unknown>;
+  }[],
+): void {
+  for (const proposal of proposals) {
+    const kind = proposal.kind as AgentProposalKind;
+    if (kind === "criteria" && typeof proposal.payload.specId === "string") {
+      context.missingCriteria.delete(proposal.payload.specId);
+    }
+    if (proposal.status === "rejected") knownTitles(context, kind).add(titleKey(proposal.title));
+    else remember(context, kind, proposal.title, proposal.payload);
+  }
 }
 
 /**

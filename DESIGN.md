@@ -428,7 +428,7 @@ Barre : groupe « Récents » (3 projets, `ProjectTile` 22, l.38-41) au-dessus d
 |---|---|
 | `AgentProposeButton` | Hauteur 36, marges 0 14 0 12, rayon 6, 14/500, icône `wand_stars` 20 (l'`auto_awesome` des planches, §4). `idle` `--primary` ; `open` + halo 3 `--soft` ; `running` `progress_activity` (animation sous `motion-safe:`), « L'agent propose… », opacité .82, curseur `progress`, `aria-disabled` ; `ready` `rate_review`, « Relire N propositions », halo ; `unavailable` bordure pointillée `--border-strong`, fond `--surface`, texte `--muted-foreground`, infobulle avec la raison. Premier des actions de l'en-tête, absent en vue client. Maquette 21 l.110-118. |
 | `AgentProposePopover` | Modale `Dialog` centrée, 520 (`calc(100% - 32px)`), rayon 14, ombre `0 18px 44px rgba(20,16,43,.20)`, voile `--overlay` flou 6 sous `motion-safe`. En-tête `IconTile` 34 `--primary` + titre 15/600 + sous-titre 12 ; cartes radio (`role="radio"`, pastille 18, point 8, rayon 10, choisie : bordure `--primary` et fond `--diff-bg`), `Pill xs primary` « Recommandé », `Pill xs soft` pour le compte ; `Textarea` 2 lignes (`value`) ; puces « L'agent lit » 22 ; pied `--surface`. Maquette 21 l.57-68, 127-131 ; 10 l.388-419. |
-| `ProposalGenerationBanner` | Bande de génération pleine largeur (maquette 10 l.107-108) : `--diff-bg`, bordure basse, `progress_activity` 18 `--primary`, texte 13 (« … Cela peut prendre une minute. Vous pouvez quitter la page. »), « Annuler l'attente » souligné ; `role="status"`. Suivie de `ProposalSkeleton` (6 lignes de 44). |
+| `ProposalGenerationBanner` | Bande de génération pleine largeur (maquette 10 l.107-108) : `--diff-bg`, bordure basse, `progress_activity` 18 `--primary`, texte 13 (« … Cela peut prendre une minute. Vous pouvez quitter la page. »), « Annuler l'attente » souligné ; `role="status"`. Prop `detail` : seconde ligne `--muted-foreground` (bilan en cours, §5.25, TK-114b). Suivie de `ProposalSkeleton` (6 lignes de 44). |
 | `ProposalReview` | Bandeau `--diff-bg` (`role="group"` nommé ; les annonces passent par une région `role="status"` à part) : « Mode relecture · N propositions · A acceptées · R rejetées · P à relire », barre 6 (acceptées `--primary`, rejetées `--muted` à 50 %), « Enregistrer A dans la spec ». Liste 330, détail, pied Accepter `A` · Modifier · Rejeter `R` · demande à l'agent ; « Remettre à relire » une fois décidée. Raccourcis J / K / A / R hors champ de saisie (2.1.4). Maquette 10 l.114-168. |
 | Relecture en volume | Filtre « À relire » par défaut ; au-delà de 30, groupes repliables à en-tête collant (`aria-expanded`), 8 éléments puis « Afficher 20 de plus · N restantes dans ce groupe », « Accepter les N restantes » par groupe seulement, liste du groupe ouvert virtualisée (`aria-setsize`, `aria-posinset`). Maquette 12 l.126-148. |
 
@@ -590,6 +590,15 @@ Galerie : `/dev/ui`, section « 21. Diagramme » (vue des zones de la planche, i
 | À revoir | `InlineAlert` `warning` `role="alert"` `sync_problem` (« Le modèle de données a changé depuis la validation (version …) » + éléments + « Voir les changements » + « Proposer les mises à jour », deux boutons `sm`) ; `ArchNodeCard` prop `stale` (contour 2 px `--status-pending-icon`, nom accessible « …, à revoir ») ; encadré ambre dans la fiche du composant concerné |
 | Vue client | `InlineAlert` `readonly` `role="note"` `visibility` « Lecture seule. … » ; en-tête « Validé par l'équipe · … · lecture seule » + « Commenter » (`add_comment`, client seulement) ; fiches « En clair » (`--surface`), « Sert » seul, sans YAML ni Mermaid ni « Modifier » ; onglets Schéma, Composants, Décisions, Flux (pas de Document) |
 
+### 5.25 Architecture : bilan du lancement (v2.31, TK-114b, sans maquette, B613 à B622)
+
+Aucune planche : composé avec l'existant (B619). Textes du bilan en français, jamais de texte ni de nom du fournisseur.
+
+| Élément | Règle |
+|---|---|
+| `ProposalGenerationBanner` prop `detail` | Seconde ligne facultative du bandeau de génération (ajoutée, TK-114b) : `text-meta` `--muted-foreground`, sous le texte d'état, dans la même région `role="status"` (annoncée quand elle change, après chaque zone ou appel) ; retour à la ligne à 375 px. Ex. « Zones traitées 4/9 · écartées 2 · couverture 38/174 » |
+| Bilan en relecture | `InlineAlert` au-dessus des avertissements d'architecture, `role="note"` (pas d'annonce) : `neutral` `info` si terminé, `warning` `warning` sinon. Ligne 1 en 600 : « Bilan du lancement · zones traitées N/M · écartées K · couverture X/Y · <motif> » ; ligne 2 : « Fonctionnalités servies … · parcours détaillés … · tables rattachées … · avant : … » ; ligne 3 si des zones sont écartées : « Zones écartées : réponse coupée (n), réponse invalide (n), consigne refusée (n), refus du modèle (n) ». Motifs : terminé, arrêté au plafond, arrêté au délai, annulé, interrompu |
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -666,3 +675,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 13/11/2026 | v2.27 (correctif staging, B481) : positions enregistrées appliquées par vue entière, un déplacement enregistre toute la vue |
 | 21/11/2026 | v2.28 (TK-111, passations 10 et 12 §8.1, B506 à B515, maquette 13) : §5.22 Architecture, Document et Composants, `DocSectionStatus`, variante de `ProposedPageCard` |
 | 21/11/2026 | v2.29 (TK-114, passation 12 §8.3 et §8.4, B608 à B611) : marges de l'encadré pointillé `--primary` portées par `ProposedPageCard`, `ProposedPageList` et `ProposalDiff` ; prop `summaryId` de `ProjectHeader` (raison d'un bouton désactivé dans le résumé) |
+| 21/11/2026 | v2.31 (TK-114b, sans maquette, B613 à B622) : §5.25 bilan du lancement de l'Architecture ; prop `detail` de `ProposalGenerationBanner` ; bilan en relecture par `InlineAlert` `role="note"` |

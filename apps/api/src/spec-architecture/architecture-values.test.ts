@@ -164,3 +164,45 @@ describe("propositions en attente et avertissements", () => {
     expect(input.archFlows.map((f) => f.value.id)).toEqual(["P-reserver"]);
   });
 });
+
+describe("TK-114b (B615) : proposition de mise à jour d'un composant indexé", () => {
+  it("une proposition qui porte specId remplace le composant indexé : aucun double propriétaire", () => {
+    const input = checksInputOf({
+      features: ["F-001"],
+      tables: ["T-client", "T-salle"],
+      flows: [],
+      components: [{ specId: "C-api", data: DATA }],
+      archflows: [],
+      pending: [
+        {
+          kind: "component",
+          payload: {
+            specId: "C-api",
+            name: "API",
+            type: "service",
+            zone: "Noyau",
+            responsibility: "Mise à jour des liens du composant.",
+            owns: ["T-client", "T-salle"],
+            serves: ["F-001"],
+          },
+        },
+      ],
+    });
+    expect(input.components.map((c) => c.value.id)).toEqual(["C-api"]);
+    expect(input.components[0]?.value.possede).toEqual(["T-client", "T-salle"]);
+  });
+
+  it("specId illisible : la proposition garde l'identifiant tiré de son nom", () => {
+    const input = checksInputOf({
+      features: [],
+      tables: [],
+      flows: [],
+      components: [{ specId: "C-api", data: DATA }],
+      archflows: [],
+      pending: [
+        { kind: "component", payload: { specId: "api", name: "Base", type: "store", zone: "Z" } },
+      ],
+    });
+    expect(input.components.map((c) => c.value.id)).toEqual(["C-api", "C-base"]);
+  });
+});

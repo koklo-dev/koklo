@@ -23,6 +23,7 @@ export {
   currentDataModel,
   currentDomainTitles,
   currentFeatures,
+  currentTableIds,
   type DossierClient,
   type DossierSources,
   type FrozenPage,

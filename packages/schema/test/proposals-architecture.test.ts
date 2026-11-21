@@ -81,6 +81,19 @@ describe("componentProposalSchema", () => {
     expect(bad({ name: "a\nb" })).toBe(false);
     expect(bad({ clientSummary: Array.from({ length: 13 }, (_, i) => `Phrase ${i}`) })).toBe(false);
   });
+
+  it("TK-114b (B615) : specId facultatif C-slug, owns et serves jusqu'à 200", () => {
+    const parse = (extra: object) =>
+      componentProposalSchema.safeParse({ ...COMPONENT, ...extra }).success;
+    expect(parse({ specId: "C-api" })).toBe(true);
+    expect(parse({ specId: "api" })).toBe(false);
+    const tables = (n: number) => Array.from({ length: n }, (_, i) => `T-t${i}`);
+    const features = (n: number) =>
+      Array.from({ length: n }, (_, i) => `F-${String(i + 1).padStart(3, "0")}`);
+    expect(parse({ owns: tables(200), serves: features(200) })).toBe(true);
+    expect(parse({ owns: tables(201) })).toBe(false);
+    expect(parse({ serves: features(201) })).toBe(false);
+  });
 });
 
 describe("archflowProposalSchema", () => {

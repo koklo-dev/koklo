@@ -173,6 +173,18 @@ export function pendingComponent(payload: unknown): Component | undefined {
   };
 }
 
+/** Composant d'une proposition ; celle qui met à jour un composant indexé (`specId`, B615) en garde l'identifiant. */
+function proposedComponent(payload: unknown): Component | undefined {
+  const component = pendingComponent(payload);
+  const specId = specIdOf(payload);
+  return component && specId ? { ...component, id: specId } : component;
+}
+
+const specIdOf = (payload: unknown): string | undefined => {
+  const specId = record(payload).specId;
+  return typeof specId === "string" && COMPONENT.test(specId) ? specId : undefined;
+};
+
 interface ChecksFacts {
   features: readonly string[];
   tables: readonly string[];
@@ -206,9 +218,10 @@ export function checksInputOf(facts: ChecksFacts): ArchitectureInput & {
     });
     return component === undefined ? [] : [{ ...component, id: specId }];
   });
-  const proposed = facts.pending
-    .filter((item) => item.kind === "component")
-    .flatMap((item) => pendingComponent(item.payload) ?? []);
+  const pendingComponents = facts.pending.filter((item) => item.kind === "component");
+  const proposed = pendingComponents.flatMap((item) => proposedComponent(item.payload) ?? []);
+  // Une proposition `specId` (B615) remplace le composant indexé : ses liens sont l'index ∪ ajouts.
+  const replaced = new Set(pendingComponents.flatMap((item) => specIdOf(item.payload) ?? []));
   const flows = new Set(facts.archflows);
   for (const item of facts.pending) {
     const flow = item.kind === "archflow" ? text(record(item.payload).flow) : "";
@@ -219,7 +232,7 @@ export function checksInputOf(facts: ChecksFacts): ArchitectureInput & {
     features: ids(facts.features),
     tables: ids(facts.tables),
     flows: ids(facts.flows),
-    components: [...indexed, ...proposed].map(entry),
+    components: [...indexed.filter((c) => !replaced.has(c.id)), ...proposed].map(entry),
     archFlows: ids([...flows]),
   };
 }

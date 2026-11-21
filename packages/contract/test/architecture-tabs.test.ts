@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, SHA, UUID } from "./support.ts";
  * `specBatch.submit`, lectures `spec.architecture.*`, `spec.item.get` de type `component`, compteur `components`.
  */
 describe("TK-111 surface", () => {
-  it("version 3.11.0 (TK-113 est additif : mineure)", () => {
-    expect(CONTRACT_VERSION).toBe("3.11.0");
+  it("version 3.12.0 (TK-113 est additif : mineure)", () => {
+    expect(CONTRACT_VERSION).toBe("3.12.0");
   });
 
   it.each([
@@ -81,6 +81,26 @@ describe("TK-111 specBatch.submit : component.*", () => {
     expect(await ok({ kind: "component.update", specId: "T-api", zone: "Bord" })).toBe(false);
     expect(await ok({ kind: "component.delete", specId: "C-api" })).toBe(true);
     expect(await ok({ kind: "component.delete", specId: "F-001" })).toBe(false);
+  });
+});
+
+describe("TK-114b specBatch.submit : liens d'un composant (B615)", () => {
+  const component = {
+    kind: "component.create",
+    name: "API",
+    type: "service",
+    zone: "Coeur",
+    responsibility: "Expose les procédures.",
+  };
+  it("TK-114b (B615) : owns et serves jusqu'à 200 liens, en création comme en mise à jour", async () => {
+    const tables = (n: number) => Array.from({ length: n }, (_, i) => `T-table-${i}`);
+    const features = (n: number) =>
+      Array.from({ length: n }, (_, i) => `F-${String(i + 1).padStart(3, "0")}`);
+    const update = { kind: "component.update", specId: "C-base-de-donnees" };
+    expect(await ok({ ...component, owns: tables(200), serves: features(200) })).toBe(true);
+    expect(await ok({ ...update, owns: tables(200), serves: features(200) })).toBe(true);
+    expect(await ok({ ...component, owns: tables(201) })).toBe(false);
+    expect(await ok({ ...update, serves: features(201) })).toBe(false);
   });
 });
 

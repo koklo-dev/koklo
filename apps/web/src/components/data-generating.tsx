@@ -19,11 +19,14 @@ const FRAMES = [
  */
 export function DataGenerating({
   onLeave,
+  detail,
   text = DATA_GENERATING,
   heightClass = "h-[420px]",
   frames,
 }: {
   onLeave: () => void;
+  /** Ligne de détail du bandeau (bilan en cours de l'Architecture, TK-114b). */
+  detail?: string | undefined;
   /** Phrase du bandeau : celle du livrable (Données par défaut). */
   text?: string;
   /** Hauteur du cadre : 420 pour les Données, 440 pour l'Architecture (maquette 13 l.109). */
@@ -35,7 +38,9 @@ export function DataGenerating({
   const size = frames ? "" : "h-[110px] w-[220px] ";
   return (
     <>
-      <ProposalGenerationBanner onLeave={onLeave}>{text}</ProposalGenerationBanner>
+      <ProposalGenerationBanner onLeave={onLeave} {...(detail ? { detail } : {})}>
+        {text}
+      </ProposalGenerationBanner>
       <div className="px-4 py-5 md:px-7">
         <div
           aria-hidden="true"

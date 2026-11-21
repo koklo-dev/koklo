@@ -37,7 +37,7 @@ export function rowsOf(
       launchId: launch.id,
       deliverable: launch.deliverable,
       kind: candidate.kind,
-      zone,
+      zone: candidate.zone ?? zone,
       position: published + index,
       title: candidate.title,
       rationale: candidate.rationale,

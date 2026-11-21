@@ -11,6 +11,8 @@ import {
   FUNCTIONAL_MODES,
   isActiveLaunch,
   isStaleLaunch,
+  LAUNCH_DISCARD_REASONS,
+  LAUNCH_STOP_REASONS,
   PROPOSAL_NOTIFY_AFTER_MS,
 } from "../src/index.ts";
 
@@ -55,7 +57,20 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       perZone: 25,
       perLaunch: 500,
       instruction: 500,
+      segments: 8,
+      links: 200,
+      coverage: { features: 15, flows: 5, calls: 30 },
     });
+  });
+
+  it("TK-114b : motifs fermés de zone écartée et d'arrêt du lancement (B618)", () => {
+    expect([...LAUNCH_DISCARD_REASONS]).toEqual([
+      "truncated",
+      "output_invalid",
+      "prompt_rejected",
+      "refused",
+    ]);
+    expect([...LAUNCH_STOP_REASONS]).toEqual(["completed", "cap", "deadline", "cancelled"]);
   });
 
   it("L'agent lit, pour le Fonctionnel : dossier figé, Synthèse, risques, cahier actuel", () => {

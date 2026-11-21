@@ -193,3 +193,10 @@ describe("D2b erreurs du port Git <-> erreurs typées : suite", () => {
     ).toBe(true);
   });
 });
+
+describe("TK-114b (contrat 3.12.0) : motifs du bilan du lancement", () => {
+  it("launchDiscardReasonSchema = LAUNCH_DISCARD_REASONS ; launchStopReasonSchema = LAUNCH_STOP_REASONS (même ordre)", () => {
+    expect(contract.launchDiscardReasonSchema.options).toEqual([...domain.LAUNCH_DISCARD_REASONS]);
+    expect(contract.launchStopReasonSchema.options).toEqual([...domain.LAUNCH_STOP_REASONS]);
+  });
+});

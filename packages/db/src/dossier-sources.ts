@@ -54,12 +54,17 @@ export interface CurrentDataModel {
   readonly fixtures: readonly CurrentTitle[];
 }
 
-/** Composant d'architecture du cahier actuel (TK-111) : identifiant, nom, zone et type, jamais la responsabilité ni les liens. */
+/**
+ * Composant d'architecture du cahier actuel (TK-111) : identifiant, nom, zone et type, jamais la responsabilité. `owns` et
+ * `serves` (TK-114b, `possede`/`sert`) servent au calcul de la couverture : jamais envoyés au modèle.
+ */
 export interface CurrentComponent {
   readonly specId: string;
   readonly title: string;
   readonly zone: string | null;
   readonly type: string;
+  readonly owns: readonly string[];
+  readonly serves: readonly string[];
 }
 
 /** Ce que l'agent lit de l'architecture : composants, flux techniques, décisions, et exigences connues des fonctionnalités (B512). */
@@ -275,7 +280,37 @@ export async function currentDataModel(
   };
 }
 
+/**
+ * Identifiants de toutes les tables de la tête de spec (TK-114b, B616) : la couverture compte chaque table, sans le plafond de
+ * 200 des tables envoyées au modèle. Jamais le contenu.
+ */
+export async function currentTableIds(client: DossierClient, projectId: string): Promise<string[]> {
+  const snapshotId = await headSnapshotId(client, projectId);
+  if (snapshotId === null) return [];
+  const rows = await client.specEntity.findMany({
+    where: { snapshotId, kind: { in: ["table"] } },
+    orderBy: [{ sort: "asc" }, { id: "asc" }],
+    select: { specId: true },
+  });
+  return rows.map((row) => row.specId);
+}
+
 const COMPONENTS_MAX = 200;
+
+const idsOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+
+const componentOf = (row: { specId: string; data: unknown }): CurrentComponent => {
+  const data = recordOf(row.data);
+  return {
+    specId: row.specId,
+    title: textOf(data.titre),
+    zone: textOf(data.zone) || null,
+    type: textOf(data.type),
+    owns: idsOf(data.possede),
+    serves: idsOf(data.sert),
+  };
+};
 const NFR_MAX = 100;
 
 /**
@@ -299,24 +334,9 @@ export async function currentArchitecture(
     of(kind)
       .slice(0, DOMAIN_TITLES_MAX)
       .map((row) => ({ specId: row.specId, title: textOf(recordOf(row.data).titre) }));
-  const nfr = new Set(
-    of("feature").flatMap((row) => {
-      const cited = recordOf(row.data).nfr;
-      return Array.isArray(cited) ? cited.filter((id): id is string => typeof id === "string") : [];
-    }),
-  );
+  const nfr = new Set(of("feature").flatMap((row) => idsOf(recordOf(row.data).nfr)));
   return {
-    components: of("component")
-      .slice(0, COMPONENTS_MAX)
-      .map((row) => {
-        const data = recordOf(row.data);
-        return {
-          specId: row.specId,
-          title: textOf(data.titre),
-          zone: textOf(data.zone) || null,
-          type: textOf(data.type),
-        };
-      }),
+    components: of("component").slice(0, COMPONENTS_MAX).map(componentOf),
     archflows: titled("archflow"),
     decisions: titled("adr"),
     nfr: [...nfr].sort().slice(0, NFR_MAX),

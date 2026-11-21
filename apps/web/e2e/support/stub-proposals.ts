@@ -29,6 +29,11 @@ export type ProposalsMode =
   | "architecture"
   /** TK-111 : 66 propositions de l'architecture (au-delà de 30 : relecture groupée par type). */
   | "architectureVolume"
+  /** TK-114b : génération de l'architecture avec le bilan en cours (« Zones traitées 4/9 · … »). */
+  | "architectureGeneratingReport"
+  /** TK-114b : les 9 propositions de l'architecture, bilan terminé ; `architectureDeadline` : arrêté au délai. */
+  | "architectureReport"
+  | "architectureDeadline"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -428,7 +433,46 @@ function architectureVolumeItems(): Item[] {
 let items: Item[] = [];
 let architectureMode: ProposalsMode | undefined;
 let volumeData = false;
-let launchStatus: "queued" | "running" | "done" = "done";
+let launchStatus: "queued" | "running" | "done" | "failed" = "done";
+let report: Record<string, unknown> | undefined;
+
+const cover = (covered: number, total: number) => ({ covered, total });
+const BEFORE = { features: cover(0, 174), flows: cover(0, 22), tables: cover(0, 48) };
+/** Bilans du lancement de l'Architecture (contrat 3.12.0, TK-114b) : que des nombres et des motifs fermés. */
+const REPORTS: Partial<Record<ProposalsMode, Record<string, unknown>>> = {
+  architectureGeneratingReport: {
+    zonesRequested: 9,
+    zonesDone: 2,
+    zonesDiscarded: 2,
+    discardReasons: [{ reason: "truncated", count: 2 }],
+    coverageBefore: BEFORE,
+    coverageAfter: { features: cover(38, 174), flows: cover(2, 22), tables: cover(10, 48) },
+    coverageCalls: 0,
+  },
+  architectureReport: {
+    zonesRequested: 9,
+    zonesDone: 7,
+    zonesDiscarded: 2,
+    discardReasons: [
+      { reason: "truncated", count: 1 },
+      { reason: "output_invalid", count: 1 },
+    ],
+    coverageBefore: BEFORE,
+    coverageAfter: { features: cover(174, 174), flows: cover(22, 22), tables: cover(48, 48) },
+    coverageCalls: 12,
+    stopReason: "completed",
+  },
+  architectureDeadline: {
+    zonesRequested: 9,
+    zonesDone: 9,
+    zonesDiscarded: 0,
+    discardReasons: [],
+    coverageBefore: BEFORE,
+    coverageAfter: { features: cover(151, 174), flows: cover(19, 22), tables: cover(48, 48) },
+    coverageCalls: 18,
+    stopReason: "deadline",
+  },
+};
 let reads = 0;
 let started = false;
 const journal: Array<Record<string, unknown>> = [];
@@ -441,14 +485,20 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   launchStatus = "done";
   items = [];
   volumeData = mode === "dataVolume";
-  architectureMode = mode === "architecture" || mode === "architectureVolume" ? mode : undefined;
+  report = REPORTS[mode];
+  architectureMode =
+    mode === "architecture" || mode === "architectureVolume" || report ? mode : undefined;
   if (mode === "ready") items = Array.from({ length: 12 }, (_, i) => make(i + 1, 3));
   if (mode === "mixed") items = mixed();
   if (mode === "data") items = dataItems();
   if (mode === "dataVolume") items = dataVolumeItems();
-  if (mode === "architecture") items = architectureItems();
+  if (mode === "architecture" || mode === "architectureReport") items = architectureItems();
+  if (mode === "architectureDeadline") {
+    items = architectureItems();
+    launchStatus = "failed";
+  }
   if (mode === "architectureVolume") items = architectureVolumeItems();
-  if (mode === "generating") {
+  if (mode === "generating" || mode === "architectureGeneratingReport") {
     started = true;
     launchStatus = "running";
   }
@@ -538,7 +588,13 @@ function list(query: URLSearchParams, mode: ProposalsMode): Reply {
   const limit = Number(query.get("limit") ?? 50);
   const launch =
     started || items.length > 0
-      ? { id: LAUNCH_ID, status: launchStatus, proposedCount: items.length, discardedCount: 0 }
+      ? {
+          id: LAUNCH_ID,
+          status: launchStatus,
+          proposedCount: items.length,
+          discardedCount: 0,
+          ...(report ? { report } : {}),
+        }
       : null;
   return reply(200, {
     items: own.slice(from, from + limit),

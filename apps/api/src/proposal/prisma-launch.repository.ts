@@ -26,6 +26,14 @@ interface Row {
   requestedBy: string;
   lastSeenAt: Date | null;
   finishedAt: Date | null;
+  zones: unknown;
+  zonesDone: number;
+  zonesDiscarded: number;
+  discardReasons: unknown;
+  coverageCalls: number;
+  coverageBefore: unknown;
+  coverageAfter: unknown;
+  stopReason: string | null;
 }
 
 export const launchOf = (row: Row): LaunchRecord => ({
@@ -40,6 +48,16 @@ export const launchOf = (row: Row): LaunchRecord => ({
   requestedBy: row.requestedBy,
   lastSeenAt: row.lastSeenAt,
   finishedAt: row.finishedAt,
+  progress: {
+    zones: row.zones,
+    zonesDone: row.zonesDone,
+    zonesDiscarded: row.zonesDiscarded,
+    discardReasons: row.discardReasons,
+    coverageCalls: row.coverageCalls,
+    coverageBefore: row.coverageBefore,
+    coverageAfter: row.coverageAfter,
+    stopReason: row.stopReason,
+  },
 });
 
 @Injectable()

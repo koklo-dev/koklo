@@ -1,7 +1,7 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 4
+version: 6
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
@@ -41,6 +41,7 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 | 3 | 2026-11-21 | TK-112 | Schéma en couches et Flux en séquence (§11) ; `SequenceDiagram`, `ArchNodeCard`, props `bands` et `ghostIds` du `DiagramViewer` ajoutés à `packages/ui` (DESIGN.md §5.23) ; onglet par défaut Schéma ≥ 1024 px (B541 à B550). |
 | 4 | 2026-11-21 | TK-113 | Décisions, « Valider l'architecture », « À revoir » (impact amont des lots 5 et 6), vue client en lecture seule avec commentaires (§12) ; `DecisionStatus` et prop `stale` de `ArchNodeCard` ajoutés à `packages/ui` (DESIGN.md §5.24) ; ligne Composants vers Schéma (B585) (B575 à B592). |
 | 5 | 2026-11-21 | TK-114 | En-tête vérifié contre la maquette 13 l.58-88 : résumé en ligne entière, actions à droite, libellés courts ; aucun changement de code (passation 12 §8.4). |
+| 6 | 2026-11-21 | TK-114b | Bilan du lancement (§13), sans maquette : ligne de détail de la Génération (prop `detail` de `ProposalGenerationBanner` ajoutée à `packages/ui`, DESIGN.md §5.25) et `InlineAlert` « Bilan du lancement » en Relecture ; propositions de mise à jour d'un composant indexé (B613 à B622). |
 
 ## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
 - **Schéma** : lecteur du lot 6 ; au-delà de 25 composants, vue des zones (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone. Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
@@ -60,3 +61,10 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 - **Clavier et annonces** : lignes de liste = boutons `aria-current` ; flèches haut/bas entre lignes ; Échap ferme la fenêtre de commentaire et rend le focus au bouton d'origine ; fiche de décision en `article` `aria-label="Décision"` ; annonces dans l'unique région `role="status"` de la page (compte après filtre, « Architecture validée », « Commentaire envoyé »).
 - **375 px** : liste puis fiche « ← Liste », commandes 44 px, filtres sur plusieurs lignes, « Valider l'architecture » et « Commenter » pleine largeur, aucun défilement horizontal de page.
 - **États comparés à la maquette** (clair, sombre, 375 px) : Décisions (liste + fiche) ; À revoir (bandeau, schéma avec contours ambre) ; Vue client Décision « En clair » ; Vue client Schéma ; Décisions vide ou erreur ; liste validée « Validé par l'équipe ».
+
+## 13. Bilan du lancement (TK-114b, sans maquette, B613 à B622)
+- **Génération** : sous le texte du bandeau, ligne `detail` « Zones traitées 4/9 · écartées 2 · couverture 38/174 » (couverture = fonctionnalités servies), mise à jour à chaque sondage (3 s) ; avant la liste des zones : « Préparation des zones ». Annoncée par la région `role="status"` du bandeau quand elle change.
+- **Relecture** : `InlineAlert` `role="note"` au-dessus des avertissements, neutre `info` si terminé, `warning` sinon ; trois lignes (DESIGN §5.25) : bilan court avec le motif, couverture détaillée avant/après, zones écartées par motif. Absente si le lancement n'a pas de bilan (lancement d'avant TK-114b).
+- **Mise à jour d'un composant indexé** (proposition avec `specId`, B615) : sous-titre « Mise à jour · zone Données », identifiant = `specId`, contenu « Possède » et « Sert » complets ; acceptée, elle enregistre `component.update` (liens seuls).
+- **États** : chargement et erreur de la liste inchangés (le bilan vient de `proposal.list`) ; droits : mêmes rôles que la relecture ; vide : pas de bilan.
+- **375 px** : les lignes du bilan passent à la ligne, aucune troncature ; aucune action dans le bilan.

@@ -204,3 +204,50 @@ describe("références, sous-lignes et modes", () => {
     expect(isArchitectureKind("table")).toBe(false);
   });
 });
+
+describe("TK-114b (B615) : mise à jour d'un composant indexé (specId)", () => {
+  const update = (over: Record<string, unknown> = {}) =>
+    component(1, {
+      specId: "C-base-de-donnees",
+      name: "Base de données",
+      type: "store",
+      zone: "Données",
+      responsibility: "Mise à jour des liens du composant.",
+      owns: ["T-client", "T-salle"],
+      serves: ["F-001"],
+      dependsOn: [],
+      decisions: [],
+      ...over,
+    });
+
+  it("acceptée : component.update avec les seuls liens complets, jamais le nom ni la responsabilité", () => {
+    expect(operationsOf(update())).toEqual([
+      {
+        kind: "component.update",
+        specId: "C-base-de-donnees",
+        owns: ["T-client", "T-salle"],
+        serves: ["F-001"],
+      },
+    ]);
+  });
+
+  it("listes vides : remises à vide (l'index ∪ ajouts est déjà dans la proposition)", () => {
+    expect(operationsOf(update({ serves: [] }))).toEqual([
+      {
+        kind: "component.update",
+        specId: "C-base-de-donnees",
+        owns: ["T-client", "T-salle"],
+        serves: [],
+      },
+    ]);
+  });
+
+  it("référence = specId ; sous-ligne « Mise à jour · zone Données »", () => {
+    expect(refOf(update({ name: "Autre nom" }))).toBe("C-base-de-donnees");
+    expect(subtitleOf(update())).toBe("Mise à jour · zone Prise de rendez-vous");
+  });
+
+  it("specId illisible : création comme avant", () => {
+    expect(operationsOf(update({ specId: "base" }))[0]).toMatchObject({ kind: "component.create" });
+  });
+});

@@ -5,6 +5,8 @@ import { Button } from "./button.tsx";
 export interface ProposalGenerationBannerProps {
   /** Texte de l'état (« L'agent rédige… Cela peut prendre une minute. Vous pouvez quitter la page. »). */
   children: string;
+  /** Seconde ligne facultative (bilan en cours, TK-114b, DESIGN §5.25) : annoncée avec le texte par la même région. */
+  detail?: string;
   /** « Annuler l'attente » : quitte l'attente seulement, rien n'est annulé côté serveur. */
   onLeave?: () => void;
   /** Sans `role="status"` : quand la page porte déjà sa région d'état (relecture), une seule annonce reste. */
@@ -15,6 +17,7 @@ export interface ProposalGenerationBannerProps {
 /** Bandeau de génération (maquette 10 l.107-108) : bande pleine largeur `--diff-bg`, bordure basse, `progress_activity` primaire, `role="status"`. */
 export function ProposalGenerationBanner({
   children,
+  detail,
   onLeave,
   silent = false,
   className,
@@ -34,7 +37,14 @@ export function ProposalGenerationBanner({
         tone="primary"
         className="motion-safe:animate-spin"
       />
-      <span className="min-w-0 flex-1">{children}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span>{children}</span>
+        {detail ? (
+          <span data-slot="proposal-generation-detail" className="text-meta text-muted-foreground">
+            {detail}
+          </span>
+        ) : null}
+      </span>
       {onLeave ? (
         <Button variant="text" onClick={onLeave} className="h-11 font-semibold md:h-7">
           Annuler l'attente

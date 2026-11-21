@@ -1,30 +1,18 @@
-import { randomBytes } from "node:crypto";
-import {
-  type AgentProposalKind,
-  type AiProvider,
-  type FramedPrompt,
-  validateLlmOutput,
-} from "@koklo/domain";
-import { PROPOSAL_BUDGETS, type ProposalPurpose } from "@koklo/llm";
-import { jsonSchemaOf, PROPOSAL_SCHEMAS } from "@koklo/schema";
-import { AgentProposeFailure, isIgnorableZoneError, OutputInvalidError } from "./errors.ts";
-import { batchPrompt, zonesPrompt } from "./prompts.ts";
+import type { AgentProposalKind } from "@koklo/domain";
+import { ask, type GenerateDeps, type Run, timeUp } from "./call.ts";
+import { type CoverageIndex, coverageIndexOf, coverageOf } from "./coverage.ts";
+import { type CoverageOutcome, coveragePass, linkTables, recordAfter } from "./coverage-pass.ts";
+import { zonesPrompt } from "./prompts.ts";
 import type { LaunchSources } from "./sources.ts";
-import type { AgentProposeStore, LaunchContext } from "./store.ts";
-import { titleKey, triageProposals, zonesOf } from "./triage.ts";
+import type { LaunchContext, LaunchProgress } from "./store.ts";
+import { rememberPublished, type TriageContext, titleKey, zonesOf } from "./triage.ts";
 import type { ArchitectureRefs } from "./triage-architecture.ts";
+import { zonesPass } from "./zones-pass.ts";
 
-export interface GenerateDeps {
-  readonly store: AgentProposeStore;
-  readonly ai: AiProvider;
-  /** Nonce neuf à chaque appel (le domaine n'a pas d'aléa). */
-  readonly nonce?: () => string;
-  /** Durée maximale d'un lancement, en ms : au-delà, le lancement échoue (`timeout`), ce qui est publié reste lisible. */
-  readonly deadlineMs: number;
-  readonly now: () => Date;
-}
+export type { GenerateDeps } from "./call.ts";
 
-const randomNonce = (): string => randomBytes(24).toString("hex");
+/** Issue d'un segment : relais au suivant, fin (`completed`, `cap`), délai épuisé, ou arrêt de l'extérieur. */
+export type GenerateOutcome = CoverageOutcome;
 
 /** Types de proposition que chaque mode du Fonctionnel demande (TK-103, B342 : règles, rôles et parcours s'y ajoutent). */
 const KINDS_OF_MODE: Readonly<Record<string, readonly AgentProposalKind[]>> = {
@@ -65,58 +53,6 @@ const ZONES_SCHEMA = {
   properties: { zones: { type: "array", items: { type: "string" } } },
 } as const;
 
-/** Schéma demandé au fournisseur : la structure seule, les bornes sont revérifiées par Zod à la validation. */
-function batchSchema(kinds: readonly AgentProposalKind[]): Record<string, unknown> {
-  const contents = kinds.map((kind) => jsonSchemaOf(PROPOSAL_SCHEMAS[kind]));
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: ["proposals"],
-    properties: {
-      proposals: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["kind", "rationale", "content"],
-          properties: {
-            kind: { type: "string", enum: kinds },
-            rationale: { type: "string" },
-            content: contents.length === 1 ? contents[0] : { anyOf: contents },
-          },
-        },
-      },
-    },
-  };
-}
-
-/** Un appel au modèle : battement, appel routé, arrêt normal exigé, sortie validée par `parse`. */
-async function ask<T>(
-  deps: GenerateDeps,
-  launch: LaunchContext,
-  euOnly: boolean,
-  call: {
-    purpose: ProposalPurpose;
-    prompt: (nonce: string) => FramedPrompt;
-    schema: Record<string, unknown>;
-    parse: (raw: unknown) => T;
-  },
-): Promise<T> {
-  await deps.store.heartbeat(launch);
-  const response = await deps.ai.complete({
-    organizationId: launch.organizationId,
-    userId: launch.requestedBy,
-    usage: "spec_deliverables",
-    euOnly,
-    prompt: call.prompt((deps.nonce ?? randomNonce)()),
-    output: { kind: "json", schema: call.schema },
-    budget: PROPOSAL_BUDGETS[call.purpose],
-    trace: { purpose: call.purpose, correlationId: launch.id },
-  });
-  if (response.stop !== "end") throw new OutputInvalidError();
-  return validateLlmOutput(response.output, call.parse).value;
-}
-
 /** Références que le modèle peut viser : fonctionnalités et règles du cahier, tables du modèle actuel. */
 const dataRefs = (sources: LaunchSources) => ({
   specIds: new Set([...sources.features, ...sources.rules].map((item) => item.specId)),
@@ -137,74 +73,110 @@ const architectureRefs = (sources: LaunchSources): ArchitectureRefs => {
   return {
     features: ids(sources.features),
     rules: ids(sources.rules),
-    tables: ids(sources.tables),
+    tables: new Set(sources.tableIds ?? ids(sources.tables)),
     flows: ids(sources.flows),
     roles: ids(sources.roles),
     components: ids(architecture?.components),
     decisions: ids(architecture?.decisions),
     archflows: ids(architecture?.archflows),
+    ownedTables: new Set((architecture?.components ?? []).flatMap((item) => item.owns)),
   };
 };
 
-/**
- * Déroulé d'un lancement : étape 1, les zones (douze au plus) ; étape 2, une zone par appel, chaque zone validée
- * publiée aussitôt. Retourne `false` si le lancement a été arrêté de l'extérieur (annulé, repris). Une zone dont
- * la sortie ou le prompt est refusé est ignorée et comptée ; toute autre erreur interrompt le lancement.
- */
-export async function generate(
-  deps: GenerateDeps,
+/** Contexte de tri d'un segment : titres et références des sources, puis des propositions déjà publiées du lancement. */
+function triageContextOf(
   launch: LaunchContext,
   sources: LaunchSources,
-  euOnly: boolean,
-): Promise<boolean> {
-  const kinds = kindsOfMode(launch.mode, launch.deliverable);
-  const isData = launch.deliverable === "data";
-  const started = deps.now().getTime();
-  const zones = await ask(deps, launch, euOnly, {
-    purpose: "proposal-zones",
-    prompt: (nonce) => zonesPrompt(nonce, sources, launch.instruction),
-    schema: ZONES_SCHEMA,
-    parse: (raw) => (isData ? zonesOf(raw, DATA_ZONE_MAX) : zonesOf(raw)),
-  });
-  const context = {
+  kinds: readonly AgentProposalKind[],
+): TriageContext {
+  const titles = (items: readonly { title: string }[] | undefined) =>
+    new Set((items ?? []).map((item) => titleKey(item.title)));
+  const architecture = sources.architecture;
+  return {
     kinds,
     titles: {
-      feature: new Set(sources.features.map((feature) => titleKey(feature.title))),
-      rule: new Set(sources.rules.map((rule) => titleKey(rule.title))),
-      role: new Set(sources.roles.map((role) => titleKey(role.title))),
-      flow: new Set(sources.flows.map((flow) => titleKey(flow.title))),
-      table: new Set((sources.tables ?? []).map((table) => titleKey(table.title))),
-      fixtures: new Set((sources.fixtures ?? []).map((fixture) => titleKey(fixture.title))),
-      component: new Set(
-        (sources.architecture?.components ?? []).map((item) => titleKey(item.title)),
-      ),
-      archflow: new Set(
-        (sources.architecture?.archflows ?? []).map((item) => titleKey(item.title)),
-      ),
-      adr: new Set((sources.architecture?.decisions ?? []).map((item) => titleKey(item.title))),
+      feature: titles(sources.features),
+      rule: titles(sources.rules),
+      role: titles(sources.roles),
+      flow: titles(sources.flows),
+      table: titles(sources.tables),
+      fixtures: titles(sources.fixtures),
+      component: titles(architecture?.components),
+      archflow: titles(architecture?.archflows),
+      adr: titles(architecture?.decisions),
     },
-    ...(sources.architecture === undefined ? {} : { arch: architectureRefs(sources) }),
-    ...(isData ? { refs: dataRefs(sources) } : {}),
+    ...(architecture === undefined ? {} : { arch: architectureRefs(sources) }),
+    ...(launch.deliverable === "data" ? { refs: dataRefs(sources) } : {}),
     missingCriteria: new Map(
       sources.features
         .filter((feature) => feature.criteria.length === 0)
         .map((feature) => [feature.specId, feature.title] as const),
     ),
   };
-  for (const zone of zones) {
-    if (deps.now().getTime() - started > deps.deadlineMs) throw new AgentProposeFailure("timeout");
-    const triaged = await ask(deps, launch, euOnly, {
-      purpose: "proposal-batch",
-      prompt: (nonce) =>
-        batchPrompt(nonce, { sources, instruction: launch.instruction, zone, kinds }),
-      schema: batchSchema(kinds),
-      parse: (raw) => triageProposals(raw, context),
-    }).catch((error: unknown) => {
-      if (isIgnorableZoneError(error)) return { accepted: [], discarded: 1 };
-      throw error;
-    });
-    const outcome = await deps.store.publishZone(launch, zone, triaged.accepted, triaged.discarded);
-    if (outcome === "stopped") return false;
-  }
-  return true;
+}
+
+/** Couverture et règle des tables : Architecture, modes `complete` et `all` seulement (B616, B618). */
+const coverageIndexFor = (launch: LaunchContext, sources: LaunchSources) =>
+  launch.deliverable === "architecture" && (launch.mode === "complete" || launch.mode === "all")
+    ? coverageIndexOf(sources)
+    : undefined;
+
+/** Étape 1, au premier segment : les zones (douze au plus), stockées avec la couverture de l'index avant le lancement. */
+async function firstStep(
+  run: Run,
+  index: CoverageIndex | undefined,
+): Promise<readonly string[] | GenerateOutcome> {
+  const up = timeUp(run);
+  if (up !== undefined) return up;
+  const isData = run.launch.deliverable === "data";
+  const zones = await ask(run, {
+    purpose: "proposal-zones",
+    prompt: (nonce) => zonesPrompt(nonce, run.sources, run.launch.instruction),
+    schema: ZONES_SCHEMA,
+    parse: (raw) => (isData ? zonesOf(raw, DATA_ZONE_MAX) : zonesOf(raw)),
+  });
+  const before = index === undefined ? undefined : coverageOf(index, []).counts;
+  const outcome = await run.deps.store.recordZones(run.launch, zones, before);
+  return outcome === "stopped" ? "stopped" : zones;
+}
+
+/** Fin de l'Architecture : la règle des tables passe avant toute fin (B614), sauf arrêt de l'extérieur. */
+async function architectureEnd(
+  run: Run,
+  index: CoverageIndex,
+  outcome: GenerateOutcome,
+): Promise<GenerateOutcome> {
+  if (outcome === "handoff" || outcome === "stopped") return outcome;
+  return (await linkTables(run, index)) === "stopped" ? "stopped" : outcome;
+}
+
+/**
+ * Un segment d'un lancement (B617) : étape 1, les zones (premier segment) ; étape 2, une zone par appel à partir de la
+ * première non traitée, chaque zone publiée aussitôt ; Architecture (`complete`, `all`) : règle des tables puis passe de
+ * couverture. Avant chaque appel, un segment qui a épuisé son temps passe le relais (`handoff`) ; au huitième, `deadline`.
+ * Une zone écartée est comptée avec son motif ; toute autre erreur interrompt le lancement.
+ */
+export async function generate(
+  deps: GenerateDeps,
+  launch: LaunchContext,
+  sources: LaunchSources,
+  euOnly: boolean,
+  progress: LaunchProgress,
+): Promise<GenerateOutcome> {
+  const kinds = kindsOfMode(launch.mode, launch.deliverable);
+  const context = triageContextOf(launch, sources, kinds);
+  rememberPublished(context, await deps.store.launchProposals(launch));
+  const index = coverageIndexFor(launch, sources);
+  const started = deps.now().getTime();
+  const run: Run = { deps, launch, sources, euOnly, progress, kinds, context, started };
+  const zones = progress.zones.length > 0 ? progress.zones : await firstStep(run, index);
+  if (typeof zones === "string") return zones;
+  const afterZone = async () => {
+    if (index !== undefined) await recordAfter(run, index);
+  };
+  const outcome = await zonesPass(run, zones, afterZone);
+  if (index === undefined) return outcome === "done" ? "completed" : outcome;
+  if (outcome !== "done") return architectureEnd(run, index, outcome);
+  if ((await linkTables(run, index)) === "stopped") return "stopped";
+  return architectureEnd(run, index, await coveragePass(run, index));
 }

@@ -1,5 +1,5 @@
 import { type AgentProposalKind, slugOf } from "@koklo/domain";
-import { isRecord } from "../job-support.ts";
+import { recordsOf, stringsOf } from "../job-support.ts";
 
 /**
  * Références que le modèle peut viser pour le livrable Architecture (TK-111, B511) : identifiants du cahier, des tables, des
@@ -17,6 +17,8 @@ export interface ArchitectureRefs {
   readonly decisions: ReadonlySet<string>;
   /** Flux techniques existants, puis acceptés : un parcours n'a qu'un flux. */
   readonly archflows: Set<string>;
+  /** Tables déjà possédées (index, puis acceptées) : le premier déclarant reste propriétaire (TK-114b, B614). */
+  readonly ownedTables: Set<string>;
 }
 
 export const ARCHITECTURE_KINDS: readonly AgentProposalKind[] = [
@@ -31,10 +33,6 @@ export const isArchitectureKind = (kind: AgentProposalKind): boolean =>
 /** Identifiant que le serveur attribuera à un composant : `C-<slug du nom>`. */
 export const componentIdOf = (name: string): string => `C-${slugOf(name, "composant")}`;
 
-const stringsOf = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-const recordsOf = (value: unknown): Record<string, unknown>[] =>
-  Array.isArray(value) ? value.filter(isRecord) : [];
 const allIn = (ids: readonly string[], known: ReadonlySet<string>): boolean =>
   ids.every((id) => known.has(id));
 
@@ -99,15 +97,32 @@ export function architectureKnown(
   return true;
 }
 
-/** Une proposition acceptée devient connue pour la suite de la génération (composants, flux). */
+/** Identifiant d'un composant proposé : son `specId` (posé par le code seul), sinon celui que le serveur attribuera. */
+export const proposedComponentId = (payload: Record<string, unknown>): string | undefined => {
+  if (typeof payload.specId === "string") return payload.specId;
+  return typeof payload.name === "string" ? componentIdOf(payload.name) : undefined;
+};
+
+/** Composant proposé : les tables déjà possédées sont retirées de `owns` (TK-114b, B614). Tout autre type : inchangé. */
+export function withoutOwnedTables(
+  kind: AgentProposalKind,
+  payload: Record<string, unknown>,
+  arch: ArchitectureRefs | undefined,
+): Record<string, unknown> {
+  if (kind !== "component" || arch === undefined || !Array.isArray(payload.owns)) return payload;
+  return { ...payload, owns: stringsOf(payload.owns).filter((id) => !arch.ownedTables.has(id)) };
+}
+
+/** Une proposition acceptée devient connue pour la suite de la génération (composants, flux, tables possédées). */
 export function rememberAccepted(
   kind: AgentProposalKind,
   payload: Record<string, unknown>,
   arch: ArchitectureRefs | undefined,
 ): void {
   if (arch === undefined) return;
-  if (kind === "component" && typeof payload.name === "string") {
-    arch.components.add(componentIdOf(payload.name));
-  }
+  const id = kind === "component" ? proposedComponentId(payload) : undefined;
+  if (id !== undefined) arch.components.add(id);
+  if (kind === "component")
+    for (const table of stringsOf(payload.owns)) arch.ownedTables.add(table);
   if (kind === "archflow" && typeof payload.flow === "string") arch.archflows.add(payload.flow);
 }

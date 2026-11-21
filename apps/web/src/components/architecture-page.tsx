@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { ArchitectureHeaderAction } from "../lib/architecture-header-state.ts";
 import { withArchitectureUrl } from "../lib/architecture-tab.ts";
 import { upstreamTargetOf } from "../lib/architecture-upstream.ts";
+import { launchDetailOf } from "../lib/launch-report.ts";
 import { specPath } from "../lib/shell-routes.ts";
 import { type ArchitecturePageModel, useArchitecturePage } from "../lib/use-architecture-page.ts";
 import { ArchitectureClientView } from "./architecture-client-view.tsx";
@@ -281,7 +282,14 @@ function ListBody({ page }: { page: ArchitecturePageModel }) {
 /** Relecture ouverte : génération, onglet Relecture, ou l'architecture proposée dans les onglets de lecture. */
 function ReviewBody({ page }: { page: ArchitecturePageModel }) {
   const { url, propose, head } = page;
-  if (page.generating) return <ArchitectureGenerating onLeave={url.closeReview} />;
+  if (page.generating) {
+    return (
+      <ArchitectureGenerating
+        onLeave={url.closeReview}
+        detail={launchDetailOf(propose.status.launch)}
+      />
+    );
+  }
   if (url.tab === "review") {
     return (
       <ArchitectureReviewView

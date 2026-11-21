@@ -127,3 +127,47 @@ describe("ai.reviseProposal", () => {
     expect(fake.calls).toHaveLength(0);
   });
 });
+
+describe("TK-114b (B615) : « Retoucher » garde le specId d'origine", () => {
+  const LINKS = {
+    specId: "C-base-de-donnees",
+    name: "Base de données",
+    type: "store",
+    zone: "Données",
+    responsibility: "Mise à jour des liens du composant.",
+    owns: ["T-client"],
+    serves: ["F-001"],
+  };
+  const reviseWith = async (reply: object, payload: object) => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    const { id } = await insertProposal(b.database, world, {
+      deliverable: "architecture",
+      kind: "component",
+      zone: "Données",
+      title: "Base de données",
+      payload,
+    });
+    b.use(FakeLlm.replying(reply));
+    const res = await proposalApi(b.app, world.actors.dev).revise(world.projectId, id, {
+      instruction: "Ajoute la table des salles",
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    return res.body.content as Record<string, unknown>;
+  };
+
+  it("le modèle retire ou change le specId : celui de la proposition d'origine est remis", async () => {
+    const { specId: _dropped, ...rest } = LINKS;
+    const revised = { ...rest, owns: ["T-client", "T-salle"] };
+    expect(await reviseWith(revised, LINKS)).toEqual({ ...revised, specId: "C-base-de-donnees" });
+    expect(await reviseWith({ ...revised, specId: "C-autre" }, LINKS)).toMatchObject({
+      specId: "C-base-de-donnees",
+    });
+  });
+
+  it("proposition sans specId : un specId posé par le modèle est retiré", async () => {
+    const { specId: _dropped, ...fresh } = LINKS;
+    const content = await reviseWith({ ...fresh, specId: "C-api" }, fresh);
+    expect(content).not.toHaveProperty("specId");
+  });
+});

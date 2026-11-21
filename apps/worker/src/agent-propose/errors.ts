@@ -1,4 +1,5 @@
 import {
+  type LaunchDiscardReason,
   LlmAuthError,
   LlmInvalidOutputError,
   LlmRateLimitedError,
@@ -11,6 +12,22 @@ export class OutputInvalidError extends Error {
   constructor() {
     super("Sortie du modèle invalide");
     this.name = "OutputInvalidError";
+  }
+}
+
+/** Sortie coupée par le plafond de jetons (`max-tokens`) : la zone est écartée avec le motif `truncated` (TK-114b). */
+export class OutputTruncatedError extends OutputInvalidError {
+  constructor() {
+    super();
+    this.name = "OutputTruncatedError";
+  }
+}
+
+/** Le modèle a refusé de répondre (`refusal`) : la zone est écartée avec le motif `refused` (TK-114b). */
+export class OutputRefusedError extends OutputInvalidError {
+  constructor() {
+    super();
+    this.name = "OutputRefusedError";
   }
 }
 
@@ -40,8 +57,16 @@ export function errorCodeOf(error: unknown): string {
   return "provider_error";
 }
 
-/** Une zone dont la sortie ou le prompt est refusé est ignorée et comptée ; les autres erreurs interrompent. */
-export const isIgnorableZoneError = (error: unknown): boolean =>
-  error instanceof OutputInvalidError ||
-  error instanceof LlmInvalidOutputError ||
-  error instanceof UntrustedDelimiterCollisionError;
+/**
+ * Motif fermé d'une zone (ou d'un appel de couverture) écartée : sortie coupée, refusée, invalide, prompt refusé (B618).
+ * `undefined` : l'erreur n'est pas propre à la zone et interrompt le lancement.
+ */
+export function discardReasonOf(error: unknown): LaunchDiscardReason | undefined {
+  if (error instanceof OutputTruncatedError) return "truncated";
+  if (error instanceof OutputRefusedError) return "refused";
+  if (error instanceof OutputInvalidError || error instanceof LlmInvalidOutputError) {
+    return "output_invalid";
+  }
+  if (error instanceof UntrustedDelimiterCollisionError) return "prompt_rejected";
+  return undefined;
+}
