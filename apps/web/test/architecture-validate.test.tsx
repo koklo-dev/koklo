@@ -166,7 +166,13 @@ describe("Architecture à revoir", () => {
       available: true,
     });
     renderArchitecture();
-    await userEvent.click(await screen.findByRole("button", { name: "Proposer les mises à jour" }));
+    // Deux accès à la même action : l'en-tête (maquette 13 l.864) et le bandeau d'alerte.
+    const [fromHeader, fromAlert] = await screen.findAllByRole("button", {
+      name: "Proposer les mises à jour",
+    });
+    expect(fromHeader).toBeDefined();
+    expect(fromAlert).toBeDefined();
+    await userEvent.click(fromAlert as HTMLElement);
     const dialog = within(await screen.findByRole("dialog"));
     await waitFor(() =>
       expect(dialog.getByRole("textbox")).toHaveValue(
