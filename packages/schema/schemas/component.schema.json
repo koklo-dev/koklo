@@ -3,6 +3,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "acteurs": {
+      "default": [],
+      "items": {
+        "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "type": "array"
+    },
     "decisions": {
       "default": [],
       "items": {
