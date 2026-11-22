@@ -19,6 +19,11 @@ const REPORT = {
   coverageCalls: 12,
   stopReason: "completed" as const,
 };
+/** Couverture du contrat 3.13.0 : `links` (composants reliés, B642) en plus. */
+const withLinks = (coverage: typeof REPORT.coverageAfter, covered: number) => ({
+  ...coverage,
+  links: count(covered, 23),
+});
 const launch = (status: string, over: Partial<typeof REPORT> | null = {}) => ({
   id: "l",
   status: status as "done",
@@ -118,5 +123,24 @@ describe("launchReportOf : bilan de la Relecture", () => {
       report: { ...bare, zonesRequested: 0, zonesDone: 0, zonesDiscarded: 0, discardReasons: [] },
     };
     expect(launchReportOf(old)).toBeNull();
+  });
+});
+
+describe("TK-114c : bilan des liens (contrat 3.13.0)", () => {
+  it("TK-114c (B642) : « composants reliés X/Y » après les tables, et dans « avant : » s'il existe", () => {
+    const report = launchReportOf(
+      launch("done", {
+        coverageBefore: withLinks(REPORT.coverageBefore, 3),
+        coverageAfter: withLinks(REPORT.coverageAfter, 23),
+      }),
+    );
+    expect(report?.lines[1]).toBe(
+      "Fonctionnalités servies 174/174 · parcours détaillés 22/22 · tables rattachées 48/48 · composants reliés 23/23 · avant : 0/174, 0/22, 0/48, 3/23",
+    );
+    const noBefore = launchReportOf(
+      launch("done", { coverageAfter: withLinks(REPORT.coverageAfter, 20) }),
+    );
+    expect(noBefore?.lines[1]).toContain("composants reliés 20/23 · avant : 0/174, 0/22, 0/48");
+    expect(noBefore?.lines[1]).not.toContain("0/48,");
   });
 });

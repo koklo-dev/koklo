@@ -242,6 +242,25 @@ describe("TK-114b (B615) : mise à jour d'un composant indexé (specId)", () => 
     ]);
   });
 
+  it("TK-114c (B637) : la charge porte dependsOn → component.update l'envoie, mis en forme comme à la création", () => {
+    const links = [
+      { to: "C-api", via: "HTTP", async: false },
+      { to: "C-file", via: "planifie", async: true },
+    ];
+    expect(operationsOf(update({ dependsOn: links }))).toEqual([
+      {
+        kind: "component.update",
+        specId: "C-base-de-donnees",
+        owns: ["T-client", "T-salle"],
+        serves: ["F-001"],
+        dependsOn: [
+          { to: "C-api", via: "HTTP" },
+          { to: "C-file", via: "planifie", async: true },
+        ],
+      },
+    ]);
+  });
+
   it("référence = specId ; sous-ligne « Mise à jour · zone Données »", () => {
     expect(refOf(update({ name: "Autre nom" }))).toBe("C-base-de-donnees");
     expect(subtitleOf(update())).toBe("Mise à jour · zone Prise de rendez-vous");

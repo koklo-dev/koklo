@@ -27,13 +27,21 @@ export type ArchitectureWarning = {
 
 type Warn = (code: ArchitectureWarningCode, entityId: string, message: string) => void;
 
-/** Ce que la couverture lit (TK-114b, B616) : des identifiants, et des composants réduits à leurs liens. */
+/** Dépendance d'un composant telle que le graphe la lit : `mode: asynchrone` n'est pas une arête synchrone. */
+type GraphDependency = { vers: string; mode?: string };
+type GraphComponent = { id: string; depend_de?: readonly GraphDependency[] };
+
+/** Ce que la couverture lit (TK-114b, B616 ; TK-114c, B633) : des identifiants, et des composants réduits à leurs liens. */
 export type ArchitectureCoverageInput = {
   features: readonly { value: { id: string } }[];
   tables: readonly { value: { id: string } }[];
   flows: readonly { value: { id: string } }[];
   components: readonly {
-    value: { id: string; possede: readonly string[]; sert: readonly string[] };
+    value: GraphComponent & {
+      possede: readonly string[];
+      sert: readonly string[];
+      type?: string;
+    };
   }[];
   archFlows: readonly { value: { id: string } }[];
 };
@@ -45,7 +53,14 @@ export type ArchitectureCoverage = {
   unservedFeatures: string[];
   missingFlows: string[];
   unownedTables: string[];
-  counts: { features: CoverageCount; flows: CoverageCount; tables: CoverageCount };
+  /** Composants non externes sans lien vers ni depuis un autre composant connu (B633). */
+  isolatedComponents: string[];
+  counts: {
+    features: CoverageCount;
+    flows: CoverageCount;
+    tables: CoverageCount;
+    links: CoverageCount;
+  };
 };
 
 /** Propriétaires de chaque table, dans l'ordre des composants. */
@@ -64,9 +79,23 @@ const countOf = (all: readonly unknown[], holes: readonly unknown[]): CoverageCo
   total: all.length,
 });
 
+/** Composants reliés à un autre composant connu, dans un sens ou dans l'autre (soi-même exclu). */
+function linkedOf(components: readonly { value: GraphComponent }[]): Set<string> {
+  const known = new Set(components.map(({ value }) => value.id));
+  const linked = new Set<string>();
+  for (const { value } of components) {
+    for (const { vers } of value.depend_de ?? []) {
+      if (vers === value.id || !known.has(vers)) continue;
+      linked.add(value.id);
+      linked.add(vers);
+    }
+  }
+  return linked;
+}
+
 /**
  * Couverture de l'architecture (TK-114b, B616) : fonctionnalités servies par aucun composant, parcours sans flux technique,
- * tables sans propriétaire. Pure ; partagée par `architectureChecks` (avertissements) et la passe de couverture du worker.
+ * tables sans propriétaire, composants isolés (TK-114c, B633). Pure ; partagée par `architectureChecks` (avertissements) et la passe de couverture du worker.
  */
 export function architectureCoverage(spec: ArchitectureCoverageInput): ArchitectureCoverage {
   const served = new Set(spec.components.flatMap(({ value }) => value.sert));
@@ -75,14 +104,19 @@ export function architectureCoverage(spec: ArchitectureCoverageInput): Architect
   const unservedFeatures = idsOf(spec.features).filter((id) => !served.has(id));
   const missingFlows = idsOf(spec.flows).filter((id) => !detailed.has(id));
   const unownedTables = idsOf(spec.tables).filter((id) => (owners.get(id) ?? []).length === 0);
+  const linked = linkedOf(spec.components);
+  const internal = spec.components.filter(({ value }) => value.type !== "ext");
+  const isolatedComponents = idsOf(internal).filter((id) => !linked.has(id));
   return {
     unservedFeatures,
     missingFlows,
     unownedTables,
+    isolatedComponents,
     counts: {
       features: countOf(spec.features, unservedFeatures),
       flows: countOf(spec.flows, missingFlows),
       tables: countOf(spec.tables, unownedTables),
+      links: countOf(internal, isolatedComponents),
     },
   };
 }
@@ -124,12 +158,12 @@ function checkCoverage(spec: ArchitectureInput, warn: Warn): void {
 }
 
 /** Dépendances synchrones entre composants connus : `mode: asynchrone` n'est pas une arête. */
-function synchronousGraph(components: readonly Component[]): Map<string, string[]> {
+export function synchronousGraph(components: readonly GraphComponent[]): Map<string, string[]> {
   const known = new Set(components.map((component) => component.id));
   return new Map(
     components.map((component) => [
       component.id,
-      component.depend_de
+      (component.depend_de ?? [])
         .filter((dep) => dep.mode !== "asynchrone" && known.has(dep.vers))
         .map((dep) => dep.vers),
     ]),
@@ -146,6 +180,18 @@ function reachableFrom(graph: ReadonlyMap<string, readonly string[]>, from: stri
     pending.push(...(graph.get(id) ?? []));
   }
   return reached;
+}
+
+/**
+ * Vrai si une dépendance synchrone `from` → `to` fermerait un cycle synchrone (TK-114c, B635) : `to` atteint déjà `from`,
+ * ou `from` = `to`. Même graphe que `ARCH_SYNC_CYCLE`.
+ */
+export function closesSyncCycle(
+  graph: ReadonlyMap<string, readonly string[]>,
+  from: string,
+  to: string,
+): boolean {
+  return from === to || reachableFrom(graph, to).has(from);
 }
 
 /** Groupes de composants qui s'atteignent mutuellement (ou un composant qui dépend de lui-même), ids triés. */

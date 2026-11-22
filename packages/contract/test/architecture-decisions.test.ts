@@ -8,8 +8,8 @@ import { errors, input, isValid, output, proc, SHA, scopedInput, UUID } from "./
  * `archflow`, lectures `clientSpace.architecture*`.
  */
 describe("TK-113 surface", () => {
-  it("version 3.12.0 (additif : mineure)", () => {
-    expect(CONTRACT_VERSION).toBe("3.12.0");
+  it("version 3.13.0 (additif : mineure)", () => {
+    expect(CONTRACT_VERSION).toBe("3.13.0");
   });
 
   it.each([

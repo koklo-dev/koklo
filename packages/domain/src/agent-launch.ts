@@ -59,7 +59,7 @@ export const AGENT_PROPOSE_LIMITS = {
   instruction: 500,
   segments: 8,
   links: 200,
-  coverage: { features: 15, flows: 5, calls: 30 },
+  coverage: { features: 15, flows: 5, components: 10, calls: 30 },
 } as const;
 
 /** Motif fermé d'une zone écartée (B618) : jamais le texte du fournisseur. */

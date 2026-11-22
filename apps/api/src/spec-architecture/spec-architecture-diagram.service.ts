@@ -135,6 +135,7 @@ export class SpecArchitectureDiagramService {
         responsibility,
       })),
       relations: view.relations,
+      crossRelations: view.crossRelations,
       actors: view.actors,
       outgoing: view.outgoing,
       truncated: view.truncated,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { benchOf, type Reply, ScriptedAi } from "../../test/support/propose-run.ts";
+import type { PublishedProposal } from "./coverage.ts";
 import { coverageIndexOf } from "./coverage.ts";
 import { coveragePass } from "./coverage-pass.ts";
 import type { LaunchSources } from "./sources.ts";
@@ -33,7 +34,9 @@ const SOURCES: LaunchSources = {
         type: "service",
         owns: [],
         serves: [],
+        dependsOn: [{ to: "C-banque", via: "HTTPS" }],
       },
+      { specId: "C-banque", title: "Banque", zone: "Achats", type: "ext", owns: [], serves: [] },
     ],
     archflows: [],
     decisions: [],
@@ -49,6 +52,7 @@ const panier = (over: Record<string, unknown> = {}) => ({
     type: "service",
     zone: "Achats",
     responsibility: "Garde le panier.",
+    dependsOn: [{ to: "C-paiement", via: "HTTP" }],
     ...over,
   },
 });
@@ -198,6 +202,15 @@ describe("coveragePass (TK-114b, B616)", () => {
             type: "service",
             owns: [],
             serves: ["F-001", "F-002", "F-003"],
+            dependsOn: [{ to: "C-banque", via: "HTTPS" }],
+          },
+          {
+            specId: "C-banque",
+            title: "Banque",
+            zone: "Achats",
+            type: "ext",
+            owns: [],
+            serves: [],
           },
         ],
       },
@@ -218,5 +231,159 @@ describe("coveragePass (TK-114b, B616)", () => {
     bench.store.state.status = "cancelled";
     expect(await coveragePass(bench.run, coverageIndexOf(SOURCES))).toBe("stopped");
     expect(bench.store.proposals).toHaveLength(0);
+  });
+});
+
+/**
+ * TK-114c (B633 à B636) : faux moteur « Toto », 23 composants indexés en 8 zones, 3 seulement reliés (t01 → t02 → t03). La
+ * même passe propose les liens des composants isolés, 10 par paquet, et les écrit là où ils peuvent l'être.
+ */
+const tid = (n: number) => `C-t${String(n).padStart(2, "0")}`;
+const TOTO: LaunchSources = {
+  ...SOURCES,
+  features: [],
+  roles: [],
+  architecture: {
+    components: Array.from({ length: 23 }, (_, i) => ({
+      specId: tid(i + 1),
+      title: `Toto ${i + 1}`,
+      zone: `Zone ${(i % 8) + 1}`,
+      type: "service",
+      owns: [],
+      serves: [],
+      dependsOn: i < 2 ? [{ to: tid(i + 2), via: "HTTP" }] : [],
+    })),
+    archflows: [],
+    decisions: [],
+    nfr: [],
+  },
+};
+const link = (from: number | string, to: number | string, via = "HTTP", async = false) => ({
+  from: typeof from === "number" ? tid(from) : from,
+  to: typeof to === "number" ? tid(to) : to,
+  via,
+  async,
+});
+const linksReply = (links: unknown[], proposals: unknown[] = [], assignments: unknown[] = []) => ({
+  output: { assignments, proposals, links },
+});
+const pending = (
+  id: string,
+  payload: Record<string, unknown>,
+): PublishedProposal & {
+  position: number;
+} => ({
+  id,
+  kind: "component",
+  zone: "Zone 1",
+  title: String(payload.name),
+  status: "pending",
+  applied: false,
+  payload: { type: "service", zone: "Zone 1", responsibility: "Relaie.", ...payload },
+  position: 0,
+});
+const bySpecId = (bench: { store: { proposals: { payload: Record<string, unknown> }[] } }) =>
+  bench.store.proposals.filter((p) => typeof p.payload.specId === "string");
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("coveragePass, liens (TK-114c, faux moteur Toto)", () => {
+  it("liens proposés : composant de la même réponse, complément d'une proposition en attente, specId d'un indexé", async () => {
+    const ai = new ScriptedAi(
+      replies(
+        linksReply(
+          [
+            link(4, 1),
+            link("C-relais", 6, "gRPC"),
+            link("C-passerelle", 7),
+            link(1, 11),
+            link(8, 9),
+            link(9, 8),
+            link(9, 8, "AMQP", true),
+            link(10, 10),
+            link(10, "C-inconnu"),
+            link(1, 2, "TCP"),
+          ],
+          [panier({ name: "Relais", zone: "Zone 2", dependsOn: [{ to: tid(5), via: "HTTP" }] })],
+        ),
+      ),
+    );
+    const bench = benchOf(TOTO, ai);
+    bench.store.proposals.push(
+      pending("p-passerelle", { name: "Passerelle" }),
+      pending("p-t01", { specId: tid(1), name: "Toto 1", serves: [] }),
+    );
+    expect(await coveragePass(bench.run, coverageIndexOf(TOTO))).toBe("cap");
+    expect(ai.requests).toHaveLength(3);
+    expect(JSON.stringify(ai.requests[0])).toContain(
+      `Components without any dependency\\n${tid(4)} | Toto 4 | Zone 4 | service`,
+    );
+    const payloadOf = (title: string) =>
+      bench.store.proposals.find((p) => p.title === title)?.payload;
+    expect(payloadOf("Relais")?.dependsOn).toEqual([
+      { to: tid(5), via: "HTTP" },
+      { to: tid(6), via: "gRPC" },
+    ]);
+    expect(payloadOf("Passerelle")?.dependsOn).toEqual([{ to: tid(7), via: "HTTP" }]);
+    expect(payloadOf("Toto 1")?.dependsOn).toEqual([
+      { to: tid(2), via: "HTTP" },
+      { to: tid(11), via: "HTTP" },
+    ]);
+    const updates = Object.fromEntries(
+      bySpecId(bench).map((p) => [p.payload.specId, p.payload.dependsOn]),
+    );
+    expect(updates).toEqual({
+      [tid(1)]: [
+        { to: tid(2), via: "HTTP" },
+        { to: tid(11), via: "HTTP" },
+      ],
+      [tid(4)]: [{ to: tid(1), via: "HTTP" }],
+      [tid(8)]: [{ to: tid(9), via: "HTTP" }],
+      [tid(9)]: [{ to: tid(8), via: "AMQP", async: true }],
+    });
+    expect(JSON.stringify(bench.store.proposals)).not.toContain("C-inconnu");
+    expect(bench.store.state.coverageAfter?.links).toEqual({ covered: 12, total: 25 });
+    expect(bench.store.state.coverageStalled).toBe(2);
+  });
+
+  it("arrêt completed quand plus aucun composant n'est isolé ; stalled remis à zéro", async () => {
+    const towards = (from: number) => Array.from({ length: 10 }, (_, i) => link(from + i, 1));
+    const ai = new ScriptedAi(replies(linksReply(towards(4)), linksReply(towards(14))));
+    const bench = benchOf(TOTO, ai);
+    expect(await coveragePass(bench.run, coverageIndexOf(TOTO))).toBe("completed");
+    expect(ai.requests).toHaveLength(2);
+    expect(bySpecId(bench)).toHaveLength(20);
+    expect(bench.store.state.coverageAfter?.links).toEqual({ covered: 23, total: 23 });
+    expect(bench.store.state).toMatchObject({ coverageCalls: 2, coverageStalled: 0 });
+  });
+
+  it("aucun lien retenu : stalled incrémenté, rien publié, cap après une passe complète", async () => {
+    const ai = new ScriptedAi(replies(linksReply([link(3, 1), link(4, "C-inconnu"), link(2, 3)])));
+    const bench = benchOf(TOTO, ai);
+    expect(await coveragePass(bench.run, coverageIndexOf(TOTO))).toBe("cap");
+    expect(ai.requests).toHaveLength(2);
+    expect(bench.store.proposals).toHaveLength(0);
+    expect(bench.store.state.coverageStalled).toBe(2);
+  });
+
+  it("affectation et lien d'un même indexé : une seule proposition specId (serves et dependsOn)", async () => {
+    const sources = { ...TOTO, features: [{ specId: "F-001", title: "Payer", criteria: [] }] };
+    const ai = new ScriptedAi(
+      replies(linksReply([link(4, 1)], [], [{ feature: "F-001", component: tid(4) }])),
+    );
+    const bench = benchOf(sources, ai);
+    await coveragePass(bench.run, coverageIndexOf(sources));
+    const updates = bySpecId(bench).filter((p) => p.payload.specId === tid(4));
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.payload).toMatchObject({
+      serves: ["F-001"],
+      dependsOn: [{ to: tid(1), via: "HTTP" }],
+    });
+  });
+
+  it("sortie sans links : tolérée (liste vide)", async () => {
+    const ai = new ScriptedAi(replies({ output: { assignments: [], proposals: [] } }));
+    const bench = benchOf(TOTO, ai);
+    expect(await coveragePass(bench.run, coverageIndexOf(TOTO))).toBe("cap");
+    expect(bench.store.state.discardedCount).toBe(0);
   });
 });

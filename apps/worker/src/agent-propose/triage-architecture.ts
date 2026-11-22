@@ -36,17 +36,16 @@ export const componentIdOf = (name: string): string => `C-${slugOf(name, "compos
 const allIn = (ids: readonly string[], known: ReadonlySet<string>): boolean =>
   ids.every((id) => known.has(id));
 
+const ownIdOf = (payload: Record<string, unknown>): string =>
+  componentIdOf(typeof payload.name === "string" ? payload.name : "");
+
+/** Les cibles de `dependsOn` sont filtrées avant (`withKnownDependencies`, B638) : seuls tables, fonctions et décisions écartent. */
 function componentKnown(payload: Record<string, unknown>, arch: ArchitectureRefs): boolean {
-  const own = componentIdOf(typeof payload.name === "string" ? payload.name : "");
-  if (arch.components.has(own)) return false;
-  const targets = recordsOf(payload.dependsOn).flatMap((link) =>
-    typeof link.to === "string" ? [link.to] : [],
-  );
+  if (arch.components.has(ownIdOf(payload))) return false;
   return (
     allIn(stringsOf(payload.owns), arch.tables) &&
     allIn(stringsOf(payload.serves), arch.features) &&
-    allIn(stringsOf(payload.decisions), arch.decisions) &&
-    targets.every((id) => id === own || arch.components.has(id))
+    allIn(stringsOf(payload.decisions), arch.decisions)
   );
 }
 
@@ -111,6 +110,24 @@ export function withoutOwnedTables(
 ): Record<string, unknown> {
   if (kind !== "component" || arch === undefined || !Array.isArray(payload.owns)) return payload;
   return { ...payload, owns: stringsOf(payload.owns).filter((id) => !arch.ownedTables.has(id)) };
+}
+
+/**
+ * Composant proposé : une cible de `dependsOn` inconnue (zone pas encore traitée, composant cité avant d'être proposé) est
+ * retirée au lieu d'écarter le composant (TK-114c, B638) ; l'auto-dépendance reste admise (TK-111). La passe de couverture
+ * rétablit ensuite les liens. Tout autre type : inchangé.
+ */
+export function withKnownDependencies(
+  kind: AgentProposalKind,
+  payload: Record<string, unknown>,
+  arch: ArchitectureRefs | undefined,
+): Record<string, unknown> {
+  if (kind !== "component" || arch === undefined || !Array.isArray(payload.dependsOn))
+    return payload;
+  const own = ownIdOf(payload);
+  const known = (link: Record<string, unknown>) =>
+    typeof link.to === "string" && (link.to === own || arch.components.has(link.to));
+  return { ...payload, dependsOn: recordsOf(payload.dependsOn).filter(known) };
 }
 
 /** Une proposition acceptée devient connue pour la suite de la génération (composants, flux, tables possédées). */

@@ -12,6 +12,7 @@ const input = {
   packet: {
     features: [{ specId: "F-007", title: "Exporter les factures" }],
     flows: [{ specId: "P-payer", title: "Payer une commande" }],
+    components: [{ specId: "C-seul", title: "Isolé", zone: "Bord", type: "store" }],
   },
   components: [{ specId: "C-api", title: "API", zone: "Noyau", type: "service" }],
   roles: [{ specId: "RL-client", title: "Client" }],
@@ -19,12 +20,17 @@ const input = {
   instruction: "Privilégier les composants existants",
 };
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("coveragePrompt", () => {
   it("consigne constante dans system, sans aucune donnée interpolée", () => {
     const prompt = coveragePrompt(NONCE, input);
     expect(prompt.system).toContain(revealTrusted(COVERAGE_INSTRUCTIONS));
     expect(prompt.system).toContain("assignments");
+    expect(prompt.system).toContain("links array");
+    expect(prompt.system).toContain("must never form a cycle");
     for (const data of [
+      "C-seul",
+      "Isolé",
       "F-007",
       "Exporter",
       "P-payer",
@@ -45,7 +51,8 @@ describe("coveragePrompt", () => {
     expect(user).toContain("RL-client | Client");
     expect(user).toContain("ADR-001");
     expect(user).toContain("origin=user-input");
-    expect(user.match(new RegExp(`nonce=${NONCE}>>>`, "g"))?.length).toBeGreaterThanOrEqual(8);
+    expect(user).toContain("Components without any dependency\nC-seul | Isolé | Bord | store");
+    expect(user.match(new RegExp(`nonce=${NONCE}>>>`, "g"))?.length).toBeGreaterThanOrEqual(9);
   });
 
   it("la responsabilité et les liens d'un composant indexé n'entrent jamais ; sans consigne : pas de bloc user-input", () => {
@@ -61,12 +68,33 @@ describe("coveragePrompt", () => {
           responsibility: "SECRET-RESP",
           owns: ["T-secret"],
           serves: ["F-secret"],
+          dependsOn: [{ to: "C-secret", via: "VIA-SECRET" }],
         },
       ],
+      packet: {
+        ...input.packet,
+        components: [
+          {
+            specId: "C-seul",
+            title: "Isolé",
+            zone: null,
+            type: "store",
+            responsibility: "SECRET-RESP-2",
+          },
+        ],
+      },
     };
     const { user } = coveragePrompt(NONCE, indexed);
     expect(user).toContain("C-api | API | none | service");
-    for (const absent of ["SECRET-RESP", "T-secret", "F-secret", "origin=user-input"]) {
+    expect(user).toContain("C-seul | Isolé | none | store");
+    for (const absent of [
+      "SECRET-RESP",
+      "T-secret",
+      "F-secret",
+      "C-secret",
+      "VIA-SECRET",
+      "origin=user-input",
+    ]) {
       expect(user, absent).not.toContain(absent);
     }
   });

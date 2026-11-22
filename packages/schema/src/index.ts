@@ -70,6 +70,8 @@ export {
   architectureChecks,
   architectureCoverage,
   type CoverageCount,
+  closesSyncCycle,
+  synchronousGraph,
 } from "./rules/architecture-checks.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";

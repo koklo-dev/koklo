@@ -1,7 +1,7 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 6
+version: 7
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
@@ -42,9 +42,10 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 | 4 | 2026-11-21 | TK-113 | Décisions, « Valider l'architecture », « À revoir » (impact amont des lots 5 et 6), vue client en lecture seule avec commentaires (§12) ; `DecisionStatus` et prop `stale` de `ArchNodeCard` ajoutés à `packages/ui` (DESIGN.md §5.24) ; ligne Composants vers Schéma (B585) (B575 à B592). |
 | 5 | 2026-11-21 | TK-114 | En-tête vérifié contre la maquette 13 l.58-88 : résumé en ligne entière, actions à droite, libellés courts ; aucun changement de code (passation 12 §8.4). |
 | 6 | 2026-11-21 | TK-114b | Bilan du lancement (§13), sans maquette : ligne de détail de la Génération (prop `detail` de `ProposalGenerationBanner` ajoutée à `packages/ui`, DESIGN.md §5.25) et `InlineAlert` « Bilan du lancement » en Relecture ; propositions de mise à jour d'un composant indexé (B613 à B622). |
+| 7 | 2026-11-22 | TK-114c | Vue des zones dès 3 zones et plus de 12 composants (ou plus de 25 en 2 zones), écart assumé avec la règle « au-delà de 25 » (B632) ; liens inter-zones tracés vers la carte estompée et dans la vue à plat (B641) ; « composants reliés » dans le bilan (B642) ; aucun composant ajouté à `packages/ui` (§14). |
 
 ## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
-- **Schéma** : lecteur du lot 6 ; au-delà de 25 composants, vue des zones (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone. Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
+- **Schéma** : lecteur du lot 6 ; vue des zones dès 3 zones et plus de 12 composants, ou plus de 25 composants en 2 zones (TK-114c, B632 ; avant : au-delà de 25) (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone, relié par un trait à chaque composant de la zone qui l'appelle ou qu'il appelle (TK-114c, B641). Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
 - **Flux** : liste (pages de 50, « N flux · un par parcours »), diagramme de séquence (appels pleins, retours pointillés, bloc `alt`, séparateur), sélecteur Diagramme · YAML · Mermaid (équipe), puces de liens ; « Nouveau flux » et « Modifier » ouvrent `SpecItemSheet`.
 - **États** : chargement (squelette de la hauteur du cadre), vide (« Aucun composant à afficher », « Aucun flux »), erreur (`InlineAlert` + Réessayer), droits (designer sans glisser ni Modifier ; client et business renvoyés à la vue d'ensemble).
 - **Accessibilité** : nœud = `button` `aria-pressed` (« Service API »), Alt + flèches déplace avec annonce, `/` focalise la recherche, SVG `aria-hidden` ; séquence `role="img"` « Diagramme de séquence X, N messages » + `details` « Lire les messages » (liste numérotée) ; défilement horizontal focusable.
@@ -68,3 +69,12 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 - **Mise à jour d'un composant indexé** (proposition avec `specId`, B615) : sous-titre « Mise à jour · zone Données », identifiant = `specId`, contenu « Possède » et « Sert » complets ; acceptée, elle enregistre `component.update` (liens seuls).
 - **États** : chargement et erreur de la liste inchangés (le bilan vient de `proposal.list`) ; droits : mêmes rôles que la relecture ; vide : pas de bilan.
 - **375 px** : les lignes du bilan passent à la ligne, aucune troncature ; aucune action dans le bilan.
+
+## 14. Vue par zones dès 3 zones et liens complétés (TK-114c, maquette 13 l.175-239, 676-720, B631 à B643)
+- **Seuil** : zones si au moins 3 zones et plus de 12 composants, ou plus de 25 composants en au moins 2 zones ; sinon à plat en 4 couches. Le projet « Toto » (23 composants, 8 zones) s'ouvre sur la vue des zones. Données inchangées (25 tables, 2 zones).
+- **Liens** : zone ouverte = liens internes (maquette l.693) + un trait par paire composant / zone voisine vers la carte estompée (l.717-718), les cartes estompées sur leur propre rangée sous les couches (l.716-717, B648), étiquette du moyen, pointillé si asynchrone ; vue des zones = traits « N liens » entre cartes (l.702), comptés par le serveur ; vue à plat = tous les liens, inter-zones compris. Le sens reste lu dans la fiche (« Dépend de », B559).
+- **Bilan** : ligne 2 « … · tables rattachées a/b · composants reliés c/d · avant : … » (§13, DESIGN §5.25).
+- **États** : chargement, vide, erreur, droits : inchangés (§11) ; zone sans lien : aucun trait, cartes voisines absentes.
+- **Clavier et annonces** : inchangés (§11) ; les traits sont décoratifs (SVG `aria-hidden`), les liens se lisent dans la fiche.
+- **375 px** : la vue des zones est la liste de cartes (`md:hidden`), le lecteur est masqué sous 768 px ; aucun défilement horizontal de page.
+- **États comparés à la maquette** (clair, sombre, 375 px) : vue des zones « Toto » (23 composants, 8 zones) ; zone ouverte avec traits vers une carte estompée ; vue à plat d'un petit projet (8 composants) ; erreur du schéma.

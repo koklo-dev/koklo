@@ -91,7 +91,10 @@ interface Args {
   enabled: boolean;
 }
 
-/** Zones lues du serveur, zone ouverte et détails : le diagramme s'ouvre par zones au-delà de 25 composants en plusieurs zones. */
+/**
+ * Zones lues du serveur, zone ouverte et détails : le diagramme s'ouvre par zones dès 3 zones au-delà de 12 composants,
+ * ou au-delà de 25 composants en plusieurs zones (B632).
+ */
 function useZonesState({ projectId, zone, sel, enabled }: Args) {
   const zones = useArchitectureZones(projectId, enabled);
   const entries = useMemo<ArchZoneEntry[]>(() => zones.data?.zones ?? [], [zones.data]);
@@ -127,9 +130,13 @@ function useDiagramParts(
     [zoned, opened, entries],
   );
   const nodes = useMemo<ArchNode[]>(() => nodesOf(details, ghosts), [details, ghosts]);
+  const zoneNames = useMemo(
+    () => new Map(entries.map((entry) => [entry.id, entry.name])),
+    [entries],
+  );
   return {
     nodes,
-    relations: useMemo(() => relationsOf(details, nodes), [details, nodes]),
+    relations: useMemo(() => relationsOf(details, nodes, zoneNames), [details, nodes, zoneNames]),
     positions: useMemo(() => positionsOf(nodes, saved ?? {}), [nodes, saved]),
   };
 }

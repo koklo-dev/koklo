@@ -36,9 +36,21 @@ const layersLoaded = async (page: Page) => {
   await expect(schemaRegion(page)).toBeVisible();
   await expect(node(page, "Service API")).toBeVisible();
 };
-const zonesLoaded = async (page: Page) => {
-  await expect(page.getByText("Toutes les zones · 120 composants")).toBeVisible();
+const zonesLoaded = async (page: Page, count = 120) => {
+  await expect(page.getByText(`Toutes les zones · ${count} composants`)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Zone / }).first()).toBeVisible();
+};
+/** TK-114c (B641) : zone « Commandes » du mode toto, ses traits vers les cartes estompées des zones voisines. */
+const TOTO_ZONE = "Commandes";
+const crossTraits = (page: Page) => page.locator("[data-relation*='>zone:']");
+const totoZoneLoaded = async (page: Page) => {
+  await expect(node(page, /^Service Commandes/)).toBeVisible();
+  await expect(node(page, /, autre zone$/).first()).toBeVisible();
+  await expect(crossTraits(page)).toHaveCount(3);
+  // Les cartes estompées ont leur rangée sous les couches (B648) : la capture les montre avec leurs traits.
+  await node(page, /, autre zone$/)
+    .last()
+    .scrollIntoViewIfNeeded();
 };
 const FIRST_FLOW = "P-reserver-un-rendez-vous";
 /** Sous 768 px, la liste d'abord puis le détail : le flux se choisit par `?f=` (fiche §7). */
@@ -66,7 +78,20 @@ const VIEWS: View[] = [
     name: "zones-schema",
     architecture: "volume",
     path: `${PATH}?tab=schema`,
-    visible: zonesLoaded,
+    visible: (page) => zonesLoaded(page),
+  },
+  {
+    name: "zones-toto-schema",
+    architecture: "toto",
+    path: `${PATH}?tab=schema`,
+    visible: (page) => zonesLoaded(page, 23),
+  },
+  {
+    name: "zone-open-toto-schema",
+    architecture: "toto",
+    path: `${PATH}?tab=schema&zone=${TOTO_ZONE}`,
+    desktopOnly: true,
+    visible: totoZoneLoaded,
   },
   {
     name: "zone-open-schema",
@@ -262,6 +287,41 @@ test.describe("parcours des onglets Schéma et Flux", () => {
     await page.keyboard.press("Escape");
     await ghost.click();
     await expect(page).not.toHaveURL(/zone=Communication/);
+  });
+
+  test("TK-114c : 23 composants en 8 zones → zone → traits vers les cartes estompées, l'asynchrone en pointillé", async ({
+    page,
+  }) => {
+    await start(page, "toto");
+    await page.goto(`${PATH}?tab=schema`);
+    await zonesLoaded(page, 23);
+    await expect(page.getByRole("button", { name: /^Zone / })).toHaveCount(8);
+    await page
+      .getByRole("button", { name: new RegExp(`^Zone ${TOTO_ZONE}`) })
+      .first()
+      .click();
+    await expect(page).toHaveURL(new RegExp(`zone=${TOTO_ZONE}`));
+    await totoZoneLoaded(page);
+    await expect(
+      page.locator("[data-relation='C-toto-commandes>zone:Paiement']"),
+    ).not.toHaveAttribute("stroke-dasharray", /.*/);
+    await expect(page.locator("[data-relation='C-toto-commandes>zone:Messages']")).toHaveAttribute(
+      "stroke-dasharray",
+      "5 4",
+    );
+    await expect(page.locator("[data-relation='C-toto-panier>zone:Catalogue']")).toHaveCount(1);
+    await expect(page.getByText("publie", { exact: true })).toBeVisible();
+  });
+
+  test("TK-114c : mode demo (8 composants) reste à plat, les liens entre zones tracés en direct", async ({
+    page,
+  }) => {
+    await start(page);
+    await page.goto(`${PATH}?tab=schema`);
+    await layersLoaded(page);
+    await expect(page.getByText(/^Toutes les zones/)).toHaveCount(0);
+    await expect(page.locator("[data-relation='C-api>C-auth']")).toHaveCount(1);
+    await expect(crossTraits(page)).toHaveCount(0);
   });
 
   test("« Aller à un composant… » : « / » focalise, Entrée ouvre la zone du composant", async ({

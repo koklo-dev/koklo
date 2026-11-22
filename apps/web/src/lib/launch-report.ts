@@ -54,6 +54,14 @@ const isEmpty = (report: LaunchReport): boolean =>
   !report.coverageAfter &&
   !report.stopReason;
 
+/** Couverture d'avant le lancement : composants reliés (B642) seulement s'ils ont été comptés. */
+const beforeCounts = (before: NonNullable<LaunchReport["coverageBefore"]>) => [
+  before.features,
+  before.flows,
+  before.tables,
+  ...(before.links ? [before.links] : []),
+];
+
 function coverageLine(report: LaunchReport): string[] {
   const after = report.coverageAfter;
   if (!after) return [];
@@ -62,9 +70,8 @@ function coverageLine(report: LaunchReport): string[] {
     `Fonctionnalités servies ${ratio(after.features)}`,
     `parcours détaillés ${ratio(after.flows)}`,
     `tables rattachées ${ratio(after.tables)}`,
-    ...(before
-      ? [`avant : ${[before.features, before.flows, before.tables].map(ratio).join(", ")}`]
-      : []),
+    ...(after.links ? [`composants reliés ${ratio(after.links)}`] : []),
+    ...(before ? [`avant : ${beforeCounts(before).map(ratio).join(", ")}`] : []),
   ];
   return [parts.join(" · ")];
 }

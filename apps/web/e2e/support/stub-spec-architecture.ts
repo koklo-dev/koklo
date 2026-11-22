@@ -3,10 +3,11 @@ import type { IncomingMessage } from "node:http";
 /**
  * Faux API de l'écran Architecture (TK-111, contrat 3.9.0) : `spec.architecture.components.list`, `.document`, `.checks`
  * et la lecture d'édition `spec.item.get` du type `component`. Trois jeux, choisis par le scénario (`architecture`) :
- * « empty » (aucun composant : état Prêt), « demo » (8 composants, 6 sections : la maquette 13) et « volume » (120
- * composants sur 6 zones, comme `seed:large`). Aucun appel réel, aucune donnée réelle.
+ * « empty » (aucun composant : état Prêt), « demo » (8 composants, 6 sections : la maquette 13), « volume » (120
+ * composants sur 6 zones, comme `seed:large`) et « toto » (TK-114c : 23 composants en 8 zones, liens dans et entre les
+ * zones, un asynchrone). Aucun appel réel, aucune donnée réelle.
  */
-export type ArchitectureMode = "empty" | "demo" | "volume";
+export type ArchitectureMode = "empty" | "demo" | "volume" | "toto";
 export type ArchitectureScenario = { architecture?: ArchitectureMode };
 
 export type Reply = { status: number; body: string };
@@ -154,8 +155,109 @@ const GENERATED: Component[] = Array.from({ length: VOLUME_COUNT - DEMO.length }
   };
 });
 
+/** TK-114c (B632, B641) : 23 composants en 8 zones aux noms neutres ; chaque zone en relie une autre. */
+const TOTO_ZONES = [
+  "Accueil",
+  "Comptes",
+  "Catalogue",
+  "Commandes",
+  "Paiement",
+  "Messages",
+  "Rapports",
+  "Socle",
+];
+const TOTO_SPECS: ReadonlyArray<[string, string, Type, number, Component["dependsOn"]]> = [
+  ["C-toto-portail", "Portail", "app", 0, [{ to: "C-toto-passerelle", via: "HTTPS" }]],
+  [
+    "C-toto-passerelle",
+    "Passerelle",
+    "service",
+    0,
+    [
+      { to: "C-toto-comptes", via: "contrat typé" },
+      { to: "C-toto-catalogue", via: "contrat typé" },
+      { to: "C-toto-commandes", via: "contrat typé" },
+    ],
+  ],
+  ["C-toto-session", "Sessions", "store", 0, []],
+  [
+    "C-toto-comptes",
+    "Comptes",
+    "service",
+    1,
+    [
+      { to: "C-toto-base-comptes", via: "SQL" },
+      { to: "C-toto-session", via: "lecture" },
+    ],
+  ],
+  ["C-toto-base-comptes", "Base des comptes", "store", 1, []],
+  ["C-toto-annuaire", "Annuaire", "ext", 1, []],
+  ["C-toto-catalogue", "Catalogue", "service", 2, [{ to: "C-toto-base-catalogue", via: "SQL" }]],
+  ["C-toto-base-catalogue", "Base du catalogue", "store", 2, []],
+  ["C-toto-recherche", "Recherche", "service", 2, [{ to: "C-toto-base-catalogue", via: "index" }]],
+  [
+    "C-toto-commandes",
+    "Commandes",
+    "service",
+    3,
+    [
+      { to: "C-toto-base-commandes", via: "SQL" },
+      { to: "C-toto-paiement", via: "contrat typé" },
+      { to: "C-toto-file", via: "publie", async: true },
+    ],
+  ],
+  ["C-toto-base-commandes", "Base des commandes", "store", 3, []],
+  ["C-toto-panier", "Panier", "service", 3, [{ to: "C-toto-catalogue", via: "contrat typé" }]],
+  ["C-toto-paiement", "Paiement", "service", 4, [{ to: "C-toto-banque", via: "HTTPS" }]],
+  ["C-toto-banque", "Banque", "ext", 4, []],
+  ["C-toto-factures", "Factures", "store", 4, []],
+  ["C-toto-file", "File des messages", "queue", 5, []],
+  [
+    "C-toto-envoi",
+    "Envoi",
+    "service",
+    5,
+    [
+      { to: "C-toto-file", via: "consomme", async: true },
+      { to: "C-toto-courriel", via: "HTTPS" },
+    ],
+  ],
+  ["C-toto-courriel", "Courriel", "ext", 5, []],
+  [
+    "C-toto-rapports",
+    "Rapports",
+    "service",
+    6,
+    [
+      { to: "C-toto-entrepot", via: "SQL" },
+      { to: "C-toto-base-commandes", via: "lecture" },
+    ],
+  ],
+  ["C-toto-entrepot", "Entrepôt", "store", 6, []],
+  ["C-toto-journal", "Journal", "store", 7, []],
+  ["C-toto-config", "Configuration", "service", 7, [{ to: "C-toto-journal", via: "écrit" }]],
+  ["C-toto-cles", "Clés", "ext", 7, []],
+];
+const TOTO: Component[] = TOTO_SPECS.map(([specId, name, type, zone, dependsOn]) => ({
+  specId,
+  name,
+  type,
+  zone: TOTO_ZONES[zone] as string,
+  responsibility: `Responsabilité du composant ${name}.`,
+  owns: [],
+  serves: [],
+  dependsOn,
+  decisions: [],
+}));
+
 export const componentsOf = (mode: ArchitectureMode): Component[] =>
-  mode === "empty" ? [] : mode === "volume" ? [...DEMO, ...GENERATED] : DEMO;
+  mode === "empty"
+    ? []
+    : mode === "volume"
+      ? [...DEMO, ...GENERATED]
+      : mode === "toto"
+        ? TOTO
+        : DEMO;
 
 /** Compteur de `spec.head.counts.components` d'après le mode du scénario. */
 export const architectureCounts = (mode: ArchitectureMode | undefined) =>
@@ -332,20 +434,47 @@ function zonesOf(mode: ArchitectureMode) {
   });
 }
 
+const linkOf = (from: string, dep: Component["dependsOn"][number]) => ({
+  from,
+  to: dep.to,
+  via: dep.via,
+  ...(dep.async ? { async: true } : {}),
+});
+
+/** Liens d'une zone avec les autres (B640, B646) : sortants d'abord, puis entrants ; `zone` = celle de l'autre composant. */
+function crossRelationsOf(all: readonly Component[], name: string) {
+  const zoneOf = new Map(all.map((c) => [c.specId, c.zone]));
+  const outside = (id: string) => {
+    const zone = zoneOf.get(id);
+    return zone !== undefined && zone !== name ? zoneIdOf(zone) : null;
+  };
+  const own = all.filter((c) => c.zone === name);
+  const outgoing = own.flatMap((c) =>
+    c.dependsOn.flatMap((dep) => {
+      const zone = outside(dep.to);
+      return zone ? [{ ...linkOf(c.specId, dep), zone }] : [];
+    }),
+  );
+  const incoming = all
+    .filter((c) => c.zone !== name)
+    .flatMap((c) =>
+      c.dependsOn
+        .filter((dep) => zoneOf.get(dep.to) === name)
+        .map((dep) => ({ ...linkOf(c.specId, dep), zone: zoneIdOf(c.zone) })),
+    );
+  return [...outgoing, ...incoming];
+}
+
 function zoneDetail(mode: ArchitectureMode, id: string): Reply {
   const entry = zonesOf(mode).find((zone) => zone.id === id);
   if (!entry) return typed(404, "NOT_FOUND");
   const all = componentsOf(mode);
   const own = all.filter((c) => c.zone === entry.name).slice(0, 200);
   const here = new Set(own.map((c) => c.specId));
+  const crossRelations = crossRelationsOf(all, entry.name);
   const outgoing = new Map<string, number>();
-  for (const c of own) {
-    for (const dep of c.dependsOn) {
-      const target = all.find((x) => x.specId === dep.to);
-      if (target && target.zone !== entry.name) {
-        outgoing.set(zoneIdOf(target.zone), (outgoing.get(zoneIdOf(target.zone)) ?? 0) + 1);
-      }
-    }
+  for (const link of crossRelations.filter((cross) => here.has(cross.from))) {
+    outgoing.set(link.zone, (outgoing.get(link.zone) ?? 0) + 1);
   }
   return reply(200, {
     zone: {
@@ -361,15 +490,9 @@ function zoneDetail(mode: ArchitectureMode, id: string): Reply {
       responsibility: c.responsibility,
     })),
     relations: own.flatMap((c) =>
-      c.dependsOn
-        .filter((dep) => here.has(dep.to))
-        .map((dep) => ({
-          from: c.specId,
-          to: dep.to,
-          via: dep.via,
-          ...(dep.async ? { async: true } : {}),
-        })),
+      c.dependsOn.filter((dep) => here.has(dep.to)).map((dep) => linkOf(c.specId, dep)),
     ),
+    crossRelations,
     actors: entry.actorCount > 0 ? [{ id: "RL-client", name: "Client" }] : [],
     outgoing: [...outgoing].map(([zone, count]) => ({ zone, count })),
     truncated: false,

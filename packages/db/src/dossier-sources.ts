@@ -65,6 +65,14 @@ export interface CurrentComponent {
   readonly type: string;
   readonly owns: readonly string[];
   readonly serves: readonly string[];
+  /** Dépendances lues de `depend_de` (TK-114c, B631) ; toujours rempli par le lecteur, facultatif pour les fixtures. */
+  readonly dependsOn?: readonly CurrentDependency[];
+}
+
+export interface CurrentDependency {
+  readonly to: string;
+  readonly via: string;
+  readonly async?: boolean;
 }
 
 /** Ce que l'agent lit de l'architecture : composants, flux techniques, décisions, et exigences connues des fonctionnalités (B512). */
@@ -300,6 +308,19 @@ const COMPONENTS_MAX = 200;
 const idsOf = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
 
+/** Motif `C-<slug>` de `@koklo/schema` (`PATTERNS.component`), que ce paquet n'importe pas. */
+const COMPONENT_ID = /^C-[a-z0-9][a-z0-9-]*$/;
+
+/** `depend_de` `{ vers, via, mode }` → `{ to, via, async }` ; une entrée sans cible `C-` ni canal est ignorée. */
+const dependenciesOf = (value: unknown): CurrentDependency[] =>
+  (Array.isArray(value) ? value : []).flatMap((item) => {
+    const dep = recordOf(item);
+    const to = textOf(dep.vers);
+    const via = textOf(dep.via);
+    if (!COMPONENT_ID.test(to) || via === "") return [];
+    return [dep.mode === "asynchrone" ? { to, via, async: true } : { to, via }];
+  });
+
 const componentOf = (row: { specId: string; data: unknown }): CurrentComponent => {
   const data = recordOf(row.data);
   return {
@@ -309,6 +330,7 @@ const componentOf = (row: { specId: string; data: unknown }): CurrentComponent =
     type: textOf(data.type),
     owns: idsOf(data.possede),
     serves: idsOf(data.sert),
+    dependsOn: dependenciesOf(data.depend_de),
   };
 };
 const NFR_MAX = 100;

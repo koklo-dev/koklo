@@ -15,6 +15,7 @@ export {
   type CurrentArchitecture,
   type CurrentComponent,
   type CurrentDataModel,
+  type CurrentDependency,
   type CurrentDomainTitles,
   type CurrentFeature,
   type CurrentTable,

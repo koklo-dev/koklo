@@ -1,7 +1,7 @@
 import { componentProposalSchema } from "@koklo/schema";
 import { describe, expect, it } from "vitest";
 import type { CoverageIndex, IndexedComponent, PublishedProposal } from "./coverage.ts";
-import { tablesPlan } from "./tables.ts";
+import { tablesPlan, updateProposalOf } from "./tables.ts";
 
 /**
  * TK-114b (B614, B615) : les tables sans propriétaire sont rattachées par le code, sans appel au modèle. Ordre des
@@ -133,5 +133,41 @@ describe("tablesPlan", () => {
       creations: [],
       complements: [],
     });
+  });
+});
+
+/** TK-114c (B636) : proposition `specId` qui porte des liens : dependsOn = index ∪ ajouts (clé `to`), 30 au plus. */
+describe("updateProposalOf, dépendances", () => {
+  const api = indexed("C-api", {
+    type: "service",
+    dependsOn: [{ to: "C-db", via: "SQL" }],
+  });
+
+  it("dependsOn = index ∪ ajouts, sans doublon de cible, 30 au plus", () => {
+    const added = Array.from({ length: 35 }, (_, i) => ({ to: `C-c${i}`, via: "HTTP" }));
+    const update = updateProposalOf(
+      api,
+      {
+        dependsOn: [
+          { to: "C-db", via: "TCP" },
+          { to: "C-bus", via: "AMQP", async: true },
+          ...added,
+        ],
+      },
+      "Liens",
+    );
+    const deps = update?.payload.dependsOn as { to: string }[];
+    expect(deps).toHaveLength(30);
+    expect(deps.slice(0, 2)).toEqual([
+      { to: "C-db", via: "SQL" },
+      { to: "C-bus", via: "AMQP", async: true },
+    ]);
+    expect(componentProposalSchema.safeParse(update?.payload).success).toBe(true);
+  });
+
+  it("sans dépendance ajoutée : dependsOn omis (B637, propositions de TK-114b inchangées)", () => {
+    expect(updateProposalOf(api, { serves: ["F-001"] }, "Liens")?.payload).not.toHaveProperty(
+      "dependsOn",
+    );
   });
 });

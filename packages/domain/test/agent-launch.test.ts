@@ -59,7 +59,7 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       instruction: 500,
       segments: 8,
       links: 200,
-      coverage: { features: 15, flows: 5, calls: 30 },
+      coverage: { features: 15, flows: 5, components: 10, calls: 30 },
     });
   });
 

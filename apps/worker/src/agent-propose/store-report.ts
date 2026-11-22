@@ -1,7 +1,13 @@
 import type { Prisma, TenantClient } from "@koklo/db";
 import type { LaunchDiscardReason } from "@koklo/domain";
 import { isRecord, stringsOf } from "../job-support.ts";
-import { type Complement, type PublishedProposal, unionOf } from "./coverage.ts";
+import {
+  type Complement,
+  dependenciesOf,
+  dependencyUnion,
+  type PublishedProposal,
+  unionOf,
+} from "./coverage.ts";
 import { rowsOf } from "./publish.ts";
 import type {
   Claim,
@@ -58,16 +64,18 @@ export async function claimSegment(
   return count === 0 ? { kind: "settled" } : { kind: "ready", launch, progress: progressOf(row) };
 }
 
-/** Liens ajoutés à une charge de composant, 200 au plus par liste ; une liste sans ajout reste telle quelle. */
+/** Liens ajoutés à une charge de composant, 200 au plus par liste (30 dépendances, réunies par cible) ; une liste sans ajout reste telle quelle. */
 export function mergeLinks(
   payload: Record<string, unknown>,
-  complement: Pick<Complement, "owns" | "serves">,
+  complement: Pick<Complement, "owns" | "serves" | "dependsOn">,
 ): Record<string, unknown> {
   const merged = { ...payload };
   if (complement.owns.length > 0) merged.owns = unionOf(stringsOf(payload.owns), complement.owns);
   if (complement.serves.length > 0) {
     merged.serves = unionOf(stringsOf(payload.serves), complement.serves);
   }
+  const deps = complement.dependsOn ?? [];
+  if (deps.length > 0) merged.dependsOn = dependencyUnion(dependenciesOf(payload.dependsOn), deps);
   return merged;
 }
 
