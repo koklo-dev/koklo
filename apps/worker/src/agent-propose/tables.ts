@@ -29,6 +29,8 @@ const DATABASE_ID = componentIdOf(DATABASE_NAME);
 const DATA_ZONE = "Données";
 export const TABLES_RATIONALE = "Tables sans composant propriétaire.";
 const DATABASE_RESPONSIBILITY = "Garde les tables du modèle de données.";
+/** Rôles d'un composant, 20 au plus (B650). */
+export const ACTORS_MAX = 20;
 /** Responsabilité d'une proposition `specId` : jamais appliquée (B615 ; seuls `owns`, `serves` et `dependsOn` le sont). */
 const UPDATE_RESPONSIBILITY = "Mise à jour des liens du composant.";
 
@@ -38,15 +40,22 @@ const isPendingComponent = (proposal: PublishedProposal): boolean =>
 /**
  * Proposition `specId` d'un composant indexé (B615) : nom, type et zone de l'index, liens = index ∪ ajouts ; `dependsOn`
  * (index ∪ ajouts par cible, 30 au plus) seulement si des dépendances sont ajoutées (TK-114c, B636, B637). `undefined` si la
- * charge n'est pas valide (composant indexé incomplet) : la cible est alors ignorée.
+ * charge n'est pas valide (composant indexé incomplet) : la cible est alors ignorée. `actors` (index ∪ ajouts, 20 au plus)
+ * seulement si des rôles sont ajoutés (TK-114d, B653) : la mise à jour remplace la liste.
  */
 export function updateProposalOf(
   component: IndexedComponent,
-  add: { owns?: readonly string[]; serves?: readonly string[]; dependsOn?: readonly Dependency[] },
+  add: {
+    owns?: readonly string[];
+    serves?: readonly string[];
+    dependsOn?: readonly Dependency[];
+    actors?: readonly string[];
+  },
   rationale: string,
 ): Candidate | undefined {
   const zone = component.zone ?? DATA_ZONE;
   const added = add.dependsOn ?? [];
+  const actors = add.actors ?? [];
   const payload = {
     specId: component.specId,
     name: component.title,
@@ -56,6 +65,7 @@ export function updateProposalOf(
     owns: unionOf(component.owns, add.owns ?? []),
     serves: unionOf(component.serves, add.serves ?? []),
     ...(added.length > 0 ? { dependsOn: dependencyUnion(component.dependsOn ?? [], added) } : {}),
+    ...(actors.length > 0 ? { actors: unionOf(component.actors ?? [], actors, ACTORS_MAX) } : {}),
   };
   if (!componentProposalSchema.safeParse(payload).success) return undefined;
   return { kind: "component", title: component.title, rationale, zone, payload };

@@ -1779,7 +1779,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "3.13.0"
+    "version": "3.14.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -23052,6 +23052,73 @@
                                       ],
                                       "type": "object"
                                     },
+                                    "reprises": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "skipped": {
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "count": {
+                                                "maximum": 9007199254740991,
+                                                "minimum": 1,
+                                                "type": "integer"
+                                              },
+                                              "reason": {
+                                                "enum": [
+                                                  "too_long",
+                                                  "no_entry_app",
+                                                  "cap"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "reason",
+                                              "count"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          "maxItems": 3,
+                                          "type": "array"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "roles": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
                                     "tables": {
                                       "additionalProperties": false,
                                       "properties": {
@@ -23124,6 +23191,73 @@
                                       "type": "object"
                                     },
                                     "links": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "reprises": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "skipped": {
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "count": {
+                                                "maximum": 9007199254740991,
+                                                "minimum": 1,
+                                                "type": "integer"
+                                              },
+                                              "reason": {
+                                                "enum": [
+                                                  "too_long",
+                                                  "no_entry_app",
+                                                  "cap"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "reason",
+                                              "count"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          "maxItems": 3,
+                                          "type": "array"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "roles": {
                                       "additionalProperties": false,
                                       "properties": {
                                         "covered": {
@@ -28532,6 +28666,27 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "actorRelations": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "from": {
+                            "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          },
+                          "to": {
+                            "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "to"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "actors": {
                       "items": {
                         "additionalProperties": false,
@@ -28720,6 +28875,7 @@
                     "actors",
                     "outgoing",
                     "crossRelations",
+                    "actorRelations",
                     "truncated",
                     "commitSha"
                   ],
@@ -30185,6 +30341,14 @@
                         },
                         {
                           "properties": {
+                            "actors": {
+                              "items": {
+                                "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                                "type": "string"
+                              },
+                              "maxItems": 20,
+                              "type": "array"
+                            },
                             "clientSummary": {
                               "items": {
                                 "maxLength": 200,
@@ -30284,6 +30448,14 @@
                         },
                         {
                           "properties": {
+                            "actors": {
+                              "items": {
+                                "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                                "type": "string"
+                              },
+                              "maxItems": 20,
+                              "type": "array"
+                            },
                             "clientSummary": {
                               "items": {
                                 "maxLength": 200,

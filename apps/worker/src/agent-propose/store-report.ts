@@ -17,6 +17,7 @@ import type {
   PublishOutcome,
   ZonePublication,
 } from "./store.ts";
+import { ACTORS_MAX } from "./tables.ts";
 
 /**
  * Écritures du bilan d'un lancement (TK-114b, B617-B621), sorties de `AgentProposeStore` : prise d'un job de suite,
@@ -64,10 +65,13 @@ export async function claimSegment(
   return count === 0 ? { kind: "settled" } : { kind: "ready", launch, progress: progressOf(row) };
 }
 
-/** Liens ajoutés à une charge de composant, 200 au plus par liste (30 dépendances, réunies par cible) ; une liste sans ajout reste telle quelle. */
+/**
+ * Liens ajoutés à une charge de composant, 200 au plus par liste (30 dépendances, réunies par cible ; 20 rôles, TK-114d) ;
+ * une liste sans ajout reste telle quelle.
+ */
 export function mergeLinks(
   payload: Record<string, unknown>,
-  complement: Pick<Complement, "owns" | "serves" | "dependsOn">,
+  complement: Pick<Complement, "owns" | "serves" | "dependsOn" | "actors">,
 ): Record<string, unknown> {
   const merged = { ...payload };
   if (complement.owns.length > 0) merged.owns = unionOf(stringsOf(payload.owns), complement.owns);
@@ -76,6 +80,8 @@ export function mergeLinks(
   }
   const deps = complement.dependsOn ?? [];
   if (deps.length > 0) merged.dependsOn = dependencyUnion(dependenciesOf(payload.dependsOn), deps);
+  const actors = complement.actors ?? [];
+  if (actors.length > 0) merged.actors = unionOf(stringsOf(payload.actors), actors, ACTORS_MAX);
   return merged;
 }
 

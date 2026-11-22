@@ -53,7 +53,11 @@ export interface ComponentNode {
   zone: string | undefined;
   responsibility: string;
   dependsOn: { to: string; via: string; async: boolean }[];
+  /** Rôles `RL-` d'entrée, lus de `acteurs` (TK-114d, B650) : comptent pour une `app` seulement. */
+  actors: string[];
 }
+
+const ROLE = /^RL-[a-z0-9][a-z0-9-]*$/;
 
 export function componentNode(specId: string, data: unknown): ComponentNode {
   const json = record(data);
@@ -68,6 +72,7 @@ export function componentNode(specId: string, data: unknown): ComponentNode {
       via,
       async: async === true,
     })),
+    actors: matching(json.acteurs, ROLE),
   };
 }
 
@@ -160,6 +165,7 @@ export function pendingComponent(payload: unknown): Component | undefined {
     responsabilite: text(json.responsibility),
     possede: matching(json.owns, TABLE),
     sert: matching(json.serves, FEATURE),
+    acteurs: matching(json.actors, ROLE),
     depend_de: list(json.dependsOn).flatMap((entry) => {
       const dependency = record(entry);
       const to = text(dependency.to);

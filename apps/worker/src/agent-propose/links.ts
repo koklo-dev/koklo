@@ -37,7 +37,7 @@ export function linksOf(raw: unknown): ProposedLink[] {
 }
 
 /** Graphe synchrone des dépendances connues, complété au fil des liens retenus. */
-const graphOf = (dependencies: ReadonlyMap<string, readonly Dependency[]>) =>
+export const graphOf = (dependencies: ReadonlyMap<string, readonly Dependency[]>) =>
   synchronousGraph(
     [...dependencies].map(([id, deps]) => ({
       id,

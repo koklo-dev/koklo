@@ -23,6 +23,8 @@ interface ComponentPayload {
   responsibility?: string;
   owns?: string[];
   serves?: string[];
+  /** Rôles d'entrée (TK-114d, contrat 3.14.0) ; remplace la liste. */
+  actors?: string[];
   dependsOn?: { to: string; via: string; async?: boolean }[];
   decisions?: string[];
   /** Phrases du client ; une liste vide retire le résumé. */
@@ -57,6 +59,7 @@ function overlay(base: Component, payload: ComponentPayload): Component {
   if (payload.responsibility !== undefined) next.responsabilite = payload.responsibility;
   if (payload.owns !== undefined) next.possede = payload.owns;
   if (payload.serves !== undefined) next.sert = payload.serves;
+  if (payload.actors !== undefined) next.acteurs = payload.actors;
   if (payload.decisions !== undefined) next.decisions = payload.decisions;
   if (payload.dependsOn !== undefined) {
     next.depend_de = payload.dependsOn.map((dependency) => ({
@@ -101,6 +104,7 @@ export function applyComponent(
       responsabilite: "",
       possede: [],
       sert: [],
+      acteurs: [],
       depend_de: [],
       decisions: [],
     };

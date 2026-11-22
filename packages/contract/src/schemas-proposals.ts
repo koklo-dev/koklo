@@ -133,12 +133,24 @@ const coverageCountSchema = z.strictObject({
   covered: z.number().int().min(0),
   total: z.number().int().min(0),
 });
+/** Motifs fermés d'un flux direct non repris (TK-114d, B655) : trop long, sans application d'entrée, au-delà du plafond. */
+export const repriseSkipReasonSchema = z.enum(["too_long", "no_entry_app", "cap"]);
+const reprisesSchema = coverageCountSchema.extend({
+  skipped: z
+    .array(z.strictObject({ reason: repriseSkipReasonSchema, count: z.number().int().min(1) }))
+    .max(3)
+    .optional(),
+});
 const launchCoverageSchema = z.strictObject({
   features: coverageCountSchema,
   flows: coverageCountSchema,
   tables: coverageCountSchema,
   /** Composants non externes reliés à un autre composant (TK-114c, contrat 3.13.0, B633) ; absent avant TK-114c. */
   links: coverageCountSchema.optional(),
+  /** Rôles avec une application d'entrée (TK-114d, contrat 3.14.0, B651) ; absent avant TK-114d. */
+  roles: coverageCountSchema.optional(),
+  /** Flux directs de l'index repris par le lancement (B660) ; `skipped` : motifs des flux non repris. */
+  reprises: reprisesSchema.optional(),
 });
 
 /**

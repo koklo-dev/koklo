@@ -199,6 +199,7 @@ describe("readFrozenDossier", () => {
 });
 
 /** TK-111 (B512) : ce que l'agent lit de l'architecture actuelle et des exigences connues ; titres seulement, jamais le contenu. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même lecture, un test par comportement
 describe("currentArchitecture", () => {
   const head = {
     repo: { id: "r-1", defaultBranch: "main" },
@@ -219,6 +220,7 @@ describe("currentArchitecture", () => {
             responsabilite: "secret interne",
             possede: ["T-user", 3],
             sert: ["F-001"],
+            acteurs: ["RL-client", "C-x", 3],
             depend_de: [
               { vers: "C-db", via: "SQL" },
               { vers: "C-bus", via: "AMQP", mode: "asynchrone" },
@@ -249,17 +251,85 @@ describe("currentArchitecture", () => {
           type: "service",
           owns: ["T-user"],
           serves: ["F-001"],
+          actors: ["RL-client"],
           dependsOn: [
             { to: "C-db", via: "SQL" },
             { to: "C-bus", via: "AMQP", async: true },
           ],
         },
       ],
-      archflows: [{ specId: "P-reserver", title: "P-reserver" }],
+      archflows: [
+        {
+          specId: "P-reserver",
+          title: "P-reserver",
+          participants: [],
+          messages: [],
+          features: [],
+          rules: [],
+          decisions: [],
+        },
+      ],
       decisions: [{ specId: "ADR-001", title: "Base relationnelle" }],
       nfr: ["NFR-001", "NFR-002"],
     });
     expect(JSON.stringify(result)).not.toContain("secret interne");
+  });
+
+  it("TK-114d (B655) : flux techniques avec participants et messages en forme de proposition, éléments illisibles ignorés", async () => {
+    const { typed } = fakeClient({
+      ...head,
+      entities: [
+        {
+          kind: "archflow",
+          specId: "P-reserver",
+          data: {
+            titre: "P-reserver",
+            participants: ["RL-client", "C-api", 4],
+            messages: [
+              { de: "RL-client", vers: "C-api", texte: "Réserve", retour: "Réservé" },
+              {
+                bloc: "alt",
+                libelle: "Complet",
+                messages: [
+                  { de: "C-api", vers: "RL-client", texte: "Refuse", erreur: "Complet" },
+                  "x",
+                ],
+              },
+              { bloc: "separateur", libelle: "Plus tard" },
+              { de: "C-api", texte: "sans cible" },
+              { bloc: "boucle", libelle: "inconnu" },
+            ],
+            fonctionnalites: ["F-001"],
+            regles: ["R-001"],
+            decisions: ["ADR-001"],
+          },
+        },
+      ],
+    });
+    const { archflows } = await currentArchitecture(typed, PROJECT);
+    expect(
+      {
+        archflows: [
+          {
+            specId: "P-reserver",
+            title: "P-reserver",
+            participants: ["RL-client", "C-api"],
+            messages: [
+              { from: "RL-client", to: "C-api", text: "Réserve", reply: "Réservé" },
+              {
+                block: "alt",
+                label: "Complet",
+                messages: [{ from: "C-api", to: "RL-client", text: "Refuse", error: "Complet" }],
+              },
+              { block: "separator", label: "Plus tard" },
+            ],
+            features: ["F-001"],
+            rules: ["R-001"],
+            decisions: ["ADR-001"],
+          },
+        ],
+      }.archflows,
+    ).toEqual(archflows);
   });
 
   it("sans tête de spec : rien", async () => {

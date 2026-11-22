@@ -360,4 +360,41 @@ describe("TK-114b (contrat 3.12.0, B620) : launch.report, bilan du lancement de 
     };
     expect(await valid(negative)).toBe(false);
   });
+
+  it("TK-114d (contrat 3.14.0, B660) : roles et reprises facultatifs, motifs fermés, 3 au plus", async () => {
+    const roles = { covered: 5, total: 5 };
+    const reprises = {
+      covered: 20,
+      total: 22,
+      skipped: [
+        { reason: "too_long", count: 1 },
+        { reason: "no_entry_app", count: 1 },
+      ],
+    };
+    const report = {
+      ...REPORT,
+      coverageBefore: { ...REPORT.coverageBefore, roles: { covered: 0, total: 5 } },
+      coverageAfter: { ...REPORT.coverageAfter, roles, reprises },
+    };
+    expect(await valid(report)).toBe(true);
+    const kept = await parsed(output("proposal.list"), page({ ...LAUNCH, report }));
+    expect(kept?.launch).toMatchObject({ report });
+    const coverageWith = (extra: object) => ({
+      ...REPORT,
+      coverageAfter: { ...REPORT.coverageAfter, ...extra },
+    });
+    expect(await valid(coverageWith({ reprises: { covered: 0, total: 0 } }))).toBe(true);
+    expect(
+      await valid(
+        coverageWith({ reprises: { ...reprises, skipped: [{ reason: "autre", count: 1 }] } }),
+      ),
+    ).toBe(false);
+    expect(
+      await valid(
+        coverageWith({ reprises: { ...reprises, skipped: [{ reason: "cap", count: 0 }] } }),
+      ),
+    ).toBe(false);
+    const four = ["too_long", "no_entry_app", "cap", "cap"].map((reason) => ({ reason, count: 1 }));
+    expect(await valid(coverageWith({ reprises: { ...reprises, skipped: four } }))).toBe(false);
+  });
 });

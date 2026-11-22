@@ -37,10 +37,17 @@ const slugOf = (text: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-/** Identifiant du composant indexé que la proposition met à jour (B615, posé par le worker seul), sinon `undefined`. */
-const specIdOf = ({ content }: ProposalOutput): string | undefined => {
+/**
+ * Identifiant indexé que la proposition met à jour, posé par le worker seul : composant `C-` (B615) ou flux repris `P-`
+ * (B659) ; sinon `undefined`.
+ */
+const SPEC_ID: Record<string, RegExp> = {
+  component: /^C-[a-z0-9][a-z0-9-]*$/,
+  archflow: /^P-[a-z0-9][a-z0-9-]*$/,
+};
+const specIdOf = ({ kind, content }: ProposalOutput): string | undefined => {
   const specId = str(content.specId);
-  return /^C-[a-z0-9][a-z0-9-]*$/.test(specId) ? specId : undefined;
+  return SPEC_ID[kind]?.test(specId) ? specId : undefined;
 };
 
 const dependenciesOf = (content: Content) =>
@@ -55,13 +62,14 @@ function componentOperation(proposal: ProposalOutput): Operation {
   const specId = specIdOf(proposal);
   const dependsOn = dependenciesOf(content);
   // Mise à jour d'un composant indexé : les liens seuls, complets (index ∪ ajouts), jamais le nom ni la responsabilité ;
-  // `dependsOn` seulement quand la charge en porte (B637).
+  // `dependsOn` et `actors` seulement quand la charge en porte (B637, B659).
   if (specId) {
     return {
       kind: "component.update",
       specId,
       owns: strings(content.owns),
       serves: strings(content.serves),
+      ...optional("actors", strings(content.actors)),
       ...optional("dependsOn", dependsOn),
     };
   }
@@ -73,25 +81,28 @@ function componentOperation(proposal: ProposalOutput): Operation {
     responsibility: str(content.responsibility).trim(),
     ...optional("owns", strings(content.owns)),
     ...optional("serves", strings(content.serves)),
+    ...optional("actors", strings(content.actors)),
     ...optional("dependsOn", dependsOn),
     ...optional("decisions", strings(content.decisions)),
     ...optional("clientSummary", strings(content.clientSummary)),
   };
 }
 
-function archflowOperation({ content }: ProposalOutput): Operation {
-  return {
-    kind: "archflow.create",
-    flow: str(content.flow),
+type FlowMessages = Extract<Operation, { kind: "archflow.create" }>["messages"];
+
+/** Flux d'un parcours ; reprise d'un flux indexé (`specId` `P-`, B655, B659) : `archflow.update` des mêmes champs. */
+function archflowOperation(proposal: ProposalOutput): Operation {
+  const { content } = proposal;
+  const fields = {
     participants: strings(content.participants),
-    messages: (Array.isArray(content.messages) ? content.messages : []) as Extract<
-      Operation,
-      { kind: "archflow.create" }
-    >["messages"],
+    messages: (Array.isArray(content.messages) ? content.messages : []) as FlowMessages,
     ...optional("features", strings(content.features)),
     ...optional("rules", strings(content.rules)),
     ...optional("decisions", strings(content.decisions)),
   };
+  const specId = specIdOf(proposal);
+  if (specId) return { kind: "archflow.update", specId, ...fields };
+  return { kind: "archflow.create", flow: str(content.flow), ...fields };
 }
 
 function adrOperation({ content }: ProposalOutput): Operation {
@@ -147,7 +158,7 @@ export function architectureRefOf(proposal: ProposalOutput): string {
   if (proposal.kind === "component") {
     return specIdOf(proposal) ?? `C-${slugOf(str(content.name)) || "composant"}`;
   }
-  if (proposal.kind === "archflow") return str(content.flow) || "P-flux";
+  if (proposal.kind === "archflow") return specIdOf(proposal) ?? (str(content.flow) || "P-flux");
   if (proposal.kind === "adr") {
     return `ADR-${String(proposal.position + 1).padStart(RANK_WIDTH, "0")}`;
   }
@@ -172,7 +183,8 @@ export function architectureSubtitleOf(proposal: ProposalOutput): string {
     return `${kind} · zone ${zone}`;
   }
   if (proposal.kind === "archflow") {
-    return `Flux · ${plural(messageCount(content.messages), "message", "messages")}`;
+    const label = specIdOf(proposal) ? "Flux repris" : "Flux";
+    return `${label} · ${plural(messageCount(content.messages), "message", "messages")}`;
   }
   if (proposal.kind === "adr") {
     const alternatives = records(content.alternatives).length;

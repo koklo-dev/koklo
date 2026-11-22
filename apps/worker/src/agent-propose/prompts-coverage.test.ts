@@ -13,6 +13,10 @@ const input = {
     features: [{ specId: "F-007", title: "Exporter les factures" }],
     flows: [{ specId: "P-payer", title: "Payer une commande" }],
     components: [{ specId: "C-seul", title: "Isolé", zone: "Bord", type: "store" }],
+    roles: [
+      { specId: "RL-invite", title: "Invité", calls: ["C-api", "C-base"] },
+      { specId: "RL-seul", title: "Seul", calls: [] },
+    ],
   },
   components: [{ specId: "C-api", title: "API", zone: "Noyau", type: "service" }],
   roles: [{ specId: "RL-client", title: "Client" }],
@@ -53,6 +57,18 @@ describe("coveragePrompt", () => {
     expect(user).toContain("origin=user-input");
     expect(user).toContain("Components without any dependency\nC-seul | Isolé | Bord | store");
     expect(user.match(new RegExp(`nonce=${NONCE}>>>`, "g"))?.length).toBeGreaterThanOrEqual(9);
+  });
+
+  it("TK-114d (B653) : consigne rôle → application d'abord, entries et actors ; rôles sans application en donnée", () => {
+    const { system, user } = coveragePrompt(NONCE, input);
+    expect(system).toContain("an entries array");
+    expect(system).toContain("an actors array");
+    expect(system).toContain("a role must first reach an application");
+    expect(system).toContain("one application may gather several roles");
+    for (const data of ["RL-invite", "Invité", "C-base"]) expect(system, data).not.toContain(data);
+    expect(user).toContain(
+      "Roles without an entry application\nRL-invite | Invité | C-api, C-base\nRL-seul | Seul | none",
+    );
   });
 
   it("la responsabilité et les liens d'un composant indexé n'entrent jamais ; sans consigne : pas de bloc user-input", () => {

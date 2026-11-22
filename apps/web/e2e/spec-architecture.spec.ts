@@ -124,9 +124,10 @@ VIEWS.push(
     visible: async (page) => {
       await generating(page);
       await expect(
-        page
-          .getByRole("status")
-          .filter({ hasText: "Zones traitées 4/9 · écartées 2 · couverture 38/174" }),
+        page.getByRole("status").filter({
+          hasText:
+            "Zones traitées 4/9 · écartées 2 · couverture 38/174 · rôles avec application 3/5 · flux repris 10/22",
+        }),
       ).toBeVisible();
     },
   },
@@ -141,6 +142,11 @@ VIEWS.push(
         "Bilan du lancement · zones traitées 9/9 · écartées 2 · couverture 174/174 · terminé",
       );
       await expect(note).toContainText("Zones écartées : réponse coupée (1), réponse invalide (1)");
+      // TK-114d (B661, B659) : ligne des rôles, proposition « Flux repris ».
+      await expect(note).toContainText(
+        "Rôles avec application 5/5 · flux repris 22/22 · avant : 0/5",
+      );
+      await expect(page.getByText("Flux repris · 2 messages").first()).toBeVisible();
       await expect(page.getByText("Avertissements d'architecture", { exact: false })).toBeVisible();
     },
   },
@@ -152,6 +158,9 @@ VIEWS.push(
     visible: async (page) => {
       await expect(page.getByRole("note")).toContainText(
         "zones traitées 9/9 · écartées 0 · couverture 151/174 · arrêté au délai",
+      );
+      await expect(page.getByRole("note")).toContainText(
+        "Rôles avec application 4/5 · flux repris 16/22 · avant : 0/5 · non repris : trop long (1), sans application d'entrée (2), au-delà du plafond (3)",
       );
     },
   },

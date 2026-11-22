@@ -4,7 +4,15 @@ import {
   type ArchitectureZone,
   type ArchitectureZones,
 } from "@koklo/contract";
-import { ZONE_ICON_DEFAULT, type ZoneStyle } from "@koklo/schema";
+import {
+  type Exchange,
+  entryAppsOf,
+  exchangesOf,
+  type FlowItemInput,
+  roleSideOf,
+  ZONE_ICON_DEFAULT,
+  type ZoneStyle,
+} from "@koklo/schema";
 import { NO_ZONE_ID, NO_ZONE_NAME, zoneIdOf } from "../spec-data/data-zones.ts";
 import { isRecord, texts } from "../spec-read/entity-values.ts";
 import { type ComponentNode, componentNode } from "./architecture-values.ts";
@@ -13,23 +21,40 @@ import { type ComponentNode, componentNode } from "./architecture-values.ts";
  * Zones de l'architecture (TK-112, B546) : calcul pur sur les composants indexés de la tête. Une zone est la valeur `zone`
  * des composants (libellé libre, identifiant par `zoneIdOf` comme les Données) ; les composants sans zone forment « Sans
  * zone », en dernier. Un lien entre deux zones compte les paires de composants reliés par `depend_de`, une fois par paire quel
- * que soit le sens ou le canal. Les acteurs d'une zone sont les rôles `RL-` qui participent à un flux contenant l'un de ses
- * composants.
+ * que soit le sens ou le canal. Les acteurs d'une zone (TK-114d, B654) sont les `acteurs` de ses applications, les rôles qui
+ * échangent avec l'une d'elles dans un flux, et les rôles des flux qui touchent ses composants seulement si le rôle n'a aucune
+ * application d'entrée.
  */
 export type ArchNode = ComponentNode;
 
 export const archNodes = (rows: readonly { specId: string; data: unknown }[]): ArchNode[] =>
   rows.map(({ specId, data }) => componentNode(specId, data));
 
-/** Participants d'un flux indexé (lecture tolérante : texte seulement). */
+/** Participants et messages d'un flux indexé (lecture tolérante : texte seulement ; messages absents des fixtures). */
 export interface FlowParticipants {
   participants: string[];
+  messages?: FlowItemInput[];
+}
+
+/** Messages `de`/`vers` d'un flux, blocs `alt` compris ; un élément illisible est ignoré. */
+function fileItemsOf(value: unknown): FlowItemInput[] {
+  return (Array.isArray(value) ? value : []).flatMap((item): FlowItemInput[] => {
+    if (!isRecord(item)) return [];
+    if (typeof item.bloc === "string")
+      return [{ bloc: item.bloc, messages: fileItemsOf(item.messages) }];
+    return typeof item.de === "string" && typeof item.vers === "string"
+      ? [{ de: item.de, vers: item.vers }]
+      : [];
+  });
 }
 
 export const flowParticipants = (
   rows: readonly { specId: string; data: unknown }[],
 ): FlowParticipants[] =>
-  rows.map(({ data }) => ({ participants: texts(isRecord(data) ? data.participants : undefined) }));
+  rows.map(({ data }) => {
+    const json = isRecord(data) ? data : {};
+    return { participants: texts(json.participants), messages: fileItemsOf(json.messages) };
+  });
 
 interface Group {
   id: string;
@@ -55,13 +80,64 @@ function groupsOf(nodes: readonly ArchNode[]): Group[] {
 
 const isActor = (id: string): boolean => id.startsWith("RL-");
 
-/** Rôles (`RL-`) des flux qui contiennent un composant du groupe, dans l'ordre de première apparition. */
-function actorIdsOf(group: Group, flows: readonly FlowParticipants[]): string[] {
+/** Ce que les acteurs d'une zone lisent : les applications d'entrée de chaque rôle et les échanges des flux. */
+export interface ActorContext {
+  readonly flows: readonly FlowParticipants[];
+  readonly entryApps: ReadonlyMap<string, readonly string[]>;
+  readonly exchanges: readonly Exchange[];
+}
+
+export function actorContextOf(
+  nodes: readonly ArchNode[],
+  flows: readonly FlowParticipants[],
+): ActorContext {
+  const roleFlows = flows.map((flow, i) => ({ id: String(i), messages: flow.messages ?? [] }));
+  return {
+    flows,
+    entryApps: entryAppsOf(
+      nodes.map(({ id, type, actors }) => ({ id, type, acteurs: actors.filter(isActor) })),
+      roleFlows,
+    ),
+    exchanges: roleFlows.flatMap((flow) => exchangesOf(flow.messages)),
+  };
+}
+
+/** Rôle → application de la zone : `acteurs` de l'application, puis rôles qui échangent avec elle (B654). */
+function actorRelationsOf(
+  members: readonly ArchNode[],
+  context: ActorContext,
+): ArchitectureZone["actorRelations"] {
+  const apps = members.filter((member) => member.type === "app");
+  const appIds = new Set(apps.map((app) => app.id));
+  const pairs = [
+    ...apps.flatMap((app) =>
+      app.actors.filter(isActor).map((role) => ({ from: role, to: app.id })),
+    ),
+    ...context.exchanges.flatMap((exchange) => {
+      const side = roleSideOf(exchange);
+      return side !== undefined && appIds.has(side.component)
+        ? [{ from: side.role, to: side.component }]
+        : [];
+    }),
+  ];
+  const seen = new Set<string>();
+  return pairs.filter((pair) => {
+    const key = `${pair.from}|${pair.to}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Acteurs du groupe (B654), dans l'ordre de première apparition : ceux de ses applications, puis les rôles sans application. */
+function actorIdsOf(group: Group, context: ActorContext): string[] {
   const members = new Set(group.members.map((member) => member.id));
-  const actors = new Set<string>();
-  for (const flow of flows) {
+  const actors = new Set(actorRelationsOf(group.members, context).map((pair) => pair.from));
+  for (const flow of context.flows) {
     if (!flow.participants.some((id) => members.has(id))) continue;
-    for (const id of flow.participants) if (isActor(id)) actors.add(id);
+    for (const id of flow.participants) {
+      if (isActor(id) && (context.entryApps.get(id) ?? []).length === 0) actors.add(id);
+    }
   }
   return [...actors];
 }
@@ -117,11 +193,12 @@ export function buildArchZones(
   const groups = groupsOf(nodes);
   const links = crossLinks(nodes);
   const order = groups.map((group) => group.id);
+  const context = actorContextOf(nodes, flows);
   return {
     componentCount: nodes.length,
     zones: groups.map((group) => ({
       ...summaryOf(group, styles),
-      actorCount: actorIdsOf(group, flows).length,
+      actorCount: actorIdsOf(group, context).length,
       preview: group.members.slice(0, ARCHITECTURE_ZONE_PREVIEW_MAX).map((member) => member.name),
       links: linksOf(group.id, links, order),
     })),
@@ -136,6 +213,8 @@ export interface ArchZoneView {
   /** Liens entre un composant rendu et un composant d'une autre zone, dans les deux sens (TK-114c, B640). */
   crossRelations: ArchitectureZone["crossRelations"];
   actors: ArchitectureZone["actors"];
+  /** Rôle → application rendue de la zone (TK-114d, B654). */
+  actorRelations: ArchitectureZone["actorRelations"];
   outgoing: ArchitectureZone["outgoing"];
   truncated: boolean;
 }
@@ -196,6 +275,7 @@ export function buildArchZone(
     crossLinks(nodes),
     groups.map((entry) => entry.id),
   );
+  const context = actorContextOf(nodes, flows);
   return {
     zone: summaryOf(group, styles),
     members,
@@ -203,10 +283,11 @@ export function buildArchZone(
       member.dependsOn.filter(({ to }) => shown.has(to)).map((dep) => relationOf(member.id, dep)),
     ),
     crossRelations: crossRelationsOf(nodes, members, id),
-    actors: actorIdsOf(group, flows).map((actor) => ({
+    actors: actorIdsOf(group, context).map((actor) => ({
       id: actor,
       name: roleNames.get(actor) ?? actor,
     })),
+    actorRelations: actorRelationsOf(members, context),
     outgoing: outgoing.map(({ to, count }) => ({ zone: to, count })),
     truncated: group.members.length > members.length,
   };

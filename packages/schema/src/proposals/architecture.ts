@@ -48,6 +48,8 @@ export const componentProposalSchema = z
     responsibility: oneLine(500),
     owns: z.array(link(PATTERNS.table)).max(LINKS_MAX).optional(),
     serves: z.array(link(PATTERNS.feature)).max(LINKS_MAX).optional(),
+    /** Rôles qui entrent par ce composant (TK-114d, B650) : `app` seulement, le tri du worker retire le reste. */
+    actors: z.array(link(PATTERNS.role)).max(20).optional(),
     dependsOn: z.array(componentDependencySchema).max(30).optional(),
     decisions: z.array(link(PATTERNS.adr)).max(20).optional(),
     clientSummary: z.array(oneLine(200)).max(12).optional(),
@@ -72,8 +74,13 @@ const altBlock = z
   .strict();
 const separator = z.object({ block: z.literal("separator"), label: oneLine(200) }).strict();
 
+/**
+ * `specId` (TK-114d, B655) : posé par le code seul sur un flux repris (identifiant du flux indexé qu'il remplace) ; le schéma
+ * envoyé au modèle l'omet et le tri du worker écarte toute sortie qui en porte un.
+ */
 export const archflowProposalSchema = z
   .object({
+    specId: link(PATTERNS.flow).optional(),
     flow: link(PATTERNS.flow),
     participants: z.array(participant).min(2).max(12),
     messages: z

@@ -84,4 +84,14 @@ describe("launchView : bilan du lancement (TK-114b)", () => {
     expect(view.report?.coverageAfter).toEqual(links);
     expect(view.report?.coverageBefore).toEqual(COVERAGE);
   });
+
+  it("TK-114d (contrat 3.14.0, B660) : rôles et flux repris écrits par le worker rendus tels quels", () => {
+    const after = {
+      ...COVERAGE,
+      roles: { covered: 5, total: 5 },
+      reprises: { covered: 21, total: 22, skipped: [{ reason: "too_long", count: 1 }] },
+    };
+    const view = launchView(launch({ progress: { ...PROGRESS, coverageAfter: after } }));
+    expect(view.report?.coverageAfter).toEqual(after);
+  });
 });

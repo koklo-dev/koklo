@@ -402,6 +402,25 @@ function architectureItems(): Item[] {
   ];
 }
 
+/** TK-114d (B655, B659) : reprise d'un flux indexé, passée par l'application d'entrée du rôle (`specId` posé par le code). */
+const reprise = (): Item => ({
+  ...flow(10, "Annuler ou déplacer", "P-annuler", [
+    { from: "RL-client", to: "C-web", text: "annule la réservation" },
+    { from: "C-web", to: "C-api", text: "annule la réservation", reply: "annulée" },
+  ]),
+  zone: "Flux techniques",
+  rationale: "Flux repris pour passer par l'application d'entrée.",
+  content: {
+    specId: "P-annuler",
+    flow: "P-annuler",
+    participants: ["RL-client", "C-web", "C-api"],
+    messages: [
+      { from: "RL-client", to: "C-web", text: "annule la réservation" },
+      { from: "C-web", to: "C-api", text: "annule la réservation", reply: "annulée" },
+    ],
+  },
+});
+
 /** 66 propositions : 1 section, 40 composants, 15 flux, 10 décisions (au-delà de 30 : un groupe par type). */
 function architectureVolumeItems(): Item[] {
   const base = architectureItems();
@@ -437,8 +456,17 @@ let launchStatus: "queued" | "running" | "done" | "failed" = "done";
 let report: Record<string, unknown> | undefined;
 
 const cover = (covered: number, total: number) => ({ covered, total });
-const BEFORE = { features: cover(0, 174), flows: cover(0, 22), tables: cover(0, 48) };
-/** Bilans du lancement de l'Architecture (contrat 3.12.0, TK-114b) : que des nombres et des motifs fermés. */
+const BEFORE = {
+  features: cover(0, 174),
+  flows: cover(0, 22),
+  tables: cover(0, 48),
+  roles: cover(0, 5),
+  reprises: cover(0, 22),
+};
+/**
+ * Bilans du lancement de l'Architecture (contrat 3.12.0, TK-114b ; rôles et reprises 3.14.0, TK-114d) : que des nombres
+ * et des motifs fermés.
+ */
 const REPORTS: Partial<Record<ProposalsMode, Record<string, unknown>>> = {
   architectureGeneratingReport: {
     zonesRequested: 9,
@@ -446,7 +474,13 @@ const REPORTS: Partial<Record<ProposalsMode, Record<string, unknown>>> = {
     zonesDiscarded: 2,
     discardReasons: [{ reason: "truncated", count: 2 }],
     coverageBefore: BEFORE,
-    coverageAfter: { features: cover(38, 174), flows: cover(2, 22), tables: cover(10, 48) },
+    coverageAfter: {
+      features: cover(38, 174),
+      flows: cover(2, 22),
+      tables: cover(10, 48),
+      roles: cover(3, 5),
+      reprises: cover(10, 22),
+    },
     coverageCalls: 0,
   },
   architectureReport: {
@@ -458,7 +492,13 @@ const REPORTS: Partial<Record<ProposalsMode, Record<string, unknown>>> = {
       { reason: "output_invalid", count: 1 },
     ],
     coverageBefore: BEFORE,
-    coverageAfter: { features: cover(174, 174), flows: cover(22, 22), tables: cover(48, 48) },
+    coverageAfter: {
+      features: cover(174, 174),
+      flows: cover(22, 22),
+      tables: cover(48, 48),
+      roles: cover(5, 5),
+      reprises: cover(22, 22),
+    },
     coverageCalls: 12,
     stopReason: "completed",
   },
@@ -468,7 +508,20 @@ const REPORTS: Partial<Record<ProposalsMode, Record<string, unknown>>> = {
     zonesDiscarded: 0,
     discardReasons: [],
     coverageBefore: BEFORE,
-    coverageAfter: { features: cover(151, 174), flows: cover(19, 22), tables: cover(48, 48) },
+    coverageAfter: {
+      features: cover(151, 174),
+      flows: cover(19, 22),
+      tables: cover(48, 48),
+      roles: cover(4, 5),
+      reprises: {
+        ...cover(16, 22),
+        skipped: [
+          { reason: "too_long", count: 1 },
+          { reason: "no_entry_app", count: 2 },
+          { reason: "cap", count: 3 },
+        ],
+      },
+    },
     coverageCalls: 18,
     stopReason: "deadline",
   },
@@ -492,7 +545,8 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   if (mode === "mixed") items = mixed();
   if (mode === "data") items = dataItems();
   if (mode === "dataVolume") items = dataVolumeItems();
-  if (mode === "architecture" || mode === "architectureReport") items = architectureItems();
+  if (mode === "architecture") items = architectureItems();
+  if (mode === "architectureReport") items = [...architectureItems(), reprise()];
   if (mode === "architectureDeadline") {
     items = architectureItems();
     launchStatus = "failed";

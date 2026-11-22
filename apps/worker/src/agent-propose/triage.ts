@@ -7,6 +7,7 @@ import {
   architectureKnown,
   isArchitectureKind,
   rememberAccepted,
+  withKnownActors,
   withKnownDependencies,
   withoutOwnedTables,
 } from "./triage-architecture.ts";
@@ -149,10 +150,15 @@ function candidateOf(entry: unknown, context: TriageContext): Candidate | undefi
   const asKind = kind as AgentProposalKind;
   const parsed = PROPOSAL_SCHEMAS[asKind].safeParse(content);
   if (!parsed.success) return undefined;
-  // `specId` n'est posé que par le code (B615) : une sortie du modèle qui en porte un est écartée.
-  if (asKind === "component" && "specId" in parsed.data) return undefined;
+  // `specId` n'est posé que par le code (B615, B655) : une sortie du modèle qui en porte un est écartée.
+  if ((asKind === "component" || asKind === "archflow") && "specId" in parsed.data)
+    return undefined;
   const owned = withoutOwnedTables(asKind, parsed.data as Record<string, unknown>, context.arch);
-  const payload = withKnownDependencies(asKind, owned, context.arch);
+  const payload = withKnownActors(
+    asKind,
+    withKnownDependencies(asKind, owned, context.arch),
+    context.arch,
+  );
   const title = titleFor(asKind, payload, context);
   return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
 }

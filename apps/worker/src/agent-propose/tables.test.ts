@@ -170,4 +170,17 @@ describe("updateProposalOf, dépendances", () => {
       "dependsOn",
     );
   });
+
+  it("TK-114d (B653) : actors = index ∪ ajouts, 20 au plus ; sans rôle ajouté : actors omis", () => {
+    const app = indexed("C-web", { type: "app", actors: ["RL-a"] });
+    const roles = Array.from({ length: 25 }, (_, i) => `RL-r${i}`);
+    const update = updateProposalOf(app, { actors: ["RL-a", ...roles] }, "Rôles");
+    const actors = update?.payload.actors as string[];
+    expect(actors).toHaveLength(20);
+    expect(actors[0]).toBe("RL-a");
+    expect(componentProposalSchema.safeParse(update?.payload).success).toBe(true);
+    expect(updateProposalOf(app, { serves: ["F-001"] }, "Liens")?.payload).not.toHaveProperty(
+      "actors",
+    );
+  });
 });

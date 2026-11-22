@@ -144,3 +144,63 @@ describe("TK-114c : bilan des liens (contrat 3.13.0)", () => {
     expect(noBefore?.lines[1]).not.toContain("0/48,");
   });
 });
+
+describe("TK-114d (B661) : rôles avec application et flux repris (contrat 3.14.0)", () => {
+  const withRoles = (
+    coverage: typeof REPORT.coverageAfter,
+    roles: number,
+    reprises: Record<string, unknown>,
+  ) => ({ ...coverage, roles: count(roles, 5), reprises: { total: 22, ...reprises } });
+
+  it("Génération : « · rôles avec application X/Y · flux repris A/B » après la couverture", () => {
+    const running = launch("running", {
+      zonesDone: 2,
+      zonesDiscarded: 2,
+      coverageAfter: withRoles(
+        { features: count(38, 174), flows: count(0, 22), tables: count(0, 48) },
+        3,
+        { covered: 10 },
+      ) as never,
+      stopReason: undefined,
+    });
+    expect(launchDetailOf(running)).toBe(
+      "Zones traitées 4/9 · écartées 2 · couverture 38/174 · rôles avec application 3/5 · flux repris 10/22",
+    );
+  });
+
+  it("Relecture : ligne des rôles après la couverture, « avant : » des rôles", () => {
+    const report = launchReportOf(
+      launch("done", {
+        coverageBefore: withRoles(REPORT.coverageBefore, 0, { covered: 0 }) as never,
+        coverageAfter: withRoles(REPORT.coverageAfter, 5, { covered: 22 }) as never,
+      }),
+    );
+    expect(report?.lines).toEqual([
+      "Bilan du lancement · zones traitées 9/9 · écartées 2 · couverture 174/174 · terminé",
+      "Fonctionnalités servies 174/174 · parcours détaillés 22/22 · tables rattachées 48/48 · avant : 0/174, 0/22, 0/48",
+      "Rôles avec application 5/5 · flux repris 22/22 · avant : 0/5",
+      "Zones écartées : réponse coupée (1), réponse invalide (1)",
+    ]);
+  });
+
+  it("motifs des flux non repris : « · non repris : trop long (1), sans application d'entrée (2), au-delà du plafond (3) »", () => {
+    const skipped = [
+      { reason: "too_long", count: 1 },
+      { reason: "no_entry_app", count: 2 },
+      { reason: "cap", count: 3 },
+    ];
+    const report = launchReportOf(
+      launch("done", {
+        coverageAfter: withRoles(REPORT.coverageAfter, 4, { covered: 16, skipped }) as never,
+      }),
+    );
+    expect(report?.lines[2]).toBe(
+      "Rôles avec application 4/5 · flux repris 16/22 · non repris : trop long (1), sans application d'entrée (2), au-delà du plafond (3)",
+    );
+  });
+
+  it("lancement d'avant TK-114d (sans roles) : rien de plus", () => {
+    expect(launchReportOf(launch("done"))?.lines).toHaveLength(3);
+    expect(launchDetailOf(launch("running"))).not.toContain("rôles");
+  });
+});

@@ -2,6 +2,8 @@ import type { LaunchReport, ProposalListOutput } from "@koklo/contract";
 
 type Launch = NonNullable<ProposalListOutput["launch"]>;
 type Count = { covered: number; total: number };
+type Coverage = NonNullable<LaunchReport["coverageAfter"]>;
+type RepriseSkip = NonNullable<NonNullable<Coverage["reprises"]>["skipped"]>[number];
 
 /** Libellés des motifs de zone écartée (DESIGN §5.25, B619) : jamais le texte du fournisseur. */
 const DISCARD_LABELS: Record<LaunchReport["discardReasons"][number]["reason"], string> = {
@@ -18,13 +20,33 @@ const STOP_LABELS: Record<NonNullable<LaunchReport["stopReason"]>, string> = {
   cancelled: "annulé",
 };
 
+/** Motifs d'un flux direct non repris (B655, B661). */
+const SKIP_LABELS: Record<RepriseSkip["reason"], string> = {
+  too_long: "trop long",
+  no_entry_app: "sans application d'entrée",
+  cap: "au-delà du plafond",
+};
+
 const ACTIVE = new Set(["queued", "running"]);
 const ratio = ({ covered, total }: Count): string => `${covered}/${total}`;
+
+const currentOf = (report: LaunchReport): Coverage | undefined =>
+  report.coverageAfter ?? report.coverageBefore;
+
+/** « rôles avec application X/Y · flux repris A/B » (B661) ; rien pour un lancement d'avant TK-114d (sans `roles`). */
+function rolesParts(coverage: Coverage | undefined, capital = false): string[] {
+  if (!coverage?.roles) return [];
+  const { roles, reprises } = coverage;
+  return [
+    `${capital ? "Rôles" : "rôles"} avec application ${ratio(roles)}`,
+    ...(reprises ? [`flux repris ${ratio(reprises)}`] : []),
+  ];
+}
 
 /** « Zones traitées N/M · écartées K » puis la couverture des fonctionnalités, après ou, à défaut, avant le lancement. */
 function summaryOf(report: LaunchReport, prefix: string): string {
   const processed = report.zonesDone + report.zonesDiscarded;
-  const coverage = (report.coverageAfter ?? report.coverageBefore)?.features;
+  const coverage = currentOf(report)?.features;
   return [
     `${prefix} ${processed}/${report.zonesRequested}`,
     `écartées ${report.zonesDiscarded}`,
@@ -37,7 +59,7 @@ export function launchDetailOf(launch: Launch | null | undefined): string | unde
   const report = launch?.report;
   if (!report) return undefined;
   if (report.zonesRequested === 0) return "Préparation des zones";
-  return summaryOf(report, "Zones traitées");
+  return [summaryOf(report, "Zones traitées"), ...rolesParts(currentOf(report))].join(" · ");
 }
 
 /** Motif d'arrêt affiché : celui du bilan, sinon déduit du statut (échec sans motif : interrompu). */
@@ -76,6 +98,23 @@ function coverageLine(report: LaunchReport): string[] {
   return [parts.join(" · ")];
 }
 
+/** « Rôles avec application X/Y · flux repris A/B · avant : x/Y » puis les motifs des flux non repris (B661). */
+function rolesLine(report: LaunchReport): string[] {
+  const after = report.coverageAfter;
+  const parts = rolesParts(after, true);
+  if (parts.length === 0) return [];
+  const before = report.coverageBefore?.roles;
+  const skipped = after?.reprises?.skipped ?? [];
+  const reasons = skipped.map(({ reason, count }) => `${SKIP_LABELS[reason]} (${count})`);
+  return [
+    [
+      ...parts,
+      ...(before ? [`avant : ${ratio(before)}`] : []),
+      ...(reasons.length > 0 ? [`non repris : ${reasons.join(", ")}`] : []),
+    ].join(" · "),
+  ];
+}
+
 function discardLine(report: LaunchReport): string[] {
   if (report.discardReasons.length === 0) return [];
   const parts = report.discardReasons.map(
@@ -102,6 +141,7 @@ export function launchReportOf(launch: Launch | null | undefined): LaunchReportV
     lines: [
       `${summaryOf(report, "Bilan du lancement · zones traitées")} · ${stop}`,
       ...coverageLine(report),
+      ...rolesLine(report),
       ...discardLine(report),
     ],
   };

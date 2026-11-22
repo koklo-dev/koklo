@@ -423,3 +423,4 @@ Tests à réécrire avec ces retraits :
 | Maquette 13 l.385, l.379, l.389 : pied de liste sans « Revenir en haut », puces sans icône +, boutons de 30 px | « Revenir en haut » dès 21 lignes, icône + des puces `FilterChipMenu`, `Button` sm de 32 px | Socle TK-94 partagé ; pas de variante propre à cet écran (B607) |
 | Maquette 13 l.391 : titre de fiche 22 px, h3 15 px | 20 px et 14 px | Pas de 22 ni de 15 dans l'échelle v2 (B333, B607) |
 | Maquette 13 l.379 (client) : puces Statut, Composant, Date | Statut seul | L'entrée `clientSpace.adrs` n'a ni `from`/`to` ni `component`, la sortie pas de facettes (B607) |
+| Maquette 13 l.566-568, l.697 : trait acteur → application étiqueté « navigateur » | Trait sans étiquette | Le moyen d'entrée n'est pas dans le modèle ; « navigateur » serait faux pour une application mobile (TK-114d, B662) |

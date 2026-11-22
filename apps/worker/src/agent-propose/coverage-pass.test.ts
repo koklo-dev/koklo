@@ -21,7 +21,8 @@ const SOURCES: LaunchSources = {
     criteria: [],
   })),
   rules: [],
-  roles: [{ specId: "RL-client", title: "Client" }],
+  // TK-114d : aucun rôle ici (la passe des applications est couverte par entry-apps.test.ts).
+  roles: [],
   flows: [],
   tables: [],
   tableIds: [],

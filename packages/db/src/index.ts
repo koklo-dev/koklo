@@ -11,6 +11,11 @@ export {
   raiseCounterTo,
   type TenantTx,
 } from "./counters.ts";
+export type {
+  CurrentArchflow,
+  CurrentFlowItem,
+  CurrentFlowMessage,
+} from "./dossier-archflows.ts";
 export {
   type CurrentArchitecture,
   type CurrentComponent,

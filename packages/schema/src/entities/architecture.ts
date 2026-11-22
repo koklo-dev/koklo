@@ -22,6 +22,8 @@ export const ComponentSchema = z.strictObject({
   responsabilite: line,
   possede: z.array(tableId).default([]),
   sert: z.array(featureId).default([]),
+  /** Rôles qui entrent par ce composant (TK-114d, B650) : lu pour `type: app` seulement. */
+  acteurs: z.array(roleId).max(20).default([]),
   depend_de: z.array(dependency).default([]),
   decisions: z.array(adrId).default([]),
   resume_client: z.array(line).optional(),
@@ -119,6 +121,8 @@ export const AdrSchema = AdrFrontSchema.extend({
 });
 
 export type Component = z.output<typeof ComponentSchema>;
+/** Composant avant les valeurs par défaut (listes facultatives) : ce que l'émission accepte. */
+export type ComponentInput = z.input<typeof ComponentSchema>;
 export type ComponentType = Component["type"];
 export type ArchFlow = z.output<typeof ArchFlowSchema>;
 export type ArchFlowItem = Item;

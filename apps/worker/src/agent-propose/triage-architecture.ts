@@ -130,6 +130,21 @@ export function withKnownDependencies(
   return { ...payload, dependsOn: recordsOf(payload.dependsOn).filter(known) };
 }
 
+/**
+ * Composant proposé (TK-114d, B650) : `actors` n'est gardé que sur une `app`, sans rôle inconnu ni doublon ; sur tout autre
+ * type il est retiré (le composant reste). Tout autre type de proposition : inchangé.
+ */
+export function withKnownActors(
+  kind: AgentProposalKind,
+  payload: Record<string, unknown>,
+  arch: ArchitectureRefs | undefined,
+): Record<string, unknown> {
+  if (kind !== "component" || !("actors" in payload)) return payload;
+  const { actors, ...rest } = payload;
+  if (payload.type !== "app" || arch === undefined) return rest;
+  return { ...rest, actors: [...new Set(stringsOf(actors).filter((id) => arch.roles.has(id)))] };
+}
+
 /** Une proposition acceptée devient connue pour la suite de la génération (composants, flux, tables possédées). */
 export function rememberAccepted(
   kind: AgentProposalKind,

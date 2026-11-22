@@ -167,3 +167,23 @@ describe("schéma JSON demandé au fournisseur", () => {
     expect(schema.additionalProperties).toBe(false);
   });
 });
+
+describe("TK-114d : actors du composant, specId du flux repris (B650, B655)", () => {
+  it("actors : RL-slug, 20 au plus", () => {
+    const parse = (actors: unknown) =>
+      componentProposalSchema.safeParse({ ...COMPONENT, actors }).success;
+    expect(parse(["RL-colocataire", "RL-invite"])).toBe(true);
+    expect(parse(["colocataire"])).toBe(false);
+    expect(parse(["C-api"])).toBe(false);
+    expect(parse(Array.from({ length: 20 }, (_, i) => `RL-r${i}`))).toBe(true);
+    expect(parse(Array.from({ length: 21 }, (_, i) => `RL-r${i}`))).toBe(false);
+  });
+
+  it("archflow : specId facultatif P-slug", () => {
+    const parse = (specId: unknown) =>
+      archflowProposalSchema.safeParse({ ...FLOW, specId }).success;
+    expect(parse("P-inscription")).toBe(true);
+    expect(parse("C-api")).toBe(false);
+    expect(archflowProposalSchema.safeParse(FLOW).success).toBe(true);
+  });
+});

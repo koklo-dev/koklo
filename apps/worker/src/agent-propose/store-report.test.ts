@@ -101,6 +101,16 @@ describe("store-report (TK-114b)", () => {
     expect(other.calls).toEqual([]);
   });
 
+  it("TK-114d (B653) : mergeLinks réunit les rôles, 20 au plus ; sans rôle ajouté, actors inchangé", () => {
+    const actors = Array.from({ length: 19 }, (_, i) => `RL-r${i}`);
+    const merged = mergeLinks(
+      { name: "Web", actors },
+      { owns: [], serves: [], actors: ["RL-r0", "RL-neuf", "RL-de-trop"] },
+    );
+    expect(merged.actors).toEqual([...actors, "RL-neuf"]);
+    expect(mergeLinks({ actors: ["RL-a"] }, { owns: [], serves: [] }).actors).toEqual(["RL-a"]);
+  });
+
   it("mergeLinks : union sans doublon, 200 liens au plus, liste sans ajout inchangée", () => {
     const owns = Array.from({ length: 199 }, (_, i) => `T-${i}`);
     const merged = mergeLinks(

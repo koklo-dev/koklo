@@ -1,4 +1,5 @@
 import type { TenantClient } from "./client.ts";
+import { archflowOf, type CurrentArchflow } from "./dossier-archflows.ts";
 
 /**
  * Ce que l'agent lit pour le Fonctionnel (« L'agent lit », `AGENT_READS.functional`) : pages du dossier figées, synthèse
@@ -67,6 +68,8 @@ export interface CurrentComponent {
   readonly serves: readonly string[];
   /** Dépendances lues de `depend_de` (TK-114c, B631) ; toujours rempli par le lecteur, facultatif pour les fixtures. */
   readonly dependsOn?: readonly CurrentDependency[];
+  /** Rôles `RL-` lus de `acteurs` (TK-114d, B650) ; toujours rempli par le lecteur, facultatif pour les fixtures. */
+  readonly actors?: readonly string[];
 }
 
 export interface CurrentDependency {
@@ -78,7 +81,8 @@ export interface CurrentDependency {
 /** Ce que l'agent lit de l'architecture : composants, flux techniques, décisions, et exigences connues des fonctionnalités (B512). */
 export interface CurrentArchitecture {
   readonly components: readonly CurrentComponent[];
-  readonly archflows: readonly CurrentTitle[];
+  /** Flux techniques avec leurs messages (TK-114d, B655). */
+  readonly archflows: readonly CurrentArchflow[];
   readonly decisions: readonly CurrentTitle[];
   readonly nfr: readonly string[];
 }
@@ -321,6 +325,9 @@ const dependenciesOf = (value: unknown): CurrentDependency[] =>
     return [dep.mode === "asynchrone" ? { to, via, async: true } : { to, via }];
   });
 
+/** Motif `RL-<slug>` de `@koklo/schema` (`PATTERNS.role`). */
+const ROLE_ID = /^RL-[a-z0-9][a-z0-9-]*$/;
+
 const componentOf = (row: { specId: string; data: unknown }): CurrentComponent => {
   const data = recordOf(row.data);
   return {
@@ -331,6 +338,7 @@ const componentOf = (row: { specId: string; data: unknown }): CurrentComponent =
     owns: idsOf(data.possede),
     serves: idsOf(data.sert),
     dependsOn: dependenciesOf(data.depend_de),
+    actors: idsOf(data.acteurs).filter((id) => ROLE_ID.test(id)),
   };
 };
 const NFR_MAX = 100;
@@ -359,7 +367,7 @@ export async function currentArchitecture(
   const nfr = new Set(of("feature").flatMap((row) => idsOf(recordOf(row.data).nfr)));
   return {
     components: of("component").slice(0, COMPONENTS_MAX).map(componentOf),
-    archflows: titled("archflow"),
+    archflows: of("archflow").slice(0, DOMAIN_TITLES_MAX).map(archflowOf),
     decisions: titled("adr"),
     nfr: [...nfr].sort().slice(0, NFR_MAX),
   };
