@@ -17,6 +17,7 @@ import {
  * Mermaid : seuls les champs lisibles de l'écran sortent.
  */
 const slug = "[a-z0-9][a-z0-9-]*";
+const roleLink = z.string().regex(new RegExp(`^RL-${slug}$`));
 export const componentIdSchema = z.string().regex(new RegExp(`^C-${slug}$`));
 export const adrIdSchema = z.string().regex(/^ADR-\d{3,}$/);
 export const archFlowIdSchema = z.string().regex(new RegExp(`^P-${slug}$`));
@@ -60,6 +61,8 @@ const componentFields = {
   /** 200 liens au plus (TK-114b, B615) : une mise à jour par l'agent porte l'index ∪ ajouts. */
   owns: z.array(tableLink).max(200),
   serves: z.array(featureLink).max(200),
+  /** Rôles `RL-` qui entrent par ce composant, lus pour `type: app` (TK-114d, contrat 3.14.0, B650) ; remplace la liste. */
+  actors: z.array(roleLink).max(20),
   dependsOn: z.array(dependencySchema).max(30),
   decisions: z.array(adrIdSchema).max(20),
   /** Phrases simples montrées au client (vue client, TK-114) ; remplace la liste précédente. */
@@ -281,7 +284,6 @@ export const architectureChecksSchema = z.object({
 });
 
 // --- TK-112 (contrat 3.10.0, additif, B541 à B550) : schéma en couches et flux en séquence ---
-const roleLink = z.string().regex(new RegExp(`^RL-${slug}$`));
 /** Un nœud du schéma : un composant (`C-<slug>`) ou un acteur (`RL-<slug>`). */
 const nodeIdSchema = z.union([componentIdSchema, roleLink]);
 /** Bornes des lectures : celles de TK-110 (aperçu 7, composants d'une zone 200, résultats de recherche 20). */
@@ -349,6 +351,8 @@ export const architectureZoneSchema = z.object({
       zone: zoneIdSchema,
     }),
   ),
+  /** Rôle → application rendue de la zone (TK-114d, contrat 3.14.0, B654) : trait sans étiquette. */
+  actorRelations: z.array(z.object({ from: roleLink, to: componentIdSchema })),
   truncated: z.boolean(),
   commitSha: commitShaSchema,
 });

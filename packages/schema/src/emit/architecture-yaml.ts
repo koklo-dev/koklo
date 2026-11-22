@@ -3,6 +3,7 @@ import {
   type ArchFlow,
   ArchFlowSchema,
   type Component,
+  type ComponentInput,
   ComponentSchema,
 } from "../entities/index.ts";
 import { toPointer } from "../parse/zod-issues.ts";
@@ -34,7 +35,7 @@ const dependency = (value: Component["depend_de"][number]) => ({
  * Composant -> YAML canonique (`architecture/components/<slug>.yaml`) : clés dans un ordre FIXE, listes vides omises.
  * Pure ; ne lève que `EmitComponentError`. Relu par `parseSpecFiles`, l'émission est idempotente.
  */
-export function emitComponentYaml(component: Component): string {
+export function emitComponentYaml(component: Component | ComponentInput): string {
   const checked = ComponentSchema.safeParse(component);
   if (!checked.success) {
     const issue = checked.error.issues[0];
@@ -53,6 +54,7 @@ export function emitComponentYaml(component: Component): string {
       responsabilite: value.responsabilite,
       ...listIf("possede", value.possede),
       ...listIf("sert", value.sert),
+      ...listIf("acteurs", value.acteurs),
       ...listIf("depend_de", value.depend_de.map(dependency)),
       ...listIf("decisions", value.decisions),
       ...(value.resume_client === undefined ? {} : { resume_client: [...value.resume_client] }),

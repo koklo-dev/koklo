@@ -225,3 +225,46 @@ describe("vue des zones (B546)", () => {
     expect(relations[0]?.weight).toBeGreaterThan(1);
   });
 });
+
+describe("traits acteur → application (TK-114d, B654, B662)", () => {
+  const TOTO: ArchZoneDetail = {
+    zone: { id: "Z-courses", name: "Liste de courses" },
+    components: [
+      { specId: "C-ecran-liste", name: "Écran Liste de courses", type: "app" },
+      { specId: "C-courses", name: "Service des courses", type: "service" },
+    ],
+    relations: [{ from: "C-ecran-liste", to: "C-courses", via: "appel" }],
+    actors: [
+      { id: "RL-colocataire", name: "Colocataire" },
+      { id: "RL-invite", name: "Invité" },
+    ],
+    actorRelations: [
+      { from: "RL-colocataire", to: "C-ecran-liste" },
+      { from: "RL-invite", to: "C-ecran-liste" },
+      { from: "RL-visiteur", to: "C-ecran-liste" },
+    ],
+    outgoing: [],
+  };
+
+  it("un trait plein sans étiquette par rôle relié à une application rendue", () => {
+    const relations = relationsOf([TOTO], nodesOf([TOTO]));
+    const actorLinks = relations.filter((link) => link.from.startsWith("RL-"));
+    expect(actorLinks).toEqual([
+      {
+        id: "RL-colocataire>C-ecran-liste",
+        from: "RL-colocataire",
+        to: "C-ecran-liste",
+        dashed: false,
+      },
+      { id: "RL-invite>C-ecran-liste", from: "RL-invite", to: "C-ecran-liste", dashed: false },
+    ]);
+    expect(relations).toHaveLength(3);
+  });
+
+  it("sans actorRelations (lecture d'avant 3.14.0) : aucun trait d'acteur", () => {
+    const { actorRelations: _a, ...old } = TOTO;
+    expect(relationsOf([old], nodesOf([old])).every((link) => !link.from.startsWith("RL-"))).toBe(
+      true,
+    );
+  });
+});

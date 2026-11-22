@@ -180,3 +180,14 @@ describe("fichiers tolérants de l'architecture", () => {
     );
   });
 });
+
+describe("ComponentSchema.acteurs (TK-114d, B650)", () => {
+  it("vide par défaut, RL- seuls, 20 au plus", () => {
+    expect(ComponentSchema.parse(COMPONENT).acteurs).toEqual([]);
+    const parse = (acteurs: unknown) =>
+      ComponentSchema.safeParse({ ...COMPONENT, acteurs }).success;
+    expect(parse(["RL-visiteur"])).toBe(true);
+    expect(parse(["C-api"])).toBe(false);
+    expect(parse(Array.from({ length: 21 }, (_, i) => `RL-r${i}`))).toBe(false);
+  });
+});

@@ -42,6 +42,17 @@ describe("zones-pass (TK-114b)", () => {
     expect(item(["component", "archflow"])?.content).toHaveProperty("anyOf");
   });
 
+  it("TK-114d (B655) : specId d'un flux jamais demandé au modèle", () => {
+    const content = (
+      batchSchema(["archflow"]).properties as Record<
+        string,
+        { items: { properties: Record<string, unknown> } }
+      >
+    ).proposals?.items.properties.content;
+    expect(JSON.stringify(content)).not.toContain("specId");
+    expect(JSON.stringify(content)).toContain("participants");
+  });
+
   it("reprend à la première zone non traitée, publie chaque zone puis appelle afterPublish", async () => {
     const ai = new ScriptedAi((_, request) => ({
       output: { proposals: [component(zoneOf(request.prompt.user))] },

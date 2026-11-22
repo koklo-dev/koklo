@@ -67,6 +67,7 @@ function serveManyZones() {
       ],
       relations: [],
       actors: [],
+      actorRelations: [],
       outgoing: [{ zone: "Z-1", count: 3 }],
       truncated: false,
       commitSha: SHA40,
@@ -95,6 +96,10 @@ describe("Onglet Schéma : lecteur", () => {
     // Le type reste écrit : la forme et la couleur ne le portent jamais seules.
     expect(screen.getAllByText("Externe").length).toBeGreaterThan(0);
     expect(screen.getByText("asynchrone")).toBeVisible();
+    // TK-114d (B654, B662) : l'acteur est relié à son application d'entrée, trait sans étiquette, masqué aux lecteurs.
+    const actorLink = document.querySelector('[data-relation="RL-client>C-web"]');
+    expect(actorLink).not.toBeNull();
+    expect(actorLink?.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(screen.getByRole("toolbar", { name: "Zoom du diagramme" })).toBeVisible();
   });
 

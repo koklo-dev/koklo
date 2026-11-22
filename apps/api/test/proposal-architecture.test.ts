@@ -216,6 +216,9 @@ describe("TK-114b (contrat 3.12.0, B620) : proposal.list rend le bilan du lancem
     features: { covered: 174, total: 174 },
     flows: { covered: 22, total: 22 },
     tables: { covered: 48, total: 48 },
+    // TK-114d (contrat 3.14.0, B660) : rôles et flux repris rendus tels que le worker les écrit.
+    roles: { covered: 5, total: 5 },
+    reprises: { covered: 21, total: 22, skipped: [{ reason: "too_long", count: 1 }] },
   };
   const ZERO = {
     features: { covered: 0, total: 174 },

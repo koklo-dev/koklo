@@ -270,3 +270,92 @@ describe("TK-114b (B615) : mise à jour d'un composant indexé (specId)", () => 
     expect(operationsOf(update({ specId: "base" }))[0]).toMatchObject({ kind: "component.create" });
   });
 });
+
+describe("TK-114d (B659) : actors d'une application", () => {
+  it("component.create envoie actors quand la charge en porte, l'omet sinon", () => {
+    const [withActors] = operationsOf(
+      component(1, { type: "app", actors: ["RL-colocataire", "RL-invite"] }),
+    );
+    expect(withActors).toMatchObject({
+      kind: "component.create",
+      type: "app",
+      actors: ["RL-colocataire", "RL-invite"],
+    });
+    const [without] = operationsOf(component(2, { type: "app", actors: [] }));
+    expect(without).not.toHaveProperty("actors");
+  });
+
+  it("component.update envoie la liste complète des actors si la charge en porte, l'omet sinon", () => {
+    const base = { specId: "C-ecran-liste", type: "app", owns: [], serves: [], dependsOn: [] };
+    const [withActors] = operationsOf(component(1, { ...base, actors: ["RL-visiteur"] }));
+    expect(withActors).toEqual({
+      kind: "component.update",
+      specId: "C-ecran-liste",
+      owns: [],
+      serves: [],
+      actors: ["RL-visiteur"],
+    });
+    const [without] = operationsOf(component(2, base));
+    expect(without).not.toHaveProperty("actors");
+  });
+});
+
+describe("TK-114d (B655, B659) : flux repris -> archflow.update", () => {
+  const reprise = (over: Record<string, unknown> = {}) =>
+    fake(1, {
+      kind: "archflow" as never,
+      zone: "Flux techniques",
+      status: "accepted",
+      content: {
+        specId: "P-faire-courses",
+        flow: "P-faire-courses",
+        participants: ["RL-colocataire", "C-ecran-liste", "C-courses"],
+        messages: [
+          { from: "RL-colocataire", to: "C-ecran-liste", text: "coche un article" },
+          {
+            from: "C-ecran-liste",
+            to: "C-courses",
+            text: "coche un article",
+            reply: "liste à jour",
+          },
+        ],
+        features: ["F-001"],
+        rules: [],
+        decisions: [],
+        ...over,
+      },
+    });
+
+  it("archflow avec specId P- valide -> archflow.update (participants, messages, liens non vides)", () => {
+    expect(operationsOf(reprise())).toEqual([
+      {
+        kind: "archflow.update",
+        specId: "P-faire-courses",
+        participants: ["RL-colocataire", "C-ecran-liste", "C-courses"],
+        messages: [
+          { from: "RL-colocataire", to: "C-ecran-liste", text: "coche un article" },
+          {
+            from: "C-ecran-liste",
+            to: "C-courses",
+            text: "coche un article",
+            reply: "liste à jour",
+          },
+        ],
+        features: ["F-001"],
+      },
+    ]);
+  });
+
+  it("specId illisible : archflow.create comme avant", () => {
+    expect(operationsOf(reprise({ specId: "C-courses" }))[0]).toMatchObject({
+      kind: "archflow.create",
+      flow: "P-faire-courses",
+    });
+  });
+
+  it("référence = specId ; sous-ligne « Flux repris · 2 messages »", () => {
+    expect(refOf(reprise({ flow: "" }))).toBe("P-faire-courses");
+    expect(subtitleOf(reprise())).toBe("Flux repris · 2 messages");
+    expect(subtitleOf(reprise({ specId: undefined }))).toBe("Flux · 2 messages");
+  });
+});

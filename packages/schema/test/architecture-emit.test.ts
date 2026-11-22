@@ -236,3 +236,18 @@ describe("emitFlowMermaid", () => {
     expect(lines.filter((l) => /^\s*participant /.test(l))).toHaveLength(3);
   });
 });
+
+describe("emitComponentYaml, acteurs (TK-114d)", () => {
+  it("acteurs écrits après sert, omis vides, relus à l'identique", () => {
+    const app = component("C-web", { type: "app", sert: ["F-001"], acteurs: ["RL-visiteur"] });
+    const text = emitComponentYaml(app);
+    expect(text).toContain("acteurs:\n  - RL-visiteur\n");
+    expect(text.indexOf("sert")).toBeLessThan(text.indexOf("acteurs"));
+    expect(emitComponentYaml(component("C-api"))).not.toContain("acteurs");
+    const { spec, issues } = parseSpecFiles(
+      archFiles({ "architecture/components/web.yaml": text }),
+    );
+    expect(issues).toEqual([]);
+    expect(spec.components.find((c) => c.value.id === "C-web")?.value).toEqual(app);
+  });
+});

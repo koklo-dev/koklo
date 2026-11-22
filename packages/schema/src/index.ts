@@ -73,6 +73,19 @@ export {
   closesSyncCycle,
   synchronousGraph,
 } from "./rules/architecture-checks.ts";
+export {
+  DIRECT_COMPONENT_TYPES,
+  type Exchange,
+  entryAppsOf,
+  exchangesOf,
+  type FlowItemInput,
+  isDirectFlow,
+  isRoleId,
+  type RoleComponent,
+  type RoleFlow,
+  roleCoverage,
+  roleSideOf,
+} from "./rules/architecture-roles.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";
 export { checkSpec, validateSpec } from "./validate.ts";

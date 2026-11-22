@@ -1,16 +1,22 @@
 import type { AgentProposalKind } from "@koklo/domain";
-import { componentProposalSchema, jsonSchemaOf, PROPOSAL_SCHEMAS } from "@koklo/schema";
+import {
+  archflowProposalSchema,
+  componentProposalSchema,
+  jsonSchemaOf,
+  PROPOSAL_SCHEMAS,
+} from "@koklo/schema";
 import { ask, type Run, timeUp } from "./call.ts";
 import { discardReasonOf } from "./errors.ts";
 import { batchPrompt } from "./prompts.ts";
 import type { ZonePublication } from "./store.ts";
 import { triageProposals } from "./triage.ts";
 
-/** Schéma d'un type demandé au modèle : `specId` n'est jamais demandé (B615), le code seul le pose. */
-const modelSchemaOf = (kind: AgentProposalKind) =>
-  kind === "component"
-    ? jsonSchemaOf(componentProposalSchema.omit({ specId: true }))
-    : jsonSchemaOf(PROPOSAL_SCHEMAS[kind]);
+/** Schéma d'un type demandé au modèle : `specId` n'est jamais demandé (B615, B655), le code seul le pose. */
+function modelSchemaOf(kind: AgentProposalKind) {
+  if (kind === "component") return jsonSchemaOf(componentProposalSchema.omit({ specId: true }));
+  if (kind === "archflow") return jsonSchemaOf(archflowProposalSchema.omit({ specId: true }));
+  return jsonSchemaOf(PROPOSAL_SCHEMAS[kind]);
+}
 
 /** Schéma demandé au fournisseur : la structure seule, les bornes sont revérifiées par Zod à la validation. */
 export function batchSchema(kinds: readonly AgentProposalKind[]): Record<string, unknown> {

@@ -209,6 +209,20 @@ describe("composants : component.create, update, delete", () => {
     });
   });
 
+  it("TK-114d (B650, B659) : actors écrit acteurs à la création, remplace la liste à la mise à jour", () => {
+    const created = plan([
+      op("component.create", "C-base", { ...COMPONENT, type: "app", actors: ["RL-client"] }),
+    ]);
+    expect(contentOf(created, "architecture/components/base.yaml")).toContain(
+      "acteurs:\n  - RL-client\n",
+    );
+    const files = [...BASE, componentFile("base", { type: "app", acteurs: ["RL-client"] })];
+    const cleared = plan([op("component.update", "C-base", { actors: [] })], files);
+    expect(contentOf(cleared, "architecture/components/base.yaml")).not.toContain("acteurs");
+    const kept = plan([op("component.update", "C-base", { zone: "Bord" })], files);
+    expect(contentOf(kept, "architecture/components/base.yaml")).toContain("acteurs:");
+  });
+
   it("delete retire le fichier ; un composant encore cité par un autre est refusé (ARCH_UNKNOWN_COMPONENT)", () => {
     const files = [...BASE, componentFile("base", { depend_de: [{ vers: "C-api", via: "SQL" }] })];
     const removed = plan([op("component.delete", "C-base")], files);

@@ -143,6 +143,8 @@ export interface ArchZoneDetail {
   actors: ReadonlyArray<{ id: string; name: string }>;
   outgoing: ReadonlyArray<{ zone: string; count: number }>;
   crossRelations?: ReadonlyArray<ArchLink & { zone: string }> | undefined;
+  /** Rôle → application rendue (TK-114d, B654) : trait plein sans étiquette (B662). */
+  actorRelations?: ReadonlyArray<{ from: string; to: string }> | undefined;
 }
 
 const GHOST_PREFIX = "zone:";
@@ -212,7 +214,7 @@ function crossEnds(
 
 /**
  * Liens entre nœuds rendus, un par paire : « moyen » (le premier) en étiquette, pointillés quand l'appel est asynchrone
- * (maquette 13 l.693, l.717-718).
+ * (maquette 13 l.693, l.717-718) ; acteur → application : trait plein sans étiquette (B662).
  */
 export function relationsOf(
   details: readonly ArchZoneDetail[],
@@ -221,24 +223,19 @@ export function relationsOf(
 ): DiagramRelation[] {
   const known = new Set(nodes.map((node) => node.id));
   const byId = new Map<string, DiagramRelation>();
-  const add = (ends: { from: string; to: string } | null, link: ArchLink) => {
+  const add = (ends: { from: string; to: string } | null, link?: ArchLink) => {
     if (!ends) return;
     const id = `${ends.from}>${ends.to}`;
     if (byId.has(id)) return;
-    byId.set(id, {
-      id,
-      from: ends.from,
-      to: ends.to,
-      label: link.via,
-      labelFont: "sans",
-      dashed: link.async === true,
-    });
+    const label = link ? { label: link.via, labelFont: "sans" as const } : {};
+    byId.set(id, { id, from: ends.from, to: ends.to, ...label, dashed: link?.async === true });
   };
+  const rendered = (link: { from: string; to: string }) =>
+    known.has(link.from) && known.has(link.to) ? link : null;
   for (const detail of details) {
-    for (const link of detail.relations) {
-      add(known.has(link.from) && known.has(link.to) ? link : null, link);
-    }
+    for (const link of detail.relations) add(rendered(link), link);
     for (const link of detail.crossRelations ?? []) add(crossEnds(link, known, zoneNames), link);
+    for (const link of detail.actorRelations ?? []) add(rendered(link));
   }
   return [...byId.values()];
 }

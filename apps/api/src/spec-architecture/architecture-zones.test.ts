@@ -19,6 +19,7 @@ const node = (
   zone,
   responsibility: `Rôle de ${id}`,
   dependsOn: dependsOn.map(({ to, via = "HTTP", async = false }) => ({ to, via, async })),
+  actors: [],
 });
 
 /** 34 composants dans 6 zones (6, 6, 6, 6, 5, 5) : la planche de la maquette. */
@@ -70,7 +71,10 @@ describe("flowParticipants : participants des flux indexés", () => {
         { specId: "P-a", data: { participants: ["RL-client", "C-api", 4] } },
         { specId: "P-b", data: null },
       ]),
-    ).toEqual([{ participants: ["RL-client", "C-api"] }, { participants: [] }]);
+    ).toEqual([
+      { participants: ["RL-client", "C-api"], messages: [] },
+      { participants: [], messages: [] },
+    ]);
   });
 });
 
@@ -226,5 +230,77 @@ describe("buildArchZone", () => {
     expect(view?.truncated).toBe(true);
     expect(view?.relations).toEqual([{ from: "C-m0", to: "C-m1", via: "HTTP" }]);
     expect(view?.crossRelations).toEqual([]);
+  });
+});
+
+/**
+ * TK-114d (B654) : les acteurs d'une zone sont les `acteurs` de ses applications, les rôles qui échangent avec l'une d'elles,
+ * et ceux des flux qui touchent ses composants seulement si le rôle n'a aucune application d'entrée ; traits rôle → app.
+ */
+describe("acteurs et applications d'entrée (TK-114d, B654)", () => {
+  const app = (id: string, zone: string, actors: string[] = []): ArchNode => ({
+    ...node(id, zone),
+    type: "app",
+    actors,
+  });
+  const nodes = [
+    app("C-portail", "Accueil", ["RL-client", "C-api", "RL-client"]),
+    app("C-backoffice", "Accueil"),
+    node("C-api", "Rendez-vous"),
+    node("C-agenda", "Rendez-vous"),
+  ];
+  const message = (de: string, vers: string) => ({ de, vers, texte: "Appelle" });
+  const flows = [
+    {
+      participants: ["RL-client", "C-portail", "C-api"],
+      messages: [message("RL-client", "C-portail"), message("C-portail", "C-api")],
+    },
+    {
+      participants: ["RL-accueil", "RL-gerant", "C-backoffice", "C-api"],
+      messages: [
+        message("RL-accueil", "C-backoffice"),
+        { bloc: "alt", libelle: "Sinon", messages: [message("C-backoffice", "RL-gerant")] },
+        message("C-backoffice", "C-api"),
+      ],
+    },
+    { participants: ["RL-visiteur", "C-agenda"], messages: [message("RL-visiteur", "C-agenda")] },
+    { participants: ["RL-client", "C-agenda"], messages: [message("RL-client", "C-agenda")] },
+  ];
+
+  it("lecture : acteurs RL- d'un composant ; messages d'un flux indexé", () => {
+    const [read] = archNodes([
+      { specId: "C-web", data: { type: "app", acteurs: ["RL-a", "C-x", 3, "RL-b"] } },
+    ]);
+    expect(read?.actors).toEqual(["RL-a", "RL-b"]);
+    expect(
+      flowParticipants([
+        {
+          specId: "P-a",
+          data: { participants: ["RL-a"], messages: [message("RL-a", "C-web"), 4] },
+        },
+      ]),
+    ).toEqual([{ participants: ["RL-a"], messages: [{ de: "RL-a", vers: "C-web" }] }]);
+  });
+
+  it("cartes : un acteur avec application n'est compté que dans la zone de ses applications", () => {
+    const { zones } = buildArchZones(nodes, flows, []);
+    expect(zones.map((z) => [z.id, z.actorCount])).toEqual([
+      ["accueil", 3],
+      ["rendez-vous", 1],
+    ]);
+  });
+
+  it("zone ouverte : actorRelations rôle → application rendue ; acteur avec application absent d'une zone de services", () => {
+    const names = new Map([["RL-client", "Client"]]);
+    const accueil = buildArchZone(nodes, flows, [], "accueil", names);
+    expect(accueil?.actors.map((a) => a.id)).toEqual(["RL-client", "RL-accueil", "RL-gerant"]);
+    expect(accueil?.actorRelations).toEqual([
+      { from: "RL-client", to: "C-portail" },
+      { from: "RL-accueil", to: "C-backoffice" },
+      { from: "RL-gerant", to: "C-backoffice" },
+    ]);
+    const services = buildArchZone(nodes, flows, [], "rendez-vous", names);
+    expect(services?.actors.map((a) => a.id)).toEqual(["RL-visiteur"]);
+    expect(services?.actorRelations).toEqual([]);
   });
 });

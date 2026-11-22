@@ -234,3 +234,30 @@ describe("triage des flux, décisions et sections", () => {
     expect([...arch.ownedTables]).toEqual(["T-client", "T-salle"]);
   });
 });
+
+/** TK-114d (B650, B655) : `actors` gardé sur une `app` seule, rôles connus ; `specId` d'un flux posé par le code seul. */
+describe("triage des acteurs et des flux repris (TK-114d)", () => {
+  it("app : rôles inconnus et doublons retirés ; autre type : actors retiré, composant gardé", () => {
+    const { accepted, discarded } = triageProposals(
+      {
+        proposals: [
+          component("Portail", { type: "app", actors: ["RL-client", "RL-fantome", "RL-client"] }),
+          component("Relevés", { actors: ["RL-client"] }),
+        ],
+      },
+      context(),
+    );
+    expect(discarded).toBe(0);
+    expect(accepted[0]?.payload.actors).toEqual(["RL-client"]);
+    expect(accepted[1]?.payload).not.toHaveProperty("actors");
+  });
+
+  it("une sortie du modèle qui porte specId sur un flux est écartée", () => {
+    const { accepted, discarded } = triageProposals(
+      { proposals: [flow("P-reserver", { specId: "P-reserver" })] },
+      context(),
+    );
+    expect(accepted).toEqual([]);
+    expect(discarded).toBe(1);
+  });
+});

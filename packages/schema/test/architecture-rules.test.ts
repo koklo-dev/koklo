@@ -213,3 +213,19 @@ describe("architectureChecks : avertissements non bloquants", () => {
     expect(keys).toEqual([...keys].sort());
   });
 });
+
+describe("acteurs d'un composant (TK-114d, B650)", () => {
+  it("un rôle inconnu de l'index est signalé comme dans sert, rôle connu admis", () => {
+    const issues = checkSpec(
+      withArch({
+        "architecture/components/api.yaml": componentYaml(
+          "C-api",
+          "acteurs: [RL-visiteur, RL-fantome]\n",
+        ).replace("service", "app"),
+      }),
+    ).issues.filter((issue) => issue.entityId === "C-api" && issue.severity === "error");
+    expect(issues.map((issue) => [issue.code, issue.pointer])).toEqual([
+      ["R4_UNKNOWN_ROLE", "/acteurs/1"],
+    ]);
+  });
+});

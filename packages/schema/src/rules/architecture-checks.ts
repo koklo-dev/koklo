@@ -1,5 +1,6 @@
 import type { Component } from "../entities/index.ts";
 import { compare } from "../issue.ts";
+import { type FlowItemInput, roleCoverage } from "./architecture-roles.ts";
 
 /** Ce que les avertissements lisent : des identifiants (cahier, tables, parcours, flux) et les composants entiers. */
 export type ArchitectureInput = {
@@ -31,19 +32,26 @@ type Warn = (code: ArchitectureWarningCode, entityId: string, message: string) =
 type GraphDependency = { vers: string; mode?: string };
 type GraphComponent = { id: string; depend_de?: readonly GraphDependency[] };
 
-/** Ce que la couverture lit (TK-114b, B616 ; TK-114c, B633) : des identifiants, et des composants réduits à leurs liens. */
+/**
+ * Ce que la couverture lit (TK-114b, B616 ; TK-114c, B633) : des identifiants, et des composants réduits à leurs liens.
+ * TK-114d (B651, B652) : les rôles, les `acteurs` des composants et les messages des flux (forme du fichier).
+ */
 export type ArchitectureCoverageInput = {
   features: readonly { value: { id: string } }[];
   tables: readonly { value: { id: string } }[];
   flows: readonly { value: { id: string } }[];
+  roles?: readonly { value: { id: string } }[];
   components: readonly {
     value: GraphComponent & {
       possede: readonly string[];
       sert: readonly string[];
       type?: string;
+      acteurs?: readonly string[];
     };
   }[];
-  archFlows: readonly { value: { id: string } }[];
+  archFlows: readonly {
+    value: { id: string; participants?: readonly string[]; messages?: readonly FlowItemInput[] };
+  }[];
 };
 
 export type CoverageCount = { covered: number; total: number };
@@ -55,11 +63,16 @@ export type ArchitectureCoverage = {
   unownedTables: string[];
   /** Composants non externes sans lien vers ni depuis un autre composant connu (B633). */
   isolatedComponents: string[];
+  /** Rôles sans application d'entrée (TK-114d, B651). */
+  rolesWithoutApp: string[];
+  /** Flux techniques dont un message relie un rôle à un service, une base ou une file (B652) : pas un trou de la passe. */
+  directFlows: string[];
   counts: {
     features: CoverageCount;
     flows: CoverageCount;
     tables: CoverageCount;
     links: CoverageCount;
+    roles: CoverageCount;
   };
 };
 
@@ -107,16 +120,25 @@ export function architectureCoverage(spec: ArchitectureCoverageInput): Architect
   const linked = linkedOf(spec.components);
   const internal = spec.components.filter(({ value }) => value.type !== "ext");
   const isolatedComponents = idsOf(internal).filter((id) => !linked.has(id));
+  const roles = idsOf(spec.roles ?? []);
+  const { rolesWithoutApp, directFlows } = roleCoverage(
+    roles,
+    spec.components.map(({ value }) => value),
+    spec.archFlows.map(({ value }) => value),
+  );
   return {
     unservedFeatures,
     missingFlows,
     unownedTables,
     isolatedComponents,
+    rolesWithoutApp,
+    directFlows,
     counts: {
       features: countOf(spec.features, unservedFeatures),
       flows: countOf(spec.flows, missingFlows),
       tables: countOf(spec.tables, unownedTables),
       links: countOf(internal, isolatedComponents),
+      roles: countOf(roles, rolesWithoutApp),
     },
   };
 }

@@ -1,8 +1,15 @@
 import type { AgentProposalKind } from "@koklo/domain";
 import { ask, type GenerateDeps, type Run, timeUp } from "./call.ts";
-import { type CoverageIndex, coverageIndexOf, coverageOf } from "./coverage.ts";
-import { type CoverageOutcome, coveragePass, linkTables, recordAfter } from "./coverage-pass.ts";
+import { type CoverageIndex, coverageIndexOf } from "./coverage.ts";
+import {
+  type CoverageOutcome,
+  coveragePass,
+  linkTables,
+  recordAfter,
+  repriseFlows,
+} from "./coverage-pass.ts";
 import { zonesPrompt } from "./prompts.ts";
+import { coverageCountsOf } from "./reprises.ts";
 import type { LaunchSources } from "./sources.ts";
 import type { LaunchContext, LaunchProgress } from "./store.ts";
 import { rememberPublished, type TriageContext, titleKey, zonesOf } from "./triage.ts";
@@ -135,19 +142,23 @@ async function firstStep(
     schema: ZONES_SCHEMA,
     parse: (raw) => (isData ? zonesOf(raw, DATA_ZONE_MAX) : zonesOf(raw)),
   });
-  const before = index === undefined ? undefined : coverageOf(index, []).counts;
+  const before = index === undefined ? undefined : coverageCountsOf(index, []);
   const outcome = await run.deps.store.recordZones(run.launch, zones, before);
   return outcome === "stopped" ? "stopped" : zones;
 }
 
-/** Fin de l'Architecture : la règle des tables passe avant toute fin (B614), sauf arrêt de l'extérieur. */
-async function architectureEnd(
+/**
+ * Fin de l'Architecture : la règle des tables (B614) puis les flux repris (TK-114d, B656) passent avant toute fin, jamais sur
+ * un relais ni un arrêt de l'extérieur.
+ */
+export async function architectureEnd(
   run: Run,
   index: CoverageIndex,
   outcome: GenerateOutcome,
 ): Promise<GenerateOutcome> {
   if (outcome === "handoff" || outcome === "stopped") return outcome;
-  return (await linkTables(run, index)) === "stopped" ? "stopped" : outcome;
+  if ((await linkTables(run, index)) === "stopped") return "stopped";
+  return (await repriseFlows(run, index)) === "stopped" ? "stopped" : outcome;
 }
 
 /**

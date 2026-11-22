@@ -137,6 +137,7 @@ export class SpecArchitectureDiagramService {
       relations: view.relations,
       crossRelations: view.crossRelations,
       actors: view.actors,
+      actorRelations: view.actorRelations,
       outgoing: view.outgoing,
       truncated: view.truncated,
       commitSha: model.commitSha,

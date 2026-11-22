@@ -188,6 +188,49 @@ describe("zones : cas limites d'un petit dépôt", () => {
     expect(res.body.truncated).toBe(true);
   });
 
+  it("TK-114d (B654) : actorRelations rôle → application ; acteur avec application absent de la zone de services", async () => {
+    const s = await readScene(read());
+    const message = (de: string, vers: string) => ({ de, vers, texte: "Appelle" });
+    await seedIndex(read(), s, [], {
+      commit: true,
+      entities: [
+        component("C-portail", "Accueil", { type: "app", acteurs: ["RL-client"] }),
+        component("C-api", "Rendez-vous"),
+        entity("archflow", "P-reserver", "P-reserver", {
+          id: "P-reserver",
+          titre: "P-reserver",
+          participants: ["RL-client", "C-api", "RL-visiteur"],
+          messages: [message("RL-client", "C-api"), message("RL-visiteur", "C-api")],
+        }),
+      ],
+    });
+    const zone = (id: string) =>
+      send(
+        read().app,
+        s.world.actors.dev.cookie,
+        "get",
+        `/projects/${s.projectId}/spec/architecture/zone?zone=${id}`,
+      );
+    const accueil = await zone("accueil");
+    expect(accueil.status, JSON.stringify(accueil.body).slice(0, 300)).toBe(200);
+    expect(accueil.body.actorRelations).toEqual([{ from: "RL-client", to: "C-portail" }]);
+    const services = await zone("rendez-vous");
+    expect(services.body.actors.map((a: { id: string }) => a.id)).toEqual(["RL-visiteur"]);
+    expect(services.body.actorRelations).toEqual([]);
+    const cards = await send(
+      read().app,
+      s.world.actors.dev.cookie,
+      "get",
+      `/projects/${s.projectId}/spec/architecture/zones`,
+    );
+    expect(
+      cards.body.zones.map((z: { id: string; actorCount: number }) => [z.id, z.actorCount]),
+    ).toEqual([
+      ["accueil", 1],
+      ["rendez-vous", 1],
+    ]);
+  });
+
   it("icône et libellé de architecture/_zones.yaml au commit indexé ; sans zone : « Sans zone »", async () => {
     const s = await readScene(read());
     const { snapshotId } = await seedIndex(read(), s, [], {

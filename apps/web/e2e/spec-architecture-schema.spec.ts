@@ -52,6 +52,19 @@ const totoZoneLoaded = async (page: Page) => {
     .last()
     .scrollIntoViewIfNeeded();
 };
+/** TK-114d (B654, B662) : zone « Accueil » du mode toto, ses deux applications et leurs acteurs reliés. */
+const ACTOR_ZONE = "Accueil";
+const ACTOR_TRAITS = [
+  "RL-client>C-toto-portail",
+  "RL-invite>C-toto-portail",
+  "RL-gestionnaire>C-toto-console",
+];
+const actorZoneLoaded = async (page: Page) => {
+  await expect(node(page, /^Application Portail/)).toBeVisible();
+  await expect(node(page, /^Acteur Gestionnaire/)).toBeVisible();
+  for (const id of ACTOR_TRAITS)
+    await expect(page.locator(`[data-relation='${id}']`)).toHaveCount(1);
+};
 const FIRST_FLOW = "P-reserver-un-rendez-vous";
 /** Sous 768 px, la liste d'abord puis le détail : le flux se choisit par `?f=` (fiche §7). */
 const flowPath = (page: Page, tab = "flows") =>
@@ -92,6 +105,13 @@ const VIEWS: View[] = [
     path: `${PATH}?tab=schema&zone=${TOTO_ZONE}`,
     desktopOnly: true,
     visible: totoZoneLoaded,
+  },
+  {
+    name: "zone-open-toto-actors-schema",
+    architecture: "toto",
+    path: `${PATH}?tab=schema&zone=${ACTOR_ZONE}`,
+    desktopOnly: true,
+    visible: actorZoneLoaded,
   },
   {
     name: "zone-open-schema",
@@ -311,6 +331,25 @@ test.describe("parcours des onglets Schéma et Flux", () => {
     );
     await expect(page.locator("[data-relation='C-toto-panier>zone:Catalogue']")).toHaveCount(1);
     await expect(page.getByText("publie", { exact: true })).toBeVisible();
+  });
+
+  test("TK-114d : chaque acteur relié à son application d'entrée, trait plein sans étiquette, carte « · 3 acteurs »", async ({
+    page,
+  }) => {
+    await start(page, "toto");
+    await page.goto(`${PATH}?tab=schema`);
+    await zonesLoaded(page, 23);
+    const card = page.getByRole("button", { name: new RegExp(`^Zone ${ACTOR_ZONE}`) }).first();
+    await expect(card).toContainText("3 acteurs");
+    await card.click();
+    await expect(page).toHaveURL(new RegExp(`zone=${ACTOR_ZONE}`));
+    await actorZoneLoaded(page);
+    const trait = page.locator(`[data-relation='${ACTOR_TRAITS[0]}']`);
+    await expect(trait).not.toHaveAttribute("stroke-dasharray", /.*/);
+    // Les acteurs n'apparaissent que dans la zone de leur application (B654).
+    await page.goto(`${PATH}?tab=schema&zone=${TOTO_ZONE}`);
+    await totoZoneLoaded(page);
+    await expect(node(page, /^Acteur /)).toHaveCount(0);
   });
 
   test("TK-114c : mode demo (8 composants) reste à plat, les liens entre zones tracés en direct", async ({

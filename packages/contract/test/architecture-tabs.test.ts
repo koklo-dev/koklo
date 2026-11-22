@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, SHA, UUID } from "./support.ts";
  * `specBatch.submit`, lectures `spec.architecture.*`, `spec.item.get` de type `component`, compteur `components`.
  */
 describe("TK-111 surface", () => {
-  it("version 3.13.0 (TK-113 est additif : mineure)", () => {
-    expect(CONTRACT_VERSION).toBe("3.13.0");
+  it("version 3.14.0 (TK-114d est additif : mineure)", () => {
+    expect(CONTRACT_VERSION).toBe("3.14.0");
   });
 
   it.each([
@@ -32,6 +32,7 @@ describe("TK-111 surface", () => {
 const batch = (operations: unknown[]) => ({ projectId: UUID, idempotencyKey: "k-1", operations });
 const ok = async (operation: unknown) => isValid(input("specBatch.submit"), batch([operation]));
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même famille d'opérations, un test par cas
 describe("TK-111 specBatch.submit : component.*", () => {
   const component = {
     kind: "component.create",
@@ -73,6 +74,22 @@ describe("TK-111 specBatch.submit : component.*", () => {
     expect(await ok({ ...component, dependsOn: [{ to: "db", via: "SQL" }] })).toBe(false);
     expect(await ok({ ...component, dependsOn: [{ to: "C-db" }] })).toBe(false);
     expect(await ok({ ...component, decisions: ["ADR-1"] })).toBe(false);
+  });
+
+  it("TK-114d (contrat 3.14.0, B650) : actors RL-slug, 20 au plus, sur component.create et update", async () => {
+    const create = {
+      kind: "component.create",
+      name: "Portail",
+      type: "app",
+      zone: "Bord",
+      responsibility: "Accueille les visiteurs.",
+    };
+    expect(await ok({ ...create, actors: ["RL-visiteur"] })).toBe(true);
+    expect(await ok({ kind: "component.update", specId: "C-portail", actors: [] })).toBe(true);
+    expect(await ok({ ...create, actors: ["visiteur"] })).toBe(false);
+    expect(await ok({ ...create, actors: Array.from({ length: 21 }, (_, i) => `RL-r${i}`) })).toBe(
+      false,
+    );
   });
 
   it("component.update et component.delete : identifiant C-slug, au moins un champ modifié", async () => {
@@ -365,6 +382,7 @@ describe("TK-112 A spec.architecture : zones, zone, search, layout, flows, sourc
       actors: [{ id: "RL-client", name: "Client" }],
       outgoing: [{ zone: "donnees", count: 1 }],
       crossRelations: [{ from: "C-api", to: "C-db", via: "SQL", zone: "donnees" }],
+      actorRelations: [{ from: "RL-client", to: "C-portail" }],
       truncated: false,
       commitSha: SHA,
     };
@@ -386,6 +404,13 @@ describe("TK-112 A spec.architecture : zones, zone, search, layout, flows, sourc
     expect(await cross([{ from: "api", to: "C-db", via: "SQL", zone: "donnees" }])).toBe(false);
     const { crossRelations: _cross, ...before } = view;
     expect(await isValid(o, before)).toBe(false);
+    // TK-114d (contrat 3.14.0, B654, B660) : traits rôle → application rendue, toujours présents.
+    const actorLinks = (actorRelations: unknown) => isValid(o, { ...view, actorRelations });
+    expect(await actorLinks([])).toBe(true);
+    expect(await actorLinks([{ from: "C-api", to: "C-portail" }])).toBe(false);
+    expect(await actorLinks([{ from: "RL-client", to: "RL-admin" }])).toBe(false);
+    const { actorRelations: _actors, ...withoutActors } = view;
+    expect(await isValid(o, withoutActors)).toBe(false);
     const many = Array.from({ length: 201 }, (_, n) => ({
       ...view.components[0],
       specId: `C-c${n}`,

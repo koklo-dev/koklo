@@ -35,6 +35,13 @@ function checkComponent(component: Component, index: SpecIndex, emit: Emit): voi
         code: "ARCH_UNKNOWN_FEATURE",
         label: "La fonctionnalité",
       },
+      {
+        items: component.acteurs,
+        base: "/acteurs",
+        known: index.roles,
+        code: "R4_UNKNOWN_ROLE",
+        label: "Le rôle",
+      },
       decisionLinks(component.decisions, "/decisions", index),
     ],
     emit,

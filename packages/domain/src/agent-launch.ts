@@ -51,6 +51,7 @@ export type AgentProposalStatus = (typeof AGENT_PROPOSAL_STATUSES)[number];
 /**
  * Plafonds d'un lancement : zones, propositions par zone et par lancement, consigne libre. TK-114b : segments enchaînés d'un
  * même lancement (B617), liens `owns`/`serves` d'un composant (B615), paquets et appels de la passe de couverture (B616).
+ * TK-114d : rôles sans application par paquet (B653), flux repris par lancement (B655).
  */
 export const AGENT_PROPOSE_LIMITS = {
   zones: 12,
@@ -59,7 +60,7 @@ export const AGENT_PROPOSE_LIMITS = {
   instruction: 500,
   segments: 8,
   links: 200,
-  coverage: { features: 15, flows: 5, components: 10, calls: 30 },
+  coverage: { features: 15, flows: 5, components: 10, calls: 30, roles: 5, reprises: 60 },
 } as const;
 
 /** Motif fermé d'une zone écartée (B618) : jamais le texte du fournisseur. */

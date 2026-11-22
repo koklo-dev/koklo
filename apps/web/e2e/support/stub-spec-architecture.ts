@@ -36,6 +36,8 @@ export interface Component {
   serves: string[];
   dependsOn: Array<{ to: string; via: string; async?: boolean }>;
   decisions: string[];
+  /** Rôles qui entrent par cette application (`acteurs`, TK-114d, B650). */
+  actors?: string[];
 }
 
 const DEMO: Component[] = [
@@ -49,6 +51,7 @@ const DEMO: Component[] = [
     serves: ["F-001", "F-002"],
     dependsOn: [{ to: "C-api", via: "HTTPS" }],
     decisions: ["ADR-002"],
+    actors: ["RL-client"],
   },
   {
     specId: "C-api",
@@ -155,7 +158,10 @@ const GENERATED: Component[] = Array.from({ length: VOLUME_COUNT - DEMO.length }
   };
 });
 
-/** TK-114c (B632, B641) : 23 composants en 8 zones aux noms neutres ; chaque zone en relie une autre. */
+/**
+ * TK-114c (B632, B641) : 23 composants en 8 zones aux noms neutres ; chaque zone en relie une autre. TK-114d (B654) :
+ * deux applications d'entrée dans « Accueil », chacune avec ses rôles (données inventées).
+ */
 const TOTO_ZONES = [
   "Accueil",
   "Comptes",
@@ -168,6 +174,7 @@ const TOTO_ZONES = [
 ];
 const TOTO_SPECS: ReadonlyArray<[string, string, Type, number, Component["dependsOn"]]> = [
   ["C-toto-portail", "Portail", "app", 0, [{ to: "C-toto-passerelle", via: "HTTPS" }]],
+  ["C-toto-console", "Console", "app", 0, [{ to: "C-toto-passerelle", via: "HTTPS" }]],
   [
     "C-toto-passerelle",
     "Passerelle",
@@ -236,8 +243,11 @@ const TOTO_SPECS: ReadonlyArray<[string, string, Type, number, Component["depend
   ["C-toto-entrepot", "Entrepôt", "store", 6, []],
   ["C-toto-journal", "Journal", "store", 7, []],
   ["C-toto-config", "Configuration", "service", 7, [{ to: "C-toto-journal", via: "écrit" }]],
-  ["C-toto-cles", "Clés", "ext", 7, []],
 ];
+const TOTO_ACTORS: Record<string, string[]> = {
+  "C-toto-portail": ["RL-client", "RL-invite"],
+  "C-toto-console": ["RL-gestionnaire"],
+};
 const TOTO: Component[] = TOTO_SPECS.map(([specId, name, type, zone, dependsOn]) => ({
   specId,
   name,
@@ -248,6 +258,7 @@ const TOTO: Component[] = TOTO_SPECS.map(([specId, name, type, zone, dependsOn])
   serves: [],
   dependsOn,
   decisions: [],
+  ...(TOTO_ACTORS[specId] ? { actors: TOTO_ACTORS[specId] } : {}),
 }));
 
 export const componentsOf = (mode: ArchitectureMode): Component[] =>
@@ -417,6 +428,20 @@ function zoneLinks(all: readonly Component[], name: string) {
   return [...links].map(([to, count]) => ({ to, count }));
 }
 
+const ROLE_NAMES: Record<string, string> = {
+  "RL-client": "Client",
+  "RL-invite": "Invité",
+  "RL-gestionnaire": "Gestionnaire",
+};
+/** Acteur rendu dans la zone de son application d'entrée seulement (B654) ; trait rôle → application. */
+const actorRelationsOf = (own: readonly Component[]) =>
+  own.flatMap((c) =>
+    c.type === "app" ? (c.actors ?? []).map((from) => ({ from, to: c.specId })) : [],
+  );
+const actorIdsOf = (own: readonly Component[]) => [
+  ...new Set(actorRelationsOf(own).map((link) => link.from)),
+];
+
 function zonesOf(mode: ArchitectureMode) {
   const all = componentsOf(mode);
   const names = [...new Set(all.map((c) => c.zone))].sort((a, b) => a.localeCompare(b, "fr"));
@@ -427,7 +452,7 @@ function zonesOf(mode: ArchitectureMode) {
       name,
       icon: ICONS[name] ?? "folder_open",
       componentCount: own.length,
-      actorCount: own.some((c) => c.specId === "C-web") ? 1 : 0,
+      actorCount: actorIdsOf(own).length,
       preview: own.slice(0, 7).map((c) => c.name),
       links: zoneLinks(all, name),
     };
@@ -493,7 +518,8 @@ function zoneDetail(mode: ArchitectureMode, id: string): Reply {
       c.dependsOn.filter((dep) => here.has(dep.to)).map((dep) => linkOf(c.specId, dep)),
     ),
     crossRelations,
-    actors: entry.actorCount > 0 ? [{ id: "RL-client", name: "Client" }] : [],
+    actors: actorIdsOf(own).map((id) => ({ id, name: ROLE_NAMES[id] ?? id })),
+    actorRelations: actorRelationsOf(own),
     outgoing: [...outgoing].map(([zone, count]) => ({ zone, count })),
     truncated: false,
     commitSha: SHA,

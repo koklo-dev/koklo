@@ -87,6 +87,8 @@ describe("coverageIndexOf", () => {
       tableIds: ["T-a", "T-b"],
       components: sources.architecture.components,
       archflows: ["P-a"],
+      technicalFlows: sources.architecture.archflows,
+      roles: [],
     });
   });
 });
@@ -201,5 +203,60 @@ describe("knownComponents", () => {
       { specId: "C-api", title: "API", zone: "Noyau", type: "service" },
       { specId: "C-cache", title: "Cache", zone: "Noyau", type: "queue" },
     ]);
+  });
+});
+
+/** TK-114d (B651, B653) : rôles et applications d'entrée dans la couverture, rôles sans application 5 par paquet. */
+describe("couverture des rôles (TK-114d)", () => {
+  const ROLES = titled("RL-r", 7).map(({ specId, title }) => ({
+    specId: specId.replace(/0+(\d)$/, "$1"),
+    title,
+  }));
+  const WITH_ROLES: CoverageIndex = {
+    ...INDEX,
+    roles: ROLES,
+    components: [...INDEX.components, { ...COMPONENT("C-web"), type: "app" }],
+    technicalFlows: [
+      {
+        specId: "P-b",
+        title: "P-b",
+        participants: ["RL-r1", "C-api"],
+        messages: [{ from: "RL-r1", to: "C-api", text: "Appelle" }],
+      },
+    ],
+  };
+
+  it("index : aucun rôle couvert, P-b direct ; actors d'une app proposée, flux repris : couverts", () => {
+    const before = coverageOf(WITH_ROLES, []);
+    expect(before.counts.roles).toEqual({ covered: 0, total: 7 });
+    expect(before.directFlows).toEqual(["P-b"]);
+    const proposals = [
+      proposal("component", { specId: "C-web", name: "Web", type: "app", actors: ["RL-r2"] }),
+      proposal("component", { name: "Mobile", type: "app", actors: ["RL-r3"] }, "rejected"),
+      proposal("archflow", {
+        specId: "P-b",
+        flow: "P-b",
+        messages: [
+          { from: "RL-r1", to: "C-web", text: "Appelle" },
+          { from: "C-web", to: "C-api", text: "Appelle" },
+        ],
+      }),
+    ];
+    const after = coverageOf(WITH_ROLES, proposals);
+    expect(after.rolesWithoutApp).toEqual(["RL-r3", "RL-r4", "RL-r5", "RL-r6", "RL-r7"]);
+    expect(after.directFlows).toEqual([]);
+  });
+
+  it("rôles sans application : 5 par paquet, avec les composants appelés", () => {
+    const roles = ROLES.map((role) => ({ ...role, calls: ["C-api"] }));
+    const holes = {
+      unservedFeatures: [],
+      missingFlows: [],
+      isolatedComponents: [],
+      rolesWithoutApp: ROLES.map((role) => role.specId),
+    };
+    const packets = packetsOf(WITH_ROLES, holes, [], roles);
+    expect(packets.map((p) => p.roles?.length)).toEqual([5, 2]);
+    expect(packets[0]?.roles?.[0]).toEqual({ specId: "RL-r1", title: "RL-r 1", calls: ["C-api"] });
   });
 });
