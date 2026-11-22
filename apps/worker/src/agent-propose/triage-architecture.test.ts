@@ -72,6 +72,7 @@ const section = (title: string, markdown = "Texte.") => ({
 });
 const run = (proposals: unknown[], ctx = context()) => triageProposals({ proposals }, ctx);
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("triage des composants", () => {
   it("accepte un composant valide : titre = nom, il devient connu pour les flux et les dépendances suivants", () => {
     const { accepted, discarded } = run([
@@ -95,14 +96,13 @@ describe("triage des composants", () => {
       component("api"),
       component("Un", { owns: ["T-absente"] }),
       component("Deux", { serves: ["F-099"] }),
-      component("Trois", { dependsOn: [{ to: "C-fantome", via: "HTTP" }] }),
       component("Quatre", { decisions: ["ADR-042"] }),
       component("Cinq", { type: "lambda" }),
       component("Six", { responsibility: "Voir [x](http://exemple.fr)" }),
       component("Sept"),
     ]);
     expect(accepted.map((a) => a.title)).toEqual(["Sept"]);
-    expect(discarded).toBe(7);
+    expect(discarded).toBe(6);
   });
 
   it("deux noms au même identifiant C-<slug> : le second est écarté", () => {
@@ -112,6 +112,27 @@ describe("triage des composants", () => {
     ]);
     expect(accepted).toHaveLength(1);
     expect(discarded).toBe(1);
+  });
+
+  it("TK-114c (B638) : une cible inconnue est retirée de dependsOn, le composant est gardé", () => {
+    const { accepted, discarded } = run([
+      component("Trois", {
+        dependsOn: [
+          { to: "C-fantome", via: "HTTP" },
+          { to: "C-api", via: "HTTP" },
+          { to: "C-trois", via: "SQL" },
+        ],
+      }),
+      component("Quatre", { dependsOn: [{ to: "C-zone-suivante", via: "AMQP", async: true }] }),
+    ]);
+    expect(discarded).toBe(0);
+    expect(accepted.map((a) => a.payload.dependsOn)).toEqual([
+      [
+        { to: "C-api", via: "HTTP" },
+        { to: "C-trois", via: "SQL" },
+      ],
+      [],
+    ]);
   });
 
   it("une dépendance sur soi-même est permise (id de son propre nom)", () => {

@@ -283,6 +283,7 @@ describe("TK-99a specBatch.submit : 200 opérations et proposalIds", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même schéma, un test par comportement
 describe("TK-114b (contrat 3.12.0, B620) : launch.report, bilan du lancement de l'Architecture", () => {
   const COUNT = { covered: 38, total: 174 };
   const REPORT = {
@@ -340,5 +341,23 @@ describe("TK-114b (contrat 3.12.0, B620) : launch.report, bilan du lancement de 
     expect(await valid({ ...REPORT, zonesDone: -1 })).toBe(false);
     expect(await valid({ ...REPORT, coverageAfter: { features: COUNT } })).toBe(false);
     expect(await valid({ ...REPORT, text: "sortie du fournisseur" })).toBe(false);
+  });
+
+  it("TK-114c (contrat 3.13.0, B640) : links facultatif dans la couverture avant et après", async () => {
+    const links = { covered: 3, total: 23 };
+    const withLinks = {
+      ...REPORT,
+      coverageBefore: { ...REPORT.coverageBefore, links },
+      coverageAfter: { ...REPORT.coverageAfter, links: { covered: 23, total: 23 } },
+    };
+    expect(await valid(withLinks)).toBe(true);
+    const kept = await parsed(output("proposal.list"), page({ ...LAUNCH, report: withLinks }));
+    expect(kept?.launch).toMatchObject({ report: withLinks });
+    expect(await valid(REPORT)).toBe(true);
+    const negative = {
+      ...REPORT,
+      coverageAfter: { ...REPORT.coverageAfter, links: { covered: -1, total: 2 } },
+    };
+    expect(await valid(negative)).toBe(false);
   });
 });

@@ -154,6 +154,7 @@ describe("buildArchZones", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même vue, un test par comportement
 describe("buildArchZone", () => {
   const nodes = [
     node("C-a1", "A", [
@@ -190,6 +191,26 @@ describe("buildArchZone", () => {
     expect(view?.relations).toEqual([{ from: "C-a", to: "C-b", via: "AMQP", async: true }]);
   });
 
+  it("TK-114c (B640) : crossRelations, liens avec les autres zones dans les deux sens, zone = l'autre zone", () => {
+    const view = buildArchZone(nodes, flows, [], "a", new Map());
+    expect(view?.crossRelations).toEqual([
+      { from: "C-a1", to: "C-b1", via: "AMQP", async: true, zone: "b" },
+      { from: "C-b1", to: "C-a1", via: "HTTP", zone: "b" },
+    ]);
+    const other = buildArchZone(
+      [...nodes, node("C-c1", undefined, [{ to: "C-b1" }, { to: "C-fantome" }])],
+      [],
+      [],
+      "b",
+      new Map(),
+    );
+    expect(other?.crossRelations).toEqual([
+      { from: "C-b1", to: "C-a1", via: "HTTP", zone: "a" },
+      { from: "C-a1", to: "C-b1", via: "AMQP", async: true, zone: "a" },
+      { from: "C-c1", to: "C-b1", via: "HTTP", zone: "sans-zone" },
+    ]);
+  });
+
   it("acteur sans nom connu : repli sur l'identifiant", () => {
     const view = buildArchZone(nodes, flows, [], "a", new Map());
     expect(view?.actors).toEqual([{ id: "RL-client", name: "RL-client" }]);
@@ -204,5 +225,6 @@ describe("buildArchZone", () => {
     expect(view?.zone.componentCount).toBe(205);
     expect(view?.truncated).toBe(true);
     expect(view?.relations).toEqual([{ from: "C-m0", to: "C-m1", via: "HTTP" }]);
+    expect(view?.crossRelations).toEqual([]);
   });
 });

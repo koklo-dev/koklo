@@ -336,6 +336,19 @@ export const architectureZoneSchema = z.object({
   ),
   actors: z.array(z.object({ id: roleLink, name: z.string() })),
   outgoing: z.array(z.object({ zone: zoneIdSchema, count: z.number().int().min(1) })),
+  /**
+   * Liens entre un composant de la zone et un composant d'une autre zone, dans les deux sens (TK-114c, contrat 3.13.0,
+   * B640) : `zone` est l'identifiant de l'autre zone.
+   */
+  crossRelations: z.array(
+    z.object({
+      from: componentIdSchema,
+      to: componentIdSchema,
+      via: z.string(),
+      async: z.boolean().optional(),
+      zone: zoneIdSchema,
+    }),
+  ),
   truncated: z.boolean(),
   commitSha: commitShaSchema,
 });

@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, SHA, UUID } from "./support.ts";
  * `specBatch.submit`, lectures `spec.architecture.*`, `spec.item.get` de type `component`, compteur `components`.
  */
 describe("TK-111 surface", () => {
-  it("version 3.12.0 (TK-113 est additif : mineure)", () => {
-    expect(CONTRACT_VERSION).toBe("3.12.0");
+  it("version 3.13.0 (TK-113 est additif : mineure)", () => {
+    expect(CONTRACT_VERSION).toBe("3.13.0");
   });
 
   it.each([
@@ -364,6 +364,7 @@ describe("TK-112 A spec.architecture : zones, zone, search, layout, flows, sourc
       relations: [{ from: "C-api", to: "C-db", via: "SQL" }],
       actors: [{ id: "RL-client", name: "Client" }],
       outgoing: [{ zone: "donnees", count: 1 }],
+      crossRelations: [{ from: "C-api", to: "C-db", via: "SQL", zone: "donnees" }],
       truncated: false,
       commitSha: SHA,
     };
@@ -375,6 +376,16 @@ describe("TK-112 A spec.architecture : zones, zone, search, layout, flows, sourc
         relations: [{ from: "C-api", to: "C-db", via: "AMQP", async: true }],
       }),
     ).toBe(true);
+    // TK-114c (contrat 3.13.0, B640) : liens avec les autres zones, dans les deux sens, zone = l'autre zone.
+    const cross = (crossRelations: unknown) => isValid(o, { ...view, crossRelations });
+    expect(
+      await cross([{ from: "C-job", to: "C-api", via: "AMQP", async: true, zone: "travaux" }]),
+    ).toBe(true);
+    expect(await cross([])).toBe(true);
+    expect(await cross([{ from: "C-api", to: "C-db", via: "SQL" }])).toBe(false);
+    expect(await cross([{ from: "api", to: "C-db", via: "SQL", zone: "donnees" }])).toBe(false);
+    const { crossRelations: _cross, ...before } = view;
+    expect(await isValid(o, before)).toBe(false);
     const many = Array.from({ length: 201 }, (_, n) => ({
       ...view.components[0],
       specId: `C-c${n}`,

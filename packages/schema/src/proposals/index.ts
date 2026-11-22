@@ -12,6 +12,7 @@ export { isSafeText, safeText } from "./ai-text-policy.ts";
 export {
   adrProposalSchema,
   archflowProposalSchema,
+  componentDependencySchema,
   componentProposalSchema,
   docSectionProposalSchema,
 } from "./architecture.ts";

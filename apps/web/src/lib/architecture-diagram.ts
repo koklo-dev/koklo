@@ -15,10 +15,16 @@ import {
  * `architecture/_layout.yaml` passent par-dessus nœud par nœud.
  */
 
-/** Zone d'un composant : même règle que le diagramme des Données (plus de 25 composants en au moins deux zones). */
-export const ZONE_VIEW_ABOVE = 25;
+/**
+ * Vue par zones (B632) : dès 3 zones au-delà de 12 composants ; l'ancienne règle (plus de 25 composants en au moins
+ * deux zones, celle des Données) reste vraie.
+ */
+export const ZONE_VIEW_ABOVE = 12;
+export const ZONE_VIEW_MIN_ZONES = 3;
+export const ZONE_VIEW_LARGE_ABOVE = 25;
 export const usesZoneView = (components: number, zones: number): boolean =>
-  components > ZONE_VIEW_ABOVE && zones >= 2;
+  (components > ZONE_VIEW_ABOVE && zones >= ZONE_VIEW_MIN_ZONES) ||
+  (components > ZONE_VIEW_LARGE_ABOVE && zones >= 2);
 
 /** Carte de zone (maquette 13 l.702-710) : 300 × 180 ; grille à 2 colonnes, x = 40 + (i % 2) × 400, y = 30 + ⌊i / 2⌋ × 270. */
 export const ZONE_WIDTH = 300;
@@ -109,6 +115,10 @@ const LANE_OF: Record<ArchNodeKind, number> = {
 };
 const LANE_LEFT = 30;
 const GAP = 24;
+/** Bas de la couche « Données et services externes » (540 + 250). */
+const LANES_BOTTOM = 790;
+/** Rangée des nœuds d'une autre zone, sous les couches (maquette 13 l.716-717). */
+const GHOST_TOP = LANES_BOTTOM + 60;
 
 /** Nœud du schéma : composant (`C-`), acteur (`RL-`) ou composant d'une autre zone (`zone:<libellé>`). */
 export interface ArchNode extends DiagramNode {
@@ -118,13 +128,21 @@ export interface ArchNode extends DiagramNode {
   ghostZone?: string;
 }
 
-/** Ce que `spec.architecture.zone` rend d'une zone. */
+interface ArchLink {
+  from: string;
+  to: string;
+  via: string;
+  async?: boolean | undefined;
+}
+
+/** Ce que `spec.architecture.zone` rend d'une zone ; `crossRelations` : liens avec un composant d'une autre `zone` (B640). */
 export interface ArchZoneDetail {
   zone: { id: string; name: string };
   components: ReadonlyArray<{ specId: string; name: string; type: ArchNodeKind }>;
-  relations: ReadonlyArray<{ from: string; to: string; via: string; async?: boolean | undefined }>;
+  relations: readonly ArchLink[];
   actors: ReadonlyArray<{ id: string; name: string }>;
   outgoing: ReadonlyArray<{ zone: string; count: number }>;
+  crossRelations?: ReadonlyArray<ArchLink & { zone: string }> | undefined;
 }
 
 const GHOST_PREFIX = "zone:";
@@ -175,30 +193,54 @@ export function ghostsOf(
     .sort((a, b) => fr(a.name, b.name));
 }
 
-/** Liens entre composants rendus : « moyen », pointillés quand l'appel est asynchrone (maquette 13 l.693). */
+/**
+ * Lien inter-zones (B641) : trait direct quand les deux composants sont rendus (vue à plat), sinon vers la carte
+ * estompée de l'autre zone (`zone:<nom>`) si elle est affichée ; le composant rendu garde son sens.
+ */
+function crossEnds(
+  link: ArchLink & { zone: string },
+  known: ReadonlySet<string>,
+  zoneNames: ReadonlyMap<string, string>,
+): { from: string; to: string } | null {
+  if (known.has(link.from) && known.has(link.to)) return link;
+  const name = zoneNames.get(link.zone);
+  const ghost = name === undefined ? "" : `${GHOST_PREFIX}${name}`;
+  if (!known.has(ghost)) return null;
+  if (known.has(link.from)) return { from: link.from, to: ghost };
+  return known.has(link.to) ? { from: ghost, to: link.to } : null;
+}
+
+/**
+ * Liens entre nœuds rendus, un par paire : « moyen » (le premier) en étiquette, pointillés quand l'appel est asynchrone
+ * (maquette 13 l.693, l.717-718).
+ */
 export function relationsOf(
   details: readonly ArchZoneDetail[],
   nodes: readonly ArchNode[],
+  zoneNames: ReadonlyMap<string, string> = new Map(),
 ): DiagramRelation[] {
   const known = new Set(nodes.map((node) => node.id));
-  const seen = new Set<string>();
-  const relations: DiagramRelation[] = [];
+  const byId = new Map<string, DiagramRelation>();
+  const add = (ends: { from: string; to: string } | null, link: ArchLink) => {
+    if (!ends) return;
+    const id = `${ends.from}>${ends.to}`;
+    if (byId.has(id)) return;
+    byId.set(id, {
+      id,
+      from: ends.from,
+      to: ends.to,
+      label: link.via,
+      labelFont: "sans",
+      dashed: link.async === true,
+    });
+  };
   for (const detail of details) {
     for (const link of detail.relations) {
-      const id = `${link.from}>${link.to}`;
-      if (seen.has(id) || !known.has(link.from) || !known.has(link.to)) continue;
-      seen.add(id);
-      relations.push({
-        id,
-        from: link.from,
-        to: link.to,
-        label: link.via,
-        labelFont: "sans",
-        dashed: link.async === true,
-      });
+      add(known.has(link.from) && known.has(link.to) ? link : null, link);
     }
+    for (const link of detail.crossRelations ?? []) add(crossEnds(link, known, zoneNames), link);
   }
-  return relations;
+  return [...byId.values()];
 }
 
 /** Couches affichées : celles qui ont un nœud, sans quoi une couche vide mangerait la hauteur ; toutes en vue complète. */
@@ -206,7 +248,8 @@ export const bandsOf = (): DiagramBand[] => LANES.map((lane) => ({ ...lane }));
 
 /**
  * Placement par couche (B547) : y centré dans la couche du type, x dans l'ordre des identifiants, séparés de la largeur
- * du nœud et de 24 px. Un nœud d'une autre zone se range dans la couche Services, après les composants.
+ * du nœud et de 24 px. Un nœud d'une autre zone se range dans sa propre rangée sous les couches (maquette 13
+ * l.716-717, B648), pour que ses traits et leurs étiquettes ne chevauchent pas les composants.
  */
 export function layerPositions(nodes: readonly ArchNode[]): Record<string, DiagramPoint> {
   const next: number[] = LANES.map(() => LANE_LEFT);
@@ -215,7 +258,13 @@ export function layerPositions(nodes: readonly ArchNode[]): Record<string, Diagr
     if (isGhostId(a.id) !== isGhostId(b.id)) return isGhostId(a.id) ? 1 : -1;
     return a.id.localeCompare(b.id, "en");
   });
+  let ghostX = LANE_LEFT;
   for (const node of ordered) {
+    if (isGhostId(node.id)) {
+      result[node.id] = { x: ghostX, y: GHOST_TOP };
+      ghostX += node.width + GAP;
+      continue;
+    }
     const lane = LANE_OF[node.kind];
     const band = LANES[lane];
     if (!band) continue;

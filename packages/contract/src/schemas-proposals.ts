@@ -137,6 +137,8 @@ const launchCoverageSchema = z.strictObject({
   features: coverageCountSchema,
   flows: coverageCountSchema,
   tables: coverageCountSchema,
+  /** Composants non externes reliés à un autre composant (TK-114c, contrat 3.13.0, B633) ; absent avant TK-114c. */
+  links: coverageCountSchema.optional(),
 });
 
 /**

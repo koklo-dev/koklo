@@ -43,23 +43,28 @@ const specIdOf = ({ content }: ProposalOutput): string | undefined => {
   return /^C-[a-z0-9][a-z0-9-]*$/.test(specId) ? specId : undefined;
 };
 
+const dependenciesOf = (content: Content) =>
+  records(content.dependsOn).map((link) => ({
+    to: str(link.to),
+    via: str(link.via),
+    ...(link.async === true ? { async: true } : {}),
+  }));
+
 function componentOperation(proposal: ProposalOutput): Operation {
   const { content } = proposal;
   const specId = specIdOf(proposal);
-  // Mise à jour d'un composant indexé : les liens seuls, complets (index ∪ ajouts), jamais le nom ni la responsabilité.
+  const dependsOn = dependenciesOf(content);
+  // Mise à jour d'un composant indexé : les liens seuls, complets (index ∪ ajouts), jamais le nom ni la responsabilité ;
+  // `dependsOn` seulement quand la charge en porte (B637).
   if (specId) {
     return {
       kind: "component.update",
       specId,
       owns: strings(content.owns),
       serves: strings(content.serves),
+      ...optional("dependsOn", dependsOn),
     };
   }
-  const dependsOn = records(content.dependsOn).map((link) => ({
-    to: str(link.to),
-    via: str(link.via),
-    ...(link.async === true ? { async: true } : {}),
-  }));
   return {
     kind: "component.create",
     name: str(content.name).trim(),

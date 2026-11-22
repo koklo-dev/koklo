@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adrProposalSchema,
   archflowProposalSchema,
+  componentDependencySchema,
   componentProposalSchema,
   docSectionProposalSchema,
   jsonSchemaOf,
@@ -93,6 +94,19 @@ describe("componentProposalSchema", () => {
     expect(parse({ owns: tables(200), serves: features(200) })).toBe(true);
     expect(parse({ owns: tables(201) })).toBe(false);
     expect(parse({ serves: features(201) })).toBe(false);
+  });
+});
+
+describe("componentDependencySchema (TK-114c, B635)", () => {
+  it("to C-slug, via texte brut 1 à 120, async facultatif, rien d'autre", () => {
+    const ok = (value: object) => componentDependencySchema.safeParse(value).success;
+    expect(ok({ to: "C-db", via: "SQL" })).toBe(true);
+    expect(ok({ to: "C-db", via: "AMQP", async: true })).toBe(true);
+    expect(ok({ to: "db", via: "SQL" })).toBe(false);
+    expect(ok({ to: "C-db", via: "" })).toBe(false);
+    expect(ok({ to: "C-db", via: "x".repeat(121) })).toBe(false);
+    expect(ok({ to: "C-db", via: "voir https://x.fr" })).toBe(false);
+    expect(ok({ to: "C-db", via: "SQL", from: "C-api" })).toBe(false);
   });
 });
 

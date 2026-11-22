@@ -12,6 +12,8 @@ import {
   relationsOf,
   usesZoneView,
   ZONE_VIEW_ABOVE,
+  ZONE_VIEW_LARGE_ABOVE,
+  ZONE_VIEW_MIN_ZONES,
   zoneGridPositions,
   zoneNodesOf,
   zoneRelationsOf,
@@ -80,6 +82,15 @@ describe("couches (B547)", () => {
     expect([lane("C-db"), lane("C-sms"), lane("C-file")]).toEqual([3, 3, 3]);
   });
 
+  it("une carte d'une autre zone a sa propre rangée sous les couches (B648)", () => {
+    const nodes = nodesOf([DETAIL], [{ id: "Z-com", name: "Communication" }]);
+    const at = layerPositions(nodes);
+    const lanesBottom = Math.max(...bandsOf().map((band) => band.top + band.height));
+    expect(lanesBottom).toBe(790);
+    expect(at["zone:Communication"]).toEqual({ x: 30, y: 850 });
+    expect(at["zone:Communication"]?.y ?? 0).toBeGreaterThan(lanesBottom);
+  });
+
   it("x par ordre des identifiants, espacé de la largeur du nœud + 24 px", () => {
     const at = layerPositions(nodesOf([DETAIL]));
     const data = ["C-db", "C-file", "C-sms"].map((id) => at[id]?.x ?? 0);
@@ -130,11 +141,70 @@ describe("nœuds, liens et zones voisines", () => {
   });
 });
 
+describe("liens inter-zones (TK-114c, B641)", () => {
+  const OPEN: ArchZoneDetail = {
+    ...DETAIL,
+    crossRelations: [
+      { from: "C-api", to: "C-mail", via: "contrat typé", zone: "Z-com" },
+      { from: "C-api", to: "C-push", via: "file", async: true, zone: "Z-com" },
+      { from: "C-sms", to: "C-push", via: "rappel", async: true, zone: "Z-com" },
+      { from: "C-push", to: "C-db", via: "lecture", zone: "Z-com" },
+      { from: "C-api", to: "C-x", via: "x", zone: "Z-sans-carte" },
+    ],
+  };
+  const NAMES = new Map(ENTRIES.map((entry) => [entry.id, entry.name]));
+
+  it("zone ouverte : trait composant → carte estompée, un par paire, premier moyen, sens gardé", () => {
+    const nodes = nodesOf([OPEN], ghostsOf(OPEN, ENTRIES));
+    const cross = relationsOf([OPEN], nodes, NAMES).filter(
+      (link) => isGhostId(link.from) || isGhostId(link.to),
+    );
+    expect(cross.map((link) => link.id)).toEqual([
+      "C-api>zone:Communication",
+      "C-sms>zone:Communication",
+      "zone:Communication>C-db",
+    ]);
+    expect(cross[0]).toMatchObject({ label: "contrat typé", dashed: false });
+    expect(cross[1]).toMatchObject({ label: "rappel", dashed: true });
+  });
+
+  it("sans carte estompée ni nom de zone : aucun trait inter-zones", () => {
+    const nodes = nodesOf([OPEN], ghostsOf(OPEN, ENTRIES));
+    expect(relationsOf([OPEN], nodes).filter((link) => isGhostId(link.to))).toEqual([]);
+    expect(relationsOf([OPEN], nodesOf([OPEN]), NAMES)).toHaveLength(2);
+  });
+
+  it("vue à plat : les deux composants présents, trait direct", () => {
+    const other: ArchZoneDetail = {
+      zone: { id: "Z-com", name: "Communication" },
+      components: [
+        { specId: "C-mail", name: "Mail", type: "ext" },
+        { specId: "C-push", name: "Push", type: "service" },
+      ],
+      relations: [],
+      actors: [],
+      outgoing: [],
+      crossRelations: [{ from: "C-push", to: "C-db", via: "lecture", zone: "Z-rdv" }],
+    };
+    const details = [OPEN, other];
+    const ids = relationsOf(details, nodesOf(details), NAMES).map((link) => link.id);
+    expect(ids).toEqual(
+      expect.arrayContaining(["C-api>C-mail", "C-api>C-push", "C-sms>C-push", "C-push>C-db"]),
+    );
+    expect(ids.filter((id) => id === "C-push>C-db")).toHaveLength(1);
+    expect(ids.some((id) => id.includes("zone:"))).toBe(false);
+  });
+});
+
 describe("vue des zones (B546)", () => {
-  it("s'ouvre au-delà de 25 composants en au moins deux zones", () => {
-    expect(ZONE_VIEW_ABOVE).toBe(25);
+  it("TK-114c (B632) : dès 3 zones au-delà de 12 composants ; l'ancienne règle (25, 2 zones) reste", () => {
+    expect([ZONE_VIEW_ABOVE, ZONE_VIEW_MIN_ZONES, ZONE_VIEW_LARGE_ABOVE]).toEqual([12, 3, 25]);
+    expect(usesZoneView(13, 3)).toBe(true);
+    expect(usesZoneView(12, 8)).toBe(false);
+    expect(usesZoneView(23, 8)).toBe(true);
+    expect(usesZoneView(13, 2)).toBe(false);
     expect(usesZoneView(26, 2)).toBe(true);
-    expect(usesZoneView(25, 6)).toBe(false);
+    expect(usesZoneView(25, 2)).toBe(false);
     expect(usesZoneView(34, 1)).toBe(false);
   });
 

@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b)", () => {
-  it("est en 3.12.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("3.12.0");
-    expect(CONTRACT_VERSION).toBe("3.12.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b, TK-114c)", () => {
+  it("est en 3.13.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("3.13.0");
+    expect(CONTRACT_VERSION).toBe("3.13.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -250,9 +250,26 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "3.10.0",
       "3.11.0",
       "3.12.0",
+      "3.13.0",
     ]);
   });
 });
+
+/** Empreintes figées des versions 3.12.0 à 3.1.0 (TK-103 à TK-114b), de la plus récente à la plus ancienne. */
+const FROZEN_3X: readonly (readonly [string, string])[] = [
+  ["3.12.0", "5c766765685a107a28c3ff230bec667b05ffa52f7b46b351985c8bd9ee59d670"],
+  ["3.11.0", "7632a56ed5804eb504b74d0bdbcff77b807f51744dd6d2f8f4831a32ec87a354"],
+  ["3.10.0", "4c094fe99194546d9b896537b1080463cce960c67f4a60d82b5cc496df5e47f8"],
+  ["3.9.0", "bd78257efc64fa6818d6c0fe6dae79c00f3438c04ee4a99e48a1c1d77f51590a"],
+  ["3.8.0", "7ab3708b691bda7c1148414463bcf9e1521634af2acc1b02897858506478d3a2"],
+  ["3.7.0", "d43be512f78293e67eaff42bd5669c3f18dca59e7e928e0d88109ba2036179a2"],
+  ["3.6.0", "2f16444edc676a1376cef80ed1aecb7aeba63f09bebe01e8c1ea9c8a9ce2e90f"],
+  ["3.5.0", "8fc7ee5921e5b559a11a785605a0ba0089bd4f718e034734cbb8adc698fedf9f"],
+  ["3.4.0", "860aa5fa96d021c04184b4b7d76bf812ec0c079d76948c2a0e95be6cf2f22e95"],
+  ["3.3.0", "2d983924cfb08886ae5f9806ded8ac588fda29ee1509e94ef3c6f40846736348"],
+  ["3.2.0", "2d01ad97c777a650c1c3e10289de11a9ee0b37ca10ae895822cf9f456f736dfd"],
+  ["3.1.0", "5744eafd0f220d31ff62cb9aa654d3fbaae28aea6ef161fcf138e7498f9f044b"],
+];
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même comportement, un test par cas
 describe("CT-10b empreintes figées des versions publiées", () => {
@@ -460,56 +477,21 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["3.0.0"]).not.toBe(versions["2.11.0"]);
   });
 
-  it("l'empreinte 3.12.0 est celle du document généré ; 3.1.0 à 3.11.0 restent figées (TK-103 à TK-114b)", async () => {
+  it("l'empreinte 3.13.0 est celle du document généré ; 3.1.0 à 3.12.0 restent figées (TK-103 à TK-114c)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["3.12.0"]).toBe(hash);
-    expect(versions["3.12.0"]).not.toBe(versions["3.11.0"]);
-    expect(versions["3.11.0"]).toBe(
-      "7632a56ed5804eb504b74d0bdbcff77b807f51744dd6d2f8f4831a32ec87a354",
-    );
-    expect(versions["3.11.0"]).not.toBe(versions["3.10.0"]);
-    expect(versions["3.10.0"]).toBe(
-      "4c094fe99194546d9b896537b1080463cce960c67f4a60d82b5cc496df5e47f8",
-    );
-    expect(versions["3.10.0"]).not.toBe(versions["3.9.0"]);
-    expect(versions["3.9.0"]).toBe(
-      "bd78257efc64fa6818d6c0fe6dae79c00f3438c04ee4a99e48a1c1d77f51590a",
-    );
-    expect(versions["3.9.0"]).not.toBe(versions["3.8.0"]);
-    expect(versions["3.8.0"]).toBe(
-      "7ab3708b691bda7c1148414463bcf9e1521634af2acc1b02897858506478d3a2",
-    );
-    expect(versions["3.8.0"]).not.toBe(versions["3.7.0"]);
-    expect(versions["3.7.0"]).toBe(
-      "d43be512f78293e67eaff42bd5669c3f18dca59e7e928e0d88109ba2036179a2",
-    );
-    expect(versions["3.7.0"]).not.toBe(versions["3.6.0"]);
-    expect(versions["3.6.0"]).toBe(
-      "2f16444edc676a1376cef80ed1aecb7aeba63f09bebe01e8c1ea9c8a9ce2e90f",
-    );
-    expect(versions["3.6.0"]).not.toBe(versions["3.5.0"]);
-    expect(versions["3.5.0"]).toBe(
-      "8fc7ee5921e5b559a11a785605a0ba0089bd4f718e034734cbb8adc698fedf9f",
-    );
-    expect(versions["3.5.0"]).not.toBe(versions["3.4.0"]);
-    expect(versions["3.4.0"]).toBe(
-      "860aa5fa96d021c04184b4b7d76bf812ec0c079d76948c2a0e95be6cf2f22e95",
-    );
-    expect(versions["3.4.0"]).not.toBe(versions["3.3.0"]);
-    expect(versions["3.3.0"]).toBe(
-      "2d983924cfb08886ae5f9806ded8ac588fda29ee1509e94ef3c6f40846736348",
-    );
-    expect(versions["3.3.0"]).not.toBe(versions["3.2.0"]);
-    expect(versions["3.2.0"]).toBe(
-      "2d01ad97c777a650c1c3e10289de11a9ee0b37ca10ae895822cf9f456f736dfd",
-    );
-    expect(versions["3.1.0"]).toBe(
-      "5744eafd0f220d31ff62cb9aa654d3fbaae28aea6ef161fcf138e7498f9f044b",
-    );
-    expect(versions["3.2.0"]).not.toBe(versions["3.1.0"]);
+    expect(versions["3.13.0"]).toBe(hash);
+    expect(versions["3.13.0"]).not.toBe(versions["3.12.0"]);
+    for (const [version, frozen] of FROZEN_3X) {
+      expect(versions[version], version).toBe(frozen);
+    }
+    // Chaque version 3.x diffère de la précédente.
+    FROZEN_3X.slice(1).forEach(([older], i) => {
+      const newer = FROZEN_3X[i]?.[0] ?? "";
+      expect(versions[newer], `${newer} / ${older}`).not.toBe(versions[older]);
+    });
   });
 });
 

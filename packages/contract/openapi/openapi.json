@@ -1779,7 +1779,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "3.12.0"
+    "version": "3.13.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -23032,6 +23032,26 @@
                                       ],
                                       "type": "object"
                                     },
+                                    "links": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
                                     "tables": {
                                       "additionalProperties": false,
                                       "properties": {
@@ -23084,6 +23104,26 @@
                                       "type": "object"
                                     },
                                     "flows": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "covered": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "total": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "covered",
+                                        "total"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "links": {
                                       "additionalProperties": false,
                                       "properties": {
                                         "covered": {
@@ -28552,6 +28592,40 @@
                       "maxItems": 200,
                       "type": "array"
                     },
+                    "crossRelations": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "async": {
+                            "type": "boolean"
+                          },
+                          "from": {
+                            "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          },
+                          "to": {
+                            "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+                            "type": "string"
+                          },
+                          "via": {
+                            "type": "string"
+                          },
+                          "zone": {
+                            "maxLength": 80,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "to",
+                          "via",
+                          "zone"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "outgoing": {
                       "items": {
                         "additionalProperties": false,
@@ -28645,6 +28719,7 @@
                     "relations",
                     "actors",
                     "outgoing",
+                    "crossRelations",
                     "truncated",
                     "commitSha"
                   ],

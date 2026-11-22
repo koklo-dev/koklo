@@ -75,4 +75,13 @@ describe("launchView : bilan du lancement (TK-114b)", () => {
       launchView(launch({ progress: { ...PROGRESS, stopReason: "boom" } })),
     ).not.toHaveProperty("report");
   });
+
+  it("TK-114c (contrat 3.13.0, B640) : la couverture des liens écrite par le worker est rendue telle quelle", () => {
+    const links = { ...COVERAGE, links: { covered: 20, total: 23 } };
+    const view = launchView(
+      launch({ progress: { ...PROGRESS, coverageBefore: COVERAGE, coverageAfter: links } }),
+    );
+    expect(view.report?.coverageAfter).toEqual(links);
+    expect(view.report?.coverageBefore).toEqual(COVERAGE);
+  });
 });

@@ -133,9 +133,49 @@ export interface ArchZoneView {
   /** Composants rendus, 200 au plus. */
   members: ArchNode[];
   relations: ArchitectureZone["relations"];
+  /** Liens entre un composant rendu et un composant d'une autre zone, dans les deux sens (TK-114c, B640). */
+  crossRelations: ArchitectureZone["crossRelations"];
   actors: ArchitectureZone["actors"];
   outgoing: ArchitectureZone["outgoing"];
   truncated: boolean;
+}
+
+const relationOf = (from: string, { to, via, async }: ArchNode["dependsOn"][number]) => ({
+  from,
+  to,
+  via,
+  ...(async ? { async: true } : {}),
+});
+
+/**
+ * Liens inter-zones d'une zone ouverte : d'abord ceux de ses composants rendus vers une autre zone, puis ceux d'un composant
+ * d'une autre zone vers eux ; `zone` = identifiant de l'autre zone. Une cible inconnue de la tête est ignorée.
+ */
+function crossRelationsOf(
+  nodes: readonly ArchNode[],
+  members: readonly ArchNode[],
+  id: string,
+): ArchitectureZone["crossRelations"] {
+  const zoneIds = new Map(nodes.map((node) => [node.id, zoneIdOf(node.zone)]));
+  const shown = new Set(members.map((member) => member.id));
+  const outside = (other: string) => {
+    const zone = zoneIds.get(other);
+    return zone === undefined || zone === id ? undefined : zone;
+  };
+  const outgoing = members.flatMap((member) =>
+    member.dependsOn.flatMap((dep) => {
+      const zone = outside(dep.to);
+      return zone === undefined ? [] : [{ ...relationOf(member.id, dep), zone }];
+    }),
+  );
+  const incoming = nodes.flatMap((node) => {
+    const zone = outside(node.id);
+    if (zone === undefined) return [];
+    return node.dependsOn
+      .filter((dep) => shown.has(dep.to))
+      .map((dep) => ({ ...relationOf(node.id, dep), zone }));
+  });
+  return [...outgoing, ...incoming];
 }
 
 /** Une zone ouverte ; `undefined` : identifiant inconnu. `roleNames` : nom d'un rôle `RL-`, repli sur l'identifiant. */
@@ -160,15 +200,9 @@ export function buildArchZone(
     zone: summaryOf(group, styles),
     members,
     relations: members.flatMap((member) =>
-      member.dependsOn
-        .filter(({ to }) => shown.has(to))
-        .map(({ to, via, async }) => ({
-          from: member.id,
-          to,
-          via,
-          ...(async ? { async: true } : {}),
-        })),
+      member.dependsOn.filter(({ to }) => shown.has(to)).map((dep) => relationOf(member.id, dep)),
     ),
+    crossRelations: crossRelationsOf(nodes, members, id),
     actors: actorIdsOf(group, flows).map((actor) => ({
       id: actor,
       name: roleNames.get(actor) ?? actor,

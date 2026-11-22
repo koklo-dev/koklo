@@ -115,6 +115,31 @@ describe("store-report (TK-114b)", () => {
     });
   });
 
+  it("TK-114c (B636) : mergeLinks réunit dependsOn par cible, 30 au plus ; sans ajout, inchangé", () => {
+    const deps = Array.from({ length: 29 }, (_, i) => ({ to: `C-c${i}`, via: "HTTP" }));
+    const merged = mergeLinks(
+      { name: "Api", dependsOn: deps },
+      {
+        owns: [],
+        serves: [],
+        dependsOn: [
+          { to: "C-c0", via: "TCP" },
+          { to: "C-neuf", via: "AMQP", async: true },
+          { to: "C-de-trop", via: "HTTP" },
+        ],
+      },
+    );
+    expect(merged.dependsOn).toHaveLength(30);
+    expect((merged.dependsOn as unknown[]).at(-1)).toEqual({
+      to: "C-neuf",
+      via: "AMQP",
+      async: true,
+    });
+    expect(mergeLinks({ name: "Api" }, { owns: [], serves: [], dependsOn: [] })).toEqual({
+      name: "Api",
+    });
+  });
+
   it("publishZoneIn : zone écartée avec motif compté, ou zone faite ; lancement arrêté → stopped", async () => {
     const fake = writerOf({
       id: LAUNCH.id,

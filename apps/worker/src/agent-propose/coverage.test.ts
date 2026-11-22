@@ -37,6 +37,14 @@ const INDEX: CoverageIndex = {
   ],
   archflows: ["P-b"],
 };
+const COMPONENT = (specId: string) => ({
+  specId,
+  title: specId.slice(2),
+  zone: "Noyau",
+  type: "service",
+  owns: [],
+  serves: [],
+});
 const proposal = (
   kind: string,
   payload: Record<string, unknown>,
@@ -104,6 +112,33 @@ describe("coverageOf", () => {
     expect(coverage.unownedTables).toEqual(["T-a"]);
     expect(coverage.counts.features).toEqual({ covered: 2, total: 3 });
   });
+
+  it("TK-114c (B633) : liens de l'index et du lancement ; une specId sans dependsOn garde ceux de l'index", () => {
+    const index: CoverageIndex = {
+      ...INDEX,
+      components: [
+        { ...COMPONENT("C-api"), dependsOn: [{ to: "C-db", via: "SQL" }] },
+        COMPONENT("C-db"),
+        COMPONENT("C-seul"),
+        { ...COMPONENT("C-mail"), type: "ext" },
+      ],
+    };
+    expect(coverageOf(index, []).isolatedComponents).toEqual(["C-seul"]);
+    expect(coverageOf(index, []).counts.links).toEqual({ covered: 2, total: 3 });
+    const kept = coverageOf(index, [proposal("component", { specId: "C-api", name: "API" })]);
+    expect(kept.isolatedComponents).toEqual(["C-seul"]);
+    const relinked = coverageOf(index, [
+      proposal("component", { specId: "C-api", name: "API", dependsOn: [] }),
+      proposal("component", {
+        name: "Cache",
+        type: "store",
+        dependsOn: [{ to: "C-seul", via: "TCP" }],
+      }),
+      proposal("component", { name: "Rejet", dependsOn: [{ to: "C-db", via: "x" }] }, "rejected"),
+    ]);
+    expect(relinked.isolatedComponents).toEqual(["C-api", "C-db"]);
+    expect(relinked.counts.links).toEqual({ covered: 2, total: 4 });
+  });
 });
 
 describe("packetsOf", () => {
@@ -113,7 +148,7 @@ describe("packetsOf", () => {
       unservedFeatures: index.features.map((f) => f.specId),
       missingFlows: index.flows.map((f) => f.specId),
     };
-    const packets = packetsOf(index, holes);
+    const packets = packetsOf(index, { ...holes, isolatedComponents: [] }, []);
     expect(packets.map((p) => [p.features.length, p.flows.length])).toEqual([
       [15, 5],
       [15, 5],
@@ -129,6 +164,29 @@ describe("packetsOf", () => {
       [9, 0],
     ]);
     expect(packets[0]?.features[0]).toEqual({ specId: "F-001", title: "F- 1" });
+  });
+
+  it("TK-114c (B634) : composants isolés 10 par paquet, dans l'ordre des composants connus", () => {
+    const known = Array.from({ length: 23 }, (_, i) => ({
+      specId: `C-t${String(i + 1).padStart(2, "0")}`,
+      title: `T ${i + 1}`,
+      zone: `Zone ${(i % 8) + 1}`,
+      type: "service",
+    }));
+    const isolated = known.slice(3).map((item) => item.specId);
+    const holes = { unservedFeatures: ["F-001"], missingFlows: [], isolatedComponents: isolated };
+    const packets = packetsOf(INDEX, holes, known);
+    expect(packets.map((p) => [p.features.length, p.components.length])).toEqual([
+      [1, 10],
+      [0, 10],
+    ]);
+    expect(packets[0]?.components[0]).toEqual({
+      specId: "C-t04",
+      title: "T 4",
+      zone: "Zone 4",
+      type: "service",
+    });
+    expect(packets[1]?.components.at(-1)?.specId).toBe("C-t23");
   });
 });
 

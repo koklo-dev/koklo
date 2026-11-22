@@ -99,13 +99,23 @@ function zoneReply(zone: string) {
 const linesOf = (text: string, pattern: RegExp) =>
   text.split("\n").flatMap((line) => pattern.exec(line)?.[1] ?? []);
 
-/** Appel de couverture : chaque fonctionnalité du paquet au premier composant connu, un flux par parcours. */
+/**
+ * Appel de couverture : chaque fonctionnalité du paquet au premier composant connu, un flux par parcours ; TK-114c : chaque
+ * composant sans dépendance relié au premier composant connu (lui-même, en asynchrone, au second).
+ */
 function coverageReply(user: string) {
-  const [known] = linesOf(user, /^(C-[a-z0-9-]+) \| /);
+  const [before, after = ""] = user.split("Known components");
+  const [known, second] = linesOf(after, /^(C-[a-z0-9-]+) \| /);
   if (known === undefined) return { proposals: [] };
+  const links = linesOf(before ?? "", /^(C-[a-z0-9-]+) \| /).map((from) =>
+    from === known
+      ? { from, to: second, via: "AMQP", async: true }
+      : { from, to: known, via: "HTTP", async: false },
+  );
   return {
     assignments: linesOf(user, /^(F-\d{3}) \| /).map((feature) => ({ feature, component: known })),
     proposals: linesOf(user, /^(P-[a-z0-9-]+) \| /).map((flow) => archflow(flow, known)),
+    links,
   };
 }
 
@@ -174,7 +184,7 @@ const duplicates = (store: MemoryProposeStore) => {
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("TK-114b : volume du projet Toto (faux moteur, horloge 210 s par appel)", () => {
-  it("segments de 600 s enchaînés, 9 zones, couverture 174/174 · 22/22 · 48/48, completed, aucun doublon", async () => {
+  it("segments de 600 s enchaînés, 9 zones, couverture 174/174 · 22/22 · 48/48 · liens 28/28, completed, aucun doublon", async () => {
     const { ai, store } = await runLaunch({ stepMs: 210_000 });
     expect(AGENT_PROPOSE_DEFAULTS.deadlineMs).toBe(600_000);
     expect(store.state).toMatchObject({
@@ -192,11 +202,13 @@ describe("TK-114b : volume du projet Toto (faux moteur, horloge 210 s par appel)
       features: { covered: 174, total: 174 },
       flows: { covered: 22, total: 22 },
       tables: { covered: 48, total: 48 },
+      links: { covered: 28, total: 28 },
     });
     expect(store.state.coverageBefore).toEqual({
       features: { covered: 0, total: 174 },
       flows: { covered: 0, total: 22 },
       tables: { covered: 0, total: 48 },
+      links: { covered: 0, total: 0 },
     });
     expect(store.state.coverageCalls).toBe(ai.coverageCalls);
     expect(ai.coverageCalls).toBeGreaterThan(0);

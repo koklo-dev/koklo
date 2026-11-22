@@ -26,6 +26,15 @@ const adrLink = z
 /** Liens d'un composant (B615) : 200 au plus, comme les opérations `component.create|update`. */
 const LINKS_MAX = 200;
 
+/** Dépendance proposée d'un composant (TK-114c, B635) : partagée par `dependsOn` et les liens de la passe de couverture. */
+export const componentDependencySchema = z
+  .object({
+    to: link(PATTERNS.component),
+    via: oneLine(120),
+    async: z.boolean().optional(),
+  })
+  .strict();
+
 /**
  * `specId` (TK-114b, B615) : posé par le code seul, quand la proposition complète les liens d'un composant déjà dans l'index ;
  * le schéma envoyé au modèle l'omet et le tri du worker écarte toute sortie qui en porte un.
@@ -39,18 +48,7 @@ export const componentProposalSchema = z
     responsibility: oneLine(500),
     owns: z.array(link(PATTERNS.table)).max(LINKS_MAX).optional(),
     serves: z.array(link(PATTERNS.feature)).max(LINKS_MAX).optional(),
-    dependsOn: z
-      .array(
-        z
-          .object({
-            to: link(PATTERNS.component),
-            via: oneLine(120),
-            async: z.boolean().optional(),
-          })
-          .strict(),
-      )
-      .max(30)
-      .optional(),
+    dependsOn: z.array(componentDependencySchema).max(30).optional(),
     decisions: z.array(link(PATTERNS.adr)).max(20).optional(),
     clientSummary: z.array(oneLine(200)).max(12).optional(),
   })
