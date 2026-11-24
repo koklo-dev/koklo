@@ -1392,6 +1392,94 @@
                   "write_conflict"
                 ],
                 "type": "string"
+              },
+              "skipped": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "feature.create",
+                        "feature.update",
+                        "feature.delete",
+                        "rule.create",
+                        "rule.update",
+                        "rule.delete",
+                        "role.create",
+                        "role.update",
+                        "role.delete",
+                        "flow.create",
+                        "flow.update",
+                        "flow.delete",
+                        "table.create",
+                        "table.update",
+                        "table.delete",
+                        "fixture.create",
+                        "component.create",
+                        "component.update",
+                        "component.delete",
+                        "archflow.create",
+                        "archflow.update",
+                        "archflow.delete",
+                        "adr.create",
+                        "adr.update",
+                        "adr.delete",
+                        "doc.section.create",
+                        "doc.section.update",
+                        "doc.section.delete",
+                        "layout.save",
+                        "architecture.layout.save",
+                        "idea.page.write",
+                        "idea.page.delete",
+                        "idea.index.write",
+                        "idea.synthesis.write",
+                        "idea.version.tag",
+                        "spec.migrate",
+                        "spec.migrate.revert"
+                      ],
+                      "type": "string"
+                    },
+                    "position": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "proposalId": {
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string"
+                    },
+                    "reason": {
+                      "enum": [
+                        "exists",
+                        "missing",
+                        "duplicate"
+                      ],
+                      "type": "string"
+                    },
+                    "specId": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*|T-[a-z0-9][a-z0-9-]*|FX-[a-z0-9][a-z0-9-]*|C-[a-z0-9][a-z0-9-]*|ADR-\\d{3,}|DOC-[a-z0-9][a-z0-9-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "position",
+                    "kind",
+                    "specId",
+                    "reason",
+                    "proposalId"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 200,
+                "type": "array"
               }
             },
             "required": [
@@ -1779,7 +1867,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "3.14.0"
+    "version": "3.15.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -23338,6 +23426,11 @@
                                   "maxItems": 4,
                                   "type": "array"
                                 },
+                                "sectionsExisting": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": 1,
+                                  "type": "integer"
+                                },
                                 "stopReason": {
                                   "enum": [
                                     "completed",
@@ -31237,6 +31330,23 @@
                     },
                     "maxItems": 200,
                     "type": "array"
+                  },
+                  "skipConflicts": {
+                    "properties": {
+                      "proposals": {
+                        "items": {
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "type": "string"
+                        },
+                        "maxItems": 200,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "proposals"
+                    ],
+                    "type": "object"
                   }
                 },
                 "required": [
@@ -31488,6 +31598,94 @@
                         ],
                         "type": "object"
                       },
+                      "type": "array"
+                    },
+                    "skipped": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "feature.create",
+                              "feature.update",
+                              "feature.delete",
+                              "rule.create",
+                              "rule.update",
+                              "rule.delete",
+                              "role.create",
+                              "role.update",
+                              "role.delete",
+                              "flow.create",
+                              "flow.update",
+                              "flow.delete",
+                              "table.create",
+                              "table.update",
+                              "table.delete",
+                              "fixture.create",
+                              "component.create",
+                              "component.update",
+                              "component.delete",
+                              "archflow.create",
+                              "archflow.update",
+                              "archflow.delete",
+                              "adr.create",
+                              "adr.update",
+                              "adr.delete",
+                              "doc.section.create",
+                              "doc.section.update",
+                              "doc.section.delete",
+                              "layout.save",
+                              "architecture.layout.save",
+                              "idea.page.write",
+                              "idea.page.delete",
+                              "idea.index.write",
+                              "idea.synthesis.write",
+                              "idea.version.tag",
+                              "spec.migrate",
+                              "spec.migrate.revert"
+                            ],
+                            "type": "string"
+                          },
+                          "position": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "proposalId": {
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "type": "string"
+                          },
+                          "reason": {
+                            "enum": [
+                              "exists",
+                              "missing",
+                              "duplicate"
+                            ],
+                            "type": "string"
+                          },
+                          "specId": {
+                            "anyOf": [
+                              {
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*|T-[a-z0-9][a-z0-9-]*|FX-[a-z0-9][a-z0-9-]*|C-[a-z0-9][a-z0-9-]*|ADR-\\d{3,}|DOC-[a-z0-9][a-z0-9-]*)$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "kind",
+                          "specId",
+                          "reason",
+                          "proposalId"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 200,
                       "type": "array"
                     },
                     "status": {
@@ -31929,6 +32127,94 @@
                         ],
                         "type": "object"
                       },
+                      "type": "array"
+                    },
+                    "skipped": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "feature.create",
+                              "feature.update",
+                              "feature.delete",
+                              "rule.create",
+                              "rule.update",
+                              "rule.delete",
+                              "role.create",
+                              "role.update",
+                              "role.delete",
+                              "flow.create",
+                              "flow.update",
+                              "flow.delete",
+                              "table.create",
+                              "table.update",
+                              "table.delete",
+                              "fixture.create",
+                              "component.create",
+                              "component.update",
+                              "component.delete",
+                              "archflow.create",
+                              "archflow.update",
+                              "archflow.delete",
+                              "adr.create",
+                              "adr.update",
+                              "adr.delete",
+                              "doc.section.create",
+                              "doc.section.update",
+                              "doc.section.delete",
+                              "layout.save",
+                              "architecture.layout.save",
+                              "idea.page.write",
+                              "idea.page.delete",
+                              "idea.index.write",
+                              "idea.synthesis.write",
+                              "idea.version.tag",
+                              "spec.migrate",
+                              "spec.migrate.revert"
+                            ],
+                            "type": "string"
+                          },
+                          "position": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "proposalId": {
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "type": "string"
+                          },
+                          "reason": {
+                            "enum": [
+                              "exists",
+                              "missing",
+                              "duplicate"
+                            ],
+                            "type": "string"
+                          },
+                          "specId": {
+                            "anyOf": [
+                              {
+                                "pattern": "^(F-\\d{3,}|R-\\d{3,}|RL-[a-z0-9][a-z0-9-]*|P-[a-z0-9][a-z0-9-]*|T-[a-z0-9][a-z0-9-]*|FX-[a-z0-9][a-z0-9-]*|C-[a-z0-9][a-z0-9-]*|ADR-\\d{3,}|DOC-[a-z0-9][a-z0-9-]*)$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "kind",
+                          "specId",
+                          "reason",
+                          "proposalId"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 200,
                       "type": "array"
                     },
                     "status": {

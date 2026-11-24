@@ -28,18 +28,6 @@ interface RulePayload {
   endpoints?: string[];
 }
 
-const RULE_FILE = /^domain\/rules\/(R-\d{3,})(?:-[^/]*)?\.md$/;
-
-/** Règles de la tête : identifiant -> chemin. */
-export function ruleIndex(paths: Iterable<string>): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const path of paths) {
-    const id = RULE_FILE.exec(path)?.[1];
-    if (id !== undefined) index.set(id, path);
-  }
-  return index;
-}
-
 /** Chemin d'une règle nouvelle : `domain/rules/R-nnn-<slug du titre>.md`. */
 export const rulePathOf = (id: string, title: unknown): string =>
   `domain/rules/${id}-${slugOf(title, "regle")}.md`;

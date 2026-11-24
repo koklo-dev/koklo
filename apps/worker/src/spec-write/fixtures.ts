@@ -10,20 +10,8 @@ interface FixturePayload {
   rows?: Fixture["lignes"];
 }
 
-const FIXTURE_FILE = /^data\/fixtures\/(FX-[a-z0-9][a-z0-9-]*)\.yaml$/;
-
 /** Chemin d'un jeu nouveau : `data/fixtures/FX-<slug>.yaml`. */
 export const fixturePathOf = (id: string): string => `data/fixtures/${id}.yaml`;
-
-/** Jeux de la tête : identifiants pris. */
-export function fixtureIndex(paths: Iterable<string>): Set<string> {
-  const taken = new Set<string>();
-  for (const path of paths) {
-    const id = FIXTURE_FILE.exec(path)?.[1];
-    if (id !== undefined) taken.add(id);
-  }
-  return taken;
-}
 
 /** `fixture.create` : un jeu d'exemple ne se modifie pas ici (le volume réel est généré côté serveur, TK-110). */
 export function applyFixture(workspace: Workspace, operation: BatchOperation): void {

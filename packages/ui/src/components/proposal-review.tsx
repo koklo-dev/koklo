@@ -34,7 +34,7 @@ export interface ProposalReviewProps {
   onAcceptGroup?: (groupKey: string) => void;
   /** « Afficher 20 de plus » d'un groupe. */
   onLoadMore?: (groupKey: string) => void;
-  onSave?: () => void;
+  onSave?: (() => void) | undefined;
   saving?: boolean;
   /** Avancement pendant l'enregistrement : la barre du bandeau se remplit en vert, lot après lot. */
   saveProgress?: ProposalSaveProgress | undefined;
@@ -198,6 +198,7 @@ export function ProposalReview(props: ProposalReviewProps) {
           onAcceptGroup={props.onAcceptGroup}
           onLoadMore={props.onLoadMore}
           groupNote={props.groupNote}
+          canSave={Boolean(props.onSave)}
         />
         {props.children}
       </div>

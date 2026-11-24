@@ -25,18 +25,6 @@ interface AdrPayload {
   supersededBy?: string;
 }
 
-const ADR_FILE = /^architecture\/adr\/(ADR-\d{3,})-[^/]*\.md$/;
-
-/** Décisions de la tête : identifiant -> chemin. */
-export function adrIndex(paths: Iterable<string>): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const path of paths) {
-    const id = ADR_FILE.exec(path)?.[1];
-    if (id !== undefined) index.set(id, path);
-  }
-  return index;
-}
-
 /** Chemin d'une décision nouvelle : `architecture/adr/<ADR-nnn>-<slug du titre>.md`. */
 export const adrPathOf = (id: string, title: unknown): string =>
   `architecture/adr/${id}-${slugOf(title, "decision")}.md`;

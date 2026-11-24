@@ -468,6 +468,42 @@ describe("document : doc.section.create, update, delete", () => {
   });
 });
 
+/** TK-114e (B671) : conflits par l'index partagé ; tout le lot refusé, double création comprise. */
+describe("conflits d'un lot (TK-114e)", () => {
+  const conflict = { outcome: { status: "conflict", errorCode: "write_conflict" } };
+  const TACHES = "architecture/overview/04-taches-modeles-de-taches-et-cycle-de-vie.md";
+  const withTaches = [
+    ...BASE,
+    { path: TACHES, content: "---\nstatut: brouillon\n---\n# Tâches\n\nTexte.\n" },
+  ];
+
+  it("une doc.section.create dont l'identifiant existe refuse tout le lot (write_conflict)", () => {
+    const operations = [
+      op("component.create", "C-base", COMPONENT),
+      op("doc.section.create", "DOC-taches-modeles-de-taches-et-cycle-de-vie", {
+        title: "Tâches, modèles de tâches et cycle de vie",
+        markdown: "Autre texte.",
+      }),
+    ];
+    expect(plan(operations, withTaches)).toEqual(conflict);
+  });
+
+  it("deux component.create du même identifiant : write_conflict", () => {
+    const operations = [
+      op("component.create", "C-base", COMPONENT),
+      op("component.create", "C-base", { ...COMPONENT, responsibility: "Autre." }),
+    ];
+    expect(plan(operations)).toEqual(conflict);
+  });
+
+  it("un lot sans conflit est écrit comme avant", () => {
+    expect(paths(plan([op("component.create", "C-base", COMPONENT)], withTaches))).toEqual([
+      "architecture/components/base.yaml",
+      "architecture/schema.mmd",
+    ]);
+  });
+});
+
 describe("intégrité des opérations", () => {
   const batch = (kind: string, targetSpecId: string | null) => ({
     branch: "cadrage",

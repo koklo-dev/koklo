@@ -169,6 +169,8 @@ export const launchReportSchema = z.strictObject({
   coverageAfter: launchCoverageSchema.optional(),
   coverageCalls: counter(30),
   stopReason: launchStopReasonSchema.optional(),
+  /** Sections déjà présentes (tête ou lancement) écartées au triage (TK-114e, contrat 3.15.0, B670) ; absent si aucune. */
+  sectionsExisting: z.number().int().min(1).optional(),
 });
 
 export const proposalLaunchSchema = z.object({

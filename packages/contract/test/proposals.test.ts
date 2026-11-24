@@ -397,4 +397,86 @@ describe("TK-114b (contrat 3.12.0, B620) : launch.report, bilan du lancement de 
     const four = ["too_long", "no_entry_app", "cap", "cap"].map((reason) => ({ reason, count: 1 }));
     expect(await valid(coverageWith({ reprises: { ...reprises, skipped: four } }))).toBe(false);
   });
+  it("TK-114e (contrat 3.15.0, B670) : sectionsExisting facultatif, entier ≥ 1", async () => {
+    expect(await valid({ ...REPORT, sectionsExisting: 1 })).toBe(true);
+    const kept = await parsed(
+      output("proposal.list"),
+      page({ ...LAUNCH, report: { ...REPORT, sectionsExisting: 3 } }),
+    );
+    expect(kept?.launch).toMatchObject({ report: { sectionsExisting: 3 } });
+    expect(await valid({ ...REPORT, sectionsExisting: 0 })).toBe(false);
+    expect(await valid({ ...REPORT, sectionsExisting: 1.5 })).toBe(false);
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même schéma, un test par comportement
+describe("TK-114e (contrat 3.15.0, B672, B675) : skipConflicts en entrée, skipped en sortie et dans SPEC_BATCH_CONFLICT", () => {
+  const op = { kind: "doc.section.create", title: "Tâches", markdown: "Texte." };
+  const submit = (extra: Record<string, unknown>) => ({
+    projectId: UUID,
+    idempotencyKey: "k-1",
+    operations: [op, op],
+    proposalIds: [UUID, UUID2],
+    ...extra,
+  });
+  const SKIPPED = [
+    {
+      position: 1,
+      kind: "doc.section.create",
+      specId: "DOC-taches",
+      reason: "exists",
+      proposalId: UUID2,
+    },
+  ];
+  const BATCH = {
+    id: UUID,
+    branch: "cadrage",
+    status: "committed",
+    idempotencyKey: "k-1",
+    baseSha: null,
+    commitSha: null,
+    errorCode: null,
+    report: null,
+    results: [{ position: 0, kind: "doc.section.create", specId: "DOC-autre" }],
+    enqueuedAt: INSTANT,
+    committedAt: INSTANT,
+  };
+
+  it("skipConflicts facultatif : { proposals: uuid[] }, 200 au plus", async () => {
+    const i = input("specBatch.submit");
+    expect(await isValid(i, submit({}))).toBe(true);
+    expect(await isValid(i, submit({ skipConflicts: { proposals: [UUID, UUID2] } }))).toBe(true);
+    expect(await isValid(i, submit({ skipConflicts: { proposals: ["x", UUID] } }))).toBe(false);
+    expect(await isValid(i, submit({ skipConflicts: {} }))).toBe(false);
+    const many = Array.from({ length: 201 }, () => UUID);
+    expect(await isValid(i, submit({ skipConflicts: { proposals: many } }))).toBe(false);
+  });
+
+  it("skipped facultatif dans la sortie : position, kind, specId nullable, motif fermé, proposalId", async () => {
+    const o = output("specBatch.submit");
+    expect(await isValid(o, BATCH)).toBe(true);
+    expect(await isValid(o, { ...BATCH, skipped: SKIPPED })).toBe(true);
+    expect(await parsed(o, { ...BATCH, skipped: SKIPPED })).toMatchObject({ skipped: SKIPPED });
+    for (const reason of ["exists", "missing", "duplicate"]) {
+      expect(await isValid(o, { ...BATCH, skipped: [{ ...SKIPPED[0], reason }] }), reason).toBe(
+        true,
+      );
+    }
+    const nullId = [{ ...SKIPPED[0], kind: "adr.create", specId: null }];
+    expect(await isValid(o, { ...BATCH, skipped: nullId })).toBe(true);
+    expect(await isValid(o, { ...BATCH, skipped: [{ ...SKIPPED[0], reason: "autre" }] })).toBe(
+      false,
+    );
+    expect(await isValid(o, { ...BATCH, skipped: [{ ...SKIPPED[0], proposalId: "x" }] })).toBe(
+      false,
+    );
+  });
+
+  it("SPEC_BATCH_CONFLICT (409) accepte skipped facultatif, même forme", async () => {
+    const data = errors("specBatch.submit").SPEC_BATCH_CONFLICT?.data;
+    expect(await isValid(data, { reason: "write_conflict", skipped: SKIPPED })).toBe(true);
+    expect(await isValid(data, { reason: "write_conflict" })).toBe(true);
+    const bad = [{ ...SKIPPED[0], reason: "autre" }];
+    expect(await isValid(data, { reason: "write_conflict", skipped: bad })).toBe(false);
+  });
 });

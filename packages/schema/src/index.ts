@@ -87,5 +87,27 @@ export {
   roleSideOf,
 } from "./rules/architecture-roles.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";
+export {
+  adrIndex,
+  archFlowIndex,
+  componentIndex,
+  conflictsOf,
+  type DocSections,
+  docSectionIndex,
+  type FlowIndex,
+  featureIdOfPath,
+  featureIndex,
+  fixtureIndex,
+  flowIndex,
+  genreOf,
+  presentAtHead,
+  ruleIndex,
+  type SpecConflict,
+  type SpecConflictReason,
+  type SpecPathIndex,
+  type SpecPathOperation,
+  specPathIndex,
+  tableIndex,
+} from "./spec-path-index.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";
 export { checkSpec, validateSpec } from "./validate.ts";

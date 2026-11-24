@@ -20,6 +20,7 @@ import {
   withOrganization,
 } from "@koklo/db";
 import { ideaPagesDiff } from "@koklo/domain";
+import type { HeadDocSection, SpecHead } from "./doc-sections.ts";
 import type { LaunchContext } from "./store.ts";
 
 /**
@@ -46,6 +47,43 @@ export interface LaunchSources {
   readonly architecture?: CurrentArchitecture;
   /** Architecture (TK-114b) : identifiants de toutes les tables, pour la couverture ; jamais envoyés au modèle. */
   readonly tableIds?: readonly string[];
+  /** Architecture (TK-114e, B670) : sections du document de la tête, lues dans git (100 au plus). */
+  readonly docSections?: readonly HeadDocSection[];
+}
+
+/** Lecture des sections de la tête (fournisseur git du worker) ; liste vide sans fournisseur. */
+export type DocSectionsReader = (head: SpecHead | null) => Promise<readonly HeadDocSection[]>;
+export const noDocSections: DocSectionsReader = async () => [];
+
+/** Branche de travail lue d'abord, comme `headSnapshotId` de `@koklo/db` (`dossier-sources`). */
+const WORKING_BRANCH = "cadrage";
+
+/** Tête indexée de la spec (branche de cadrage, sinon branche par défaut) ; `null` sans tête ou sur un snapshot échoué. */
+export async function specHeadOf(
+  client: TenantClient,
+  projectId: string,
+): Promise<SpecHead | null> {
+  const repo = await client.projectRepo.findFirst({
+    where: { projectId, OR: [{ role: "spec" }, { specPath: { not: null } }] },
+    include: { installation: true },
+  });
+  if (!repo) return null;
+  for (const branch of [WORKING_BRANCH, repo.defaultBranch]) {
+    const head = await client.specHead.findFirst({
+      where: { repoId: repo.id, branch },
+      include: { snapshot: { select: { commitSha: true, status: true } } },
+    });
+    if (!head) continue;
+    if (head.snapshot.status === "failed") return null;
+    const owner = { kind: repo.installation.ownerKind, login: repo.installation.ownerLogin };
+    return {
+      installation: { id: repo.installation.externalId, owner },
+      repo: { owner: { kind: owner.kind, login: repo.ownerLogin }, name: repo.name },
+      specPath: repo.specPath,
+      commitSha: head.snapshot.commitSha,
+    };
+  }
+  return null;
 }
 
 /** Diff `idea-vN-1` vers `idea-vN` du mode `update` ; `null` sans version précédente, `undefined` hors mode `update`. */
@@ -78,12 +116,14 @@ function readDataSources(client: TenantClient, launch: LaunchContext): Promise<L
 }
 
 /**
- * Sources de l'Architecture (B512) : le Fonctionnel indexé, les tables, l'architecture actuelle et les exigences connues ; ni
+ * Sources de l'Architecture (B512) : le Fonctionnel indexé, les tables, l'architecture actuelle, les exigences connues et les
+ * sections du document de la tête (TK-114e) ; ni
  * dossier d'idée, ni synthèse, ni lignes de jeux (`tag` est celui de l'architecture).
  */
 function readArchitectureSources(
   client: TenantClient,
   launch: LaunchContext,
+  docSections: DocSectionsReader,
 ): Promise<LaunchSources> {
   return withOrganization(launch.organizationId, async () => ({
     tag: "architecture",
@@ -95,6 +135,7 @@ function readArchitectureSources(
     tables: (await currentDataModel(client, launch.projectId)).tables,
     architecture: await currentArchitecture(client, launch.projectId),
     tableIds: await currentTableIds(client, launch.projectId),
+    docSections: await docSections(await specHeadOf(client, launch.projectId)),
   }));
 }
 
@@ -102,9 +143,12 @@ function readArchitectureSources(
 export function readSources(
   client: TenantClient,
   launch: LaunchContext,
+  docSections: DocSectionsReader = noDocSections,
 ): Promise<LaunchSources | null> {
   if (launch.deliverable === "data") return readDataSources(client, launch);
-  if (launch.deliverable === "architecture") return readArchitectureSources(client, launch);
+  if (launch.deliverable === "architecture") {
+    return readArchitectureSources(client, launch, docSections);
+  }
   return withOrganization(launch.organizationId, async () => {
     const version = await frozenVersion(client, launch.projectId, launch.baseVersion);
     if (!version) return null;

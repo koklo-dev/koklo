@@ -22,6 +22,22 @@ export const componentIdOf = (name: unknown): string => `C-${slugOf(name, "compo
 /** Identifiant d'une section du document nouvelle : `DOC-<slug du titre>` ; le worker pose le numéro NN du fichier. */
 export const docSectionIdOf = (title: unknown): string => `DOC-${slugOf(title, "section")}`;
 
+/** Créations dont l'identifiant se déduit du texte saisi, sans compteur : `RL-`, `P-`, `T-`, `FX-`, `C-`, `DOC-` et le flux technique. */
+const SLUG_IDS: Readonly<Record<string, (payload: Record<string, unknown>) => string>> = {
+  "role.create": (payload) => roleIdOf(payload.name),
+  "flow.create": (payload) => flowIdOf(payload.title),
+  "table.create": (payload) => tableIdOf(payload.name),
+  "fixture.create": (payload) => fixtureIdOf(payload.title),
+  "component.create": (payload) => componentIdOf(payload.name),
+  "archflow.create": (payload) => String(payload.flow ?? ""),
+  "doc.section.create": (payload) => docSectionIdOf(payload.title),
+};
+
+/** Identifiant d'une création déduit de son texte (pré-vérification, TK-114e), `null` pour une création numérotée par compteur. */
+export const slugSpecIdOf = (
+  operation: Pick<PreparedOperation, "kind" | "payload">,
+): string | null => SLUG_IDS[operation.kind]?.(operation.payload) ?? null;
+
 /**
  * Identifiant d'une création, attribué à l'enfilage : `F-nnn` et `R-nnn` par les compteurs du projet (jamais deux fois la
  * même valeur, même en concurrence), `ADR-nnn` par le compteur `adr` (TK-111), `RL-`, `P-`, `T-`, `FX-`, `C-` et `DOC-` d'après
@@ -32,15 +48,8 @@ export async function createdSpecId(
   scope: ProjectScope,
   operation: PreparedOperation,
 ): Promise<string> {
-  const { kind, payload } = operation;
+  const { kind } = operation;
   if (kind === "rule.create") return numbered("R", await nextCounterValue(tx, scope, "rule"));
-  if (kind === "role.create") return roleIdOf(payload.name);
-  if (kind === "flow.create") return flowIdOf(payload.title);
-  if (kind === "table.create") return tableIdOf(payload.name);
-  if (kind === "fixture.create") return fixtureIdOf(payload.title);
-  if (kind === "component.create") return componentIdOf(payload.name);
-  if (kind === "archflow.create") return String(payload.flow ?? "");
   if (kind === "adr.create") return numbered("ADR", await nextCounterValue(tx, scope, "adr"));
-  if (kind === "doc.section.create") return docSectionIdOf(payload.title);
-  return numbered("F", await nextCounterValue(tx, scope, "feature"));
+  return slugSpecIdOf(operation) ?? numbered("F", await nextCounterValue(tx, scope, "feature"));
 }

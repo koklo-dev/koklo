@@ -1,31 +1,38 @@
 import type { FileChange } from "@koklo/domain";
 import {
   checkSpec,
+  conflictsOf,
+  type DocSections,
+  docSectionIndex,
   EmitFeatureError,
   emitFeatureMarkdown,
   emitModelMermaid,
   type Feature,
+  genreOf,
   parseFeatureMarkdown,
   parseSpecFiles,
+  presentAtHead,
   type SpecFile,
+  type SpecPathIndex,
+  specPathIndex,
 } from "@koklo/schema";
-import { adrIndex, applyAdr } from "./adrs.ts";
-import { applyArchFlow, archFlowIndex } from "./archflows.ts";
+import { applyAdr } from "./adrs.ts";
+import { applyArchFlow } from "./archflows.ts";
 import { refreshArchitecture } from "./architecture-generated.ts";
 import { startingPoint } from "./auto-migrate.ts";
-import { applyComponent, componentIndex } from "./components.ts";
-import { applyDocSection, type DocSections, docSectionIndex } from "./doc-sections.ts";
+import { applyComponent } from "./components.ts";
+import { applyDocSection } from "./doc-sections.ts";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
-import { applyFixture, fixtureIndex } from "./fixtures.ts";
-import { applyFlow, flowIndex } from "./flows.ts";
+import { applyFixture } from "./fixtures.ts";
+import { applyFlow } from "./flows.ts";
 import { applyLayout, isLayoutKind } from "./layout.ts";
-import { featureIdOfPath, featurePathOf, isIdeaKind, isMigrationKind } from "./paths.ts";
+import { featurePathOf, isIdeaKind, isMigrationKind } from "./paths.ts";
 import { planIdeaBatch } from "./plan-idea.ts";
 import { planMigrationBatch } from "./plan-migration.ts";
 import { newIssues, toStoredReport } from "./report.ts";
 import { applyRole } from "./roles.ts";
-import { applyRule, ruleIndex } from "./rules.ts";
-import { applyTable, tableIndex } from "./tables.ts";
+import { applyRule } from "./rules.ts";
+import { applyTable } from "./tables.ts";
 import {
   type BatchOperation,
   conflicted,
@@ -52,84 +59,41 @@ interface Planned extends Workspace {
   readonly docs: DocSections & { next: number };
 }
 
-interface Index {
-  readonly features: Map<string, string>;
-  readonly rules: Map<string, string>;
-  readonly flows: { owned: Map<string, string>; taken: Set<string> };
+/** Index par chemins de la tête (partagé avec l'API, B671) et les rôles, lus dans `domain/roles.yaml`. */
+interface Index extends SpecPathIndex {
   readonly roles: Set<string>;
-  readonly tables: Map<string, string>;
-  readonly fixtures: Set<string>;
-  readonly components: Map<string, string>;
-  readonly archflows: Map<string, string>;
-  readonly adrs: Map<string, string>;
-  readonly docs: DocSections;
 }
 
-function featureIndex(files: readonly SpecFile[]): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const file of files) {
-    const id = featureIdOfPath(file.path);
-    if (id !== undefined) index.set(id, file.path);
+function rolesOf(files: readonly SpecFile[]): Set<string> {
+  const roles = new Set<string>();
+  const file = files.filter((f) => f.path === "domain/roles.yaml");
+  for (const parsed of parseSpecFiles(file).spec.roles) {
+    for (const role of parsed.value.roles) roles.add(role.id);
   }
-  return index;
+  return roles;
 }
-
-/** Genre d'une opération (`feature`, `rule`, `role`, `flow`, `table`, `fixture`, `layout`, `architecture` pour sa mise en page) : le préfixe de son `kind`. */
-const genreOf = (operation: BatchOperation): string => operation.kind.split(".")[0] ?? "";
 
 function indexOf(files: readonly SpecFile[], tree: readonly string[]): Index {
   const paths = files.map((file) => file.path);
-  const roles = new Set<string>();
-  if (paths.includes("domain/roles.yaml")) {
-    for (const file of parseSpecFiles(files.filter((f) => f.path === "domain/roles.yaml")).spec
-      .roles) {
-      for (const role of file.value.roles) roles.add(role.id);
-    }
-  }
   return {
-    features: featureIndex(files),
-    rules: ruleIndex(paths),
-    flows: flowIndex(paths),
-    roles,
-    tables: tableIndex(paths),
-    fixtures: fixtureIndex(paths),
-    components: componentIndex(paths),
-    archflows: archFlowIndex(paths),
-    adrs: adrIndex(paths),
+    ...specPathIndex(paths),
+    roles: rolesOf(files),
     docs: docSectionIndex([...new Set([...tree, ...paths])]),
   };
 }
 
-/** Une identité est-elle déjà prise sur la tête ? Un `.json` hérité occupe encore l'identifiant de son parcours. */
-function present(index: Index, operation: BatchOperation): boolean {
-  const id = operation.targetSpecId ?? "";
-  const genre = genreOf(operation);
-  if (genre === "rule") return index.rules.has(id);
-  if (genre === "role") return index.roles.has(id);
-  if (genre === "table") return index.tables.has(id);
-  if (genre === "fixture") return index.fixtures.has(id);
-  if (genre === "component") return index.components.has(id);
-  if (genre === "archflow") return index.archflows.has(id);
-  if (genre === "adr") return index.adrs.has(id);
-  if (genre === "doc") return index.docs.byId.has(id);
-  if (genre === "flow") {
-    const created = operation.kind === "flow.create";
-    return created ? index.flows.taken.has(id) : index.flows.owned.has(id);
-  }
-  return index.features.has(id);
+/** Une identité est-elle déjà prise sur la tête ? `layout.save` n'est jamais vérifié : le dernier écrit gagne (B418). */
+function present(index: Index, operation: BatchOperation): boolean | undefined {
+  if (isLayoutKind(operation.kind)) return undefined;
+  if (genreOf(operation) === "role") return index.roles.has(operation.targetSpecId ?? "");
+  return presentAtHead(index, operation) ?? false;
 }
 
-/** `update` et `delete` visent un élément présent sur la tête ; `create` une identité libre. */
-function conflictOf(operations: readonly BatchOperation[], index: Index) {
-  for (const operation of operations) {
-    // `layout.save` remplace le fichier s'il existe : le dernier écrit gagne, jamais de conflit (B418).
-    if (isLayoutKind(operation.kind)) continue;
-    if (operation.kind.endsWith(".create") === present(index, operation)) {
-      return conflicted("write_conflict");
-    }
-  }
-  return undefined;
-}
+/** `update` et `delete` visent un élément présent sur la tête ; `create` une identité libre, une seule fois dans le lot. */
+const conflictOf = (operations: readonly BatchOperation[], index: Index) =>
+  conflictsOf(operations, (operation) => present(index, operation)).length > 0
+    ? conflicted("write_conflict")
+    : undefined;
 
 function requireDesign(workspace: Workspace, linked: boolean): void {
   if (workspace.designer && !linked) stop(failed("FORBIDDEN"));

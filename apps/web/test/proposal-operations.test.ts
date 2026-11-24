@@ -32,11 +32,18 @@ describe("operationOf", () => {
     expect(isSavable(fake(1))).toBe(false);
     expect(isSavable(fake(1, { status: "accepted", appliedBatchId: "b" }))).toBe(false);
   });
+
+  it("isSavable : une acceptée tenue par un lot échoué redevient enregistrable (TK-114e, B673)", () => {
+    const held = fake(1, { status: "accepted", appliedBatchId: "b" });
+    expect(isSavable(held, new Set(["b"]))).toBe(true);
+    expect(isSavable(held, new Set(["autre"]))).toBe(false);
+    expect(isSavable(fake(1, { appliedBatchId: "b" }), new Set(["b"]))).toBe(false);
+  });
 });
 
-describe("planBatches", () => {
-  const accepted = (n: number, zones: number) => many(n, zones, () => ({ status: "accepted" }));
+const accepted = (n: number, zones: number) => many(n, zones, () => ({ status: "accepted" }));
 
+describe("planBatches", () => {
   it("200 ou moins : un seul lot, une opération par proposition, proposalIds alignés", () => {
     const plans = planBatches("L", accepted(200, 8));
     expect(plans).toHaveLength(1);
@@ -80,5 +87,43 @@ describe("planBatches", () => {
     expect(planBatches("L", accepted(6, 1))[0]?.key).not.toBe(first);
     expect(first).toMatch(/^proposal-L-[A-Za-z0-9-]+-1-[a-z0-9]+$/);
     expect(first?.length).toBeLessThanOrEqual(128);
+  });
+});
+
+describe("planBatches : correspondance et réessai", () => {
+  it("operationProposals : la proposition de chaque opération, parallèle aux opérations (B675)", () => {
+    const relations = fake(3, {
+      status: "accepted",
+      kind: "relations",
+      content: {
+        updates: [
+          { specId: "T-client", relations: [] },
+          { specId: "T-rdv", relations: [] },
+        ],
+      },
+    });
+    const items = [fake(1, { status: "accepted" }), relations, fake(2, { status: "accepted" })];
+    const [plan] = planBatches("L", items);
+    expect(plan?.operations).toHaveLength(4);
+    expect(plan?.operationProposals).toEqual([
+      items[0]?.id,
+      relations.id,
+      relations.id,
+      items[2]?.id,
+    ]);
+  });
+
+  it("réessai : clé du plan suivie de -r<empreinte des lots échoués>, 128 au plus (B673)", () => {
+    const items = accepted(5, 1);
+    const plain = planBatches("L", items)[0]?.key ?? "";
+    const retry = planBatches("L", items, BATCH_BYTES_BUDGET, ["b2", "b1"])[0]?.key ?? "";
+    expect(retry).toMatch(new RegExp(`^${plain}-r[a-z0-9]+$`));
+    expect(planBatches("L", items, BATCH_BYTES_BUDGET, ["b1", "b2"])[0]?.key).toBe(retry);
+    expect(planBatches("L", items, BATCH_BYTES_BUDGET, ["b3"])[0]?.key).not.toBe(retry);
+    const long = planBatches("0190aaaa-0000-7000-8000-000000000001", items, BATCH_BYTES_BUDGET, [
+      "x",
+    ]);
+    expect(long[0]?.key.length).toBeLessThanOrEqual(128);
+    expect(long[0]?.key).toMatch(/^[A-Za-z0-9._:-]{1,128}$/);
   });
 });

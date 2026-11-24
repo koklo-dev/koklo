@@ -7,6 +7,7 @@ import {
   architectureKnown,
   isArchitectureKind,
   rememberAccepted,
+  sectionExists,
   withKnownActors,
   withKnownDependencies,
   withoutOwnedTables,
@@ -140,8 +141,12 @@ function criteriaTarget(
   return `${specId} · ${featureTitle}`.slice(0, TITLE_MAX);
 }
 
+/** Écart d'une section dont l'identifiant existe déjà : compté à part (`existing_section`, TK-114e). */
+const EXISTING_SECTION = "existing_section";
+type Triaged = Candidate | typeof EXISTING_SECTION | undefined;
+
 /** Une entrée de la sortie du modèle : `undefined` si elle doit être écartée (jamais publiée, comptée). */
-function candidateOf(entry: unknown, context: TriageContext): Candidate | undefined {
+function candidateOf(entry: unknown, context: TriageContext): Triaged {
   if (!isRecord(entry)) return undefined;
   const { kind, rationale, content } = entry;
   const kinds: readonly unknown[] = context.kinds;
@@ -159,6 +164,7 @@ function candidateOf(entry: unknown, context: TriageContext): Candidate | undefi
     withKnownDependencies(asKind, owned, context.arch),
     context.arch,
   );
+  if (sectionExists(asKind, payload, context.arch)) return EXISTING_SECTION;
   const title = titleFor(asKind, payload, context);
   return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
 }
@@ -221,23 +227,26 @@ export function rememberPublished(
 
 /**
  * Trie la sortie d'une zone : chaque entrée est validée à part (schéma du type, texte brut, doublon, cible) ; une
- * entrée refusée est écartée et comptée, jamais publiée. Au plus 25 propositions par zone, l'excédent est écarté.
+ * entrée refusée est écartée et comptée, jamais publiée ; une section qui existe déjà l'est aussi dans `existingSections`. Au
+ * plus 25 propositions par zone, l'excédent est écarté.
  * Seule une sortie qui n'a pas la forme `{ proposals: [...] }` lève.
  */
 export function triageProposals(
   raw: unknown,
   context: TriageContext,
-): { accepted: Candidate[]; discarded: number } {
+): { accepted: Candidate[]; discarded: number; existingSections: number } {
   if (!isRecord(raw) || !Array.isArray(raw.proposals)) throw new OutputInvalidError();
   const accepted: Candidate[] = [];
   let discarded = 0;
+  let existingSections = 0;
   for (const entry of raw.proposals as unknown[]) {
     const candidate =
       accepted.length < AGENT_PROPOSE_LIMITS.perZone ? candidateOf(entry, context) : undefined;
-    if (candidate === undefined) discarded += 1;
-    else accepted.push(candidate);
+    if (typeof candidate === "object") accepted.push(candidate);
+    else discarded += 1;
+    if (candidate === EXISTING_SECTION) existingSections += 1;
   }
-  return { accepted, discarded };
+  return { accepted, discarded, existingSections };
 }
 
 /** Titres de zones du modèle : texte brut d'une ligne, `maxLength` caractères au plus (120 ; 80 pour les Données), sans doublon, douze au plus. */

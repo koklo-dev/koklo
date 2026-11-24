@@ -19,6 +19,8 @@ export interface ArchitectureRefs {
   readonly archflows: Set<string>;
   /** Tables déjà possédées (index, puis acceptées) : le premier déclarant reste propriétaire (TK-114b, B614). */
   readonly ownedTables: Set<string>;
+  /** Sections du document `DOC-<slug>` de la tête (git), puis acceptées : une section n'est jamais reproposée (TK-114e). */
+  readonly docSections: Set<string>;
 }
 
 export const ARCHITECTURE_KINDS: readonly AgentProposalKind[] = [
@@ -32,6 +34,17 @@ export const isArchitectureKind = (kind: AgentProposalKind): boolean =>
 
 /** Identifiant que le serveur attribuera à un composant : `C-<slug du nom>`. */
 export const componentIdOf = (name: string): string => `C-${slugOf(name, "composant")}`;
+
+/** Identifiant que le serveur attribuera à une section : `DOC-<slug du titre>` (`docSectionIdOf` de l'API). */
+export const docSectionIdOf = (title: unknown): string => `DOC-${slugOf(title, "section")}`;
+
+/** Section proposée dont l'identifiant existe déjà, sur la tête ou plus tôt dans le lancement (TK-114e, B669). */
+export const sectionExists = (
+  kind: AgentProposalKind,
+  payload: Record<string, unknown>,
+  arch: ArchitectureRefs | undefined,
+): boolean =>
+  kind === "doc_section" && arch?.docSections.has(docSectionIdOf(payload.title)) === true;
 
 const allIn = (ids: readonly string[], known: ReadonlySet<string>): boolean =>
   ids.every((id) => known.has(id));
@@ -93,6 +106,7 @@ export function architectureKnown(
   if (kind === "component") return componentKnown(payload, arch);
   if (kind === "archflow") return archflowKnown(payload, arch);
   if (kind === "adr") return adrKnown(payload, arch);
+  if (kind === "doc_section") return !sectionExists(kind, payload, arch);
   return true;
 }
 
@@ -145,7 +159,7 @@ export function withKnownActors(
   return { ...rest, actors: [...new Set(stringsOf(actors).filter((id) => arch.roles.has(id)))] };
 }
 
-/** Une proposition acceptée devient connue pour la suite de la génération (composants, flux, tables possédées). */
+/** Une proposition acceptée devient connue pour la suite de la génération (composants, flux, tables possédées, sections). */
 export function rememberAccepted(
   kind: AgentProposalKind,
   payload: Record<string, unknown>,
@@ -157,4 +171,5 @@ export function rememberAccepted(
   if (kind === "component")
     for (const table of stringsOf(payload.owns)) arch.ownedTables.add(table);
   if (kind === "archflow" && typeof payload.flow === "string") arch.archflows.add(payload.flow);
+  if (kind === "doc_section") arch.docSections.add(docSectionIdOf(payload.title));
 }

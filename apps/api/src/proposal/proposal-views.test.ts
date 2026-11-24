@@ -37,6 +37,7 @@ const launch = (over: Partial<LaunchRecord> = {}): LaunchRecord => ({
   ...over,
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même fonction, un test par comportement
 describe("launchView : bilan du lancement (TK-114b)", () => {
   it("Architecture : zones demandées, traitées, écartées, motifs dans l'ordre du vocabulaire, couverture et motif d'arrêt", () => {
     expect(launchView(launch()).report).toEqual({
@@ -93,5 +94,19 @@ describe("launchView : bilan du lancement (TK-114b)", () => {
     };
     const view = launchView(launch({ progress: { ...PROGRESS, coverageAfter: after } }));
     expect(view.report?.coverageAfter).toEqual(after);
+  });
+
+  it("TK-114e (contrat 3.15.0, B670, B677) : sectionsExisting depuis existing_section, absent des motifs ; nul ou illisible → omis", () => {
+    const progress = { ...PROGRESS, discardReasons: { existing_section: 2, truncated: 1 } };
+    const view = launchView(launch({ progress }));
+    expect(view.report?.sectionsExisting).toBe(2);
+    expect(view.report?.discardReasons).toEqual([{ reason: "truncated", count: 1 }]);
+    for (const existing_section of [0, "2", 1.5]) {
+      const odd = { ...PROGRESS, discardReasons: { existing_section } };
+      expect(
+        launchView(launch({ progress: odd })).report,
+        String(existing_section),
+      ).not.toHaveProperty("sectionsExisting");
+    }
   });
 });

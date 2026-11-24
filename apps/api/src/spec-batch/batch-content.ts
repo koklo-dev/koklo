@@ -30,3 +30,17 @@ export function sameContent(record: BatchRecord, asked: PreparedBatch): boolean 
     })
   );
 }
+
+/**
+ * Rejeu d'un enregistrement pré-vérifié (`skipConflicts`, TK-114e) : la pré-vérification n'est pas refaite (la branche a
+ * changé depuis), l'entrée est réduite aux opérations du lot enregistré quand elles en forment une sous-suite, dans l'ordre ;
+ * sinon elle est rendue entière et la clé sera tenue pour réutilisée.
+ */
+export function replayedSubset(record: BatchRecord, asked: PreparedBatch): PreparedBatch {
+  const operations: PreparedOperation[] = [];
+  for (const operation of asked.operations) {
+    const stored = record.operations[operations.length];
+    if (stored !== undefined && sameOperation(stored, operation)) operations.push(operation);
+  }
+  return operations.length === record.operations.length ? { ...asked, operations } : asked;
+}

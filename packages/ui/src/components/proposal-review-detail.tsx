@@ -109,7 +109,7 @@ function BlockedNote() {
   return (
     <p className="flex items-center gap-2 border-t border-border pt-3 text-meta text-muted-foreground">
       <Icon name="error" size={18} fill tone="danger" />
-      Enregistrement échoué · à reprendre par l'équipe technique
+      Enregistrement échoué · à réessayer
     </p>
   );
 }

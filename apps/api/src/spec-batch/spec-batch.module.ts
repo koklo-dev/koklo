@@ -1,5 +1,6 @@
 import { Inject, Module, type OnModuleInit } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
+import { GitAccess } from "../repo/git-access.ts";
 import { TrackerModule } from "../tracker/tracker.module.ts";
 import { mountFirst } from "../webhook/webhook-body-parser.ts";
 import { PrismaSpecBatchRepository } from "./prisma-spec-batch.repository.ts";
@@ -15,6 +16,7 @@ import { SpecWriteQueue } from "./spec-write.queue.ts";
   providers: [
     SpecBatchService,
     SpecWriteQueue,
+    GitAccess,
     { provide: SPEC_BATCH_REPOSITORY, useClass: PrismaSpecBatchRepository },
   ],
   // `IdeaModule` (TK-89) enregistre ses lots de publication par ce service.

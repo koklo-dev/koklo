@@ -124,6 +124,16 @@ function DevUiDecisionFrames() {
           Le modèle de données a changé depuis la validation.
         </InlineAlert>
       </DevUiFrame>
+      <DevUiFrame title="InlineAlert actions : action désactivée pendant l'envoi (TK-114e)" wide>
+        <InlineAlert
+          variant="error"
+          icon="sync_problem"
+          actions={[{ label: "Envoi…", onClick: () => undefined, primary: true, disabled: true }]}
+        >
+          L'enregistrement de 3 propositions acceptées n'a pas abouti : le dépôt de la spec n'a pas
+          répondu. Rien n'a été écrit dans la spec.
+        </InlineAlert>
+      </DevUiFrame>
     </>
   );
 }

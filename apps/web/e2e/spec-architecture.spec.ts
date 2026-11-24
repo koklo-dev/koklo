@@ -19,7 +19,7 @@ import type { ArchitectureMode } from "./support/stub-spec-architecture.ts";
  * Relecture, Liste · équipe) sur les onglets Document et Composants, en clair, sombre et à 375 px, avec axe et sans
  * défilement horizontal de page, plus la relecture groupée par type (66 propositions), le volume de 120 composants, la
  * feuille Composant et les droits ; TK-114b : bilan du lancement (Génération avec détail, Relecture terminée ou arrêtée
- * au délai). Pile locale : faux API (support/stub-spec-architecture.ts). Captures dans
+ * au délai) ; TK-114e : enregistrement échoué et « Réessayer l'enregistrement ». Pile locale : faux API (support/stub-spec-architecture.ts). Captures dans
  * design/screens/captures/S-spec-architecture/<état>-<onglet>-<thème>[-mobile].png.
  */
 const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/architecture`;
@@ -48,6 +48,9 @@ const documentLoaded = async (page: Page) => {
   await expect(page.getByText("architecture/overview/01-contexte.md")).toBeVisible();
 };
 const reviewBanner = (page: Page) => page.getByRole("group", { name: "Mode relecture" });
+const saveFailed = (page: Page) => page.getByRole("alert").filter({ hasText: "n'a pas abouti" });
+const SAVE_FAILED_TEXT =
+  "L'enregistrement de 122 propositions acceptées n'a pas abouti : un élément proposé existait déjà dans la spec ou avait changé entre-temps. Rien n'a été écrit dans la spec.";
 
 const ready = async (page: Page) => {
   await expect(page.getByText("L'agent peut proposer l'architecture")).toBeVisible();
@@ -161,6 +164,20 @@ VIEWS.push(
       );
       await expect(page.getByRole("note")).toContainText(
         "Rôles avec application 4/5 · flux repris 16/22 · avant : 0/5 · non repris : trop long (1), sans application d'entrée (2), au-delà du plafond (3)",
+      );
+    },
+  },
+  {
+    // TK-114e (S-spec-architecture §16, B674) : lot `conflict` qui tient 122 acceptées, bilan « sections déjà présentes ».
+    name: "review-save-failed",
+    architecture: "demo",
+    proposals: "architectureSaveFailed",
+    path: `${PATH}?view=review`,
+    visible: async (page) => {
+      await expect(saveFailed(page)).toContainText(SAVE_FAILED_TEXT);
+      await expect(page.getByRole("button", { name: "Réessayer l'enregistrement" })).toBeVisible();
+      await expect(page.getByRole("note").filter({ hasText: "Bilan du lancement" })).toContainText(
+        "sections déjà présentes écartées : 1",
       );
     },
   },
@@ -379,6 +396,24 @@ test.describe("parcours de l'écran Architecture", () => {
     await page.getByRole("button", { name: "Quitter la relecture" }).click();
     await expect(page).not.toHaveURL(/view=review/);
     await expect(reviewBanner(page)).toHaveCount(0);
+  });
+
+  test("enregistrement échoué : alerte, Réessayer, « 121 enregistrées · 1 remise à relire » (TK-114e)", async ({
+    page,
+  }) => {
+    await start(page, { proposals: "architectureSaveFailed" });
+    await page.goto(`${PATH}?view=review`);
+    await expect(saveFailed(page)).toContainText(SAVE_FAILED_TEXT);
+    await expect(reviewBanner(page).getByRole("button", { name: /^Enregistrer/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "Réessayer l'enregistrement" }).click();
+    const summary = "121 enregistrées dans la spec · 1 remise à relire : existe déjà dans la spec";
+    await expect(page.getByRole("status").filter({ hasText: summary }).first()).toBeAttached();
+    await expect(saveFailed(page)).toHaveCount(0);
+    await settle(page);
+    await page.screenshot({
+      path: `${CAPTURES_DIR}/S-spec-architecture/review-save-retried-light.png`,
+      fullPage: true,
+    });
   });
 
   test("designer : lecture seule, aucun bouton d'écriture ni « Proposer »", async ({ page }) => {

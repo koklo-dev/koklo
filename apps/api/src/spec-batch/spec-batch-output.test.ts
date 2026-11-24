@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BatchRecord } from "./spec-batch.repository.ts";
-import { failureOf, isOpen, outputOf } from "./spec-batch-output.ts";
+import { allSkipped, failureOf, isOpen, outputOf } from "./spec-batch-output.ts";
 
 const record = (over: Partial<BatchRecord> = {}): BatchRecord => ({
   id: "11111111-1111-4111-8111-111111111111",
@@ -60,5 +60,22 @@ describe("failureOf", () => {
   it("le conflit porte la raison et le lot", () => {
     const error = failureOf(record({ errorCode: "stale_base" })) as { data: unknown };
     expect(error.data).toEqual({ reason: "stale_base", batchId: record().id });
+  });
+});
+
+describe("allSkipped (TK-114e, B672)", () => {
+  it("tout écarté : SPEC_BATCH_CONFLICT write_conflict, skipped, aucun lot", () => {
+    const skipped = [
+      {
+        position: 0,
+        kind: "doc.section.create",
+        specId: "DOC-taches",
+        reason: "exists" as const,
+        proposalId: "22222222-2222-4222-8222-222222222222",
+      },
+    ];
+    const error = allSkipped(skipped);
+    expect(error.code).toBe("SPEC_BATCH_CONFLICT");
+    expect(error.data).toEqual({ reason: "write_conflict", skipped });
   });
 });

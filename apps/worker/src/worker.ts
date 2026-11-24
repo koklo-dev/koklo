@@ -119,7 +119,7 @@ async function registerDatabaseJobs(
     boss,
     logger,
     database,
-    keyRingOf({ encryptionKeyring: config.encryptionKeyring }),
+    { cipher: keyRingOf({ encryptionKeyring: config.encryptionKeyring }), provider },
     options.agentPropose,
   );
   await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);

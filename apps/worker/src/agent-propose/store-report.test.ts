@@ -172,6 +172,30 @@ describe("store-report (TK-114b)", () => {
     expect(stopped.calls).toEqual([]);
   });
 
+  it("TK-114e (B670) : publishZoneIn compte les sections déjà présentes dans discard_reasons.existing_section", async () => {
+    const fake = writerOf({
+      id: LAUNCH.id,
+      status: "running",
+      proposedCount: 0,
+      discardReasons: { truncated: 1, existing_section: 2 },
+    });
+    const zone = { zone: "Document", accepted: [], discarded: 3, existingSections: 3 };
+    await publishZoneIn(fake.client, LAUNCH, zone, NOW);
+    expect(fake.calls.at(-1)?.data).toMatchObject({
+      zonesDone: { increment: 1 },
+      discardedCount: { increment: 3 },
+      discardReasons: { truncated: 1, existing_section: 5 },
+    });
+    const none = writerOf({
+      id: LAUNCH.id,
+      status: "running",
+      proposedCount: 0,
+      discardReasons: {},
+    });
+    await publishZoneIn(none.client, LAUNCH, { ...zone, existingSections: 0 }, NOW);
+    expect(none.calls.at(-1)?.data).not.toHaveProperty("discardReasons");
+  });
+
   it("publishCoverageIn : complément seulement sur une proposition pending non appliquée du lancement", async () => {
     const proposals = [
       {

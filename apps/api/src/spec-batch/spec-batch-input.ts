@@ -43,6 +43,27 @@ function assertDistinctTargets(operations: readonly PreparedOperation[]): void {
 }
 
 /**
+ * `skipConflicts` (TK-114e, B675) : une proposition par opération, chacune dans `proposalIds`, et chaque proposition de
+ * `proposalIds` citée (sinon elle serait tenue par un lot qui n'écrit rien pour elle).
+ */
+function assertSkipConflicts(input: SpecBatchSubmitInput): void {
+  const proposals = input.skipConflicts?.proposals;
+  if (proposals === undefined) return;
+  const allowed = new Set(input.proposalIds ?? []);
+  const cited = new Set(proposals);
+  if (
+    proposals.length !== input.operations.length ||
+    proposals.some((id) => !allowed.has(id)) ||
+    [...allowed].some((id) => !cited.has(id))
+  ) {
+    throw validation(
+      "skipConflicts",
+      "Une proposition par opération, chacune parmi les propositions du lot.",
+    );
+  }
+}
+
+/**
  * Entrées contrôlées avant toute écriture : branche, objet du commit sur une seule ligne (il
  * finit dans l'historique git), une opération par feature. L'auteur et les trailers ne viennent
  * jamais de l'entrée.
@@ -54,6 +75,7 @@ export function prepareBatch(input: SpecBatchSubmitInput, defaultBranch: string)
   }
   const operations = input.operations.map(operationOf);
   assertDistinctTargets(operations);
+  assertSkipConflicts(input);
   return {
     idempotencyKey: input.idempotencyKey,
     branch,

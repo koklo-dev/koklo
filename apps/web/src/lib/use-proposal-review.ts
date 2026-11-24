@@ -2,14 +2,13 @@
 
 import type { ProposalReviewGroup, ProposalReviewItem } from "@koklo/ui";
 import { PROPOSAL_FIRST_PAGE, PROPOSAL_GROUP_THRESHOLD, PROPOSAL_NEXT_PAGE } from "@koklo/ui";
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { type FeaturesTab, tabOfProposalKind } from "./features-tab.ts";
 import { orpc } from "./orpc.ts";
-import { type Cascade, prepareDataProposals, type TableRelation } from "./proposal-data.ts";
 import { type Deliverable, refOf, subtitleOf } from "./proposal-labels.ts";
-import { isSavable } from "./proposal-operations.ts";
 import type { ProposalGroupOutput, ProposalOutput } from "./proposal-types.ts";
+import { NO_CASCADE, useSavable } from "./use-proposal-savable.ts";
 import {
   isActiveLaunch,
   listInput,
@@ -43,53 +42,6 @@ function useFailedBatches(projectId: string, proposals: ProposalOutput[]): Reado
     if (id && (status === "failed" || status === "conflict")) failed.add(id);
   });
   return failed;
-}
-
-/** Relations déjà écrites d'une table enregistrée : `table.update` les remplace, les nouvelles s'y ajoutent. */
-async function savedRelations(projectId: string, specId: string): Promise<TableRelation[]> {
-  try {
-    const item = await orpc.spec.item.get.call({ projectId, type: "table", id: specId });
-    return item.type === "table" ? item.values.relations : [];
-  } catch {
-    return [];
-  }
-}
-
-const NO_CASCADE: Cascade = { relations: 0, fields: 0 };
-
-/**
- * Toutes les acceptées pas encore enregistrées du lancement (parcourt les pages de 100) : base du bouton « Enregistrer ».
- * Pour les Données, la cascade du rejet et le rattachement des relations passent d'abord (B392).
- */
-function useSavable(
-  projectId: string,
-  launchId: string | undefined,
-  accepted: number,
-  deliverable: Deliverable,
-) {
-  const query = useQuery({
-    queryKey: [...orpc.proposal.key(), "savable", projectId, launchId, accepted, deliverable],
-    enabled: accepted > 0 && launchId !== undefined,
-    queryFn: async (): Promise<{ proposals: ProposalOutput[]; cascade: Cascade }> => {
-      let all: ProposalOutput[] = [];
-      let cursor: string | undefined;
-      do {
-        const page = await orpc.proposal.list.call(
-          listInput(
-            projectId,
-            { status: "all", limit: 100, ...(cursor ? { cursor } : {}) },
-            deliverable,
-          ),
-        );
-        all = [...all, ...page.items];
-        cursor = page.nextCursor ?? undefined;
-      } while (cursor);
-      if (deliverable !== "data") return { proposals: all.filter(isSavable), cascade: NO_CASCADE };
-      const ready = await prepareDataProposals(all, (id) => savedRelations(projectId, id));
-      return { proposals: ready.proposals.filter(isSavable), cascade: ready.cascade };
-    },
-  });
-  return query.data;
 }
 
 function itemOf(proposal: ProposalOutput, failed: ReadonlySet<string>): ProposalReviewItem {
@@ -198,8 +150,9 @@ export function useProposalReview(
   });
   const loaded = results.map((result) => result.data?.items ?? []);
   const proposals = loaded.flat();
-  const failed = useFailedBatches(projectId, proposals);
+  const loadedFailed = useFailedBatches(projectId, proposals);
   const savedSet = useSavable(projectId, status.launch?.id, counts.accepted, deliverable);
+  const failed = new Set([...loadedFailed, ...(savedSet?.failed ?? [])]);
   const savable = savedSet?.proposals;
   const view = groups.map((group, index) =>
     groupOf(group, loaded[index] ?? [], { grouped, filter, failed }),
@@ -227,6 +180,8 @@ export function useProposalReview(
       for (const result of results) void result.refetch();
     },
     failed,
+    /** Enregistrement échoué à reprendre (alerte et « Réessayer l'enregistrement », B674). */
+    saveFailure: savedSet?.failure ?? null,
   };
 }
 

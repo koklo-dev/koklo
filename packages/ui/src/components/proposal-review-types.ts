@@ -1,6 +1,6 @@
 import type { IconName } from "../icons/icon.tsx";
 
-/** État d'une proposition : `blocked` = liée à un lot d'enregistrement échoué (à reprendre par l'équipe technique). */
+/** État d'une proposition : `blocked` = liée à un lot d'enregistrement échoué (à réessayer depuis la relecture, B674). */
 export type ProposalStatus = "pending" | "accepted" | "rejected" | "blocked";
 
 /** Décisions que l'écran peut prendre : `pending` remet à relire. */

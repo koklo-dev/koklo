@@ -38,20 +38,8 @@ interface TablePayload {
   relations?: { to: string; cardinality: (typeof CARDINALITES_V2)[number] }[];
 }
 
-const TABLE_FILE = /^data\/tables\/(?:T-)?([a-z0-9][a-z0-9-]*)\.yaml$/;
-
 /** Chemin d'une table nouvelle : `data/tables/<slug>.yaml` (le slug est l'identifiant sans `T-`). */
 export const tablePathOf = (id: string): string => `data/tables/${id.slice(2)}.yaml`;
-
-/** Tables de la tête : identifiant -> chemin (un fichier v1 `T-<slug>.yaml` occupe aussi son identifiant). */
-export function tableIndex(paths: Iterable<string>): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const path of paths) {
-    const slug = TABLE_FILE.exec(path)?.[1];
-    if (slug !== undefined) index.set(`T-${slug}`, path);
-  }
-  return index;
-}
 
 const field = (value: PayloadField): TableV2["champs"][number] => ({
   nom: value.name,

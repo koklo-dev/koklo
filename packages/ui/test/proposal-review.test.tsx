@@ -315,16 +315,15 @@ describe("ProposalDetail : détail et actions", () => {
     expect(onDecide).toHaveBeenCalledWith("p1", "pending");
   });
 
-  it("lot échoué : « Enregistrement échoué · à reprendre par l'équipe technique », aucune action", () => {
+  it("lot échoué : « Enregistrement échoué · à réessayer », aucune action (TK-114e, B674)", () => {
     const blocked = { ...items(1)[0], status: "blocked" } as ProposalReviewItem;
     render(
       <ProposalDetail item={blocked} onDecide={vi.fn()}>
         <p>Corps</p>
       </ProposalDetail>,
     );
-    expect(
-      screen.getByText("Enregistrement échoué · à reprendre par l'équipe technique"),
-    ).toBeVisible();
+    expect(screen.getByText("Enregistrement échoué · à réessayer")).toBeVisible();
+    expect(screen.queryByText(/équipe technique/)).toBeNull();
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
@@ -387,5 +386,35 @@ describe("ProposalReview : enregistrement par lots", () => {
       screen.getByRole("progressbar", { name: "Avancement de la relecture" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Quitter la relecture" })).toBeEnabled();
+  });
+});
+
+/** TK-114e, B685 : enregistrement non proposé (échec à réessayer) — aucun appel à enregistrer contradictoire. */
+describe("ProposalReview : sans enregistrement proposé", () => {
+  const allRead: Partial<ProposalReviewProps> = {
+    onSave: undefined,
+    counts: { total: 3, accepted: 3, rejected: 0, pending: 0 },
+    groups: [
+      {
+        key: "all",
+        label: "Toutes",
+        counts: { total: 3, accepted: 3, pending: 0 },
+        matching: 0,
+        items: [],
+      },
+    ],
+    selectedId: undefined,
+  };
+
+  it("acceptées sans onSave : ni bouton, ni « Acceptez au moins une proposition »", () => {
+    setup({ onSave: undefined });
+    expect(screen.queryByRole("button", { name: /^Enregistrer/ })).toBeNull();
+    expect(screen.queryByText("Acceptez au moins une proposition pour enregistrer.")).toBeNull();
+  });
+
+  it("tout est relu sans onSave : « Tout est relu. » sans appel à enregistrer", () => {
+    setup(allRead);
+    expect(screen.getByText("Tout est relu.")).toBeVisible();
+    expect(screen.queryByText(/Enregistrez les/)).toBeNull();
   });
 });
