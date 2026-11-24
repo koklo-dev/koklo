@@ -22,6 +22,7 @@ import {
 } from "../lib/architecture-document.ts";
 import { DOC_AGENT_ACTIONS } from "../lib/architecture-labels.ts";
 import { buildSubmitInput } from "../lib/feature-operation.ts";
+import { rateLimitedReadText } from "../lib/git-read-labels.ts";
 import type { DocSection } from "../lib/use-architecture-document.ts";
 import type { ArchitecturePageModel } from "../lib/use-architecture-page.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
@@ -339,7 +340,7 @@ export function ArchitectureDocumentTab({ page }: { page: ArchitecturePageModel 
           title="Impossible de charger le document"
           onRetry={() => void doc.query.refetch()}
         >
-          Réessayez dans un instant.
+          {rateLimitedReadText(doc.query.error) ?? "Réessayez dans un instant."}
         </ErrorNotice>
       </div>
     );

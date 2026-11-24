@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderArchitecture, serveArchitecture } from "./support/architecture.tsx";
 import { batch, lastSubmit, submitInputs } from "./support/feature-form.tsx";
+import { RATE_LIMITED, RATE_LIMITED_TEXT } from "./support/git-read.ts";
 import { fake, serveProposals } from "./support/proposals.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
@@ -28,6 +29,7 @@ beforeEach(() => {
   watchUrl();
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Onglet Document : lecture", () => {
   it("choisir une section l'écrit dans l'adresse (?s=) et ouvre son texte", async () => {
     serveArchitecture("owner");
@@ -64,7 +66,23 @@ describe("Onglet Document : lecture", () => {
     procedures.specArchitectureDocument.mockRejectedValue(new Error("boom"));
     renderArchitecture({ search: "tab=document" });
     expect(await screen.findByText("Impossible de charger le document")).toBeInTheDocument();
+    expect(screen.getByText("Réessayez dans un instant.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+  });
+
+  it("quota GitHub épuisé : délai dans le message, « Réessayer » relance la lecture (TK-114f)", async () => {
+    serveArchitecture("owner");
+    procedures.specArchitectureDocument.mockRejectedValueOnce(RATE_LIMITED);
+    renderArchitecture({ search: "tab=document" });
+    expect(await screen.findByText("Impossible de charger le document")).toBeInTheDocument();
+    expect(screen.getByText(RATE_LIMITED_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText("Réessayez dans un instant.")).toBeNull();
+    const calls = procedures.specArchitectureDocument.mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    await waitFor(() =>
+      expect(procedures.specArchitectureDocument.mock.calls.length).toBe(calls + 1),
+    );
+    await waitFor(() => expect(screen.queryByText(RATE_LIMITED_TEXT)).toBeNull());
   });
 
   it("le texte brut n'est jamais interprété : une balise reste du texte", async () => {

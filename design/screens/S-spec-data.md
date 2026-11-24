@@ -50,9 +50,13 @@ Réalisation (lot C) : aucune table choisie à l'ouverture ; au premier clic la 
 ## 12. Volume réel (TK-110)
 Maquette 11 en « Volume réel » (l.171-205, 232-262, 393-396, 474-488, 575-584, 753-760). **Zones** : calculées par le serveur dès 25 tables (carte 300 × 180, fil « Toutes les zones · 65 tables / Zone · N tables · M liens vers d'autres zones », « Aller à une table… » touche `/`, mini-carte, zoom < 60 % = noms seuls) ; client : mêmes vues sur le modèle validé. **États** : chargement = 6 cartes squelettes `motion-safe` ; erreur des zones = `InlineAlert` + « Réessayer », le reste de la page reste utilisable ; recherche vide = `EmptyState` `search_off` ; modèle non validé (client) = écran « pas encore validé » existant. **Clavier et annonces** : `/` ouvre la recherche, Entrée ouvre la zone et sélectionne, Échap ferme ; `role="status"` « Zone X ouverte · 9 tables » et « Page 2 sur 50 » ; zone = bouton nommé « Zone X, 9 tables ». **375 px** : fil et recherche en colonne, cartes de zone en colonne, pagination 44 px, tableau défilant en interne, aucun défilement horizontal de page. **Jeux** : taille 25 / 50 / 100 mémorisée, « 26–50 sur 1 240 ». **Relecture** : groupes par zone + « Relations et jeux d'exemple ». États à capturer (clair, sombre, 375 px) : vue des zones, zone « Prise de rendez-vous », zoom 50 %, page 2 d'un jeu, relecture groupée, recherche vide ou erreur.
 
+## 12b. Lectures limitées par GitHub (TK-114f, B694)
+- YAML d'une table (fiche du Diagramme) en `PROVIDER_RATE_LIMITED` : `InlineAlert` `error` `schedule` « GitHub limite les lectures, réessayez dans N min. » + « Réessayer », comme `S-spec-architecture` §17 ; autres erreurs inchangées.
+
 ## 13. Historique
 | Version | Date | Ticket | Changement et raison |
 |---|---|---|---|
+| 7 | 2026-11-24 | TK-114f | YAML d'une table : message de lecture limitée par GitHub avec délai et « Réessayer » (B694). |
 | 6 | 2026-11-21 | TK-114 | En-tête vérifié contre la maquette 11 l.74-89 : résumé en ligne entière, actions à droite, libellés courts ; aucun changement de code (passation 12 §8.4). |
 | 5 | 2026-11-20 | TK-110 | Volume réel : zones, zone et recherche venues du serveur, jeux à lignes générées pagination 25 / 50 / 100, groupe « Relations et jeux d'exemple » (B482 à B491). |
 | 4 | 2026-11-13 | TK-109 | « Valider le modèle », statut « Validé par l'équipe », état « À revoir » (impact amont), vue client (Lecture seule, « Ce qu'on enregistre », « Commenter »), commentaires visibles de l'équipe dans la fiche (B444 à B455). |

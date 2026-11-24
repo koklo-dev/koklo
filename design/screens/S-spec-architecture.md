@@ -1,7 +1,7 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 9
+version: 10
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
@@ -45,6 +45,7 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 | 7 | 2026-11-22 | TK-114c | Vue des zones dès 3 zones et plus de 12 composants (ou plus de 25 en 2 zones), écart assumé avec la règle « au-delà de 25 » (B632) ; liens inter-zones tracés vers la carte estompée et dans la vue à plat (B641) ; « composants reliés » dans le bilan (B642) ; aucun composant ajouté à `packages/ui` (§14). |
 | 8 | 2026-11-22 | TK-114d | Application d'entrée de chaque rôle : trait acteur → application sans étiquette (B662, écart « navigateur » de la maquette 13 l.566-568), acteurs placés par leur application (B654) ; propositions « Flux repris » (B655, B659) ; bilan « rôles avec application · flux repris » (§15, B661) ; aucun composant ajouté à `packages/ui`. |
 | 9 | 2026-11-24 | TK-114e | Relecture : alerte « Enregistrement échoué » avec motif en mots simples et « Réessayer l'enregistrement » (§16, B672 à B674), bouton du bandeau retiré tant qu'elle est affichée ; bilan « sections déjà présentes écartées » (B670) ; sans maquette, aucun composant ajouté à `packages/ui`. |
+| 10 | 2026-11-24 | TK-114f | Lectures limitées par GitHub : « GitHub limite les lectures, réessayez dans N min. » + « Réessayer » sur les vues YAML/Mermaid et le document (§17, B694) ; sans maquette, aucun composant ajouté. |
 
 ## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
 - **Schéma** : lecteur du lot 6 ; vue des zones dès 3 zones et plus de 12 composants, ou plus de 25 composants en 2 zones (TK-114c, B632 ; avant : au-delà de 25) (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone, relié par un trait à chaque composant de la zone qui l'appelle ou qu'il appelle (TK-114c, B641). Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
@@ -100,3 +101,11 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 - **375 px** : texte à la ligne, bouton sous le texte, aucune troncature ni défilement horizontal.
 - **États comparés** (clair, sombre, 375 px) : relecture avec l'alerte d'un lot `conflict` de 122 propositions ; récapitulatif après réessai avec 1 remise à relire.
 
+
+## 17. Lectures limitées par GitHub (TK-114f, sans maquette, B687 à B695)
+- **Quand** : une vue qui lit un fichier du dépôt reçoit `PROVIDER_RATE_LIMITED` (quota de l'installation épuisé) : YAML et Mermaid d'un flux (onglet Flux), YAML d'un composant et Mermaid du schéma (fiche du Schéma), document (onglet Document).
+- **Rendu** : à la place de « … n'a pas pu être lu », `InlineAlert` `error` icône `schedule` : « GitHub limite les lectures, réessayez dans N min. » (N = `retryAfterMs` arrondi à la minute supérieure, 1 au moins ; sans délai : « réessayez dans un instant. ») + action « Réessayer » (relance la seule requête, désactivée pendant la relance). Onglet Document : même phrase dans l'`ErrorNotice` existant (son « Réessayer » reste).
+- **Autres erreurs** : textes actuels inchangés.
+- **Clavier et annonces** : `role="alert"` (dérivé de la variante) annonce une fois ; « Réessayer » atteignable au clavier, cible 44 px sous 768 px (InlineAlert `sm`).
+- **375 px** : texte à la ligne, bouton sous le texte, sans défilement horizontal.
+- **États comparés** (clair, sombre, 375 px) : YAML d'un flux limité (N = 30) ; Mermaid du schéma limité sans délai.

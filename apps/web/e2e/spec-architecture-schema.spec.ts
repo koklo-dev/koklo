@@ -74,13 +74,45 @@ const flowLoaded = async (page: Page) => {
   await expect(page.getByText("La veille à 18 h")).toBeVisible();
 };
 
+/** TK-114f (§17) : quota GitHub épuisé sur `spec.architecture.source` de la cible `kind`, une fois ou toujours. */
+const RATE_LIMITED_TEXT = "GitHub limite les lectures, réessayez dans 30 min.";
+const NO_DELAY_TEXT = "GitHub limite les lectures, réessayez dans un instant.";
+const limitSource = async (page: Page, kind: string, retryAfterMs?: number, times?: number) => {
+  await page.route(
+    (url) =>
+      url.pathname.endsWith("/spec/architecture/source") &&
+      url.searchParams.get("target[kind]") === kind,
+    (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({
+          defined: true,
+          code: "PROVIDER_RATE_LIMITED",
+          message: "PROVIDER_RATE_LIMITED",
+          ...(retryAfterMs === undefined ? {} : { data: { retryAfterMs } }),
+        }),
+      }),
+    times === undefined ? undefined : { times },
+  );
+};
+const limitAlert = (page: Page) =>
+  page.getByRole("alert").filter({ hasText: "GitHub limite les lectures" });
+const showFlowYaml = (page: Page) =>
+  page
+    .getByRole("group", { name: "Affichage du flux" })
+    .getByRole("button", { name: "YAML" })
+    .click();
+
 interface View {
   name: string;
   architecture: ArchitectureMode;
   role?: KanbanRole;
   path: string;
   visible: (page: Page) => Promise<void>;
-  /** Avant l'ouverture (erreur simulée) ou une fois l'état affiché (zoom). */
+  /** Avant l'ouverture de la page : erreur simulée sur une route. */
+  before?: (page: Page) => Promise<void>;
+  /** Une fois l'état affiché (zoom). */
   setup?: (page: Page) => Promise<void>;
   /** Capturé au bureau seulement (la zone ouverte est un lecteur masqué sous 768 px). */
   desktopOnly?: boolean;
@@ -177,10 +209,32 @@ const VIEWS: View[] = [
     },
   },
   {
+    name: "rate-limited-yaml-flows",
+    architecture: "demo",
+    path: `${PATH}?tab=flows`,
+    before: (page) => limitSource(page, "flow", 1_800_000),
+    visible: async (page) => {
+      await flowLoaded(page);
+      await showFlowYaml(page);
+      await expect(limitAlert(page)).toContainText(RATE_LIMITED_TEXT);
+    },
+  },
+  {
+    name: "rate-limited-mermaid-schema",
+    architecture: "demo",
+    path: `${PATH}?tab=schema&sel=C-api`,
+    before: (page) => limitSource(page, "schema"),
+    visible: async (page) => {
+      const sheet = fiche(page).or(page.getByRole("dialog", { name: "Fiche du composant" }));
+      await sheet.getByRole("button", { name: "Mermaid" }).click();
+      await expect(limitAlert(page)).toContainText(NO_DELAY_TEXT);
+    },
+  },
+  {
     name: "error-schema",
     architecture: "demo",
     path: `${PATH}?tab=schema`,
-    setup: async (page) => {
+    before: async (page) => {
       await page.route("**/spec/architecture/zones*", (route) =>
         route.fulfill({ status: 500, contentType: "application/json", body: "{}" }),
       );
@@ -211,10 +265,10 @@ for (const viewport of VIEWPORTS) {
           await page.goto(PATH);
           await switchToDark(page);
         }
-        if (view.name === "error-schema") await view.setup?.(page);
+        await view.before?.(page);
         await page.goto(view.path.includes("tab=flows") ? flowPath(page) : view.path);
         await view.visible(page);
-        if (view.name !== "error-schema") await view.setup?.(page);
+        await view.setup?.(page);
         await expect(page.locator("html")).toHaveClass(
           theme === "dark" ? /dark/ : /^((?!dark).)*$/,
         );
@@ -440,6 +494,27 @@ test.describe("parcours des onglets Schéma et Flux", () => {
     await expect(page.getByText("Source de vérité", { exact: true })).toBeVisible();
     await group.getByRole("button", { name: "Mermaid" }).click();
     await expect(page.getByText("Généré", { exact: true })).toBeVisible();
+  });
+
+  test("TK-114f : quota GitHub épuisé sur le YAML d'un flux, « Réessayer » au clavier relance la lecture", async ({
+    page,
+  }) => {
+    await start(page);
+    await limitSource(page, "flow", 1_800_000, 1);
+    await page.goto(`${PATH}?tab=flows`);
+    await flowLoaded(page);
+    await showFlowYaml(page);
+    const alert = limitAlert(page);
+    await expect(alert).toContainText(RATE_LIMITED_TEXT);
+    const retry = alert.getByRole("button", { name: "Réessayer" });
+    for (let tab = 0; tab < 40; tab += 1) {
+      if (await retry.evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press("Tab");
+    }
+    await expect(retry).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("architecture/flows/reserver-un-rendez-vous.yaml")).toBeVisible();
+    await expect(limitAlert(page)).toHaveCount(0);
   });
 
   test("designer : lit schéma et flux, sans glisser, sans « Modifier » ni « Nouveau flux »", async ({
