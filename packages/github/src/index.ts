@@ -39,6 +39,16 @@ export {
 } from "./provisioning/spec-provisioning.ts";
 export { buildInitialSpecFiles, type SpecScaffoldInput } from "./provisioning/spec-scaffold.ts";
 export {
+  cachedGitReads,
+  GIT_READ_CACHE_MAX_BYTES,
+  GIT_READ_CACHE_MAX_CONTENT_CHARS,
+  GIT_READ_CACHE_MAX_ENTRIES,
+  GIT_READ_CACHE_MAX_LISTINGS,
+  GIT_READ_CACHE_TTL_MS,
+  GitReadCache,
+  type GitReadCacheOptions,
+} from "./read-cache.ts";
+export {
   InvalidWebhookPayloadError,
   type InvalidWebhookPayloadReason,
   normalizeWebhook,

@@ -8,11 +8,13 @@ import type {
   ArchitectureComponentsListInput,
   ArchitectureDocument,
 } from "@koklo/contract";
+import type { GitReadCache } from "@koklo/github";
 import { architectureChecks } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { GitAccess, step } from "../repo/git-access.ts";
-import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
+import { GIT_PROVIDER, GIT_READ_CACHE, type GitProviderBinding } from "../repo/tokens.ts";
+import { committedReads } from "../spec-data/committed-file.ts";
 import { indexFailed } from "../spec-read/index-failed.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
@@ -82,6 +84,7 @@ export class SpecArchitectureService {
     @Inject(SPEC_ARCHITECTURE_REPOSITORY) private readonly repository: SpecArchitectureRepository,
     @Inject(GIT_PROVIDER) private readonly provider: GitProviderBinding,
     @Inject(GitAccess) private readonly access: GitAccess,
+    @Inject(GIT_READ_CACHE) private readonly cache: GitReadCache,
   ) {}
 
   async components(
@@ -161,30 +164,19 @@ export class SpecArchitectureService {
 
   /** Fichiers de section de l'arbre au commit indexé (`DOC_SECTIONS_MAX` au plus) ; sans fournisseur utilisable : indisponible. */
   private async readSections(source: GitSource): Promise<{ path: string; content: string }[]> {
-    const provider = this.provider;
-    if (provider === null || !source.installation.active) {
+    if (this.provider === null || !source.installation.active) {
       throw new ORPCError("PROVIDER_UNAVAILABLE");
     }
-    const auth = await this.access.installationAuth(provider, {
-      id: source.installation.id,
-      externalId: source.installation.externalId,
-      ownerKind: source.owner.kind,
-      ownerLogin: source.owner.login,
-    });
-    const repo = { owner: source.owner, name: source.repoName };
+    const { reads, at } = await committedReads(this.provider, this.access, this.cache, source);
     const prefix = source.specPath === null ? "" : `${source.specPath}/`;
-    const listing = await step("readFile", () =>
-      provider.listFiles({ auth, repo, ref: source.commitSha }),
-    );
+    const listing = await step("readFile", () => reads.listFiles(at));
     const paths = listing.files
       .map((file) => file.path)
       .filter((path) => path.startsWith(prefix) && isDocSectionPath(path.slice(prefix.length)))
       .slice(0, DOC_SECTIONS_MAX);
     const files: { path: string; content: string }[] = [];
     for (const path of paths) {
-      const file = await step("readFile", () =>
-        provider.readFile({ auth, repo, ref: source.commitSha, path }),
-      );
+      const file = await step("readFile", () => reads.readFile({ ...at, path }));
       files.push({ path: path.slice(prefix.length), content: file.content });
     }
     return files;

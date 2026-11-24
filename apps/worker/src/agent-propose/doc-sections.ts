@@ -1,4 +1,5 @@
 import type { GitInstallation, GitProvider, RepoRef } from "@koklo/domain";
+import { cachedGitReads, type GitReadCache } from "@koklo/github";
 import type { Logger } from "@koklo/observability";
 import { docSectionSlugOf, parseDocSection } from "@koklo/schema";
 import { errorNameOf } from "../job-support.ts";
@@ -45,16 +46,22 @@ async function readSections(provider: GitProvider, head: SpecHead): Promise<Head
 /**
  * Sections du document d'architecture de la tête, lues dans git (les sections ne sont pas indexées, B508). Sans fournisseur
  * ni tête : liste vide. Une panne n'arrête pas le lancement : liste vide et avertissement (le nom de l'erreur seul, jamais le
- * texte du fournisseur) ; l'enregistrement rattrape un doublon.
+ * texte du fournisseur) ; l'enregistrement rattrape un doublon. `cache` (TK-114f) : lectures au commit gardées par
+ * installation, un 2e lancement sur la même tête ne relit rien.
  */
 export async function headDocSections(
   provider: GitProvider | null,
   head: SpecHead | null,
   logger: Logger,
+  cache?: GitReadCache,
 ): Promise<HeadDocSection[]> {
   if (provider === null || head === null) return [];
+  const reads =
+    cache === undefined
+      ? provider
+      : cachedGitReads(provider, cache, { installationId: head.installation.id });
   try {
-    return await readSections(provider, head);
+    return await readSections(reads, head);
   } catch (error) {
     logger.warn({ errorName: errorNameOf(error) }, "agent-propose: doc sections unread");
     return [];

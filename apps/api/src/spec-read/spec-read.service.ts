@@ -8,11 +8,13 @@ import type {
   SpecRefsSearchInput,
   SpecRefsSearchOutput,
 } from "@koklo/contract";
+import type { GitReadCache } from "@koklo/github";
 import { parseFeatureMarkdown } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { GitAccess, step } from "../repo/git-access.ts";
-import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
+import { GIT_PROVIDER, GIT_READ_CACHE, type GitProviderBinding } from "../repo/tokens.ts";
+import { committedReads, specFilePath } from "../spec-data/committed-file.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -63,6 +65,7 @@ export class SpecReadService {
     @Inject(SPEC_READ_REPOSITORY) private readonly repository: SpecReadRepository,
     @Inject(GIT_PROVIDER) private readonly provider: GitProviderBinding,
     @Inject(GitAccess) private readonly access: GitAccess,
+    @Inject(GIT_READ_CACHE) private readonly cache: GitReadCache,
   ) {}
 
   head(scope: ProjectScope, revision: Revision): Promise<SpecHeadOutput> {
@@ -138,23 +141,9 @@ export class SpecReadService {
     if (this.provider === null || !source.installation.active) {
       throw new ORPCError("PROVIDER_UNAVAILABLE");
     }
-    const provider = this.provider;
-    const auth = await this.access.installationAuth(provider, {
-      id: source.installation.id,
-      externalId: source.installation.externalId,
-      ownerKind: source.owner.kind,
-      ownerLogin: source.owner.login,
-    });
-    const path =
-      source.specPath === null ? source.filePath : `${source.specPath}/${source.filePath}`;
-    const file = await step("readFile", () =>
-      provider.readFile({
-        auth,
-        repo: { owner: source.owner, name: source.repoName },
-        ref: source.commitSha,
-        path,
-      }),
-    );
+    const { reads, at } = await committedReads(this.provider, this.access, this.cache, source);
+    const path = specFilePath(source, source.filePath);
+    const file = await step("readFile", () => reads.readFile({ ...at, path }));
     const parsed = parseFeatureMarkdown(source.filePath, file.content);
     if (!parsed.ok) throw new Error("indexed feature file is not parseable");
     return detailOf(parsed.value, source.filePath, source.commitSha);
