@@ -53,7 +53,10 @@ describe("pannes transitoires : relance puis failed au dernier essai", () => {
     const row = await bench.settled(id);
 
     expect(row).toMatchObject({ status: "failed", error_code: code, attempts: 2 });
-    expect(bench.spy.callsOf("listFiles").length).toBeGreaterThanOrEqual(2);
+    // Quota épuisé (B690) : le second essai a lieu mais le frein le refuse sans rappeler GitHub.
+    const calls = bench.spy.callsOf("listFiles").length;
+    if (code === "provider_rate_limited") expect(calls).toBe(1);
+    else expect(calls).toBeGreaterThanOrEqual(2);
     expect((await bench.jobCompleted(id)).state).toBe("completed");
     covered.add(code);
   });
