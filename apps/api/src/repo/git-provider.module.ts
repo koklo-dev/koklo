@@ -1,4 +1,4 @@
-import { createOctokitGitProvider, keyRingOf } from "@koklo/github";
+import { createOctokitGitProvider, GitReadCache, keyRingOf } from "@koklo/github";
 import { type DynamicModule, Global, Module } from "@nestjs/common";
 import { CLOCK, type Clock } from "../clock.ts";
 import type { AppConfig } from "../config.ts";
@@ -7,6 +7,7 @@ import { requestLogger } from "../request-logger.ts";
 import { PrismaUserCredentials } from "./prisma-user-credentials.ts";
 import {
   GIT_PROVIDER,
+  GIT_READ_CACHE,
   type GitProviderBinding,
   NoUserCredentials,
   USER_CREDENTIALS,
@@ -54,13 +55,14 @@ export class GitProviderModule {
           inject: [CLOCK],
           useFactory: (clock: Clock) => providerOf(config, clock),
         },
+        { provide: GIT_READ_CACHE, useFactory: () => new GitReadCache() },
         {
           provide: USER_CREDENTIALS,
           inject: [DatabaseService],
           useFactory: (database: DatabaseService) => credentialsOf(config, database),
         },
       ],
-      exports: [GIT_PROVIDER, USER_CREDENTIALS],
+      exports: [GIT_PROVIDER, GIT_READ_CACHE, USER_CREDENTIALS],
     };
   }
 }

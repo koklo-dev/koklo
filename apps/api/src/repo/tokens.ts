@@ -40,3 +40,9 @@ export class NoUserCredentials implements UserCredentialsStore {
     // Rien à conserver : voir la documentation de la classe.
   }
 }
+
+/**
+ * Cache des lectures git au SHA complet (TK-114f), un par processus, partagé par tous les services de lecture ; la portée
+ * (installation, dépôt) est dans la clé. Jamais utilisé pour écrire.
+ */
+export const GIT_READ_CACHE = Symbol("GIT_READ_CACHE");

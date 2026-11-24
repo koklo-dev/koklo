@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@koklo/db";
 import type { AiProvider, GitProvider } from "@koklo/domain";
+import type { GitReadCache } from "@koklo/github";
 import type { CredentialCipher } from "@koklo/llm";
 import type { Logger } from "@koklo/observability";
 import type { PgBoss } from "pg-boss";
@@ -14,19 +15,19 @@ export type AgentProposeOptions = Partial<AgentProposeSettings> & { ai?: AiProvi
 
 /**
  * Assemble le magasin et le moteur d'IA du worker (porte-clés de la configuration) et enregistre la file. `provider` lit les
- * sections du document de la tête (TK-114e) ; nul : aucune section lue.
+ * sections du document de la tête (TK-114e) ; nul : aucune section lue. `readCache` : cache de lecture du worker (TK-114f).
  */
 export async function wireAgentPropose(
   boss: PgBoss,
   logger: Logger,
   database: PrismaClient,
-  keys: { cipher: CredentialCipher | null; provider: GitProvider | null },
+  keys: { cipher: CredentialCipher | null; provider: GitProvider | null; readCache?: GitReadCache },
   options: AgentProposeOptions = {},
 ): Promise<void> {
   const { ai, ...settings } = options;
-  const { cipher, provider } = keys;
+  const { cipher, provider, readCache } = keys;
   const store = new AgentProposeStore(database, undefined, (head) =>
-    headDocSections(provider, head, logger),
+    headDocSections(provider, head, logger, readCache),
   );
   const engine = ai ?? createAiEngine({ client: store.client, cipher, logger });
   await registerAgentPropose(boss, logger, { store, ai: engine }, settings);

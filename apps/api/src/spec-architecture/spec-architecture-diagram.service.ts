@@ -15,6 +15,7 @@ import type {
 } from "@koklo/contract";
 import { ARCHITECTURE_SEARCH_MAX } from "@koklo/contract";
 import { SCOPING_BRANCH } from "@koklo/domain";
+import type { GitReadCache } from "@koklo/github";
 import {
   ARCH_LAYOUT_PATH,
   ARCH_ZONES_PATH,
@@ -30,7 +31,7 @@ import {
 } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { GitAccess } from "../repo/git-access.ts";
-import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
+import { GIT_PROVIDER, GIT_READ_CACHE, type GitProviderBinding } from "../repo/tokens.ts";
 import { SpecBatchService } from "../spec-batch/spec-batch.service.ts";
 import { readCommittedFile } from "../spec-data/committed-file.ts";
 import { indexFailed } from "../spec-read/index-failed.ts";
@@ -101,6 +102,7 @@ export class SpecArchitectureDiagramService {
     private readonly repository: SpecArchitectureDiagramRepository,
     @Inject(GIT_PROVIDER) private readonly provider: GitProviderBinding,
     @Inject(GitAccess) private readonly access: GitAccess,
+    @Inject(GIT_READ_CACHE) private readonly cache: GitReadCache,
     @Inject(SpecBatchService) private readonly batches: SpecBatchService,
   ) {}
 
@@ -348,6 +350,6 @@ export class SpecArchitectureDiagramService {
   }
 
   private readCommitted(source: GitSource, file: string): Promise<string | undefined> {
-    return readCommittedFile(this.provider, this.access, source, file);
+    return readCommittedFile(this.provider, this.access, this.cache, source, file);
   }
 }

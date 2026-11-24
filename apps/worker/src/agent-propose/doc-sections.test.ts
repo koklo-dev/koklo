@@ -1,4 +1,5 @@
 import type { GitProvider } from "@koklo/domain";
+import { GitReadCache } from "@koklo/github";
 import { createLogger } from "@koklo/observability";
 import { describe, expect, it } from "vitest";
 import { DOC_SECTIONS_MAX, headDocSections, type SpecHead } from "./doc-sections.ts";
@@ -23,7 +24,7 @@ function fakeProvider(paths: string[], fail = false) {
     },
     listFiles: async ({ ref }: { ref: string }) => ({
       ref,
-      files: paths.map((path) => ({ path, sha: "s" })),
+      files: paths.map((path) => ({ path, sha: `s-${path}` })),
     }),
     readFile: async ({ path, ref }: { path: string; ref: string }) => {
       reads.push({ path, ref });
@@ -31,7 +32,7 @@ function fakeProvider(paths: string[], fail = false) {
       return {
         path,
         ref,
-        sha: "s",
+        sha: `s-${path}`,
         content: `---\nstatut: brouillon\n---\n# Titre ${slug}\n\nTexte.\n`,
       };
     },
@@ -92,5 +93,19 @@ describe("headDocSections (TK-114e)", () => {
     expect(await headDocSections(fakeProvider([], true).provider, HEAD, loud.logger)).toEqual([]);
     expect(loud.lines.join("")).toContain("doc sections");
     expect(loud.lines.join("")).not.toContain("panne");
+  });
+
+  it("TK-114f : 2e lancement sur la même tête, avec le cache du worker : aucun readFile", async () => {
+    const { provider, reads } = fakeProvider([
+      "spec/architecture/overview/01-contexte.md",
+      "spec/architecture/overview/02-principes.md",
+    ]);
+    const head = { ...HEAD, commitSha: "f".repeat(40) };
+    const cache = new GitReadCache();
+    const first = await headDocSections(provider, head, capture().logger, cache);
+    const second = await headDocSections(provider, head, capture().logger, cache);
+    expect(second).toEqual(first);
+    expect(first.map((section) => section.title)).toEqual(["Titre contexte", "Titre principes"]);
+    expect(reads).toHaveLength(2);
   });
 });

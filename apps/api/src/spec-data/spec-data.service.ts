@@ -17,6 +17,7 @@ import type {
   DataZones,
 } from "@koklo/contract";
 import { SCOPING_BRANCH } from "@koklo/domain";
+import type { GitReadCache } from "@koklo/github";
 import {
   emitModelMermaid,
   emitTableYaml,
@@ -31,7 +32,7 @@ import {
 } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { GitAccess } from "../repo/git-access.ts";
-import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
+import { GIT_PROVIDER, GIT_READ_CACHE, type GitProviderBinding } from "../repo/tokens.ts";
 import { SpecBatchService } from "../spec-batch/spec-batch.service.ts";
 import { indexFailed } from "../spec-read/index-failed.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
@@ -116,6 +117,7 @@ export class SpecDataService {
     @Inject(SPEC_DATA_REPOSITORY) private readonly repository: SpecDataRepository,
     @Inject(GIT_PROVIDER) private readonly provider: GitProviderBinding,
     @Inject(GitAccess) private readonly access: GitAccess,
+    @Inject(GIT_READ_CACHE) private readonly cache: GitReadCache,
     @Inject(SpecBatchService) private readonly batches: SpecBatchService,
   ) {}
 
@@ -299,6 +301,6 @@ export class SpecDataService {
 
   /** Fichier de la spec au commit indexé ; `undefined` : absent, ou aucun fournisseur utilisable. */
   private readCommitted(source: GitSource, file: string): Promise<string | undefined> {
-    return readCommittedFile(this.provider, this.access, source, file);
+    return readCommittedFile(this.provider, this.access, this.cache, source, file);
   }
 }

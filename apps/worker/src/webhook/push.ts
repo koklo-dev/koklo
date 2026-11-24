@@ -5,6 +5,7 @@ import {
   isValidBranchName,
   type RepoRef,
 } from "@koklo/domain";
+import { cachedGitReads, type GitReadCache } from "@koklo/github";
 import type { Logger } from "@koklo/observability";
 import { isFlowPath, parseSpecFiles, type SpecFile } from "@koklo/schema";
 import { readSpecFiles, recognizedSpecPaths } from "../spec-read/read-spec.ts";
@@ -26,6 +27,11 @@ export interface PushDeps {
   /** `null` : ni App configurée ni fournisseur injecté ; la livraison échoue en `provider_unavailable`. */
   readonly provider: GitProvider | null;
   readonly logger: Logger;
+  /**
+   * Cache des lectures au SHA du worker (TK-114f, B691) ; absent : lectures directes. L'arbre de la branche est toujours lu
+   * chez le fournisseur ; seuls les blobs nouveaux du commit sont lus.
+   */
+  readonly readCache?: GitReadCache;
 }
 
 const BRANCH_PREFIX = "refs/heads/";
@@ -78,11 +84,15 @@ function parsedSnapshot(deps: PushDeps, files: readonly SpecFile[]): SnapshotWri
  */
 export async function indexBranch(
   deps: PushDeps,
-  provider: GitProvider,
+  direct: GitProvider,
   target: Target,
   branch: string,
 ): Promise<DeliveryOutcome> {
   const { installation, repo } = target;
+  const provider =
+    deps.readCache === undefined
+      ? direct
+      : cachedGitReads(direct, deps.readCache, { installationId: installation.externalId });
   const auth = await provider.authenticate({
     installation: {
       id: installation.externalId,

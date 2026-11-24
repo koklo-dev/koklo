@@ -4,7 +4,7 @@ import {
   RECONCILE_GRACE_MINUTES_DEFAULT,
   WEBHOOK_RETENTION_DAYS_DEFAULT,
 } from "@koklo/domain";
-import { keyRingOf } from "@koklo/github";
+import { GitReadCache, keyRingOf } from "@koklo/github";
 import type { LogDestination, Logger } from "@koklo/observability";
 import { PgBoss } from "pg-boss";
 import { type AgentProposeOptions, wireAgentPropose } from "./agent-propose/wire.ts";
@@ -96,6 +96,7 @@ async function registerDatabaseJobs(
   mailSender: MailSender,
 ): Promise<void> {
   const provider = providerOf(config, options.gitProvider);
+  const readCache = new GitReadCache();
   const retentionDays = config.webhookRetentionDays ?? WEBHOOK_RETENTION_DAYS_DEFAULT;
   await registerSpecWrite(
     boss,
@@ -119,10 +120,15 @@ async function registerDatabaseJobs(
     boss,
     logger,
     database,
-    { cipher: keyRingOf({ encryptionKeyring: config.encryptionKeyring }), provider },
+    { cipher: keyRingOf({ encryptionKeyring: config.encryptionKeyring }), provider, readCache },
     options.agentPropose,
   );
-  await registerWebhookDelivery(boss, logger, { raw: database, provider }, options.webhookDelivery);
+  await registerWebhookDelivery(
+    boss,
+    logger,
+    { raw: database, provider, readCache },
+    options.webhookDelivery,
+  );
   await registerWebhookPurge(boss, logger, { raw: database, retentionDays });
   await registerNotificationEmail(
     boss,

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@koklo/db";
 import { withTenantIsolation } from "@koklo/db";
 import type { GitProvider } from "@koklo/domain";
+import type { GitReadCache } from "@koklo/github";
 import type { Logger } from "@koklo/observability";
 import type { PgBoss } from "pg-boss";
 import {
@@ -29,6 +30,8 @@ export interface WebhookRegistration {
   readonly raw: PrismaClient;
   /** `null` : ni App configurée ni fournisseur injecté ; les pushes échouent en `provider_unavailable`. */
   readonly provider: GitProvider | null;
+  /** Cache des lectures au SHA du worker (TK-114f), partagé avec `agent-propose`. */
+  readonly readCache?: GitReadCache;
 }
 
 /**
@@ -60,6 +63,7 @@ export async function registerWebhookDelivery(
     client,
     deliveries: new DeliveryStore(deps.raw),
     provider: deps.provider,
+    ...(deps.readCache === undefined ? {} : { readCache: deps.readCache }),
     logger,
     retryLimit: settings.retryLimit,
   });
