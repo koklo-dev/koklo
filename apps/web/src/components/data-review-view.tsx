@@ -1,11 +1,12 @@
 "use client";
 
 import { ProposalReviewBanner } from "@koklo/ui";
+import { SAVE_FAILURE_SUFFIX } from "../lib/proposal-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import { useProposalReview } from "../lib/use-proposal-review.ts";
 import type { useProposals } from "../lib/use-proposals.ts";
 import { ProposeDialog } from "./features-propose.tsx";
-import { FeaturesReview } from "./features-review.tsx";
+import { dataSummary, FeaturesReview, saveProp } from "./features-review.tsx";
 
 const SUBTITLE = "Modèle de données, d'après le cahier fonctionnel";
 const PLACEHOLDER = "ex. « ajoute l'historique des prix des prestations »";
@@ -56,11 +57,11 @@ export function DataReviewBar({
     <div>
       <ProposalReviewBanner
         counts={counts}
-        {...(review.savable.length > 0 ? { onSave: () => void actions.save() } : {})}
+        {...saveProp(review, actions)}
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
-        summaryText={` · l'agent propose ${counts.total} ${counts.total >= 2 ? "éléments" : "élément"} depuis le cahier fonctionnel · ${counts.accepted} ${counts.accepted >= 2 ? "acceptés" : "accepté"} · ${counts.pending} à relire`}
+        summaryText={`${dataSummary(counts)}${review.saveFailure ? SAVE_FAILURE_SUFFIX : ""}`}
       />
       <div role="status" className="sr-only">
         {[actions.announcement || actions.summary, statusText].filter(Boolean).join(" ")}

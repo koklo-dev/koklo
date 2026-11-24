@@ -127,7 +127,10 @@ function useRevise({ projectId, announce, refresh }: Deps) {
   return { revise, error, busy };
 }
 
-/** Enregistrement : le récapitulatif reste affiché, l'annonce le répète dans la région d'état. */
+/**
+ * Enregistrement, ou réessai d'un enregistrement échoué (ses lots rejoués, B673) : le récapitulatif reste affiché,
+ * l'annonce le répète dans la région d'état.
+ */
 function useSaveAll(
   { projectId, review, announce }: Deps,
   branch: string | undefined,
@@ -140,12 +143,12 @@ function useSaveAll(
     if (!launchId) return;
     clearError();
     const kinds = review.savable.map((proposal) => proposal.kind);
-    const result = await saver.save(launchId, review.savable);
+    const result = await saver.save(launchId, review.savable, review.saveFailure?.batches);
     if (!result) return;
-    const breakdown = result.left === 0 ? savedBreakdown(kinds) : "";
-    const text = [SAVED_TEXT(result.saved, result.left), breakdown, cascadeText(review.cascade)]
-      .filter(Boolean)
-      .join(" : ");
+    const breakdown =
+      result.left === 0 && result.returned.length === 0 ? savedBreakdown(kinds) : "";
+    const saved = SAVED_TEXT(result.saved, result.left, result.returned);
+    const text = [saved, breakdown, cascadeText(review.cascade)].filter(Boolean).join(" : ");
     setSummary(text);
     announce(text);
   };

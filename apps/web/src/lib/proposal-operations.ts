@@ -17,6 +17,8 @@ export interface BatchPlan {
   key: string;
   operations: Operation[];
   proposalIds: string[];
+  /** Proposition de chaque opération, parallèle à `operations` (`skipConflicts`, B675). */
+  operationProposals: string[];
 }
 
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -176,10 +178,16 @@ export function operationOf(proposal: ProposalOutput): Operation | null {
   return null;
 }
 
-/** Acceptée, pas encore appliquée par un lot, et enregistrable. */
-export const isSavable = (proposal: ProposalOutput): boolean =>
+/**
+ * Acceptée, pas encore appliquée par un lot (ou tenue par un lot échoué de `failed`, rejouable : B673), et
+ * enregistrable.
+ */
+export const isSavable = (
+  proposal: ProposalOutput,
+  failed: ReadonlySet<string> = new Set(),
+): boolean =>
   proposal.status === "accepted" &&
-  proposal.appliedBatchId === null &&
+  (proposal.appliedBatchId === null || failed.has(proposal.appliedBatchId)) &&
   operationsOf(proposal).length > 0;
 
 const slug = (text: string): string =>
@@ -230,37 +238,46 @@ function slices(items: ProposalOutput[], budget: number): ProposalOutput[][] {
   return out;
 }
 
+/** Jusqu'à 200 propositions, une suite ; au-delà, une par groupe (`type:zone`) ; chacune coupée par `slices`. */
+function chunksOf(proposals: ProposalOutput[], budget: number) {
+  const chunks: Array<{ group: string; items: ProposalOutput[] }> = [];
+  if (proposals.length <= SPEC_BATCH_OPERATIONS_MAX) {
+    for (const items of slices(proposals, budget)) chunks.push({ group: "all", items });
+    return chunks;
+  }
+  const groups = new Map<string, ProposalOutput[]>();
+  for (const item of proposals) {
+    const key = `${item.kind}:${item.zone}`;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  for (const [group, items] of groups) {
+    for (const slice of slices(items, budget)) chunks.push({ group, items: slice });
+  }
+  return chunks;
+}
+
 /**
  * Découpe l'enregistrement : jusqu'à 200 propositions, un seul lot ; au-delà, un lot par groupe
  * (`type:zone`), chacun de 200 au plus. Tout lot reste aussi sous `BATCH_BYTES_BUDGET` octets d'opérations, pour ne
  * jamais buter sur le plafond de l'API (413) avec des descriptions longues. Clé
  * `proposal-<lancement>-<groupe>-<n>-<empreinte>` : identique si le même lot est renvoyé (reprise après coupure),
- * différente dès que son contenu change.
+ * différente dès que son contenu change. Réessai d'un enregistrement échoué (`retryOf` : ses lots) : la clé gagne
+ * `-r<empreinte des lots échoués>`, sinon l'API rendrait le lot en échec (B673).
  */
 export function planBatches(
   launchId: string,
   proposals: ProposalOutput[],
   budget = BATCH_BYTES_BUDGET,
+  retryOf: readonly string[] = [],
 ): BatchPlan[] {
-  const chunks: Array<{ group: string; items: ProposalOutput[] }> = [];
-  if (proposals.length <= SPEC_BATCH_OPERATIONS_MAX) {
-    for (const items of slices(proposals, budget)) chunks.push({ group: "all", items });
-  } else {
-    const groups = new Map<string, ProposalOutput[]>();
-    for (const item of proposals) {
-      const key = `${item.kind}:${item.zone}`;
-      groups.set(key, [...(groups.get(key) ?? []), item]);
-    }
-    for (const [group, items] of groups) {
-      for (const slice of slices(items, budget)) chunks.push({ group, items: slice });
-    }
-  }
-  return chunks.map(({ group, items }, index) => {
+  const retry = retryOf.length > 0 ? `-r${fingerprint([...retryOf].sort())}` : "";
+  return chunksOf(proposals, budget).map(({ group, items }, index) => {
     const ids = items.map((item) => item.id);
     return {
-      key: `proposal-${launchId}-${slug(group)}-${index + 1}-${fingerprint(ids)}`,
+      key: `proposal-${launchId}-${slug(group)}-${index + 1}-${fingerprint(ids)}${retry}`,
       operations: items.flatMap(operationsOf),
       proposalIds: ids,
+      operationProposals: items.flatMap((item) => operationsOf(item).map(() => item.id)),
     };
   });
 }

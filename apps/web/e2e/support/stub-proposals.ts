@@ -1,4 +1,11 @@
 import type { IncomingMessage } from "node:http";
+import {
+  batchReply,
+  EXISTING_SECTION_TITLE,
+  FAILED_BATCH_ID,
+  SAVE_ROUTE,
+  submitReply,
+} from "./stub-save-failed.ts";
 
 /**
  * Faux API des propositions de l'agent (TK-99b, contrat 2.9.0) : `ai.proposeOptions`, `ai.proposeDeliverable`,
@@ -34,6 +41,8 @@ export type ProposalsMode =
   /** TK-114b : les 9 propositions de l'architecture, bilan terminé ; `architectureDeadline` : arrêté au délai. */
   | "architectureReport"
   | "architectureDeadline"
+  /** TK-114e : 122 acceptées tenues par un lot `conflict` (dont la section déjà présente), bilan « sections déjà présentes ». */
+  | "architectureSaveFailed"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -71,7 +80,7 @@ interface Item {
   rationale: string;
   content: Record<string, unknown>;
   status: "pending" | "accepted" | "rejected";
-  appliedBatchId: null;
+  appliedBatchId: string | null;
   createdAt: string;
 }
 
@@ -449,6 +458,35 @@ function architectureVolumeItems(): Item[] {
   return [base[0] as Item, ...components, ...flows, ...adrs];
 }
 
+/**
+ * 122 acceptées tenues par le lot en conflit (scénario staging, B668) : la section déjà présente sur la tête et
+ * 121 composants. Au-delà de 30 : relecture groupée, filtre « À relire » par défaut.
+ */
+function architectureSaveFailedItems(): Item[] {
+  const section: Item = {
+    ...architectureDocument(),
+    title: EXISTING_SECTION_TITLE,
+    content: {
+      title: EXISTING_SECTION_TITLE,
+      markdown: "Une tâche suit son modèle, de la création à la clôture.",
+    },
+  };
+  const components = Array.from({ length: 121 }, (_, i) =>
+    component(
+      2 + i,
+      `Composant accepté ${String(i + 1).padStart(3, "0")}`,
+      ["service", "app", "store", "queue", "ext"][i % 5] as string,
+      VOLUME_ZONES[i % VOLUME_ZONES.length] as string,
+      `Responsabilité du composant accepté ${i + 1}.`,
+    ),
+  );
+  return [section, ...components].map((item) => ({
+    ...item,
+    status: "accepted",
+    appliedBatchId: FAILED_BATCH_ID,
+  }));
+}
+
 let items: Item[] = [];
 let architectureMode: ProposalsMode | undefined;
 let volumeData = false;
@@ -526,38 +564,44 @@ const REPORTS: Partial<Record<ProposalsMode, Record<string, unknown>>> = {
     stopReason: "deadline",
   },
 };
+/** TK-114e (B670) : bilan terminé, une section écartée parce qu'elle existait déjà. */
+REPORTS.architectureSaveFailed = {
+  ...REPORTS.architectureReport,
+  zonesDone: 9,
+  zonesDiscarded: 0,
+  discardReasons: [],
+  sectionsExisting: 1,
+};
 let reads = 0;
 let started = false;
 const journal: Array<Record<string, unknown>> = [];
+
+/** Propositions de départ de chaque mode (les autres modes partent sans proposition). */
+const ITEMS_OF: Partial<Record<ProposalsMode, () => Item[]>> = {
+  ready: () => Array.from({ length: 12 }, (_, i) => make(i + 1, 3)),
+  mixed,
+  data: dataItems,
+  dataVolume: dataVolumeItems,
+  architecture: architectureItems,
+  architectureReport: () => [...architectureItems(), reprise()],
+  architectureDeadline: architectureItems,
+  architectureVolume: architectureVolumeItems,
+  architectureSaveFailed: architectureSaveFailedItems,
+  volume: () => Array.from({ length: 400 }, (_, i) => make(i + 1, 16)),
+  hostile: () => [make(1, 1, true)],
+};
 
 export function resetProposals(scenario: ProposalsScenario = {}): void {
   const mode = scenario.proposals ?? "none";
   journal.length = 0;
   reads = 0;
-  started = false;
-  launchStatus = "done";
-  items = [];
   volumeData = mode === "dataVolume";
   report = REPORTS[mode];
   architectureMode =
     mode === "architecture" || mode === "architectureVolume" || report ? mode : undefined;
-  if (mode === "ready") items = Array.from({ length: 12 }, (_, i) => make(i + 1, 3));
-  if (mode === "mixed") items = mixed();
-  if (mode === "data") items = dataItems();
-  if (mode === "dataVolume") items = dataVolumeItems();
-  if (mode === "architecture") items = architectureItems();
-  if (mode === "architectureReport") items = [...architectureItems(), reprise()];
-  if (mode === "architectureDeadline") {
-    items = architectureItems();
-    launchStatus = "failed";
-  }
-  if (mode === "architectureVolume") items = architectureVolumeItems();
-  if (mode === "generating" || mode === "architectureGeneratingReport") {
-    started = true;
-    launchStatus = "running";
-  }
-  if (mode === "volume") items = Array.from({ length: 400 }, (_, i) => make(i + 1, 16));
-  if (mode === "hostile") items = [make(1, 1, true)];
+  items = ITEMS_OF[mode]?.() ?? [];
+  started = mode === "generating" || mode === "architectureGeneratingReport";
+  launchStatus = started ? "running" : mode === "architectureDeadline" ? "failed" : "done";
 }
 
 /** Livrable Données au-delà de 30 propositions : relations et jeux dans le groupe `links` (comme le serveur, B487). */
@@ -761,8 +805,13 @@ export function handleProposals(req: IncomingMessage, url: URL, h: Handlers): bo
     h.send(reply(200, journal));
     return true;
   }
-  if (!ROUTE.test(url.pathname)) return false;
   const mode = h.scenario.proposals ?? "none";
+  if (mode === "architectureSaveFailed" && SAVE_ROUTE.test(url.pathname)) {
+    if (req.method === "GET") h.send(batchReply(url.pathname));
+    else readBody(req, (body) => h.send(submitReply(body, items)));
+    return true;
+  }
+  if (!ROUTE.test(url.pathname)) return false;
   const path = url.pathname;
   if (req.method === "GET") {
     if (path.endsWith("/options")) h.send(options(mode, url.searchParams.get("deliverable")));

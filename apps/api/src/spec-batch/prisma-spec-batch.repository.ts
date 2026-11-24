@@ -21,6 +21,7 @@ import type {
   SpecBatchPlan,
   SpecBatchRepository,
 } from "./spec-batch.repository.ts";
+import type { SpecGitTarget } from "./spec-head-paths.ts";
 import { createdSpecId } from "./spec-ids.ts";
 
 const WITH_OPERATIONS = { operations: { orderBy: { position: "asc" as const } } };
@@ -62,32 +63,73 @@ const recordOf = (row: Row): BatchRecord => ({
   })),
 });
 
+const rowByKey = (tx: Tx, scope: ProjectScope, idempotencyKey: string) =>
+  tx.specWriteBatch.findFirst({
+    where: { projectId: scope.projectId, idempotencyKey },
+    include: WITH_OPERATIONS,
+  });
+
+/** Lots du projet en échec (`failed`, `conflict`, terminaux) qui tiennent l'une de ces propositions (TK-114e, B673). */
+async function failedLocks(tx: Tx, scope: ProjectScope, ids: readonly string[]): Promise<string[]> {
+  const held = await tx.agentProposal.findMany({
+    where: { id: { in: [...ids] }, projectId: scope.projectId, appliedBatchId: { not: null } },
+    select: { appliedBatchId: true },
+  });
+  const locks = [...new Set(held.map((row) => row.appliedBatchId ?? ""))];
+  if (locks.length === 0) return [];
+  const failed = await tx.specWriteBatch.findMany({
+    where: {
+      id: { in: locks },
+      projectId: scope.projectId,
+      status: { in: ["failed", "conflict"] },
+    },
+    select: { id: true },
+  });
+  return failed.map((row) => row.id);
+}
+
 /**
- * Preuve serveur que les opérations viennent de propositions acceptées (TK-99a) : chacune est du projet, `accepted`,
- * pas déjà appliquée (tout type de proposition a une opération de spec : TK-103, TK-107) ; elle reçoit le lot dans la transaction de l'enfilage. Une course
- * entre deux lots sur la même proposition est tranchée par la condition de l'écriture (tout ou rien).
+ * Propositions du projet, acceptées, libres ou tenues par un lot du projet en échec, mises à jour en une requête : le compte
+ * doit être exact (tout ou rien). Une course entre deux lots sur la même proposition est tranchée par la condition de
+ * l'écriture : le second ne trouve plus la proposition libre ni tenue par le lot en échec.
  */
-async function applyProposals(
+async function claimProposals(
   tx: Tx,
   scope: ProjectScope,
-  batchId: string,
   ids: readonly string[],
-) {
+  data: { appliedBatchId: string | null; status?: "pending" },
+): Promise<void> {
   if (ids.length === 0) return;
+  const failed = await failedLocks(tx, scope, ids);
   const where = {
     id: { in: [...ids] },
     projectId: scope.projectId,
     status: "accepted",
-    appliedBatchId: null,
+    OR: [
+      { appliedBatchId: null },
+      ...(failed.length === 0 ? [] : [{ appliedBatchId: { in: failed } }]),
+    ],
   };
-  const applied = await tx.agentProposal.updateMany({ where, data: { appliedBatchId: batchId } });
-  if (applied.count !== ids.length) {
+  const claimed = await tx.agentProposal.updateMany({ where, data });
+  if (claimed.count !== ids.length) {
     throw validation(
       "proposalIds",
       "Chaque proposition doit être acceptée, du projet et pas déjà appliquée.",
     );
   }
 }
+
+/**
+ * Preuve serveur que les opérations viennent de propositions acceptées (TK-99a) : chacune est du projet, `accepted`, pas
+ * déjà appliquée ou tenue par un lot du projet en échec (rejeu, TK-114e, B673 ; le lot échoué reste en base) ; elle reçoit
+ * le lot dans la transaction de l'enfilage.
+ */
+const applyProposals = (tx: Tx, scope: ProjectScope, batchId: string, ids: readonly string[]) =>
+  claimProposals(tx, scope, ids, { appliedBatchId: batchId });
+
+/** Propositions écartées par la pré-vérification (TK-114e, B672) : « à relire », sans ligne de décision. */
+const returnProposals = (tx: Tx, scope: ProjectScope, ids: readonly string[]) =>
+  claimProposals(tx, scope, ids, { appliedBatchId: null, status: "pending" });
 
 @Injectable()
 export class PrismaSpecBatchRepository implements SpecBatchRepository {
@@ -148,16 +190,48 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
     });
   }
 
+  findByKey(scope: ProjectScope, idempotencyKey: string): Promise<BatchRecord | null> {
+    return this.transactions.run(scope, async (tx) => {
+      const row = await rowByKey(tx, scope, idempotencyKey);
+      return row ? recordOf(row) : null;
+    });
+  }
+
+  gitTarget(scope: ProjectScope): Promise<SpecGitTarget> {
+    return this.transactions.run(scope, async (tx) => {
+      const repo = orNotFound(
+        await tx.projectRepo.findFirst({
+          where: { projectId: scope.projectId, ...carrierFilter },
+          select: { name: true, ownerLogin: true, specPath: true, installationId: true },
+        }),
+      );
+      const installation = await tx.providerInstallation.findFirst({
+        where: { id: repo.installationId },
+      });
+      return {
+        specPath: repo.specPath,
+        repoName: repo.name,
+        owner: { kind: installation?.ownerKind ?? "organization", login: repo.ownerLogin },
+        installation: {
+          id: installation?.id ?? "",
+          externalId: installation?.externalId ?? "",
+          active: installation?.status === "active",
+        },
+      };
+    });
+  }
+
+  returnToReview(scope: ProjectScope, ids: readonly string[]): Promise<void> {
+    return this.transactions.run(scope, (tx) => returnProposals(tx, scope, ids));
+  }
+
   /** Le lot déjà enregistré sous cette clé : rejeu à l'identique, ou clé réutilisée avec un autre contenu. */
   private async known(
     tx: Tx,
     scope: ProjectScope,
     batch: PreparedBatch,
   ): Promise<CreateOutcome | null> {
-    const row = await tx.specWriteBatch.findFirst({
-      where: { projectId: scope.projectId, idempotencyKey: batch.idempotencyKey },
-      include: WITH_OPERATIONS,
-    });
+    const row = await rowByKey(tx, scope, batch.idempotencyKey);
     if (!row) return null;
     const record = recordOf(row);
     return sameContent(record, batch)
@@ -207,6 +281,7 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
       });
     }
     await tx.specWriteOperation.createMany({ data: operations });
+    await returnProposals(tx, scope, batch.returnedProposalIds ?? []);
     await applyProposals(tx, scope, row.id, batch.proposalIds ?? []);
     await recordAudit(tx, scope, {
       action: "spec.batch.submit",

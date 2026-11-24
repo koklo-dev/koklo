@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type TriageContext, titleKey, triageProposals } from "./triage.ts";
+import { rememberPublished, type TriageContext, titleKey, triageProposals } from "./triage.ts";
+import { type ArchitectureRefs, docSectionIdOf } from "./triage-architecture.ts";
 
 /**
  * TK-111 lot B (cas 1, B511) : tri des propositions `component`, `archflow`, `adr`, `doc_section`. Une charge invalide, une
@@ -20,6 +21,7 @@ const context = (over: Partial<TriageContext> = {}): TriageContext => ({
     decisions: new Set(["ADR-001"]),
     archflows: new Set(["P-annuler"]),
     ownedTables: new Set<string>(),
+    docSections: new Set<string>(),
   },
   ...over,
 });
@@ -259,5 +261,65 @@ describe("triage des acteurs et des flux repris (TK-114d)", () => {
     );
     expect(accepted).toEqual([]);
     expect(discarded).toBe(1);
+  });
+});
+
+/** TK-114e (B669, B670) : une section dont l'identifiant `DOC-<slug du titre>` existe déjà est écartée et comptée. */
+describe("triage des sections du document (TK-114e)", () => {
+  const TACHES = "DOC-taches-modeles-de-taches-et-cycle-de-vie";
+  const withSections = (ids: string[]): TriageContext => {
+    const base = context();
+    return { ...base, arch: { ...(base.arch as ArchitectureRefs), docSections: new Set(ids) } };
+  };
+
+  it("docSectionIdOf : même identifiant que l'API (slug du titre, repli section)", () => {
+    expect(docSectionIdOf("Tâches, modèles de tâches et cycle de vie")).toBe(TACHES);
+    expect(docSectionIdOf("Sécurité et données personnelles")).toBe(
+      "DOC-securite-et-donnees-personnelles",
+    );
+    expect(docSectionIdOf("Déploiement : environnements")).toBe("DOC-deploiement-environnements");
+    expect(docSectionIdOf("« »")).toBe("DOC-section");
+  });
+
+  it("section dont le slug existe sur la tête : écartée, comptée existing_section", () => {
+    const result = run(
+      [section("Tâches, modèles de tâches et cycle de vie"), section("Sécurité")],
+      withSections([TACHES]),
+    );
+    expect(result.accepted.map((candidate) => candidate.title)).toEqual(["Sécurité"]);
+    expect(result.discarded).toBe(1);
+    expect(result.existingSections).toBe(1);
+  });
+
+  it("deux titres différents de même slug dans un lancement : la seconde écartée", () => {
+    const result = run(
+      [
+        section("Tâches : modèles de tâches et cycle de vie"),
+        section("Taches, modeles de taches et cycle de vie"),
+      ],
+      withSections([]),
+    );
+    expect(result.accepted).toHaveLength(1);
+    expect(result.discarded).toBe(1);
+    expect(result.existingSections).toBe(1);
+  });
+
+  it("reprise d'un segment : les sections publiées sont connues", () => {
+    const ctx = withSections([]);
+    rememberPublished(ctx, [
+      {
+        kind: "doc_section",
+        title: "Tâches, modèles de tâches et cycle de vie",
+        status: "pending",
+        payload: { title: "Tâches, modèles de tâches et cycle de vie", markdown: "Texte." },
+      },
+    ]);
+    const result = run([section("Taches : modeles de taches et cycle de vie")], ctx);
+    expect(result.accepted).toEqual([]);
+    expect(result.existingSections).toBe(1);
+  });
+
+  it("sans section en conflit, rien n'est compté", () => {
+    expect(run([section("Sécurité")], withSections([TACHES])).existingSections).toBe(0);
   });
 });

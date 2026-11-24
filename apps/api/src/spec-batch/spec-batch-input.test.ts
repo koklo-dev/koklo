@@ -101,3 +101,36 @@ describe("prepareBatch : règles, rôles et parcours (TK-103)", () => {
     expect(fieldOf(base({ operations: twice }))).toBe("operations");
   });
 });
+
+describe("prepareBatch : skipConflicts (TK-114e, B675)", () => {
+  const A = "00000000-0000-4000-8000-00000000000a";
+  const B = "00000000-0000-4000-8000-00000000000b";
+  const two = [
+    { kind: "doc.section.create", title: "Un", markdown: "x" },
+    { kind: "doc.section.create", title: "Deux", markdown: "y" },
+  ] as SpecBatchSubmitInput["operations"];
+
+  it("une proposition par opération, chacune dans proposalIds, chacune de proposalIds citée : accepté", () => {
+    const input = base({
+      operations: two,
+      proposalIds: [A, B],
+      skipConflicts: { proposals: [A, B] },
+    });
+    expect(fieldOf(input)).toBeUndefined();
+    const once = { ...input, proposalIds: [A], skipConflicts: { proposals: [A, A] } };
+    expect(fieldOf(once)).toBeUndefined();
+  });
+
+  it("longueur différente des opérations, ou identifiant hors proposalIds : 422 sur skipConflicts", () => {
+    const ok = { operations: two, proposalIds: [A, B] };
+    expect(fieldOf(base({ ...ok, skipConflicts: { proposals: [A] } }))).toBe("skipConflicts");
+    expect(fieldOf(base({ ...ok, proposalIds: [A], skipConflicts: { proposals: [A, B] } }))).toBe(
+      "skipConflicts",
+    );
+    expect(fieldOf(base({ operations: two, skipConflicts: { proposals: [A, B] } }))).toBe(
+      "skipConflicts",
+    );
+    // Une proposition de `proposalIds` sans opération serait tenue par un lot qui n'écrit rien pour elle.
+    expect(fieldOf(base({ ...ok, skipConflicts: { proposals: [A, A] } }))).toBe("skipConflicts");
+  });
+});

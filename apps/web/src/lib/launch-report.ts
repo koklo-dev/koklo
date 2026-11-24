@@ -84,9 +84,15 @@ const beforeCounts = (before: NonNullable<LaunchReport["coverageBefore"]>) => [
   ...(before.links ? [before.links] : []),
 ];
 
+/** « sections déjà présentes écartées : n » (B670) : seulement quand n ≥ 1 ; seul sur sa ligne sans couverture. */
+const sectionsPart = (report: LaunchReport, capital = false): string[] =>
+  report.sectionsExisting
+    ? [`${capital ? "Sections" : "sections"} déjà présentes écartées : ${report.sectionsExisting}`]
+    : [];
+
 function coverageLine(report: LaunchReport): string[] {
   const after = report.coverageAfter;
-  if (!after) return [];
+  if (!after) return sectionsPart(report, true);
   const before = report.coverageBefore;
   const parts = [
     `Fonctionnalités servies ${ratio(after.features)}`,
@@ -94,6 +100,7 @@ function coverageLine(report: LaunchReport): string[] {
     `tables rattachées ${ratio(after.tables)}`,
     ...(after.links ? [`composants reliés ${ratio(after.links)}`] : []),
     ...(before ? [`avant : ${beforeCounts(before).map(ratio).join(", ")}`] : []),
+    ...sectionsPart(report),
   ];
   return [parts.join(" · ")];
 }

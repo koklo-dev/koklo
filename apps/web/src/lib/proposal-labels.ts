@@ -110,11 +110,49 @@ export const ARRIVED_TEXT = (total: number): string =>
   `${total} ${total >= 2 ? "propositions arrivées" : "proposition arrivée"}`;
 export const GROUP_CHANGED_TEXT = (pending: number): string =>
   `Le groupe a changé : ${pending} à relire.`;
-export const SAVED_TEXT = (saved: number, left: number): string =>
-  left === 0
-    ? `${saved} enregistrée${saved >= 2 ? "s" : ""} dans la spec`
-    : `${saved} enregistrée${saved >= 2 ? "s" : ""}, ${left} à reprendre`;
-export const BLOCKED_TEXT = "Enregistrement échoué · à reprendre par l'équipe technique";
+/** Motifs d'une proposition écartée à l'enregistrement (B672), en mots simples. */
+const SKIP_REASON_TEXTS: Record<string, string> = {
+  exists: "existe déjà dans la spec",
+  missing: "n'existe plus dans la spec",
+  duplicate: "en double dans l'enregistrement",
+};
+export const skipReasonText = (reason: string): string =>
+  SKIP_REASON_TEXTS[reason] ?? "écartée par la vérification de la spec";
+
+/** « M remises à relire : existe déjà dans la spec » : une raison par proposition remise à relire. */
+function returnedText(reasons: readonly string[]): string {
+  const n = reasons.length;
+  const why = [...new Set(reasons.map(skipReasonText))].join(", ");
+  return `${n} remise${n >= 2 ? "s" : ""} à relire : ${why}`;
+}
+
+/** « N enregistrées dans la spec », « N enregistrées, L à reprendre », suivi de « · M remises à relire : motif ». */
+export const SAVED_TEXT = (
+  saved: number,
+  left: number,
+  returned: readonly string[] = [],
+): string => {
+  const done =
+    left === 0
+      ? `${saved} enregistrée${saved >= 2 ? "s" : ""} dans la spec`
+      : `${saved} enregistrée${saved >= 2 ? "s" : ""}, ${left} à reprendre`;
+  return returned.length > 0 ? `${done} · ${returnedText(returned)}` : done;
+};
+export const BLOCKED_TEXT = "Enregistrement échoué · à réessayer";
+
+/** Motif d'un lot d'enregistrement échoué (B674) : jamais le code ni le texte du fournisseur. */
+function saveFailureReason(code: string | null): string {
+  if (code === "write_conflict" || code === "stale_base" || code === "conflict")
+    return "un élément proposé existait déjà dans la spec ou avait changé entre-temps";
+  if (code === "SPEC_INVALID") return "la spec obtenue aurait contenu des erreurs";
+  if (code?.startsWith("PROVIDER_")) return "le dépôt de la spec n'a pas répondu";
+  return "l'enregistrement n'a pas pu se terminer";
+}
+
+export const SAVE_FAILURE_TEXT = (count: number, code: string | null): string =>
+  `L'enregistrement de ${count} ${count >= 2 ? "propositions acceptées" : "proposition acceptée"} n'a pas abouti : ${saveFailureReason(code)}. Rien n'a été écrit dans la spec.`;
+/** Suffixe du résumé du bandeau des onglets hors Relecture tant qu'un enregistrement a échoué (S-spec-architecture §16). */
+export const SAVE_FAILURE_SUFFIX = " · enregistrement à reprendre dans la Relecture";
 
 const TAB_NOUNS = {
   features: ["fonctionnalité", "fonctionnalités"],

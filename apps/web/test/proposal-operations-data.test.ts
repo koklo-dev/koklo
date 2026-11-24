@@ -130,7 +130,7 @@ describe("prepareDataProposals : relations et rejet en cascade (B392)", () => {
       kind: "table.create",
       relations: [{ to: "T-client", cardinality: "n → 1" }],
     });
-    expect(proposals.filter(isSavable).map((p) => p.kind)).toEqual(["table", "table"]);
+    expect(proposals.filter((p) => isSavable(p)).map((p) => p.kind)).toEqual(["table", "table"]);
   });
 
   it("une relation partant d'une table enregistrée devient un table.update qui garde les relations existantes", async () => {

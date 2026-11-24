@@ -1,7 +1,7 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 7
+version: 9
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
@@ -44,6 +44,7 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 | 6 | 2026-11-21 | TK-114b | Bilan du lancement (§13), sans maquette : ligne de détail de la Génération (prop `detail` de `ProposalGenerationBanner` ajoutée à `packages/ui`, DESIGN.md §5.25) et `InlineAlert` « Bilan du lancement » en Relecture ; propositions de mise à jour d'un composant indexé (B613 à B622). |
 | 7 | 2026-11-22 | TK-114c | Vue des zones dès 3 zones et plus de 12 composants (ou plus de 25 en 2 zones), écart assumé avec la règle « au-delà de 25 » (B632) ; liens inter-zones tracés vers la carte estompée et dans la vue à plat (B641) ; « composants reliés » dans le bilan (B642) ; aucun composant ajouté à `packages/ui` (§14). |
 | 8 | 2026-11-22 | TK-114d | Application d'entrée de chaque rôle : trait acteur → application sans étiquette (B662, écart « navigateur » de la maquette 13 l.566-568), acteurs placés par leur application (B654) ; propositions « Flux repris » (B655, B659) ; bilan « rôles avec application · flux repris » (§15, B661) ; aucun composant ajouté à `packages/ui`. |
+| 9 | 2026-11-24 | TK-114e | Relecture : alerte « Enregistrement échoué » avec motif en mots simples et « Réessayer l'enregistrement » (§16, B672 à B674), bouton du bandeau retiré tant qu'elle est affichée ; bilan « sections déjà présentes écartées » (B670) ; sans maquette, aucun composant ajouté à `packages/ui`. |
 
 ## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
 - **Schéma** : lecteur du lot 6 ; vue des zones dès 3 zones et plus de 12 composants, ou plus de 25 composants en 2 zones (TK-114c, B632 ; avant : au-delà de 25) (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone, relié par un trait à chaque composant de la zone qui l'appelle ou qu'il appelle (TK-114c, B641). Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
@@ -88,3 +89,14 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 - **Clavier et annonces** : inchangés ; traits décoratifs (`aria-hidden`), la ligne `detail` reste annoncée par la région `role="status"` du bandeau.
 - **375 px** : lignes du bilan à la ligne, aucune troncature ; lecteur masqué sous 768 px (liste de cartes) ; aucun défilement horizontal.
 - **États comparés à la maquette** (clair, sombre, 375 px) : zone ouverte « Toto » avec acteurs reliés à l'application ; relecture avec le bilan des rôles et une proposition « Flux repris » ; bilan avec motifs « non repris » ; vue des zones « Toto ».
+
+## 16. Enregistrement échoué et réessai (TK-114e, sans maquette, B668 à B676)
+- **Relecture** : un lot d'enregistrement `conflict` ou `failed` qui tient encore des propositions acceptées affiche, au-dessus des groupes, `InlineAlert` `error` `sync_problem` : « L'enregistrement de N propositions acceptées n'a pas abouti : <motif>. Rien n'a été écrit dans la spec. » + `Button sm` primaire « Réessayer l'enregistrement ». Motifs : conflit (« un élément proposé existait déjà dans la spec ou avait changé entre-temps »), spec invalide (« la spec obtenue aurait contenu des erreurs »), dépôt (« le dépôt de la spec n'a pas répondu »), autre (« l'enregistrement n'a pas pu se terminer »).
+- **Réessai** : rejoue les acceptées non écrites ; le serveur écarte celles qui entrent en conflit avec la tête et les remet « À relire ». Récapitulatif : « N enregistrées dans la spec · M remises à relire : <motif court> ».
+- **Bandeau** : « Enregistrer N dans la spec » retiré tant que l'alerte est affichée ; sur Document et Composants, le résumé du bandeau gagne « · enregistrement à reprendre dans la Relecture ».
+- **Bilan** : « · sections déjà présentes écartées : n » (n ≥ 1).
+- **États** : alerte absente sans lot échoué ; réessai en cours (bouton « Enregistrement… » désactivé, barre verte) ; réessai réussi (alerte retirée, récapitulatif) ; réessai encore en échec (alerte reste, motif à jour) ; tout écarté (aucun lot, M remises à relire) ; droits : designer, client, business ne voient ni l'alerte ni le bouton (pas d'écriture).
+- **Clavier et annonces** : le bouton est atteignable au clavier dans l'ordre de lecture (après le bandeau, avant les groupes) ; `role="alert"` annonce l'échec une fois ; le récapitulatif passe par la région `role="status"` existante ; focus conservé sur le bouton (désactivé puis retiré) puis rendu au titre de la relecture.
+- **375 px** : texte à la ligne, bouton sous le texte, aucune troncature ni défilement horizontal.
+- **États comparés** (clair, sombre, 375 px) : relecture avec l'alerte d'un lot `conflict` de 122 propositions ; récapitulatif après réessai avec 1 remise à relire.
+

@@ -139,7 +139,7 @@ function listAnswer(input: Record<string, unknown>) {
 /** Installe le faux serveur : propositions de départ, options du modal, décisions qui modifient le magasin. */
 export function serveProposals(
   items: Fake[],
-  over: { launchStatus?: string; report?: unknown } = {},
+  over: { launchStatus?: string; report?: unknown; failed?: FailedBatch; skip?: string[] } = {},
 ): void {
   store.items = items;
   store.launchStatus = over.launchStatus ?? "done";
@@ -183,15 +183,58 @@ export function serveProposals(
       return { decided: own.length };
     },
   );
-  procedures.specBatchSubmit.mockImplementation(async (input: { proposalIds: string[] }) => {
-    const id = `0190cccc-0000-7000-8000-${String(procedures.specBatchSubmit.mock.calls.length).padStart(12, "0")}`;
-    for (const p of store.items) if (input.proposalIds.includes(p.id)) p.appliedBatchId = id;
-    return { id, status: "committed", errorCode: null, commitSha: "a".repeat(40), results: [] };
+  procedures.specBatchSubmit.mockImplementation(async (input: SubmitInput) =>
+    submitAnswer(input, over.skip ?? []),
+  );
+  procedures.specBatchGet.mockImplementation(async (input: { batchId: string }) =>
+    over.failed?.id === input.batchId
+      ? { ...over.failed }
+      : { id: input.batchId, status: "committed", errorCode: null },
+  );
+}
+
+/** Lot d'enregistrement échoué qui tient encore des acceptées (TK-114e, B673). */
+export interface FailedBatch {
+  id: string;
+  status: "failed" | "conflict";
+  errorCode: string | null;
+}
+
+interface SubmitInput {
+  proposalIds: string[];
+  operations: Array<{ kind: string }>;
+  skipConflicts?: { proposals: string[] };
+}
+
+/**
+ * `specBatch.submit` : avec `skipConflicts`, les propositions de `skip` sont écartées (`exists`), remises à relire ;
+ * tout écarté : 409 `SPEC_BATCH_CONFLICT` `write_conflict` avec `skipped`, aucun lot (B672).
+ */
+function submitAnswer(input: SubmitInput, skip: readonly string[]) {
+  const id = `0190cccc-0000-7000-8000-${String(procedures.specBatchSubmit.mock.calls.length).padStart(12, "0")}`;
+  const owners = input.skipConflicts?.proposals ?? [];
+  const skipped = input.operations.flatMap((op, position) => {
+    const proposalId = owners[position];
+    return proposalId && skip.includes(proposalId)
+      ? [{ position, kind: op.kind, specId: null, reason: "exists", proposalId }]
+      : [];
   });
-  procedures.specBatchGet.mockImplementation(async (input: { batchId: string }) => ({
-    id: input.batchId,
+  const returned = new Set(skipped.map((entry) => entry.proposalId));
+  for (const p of store.items) {
+    if (returned.has(p.id)) Object.assign(p, { status: "pending", appliedBatchId: null });
+    else if (input.proposalIds.includes(p.id)) p.appliedBatchId = id;
+  }
+  if (returned.size > 0 && returned.size === input.proposalIds.length) {
+    throw apiError("SPEC_BATCH_CONFLICT", { reason: "write_conflict", skipped });
+  }
+  return {
+    id,
     status: "committed",
-  }));
+    errorCode: null,
+    commitSha: "a".repeat(40),
+    results: [],
+    ...(skipped.length > 0 ? { skipped } : {}),
+  };
 }
 
 export const renderTeam = (search = ""): ReturnType<typeof renderFeatures> => {

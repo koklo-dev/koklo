@@ -199,4 +199,31 @@ describe("prompts de l'Architecture (TK-111)", () => {
     expect(text).toContain("architecture");
     expect(text).toContain("C-api");
   });
+
+  it("TK-114e (B670) : les sections de la tête entrent dans le bloc de l'architecture actuelle, consigne constante", () => {
+    const withSections: LaunchSources = {
+      ...archSources,
+      docSections: [{ specId: "DOC-contexte", title: "Contexte général du système" }],
+    };
+    const ask = (input: LaunchSources) =>
+      batchPrompt(NONCE, {
+        sources: input,
+        instruction: null,
+        zone: "Noyau",
+        kinds: ["doc_section"],
+      });
+    const prompt = ask(withSections);
+    expect(prompt.user).toContain("Document sections\nDOC-contexte | Contexte général du système");
+    expect(prompt.system).not.toContain("Contexte général du système");
+    expect(prompt.system).toContain("or the title of an existing decision or document section");
+    expect(ask(archSources).system).toBe(prompt.system);
+    const all = batchPrompt(NONCE, {
+      sources: withSections,
+      instruction: null,
+      zone: "Noyau",
+      kinds: ["component", "archflow", "adr", "doc_section"],
+    });
+    expect(all.system).toContain("or the title of an existing decision or document section");
+    expect(all.system).not.toContain("Contexte général du système");
+  });
 });

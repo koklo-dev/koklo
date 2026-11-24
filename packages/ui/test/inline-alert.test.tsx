@@ -335,4 +335,21 @@ describe("InlineAlert actions primaires (13 l.128)", () => {
     expect(primary.querySelector("svg, span")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Voir" })).not.toHaveClass("bg-primary");
   });
+
+  it("disabled : l'action reste dans l'ordre de lecture, désactivée, sans appeler son rappel (TK-114e)", async () => {
+    const onClick = vi.fn();
+    render(
+      <InlineAlert
+        variant="error"
+        icon="sync_problem"
+        actions={[{ label: "Enregistrement…", onClick, primary: true, disabled: true }]}
+      >
+        Texte
+      </InlineAlert>,
+    );
+    const button = screen.getByRole("button", { name: "Enregistrement…" });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

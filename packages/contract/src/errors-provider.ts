@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ownerKindSchema } from "./schemas-provider.ts";
-import { commitShaSchema, validationReportSchema } from "./schemas-spec.ts";
+import { commitShaSchema, specBatchSkippedSchema, validationReportSchema } from "./schemas-spec.ts";
 
 /**
  * Erreurs du fournisseur git et des lots d'écriture (0.5.0). Aucune ne porte de jeton, de message
@@ -66,6 +66,8 @@ export const specBatchConflictError = {
     data: z.object({
       reason: z.enum(["idempotency_key_reused", "stale_base", "write_conflict"]),
       batchId: z.uuid().optional(),
+      /** Tout écarté par `skipConflicts` (TK-114e, 3.15.0) : aucun lot, `write_conflict` et les opérations écartées. */
+      skipped: specBatchSkippedSchema.optional(),
     }),
   },
 } as const;

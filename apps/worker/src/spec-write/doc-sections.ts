@@ -1,7 +1,7 @@
 import {
   type DocSectionStatus,
+  type DocSections,
   docSectionPath,
-  docSectionSlugOf,
   EmitDocSectionError,
   emitDocSection,
   parseDocSection,
@@ -14,26 +14,6 @@ interface DocSectionPayload {
   title?: string;
   markdown?: string;
   status?: DocSectionStatus;
-}
-
-export interface DocSections {
-  /** `DOC-<slug>` -> chemin. */
-  readonly byId: Map<string, string>;
-  /** Plus grand numéro NN pris (0 sans section). */
-  readonly last: number;
-}
-
-/** Sections de la tête : `DOC-<slug>` -> chemin ; le numéro suivant se déduit du plus grand préfixe. */
-export function docSectionIndex(paths: Iterable<string>): DocSections {
-  const byId = new Map<string, string>();
-  let last = 0;
-  for (const path of paths) {
-    const found = docSectionSlugOf(path);
-    if (found === undefined) continue;
-    byId.set(`DOC-${found.slug}`, path);
-    last = Math.max(last, found.num);
-  }
-  return { byId, last };
 }
 
 /** Slug d'un identifiant `DOC-<slug>`. */

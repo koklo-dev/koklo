@@ -87,6 +87,7 @@ const architectureRefs = (sources: LaunchSources): ArchitectureRefs => {
     decisions: ids(architecture?.decisions),
     archflows: ids(architecture?.archflows),
     ownedTables: new Set((architecture?.components ?? []).flatMap((item) => item.owns)),
+    docSections: ids(sources.docSections),
   };
 };
 

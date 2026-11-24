@@ -1,11 +1,14 @@
 import type { SpecBatchOutput, SpecBatchSubmitInput } from "@koklo/contract";
+import { specPathIndex } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type { AppConfig } from "../config.ts";
 import { APP_CONFIG } from "../database/database.module.ts";
+import { GitAccess } from "../repo/git-access.ts";
 import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { replayedSubset } from "./batch-content.ts";
 import {
   type BatchRecord,
   type PreparedBatch,
@@ -14,7 +17,16 @@ import {
   type SpecBatchRepository,
 } from "./spec-batch.repository.ts";
 import { prepareBatch } from "./spec-batch-input.ts";
-import { failureOf, isOpen, outputOf, reusedKey } from "./spec-batch-output.ts";
+import {
+  allSkipped,
+  failureOf,
+  isOpen,
+  outputOf,
+  reusedKey,
+  skippedOf,
+} from "./spec-batch-output.ts";
+import { type Precheck, precheckBatch } from "./spec-batch-precheck.ts";
+import { specHeadPaths } from "./spec-head-paths.ts";
 import { SpecWriteQueue } from "./spec-write.queue.ts";
 import { pollUntil, SPEC_BATCH_WAIT_DEFAULT_MS } from "./wait.ts";
 
@@ -31,6 +43,7 @@ export class SpecBatchService {
     @Inject(GIT_PROVIDER) private readonly provider: GitProviderBinding,
     @Inject(SpecWriteQueue) private readonly queue: SpecWriteQueue,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(GitAccess) private readonly access: GitAccess,
   ) {}
 
   async submit(
@@ -38,7 +51,59 @@ export class SpecBatchService {
     role: string,
     input: SpecBatchSubmitInput,
   ): Promise<SpecBatchOutput> {
-    return this.commitPrepared(scope, role, (plan) => prepareBatch(input, plan.defaultBranch));
+    const proposals = input.skipConflicts?.proposals;
+    if (proposals === undefined) {
+      return this.commitPrepared(scope, role, (plan) => prepareBatch(input, plan.defaultBranch));
+    }
+    const prepared = prepareBatch(input, (await this.planned(scope)).defaultBranch);
+    const known = await this.repository.findByKey(scope, prepared.idempotencyKey);
+    if (known) return this.commitPrepared(scope, role, () => replayedSubset(known, prepared));
+    return this.submitChecked(
+      scope,
+      role,
+      prepared,
+      await this.precheck(scope, prepared, proposals),
+    );
+  }
+
+  /**
+   * Enregistrement pré-vérifié (TK-114e, B671, B672) : seules les propositions sans conflit partent, les écartées sont remises
+   * à relire (dans la transaction du lot) et rendues dans `skipped`. Tout écarté : aucun lot, 409 `write_conflict`.
+   */
+  private async submitChecked(
+    scope: ProjectScope,
+    role: string,
+    prepared: PreparedBatch,
+    checked: Precheck,
+  ): Promise<SpecBatchOutput> {
+    const returned = [...new Set(checked.skipped.map((skipped) => skipped.proposalId))];
+    if (checked.kept.length === 0) {
+      await this.repository.returnToReview(scope, returned);
+      throw allSkipped(checked.skipped);
+    }
+    const output = await this.commitPrepared(scope, role, () => ({
+      ...prepared,
+      operations: checked.kept,
+      proposalIds: checked.keptProposalIds,
+      returnedProposalIds: returned,
+    }));
+    return checked.skipped.length === 0
+      ? output
+      : { ...output, skipped: skippedOf(checked.skipped) };
+  }
+
+  /** Index par chemins de la branche du lot, lu hors transaction ; branche absente : rien n'est écarté. */
+  private async precheck(
+    scope: ProjectScope,
+    prepared: PreparedBatch,
+    proposals: readonly string[],
+  ): Promise<Precheck> {
+    const target = await this.repository.gitTarget(scope);
+    const paths = await specHeadPaths(this.provider, this.access, target, prepared.branch);
+    if (paths === null) {
+      return { kept: prepared.operations, keptProposalIds: [...new Set(proposals)], skipped: [] };
+    }
+    return precheckBatch(prepared.operations, proposals, specPathIndex(paths));
   }
 
   /**

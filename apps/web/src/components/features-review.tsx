@@ -20,6 +20,7 @@ import { ArchitectureGenerating } from "./architecture-generating.tsx";
 import { DataGenerating } from "./data-generating.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { ReviewDetail } from "./features-review-detail.tsx";
+import { SaveFailureNotice } from "./save-failure-notice.tsx";
 
 const GENERATING =
   "L'agent rédige le cahier fonctionnel à partir du dossier d'idée. Cela peut prendre une minute. Vous pouvez quitter la page.";
@@ -29,11 +30,15 @@ export const DATA_GENERATING =
   "L'agent déduit les tables et les relations du cahier fonctionnel. Cela peut prendre une minute. Vous pouvez quitter la page.";
 
 /** « · l'agent propose 12 éléments depuis le cahier fonctionnel · 3 acceptés · 7 à relire » (maquette 11 l.115). */
-const dataSummary = ({ total, accepted, pending }: ProposalReviewModel["counts"]): string =>
+export const dataSummary = ({ total, accepted, pending }: ProposalReviewModel["counts"]): string =>
   ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis le cahier fonctionnel · ${accepted} ${accepted >= 2 ? "acceptés" : "accepté"} · ${pending} à relire`;
 
 /** « · l'agent propose 12 éléments depuis le fonctionnel et les données · 3 acceptés · 7 à relire » (maquette 13 l.113). */
-const architectureSummary = ({ total, accepted, pending }: ProposalReviewModel["counts"]): string =>
+export const architectureSummary = ({
+  total,
+  accepted,
+  pending,
+}: ProposalReviewModel["counts"]): string =>
   ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis le fonctionnel et les données · ${accepted} ${accepted >= 2 ? "acceptés" : "accepté"} · ${pending} à relire`;
 
 type ReviewTab = FeaturesTab | "data" | "architecture";
@@ -124,6 +129,13 @@ const detailProp = (detail: string | undefined) => (detail ? { detail } : {});
 const generatingText = (tab: ReviewTab): string =>
   tab === "data" ? DATA_GENERATING : tab === "architecture" ? ARCHITECTURE_GENERATING : GENERATING;
 
+/** « Enregistrer N dans la spec » : seulement sans enregistrement échoué, que l'alerte reprend (une seule action). */
+export const saveProp = (
+  review: ProposalReviewModel,
+  actions: { save: () => Promise<void> },
+): { onSave?: () => void } =>
+  review.savable.length > 0 && !review.saveFailure ? { onSave: () => void actions.save() } : {};
+
 interface Notices {
   tab: ReviewTab;
   review: ProposalReviewModel;
@@ -131,9 +143,12 @@ interface Notices {
   onLeave: () => void;
 }
 
-/** Avis au-dessus de la relecture : erreur d'action, récapitulatif d'enregistrement, attente, « tout est relu ». */
+/**
+ * Avis au-dessus de la relecture : erreur d'action, récapitulatif d'enregistrement, attente, « tout est relu ».
+ * L'enregistrement échoué à réessayer (B674) se place sous le bandeau, avant les groupes : `SaveFailureSlot`.
+ */
 function ReviewNotices({ review, actions, onLeave, tab }: Notices) {
-  const { counts, active } = review;
+  const { counts, active, saveFailure } = review;
   return (
     <div className="flex flex-col gap-2 px-4 pt-3 empty:hidden md:px-7">
       {actions.error ? <ErrorNotice>{failureText(actions.error)}</ErrorNotice> : null}
@@ -152,11 +167,25 @@ function ReviewNotices({ review, actions, onLeave, tab }: Notices) {
           {generatingText(tab)}
         </ProposalGenerationBanner>
       ) : null}
-      {counts.pending === 0 && counts.accepted > 0 && !active ? (
+      {counts.pending === 0 && counts.accepted > 0 && !active && !saveFailure ? (
         <InlineAlert variant="neutral" icon="done_all">
           {`Tout est relu. Enregistrez les ${counts.accepted} acceptées.`}
         </InlineAlert>
       ) : null}
+    </div>
+  );
+}
+
+/** Alerte d'enregistrement échoué sous le bandeau « Mode relecture », avant le bilan et les groupes (§16). */
+function SaveFailureSlot({ review, actions }: Pick<Notices, "review" | "actions">) {
+  if (!review.saveFailure || review.savable.length === 0) return null;
+  return (
+    <div className="mx-4 mt-4 md:mx-7">
+      <SaveFailureNotice
+        failure={review.saveFailure}
+        saving={actions.saving}
+        onRetry={() => void actions.save()}
+      />
     </div>
   );
 }
@@ -207,7 +236,7 @@ export function FeaturesReview({
         onDecide={(id, decision) => void actions.decide(id, decision)}
         onAcceptGroup={(key) => void actions.acceptGroup(key)}
         onLoadMore={review.loadMore}
-        {...(review.savable.length > 0 ? { onSave: () => void actions.save() } : {})}
+        {...saveProp(review, actions)}
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
@@ -218,7 +247,12 @@ export function FeaturesReview({
           ? { summaryText: architectureSummary(counts), groupNote: "Groupées par type" }
           : {})}
         announcement={actions.announcement}
-        notice={notice}
+        notice={
+          <>
+            <SaveFailureSlot review={review} actions={actions} />
+            {notice}
+          </>
+        }
       >
         {selected && item ? (
           <ReviewDetail

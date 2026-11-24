@@ -85,11 +85,24 @@ export function mergeLinks(
   return merged;
 }
 
-const countedReason = (current: unknown, reason: LaunchDiscardReason) => {
+/** Motif de zone, ou `existing_section` (sections déjà présentes, TK-114e : hors motifs de zone, ignoré par l'API). */
+type CountedReason = LaunchDiscardReason | "existing_section";
+
+const countedReason = (current: unknown, reason: CountedReason, by = 1) => {
   const counts = isRecord(current) ? current : {};
   const previous = typeof counts[reason] === "number" ? (counts[reason] as number) : 0;
-  return { ...counts, [reason]: previous + 1 };
+  return { ...counts, [reason]: previous + by };
 };
+
+/** `discard_reasons` après la zone : motif de la zone écartée, sections déjà présentes ; `undefined` sans changement. */
+function zoneReasons(current: unknown, publication: ZonePublication) {
+  const { reason, existingSections = 0 } = publication;
+  if (reason === undefined && existingSections === 0) return undefined;
+  const counted = reason === undefined ? current : countedReason(current, reason);
+  return existingSections === 0
+    ? counted
+    : countedReason(counted, "existing_section", existingSections);
+}
 
 async function insertRows(
   tx: Writer,
@@ -119,18 +132,16 @@ export async function publishZoneIn(
 ): Promise<PublishOutcome> {
   const inserted = await insertRows(tx, launch, publication.zone, publication.accepted);
   if (inserted === undefined) return "stopped";
-  const { reason } = publication;
+  const reasons = zoneReasons(inserted.discardReasons, publication);
   await tx.agentLaunch.updateMany({
     where: { id: launch.id },
     data: {
       proposedCount: { increment: inserted.created },
       discardedCount: { increment: publication.discarded + inserted.overflow },
-      ...(reason === undefined
+      ...(publication.reason === undefined
         ? { zonesDone: { increment: 1 } }
-        : {
-            zonesDiscarded: { increment: 1 },
-            discardReasons: json(countedReason(inserted.discardReasons, reason)),
-          }),
+        : { zonesDiscarded: { increment: 1 } }),
+      ...(reasons === undefined ? {} : { discardReasons: json(reasons) }),
       heartbeatAt: now,
     },
   });

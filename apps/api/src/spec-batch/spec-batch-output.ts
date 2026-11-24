@@ -1,6 +1,7 @@
 import type { SpecBatchOutput } from "@koklo/contract";
 import { ORPCError } from "@orpc/server";
 import type { BatchRecord } from "./spec-batch.repository.ts";
+import type { SkippedOperation } from "./spec-batch-precheck.ts";
 
 export const isOpen = (status: BatchRecord["status"]): boolean =>
   status === "queued" || status === "committing";
@@ -23,6 +24,17 @@ export const outputOf = (record: BatchRecord): SpecBatchOutput => ({
   enqueuedAt: record.enqueuedAt.toISOString(),
   committedAt: record.committedAt?.toISOString() ?? null,
 });
+
+type Skipped = NonNullable<SpecBatchOutput["skipped"]>;
+
+/** Opérations écartées telles que le contrat les rend (motifs et genres fermés). */
+export const skippedOf = (skipped: readonly SkippedOperation[]): Skipped => skipped as Skipped;
+
+/** Tout écarté par `skipConflicts` (TK-114e, B672) : aucun lot, conflit d'écriture et les opérations écartées. */
+export const allSkipped = (skipped: readonly SkippedOperation[]) =>
+  new ORPCError("SPEC_BATCH_CONFLICT", {
+    data: { reason: "write_conflict", skipped: skippedOf(skipped) },
+  });
 
 export const reusedKey = (batchId: string) =>
   new ORPCError("SPEC_BATCH_CONFLICT", { data: { reason: "idempotency_key_reused", batchId } });

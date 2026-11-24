@@ -4,11 +4,12 @@ import type { ProposalListOutput } from "@koklo/contract";
 import { InlineAlert, ProposalReviewBanner } from "@koklo/ui";
 import { CHECKS_NOTE, CHECKS_TITLE } from "../lib/architecture-labels.ts";
 import { launchReportOf } from "../lib/launch-report.ts";
+import { SAVE_FAILURE_SUFFIX } from "../lib/proposal-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import { useProposalReview } from "../lib/use-proposal-review.ts";
 import type { useProposals } from "../lib/use-proposals.ts";
 import { ProposeDialog } from "./features-propose.tsx";
-import { FeaturesReview } from "./features-review.tsx";
+import { architectureSummary, FeaturesReview, saveProp } from "./features-review.tsx";
 
 const SUBTITLE = "Architecture, d'après le cahier fonctionnel et le modèle de données";
 const PLACEHOLDER = "ex. « sépare l'envoi des SMS dans un service à part »";
@@ -121,11 +122,11 @@ export function ArchitectureReviewBar({
     <div>
       <ProposalReviewBanner
         counts={counts}
-        {...(review.savable.length > 0 ? { onSave: () => void actions.save() } : {})}
+        {...saveProp(review, actions)}
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
-        summaryText={` · l'agent propose ${counts.total} ${counts.total >= 2 ? "éléments" : "élément"} depuis le fonctionnel et les données · ${counts.accepted} ${counts.accepted >= 2 ? "acceptés" : "accepté"} · ${counts.pending} à relire`}
+        summaryText={`${architectureSummary(counts)}${review.saveFailure ? SAVE_FAILURE_SUFFIX : ""}`}
       />
       <div role="status" className="sr-only">
         {[actions.announcement || actions.summary, statusText].filter(Boolean).join(" ")}

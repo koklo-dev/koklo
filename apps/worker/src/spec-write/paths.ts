@@ -10,7 +10,6 @@ import { isLayoutKind } from "./layout.ts";
 import type { BatchOperation, LoadedBatch } from "./types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const FEATURE_FILE = /^features\/(F-\d{3,})(?:-[^/]*)?\.md$/;
 export const OPERATION_KINDS = [
   "feature.create",
   "feature.update",
@@ -89,9 +88,6 @@ export const slugOf = (title: unknown, fallback = "feature"): string => slugTitl
 /** Chemin (relatif à la racine de la spec) d'une feature nouvelle. */
 export const featurePathOf = (specId: string, title: unknown): string =>
   `features/${specId}-${slugOf(title)}.md`;
-
-/** Identifiant de la feature portée par un chemin `features/F-nnn[-slug].md`, sinon `undefined`. */
-export const featureIdOfPath = (path: string): string | undefined => FEATURE_FILE.exec(path)?.[1];
 
 /** Préfixe un chemin de la spec par le dossier du monorepo (`specPath`), s'il y en a un. */
 export const withSpecPath = (specPath: string | null, path: string): string =>

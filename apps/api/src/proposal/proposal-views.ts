@@ -23,16 +23,24 @@ export const proposalView = (record: ProposalRecord): Item => ({
 
 type Report = NonNullable<Launch["report"]>;
 
+const countsOf = (counts: unknown): Record<string, unknown> =>
+  typeof counts === "object" && counts !== null ? (counts as Record<string, unknown>) : {};
+const isCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 1;
+
 /** Motifs comptés dans l'ordre du vocabulaire fermé ; un motif inconnu ou un compte nul est ignoré. */
 const reasonsOf = (counts: unknown): Report["discardReasons"] => {
-  const record =
-    typeof counts === "object" && counts !== null ? (counts as Record<string, unknown>) : {};
+  const record = countsOf(counts);
   return LAUNCH_DISCARD_REASONS.flatMap((reason) => {
     const count = record[reason];
-    return typeof count === "number" && Number.isInteger(count) && count >= 1
-      ? [{ reason, count }]
-      : [];
+    return isCount(count) ? [{ reason, count }] : [];
   });
+};
+
+/** Sections déjà présentes écartées au triage (TK-114e, B670, B677) : clé `existing_section`, hors des motifs de zone. */
+const sectionsExistingOf = (counts: unknown): { sectionsExisting?: number } => {
+  const count = countsOf(counts).existing_section;
+  return isCount(count) ? { sectionsExisting: count } : {};
 };
 
 /** Bilan du lancement (TK-114b, B620) : colonnes validées par le schéma du contrat, `undefined` si l'une est illisible. */
@@ -47,6 +55,7 @@ function reportOf(progress: LaunchProgress): Report | undefined {
     ...(progress.coverageAfter === null ? {} : { coverageAfter: progress.coverageAfter }),
     coverageCalls: progress.coverageCalls,
     ...(progress.stopReason === null ? {} : { stopReason: progress.stopReason }),
+    ...sectionsExistingOf(progress.discardReasons),
   });
   return parsed.success ? parsed.data : undefined;
 }

@@ -204,3 +204,13 @@ describe("TK-114d (B661) : rôles avec application et flux repris (contrat 3.14.
     expect(launchDetailOf(launch("running"))).not.toContain("rôles");
   });
 });
+
+describe("sections déjà présentes (TK-114e, B670)", () => {
+  it("« · sections déjà présentes écartées : n » en fin de ligne de couverture quand n ≥ 1", () => {
+    const report = launchReportOf(launch("done", { sectionsExisting: 1 } as never));
+    expect(report?.lines[1]).toBe(
+      "Fonctionnalités servies 174/174 · parcours détaillés 22/22 · tables rattachées 48/48 · avant : 0/174, 0/22, 0/48 · sections déjà présentes écartées : 1",
+    );
+    expect(launchReportOf(launch("done"))?.lines.join(" ")).not.toContain("déjà présentes");
+  });
+});

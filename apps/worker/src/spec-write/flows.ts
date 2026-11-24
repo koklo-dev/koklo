@@ -18,29 +18,8 @@ interface FlowPayload {
   features?: string[];
 }
 
-const FLOW_FILE = /^design\/flows\/(P-[^/]*?)\.(?:yaml|json)$/;
-
 /** Chemin d'un parcours nouveau : `design/flows/P-<slug>.yaml`. */
 export const flowPathOf = (id: string): string => `design/flows/${id}.yaml`;
-
-/**
- * Parcours de la tête : identifiant -> chemin. Un `.json` hérité (`P-001-inscription.json`) occupe aussi son identifiant
- * `P-001` : on ne crée jamais un second fichier pour lui. Seul un `.yaml` se modifie ou se supprime.
- */
-export function flowIndex(paths: Iterable<string>): {
-  owned: Map<string, string>;
-  taken: Set<string>;
-} {
-  const owned = new Map<string, string>();
-  const taken = new Set<string>();
-  for (const path of paths) {
-    const stem = FLOW_FILE.exec(path)?.[1];
-    if (stem === undefined) continue;
-    taken.add(stem);
-    if (path.endsWith(".yaml")) owned.set(stem, path);
-  }
-  return { owned, taken };
-}
 
 const step = (value: Step) => ({
   libelle: value.label,

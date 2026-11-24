@@ -63,6 +63,8 @@ export type InlineAlertAction = {
   primary?: boolean;
   /** Icône de 18 avant le libellé. */
   icon?: IconName;
+  /** Action en cours : le bouton reste à sa place, désactivé (« Enregistrement… », TK-114e). */
+  disabled?: boolean;
 };
 
 type Common = Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
@@ -159,6 +161,7 @@ export function InlineAlert({
                   item.primary ? "default" : NEUTRAL_TONES.has(variant) ? "outline" : "inherit"
                 }
                 onClick={item.onClick}
+                disabled={item.disabled === true}
               >
                 {item.icon ? <Icon name={item.icon} size={18} /> : null}
                 {item.label}

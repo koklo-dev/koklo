@@ -21,16 +21,25 @@ export interface ProposalReviewListProps {
   onLoadMore?: ((key: string) => void) | undefined;
   /** Note à droite des filtres (défaut « Groupé par type puis par zone » ; « Groupées par zone » en maquette 11). */
   groupNote?: string | undefined;
+  /** Faux quand l'enregistrement n'est pas proposé (échec à réessayer, B685) : « Tout est relu. » sans appel à enregistrer. */
+  canSave?: boolean | undefined;
 }
 
 const DEFAULT_GROUP_NOTE = "Groupé par type puis par zone";
 
-function EmptyNote({ counts }: { counts: ProposalReviewCounts }) {
+function EmptyNote({
+  counts,
+  canSave = true,
+}: {
+  counts: ProposalReviewCounts;
+  canSave?: boolean;
+}) {
+  const allRead = canSave
+    ? `Tout est relu. Enregistrez les ${counts.accepted} acceptées.`
+    : "Tout est relu.";
   return (
     <p className="px-3 py-4 text-meta text-muted-foreground">
-      {counts.accepted > 0
-        ? `Tout est relu. Enregistrez les ${counts.accepted} acceptées.`
-        : "Aucune proposition à relire."}
+      {counts.accepted > 0 ? allRead : "Aucune proposition à relire."}
     </p>
   );
 }
@@ -66,7 +75,9 @@ export function ProposalReviewList(props: ProposalReviewListProps) {
       className="flex max-h-[880px] min-w-0 max-w-full flex-[0_0_330px] flex-col self-start overflow-auto border-border p-2 md:border-r"
     >
       {grouped ? <Filters {...props} /> : null}
-      {loaded === 0 && !grouped ? <EmptyNote counts={props.counts} /> : null}
+      {loaded === 0 && !grouped ? (
+        <EmptyNote counts={props.counts} canSave={props.canSave ?? true} />
+      ) : null}
       <ul
         // biome-ignore lint/a11y/noRedundantRoles: `list-style: none` retire la sémantique de liste dans Safari / VoiceOver
         role="list"
@@ -99,7 +110,9 @@ export function ProposalReviewList(props: ProposalReviewListProps) {
                 />
               ))}
       </ul>
-      {grouped && loaded === 0 ? <EmptyNote counts={props.counts} /> : null}
+      {grouped && loaded === 0 ? (
+        <EmptyNote counts={props.counts} canSave={props.canSave ?? true} />
+      ) : null}
     </div>
   );
 }

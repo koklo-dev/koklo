@@ -203,10 +203,10 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b, TK-114c, TK-114d)", () => {
-  it("est en 3.14.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("3.14.0");
-    expect(CONTRACT_VERSION).toBe("3.14.0");
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b, TK-114c, TK-114d, TK-114e)", () => {
+  it("est en 3.15.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("3.15.0");
+    expect(CONTRACT_VERSION).toBe("3.15.0");
     expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
       "0.1.0",
       "0.2.0",
@@ -252,12 +252,14 @@ describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-
       "3.12.0",
       "3.13.0",
       "3.14.0",
+      "3.15.0",
     ]);
   });
 });
 
-/** Empreintes figées des versions 3.13.0 à 3.1.0 (TK-103 à TK-114c), de la plus récente à la plus ancienne. */
+/** Empreintes figées des versions 3.14.0 à 3.1.0 (TK-103 à TK-114d), de la plus récente à la plus ancienne. */
 const FROZEN_3X: readonly (readonly [string, string])[] = [
+  ["3.14.0", "af502207056be542300e6ee2f185f0a7ee35e7d4a1fd50555cd234713ef5996e"],
   ["3.13.0", "58100a11b99223c485c72bfebb594830c8236f1eed7e6afee00b8a41209eba9e"],
   ["3.12.0", "5c766765685a107a28c3ff230bec667b05ffa52f7b46b351985c8bd9ee59d670"],
   ["3.11.0", "7632a56ed5804eb504b74d0bdbcff77b807f51744dd6d2f8f4831a32ec87a354"],
@@ -479,13 +481,13 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["3.0.0"]).not.toBe(versions["2.11.0"]);
   });
 
-  it("l'empreinte 3.14.0 est celle du document généré ; 3.1.0 à 3.13.0 restent figées (TK-103 à TK-114c)", async () => {
+  it("l'empreinte 3.15.0 est celle du document généré ; 3.1.0 à 3.14.0 restent figées (TK-103 à TK-114d)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["3.14.0"]).toBe(hash);
-    expect(versions["3.14.0"]).not.toBe(versions["3.13.0"]);
+    expect(versions["3.15.0"]).toBe(hash);
+    expect(versions["3.15.0"]).not.toBe(versions["3.14.0"]);
     for (const [version, frozen] of FROZEN_3X) {
       expect(versions[version], version).toBe(frozen);
     }

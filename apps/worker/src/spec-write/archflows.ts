@@ -32,21 +32,9 @@ interface ArchFlowPayload {
   decisions?: string[];
 }
 
-const FLOW_FILE = /^architecture\/flows\/(P-[a-z0-9][a-z0-9-]*)\.yaml$/;
-
 /** Chemin du flux technique d'un parcours : `architecture/flows/<P-id>.yaml` (son `.mmd` porte le même nom). */
 export const archFlowPathOf = (id: string): string => `architecture/flows/${id}.yaml`;
 export const archFlowMermaidPathOf = (id: string): string => `architecture/flows/${id}.mmd`;
-
-/** Flux de la tête : identifiant du parcours -> chemin. */
-export function archFlowIndex(paths: Iterable<string>): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const path of paths) {
-    const id = FLOW_FILE.exec(path)?.[1];
-    if (id !== undefined) index.set(id, path);
-  }
-  return index;
-}
 
 const message = (value: Message) => ({
   de: value.from,

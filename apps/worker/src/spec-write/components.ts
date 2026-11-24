@@ -31,21 +31,9 @@ interface ComponentPayload {
   clientSummary?: string[];
 }
 
-const COMPONENT_FILE = /^architecture\/components\/([a-z0-9][a-z0-9-]*)\.yaml$/;
-
 /** Chemin d'un composant nouveau : `architecture/components/<slug>.yaml` (le slug est l'identifiant sans `C-`). */
 export const componentPathOf = (id: string): string =>
   `architecture/components/${id.slice(2)}.yaml`;
-
-/** Composants de la tête : identifiant -> chemin. */
-export function componentIndex(paths: Iterable<string>): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const path of paths) {
-    const slug = COMPONENT_FILE.exec(path)?.[1];
-    if (slug !== undefined) index.set(`C-${slug}`, path);
-  }
-  return index;
-}
 
 /** Applique les champs présents du payload (`undefined` : inchangé). */
 function overlay(base: Component, payload: ComponentPayload): Component {

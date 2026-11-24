@@ -103,11 +103,11 @@ export function ProposalReviewBanner({
         <Button size="sm" icon="add" loading={saving} onClick={onSave} className="h-11 md:h-8">
           {`Enregistrer ${counts.accepted} dans la spec`}
         </Button>
-      ) : (
+      ) : counts.accepted === 0 ? (
         <span className="text-caption font-normal text-muted-foreground">
           Acceptez au moins une proposition pour enregistrer.
         </span>
-      )}
+      ) : null}
       <Button
         size="sm"
         variant="outline"

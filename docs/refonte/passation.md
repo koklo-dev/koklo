@@ -41,8 +41,9 @@ last_reviewed: 2026-11-21
 | 025 | TK-114b (« Tout reproposer » complet : segments de 600 s enchaînés, passe de couverture, tables rattachées à « Base de données » par le code, bilan du lancement) | ✅ fusionné (PR #227) ; décisions B613 à B630 ; contrat 3.12.0 ; DESIGN v2.31 ; migration `agent_launch_report` |
 | 025 | TK-114c (vue par zones dès 3 zones et plus de 12 composants, liens « Dépend de » complétés par la passe de couverture, traits inter-zones, bilan « composants reliés ») | ✅ fusionné (PR #231) ; décisions B631 à B647 ; contrat 3.13.0 ; DESIGN v2.32 ; sans migration |
 | 025 | TK-114d (application d'entrée pour chaque rôle, flux directs repris pour passer par elle, bilan « rôles avec application · flux repris ») | ✅ fusionné (PR #233) ; décisions B649 à B667 ; contrat 3.14.0 ; DESIGN v2.33 ; sans migration |
+| 025 | TK-114e (enregistrement sans conflit global : pré-vérification côté API, sections déjà présentes écartées au triage, échec visible dans la Relecture avec « Réessayer l'enregistrement ») | PR #235 ; décisions B668 à B678 ; contrat 3.15.0 ; DESIGN v2.34 ; sans migration |
 
-Ticket en cours : aucun (TK-114d fusionné) (TK-114c fusionné) (TK-114b fusionné). Prochain : TK-115 (sprint 026, Technique : formats, états, Stack, Environnements), **pas encore lancé**. DoD des sprints 022 à 025 encore à vérifier avant de les cocher ; case de TK-110 (sprint 024) à cocher après relecture des captures.
+Ticket en cours : TK-114e en PR (#235) (TK-114d fusionné) (TK-114c fusionné) (TK-114b fusionné). Prochain : TK-115 (sprint 026, Technique : formats, états, Stack, Environnements), **pas encore lancé**. DoD des sprints 022 à 025 encore à vérifier avant de les cocher ; case de TK-110 (sprint 024) à cocher après relecture des captures.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 

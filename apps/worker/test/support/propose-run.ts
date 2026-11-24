@@ -109,6 +109,7 @@ export function benchOf(
         decisions: ids(architecture?.decisions),
         archflows: ids(architecture?.archflows),
         ownedTables: new Set((architecture?.components ?? []).flatMap((c) => c.owns)),
+        docSections: ids(sources.docSections),
       },
     },
     started: 0,

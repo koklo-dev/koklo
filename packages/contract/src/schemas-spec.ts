@@ -286,7 +286,30 @@ export const specBatchSubmitInputSchema = z.object({
   operations: z.array(specOperationSchema).min(1).max(SPEC_BATCH_OPERATIONS_MAX),
   /** Preuve serveur que les opérations viennent de propositions acceptées du projet (TK-99a, 2.9.0). */
   proposalIds: z.array(z.uuid()).max(SPEC_BATCH_PROPOSALS_MAX).optional(),
+  /**
+   * Enregistrement de propositions (TK-114e, 3.15.0, B675) : `proposals[i]` est la proposition de l'opération i (même
+   * longueur que `operations`, chaque valeur dans `proposalIds`, sinon 422). Une proposition dont une opération est en
+   * conflit avec la branche est écartée en entier et remise à relire ; les autres partent.
+   */
+  skipConflicts: z
+    .object({ proposals: z.array(z.uuid()).max(SPEC_BATCH_OPERATIONS_MAX) })
+    .optional(),
 });
+
+/** Motif d'une opération écartée (TK-114e, 3.15.0) : identifiant déjà pris, cible absente, création en double dans le lot. */
+export const specBatchSkipReasonSchema = z.enum(["exists", "missing", "duplicate"]);
+/** Opérations écartées par `skipConflicts`, positions de l'entrée (base 0) ; réponse de `submit` seulement, jamais stockée. */
+export const specBatchSkippedSchema = z
+  .array(
+    z.object({
+      position: z.number().int().min(0),
+      kind: specOperationKindSchema,
+      specId: specIdSchema.nullable(),
+      reason: specBatchSkipReasonSchema,
+      proposalId: z.uuid(),
+    }),
+  )
+  .max(SPEC_BATCH_OPERATIONS_MAX);
 
 /** Sans `authorUserId` : aucun identifiant interne d'utilisateur n'est exposé. */
 export const specBatchSchema = z.object({
@@ -307,6 +330,8 @@ export const specBatchSchema = z.object({
   ),
   enqueuedAt: instantSchema,
   committedAt: instantSchema.nullable(),
+  /** Écartées par `skipConflicts` (TK-114e, 3.15.0) : réponse de `submit` seulement, `get` l'omet. */
+  skipped: specBatchSkippedSchema.optional(),
 });
 /**
  * Migration du format de spec v1 vers v2 (TK-106, 3.4.0) : un seul lot du bot sur la branche de travail (`cadrage` par
