@@ -57,9 +57,11 @@ interface Plan {
   height: number;
 }
 
-const WIDTH = 820;
+const MIN_WIDTH = 820;
 const MARGIN = 60;
 const HEAD_WIDTH = 112;
+/** Écart minimal entre deux lignes de vie : une en-tête de 112 px et 20 px d'air, pour qu'elles ne se chevauchent jamais. */
+const MIN_PITCH = HEAD_WIDTH + 20;
 const FIRST_Y = 78;
 const ROW = 40;
 const ALT_HEADER = 18;
@@ -73,8 +75,12 @@ const HEAD_ICONS: Record<ArchNodeKind, IconName> = {
   ext: "cloud",
 };
 
+/** 820 px (maquette 13) jusqu'à 6 participants ; au-delà le dessin s'élargit et le cadre défile. */
+const widthOf = (count: number): number =>
+  Math.max(MIN_WIDTH, 2 * MARGIN + (count - 1) * MIN_PITCH);
+
 const columnX = (index: number, count: number): number =>
-  count < 2 ? WIDTH / 2 : MARGIN + (index * (WIDTH - 2 * MARGIN)) / (count - 1);
+  count < 2 ? widthOf(count) / 2 : MARGIN + (index * (widthOf(count) - 2 * MARGIN)) / (count - 1);
 
 /** Flèches d'un message : l'appel, puis son retour et son échec en sens inverse. */
 function arrowsOf(message: SequenceMessage, ids: readonly string[], start: number, y: number) {
@@ -164,7 +170,7 @@ function Heads({ participants }: { participants: readonly SequenceParticipant[] 
         className="shrink-0 text-secondary-foreground"
       />
       <span
-        className="min-w-0 truncate"
+        className="line-clamp-2 min-w-0 break-words text-center leading-[1.15]"
         title={`${ARCH_NODE_LABELS[participant.type]} ${participant.name}`}
       >
         {participant.name}
@@ -221,6 +227,7 @@ function Markers({ id }: { id: string }) {
 
 /** Cadres des blocs `alt` et lignes de vie : le fond du dessin. */
 function Frame({ plan, count }: { plan: Plan; count: number }) {
+  const width = widthOf(count);
   return (
     <>
       {plan.frames.map((frame) => (
@@ -228,7 +235,7 @@ function Frame({ plan, count }: { plan: Plan; count: number }) {
           key={frame.y}
           x={24}
           y={frame.y}
-          width={WIDTH - 48}
+          width={width - 48}
           height={frame.height}
           rx={8}
           strokeDasharray="4 3"
@@ -310,6 +317,7 @@ export function SequenceDiagram({ title, participants, items, className }: Seque
     participants.map((participant) => participant.id),
   );
   const count = participants.length;
+  const width = widthOf(count);
   const label = `Diagramme de séquence ${title}, ${plan.arrows.length} ${plan.arrows.length > 1 ? "messages" : "message"}`;
   return (
     <div data-slot="sequence-diagram" className={cn("flex flex-col gap-2", className)}>
@@ -322,10 +330,10 @@ export function SequenceDiagram({ title, participants, items, className }: Seque
         <div
           role="img"
           aria-label={label}
-          style={{ width: WIDTH, height: plan.height }}
+          style={{ width, height: plan.height }}
           className="relative"
         >
-          <svg aria-hidden="true" width={WIDTH} height={plan.height} className="absolute inset-0">
+          <svg aria-hidden="true" width={width} height={plan.height} className="absolute inset-0">
             <Markers id={markerId} />
             <Frame plan={plan} count={count} />
             <Arrows plan={plan} count={count} markerId={markerId} />

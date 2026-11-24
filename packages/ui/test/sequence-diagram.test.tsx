@@ -70,6 +70,22 @@ describe("SequenceDiagram", () => {
     expect(container.querySelectorAll("svg line:not([data-arrow])")).toHaveLength(4);
   });
 
+  it("au-delà de 6 participants le dessin s'élargit : deux en-têtes ne se chevauchent jamais", () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      id: `C-${i}`,
+      name: `Service ${i}`,
+      type: "service" as const,
+    }));
+    const { container } = render(<SequenceDiagram title="Large" participants={many} items={[]} />);
+    const lefts = [...container.querySelectorAll<HTMLElement>("[data-slot='sequence-head']")].map(
+      (head) => Number.parseFloat(head.style.left),
+    );
+    for (let i = 1; i < lefts.length; i += 1) {
+      expect((lefts[i] ?? 0) - (lefts[i - 1] ?? 0)).toBeGreaterThanOrEqual(132);
+    }
+    expect(screen.getByRole("img", { name: /Large/ })).toHaveStyle({ width: "1176px" });
+  });
+
   it("numérote les messages en mono 10", () => {
     diagram();
     expect(screen.getByText("1.")).toHaveClass("font-mono");
