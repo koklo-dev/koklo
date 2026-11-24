@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FLOW_ROWS, renderArchitecture, serveArchitecture } from "./support/architecture.tsx";
+import { RATE_LIMITED_TEXT, rejectOnce, sourceOf } from "./support/git-read.ts";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
 vi.mock("next/navigation", async () => {
@@ -128,6 +129,30 @@ describe("Onglet Flux", () => {
     renderArchitecture({ search: "tab=flows" });
     expect(await screen.findByText("Impossible de charger les flux")).toBeVisible();
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+  });
+
+  it("YAML du flux : quota GitHub épuisé → délai et « Réessayer » relance la lecture (TK-114f)", async () => {
+    serveArchitecture("owner");
+    rejectOnce(procedures.specArchitectureSource, (input) => sourceOf(input).format === "yaml");
+    renderArchitecture({ search: "tab=flows" });
+    const group = await screen.findByRole("group", { name: "Affichage du flux" });
+    await userEvent.click(within(group).getByRole("button", { name: "YAML" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(RATE_LIMITED_TEXT);
+    const calls = procedures.specArchitectureSource.mock.calls.length;
+    await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByText("architecture/flows/P-reserver.yaml")).toBeVisible();
+    expect(procedures.specArchitectureSource.mock.calls.length).toBe(calls + 1);
+  });
+
+  it("YAML du flux : autre erreur → texte inchangé, sans délai", async () => {
+    serveArchitecture("owner");
+    rejectOnce(procedures.specArchitectureSource, () => true, new Error("boom"));
+    renderArchitecture({ search: "tab=flows" });
+    const group = await screen.findByRole("group", { name: "Affichage du flux" });
+    await userEvent.click(within(group).getByRole("button", { name: "YAML" }));
+    expect(await screen.findByText("Le fichier du flux n'a pas pu être lu.")).toBeVisible();
+    expect(screen.queryByText(/GitHub limite les lectures/)).toBeNull();
   });
 
   it("sous 768 px, la liste d'abord puis le détail avec « Liste » pour revenir (?f=)", async () => {

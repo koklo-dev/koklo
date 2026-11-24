@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MODEL, renderData, serveData, TABLE_YAML } from "./support/data.tsx";
+import { RATE_LIMITED_TEXT, rejectOnce } from "./support/git-read.ts";
 import { fake, serveProposals } from "./support/proposals.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 import { DESKTOP, setViewport } from "./viewport.ts";
@@ -107,6 +108,7 @@ describe("Fiche : vue Fiche", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Fiche : YAML et Mermaid", () => {
   it("YAML : le fichier de la table dans un pre, « Source de vérité », texte brut", async () => {
     serveData("owner");
@@ -141,6 +143,32 @@ describe("Fiche : YAML et Mermaid", () => {
     await view(fiche, "YAML");
     expect(await within(fiche).findByText("Généré")).toBeInTheDocument();
     expect(within(fiche).queryByText("Source de vérité")).toBeNull();
+  });
+
+  it("YAML : quota GitHub épuisé → délai et « Réessayer » relance la lecture (TK-114f)", async () => {
+    serveData("owner");
+    rejectOnce(procedures.specDataTablesSource);
+    renderData();
+    const fiche = await pickTable("Client");
+    await view(fiche, "YAML");
+    const alert = await within(fiche).findByRole("alert");
+    expect(alert).toHaveTextContent(RATE_LIMITED_TEXT);
+    const calls = procedures.specDataTablesSource.mock.calls.length;
+    await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
+    expect(await within(fiche).findByText("data/tables/client.yaml")).toBeInTheDocument();
+    expect(procedures.specDataTablesSource.mock.calls.length).toBe(calls + 1);
+  });
+
+  it("YAML : autre erreur → texte inchangé", async () => {
+    serveData("owner");
+    procedures.specDataTablesSource.mockRejectedValue(new Error("boom"));
+    renderData();
+    const fiche = await pickTable("Client");
+    await view(fiche, "YAML");
+    expect(
+      await within(fiche).findByText("Le fichier de la table n'a pas pu être lu."),
+    ).toBeInTheDocument();
+    expect(within(fiche).queryByText(/GitHub limite les lectures/)).toBeNull();
   });
 
   it("Mermaid : data/model.mmd entier, « Généré », Copier envoie le texte et dit « Copié »", async () => {

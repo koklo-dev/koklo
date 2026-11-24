@@ -17,6 +17,7 @@ import { orpc } from "../lib/orpc.ts";
 import { useArchitectureSource } from "../lib/use-architecture-flows.ts";
 import { CopyAction, SourceBlock } from "./data-diagram-source.tsx";
 import { SECTION } from "./data-fiche-parts.tsx";
+import { GitReadError } from "./git-read-error.tsx";
 
 type Detail = Extract<SpecItem, { type: "component" }>["values"];
 type View = "fiche" | "yaml" | "mermaid";
@@ -122,7 +123,12 @@ function ComponentYaml({ projectId, id }: { projectId: string; id: string }) {
   if (source.isPending) return <Skeleton aria-busy="true" className="h-40 rounded-[10px]" />;
   if (source.isError || !source.data) {
     return (
-      <p className="m-0 text-body text-destructive">Le fichier du composant n'a pas pu être lu.</p>
+      <GitReadError
+        error={source.error}
+        onRetry={() => void source.refetch()}
+        retrying={source.isFetching}
+        fallback="Le fichier du composant n'a pas pu être lu."
+      />
     );
   }
   const { path, text, generated } = source.data;
@@ -149,7 +155,12 @@ function SchemaMermaid({ projectId }: { projectId: string }) {
   if (source.isPending) return <Skeleton aria-busy="true" className="h-40 rounded-[10px]" />;
   if (source.isError || !source.data) {
     return (
-      <p className="m-0 text-body text-destructive">Le Mermaid du schéma n'a pas pu être lu.</p>
+      <GitReadError
+        error={source.error}
+        onRetry={() => void source.refetch()}
+        retrying={source.isFetching}
+        fallback="Le Mermaid du schéma n'a pas pu être lu."
+      />
     );
   }
   return (

@@ -8,6 +8,7 @@ import {
   serveArchitecture,
   ZONE_ENTRIES,
 } from "./support/architecture.tsx";
+import { RATE_LIMITED_TEXT, rejectOnce, sourceOf } from "./support/git-read.ts";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
 vi.mock("next/navigation", async () => {
@@ -123,6 +124,41 @@ describe("Onglet Schéma : lecteur", () => {
     expect(within(fiche).getByText("Généré")).toBeVisible();
   });
 
+  it.each([
+    ["YAML", "component", "architecture/components/C-api.yaml"],
+    ["Mermaid", "schema", "architecture/schema.mmd"],
+  ])(
+    "fiche, vue %s : quota GitHub épuisé → délai et « Réessayer » (TK-114f)",
+    async (name, kind, path) => {
+      serveArchitecture("owner");
+      rejectOnce(procedures.specArchitectureSource, (input) => sourceOf(input).kind === kind);
+      renderArchitecture({ wide: true });
+      await userEvent.click(await node("Service API"));
+      const fiche = await screen.findByRole("complementary", { name: "Fiche du composant" });
+      await userEvent.click(within(fiche).getByRole("button", { name }));
+      const alert = await within(fiche).findByRole("alert");
+      expect(alert).toHaveTextContent(RATE_LIMITED_TEXT);
+      const calls = procedures.specArchitectureSource.mock.calls.length;
+      await userEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
+      expect(await within(fiche).findByText(path)).toBeVisible();
+      expect(procedures.specArchitectureSource.mock.calls.length).toBe(calls + 1);
+    },
+  );
+
+  it.each([
+    ["YAML", "Le fichier du composant n'a pas pu être lu."],
+    ["Mermaid", "Le Mermaid du schéma n'a pas pu être lu."],
+  ])("fiche, vue %s : autre erreur → texte inchangé", async (name, text) => {
+    serveArchitecture("owner");
+    procedures.specArchitectureSource.mockRejectedValue(new Error("boom"));
+    renderArchitecture({ wide: true });
+    await userEvent.click(await node("Service API"));
+    const fiche = await screen.findByRole("complementary", { name: "Fiche du composant" });
+    await userEvent.click(within(fiche).getByRole("button", { name }));
+    expect(await within(fiche).findByText(text)).toBeVisible();
+    expect(within(fiche).queryByText(/GitHub limite les lectures/)).toBeNull();
+  });
+
   it("un acteur n'a que sa fiche : ni YAML ni Mermaid ni « Modifier »", async () => {
     serveArchitecture("owner");
     renderArchitecture({ wide: true, search: "sel=RL-client" });
@@ -152,7 +188,6 @@ describe("Onglet Schéma : lecteur", () => {
   });
 });
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Onglet Schéma : vue des zones", () => {
   it("au-delà de 25 composants : une carte par zone, 34 composants, un trait par paire de zones", async () => {
     serveArchitecture("owner");

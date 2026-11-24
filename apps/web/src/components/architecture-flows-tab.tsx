@@ -30,6 +30,7 @@ import { useAutoLoad } from "../lib/use-auto-load.ts";
 import { useListFooter } from "../lib/use-features-list.ts";
 import { SourceBlock } from "./data-diagram-source.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
+import { GitReadError } from "./git-read-error.tsx";
 
 type View = "diagram" | "yaml" | "mermaid";
 const VIEWS = [
@@ -55,7 +56,14 @@ function FlowSource({
   const source = useFlowSource(projectId, flowId, format, true);
   if (source.isPending) return <Skeleton aria-busy="true" className="h-40 rounded-[10px]" />;
   if (source.isError || !source.data) {
-    return <p className="m-0 text-body text-destructive">Le fichier du flux n'a pas pu être lu.</p>;
+    return (
+      <GitReadError
+        error={source.error}
+        onRetry={() => void source.refetch()}
+        retrying={source.isFetching}
+        fallback="Le fichier du flux n'a pas pu être lu."
+      />
+    );
   }
   const { path, text, generated } = source.data;
   const yaml = format === "yaml";

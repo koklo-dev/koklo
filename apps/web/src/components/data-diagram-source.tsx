@@ -4,6 +4,7 @@ import { Button, Icon, type IconName, Pill, Skeleton, useToast } from "@koklo/ui
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { orpc } from "../lib/orpc.ts";
+import { GitReadError } from "./git-read-error.tsx";
 
 const YAML_NOTE =
   "Un fichier par table : c'est ce que l'agent lit et modifie. Le diagramme, le Mermaid et le SQL en sont dérivés.";
@@ -68,7 +69,12 @@ export function TableYaml({ projectId, tableId }: { projectId: string; tableId: 
   if (source.isPending) return <Skeleton aria-busy="true" className="h-40 rounded-[10px]" />;
   if (source.isError || !source.data) {
     return (
-      <p className="m-0 text-body text-destructive">Le fichier de la table n'a pas pu être lu.</p>
+      <GitReadError
+        error={source.error}
+        onRetry={() => void source.refetch()}
+        retrying={source.isFetching}
+        fallback="Le fichier de la table n'a pas pu être lu."
+      />
     );
   }
   const { path, text, generated } = source.data;
