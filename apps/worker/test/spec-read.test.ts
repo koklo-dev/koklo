@@ -172,11 +172,12 @@ describe("une seule implémentation de la lecture de spec", () => {
       return path.endsWith(".ts") && !path.endsWith(".test.ts") ? [path] : [];
     });
 
-  it("seul le module partagé appelle readFile du port ; execute.ts ne définit plus readSpec", () => {
+  it("seuls le module partagé et la lecture des sections appellent readFile du port ; execute.ts ne définit plus readSpec", () => {
     const callers = sources(src)
       .filter((file) => /\.readFile\(/.test(readFileSync(file, "utf8")))
       .map((file) => relative(src, file));
-    expect(callers).toEqual(["spec-read/read-spec.ts"]);
+    // `doc-sections.ts` (TK-114e) lit les sections du document d'architecture, que `readSpecFiles` ne charge pas (B508, B670).
+    expect(callers).toEqual(["agent-propose/doc-sections.ts", "spec-read/read-spec.ts"]);
     expect(readFileSync(join(src, "spec-write/execute.ts"), "utf8")).not.toMatch(
       /function readSpec\b/,
     );
