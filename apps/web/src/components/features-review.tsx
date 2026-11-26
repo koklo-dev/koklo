@@ -29,17 +29,29 @@ const GENERATING =
 export const DATA_GENERATING =
   "L'agent déduit les tables et les relations du cahier fonctionnel. Cela peut prendre une minute. Vous pouvez quitter la page.";
 
-/** « · l'agent propose 12 éléments depuis le cahier fonctionnel · 3 acceptés · 7 à relire » (maquette 11 l.115). */
-export const dataSummary = ({ total, accepted, pending }: ProposalReviewModel["counts"]): string =>
-  ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis le cahier fonctionnel · ${accepted} ${accepted >= 2 ? "acceptés" : "accepté"} · ${pending} à relire`;
+/**
+ * « · l'agent propose 12 éléments depuis <source> · 3 acceptés · 7 à relire », avec « · K déjà présente(s) dans la
+ * spec » avant « à relire » quand K ≥ 1 (B702).
+ */
+function agentSummary(source: string, counts: ProposalReviewModel["counts"]): string {
+  const { total, accepted, pending, present } = counts;
+  return [
+    ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis ${source}`,
+    `${accepted} ${accepted >= 2 ? "acceptés" : "accepté"}`,
+    ...(present > 0
+      ? [`${present} ${present >= 2 ? "déjà présentes" : "déjà présente"} dans la spec`]
+      : []),
+    `${pending} à relire`,
+  ].join(" · ");
+}
 
-/** « · l'agent propose 12 éléments depuis le fonctionnel et les données · 3 acceptés · 7 à relire » (maquette 13 l.113). */
-export const architectureSummary = ({
-  total,
-  accepted,
-  pending,
-}: ProposalReviewModel["counts"]): string =>
-  ` · l'agent propose ${total} ${total >= 2 ? "éléments" : "élément"} depuis le fonctionnel et les données · ${accepted} ${accepted >= 2 ? "acceptés" : "accepté"} · ${pending} à relire`;
+/** Données (maquette 11 l.115). */
+export const dataSummary = (counts: ProposalReviewModel["counts"]): string =>
+  agentSummary("le cahier fonctionnel", counts);
+
+/** Architecture (maquette 13 l.113). */
+export const architectureSummary = (counts: ProposalReviewModel["counts"]): string =>
+  agentSummary("le fonctionnel et les données", counts);
 
 type ReviewTab = FeaturesTab | "data" | "architecture";
 

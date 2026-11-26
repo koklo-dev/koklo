@@ -19,7 +19,8 @@ import type { ArchitectureMode } from "./support/stub-spec-architecture.ts";
  * Relecture, Liste · équipe) sur les onglets Document et Composants, en clair, sombre et à 375 px, avec axe et sans
  * défilement horizontal de page, plus la relecture groupée par type (66 propositions), le volume de 120 composants, la
  * feuille Composant et les droits ; TK-114b : bilan du lancement (Génération avec détail, Relecture terminée ou arrêtée
- * au délai) ; TK-114e : enregistrement échoué et « Réessayer l'enregistrement ». Pile locale : faux API (support/stub-spec-architecture.ts). Captures dans
+ * au délai) ; TK-114e : enregistrement échoué et « Réessayer l'enregistrement » ; TK-114g : section déjà présente
+ * dans la spec (état terminal, récapitulatif). Pile locale : faux API (support/stub-spec-architecture.ts). Captures dans
  * design/screens/captures/S-spec-architecture/<état>-<onglet>-<thème>[-mobile].png.
  */
 const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/architecture`;
@@ -257,6 +258,58 @@ for (const viewport of VIEWPORTS) {
   }
 }
 
+/** TK-114g (S-spec-architecture §18, B702, B703) : section déjà présente dans la spec, état terminal. */
+const PRESENT_LABEL = "Déjà présente dans la spec";
+const presentRow = (page: Page) =>
+  page
+    .getByRole("list", { name: "Propositions à relire" })
+    .getByRole("button")
+    .filter({ has: page.getByRole("img", { name: PRESENT_LABEL }) });
+
+for (const viewport of VIEWPORTS) {
+  for (const theme of THEMES) {
+    test(`S-spec-architecture review-already-present (${theme}${viewport.name}) : pastille, aucune décision, axe, capture`, async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await setScenario({
+        session: true,
+        projects: "data",
+        installations: "single",
+        architecture: "demo",
+        proposals: "architecturePresent",
+      });
+      if (theme === "dark") {
+        await page.goto(PATH);
+        await switchToDark(page);
+      }
+      await page.goto(`${PATH}?view=review`);
+      await expect(reviewBanner(page)).toContainText("1 déjà présente dans la spec · 7 à relire");
+      await presentRow(page).click();
+      const detail = page.locator("[data-slot=proposal-detail]");
+      await expect(detail.getByText(PRESENT_LABEL, { exact: true })).toBeVisible();
+      await expect(detail.getByText(`${PRESENT_LABEL} · rien à enregistrer`)).toBeVisible();
+      await expect(
+        detail.getByRole("button", { name: /^(Accepter|Rejeter|Remettre à relire)/ }),
+      ).toHaveCount(0);
+      await settle(page);
+      await page.screenshot({
+        path: `${CAPTURES_DIR}/S-spec-architecture/review-already-present-${theme}${viewport.name}.png`,
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0);
+      const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+      expect(results.violations, JSON.stringify(results.violations.map((v) => v.id))).toEqual([]);
+      await releaseHeld();
+    });
+  }
+}
+
 const start = async (
   page: Page,
   over: { architecture?: ArchitectureMode; proposals?: ProposalsMode; role?: KanbanRole } = {},
@@ -412,6 +465,28 @@ test.describe("parcours de l'écran Architecture", () => {
     await settle(page);
     await page.screenshot({
       path: `${CAPTURES_DIR}/S-spec-architecture/review-save-retried-light.png`,
+      fullPage: true,
+    });
+  });
+
+  test("déjà présente : A et R inertes ; enregistrer → « 1 proposition écartée : déjà présente » (TK-114g)", async ({
+    page,
+  }) => {
+    await start(page, { proposals: "architecturePresent" });
+    await page.goto(`${PATH}?view=review`);
+    await presentRow(page).click();
+    await page.keyboard.press("a");
+    await page.keyboard.press("r");
+    await expect(presentRow(page)).toHaveCount(1);
+    await reviewBanner(page).getByRole("button", { name: "Enregistrer 2 dans la spec" }).click();
+    const summary =
+      "1 enregistrée dans la spec · 1 proposition écartée : déjà présente dans la spec";
+    await expect(page.getByRole("status").filter({ hasText: summary }).first()).toBeAttached();
+    await expect(reviewBanner(page)).toContainText("2 déjà présentes dans la spec");
+    await expect(saveFailed(page)).toHaveCount(0);
+    await settle(page);
+    await page.screenshot({
+      path: `${CAPTURES_DIR}/S-spec-architecture/save-already-present-light.png`,
       fullPage: true,
     });
   });

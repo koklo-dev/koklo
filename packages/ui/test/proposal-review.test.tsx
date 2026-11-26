@@ -197,6 +197,27 @@ describe("ProposalReview : liste à plat de 330 px", () => {
   });
 });
 
+describe("ProposalReview : identifiant long (TK-114g)", () => {
+  it("identifiant long : il se tronque (titre complet au survol), le titre et l'icône d'état restent sur la ligne", () => {
+    const ref = "DOC-taches-modeles-de-taches-et-cycle-de-vie";
+    const [group] = flat(1);
+    const long = {
+      ...(group as ProposalReviewGroup).items[0],
+      ref,
+      status: "present",
+    } as ProposalReviewItem;
+    setup({ groups: [{ ...(group as ProposalReviewGroup), items: [long] }], selectedId: "p1" });
+    const row = within(screen.getByRole("list", { name: "Propositions à relire" })).getByRole(
+      "listitem",
+    );
+    const tag = within(row).getByTitle(ref);
+    expect(tag).toHaveClass("min-w-0", "overflow-hidden");
+    expect(within(tag).getByText(ref)).toHaveClass("truncate");
+    expect(within(row).getByText("Fonctionnalité 1")).toBeVisible();
+    expect(within(row).getByRole("img", { name: "Déjà présente dans la spec" })).toBeVisible();
+  });
+});
+
 describe("ProposalReview : raccourcis J, K, A, R (2.1.4)", () => {
   it("J et K : suivante et précédente, aux limites rien ne bouge", async () => {
     const { props } = setup();
@@ -416,5 +437,91 @@ describe("ProposalReview : sans enregistrement proposé", () => {
     setup(allRead);
     expect(screen.getByText("Tout est relu.")).toBeVisible();
     expect(screen.queryByText(/Enregistrez les/)).toBeNull();
+  });
+});
+
+/** TK-114g lot B, cas B1 (maquette 13 l.639-668, maquette 09 l.271 et 281, B702) : déjà présente dans la spec. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("ProposalReview : déjà présente dans la spec", () => {
+  const present = { ...items(1)[0], id: "p1", status: "present" } as ProposalReviewItem;
+
+  it("ligne : icône nommée « Déjà présente dans la spec », titre estompé", () => {
+    const groups = flat();
+    (groups[0]?.items[6] as ProposalReviewItem).status = "present";
+    setup({ groups });
+    const row = screen.getAllByRole("listitem")[6] as HTMLElement;
+    expect(within(row).getByRole("img", { name: "Déjà présente dans la spec" })).toBeVisible();
+    expect(within(row).getByText("Fonctionnalité 7")).toHaveClass("text-muted-foreground");
+  });
+
+  it("détail : pastille success, note, aucun bouton de décision ni raccourci A/R", () => {
+    render(
+      <ProposalDetail item={present} onDecide={vi.fn()}>
+        <p>Corps</p>
+      </ProposalDetail>,
+    );
+    const pill = screen.getByText("Déjà présente dans la spec", { selector: "[data-tone]" });
+    expect(pill).toHaveAttribute("data-tone", "success");
+    expect(screen.getByText("Déjà présente dans la spec · rien à enregistrer")).toBeVisible();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryByText(/A : accepter/)).toBeNull();
+  });
+
+  it("touche A sur une déjà présente : aucun appel à onDecide", async () => {
+    const groups = flat();
+    (groups[0]?.items[0] as ProposalReviewItem).status = "present";
+    const { props } = setup({ groups, selectedId: "p1" });
+    (screen.getByText("Fonctionnalité 1").closest("button") as HTMLElement).focus();
+    await userEvent.setup().keyboard("ar");
+    expect(props.onDecide).not.toHaveBeenCalled();
+  });
+
+  it("bandeau : « 1 déjà présente dans la spec » après les rejetées, hors « à relire » et « Enregistrer »", () => {
+    setup({ counts: { total: 3, accepted: 1, rejected: 0, pending: 1, present: 1 } });
+    const banner = screen.getByRole("group", { name: "Mode relecture" });
+    expect(banner.textContent).toContain(
+      "3 propositions · 1 acceptée · 0 rejetée · 1 déjà présente dans la spec · 1 à relire",
+    );
+    expect(
+      within(banner).getByRole("button", { name: "Enregistrer 1 dans la spec" }),
+    ).toBeVisible();
+  });
+
+  it("bandeau : pluriel, et rien quand K = 0", () => {
+    const { unmount } = setup({
+      counts: { total: 4, accepted: 1, rejected: 0, pending: 1, present: 2 },
+    });
+    expect(screen.getByRole("group", { name: "Mode relecture" }).textContent).toContain(
+      "2 déjà présentes dans la spec",
+    );
+    unmount();
+    setup({ counts: { total: 2, accepted: 1, rejected: 0, pending: 1, present: 0 } });
+    expect(screen.getByRole("group", { name: "Mode relecture" })).not.toHaveTextContent(
+      "déjà présente",
+    );
+  });
+
+  it("tout déjà présent : « Tout est relu. », aucun bouton d'enregistrement", () => {
+    setup({
+      counts: { total: 2, accepted: 0, rejected: 0, pending: 0, present: 2 },
+      groups: [
+        {
+          key: "all",
+          label: "Toutes",
+          counts: { total: 2, accepted: 0, pending: 0 },
+          matching: 0,
+          items: [],
+        },
+      ],
+      selectedId: undefined,
+    });
+    expect(screen.getByText("Tout est relu.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Enregistrer/ })).toBeNull();
+  });
+
+  it("jauge : part secondaire = rejetées + déjà présentes", () => {
+    setup({ counts: { total: 4, accepted: 1, rejected: 1, pending: 1, present: 1 } });
+    const bar = screen.getByRole("progressbar", { name: "Avancement de la relecture" });
+    expect((bar.children[1] as HTMLElement).style.width).toBe("50%");
   });
 });

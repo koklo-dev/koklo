@@ -17,6 +17,8 @@ export interface ProposalCounts {
   accepted: number;
   rejected: number;
   pending: number;
+  /** Déjà présentes dans la spec (B700) : ni rejetées par une personne, ni à relire. */
+  present: number;
 }
 
 export function countsOf(groups: readonly ProposalGroupOutput[]): ProposalCounts {
@@ -27,6 +29,7 @@ export function countsOf(groups: readonly ProposalGroupOutput[]): ProposalCounts
     accepted: sum((g) => g.accepted),
     rejected: sum((g) => g.rejected),
     pending: sum((g) => g.pending),
+    present: sum((g) => g.alreadyPresent ?? 0),
   };
 }
 

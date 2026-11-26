@@ -1,9 +1,9 @@
 "use client";
 
-import type { ProposalReviewGroup, ProposalReviewItem } from "@koklo/ui";
+import type { ProposalReviewGroup, ProposalReviewItem, ProposalStatus } from "@koklo/ui";
 import { PROPOSAL_FIRST_PAGE, PROPOSAL_GROUP_THRESHOLD, PROPOSAL_NEXT_PAGE } from "@koklo/ui";
-import { keepPreviousData, useQueries } from "@tanstack/react-query";
-import { useState } from "react";
+import { keepPreviousData, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { type FeaturesTab, tabOfProposalKind } from "./features-tab.ts";
 import { orpc } from "./orpc.ts";
 import { type Deliverable, refOf, subtitleOf } from "./proposal-labels.ts";
@@ -44,15 +44,34 @@ function useFailedBatches(projectId: string, proposals: ProposalOutput[]): Reado
   return failed;
 }
 
-function itemOf(proposal: ProposalOutput, failed: ReadonlySet<string>): ProposalReviewItem {
+function statusOf(proposal: ProposalOutput, failed: ReadonlySet<string>): ProposalStatus {
+  if (proposal.discardReason === "already_present") return "present";
   const blocked = proposal.appliedBatchId !== null && failed.has(proposal.appliedBatchId);
+  return blocked ? "blocked" : proposal.status;
+}
+
+function itemOf(proposal: ProposalOutput, failed: ReadonlySet<string>): ProposalReviewItem {
   return {
     id: proposal.id,
     ref: refOf(proposal),
     title: proposal.title,
     subtitle: subtitleOf(proposal),
-    status: blocked ? "blocked" : proposal.status,
+    status: statusOf(proposal, failed),
   };
+}
+
+/**
+ * Badge du menu (B704) : la liste règle les déjà présentes côté serveur ; dès qu'elle en rend une encore inconnue
+ * de l'écran, la lecture des livrables est relue pour retirer ces propositions du badge.
+ */
+function useDeliverablesRefresh(present: number) {
+  const queryClient = useQueryClient();
+  const known = useRef(0);
+  useEffect(() => {
+    if (present <= known.current) return;
+    known.current = present;
+    void queryClient.invalidateQueries({ queryKey: orpc.spec.deliverables.key() });
+  }, [present, queryClient]);
 }
 
 function groupOf(
@@ -115,6 +134,11 @@ function useGroupReads(reads: GroupReads) {
   });
 }
 
+/** Relit le lancement et chaque groupe chargé. */
+const refetchAll = (reads: readonly { refetch: () => Promise<unknown> }[]) => {
+  for (const read of reads) void read.refetch();
+};
+
 /** Les Données et l'Architecture relisent tous leurs groupes ; un onglet du cahier ne relit que ses types. */
 const inTab = (groupKey: string, tab: FeaturesTab | "data" | "architecture"): boolean =>
   tab === "data" ||
@@ -135,6 +159,7 @@ export function useProposalReview(
   const [filter, setFilter] = useState<ReviewFilter>("pending");
   const { shown, loadMore } = useShown();
   const { counts, active } = status;
+  useDeliverablesRefresh(counts.present);
   // Chaque onglet relit les propositions de son type (maquette 10 l.532) ; les comptes du bandeau restent ceux du lancement.
   const groups = status.groups.filter((group) => inTab(group.key, tab));
   const grouped = counts.total > PROPOSAL_GROUP_THRESHOLD;
@@ -175,10 +200,7 @@ export function useProposalReview(
     counts: { ...counts, accepted: savable ? savable.length : counts.accepted },
     active,
     error,
-    refetch: () => {
-      void status.query.refetch();
-      for (const result of results) void result.refetch();
-    },
+    refetch: () => refetchAll([status.query, ...results]),
     failed,
     /** Enregistrement échoué à reprendre (alerte et « Réessayer l'enregistrement », B674). */
     saveFailure: savedSet?.failure ?? null,

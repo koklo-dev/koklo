@@ -1,7 +1,10 @@
 import type { IconName } from "../icons/icon.tsx";
 
-/** État d'une proposition : `blocked` = liée à un lot d'enregistrement échoué (à réessayer depuis la relecture, B674). */
-export type ProposalStatus = "pending" | "accepted" | "rejected" | "blocked";
+/**
+ * État d'une proposition : `blocked` = liée à un lot d'enregistrement échoué (à réessayer depuis la relecture, B674) ;
+ * `present` = création déjà présente dans la spec, état terminal sans décision possible (B702).
+ */
+export type ProposalStatus = "pending" | "accepted" | "rejected" | "blocked" | "present";
 
 /** Décisions que l'écran peut prendre : `pending` remet à relire. */
 export type ProposalDecision = "accepted" | "rejected" | "pending";
@@ -51,14 +54,25 @@ export interface ProposalReviewCounts {
   accepted: number;
   rejected: number;
   pending: number;
+  /** Déjà présentes dans la spec : ni « à relire », ni dans « Enregistrer N » (B702). */
+  present?: number;
 }
 
 export const PROPOSAL_STATE: Record<
   ProposalStatus,
-  { label: string; icon: IconName; fill: boolean; tone?: "primary" | "muted" | "danger" }
+  {
+    label: string;
+    icon: IconName;
+    fill: boolean;
+    tone?: "primary" | "muted" | "danger" | "success";
+  }
 > = {
   pending: { label: "À relire", icon: "schedule", fill: false, tone: "muted" },
   accepted: { label: "Acceptée", icon: "check_circle", fill: true, tone: "primary" },
   rejected: { label: "Rejetée", icon: "cancel", fill: false, tone: "muted" },
   blocked: { label: "Enregistrement échoué", icon: "error", fill: true, tone: "danger" },
+  present: { label: "Déjà présente dans la spec", icon: "task_alt", fill: true, tone: "success" },
 };
+
+/** États où la proposition s'affiche estompée dans la liste (maquette 13 l.641). */
+export const isFaded = (status: ProposalStatus) => status === "rejected" || status === "present";

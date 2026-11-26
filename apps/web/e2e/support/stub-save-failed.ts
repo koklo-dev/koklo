@@ -1,7 +1,9 @@
 /**
  * Faux API de l'enregistrement échoué de l'Architecture (TK-114e, B668 à B674), mode `architectureSaveFailed` des
  * propositions : un lot `conflict` (`write_conflict`) tient les 122 acceptées ; le réessai (`skipConflicts`) écarte la
- * section dont l'identifiant existe déjà sur la tête (`exists`), la remet à relire et écrit le reste. Aucun appel réel.
+ * section dont l'identifiant existe déjà sur la tête (`exists`), la remet à relire et écrit le reste. Mode
+ * `architecturePresent` (TK-114g, B698) : la section « Observabilité » acceptée est déjà sur la tête, écartée comme
+ * déjà présente (`outcome: "already_present"`, rejetée, motif posé). Aucun appel réel.
  */
 export const FAILED_BATCH_ID = "01900000-0000-7000-8000-0000000000f1";
 const RETRY_BATCH_ID = "01900000-0000-7000-8000-0000000000f2";
@@ -14,6 +16,7 @@ const reply = (status: number, body: unknown): Reply => ({ status, body: JSON.st
 interface Held {
   id: string;
   status: "pending" | "accepted" | "rejected";
+  discardReason?: "already_present";
   appliedBatchId: string | null;
 }
 interface Operation {
@@ -32,6 +35,16 @@ const slugOf = (text: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 const EXISTING_SECTION = `DOC-${slugOf(EXISTING_SECTION_TITLE)}`;
+/** Section acceptée du mode `architecturePresent`, déjà présente sur la tête au moment d'enregistrer. */
+export const PRESENT_SECTION_TITLE = "Observabilité";
+
+/** Écartée remise à relire (B672) ou déjà présente, réglée par le serveur (B698). */
+interface SubmitOptions {
+  existing: string;
+  present: boolean;
+}
+const SETTLED = { status: "rejected", discardReason: "already_present", appliedBatchId: null };
+const RETURNED = { status: "pending", appliedBatchId: null };
 
 const batchView = (id: string, committed: boolean, extra: Record<string, unknown> = {}) => ({
   id,
@@ -57,21 +70,30 @@ export function batchReply(path: string): Reply {
 }
 
 /** `specBatch.submit` avec `skipConflicts` : la section déjà présente est écartée, le reste enregistré. */
-export function submitReply(body: Record<string, unknown>, items: Held[]): Reply {
+export function submitReply(
+  body: Record<string, unknown>,
+  items: Held[],
+  options: SubmitOptions = { existing: EXISTING_SECTION, present: false },
+): Reply {
   const operations = (body.operations as Operation[] | undefined) ?? [];
   const owners = (body.skipConflicts as { proposals?: string[] } | undefined)?.proposals ?? [];
   const skipped = operations.flatMap((op, position) => {
     const specId = op.kind === "doc.section.create" ? `DOC-${slugOf(op.title ?? "")}` : null;
     const proposalId = owners[position];
-    return specId === EXISTING_SECTION && proposalId
-      ? [{ position, kind: op.kind, specId, reason: "exists", proposalId }]
+    const outcome = options.present ? { outcome: "already_present" } : {};
+    return specId === options.existing && proposalId
+      ? [{ position, kind: op.kind, specId, reason: "exists", proposalId, ...outcome }]
       : [];
   });
   const returned = new Set(skipped.map((entry) => entry.proposalId));
   const ids = (body.proposalIds as string[] | undefined) ?? [];
   for (const item of items) {
-    if (returned.has(item.id)) Object.assign(item, { status: "pending", appliedBatchId: null });
+    if (returned.has(item.id)) Object.assign(item, options.present ? SETTLED : RETURNED);
     else if (ids.includes(item.id)) item.appliedBatchId = RETRY_BATCH_ID;
   }
   return reply(200, batchView(RETRY_BATCH_ID, true, { skipped }));
 }
+
+/** `specBatch.submit` du mode `architecturePresent` : « Observabilité » est déjà sur la tête (B698). */
+export const submitPresentReply = (body: Record<string, unknown>, items: Held[]): Reply =>
+  submitReply(body, items, { existing: `DOC-${slugOf(PRESENT_SECTION_TITLE)}`, present: true });

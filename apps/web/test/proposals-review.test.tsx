@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { architectureSummary, dataSummary } from "../src/components/features-review.tsx";
 import { inputsOf } from "./support/features.tsx";
 import { fake, many, renderTeam, serveProposals } from "./support/proposals.tsx";
 import { findNamed } from "./support/wait.ts";
@@ -281,5 +282,60 @@ describe("Lot échoué (B320) et texte brut", () => {
     expect(root.querySelector("a, [href], img")).toBeNull();
     expect(root.textContent).toContain("<a href");
     expect(within(root).getAllByText(/evil\.example/).length).toBeGreaterThan(0);
+  });
+});
+
+/** TK-114g lot B, cas B3 (B702, B703) : proposition déjà présente dans la spec. */
+describe("Déjà présente dans la spec", () => {
+  const present = { status: "rejected", discardReason: "already_present" } as const;
+
+  it("comptée à part : « 0 à relire », « Enregistrer 1 », visible avec l'état nommé, sans action", async () => {
+    serveProposals([fake(1, present), fake(2, { status: "accepted" })]);
+    review();
+    await waitFor(async () => expect((await banner()).textContent).toContain("0 à relire"));
+    expect((await banner()).textContent).toContain("1 déjà présente dans la spec");
+    expect((await banner()).textContent).toContain("0 rejetée");
+    expect(await findNamed("button", "Enregistrer 1 dans la spec")).toBeVisible();
+    const row = (await screen.findByRole("img", { name: "Déjà présente dans la spec" })).closest(
+      "button",
+    );
+    await userEvent.click(row as HTMLElement);
+    expect(
+      await screen.findByText("Déjà présente dans la spec · rien à enregistrer"),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Remettre à relire/ })).not.toBeInTheDocument();
+  });
+
+  it("en volume : absente du filtre « À relire », visible dans « Toutes »", async () => {
+    serveProposals([fake(1, present), ...many(39).slice(1)]);
+    review();
+    await screen.findAllByText(/Réserver un créneau 2$/);
+    expect(screen.queryByText("Réserver un créneau 1")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /^Toutes/ }));
+    expect(await screen.findByRole("img", { name: "Déjà présente dans la spec" })).toBeVisible();
+  });
+
+  it("bandeaux Données et Architecture : « K déjà présente(s) dans la spec » avant « à relire »", () => {
+    const counts = { total: 9, accepted: 2, rejected: 0, pending: 6, present: 1 };
+    expect(architectureSummary(counts)).toBe(
+      " · l'agent propose 9 éléments depuis le fonctionnel et les données · 2 acceptés · 1 déjà présente dans la spec · 6 à relire",
+    );
+    expect(dataSummary({ ...counts, present: 2, pending: 5 })).toContain(
+      "2 acceptés · 2 déjà présentes dans la spec · 5 à relire",
+    );
+    expect(dataSummary({ ...counts, present: 0 })).not.toContain("déjà présente");
+  });
+
+  it("409 tout déjà présent : récapitulatif B703, pas d'alerte d'échec", async () => {
+    const items = [fake(1, { status: "accepted" })];
+    serveProposals(items, { present: [items[0]?.id as string] });
+    review();
+    await userEvent.click(await findNamed("button", "Enregistrer 1 dans la spec"));
+    await waitFor(() =>
+      expect(statusText()?.textContent).toContain(
+        "0 enregistrée dans la spec · 1 proposition écartée : déjà présente dans la spec",
+      ),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

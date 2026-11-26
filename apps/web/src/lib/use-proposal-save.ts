@@ -20,6 +20,8 @@ export interface SaveResult {
   code: string | null;
   /** Motif de chaque proposition écartée par la vérification de la spec et remise à relire (B672). */
   returned: string[];
+  /** Propositions écartées parce que déjà présentes dans la spec : rejetées par le serveur, ni enregistrées ni remises à relire (B703). */
+  present: number;
 }
 
 type Skipped = NonNullable<SpecBatchOutput["skipped"]>;
@@ -28,11 +30,17 @@ interface PlanOutcome {
   skipped: Skipped;
 }
 
-/** Un motif par proposition écartée (toutes les opérations d'une proposition partent ensemble). */
-function reasonsOf(skipped: Skipped): string[] {
-  const byProposal = new Map<string, string>();
-  for (const entry of skipped) byProposal.set(entry.proposalId, entry.reason);
-  return [...byProposal.values()];
+/**
+ * Un motif par proposition remise à relire (toutes les opérations d'une proposition partent ensemble) et le nombre
+ * de déjà présentes ; `outcome` absent vaut remise à relire (serveur antérieur à 3.16.0).
+ */
+function reasonsOf(skipped: Skipped): { returned: string[]; present: number } {
+  const byProposal = new Map<string, Skipped[number]>();
+  for (const entry of skipped) byProposal.set(entry.proposalId, entry);
+  const entries = [...byProposal.values()];
+  const present = entries.filter((entry) => entry.outcome === "already_present").length;
+  const returned = entries.filter((entry) => entry.outcome !== "already_present");
+  return { returned: returned.map((entry) => entry.reason), present };
 }
 
 /** 409 `SPEC_BATCH_CONFLICT` avec `skipped` : tout a été écarté et remis à relire, aucun lot (B672). */
@@ -68,16 +76,19 @@ async function runPlans(
   let done = 0;
   let code: string | null = null;
   const returned: string[] = [];
+  let present = 0;
   for (const [index, plan] of plans.entries()) {
     onProgress({ saved: done, sending: plan.proposalIds.length, total, batch: index + 1, batches });
     const outcome = await runPlan(plan);
     code = outcome.code;
     if (code) break;
     done += plan.proposalIds.length;
-    returned.push(...reasonsOf(outcome.skipped));
+    const reasons = reasonsOf(outcome.skipped);
+    returned.push(...reasons.returned);
+    present += reasons.present;
   }
   onProgress({ saved: done, sending: 0, total, batch: batches, batches });
-  return { saved: done - returned.length, left: total - done, code, returned };
+  return { saved: done - returned.length - present, left: total - done, code, returned, present };
 }
 
 /** Entrée de `specBatch.submit` : toujours `skipConflicts`, les conflits avec la tête sont écartés (B671, B675). */

@@ -26,6 +26,8 @@ export interface DemoProposal {
   why: string;
   description: string;
   criteria: DemoCriterion[];
+  /** Déjà présente dans la spec (TK-114g) : état terminal, aucune décision possible. */
+  present?: boolean;
 }
 
 const ZONES = [
@@ -78,6 +80,7 @@ export function demoProposals(count: number): DemoProposal[] {
       why: "Le dossier d'idée fait de ce parcours un besoin récurrent de la clinique.",
       description: `${title} depuis l'espace client, sans appeler la clinique.`,
       criteria: criteriaFor(n),
+      ...(count <= 30 && n === 3 ? { present: true } : {}),
     };
   });
 }
@@ -89,8 +92,10 @@ export function subtitleOf(p: DemoProposal): string {
 
 export type Decisions = Readonly<Record<string, ProposalDecision>>;
 
-const statusOf = (decisions: Decisions, id: string): ProposalStatus => {
-  const d = decisions[id];
+/** État affiché : une déjà présente le reste, quelle que soit la décision ; sinon la décision prise, ou « à relire ». */
+export const statusOf = (decisions: Decisions, p: DemoProposal): ProposalStatus => {
+  if (p.present) return "present";
+  const d = decisions[p.id];
   return d === undefined || d === "pending" ? "pending" : d;
 };
 
@@ -100,7 +105,7 @@ function toItem(p: DemoProposal, decisions: Decisions): ProposalReviewItem {
     ref: p.ref,
     title: p.title,
     subtitle: subtitleOf(p),
-    status: statusOf(decisions, p.id),
+    status: statusOf(decisions, p),
   };
 }
 
@@ -108,13 +113,14 @@ export function countsOf(
   proposals: readonly DemoProposal[],
   decisions: Decisions,
 ): ProposalReviewCounts {
-  const status = (p: DemoProposal) => statusOf(decisions, p.id);
+  const status = (p: DemoProposal) => statusOf(decisions, p);
   const count = (s: ProposalStatus) => proposals.filter((p) => status(p) === s).length;
   return {
     total: proposals.length,
     accepted: count("accepted"),
     rejected: count("rejected"),
     pending: count("pending"),
+    present: count("present"),
   };
 }
 
@@ -142,7 +148,7 @@ export function groupsOf(
   return keys.map((key) => {
     const own = proposals.filter((p) => `${p.type}:${p.zone}` === key);
     const first = own[0] as DemoProposal;
-    const matching = own.filter((p) => filter === "all" || statusOf(decisions, p.id) === "pending");
+    const matching = own.filter((p) => filter === "all" || statusOf(decisions, p) === "pending");
     const { accepted, pending } = countsOf(own, decisions);
     return {
       key,
