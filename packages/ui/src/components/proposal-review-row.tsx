@@ -1,7 +1,7 @@
 import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { IdTag } from "./id-tag.tsx";
-import { PROPOSAL_STATE, type ProposalReviewItem } from "./proposal-review-types.ts";
+import { isFaded, PROPOSAL_STATE, type ProposalReviewItem } from "./proposal-review-types.ts";
 
 /** État d'une proposition : icône pleine ou au contour avec son libellé accessible (jamais la couleur seule). */
 export function ProposalStateIcon({ status }: { status: ProposalReviewItem["status"] }) {
@@ -16,11 +16,13 @@ export function ProposalRowContent({ item }: { item: ProposalReviewItem }) {
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
       <span className="flex items-center gap-2">
-        <IdTag>{item.ref}</IdTag>
+        <IdTag title={item.ref} className="min-w-0 max-w-[60%] overflow-hidden">
+          <span className="truncate">{item.ref}</span>
+        </IdTag>
         <span
           className={cn(
             "min-w-0 flex-1 text-body font-semibold",
-            item.status === "rejected" && "text-muted-foreground",
+            isFaded(item.status) && "text-muted-foreground",
           )}
         >
           {item.title}

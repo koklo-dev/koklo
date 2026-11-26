@@ -34,12 +34,15 @@ function EmptyNote({
   counts: ProposalReviewCounts;
   canSave?: boolean;
 }) {
-  const allRead = canSave
-    ? `Tout est relu. Enregistrez les ${counts.accepted} acceptées.`
-    : "Tout est relu.";
+  const allRead =
+    canSave && counts.accepted > 0
+      ? `Tout est relu. Enregistrez les ${counts.accepted} acceptées.`
+      : "Tout est relu.";
+  // Déjà présentes seules (B702) : la relecture est finie, sans rien à enregistrer.
+  const done = counts.accepted > 0 || (counts.present ?? 0) > 0;
   return (
     <p className="px-3 py-4 text-meta text-muted-foreground">
-      {counts.accepted > 0 ? allRead : "Aucune proposition à relire."}
+      {done ? allRead : "Aucune proposition à relire."}
     </p>
   );
 }

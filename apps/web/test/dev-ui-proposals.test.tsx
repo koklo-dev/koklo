@@ -72,3 +72,19 @@ describe("galerie /dev/ui : bandeau de génération avec détail (TK-114b)", () 
     );
   });
 });
+
+/** TK-114g lot B : variante « déjà présente dans la spec » de la relecture (DESIGN.md §5.25 v2.35). */
+describe("galerie /dev/ui : déjà présente dans la spec", () => {
+  it("relecture à plat : F-003 déjà présente dans la spec, comptée à part dans le bandeau (TK-114g)", () => {
+    render(<DevUiProposals />);
+    const flat = within(
+      within(region()).getAllByRole("region", {
+        name: "Relecture des propositions",
+      })[0] as HTMLElement,
+    );
+    expect(flat.getByRole("img", { name: "Déjà présente dans la spec" })).toBeVisible();
+    expect(flat.getByRole("group", { name: "Mode relecture" })).toHaveTextContent(
+      "1 déjà présente dans la spec · 11 à relire",
+    );
+  });
+});

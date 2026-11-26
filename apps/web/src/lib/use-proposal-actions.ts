@@ -145,9 +145,9 @@ function useSaveAll(
     const kinds = review.savable.map((proposal) => proposal.kind);
     const result = await saver.save(launchId, review.savable, review.saveFailure?.batches);
     if (!result) return;
-    const breakdown =
-      result.left === 0 && result.returned.length === 0 ? savedBreakdown(kinds) : "";
-    const saved = SAVED_TEXT(result.saved, result.left, result.returned);
+    const skipped = result.returned.length + result.present;
+    const breakdown = result.left === 0 && skipped === 0 ? savedBreakdown(kinds) : "";
+    const saved = SAVED_TEXT(result.saved, result.left, result.returned, result.present);
     const text = [saved, breakdown, cascadeText(review.cascade)].filter(Boolean).join(" : ");
     setSummary(text);
     announce(text);

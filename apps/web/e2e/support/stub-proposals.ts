@@ -4,6 +4,7 @@ import {
   EXISTING_SECTION_TITLE,
   FAILED_BATCH_ID,
   SAVE_ROUTE,
+  submitPresentReply,
   submitReply,
 } from "./stub-save-failed.ts";
 
@@ -43,6 +44,11 @@ export type ProposalsMode =
   | "architectureDeadline"
   /** TK-114e : 122 acceptées tenues par un lot `conflict` (dont la section déjà présente), bilan « sections déjà présentes ». */
   | "architectureSaveFailed"
+  /**
+   * TK-114g : les 9 de l'architecture, la section existante déjà réglée « déjà présente », « Observabilité » et la
+   * passerelle SMS acceptées ; à l'enregistrement, « Observabilité » est écartée comme déjà présente.
+   */
+  | "architecturePresent"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -80,6 +86,8 @@ interface Item {
   rationale: string;
   content: Record<string, unknown>;
   status: "pending" | "accepted" | "rejected";
+  /** Déjà présente dans la spec, réglée par le serveur (TK-114g, B697). */
+  discardReason?: "already_present";
   appliedBatchId: string | null;
   createdAt: string;
 }
@@ -487,6 +495,23 @@ function architectureSaveFailedItems(): Item[] {
   }));
 }
 
+/** TK-114g : section existante réglée « déjà présente » en tête, puis les 9 ; deux acceptées à enregistrer. */
+function architecturePresentItems(): Item[] {
+  const [section, sms, ...rest] = architectureItems() as [Item, Item, ...Item[]];
+  const present: Item = {
+    ...architectureDocument(),
+    id: make(10, 1).id,
+    title: EXISTING_SECTION_TITLE,
+    content: {
+      title: EXISTING_SECTION_TITLE,
+      markdown: "Une tâche suit son modèle, de la création à la clôture.",
+    },
+    status: "rejected",
+    discardReason: "already_present",
+  };
+  return [present, { ...section, status: "accepted" }, { ...sms, status: "accepted" }, ...rest];
+}
+
 let items: Item[] = [];
 let architectureMode: ProposalsMode | undefined;
 let volumeData = false;
@@ -587,6 +612,7 @@ const ITEMS_OF: Partial<Record<ProposalsMode, () => Item[]>> = {
   architectureDeadline: architectureItems,
   architectureVolume: architectureVolumeItems,
   architectureSaveFailed: architectureSaveFailedItems,
+  architecturePresent: architecturePresentItems,
   volume: () => Array.from({ length: 400 }, (_, i) => make(i + 1, 16)),
   hostile: () => [make(1, 1, true)],
 };
@@ -598,7 +624,12 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
   volumeData = mode === "dataVolume";
   report = REPORTS[mode];
   architectureMode =
-    mode === "architecture" || mode === "architectureVolume" || report ? mode : undefined;
+    mode === "architecture" ||
+    mode === "architectureVolume" ||
+    mode === "architecturePresent" ||
+    report
+      ? mode
+      : undefined;
   items = ITEMS_OF[mode]?.() ?? [];
   started = mode === "generating" || mode === "architectureGeneratingReport";
   launchStatus = started ? "running" : mode === "architectureDeadline" ? "failed" : "done";
@@ -653,7 +684,9 @@ function groups() {
       flat && !MIXED_FLAT() && !architectureMode
         ? items
         : items.filter((item) => groupKeyOf(item) === key);
-    const count = (status: string) => own.filter((item) => item.status === status).length;
+    const count = (status: string) =>
+      own.filter((item) => item.status === status && !item.discardReason).length;
+    const present = own.filter((item) => item.discardReason).length;
     return {
       key,
       label: labelOf(key, flat),
@@ -661,6 +694,7 @@ function groups() {
       accepted: count("accepted"),
       rejected: count("rejected"),
       pending: count("pending"),
+      ...(present > 0 ? { alreadyPresent: present } : {}),
     };
   });
 }
@@ -797,6 +831,12 @@ interface Handlers {
   send: Send;
 }
 
+/** Modes dont le faux API répond aussi aux lots de la spec (`specBatch.submit|get`). */
+const SAVE_MODES: Partial<Record<ProposalsMode, typeof submitReply>> = {
+  architectureSaveFailed: submitReply,
+  architecturePresent: submitPresentReply,
+};
+
 const ROUTE =
   /^\/projects\/[^/]+\/(ai\/deliverable\/(options|propose)|ai\/proposals\/[^/]+\/revise|proposals(\/.*)?)$/;
 
@@ -806,9 +846,10 @@ export function handleProposals(req: IncomingMessage, url: URL, h: Handlers): bo
     return true;
   }
   const mode = h.scenario.proposals ?? "none";
-  if (mode === "architectureSaveFailed" && SAVE_ROUTE.test(url.pathname)) {
+  if (SAVE_MODES[mode] && SAVE_ROUTE.test(url.pathname)) {
+    const submit = SAVE_MODES[mode];
     if (req.method === "GET") h.send(batchReply(url.pathname));
-    else readBody(req, (body) => h.send(submitReply(body, items)));
+    else readBody(req, (body) => h.send(submit(body, items)));
     return true;
   }
   if (!ROUTE.test(url.pathname)) return false;

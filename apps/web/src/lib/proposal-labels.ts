@@ -126,17 +126,31 @@ function returnedText(reasons: readonly string[]): string {
   return `${n} remise${n >= 2 ? "s" : ""} à relire : ${why}`;
 }
 
-/** « N enregistrées dans la spec », « N enregistrées, L à reprendre », suivi de « · M remises à relire : motif ». */
+/** « K proposition(s) écartée(s) : déjà présente(s) dans la spec » (B703). */
+const presentText = (k: number): string =>
+  k >= 2
+    ? `${k} propositions écartées : déjà présentes dans la spec`
+    : `${k} proposition écartée : déjà présente dans la spec`;
+
+/**
+ * « N enregistrées dans la spec », « N enregistrées, L à reprendre », suivi de « · K propositions écartées : déjà
+ * présentes dans la spec » puis de « · M remises à relire : motif ».
+ */
 export const SAVED_TEXT = (
   saved: number,
   left: number,
   returned: readonly string[] = [],
+  present = 0,
 ): string => {
   const done =
     left === 0
       ? `${saved} enregistrée${saved >= 2 ? "s" : ""} dans la spec`
       : `${saved} enregistrée${saved >= 2 ? "s" : ""}, ${left} à reprendre`;
-  return returned.length > 0 ? `${done} · ${returnedText(returned)}` : done;
+  return [
+    done,
+    ...(present > 0 ? [presentText(present)] : []),
+    ...(returned.length > 0 ? [returnedText(returned)] : []),
+  ].join(" · ");
 };
 export const BLOCKED_TEXT = "Enregistrement échoué · à réessayer";
 

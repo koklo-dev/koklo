@@ -8,6 +8,7 @@ import {
   type ProposalFilter,
   ProposalReview,
   type ProposalReviewProps,
+  type ProposalStatus,
 } from "@koklo/ui";
 import { useMemo, useState } from "react";
 import {
@@ -16,6 +17,7 @@ import {
   type DemoProposal,
   demoProposals,
   groupsOf,
+  statusOf,
   subtitleOf,
 } from "./dev-ui-proposals-data.ts";
 
@@ -41,7 +43,7 @@ function useDemoReview(proposals: readonly DemoProposal[]) {
   };
   const acceptGroup = (key: string) => {
     const own = proposals.filter(
-      (p) => `${p.type}:${p.zone}` === key && (decisions[p.id] ?? "pending") === "pending",
+      (p) => `${p.type}:${p.zone}` === key && statusOf(decisions, p) === "pending",
     );
     setDecisions((prev) => ({
       ...prev,
@@ -73,7 +75,7 @@ function DemoDetail({
   onDecide,
 }: {
   proposal: DemoProposal;
-  status: "pending" | "accepted" | "rejected";
+  status: ProposalStatus;
   onDecide: ProposalReviewProps["onDecide"];
 }) {
   return (
@@ -111,18 +113,20 @@ function DemoDetail({
   );
 }
 
-/** Relecture interactive de la galerie : 12 propositions (à plat) ou 400 (groupes, `VirtualList`). */
+/**
+ * Relecture interactive de la galerie : 12 propositions (à plat, dont F-003 déjà présente dans la spec, TK-114g) ou
+ * 400 (groupes, `VirtualList`).
+ */
 export function DemoReview({ count }: { count: number }) {
   const proposals = useMemo(() => demoProposals(count), [count]);
   const { props, decisions } = useDemoReview(proposals);
   const selected =
     proposals.find((p) => p.id === props.selectedId) ?? (proposals[0] as DemoProposal);
-  const raw = decisions[selected.id] ?? "pending";
   return (
     <ProposalReview {...props} className="overflow-hidden rounded-xl border">
       <DemoDetail
         proposal={selected}
-        status={raw === "pending" ? "pending" : raw}
+        status={statusOf(decisions, selected)}
         onDecide={props.onDecide}
       />
     </ProposalReview>

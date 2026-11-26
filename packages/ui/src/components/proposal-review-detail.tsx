@@ -5,11 +5,12 @@ import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { Button } from "./button.tsx";
 import { IdTag } from "./id-tag.tsx";
-import { Pill } from "./pill.tsx";
+import { Pill, type PillTone } from "./pill.tsx";
 import {
   PROPOSAL_STATE,
   type ProposalDecision,
   type ProposalReviewItem,
+  type ProposalStatus,
 } from "./proposal-review-types.ts";
 
 export interface ProposalDetailProps {
@@ -105,13 +106,31 @@ function DecidedActions({ item, onDecide }: ProposalDetailProps) {
   );
 }
 
-function BlockedNote() {
+/** Note d'un état sans action : lot échoué (B674) ou déjà présente dans la spec (B702). */
+const STATE_NOTE: Partial<Record<ProposalStatus, string>> = {
+  blocked: "Enregistrement échoué · à réessayer",
+  present: "Déjà présente dans la spec · rien à enregistrer",
+};
+
+function StateNote({ status }: { status: ProposalStatus }) {
+  const text = STATE_NOTE[status];
+  if (!text) return null;
+  const state = PROPOSAL_STATE[status];
   return (
     <p className="flex items-center gap-2 border-t border-border pt-3 text-meta text-muted-foreground">
-      <Icon name="error" size={18} fill tone="danger" />
-      Enregistrement échoué · à réessayer
+      <Icon name={state.icon} size={18} fill tone={state.tone} />
+      {text}
     </p>
   );
+}
+
+const PILL_OF: Partial<Record<ProposalStatus, PillTone>> = { accepted: "soft", present: "success" };
+
+function Actions(props: ProposalDetailProps) {
+  const { status } = props.item;
+  if (status === "pending") return <PendingActions {...props} />;
+  if (status === "accepted" || status === "rejected") return <DecidedActions {...props} />;
+  return <StateNote status={status} />;
 }
 
 /** Détail de la proposition choisie (maquette 10 l.135-168) : en-tête, justification, contenu, actions. */
@@ -126,7 +145,7 @@ export function ProposalDetail(props: ProposalDetailProps) {
       <div className="flex flex-wrap items-center gap-2.5">
         <IdTag size="default">{item.ref}</IdTag>
         <h2 className="text-xl font-semibold">{item.title}</h2>
-        <Pill tone={item.status === "accepted" ? "soft" : "outline"}>{state.label}</Pill>
+        <Pill tone={PILL_OF[item.status] ?? "outline"}>{state.label}</Pill>
       </div>
       {why ? (
         <p className="flex gap-2 text-meta text-muted-foreground">
@@ -136,13 +155,11 @@ export function ProposalDetail(props: ProposalDetailProps) {
       ) : null}
       {meta ? <p className="text-meta text-muted-foreground">{meta}</p> : null}
       {children}
-      {item.status === "pending" ? <PendingActions {...props} /> : null}
-      {item.status === "accepted" || item.status === "rejected" ? (
-        <DecidedActions {...props} />
-      ) : null}
-      {item.status === "blocked" ? <BlockedNote /> : null}
+      <Actions {...props} />
       <p className="text-caption font-normal text-muted-foreground">
-        J / K : suivante / précédente · A : accepter · R : rejeter
+        {item.status === "present"
+          ? "J / K : suivante / précédente"
+          : "J / K : suivante / précédente · A : accepter · R : rejeter"}
       </p>
     </article>
   );

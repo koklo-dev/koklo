@@ -18,11 +18,20 @@ export interface ProposalReviewBannerProps {
 
 const plural = (n: number, one: string, other: string) => `${n} ${n >= 2 ? other : one}`;
 
-function summary({ total, accepted, rejected, pending }: ProposalReviewCounts): string {
+function summary({
+  total,
+  accepted,
+  rejected,
+  pending,
+  present = 0,
+}: ProposalReviewCounts): string {
   return [
     ` · ${plural(total, "proposition", "propositions")}`,
     plural(accepted, "acceptée", "acceptées"),
     plural(rejected, "rejetée", "rejetées"),
+    ...(present > 0
+      ? [plural(present, "déjà présente dans la spec", "déjà présentes dans la spec")]
+      : []),
     `${pending} à relire`,
   ].join(" · ");
 }
@@ -60,7 +69,7 @@ function Gauge({
       aria-valuetext={`${counts.accepted} acceptées sur ${counts.total}`}
       variant="split"
       value={share(counts.accepted)}
-      secondary={share(counts.rejected)}
+      secondary={share(counts.rejected + (counts.present ?? 0))}
       className="flex-[1_0_100%]"
     />
   );
