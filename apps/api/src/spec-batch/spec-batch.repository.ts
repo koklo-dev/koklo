@@ -26,6 +26,8 @@ export interface PreparedBatch {
   proposalIds?: readonly string[];
   /** Propositions écartées par la pré-vérification (TK-114e, B672) : remises à relire dans la transaction du lot. */
   returnedProposalIds?: readonly string[];
+  /** Propositions écartées déjà présentes dans la spec (TK-114g, B698) : rejetées, `already_present`, dans la même transaction. */
+  presentProposalIds?: readonly string[];
 }
 
 export interface BatchRecord {
@@ -77,8 +79,13 @@ export interface SpecBatchRepository {
   /** Où lire la spec dans git (pré-vérification, TK-114e) ; `NOT_FOUND` sans dépôt de spec. */
   gitTarget(scope: ProjectScope): Promise<SpecGitTarget>;
   /**
-   * Propositions écartées remises à relire (`pending`, `appliedBatchId` nul), UNE transaction, sans ligne de décision :
-   * chacune doit être acceptée, du projet, libre ou tenue par un lot du projet en échec ; sinon 422 et rien ne change.
+   * Propositions écartées, UNE transaction, sans ligne de décision : `toReview` remises à relire (`pending`), `present`
+   * rejetées comme déjà présentes (TK-114g, B698), `appliedBatchId` nul. Chacune doit être acceptée, du projet, libre ou
+   * tenue par un lot du projet en échec ; sinon 422 et rien ne change.
    */
-  returnToReview(scope: ProjectScope, ids: readonly string[]): Promise<void>;
+  returnToReview(
+    scope: ProjectScope,
+    toReview: readonly string[],
+    present: readonly string[],
+  ): Promise<void>;
 }

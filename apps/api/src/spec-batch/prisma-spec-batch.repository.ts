@@ -97,7 +97,11 @@ async function claimProposals(
   tx: Tx,
   scope: ProjectScope,
   ids: readonly string[],
-  data: { appliedBatchId: string | null; status?: "pending" },
+  data: {
+    appliedBatchId: string | null;
+    status?: "pending" | "rejected";
+    discardReason?: "already_present";
+  },
 ): Promise<void> {
   if (ids.length === 0) return;
   const failed = await failedLocks(tx, scope, ids);
@@ -130,6 +134,25 @@ const applyProposals = (tx: Tx, scope: ProjectScope, batchId: string, ids: reado
 /** Propositions écartées par la pré-vérification (TK-114e, B672) : « à relire », sans ligne de décision. */
 const returnProposals = (tx: Tx, scope: ProjectScope, ids: readonly string[]) =>
   claimProposals(tx, scope, ids, { appliedBatchId: null, status: "pending" });
+
+/** Propositions écartées déjà présentes dans la spec (TK-114g, B698) : rejetées, terminal, sans ligne de décision. */
+const settlePresent = (tx: Tx, scope: ProjectScope, ids: readonly string[]) =>
+  claimProposals(tx, scope, ids, {
+    appliedBatchId: null,
+    status: "rejected",
+    discardReason: "already_present",
+  });
+
+/** Écartées d'un enregistrement pré-vérifié : remises à relire, puis déjà présentes. */
+async function setAside(
+  tx: Tx,
+  scope: ProjectScope,
+  toReview: readonly string[],
+  present: readonly string[],
+): Promise<void> {
+  await returnProposals(tx, scope, toReview);
+  await settlePresent(tx, scope, present);
+}
 
 @Injectable()
 export class PrismaSpecBatchRepository implements SpecBatchRepository {
@@ -221,8 +244,12 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
     });
   }
 
-  returnToReview(scope: ProjectScope, ids: readonly string[]): Promise<void> {
-    return this.transactions.run(scope, (tx) => returnProposals(tx, scope, ids));
+  returnToReview(
+    scope: ProjectScope,
+    toReview: readonly string[],
+    present: readonly string[],
+  ): Promise<void> {
+    return this.transactions.run(scope, (tx) => setAside(tx, scope, toReview, present));
   }
 
   /** Le lot déjà enregistré sous cette clé : rejeu à l'identique, ou clé réutilisée avec un autre contenu. */
@@ -281,7 +308,7 @@ export class PrismaSpecBatchRepository implements SpecBatchRepository {
       });
     }
     await tx.specWriteOperation.createMany({ data: operations });
-    await returnProposals(tx, scope, batch.returnedProposalIds ?? []);
+    await setAside(tx, scope, batch.returnedProposalIds ?? [], batch.presentProposalIds ?? []);
     await applyProposals(tx, scope, row.id, batch.proposalIds ?? []);
     await recordAudit(tx, scope, {
       action: "spec.batch.submit",

@@ -16,6 +16,8 @@ export interface ProposalRecord {
   payload: Record<string, unknown>;
   status: AgentProposalStatus;
   appliedBatchId: string | null;
+  /** TK-114g (B697) : création déjà présente dans la spec, réglée par le serveur (`status: "rejected"`). */
+  discardReason: "already_present" | null;
   createdAt: Date;
 }
 
@@ -37,10 +39,11 @@ export interface ProposalWindow {
   previousCursor: string | null;
 }
 
-/** Une proposition décidée, ou refusée parce qu'un lot de spec l'a déjà appliquée. */
+/** Une proposition décidée, ou refusée parce qu'un lot de spec l'a déjà appliquée ou qu'elle est déjà présente (B701). */
 export type DecideOutcome =
   | { kind: "decided"; proposal: ProposalRecord }
   | { kind: "applied" }
+  | { kind: "present" }
   | { kind: "missing" };
 
 /** Décision de groupe : appliquée, ou refusée parce que le N attendu n'est plus le N réel. */
@@ -73,6 +76,21 @@ export interface ProposalRepository {
     group: GroupFilter,
     expected: number,
   ): Promise<DecideManyOutcome>;
+  /**
+   * Créations du lancement pas encore réglées (TK-114g, B699) : `pending` ou `accepted`, non appliquées, sans motif, des
+   * types `kinds`.
+   */
+  unsettledCreations(
+    scope: ProjectScope,
+    launchId: string,
+    kinds: readonly AgentProposalKind[],
+  ): Promise<ProposalRecord[]>;
+  /** Règle `ids` déjà présentes (`rejected`, `already_present`), idempotent : seules les encore candidates changent. */
+  settleAlreadyPresent(
+    scope: ProjectScope,
+    launchId: string,
+    ids: readonly string[],
+  ): Promise<number>;
   /** Remplace le contenu d'une proposition encore modifiable ; elle reste `pending`. `null` si elle a disparu. */
   revise(
     scope: ProjectScope,

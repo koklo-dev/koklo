@@ -114,7 +114,7 @@ export const ai = {
     .output(aiPrefillItemOutputSchema),
   /** Révise UNE proposition (appel synchrone, texte brut) : elle reste en attente et n'entre jamais dans la spec. */
   reviseProposal: route("POST", "/projects/{projectId}/ai/proposals/{proposalId}/revise")
-    .errors({ ...proposalErrors, ...conflictOf("proposal_applied") })
+    .errors({ ...proposalErrors, ...conflictOf("proposal_applied", "proposal_already_present") })
     .input(aiReviseProposalInputSchema)
     .output(proposalSchema),
 };

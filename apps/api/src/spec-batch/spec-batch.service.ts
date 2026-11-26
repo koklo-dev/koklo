@@ -68,7 +68,8 @@ export class SpecBatchService {
 
   /**
    * Enregistrement pré-vérifié (TK-114e, B671, B672) : seules les propositions sans conflit partent, les écartées sont remises
-   * à relire (dans la transaction du lot) et rendues dans `skipped`. Tout écarté : aucun lot, 409 `write_conflict`.
+   * à relire ou, déjà présentes dans la spec, rejetées (TK-114g, B698), dans la transaction du lot, et rendues dans `skipped`.
+   * Tout écarté : aucun lot, 409 `write_conflict`, mêmes écritures.
    */
   private async submitChecked(
     scope: ProjectScope,
@@ -76,9 +77,14 @@ export class SpecBatchService {
     prepared: PreparedBatch,
     checked: Precheck,
   ): Promise<SpecBatchOutput> {
-    const returned = [...new Set(checked.skipped.map((skipped) => skipped.proposalId))];
+    const present = checked.alreadyPresentProposalIds;
+    const returned = [
+      ...new Set(
+        checked.skipped.map((skipped) => skipped.proposalId).filter((id) => !present.includes(id)),
+      ),
+    ];
     if (checked.kept.length === 0) {
-      await this.repository.returnToReview(scope, returned);
+      await this.repository.returnToReview(scope, returned, present);
       throw allSkipped(checked.skipped);
     }
     const output = await this.commitPrepared(scope, role, () => ({
@@ -86,6 +92,7 @@ export class SpecBatchService {
       operations: checked.kept,
       proposalIds: checked.keptProposalIds,
       returnedProposalIds: returned,
+      presentProposalIds: present,
     }));
     return checked.skipped.length === 0
       ? output
@@ -101,7 +108,13 @@ export class SpecBatchService {
     const target = await this.repository.gitTarget(scope);
     const paths = await specHeadPaths(this.provider, this.access, target, prepared.branch);
     if (paths === null) {
-      return { kept: prepared.operations, keptProposalIds: [...new Set(proposals)], skipped: [] };
+      const keptProposalIds = [...new Set(proposals)];
+      return {
+        kept: prepared.operations,
+        keptProposalIds,
+        skipped: [],
+        alreadyPresentProposalIds: [],
+      };
     }
     return precheckBatch(prepared.operations, proposals, specPathIndex(paths));
   }

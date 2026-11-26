@@ -178,3 +178,37 @@ describe("TK-111 groupes de l'Architecture", () => {
     expect(buildGroups([count("component", "A", "pending", 3)], "type_zone")[0]?.key).toBe("all");
   });
 });
+
+describe("TK-114g (contrat 3.16.0, B700) : déjà présentes comptées à part", () => {
+  const present = (kind: GroupCount["kind"], zone: string, n: number): GroupCount => ({
+    ...count(kind, zone, "rejected", n),
+    discardReason: "already_present",
+  });
+
+  it("alreadyPresent hors des rejets humains ; total inchangé", () => {
+    const groups = buildGroups(
+      [
+        count("doc_section", "Noyau", "pending", 1),
+        count("doc_section", "Noyau", "rejected", 2),
+        present("doc_section", "Noyau", 1),
+      ],
+      "type_zone",
+    );
+    expect(groups).toEqual([
+      {
+        key: "all",
+        label: "Toutes les propositions",
+        total: 4,
+        accepted: 0,
+        rejected: 2,
+        pending: 1,
+        alreadyPresent: 1,
+      },
+    ]);
+  });
+
+  it("aucune déjà présente : pas de champ alreadyPresent", () => {
+    const [group] = buildGroups([count("component", "A", "pending", 3)], "type_zone");
+    expect(group).not.toHaveProperty("alreadyPresent");
+  });
+});

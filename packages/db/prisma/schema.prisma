@@ -1777,6 +1777,8 @@ model AgentProposal {
   payload        Json     @db.JsonB
   status         String   @default("pending")
   appliedBatchId String?  @map("applied_batch_id") @db.Uuid
+  /// TK-114g (B697) : `already_present` (création déjà présente dans la spec, seulement avec `status = 'rejected'`).
+  discardReason  String?  @map("discard_reason")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

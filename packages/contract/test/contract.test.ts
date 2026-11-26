@@ -203,62 +203,67 @@ describe("CT-8b garde de version", () => {
   });
 });
 
-describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b, TK-114c, TK-114d, TK-114e)", () => {
-  it("est en 3.15.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
-    expect(readJson("package.json").version).toBe("3.15.0");
-    expect(CONTRACT_VERSION).toBe("3.15.0");
-    expect(Object.keys(readJson("openapi/versions.json"))).toEqual([
-      "0.1.0",
-      "0.2.0",
-      "0.3.0",
-      "0.4.0",
-      "0.5.0",
-      "0.6.0",
-      "0.7.0",
-      "0.8.0",
-      "0.9.0",
-      "0.10.0",
-      "0.11.0",
-      "0.12.0",
-      "0.13.0",
-      "0.14.0",
-      "1.0.0",
-      "1.1.0",
-      "2.0.0",
-      "2.1.0",
-      "2.2.0",
-      "2.3.0",
-      "2.4.0",
-      "2.5.0",
-      "2.6.0",
-      "2.7.0",
-      "2.8.0",
-      "2.8.1",
-      "2.9.0",
-      "2.10.0",
-      "2.11.0",
-      "3.0.0",
-      "3.1.0",
-      "3.2.0",
-      "3.3.0",
-      "3.4.0",
-      "3.5.0",
-      "3.6.0",
-      "3.7.0",
-      "3.8.0",
-      "3.9.0",
-      "3.10.0",
-      "3.11.0",
-      "3.12.0",
-      "3.13.0",
-      "3.14.0",
-      "3.15.0",
-    ]);
+/** Versions publiées, dans l'ordre (TK-42 à TK-114g). */
+const PUBLISHED_VERSIONS = [
+  "0.1.0",
+  "0.2.0",
+  "0.3.0",
+  "0.4.0",
+  "0.5.0",
+  "0.6.0",
+  "0.7.0",
+  "0.8.0",
+  "0.9.0",
+  "0.10.0",
+  "0.11.0",
+  "0.12.0",
+  "0.13.0",
+  "0.14.0",
+  "1.0.0",
+  "1.1.0",
+  "2.0.0",
+  "2.1.0",
+  "2.2.0",
+  "2.3.0",
+  "2.4.0",
+  "2.5.0",
+  "2.6.0",
+  "2.7.0",
+  "2.8.0",
+  "2.8.1",
+  "2.9.0",
+  "2.10.0",
+  "2.11.0",
+  "3.0.0",
+  "3.1.0",
+  "3.2.0",
+  "3.3.0",
+  "3.4.0",
+  "3.5.0",
+  "3.6.0",
+  "3.7.0",
+  "3.8.0",
+  "3.9.0",
+  "3.10.0",
+  "3.11.0",
+  "3.12.0",
+  "3.13.0",
+  "3.14.0",
+  "3.15.0",
+  "3.16.0",
+];
+
+describe("CT-10 version du contrat (TK-42, TK-45c2, TK-48a2, TK-52b, TK-54b, TK-55a, TK-55b, TK-55c, TK-55d, TK-55, TK-94, TK-95, TK-96, TK-88, TK-97, TK-98, TK-89, TK-90, TK-91, TK-92, TK-93, TK-99a, TK-100, TK-101, TK-102, TK-103, TK-104, TK-105, TK-106, TK-110, TK-112, TK-113, TK-114b, TK-114c, TK-114d, TK-114e, TK-114g)", () => {
+  it("est en 3.16.0 : package.json, CONTRACT_VERSION et versions.json alignés", () => {
+    expect(readJson("package.json").version).toBe("3.16.0");
+    expect(CONTRACT_VERSION).toBe("3.16.0");
+    expect(Object.keys(readJson("openapi/versions.json"))).toEqual(PUBLISHED_VERSIONS);
   });
 });
 
-/** Empreintes figées des versions 3.14.0 à 3.1.0 (TK-103 à TK-114d), de la plus récente à la plus ancienne. */
+/** Empreintes figées des versions 3.15.0 à 3.1.0 (TK-103 à TK-114e), de la plus récente à la plus ancienne. */
 const FROZEN_3X: readonly (readonly [string, string])[] = [
+  ["3.15.0", "03dc4648a646fd9734f72c6971d423b7bd42331b443c043587d4b1d22a4b44bc"],
   ["3.14.0", "af502207056be542300e6ee2f185f0a7ee35e7d4a1fd50555cd234713ef5996e"],
   ["3.13.0", "58100a11b99223c485c72bfebb594830c8236f1eed7e6afee00b8a41209eba9e"],
   ["3.12.0", "5c766765685a107a28c3ff230bec667b05ffa52f7b46b351985c8bd9ee59d670"],
@@ -481,13 +486,13 @@ describe("CT-10b empreintes figées des versions publiées", () => {
     expect(versions["3.0.0"]).not.toBe(versions["2.11.0"]);
   });
 
-  it("l'empreinte 3.15.0 est celle du document généré ; 3.1.0 à 3.14.0 restent figées (TK-103 à TK-114d)", async () => {
+  it("l'empreinte 3.16.0 est celle du document généré ; 3.1.0 à 3.15.0 restent figées (TK-103 à TK-114e)", async () => {
     const versions = readJson("openapi/versions.json") as Record<string, string>;
     const hash = createHash("sha256")
       .update(canonical(await generateOpenApi()))
       .digest("hex");
-    expect(versions["3.15.0"]).toBe(hash);
-    expect(versions["3.15.0"]).not.toBe(versions["3.14.0"]);
+    expect(versions["3.16.0"]).toBe(hash);
+    expect(versions["3.16.0"]).not.toBe(versions["3.15.0"]);
     for (const [version, frozen] of FROZEN_3X) {
       expect(versions[version], version).toBe(frozen);
     }

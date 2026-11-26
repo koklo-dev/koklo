@@ -480,3 +480,96 @@ describe("TK-114e (contrat 3.15.0, B672, B675) : skipConflicts en entrée, skipp
     expect(await isValid(data, { reason: "write_conflict", skipped: bad })).toBe(false);
   });
 });
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'un même contrat, un test par comportement
+describe("TK-114g (contrat 3.16.0, B700) : proposition déjà présente dans la spec", () => {
+  const GROUP = {
+    key: "doc_section",
+    label: "Sections",
+    total: 2,
+    accepted: 0,
+    rejected: 0,
+    pending: 1,
+  };
+  const page = (item: unknown, group: unknown = GROUP) => ({
+    items: [item],
+    nextCursor: null,
+    previousCursor: null,
+    offset: 0,
+    total: 1,
+    groups: [group],
+    launch: LAUNCH,
+  });
+  const PRESENT = { ...PROPOSAL, status: "rejected", discardReason: "already_present" };
+  const ITEM = {
+    position: 0,
+    kind: "doc.section.create",
+    specId: "DOC-taches",
+    reason: "exists",
+    proposalId: UUID2,
+  };
+  const BATCH = {
+    id: UUID,
+    branch: "cadrage",
+    status: "queued",
+    idempotencyKey: "k-1",
+    baseSha: null,
+    commitSha: null,
+    errorCode: null,
+    report: null,
+    results: [],
+    enqueuedAt: INSTANT,
+    committedAt: null,
+  };
+
+  it("proposalSchema.discardReason facultatif, seulement already_present", async () => {
+    const o = output("proposal.list");
+    expect(await isValid(o, page(PROPOSAL))).toBe(true);
+    expect(await isValid(o, page(PRESENT))).toBe(true);
+    expect(await parsed(o, page(PRESENT))).toMatchObject({ items: [PRESENT] });
+    expect(await isValid(o, page({ ...PRESENT, discardReason: "autre" }))).toBe(false);
+    expect(await isValid(o, page({ ...PRESENT, discardReason: null }))).toBe(false);
+  });
+
+  it("proposalGroupSchema.alreadyPresent facultatif, entier ≥ 0", async () => {
+    const o = output("proposal.list");
+    expect(await isValid(o, page(PROPOSAL, { ...GROUP, alreadyPresent: 1 }))).toBe(true);
+    expect(await isValid(o, page(PROPOSAL, { ...GROUP, alreadyPresent: 0 }))).toBe(true);
+    expect(await parsed(o, page(PROPOSAL, { ...GROUP, alreadyPresent: 1 }))).toMatchObject({
+      groups: [{ alreadyPresent: 1 }],
+    });
+    expect(await isValid(o, page(PROPOSAL, { ...GROUP, alreadyPresent: -1 }))).toBe(false);
+    expect(await isValid(o, page(PROPOSAL, { ...GROUP, alreadyPresent: 1.5 }))).toBe(false);
+  });
+
+  it("skipped : outcome facultatif already_present|to_review, en sortie de submit et dans SPEC_BATCH_CONFLICT", async () => {
+    const o = output("specBatch.submit");
+    const data = errors("specBatch.submit").SPEC_BATCH_CONFLICT?.data;
+    for (const outcome of ["already_present", "to_review"]) {
+      const skipped = [{ ...ITEM, outcome }];
+      expect(await isValid(o, { ...BATCH, skipped }), outcome).toBe(true);
+      expect(await isValid(data, { reason: "write_conflict", skipped }), outcome).toBe(true);
+    }
+    expect(await isValid(o, { ...BATCH, skipped: [ITEM] })).toBe(true);
+    const present = [{ ...ITEM, outcome: "already_present" }];
+    expect(await parsed(o, { ...BATCH, skipped: present })).toMatchObject({ skipped: present });
+    const bad = [{ ...ITEM, outcome: "autre" }];
+    expect(await isValid(o, { ...BATCH, skipped: bad })).toBe(false);
+    expect(await isValid(data, { reason: "write_conflict", skipped: bad })).toBe(false);
+  });
+
+  it("decide et reviseProposal : 409 CONFLICT proposal_already_present (B701)", async () => {
+    for (const name of ["proposal.decide", "ai.reviseProposal"]) {
+      const data = errors(name).CONFLICT?.data;
+      expect(await isValid(data, { reason: "proposal_already_present" }), name).toBe(true);
+      expect(await isValid(data, { reason: "proposal_applied" }), name).toBe(true);
+    }
+  });
+
+  it("documenté dans l'OpenAPI : discardReason, alreadyPresent et outcome", async () => {
+    const text = JSON.stringify(await generateOpenApi());
+    expect(text).toContain('"discardReason"');
+    expect(text).toContain('"alreadyPresent"');
+    expect(text).toContain('"outcome"');
+  });
+});

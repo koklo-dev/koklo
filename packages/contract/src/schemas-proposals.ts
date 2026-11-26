@@ -87,6 +87,8 @@ export const proposalSchema = z.object({
   status: proposalStatusSchema,
   /** Lot de spec qui a appliqué la proposition ; une proposition appliquée n'est plus modifiable. */
   appliedBatchId: z.uuid().nullable(),
+  /** TK-114g (3.16.0, B700) : création déjà présente dans la spec, réglée par le serveur (`status: "rejected"`, terminal). */
+  discardReason: z.literal("already_present").optional(),
   createdAt: instantSchema,
 });
 
@@ -115,8 +117,10 @@ export const proposalGroupSchema = z.object({
   label: z.string(),
   total: z.number().int().min(0),
   accepted: z.number().int().min(0),
+  /** Rejets humains seulement ; les déjà présentes sont comptées à part (`alreadyPresent`, TK-114g, 3.16.0). */
   rejected: z.number().int().min(0),
   pending: z.number().int().min(0),
+  alreadyPresent: z.number().int().min(0).optional(),
 });
 
 /** Motifs fermés d'une zone écartée et d'arrêt d'un lancement (TK-114b, B618) : miroirs de `@koklo/domain`. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LaunchRecord } from "./launch.repository.ts";
-import { launchView } from "./proposal-views.ts";
+import type { ProposalRecord } from "./proposal.repository.ts";
+import { launchView, proposalView } from "./proposal-views.ts";
 
 /**
  * TK-114b (contrat 3.12.0, B620) : `launch.report`, rendu pour le livrable Architecture seulement, à partir des colonnes
@@ -108,5 +109,31 @@ describe("launchView : bilan du lancement (TK-114b)", () => {
         String(existing_section),
       ).not.toHaveProperty("sectionsExisting");
     }
+  });
+});
+
+describe("TK-114g (contrat 3.16.0, B700) : proposalView.discardReason", () => {
+  const record = (discardReason: "already_present" | null): ProposalRecord => ({
+    id: "6f1c2c1e-8d0a-4e8e-9f61-3f0b7c1a2b3d",
+    launchId: "6f1c2c1e-8d0a-4e8e-9f61-3f0b7c1a2b3c",
+    deliverable: "architecture",
+    kind: "doc_section",
+    zone: "Noyau",
+    position: 0,
+    title: "Contexte",
+    rationale: "Manque",
+    payload: { title: "Contexte", markdown: "Texte." },
+    status: discardReason === null ? "pending" : "rejected",
+    appliedBatchId: null,
+    discardReason,
+    createdAt: new Date("2026-11-24T10:00:00.000Z"),
+  });
+
+  it("rendu seulement s'il est posé", () => {
+    expect(proposalView(record("already_present"))).toMatchObject({
+      status: "rejected",
+      discardReason: "already_present",
+    });
+    expect(proposalView(record(null))).not.toHaveProperty("discardReason");
   });
 });

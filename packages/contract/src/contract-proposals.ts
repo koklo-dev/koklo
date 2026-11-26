@@ -20,9 +20,12 @@ export const proposal = {
     .errors(base)
     .input(proposalListInputSchema)
     .output(proposalListOutputSchema),
-  /** Une proposition déjà appliquée par un lot n'est jamais modifiable : 409 CONFLICT `proposal_applied`. */
+  /**
+   * Une proposition déjà appliquée par un lot n'est jamais modifiable : 409 CONFLICT `proposal_applied` ; déjà présente dans
+   * la spec (TK-114g, B701) : `proposal_already_present`.
+   */
   decide: route("POST", "/projects/{projectId}/proposals/{proposalId}/decision")
-    .errors({ ...base, ...conflictOf("proposal_applied") })
+    .errors({ ...base, ...conflictOf("proposal_applied", "proposal_already_present") })
     .input(proposalDecideInputSchema)
     .output(proposalSchema),
   /** Agit sur TOUTES les propositions en attente du groupe ; un N périmé est refusé (409). */

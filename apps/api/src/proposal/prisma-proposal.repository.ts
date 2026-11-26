@@ -28,6 +28,7 @@ interface Row {
   payload: unknown;
   status: string;
   appliedBatchId: string | null;
+  discardReason: string | null;
   createdAt: Date;
 }
 
@@ -43,6 +44,7 @@ export const proposalOf = (row: Row): ProposalRecord => ({
   payload: row.payload as Record<string, unknown>,
   status: row.status as ProposalRecord["status"],
   appliedBatchId: row.appliedBatchId,
+  discardReason: row.discardReason === "already_present" ? "already_present" : null,
   createdAt: row.createdAt,
 });
 
@@ -58,6 +60,15 @@ const STATUS_OF: Record<Decision, "pending" | "accepted" | "rejected"> = {
   reject: "rejected",
   reset: "pending",
 };
+
+/** Créations encore à régler (TK-114g, B699) : reprise telle quelle par l'UPDATE, qui reste ainsi idempotent. */
+const unsettledWhere = (scope: ProjectScope, launchId: string) => ({
+  projectId: scope.projectId,
+  launchId,
+  status: { in: ["pending", "accepted"] },
+  appliedBatchId: null,
+  discardReason: null,
+});
 
 const groupWhere = (group: GroupFilter) => ({
   ...(group.kind === undefined ? {} : { kind: group.kind }),
@@ -112,7 +123,7 @@ export class PrismaProposalRepository implements ProposalRepository {
   groupCounts(scope: ProjectScope, launchId: string): Promise<GroupCount[]> {
     return this.transactions.run(scope, async (tx) => {
       const groups = await tx.agentProposal.groupBy({
-        by: ["kind", "zone", "status"],
+        by: ["kind", "zone", "status", "discardReason"],
         where: { projectId: scope.projectId, launchId },
         _count: { _all: true },
         _min: { position: true },
@@ -121,9 +132,40 @@ export class PrismaProposalRepository implements ProposalRepository {
         kind: group.kind as AgentProposalKind,
         zone: group.zone,
         status: group.status as GroupCount["status"],
+        ...(group.discardReason === "already_present"
+          ? { discardReason: "already_present" as const }
+          : {}),
         n: group._count._all,
         first: group._min.position ?? 0,
       }));
+    });
+  }
+
+  unsettledCreations(
+    scope: ProjectScope,
+    launchId: string,
+    kinds: readonly AgentProposalKind[],
+  ): Promise<ProposalRecord[]> {
+    return this.transactions.run(scope, async (tx) => {
+      const rows = await tx.agentProposal.findMany({
+        where: { ...unsettledWhere(scope, launchId), kind: { in: [...kinds] } },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+      });
+      return rows.map(proposalOf);
+    });
+  }
+
+  settleAlreadyPresent(
+    scope: ProjectScope,
+    launchId: string,
+    ids: readonly string[],
+  ): Promise<number> {
+    return this.transactions.run(scope, async (tx) => {
+      const settled = await tx.agentProposal.updateMany({
+        where: { ...unsettledWhere(scope, launchId), id: { in: [...ids] } },
+        data: { status: "rejected", discardReason: "already_present" },
+      });
+      return settled.count;
     });
   }
 
@@ -149,6 +191,7 @@ export class PrismaProposalRepository implements ProposalRepository {
       });
       if (!current) return { kind: "missing" };
       if (current.appliedBatchId !== null) return { kind: "applied" };
+      if (current.discardReason !== null) return { kind: "present" };
       const row = await tx.agentProposal.update({
         where: { id: current.id },
         data: {
@@ -242,7 +285,12 @@ export class PrismaProposalRepository implements ProposalRepository {
   ): Promise<ProposalRecord | null> {
     return this.transactions.run(scope, async (tx) => {
       const found = await tx.agentProposal.updateMany({
-        where: { id: proposalId, projectId: scope.projectId, appliedBatchId: null },
+        where: {
+          id: proposalId,
+          projectId: scope.projectId,
+          appliedBatchId: null,
+          discardReason: null,
+        },
         data: { title: content.title, payload: content.payload as object, status: "pending" },
       });
       if (found.count === 0) return null;
