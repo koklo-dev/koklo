@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, SHA, UUID } from "./support.ts";
  * `specBatch.submit`, lectures `spec.architecture.*`, `spec.item.get` de type `component`, compteur `components`.
  */
 describe("TK-111 surface", () => {
-  it("version 3.15.0 (TK-114e est additif : mineure)", () => {
-    expect(CONTRACT_VERSION).toBe("3.15.0");
+  it("version 3.16.0 (TK-114g est additif : mineure)", () => {
+    expect(CONTRACT_VERSION).toBe("3.16.0");
   });
 
   it.each([

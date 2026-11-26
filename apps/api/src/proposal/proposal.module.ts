@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AiModule } from "../ai/ai.module.ts";
 import { AgentProposeQueue } from "../queue/agent-propose-queue.ts";
+import { SpecArchitectureModule } from "../spec-architecture/spec-architecture.module.ts";
 import { SpecDeliverablesModule } from "../spec-deliverables/spec-deliverables.module.ts";
 import { SpecReadModule } from "../spec-read/spec-read.module.ts";
 import { TrackerModule } from "../tracker/tracker.module.ts";
@@ -19,7 +20,13 @@ import { ProposalReviseService } from "./proposal-revise.service.ts";
  * besoin du dépôt de lancements, et `AiModule` ne doit pas dépendre d'un module qui dépend de lui.
  */
 @Module({
-  imports: [TrackerModule, AiModule, SpecReadModule, SpecDeliverablesModule],
+  imports: [
+    TrackerModule,
+    AiModule,
+    SpecReadModule,
+    SpecDeliverablesModule,
+    SpecArchitectureModule,
+  ],
   controllers: [ProposalController],
   providers: [
     ProposalService,

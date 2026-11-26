@@ -19,7 +19,8 @@ import {
  * TK-114e (B671 à B676) : scénario du staging. Un enregistrement de propositions acceptées refusé en entier par le worker
  * (`write_conflict` : une section existait déjà) laisse les propositions tenues par un lot `conflict`. Le réessai avec
  * `skipConflicts` rejoue ces propositions (B673), n'envoie que celles sans conflit (B671) et remet l'autre « à relire »
- * (B672). Intégration : vrai worker, faux fournisseur git.
+ * (B672). TK-114g (B698) : une proposition dont tous les conflits sont `exists` est déjà présente : rejetée, `already_present`,
+ * terminale. Intégration : vrai worker, faux fournisseur git.
  */
 const bench = installSpecBench({ beforeAll, afterAll, beforeEach });
 
@@ -90,8 +91,13 @@ async function acceptedProposals(b: SpecBench, s: SpecScene, count: number) {
 }
 
 const proposalRows = (b: SpecBench, ids: string[]) =>
-  b.database.query<{ id: string; status: string; applied_batch_id: string | null }>(
-    "SELECT id, status, applied_batch_id FROM agent_proposals WHERE id = ANY($1::uuid[])",
+  b.database.query<{
+    id: string;
+    status: string;
+    applied_batch_id: string | null;
+    discard_reason: string | null;
+  }>(
+    "SELECT id, status, applied_batch_id, discard_reason FROM agent_proposals WHERE id = ANY($1::uuid[])",
     [ids],
   );
 
@@ -119,7 +125,7 @@ describe("specBatch.submit avec skipConflicts (TK-114e)", () => {
     expect(rows.every((row) => row.applied_batch_id === failed?.id)).toBe(true);
   });
 
-  it("scénario staging : réessai → lot committed, tout le reste écrit, la section remise à relire", async () => {
+  it("scénario staging : réessai → lot committed, tout le reste écrit, la section déjà présente rejetée (TK-114g)", async () => {
     const b = bench();
     const { s, ids, api } = await stagingConflict(b);
     const res = await api.submit(
@@ -135,6 +141,7 @@ describe("specBatch.submit avec skipConflicts (TK-114e)", () => {
         specId: SECTION_ID,
         reason: "exists",
         proposalId: ids[6],
+        outcome: "already_present",
       },
     ]);
     expect(res.body.results).toHaveLength(9);
@@ -157,7 +164,11 @@ describe("specBatch.submit avec skipConflicts (TK-114e)", () => {
       "Débite tout",
     );
     const rows = new Map((await proposalRows(b, ids)).map((row) => [row.id, row]));
-    expect(rows.get(ids[6] ?? "")).toMatchObject({ status: "pending", applied_batch_id: null });
+    expect(rows.get(ids[6] ?? "")).toMatchObject({
+      status: "rejected",
+      applied_batch_id: null,
+      discard_reason: "already_present",
+    });
     for (const id of ids.filter((_, k) => k !== 6)) {
       expect(rows.get(id)).toMatchObject({ status: "accepted", applied_batch_id: res.body.id });
     }
@@ -169,7 +180,7 @@ describe("specBatch.submit avec skipConflicts (TK-114e)", () => {
     expect(await batchRows(b.database, s.projectId)).toHaveLength(3);
   });
 
-  it("tout écarté : 409 write_conflict avec skipped, aucun lot, la proposition remise à relire", async () => {
+  it("tout déjà présent : 409 write_conflict avec skipped, aucun lot, la proposition rejetée already_present (TK-114g)", async () => {
     const b = bench();
     const s = await specScene(b);
     await stagingHead(b, s);
@@ -194,14 +205,53 @@ describe("specBatch.submit avec skipConflicts (TK-114e)", () => {
           specId: SECTION_ID,
           reason: "exists",
           proposalId: id,
+          outcome: "already_present",
         },
       ],
     });
     expect(await batchRows(b.database, s.projectId)).toHaveLength(before);
     expect((await proposalRows(b, [id]))[0]).toMatchObject({
+      status: "rejected",
+      applied_batch_id: null,
+      discard_reason: "already_present",
+    });
+  });
+
+  it("TK-114g (B698) : composant modifié disparu (missing) → remis à relire, la nouvelle section part", async () => {
+    const b = bench();
+    const s = await specScene(b);
+    await stagingHead(b, s);
+    const [gone = "", fresh = ""] = await acceptedProposals(b, s, 2);
+    const operations = [
+      { kind: "component.update", specId: "C-disparu", responsibility: "Sert." },
+      section("Observabilité"),
+    ];
+    const res = await batchApi(b.app, s.world.actors.dev).submit(
+      s.projectId,
+      batch(operations, {
+        branch: BRANCH,
+        proposalIds: [gone, fresh],
+        skipConflicts: { proposals: [gone, fresh] },
+      }),
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.skipped).toEqual([
+      {
+        position: 0,
+        kind: "component.update",
+        specId: "C-disparu",
+        reason: "missing",
+        proposalId: gone,
+        outcome: "to_review",
+      },
+    ]);
+    const rows = new Map((await proposalRows(b, [gone, fresh])).map((row) => [row.id, row]));
+    expect(rows.get(gone)).toMatchObject({
       status: "pending",
       applied_batch_id: null,
+      discard_reason: null,
     });
+    expect(rows.get(fresh)).toMatchObject({ status: "accepted", applied_batch_id: res.body.id });
   });
 
   it("skipConflicts de mauvaise longueur ou hors proposalIds : 422 ; proposition tenue par un lot committed : 422", async () => {

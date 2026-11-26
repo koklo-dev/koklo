@@ -114,6 +114,27 @@ describe("proposal.decide", () => {
     expect(await statusOf(b, id)).toBe("accepted");
   });
 
+  it("TK-114g (B701) : déjà présente dans la spec : accept, reject, reset → 409 proposal_already_present, rien ne change", async () => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    const { id } = await insertProposal(b.database, world, { status: "rejected" });
+    await b.database.query(
+      "UPDATE agent_proposals SET discard_reason = 'already_present' WHERE id = $1",
+      [id],
+    );
+    const api = proposalApi(b.app, world.actors.dev);
+    for (const decision of ["accept", "reject", "reset"]) {
+      const res = await api.decide(world.projectId, id, decision);
+      expect(res.status, decision).toBe(409);
+      expect(res.body).toMatchObject({
+        code: "CONFLICT",
+        data: { reason: "proposal_already_present" },
+      });
+    }
+    expect(await statusOf(b, id)).toBe("rejected");
+    expect(await decisionRows(b, id)).toEqual([]);
+  });
+
   it("client et business : 403 ; proposition d'un autre projet ou inconnue : 404", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);

@@ -307,6 +307,8 @@ export const specBatchSkippedSchema = z
       specId: specIdSchema.nullable(),
       reason: specBatchSkipReasonSchema,
       proposalId: z.uuid(),
+      /** TK-114g (3.16.0, B700) : `already_present` (rejetée, terminal) ou `to_review` (remise à relire) ; absent = `to_review`. */
+      outcome: z.enum(["already_present", "to_review"]).optional(),
     }),
   )
   .max(SPEC_BATCH_OPERATIONS_MAX);

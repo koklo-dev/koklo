@@ -39,6 +39,8 @@ export interface GroupCount {
   kind: AgentProposalKind;
   zone: string;
   status: "pending" | "accepted" | "rejected";
+  /** TK-114g (B700) : rejetées par le serveur, déjà présentes dans la spec ; comptées à part des rejets humains. */
+  discardReason?: "already_present";
   n: number;
   first: number;
 }
@@ -50,6 +52,8 @@ export interface ProposalGroup {
   accepted: number;
   rejected: number;
   pending: number;
+  /** TK-114g (contrat 3.16.0) : rendu seulement s'il y en a au moins une. */
+  alreadyPresent?: number;
 }
 
 /**
@@ -114,7 +118,11 @@ export function buildGroups(counts: readonly GroupCount[], by: GroupBy): Proposa
     const label = single ? "Toutes les propositions" : labelOf(row, by);
     const group = groups.get(key) ?? emptyGroup(key, label);
     group.total += row.n;
-    group[row.status] += row.n;
+    if (row.discardReason === "already_present") {
+      group.alreadyPresent = (group.alreadyPresent ?? 0) + row.n;
+    } else {
+      group[row.status] += row.n;
+    }
     groups.set(key, group);
   }
   return [...groups.values()];

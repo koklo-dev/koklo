@@ -162,23 +162,43 @@ export class SpecArchitectureService {
     return { warnings: architectureChecks(checksInputOf(indexed.facts)) };
   }
 
+  /**
+   * Chemins de l'arbre au commit indexé de la branche par défaut, relatifs à la racine de la spec (TK-114g, B699 : réglage des
+   * propositions déjà présentes). `null` sans index lisible ni fournisseur utilisable ; une erreur du fournisseur remonte.
+   */
+  async headSpecPaths(scope: ProjectScope): Promise<string[] | null> {
+    const source = await this.repository.headSource(scope, {});
+    if (source === null || source.kind === "failed") return null;
+    if (this.provider === null || !source.installation.active) return null;
+    return (await this.treeAt(this.provider, source)).paths;
+  }
+
   /** Fichiers de section de l'arbre au commit indexé (`DOC_SECTIONS_MAX` au plus) ; sans fournisseur utilisable : indisponible. */
   private async readSections(source: GitSource): Promise<{ path: string; content: string }[]> {
     if (this.provider === null || !source.installation.active) {
       throw new ORPCError("PROVIDER_UNAVAILABLE");
     }
-    const { reads, at } = await committedReads(this.provider, this.access, this.cache, source);
+    const { reads, at, paths, prefix } = await this.treeAt(this.provider, source);
+    const sections = paths.filter(isDocSectionPath).slice(0, DOC_SECTIONS_MAX);
+    const files: { path: string; content: string }[] = [];
+    for (const path of sections) {
+      const file = await step("readFile", () =>
+        reads.readFile({ ...at, path: `${prefix}${path}` }),
+      );
+      files.push({ path, content: file.content });
+    }
+    return files;
+  }
+
+  /** Arbre au commit indexé, lu par le cache des lectures git (TK-114f) : chemins relatifs à la racine de la spec. */
+  private async treeAt(provider: NonNullable<GitProviderBinding>, source: GitSource) {
+    const { reads, at } = await committedReads(provider, this.access, this.cache, source);
     const prefix = source.specPath === null ? "" : `${source.specPath}/`;
     const listing = await step("readFile", () => reads.listFiles(at));
     const paths = listing.files
       .map((file) => file.path)
-      .filter((path) => path.startsWith(prefix) && isDocSectionPath(path.slice(prefix.length)))
-      .slice(0, DOC_SECTIONS_MAX);
-    const files: { path: string; content: string }[] = [];
-    for (const path of paths) {
-      const file = await step("readFile", () => reads.readFile({ ...at, path }));
-      files.push({ path: path.slice(prefix.length), content: file.content });
-    }
-    return files;
+      .filter((path) => path.startsWith(prefix))
+      .map((path) => path.slice(prefix.length));
+    return { reads, at, paths, prefix };
   }
 }

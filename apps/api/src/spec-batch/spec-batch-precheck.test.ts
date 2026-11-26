@@ -46,6 +46,7 @@ describe("precheckBatch", () => {
     const result = precheckBatch(operations, [P1, P2, P3, P2], HEAD);
     expect(result.kept).toEqual([operations[0], operations[2]]);
     expect(result.keptProposalIds).toEqual([P1, P3]);
+    expect(result.alreadyPresentProposalIds).toEqual([P2]);
     expect(result.skipped).toEqual([
       {
         position: 1,
@@ -53,6 +54,7 @@ describe("precheckBatch", () => {
         specId: "DOC-taches-modeles-de-taches-et-cycle-de-vie",
         reason: "exists",
         proposalId: P2,
+        outcome: "already_present",
       },
       {
         position: 3,
@@ -60,6 +62,7 @@ describe("precheckBatch", () => {
         specId: "DOC-deploiement",
         reason: "exists",
         proposalId: P2,
+        outcome: "already_present",
       },
     ]);
   });
@@ -115,5 +118,46 @@ describe("precheckBatch", () => {
     expect(result.skipped).toEqual([]);
     expect(result.kept).toEqual(operations);
     expect(result.keptProposalIds).toEqual([P1]);
+    expect(result.alreadyPresentProposalIds).toEqual([]);
+  });
+
+  it("TK-114g (B698) : déjà présente seulement si tous ses conflits propres sont exists, sinon remise à relire", () => {
+    const operations = [
+      section("Tâches, modèles de tâches et cycle de vie"),
+      op("component.create", null, { name: "API" }),
+      op("component.update", "C-disparu", { responsibility: "Sert." }),
+      op("archflow.update", "P-payer", { messages: [] }),
+      op("flow.create", null, { title: "Payer" }),
+      op("flow.create", null, { title: "Payer" }),
+    ];
+    const result = precheckBatch(
+      operations,
+      [P1, P2, P2, P3, `${P1.slice(0, -1)}4`, `${P1.slice(0, -1)}5`],
+      HEAD,
+    );
+    expect(result.alreadyPresentProposalIds).toEqual([P1]);
+    expect(
+      result.skipped.map(({ position, reason, outcome }) => [position, reason, outcome]),
+    ).toEqual([
+      [0, "exists", "already_present"],
+      [1, "exists", "to_review"],
+      [2, "missing", "to_review"],
+      [3, "missing", "to_review"],
+      [5, "duplicate", "to_review"],
+    ]);
+    expect(result.kept).toEqual([operations[4]]);
+  });
+
+  it("TK-114g (B698) : une opération écartée par contagion suit le sort de sa proposition", () => {
+    const operations = [
+      section("Tâches, modèles de tâches et cycle de vie"),
+      op("component.create", null, { name: "Cache" }),
+    ];
+    const result = precheckBatch(operations, [P1, P1], HEAD);
+    expect(result.alreadyPresentProposalIds).toEqual([P1]);
+    expect(result.skipped.map(({ outcome }) => outcome)).toEqual([
+      "already_present",
+      "already_present",
+    ]);
   });
 });

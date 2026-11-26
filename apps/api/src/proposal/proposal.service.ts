@@ -4,14 +4,21 @@ import type {
   ProposalListInput,
   ProposalListOutput,
 } from "@koklo/contract";
-import { LAST_SEEN_THROTTLE_MS } from "@koklo/domain";
+import { type AgentLaunchStatus, LAST_SEEN_THROTTLE_MS } from "@koklo/domain";
+import { specPathIndex } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { CLOCK, type Clock } from "../clock.ts";
+import { requestLogger } from "../request-logger.ts";
+import { SpecArchitectureService } from "../spec-architecture/spec-architecture.service.ts";
 import { conflict, notFound, orNotFound, validation } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
-import { LAUNCH_REPOSITORY, type LaunchRepository } from "./launch.repository.ts";
+import {
+  LAUNCH_REPOSITORY,
+  type LaunchRecord,
+  type LaunchRepository,
+} from "./launch.repository.ts";
 import { PROPOSAL_REPOSITORY, type ProposalRepository } from "./proposal.repository.ts";
 import { validContent } from "./proposal-content.ts";
 import {
@@ -21,7 +28,22 @@ import {
   type GroupFilter,
   groupFilterOf,
 } from "./proposal-groups.ts";
+import { alreadyPresentIds, PRESENT_KINDS, presentTargetOf } from "./proposal-present.ts";
 import { launchView, proposalView } from "./proposal-views.ts";
+
+/** Lancements dont les propositions ne bougent plus : seuls réglés « déjà présentes » (TK-114g, B699). */
+const FINISHED: ReadonlySet<AgentLaunchStatus> = new Set(["done", "failed", "canceled"]);
+
+/** Lecture de la tête impossible : rien n'est réglé, la liste répond comme avant (B699) ; ni message ni secret. */
+function logUnsettled(error: unknown): void {
+  requestLogger().warn(
+    {
+      errorName: error instanceof Error ? error.name : "erreur",
+      ...(error instanceof ORPCError ? { code: error.code } : {}),
+    },
+    "proposal already-present settle skipped",
+  );
+}
 
 const EMPTY_PAGE: ProposalListOutput = {
   items: [],
@@ -49,6 +71,7 @@ export class ProposalService {
     @Inject(PROPOSAL_REPOSITORY) private readonly proposals: ProposalRepository,
     @Inject(LAUNCH_REPOSITORY) private readonly launches: LaunchRepository,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(SpecArchitectureService) private readonly architecture: SpecArchitectureService,
   ) {}
 
   async list(scope: ProjectScope, input: ProposalListInput): Promise<ProposalListOutput> {
@@ -60,6 +83,7 @@ export class ProposalService {
       new Date(this.clock.now()),
       LAST_SEEN_THROTTLE_MS,
     );
+    await this.settleAlreadyPresent(scope, launch);
     const group = input.group === undefined ? {} : filterOf(input.group);
     const groups = buildGroups(await this.proposals.groupCounts(scope, launch.id), input.groupBy);
     const window = await this.proposals.window(scope, {
@@ -82,6 +106,7 @@ export class ProposalService {
 
   async decide(scope: ProjectScope, input: ProposalDecideInput) {
     const current = orNotFound(await this.proposals.find(scope, input.proposalId));
+    if (current.discardReason !== null) throw conflict("proposal_already_present");
     if (input.edited !== undefined && input.decision !== "accept") {
       throw validation("edited", "Un contenu corrigé ne s'enregistre qu'avec l'acceptation.");
     }
@@ -92,6 +117,7 @@ export class ProposalService {
     const outcome = await this.proposals.decide(scope, current.id, input.decision, edited);
     if (outcome.kind === "missing") throw notFound();
     if (outcome.kind === "applied") throw conflict("proposal_applied");
+    if (outcome.kind === "present") throw conflict("proposal_already_present");
     return proposalView(outcome.proposal);
   }
 
@@ -106,6 +132,27 @@ export class ProposalService {
       });
     }
     return { decided: outcome.decided };
+  }
+
+  /**
+   * TK-114g (B699) : créations d'un lancement terminé déjà présentes dans l'arbre au commit indexé → `rejected`,
+   * `already_present`. Aucune candidate : aucune lecture git ; lecture impossible : rien n'est réglé.
+   */
+  private async settleAlreadyPresent(scope: ProjectScope, launch: LaunchRecord): Promise<void> {
+    if (!FINISHED.has(launch.status)) return;
+    const candidates = (
+      await this.proposals.unsettledCreations(scope, launch.id, PRESENT_KINDS)
+    ).filter((record) => presentTargetOf(record) !== null);
+    if (candidates.length === 0) return;
+    let paths: string[] | null;
+    try {
+      paths = await this.architecture.headSpecPaths(scope);
+    } catch (error) {
+      logUnsettled(error);
+      return;
+    }
+    const ids = paths === null ? [] : alreadyPresentIds(candidates, specPathIndex(paths));
+    if (ids.length > 0) await this.proposals.settleAlreadyPresent(scope, launch.id, ids);
   }
 
   /** « all » n'est un groupe que sous le seuil : au-delà, accepter tout d'un coup n'est jamais un geste de groupe. */

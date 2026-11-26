@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BatchRecord } from "./spec-batch.repository.ts";
-import { allSkipped, failureOf, isOpen, outputOf } from "./spec-batch-output.ts";
+import { allSkipped, failureOf, isOpen, outputOf, skippedOf } from "./spec-batch-output.ts";
 
 const record = (over: Partial<BatchRecord> = {}): BatchRecord => ({
   id: "11111111-1111-4111-8111-111111111111",
@@ -72,10 +72,28 @@ describe("allSkipped (TK-114e, B672)", () => {
         specId: "DOC-taches",
         reason: "exists" as const,
         proposalId: "22222222-2222-4222-8222-222222222222",
+        outcome: "already_present" as const,
       },
     ];
     const error = allSkipped(skipped);
     expect(error.code).toBe("SPEC_BATCH_CONFLICT");
     expect(error.data).toEqual({ reason: "write_conflict", skipped });
+  });
+
+  it("TK-114g (B700) : skippedOf rend l'issue de chaque écartée (already_present, to_review)", () => {
+    const base = {
+      position: 0,
+      kind: "doc.section.create",
+      specId: "DOC-taches",
+      proposalId: "22222222-2222-4222-8222-222222222222",
+    };
+    const skipped = [
+      { ...base, reason: "exists" as const, outcome: "already_present" as const },
+      { ...base, position: 1, reason: "missing" as const, outcome: "to_review" as const },
+    ];
+    expect(skippedOf(skipped).map(({ outcome }) => outcome)).toEqual([
+      "already_present",
+      "to_review",
+    ]);
   });
 });

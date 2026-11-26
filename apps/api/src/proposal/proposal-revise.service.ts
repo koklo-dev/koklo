@@ -45,6 +45,7 @@ export class ProposalReviseService {
   ): Promise<AgentProposal> {
     const current = orNotFound(await this.proposals.find(scope, input.proposalId));
     if (current.appliedBatchId !== null) throw conflict("proposal_applied");
+    if (current.discardReason !== null) throw conflict("proposal_already_present");
     const schema = PROPOSAL_SCHEMAS[current.kind];
     const content = await this.runner.run({
       purpose: "proposal-revise",

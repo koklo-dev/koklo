@@ -107,6 +107,25 @@ describe("ai.reviseProposal", () => {
     expect(fake.calls).toHaveLength(0);
   });
 
+  it("TK-114g (B701) : déjà présente dans la spec → 409 proposal_already_present sans appel au modèle", async () => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    const { id } = await insertProposal(b.database, world, { status: "rejected" });
+    await b.database.query(
+      "UPDATE agent_proposals SET discard_reason = 'already_present' WHERE id = $1",
+      [id],
+    );
+    const fake = FakeLlm.replying(REVISED);
+    b.use(fake);
+    const res = await proposalApi(b.app, world.actors.dev).revise(world.projectId, id);
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({
+      code: "CONFLICT",
+      data: { reason: "proposal_already_present" },
+    });
+    expect(fake.calls).toHaveLength(0);
+  });
+
   it("client et business : 403 sans appel au modèle ; consigne vide ou trop longue : 400", async () => {
     const b = bench();
     const { world } = await keyedWorld(b);

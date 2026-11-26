@@ -18,6 +18,7 @@ export const proposalView = (record: ProposalRecord): Item => ({
   content: record.payload,
   status: record.status,
   appliedBatchId: record.appliedBatchId,
+  ...(record.discardReason === null ? {} : { discardReason: record.discardReason }),
   createdAt: record.createdAt.toISOString(),
 });
 
