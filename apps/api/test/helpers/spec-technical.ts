@@ -15,6 +15,12 @@ export function technicalApi(app: INestApplication, actor: Pick<Actor, "cookie">
     stack: (p: string, query = "") => get(p, `technical/stack${query}`),
     source: (p: string, id: string) => get(p, `technical/stack/${id}/source`),
     environments: (p: string) => get(p, "technical/environments"),
+    ops: (p: string, query = "") => get(p, `technical/operations${query}`),
+    op: (p: string, id: string) => get(p, `technical/operations/${id}`),
+    opSource: (p: string, id: string) => get(p, `technical/operations/${id}/source`),
+    options: (p: string) => get(p, "technical/operation-options"),
+    contract: (p: string, id: string) => get(p, `technical/operations/${id}/contract`),
+    nfr: (p: string, query = "") => get(p, `technical/nfr${query}`),
     sections: (p: string, deliverable = "technical") =>
       get(p, `document/sections?deliverable=${deliverable}`),
     choose: (p: string, id: string, option: string, over: Record<string, unknown> = {}) =>
@@ -38,6 +44,9 @@ export function clientTechnicalApi(
     summary: (p: string) => get(p, ""),
     stack: (p: string, query = "") => get(p, `/stack${query}`),
     environments: (p: string) => get(p, "/environments"),
+    ops: (p: string, query = "") => get(p, `/operations${query}`),
+    op: (p: string, id: string) => get(p, `/operations/${id}`),
+    nfr: (p: string, query = "") => get(p, `/nfr${query}`),
     document: (p: string) => get(p, "/document"),
   };
 }
@@ -137,3 +146,30 @@ export const componentEntity = (id: string, over: Record<string, unknown> = {}) 
     responsabilite: "Fait son travail.",
     ...over,
   });
+
+/** `domain/roles.yaml` indexé : trois permissions, quatre rôles dont un restreint, un cinquième au-delà de la limite. */
+export const rolesEntity = () => {
+  const role = (id: string, nom: string, permissions: string[], over = {}) => ({
+    id,
+    nom,
+    description: nom,
+    permissions,
+    ...over,
+  });
+  const book = "PM-reservation.creer";
+  return technical("roles", "roles", {
+    titre: "Rôles et permissions",
+    permissions: [{ id: "PM-agenda.lire", ressource: "agenda", action: "lire" }],
+    roles: [
+      role("RL-client", "Client", [book], { restrictions: { [book]: "les siennes" } }),
+      role("RL-accueil", "Accueil", [book, "PM-agenda.lire"]),
+      role("RL-gerant", "Gérant", [book]),
+      role("RL-employe", "Employé", [book]),
+      role("RL-comptable", "Comptable", [book, "PM-caisse.cloturer"]),
+    ],
+  });
+};
+
+/** Endpoint de l'ancien format REST : même genre d'index, jamais une opération du cahier. */
+export const restEntity = (id: string) =>
+  technical("endpoint", id, { id, titre: id, methode: "GET", chemin: "/ancien" });

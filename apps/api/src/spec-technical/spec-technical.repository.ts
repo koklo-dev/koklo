@@ -48,6 +48,8 @@ export interface SpecTechnicalRepository {
     scope: ProjectScope,
     revision: Revision,
   ): Promise<IndexFailure | EnvironmentsFound | null>;
-  /** Comptes de la tête ; `null` : rien d'indexé. */
-  counts(scope: ProjectScope): Promise<ReturnType<typeof technicalCounts> | null>;
+  /** Comptes de la tête, dont les opérations `zone.verbe` seules ; `null` : rien d'indexé. */
+  counts(
+    scope: ProjectScope,
+  ): Promise<(ReturnType<typeof technicalCounts> & { operations: number }) | null>;
 }

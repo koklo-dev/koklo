@@ -8,7 +8,7 @@ import { createWorld, type World } from "./helpers/tickets.ts";
 
 /**
  * TK-115 lot B (cas 9, B728, B736) : `seed:large`, 300 choix. La première page de la grille répond sous 300 ms, la
- * recherche trouve un choix de la 5e page et `around` l'amène.
+ * recherche trouve un choix de la 5e page et `around` l'amène. TK-116 (cas 1) : 500 opérations et 200 exigences.
  */
 let database: TestDatabase;
 let app: INestApplication;
@@ -56,5 +56,37 @@ describe("spec.technical.stack.list sur 300 choix", () => {
     const around = await api().stack(world.projectId, `?around=${id}`);
     expect(ids(around.body)).toContain(id);
     expect(Math.floor(around.body.offset / 24) + 1).toBe(5);
+  });
+});
+
+describe("spec.technical.ops et nfr sur 500 opérations", () => {
+  const timed = async (read: () => ReturnType<ReturnType<typeof api>["ops"]>) => {
+    await read();
+    const timings: number[] = [];
+    let res = await read();
+    for (let run = 0; run < 3; run += 1) {
+      const start = performance.now();
+      res = await read();
+      timings.push(performance.now() - start);
+    }
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(Math.min(...timings)).toBeLessThan(300);
+    return res.body;
+  };
+
+  it("première page de 50 opérations sous 300 ms, REST absent, six zones comptées", async () => {
+    const body = await timed(() => api().ops(world.projectId));
+    expect(body.total).toBe(500);
+    expect(body.items).toHaveLength(50);
+    expect(Object.values(body.facets.zone as Record<string, number>)).toHaveLength(6);
+    expect(ids(body).every((id) => !id.startsWith("E-"))).toBe(true);
+  });
+
+  it("q trouve une opération hors de la première page ; exigences en pages de 50", async () => {
+    const found = await api().ops(world.projectId, "?q=reservation.export");
+    expect(ids(found.body)).toContain("reservation.export");
+    const nfr = await timed(() => api().nfr(world.projectId));
+    expect(nfr.total).toBe(200);
+    expect(nfr.items).toHaveLength(50);
   });
 });

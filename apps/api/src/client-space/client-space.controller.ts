@@ -362,4 +362,49 @@ export class ClientSpaceController {
       ),
     );
   }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technicalOps)
+  technicalOps(@Req() request: Request) {
+    return implement(contract.clientSpace.technicalOps).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.operations(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technicalOp)
+  technicalOp(@Req() request: Request) {
+    return implement(contract.clientSpace.technicalOp).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.operation(scope, input.opId),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technicalNfr)
+  technicalNfr(@Req() request: Request) {
+    return implement(contract.clientSpace.technicalNfr).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.requirements(scope, input),
+        this.access,
+      ),
+    );
+  }
 }

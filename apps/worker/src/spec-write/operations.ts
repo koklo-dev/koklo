@@ -1,4 +1,10 @@
-import { emitOperationYaml, type Operation, TECHNICAL_PROPOSAL_VOCABULARY } from "@koklo/schema";
+import {
+  type Component,
+  emitOperationYaml,
+  type Operation,
+  parseSpecFiles,
+  TECHNICAL_PROPOSAL_VOCABULARY,
+} from "@koklo/schema";
 import { overlaid, readEntity, wordOf, writeEntity } from "./technical-files.ts";
 import type { BatchOperation } from "./types.ts";
 import { forbidDesigner, removeFile, type Workspace } from "./workspace.ts";
@@ -59,11 +65,34 @@ function overlay(base: Operation, payload: OperationPayload): Operation {
   });
 }
 
-const emptyOperation = (id: string): Operation => ({
+const COMPONENTS_DIR = "architecture/components/";
+
+/** Composants lisibles des fichiers de la branche, rangés par identifiant. */
+function componentsOf(workspace: Workspace): Component[] {
+  const files = [...workspace.files]
+    .filter(([path]) => path.startsWith(COMPONENTS_DIR))
+    .map(([path, content]) => ({ path, content }));
+  const parsed = parseSpecFiles(files).spec.components.map((entry) => entry.value);
+  return parsed.sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
+/**
+ * Composant d'une opération créée sans lui (B769) : premier service de la zone par identifiant, sinon premier service,
+ * sinon premier composant de la zone, sinon premier composant ; sans aucun composant, vide (l'émission refuse le lot).
+ */
+function deducedComponent(workspace: Workspace, zone: string): string {
+  const all = componentsOf(workspace);
+  const services = all.filter((component) => component.type === "service");
+  const inZone = (component: Component) => component.zone === zone;
+  const found = services.find(inZone) ?? services[0] ?? all.find(inZone) ?? all[0];
+  return found?.id ?? "";
+}
+
+const emptyOperation = (id: string, composant: string): Operation => ({
   id,
   type: "lecture",
   zone: "",
-  composant: "",
+  composant,
   permission: "interne",
   resume: "",
   entree: {},
@@ -86,7 +115,8 @@ export function applyOperationFile(
   const id = operation.targetSpecId ?? "";
   const payload = operation.payload as OperationPayload;
   if (operation.kind === "op.create") {
-    const next = overlay(emptyOperation(id), payload);
+    const component = payload.component ?? deducedComponent(workspace, payload.zone ?? "");
+    const next = overlay(emptyOperation(id, component), payload);
     writeEntity(workspace, operationPathOf(id), id, () => emitOperationYaml(next));
     return;
   }

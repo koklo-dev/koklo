@@ -49,6 +49,11 @@ const REF_SHAPES: Record<RefKind, { pattern: RegExp; label: string }> = {
   stack: { pattern: /^ST-[a-z0-9][a-z0-9-]*$/, label: "de choix technique (ST-slug)" },
   environments: { pattern: /^environments$/, label: "du bloc des environnements (environments)" },
   tech_section: { pattern: /^DOC-[a-z0-9][a-z0-9-]*$/, label: "de section (DOC-slug)" },
+  operation: {
+    pattern: /^[a-z0-9][A-Za-z0-9_-]*\.[a-z0-9][A-Za-z0-9_-]*$/,
+    label: "d'opération (zone.verbe)",
+  },
+  requirements: { pattern: /^requirements$/, label: "du bloc des exigences (requirements)" },
 };
 const isRefKind = (kind: string): kind is RefKind => kind in REF_SHAPES;
 

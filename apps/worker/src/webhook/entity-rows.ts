@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import {
   type BusinessRule,
   canonicalize,
+  NFR_CATEGORIES,
+  type Nfr,
   type ParsedSpec,
   type SpecFile,
   STACK_LAYERS,
@@ -171,20 +173,46 @@ function stackCandidates(spec: ParsedSpec): Candidate[] {
   return candidate("stack", idOf)(titled);
 }
 
-/** Cahier technique (TK-115) : choix, opérations (titre = résumé), exigences et le bloc des environnements. */
-function technicalCandidates(spec: ParsedSpec): Candidate[] {
-  const operations = spec.operations.map(({ path, value }) => ({
+const byId = (a: string, b: string) => a.localeCompare(b, "fr", { numeric: true });
+
+/**
+ * Opérations indexées par zone (ordre alphabétique) puis nom (B772), titrées par leur résumé ; `champs` garde l'ordre des
+ * entrées et des sorties, que jsonb ne conserve pas.
+ */
+function operationCandidates(spec: ParsedSpec): Candidate[] {
+  const sorted = [...spec.operations].sort(
+    (a, b) => a.value.zone.localeCompare(b.value.zone, "fr") || byId(a.value.id, b.value.id),
+  );
+  const titled = sorted.map(({ path, value }) => ({
     path,
-    value: { ...value, titre: value.resume },
+    value: {
+      ...value,
+      titre: value.resume,
+      champs: { entree: Object.keys(value.entree), sortie: Object.keys(value.sortie) },
+    },
   }));
+  return candidate("endpoint", idOf)(titled);
+}
+
+/** Exigences indexées par catégorie (ordre du format) puis numéro (B772). */
+function requirementCandidates(spec: ParsedSpec): Candidate[] {
+  const rank = (nfr: Nfr) => NFR_CATEGORIES.indexOf(nfr.categorie);
+  const sorted = [...spec.nfrs].sort(
+    (a, b) => rank(a.value) - rank(b.value) || byId(a.value.id, b.value.id),
+  );
+  return candidate("nfr", idOf)(sorted);
+}
+
+/** Cahier technique : choix, opérations, exigences et le bloc des environnements. */
+function technicalCandidates(spec: ParsedSpec): Candidate[] {
   const environments = spec.environments.map(({ path, value }) => ({
     path,
     value: { ...value, titre: ENVIRONMENTS_TITLE },
   }));
   return [
     ...stackCandidates(spec),
-    ...candidate("endpoint", idOf)(operations),
-    ...candidate("nfr", idOf)(spec.nfrs),
+    ...operationCandidates(spec),
+    ...requirementCandidates(spec),
     ...candidate("environments", () => "environments")(environments),
   ];
 }

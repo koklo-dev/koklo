@@ -46,9 +46,17 @@ import {
 } from "./schemas-spec-domain.ts";
 import {
   environmentsContentShape,
+  nfrCategorySchema,
+  nfrIdSchema,
+  operationNameSchema,
   stackIdSchema,
   stackSummarySchema,
 } from "./schemas-spec-technical.ts";
+import {
+  nfrSummarySchema,
+  operationDetailSchema,
+  operationSummarySchema,
+} from "./schemas-spec-technical-api.ts";
 import { pageInputSchema } from "./schemas-tickets.ts";
 
 /**
@@ -463,6 +471,46 @@ export const clientSpaceTechnicalDocumentOutputSchema = z.object({
     }),
   ),
 });
+// --- TK-116 (3.18.0) : opérations et exigences validées (B773) ; ni chemin, ni SHA, ni YAML, ni contrat. ---
+const clientIdentity = { specId: true, filePath: true } as const;
+export const clientOperationSummarySchema = operationSummarySchema
+  .omit(clientIdentity)
+  .extend({ id: operationNameSchema });
+export const clientOperationDetailSchema = operationDetailSchema
+  .omit({ ...clientIdentity, commitSha: true })
+  .extend({ id: operationNameSchema });
+export const clientNfrSchema = nfrSummarySchema.omit(clientIdentity).extend({ id: nfrIdSchema });
+
+export const clientSpaceTechnicalOpsInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    zone: z.string().min(1).max(80).optional(),
+    ...listInputShape(operationNameSchema),
+  })
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+export const clientSpaceTechnicalOpsOutputSchema = listOf(clientOperationSummarySchema).extend(
+  clientTechnicalState,
+);
+export const clientSpaceTechnicalOpInputSchema = z.object({
+  projectId: z.uuid(),
+  opId: operationNameSchema,
+});
+/** `operation` nulle tant que le livrable n'est pas validé, que l'opération existe ou non. */
+export const clientSpaceTechnicalOpOutputSchema = z.object({
+  ...clientTechnicalState,
+  operation: clientOperationDetailSchema.nullable(),
+});
+export const clientSpaceTechnicalNfrInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    category: nfrCategorySchema.optional(),
+    ...listInputShape(nfrIdSchema),
+  })
+  .omit({ q: true })
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+export const clientSpaceTechnicalNfrOutputSchema =
+  listOf(clientNfrSchema).extend(clientTechnicalState);
+
 export type ClientSpaceTechnical = z.output<typeof clientSpaceTechnicalOutputSchema>;
 export type ClientStackChoice = z.output<typeof clientStackChoiceSchema>;
 export type ClientSpaceTechnicalStack = z.output<typeof clientSpaceTechnicalStackOutputSchema>;
@@ -472,3 +520,9 @@ export type ClientSpaceTechnicalEnvironments = z.output<
 export type ClientSpaceTechnicalDocument = z.output<
   typeof clientSpaceTechnicalDocumentOutputSchema
 >;
+export type ClientOperationSummary = z.output<typeof clientOperationSummarySchema>;
+export type ClientOperationDetail = z.output<typeof clientOperationDetailSchema>;
+export type ClientNfr = z.output<typeof clientNfrSchema>;
+export type ClientSpaceTechnicalOps = z.output<typeof clientSpaceTechnicalOpsOutputSchema>;
+export type ClientSpaceTechnicalOp = z.output<typeof clientSpaceTechnicalOpOutputSchema>;
+export type ClientSpaceTechnicalNfr = z.output<typeof clientSpaceTechnicalNfrOutputSchema>;

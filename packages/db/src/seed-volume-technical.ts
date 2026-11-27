@@ -107,11 +107,14 @@ function operations(count: number, components: number, rules: number, features: 
       'entree', '{}'::jsonb, 'sortie', '{}'::jsonb, 'erreurs', '[]'::jsonb,
       'regles', jsonb_build_array('R-' || ${pad(`(1 + n % ${rules})`)}),
       'sert', jsonb_build_array('F-' || ${pad(`(1 + n % ${features})`)}))`;
+  const rows = `SELECT n, ${id} AS spec_id, ${data} AS data FROM generate_series(1, ${count}) AS n`;
+  // Rang du worker (B772) : zone puis nom, comparés octet par octet.
+  const rank = `row_number() OVER (ORDER BY data ->> 'zone' COLLATE "C", spec_id COLLATE "C")`;
   return insert(
     "endpoint",
     "operation",
-    `SELECT n, ${id} AS spec_id, 'api/endpoints/' || ${id} || '.yaml' AS path, ${data} AS data, 1000 + n AS sort
-       FROM generate_series(1, ${count}) AS n`,
+    `SELECT n, spec_id, 'api/endpoints/' || spec_id || '.yaml' AS path, data, (1000 + ${rank})::int AS sort
+       FROM (${rows}) AS operations`,
   );
 }
 
@@ -131,10 +134,13 @@ function requirements(count: number, components: number): string {
       'cible', 'p95 < ' || (200 + n) || ' ms', 'enonce', 'Énoncé de l''exigence ' || n || '.',
       'verification', jsonb_build_object('mode', 'a_definir'),
       'liens', jsonb_build_array('C-composant-' || ${pad(`(1 + n % ${components})`)}))`;
+  // Rang du worker (B772) : catégorie (ordre de la maquette) puis numéro.
+  const rank = `row_number() OVER (ORDER BY (n - 1) % ${CATEGORIES.length}, n)`;
   return insert(
     "nfr",
     "nfr",
-    `SELECT n, 'NFR-' || ${pad()} AS spec_id, 'nfr/NFR-' || ${pad()} || '.yaml' AS path, ${data} AS data, n AS sort
+    `SELECT n, 'NFR-' || ${pad()} AS spec_id, 'nfr/NFR-' || ${pad()} || '.yaml' AS path, ${data} AS data,
+            (${rank})::int AS sort
        FROM generate_series(1, ${count}) AS n`,
   );
 }

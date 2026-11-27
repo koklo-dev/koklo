@@ -9,7 +9,13 @@ import {
   submitOk,
 } from "./helpers/spec-batch.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
-import { componentEntity, stackEntity, technicalApi } from "./helpers/spec-technical.ts";
+import {
+  componentEntity,
+  nfrEntity,
+  operationEntity,
+  stackEntity,
+  technicalApi,
+} from "./helpers/spec-technical.ts";
 import { send } from "./helpers/tickets.ts";
 
 /**
@@ -26,13 +32,27 @@ const ROUTES = (p: string) => [
   `/projects/${p}/spec/technical/environments`,
   `/projects/${p}/spec/document/sections?deliverable=technical`,
   `/projects/${p}/spec/items/stack/ST-sms`,
+  // TK-116 : opérations, contrat généré et exigences (aucun YAML ni contrat hors équipe et designer).
+  `/projects/${p}/spec/technical/operations`,
+  `/projects/${p}/spec/technical/operations/avis.create`,
+  `/projects/${p}/spec/technical/operations/avis.create/source`,
+  `/projects/${p}/spec/technical/operations/avis.create/contract`,
+  `/projects/${p}/spec/technical/operation-options`,
+  `/projects/${p}/spec/technical/nfr`,
+  `/projects/${p}/spec/items/operation/avis.create`,
+  `/projects/${p}/spec/items/nfr/NFR-001`,
 ];
 
 async function seeded() {
   const s = await readScene(read());
   await seedIndex(read(), s, [], {
     commit: true,
-    entities: [stackEntity("ST-sms"), componentEntity("C-sms")],
+    entities: [
+      stackEntity("ST-sms"),
+      componentEntity("C-sms"),
+      operationEntity("avis.create"),
+      nfrEntity("NFR-001"),
+    ],
   });
   return s;
 }
@@ -52,7 +72,7 @@ describe("lectures du cahier technique", () => {
       const res = await send(read().app, s.world.actors[role].cookie, "get", path);
       expect(res.status, `${role} ${path}`).toBe(403);
       expect(res.body.code).toBe("FORBIDDEN");
-      expect(JSON.stringify(res.body)).not.toMatch(/SMS|Brevo|yaml/i);
+      expect(JSON.stringify(res.body)).not.toMatch(/SMS|Brevo|yaml|avis\.create|export const/i);
     }
   });
 

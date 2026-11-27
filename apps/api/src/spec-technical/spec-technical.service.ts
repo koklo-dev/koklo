@@ -144,9 +144,8 @@ export class SpecTechnicalService {
 
   /** Comptes de la tête (vue client) ; rien d'indexé : zéros. */
   async counts(scope: ProjectScope) {
-    return (
-      (await this.repository.counts(scope)) ?? { stack: 0, endpoints: 0, nfr: 0, environments: 0 }
-    );
+    const none = { stack: 0, endpoints: 0, nfr: 0, environments: 0, operations: 0 };
+    return (await this.repository.counts(scope)) ?? none;
   }
 
   sections(

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { OPERATIONS_ONLY } from "../spec-technical/operation-where.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { type CursorPosition, keysetAfter, pageOfItems } from "../tracker/cursor.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
@@ -39,6 +40,16 @@ const toRecord = (row: {
   createdAt: row.createdAt,
 });
 
+/**
+ * Entité d'index qui prouve que la cible existe : une opération est une entité `endpoint` du cahier (jamais le REST), le
+ * bloc des exigences existe dès qu'une exigence est à la tête.
+ */
+function entityOf(kind: IndexedRefKind, ref: string) {
+  if (kind === "operation") return { kind: "endpoint", specId: ref, AND: OPERATIONS_ONLY };
+  if (kind === "requirements") return { kind: "nfr" };
+  return { kind, specId: ref };
+}
+
 class PrismaCommentStore implements CommentStore {
   constructor(
     private readonly tx: Tx,
@@ -57,7 +68,7 @@ class PrismaCommentStore implements CommentStore {
     const head = await this.resolver.resolve(this.tx, this.scope, {});
     if (!head || head.snapshot.status === "failed") return false;
     const row = await this.tx.specEntity.findFirst({
-      where: { snapshotId: head.snapshot.id, kind, specId: ref },
+      where: { snapshotId: head.snapshot.id, ...entityOf(kind, ref) },
       select: { id: true },
     });
     return row !== null;

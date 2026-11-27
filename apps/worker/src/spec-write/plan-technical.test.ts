@@ -222,6 +222,87 @@ describe("op.*", () => {
   });
 });
 
+/** B769 : le composant d'une opération créée sans lui est déduit de la zone, comme la couche d'un choix. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("op.create sans composant", () => {
+  const zoned = (slug: string, type: "app" | "service" | "ext", zone: string) => ({
+    path: `architecture/components/${slug}.yaml`,
+    content: emitComponentYaml({
+      id: `C-${slug}`,
+      nom: slug,
+      type,
+      zone,
+      responsabilite: "Fait son travail.",
+      possede: [],
+      sert: [],
+      depend_de: [],
+      decisions: [],
+    }),
+  });
+  const { component: _component, ...WITHOUT } = CREATE_OP;
+  const path = "api/endpoints/creneau.listAvailable.yaml";
+  const deduced = (components: { path: string; content: string }[]) => {
+    const operation = op("op.create", "creneau.listAvailable", { ...WITHOUT, zone: "Rendez-vous" });
+    const result = plan([operation], "dev", [MANIFEST, ...components]);
+    return parsed(result, path).operations[0]?.value.composant;
+  };
+
+  it.each([
+    [
+      "premier service de la zone par identifiant",
+      [
+        zoned("zz", "service", "Rendez-vous"),
+        zoned("api", "service", "Rendez-vous"),
+        zoned("aaa", "service", "Autre"),
+        zoned("app", "app", "Rendez-vous"),
+      ],
+      "C-api",
+    ],
+    [
+      "sinon premier service",
+      [
+        zoned("app", "app", "Rendez-vous"),
+        zoned("worker", "service", "Autre"),
+        zoned("auth", "service", "Autre"),
+      ],
+      "C-auth",
+    ],
+    [
+      "sinon premier composant de la zone",
+      [zoned("web", "app", "Rendez-vous"), zoned("app", "app", "Autre")],
+      "C-web",
+    ],
+    ["sinon premier composant", [zoned("web", "app", "Autre"), zoned("sms", "ext", "X")], "C-sms"],
+  ] as const)("%s", (_label, components, expected) => {
+    expect(deduced([...components])).toBe(expected);
+  });
+
+  it("sans aucun composant : SPEC_INVALID", () => {
+    const operation = op("op.create", "creneau.listAvailable", WITHOUT);
+    expect(plan([operation], "dev", [MANIFEST])).toMatchObject({
+      outcome: { errorCode: "SPEC_INVALID" },
+    });
+  });
+
+  it("op.update garde le composant du fichier, même si la zone change", () => {
+    const operation = op("op.create", "creneau.listAvailable", CREATE_OP);
+    const files = [
+      ...BASE,
+      zoned("agenda", "service", "Agenda"),
+      { path, content: contentOf(plan([operation]), path) ?? "" },
+    ];
+    const updated = plan(
+      [op("op.update", "creneau.listAvailable", { zone: "Agenda" })],
+      "dev",
+      files,
+    );
+    expect(parsed(updated, path).operations[0]?.value).toMatchObject({
+      zone: "Agenda",
+      composant: "C-web",
+    });
+  });
+});
+
 const CREATE_NFR = {
   category: "performance",
   title: "Rapidité",

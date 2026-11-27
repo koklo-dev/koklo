@@ -57,9 +57,11 @@ import {
   environmentUpdateSchema,
   nfrCreateSchema,
   nfrDeleteSchema,
+  nfrIdSchema,
   nfrUpdateSchema,
   operationCreateSchema,
   operationDeleteSchema,
+  operationNameSchema,
   operationUpdateSchema,
   stackCreateSchema,
   stackDeleteSchema,
@@ -68,6 +70,7 @@ import {
   stackUpdateSchema,
   TECHNICAL_OPERATION_KINDS,
 } from "./schemas-spec-technical.ts";
+import { nfrDetailSchema, operationDetailSchema } from "./schemas-spec-technical-api.ts";
 import { instantSchema } from "./schemas-tickets.ts";
 
 /** Valeurs et motifs identiques à ceux de @koklo/schema (parité vérifiée par apps/api/test). */
@@ -401,9 +404,11 @@ export const specRefKindSchema = z.enum([
   "table",
   "endpoint",
   "screen",
-  /** Liens du cahier technique (3.17.0). */
+  /** Liens du cahier technique (3.17.0) ; choix et décisions pour les exigences (3.18.0). */
   "component",
   "nfr",
+  "stack",
+  "adr",
 ]);
 /** Genres d'entités de l'index générique (`spec_entities`) : un élément peut en citer un autre quel que soit son genre. */
 const specEntityKindSchema = z.enum([
@@ -438,6 +443,8 @@ export const SPEC_ITEM_TYPES = [
   "adr",
   "stack",
   "environment",
+  "operation",
+  "nfr",
 ] as const;
 const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   feature: featureIdSchema,
@@ -450,6 +457,8 @@ const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   adr: adrIdSchema,
   stack: stackIdSchema,
   environment: environmentIdSchema,
+  operation: operationNameSchema,
+  nfr: nfrIdSchema,
 };
 export const specItemGetInputSchema = z
   .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
@@ -483,6 +492,8 @@ export const specItemSchema = z.discriminatedUnion("type", [
   itemOf("adr", adrIdSchema, adrDetailSchema),
   itemOf("stack", stackIdSchema, stackDetailSchema),
   itemOf("environment", environmentIdSchema, environmentDetailSchema),
+  itemOf("operation", operationNameSchema, operationDetailSchema),
+  itemOf("nfr", nfrIdSchema, nfrDetailSchema),
 ]);
 
 export const specRefsSearchInputSchema = z.object({
