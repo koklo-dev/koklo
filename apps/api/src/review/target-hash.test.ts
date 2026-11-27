@@ -69,6 +69,14 @@ describe("hachage de cible", () => {
     expect(targetHashOf(edited("E-auth"), "deliverable", "functional")).toBe(functional);
   });
 
+  it("livrable sans entité indexée (Architecture, Sécurité, Design, Qualité) : null", () => {
+    for (const key of ["architecture", "security", "design", "quality"]) {
+      expect(targetHashOf(ENTITIES, "deliverable", key), key).toBeNull();
+    }
+  });
+});
+
+describe("hachage de cible : Technique", () => {
   it("Technique : ses opérations comptent, pas celles des autres livrables", () => {
     const base = targetHashOf(ENTITIES, "deliverable", "technical");
     const edited = (id: string) =>
@@ -76,11 +84,5 @@ describe("hachage de cible", () => {
     expect(base).toMatch(/^[0-9a-f]{64}$/);
     expect(targetHashOf(edited("E-auth"), "deliverable", "technical")).not.toBe(base);
     expect(targetHashOf(edited("F-001"), "deliverable", "technical")).toBe(base);
-  });
-
-  it("livrable sans entité indexée (Architecture, Sécurité, Design, Qualité) : null", () => {
-    for (const key of ["architecture", "security", "design", "quality"]) {
-      expect(targetHashOf(ENTITIES, "deliverable", key), key).toBeNull();
-    }
   });
 });
