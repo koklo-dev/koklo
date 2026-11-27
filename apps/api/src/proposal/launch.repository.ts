@@ -59,6 +59,16 @@ export interface TechnicalFacts {
   requirements: number;
 }
 
+/** Faits de la tête dont dépendent les lancements de la Sécurité (TK-117, B806). */
+export interface SecurityFacts {
+  /** Surfaces exposées sans menace ou avec une menace sans parade. */
+  surfaces: number;
+  /** Champs du modèle sans entrée. */
+  unclassified: number;
+  /** Exigences du niveau effectif sans réponse. */
+  unanswered: number;
+}
+
 /** Accès aux lancements d'agent du projet ; chaque méthode est une transaction courte, sans réseau. */
 export interface LaunchRepository {
   /** Numéro de la dernière version `idea-vN` figée (commit réglé), `null` sans version. */
@@ -74,6 +84,7 @@ export interface LaunchRepository {
   fail(scope: ProjectScope, launchId: string, errorCode: string, now: Date): Promise<void>;
   optionFacts(scope: ProjectScope): Promise<OptionFacts>;
   technicalFacts(scope: ProjectScope): Promise<TechnicalFacts>;
+  securityFacts(scope: ProjectScope): Promise<SecurityFacts>;
   /** Vrai si la tête de spec porte au moins une entité du Fonctionnel (fonctionnalité, règle, rôles, parcours). */
   hasFunctionalEntities(scope: ProjectScope): Promise<boolean>;
   /** Le lancement désigné, ou le dernier du livrable ; `null` s'il n'y en a pas (ou hors du projet). */

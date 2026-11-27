@@ -3,6 +3,7 @@ import type { SpecNode } from "../entities/index.ts";
 import { ruleIssue } from "../issue.ts";
 import type { Issue, ParsedSpec } from "../types.ts";
 import { parseDataRef, type SpecIndex } from "./index.ts";
+import { checkSecurityWarnings } from "./rule4-security.ts";
 import { checkTechnicalWarnings } from "./rule4-technical.ts";
 import { checkDomainOrphans } from "./rule7-domain.ts";
 
@@ -47,7 +48,7 @@ function collectReferences(spec: ParsedSpec): Referenced {
 const warn = (code: IssueCode, path: string, entityId: string, message: string): Issue =>
   ruleIssue(7, code, path, "", entityId, message);
 
-/** Règle 7 (avertissement) : table, endpoint, écran ou test jamais référencé ; exigence ou choix technique cité et inconnu. */
+/** Règle 7 (avertissement) : table, endpoint, écran ou test jamais référencé ; référence souple citée et inconnue. */
 export function checkRule7(spec: ParsedSpec, index: SpecIndex): Issue[] {
   const used = collectReferences(spec);
   const cited = new Set(spec.features.flatMap((f) => f.value.ecrans));
@@ -94,5 +95,6 @@ export function checkRule7(spec: ParsedSpec, index: SpecIndex): Issue[] {
       ),
     ...checkDomainOrphans(spec),
     ...checkTechnicalWarnings(spec, index),
+    ...checkSecurityWarnings(spec, index),
   ];
 }

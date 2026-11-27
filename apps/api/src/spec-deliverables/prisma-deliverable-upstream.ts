@@ -1,7 +1,11 @@
+import { createHash } from "node:crypto";
+import { modelFields } from "@koklo/schema";
 import type { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { OPERATIONS_ONLY } from "../spec-technical/operation-where.ts";
 import type { Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type {
+  SecurityUpstreamFacts,
   TechnicalUpstreamFacts,
   UpstreamEntity,
   UpstreamFacts,
@@ -203,5 +207,63 @@ export async function readTechnicalUpstreamFacts(
     atDecision: decidedId === null ? null : await architectureAt(tx, decidedId),
     atHead: await architectureAt(tx, headId),
     citing: citing.map((row) => ({ id: row.specId, cites: citedIn(row.data) })),
+  };
+}
+
+const roleHash = (role: unknown): string =>
+  createHash("sha256").update(JSON.stringify(role)).digest("hex");
+
+/** Choix, opérations, tables (et leurs champs) et rôles d'un instantané. */
+async function securityUpstreamAt(tx: Tx, snapshotId: string) {
+  const rows = await tx.specEntity.findMany({
+    where: {
+      snapshotId,
+      OR: [
+        { kind: { in: ["stack", "table", "roles"] } },
+        { kind: "endpoint", AND: OPERATIONS_ONLY },
+      ],
+    },
+    select: { kind: true, specId: true, data: true, contentHash: true },
+    take: MAX_ENTITIES * 4,
+  });
+  const hashes = new Map<string, string>();
+  const tables: { id: string; champs: { nom: string }[] }[] = [];
+  for (const row of rows) {
+    const data = (row.data ?? {}) as { champs?: { nom: string }[]; roles?: { id: string }[] };
+    if (row.kind === "table") tables.push({ id: row.specId, champs: data.champs ?? [] });
+    if (row.kind === "roles") {
+      for (const role of data.roles ?? []) hashes.set(role.id, roleHash(role));
+    } else hashes.set(row.specId, row.contentHash);
+  }
+  return { hashes, fields: new Set(modelFields(tables)) };
+}
+
+async function threatLinksAt(tx: Tx, snapshotId: string) {
+  const rows = await tx.specEntity.findMany({
+    where: { snapshotId, kind: "threat" },
+    select: { specId: true, data: true },
+    take: MAX_ENTITIES,
+  });
+  return rows.map((row) => {
+    const links = (row.data as { liens?: string[] } | null)?.liens;
+    return { id: row.specId, links: links ?? [] };
+  });
+}
+
+/** Faits de l'impact amont sur la Sécurité (TK-117, B805). */
+export async function readSecurityUpstreamFacts(
+  tx: Tx,
+  resolver: SpecHeadResolver,
+  scope: ProjectScope,
+): Promise<SecurityUpstreamFacts | null> {
+  const heads = await decidedHeads(tx, resolver, scope, "security");
+  if (heads === null || heads.decidedId === null) return null;
+  const before = await securityUpstreamAt(tx, heads.decidedId);
+  const after = await securityUpstreamAt(tx, heads.headId);
+  return {
+    atDecision: before.hashes,
+    atHead: after.hashes,
+    fields: { atDecision: before.fields, atHead: after.fields },
+    threats: await threatLinksAt(tx, heads.headId),
   };
 }

@@ -1,6 +1,25 @@
 import { z } from "zod";
 import { AROUND_WITH_CURSOR_MESSAGE, listInputShape, noAroundWithCursor } from "./schemas-lists.ts";
 import {
+  asvsCreateSchema,
+  asvsSetLevelSchema,
+  asvsUpdateSchema,
+  dataEntryDetailSchema,
+  dataFieldSchema,
+  rightCreateSchema,
+  rightDeleteSchema,
+  SECURITY_OPERATION_KINDS,
+  sensitiveCreateSchema,
+  sensitiveDeleteSchema,
+  sensitiveUpdateSchema,
+  summaryUpdateSchema,
+  threatCreateSchema,
+  threatDeleteSchema,
+  threatDetailSchema,
+  threatIdSchema,
+  threatUpdateSchema,
+} from "./schemas-security.ts";
+import {
   ARCHITECTURE_OPERATION_KINDS,
   adrCreateSchema,
   adrDeleteSchema,
@@ -99,6 +118,7 @@ export const specOperationKindSchema = z.enum([
   ...DATA_OPERATION_KINDS,
   ...ARCHITECTURE_OPERATION_KINDS,
   ...TECHNICAL_OPERATION_KINDS,
+  ...SECURITY_OPERATION_KINDS,
   "layout.save",
   "architecture.layout.save",
   "idea.page.write",
@@ -308,6 +328,18 @@ export const specOperationSchema = z.discriminatedUnion("kind", [
   environmentCreateSchema,
   environmentUpdateSchema,
   environmentDeleteSchema,
+  threatCreateSchema,
+  threatUpdateSchema,
+  threatDeleteSchema,
+  sensitiveCreateSchema,
+  sensitiveUpdateSchema,
+  sensitiveDeleteSchema,
+  rightCreateSchema,
+  rightDeleteSchema,
+  asvsSetLevelSchema,
+  asvsCreateSchema,
+  asvsUpdateSchema,
+  summaryUpdateSchema,
 ]);
 
 /** 200 opérations par lot depuis 2.9.0 (TK-99a) : un groupe de propositions se soumet en un commit. */
@@ -428,6 +460,11 @@ const specEntityKindSchema = z.enum([
   "stack",
   "nfr",
   "environments",
+  "threat",
+  "sensitive",
+  "rights",
+  "asvs",
+  "security_summary",
 ]);
 const refShape = { specId: z.string().min(1).max(100), title: z.string().max(300) };
 export const specRefSchema = z.object({ kind: specRefKindSchema, ...refShape });
@@ -445,6 +482,8 @@ export const SPEC_ITEM_TYPES = [
   "environment",
   "operation",
   "nfr",
+  "threat",
+  "sensitive",
 ] as const;
 const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   feature: featureIdSchema,
@@ -459,6 +498,8 @@ const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   environment: environmentIdSchema,
   operation: operationNameSchema,
   nfr: nfrIdSchema,
+  threat: threatIdSchema,
+  sensitive: dataFieldSchema,
 };
 export const specItemGetInputSchema = z
   .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
@@ -494,6 +535,8 @@ export const specItemSchema = z.discriminatedUnion("type", [
   itemOf("environment", environmentIdSchema, environmentDetailSchema),
   itemOf("operation", operationNameSchema, operationDetailSchema),
   itemOf("nfr", nfrIdSchema, nfrDetailSchema),
+  itemOf("threat", threatIdSchema, threatDetailSchema),
+  itemOf("sensitive", dataFieldSchema, dataEntryDetailSchema),
 ]);
 
 export const specRefsSearchInputSchema = z.object({

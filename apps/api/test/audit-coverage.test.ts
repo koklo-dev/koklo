@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { contract, type Role } from "@koklo/contract";
 import type { TestDatabase } from "@koklo/db/testing";
+import { emitThreatYaml } from "@koklo/schema";
 import { CaptureMailSender, startWorker, type Worker } from "@koklo/worker";
 import type { INestApplication } from "@nestjs/common";
 import type { PgBoss } from "pg-boss";
@@ -22,7 +23,9 @@ import type { RepoBench } from "./helpers/repo-scene.ts";
 import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./helpers/repos.ts";
 import { reviewApi } from "./helpers/reviews.ts";
 import { settingsApi } from "./helpers/settings.ts";
+import { deliverablesApi } from "./helpers/spec-deliverables.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
+import { clearedSeeds, clientSecurityApi, FEATURES, securityApi } from "./helpers/spec-security.ts";
 import { stackEntity, technicalApi } from "./helpers/spec-technical.ts";
 import { suggestionApi } from "./helpers/suggestions.ts";
 import {
@@ -174,6 +177,8 @@ const WRITE_GROUPS = [
   "aiUsage",
   "aiSettings",
   "spec",
+  "security",
+  "clientSpace",
 ];
 /**
  * Groupes dont les écritures sont journalisées et prouvées par une suite dédiée (`idea-audit.test.ts`, TK-89) : leurs
@@ -183,7 +188,7 @@ const WRITE_GROUPS = [
  */
 const DEDICATED_AUDIT_GROUPS = ["idea", "specMigration"];
 /** Groupes sans écriture à journaliser ici : lecture seule (H3). */
-const READ_ONLY_GROUPS = ["audit", "clientSpace", "search", "aiModel"];
+const READ_ONLY_GROUPS = ["audit", "search", "aiModel"];
 /**
  * Groupes du contrat sans implémentation API : plus aucun depuis TK-48a2 (`installation` a rejoint
  * WRITE_GROUPS : `installation.start` est une écriture, `installation.list` une lecture du même groupe,
@@ -233,6 +238,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "aiProvider.verify",
   "aiSettings.update",
   "aiUsage.set",
+  "clientSpace.securityContactSet",
   "comment.create",
   "comment.delete",
   "dependency.add",
@@ -268,6 +274,13 @@ const EXPECTED_WRITE_PROCEDURES = [
   "repo.link",
   "review.remind",
   "review.submit",
+  "security.asvs.setLevel",
+  "security.data.classify",
+  "security.summary.accept",
+  "security.summary.propose",
+  "security.threat.create",
+  "security.threat.update",
+  "security.validate",
   "spec.architecture.layout.save",
   "spec.data.layout.save",
   "spec.forceDeliverable",
@@ -291,8 +304,10 @@ const EXPECTED_WRITE_PROCEDURES = [
  * Exception documentée (TK-98) : tester une clé avant de l'enregistrer consomme le quota `verify`, compté
  * par une ligne d'audit écrite AVANT l'appel (`llm_credential.verify`). `aiProvider.add` et `replaceKey`
  * produisent donc deux lignes (quota, puis écriture) ; elles sont vérifiées à part, plus bas.
+ * `security.summary.accept` (TK-117) accepte la proposition puis enregistre le lot : `proposal.decide` et
+ * `spec.batch.submit`, prouvés par sa suite dédiée ci-dessous.
  */
-const TWO_ENTRY_PROCEDURES = ["aiProvider.add", "aiProvider.replaceKey"];
+const TWO_ENTRY_PROCEDURES = ["aiProvider.add", "aiProvider.replaceKey", "security.summary.accept"];
 
 /** Groupes dont les écritures portent le projet explicite de la requête (`audit_log.project_id`, TK-96). */
 const PILOTAGE_GROUPS = ["ticket", "dependency", "sprint", "comment", "projectState", "lease"];
@@ -1241,7 +1256,219 @@ const SCENARIOS: Scenario[] = [
   ...proposalScenarios(),
   ...deliverableScenarios(),
   ...aiProviderScenarios(),
+  ...securityScenarios(),
 ];
+
+/** TK-117 : écritures de la Sécurité (lots d'une opération, proposition, validation) et contact en cas d'incident. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: liste de scénarios d'audit, un par écriture
+function securityScenarios(): Scenario[] {
+  const appOf = async () => (await repoRuntimeOf()).app;
+  const runtimeOf = async () => {
+    const { app: repoApp, harness } = await repoRuntimeOf();
+    return { database, app: repoApp, harness } as unknown as RepoBench;
+  };
+  /** Dépôt de spec avec les fichiers de la Sécurité et leur index à la tête. */
+  const prepared = async (ctx: Ctx) => {
+    await specWorkerOf();
+    const runtime = await runtimeOf();
+    const scene = await readScene(runtime, { world: ctx.world });
+    await runtime.harness.inner.writeCommit({
+      auth: await runtime.harness.authFor(scene.owner),
+      repo: scene.ref,
+      branch: "cadrage",
+      author: { name: "Koklo", email: "koklo-bot@users.noreply.invalid" },
+      message: "test: menace",
+      files: [{ path: "security/threats/SEC-T01.yaml", content: THREAT_YAML }],
+    });
+    const head = await seedIndex(runtime, scene, FEATURES, {
+      commit: true,
+      entities: clearedSeeds(),
+    });
+    // La tête porte déjà SEC-T01 : le compteur du projet est au-delà.
+    await database.query(
+      `INSERT INTO project_counters (organization_id, project_id, name, last_value, updated_at)
+       VALUES ($1, $2, 'threat', 1, now()) ON CONFLICT (project_id, name) DO NOTHING`,
+      [ctx.world.organizationId, ctx.world.projectId],
+    );
+    return { sha: head.sha };
+  };
+  const api = async (ctx: Ctx, role: Role = "dev") =>
+    securityApi(await appOf(), ctx.world.actors[role]);
+  const batched = async (ctx: Ctx) => {
+    const [batch] = await database.query<{ id: string }>(
+      "SELECT id FROM spec_write_batches WHERE project_id = $1 ORDER BY enqueued_at DESC LIMIT 1",
+      [ctx.world.projectId],
+    );
+    return {
+      action: "spec.batch.submit",
+      targetKind: "spec_batch",
+      targetId: batch?.id ?? "",
+      ticketId: null,
+    };
+  };
+  const write = (
+    procedure: string,
+    call: (ctx: Ctx, role: Role) => Promise<Response>,
+  ): Scenario => ({
+    procedure,
+    role: "dev",
+    prepare: prepared,
+    call: (ctx) => call(ctx, "dev"),
+    expected: batched,
+    denied: (ctx) => call(ctx, "designer"),
+    deniedStatuses: [403],
+  });
+  return [
+    write("security.threat.create", async (ctx, role) =>
+      (await api(ctx, role)).createThreat(ctx.world.projectId),
+    ),
+    write("security.threat.update", async (ctx, role) =>
+      (await api(ctx, role)).updateThreat(ctx.world.projectId, "SEC-T01", { severity: "low" }),
+    ),
+    write("security.data.classify", async (ctx, role) =>
+      (await api(ctx, role)).classify(ctx.world.projectId, {
+        data: "Note",
+        fields: ["clientes.note"],
+        category: "technical",
+      }),
+    ),
+    write("security.asvs.setLevel", async (ctx, role) =>
+      (await api(ctx, role)).setLevel(ctx.world.projectId, 2),
+    ),
+    {
+      procedure: "security.summary.propose",
+      role: "dev",
+      prepare: async (ctx) => {
+        await send(
+          await appOf(),
+          ctx.world.actors.owner.cookie,
+          "put",
+          "/llm-credentials/anthropic",
+          {
+            provider: "anthropic",
+            apiKey: makeSentinel(),
+          },
+        );
+        await prepared(ctx);
+        await deliverablesApi(await appOf(), ctx.world.actors.owner).force(
+          ctx.world.projectId,
+          "security",
+        );
+        return {};
+      },
+      call: async (ctx) => (await api(ctx)).propose(ctx.world.projectId),
+      expected: async (_ctx, _state, response) => ({
+        action: "ai.deliverable.propose",
+        targetKind: "agent_launch",
+        targetId: String(response.body.launchId),
+        ticketId: null,
+      }),
+      denied: async (ctx) => (await api(ctx, "designer")).propose(ctx.world.projectId),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "security.validate",
+      role: "owner",
+      prepare: prepared,
+      call: async (ctx, state) =>
+        (await api(ctx, "owner")).validate(ctx.world.projectId, state.sha),
+      expected: async (_ctx, _state, response) => ({
+        action: "review.approve",
+        targetKind: "review",
+        targetId: response.body.id,
+        ticketId: null,
+      }),
+      denied: async (ctx, state) =>
+        (await api(ctx, "designer")).validate(ctx.world.projectId, state.sha),
+      deniedStatuses: [403],
+    },
+    {
+      procedure: "clientSpace.securityContactSet",
+      role: "client",
+      prepare: async (ctx) => {
+        await linkClient(
+          database,
+          ctx.world.organizationId,
+          ctx.world.projectId,
+          ctx.world.actors.client.userId,
+        );
+        return {};
+      },
+      call: async (ctx) =>
+        clientSecurityApi(await appOf(), ctx.world.actors.client).setContact(
+          ctx.world.projectId,
+          "Marie",
+          "06 00 00 00 00",
+        ),
+      expected: async (ctx) => ({
+        action: "security.contact.set",
+        targetKind: "project",
+        targetId: ctx.world.projectId,
+        ticketId: null,
+      }),
+      denied: async (ctx) =>
+        clientSecurityApi(await appOf(), ctx.world.actors.owner).setContact(
+          ctx.world.projectId,
+          "Marie",
+          "06",
+        ),
+      deniedStatuses: [403],
+    },
+  ];
+}
+
+/** « Accepter » le résumé : la décision puis le lot, chacun journalisé une fois. */
+describe("TK-117 : audit de security.summary.accept", () => {
+  it("deux entrées (proposal.decide puis spec.batch.submit), aucune sur un refus", async () => {
+    const ctx = { world: await createWorld(database, { linkedClient: false }) } as Ctx;
+    await specWorkerOf();
+    const { app: repoApp, harness } = await repoRuntimeOf();
+    const runtime = { database, app: repoApp, harness } as unknown as RepoBench;
+    await seedIndex(runtime, await readScene(runtime, { world: ctx.world }), [], { commit: true });
+    const proposal = await insertProposal(
+      database,
+      { organizationId: ctx.world.organizationId, projectId: ctx.world.projectId },
+      { deliverable: "security", kind: "summary", payload: SUMMARY_PROPOSAL },
+    );
+    const actions = () =>
+      database.query<{ action: string }>(
+        `SELECT action FROM audit_log WHERE project_id = $1
+           AND action IN ('proposal.decide', 'spec.batch.submit') ORDER BY occurred_at, id`,
+        [ctx.world.projectId],
+      );
+    const denied = securityApi(repoApp, ctx.world.actors.designer);
+    expect((await denied.accept(ctx.world.projectId, proposal.id)).status).toBe(403);
+    expect(await actions()).toEqual([]);
+    const res = await securityApi(repoApp, ctx.world.actors.dev).accept(
+      ctx.world.projectId,
+      proposal.id,
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect((await actions()).map((row) => row.action)).toEqual([
+      "proposal.decide",
+      "spec.batch.submit",
+    ]);
+  });
+});
+
+const THREAT_YAML = emitThreatYaml({
+  id: "SEC-T01",
+  titre: "Menace SEC-T01",
+  surfaces: ["F-001"],
+  categorie: "abus",
+  gravite: "elevee",
+  risque: "Un abus.",
+  parades: ["Limiter."],
+  verification: { mode: "scenario" },
+});
+const SUMMARY_PROPOSAL = {
+  location: "Chez l'hébergeur.",
+  protection: "Chiffré.",
+  access: "Chacun les siens.",
+  signIn: "Lien.",
+  checks: "Tests.",
+  incident: "24 heures.",
+};
 
 /** TK-100 : forcer l'ouverture d'un livrable, journalisé sur la ligne de forçage. */
 function deliverableScenarios(): Scenario[] {

@@ -2,6 +2,7 @@ import {
   type CurrentArchitecture,
   type CurrentDomainTitles,
   type CurrentFeature,
+  type CurrentSecurity,
   type CurrentTable,
   type CurrentTechnical,
   type CurrentTitle,
@@ -9,6 +10,7 @@ import {
   currentDataModel,
   currentDomainTitles,
   currentFeatures,
+  currentSecurity,
   currentTableIds,
   currentTechnical,
   type FrozenPage,
@@ -54,6 +56,8 @@ export interface LaunchSources {
   readonly docSections?: readonly HeadDocSection[];
   /** Livrable Technique (TK-115) : le cahier technique actuel ; sa présence choisit les prompts du cahier technique. */
   readonly technical?: CurrentTechnical;
+  /** Livrable Sécurité (TK-117) : la Sécurité actuelle ; sa présence choisit les prompts de la Sécurité. */
+  readonly security?: CurrentSecurity;
 }
 
 /** Lecture des sections de la tête (fournisseur git du worker) ; liste vide sans fournisseur. */
@@ -170,6 +174,29 @@ function readTechnicalSources(
   }));
 }
 
+/**
+ * Sources de la Sécurité (TK-117) : le Fonctionnel indexé, les tables, le cahier technique, la Sécurité actuelle et les
+ * sections du dossier de la tête ; ni dossier d'idée, ni synthèse, ni contact.
+ */
+function readSecuritySources(
+  client: TenantClient,
+  launch: LaunchContext,
+  docSections: DocSectionsReader,
+): Promise<LaunchSources> {
+  return withOrganization(launch.organizationId, async () => ({
+    tag: "security",
+    pages: [],
+    synthesis: null,
+    risks: null,
+    features: await currentFeatures(client, launch.projectId),
+    ...(await currentDomainTitles(client, launch.projectId)),
+    tables: (await currentDataModel(client, launch.projectId)).tables,
+    technical: await currentTechnical(client, launch.projectId),
+    security: await currentSecurity(client, launch.projectId),
+    docSections: await docSections(await specHeadOf(client, launch.projectId), "security"),
+  }));
+}
+
 /** Lit les sources du lancement ; `null` sans version figée (le lancement échoue, rien n'est envoyé). */
 export function readSources(
   client: TenantClient,
@@ -182,6 +209,9 @@ export function readSources(
   }
   if (launch.deliverable === "technical") {
     return readTechnicalSources(client, launch, docSections);
+  }
+  if (launch.deliverable === "security") {
+    return readSecuritySources(client, launch, docSections);
   }
   return withOrganization(launch.organizationId, async () => {
     const version = await frozenVersion(client, launch.projectId, launch.baseVersion);

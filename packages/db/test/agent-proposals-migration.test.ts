@@ -60,9 +60,9 @@ describe("TK-99a migration agent_proposals : dossier et contenu", () => {
     expect(down).not.toMatch(/DROP\s+(?:TYPE|FUNCTION|TRIGGER)/i);
   });
 
-  it("expectedTables contient les trois tables (63 au total)", () => {
+  it("expectedTables contient les trois tables (64 au total)", () => {
     for (const table of TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(63);
+    expect(expectedTables).toHaveLength(64);
   });
 
   it("les trois modèles sont des modèles d'organisation ; AgentProposal n'est plus en attente de seed", async () => {

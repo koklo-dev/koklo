@@ -54,6 +54,7 @@ const REF_SHAPES: Record<RefKind, { pattern: RegExp; label: string }> = {
     label: "d'opération (zone.verbe)",
   },
   requirements: { pattern: /^requirements$/, label: "du bloc des exigences (requirements)" },
+  security_summary: { pattern: /^summary$/, label: "du résumé de la sécurité (summary)" },
 };
 const isRefKind = (kind: string): kind is RefKind => kind in REF_SHAPES;
 

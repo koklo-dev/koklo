@@ -23,6 +23,16 @@ export function coAuthorLine(author: BatchAuthor | null): string | undefined {
   return `Co-authored-by: ${cleanName(author.name) || email} <${email}>`;
 }
 
+/** Nom d'une opération sans cible, dans l'objet du commit. */
+const TARGETLESS_LABELS: Readonly<Record<string, string>> = {
+  sensitive: "données",
+  right: "droits",
+  asvs: "exigences",
+  summary: "résumé client",
+};
+const labelOf = ({ kind, targetSpecId }: BatchOperation): string =>
+  targetSpecId ?? TARGETLESS_LABELS[kind.split(".")[0] ?? ""] ?? "";
+
 const plural = (count: number): string => `${count} page${count > 1 ? "s" : ""}`;
 
 /** Objet par défaut : `spec: créé F-001, F-002 ; modifié F-003`, ou `idea: publié 3 pages`. */
@@ -38,9 +48,9 @@ export function defaultSubject(operations: readonly BatchOperation[]): string {
   const byVerb = new Map<string, string[]>();
   for (const operation of operations) {
     const verb = VERBS[operation.kind.split(".").pop() ?? ""] ?? "modifié";
-    byVerb.set(verb, [...(byVerb.get(verb) ?? []), operation.targetSpecId ?? ""]);
+    byVerb.set(verb, [...(byVerb.get(verb) ?? []), labelOf(operation)]);
   }
-  const groups = [...byVerb].map(([verb, ids]) => `${verb} ${ids.join(", ")}`);
+  const groups = [...byVerb].map(([verb, ids]) => `${verb} ${[...new Set(ids)].join(", ")}`);
   return `spec: ${groups.join(" ; ")}`;
 }
 

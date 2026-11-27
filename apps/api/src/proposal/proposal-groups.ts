@@ -3,8 +3,11 @@ import { AGENT_PROPOSAL_KINDS, type AgentProposalKind } from "@koklo/domain";
 /** Au-delà de 30 propositions dans un lancement, la liste se groupe ; en deçà, un seul groupe (TK-99a). */
 export const GROUPING_THRESHOLD = 30;
 
-/** Les sections du cahier technique portent leur propre libellé de groupe. */
-const TECHNICAL_DOCUMENT_LABEL = "Document · cahier technique";
+/** Les sections du cahier technique et du dossier de sécurité portent leur propre libellé de groupe. */
+const DOCUMENT_LABELS: Readonly<Record<string, string>> = {
+  technical: "Document · cahier technique",
+  security: "Document · dossier de sécurité",
+};
 
 /** Clé du groupe unique d'un lancement de 30 propositions ou moins. */
 export const ALL_GROUP_KEY = "all";
@@ -28,7 +31,22 @@ const KIND_LABELS: Record<AgentProposalKind, string> = {
   op: "Opérations de l'API",
   nfr: "Exigences",
   env: "Environnements",
+  threat: "Menaces",
+  sensitive: "Données sensibles",
+  right: "Droits",
+  asvs: "Exigences",
+  summary: "Résumé client",
 };
+
+/** La Sécurité (maquette 15, B806) : menaces, données, droits, exigences, puis le document et le résumé. */
+const SECURITY_ORDER: readonly AgentProposalKind[] = [
+  "threat",
+  "sensitive",
+  "right",
+  "asvs",
+  "doc_section",
+  "summary",
+];
 
 /**
  * L'Architecture (TK-111) et le Technique (TK-115) se relisent par type, jamais par zone : le document d'abord, puis
@@ -44,12 +62,15 @@ const BY_TYPE_ONLY: readonly AgentProposalKind[] = [
   "op",
   "nfr",
   "env",
+  ...SECURITY_ORDER.filter((kind) => kind !== "doc_section"),
 ];
 const isByTypeOnly = (kind: AgentProposalKind): boolean => BY_TYPE_ONLY.includes(kind);
-const rankOf = (kind: AgentProposalKind): number =>
-  isByTypeOnly(kind)
+function rankOf(kind: AgentProposalKind, deliverable: string | undefined): number {
+  if (deliverable === "security") return SECURITY_ORDER.indexOf(kind);
+  return isByTypeOnly(kind)
     ? AGENT_PROPOSAL_KINDS.length + BY_TYPE_ONLY.indexOf(kind) - BY_TYPE_ONLY.length
     : AGENT_PROPOSAL_KINDS.indexOf(kind);
+}
 
 /** Nombre de propositions par (type, zone, statut), et position de la première de la zone. */
 export interface GroupCount {
@@ -119,7 +140,8 @@ const emptyGroup = (key: string, label: string): ProposalGroup => ({
 });
 
 const labelOf = (row: GroupCount, by: GroupBy, deliverable: string | undefined): string => {
-  if (deliverable === "technical" && row.kind === "doc_section") return TECHNICAL_DOCUMENT_LABEL;
+  const document = row.kind === "doc_section" ? DOCUMENT_LABELS[deliverable ?? ""] : undefined;
+  if (document !== undefined) return document;
   if (by === "type" || isByTypeOnly(row.kind)) return KIND_LABELS[row.kind];
   if (isLinksKind(row.kind)) return LINKS_GROUP_LABEL;
   return row.kind === "table" ? `Zone ${row.zone}` : row.zone;
@@ -132,7 +154,9 @@ export function buildGroups(
   deliverable?: string,
 ): ProposalGroup[] {
   const total = counts.reduce((sum, row) => sum + row.n, 0);
-  const ordered = [...counts].sort((a, b) => rankOf(a.kind) - rankOf(b.kind) || a.first - b.first);
+  const ordered = [...counts].sort(
+    (a, b) => rankOf(a.kind, deliverable) - rankOf(b.kind, deliverable) || a.first - b.first,
+  );
   const groups = new Map<string, ProposalGroup>();
   for (const row of ordered) {
     const single = total <= GROUPING_THRESHOLD;

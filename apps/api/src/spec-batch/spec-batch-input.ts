@@ -1,15 +1,26 @@
-import { type SpecBatchSubmitInput, TECHNICAL_OPERATION_KINDS } from "@koklo/contract";
+import {
+  SECURITY_OPERATION_KINDS,
+  type SpecBatchSubmitInput,
+  TECHNICAL_OPERATION_KINDS,
+} from "@koklo/contract";
 import { isValidBranchName, SCOPING_BRANCH } from "@koklo/domain";
-import { findSecretPaths, SECRET_REFUSAL_MESSAGE } from "@koklo/schema";
+import { findSecretPaths, SECRET_REFUSAL_MESSAGE, technicalTraceIn } from "@koklo/schema";
 import { validation } from "../tracker/api-errors.ts";
 import type { PreparedBatch, PreparedOperation } from "./spec-batch.repository.ts";
 
 type Operation = SpecBatchSubmitInput["operations"][number];
 
-/** Opération du cahier technique : choix, opération, exigence, environnement ou section de ce document. */
-export const isTechnicalOperation = (operation: Operation): boolean =>
-  (TECHNICAL_OPERATION_KINDS as readonly string[]).includes(operation.kind) ||
-  ("deliverable" in operation && operation.deliverable === "technical");
+/** Cahier technique (TK-115) et Sécurité (TK-117) : leurs opérations et les sections de leur document. */
+const RESTRICTED_KINDS: readonly string[] = [
+  ...TECHNICAL_OPERATION_KINDS,
+  ...SECURITY_OPERATION_KINDS,
+];
+const RESTRICTED_DOCUMENTS: readonly unknown[] = ["technical", "security"];
+
+/** Opération réservée à owner, admin et développeur. */
+export const isRestrictedOperation = (operation: Operation): boolean =>
+  RESTRICTED_KINDS.includes(operation.kind) ||
+  ("deliverable" in operation && RESTRICTED_DOCUMENTS.includes(operation.deliverable));
 
 /** Saut de ligne, NUL ou séparateur Unicode de ligne : le texte sortirait de sa ligne dans l'historique git. */
 const hasLineBreak = (text: string): boolean =>
@@ -36,9 +47,14 @@ function operationOf(operation: Operation): PreparedOperation {
   return { kind, specId: kind.endsWith(".create") ? null : (specId ?? null), payload };
 }
 
-/** Une section du cahier technique et une section de l'architecture peuvent porter le même identifiant `DOC-`. */
-const targetKeyOf = ({ specId, payload }: PreparedOperation): string =>
-  `${payload.deliverable === "technical" ? "technical:" : ""}${specId}`;
+/**
+ * Deux documents peuvent porter le même identifiant `DOC-`, et une donnée `table.champ` le nom d'une opération : la clé
+ * distingue le document et le genre d'une donnée.
+ */
+const targetKeyOf = ({ kind, specId, payload }: PreparedOperation): string => {
+  if (RESTRICTED_DOCUMENTS.includes(payload.deliverable)) return `${payload.deliverable}:${specId}`;
+  return kind.startsWith("sensitive.") ? `sensitive:${specId}` : String(specId);
+};
 
 /** Une seule opération par élément (fonctionnalité, règle, rôle, parcours) dans un lot : l'ordre n'a de sens qu'entre fichiers distincts. */
 function assertDistinctTargets(operations: readonly PreparedOperation[]): void {
@@ -90,6 +106,38 @@ function assertSkipConflicts(input: SpecBatchSubmitInput): void {
   }
 }
 
+/** Cartes du résumé client : jamais d'identifiant, de chemin ni d'empreinte (modèle de menace 3). */
+function assertPlainSummary(operations: readonly PreparedOperation[]) {
+  operations.forEach(({ kind, payload }, i) => {
+    if (kind !== "summary.update") return;
+    const traced = Object.entries(payload).find(
+      ([, value]) => typeof value === "string" && technicalTraceIn(value),
+    );
+    if (traced) {
+      throw validation(
+        `operations.${i}.${traced[0]}`,
+        "Aucun identifiant technique dans le résumé.",
+      );
+    }
+  });
+}
+
+/**
+ * Aucune conservation ne vient de l'agent (A7, B796) : un lot qui porte des propositions n'en pose pas ; elle se saisit
+ * ensuite dans la feuille.
+ */
+function assertNoProposedRetention(input: SpecBatchSubmitInput) {
+  if (!input.proposalIds?.length) return;
+  input.operations.forEach((operation, i) => {
+    if ("retention" in operation && operation.retention !== undefined) {
+      throw validation(
+        `operations.${i}.retention`,
+        "La durée de conservation se saisit à la main, jamais depuis une proposition.",
+      );
+    }
+  });
+}
+
 /**
  * Entrées contrôlées avant toute écriture : branche, objet du commit sur une seule ligne (il
  * finit dans l'historique git), une opération par feature. L'auteur et les trailers ne viennent
@@ -102,6 +150,8 @@ export function prepareBatch(input: SpecBatchSubmitInput, defaultBranch: string)
   }
   const operations = input.operations.map(operationOf);
   assertNoSecret(operations, input.message);
+  assertPlainSummary(operations);
+  assertNoProposedRetention(input);
   assertDistinctTargets(operations);
   assertSkipConflicts(input);
   return {

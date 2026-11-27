@@ -10,6 +10,7 @@ export const FEATURE_COUNTER_MAX = 999_999;
 const FEATURE_NUMBER = /^F-(\d+)$/;
 const RULE_NUMBER = /^R-(\d+)$/;
 const ADR_NUMBER = /^ADR-(\d+)$/;
+const THREAT_NUMBER = /^SEC-T(\d+)$/;
 const NFR_NUMBER = /^NFR-(\d+)$/;
 
 export interface IndexRows {
@@ -140,4 +141,11 @@ export const nfrCounterOf = (spec: ParsedSpec) =>
   counterOf(
     spec.nfrs.map(({ value }) => value.id).filter((id) => NFR_NUMBER.test(id)),
     NFR_NUMBER,
+  );
+
+/** Même relevé pour les menaces `SEC-Tnn` (compteur `threat`, TK-117). */
+export const threatCounterOf = (spec: ParsedSpec) =>
+  counterOf(
+    spec.threats.map(({ value }) => value.id),
+    THREAT_NUMBER,
   );

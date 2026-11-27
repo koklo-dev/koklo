@@ -13,7 +13,8 @@ export const SUGGESTION_TABLE = "suggestions";
 /** Valeurs d'enum attendues (ordre de déclaration). */
 export const SUGGESTION_STATUSES = ["open", "accepted", "rejected", "withdrawn"] as const;
 export const SUGGESTION_TARGET_KINDS = ["feature", "screen", "project"] as const;
-export const COUNTER_NAMES_AFTER = "counter_name:ticket,sprint,feature,suggestion,rule,adr,nfr";
+export const COUNTER_NAMES_AFTER =
+  "counter_name:ticket,sprint,feature,suggestion,rule,adr,nfr,threat";
 export const COUNTER_NAMES_BEFORE = "counter_name:ticket,sprint,feature";
 
 /** Colonnes exactes de la table (`udt_name/is_nullable`). Aucun lien FK vers users (RGPD). */

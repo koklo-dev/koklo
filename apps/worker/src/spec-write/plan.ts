@@ -17,9 +17,11 @@ import {
   type SpecPathIndex,
   specPathIndex,
 } from "@koklo/schema";
+import { refreshSecurity } from "./abuse-generated.ts";
 import { applyAdr } from "./adrs.ts";
 import { applyArchFlow } from "./archflows.ts";
 import { refreshArchitecture } from "./architecture-generated.ts";
+import { applyAsvs } from "./asvs.ts";
 import { startingPoint } from "./auto-migrate.ts";
 import { applyComponent } from "./components.ts";
 import { applyDocSection, type OpenSections } from "./doc-sections.ts";
@@ -34,11 +36,15 @@ import { planIdeaBatch } from "./plan-idea.ts";
 import { planMigrationBatch } from "./plan-migration.ts";
 import { newIssues, toStoredReport } from "./report.ts";
 import { applyRequirement } from "./requirements.ts";
+import { applyRight } from "./rights.ts";
 import { applyRole } from "./roles.ts";
 import { applyRule } from "./rules.ts";
 import { secretRefusal } from "./secret-check.ts";
+import { applySummary } from "./security-summary.ts";
+import { applySensitive, SECURITY_DATA_PATH } from "./sensitive.ts";
 import { applyStack } from "./stacks.ts";
 import { applyTable } from "./tables.ts";
+import { applyThreat } from "./threats.ts";
 import {
   type BatchOperation,
   conflicted,
@@ -66,12 +72,13 @@ interface Planned extends Workspace {
 }
 
 /**
- * Index par chemins de la tête (partagé avec l'API, B671), les rôles (`domain/roles.yaml`) et les environnements
- * (`tech/environments.yaml`), lus dans leur fichier.
+ * Index par chemins de la tête (partagé avec l'API, B671), les rôles (`domain/roles.yaml`), les environnements
+ * (`tech/environments.yaml`) et les entrées de `security/data.yaml` (premier champ), lus dans leur fichier.
  */
 interface Index extends SpecPathIndex {
   readonly roles: Set<string>;
   readonly environments: Set<string>;
+  readonly entries: Set<string>;
 }
 
 function rolesOf(files: readonly SpecFile[]): Set<string> {
@@ -89,6 +96,12 @@ function environmentsOf(files: readonly SpecFile[]): Set<string> {
   return new Set(parsed?.value.environnements.map((entry) => entry.id));
 }
 
+function entriesOf(files: readonly SpecFile[]): Set<string> {
+  const file = files.filter((f) => f.path === SECURITY_DATA_PATH);
+  const [parsed] = parseSpecFiles(file).spec.securityData;
+  return new Set(parsed?.value.donnees.map((entry) => entry.champs[0] as string));
+}
+
 function indexOf(files: readonly SpecFile[], tree: readonly string[]): Index {
   const paths = files.map((file) => file.path);
   const all = [...new Set([...tree, ...paths])];
@@ -96,8 +109,10 @@ function indexOf(files: readonly SpecFile[], tree: readonly string[]): Index {
     ...specPathIndex(paths),
     roles: rolesOf(files),
     environments: environmentsOf(files),
+    entries: entriesOf(files),
     docs: docSectionIndex(all),
     techDocs: docSectionIndex(all, "technical"),
+    securityDocs: docSectionIndex(all, "security"),
   };
 }
 
@@ -108,10 +123,18 @@ const openSections = (sections: DocSections): OpenSections => ({
   next: sections.last + 1,
 });
 
-/** Une identité est-elle déjà prise sur la tête ? `layout.save` n'est jamais vérifié : le dernier écrit gagne (B418). */
+/** Sans identité vérifiable dans un fichier : restrictions, exigences et résumé de la Sécurité. */
+const UNCHECKED: ReadonlySet<string> = new Set(["right", "asvs", "summary"]);
+
+/**
+ * Une identité est-elle déjà prise sur la tête ? `layout.save` n'est jamais vérifié : le dernier écrit gagne (B418). Une
+ * donnée créée n'est pas vérifiée ici : un champ déjà classé rend `data.yaml` invalide.
+ */
 function present(index: Index, operation: BatchOperation): boolean | undefined {
-  if (isLayoutKind(operation.kind)) return undefined;
   const genre = genreOf(operation);
+  if (isLayoutKind(operation.kind) || UNCHECKED.has(genre)) return undefined;
+  if (operation.kind === "sensitive.create") return undefined;
+  if (genre === "sensitive") return index.entries.has(operation.targetSpecId ?? "");
   if (genre === "role") return index.roles.has(operation.targetSpecId ?? "");
   if (genre === "env") return index.environments.has(operation.targetSpecId ?? "");
   return presentAtHead(index, operation) ?? false;
@@ -184,6 +207,11 @@ const APPLY: Readonly<Record<string, Apply>> = {
   op: (w, op, id) => applyOperationFile(w, op, w.index.endpoints.get(id)),
   nfr: (w, op, id) => applyRequirement(w, op, w.index.nfr.get(id)),
   env: (w, op) => applyEnvironment(w, op),
+  threat: (w, op, id) => applyThreat(w, op, w.index.threats.get(id)),
+  sensitive: (w, op) => applySensitive(w, op),
+  right: (w, op) => applyRight(w, op),
+  asvs: (w, op) => applyAsvs(w, op),
+  summary: (w, op) => applySummary(w, op),
 };
 
 function applyOperation(workspace: Planned, operation: BatchOperation): void {
@@ -255,12 +283,14 @@ export function planBatch(
     documents: {
       architecture: openSections(index.docs),
       technical: openSections(index.techDocs),
+      security: openSections(index.securityDocs),
     },
   };
   try {
     for (const operation of batch.operations) applyOperation(workspace, operation);
     refreshModel(workspace);
     refreshArchitecture(workspace, treePaths);
+    refreshSecurity(workspace, batch.operations, treePaths);
     const report = validate(start.files, toFiles(workspace.files));
     return report
       ? { changes: [...workspace.changes.values()], report }

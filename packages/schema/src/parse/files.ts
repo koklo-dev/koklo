@@ -14,6 +14,7 @@ import {
 } from "./kinds.ts";
 import { duplicateIdIssues } from "./roles-file.ts";
 import { parseRuleMarkdown } from "./rule-markdown.ts";
+import { parseSummaryMarkdown } from "./summary-markdown.ts";
 import { loadJson, loadYaml } from "./yaml.ts";
 import { parseWithSchema, rawId } from "./zod-issues.ts";
 import { applyZoneAlias } from "./zone-alias.ts";
@@ -67,15 +68,18 @@ const MARKDOWN_PARSERS = {
   feature: parseFeatureMarkdown,
   rule: parseRuleMarkdown,
   adr: parseAdrMarkdown,
+  security_summary: parseSummaryMarkdown,
 } as const;
 
+const isMarkdownKind = (kind: Kind): kind is keyof typeof MARKDOWN_PARSERS =>
+  Object.hasOwn(MARKDOWN_PARSERS, kind);
+
 function parseOne(file: SpecFile, kind: Kind, version: SpecVersion): FileResult {
-  if (kind === "feature" || kind === "rule" || kind === "adr") {
-    const parse = MARKDOWN_PARSERS[kind];
-    const result = parse(file.path, file.content);
-    return result.ok ? { ok: true, value: result.value, id: result.value.id } : result;
-  }
-  return parseData(file, kind, version);
+  if (!isMarkdownKind(kind)) return parseData(file, kind, version);
+  const result = MARKDOWN_PARSERS[kind](file.path, file.content);
+  if (!result.ok) return result;
+  const id = "id" in result.value ? result.value.id : undefined;
+  return { ok: true, value: result.value, id };
 }
 
 /** Fichier du dossier des tables hors format, ou `data/relations.yaml` en v2 : signalé, jamais ignoré. */
@@ -113,6 +117,7 @@ const IDENTIFIED = new Set<Kind>([
   "adr",
   "stack",
   "nfr",
+  "threat",
 ]);
 
 const empty = (): ParsedSpec => ({
@@ -133,6 +138,11 @@ const empty = (): ParsedSpec => ({
   operations: [],
   nfrs: [],
   environments: [],
+  threats: [],
+  securityData: [],
+  rights: [],
+  asvs: [],
+  securitySummaries: [],
 });
 
 /** Liste du snapshot qui reçoit chaque genre d'entité (`project` est un champ à part). */
@@ -153,6 +163,11 @@ const LIST_OF = {
   stack: "stacks",
   nfr: "nfrs",
   environments: "environments",
+  threat: "threats",
+  security_data: "securityData",
+  rights: "rights",
+  asvs: "asvs",
+  security_summary: "securitySummaries",
 } as const satisfies Record<Exclude<Kind, "project">, keyof ParsedSpec>;
 
 /** Range une entité valide dans la bonne liste du snapshot. */

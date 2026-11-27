@@ -11,7 +11,7 @@ export interface CommentTicket {
 /**
  * Genres de cible repérés par un identifiant lisible (`targetRef`) : table (3.7.0), composant, décision et flux (3.11.0),
  * choix technique, bloc des environnements et section du cahier technique (3.17.0), opération et bloc des exigences
- * (3.18.0).
+ * (3.18.0), résumé client de la Sécurité (3.19.0).
  */
 export const REF_KINDS = [
   "table",
@@ -23,6 +23,7 @@ export const REF_KINDS = [
   "tech_section",
   "operation",
   "requirements",
+  "security_summary",
 ] as const;
 export type RefKind = (typeof REF_KINDS)[number];
 /** Genres vérifiés dans l'index d'entités ; une section du cahier n'est pas indexée (lue en Git). */

@@ -153,6 +153,7 @@ describe("N3 types inférés exportés", () => {
     expectTypeOf<api.SpecBatchOutput>().toHaveProperty("results");
     expectTypeOf<api.SpecBatchOutput["commitSha"]>().toEqualTypeOf<string | null>();
   });
+  // biome-ignore lint/complexity/noExcessiveLinesPerFunction: la liste fermée des genres d'opération, un par ligne
   it("types d'entrée et union des opérations", () => {
     expectTypeOf<api.SpecBatchSubmitInput>().toHaveProperty("idempotencyKey");
     expectTypeOf<api.SpecBatchSubmitInput["operations"]>().toEqualTypeOf<api.SpecOperation[]>();
@@ -197,6 +198,18 @@ describe("N3 types inférés exportés", () => {
       | "env.create"
       | "env.update"
       | "env.delete"
+      | "threat.create"
+      | "threat.update"
+      | "threat.delete"
+      | "sensitive.create"
+      | "sensitive.update"
+      | "sensitive.delete"
+      | "right.create"
+      | "right.delete"
+      | "asvs.set_level"
+      | "asvs.create"
+      | "asvs.update"
+      | "summary.update"
     >();
     expectTypeOf<Extract<api.SpecOperation, { kind: "feature.delete" }>>().toEqualTypeOf<{
       kind: "feature.delete";

@@ -54,7 +54,7 @@ const SECTION = { title: "Vue d'ensemble", markdown: "# Vue d'ensemble\n\nLe pro
 
 describe("vocabulaire", () => {
   it("quatre schémas de plus, dans l'ordre du vocabulaire", () => {
-    expect(Object.keys(PROPOSAL_SCHEMAS).slice(-8, -4)).toEqual([
+    expect(Object.keys(PROPOSAL_SCHEMAS).slice(-13, -9)).toEqual([
       "component",
       "archflow",
       "adr",

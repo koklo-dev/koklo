@@ -27,7 +27,12 @@ export type EntityKind =
   | "test"
   | "stack"
   | "nfr"
-  | "environments";
+  | "environments"
+  | "threat"
+  | "sensitive"
+  | "rights"
+  | "asvs"
+  | "security_summary";
 
 export interface EntityRow {
   readonly kind: EntityKind;
@@ -57,6 +62,11 @@ const ZONE_OF: Readonly<Record<EntityKind, EntityRow["zone"]>> = {
   stack: "technical",
   nfr: "technical",
   environments: "technical",
+  threat: null,
+  sensitive: null,
+  rights: null,
+  asvs: null,
+  security_summary: null,
 };
 
 /** Une valeur lue de git, ramenée à du JSON pur (propriétés `undefined` écartées) : le hachage ne dépend d'aucun type interne. */
@@ -217,6 +227,61 @@ function technicalCandidates(spec: ParsedSpec): Candidate[] {
   ];
 }
 
+const SECURITY_TITLES = {
+  rights: "Matrice des droits",
+  asvs: "Exigences ASVS",
+  security_summary: "Résumé client",
+} as const;
+
+/** Rang d'une surface : les fonctionnalités dans l'ordre numérique, puis « API » (B792). */
+const surfaceRank = (surface: string | undefined): number =>
+  Number(/^F-(\d+)$/.exec(surface ?? "")?.[1] ?? Number.MAX_SAFE_INTEGER);
+
+/** Menaces triées par première surface puis identifiant (B808), titrées pour la recherche. */
+function threatCandidates(spec: ParsedSpec): Candidate[] {
+  const sorted = [...spec.threats].sort(
+    (a, b) =>
+      surfaceRank(a.value.surfaces[0]) - surfaceRank(b.value.surfaces[0]) ||
+      byId(a.value.id, b.value.id),
+  );
+  return candidate("threat", idOf)(sorted);
+}
+
+/** Une ligne par entrée de `security/data.yaml`, désignée par son premier champ ; les transferts du fichier y sont repris. */
+function entryCandidates(spec: ParsedSpec): Candidate[] {
+  const entries = spec.securityData.flatMap(({ path, value: { donnees, transferts } }) =>
+    donnees.map((entry) => ({
+      path,
+      value: { ...entry, titre: entry.donnee, transferts },
+    })),
+  );
+  const first = (entry: { value: unknown }) => (entry.value as { champs: string[] }).champs[0];
+  const sorted = entries.sort((a, b) => byId(first(a) ?? "", first(b) ?? ""));
+  return candidate("sensitive", (entry) => first(entry) ?? "")(sorted);
+}
+
+/** Fichier unique de la Sécurité (droits, exigences, résumé) : une ligne titrée, d'identifiant fixe. */
+function securityFile(
+  kind: keyof typeof SECURITY_TITLES,
+  specId: string,
+  list: readonly { path: string; value: object }[],
+): Candidate[] {
+  const titled = list.map(({ path, value }) => ({
+    path,
+    value: { ...value, titre: SECURITY_TITLES[kind] },
+  }));
+  return candidate(kind, () => specId)(titled);
+}
+
+/** Livrable Sécurité (TK-117) : menaces, données classées, droits, exigences et résumé. */
+const securityCandidates = (spec: ParsedSpec): Candidate[] => [
+  ...threatCandidates(spec),
+  ...entryCandidates(spec),
+  ...securityFile("rights", "rights", spec.rights),
+  ...securityFile("asvs", "asvs", spec.asvs),
+  ...securityFile("security_summary", "summary", spec.securitySummaries),
+];
+
 function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[] {
   const of = (
     kind: EntityKind,
@@ -255,6 +320,7 @@ function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[]
     ...of("relations", spec.relations, () => "relations"),
     ...of("endpoint", spec.endpoints, idOf),
     ...technicalCandidates(spec),
+    ...securityCandidates(spec),
     ...of("screen", spec.screens, idOf),
     ...of("test", spec.tests, (entry) => entry.path),
   ];

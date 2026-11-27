@@ -1,5 +1,10 @@
 import type { AgentProposalKind } from "@koklo/domain";
-import { findSecretPaths, PROPOSAL_SCHEMAS, SECRET_REFUSAL_MESSAGE } from "@koklo/schema";
+import {
+  findSecretPaths,
+  PROPOSAL_SCHEMAS,
+  SECRET_REFUSAL_MESSAGE,
+  securityProposalTitle,
+} from "@koklo/schema";
 import { validation } from "../tracker/api-errors.ts";
 import type { RevisedContent } from "./proposal.repository.ts";
 
@@ -14,6 +19,7 @@ const TITLE_FIELD: Partial<Record<AgentProposalKind, string>> = {
   stack: "role",
   op: "name",
   env: "name",
+  sensitive: "data",
 };
 
 /** Titre affiché d'une proposition : celui de son contenu (`name` pour un rôle, une table ou un composant), sinon l'ancien (critères, relations). */
@@ -22,7 +28,7 @@ export function titleOf(
   content: Record<string, unknown>,
   fallback: string,
 ) {
-  const value = content[TITLE_FIELD[kind] ?? "title"];
+  const value = securityProposalTitle(kind, content) ?? content[TITLE_FIELD[kind] ?? "title"];
   return typeof value === "string" && value.length > 0 ? value.slice(0, TITLE_MAX) : fallback;
 }
 

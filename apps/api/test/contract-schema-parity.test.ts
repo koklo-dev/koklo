@@ -532,3 +532,62 @@ describe("D5 cahier technique : vocabulaires et identifiants", () => {
     }
   });
 });
+
+/** TK-117 (3.19.0) : vocabulaires, identifiants et cartes de la Sécurité du contrat = ceux de @koklo/schema. */
+describe("D6 sécurité : vocabulaires et identifiants", () => {
+  const words = schema.SECURITY_PROPOSAL_VOCABULARY;
+
+  it.each([
+    ["catégories de menace", contract.THREAT_CATEGORIES, words.category],
+    ["gravités", contract.THREAT_SEVERITIES, words.severity],
+    ["vérifications", contract.THREAT_VERIFICATIONS, words.verification],
+    ["catégories de donnée", contract.DATA_CATEGORIES, words.dataCategory],
+    ["chapitres ASVS", contract.ASVS_CHAPTERS, words.chapter],
+  ])("%s : les valeurs anglaises de la table de traduction", (_name, values, table) => {
+    expect([...values]).toEqual(Object.keys(table));
+  });
+
+  it("chaque valeur traduite est celle des fichiers, dans le même ordre", () => {
+    expect(Object.values(words.category)).toEqual([...schema.THREAT_CATEGORIES]);
+    expect(Object.values(words.severity)).toEqual([...schema.THREAT_SEVERITIES]);
+    expect(Object.values(words.verification)).toEqual([...schema.THREAT_VERIFICATION_MODES]);
+    expect(Object.values(words.dataCategory)).toEqual([...schema.DATA_CATEGORIES]);
+    expect(Object.values(words.chapter)).toEqual([...schema.ASVS_CHAPTERS]);
+  });
+
+  it("cartes du résumé : les sections modifiables, plus la conservation composée", () => {
+    const written = Object.keys(words.section);
+    expect([...contract.SUMMARY_CARD_KEYS].filter((key) => key !== "retention")).toEqual(written);
+    expect(schema.SUMMARY_SECTIONS.map((section) => section.key)).toEqual([
+      "donnees",
+      "protection",
+      "acces",
+      "connexion",
+      "conservation",
+      "verification",
+      "incident",
+    ]);
+  });
+
+  it.each([
+    ["threat", contract.threatIdSchema, ["SEC-T01", "SEC-T100", "SEC-T1", "SEC-01", "../x"]],
+    ["dataField", contract.dataFieldSchema, ["clients.telephone", "a-b.c_d", "T-a.b", "a.B"]],
+  ] as const)("identifiant %s : mêmes verdicts", (kind, parser, samples) => {
+    for (const sample of samples) {
+      expect(parser.safeParse(sample).success, sample).toBe(schema.PATTERNS[kind].test(sample));
+    }
+  });
+
+  it("identifiant d'exigence ASVS et liens d'une menace : mêmes verdicts", () => {
+    for (const sample of ["V2.1.1", "EX-001", "../x", "a b"]) {
+      expect(contract.asvsRequirementIdSchema.safeParse(sample).success, sample).toBe(
+        schema.ASVS_REQUIREMENT_ID.test(sample),
+      );
+    }
+    for (const sample of ["client.export", "T-a", "RL-a", "R-001", "F-001", "C-api", "x y"]) {
+      expect(contract.threatLinkSchema.safeParse(sample).success, sample).toBe(
+        schema.ThreatSchema.shape.liens.safeParse([sample]).success,
+      );
+    }
+  });
+});

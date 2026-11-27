@@ -4,16 +4,17 @@ import { isOneLine } from "./emit/yaml-inline.ts";
 import { splitFrontMatter } from "./parse/frontmatter.ts";
 
 /**
- * Sections d'un document en fichiers `NN-<slug>.md` : architecture (`architecture/overview/`, TK-111, B508) et cahier
- * technique (`tech/cahier-technique/`, TK-115, B723). Jamais indexées en base, lues en Git. Le statut vit dans le front
- * matter (`statut: brouillon | a_relire | validee`) ; un corps vide est « À rédiger », quel que soit le statut déclaré.
+ * Sections d'un document en fichiers `NN-<slug>.md` : architecture (`architecture/overview/`, TK-111, B508), cahier
+ * technique (`tech/cahier-technique/`, TK-115, B723) et dossier de sécurité (`security/dossier/`, TK-117). Jamais
+ * indexées en base, lues en Git. Le statut vit dans le front matter (`statut: brouillon | a_relire | validee`) ; un corps vide est « À rédiger », quel que soit le statut déclaré.
  * Fonctions pures, sans I/O ; la lecture ne lève jamais.
  */
-export const DOC_SECTION_DELIVERABLES = ["architecture", "technical"] as const;
+export const DOC_SECTION_DELIVERABLES = ["architecture", "technical", "security"] as const;
 export type DocSectionDeliverable = (typeof DOC_SECTION_DELIVERABLES)[number];
 export const DOC_SECTION_DIRS: Readonly<Record<DocSectionDeliverable, string>> = {
   architecture: "architecture/overview",
   technical: "tech/cahier-technique",
+  security: "security/dossier",
 };
 export const DOC_SECTION_DIR = DOC_SECTION_DIRS.architecture;
 export const DOC_SECTION_STATUSES = ["brouillon", "a_relire", "validee", "a_rediger"] as const;
@@ -24,6 +25,22 @@ export interface DocSection {
   status: DocSectionStatus;
   markdown: string;
 }
+
+/** Sections attendues du dossier de sécurité, dans l'ordre ; `proposed` : proposée, jamais exigée. */
+export const SECURITY_DOSSIER_SECTIONS: readonly {
+  readonly slug: string;
+  readonly title: string;
+  readonly proposed?: boolean;
+}[] = [
+  { slug: "objet", title: "Objet et périmètre" },
+  { slug: "donnees", title: "Données personnelles et RGPD" },
+  { slug: "auth", title: "Authentification et sessions" },
+  { slug: "acces", title: "Contrôle d'accès" },
+  { slug: "menaces", title: "Menaces et parades" },
+  { slug: "secrets", title: "Secrets et dépendances" },
+  { slug: "incident", title: "Réponse à un incident" },
+  { slug: "sauvegardes", title: "Sauvegardes et restauration", proposed: true },
+];
 
 const FILE_NAME = /^(\d{2,})-([a-z0-9][a-z0-9-]*)\.md$/;
 const STORED = ["brouillon", "a_relire", "validee"] as const;

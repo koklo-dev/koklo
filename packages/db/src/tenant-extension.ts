@@ -51,6 +51,7 @@ export const TENANT_MODELS: readonly string[] = [
   "AgentProposal",
   "AgentProposalDecision",
   "DeliverableOverride",
+  "ProjectIncidentContact",
   "InvitationProject",
   "NotificationPreference",
   "IdeaPage",

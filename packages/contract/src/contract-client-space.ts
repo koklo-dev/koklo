@@ -1,5 +1,5 @@
 import { spaceNotReadyError, validationError } from "./errors.ts";
-import { readErrors, readOneErrors, route } from "./route-helpers.ts";
+import { readErrors, readOneErrors, route, writeOneErrors } from "./route-helpers.ts";
 import {
   clientSpaceAdrInputSchema,
   clientSpaceAdrOutputSchema,
@@ -39,6 +39,9 @@ import {
   clientSpaceRolesOutputSchema,
   clientSpaceRulesInputSchema,
   clientSpaceRulesOutputSchema,
+  clientSpaceSecurityContactSetInputSchema,
+  clientSpaceSecurityInputSchema,
+  clientSpaceSecurityOutputSchema,
   clientSpaceTechnicalDocumentOutputSchema,
   clientSpaceTechnicalEnvironmentsOutputSchema,
   clientSpaceTechnicalInputSchema,
@@ -52,6 +55,7 @@ import {
   clientSpaceTechnicalStackInputSchema,
   clientSpaceTechnicalStackOutputSchema,
 } from "./schemas-client-space.ts";
+import { incidentContactSchema } from "./schemas-security.ts";
 
 /** Lectures de l'espace client (TK-55b, TK-104) : six rôles, cloisonnement par projet côté API. */
 const spaceReadErrors = { ...readOneErrors, ...validationError, ...spaceNotReadyError } as const;
@@ -173,4 +177,14 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceTechnicalNfrInputSchema)
     .output(clientSpaceTechnicalNfrOutputSchema),
+  /** Résumé de la Sécurité validé (TK-117, 3.19.0) : les six rôles ; sans identifiant technique. */
+  security: route("GET", "/client-space/projects/{projectId}/security")
+    .errors(spaceReadErrors)
+    .input(clientSpaceSecurityInputSchema)
+    .output(clientSpaceSecurityOutputSchema),
+  /** Contact en cas d'incident (B801) : le client lié seul (403 pour tout autre rôle), audité sans les valeurs. */
+  securityContactSet: route("POST", "/client-space/projects/{projectId}/security/contact")
+    .errors({ ...writeOneErrors, ...validationError })
+    .input(clientSpaceSecurityContactSetInputSchema)
+    .output(incidentContactSchema),
 };

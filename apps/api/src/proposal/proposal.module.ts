@@ -36,5 +36,7 @@ import { ProposalReviseService } from "./proposal-revise.service.ts";
     { provide: LAUNCH_REPOSITORY, useClass: PrismaLaunchRepository },
     { provide: PROPOSAL_REPOSITORY, useClass: PrismaProposalRepository },
   ],
+  // `SpecSecurityModule` (TK-117) lance l'agent et accepte la proposition du résumé par ce circuit.
+  exports: [ProposalLaunchService, PROPOSAL_REPOSITORY],
 })
 export class ProposalModule {}

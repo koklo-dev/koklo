@@ -41,6 +41,7 @@ describe("rôles des procédures clientSpace.*", () => {
     "technicalOps",
     "technicalOp",
     "technicalNfr",
+    "security",
   ])("%s : session, garde de rôle et CLIENT_SPACE_READ_ROLES", (name) => {
     const source = read(CONTROLLER);
     const at = source.indexOf(`@Implement(contract.clientSpace.${name})`);
@@ -50,9 +51,17 @@ describe("rôles des procédures clientSpace.*", () => {
     expect(decorators).toContain("@Roles(...CLIENT_SPACE_READ_ROLES)");
   });
 
+  it("securityContactSet : le client seul (TK-117, B801)", () => {
+    const source = read(CONTROLLER);
+    const at = source.indexOf("@Implement(contract.clientSpace.securityContactSet)");
+    const decorators = source.slice(Math.max(0, at - 200), at);
+    expect(decorators).toContain("@UseGuards(SessionGuard, RoleGuard)");
+    expect(decorators).toContain("@Roles(CLIENT_ROLE)");
+  });
+
   it("aucun rôle nommé en dur, et le cloisonnement central (PROJECT_ACCESS) est injecté", () => {
     const source = read(CONTROLLER);
-    expect(source.match(/@Roles\(/g)).toHaveLength(26); // technicalOps, technicalOp, technicalNfr (TK-116), technical, technicalStack, technicalEnvironments, technicalDocument (TK-115), projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109), dataZones, dataZone, dataSearch, dataFixturePage (TK-110), architecture, adrs, adr, archFlows, archFlow (TK-113)
+    expect(source.match(/@Roles\(/g)).toHaveLength(28); // security et securityContactSet (TK-117, client seul), technicalOps, technicalOp, technicalNfr (TK-116), technical, technicalStack, technicalEnvironments, technicalDocument (TK-115), projects, features, feature, puis progress, flows, rules, roles (TK-104), dataModel, dataFixtures, dataFixtureRows (TK-109), dataZones, dataZone, dataSearch, dataFixturePage (TK-110), architecture, adrs, adr, archFlows, archFlow (TK-113)
     expect(source).not.toMatch(/@Roles\(\s*"/);
     expect(source).toContain("PROJECT_ACCESS");
   });

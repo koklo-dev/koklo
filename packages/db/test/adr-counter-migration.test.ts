@@ -56,6 +56,7 @@ describe("TK-111 migration adr_counter", () => {
 
   it("down.sql retire adr sans toucher aux autres compteurs, et rejoue (up, down, up)", async () => {
     // La migration postérieure du même enum (`nfr`, TK-115) se défait d'abord.
+    await db.query(sqlOf("down.sql", "_threat_counter"));
     await db.query(sqlOf("down.sql", "_nfr_counter"));
     expect(await labels()).toEqual([...BEFORE, "adr"]);
     await db.query(sqlOf("down.sql"));

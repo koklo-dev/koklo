@@ -18,6 +18,7 @@ const STACK_FILE = /^tech\/stack\/([a-z0-9][a-z0-9-]*)\.yaml$/;
 /** Opération `zone.verbe` et ancien REST `E-<slug>` : tous deux occupent leur identifiant. */
 const ENDPOINT_FILE = new RegExp(`^api/endpoints/(E-[a-z0-9][a-z0-9-]*|${OPERATION_NAME})\\.yaml$`);
 const NFR_FILE = /^nfr\/(NFR-[a-z0-9][a-z0-9-]*)\.yaml$/;
+const THREAT_FILE = /^security\/threats\/(SEC-T\d{2,})\.yaml$/;
 
 export interface DocSections {
   /** `DOC-<slug>` -> chemin. */
@@ -49,6 +50,9 @@ export interface SpecPathIndex {
   readonly nfr: Map<string, string>;
   /** Sections du cahier technique. */
   readonly techDocs: DocSections;
+  readonly threats: Map<string, string>;
+  /** Sections du dossier de sécurité. */
+  readonly securityDocs: DocSections;
 }
 
 /** Ce que l'index lit d'une opération : son genre (préfixe du `kind`) et son identifiant cible. */
@@ -91,6 +95,7 @@ export const stackIndex = (paths: Iterable<string>) =>
   mapOf(paths, STACK_FILE, (slug) => `ST-${slug}`);
 export const endpointIndex = (paths: Iterable<string>) => mapOf(paths, ENDPOINT_FILE);
 export const nfrIndex = (paths: Iterable<string>) => mapOf(paths, NFR_FILE);
+export const threatIndex = (paths: Iterable<string>) => mapOf(paths, THREAT_FILE);
 export const fixtureIndex = (paths: Iterable<string>): Set<string> =>
   new Set(mapOf(paths, FIXTURE_FILE).keys());
 
@@ -142,19 +147,27 @@ export function specPathIndex(paths: readonly string[]): SpecPathIndex {
     endpoints: endpointIndex(paths),
     nfr: nfrIndex(paths),
     techDocs: docSectionIndex(paths, "technical"),
+    threats: threatIndex(paths),
+    securityDocs: docSectionIndex(paths, "security"),
   };
 }
 
 /** Genre d'une opération : le préfixe de son `kind` (`feature`, `rule`, `doc`, `layout`, `architecture`…). */
 export const genreOf = (operation: SpecPathOperation): string => operation.kind.split(".")[0] ?? "";
 
-const isTechnicalDoc = (operation: SpecPathOperation): boolean =>
-  genreOf(operation) === "doc" &&
-  (operation.payload as { deliverable?: unknown } | null | undefined)?.deliverable === "technical";
+/** Livrables dont les sections ont leur propre dossier ; tout autre vise l'architecture. */
+const DOC_SCOPES = new Map<unknown, string>([
+  ["technical", "techDoc"],
+  ["security", "securityDoc"],
+]);
 
 /** Espace d'identifiants d'une opération : une section se cherche dans les sections de son livrable. */
-const scopeOf = (operation: SpecPathOperation): string =>
-  isTechnicalDoc(operation) ? "techDoc" : genreOf(operation);
+function scopeOf(operation: SpecPathOperation): string {
+  const genre = genreOf(operation);
+  if (genre !== "doc") return genre;
+  const payload = operation.payload as { deliverable?: unknown } | null | undefined;
+  return DOC_SCOPES.get(payload?.deliverable) ?? genre;
+}
 
 const PRESENCE: Readonly<Record<string, (index: SpecPathIndex, id: string) => boolean>> = {
   feature: (index, id) => index.features.has(id),
@@ -169,12 +182,14 @@ const PRESENCE: Readonly<Record<string, (index: SpecPathIndex, id: string) => bo
   stack: (index, id) => index.stacks.has(id),
   op: (index, id) => index.endpoints.has(id),
   nfr: (index, id) => index.nfr.has(id),
+  threat: (index, id) => index.threats.has(id),
+  securityDoc: (index, id) => index.securityDocs.byId.has(id),
 };
 
 /**
  * L'identifiant visé est-il présent sur la tête ? Un parcours créé vise tout identifiant occupé, un parcours modifié un
- * `.yaml`. `undefined` pour un genre que l'index par chemins ne connaît pas (rôle, mise en page, environnement) : non
- * vérifié.
+ * `.yaml`. `undefined` pour un genre que l'index par chemins ne connaît pas (rôle, mise en page, environnement, donnée,
+ * droit, exigence ASVS, résumé) : non vérifié.
  */
 export function presentAtHead(
   index: SpecPathIndex,

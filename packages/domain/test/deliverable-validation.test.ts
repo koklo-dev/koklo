@@ -11,7 +11,7 @@ import {
  * de ses cibles (éléments, bloc, livrable entier). Règle pure.
  */
 describe("entités d'un livrable (B325 c)", () => {
-  it("Fonctionnel = feature, rule, roles, flow ; Données = table, relations, fixture ; Architecture = component, archflow, adr ; Technique = stack, endpoint, nfr, environments ; les autres sans entité indexée", () => {
+  it("Fonctionnel = feature, rule, roles, flow ; Données = table, relations, fixture ; Architecture = component, archflow, adr ; Technique = stack, endpoint, nfr, environments ; Sécurité = threat, sensitive, rights, asvs, security_summary ; les autres sans entité indexée", () => {
     expect(DELIVERABLE_ENTITY_KINDS.functional).toEqual(["feature", "rule", "roles", "flow"]);
     expect(DELIVERABLE_ENTITY_KINDS.data).toEqual(["table", "relations", "fixture"]);
     expect(DELIVERABLE_ENTITY_KINDS.architecture).toEqual(["component", "archflow", "adr"]);
@@ -21,7 +21,14 @@ describe("entités d'un livrable (B325 c)", () => {
       "nfr",
       "environments",
     ]);
-    for (const key of ["security", "design", "quality"] as const) {
+    expect(DELIVERABLE_ENTITY_KINDS.security).toEqual([
+      "threat",
+      "sensitive",
+      "rights",
+      "asvs",
+      "security_summary",
+    ]);
+    for (const key of ["design", "quality"] as const) {
       expect(DELIVERABLE_ENTITY_KINDS[key]).toEqual([]);
     }
   });

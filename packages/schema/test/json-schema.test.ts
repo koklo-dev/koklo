@@ -7,6 +7,7 @@ const schemasDir = resolve(import.meta.dirname, "../schemas");
 const NAMES = [
   "adr",
   "archflow",
+  "asvs",
   "component",
   "endpoint",
   "environments",
@@ -16,13 +17,17 @@ const NAMES = [
   "operation",
   "project",
   "relation",
+  "rights",
   "roles",
   "rule",
   "screen",
+  "security-data",
+  "security-summary",
   "stack",
   "table",
   "table-v2",
   "test-scenario",
+  "threat",
 ];
 
 type JsonSchema = {

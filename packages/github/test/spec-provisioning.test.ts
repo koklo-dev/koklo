@@ -87,6 +87,17 @@ describe("TK-111 dossiers de l'architecture", () => {
   });
 });
 
+describe("TK-117 dossier des menaces", () => {
+  it("security/threats vide gardé par un .gitkeep, aucune entité ni scénario d'exemple", () => {
+    const paths = files().map((file) => file.path);
+    expect(paths).toContain("security/threats/.gitkeep");
+    expect(paths.filter((path) => path.startsWith("security/"))).toEqual([
+      "security/threats/.gitkeep",
+    ]);
+    expect(paths.some((path) => path.endsWith(".feature"))).toBe(false);
+  });
+});
+
 describe("TK-115 dossier des choix techniques", () => {
   it("tech/stack vide gardé par un .gitkeep ; la section 01 du cahier est inchangée", () => {
     const written = files();

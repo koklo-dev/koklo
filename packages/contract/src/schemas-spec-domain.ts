@@ -19,13 +19,14 @@ export const flowIdSchema = z.string().regex(new RegExp(`^P-${slug}$`));
 export const permissionIdSchema = z.string().regex(new RegExp(`^PM-${slug}(\\.${slug})*$`));
 /**
  * Un identifiant d'élément écrit par un lot : fonctionnalité, règle, rôle, parcours, table ou jeu d'exemple (3.5.0),
- * composant, décision, section (3.9.0), choix technique, exigence, environnement et opération `<zone>.<verbe>` (3.17.0).
+ * composant, décision, section (3.9.0), choix technique, exigence, environnement et opération `<zone>.<verbe>` (3.17.0),
+ * menace et champ classé (3.19.0).
  */
 export const specIdSchema = z
   .string()
   .regex(
     new RegExp(
-      `^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug}|C-${slug}|ADR-\\d{3,}|DOC-${slug}|ST-${slug}|NFR-${slug}|ENV-${slug}|[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*)$`,
+      `^(SEC-T\\d{2,}|[a-z0-9][a-z0-9-]{0,62}\\.[a-z_][a-z0-9_]{0,62}|F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug}|C-${slug}|ADR-\\d{3,}|DOC-${slug}|ST-${slug}|NFR-${slug}|ENV-${slug}|[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*)$`,
     ),
   );
 

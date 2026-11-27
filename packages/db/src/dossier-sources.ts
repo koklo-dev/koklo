@@ -166,7 +166,10 @@ export async function publishedSynthesis(
 }
 
 /** Instantané de la tête de spec (branche de cadrage, sinon branche par défaut) ; `null` s'il n'y en a pas ou s'il a échoué. */
-async function headSnapshotId(client: DossierClient, projectId: string): Promise<string | null> {
+export async function headSnapshotId(
+  client: DossierClient,
+  projectId: string,
+): Promise<string | null> {
   const repo = await client.projectRepo.findFirst({
     where: { projectId, OR: [{ role: "spec" }, { specPath: { not: null } }] },
     select: { id: true, defaultBranch: true },

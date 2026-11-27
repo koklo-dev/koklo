@@ -9,6 +9,12 @@ import {
   repriseFlows,
 } from "./coverage-pass.ts";
 import {
+  securityKinds,
+  securityKindsAt,
+  securityRefs,
+  securitySteps,
+} from "./generate-security.ts";
+import {
   technicalKinds,
   technicalKindsAt,
   technicalRefs,
@@ -54,6 +60,7 @@ export const kindsOfMode = (
 ): readonly AgentProposalKind[] => {
   if (deliverable === "data") return DATA_KINDS;
   if (deliverable === "technical") return technicalKinds(mode);
+  if (deliverable === "security") return securityKinds(mode);
   if (deliverable === "architecture") {
     return ARCHITECTURE_KINDS_OF_MODE[mode] ?? ARCHITECTURE_KINDS_OF_MODE.complete ?? [];
   }
@@ -98,6 +105,12 @@ const architectureRefs = (sources: LaunchSources): ArchitectureRefs => {
   };
 };
 
+/** Références du tri de la Sécurité (qui lit aussi le cahier technique) ou du cahier technique. */
+function referenceRefs(launch: LaunchContext, sources: LaunchSources) {
+  if (sources.security !== undefined) return { sec: securityRefs(sources) };
+  return sources.technical === undefined ? {} : { tech: technicalRefs(launch.mode, sources) };
+}
+
 /** Contexte de tri d'un segment : titres et références des sources, puis des propositions déjà publiées du lancement. */
 function triageContextOf(
   launch: LaunchContext,
@@ -121,7 +134,7 @@ function triageContextOf(
       adr: titles(architecture?.decisions),
     },
     ...(architecture === undefined ? {} : { arch: architectureRefs(sources) }),
-    ...(sources.technical === undefined ? {} : { tech: technicalRefs(launch.mode, sources) }),
+    ...referenceRefs(launch, sources),
     ...(launch.deliverable === "data" ? { refs: dataRefs(sources) } : {}),
     missingCriteria: new Map(
       sources.features
@@ -137,11 +150,16 @@ const coverageIndexFor = (launch: LaunchContext, sources: LaunchSources) =>
     ? coverageIndexOf(sources)
     : undefined;
 
-/** Zones demandées au modèle (Fonctionnel, Données, Architecture) ou étapes calculées par le code (Technique). */
+/** Étapes calculées par le code : le cahier technique et la Sécurité. */
+const CODE_STEPS: Readonly<Record<string, typeof technicalSteps>> = {
+  technical: technicalSteps,
+  security: securitySteps,
+};
+
+/** Zones demandées au modèle (Fonctionnel, Données, Architecture) ou étapes calculées par le code. */
 function zonesOfLaunch(run: Run): Promise<readonly string[]> {
-  if (run.launch.deliverable === "technical") {
-    return Promise.resolve(technicalSteps(run.launch.mode, run.sources));
-  }
+  const steps = CODE_STEPS[run.launch.deliverable];
+  if (steps !== undefined) return Promise.resolve(steps(run.launch.mode, run.sources));
   const isData = run.launch.deliverable === "data";
   return ask(run, {
     purpose: "proposal-zones",
@@ -178,6 +196,15 @@ export async function architectureEnd(
   return (await repriseFlows(run, index)) === "stopped" ? "stopped" : outcome;
 }
 
+/** Types demandés à chaque étape calculée par le code. */
+function stepKinds(launch: LaunchContext): Pick<Run, "kindsAt"> {
+  if (launch.deliverable === "technical") {
+    return { kindsAt: (index, total) => technicalKindsAt(launch.mode, index, total) };
+  }
+  if (launch.deliverable !== "security") return {};
+  return { kindsAt: (_index, _total, zone) => securityKindsAt(launch.mode, zone) };
+}
+
 /**
  * Un segment d'un lancement (B617) : étape 1, les zones (premier segment) ; étape 2, une zone par appel à partir de la
  * première non traitée, chaque zone publiée aussitôt ; Architecture (`complete`, `all`) : règle des tables puis passe de
@@ -198,9 +225,7 @@ export async function generate(
   const started = deps.now().getTime();
   const run: Run = {
     ...{ deps, launch, sources, euOnly, progress, kinds, context, started },
-    ...(launch.deliverable === "technical"
-      ? { kindsAt: (index, total) => technicalKindsAt(launch.mode, index, total) }
-      : {}),
+    ...stepKinds(launch),
   };
   const zones = progress.zones.length > 0 ? progress.zones : await firstStep(run, index);
   if (typeof zones === "string") return zones;

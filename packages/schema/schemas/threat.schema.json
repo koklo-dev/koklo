@@ -1,0 +1,129 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/threat.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "categorie": {
+      "enum": [
+        "usurpation",
+        "acces_non_autorise",
+        "fuite_donnees",
+        "alteration",
+        "abus",
+        "conformite"
+      ],
+      "type": "string"
+    },
+    "gravite": {
+      "enum": [
+        "elevee",
+        "moyenne",
+        "faible"
+      ],
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^SEC-T\\d{2,}$",
+      "type": "string"
+    },
+    "liens": {
+      "default": [],
+      "items": {
+        "maxLength": 130,
+        "pattern": "^[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*$|^T-[a-z0-9][a-z0-9-]*$|^[a-z0-9][a-z0-9-]{0,62}\\.[a-z_][a-z0-9_]{0,62}$|^RL-[a-z0-9][a-z0-9-]*$|^NFR-[a-z0-9][a-z0-9-]*$|^ST-[a-z0-9][a-z0-9-]*$|^ENV-[a-z0-9][a-z0-9-]*$|^S-[a-z0-9][a-z0-9-]*$|^R-\\d{3,}$",
+        "type": "string"
+      },
+      "maxItems": 50,
+      "type": "array"
+    },
+    "parades": {
+      "default": [],
+      "items": {
+        "maxLength": 300,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 30,
+      "type": "array"
+    },
+    "risque": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "scenario": {
+      "additionalProperties": false,
+      "properties": {
+        "alors": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "quand": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "quand",
+        "alors"
+      ],
+      "type": "object"
+    },
+    "surfaces": {
+      "items": {
+        "anyOf": [
+          {
+            "pattern": "^F-\\d{3,}$",
+            "type": "string"
+          },
+          {
+            "const": "api",
+            "type": "string"
+          }
+        ]
+      },
+      "maxItems": 30,
+      "minItems": 1,
+      "type": "array"
+    },
+    "titre": {
+      "maxLength": 200,
+      "minLength": 1,
+      "type": "string"
+    },
+    "verification": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "scenario",
+            "controle_ci",
+            "revue_humaine"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "titre",
+    "surfaces",
+    "categorie",
+    "gravite",
+    "risque",
+    "verification"
+  ],
+  "type": "object"
+}

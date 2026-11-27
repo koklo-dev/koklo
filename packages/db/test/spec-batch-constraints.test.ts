@@ -210,6 +210,7 @@ describe("TK-44a compteur de features", () => {
       "rule",
       "adr",
       "nfr",
+      "threat",
     ]);
   });
 

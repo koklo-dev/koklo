@@ -1,5 +1,10 @@
 import { AGENT_PROPOSE_LIMITS, type AgentProposalKind, slugOf } from "@koklo/domain";
-import { findSecretPaths, isSafeText, PROPOSAL_SCHEMAS } from "@koklo/schema";
+import {
+  findSecretPaths,
+  isSafeText,
+  PROPOSAL_SCHEMAS,
+  securityProposalTitle,
+} from "@koklo/schema";
 import { isRecord, recordsOf, stringsOf } from "../job-support.ts";
 import { OutputInvalidError } from "./errors.ts";
 import { titleKey } from "./title-key.ts";
@@ -13,6 +18,7 @@ import {
   withKnownDependencies,
   withoutOwnedTables,
 } from "./triage-architecture.ts";
+import { type SecurityRefs, securityVerdict } from "./triage-security.ts";
 import { type TechnicalRefs, technicalVerdict } from "./triage-technical.ts";
 
 const TITLE_MAX = 200;
@@ -51,6 +57,8 @@ export interface TriageContext {
   readonly arch?: ArchitectureRefs;
   /** Livrable Technique (TK-115) : références et éléments existants ; sa présence choisit le tri du cahier technique. */
   readonly tech?: TechnicalRefs;
+  /** Livrable Sécurité (TK-117) : références et éléments existants ; sa présence choisit le tri de la Sécurité. */
+  readonly sec?: SecurityRefs;
 }
 
 export { titleKey };
@@ -67,9 +75,10 @@ const TITLE_FIELD: Partial<Record<AgentProposalKind, string>> = {
   stack: "role",
   op: "name",
   env: "name",
+  sensitive: "data",
 };
 
-/** Types dont le `specId` n'est posé que par le code (B615, B655, TK-115) : une sortie du modèle qui en porte un est écartée. */
+/** Types dont le `specId` n'est posé que par le code (B615, B655, TK-115, TK-117) : une sortie du modèle qui en porte un est écartée. */
 const CODE_POSED_ID: ReadonlySet<AgentProposalKind> = new Set([
   "component",
   "archflow",
@@ -78,10 +87,12 @@ const CODE_POSED_ID: ReadonlySet<AgentProposalKind> = new Set([
   "op",
   "nfr",
   "env",
+  "threat",
+  "sensitive",
 ]);
 
 const titleOf = (kind: AgentProposalKind, payload: Record<string, unknown>): string => {
-  const value = payload[TITLE_FIELD[kind] ?? "title"];
+  const value = securityProposalTitle(kind, payload) ?? payload[TITLE_FIELD[kind] ?? "title"];
   return typeof value === "string" ? value.slice(0, TITLE_MAX) : "";
 };
 
@@ -182,9 +193,15 @@ function readEntry(entry: unknown, context: TriageContext) {
 
 type Entry = NonNullable<ReturnType<typeof readEntry>>;
 
-/** Cahier technique : références vérifiées et `specId` posé selon le mode, puis un titre jamais vu dans le lancement. */
-function technicalCandidate({ kind, rationale, payload }: Entry, context: TriageContext): Triaged {
-  const found = technicalVerdict(kind, payload, context.tech as TechnicalRefs);
+/**
+ * Cahier technique et Sécurité : références vérifiées et `specId` posé par le code, puis un titre jamais vu dans le
+ * lancement.
+ */
+function referencedCandidate({ kind, rationale, payload }: Entry, context: TriageContext): Triaged {
+  const found =
+    context.sec === undefined
+      ? technicalVerdict(kind, payload, context.tech as TechnicalRefs)
+      : securityVerdict(kind, payload, context.sec);
   if (found === undefined || found === EXISTING_SECTION) return found;
   const title = titleOf(kind, found.payload);
   if (knownTitles(context, kind).has(titleKey(title))) return undefined;
@@ -196,7 +213,9 @@ function technicalCandidate({ kind, rationale, payload }: Entry, context: Triage
 function candidateOf(entry: unknown, context: TriageContext): Triaged {
   const read = readEntry(entry, context);
   if (read === undefined) return undefined;
-  if (context.tech !== undefined) return technicalCandidate(read, context);
+  if (context.tech !== undefined || context.sec !== undefined) {
+    return referencedCandidate(read, context);
+  }
   const { kind, rationale } = read;
   const owned = withoutOwnedTables(kind, read.payload, context.arch);
   const payload = withKnownActors(

@@ -11,11 +11,20 @@ import {
 
 const COLLECTION = "/projects/{projectId}/reviews";
 
-const submitErrors = {
+export const submitErrors = {
   ...writeOneErrors,
   ...validationError,
-  /** `choices_open` (3.18.0, B775) : un choix technique de la tête reste à trancher. */
-  ...conflictOf("baseline_not_open", "review_incomplete", "choices_open"),
+  /**
+   * `choices_open` (3.18.0, B775) : un choix technique de la tête reste à trancher. Sécurité (3.19.0, B804) :
+   * `threats_open` (menace élevée sans parade) puis `data_unclassified` (champ non classé ou sans durée).
+   */
+  ...conflictOf(
+    "baseline_not_open",
+    "review_incomplete",
+    "choices_open",
+    "threats_open",
+    "data_unclassified",
+  ),
   ...staleVersionError,
   ...spaceNotReadyError,
 } as const;

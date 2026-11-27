@@ -30,6 +30,8 @@ type ConflictReason =
   | "baseline_not_open"
   | "review_incomplete"
   | "choices_open"
+  | "threats_open"
+  | "data_unclassified"
   | "no_client"
   | "slug_taken"
   | "already_member"

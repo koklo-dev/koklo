@@ -14,6 +14,7 @@ import {
   LAUNCH_DISCARD_REASONS,
   LAUNCH_STOP_REASONS,
   PROPOSAL_NOTIFY_AFTER_MS,
+  SECURITY_MODES,
 } from "../src/index.ts";
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
@@ -55,6 +56,11 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       "op",
       "nfr",
       "env",
+      "threat",
+      "sensitive",
+      "right",
+      "asvs",
+      "summary",
     ]);
     expect(AGENT_PROPOSE_LIMITS).toEqual({
       zones: 12,
@@ -75,6 +81,20 @@ describe("TK-99a constantes et règles du lancement d'agent", () => {
       "refused",
     ]);
     expect([...LAUNCH_STOP_REASONS]).toEqual(["completed", "cap", "deadline", "cancelled"]);
+  });
+
+  it("modes de la Sécurité (TK-117, B806)", () => {
+    expect([...SECURITY_MODES]).toEqual(["threats", "classify", "asvs", "summary"]);
+  });
+
+  it("L'agent lit, pour la Sécurité : fonctionnalités, rôles, tables, cahier technique, sécurité actuelle", () => {
+    expect([...AGENT_READS.security]).toEqual([
+      "functional.features",
+      "functional.roles",
+      "data.tables",
+      "technical.current",
+      "security.current",
+    ]);
   });
 
   it("L'agent lit, pour le Fonctionnel : dossier figé, Synthèse, risques, cahier actuel", () => {

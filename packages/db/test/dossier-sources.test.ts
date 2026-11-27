@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { currentSecurity } from "../src/dossier-security.ts";
 import {
   currentArchitecture,
   currentFeatures,
@@ -421,5 +422,64 @@ describe("currentTechnical", () => {
       environments: [],
       variables: [],
     });
+  });
+});
+
+/** TK-117 : la Sécurité actuelle lue par l'agent ; ni contact, ni conservation, ni valeur. */
+describe("currentSecurity", () => {
+  const head = {
+    repo: { id: "r-1", defaultBranch: "main" },
+    heads: { cadrage: { snapshot: { id: "s-1", status: "ready" } } },
+  };
+  const entity = (kind: string, specId: string, data: unknown) => ({ kind, specId, data });
+
+  it("menaces, entrées, droits, exigences, tables, opérations et rôles de la tête", async () => {
+    const { typed } = fakeClient({
+      ...head,
+      entities: [
+        entity("threat", "SEC-T01", { titre: "Abus", surfaces: ["F-001"], parades: ["x"] }),
+        entity("sensitive", "t.a", {
+          donnee: "A",
+          champs: ["t.a"],
+          categorie: "contact",
+          conservation: "3 ans",
+        }),
+        entity("rights", "rights", {
+          restrictions: [{ role: "RL-a", permission: "PM-b.c", restriction: "d" }],
+          propriete: ["Chacun les siens."],
+        }),
+        entity("asvs", "asvs", {
+          niveau: 2,
+          exigences: [{ id: "EX-001", chapitre: "api", titre: "T", niveau: 1, reponse: "r" }],
+          secrets_et_dependances: [{ libelle: "Secrets", valeur: "Coffre" }],
+        }),
+        entity("security_summary", "summary", { donnees: "x" }),
+        entity("table", "T-t", { champs: [{ nom: "a" }, { nom: "b" }] }),
+        entity("endpoint", "z.lire", { composant: "C-a", permission: "PM-b.c", sert: ["F-001"] }),
+        entity("endpoint", "E-rest", { methode: "GET" }),
+        entity("roles", "roles", { roles: [{ id: "RL-a", nom: "A", permissions: ["PM-b.c"] }] }),
+      ],
+    });
+    expect(await currentSecurity(typed, PROJECT)).toEqual({
+      threats: [{ specId: "SEC-T01", title: "Abus", surfaces: ["F-001"], measures: ["x"] }],
+      entries: [{ fields: ["t.a"], name: "A", category: "contact" }],
+      restrictions: [{ role: "RL-a", permission: "PM-b.c", restriction: "d" }],
+      ownershipRules: ["Chacun les siens."],
+      asvs: {
+        level: 2,
+        requirements: [{ id: "EX-001", chapter: "api", title: "T", level: 1, answered: true }],
+        facts: ["Secrets"],
+      },
+      tables: [{ id: "T-t", champs: [{ nom: "a" }, { nom: "b" }] }],
+      operations: [{ id: "z.lire", permission: "PM-b.c", serves: ["F-001"] }],
+      roles: [{ id: "RL-a", name: "A", permissions: ["PM-b.c"] }],
+      summary: true,
+    });
+  });
+
+  it("rien d'indexé : listes vides, aucun résumé", async () => {
+    const current = await currentSecurity(fakeClient({}).typed, PROJECT);
+    expect(current).toMatchObject({ threats: [], entries: [], summary: false });
+    expect(current.asvs).toEqual({ level: undefined, requirements: [], facts: [] });
   });
 });

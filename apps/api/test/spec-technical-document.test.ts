@@ -53,6 +53,6 @@ describe("spec.document.sections", () => {
     const s = await readScene(bench());
     const api = technicalApi(bench().app, s.world.actors.dev);
     expect((await api.sections(s.projectId)).status).toBe(404);
-    expect((await api.sections(s.projectId, "security")).status).toBe(400);
+    expect((await api.sections(s.projectId, "functional")).status).toBe(400);
   });
 });

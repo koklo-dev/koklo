@@ -17,7 +17,7 @@ import {
   type SpecBatchPlan,
   type SpecBatchRepository,
 } from "./spec-batch.repository.ts";
-import { isTechnicalOperation, prepareBatch } from "./spec-batch-input.ts";
+import { isRestrictedOperation, prepareBatch } from "./spec-batch-input.ts";
 import {
   allSkipped,
   failureOf,
@@ -31,9 +31,12 @@ import { specHeadPaths } from "./spec-head-paths.ts";
 import { SpecWriteQueue } from "./spec-write.queue.ts";
 import { pollUntil, SPEC_BATCH_WAIT_DEFAULT_MS } from "./wait.ts";
 
-/** Un lot qui porte une opération du cahier technique relève d'owner, admin et développeur (TK-115, B725). */
-function assertTechnicalRole(role: string, operations: SpecBatchSubmitInput["operations"]): void {
-  if (!operations.some(isTechnicalOperation)) return;
+/**
+ * Un lot qui porte une opération du cahier technique (TK-115, B725) ou de la Sécurité (TK-117, B810) relève d'owner,
+ * admin et développeur.
+ */
+function assertRestrictedRole(role: string, operations: SpecBatchSubmitInput["operations"]): void {
+  if (!operations.some(isRestrictedOperation)) return;
   if (!(DATA_PROPOSAL_ROLES as readonly string[]).includes(role)) throw forbidden();
 }
 
@@ -58,7 +61,7 @@ export class SpecBatchService {
     role: string,
     input: SpecBatchSubmitInput,
   ): Promise<SpecBatchOutput> {
-    assertTechnicalRole(role, input.operations);
+    assertRestrictedRole(role, input.operations);
     const proposals = input.skipConflicts?.proposals;
     if (proposals === undefined) {
       return this.commitPrepared(scope, role, (plan) => prepareBatch(input, plan.defaultBranch));

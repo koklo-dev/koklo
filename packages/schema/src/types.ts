@@ -1,6 +1,7 @@
 import type {
   Adr,
   ArchFlow,
+  AsvsFile,
   BusinessRule,
   Component,
   Endpoint,
@@ -12,11 +13,15 @@ import type {
   Operation,
   ProjectManifest,
   RelationsFile,
+  RightsFile,
   RolesFile,
   Screen,
+  SecurityData,
+  SecuritySummary,
   Stack,
   Table,
   TestScenario,
+  Threat,
 } from "./entities/index.ts";
 
 /** Un fichier du dépôt de spec, tel que fourni par l'appelant (aucune I/O ici). */
@@ -60,4 +65,10 @@ export type ParsedSpec = {
   operations: Parsed<Operation>[];
   nfrs: Parsed<Nfr>[];
   environments: Parsed<EnvironmentsFile>[];
+  /** Livrable Sécurité (TK-117) : menaces, puis un fichier au plus pour chacun des quatre autres. */
+  threats: Parsed<Threat>[];
+  securityData: Parsed<SecurityData>[];
+  rights: Parsed<RightsFile>[];
+  asvs: Parsed<AsvsFile>[];
+  securitySummaries: Parsed<SecuritySummary>[];
 };

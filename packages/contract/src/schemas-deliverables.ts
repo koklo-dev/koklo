@@ -22,6 +22,17 @@ export const staleTechnicalSchema = z.object({
 });
 
 /**
+ * Sécurité à revoir (3.19.0, B805) : choix de la stack, opérations, tables et rôles modifiés depuis la dernière décision,
+ * et les menaces qui les citent plus les champs nouveaux. Réservé à l'équipe et au designer.
+ */
+export const staleSecuritySchema = z.object({
+  changes: z
+    .array(z.object({ id: z.string(), change: z.enum(["added", "removed", "changed"]) }))
+    .max(STALE_TECHNICAL_MAX),
+  items: z.array(z.string()).max(STALE_TECHNICAL_MAX),
+});
+
+/**
  * Livrables de la spec (TK-100, contrat 2.10.0, additif). `status` reprend les quatre statuts de la vue d'ensemble ;
  * `available` suit B1 (un livrable s'ouvre quand son amont est prêt) ou un forçage (`forced`) qui ne vaut jamais
  * validation. `condition` dit ce qui l'ouvre tant qu'il est verrouillé. `pendingProposals` : propositions de l'agent en
@@ -48,6 +59,7 @@ export const specDeliverableSchema = z.object({
   staleComponents: z.array(componentIdSchema).max(50).optional(),
   staleFlows: z.array(archFlowIdSchema).max(50).optional(),
   staleTechnical: staleTechnicalSchema.optional(),
+  staleSecurity: staleSecuritySchema.optional(),
 });
 
 export const specDeliverablesInputSchema = z.object({ projectId: z.uuid() });

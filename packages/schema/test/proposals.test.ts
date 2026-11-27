@@ -65,6 +65,11 @@ describe("schémas de proposition par type", () => {
       "op",
       "nfr",
       "env",
+      "threat",
+      "sensitive",
+      "right",
+      "asvs",
+      "summary",
     ]);
   });
 

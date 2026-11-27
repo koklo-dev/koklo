@@ -7,6 +7,7 @@ import { tableDetail } from "../spec-data/data-values.ts";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { flowDetail, roleDetail, ruleDetail } from "../spec-read/entity-values.ts";
 import { SpecReadService } from "../spec-read/spec-read.service.ts";
+import { SpecSecurityService } from "../spec-security/spec-security.service.ts";
 import { SpecTechnicalService } from "../spec-technical/spec-technical.service.ts";
 import { SpecTechnicalApiService } from "../spec-technical/spec-technical-api.service.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
@@ -17,14 +18,17 @@ const TECHNICAL_TYPES = ["stack", "environment", "operation", "nfr"] as const;
 type TechnicalType = (typeof TECHNICAL_TYPES)[number];
 const isTechnical = (type: SpecItem["type"]): type is TechnicalType =>
   (TECHNICAL_TYPES as readonly string[]).includes(type);
+const SECURITY_TYPES: readonly SpecItem["type"][] = ["threat", "sensitive"];
 
 /**
  * Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant, un flux ou une
- * décision, Technique pour un choix, un environnement, une opération ou une exigence, Fonctionnel pour le reste.
+ * décision, Technique pour un choix, un environnement, une opération ou une exigence, Sécurité pour une menace ou une
+ * donnée classée, Fonctionnel pour le reste.
  */
 const deliverableOf = (type: SpecItem["type"]) => {
   if (type === "table") return "data";
   if (isTechnical(type)) return "technical";
+  if (SECURITY_TYPES.includes(type)) return "security";
   return ARCHITECTURE_TYPES.includes(type) ? "architecture" : "functional";
 };
 
@@ -43,6 +47,7 @@ export class SpecItemService {
     @Inject(SpecArchitectureService) private readonly adrs: SpecArchitectureService,
     @Inject(SpecTechnicalService) private readonly technical: SpecTechnicalService,
     @Inject(SpecTechnicalApiService) private readonly operations: SpecTechnicalApiService,
+    @Inject(SpecSecurityService) private readonly security: SpecSecurityService,
   ) {}
 
   async get(
@@ -84,6 +89,8 @@ export class SpecItemService {
       );
     }
     if (isTechnical(type)) return this.technicalValues(scope, type, id);
+    if (type === "threat") return this.security.threat(scope, {}, id);
+    if (type === "sensitive") return this.security.entry(scope, {}, id);
     if (type === "archflow") return this.architecture.flow(scope, { flowId: id });
     if (type === "adr") return this.adrs.adr(scope, { adrId: id });
     const entity = await this.specs.entity(scope, type, id);

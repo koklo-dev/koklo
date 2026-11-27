@@ -29,6 +29,7 @@ describe("sections du cahier technique (TK-115)", () => {
     expect(DOC_SECTION_DIRS).toEqual({
       architecture: "architecture/overview",
       technical: "tech/cahier-technique",
+      security: "security/dossier",
     });
     expect(docSectionPath(1, "objet", "technical")).toBe("tech/cahier-technique/01-objet.md");
     expect(docSectionSlugOf("tech/cahier-technique/01-objet.md", "technical")).toEqual({

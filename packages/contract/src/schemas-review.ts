@@ -57,6 +57,13 @@ export const reviewSubmitInputSchema = z
     path: ["targetRef"],
   });
 
+/** « Valider » la Sécurité (3.19.0, B804) : la décision du livrable, à la version lue. */
+export const securityValidateInputSchema = z.object({
+  projectId: z.uuid(),
+  version: z.string().min(1).max(REVIEW_VERSION_MAX),
+  comment: z.string().max(REVIEW_COMMENT_MAX).refine(isCleanText, CLEAN_MESSAGE).optional(),
+});
+
 export const reviewSubmitOutputSchema = z.object({
   id: z.uuid(),
   status: reviewStatusSchema,

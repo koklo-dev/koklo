@@ -30,6 +30,7 @@ const KEPT_DIRECTORIES = [
   "nfr",
   "api/endpoints",
   "tech/stack",
+  "security/threats",
   "design/tokens",
   "design/components",
   "design/screens",

@@ -29,6 +29,8 @@ const NAMES = [
   "projects",
   "roles",
   "rules",
+  "security",
+  "securityContactSet",
   "technical",
   "technicalDocument",
   "technicalEnvironments",
@@ -124,9 +126,9 @@ describe("CS1 surface : exactement feature, features, projects", () => {
     expect(Object.keys(d.paths[path] ?? {})).toEqual(["get"]);
   });
 
-  it("le contrat courant est 3.18.0 (clientSpace est apparu en 0.11.0)", async () => {
-    expect(api.CONTRACT_VERSION).toBe("3.18.0");
-    expect((await doc()).info.version).toBe("3.18.0");
+  it("le contrat courant est 3.19.0 (clientSpace est apparu en 0.11.0)", async () => {
+    expect(api.CONTRACT_VERSION).toBe("3.19.0");
+    expect((await doc()).info.version).toBe("3.19.0");
   });
 });
 

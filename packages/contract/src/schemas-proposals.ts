@@ -26,6 +26,11 @@ export const proposalModeSchema = z.enum([
   /** Technique (3.17.0) : « Comparer les options d'un choix » et « Rendre les exigences mesurables ». */
   "compare",
   "nfr",
+  /** Sécurité (3.19.0, B806). */
+  "threats",
+  "classify",
+  "asvs",
+  "summary",
 ]);
 export const proposalKindSchema = z.enum([
   "feature",
@@ -44,6 +49,11 @@ export const proposalKindSchema = z.enum([
   "op",
   "nfr",
   "env",
+  "threat",
+  "sensitive",
+  "right",
+  "asvs",
+  "summary",
 ]);
 export const proposalStatusSchema = z.enum(["pending", "accepted", "rejected"]);
 export const launchStatusSchema = z.enum(["queued", "running", "done", "failed", "canceled"]);
@@ -61,6 +71,12 @@ export const aiProposeDeliverableInputSchema = z.object({
 export const aiProposeDeliverableOutputSchema = z.object({
   launchId: z.uuid(),
   status: launchStatusSchema,
+});
+
+/** « Mettre à jour avec l'agent » du résumé client (3.19.0) : lancement `summary` du livrable Sécurité. */
+export const securitySummaryProposeInputSchema = z.object({
+  projectId: z.uuid(),
+  instruction: instructionSchema.optional(),
 });
 
 export const aiProposeOptionsInputSchema = z.object({

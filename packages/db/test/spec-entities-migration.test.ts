@@ -49,10 +49,10 @@ describe("TK-100 migration spec_entities : dossier et contenu", () => {
     expect(down).toMatch(/CREATE TYPE "?(?:public"?\.)?"?review_target_kind"? AS ENUM/i);
   });
 
-  it("expectedTables contient les deux tables (63 au total) ; ce sont des modèles d'organisation", () => {
+  it("expectedTables contient les deux tables (64 au total) ; ce sont des modèles d'organisation", () => {
     expect(expectedTables).toContain("spec_entities");
     expect(expectedTables).toContain("review_versions");
-    expect(expectedTables).toHaveLength(63);
+    expect(expectedTables).toHaveLength(64);
     expect(dbPackage.TENANT_MODELS).toContain("SpecEntity");
     expect(dbPackage.TENANT_MODELS).toContain("ReviewVersion");
   });

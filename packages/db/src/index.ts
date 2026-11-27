@@ -16,6 +16,7 @@ export type {
   CurrentFlowItem,
   CurrentFlowMessage,
 } from "./dossier-archflows.ts";
+export { type CurrentSecurity, currentSecurity } from "./dossier-security.ts";
 export {
   type CurrentArchitecture,
   type CurrentComponent,

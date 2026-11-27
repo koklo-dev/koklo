@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   AdrSchema,
   ArchFlowSchema,
+  AsvsFileSchema,
   BusinessRuleSchema,
   ComponentSchema,
   EndpointSchema,
@@ -12,12 +13,16 @@ import {
   OperationSchema,
   ProjectManifestSchema,
   RelationSchema,
+  RightsFileSchema,
   RolesFileSchema,
   ScreenSchema,
+  SecurityDataSchema,
+  SecuritySummarySchema,
   StackSchema,
   TableSchema,
   TableV2Schema,
   TestScenarioSchema,
+  ThreatSchema,
 } from "./entities/index.ts";
 
 const BASE = "https://koklo.dev/schemas/spec/v1";
@@ -25,6 +30,7 @@ const BASE = "https://koklo.dev/schemas/spec/v1";
 const entities = {
   adr: AdrSchema,
   archflow: ArchFlowSchema,
+  asvs: AsvsFileSchema,
   component: ComponentSchema,
   endpoint: EndpointSchema,
   environments: EnvironmentsFileSchema,
@@ -34,13 +40,17 @@ const entities = {
   operation: OperationSchema,
   project: ProjectManifestSchema,
   relation: RelationSchema,
+  rights: RightsFileSchema,
   roles: RolesFileSchema,
   rule: BusinessRuleSchema,
   screen: ScreenSchema,
+  "security-data": SecurityDataSchema,
+  "security-summary": SecuritySummarySchema,
   stack: StackSchema,
   table: TableSchema,
   "table-v2": TableV2Schema,
   "test-scenario": TestScenarioSchema,
+  threat: ThreatSchema,
 } as const;
 
 export type SchemaName = keyof typeof entities;

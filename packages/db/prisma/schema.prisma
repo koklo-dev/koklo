@@ -206,6 +206,7 @@ model Project {
   agentLaunches        AgentLaunch[]
   agentProposals       AgentProposal[]
   deliverableOverrides DeliverableOverride[]
+  incidentContacts     ProjectIncidentContact[]
 
   // Cible des clés étrangères composites (organization_id, project_id) des tables de TK-41 (H2).
   @@unique([organizationId, id])
@@ -322,6 +323,7 @@ enum CommentTargetKind {
   tech_section
   operation
   requirements
+  security_summary
 
   @@map("comment_target_kind")
 }
@@ -352,6 +354,7 @@ enum CounterName {
   rule
   adr
   nfr
+  threat
 
   @@map("counter_name")
 }
@@ -1831,6 +1834,26 @@ model DeliverableOverride {
   @@unique([projectId, deliverable])
   @@index([organizationId, projectId])
   @@map("deliverable_overrides")
+}
+
+/// Contact en cas d'incident d'un projet (TK-117, B801) : écrit par le client lié, lu par lui et par l'équipe. Une ligne
+/// par projet ; `name` (120 au plus) et `phone` (40 au plus) sont bornés par des CHECK de la migration. Jamais dans Git, ni
+/// envoyé à l'agent, ni recopié dans l'audit. `updatedBy` sans clé étrangère (RGPD).
+model ProjectIncidentContact {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  name           String
+  phone          String
+  updatedBy      String   @map("updated_by") @db.Uuid
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [organizationId, projectId], references: [organizationId, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organizationId, id])
+  @@unique([projectId])
+  @@index([organizationId, projectId])
+  @@map("project_incident_contacts")
 }
 
 /// Index d'entités générique d'un snapshot (TK-100, B11, B325) : une ligne par élément du modèle (fonctionnalité, règle, rôles,

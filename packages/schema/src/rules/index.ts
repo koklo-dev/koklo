@@ -32,6 +32,8 @@ export type SpecIndex = {
   flows: Set<string>;
   stacks: Set<string>;
   nfrs: Set<string>;
+  environments: Set<string>;
+  threats: Set<string>;
 };
 
 export function buildIndex(spec: ParsedSpec): SpecIndex {
@@ -59,5 +61,9 @@ export function buildIndex(spec: ParsedSpec): SpecIndex {
     flows: new Set(spec.flows.map((f) => f.value.id)),
     stacks: new Set(spec.stacks.map((s) => s.value.id)),
     nfrs: new Set(spec.nfrs.map((n) => n.value.id)),
+    environments: new Set(
+      spec.environments.flatMap((f) => f.value.environnements.map((e) => e.id)),
+    ),
+    threats: new Set(spec.threats.map((t) => t.value.id)),
   };
 }

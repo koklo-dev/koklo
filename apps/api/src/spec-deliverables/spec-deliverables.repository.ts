@@ -1,7 +1,11 @@
 import type { DeliverableKey } from "@koklo/domain";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { IdeaImpact } from "./deliverable-impact.ts";
-import type { TechnicalUpstreamFacts, UpstreamFacts } from "./deliverable-upstream.ts";
+import type {
+  SecurityUpstreamFacts,
+  TechnicalUpstreamFacts,
+  UpstreamFacts,
+} from "./deliverable-upstream.ts";
 
 export const SPEC_DELIVERABLES_REPOSITORY = Symbol("SPEC_DELIVERABLES_REPOSITORY");
 
@@ -19,6 +23,8 @@ export interface DeliverableRecord {
   upstream: Record<"data" | "architecture", UpstreamFacts | null>;
   /** Impact de l'architecture sur le cahier technique (TK-115, B735) ; `null` : jamais décidé ou rien d'indexé. */
   technicalUpstream: TechnicalUpstreamFacts | null;
+  /** Impact de la stack, des opérations, des tables et des rôles sur la Sécurité (TK-117, B805). */
+  securityUpstream: SecurityUpstreamFacts | null;
   /** Propositions de l'agent en attente, par livrable (vide si `withPending` est faux). */
   pendingByDeliverable: Partial<Record<DeliverableKey, number>>;
 }

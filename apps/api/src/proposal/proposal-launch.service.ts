@@ -17,17 +17,19 @@ import { forbidden, validation } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { LAUNCH_REPOSITORY, type LaunchRepository, type NewLaunch } from "./launch.repository.ts";
 import { assertDeliverableRole } from "./proposal-access.ts";
+import { securityDraft, securityOptions } from "./security-launch.ts";
 import { technicalDraft, technicalOptions } from "./technical-launch.ts";
 
 /**
- * Livrables branchés : le Fonctionnel (TK-99a), les Données (TK-107), l'Architecture (TK-111), le Technique (TK-115) ; les
- * trois autres sont refusés (TK-100).
+ * Livrables branchés : le Fonctionnel (TK-99a), les Données (TK-107), l'Architecture (TK-111), le Technique (TK-115), la
+ * Sécurité (TK-117) ; les deux autres sont refusés (TK-100).
  */
 const WIRED_DELIVERABLES: Readonly<Record<string, true>> = {
   functional: true,
   data: true,
   architecture: true,
   technical: true,
+  security: true,
 };
 /** Modes de l'Architecture (TK-111) : compléter, une décision, le document, tout reproposer. */
 const ARCHITECTURE_MODES: readonly string[] = ["complete", "decision", "document", "all"];
@@ -49,6 +51,7 @@ const READ_LABELS: Record<string, string> = {
   "architecture.current": "Architecture actuelle",
   "nfr.known": "Exigences connues",
   "technical.current": "Cahier technique actuel",
+  "security.current": "Sécurité actuelle",
 };
 const readsOf = (ids: readonly string[]) => ids.map((id) => ({ id, label: READ_LABELS[id] ?? id }));
 
@@ -107,6 +110,7 @@ export class ProposalLaunchService {
     if (input.deliverable === "data") return this.dataLaunch(scope, input, role);
     if (input.deliverable === "architecture") return this.architectureLaunch(scope, input, role);
     if (input.deliverable === "technical") return this.technicalLaunch(scope, input, role);
+    if (input.deliverable === "security") return this.securityLaunch(scope, input, role);
     return this.functionalLaunch(scope, input);
   }
 
@@ -119,6 +123,9 @@ export class ProposalLaunchService {
     if (input.deliverable === "technical") {
       const { deliverables } = await this.deliverables.list(scope, role);
       return technicalOptions(await this.launches.technicalFacts(scope), deliverables);
+    }
+    if (input.deliverable === "security") {
+      return securityOptions(await this.launches.securityFacts(scope));
     }
     if (input.deliverable === "data") {
       return {
@@ -265,6 +272,17 @@ export class ProposalLaunchService {
     assertDeliverableRole("technical", role);
     const { deliverables } = await this.deliverables.list(scope, role);
     return technicalDraft(input, await this.launches.technicalFacts(scope), deliverables);
+  }
+
+  /** Sécurité (TK-117) : owner, admin et développeur ; contrôles dans `securityDraft`. */
+  private async securityLaunch(
+    scope: ProjectScope,
+    input: AiProposeDeliverableInput,
+    role: string | undefined,
+  ): Promise<NewLaunch> {
+    assertDeliverableRole("security", role);
+    const { deliverables } = await this.deliverables.list(scope, role);
+    return securityDraft(input, await this.launches.securityFacts(scope), deliverables);
   }
 
   private async admitOrRelease(scope: ProjectScope, launchId: string, requestId: string) {

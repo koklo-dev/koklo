@@ -158,6 +158,7 @@ describe("TK-28 C7 parité des valeurs fermées avec @koklo/domain", () => {
         "tech_section",
         "operation",
         "requirements",
+        "security_summary",
       ],
     ],
     ["ticket_comments", "author_kind", ["human", "agent", "client", "system"]],
@@ -165,7 +166,7 @@ describe("TK-28 C7 parité des valeurs fermées avec @koklo/domain", () => {
     [
       "project_counters",
       "name",
-      ["ticket", "sprint", "feature", "suggestion", "rule", "adr", "nfr"],
+      ["ticket", "sprint", "feature", "suggestion", "rule", "adr", "nfr", "threat"],
     ],
   ];
 

@@ -4,6 +4,7 @@ import { parseDataRef, type SpecIndex } from "./index.ts";
 import { checkDataLinks } from "./rule4-data.ts";
 import { checkDomainLinks } from "./rule4-domain.ts";
 import { type Collect, checkLinks, type Emit, emitterFor } from "./rule4-links.ts";
+import { checkSecurityLinks } from "./rule4-security.ts";
 import { checkTechnicalLinks } from "./rule4-technical.ts";
 
 /** `T-x` ou `T-x.champ` : la table puis le champ doivent exister. */
@@ -148,7 +149,7 @@ function testLinks(spec: ParsedSpec, index: SpecIndex, at: Collect): void {
   }
 }
 
-/** Règle 4 : tout lien pointe vers une feature, table/champ, endpoint, écran, critère, rôle, permission ou règle existant ; les références du cahier technique comprises. */
+/** Règle 4 : tout lien pointe vers une feature, table/champ, endpoint, écran, critère, rôle, permission ou règle existant ; les références du cahier technique et de la Sécurité comprises. */
 export function checkRule4(spec: ParsedSpec, index: SpecIndex): Issue[] {
   const out: Issue[] = [];
   const at: Collect = (path, entityId) => emitterFor(out, path, entityId);
@@ -159,5 +160,6 @@ export function checkRule4(spec: ParsedSpec, index: SpecIndex): Issue[] {
   checkDomainLinks(spec, index, at);
   checkDataLinks(spec, index, at);
   checkTechnicalLinks(spec, index, at);
+  checkSecurityLinks(spec, index, at);
   return out;
 }

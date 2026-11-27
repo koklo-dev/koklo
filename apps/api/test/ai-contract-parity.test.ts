@@ -157,6 +157,7 @@ describe("les propositions de l'agent : vocabulaires du contrat égaux à ceux d
       ...domain.AGENT_PROPOSAL_KINDS,
       ...domain.AGENT_PROPOSAL_STATUSES,
       ...domain.FUNCTIONAL_MODES,
+      ...domain.SECURITY_MODES,
       ...domain.DELIVERABLES,
       "inconnu",
     ];
@@ -177,9 +178,10 @@ describe("les propositions de l'agent : vocabulaires du contrat égaux à ceux d
   });
 
   it("modes du lancement : ceux du domaine", async () => {
-    // « nfr » (TK-115) est à la fois un type de proposition (sonde ci-dessus) et un mode du Technique.
+    // « nfr » (TK-115) est à la fois un type de proposition (sonde ci-dessus) et un mode du Technique ; les modes de la
+    // Sécurité (TK-117) s'y ajoutent.
     expect(await enumOf("ai.proposeDeliverable", "inputSchemas", "mode")).toEqual(
-      [...domain.FUNCTIONAL_MODES, "nfr"].sort(),
+      [...new Set([...domain.FUNCTIONAL_MODES, "nfr", ...domain.SECURITY_MODES])].sort(),
     );
   });
 

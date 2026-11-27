@@ -62,13 +62,14 @@ describe("spec.data.tables.list", () => {
       specId: "T-table-004",
       name: "Table 004",
       zone: expect.any(String),
-      fieldCount: 5,
+      // TK-117 : `large` ajoute 23 mesures à chaque table (au moins 2 000 champs à classer).
+      fieldCount: 28,
       personalData: true,
       filePath: "data/tables/table-004.yaml",
     });
     expect(by("T-table-004").usedBy).toEqual([expect.stringMatching(/^F-\d{3}$/)]);
     expect(by("T-table-003").personalData).toBe(false);
-    expect(by("T-table-003").fieldCount).toBe(4);
+    expect(by("T-table-003").fieldCount).toBe(27);
     // Une relation est déclarée une fois (B384) et comptée des deux côtés.
     expect(by("T-table-001").relationCount).toBe(1);
     expect(by("T-table-002").relationCount).toBe(2);

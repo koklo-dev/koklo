@@ -17,9 +17,9 @@ const batch = (operations: unknown[]) => ({ projectId: UUID, idempotencyKey: "k-
 const ok = (operation: unknown) => isValid(input("specBatch.submit"), batch([operation]));
 
 describe("TK-115 surface", () => {
-  it("version 3.18.0 (additif : mineure)", async () => {
-    expect(CONTRACT_VERSION).toBe("3.18.0");
-    expect((await doc()).info.version).toBe("3.18.0");
+  it("version 3.19.0 (additif : mineure)", async () => {
+    expect(CONTRACT_VERSION).toBe("3.19.0");
+    expect((await doc()).info.version).toBe("3.19.0");
   });
 
   it.each([
@@ -144,11 +144,12 @@ describe("TK-115 specBatch.submit : stack, op, nfr, env", () => {
     expect(await ok({ kind: "env.delete", specId: "ENV-recette" })).toBe(true);
   });
 
-  it("doc.section.* : deliverable facultatif, architecture ou technique seulement", async () => {
+  it("doc.section.* : deliverable facultatif, un livrable à document seulement (Sécurité en 3.19.0)", async () => {
     const section = { kind: "doc.section.create", title: "Objet", markdown: "Texte." };
     expect(await ok(section)).toBe(true);
     expect(await ok({ ...section, deliverable: "technical" })).toBe(true);
-    expect(await ok({ ...section, deliverable: "security" })).toBe(false);
+    expect(await ok({ ...section, deliverable: "security" })).toBe(true);
+    expect(await ok({ ...section, deliverable: "functional" })).toBe(false);
     const kept = await parsed(
       input("specBatch.submit"),
       batch([{ kind: "doc.section.delete", specId: "DOC-objet", deliverable: "technical" }]),

@@ -3,7 +3,7 @@ import { Controller, Inject, Req, UseGuards } from "@nestjs/common";
 import { Implement } from "@orpc/nest";
 import { implement } from "@orpc/server";
 import type { Request } from "express";
-import { CLIENT_SPACE_READ_ROLES } from "../auth/roles.ts";
+import { CLIENT_ROLE, CLIENT_SPACE_READ_ROLES } from "../auth/roles.ts";
 import { RoleGuard, Roles, requireSession, SessionGuard } from "../auth/session.guard.ts";
 import { PROJECT_ACCESS, type ProjectAccess } from "../project/project-access.ts";
 import { guard, requestIdOf } from "../request-context.ts";
@@ -12,11 +12,13 @@ import { ClientSpaceService } from "./client-space.service.ts";
 import { ClientSpaceArchitectureService } from "./client-space-architecture.service.ts";
 import { ClientSpaceDataService } from "./client-space-data.service.ts";
 import { ClientSpaceEntitiesService } from "./client-space-entities.service.ts";
+import { ClientSpaceSecurityService } from "./client-space-security.service.ts";
 import { ClientSpaceTechnicalService } from "./client-space-technical.service.ts";
 
 /**
  * Lectures de l'espace client (CDC §14, TK-55b) : les six rôles. Le client n'atteint que ses projets
- * liés, les autres rôles toute leur organisation ; un projet inaccessible est un 404 uniforme.
+ * liés, les autres rôles toute leur organisation ; un projet inaccessible est un 404 uniforme. Seule écriture : le
+ * contact en cas d'incident (TK-117, B801), par le client lié.
  */
 @Controller()
 export class ClientSpaceController {
@@ -28,6 +30,7 @@ export class ClientSpaceController {
     private readonly architecture: ClientSpaceArchitectureService,
     @Inject(ClientSpaceTechnicalService)
     private readonly technical: ClientSpaceTechnicalService,
+    @Inject(ClientSpaceSecurityService) private readonly security: ClientSpaceSecurityService,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -403,6 +406,36 @@ export class ClientSpaceController {
         errors,
         input.projectId,
         (scope) => this.technical.requirements(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.security)
+  securitySummary(@Req() request: Request) {
+    return implement(contract.clientSpace.security).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.security.summary(scope, requireSession(request).role),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(CLIENT_ROLE)
+  @Implement(contract.clientSpace.securityContactSet)
+  securityContactSet(@Req() request: Request) {
+    return implement(contract.clientSpace.securityContactSet).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.security.setContact(scope, input),
         this.access,
       ),
     );

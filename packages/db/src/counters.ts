@@ -4,7 +4,15 @@ import type { TenantClient } from "./tenant-extension.ts";
 export type TenantTx = Parameters<Parameters<TenantClient["$transaction"]>[0]>[0];
 
 export type CounterScope = { readonly organizationId: string; readonly projectId: string };
-export type CounterName = "ticket" | "sprint" | "feature" | "suggestion" | "rule" | "adr" | "nfr";
+export type CounterName =
+  | "ticket"
+  | "sprint"
+  | "feature"
+  | "suggestion"
+  | "rule"
+  | "adr"
+  | "nfr"
+  | "threat";
 
 const COUNTER_MAX = 2_147_483_647;
 

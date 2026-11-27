@@ -10,8 +10,10 @@ import type {
   LaunchRepository,
   NewLaunch,
   OptionFacts,
+  SecurityFacts,
   TechnicalFacts,
 } from "./launch.repository.ts";
+import { readSecurityFacts } from "./security-facts.query.ts";
 
 const ACTIVE: AgentLaunchStatus[] = ["queued", "running"];
 
@@ -152,6 +154,16 @@ export class PrismaLaunchRepository implements LaunchRepository {
         openChoices,
         requirements: await count("nfr"),
       };
+    });
+  }
+
+  securityFacts(scope: ProjectScope): Promise<SecurityFacts> {
+    return this.transactions.run(scope, async (tx) => {
+      const found = await this.resolver.resolve(tx, scope, {});
+      if (!found || found.snapshot.status === "failed") {
+        return { surfaces: 0, unclassified: 0, unanswered: 0 };
+      }
+      return readSecurityFacts(tx, found.snapshot.id);
     });
   }
 

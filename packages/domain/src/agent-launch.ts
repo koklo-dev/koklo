@@ -25,6 +25,10 @@ export type Deliverable = (typeof DELIVERABLES)[number];
 export const FUNCTIONAL_MODES = ["complete", "criteria", "update", "all"] as const;
 export type FunctionalMode = (typeof FUNCTIONAL_MODES)[number];
 
+/** Modes de lancement de la Sécurité (TK-117, B806). */
+export const SECURITY_MODES = ["threats", "classify", "asvs", "summary"] as const;
+export type SecurityMode = (typeof SECURITY_MODES)[number];
+
 export const AGENT_LAUNCH_STATUSES = ["queued", "running", "done", "failed", "canceled"] as const;
 export type AgentLaunchStatus = (typeof AGENT_LAUNCH_STATUSES)[number];
 
@@ -47,6 +51,12 @@ export const AGENT_PROPOSAL_KINDS = [
   "op",
   "nfr",
   "env",
+  /** Sécurité (TK-117) : menace, donnée sensible, droit, exigence ASVS et résumé client. */
+  "threat",
+  "sensitive",
+  "right",
+  "asvs",
+  "summary",
 ] as const;
 export type AgentProposalKind = (typeof AGENT_PROPOSAL_KINDS)[number];
 
@@ -112,6 +122,14 @@ export const AGENT_READS = {
     "architecture.current",
     "nfr.known",
     "technical.current",
+  ],
+  /** Sécurité (TK-117) : fonctionnalités, rôles, tables, cahier technique et Sécurité actuelle. */
+  security: [
+    "functional.features",
+    "functional.roles",
+    "data.tables",
+    "technical.current",
+    "security.current",
   ],
 } as const;
 
