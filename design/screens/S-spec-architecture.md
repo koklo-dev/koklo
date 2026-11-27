@@ -1,7 +1,7 @@
 ---
 id: S-spec-architecture
 titre: Spec · Architecture (Prêt, Génération, Relecture, Liste · équipe ; onglets Document et Composants)
-version: 10
+version: 12
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/13-Lot7Architecture.html` (`pnpm maquette 13`), passations 10 §1 à §4.3 et §6 à §8, 12 §8.1, 11 §3, 14 §3. Même socle que [S-spec-data](S-spec-data.md) et [S-spec-functional](S-spec-functional.md). Schéma et Flux : TK-112 (§11). Décisions : TK-113.
 
@@ -47,6 +47,7 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 | 9 | 2026-11-24 | TK-114e | Relecture : alerte « Enregistrement échoué » avec motif en mots simples et « Réessayer l'enregistrement » (§16, B672 à B674), bouton du bandeau retiré tant qu'elle est affichée ; bilan « sections déjà présentes écartées » (B670) ; sans maquette, aucun composant ajouté à `packages/ui`. |
 | 10 | 2026-11-24 | TK-114f | Lectures limitées par GitHub : « GitHub limite les lectures, réessayez dans N min. » + « Réessayer » sur les vues YAML/Mermaid et le document (§17, B694) ; sans maquette, aucun composant ajouté. |
 | 11 | 2026-11-24 | TK-114g | Relecture : une création déjà présente sur la tête passe à l'état terminal « Déjà présente dans la spec » (§18, B697 à B704) au lieu de revenir « À relire » ; comptée à part dans le bandeau, le badge du menu et le récapitulatif ; variante `present` de `ProposalStatus` dans `packages/ui` (DESIGN.md §5.25 v2.35). |
+| 12 | 2026-11-27 | TK-114i | Correctif d'affichage (§19) : identifiants longs dans les listes de flux et la fiche du composant, compteur « Composants » en relecture limité aux composants pas encore dans la spec, fiche du schéma sans défilement horizontal (B708 à B714). |
 
 ## 11. Schéma et Flux (TK-112, maquette 13 l.175-239, 405-441, 576-752, 814-852)
 - **Schéma** : lecteur du lot 6 ; vue des zones dès 3 zones et plus de 12 composants, ou plus de 25 composants en 2 zones (TK-114c, B632 ; avant : au-delà de 25) (carte : nom, « N composants · N acteurs · cliquez pour ouvrir », 5 noms + « +N », liens « N liens ») ; zone ouverte en 4 couches (Utilisateurs, Applications, Services, Données et services externes), formes par type, type toujours écrit, liens étiquetés, asynchrone en pointillés, composant d'une autre zone estompé qui ouvre sa zone, relié par un trait à chaque composant de la zone qui l'appelle ou qu'il appelle (TK-114c, B641). Fiche : Fiche · YAML · Mermaid (équipe seulement). Glisser (owner, admin, développeur) : `spec.architecture.layout.save`, sans relecture, désactivé sous 768 px. « Aller à un composant… » (`/`) cherche sur toute la spec.
@@ -121,3 +122,14 @@ Aucune bloquante (B506 à B515 décidées en autonomie).
 - **Clavier et annonces** : J/K passent sur la ligne ; le récapitulatif passe par la région `role="status"` existante ; aucune annonce à l'ouverture (état, pas événement).
 - **375 px** : pastille à la ligne sous le titre, sans troncature ni défilement horizontal.
 - **États comparés** (captures `review-already-present-*` : clair, sombre, 375 px clair et sombre) : relecture de l'architecture avec la section déjà présente sélectionnée ; récapitulatif après enregistrement « 1 proposition écartée : déjà présente dans la spec » (clair).
+
+## 19. Identifiants longs, compteur « Composants » et largeur de la fiche (TK-114i, maquette 13 l.175-239, 363-374, 405-441, B708 à B714)
+- **Liste des flux** (équipe et client) : identifiant court, disposition de la maquette (identifiant, titre coupé, ligne de 52) ; identifiant qui laisse moins de 112 px : titre dessous sur toute la largeur, ligne plus haute ; identifiant plus large que la ligne : coupé ; les deux complets au survol, titre entier dans le `h2` du détail.
+- **En-têtes** (détail d'un flux, fiche du composant) : identifiant coupé s'il le faut ; pastille, « Modifier » / « Commenter » et sélecteur toujours entiers ; nom et pastilles de liens passent à la ligne.
+- **Fiche ouverte** : de 1280 à 1440 px (fiche ancrée) et sous 1280 (panneau), aucun défilement horizontal ; seules les sources YAML et Mermaid défilent dans leur cadre.
+- **Compteur de l'onglet Composants et barre de compte, en relecture** : composants de la spec + créations proposées à relire ou acceptées pas encore enregistrées (y compris tenues par un enregistrement échoué) ; ni les enregistrées, ni les rejetées, ni les déjà présentes, ni les modifications. Tableau : une ligne proposée seulement pour une création absente de la spec (une rejetée garde sa ligne « Rejetée », non comptée).
+- **États** : vide, chargement, erreur, droits inchangés ; lecture du compte en cours ou échouée : le compte de la spec seul. Designer : sans « Modifier » ; client : mêmes corrections, sans relecture.
+- **Clavier et annonces** : inchangés (un bouton par ligne, nom accessible complet ; `title` n'est qu'un confort).
+- **375 px** : liste puis détail ; titre sous l'identifiant long ; aucun défilement horizontal.
+- **Alternatives écartées** : titre au-dessus de l'identifiant (écart à la maquette) ; `overflow-hidden` sur la page (masque le défaut) ; panneau superposé jusqu'à 1440 px (change la planche et les Données) ; nouveau compte `applied` au contrat (le web a déjà ce qu'il faut).
+- **États comparés** (captures `long-id-*`) : zone longue avec fiche à 1366, clair puis sombre ; flux à 1366 (un long, un court) ; flux à 375 px ; fiche en panneau à 375 px ; vue Mermaid de la fiche à 1280.

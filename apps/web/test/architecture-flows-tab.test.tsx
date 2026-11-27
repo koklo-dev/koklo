@@ -1,7 +1,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FLOW_ROWS, renderArchitecture, serveArchitecture } from "./support/architecture.tsx";
+import {
+  FLOW_DETAIL,
+  FLOW_ROWS,
+  renderArchitecture,
+  serveArchitecture,
+  serveSchema,
+} from "./support/architecture.tsx";
 import { RATE_LIMITED_TEXT, rejectOnce, sourceOf } from "./support/git-read.ts";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
@@ -164,5 +170,40 @@ describe("Onglet Flux", () => {
     await userEvent.click(back);
     await waitFor(() => expect(window.location.search).not.toContain("f="));
     expect(FLOW_ROWS).toHaveLength(2);
+  });
+});
+
+/** TK-114i (B708 à B710) : un identifiant de flux long ne doit plus écraser le titre. */
+describe("Onglet Flux : identifiant long (TK-114i)", () => {
+  const specId = "P-consultation-de-la-transparence-sur-les-donnees";
+  const title = "Consulter la transparence sur les données";
+  const serveLong = () => {
+    serveArchitecture("owner");
+    serveSchema({ flows: [{ ...FLOW_ROWS[0], specId, title }] });
+    procedures.specArchitectureFlowsById.mockResolvedValue({ ...FLOW_DETAIL, specId, title });
+    renderArchitecture({ search: "tab=flows" });
+  };
+
+  it("liste : identifiant et titre complets au survol, ligne de 52 au minimum (A4)", async () => {
+    serveLong();
+    const rows = within(await list());
+    const tag = await rows.findByTitle(specId);
+    expect(tag).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
+    expect(rows.getByTitle(title)).toHaveClass("truncate", "basis-28", "flex-1");
+    expect(tag.parentElement).toHaveClass("flex-wrap");
+    expect(tag.parentElement).toContainElement(rows.getByTitle(title));
+    const row = rows.getByRole("listitem");
+    expect(row).toHaveClass("min-h-[52px]");
+    expect(row).not.toHaveClass("h-[52px]");
+    // Nom inchangé : identifiant puis titre (jsdom, sans feuille de style, ne met pas d'espace entre deux `span`).
+    expect(rows.getByRole("button", { name: new RegExp(`^${specId}\\s*${title}`) })).toBeVisible();
+  });
+
+  it("détail : identifiant tronqué, titre qui se coupe partout", async () => {
+    serveLong();
+    const heading = await screen.findByRole("heading", { level: 2, name: title });
+    expect(heading).toHaveClass("min-w-0", "[overflow-wrap:anywhere]");
+    const header = within(heading.parentElement as HTMLElement);
+    expect(header.getByTitle(specId)).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
   });
 });

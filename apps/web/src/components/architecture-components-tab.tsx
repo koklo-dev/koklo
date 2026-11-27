@@ -27,9 +27,9 @@ import {
   decisionsText,
 } from "../lib/architecture-labels.ts";
 import { architectureRefOf } from "../lib/proposal-architecture.ts";
-import type { ProposalOutput } from "../lib/proposal-types.ts";
 import { COMPONENTS_PAGE_SIZE } from "../lib/use-architecture-components.ts";
 import type { ArchitecturePageModel } from "../lib/use-architecture-page.ts";
+import { isProposedComponent } from "../lib/use-architecture-proposed.ts";
 import { useAutoLoad } from "../lib/use-auto-load.ts";
 import { NARROW_MAX, useMaxWidth } from "../lib/use-max-width.ts";
 import { FilterChipMenu } from "./features-filters.tsx";
@@ -54,9 +54,9 @@ interface Row {
 }
 
 /** Type en `Pill` : `soft` ; Externe en pointillé et écrit (maquette 13 l.797, DESIGN.md §5.22). */
-export function TypePill({ type }: { type: string }) {
+export function TypePill({ type, className }: { type: string; className?: string }) {
   return (
-    <Pill size="md" tone={type === "ext" ? "dashed" : "soft"}>
+    <Pill size="md" tone={type === "ext" ? "dashed" : "soft"} className={className}>
       {componentTypeLabel(type)}
     </Pill>
   );
@@ -167,9 +167,12 @@ function Skeletons() {
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /** Composants proposés par l'agent, ajoutés sous ceux de la spec pendant la relecture (identifiant `C-<slug du nom>`). */
-function proposedRows(proposals: readonly ProposalOutput[], saved: ReadonlySet<string>): Row[] {
+function proposedRows(
+  { proposals, failed }: ArchitecturePageModel["review"],
+  saved: ReadonlySet<string>,
+): Row[] {
   return proposals
-    .filter((proposal) => proposal.kind === "component")
+    .filter((proposal) => isProposedComponent(proposal, failed))
     .filter((proposal) => !saved.has(architectureRefOf(proposal)))
     .map((proposal) => {
       const { content } = proposal;
@@ -271,7 +274,7 @@ function rowsOf(page: ArchitecturePageModel): Row[] {
       decisions: item.decisions,
     })),
     ...(page.propose.reviewing
-      ? proposedRows(page.review.proposals, new Set(items.map((item) => item.specId)))
+      ? proposedRows(page.review, new Set(items.map((item) => item.specId)))
       : []),
   ];
 }
@@ -339,14 +342,14 @@ function ComponentsGrid({ page, rows }: { page: ArchitecturePageModel; rows: rea
 }
 
 /** Barre de compte : le total du serveur, les composants chargés, la recherche en cours, l'annonce de l'écran. */
-function Count({ page, proposed }: { page: ArchitecturePageModel; proposed: number }) {
-  const { components, url, region } = page;
-  // Pendant la relecture, le total compte toutes les propositions du lancement, les chargées en sont une partie.
-  const proposedTotal = page.propose.reviewing ? Math.max(page.proposedComponents, proposed) : 0;
+function Count({ page, rows }: { page: ArchitecturePageModel; rows: readonly Row[] }) {
+  const { components, url, region, proposedComponents } = page;
+  // Pendant la relecture, le total ajoute les composants proposés de tout le lancement ; les lignes chargées en sont une partie.
+  const proposed = rows.filter((row) => row.state && row.state !== "rejected").length;
   return (
     <CountBar
-      total={components.total + proposedTotal}
-      loaded={components.items.length + proposed}
+      total={components.total + proposedComponents}
+      loaded={components.items.length + Math.min(proposed, proposedComponents)}
       noun={COMPONENT_NOUN}
       {...(url.q ? { query: url.q } : {})}
       busy={components.stale}
@@ -364,12 +367,11 @@ function Count({ page, proposed }: { page: ArchitecturePageModel; proposed: numb
  * pour qui écrit (le Schéma l'ouvrira avec TK-112).
  */
 export function ArchitectureComponentsTab({ page }: { page: ArchitecturePageModel }) {
-  const { components, view } = page;
+  const { view } = page;
   const rows = rowsOf(page);
-  const proposed = rows.length - components.items.length;
   return (
     <div className="flex flex-col gap-3">
-      <Count page={page} proposed={proposed} />
+      <Count page={page} rows={rows} />
       {view.kind === "empty-filtered" ? (
         <NoResults page={page} />
       ) : view.kind === "loading" ? (

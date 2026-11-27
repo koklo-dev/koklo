@@ -45,8 +45,9 @@ last_reviewed: 2026-11-21
 | 025 | TK-114f (cache des lectures git par installation, dépôt et commit, frein pendant le quota, message « GitHub limite les lectures » avec « Réessayer » ; diagramme de séquence élargi, PR #238) | ✅ fusionné (PR #239) ; décisions B687 à B696 ; sans migration ni contrat |
 | 025 | TK-114g (création déjà présente sur la tête : état terminal « Déjà présente dans la spec », plus de remise à relire) | ✅ fusionné (PR #240) ; décisions B697 à B705 ; contrat 3.16.0 ; DESIGN v2.35 ; migration `discard_reason` |
 | 025 | TK-114h (relecture : identifiant long, le titre passe dessous au lieu d'être écrasé en colonne ; détail : l'identifiant passe à la ligne) | ✅ fusionné (branche `fix/tk-114h-identifiant-long`) ; correction directe, sans workflow |
+| 025 | TK-114i (identifiants longs : liste des flux, en-têtes et fiche sans débordement ; compteur « Composants » en relecture limité aux créations pas encore enregistrées) | ✅ fusionné (branche `fix/tk-114i-affichage-architecture`) ; décisions B708 à B717 ; web et ui seuls, sans contrat ni migration |
 
-Ticket en cours : aucun (TK-114h fusionné) (TK-114g fusionné) (TK-114f fusionné) (TK-114e fusionné) (TK-114d fusionné) (TK-114c fusionné) (TK-114b fusionné). Prochain : TK-115 (sprint 026, Technique : formats, états, Stack, Environnements), **pas encore lancé**. DoD des sprints 022 à 025 encore à vérifier avant de les cocher ; case de TK-110 (sprint 024) à cocher après relecture des captures.
+Ticket en cours : aucun (TK-114i fusionné) (TK-114h fusionné) (TK-114g fusionné) (TK-114f fusionné) (TK-114e fusionné) (TK-114d fusionné) (TK-114c fusionné) (TK-114b fusionné). Prochain : TK-115 (sprint 026, Technique : formats, états, Stack, Environnements), **pas encore lancé**. DoD des sprints 022 à 025 encore à vérifier avant de les cocher ; case de TK-110 (sprint 024) à cocher après relecture des captures.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 

@@ -6,7 +6,9 @@ import {
   type ArchNodeKind,
   DecisionStatus,
   DiagramViewer,
+  EntityChip,
   IdTag,
+  IdTitle,
   InlineAlert,
   ListPanel,
   ListRow,
@@ -138,6 +140,45 @@ function DevUiDecisionFrames() {
   );
 }
 
+const DEMO_FLOWS = [
+  { id: "P-reserver", title: "Réserver un rendez-vous" },
+  {
+    id: "P-consultation-de-la-transparence-sur-les-donnees",
+    title: "Consulter la transparence sur les données",
+  },
+];
+
+/** Identifiants longs (TK-114i) : `IdTitle`, ligne de 52 au minimum, `EntityChip` borné à son conteneur. */
+function DevUiLongIdFrames() {
+  return (
+    <>
+      <DevUiFrame title="IdTitle dans ListRow « min » : titre à côté d'un identifiant court, sous un long">
+        <ListPanel label="Flux, démonstration" className="max-w-[320px]">
+          {DEMO_FLOWS.map((flow) => (
+            <ListRow
+              key={flow.id}
+              fixedHeight="min"
+              title={<IdTitle id={flow.id} title={flow.title} size="sm" clipTitle />}
+              subtitle="Client · 3 composants, 1 externe"
+              onSelect={() => undefined}
+            />
+          ))}
+        </ListPanel>
+      </DevUiFrame>
+      <DevUiFrame title="EntityChip long : borné à son conteneur, identifiant tronqué, libellé à la ligne">
+        <div className="flex max-w-[260px] flex-wrap gap-1.5">
+          <EntityChip kind="component" id="C-api" title="contrat typé" />
+          <EntityChip
+            kind="component"
+            id="C-service-de-consultation-de-la-transparence"
+            title="vérification des jetons · asynchrone"
+          />
+        </div>
+      </DevUiFrame>
+    </>
+  );
+}
+
 /** Section « 23. Schéma d'architecture » : `ArchNodeCard`, le lecteur en couches (bandes, zone voisine), `SequenceDiagram`. */
 export function DevUiArchitecture() {
   const nodes = useMemo(() => nodesOf([DETAIL], GHOSTS), []);
@@ -151,6 +192,7 @@ export function DevUiArchitecture() {
   return (
     <DevUiSection id="dev-ui-architecture" title="23. Schéma d'architecture">
       <DevUiDecisionFrames />
+      <DevUiLongIdFrames />
       <DevUiFrame title="ArchNodeCard : une forme par type, le type toujours écrit">
         <div className="flex flex-wrap items-start gap-3">
           {KINDS.map((kind) => (

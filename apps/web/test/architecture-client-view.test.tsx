@@ -3,6 +3,9 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_ID } from "./support/architecture.tsx";
 import {
+  CLIENT_COMPONENTS,
+  CLIENT_FLOW,
+  CLIENT_FLOWS,
   renderClientArchitecture,
   serveClientArchitecture,
 } from "./support/architecture-client.tsx";
@@ -211,5 +214,68 @@ describe("Architecture · vue client", () => {
     renderClientArchitecture();
     expect(await screen.findByText("Impossible de charger l'architecture")).toBeVisible();
     expect(screen.getByRole("button", { name: /Réessayer/ })).toBeVisible();
+  });
+});
+
+/** TK-114i (B710, B714) : mêmes corrections pour la vue client (liste des flux, en-têtes du flux et de la fiche). */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("Architecture · vue client : identifiant long (TK-114i)", () => {
+  const specId = "P-consultation-de-la-transparence-sur-les-donnees";
+  const title = "Consulter la transparence sur les données";
+  const serveLongFlow = () => {
+    serveClientArchitecture("client");
+    procedures.clientSpaceArchFlows.mockResolvedValue({
+      items: [{ ...CLIENT_FLOWS[0], specId, title }],
+      nextCursor: null,
+      previousCursor: null,
+      offset: 0,
+      total: 1,
+      available: true,
+      validation: "validated",
+    });
+    procedures.clientSpaceArchFlow.mockResolvedValue({ ...CLIENT_FLOW, specId, title });
+    renderClientArchitecture("tab=flows");
+  };
+  const clipped = ["min-w-0", "max-w-full", "overflow-hidden"];
+
+  it("liste : identifiant et titre complets au survol, ligne de 52 au minimum (A4)", async () => {
+    serveLongFlow();
+    const rows = within(await screen.findByRole("region", { name: "Flux de l'architecture" }));
+    const tag = await rows.findByTitle(specId);
+    expect(tag).toHaveClass(...clipped);
+    expect(rows.getByTitle(title)).toHaveClass("truncate", "basis-28", "flex-1");
+    expect(tag.parentElement).toContainElement(rows.getByTitle(title));
+    const row = rows.getByRole("listitem");
+    expect(row).toHaveClass("min-h-[52px]");
+    expect(row).not.toHaveClass("h-[52px]");
+  });
+
+  it("détail du flux : identifiant tronqué, titre coupé partout, « Commenter » jamais rétréci", async () => {
+    serveLongFlow();
+    const heading = await screen.findByRole("heading", { level: 2, name: title });
+    expect(heading).toHaveClass("min-w-0", "[overflow-wrap:anywhere]");
+    const header = within(heading.parentElement as HTMLElement);
+    expect(header.getByTitle(specId)).toHaveClass(...clipped);
+    expect(header.getByRole("button", { name: "Commenter" })).toHaveClass("shrink-0");
+  });
+
+  it("fiche du composant : identifiant tronqué, type et « Commenter » jamais rétrécis", async () => {
+    const id = "C-service-de-consultation-de-la-transparence";
+    const name = "ServiceDeConsultationDeLaTransparenceSurLesDonnees";
+    serveClientArchitecture("client");
+    procedures.clientSpaceArchitecture.mockResolvedValue({
+      available: true,
+      validation: "validated",
+      truncated: false,
+      items: [{ ...CLIENT_COMPONENTS[0], id, name, dependsOn: [] }],
+      positions: {},
+    });
+    renderClientArchitecture(`tab=schema&sel=${id}`);
+    const heading = await screen.findByRole("heading", { level: 2, name });
+    expect(heading).toHaveClass("[overflow-wrap:anywhere]");
+    const fiche = within(heading.parentElement as HTMLElement);
+    expect(fiche.getByTitle(id)).toHaveClass(...clipped);
+    expect(fiche.getByRole("button", { name: "Commenter" })).toHaveClass("shrink-0");
+    expect(fiche.getByText("Service", { selector: "[data-slot='pill']" })).toHaveClass("shrink-0");
   });
 });

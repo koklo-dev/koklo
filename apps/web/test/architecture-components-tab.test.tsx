@@ -7,6 +7,7 @@ import {
   decisionsText,
 } from "../src/lib/architecture-labels.ts";
 import { componentRow, renderArchitecture, serveArchitecture } from "./support/architecture.tsx";
+import { fake, serveProposals } from "./support/proposals.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
 vi.mock("next/navigation", async () => {
@@ -134,5 +135,55 @@ describe("Onglet Composants : ligne vers le Schéma (B585)", () => {
     expect(await screen.findAllByRole("button", { name: "Modifier C-api, API" })).not.toHaveLength(
       0,
     );
+  });
+});
+
+const FAILED_BATCH = "0190cccc-0000-7000-8000-000000000002";
+const proposed = (n: number, name: string, over: Parameters<typeof fake>[1] = {}) =>
+  fake(n, {
+    kind: "component",
+    zone: "Communication",
+    title: name,
+    content: { name, type: "service", responsibility: "Envoie les rappels." },
+    ...over,
+  });
+
+/** TK-114i lot B (B4, B713) : seules les créations pas encore dans la spec ajoutent une ligne. */
+describe("Onglet Composants : lignes proposées en relecture", () => {
+  it("ni enregistrée, ni déjà présente, ni modification ; la rejetée garde sa ligne, hors du compte", async () => {
+    const rows = Array.from({ length: 70 }, (_, i) => componentRow(i + 1));
+    serveArchitecture("owner", { rows });
+    serveProposals(
+      [
+        proposed(1, "Déjà enregistrée hors page", {
+          status: "accepted",
+          appliedBatchId: "0190cccc-0000-7000-8000-000000000001",
+        }),
+        proposed(2, "Déjà présente", { status: "rejected", discardReason: "already_present" }),
+        proposed(3, "Mise à jour hors page", {
+          content: { specId: "C-composant-069", name: "Mise à jour hors page" },
+        }),
+        proposed(4, "Composant refusé", { status: "rejected" }),
+        proposed(5, "Composant à relire"),
+        proposed(6, "Composant accepté", { status: "accepted" }),
+        proposed(7, "Composant à rejouer", { status: "accepted", appliedBatchId: FAILED_BATCH }),
+      ],
+      { failed: { id: FAILED_BATCH, status: "failed", errorCode: "SPEC_INVALID" } },
+    );
+    renderArchitecture({ search: "view=review&tab=components" });
+    const grid = await screen.findByRole("table", { name: "Composants de l'architecture" });
+    // En-tête, 50 composants de la spec, 4 lignes proposées.
+    await waitFor(() => expect(within(grid).getAllByRole("row")).toHaveLength(55));
+    const stateOf = (name: string) => within(grid).getByText(name).closest("tr")?.textContent;
+    expect(stateOf("Composant refusé")).toContain("Rejetée");
+    expect(stateOf("Composant à relire")).toContain("À relire");
+    expect(stateOf("Composant accepté")).toContain("Acceptée");
+    expect(stateOf("Composant à rejouer")).toContain("Acceptée");
+    for (const name of ["Déjà enregistrée hors page", "Déjà présente", "Mise à jour hors page"]) {
+      expect(within(grid).queryByText(name)).toBeNull();
+    }
+    const total = () => document.querySelector("[data-total]");
+    await waitFor(() => expect(total()?.textContent).toBe("73"));
+    expect(total()?.closest("p")?.textContent).toContain("· 53 chargés");
   });
 });

@@ -29,15 +29,19 @@ export interface ProposalSaveFailure {
   batches: string[];
 }
 
-/** Toutes les propositions du lancement, page de 100 après page de 100. */
-async function listAll(projectId: string, deliverable: Deliverable): Promise<ProposalOutput[]> {
+/** Toutes les propositions du lancement (ou d'un seul groupe), page de 100 après page de 100. */
+export async function listAll(
+  projectId: string,
+  deliverable: Deliverable,
+  group?: string,
+): Promise<ProposalOutput[]> {
   let all: ProposalOutput[] = [];
   let cursor: string | undefined;
   do {
     const page = await orpc.proposal.list.call(
       listInput(
         projectId,
-        { status: "all", limit: 100, ...(cursor ? { cursor } : {}) },
+        { status: "all", limit: 100, ...(group ? { group } : {}), ...(cursor ? { cursor } : {}) },
         deliverable,
       ),
     );

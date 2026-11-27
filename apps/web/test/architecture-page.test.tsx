@@ -8,7 +8,7 @@ import {
   serveArchitecture,
 } from "./support/architecture.tsx";
 import { serveClientArchitecture } from "./support/architecture-client.tsx";
-import { fake, LAUNCH_ID, serveProposals } from "./support/proposals.tsx";
+import { type Fake, fake, LAUNCH_ID, serveProposals } from "./support/proposals.tsx";
 import { polyfillRadix, procedures, resetWebMocks, router, watchUrl } from "./support/web-mocks.ts";
 
 vi.mock("next/navigation", async () => {
@@ -407,6 +407,153 @@ describe("Écran Architecture : Génération et Relecture", () => {
     renderArchitecture({ search: "view=review" });
     await userEvent.click(await screen.findByRole("button", { name: "Quitter la relecture" }));
     await waitFor(() => expect(window.location.search).toBe(""));
+  });
+});
+
+const SAVED_BATCH = "0190cccc-0000-7000-8000-000000000001";
+const proposals = (from: number, count: number, over: Partial<Fake> = {}): Fake[] =>
+  Array.from({ length: count }, (_, i) => ({
+    ...proposedComponent(from + i, `Composant proposé ${from + i}`),
+    ...over,
+  }));
+const applied: Partial<Fake> = { status: "accepted", appliedBatchId: SAVED_BATCH };
+
+/** Groupes et filtre de l'API : un seul groupe « all » jusqu'à 30 propositions, un par type au-delà ; pages de 100 au plus. */
+function serveApiProposals(items: Fake[]) {
+  serveProposals(items);
+  procedures.proposalList.mockImplementation(async (input: unknown) => {
+    const { group, status, limit, cursor } = input as Record<string, string | undefined>;
+    const own = items
+      .filter((item) => !group || group === "all" || item.kind === group)
+      .filter((item) => status !== "pending" || item.status === "pending");
+    const from = Number(cursor ?? 0);
+    const end = from + Math.min(Number(limit ?? 50), 100);
+    const keys = items.length > 30 ? [...new Set(items.map((item) => item.kind))] : ["all"];
+    return {
+      items: own.slice(from, end),
+      nextCursor: end < own.length ? String(end) : null,
+      previousCursor: null,
+      offset: from,
+      total: own.length,
+      groups: keys.map((key) => {
+        const members = items.filter((item) => key === "all" || item.kind === key);
+        const n = (value: string) => members.filter((item) => item.status === value).length;
+        return {
+          key,
+          label: key,
+          total: members.length,
+          accepted: n("accepted"),
+          rejected: n("rejected"),
+          pending: n("pending"),
+        };
+      }),
+      launch: { id: LAUNCH_ID, status: "done", proposedCount: items.length, discardedCount: 0 },
+    };
+  });
+}
+
+const componentReads = () =>
+  procedures.proposalList.mock.calls
+    .map(([input]) => input as Record<string, unknown>)
+    .filter((input) => input.group === "component" && input.limit === 100);
+const expectComponentsTab = (count: number) =>
+  waitFor(
+    () =>
+      expect(within(tabsNav()).getByRole("link", { name: /^Composants/ }).textContent).toBe(
+        `Composants${count}`,
+      ),
+    { timeout: 3000 },
+  );
+const barTotal = () => document.querySelector("[data-total]")?.textContent;
+const openReviewComponents = () => renderArchitecture({ search: "view=review&tab=components" });
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("TK-114i : compteur « Composants » en relecture", () => {
+  it("45 enregistrées et 2 à relire : 5, jamais 50 ; barre du même total ; hors relecture 3", async () => {
+    serveArchitecture("owner");
+    serveApiProposals([...proposals(1, 45, applied), ...proposals(46, 2)]);
+    openReviewComponents();
+    await expectComponentsTab(5);
+    expect(barTotal()).toBe("5");
+    await userEvent.click(screen.getByRole("button", { name: "Quitter la relecture" }));
+    await expectComponentsTab(3);
+    await waitFor(() => expect(barTotal()).toBe("3"));
+  });
+
+  it("plus de 100 propositions : les pages de 100 sont suivies jusqu'au bout", async () => {
+    serveArchitecture("owner");
+    serveApiProposals(proposals(1, 120));
+    openReviewComponents();
+    await expectComponentsTab(123);
+    expect(barTotal()).toBe("123");
+    expect(componentReads().map((input) => input.cursor)).toEqual(
+      expect.arrayContaining([undefined, "100"]),
+    );
+  });
+
+  it("relecture groupée (plus de 30, filtre « À relire ») : tout le lancement, pas les 8 chargées", async () => {
+    serveArchitecture("owner");
+    serveApiProposals(proposals(1, 40));
+    openReviewComponents();
+    await expectComponentsTab(43);
+    expect(barTotal()).toBe("43");
+  });
+
+  it("30 propositions au plus (groupe « all » de l'API) : seules les créations de composants comptent", async () => {
+    serveArchitecture("owner");
+    serveApiProposals([
+      ...proposals(1, 5),
+      fake(6, { kind: "doc_section", zone: "", content: { title: "Observabilité" } }),
+    ]);
+    openReviewComponents();
+    await expectComponentsTab(8);
+    expect(barTotal()).toBe("8");
+  });
+
+  it("après une décision, le compte se relit", async () => {
+    serveArchitecture("owner");
+    serveApiProposals(proposals(1, 2));
+    renderArchitecture({ search: "view=review" });
+    await expectComponentsTab(5);
+    await userEvent.keyboard("r");
+    await waitFor(() => expect(procedures.proposalDecide).toHaveBeenCalled());
+    await expectComponentsTab(4);
+  });
+
+  it.each([
+    ["en cours", () => new Promise<never>(() => {})],
+    ["en échec", () => Promise.reject(new Error("boom"))],
+  ])("lecture %s : la spec seule, sans erreur ni blocage", async (_label, outcome) => {
+    serveArchitecture("owner");
+    serveApiProposals(proposals(1, 2));
+    const served = procedures.proposalList.getMockImplementation() as (i: unknown) => unknown;
+    procedures.proposalList.mockImplementation((input: unknown) => {
+      const { group, limit } = input as Record<string, unknown>;
+      return group === "component" && limit === 100 ? outcome() : served(input);
+    });
+    openReviewComponents();
+    const grid = await screen.findByRole("table", { name: "Composants de l'architecture" });
+    await waitFor(() => expect(within(grid).getAllByRole("row")).toHaveLength(6));
+    await waitFor(() => expect(componentReads().length).toBeGreaterThan(0));
+    await expectComponentsTab(3);
+    expect(barTotal()).toBe("3");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("hors relecture : aucune lecture des propositions de composants", async () => {
+    serveArchitecture("owner");
+    renderArchitecture({ search: "tab=components" });
+    await expectComponentsTab(3);
+    expect(componentReads()).toEqual([]);
+  });
+
+  it.each(["designer", "client"] as const)("%s en `view=review` : aucune lecture", async (role) => {
+    if (role === "client") serveClientArchitecture(role);
+    else serveArchitecture(role);
+    openReviewComponents();
+    if (role === "client") expect(await screen.findByText(/Lecture seule\./)).toBeVisible();
+    else await expectComponentsTab(3);
+    expect(componentReads()).toEqual([]);
   });
 });
 
