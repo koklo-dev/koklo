@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { launchDetailOf, launchReportOf } from "../src/lib/launch-report.ts";
+import { emptyReportOf, launchDetailOf, launchReportOf } from "../src/lib/launch-report.ts";
+import { STEP_REPORT, STEPS_LINE, SUMMARY_LINE, stepLaunch } from "./support/launch.ts";
 
 /**
  * TK-114b (B619, DESIGN §5.25, S-spec-architecture §13) : textes du bilan du lancement de l'Architecture, formatés à partir
@@ -212,5 +213,59 @@ describe("sections déjà présentes (TK-114e, B670)", () => {
       "Fonctionnalités servies 174/174 · parcours détaillés 22/22 · tables rattachées 48/48 · avant : 0/174, 0/22, 0/48 · sections déjà présentes écartées : 1",
     );
     expect(launchReportOf(launch("done"))?.lines.join(" ")).not.toContain("déjà présentes");
+  });
+});
+
+describe("TK-115b (B849) : bilan du Technique et de la Sécurité, en étapes", () => {
+  const steps = (status = "done", over: Record<string, unknown> = {}) =>
+    stepLaunch(status, { ...STEP_REPORT, ...over }) as never;
+
+  it("« étapes », les noms et motifs des étapes écartées, jamais de couverture", () => {
+    const covered = steps("done", {
+      coverageBefore: REPORT.coverageBefore,
+      coverageAfter: REPORT.coverageAfter,
+    });
+    expect(launchReportOf(covered, "étapes")).toEqual({
+      variant: "neutral",
+      icon: "info",
+      lines: [SUMMARY_LINE, STEPS_LINE],
+    });
+  });
+
+  it("lancement sans noms d'étapes : les comptes par motif", () => {
+    const old = steps("done", { discardedSteps: undefined });
+    expect(launchReportOf(old, "étapes")?.lines[1]).toBe(
+      "Étapes écartées : réponse coupée (1), réponse invalide (1)",
+    );
+  });
+
+  it("Génération : « Étapes traitées N/M · écartées K », puis « Préparation des étapes »", () => {
+    const running = steps("running", { zonesRequested: 9, zonesDone: 3, zonesDiscarded: 1 });
+    expect(launchDetailOf(running, "étapes")).toBe("Étapes traitées 4/9 · écartées 1");
+    const starting = steps("running", { zonesRequested: 0, zonesDone: 0, zonesDiscarded: 0 });
+    expect(launchDetailOf(starting, "étapes")).toBe("Préparation des étapes");
+  });
+
+  it("emptyReportOf : une étape écartée, ou un lancement inachevé", () => {
+    expect(emptyReportOf(steps())?.lines).toEqual([SUMMARY_LINE, STEPS_LINE]);
+    const clean = { zonesDone: 12, zonesDiscarded: 0, discardReasons: [], discardedSteps: [] };
+    const stopped = emptyReportOf(steps("done", { ...clean, stopReason: "deadline" }));
+    expect(stopped?.variant).toBe("warning");
+    expect(stopped?.lines).toEqual([
+      "Bilan du lancement · étapes traitées 12/12 · écartées 0 · arrêté au délai",
+    ]);
+  });
+
+  it("emptyReportOf : rien si terminé sans écart, actif, sans bilan ou sans lancement", () => {
+    const clean = { zonesDone: 12, zonesDiscarded: 0, discardReasons: [], discardedSteps: [] };
+    expect(emptyReportOf(steps("done", clean))).toBeNull();
+    expect(emptyReportOf(steps("running"))).toBeNull();
+    expect(emptyReportOf(launch("done", null))).toBeNull();
+    expect(emptyReportOf(null)).toBeNull();
+  });
+
+  it("l'Architecture garde « zones » et sa couverture", () => {
+    expect(launchReportOf(launch("done"), "zones")).toEqual(launchReportOf(launch("done")));
+    expect(launchReportOf(launch("done"))?.lines[0]).toContain("zones traitées 9/9");
   });
 });

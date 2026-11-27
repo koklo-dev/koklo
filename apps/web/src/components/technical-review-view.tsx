@@ -8,6 +8,7 @@ import type { TechnicalPageModel } from "../lib/use-technical-page.ts";
 import { ArchitectureReviewBar } from "./architecture-review-view.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
 import { FeaturesReview, technicalSummary } from "./features-review.tsx";
+import { LaunchReport } from "./launch-report-note.tsx";
 
 /** Fenêtre « Proposer avec l'agent » du cahier technique : une seule instance par vue. */
 export function TechnicalProposeDialog({ page }: { page: TechnicalPageModel }) {
@@ -29,6 +30,7 @@ export function TechnicalReviewView({ page }: { page: TechnicalPageModel }) {
         projectId={page.projectId}
         branch={page.head?.branch}
         tab="technical"
+        notice={<LaunchReport launch={page.propose.status.launch} unit="étapes" />}
         onLeave={page.url.closeReview}
       />
       <TechnicalProposeDialog page={page} />

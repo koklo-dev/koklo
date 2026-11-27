@@ -26,6 +26,7 @@ import { OVERLAY_MAX, PHONE_MAX, useMaxWidth } from "../lib/use-max-width.ts";
 import { useStackChoice } from "../lib/use-stack-choice.ts";
 import type { TechnicalPageModel } from "../lib/use-technical-page.ts";
 import { BackToList } from "./architecture-decision-list.tsx";
+import { SettledLaunchReport } from "./launch-report-note.tsx";
 import { TechnicalFichePanel } from "./technical-fiche-panel.tsx";
 import { StackFiche, type StackFicheChoice } from "./technical-stack-fiche.tsx";
 
@@ -82,6 +83,12 @@ export function StackCards({
   );
 }
 
+/** Sans choix, rien n'a été tranché (B852). */
+function countDetailOf(total: number, open: number): string {
+  if (total === 0) return "· aucun pour l'instant";
+  return open > 0 ? `· ${open} à trancher` : "· tous tranchés";
+}
+
 /** Barre de compte : région d'état de l'onglet (maquette 14 l.178). */
 export function StackCountBar({
   total,
@@ -98,7 +105,7 @@ export function StackCountBar({
       className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-meta text-muted-foreground"
     >
       <span className="font-semibold text-foreground">{`${total} choix`}</span>
-      <span>{open > 0 ? `· ${open} à trancher` : "· tous tranchés"}</span>
+      <span>{countDetailOf(total, open)}</span>
       <span className="flex-1" />
       <span>{STACK_NOTE}</span>
       {announcement ? <span className="sr-only">{announcement}</span> : null}
@@ -190,22 +197,25 @@ function Empty({ page }: { page: TechnicalPageModel }) {
     );
   }
   return (
-    <EmptyState
-      variant="inline"
-      bordered
-      icon="layers"
-      title="Aucun choix technique pour l'instant"
-      description="Un choix par rôle de l'architecture, avec ses options comparées."
-      {...(form.canWrite
-        ? {
-            action: (
-              <Button variant="outline" size="sm" onClick={() => url.openCreateOn("stack")}>
-                Nouveau choix
-              </Button>
-            ),
-          }
-        : {})}
-    />
+    <>
+      <SettledLaunchReport propose={page.propose} />
+      <EmptyState
+        variant="inline"
+        bordered
+        icon="layers"
+        title="Aucun choix technique pour l'instant"
+        description="Un choix par rôle de l'architecture, avec ses options comparées."
+        {...(form.canWrite
+          ? {
+              action: (
+                <Button variant="outline" size="sm" onClick={() => url.openCreateOn("stack")}>
+                  Nouveau choix
+                </Button>
+              ),
+            }
+          : {})}
+      />
+    </>
   );
 }
 

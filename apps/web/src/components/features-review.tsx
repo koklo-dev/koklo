@@ -11,7 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { errorCode } from "../lib/api-error.ts";
 import { ARCHITECTURE_GENERATING } from "../lib/architecture-labels.ts";
-import { launchDetailOf } from "../lib/launch-report.ts";
+import { launchDetailOf, reportUnitOf } from "../lib/launch-report.ts";
 import { NO_ACCESS } from "../lib/proposal-labels.ts";
 import { SECURITY_GENERATING } from "../lib/security-labels.ts";
 import { TECHNICAL_GENERATING } from "../lib/technical-labels.ts";
@@ -114,8 +114,8 @@ function Generating({
 }) {
   if (tab === "data") return <DataGenerating onLeave={onLeave} />;
   if (tab === "architecture") return <ArchitectureGenerating onLeave={onLeave} detail={detail} />;
-  if (tab === "technical") return <TechnicalGenerating onLeave={onLeave} />;
-  if (tab === "security") return <SecurityGenerating onLeave={onLeave} />;
+  if (tab === "technical") return <TechnicalGenerating onLeave={onLeave} detail={detail} />;
+  if (tab === "security") return <SecurityGenerating onLeave={onLeave} detail={detail} />;
   return (
     <>
       <ProposalGenerationBanner onLeave={onLeave}>{GENERATING}</ProposalGenerationBanner>
@@ -148,6 +148,10 @@ function Notice({
 const failureText = (error: unknown): string =>
   errorCode(error) === "FORBIDDEN" ? NO_ACCESS : "L'action a échoué. Réessayez dans un instant.";
 
+/** Détail du lancement en cours, dans l'unité de l'onglet (zones ou étapes). */
+const detailOf = (review: ProposalReviewModel, tab: ReviewTab) =>
+  launchDetailOf(review.status.launch, reportUnitOf(tab));
+
 /** Tout ce qui remplace la relecture : erreur de lecture, chargement, génération sans rien arrivé, rien à relire. */
 function placeholderOf(review: ProposalReviewModel, onLeave: () => void, tab: ReviewTab) {
   if (review.error) {
@@ -163,7 +167,7 @@ function placeholderOf(review: ProposalReviewModel, onLeave: () => void, tab: Re
   if (!review.status.loaded) return <Loading />;
   if (review.counts.total > 0) return null;
   if (review.active) {
-    return <Generating onLeave={onLeave} tab={tab} detail={launchDetailOf(review.status.launch)} />;
+    return <Generating onLeave={onLeave} tab={tab} detail={detailOf(review, tab)} />;
   }
   return (
     <Notice title="Aucune proposition à relire" onLeave={onLeave}>
@@ -205,11 +209,7 @@ function ReviewNotices({ review, actions, onLeave, tab }: Notices) {
       ) : null}
       {active ? (
         // `ProposalReview` porte la région d'état de la relecture : le bandeau ne la double pas.
-        <ProposalGenerationBanner
-          silent
-          onLeave={onLeave}
-          {...detailProp(launchDetailOf(review.status.launch))}
-        >
+        <ProposalGenerationBanner silent onLeave={onLeave} {...detailProp(detailOf(review, tab))}>
           {ownReviewOf(tab)?.generating ?? GENERATING}
         </ProposalGenerationBanner>
       ) : null}

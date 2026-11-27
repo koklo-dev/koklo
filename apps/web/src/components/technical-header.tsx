@@ -52,6 +52,7 @@ export function TechnicalHeader({
   statusLabel,
   statusIcon,
   summary,
+  summaryId,
   secondaryActions,
   tabCounts,
   reviewing,
@@ -65,6 +66,8 @@ export function TechnicalHeader({
   statusLabel?: string | undefined;
   statusIcon?: IconName | undefined;
   summary?: string | undefined;
+  /** Relie le résumé à « Valider » quand il en dit la raison. */
+  summaryId?: string;
   secondaryActions?: ReactNode;
   tabCounts?: TabCounts | undefined;
   reviewing: boolean;
@@ -91,6 +94,7 @@ export function TechnicalHeader({
           }
         : {})}
       {...(summary ? { summary, summaryOwnLine: true } : {})}
+      {...(summaryId ? { summaryId } : {})}
       {...(head ? { sha: { value: head.commitSha.slice(0, 7), age: ageOf(head.indexedAt) } } : {})}
       {...(secondaryActions ? { secondaryActions } : {})}
       tabs={tabsOf(projectId, tab, tabCounts ?? {}, reviewing)}

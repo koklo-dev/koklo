@@ -60,6 +60,11 @@ export type ProposalsMode =
   | "technical"
   | "security"
   | "securitySummary"
+  /** TK-115b : propositions à relire avec le bilan (étapes écartées) ; `…Discarded` : lancement fini, rien à relire. */
+  | "technicalReport"
+  | "technicalDiscarded"
+  | "securityReport"
+  | "securityDiscarded"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -616,6 +621,26 @@ REPORTS.architectureSaveFailed = {
   discardReasons: [],
   sectionsExisting: 1,
 };
+/** TK-115b (contrat 3.20.0) : bilan en étapes, les étapes écartées nommées avec leur motif. */
+const stepReport = (steps: ReadonlyArray<[step: string, reason: string]>) => ({
+  zonesRequested: 12,
+  zonesDone: 12 - steps.length,
+  zonesDiscarded: steps.length,
+  discardReasons: steps.map(([, reason]) => ({ reason, count: 1 })),
+  discardedSteps: steps.map(([step, reason]) => ({ step, reason })),
+  coverageCalls: 0,
+  stopReason: "completed",
+});
+REPORTS.technicalReport = stepReport([
+  ["Stack · Services et API", "truncated"],
+  ["Exigences", "output_invalid"],
+]);
+REPORTS.technicalDiscarded = REPORTS.technicalReport;
+REPORTS.securityReport = stepReport([
+  ["Réservation en ligne et annulation par le lien du SMS", "truncated"],
+  ["Parades 2/2", "output_invalid"],
+]);
+REPORTS.securityDiscarded = REPORTS.securityReport;
 let reads = 0;
 let started = false;
 const journal: Array<Record<string, unknown>> = [];
@@ -635,6 +660,8 @@ const ITEMS_OF: Partial<Record<ProposalsMode, () => Item[]>> = {
   technical: technicalItems,
   security: securityItems,
   securitySummary: securitySummaryItems,
+  technicalReport: technicalItems,
+  securityReport: securityItems,
   volume: () => Array.from({ length: 400 }, (_, i) => make(i + 1, 16)),
   hostile: () => [make(1, 1, true)],
 };
@@ -688,7 +715,7 @@ const LABELS: Record<string, string> = {
 
 /** Libellé d'un groupe : relecture groupée des Données (TK-110), types à plat, ou fonctionnalités par zone. */
 function labelOf(key: string, flat: boolean): string {
-  if (architectureMode === "technical") return TECHNICAL_LABELS[key] ?? key;
+  if (architectureMode?.startsWith("technical")) return TECHNICAL_LABELS[key] ?? key;
   if (architectureMode?.startsWith("security")) return SECURITY_LABELS[key] ?? key;
   if (architectureMode) return LABELS[key] ?? key;
   if (volumeData)
@@ -759,7 +786,7 @@ function list(query: URLSearchParams, mode: ProposalsMode): Reply {
   const from = Number(query.get("cursor") ?? 0);
   const limit = Number(query.get("limit") ?? 50);
   const launch =
-    started || items.length > 0
+    started || items.length > 0 || report
       ? {
           id: LAUNCH_ID,
           status: launchStatus,

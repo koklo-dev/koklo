@@ -186,6 +186,44 @@ const VIEWS: View[] = [
   },
 ];
 
+/** TK-115b : étapes écartées visibles en relecture, sur « Menaces » vide et à « Prêt » (DESIGN §5.25). */
+const report = (page: Page) =>
+  page.getByRole("note").filter({ hasText: "Parades 2/2 (réponse invalide)" });
+const noThreat = (page: Page) => page.getByText("Aucune menace pour l'instant");
+
+VIEWS.push(
+  {
+    name: "empty-threats-report",
+    security: "noThreats",
+    proposals: "securityDiscarded",
+    path: PATH,
+    visible: async (page) => {
+      await expect(report(page)).toBeVisible();
+      await expect(noThreat(page)).toBeVisible();
+    },
+  },
+  {
+    name: "ready-report",
+    security: "empty",
+    proposals: "securityDiscarded",
+    path: PATH,
+    visible: async (page) => {
+      await shown(page, "L'agent peut proposer le modèle de menaces");
+      await expect(report(page)).toBeVisible();
+    },
+  },
+  {
+    name: "review-report",
+    security: "demo",
+    proposals: "securityReport",
+    path: `${PATH}?view=review`,
+    visible: async (page) => {
+      await expect(page.getByRole("group", { name: "Mode relecture" })).toBeVisible();
+      await expect(report(page)).toBeVisible();
+    },
+  },
+);
+
 const scenario = (view: { security: SecurityMode; proposals?: ProposalsMode; role?: KanbanRole }) =>
   setScenario({
     session: true,
@@ -304,6 +342,24 @@ test.describe("parcours de la Sécurité", () => {
       .fill("Qui voit mes notes ?");
     await page.keyboard.press("Control+Enter");
     await status(page, "Question envoyée à l'équipe");
+  });
+
+  test("TK-115b : « Menaces » vide avec bilan ; filtre ou designer : aucun bilan", async ({
+    page,
+  }) => {
+    await scenario({ security: "noThreats", proposals: "securityDiscarded" });
+    await page.goto(PATH);
+    await expect(report(page)).toContainText(
+      "Bilan du lancement · étapes traitées 12/12 · écartées 2 · terminé",
+    );
+    await expect(noThreat(page)).toBeVisible();
+    await page.goto(`${PATH}?q=zzz`);
+    await expect(page.getByText("Aucune menace ne correspond")).toBeVisible();
+    await expect(page.getByText(/Bilan du lancement/)).toHaveCount(0);
+    await scenario({ security: "noThreats", proposals: "securityDiscarded", role: "designer" });
+    await page.goto(PATH);
+    await expect(noThreat(page)).toBeVisible();
+    await expect(page.getByText(/Bilan du lancement/)).toHaveCount(0);
   });
 
   test("375 px : liste, fiche puis « Liste »", async ({ page }) => {

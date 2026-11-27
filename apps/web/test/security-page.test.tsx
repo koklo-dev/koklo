@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { STEP_REPORT, STEPS_LINE, SUMMARY_LINE, serveLaunch } from "./support/launch.ts";
+import { fake, serveProposals } from "./support/proposals.tsx";
 import { renderSecurity, securityHeading, serveSecurity } from "./support/security.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
@@ -177,5 +179,50 @@ describe("Page Sécurité : équipe", () => {
     renderSecurity();
     expect(await screen.findByText("Impossible de charger la sécurité")).toBeVisible();
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+  });
+});
+
+const EMPTY_SECURITY = { threats: [], data: [], summary: false, status: "todo" as const };
+const READY = "L'agent peut proposer le modèle de menaces";
+
+describe("TK-115b : bilan du lancement de la Sécurité", () => {
+  it("Prêt : le bilan au-dessus de l'état « Prêt »", async () => {
+    serveSecurity("owner", EMPTY_SECURITY);
+    serveLaunch(STEP_REPORT);
+    renderSecurity();
+    const line = await screen.findByText(SUMMARY_LINE);
+    expect(screen.getByText(STEPS_LINE).closest('[role="note"]')).toContainElement(line);
+    const ready = screen.getByText(READY);
+    expect(line.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("Prêt : pas de bilan quand aucune étape n'est écartée", async () => {
+    serveSecurity("owner", EMPTY_SECURITY);
+    serveLaunch({ ...STEP_REPORT, zonesDiscarded: 0, discardReasons: [] });
+    renderSecurity();
+    expect(await screen.findByText(READY)).toBeInTheDocument();
+    expect(screen.queryByText(/Bilan du lancement/)).toBeNull();
+  });
+
+  it("Relecture : le bilan en note au-dessus des groupes", async () => {
+    serveSecurity("owner");
+    serveProposals([fake(1, { kind: "threat" as never, title: "Vol de session", content: {} })], {
+      report: STEP_REPORT,
+    });
+    renderSecurity({ search: "view=review" });
+    const note = (await screen.findByText(SUMMARY_LINE)).closest('[role="note"]');
+    expect(note).toHaveTextContent(STEPS_LINE);
+    const first = screen.getByRole("button", { name: /Vol de session/ });
+    expect(
+      (note as Node).compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("Génération : « Étapes traitées 4/9 · écartées 1 » sous le bandeau", async () => {
+    serveSecurity("owner");
+    serveLaunch({ ...STEP_REPORT, zonesRequested: 9, zonesDone: 3, zonesDiscarded: 1 }, "running");
+    renderSecurity({ search: "view=review" });
+    const detail = await screen.findByText("Étapes traitées 4/9 · écartées 1");
+    expect(detail.closest('[role="status"]')).toHaveTextContent("L'agent prépare la sécurité");
   });
 });

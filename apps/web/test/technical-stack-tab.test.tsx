@@ -1,8 +1,10 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { STEP_REPORT, STEPS_LINE, SUMMARY_LINE, serveLaunch } from "./support/launch.ts";
 import {
   commitOnSubmit,
+  NO_ENVIRONMENTS,
   renderTechnical,
   STACK,
   serveTechnical,
@@ -178,5 +180,83 @@ describe("Onglet Stack", () => {
       await screen.findByText("Impossible de charger le cahier technique"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+  });
+});
+
+const EMPTY_TITLE = "Aucun choix technique pour l'instant";
+const bilan = () => screen.queryByText(SUMMARY_LINE);
+/** Le faux serveur n'a rien à relire : seul le bilan du dernier lancement reste. */
+function serveNoStack(role: "owner" | "designer" = "owner", report?: Record<string, unknown>) {
+  serveTechnical(role, { choices: [] });
+  serveLaunch(report ?? STEP_REPORT);
+}
+const settled = () =>
+  waitFor(() => expect(procedures.proposalList.mock.results.length).toBeGreaterThan(0));
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("TK-115b : Stack sans choix et étapes écartées", () => {
+  it("barre « 0 choix · aucun pour l'instant », jamais « tous tranchés »", async () => {
+    serveTechnical("owner", { choices: [] });
+    renderTechnical();
+    expect(await screen.findByText("· aucun pour l'instant")).toBeInTheDocument();
+    expect(screen.getByText("0 choix")).toBeInTheDocument();
+    expect(screen.queryByText("· tous tranchés")).toBeNull();
+  });
+
+  it("bilan en note entre la barre de compte et l'état vide", async () => {
+    serveNoStack();
+    renderTechnical();
+    const note = (await screen.findByText(SUMMARY_LINE)).closest('[role="note"]');
+    expect(note).toHaveTextContent(STEPS_LINE);
+    expect(note).toHaveAttribute("data-variant", "neutral");
+    const before = Node.DOCUMENT_POSITION_PRECEDING;
+    const after = Node.DOCUMENT_POSITION_FOLLOWING;
+    const position = (text: string) =>
+      (note as Node).compareDocumentPosition(screen.getByText(text));
+    expect(position("· aucun pour l'instant") & before).toBeTruthy();
+    expect(position(EMPTY_TITLE) & after).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it.each([
+    ["aucune étape écartée", { ...STEP_REPORT, zonesDiscarded: 0, discardReasons: [] }, "done"],
+    ["lancement actif", STEP_REPORT, "running"],
+  ])("pas de bilan : %s", async (_name, report, status) => {
+    serveTechnical("owner", { choices: [] });
+    serveLaunch(report, status);
+    renderTechnical();
+    expect(await screen.findByText(EMPTY_TITLE)).toBeInTheDocument();
+    await settled();
+    expect(screen.queryByText(/Bilan du lancement/)).toBeNull();
+  });
+
+  it("pas de bilan pour le designer, qui ne propose pas", async () => {
+    serveNoStack("designer");
+    renderTechnical();
+    expect(await screen.findByText(EMPTY_TITLE)).toBeInTheDocument();
+    expect(bilan()).toBeNull();
+  });
+
+  it("pas de bilan sur une recherche sans résultat", async () => {
+    serveNoStack();
+    renderTechnical({ search: "q=zzz" });
+    expect(await screen.findByText("Aucun choix ne correspond à « zzz »")).toBeInTheDocument();
+    await settled();
+    expect(bilan()).toBeNull();
+  });
+
+  it("Prêt : le bilan au-dessus de « L'agent peut proposer le cahier technique »", async () => {
+    serveTechnical("owner", {
+      choices: [],
+      environments: NO_ENVIRONMENTS,
+      sections: [],
+      counts: { endpoints: 0, nfr: 0 },
+    });
+    serveLaunch(STEP_REPORT);
+    renderTechnical();
+    const line = await screen.findByText(SUMMARY_LINE);
+    const ready = screen.getByText("L'agent peut proposer le cahier technique");
+    expect(line.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(STEPS_LINE)).toBeInTheDocument();
   });
 });

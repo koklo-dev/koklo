@@ -2,8 +2,9 @@
 
 import { Button, Icon, type IconName, InlineAlert, Skeleton } from "@koklo/ui";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import { architectureTargetOf } from "../lib/architecture-upstream.ts";
+import { launchDetailOf } from "../lib/launch-report.ts";
 import { specPath } from "../lib/shell-routes.ts";
 import type { TechnicalHeaderAction } from "../lib/technical-header-state.ts";
 import { TECHNICAL_ERROR_TITLE } from "../lib/technical-labels.ts";
@@ -17,6 +18,7 @@ import { type TechnicalPageModel, useTechnicalPage } from "../lib/use-technical-
 import { SpecBody } from "./features-body.tsx";
 import { ProposeEntry } from "./features-header-action.tsx";
 import { StatusBlock } from "./features-status-block.tsx";
+import { SettledLaunchReport } from "./launch-report-note.tsx";
 import { TechnicalApiTab } from "./technical-api-tab.tsx";
 import { TechnicalClientView } from "./technical-client-view.tsx";
 import { TechnicalDocumentTab } from "./technical-document-tab.tsx";
@@ -106,8 +108,8 @@ const ACTIONS: Record<Exclude<TechnicalHeaderAction, "propose" | "validate">, Ac
   },
 };
 
-/** « Valider » le cahier ; une fois validé, le bouton disparaît et le focus va au titre. */
-function ValidateButton({ page }: { page: TechnicalPageModel }) {
+/** « Valider » le cahier : désactivé avec sa raison dans le résumé ; une fois validé, le focus va au titre. */
+function ValidateButton({ page, reasonId }: { page: TechnicalPageModel; reasonId: string }) {
   const { validate, header, titleRef } = page;
   const run = async () => {
     if (await validate.validate()) titleRef.current?.focus();
@@ -116,6 +118,7 @@ function ValidateButton({ page }: { page: TechnicalPageModel }) {
     <Button
       type="button"
       className={BUTTON}
+      aria-describedby={header.validateBlocked && header.summary ? reasonId : undefined}
       disabled={header.validateBlocked || validate.pending}
       onClick={() => void run()}
     >
@@ -128,14 +131,16 @@ function ValidateButton({ page }: { page: TechnicalPageModel }) {
 function ActionButton({
   action,
   page,
+  reasonId,
 }: {
   action: TechnicalHeaderAction;
   page: TechnicalPageModel;
+  reasonId: string;
 }) {
   if (action === "propose") {
     return <ProposeEntry propose={page.propose} onReview={page.url.openReview} />;
   }
-  if (action === "validate") return <ValidateButton page={page} />;
+  if (action === "validate") return <ValidateButton page={page} reasonId={reasonId} />;
   const spec = ACTIONS[action];
   const primary = spec.primary || (spec.opens && page.header.createPrimary);
   return (
@@ -178,6 +183,7 @@ function Empty({ page }: { page: TechnicalPageModel }) {
           />
         }
         onCreate={() => openForm("stack")(page)}
+        notice={<SettledLaunchReport propose={page.propose} />}
       />
     );
   }
@@ -273,7 +279,10 @@ function ListBody({ page }: { page: TechnicalPageModel }) {
 
 /** Relecture ouverte : génération, onglet Relecture, ou les onglets de lecture sous leur bandeau. */
 function ReviewBody({ page }: { page: TechnicalPageModel }) {
-  if (page.generating) return <TechnicalGenerating onLeave={page.url.closeReview} />;
+  if (page.generating) {
+    const detail = launchDetailOf(page.propose.status.launch, "étapes");
+    return <TechnicalGenerating onLeave={page.url.closeReview} detail={detail} />;
+  }
   if (page.url.tab === "review") return <TechnicalReviewView page={page} />;
   return (
     <>
@@ -315,6 +324,7 @@ function FormSheet({ page }: { page: TechnicalPageModel }) {
 /** Écran de l'équipe : en-tête par état, puis liste ou relecture, fenêtre de l'agent et formulaire. */
 function TeamTechnicalPage({ page }: { page: TechnicalPageModel }) {
   const { header, head, propose, url } = page;
+  const reasonId = useId();
   return (
     <>
       <TechnicalHeader
@@ -325,10 +335,11 @@ function TeamTechnicalPage({ page }: { page: TechnicalPageModel }) {
         statusLabel={header.statusLabel}
         statusIcon={header.statusIcon}
         summary={header.summary}
+        summaryId={reasonId}
         tabCounts={header.status === "ready" ? undefined : header.tabCounts}
         reviewing={propose.reviewing && !page.generating}
         secondaryActions={header.actions.map((action) => (
-          <ActionButton key={action} action={action} page={page} />
+          <ActionButton key={action} action={action} page={page} reasonId={reasonId} />
         ))}
         tab={page.generating && url.tab === "review" ? "stack" : url.tab}
         head={head ?? undefined}

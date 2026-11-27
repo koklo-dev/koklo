@@ -10,9 +10,18 @@ import {
  * Faux API de la page Technique (TK-115, TK-116, contrat 3.18.0) : `spec.technical.*`, `spec.document.sections`,
  * `spec.item.get`, `clientSpace.technical*`, commentaires, lot de « Choisir » et décision `review.submit|list`. Les données
  * sont celles de la maquette 14 (volume réel : 24 choix dont 2 à trancher). Scénario `technical` : « empty » (état
- * Prêt), « demo », « revise » (à revoir), « validated » (validé), « notValidated » (vue client avant validation).
+ * Prêt), « demo », « revise » (à revoir), « validated » (validé), « notValidated » (vue client avant validation),
+ * « noStack » et « noStackRevise » (TK-115b : opérations et environnements écrits, aucun choix de stack ; à valider ou
+ * à revoir ; « Valider » refusé `stack_missing`).
  */
-export type TechnicalMode = "empty" | "demo" | "revise" | "validated" | "notValidated";
+export type TechnicalMode =
+  | "empty"
+  | "demo"
+  | "revise"
+  | "validated"
+  | "notValidated"
+  | "noStack"
+  | "noStackRevise";
 export type TechnicalScenario = { technical?: TechnicalMode };
 
 type Reply = { status: number; body: string };
@@ -165,8 +174,10 @@ export function resetTechnical(): void {
   approved = false;
 }
 
+const hasNoStack = (mode: TechnicalMode): boolean => mode === "noStack" || mode === "noStackRevise";
+
 const choicesOf = (mode: TechnicalMode): Choice[] => {
-  if (mode === "empty") return [];
+  if (mode === "empty" || hasNoStack(mode)) return [];
   return base()
     .map((choice) => {
       // Un cahier validé n'a plus de choix à trancher (B775).
@@ -306,7 +317,7 @@ export const technicalCounts = (mode: TechnicalMode | undefined) =>
       : {
           // La tête compte aussi les anciens points REST : l'écran lit le total de la liste (B772).
           endpoints: technicalApiCounts.operations + 4,
-          stack: ROWS.length,
+          stack: hasNoStack(mode) ? 0 : ROWS.length,
           nfr: technicalApiCounts.requirements,
           environments: 3,
           components: 8,
@@ -316,9 +327,14 @@ export function technicalDeliverable(mode: TechnicalMode | undefined) {
   if (mode === undefined) return undefined;
   const status = isValidated(mode)
     ? "validated"
-    : { empty: "todo", demo: "pending", revise: "revise", notValidated: "pending" }[
-        mode as Exclude<TechnicalMode, "validated">
-      ];
+    : {
+        empty: "todo",
+        demo: "pending",
+        revise: "revise",
+        notValidated: "pending",
+        noStack: "pending",
+        noStackRevise: "revise",
+      }[mode as Exclude<TechnicalMode, "validated">];
   const staleTechnical = {
     changes: [
       { id: "C-avis", change: "added" },
@@ -326,7 +342,7 @@ export function technicalDeliverable(mode: TechnicalMode | undefined) {
     ],
     items: ["ST-sms", "NFR-004"],
   };
-  return { status, ...(mode === "revise" ? { staleTechnical } : {}) };
+  return { status, ...(status === "revise" ? { staleTechnical } : {}) };
 }
 
 const facetsOf = (rows: Choice[], key: "layer" | "status") => {
@@ -500,7 +516,14 @@ function comment(req: IncomingMessage, send: (reply: Reply) => void): boolean {
 
 const REVIEW_ID = "0190cccc-0000-7000-8000-000000000116";
 
-/** Décision du livrable : refusée tant qu'un choix reste à trancher (B775), puis le cahier est « Validé ». */
+/** Refus de « Valider » : aucun choix de stack (B851), ou un choix qui reste à trancher (B775). */
+function refusalOf(mode: TechnicalMode): "stack_missing" | "choices_open" | undefined {
+  const choices = choicesOf(mode);
+  if (choices.length === 0) return "stack_missing";
+  return choices.some((choice) => choice.status === "open") ? "choices_open" : undefined;
+}
+
+/** Décision du livrable : refusée (`refusalOf`), sinon le cahier est « Validé ». */
 function review(req: IncomingMessage, mode: TechnicalMode, send: (reply: Reply) => void): boolean {
   if (req.method === "GET") {
     const decision = {
@@ -517,18 +540,20 @@ function review(req: IncomingMessage, mode: TechnicalMode, send: (reply: Reply) 
       current: true,
       onBehalf: false,
     };
-    send(reply(200, { items: isValidated(mode) ? [decision] : [], nextCursor: null }));
+    const decided = isValidated(mode) || mode === "noStackRevise";
+    send(reply(200, { items: decided ? [decision] : [], nextCursor: null }));
     return true;
   }
   void body(req).then(() => {
-    if (choicesOf(mode).some((choice) => choice.status === "open")) {
+    const reason = refusalOf(mode);
+    if (reason) {
       send(
         reply(409, {
           defined: true,
           code: "CONFLICT",
           status: 409,
           message: "Conflict",
-          data: { reason: "choices_open" },
+          data: { reason },
         }),
       );
       return;

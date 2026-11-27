@@ -295,6 +295,59 @@ VIEWS.push(
   },
 );
 
+/** TK-115b : lignes du bilan (sans planche, DESIGN §5.25). */
+const STEPS =
+  "Étapes écartées : Stack · Services et API (réponse coupée), Exigences (réponse invalide)";
+const NO_STACK = "aucun choix de stack : ajoutez-en un avant de valider";
+const REVISE_NO_STACK = `Validé le 5 nov., l'architecture a changé depuis · ${NO_STACK}`;
+const report = (page: Page) => page.getByRole("note").filter({ hasText: STEPS });
+const noChoice = (page: Page) => page.getByText("Aucun choix technique pour l'instant");
+const validate = (page: Page) => page.getByRole("button", { name: "Valider" });
+
+/** États à comparer de TK-115b : étapes écartées visibles et cahier sans choix de stack. */
+VIEWS.push(
+  {
+    name: "no-stack",
+    technical: "noStack",
+    proposals: "technicalDiscarded",
+    path: PATH,
+    visible: async (page) => {
+      await expect(report(page)).toBeVisible();
+      await expect(noChoice(page)).toBeVisible();
+      await expect(validate(page)).toBeDisabled();
+    },
+  },
+  {
+    name: "revise-no-stack",
+    technical: "noStackRevise",
+    path: PATH,
+    visible: async (page) => {
+      await expect(page.getByText(REVISE_NO_STACK)).toBeVisible();
+      await expect(noChoice(page)).toBeVisible();
+    },
+  },
+  {
+    name: "review-report",
+    technical: "demo",
+    proposals: "technicalReport",
+    path: `${PATH}?view=review`,
+    visible: async (page) => {
+      await expect(banner(page)).toBeVisible();
+      await expect(report(page)).toBeVisible();
+    },
+  },
+  {
+    name: "ready-report",
+    technical: "empty",
+    proposals: "technicalDiscarded",
+    path: PATH,
+    visible: async (page) => {
+      await expect(page.getByText("L'agent peut proposer le cahier technique")).toBeVisible();
+      await expect(report(page)).toBeVisible();
+    },
+  },
+);
+
 const scenario = (view: {
   technical: TechnicalMode;
   proposals?: ProposalsMode;
@@ -376,6 +429,35 @@ test.describe("parcours de la page Technique", () => {
     ]);
     await expect(page.getByRole("button", { name: "Nouveau choix" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Valider" })).toBeDisabled();
+  });
+
+  test("TK-115b : sans choix de stack, bilan, compte et « Valider » désactivé relié", async ({
+    page,
+  }) => {
+    await start(page, { technical: "noStack", proposals: "technicalDiscarded" });
+    await page.goto(PATH);
+    await expect(report(page)).toContainText(
+      "Bilan du lancement · étapes traitées 12/12 · écartées 2 · terminé",
+    );
+    await expect(page.getByText("· aucun pour l'instant")).toBeVisible();
+    await expect(page.getByText("· tous tranchés")).toHaveCount(0);
+    await expect(noChoice(page)).toBeVisible();
+    await expect(validate(page)).toBeDisabled();
+    await expect(validate(page)).toHaveAccessibleDescription(new RegExp(`${NO_STACK}$`));
+  });
+
+  test("TK-115b : à revoir sans choix, la raison reste reliée à « Valider »", async ({ page }) => {
+    await start(page, { technical: "noStackRevise" });
+    await page.goto(PATH);
+    await expect(validate(page)).toBeDisabled();
+    await expect(validate(page)).toHaveAccessibleDescription(REVISE_NO_STACK);
+  });
+
+  test("TK-115b : le designer ne voit aucun bilan", async ({ page }) => {
+    await start(page, { technical: "noStack", proposals: "technicalDiscarded", role: "designer" });
+    await page.goto(PATH);
+    await expect(noChoice(page)).toBeVisible();
+    await expect(page.getByText(/Bilan du lancement/)).toHaveCount(0);
   });
 
   test("Stack : deux cartes par ligne dès 1024 px, fiche, tableau, YAML", async ({ page }) => {

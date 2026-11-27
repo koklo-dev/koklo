@@ -15,10 +15,18 @@ const FRAMES = [
 ];
 
 /** Génération du cahier technique (maquette 14 l.104-109) : bandeau d'état « Annuler l'attente » et squelette. */
-export function TechnicalGenerating({ onLeave }: { onLeave: () => void }) {
+export function TechnicalGenerating({
+  onLeave,
+  detail,
+}: {
+  onLeave: () => void;
+  /** « Étapes traitées 4/9 · écartées 1 » (DESIGN §5.25). */
+  detail?: string | undefined;
+}) {
   return (
     <DataGenerating
       onLeave={onLeave}
+      detail={detail}
       text={TECHNICAL_GENERATING}
       heightClass="h-[440px]"
       frames={FRAMES}

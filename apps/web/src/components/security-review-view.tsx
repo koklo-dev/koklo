@@ -5,6 +5,7 @@ import type { SecurityPageModel } from "../lib/use-security-page.ts";
 import { ArchitectureReviewBar } from "./architecture-review-view.tsx";
 import { ProposeDialog } from "./features-propose.tsx";
 import { FeaturesReview, securitySummary } from "./features-review.tsx";
+import { LaunchReport } from "./launch-report-note.tsx";
 
 /** Fenêtre « Proposer avec l'agent » de la sécurité : une seule instance par vue. */
 export function SecurityProposeDialog({ page }: { page: SecurityPageModel }) {
@@ -25,6 +26,7 @@ export function SecurityReviewView({ page }: { page: SecurityPageModel }) {
       projectId={page.projectId}
       branch={page.head?.branch}
       tab="security"
+      notice={<LaunchReport launch={page.propose.status.launch} unit="étapes" />}
       onLeave={page.url.closeReview}
     />
   );

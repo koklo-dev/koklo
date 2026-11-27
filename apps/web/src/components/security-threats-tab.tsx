@@ -39,6 +39,7 @@ import type { SecurityPageModel } from "../lib/use-security-page.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { BackToList } from "./architecture-decision-list.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
+import { SettledLaunchReport } from "./launch-report-note.tsx";
 import { SecurityEmpty } from "./security-empty.tsx";
 import { ThreatFiche } from "./security-threat-fiche.tsx";
 import { TechnicalFichePanel } from "./technical-fiche-panel.tsx";
@@ -208,16 +209,19 @@ function Empty({ page }: { page: SecurityPageModel }) {
     );
   }
   return (
-    <SecurityEmpty
-      icon="gpp_maybe"
-      title={NO_THREAT_TITLE}
-      text={NO_THREAT_TEXT}
-      action={
-        form.canWrite
-          ? { label: "Nouvelle menace", onClick: () => url.openCreateOn("threats") }
-          : undefined
-      }
-    />
+    <>
+      <SettledLaunchReport propose={page.propose} />
+      <SecurityEmpty
+        icon="gpp_maybe"
+        title={NO_THREAT_TITLE}
+        text={NO_THREAT_TEXT}
+        action={
+          form.canWrite
+            ? { label: "Nouvelle menace", onClick: () => url.openCreateOn("threats") }
+            : undefined
+        }
+      />
+    </>
   );
 }
 
