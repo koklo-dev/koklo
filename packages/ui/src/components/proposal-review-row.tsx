@@ -11,21 +11,26 @@ export function ProposalStateIcon({ status }: { status: ProposalReviewItem["stat
   );
 }
 
-/** Contenu d'un élément de la liste (maquette 10 l.542-546) : identifiant, titre, état, sous-titre. */
+/**
+ * Contenu d'un élément de la liste (maquette 10 l.542-546) : identifiant, titre, état, sous-titre.
+ * Sous 112 px de place restante (identifiant long), le titre passe sous l'identifiant.
+ */
 export function ProposalRowContent({ item }: { item: ProposalReviewItem }) {
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
       <span className="flex items-center gap-2">
-        <IdTag title={item.ref} className="min-w-0 max-w-[60%] overflow-hidden">
-          <span className="truncate">{item.ref}</span>
-        </IdTag>
-        <span
-          className={cn(
-            "min-w-0 flex-1 text-body font-semibold",
-            isFaded(item.status) && "text-muted-foreground",
-          )}
-        >
-          {item.title}
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <IdTag title={item.ref} className="min-w-0 max-w-full overflow-hidden">
+            <span className="truncate">{item.ref}</span>
+          </IdTag>
+          <span
+            className={cn(
+              "min-w-0 flex-1 basis-28 text-body font-semibold",
+              isFaded(item.status) && "text-muted-foreground",
+            )}
+          >
+            {item.title}
+          </span>
         </span>
         <ProposalStateIcon status={item.status} />
       </span>
