@@ -40,7 +40,7 @@ export const assertRestartable = (run: Run): void => {
   }
 };
 
-/** Un runner tué repart de l'état persisté (§10.3) : la fonction décide, rien n'est exécuté. */
+/** Un run interrompu repart de l'état persisté (§10.3) : la fonction décide sans exécuter. */
 export const resumePoint = (run: Run): RunEffect | null => {
   if (!isRunState(run.state)) throw new InvalidRunStateError(run.state);
   assertRestartable(run);

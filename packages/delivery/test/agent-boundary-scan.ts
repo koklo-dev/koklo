@@ -1,10 +1,10 @@
-/** Scan PUR de la frontiere AgentRuntime (incident 25) : aucune E/S, il travaille sur des textes. */
-
-/** Seul endroit autorise a invoquer un outil d'agent. */
-export const ADAPTER_PREFIX = "packages/delivery/src/claude-code/";
+/**
+ * Scan PUR de la frontière d'exécution (incident 25) : aucune E/S, il travaille sur des textes.
+ * Koklo n'exécute aucun agent de code (ADR 0023) : aucun chemin n'est exempté.
+ */
 
 export interface SourceFile {
-  /** Chemin relatif a la racine du depot, separateur `/`. */
+  /** Chemin relatif à la racine du dépôt, séparateur `/`. */
   readonly path: string;
   readonly text: string;
 }
@@ -29,19 +29,17 @@ const RULES: readonly (readonly [string, RegExp])[] = [
   ["french-entry-point", /\blancerSession\b/],
 ];
 
-/** Toute invocation d'outil d'agent hors de l'adaptateur est une violation. */
+/** Toute invocation d'outil d'agent est une violation. */
 export const scanAgentBoundary = (files: readonly SourceFile[]): BoundaryViolation[] =>
-  files
-    .filter((file) => !file.path.startsWith(ADAPTER_PREFIX))
-    .flatMap((file) =>
-      file.text.split("\n").flatMap((text, index) =>
-        RULES.filter(([, pattern]) => pattern.test(text)).map(([rule]) => ({
-          path: file.path,
-          line: index + 1,
-          rule,
-        })),
-      ),
-    );
+  files.flatMap((file) =>
+    file.text.split("\n").flatMap((text, index) =>
+      RULES.filter(([, pattern]) => pattern.test(text)).map(([rule]) => ({
+        path: file.path,
+        line: index + 1,
+        rule,
+      })),
+    ),
+  );
 
 export interface ImportViolation {
   readonly path: string;
@@ -49,8 +47,8 @@ export interface ImportViolation {
 }
 
 /**
- * Seuls utilisateurs existants hors de l'adaptateur : les aides de test de `packages/db`
- * (docker de test, CLI prisma), sans lien avec un outil d'agent. Toute autre entree est refusee.
+ * Seuls utilisateurs permis : les aides de test de `packages/db` (docker de test, CLI prisma),
+ * sans lien avec un outil d'agent. Toute autre entrée est refusée.
  */
 export const CHILD_PROCESS_ALLOWLIST: readonly string[] = [
   "packages/db/src/testing/prisma-cli.ts",
@@ -59,10 +57,9 @@ export const CHILD_PROCESS_ALLOWLIST: readonly string[] = [
 
 const CHILD_PROCESS = /["'`](?:node:)?child_process["'`]/;
 
-/** `node:child_process` n'est importe nulle part hors de l'adaptateur (liste blanche vide ailleurs). */
+/** `node:child_process` n'est importé nulle part, hors de la liste blanche. */
 export const scanChildProcessImports = (files: readonly SourceFile[]): ImportViolation[] =>
   files
-    .filter((file) => !file.path.startsWith(ADAPTER_PREFIX))
     .filter((file) => !CHILD_PROCESS_ALLOWLIST.includes(file.path))
     .flatMap((file) =>
       file.text
@@ -71,3 +68,33 @@ export const scanChildProcessImports = (files: readonly SourceFile[]): ImportVio
           CHILD_PROCESS.test(text) ? [{ path: file.path, line: index + 1 }] : [],
         ),
     );
+
+export interface DependencyViolation {
+  readonly path: string;
+  readonly dependency: string;
+}
+
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies",
+] as const;
+
+const AGENT_PACKAGE = /@anthropic-ai\/claude-/;
+
+type Manifest = Partial<Record<(typeof DEPENDENCY_FIELDS)[number], Record<string, string>>>;
+
+/** `nom@version` : un alias `npm:` est vu autant que le nom déclaré. */
+const declared = (manifest: Manifest): string[] =>
+  DEPENDENCY_FIELDS.flatMap((field) => Object.entries(manifest[field] ?? {})).map(
+    ([name, version]) => `${name}@${version}`,
+  );
+
+/** Aucun `package.json` (texte JSON) ne déclare un outil d'agent. */
+export const scanAgentDependencies = (manifests: readonly SourceFile[]): DependencyViolation[] =>
+  manifests.flatMap((file) =>
+    declared(JSON.parse(file.text) as Manifest)
+      .filter((dependency) => AGENT_PACKAGE.test(dependency))
+      .map((dependency) => ({ path: file.path, dependency })),
+  );
