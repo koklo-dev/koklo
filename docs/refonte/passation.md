@@ -48,14 +48,27 @@ last_reviewed: 2026-11-21
 | 025 | TK-114i (identifiants longs : liste des flux, en-têtes et fiche sans débordement ; compteur « Composants » en relecture limité aux créations pas encore enregistrées) | ✅ fusionné (branche `fix/tk-114i-affichage-architecture`) ; décisions B708 à B717 ; web et ui seuls, sans contrat ni migration |
 | 026 | TK-115 (Technique : formats, six états, onglets Stack, Environnements, Document, refus des secrets, contrat 3.17.0) | ✅ fusionné (PR #245, `d048a99b`) ; décisions B718 à B767 ; 5 migrations |
 | 026 | TK-116 (Technique : onglets API et Exigences, contrat généré, « Valider », contrat 3.18.0) | ✅ fusionné (PR #247, `c0775368`, déploiement staging réussi ; la #246 est une tentative fermée, commitlint) ; décisions B768 à B789 ; 1 migration. Suivis mineurs relevés en revue : erreur d'opération sans règle dont le « quand » contient « · » mal relue (bloque l'enregistrement) ; « Valider » désactivé sans raison visible en « À revoir » ; lien `?op=` périmé en vue client |
-| 026 | TK-117 (Sécurité : formats `security/`, six onglets, relecture, vue client avec résumé seul, contrat 3.19.0) | PR ouverte ; décisions B790 à B838 ; 6 migrations. Suivis non corrigés (B838) : rejeu d'`acceptSummary` en 409, durée de conservation écrite en texte libre (A7), livrable des `proposalIds` de `specBatch.submit` ; si `domain/roles.yaml` est illisible, les `droits-*.feature` sont réécrits avec l'identifiant du rôle. Le pied de « Données sensibles » (texte de la maquette) annonce un contrôle en CI qui n'arrive qu'avec TK-133 |
+| 026 | TK-117 (Sécurité : formats `security/`, six onglets, relecture, vue client avec résumé seul, contrat 3.19.0) | ✅ fusionné (PR #249, `36d17672`) ; décisions B790 à B838 ; 6 migrations. Suivis non corrigés (B838) : rejeu d'`acceptSummary` en 409, durée de conservation écrite en texte libre (A7), livrable des `proposalIds` de `specBatch.submit` ; si `domain/roles.yaml` est illisible, les `droits-*.feature` sont réécrits avec l'identifiant du rôle. Le pied de « Données sensibles » (texte de la maquette) annonce un contrôle en CI qui n'arrive qu'avec TK-133 |
+| 032 | TK-130 (retrait de l'exécution d'agents par Koklo : adaptateur, quotas et leurs tests supprimés, machine d'étapes gardée, ADR 0023, ADR 0014 « remplacée ») | PR ouverte ; décisions B839 à B843 ; ni contrat, ni migration, ni écran. Signalé, non corrigé : `.project/loop/claude-invoke.sh` (boucle de développement, hors produit) ; 4 ancres cassées et ADR 0012, 0013, 0017 à 0022 absentes de l'index d'`architecture.md` |
 
-Ticket en cours : TK-117 (PR ouverte), puis recette staging du sprint 026, puis TK-130, TK-63, TK-64, TK-65 (mandat du 2026-11-27, voir « Règles de l'utilisateur »). Cases du sprint 026 à cocher après la recette.
+Ticket en cours : TK-130 (PR ouverte). **Après lui, demander à l'utilisateur avant d'ouvrir TK-63** (puis TK-64, TK-65).
+Restent la recette staging du sprint 026 et ses cases, à cocher après elle seulement.
+
+Recette staging du sprint 026 (maquettes 14 et 15), à faire. Les écrans n'ont jamais tourné contre la vraie API ni un
+vrai modèle : « Choisir », feuilles, effacement d'« Accès », refus d'un secret, préremplissage, commentaires, relecture
+puis enregistrement, onglets API et Exigences, contrat généré, « Valider » et ouverture de Sécurité puis de Design,
+vues client, contact d'incident. Au déploiement : api, worker et web ensemble, migrations, `KOKLO_ENCRYPTION_KEY`
+dans le worker. Connu : le détecteur de secrets laisse passer `api_key=valeur` en minuscules et « NOM : valeur » sans
+préfixe connu ; pas de « Modifier » en relecture ; segmenté Fiche · YAML de 26 px à 375 px ; identifiant NFR-nnn déduit
+de la position en relecture. À relire par un juriste avant la production : durées de conservation et contact
+d'incident.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
 ## Règles de l'utilisateur (ne pas redemander)
 
+- **2026-11-27 au soir** : le mandat ci-dessous est suspendu. Arrêt après TK-117 demandé, puis, après redémarrage du
+  poste, « tu peux continuer » (lu : finir TK-117 et TK-130, demander avant le ticket suivant).
 - **Mandat du 2026-11-27** : livraison continue du sprint 026 sans l'utilisateur (TK-115 fusionné, PR #245, `d048a99b` ;
   puis TK-116, TK-117, recette staging, cases du sprint), avec vérification de chaque déploiement. **S'arrêter avant le
   Design (sprint 027, TK-118 et suivants)** : brainstorming préalable avec l'utilisateur sur les maquettes, l'interface et un
