@@ -61,7 +61,7 @@ screen `S-*` (annotated node tree), test scenario (feature + criteria covered), 
 enforced as issues: rule 4 (every link resolves, roles, permissions and rules included, even when `roles: []`), rule 5 (`specifiee` has a screen or endpoint,
 `implementee` has a test per criterion; from `specifiee`, each criterion has Given, When, Then
 steps in that order, `R5_CRITERION_INCOMPLETE`), rule 7 (no orphan entity, role, permission or rule, warning). See
-`packages/schema/README.md` for the 57 issue codes. Spec format v2 (TK-106): table `data/tables/<slug>.yaml` with
+`packages/schema/README.md` for the 61 issue codes. Spec format v2 (TK-106): table `data/tables/<slug>.yaml` with
 `id: T-<slug>`, endpoint `<zone>.<verb>`, no `data/relations.yaml` (relations live in the source table); `migrateSpecToV2`
 (`packages/schema/src/migrate`, pure) turns a v1 spec into v2 and the worker applies it as one bot batch (`spec.migrate`).
 
@@ -1004,7 +1004,8 @@ treats them as locked (`locked` conflict). A waivable limit would be another tic
 review and append only like `reviews`, the hash of the content a verdict was given on. Target hash: an element is its entity hash;
 `rules` is the ordered hash of all `R-*`; `roles` the hash of `domain/roles.yaml`; `deliverable` the hash of all its elements
 (`DELIVERABLE_ENTITY_KINDS` of `packages/domain`: Functional = feature, rule, roles, flow; Data = table, relations, fixture;
-Architecture = component, archflow, adr; Technical = stack, endpoint, nfr, environments; the others none yet).
+Architecture = component, archflow, adr; Technical = stack, endpoint, nfr, environments; Security = threat, sensitive,
+rights, asvs, security_summary; Design and Quality none yet).
 `deliverableStatusOf(facts)` (`packages/domain`) gives the status: `todo` without entity, `revise` when a change request is current,
 `validated` when the whole deliverable or every element and block target is validated, `pending` otherwise.
 
@@ -1021,6 +1022,26 @@ Approving the Technical deliverable requires every choice of the head to be clos
 Security (which depends on Technical) becomes available. Comment targets `operation` and `requirements` were added to
 `comment_target_kind` (migration `20261127140000_comment_operation_targets`). Requirement coverage is not modelled: it
 comes with the Quality deliverable.
+
+Security entities (TK-117): `threat` (one row per `security/threats/SEC-Txx.yaml`; counter `threat`), `sensitive` (one
+row per entry of `security/data.yaml`, identified by its first field), `rights`, `asvs` and `security_summary`
+(`DELIVERABLE_ENTITY_KINDS.security`). The `.feature` files of `quality/scenarios/abuse/` and the sections of
+`security/dossier/` are never indexed. Pure rules in `packages/schema/src/security/`: rights matrix (absent = no; held
+and restricted = restricted; a restriction never grants), validation blockers (high threat without countermeasure,
+model field without entry, `personnelle` / `contact` / `sensible` entry without a typed retention), ASVS level
+(recommended 2 as soon as personal data is classified, else 1; a human choice wins), client summary (retention card
+composed from typed durations only), GDPR registry and generated abuse scenarios.
+
+Migrations `20261127150000_security_entity_kinds` to `20261127200000_project_incident_contacts` (additive, each with a
+`down.sql`): the five entity kinds, proposal types `threat`, `sensitive`, `right`, `asvs`, `summary`, launch modes
+`threats`, `classify`, `asvs`, `summary`, counter `threat`, comment target `security_summary`, and the tenant table
+**`project_incident_contacts`** (`ProjectIncidentContact`: one row per project, `name` 1 to 120, `phone` 1 to 40
+characters, `updated_by` without foreign key, `updated_at`; composite key `(organization_id, project_id)`
+`ON DELETE CASCADE`). The contact is never written to Git, never sent to the agent.
+
+Derived states shown by the screen and never stored: a threat is to treat without a countermeasure; a data row is
+`unclassified` (model field without entry) or `undecided` (`personnelle`, `contact` or `sensible` entry without a typed
+retention).
 
 ### Upstream impact (TK-100 lot C)
 `DELIVERABLE_SOURCES`: Functional reads `idea`; every other deliverable reads its B1 upstream. `staleLivrables(changed)` returns the

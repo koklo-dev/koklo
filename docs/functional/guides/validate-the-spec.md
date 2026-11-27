@@ -38,6 +38,10 @@ covers_commit: c2322e2c
 
 Le cahier technique est validé par l'**équipe** (Propriétaire, Administrateur ou Développeur), pas par le client : le bouton **Valider** de la page **Cahier technique** reste désactivé tant qu'un choix est à trancher. Le client le lit ensuite et le commente. Voir [Relire et compléter le cahier technique](review-and-complete-the-technical-specification.md#valider-le-cahier-technique).
 
+## La sécurité
+
+La sécurité est validée par l'**équipe** (Propriétaire, Administrateur ou Développeur) : le bouton **Valider** de la page **Sécurité** reste désactivé tant qu'une menace élevée est sans parade ou qu'une donnée reste à classer. Le client en lit ensuite le résumé et pose ses questions. Voir [Relire et compléter la sécurité](review-and-complete-the-security-deliverable.md#valider-la-sécurité).
+
 ## Côté équipe
 
 - **Relancer** : dans l'en-tête du cahier (statut **À valider par le client**), **Relancer Marie** envoie un rappel au client. Un seul rappel part par jour et par client ; l'écran dit « Rappel envoyé » ou « Le client a déjà été relancé aujourd'hui ». La relance apparaît dans l'activité du projet.

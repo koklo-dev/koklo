@@ -68,3 +68,4 @@ Ce qui mériterait un avis humain. Ça ne bloque rien : l'option la plus conform
 | [S-spec-data](screens/S-spec-data.md) | 2 | TK-107 |
 | [S-spec-architecture](screens/S-spec-architecture.md) | 1 | TK-111 |
 | [S-spec-technical](screens/S-spec-technical.md) | 4 | TK-116 |
+| [S-spec-security](screens/S-spec-security.md) | 1 | TK-117 |

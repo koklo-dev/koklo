@@ -1353,3 +1353,31 @@ Volume: `spec-technical-ops` keeps the first page of the operations of `seed:lar
 - A rate limit cannot be removed from the operation sheet (the contract has no empty value): edit the file in Git.
 - Only the TypeScript · oRPC generator exists; the contract is shown, never written to the code repository.
 - The screen ran against a stub API only (unit tests and Playwright); no run against the real API.
+
+## Security deliverable (TK-117)
+
+### Tests (local, named files only; full suites and the other e2e run in CI)
+| Package | Main new files |
+|---------|----------------|
+| `schema` | `security-*`, `proposals-security` |
+| `db` | `security-migration` |
+| `contract` | `security` |
+| `api` | `spec-security-*`, `proposal-security`, `client-space-security`, `comment-security` |
+| `worker` | `plan-security`, `triage-security`, `generate-security` |
+| `ui` | `threat-row`, `icon-list`, `chip-facts`, `context-banner`, `data-classification-table`, `permission-matrix-compact`, `coverage-table`, `facts-panel`, `summary-card`, `expectation-box`, `question-card` |
+| `web` | `security-*`, `proposal-security`, `dev-ui-security`, `e2e/spec-security.spec.ts` (stub API, captures in `design/screens/captures/S-spec-security/`, axe, 375 px) |
+
+Volume: `spec-security-volume` keeps the first pages of `seed:large` under 300 ms (local test database).
+
+### Deployment and rollback
+- Six additive migrations with `down.sql`, `20261127150000_security_entity_kinds` to
+  `20261127200000_project_incident_contacts`. Rolling the last one back **deletes** the incident contacts; the comment
+  target one deletes the questions on the summary.
+- No new environment variable. Redeploy api, worker and web together (contract 3.19.0). The worker needs
+  `KOKLO_ENCRYPTION_KEY` for the agent.
+- Security entities appear at the next indexed commit: push to the spec repository, or reindex it.
+
+### Known limits and not verified before merge
+- The screen ran against a stub API only (unit tests and Playwright); the agent only against a fake model.
+- The checks the screen describes (scenarios in CI) arrive with TK-133; the baseline with TK-126 and TK-127.
+- Retention periods and the GDPR registry need a legal review before production.
