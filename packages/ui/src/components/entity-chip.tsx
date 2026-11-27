@@ -81,7 +81,7 @@ export function EntityChip({
       data-slot="entity-chip"
       {...(href === undefined ? {} : { href })}
       className={cn(
-        "inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-md bg-secondary pr-2 pl-1.5 text-secondary-foreground motion-safe:transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex min-h-[26px] max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-2 pl-1.5 text-secondary-foreground motion-safe:transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         href !== undefined && "hover:bg-secondary/80",
         className,
       )}
@@ -90,13 +90,20 @@ export function EntityChip({
       <Icon name={icon} size={16} />
       {/* Espaces explicites : le nom accessible se lit « Fonctionnalité F-001 Connexion ». */}
       {type ? <span className="sr-only">{type}</span> : null}{" "}
-      <span className="font-mono text-code">{id}</span>
-      {title ? (
-        <>
-          {" "}
-          <span className="text-caption font-normal text-foreground">{title}</span>
-        </>
-      ) : null}
+      {/* Le libellé passe à la ligne ; un identifiant plus large que la pastille est tronqué. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+        <span title={id} className="min-w-0 max-w-full truncate font-mono text-code">
+          {id}
+        </span>
+        {title ? (
+          <>
+            {" "}
+            <span className="min-w-0 break-words text-caption font-normal text-foreground">
+              {title}
+            </span>
+          </>
+        ) : null}
+      </span>
     </Tag>
   );
   if (!preview) return chip;

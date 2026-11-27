@@ -8,6 +8,8 @@ export type IdTagProps = ComponentProps<"span"> & {
   variant?: "tag" | "pill";
   /** Préfixe atténué de la variante `pill`. */
   prefix?: ReactNode;
+  /** Identifiant long : borné à son conteneur et tronqué, complet au survol (enfant texte). */
+  truncate?: boolean;
 };
 
 const TONE = {
@@ -30,6 +32,7 @@ export function IdTag({
   size = "default",
   variant = "tag",
   prefix,
+  truncate,
   className,
   children,
   ...props
@@ -37,15 +40,17 @@ export function IdTag({
   return (
     <span
       data-slot="id-tag"
+      title={truncate && typeof children === "string" ? children : undefined}
       className={cn(
         "inline-flex items-center whitespace-nowrap font-mono",
         tagClass(tone, size, variant === "pill"),
+        truncate && "min-w-0 max-w-full overflow-hidden",
         className,
       )}
       {...props}
     >
       {prefix && <span className="text-muted-foreground">{prefix}</span>}
-      {children}
+      {truncate ? <span className="truncate">{children}</span> : children}
     </span>
   );
 }

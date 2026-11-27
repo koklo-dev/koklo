@@ -107,8 +107,8 @@ export interface ListRowProps {
   /** Pastille, valeur ou actions à droite : hors de la zone cliquable de la ligne. */
   trailing?: ReactNode;
   selected?: boolean;
-  /** Ligne de 52 de haut. */
-  fixedHeight?: boolean;
+  /** Ligne de 52 de haut ; `"min"` : 52 au moins, elle grandit quand le titre prend une seconde ligne. */
+  fixedHeight?: boolean | "min";
   /** Titre et sous-titre à la ligne (interligne 1,3, marges 10/14, maquette 13 l.383 et l.803) au lieu d'être coupés. */
   wrap?: boolean;
   href?: string;
@@ -124,6 +124,13 @@ const FOCUS =
 function insetOf(roomy: boolean, wrap: boolean | undefined) {
   if (wrap) return { x: "px-3.5", y: "py-2.5" };
   return { x: roomy ? "px-5" : "px-4", y: "py-3" };
+}
+
+/** Hauteur de la ligne : 52 fixe, 52 au minimum, ou les marges verticales d'une ligne de panneau. */
+function heightOf(fixedHeight: ListRowProps["fixedHeight"], inPanel: boolean, inset: string) {
+  if (fixedHeight === "min") return "min-h-[52px] py-1.5";
+  if (fixedHeight) return "h-[52px]";
+  return inPanel && inset;
 }
 
 /** Ligne d'un `ListPanel` (ou, avec `as="div"`, contenu d'une ligne de `VirtualList`) : lien, bouton ou statique. */
@@ -168,7 +175,7 @@ export function ListRow({
         "flex items-center",
         gap,
         inPanel ? cn("border-t first:border-t-0", inset.x) : "min-w-0 flex-1",
-        fixedHeight ? "h-[52px]" : inPanel && inset.y,
+        heightOf(fixedHeight, inPanel, inset.y),
         selected && "bg-secondary",
         className,
       )}
