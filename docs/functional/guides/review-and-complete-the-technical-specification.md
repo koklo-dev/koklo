@@ -23,6 +23,11 @@ covers_commit: c2322e2c
    ![Relecture groupée des propositions, thème clair](../../../design/screens/captures/S-spec-technical/review-grouped-light.png)
 
 4. Cliquez **Enregistrer N dans la spec**.
+
+   Sur un grand projet, l'agent travaille par étapes (la stack couche par couche, puis les opérations, les exigences, les environnements et le document). Un bandeau **Bilan du lancement** dit combien d'étapes ont été traitées et nomme celles qui ont été écartées, avec le motif (par exemple « Stack · Services et API (réponse coupée) »). Il se lit en relecture et, quand il ne reste rien à relire, sur l'onglet **Stack** vide ou à l'ouverture de la page vide. Pour compléter ce qui manque, relancez **Proposer avec l'agent**.
+
+   ![Étapes écartées et Stack sans choix, thème clair](../../../design/screens/captures/S-spec-technical/no-stack-light.png)
+
 5. Onglet **Stack** : ouvrez un choix **À trancher**, comparez les **Options comparées**, puis cliquez **Choisir** suivi du nom de l'option. Le choix est enregistré aussitôt (« Choix enregistré »).
 
    ![Choix à trancher et sa fiche, thème clair](../../../design/screens/captures/S-spec-technical/list-stack-fiche-light.png)
@@ -46,7 +51,7 @@ covers_commit: c2322e2c
 
 ## Valider le cahier technique
 
-Quand tous les choix de la **Stack** sont tranchés, cliquez **Valider** dans l'en-tête. Tant qu'un choix reste à trancher, le bouton est désactivé et le résumé dit combien (« … choix à trancher avant de valider »). L'écran annonce « Cahier technique validé », l'en-tête affiche qui a validé, quand et sur quelle version, et **Sécurité** devient disponible (« Prêt ») dans la barre latérale.
+Quand la **Stack** compte au moins un choix et que tous sont tranchés, cliquez **Valider** dans l'en-tête. Sinon le bouton est désactivé et le résumé dit pourquoi : « aucun choix de stack : ajoutez-en un avant de valider », ou « … choix à trancher avant de valider », y compris sur un cahier **À revoir**. L'écran annonce « Cahier technique validé », l'en-tête affiche qui a validé, quand et sur quelle version, et **Sécurité** devient disponible (« Prêt ») dans la barre latérale.
 
 ![Cahier validé, thème clair](../../../design/screens/captures/S-spec-technical/validated-light.png)
 
@@ -69,6 +74,8 @@ Les éléments acceptés apparaissent dans leur onglet et le résumé de l'en-t�
 | L'architecture est vide : enregistrez au moins un composant avant de proposer le cahier technique. | Aucun composant enregistré | Complétez l'architecture |
 | Revalidez l'architecture pour relancer l'agent. | L'architecture a changé et n'est pas revalidée | Revalidez-la |
 | Un choix technique reste à trancher : tranchez-le avant de valider le cahier. | Un choix est resté ouvert | Onglet **Stack** : tranchez-le, puis **Valider** |
+| Aucun choix de stack : ajoutez un choix technique avant de valider le cahier. | Le cahier n'a aucun choix de stack | Onglet **Stack** : **Nouveau choix**, ou relancez l'agent et enregistrez ses choix |
+| Étapes écartées : … (réponse coupée) ou (réponse invalide) | Une partie de la réponse de l'agent n'a pas pu être utilisée | Relancez **Proposer avec l'agent** ; si la même étape reste écartée, signalez-le à votre équipe technique |
 | Aucun contrat : le choix ST-api reste à trancher. / Aucun générateur pour la stack retenue | Le choix de l'API est ouvert, ou n'est pas oRPC | Tranchez le choix ; seul TypeScript · oRPC a un générateur |
 | La limite ne se retire pas d'ici : saisissez-en une. | Une limite de débit existante a été vidée | Remplacez-la, ou modifiez le fichier dans le dépôt de spec |
 | Un choix de ce rôle existe déjà. / Un environnement de ce nom existe déjà. | Le nom est pris | Modifiez l'élément existant |

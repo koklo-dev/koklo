@@ -1,7 +1,7 @@
 ---
 id: S-spec-security
 titre: Spec · Sécurité (Prêt, Génération, Relecture, Liste · équipe, Validé, À revoir, Vue client ; onglets Menaces, Données sensibles, Droits, Exigences, Résumé client, Document)
-version: 2
+version: 4
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/15-Lot14Securite.html` (`pnpm maquette 15`), passations 21 §1, §2 et §4 (hors `audit.*`), 11, 14, 07. Même socle que [S-spec-technical](S-spec-technical.md). Écarts : `docs/refonte/ecarts.md` ; décisions B790 à B813.
 
@@ -35,6 +35,7 @@ En-tête : fil « Projet / Spec / Sécurité », h1 « Sécurité », statut, r�
 | Chargement | Squelettes à la taille des groupes, tableaux et cartes ; « Valider » désactivé |
 | Erreur | `ErrorNotice` + « Réessayer » ; quota GitHub : « GitHub limite les lectures, réessayez dans N min. » |
 | Droits | Designer sans bouton d'écriture ; client et business : refus serveur sur tout sauf le résumé ; business sans « Poser une question » ni contact |
+| Étape écartée (TK-115b) | Bandeau du bilan (DESIGN §5.25, `role="note"`, « étapes ») en Relecture ; plus rien à relire : sur « Menaces » vide (sans filtre) et au-dessus de « Prêt » ; seulement pour qui peut proposer |
 
 ## 5. Interactions et retours
 Feuille « Menace » : Titre, Catégorie, Gravité (aide « Élevée : données de clientes ou argent en jeu. Une menace élevée sans parade bloque la validation. »), Fonctionnalités exposées (puces, « API » admis), Ce qui peut arriver, Parades (une par ligne), Vérification ; préremplissage par l'agent. Feuille « Donnée » : Champ (mono, `table.champ`), Catégorie, Conservation (« Une durée, et à partir de quand. »), Qui y accède (puces), Protection ; l'agent ne remplit jamais Conservation, sa suggestion est une aide « Proposée par l'agent : … ». « Décider » ouvre la feuille sur la ligne, Conservation en focus. Modification d'un livrable validé : avertissement commun. Niveau ASVS : choix immédiat, toast « Niveau enregistré ». « Registre RGPD » télécharge `registre-rgpd-<projet>.md`. « Proposer une parade » et « Proposer les mises à jour » ouvrent la fenêtre de l'agent avec une consigne préremplie. Contact : carte de saisie (nom, téléphone), « Enregistrer », « Annuler ». Question : zone de texte, « Envoyer » ; toast « Question envoyée à l'équipe ». Refus de validation : alerte au-dessus de l'onglet, focus au titre après succès.
@@ -63,3 +64,4 @@ Relecture juridique des conservations et du registre avant la production (A7). L
 | 1 | 2026-11-27 | TK-117 | Création : page du livrable Sécurité (passation 21, maquette 15), B790 à B813 |
 | 2 | 2026-11-27 | TK-117 | Écran livré : champ « Donnée » dans sa feuille, résumé relu sur place, attente du contact masquée au business (B831 à B835) |
 | 3 | 2026-11-27 | TK-117 | Correction de revue : raison du blocage à revoir, puces bordées de la fiche, bouton neutre de l'encadré, ligne de menace sur une ligne à 375 px, pied du résumé (B837) |
+| 4 | 2026-11-27 | TK-115b | Bilan du lancement et étapes écartées avec leur motif (B848 à B850). |

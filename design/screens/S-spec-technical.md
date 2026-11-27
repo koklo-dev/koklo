@@ -1,7 +1,7 @@
 ---
 id: S-spec-technical
 titre: Spec · Technique (Prêt, Génération, Relecture, Liste · équipe, À revoir, Vue client ; onglets Stack, API, Exigences, Environnements, Document)
-version: 4
+version: 5
 ---
 > Maquette qui fait foi : `docs/refonte/maquettes/14-Lot8Technique.html` (`pnpm maquette 14`), passations 12 §1 à §4.1, §4.4, §4.5, §7 et §8, 11 §3, 14 §3, 07. Même socle que [S-spec-architecture](S-spec-architecture.md). Onglets API et Exigences, contrat généré et « Valider » : passations 12 §4.2, §4.3, §5, 11 §3 (TK-116, DESIGN.md §5.27).
 
@@ -36,6 +36,8 @@ En-tête : fil « Projet / Spec / Technique », h1 « Cahier technique », statu
 | Chargement | Squelettes à la taille des cartes et du tableau |
 | Erreur | `ErrorNotice` + « Réessayer » ; quota GitHub : « GitHub limite les lectures, réessayez dans N min. » |
 | Droits | Designer sans bouton d'écriture ; client et business sans YAML ni « Modifier » ; business sans « Commenter » |
+| Étape écartée (TK-115b) | Bandeau du bilan (DESIGN §5.25, `role="note"`) : « Étapes écartées : <étape> (<motif>) » en Relecture ; plus rien à relire : sur la Stack vide, entre la barre de compte et l'`EmptyState`, et au-dessus de « Prêt » ; seulement pour qui peut proposer |
+| Sans choix de stack (TK-115b) | Barre « 0 choix · aucun pour l'instant » ; « Valider » désactivé pointillé, raison « aucun choix de stack : ajoutez-en un avant de valider » au résumé, reliée au bouton, en liste comme « À revoir » ; refus serveur en `InlineAlert` erreur |
 
 ## 5. Interactions et retours
 « Choisir <option> » enregistre aussitôt (un commit), annonce « Choix enregistré », le statut passe « Choisi ». Feuilles `SpecItemSheet` (maquette l.427-479) : « Nouveau choix technique » (Rôle*, Composants concernés*, Statut*, Choix retenu, Options comparées*, Critères*, Pourquoi*, Exigences visées) et « Nouvel environnement » (Nom*, Adresse*, Hébergement*, Base*, Données*, Déploiement*, Accès), « Décrire en une phrase », erreurs avec focus, avertissement d'un cahier validé, « Supprimer » en modification. Une valeur de secret est refusée : message sous le champ, sans la valeur recopiée. Les valeurs du tableau comparatif des critères existants sont conservées à la modification. « Accès » vidé à la modification est retiré du fichier (B765) ; un choix sans composant (« Pour toute l'équipe ») se modifie sans en ajouter (B766).
@@ -64,6 +66,7 @@ Aucune bloquante (B718 à B788 décidées en autonomie). À confirmer après cou
 | 2 | 2026-11-27 | TK-115 (lot C) | Réalisation : fiche d'un choix (`StackFicheTitle`), document partagé (`SpecDocumentTab`) avec rédaction proposée sur place, vue client « Questions et commentaires » (absente pour le business), menu des environnements ; agent fermé : « Revalidez l'architecture pour relancer l'agent. » (B753 à B762). |
 | 3 | 2026-11-27 | TK-115 (correction 1) | Relecture d'un choix (titre, « pourquoi », « En clair »), rubriques en capitales, « Accès » effaçable, choix d'équipe modifiable, pastilles et tableau comparatif ajustés à la maquette (B763 à B767). |
 | 4 | 2026-11-27 | TK-116 | Onglets API (zones, fiche, YAML, contrat généré) et Exigences, feuilles Opération et Exigence, « Valider » et déblocage de Sécurité, vue client des deux onglets (B768 à B779). États à comparer : API écran principal clair, sombre, 375 px, Exigences, Liste validée, Vue client, API sans résultat. |
+| 5 | 2026-11-27 | TK-115b | Étapes écartées visibles (relecture, Stack vide, Prêt), « Valider » refusé sans choix de stack avec sa raison (B844 à B853). États à comparer : Stack sans choix avec bilan clair, sombre, 375 px ; À revoir sans choix ; Relecture avec bilan. |
 
 ## États comparés à la maquette (TK-116)
 À 1440 en clair puis sombre : API avec la fiche d'une opération (écran principal) ; à 375 px : API, liste et fiche ; Exigences (clair) ; Liste validée (clair) ; Vue client API ; API, recherche sans résultat (clair). États de TK-115 inchangés.

@@ -481,3 +481,11 @@ Tests à réécrire avec ces retraits :
 | l.505 : trois groupes ouverts sur six | Tous les groupes ouverts | Aucune règle d'ouverture dans les passations |
 | l.520 : aucune mention pour une revue humaine | « Revue humaine : <détail> » | Le contrat porte ce mode de vérification |
 | l.211 : attente du contact montrée à tout lecteur | Masquée au business | B835 |
+
+## Lot 8 · écarts retenus à la maquette 14 (TK-115b, décidés le 2026-11-27)
+
+| Maquette ou passation | Livré | Raison |
+|---|---|---|
+| l.587 : « 0 choix · tous tranchés » à zéro choix | « 0 choix · aucun pour l'instant » | B852 : rien n'a été tranché |
+| l.781-786 : « Valider » actif sans choix, raison absente « À revoir » | « Valider » désactivé et raison au résumé, à zéro choix comme à choix ouvert | B851, demande de l'utilisateur |
+| Aucune planche : étape de l'agent écartée | Bandeau du bilan (DESIGN §5.25) en Relecture, Stack vide et « Prêt » ; Sécurité de même | B849, B850 |
