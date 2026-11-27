@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.36)
+# Koklo : design (v2.37)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -607,6 +607,27 @@ Aucune planche : composé avec l'existant (B619). Textes du bilan en français, 
 | Déjà présente dans la spec (v2.35, TK-114g, maquette 13 l.639-668, maquette 09 l.271 et 281, B697 à B704) | Relecture partagée (fonctionnel, données, architecture) : variante `present` de `ProposalStatus` (`packages/ui`, `PROPOSAL_STATE`), libellé « Déjà présente dans la spec », icône `task_alt` pleine ton `success` dans la ligne (estompée comme une rejetée), `Pill` `success` dans le détail (modèle de l'état « Enregistré » de la maquette 09). Détail sans boutons ni raccourcis A/R, note `text-meta` « Déjà présente dans la spec · rien à enregistrer ». Bandeau : résumé « · K déjà présente(s) dans la spec » quand K ≥ 1, ces lignes ne comptent ni « à relire » ni dans « Enregistrer N » ; jauge : part secondaire = rejetées + déjà présentes. Récapitulatif : « … · K proposition(s) écartée(s) : déjà présente(s) dans la spec ». Aucun composant ajouté ; variante de famille existante (galerie `/dev/ui`) |
 | Trait acteur → application (v2.33, TK-114d, B662) | Schéma, couches Utilisateurs → Applications (maquette 13 l.566-568, l.697) : trait plein `--border-strong`, sans étiquette ; un acteur qui a une application d'entrée n'est plus posé dans une zone de services (B654). Aucun composant ajouté à `packages/ui` |
 
+### 5.26 Technique : Stack, Environnements, Document (v2.37, TK-115, passation 12 §1 à §4.1, §4.4, §4.5, maquette 14 l.59-238, 280-479, 525-587, B718 à B737)
+
+Écran `S-spec-technical` ; états, en-tête, relecture, vue client et bandeaux : mêmes gabarits que §5.20 à §5.25. Icône des actions de l'agent : `wand_stars` (B144). Registre d'icônes : `layers`, `dns`, `cable`, `help`, `monitoring`, `rocket_launch` ; « queue » n'existe pas dans le jeu Material : `lists`.
+
+| Élément | Règle |
+|---|---|
+| `StackLayer` | Section d'une couche : titre 12/600 en capitales espacées de .06em `--muted-foreground` + compte mono 500, écart 8 ; grille de 2 colonnes égales, écart 10 ; 1 colonne sous 768 px |
+| `StackChoiceCard` | Bouton `aria-pressed`, rayon 12, marges 12 / 14, écart 8 : `IconTile` 34 (rayon 8, `soft`, `primary` si choisie) + rôle 12 `--muted-foreground` sur choix 15/600 ; « Pour C-… » 12 ; `Pill` « Choisi » `success` ou « À trancher » `warning`, identifiant mono 11 en graisse 400 à droite. Bordure 1 px `--border` ; choisie : 2 px `--primary` et ombre `0 8px 24px` ; à revoir : 2 px `--status-pending-icon`, nom accessible « …, à revoir » ; proposée : pointillée `--border-strong` |
+| `ComparisonTable` | Cadre rayon 10 à défilement interne, 12 px : en-tête `--surface`, « Critère » 500 `--muted-foreground`, options 600 ; lignes bordées en haut, intitulé `th scope="row"` 500 ; colonne choisie ou recommandée `--secondary` (en-tête en `--secondary-foreground`, valeurs 600 en couleur de texte), en-têtes centrés verticalement, « Choisi » / « Recommandé » 10/600 `--primary` sous le nom ; sous le tableau, si une valeur est estimée : « ≈ : estimations à vérifier » 12 `--muted-foreground` |
+| `EnvironmentTable` | Cadre rayon 12, défilement interne, largeur minimale 720, 14 px ; légende 14/600 à gauche avec action « Modifier » (bouton 30) ; colonne des intitulés 180 ; en-têtes 600 avec pastille 8 px (`--border-strong`, `--status-pending-icon`, `--status-validated-foreground`, dans l'ordre, puis `--border-strong`) ; cellules 13, adresse en mono 12, « à trancher » 600 ambre (toujours écrit) |
+| `SpecRowsPanel` | Section bordée rayon 12 : en-tête (icône 18 muette, titre 14/600, note 12 à droite), lignes 13 bordées en haut : nom (mono 12/500 pour une variable, 500 sinon), usage `--muted-foreground`, `Pill` `md` de 22 de haut en fin (12/500, marges 0 10 ; `outline` « Coffre de l'hébergeur » ; intégrations : `warning` « À trancher », `soft` « Compte à créer », `success` « Configuré » et « Connecté »). Deux panneaux côte à côte `minmax(min(420px,100%),1fr)`, écart 16 |
+| Fiche d'un choix | 480 à 580 px, bordure gauche, marges 16 / 22 / 24, écart 12 : identifiant + `Pill` + « Modifier » (30) ; rôle 12 ; choix 22/600 ; segmenté Fiche · YAML ; pourquoi 14 / 1,55 ; encadré ambre `help` ; « Options comparées » ; boutons « Choisir <option> » 32, recommandée en principal ; puces |
+| Texte d'une section proposée | 15 px, interligne 1,65, sans encadré coloré (tous les livrables) |
+| En-tête | « Nouveau choix » ou « Nouvel environnement » selon l'onglet, aucune action d'ajout sur Document ; pas de « Valider » avant TK-116 |
+| `StackFicheTitle` | Titre de la fiche d'un choix (h2 22/600), porté par `packages/ui` |
+| `ProposalDetailText` | Texte d'une rubrique de relecture, sauts de ligne gardés ; `variant="prose"` : 15 px, interligne 1,65 |
+| `ProposalDetailSection variant="label"` | Rubrique de relecture du Technique et « Texte proposé » (Architecture comprise) : titre h3 12/600 en capitales espacées de .05em `--muted-foreground`, à 4 du texte (maquettes 13 et 14 l.156) ; par défaut, titre de sous-section inchangé |
+| Relecture d'un choix | Titre « <rôle> : <option retenue> » ou « <rôle> : À trancher » ; sous le titre, le « pourquoi » du choix ; « En clair » après les critères (B764) |
+| `ProposalDiff` op `draft` | « Proposition de l'agent · rédaction de la section » dans le texte d'une section (maquette 14 l.733) |
+| Document partagé | `SpecDocumentTab` (web) sert l'Architecture, le Technique et la vue client du Technique : sections, validation, rédaction proposée, colonne Agent ou « Questions et commentaires » |
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -689,3 +710,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 24/11/2026 | v2.35 (TK-114g, maquettes 13 et 09, B697 à B704) : §5.25 état « Déjà présente dans la spec » de la relecture, variante `present` de `ProposalStatus` (`task_alt` `success`, `Pill` `success`), bilan et récapitulatif qui la comptent à part ; aucun composant ajouté à `packages/ui` |
 | 22/11/2026 | v2.33 (TK-114d, maquette 13, B649 à B663) : §5.25 « rôles avec application » et « flux repris » dans le bilan ; trait acteur → application sans étiquette ; aucun composant ajouté à `packages/ui` |
 | 27/11/2026 | v2.36 (TK-114i, maquette 13 l.175-239 et 405-441, B708 à B714) : identifiants longs de l'Architecture ; `IdTitle` ajouté à `packages/ui`, `IdTag truncate`, `ListRow fixedHeight="min"`, `EntityChip` borné à son conteneur |
+| 27/11/2026 | v2.37 (TK-115, passation 12, maquette 14, B718 à B737) : §5.26 Technique ; `StackLayer`, `StackChoiceCard`, `ComparisonTable`, `EnvironmentTable`, `SpecRowsPanel` ajoutés à `packages/ui` ; icônes `layers`, `dns`, `cable`, `help`, `monitoring`, `rocket_launch` (« queue » : `lists`, B756) |

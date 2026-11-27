@@ -3,10 +3,10 @@ title: What's new
 audience: functional
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-10-29
+last_reviewed: 2026-11-27
 covers_release: unreleased
 sources: []
-covers_commit: 7f97066
+covers_commit: 9f186946
 ---
 # What's new
 
@@ -14,6 +14,12 @@ One entry per release, written for the user: the value delivered, not the
 commits. Link to the guide that explains each new capability.
 
 ## Unreleased
+- Cahier technique : sous **Spec**, la page **Technique** rassemble les choix d'outils comparés (à trancher d'un clic
+  avec **Choisir**), les environnements et le document technique. L'agent propose le contenu, vous relisez avant que
+  rien n'entre dans la spec. La spec ne garde que le nom des variables, et une valeur de secret reconnue est refusée.
+  Le client lit le cahier validé et le commente. Limite : les opérations de l'API et les exigences s'enregistrent mais
+  n'ont pas encore d'onglet, et l'écran n'a pas encore de bouton de validation.
+  Guide : [Relire et compléter le cahier technique](../guides/review-and-complete-the-technical-specification.md).
 - Organisations, membres et projets : vous pouvez maintenant créer votre organisation, choisir ou changer d'organisation
   depuis le menu latéral, inviter des membres avec un rôle (Administrateur, Développeur, Designer, Client, Business) et créer
   des projets depuis la page "Projets". Créer un projet et inviter sont réservés aux Propriétaires et aux Administrateurs.

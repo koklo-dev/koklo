@@ -3,10 +3,10 @@ title: Domain model
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-27
 covers_release: unreleased
 sources: []
-covers_commit: 5fa5b1c
+covers_commit: 9f186946
 ---
 # Domain model
 
@@ -61,7 +61,7 @@ screen `S-*` (annotated node tree), test scenario (feature + criteria covered), 
 enforced as issues: rule 4 (every link resolves, roles, permissions and rules included, even when `roles: []`), rule 5 (`specifiee` has a screen or endpoint,
 `implementee` has a test per criterion; from `specifiee`, each criterion has Given, When, Then
 steps in that order, `R5_CRITERION_INCOMPLETE`), rule 7 (no orphan entity, role, permission or rule, warning). See
-`packages/schema/README.md` for the 51 issue codes. Spec format v2 (TK-106): table `data/tables/<slug>.yaml` with
+`packages/schema/README.md` for the 57 issue codes. Spec format v2 (TK-106): table `data/tables/<slug>.yaml` with
 `id: T-<slug>`, endpoint `<zone>.<verb>`, no `data/relations.yaml` (relations live in the source table); `migrateSpecToV2`
 (`packages/schema/src/migrate`, pure) turns a v1 spec into v2 and the worker applies it as one bot batch (`spec.migrate`).
 
@@ -1003,9 +1003,15 @@ treats them as locked (`locked` conflict). A waivable limit would be another tic
 `(snapshot_id, kind, spec_id)`, CHECK on `kind` and on the hash format). `review_versions(review_id, content_hash)` keeps, one row per
 review and append only like `reviews`, the hash of the content a verdict was given on. Target hash: an element is its entity hash;
 `rules` is the ordered hash of all `R-*`; `roles` the hash of `domain/roles.yaml`; `deliverable` the hash of all its elements
-(`DELIVERABLE_ENTITY_KINDS` of `packages/domain`: Functional = feature, rule, roles, flow; Data = table, relations; the others none yet).
+(`DELIVERABLE_ENTITY_KINDS` of `packages/domain`: Functional = feature, rule, roles, flow; Data = table, relations, fixture;
+Architecture = component, archflow, adr; Technical = stack, endpoint, nfr, environments; the others none yet).
 `deliverableStatusOf(facts)` (`packages/domain`) gives the status: `todo` without entity, `revise` when a change request is current,
 `validated` when the whole deliverable or every element and block target is validated, `pending` otherwise.
+
+Technical entities (TK-115, zone `technical`): `stack` (sorted by layer then id, title « role : choice »), operations as
+`endpoint` rows (title = summary; `spec_endpoints` keeps the REST format only), `nfr` (the worker raises the `nfr` counter) and
+one `environments` row for `tech/environments.yaml`. The sections of `tech/cahier-technique/` are never indexed. The Technical
+deliverable is also « À revoir » when a component or a decision changed since its last decision (`technicalImpactOf`).
 
 ### Upstream impact (TK-100 lot C)
 `DELIVERABLE_SOURCES`: Functional reads `idea`; every other deliverable reads its B1 upstream. `staleLivrables(changed)` returns the
