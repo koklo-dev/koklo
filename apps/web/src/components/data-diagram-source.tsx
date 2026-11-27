@@ -17,7 +17,8 @@ interface SourceBlockProps {
   tag: ReactNode;
   label: string;
   code: string;
-  note: string;
+  /** Ligne sous le code ; absente de la maquette 14 (choix technique). */
+  note?: string;
   action?: ReactNode;
   /** Hauteur maximale du bloc : 560 (Données), 600 (fiche composant), 640 (flux) ; maquettes 11 et 13. */
   maxHeight?: number;
@@ -56,7 +57,7 @@ export function SourceBlock({
           {code}
         </pre>
       </section>
-      <p className="m-0 text-caption text-muted-foreground">{note}</p>
+      {note ? <p className="m-0 text-caption text-muted-foreground">{note}</p> : null}
     </div>
   );
 }

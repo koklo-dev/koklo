@@ -75,14 +75,18 @@ const ACTIVE: WritePhase[] = ["sending", "tracking", "indexing"];
 /** Le lot est écrit dans la spec : le brouillon n'a plus de raison d'être et la liste rattrape. */
 export const WRITTEN_PHASES: WritePhase[] = ["indexing", "late", "saved"];
 
-export interface SubmitRequest {
-  build: (idempotencyKey: string) => SpecBatchSubmitInput;
+/** Envoi du lot : l'entrée de `specBatch.submit`, ou un appel dédié qui rend le même lot (« Choisir », TK-115). */
+type Sending =
+  | { build: (idempotencyKey: string) => SpecBatchSubmitInput; send?: undefined }
+  | { send: (idempotencyKey: string) => Promise<SpecBatchOutput>; build?: undefined };
+
+export type SubmitRequest = Sending & {
   /** Empreinte de la saisie : une clé n'est reprise que pour une saisie identique. */
   snapshot: string;
   meta: WriteMeta;
   /** Clé gardée avec un brouillon repris. */
   resume?: { key: string; snapshot: string } | undefined;
-}
+};
 interface KeyRecord {
   key: string;
   snapshot: string;
@@ -208,7 +212,8 @@ function useSubmit(
       metaRef.current = meta;
       busy.current = true;
       update({ ...IDLE, phase: "sending", meta });
-      mutation.mutateAsync(request.build(key)).then(
+      const sent = request.send ? request.send(key) : mutation.mutateAsync(request.build(key));
+      sent.then(
         (batch) => outcomes.onReply(meta, batch),
         (error: unknown) => {
           if (errorCode(error) !== "UNAUTHORIZED")

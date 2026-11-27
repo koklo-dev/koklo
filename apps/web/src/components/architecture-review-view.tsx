@@ -99,22 +99,27 @@ export function ArchitectureReviewView({
 }
 
 /**
- * Bandeau de la relecture sur les onglets Document et Composants (09 §3.3) : le décompte, « Enregistrer N dans la
- * spec » et « Quitter la relecture » restent à portée pendant qu'on lit l'architecture proposée.
+ * Bandeau de la relecture sur les onglets de lecture (09 §3.3) : le décompte, « Enregistrer N dans la spec » et
+ * « Quitter la relecture » restent à portée pendant qu'on lit ce qui est proposé.
  */
 export function ArchitectureReviewBar({
   projectId,
   branch,
   statusText,
   onLeave,
+  tab = "architecture",
+  summaryOf = architectureSummary,
 }: {
   projectId: string;
   branch: string | undefined;
   /** Texte d'état de la page (chargement, écriture) : la région d'état du bandeau est la seule de la vue. */
   statusText: string;
   onLeave: () => void;
+  /** Livrable relu : l'Architecture par défaut, le cahier technique. */
+  tab?: "architecture" | "technical";
+  summaryOf?: typeof architectureSummary;
 }) {
-  const review = useProposalReview(projectId, true, "architecture");
+  const review = useProposalReview(projectId, true, tab);
   const actions = useProposalActions(projectId, review, branch);
   const { counts } = review;
   if (counts.total === 0) return null;
@@ -126,7 +131,7 @@ export function ArchitectureReviewBar({
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
-        summaryText={`${architectureSummary(counts)}${review.saveFailure ? SAVE_FAILURE_SUFFIX : ""}`}
+        summaryText={`${summaryOf(counts)}${review.saveFailure ? SAVE_FAILURE_SUFFIX : ""}`}
       />
       <div role="status" className="sr-only">
         {[actions.announcement || actions.summary, statusText].filter(Boolean).join(" ")}

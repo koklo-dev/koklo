@@ -1,4 +1,4 @@
-import { IdTag, ProposalDetailLines, ProposalDetailSection } from "@koklo/ui";
+import { IdTag, ProposalDetailLines, ProposalDetailSection, ProposalDetailText } from "@koklo/ui";
 import { componentTypeLabel } from "../lib/architecture-labels.ts";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
 
@@ -123,5 +123,15 @@ export function ArchitectureProposalContent({ proposal }: { proposal: ProposalOu
   if (proposal.kind === "component") return <ComponentContent content={content} />;
   if (proposal.kind === "archflow") return <ArchflowContent content={content} />;
   if (proposal.kind === "adr") return <AdrContent content={content} />;
-  return <Paragraph title="Texte proposé" value={content.markdown} />;
+  return <ProposedSectionText markdown={content.markdown} />;
+}
+
+/** Texte d'une section proposée : 15 px, sans encadré coloré (maquette 14 l.766, tous les livrables). */
+export function ProposedSectionText({ markdown }: { markdown: unknown }) {
+  if (!text(markdown)) return null;
+  return (
+    <ProposalDetailSection title="Texte proposé" variant="label">
+      <ProposalDetailText variant="prose">{text(markdown)}</ProposalDetailText>
+    </ProposalDetailSection>
+  );
 }

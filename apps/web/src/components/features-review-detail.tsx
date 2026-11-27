@@ -12,6 +12,7 @@ import { useState } from "react";
 import type { AiErrorView } from "../lib/ai-errors.ts";
 import type { FormIssue } from "../lib/feature-form.ts";
 import { editedContentOf, editValuesOf, issuesOf } from "../lib/proposal-edit.ts";
+import { technicalWhyOf } from "../lib/proposal-technical.ts";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
 import type { EditValues } from "../lib/proposal-validation.ts";
 import { AiErrorNotice } from "./ai-error-notice.tsx";
@@ -136,7 +137,7 @@ export function ReviewDetail(props: ReviewDetailProps) {
   return (
     <ProposalDetail
       item={item}
-      why={proposal.rationale}
+      why={technicalWhyOf(proposal)}
       {...(meta ? { meta } : {})}
       onDecide={onDecide}
       {...(item.status === "pending" && !domain ? { onEdit: () => setEditing(proposal.id) } : {})}

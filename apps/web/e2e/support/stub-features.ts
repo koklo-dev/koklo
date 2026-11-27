@@ -21,6 +21,7 @@ import {
 import { dataCounts, handleSpecData, resetLayout } from "./stub-spec-data.ts";
 import { domainCounts, handleSpecDomain } from "./stub-spec-domain.ts";
 import { handleSpecItem, type SpecItemScenario } from "./stub-spec-item.ts";
+import { type TechnicalScenario, technicalCounts } from "./stub-spec-technical.ts";
 
 /**
  * Faux API de l'écran /projects/[projectId]/features (TK-48 / 48d) : `spec.head`, `spec.listFeatures`,
@@ -63,7 +64,8 @@ export type FeaturesScenario = {
   write?: WriteMode;
 } & SpecItemScenario &
   ArchitectureScenario &
-  ArchitectureReviewScenario;
+  ArchitectureReviewScenario &
+  TechnicalScenario;
 
 type Reply = { status: number; body: string };
 type Send = (reply: Reply) => void;
@@ -426,7 +428,14 @@ function answerRead(
   const answer = reply(
     200,
     raw
-      ? { ...raw, counts: { ...raw.counts, ...architectureCounts(h.scenario.architecture) } }
+      ? {
+          ...raw,
+          counts: {
+            ...raw.counts,
+            ...architectureCounts(h.scenario.architecture),
+            ...technicalCounts(h.scenario.technical),
+          },
+        }
       : raw,
   );
   if (mode === "loading") h.hold(() => h.send(answer));

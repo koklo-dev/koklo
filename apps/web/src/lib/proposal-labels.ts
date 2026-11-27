@@ -6,10 +6,14 @@ import {
   isArchitectureKind,
 } from "./proposal-architecture.ts";
 import { tableRefOf } from "./proposal-data.ts";
+import { isTechnicalProposal, technicalRefOf, technicalSubtitleOf } from "./proposal-technical.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
-/** Livrables dont l'agent propose le contenu : le cahier fonctionnel (TK-99b), le modèle de données (TK-107) et l'architecture (TK-111). */
-export type Deliverable = "functional" | "data" | "architecture";
+/**
+ * Livrables dont l'agent propose le contenu : le cahier fonctionnel (TK-99b), le modèle de données (TK-107),
+ * l'architecture (TK-111) et le cahier technique (TK-115).
+ */
+export type Deliverable = "functional" | "data" | "architecture" | "technical";
 /** Livrable des écrans qui ne le précisent pas : le cahier fonctionnel. */
 export const DEFAULT_DELIVERABLE: Deliverable = "functional";
 
@@ -71,10 +75,32 @@ const ARCHITECTURE_MODE_TEXTS: typeof MODE_TEXTS = {
   },
 };
 
+/** Textes de la modale du cahier technique (maquette 14 l.793). */
+const TECHNICAL_MODE_TEXTS: typeof MODE_TEXTS = {
+  complete: {
+    title: "Compléter le cahier",
+    description: "Opérations de l'API, exigences et variables qui manquent.",
+  },
+  compare: {
+    title: "Comparer les options d'un choix",
+    description: "Tableau chiffré pour un choix à trancher ; les prix sont des estimations.",
+    noun: ["choix à trancher", "choix à trancher"],
+  },
+  nfr: {
+    title: "Rendre les exigences mesurables",
+    description: "Une cible vérifiable pour chaque exigence floue.",
+  },
+  all: {
+    title: "Tout reproposer",
+    description: "Repart de l'architecture ; ce qui est enregistré reste.",
+  },
+};
+
 const MODE_TEXTS_OF: Record<Deliverable, typeof MODE_TEXTS> = {
   functional: MODE_TEXTS,
   data: DATA_MODE_TEXTS,
   architecture: ARCHITECTURE_MODE_TEXTS,
+  technical: TECHNICAL_MODE_TEXTS,
 };
 
 /** Textes des choix de la modale pour un livrable. */
@@ -94,6 +120,10 @@ export const KIND_LABELS: Record<string, string> = {
   archflow: "Flux",
   adr: "Décision",
   doc_section: "Section du document",
+  stack: "Choix technique",
+  op: "Opération de l'API",
+  nfr: "Exigence",
+  env: "Environnement",
 };
 
 export const UNAVAILABLE_REASONS: Record<string, string> = {
@@ -192,8 +222,12 @@ export function savedBreakdown(kinds: readonly string[]): string {
 
 const countLabel = (n: number, [one, other]: [string, string]): string =>
   `${n} ${n >= 2 ? other : one}`;
-export const optionCountLabel = (mode: string, count: number | undefined): string | undefined => {
-  const noun = MODE_TEXTS[mode]?.noun;
+export const optionCountLabel = (
+  mode: string,
+  count: number | undefined,
+  deliverable: Deliverable = DEFAULT_DELIVERABLE,
+): string | undefined => {
+  const noun = modeTextsOf(deliverable)[mode]?.noun;
   return count !== undefined && noun ? countLabel(count, noun) : undefined;
 };
 
@@ -207,6 +241,7 @@ const DATA_REFS: Record<string, string> = { relations: "REL" };
 /** Identifiant lisible : celui de la fiche visée, sinon rang dans le lancement (`P-007`, `RL-002`). */
 export function refOf(proposal: ProposalOutput): string {
   const specId = text(proposal.content.specId);
+  if (isTechnicalProposal(proposal)) return technicalRefOf(proposal);
   if (isArchitectureKind(proposal.kind)) return architectureRefOf(proposal);
   if (proposal.kind === "table") return tableRefOf(text(proposal.content.name));
   if (proposal.kind === "fixtures")
@@ -242,6 +277,7 @@ function dataSubtitle(content: Record<string, unknown>): string {
 export function subtitleOf(proposal: ProposalOutput): string {
   const { content } = proposal;
   const label = KIND_LABELS[proposal.kind] ?? proposal.kind;
+  if (isTechnicalProposal(proposal)) return technicalSubtitleOf(proposal);
   if (isArchitectureKind(proposal.kind)) return architectureSubtitleOf(proposal);
   if (proposal.kind === "table") return dataSubtitle(content);
   if (proposal.kind === "relations")

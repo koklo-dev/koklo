@@ -102,7 +102,7 @@ describe("pages « Bientôt » (C4)", () => {
     expect(element.props.children.props).toEqual({ projectId: ID });
   });
 
-  it.each(["data", "technical", "security", "design", "quality"])(
+  it.each(["data", "security", "design", "quality"])(
     "spec/%s est une page « Bientôt »",
     async (slug) => {
       const { default: Page } = await import(
@@ -212,6 +212,24 @@ describe("Réglages (C7)", () => {
     expect(await generateMetadata(params({ section: "account" }))).toMatchObject({
       title: "Mon compte · Réglages · Koklo",
     });
+  });
+});
+
+describe("route du cahier technique (TK-115)", () => {
+  it("spec/technical a sa route dédiée : `[slug]` ne la sert plus", async () => {
+    const { default: Page } = await import(
+      "../src/app/(shell)/projects/[projectId]/spec/[slug]/page.tsx"
+    );
+    await expect(Page(params({ projectId: ID, slug: "technical" }))).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
+    const { default: Technical } = await import(
+      "../src/app/(shell)/projects/[projectId]/spec/technical/page.tsx"
+    );
+    const element = (await Technical(params({ projectId: ID }))) as {
+      props: { projectId: string };
+    };
+    expect(element.props).toEqual({ projectId: ID });
   });
 });
 

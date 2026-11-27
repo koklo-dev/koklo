@@ -8,12 +8,17 @@ import {
   Input,
   RadioPill,
   RadioPillGroup,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   TagInput,
   Textarea,
 } from "@koklo/ui";
 import type { ReactNode } from "react";
 import type { FormIssue } from "../lib/feature-form.ts";
-import { useRefsSearch } from "../lib/use-refs-search.ts";
+import { type RefKind, useRefsSearch } from "../lib/use-refs-search.ts";
 
 export const domainFieldId = (field: string): string => `domain-form-${field}`;
 
@@ -24,6 +29,8 @@ interface ShellProps {
   required?: boolean;
   optional?: boolean;
   hint?: ReactNode;
+  /** Rempli par l'agent : filet et mention « proposé par l'agent ». */
+  agentFilled?: boolean | undefined;
   /** Un groupe de pastilles est nommé par `aria-labelledby`, pas par un `label for`. */
   labelFor?: boolean;
   children: (control: {
@@ -43,6 +50,7 @@ export function DomainField({
   optional,
   hint,
   labelFor = true,
+  agentFilled,
   children,
 }: ShellProps) {
   const id = domainFieldId(field);
@@ -53,7 +61,7 @@ export function DomainField({
     .join(" ");
   const labelId = `${id}-label`;
   return (
-    <Field className="gap-1.5">
+    <Field className="gap-1.5" agentFilled={agentFilled ?? false}>
       <FieldLabel
         id={labelId}
         {...(labelFor ? { htmlFor: id } : {})}
@@ -82,6 +90,42 @@ interface Common {
   required?: boolean;
   optional?: boolean;
   hint?: ReactNode;
+  agentFilled?: boolean | undefined;
+}
+
+/** Choix dans une liste fermée (`Select`). */
+export function SelectField<V extends string>({
+  value,
+  options,
+  onChange,
+  ...common
+}: Common & {
+  value: V | "";
+  options: ReadonlyArray<{ value: V; label: string }>;
+  onChange: (value: V) => void;
+}) {
+  return (
+    <DomainField {...common}>
+      {({ labelId: _label, id, ...aria }) => (
+        <Select
+          value={value}
+          disabled={common.readOnly}
+          onValueChange={(next) => onChange(next as V)}
+        >
+          <SelectTrigger id={id} {...aria} className="max-md:h-11">
+            <SelectValue placeholder="Choisir…" />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </DomainField>
+  );
 }
 
 export function TextField({
@@ -205,7 +249,7 @@ export function TagsField({
   placeholder?: string;
   /** Genres cherchés par l'autocomplétion ; sans eux, saisie libre. */
   projectId?: string;
-  kinds?: ReadonlyArray<"feature" | "rule" | "flow" | "table" | "endpoint" | "screen">;
+  kinds?: ReadonlyArray<RefKind>;
 }) {
   return (
     <DomainField {...common} labelFor={false}>
@@ -237,7 +281,7 @@ function Tags(props: {
   validate: ((value: string) => string | null) | undefined;
   placeholder: string | undefined;
   projectId: string | undefined;
-  kinds: ReadonlyArray<"feature" | "rule" | "flow" | "table" | "endpoint" | "screen"> | undefined;
+  kinds: ReadonlyArray<RefKind> | undefined;
   "aria-describedby": string | undefined;
   "aria-invalid": true | undefined;
 }) {

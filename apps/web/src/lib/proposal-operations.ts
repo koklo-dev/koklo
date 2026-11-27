@@ -6,6 +6,7 @@ import {
 } from "@koklo/contract";
 import { architectureOperationOf, isArchitectureKind } from "./proposal-architecture.ts";
 import { isDataKind } from "./proposal-data.ts";
+import { isTechnicalProposal, technicalOperationOf } from "./proposal-technical.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
 type Operation = SpecBatchSubmitInput["operations"][number];
@@ -145,12 +146,15 @@ function dataOperations(proposal: ProposalOutput): Operation[] {
 /** Opérations d'une proposition acceptée (une seule, sauf `relations` : une mise à jour par table de départ). */
 export function operationsOf(proposal: ProposalOutput): Operation[] {
   if (isDataKind(proposal.kind)) return dataOperations(proposal);
-  if (isArchitectureKind(proposal.kind)) {
-    const architecture = architectureOperationOf(proposal);
-    return architecture ? [architecture] : [];
-  }
-  const op = operationOf(proposal);
+  const op = delegatedOperationOf(proposal);
   return op ? [op] : [];
+}
+
+/** Opération des propositions d'un autre livrable (technique avant architecture : ils partagent `doc_section`). */
+function delegatedOperationOf(proposal: ProposalOutput): Operation | null {
+  if (isTechnicalProposal(proposal)) return technicalOperationOf(proposal);
+  if (isArchitectureKind(proposal.kind)) return architectureOperationOf(proposal);
+  return operationOf(proposal);
 }
 
 /**

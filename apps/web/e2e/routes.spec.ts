@@ -69,9 +69,9 @@ test("/ et /kanban ouvrent le dernier projet ouvert, sinon la liste des projets"
 test("pages « Bientôt » : un livrable, EmptyState sans action, onglet du cahier", async ({
   page,
 }) => {
-  // Les Données (TK-107) et l'Architecture (TK-111) ont leur écran : le livrable « Bientôt » de ce test est le Technique.
-  await page.goto(`${PROJECT}/spec/technical`);
-  await expect(page.getByRole("heading", { level: 1, name: "Technique" })).toBeVisible();
+  // Les Données, l'Architecture et le Technique (TK-115) ont leur écran : le « Bientôt » de ce test est la Sécurité.
+  await page.goto(`${PROJECT}/spec/security`);
+  await expect(page.getByRole("heading", { level: 1, name: "Sécurité" })).toBeVisible();
   await expect(page.getByText("Bientôt")).toBeVisible();
   await expect(page.locator("main").getByRole("button")).toHaveCount(0);
   await page.goto(`${PROJECT}/spec/functional?tab=rules`);

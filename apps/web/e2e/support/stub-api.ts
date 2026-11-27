@@ -31,6 +31,7 @@ import {
   type SpecRepoScenario,
   seedCreation,
 } from "./stub-spec-repo.ts";
+import { handleSpecTechnical, resetTechnical } from "./stub-spec-technical.ts";
 
 /**
  * Faux API pour les e2e : session Better Auth + project.list, sans Postgres.
@@ -187,6 +188,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetShell(scenario);
     resetDataModel(scenario);
     resetArchitectureReview(scenario);
+    resetTechnical();
     resetIdea(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     seedCreation(scenario, addProject);
@@ -219,6 +221,7 @@ type Sender = (reply: ReturnType<typeof json>) => void;
 /** Le reste du faux API : fonctionnalités, dépôt de spec, projets, kanban, GitHub, organisations. */
 function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
   const path = url.pathname;
+  if (handleSpecTechnical(req, url, { scenario, send })) return;
   if (handleArchitectureReview(req, url, { scenario, send })) return;
   if (handleDataModel(req, url, { scenario, send })) return;
   if (/^\/(client-space|projects\/[^/]+\/reviews)/.test(path) || path === "/__client-calls") {

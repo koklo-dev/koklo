@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { type FeaturesTab, tabOfProposalKind } from "./features-tab.ts";
 import { orpc } from "./orpc.ts";
 import { type Deliverable, refOf, subtitleOf } from "./proposal-labels.ts";
+import { asTechnical, technicalTitleOf } from "./proposal-technical.ts";
 import type { ProposalGroupOutput, ProposalOutput } from "./proposal-types.ts";
 import { NO_CASCADE, useSavable } from "./use-proposal-savable.ts";
 import {
@@ -16,11 +17,15 @@ import {
   useProposalStatus,
 } from "./use-proposal-status.ts";
 
-/** Livrable relu par un écran à part : les Données et l'Architecture relisent tous les types de leur lancement. */
+/** Livrable relu par un écran à part : il relit tous les types de son lancement. */
 const DELIVERABLE_OF_TAB: Record<string, Deliverable> = {
   data: "data",
   architecture: "architecture",
+  technical: "technical",
 };
+
+/** Onglet de la relecture : un onglet du cahier fonctionnel ou la relecture entière d'un autre livrable. */
+export type ReviewTab = FeaturesTab | "data" | "architecture" | "technical";
 
 export type ReviewFilter = "pending" | "all";
 const FLAT_LIMIT = PROPOSAL_GROUP_THRESHOLD;
@@ -54,7 +59,7 @@ function itemOf(proposal: ProposalOutput, failed: ReadonlySet<string>): Proposal
   return {
     id: proposal.id,
     ref: refOf(proposal),
-    title: proposal.title,
+    title: technicalTitleOf(proposal),
     subtitle: subtitleOf(proposal),
     status: statusOf(proposal, failed),
   };
@@ -139,11 +144,9 @@ const refetchAll = (reads: readonly { refetch: () => Promise<unknown> }[]) => {
   for (const read of reads) void read.refetch();
 };
 
-/** Les Données et l'Architecture relisent tous leurs groupes ; un onglet du cahier ne relit que ses types. */
-const inTab = (groupKey: string, tab: FeaturesTab | "data" | "architecture"): boolean =>
-  tab === "data" ||
-  tab === "architecture" ||
-  tabOfProposalKind(groupKey.split(":")[0] ?? "") === tab;
+/** Un livrable à part relit tous ses groupes ; un onglet du cahier ne relit que ses types. */
+const inTab = (groupKey: string, tab: ReviewTab): boolean =>
+  Object.hasOwn(DELIVERABLE_OF_TAB, tab) || tabOfProposalKind(groupKey.split(":")[0] ?? "") === tab;
 
 /**
  * Lecture de la relecture : un groupe par `proposal.list` (`group`), `status: pending` par défaut au-delà de 30,
@@ -152,7 +155,7 @@ const inTab = (groupKey: string, tab: FeaturesTab | "data" | "architecture"): bo
 export function useProposalReview(
   projectId: string,
   enabled: boolean,
-  tab: FeaturesTab | "data" | "architecture" = "features",
+  tab: ReviewTab = "features",
 ) {
   const deliverable: Deliverable = DELIVERABLE_OF_TAB[tab as string] ?? "functional";
   const status = useProposalStatus(projectId, enabled, deliverable);
@@ -173,7 +176,8 @@ export function useProposalReview(
     shown,
     launchStatus: status.launch?.status,
   });
-  const loaded = results.map((result) => result.data?.items ?? []);
+  const mark = deliverable === "technical" ? asTechnical : (proposal: ProposalOutput) => proposal;
+  const loaded = results.map((result) => (result.data?.items ?? []).map(mark));
   const proposals = loaded.flat();
   const loadedFailed = useFailedBatches(projectId, proposals);
   const savedSet = useSavable(projectId, status.launch?.id, counts.accepted, deliverable);

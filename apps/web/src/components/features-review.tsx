@@ -11,16 +11,21 @@ import {
 import type { ReactNode } from "react";
 import { errorCode } from "../lib/api-error.ts";
 import { ARCHITECTURE_GENERATING } from "../lib/architecture-labels.ts";
-import type { FeaturesTab } from "../lib/features-tab.ts";
 import { launchDetailOf } from "../lib/launch-report.ts";
 import { NO_ACCESS } from "../lib/proposal-labels.ts";
+import { TECHNICAL_GENERATING } from "../lib/technical-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
-import { type ProposalReviewModel, useProposalReview } from "../lib/use-proposal-review.ts";
+import {
+  type ProposalReviewModel,
+  type ReviewTab,
+  useProposalReview,
+} from "../lib/use-proposal-review.ts";
 import { ArchitectureGenerating } from "./architecture-generating.tsx";
 import { DataGenerating } from "./data-generating.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { ReviewDetail } from "./features-review-detail.tsx";
 import { SaveFailureNotice } from "./save-failure-notice.tsx";
+import { TechnicalGenerating } from "./technical-generating.tsx";
 
 const GENERATING =
   "L'agent rédige le cahier fonctionnel à partir du dossier d'idée. Cela peut prendre une minute. Vous pouvez quitter la page.";
@@ -53,7 +58,27 @@ export const dataSummary = (counts: ProposalReviewModel["counts"]): string =>
 export const architectureSummary = (counts: ProposalReviewModel["counts"]): string =>
   agentSummary("le fonctionnel et les données", counts);
 
-type ReviewTab = FeaturesTab | "data" | "architecture";
+/** Cahier technique (maquette 14 l.113). */
+export const technicalSummary = (counts: ProposalReviewModel["counts"]): string =>
+  agentSummary("l'architecture", counts);
+
+/** Phrase du bandeau d'attente, résumé et note de groupe des livrables relus à part. */
+const OWN_REVIEW = {
+  data: { generating: DATA_GENERATING, summary: dataSummary, note: "Groupées par zone" },
+  architecture: {
+    generating: ARCHITECTURE_GENERATING,
+    summary: architectureSummary,
+    note: "Groupées par type",
+  },
+  technical: {
+    generating: TECHNICAL_GENERATING,
+    summary: technicalSummary,
+    note: "Groupées par type",
+  },
+} as const;
+
+const ownReviewOf = (tab: ReviewTab) =>
+  Object.hasOwn(OWN_REVIEW, tab) ? OWN_REVIEW[tab as keyof typeof OWN_REVIEW] : undefined;
 
 function Loading() {
   return (
@@ -78,6 +103,7 @@ function Generating({
 }) {
   if (tab === "data") return <DataGenerating onLeave={onLeave} />;
   if (tab === "architecture") return <ArchitectureGenerating onLeave={onLeave} detail={detail} />;
+  if (tab === "technical") return <TechnicalGenerating onLeave={onLeave} />;
   return (
     <>
       <ProposalGenerationBanner onLeave={onLeave}>{GENERATING}</ProposalGenerationBanner>
@@ -137,10 +163,6 @@ function placeholderOf(review: ProposalReviewModel, onLeave: () => void, tab: Re
 /** Ligne de détail du bandeau (bilan en cours de l'Architecture, TK-114b) : seulement quand elle existe. */
 const detailProp = (detail: string | undefined) => (detail ? { detail } : {});
 
-/** Phrase du bandeau d'attente de chaque livrable. */
-const generatingText = (tab: ReviewTab): string =>
-  tab === "data" ? DATA_GENERATING : tab === "architecture" ? ARCHITECTURE_GENERATING : GENERATING;
-
 /** « Enregistrer N dans la spec » : seulement sans enregistrement échoué, que l'alerte reprend (une seule action). */
 export const saveProp = (
   review: ProposalReviewModel,
@@ -176,7 +198,7 @@ function ReviewNotices({ review, actions, onLeave, tab }: Notices) {
           onLeave={onLeave}
           {...detailProp(launchDetailOf(review.status.launch))}
         >
-          {generatingText(tab)}
+          {ownReviewOf(tab)?.generating ?? GENERATING}
         </ProposalGenerationBanner>
       ) : null}
       {counts.pending === 0 && counts.accepted > 0 && !active && !saveFailure ? (
@@ -233,6 +255,7 @@ export function FeaturesReview({
       </Notice>
     );
   }
+  const own = ownReviewOf(tab);
   const selected = actions.selected;
   const item = review.groups.flatMap((group) => group.items).find((i) => i.id === selected?.id);
   return (
@@ -252,12 +275,7 @@ export function FeaturesReview({
         saving={actions.saving}
         saveProgress={actions.saveProgress}
         onLeave={onLeave}
-        {...(tab === "data"
-          ? { summaryText: dataSummary(counts), groupNote: "Groupées par zone" }
-          : {})}
-        {...(tab === "architecture"
-          ? { summaryText: architectureSummary(counts), groupNote: "Groupées par type" }
-          : {})}
+        {...(own ? { summaryText: own.summary(counts), groupNote: own.note } : {})}
         announcement={actions.announcement}
         notice={
           <>

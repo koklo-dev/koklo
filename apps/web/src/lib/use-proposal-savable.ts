@@ -5,6 +5,7 @@ import { orpc } from "./orpc.ts";
 import { type Cascade, prepareDataProposals, type TableRelation } from "./proposal-data.ts";
 import type { Deliverable } from "./proposal-labels.ts";
 import { isSavable } from "./proposal-operations.ts";
+import { asTechnical } from "./proposal-technical.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 import { listInput } from "./use-proposal-status.ts";
 
@@ -27,6 +28,15 @@ export interface ProposalSaveFailure {
   /** Code du premier lot échoué (`write_conflict`, `SPEC_INVALID`, …), sinon son statut. */
   errorCode: string | null;
   batches: string[];
+}
+
+/** Prépare les propositions d'un livrable : cascade et relations des Données, section marquée pour le Technique. */
+async function preparedOf(projectId: string, deliverable: Deliverable, all: ProposalOutput[]) {
+  if (deliverable === "data") {
+    return prepareDataProposals(all, (id) => savedRelations(projectId, id));
+  }
+  const proposals = deliverable === "technical" ? all.map(asTechnical) : all;
+  return { proposals, cascade: NO_CASCADE };
 }
 
 /** Toutes les propositions du lancement (ou d'un seul groupe), page de 100 après page de 100. */
@@ -113,10 +123,7 @@ export function useSavable(
       const all = await listAll(projectId, deliverable);
       const locks = await failedLocks(projectId, all);
       const failed = new Set(locks.keys());
-      const ready =
-        deliverable === "data"
-          ? await prepareDataProposals(all, (id) => savedRelations(projectId, id))
-          : { proposals: all, cascade: NO_CASCADE };
+      const ready = await preparedOf(projectId, deliverable, all);
       const proposals = ready.proposals.filter((p) => isSavable(p, failed));
       return { proposals, cascade: ready.cascade, failed, failure: failureOf(proposals, locks) };
     },

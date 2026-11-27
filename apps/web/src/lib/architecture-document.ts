@@ -36,13 +36,13 @@ export function markdownBlocks(markdown: string): MarkdownBlock[] {
 export const sectionNumber = (num: number): string => String(num).padStart(2, "0");
 
 /** Section ouverte : celle de `?s=`, sinon la première (l'ordre est celui du serveur). */
-export const selectedSectionOf = (
-  sections: readonly DocSection[],
+export const selectedSectionOf = <T extends Pick<DocSection, "slug">>(
+  sections: readonly T[],
   slug: string | undefined,
-): DocSection | undefined => sections.find((section) => section.slug === slug) ?? sections[0];
+): T | undefined => sections.find((section) => section.slug === slug) ?? sections[0];
 
 /** « Ce qui manque encore » : une ligne par section à rédiger. */
-export const docGapsOf = (sections: readonly DocSection[]): string[] =>
+export const docGapsOf = (sections: readonly Pick<DocSection, "status" | "title">[]): string[] =>
   sections
     .filter((section) => section.status === "a_rediger")
     .map((section) => `${section.title} : section vide.`);
