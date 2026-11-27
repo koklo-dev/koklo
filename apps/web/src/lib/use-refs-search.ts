@@ -18,7 +18,9 @@ export type RefKind =
   | "endpoint"
   | "screen"
   | "component"
-  | "nfr";
+  | "nfr"
+  | "stack"
+  | "adr";
 
 /**
  * Autocomplétion des liens : `spec.refs.search` une fois la frappe posée (200 ms), jamais sur une saisie vide.

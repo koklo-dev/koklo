@@ -9,14 +9,17 @@ import { shortDate } from "./overview-labels.ts";
 import { countsText, type TechnicalCounts } from "./technical-labels.ts";
 import type { TechnicalTab } from "./technical-tab.ts";
 
-/** Actions de l'en-tête (maquette 14 l.774-815). Pas de « Valider » avant TK-116. */
+/** Actions de l'en-tête (maquette 14 l.774-815). */
 export type TechnicalHeaderAction =
   | "add"
   | "propose"
   | "propose-updates"
   | "repropose"
   | "create-stack"
-  | "create-environment";
+  | "create-operation"
+  | "create-requirement"
+  | "create-environment"
+  | "validate";
 
 export interface TechnicalHeaderState {
   status?: DeliverableStatusValue;
@@ -24,6 +27,10 @@ export interface TechnicalHeaderState {
   statusIcon?: IconName;
   summary?: string;
   actions: TechnicalHeaderAction[];
+  /** « Valider » désactivé : un choix reste à trancher, ou les comptes ne sont pas encore lus. */
+  validateBlocked?: true;
+  /** Cahier validé : l'ajout devient le bouton principal. */
+  createPrimary?: true;
   tabCounts?: Partial<Record<TechnicalTab, HeaderTabCount>>;
 }
 
@@ -64,16 +71,28 @@ function listSummary({ deliverable, validation, counts }: TechnicalHeaderInput) 
   return counts ? openSummary(counts) : undefined;
 }
 
-const createActionOf = (tab: TechnicalTab): TechnicalHeaderAction[] => {
-  if (tab === "document") return [];
-  return [tab === "environments" ? "create-environment" : "create-stack"];
+/** Ajout de l'onglet ; aucun sur Document, la Relecture ajoute un choix. */
+const CREATE: Record<TechnicalTab, TechnicalHeaderAction[]> = {
+  review: ["create-stack"],
+  stack: ["create-stack"],
+  api: ["create-operation"],
+  nfr: ["create-requirement"],
+  environments: ["create-environment"],
+  document: [],
 };
 
 function listActions(input: TechnicalHeaderInput): TechnicalHeaderAction[] {
-  const create = createActionOf(input.tab);
+  const create = CREATE[input.tab];
   if (!input.agent) return create;
   if (input.deliverable !== "revise") return ["propose", ...create];
   return input.available === false ? create : [...create, "propose-updates"];
+}
+
+/** « Valider » après les autres boutons, tant que le cahier est à valider ou à revoir (B775). */
+function validationOf({ deliverable, counts }: TechnicalHeaderInput) {
+  if (deliverable !== "pending" && deliverable !== "revise") return undefined;
+  const blocked = counts === undefined || Boolean(counts.open);
+  return blocked ? { validateBlocked: true as const } : {};
 }
 
 function tabCountsOf(input: TechnicalHeaderInput): TechnicalHeaderState["tabCounts"] {
@@ -81,6 +100,8 @@ function tabCountsOf(input: TechnicalHeaderInput): TechnicalHeaderState["tabCoun
   if (!counts) return undefined;
   const totals = {
     stack: { value: counts.choices },
+    api: { value: counts.operations },
+    nfr: { value: counts.requirements },
     environments: { value: counts.environments },
   };
   if (!input.reviewing) return totals;
@@ -102,10 +123,13 @@ function listState(input: TechnicalHeaderInput): TechnicalHeaderState {
   const settled = deliverable === "validated" || deliverable === "revise";
   const summary = listSummary(input);
   const tabCounts = tabCountsOf(input);
+  const validation = validationOf(input);
   return {
     ...LIST_STATUS[settled ? deliverable : "open"],
     ...(summary ? { summary } : {}),
-    actions: listActions(input),
+    actions: [...listActions(input), ...(validation ? ["validate" as const] : [])],
+    ...validation,
+    ...(deliverable === "validated" ? { createPrimary: true as const } : {}),
     ...(tabCounts ? { tabCounts } : {}),
   };
 }

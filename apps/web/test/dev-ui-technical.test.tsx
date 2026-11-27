@@ -15,4 +15,20 @@ describe("galerie du cahier technique", () => {
     const rubric = within(section).getByRole("heading", { level: 3, name: "Texte proposé" });
     expect(rubric.className).toContain("uppercase");
   });
+
+  it("montre les opérations, leur fiche, les exigences et le pied de liste (TK-116)", () => {
+    render(<TechnicalGallery />);
+    const section = screen.getByRole("region", { name: "Cahier technique" });
+    const rows = within(section).getByRole("group", { name: "Filtrer par zone" });
+    expect(within(rows).getAllByRole("button")).toHaveLength(2);
+    expect(within(section).getByRole("button", { name: /^écriture reservation/ })).toBeVisible();
+    expect(
+      within(section).getByRole("heading", { level: 2, name: "reservation.cancel" }),
+    ).toBeVisible();
+    expect(within(section).getByRole("table", { name: "Erreurs" })).toBeInTheDocument();
+    expect(within(section).getByRole("region", { name: "Performance 2" })).toBeInTheDocument();
+    for (const label of ["Couverte", "À couvrir", "Limite de débit"]) {
+      expect(within(section).getAllByText(label).length).toBeGreaterThan(0);
+    }
+  });
 });

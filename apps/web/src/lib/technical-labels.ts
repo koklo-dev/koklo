@@ -182,11 +182,20 @@ export const countsText = (counts: TechnicalCounts): string =>
 export const clientSummaryOf = (counts: TechnicalCounts): string =>
   `${countsText(counts)} · lecture seule`;
 
-const COMMENT_NOUNS = { stack: "le choix", tech_section: "la section" } as const;
+const COMMENT_NOUNS = {
+  stack: "le choix",
+  tech_section: "la section",
+  operation: "l'opération",
+} as const;
+/** Cibles uniques du livrable : pas de nom à citer. */
+const COMMENT_TITLES = {
+  environments: "Commenter les environnements",
+  requirements: "Commenter les exigences",
+} as const;
 
-export type TechnicalCommentKind = keyof typeof COMMENT_NOUNS | "environments";
+export type TechnicalCommentKind = keyof typeof COMMENT_NOUNS | keyof typeof COMMENT_TITLES;
 
 export const commentTitleFor = (kind: TechnicalCommentKind, name: string): string =>
-  kind === "environments"
-    ? "Commenter les environnements"
+  kind === "environments" || kind === "requirements"
+    ? COMMENT_TITLES[kind]
     : `Commenter ${COMMENT_NOUNS[kind]} « ${name} »`;

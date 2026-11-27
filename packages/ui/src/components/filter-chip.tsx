@@ -16,6 +16,8 @@ type FilterChipProps = Omit<ComponentProps<"button">, "onChange"> & {
   count?: number;
   /** « Ajouter un filtre » : pointillé, icône `add`, action sans état pressé. */
   add?: boolean;
+  /** `zone` : filtre de zone des opérations, marges 0 10, texte muet au repos (DESIGN.md §5.27). */
+  variant?: "zone";
 };
 
 /** Pastille de filtre h-7 (DESIGN.md §5.5) : bouton à bascule `aria-pressed`, ou action `add`. */
@@ -25,6 +27,7 @@ export function FilterChip({
   onPressedChange,
   count,
   add = false,
+  variant,
   className,
   children,
   onClick,
@@ -44,6 +47,8 @@ export function FilterChip({
           "h-[30px] border-dashed border-border-strong bg-transparent font-medium text-foreground",
         !add && on && "border-primary bg-secondary text-secondary-foreground",
         !add && !on && "bg-background text-foreground",
+        variant === "zone" && "px-2.5",
+        variant === "zone" && !on && "text-muted-foreground",
         className,
       )}
       onClick={(event) => {

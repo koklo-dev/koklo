@@ -7,6 +7,56 @@ import { errorCode } from "./api-error.ts";
 import { orpc } from "./orpc.ts";
 import type { DocSection } from "./use-architecture-document.ts";
 
+/** Pages d'une liste à curseur : même enchaînement pour les choix, les opérations et les exigences. */
+export const CURSOR_PAGES = {
+  initialPageParam: undefined as string | undefined,
+  getNextPageParam: (page: { nextCursor: string | null }) => page.nextCursor ?? undefined,
+  getPreviousPageParam: (page: { previousCursor: string | null }) =>
+    page.previousCursor ?? undefined,
+  placeholderData: keepPreviousData,
+};
+
+/** Première page autour de l'élément de l'adresse, puis la page du curseur. */
+export const cursorOf = (cursor: string | undefined, around: string | undefined) =>
+  cursor ? { cursor } : around ? { around } : {};
+
+interface ListPage {
+  items: unknown[];
+  total: number;
+  offset: number;
+  facets?: Record<string, Record<string, number>> | undefined;
+}
+
+interface PagedQuery<P> {
+  data: { pages: P[] } | undefined;
+  isPlaceholderData: boolean;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+/** Ce qu'un écran lit d'une liste paginée : éléments chargés, total et facettes de la dernière page, suites. */
+export function pagedListOf<P extends ListPage, Q extends PagedQuery<P>>(query: Q & PagedQuery<P>) {
+  const pages = query.data?.pages ?? [];
+  const stale = query.isPlaceholderData;
+  const last = pages.at(-1);
+  return {
+    query: query as Q,
+    items: pages.flatMap((page) => page.items) as P["items"],
+    total: last?.total ?? 0,
+    offset: pages[0]?.offset ?? 0,
+    facet: (name: string): Record<string, number> => last?.facets?.[name] ?? {},
+    stale,
+    hasNext: Boolean(query.hasNextPage) && !stale,
+    hasPrevious: Boolean(query.hasPreviousPage) && !stale,
+  };
+}
+
+/** Un élément demandé par l'adresse mais introuvable : l'appelant repart de la première page. */
+export const isAroundMissing = (
+  around: string | undefined,
+  query: { isError: boolean; error: unknown },
+): boolean => Boolean(around) && query.isError && errorCode(query.error) === "NOT_FOUND";
+
 interface StackOptions {
   projectId: string;
   q: string | undefined;
@@ -26,29 +76,20 @@ export function useTechnicalStack({ projectId, q, around, enabled }: StackOption
         projectId,
         limit: STACK_PAGE_SIZE,
         ...(q ? { q } : {}),
-        ...(cursor ? { cursor } : around ? { around } : {}),
+        ...cursorOf(cursor, around),
       }),
-      initialPageParam: undefined,
-      getNextPageParam: (page) => page.nextCursor ?? undefined,
-      getPreviousPageParam: (page) => page.previousCursor ?? undefined,
-      placeholderData: keepPreviousData,
+      ...CURSOR_PAGES,
     }),
     enabled,
   });
-  const pages = query.data?.pages ?? [];
-  const stale = query.isPlaceholderData;
+  const list = pagedListOf(query);
   return {
-    query,
-    items: pages.flatMap((page) => page.items) as StackSummary[],
-    total: pages.at(-1)?.total ?? 0,
-    offset: pages[0]?.offset ?? 0,
+    ...list,
+    items: list.items as StackSummary[],
     /** Comptes par couche de toute la recherche, et choix à trancher. */
-    layers: (pages.at(-1)?.facets?.layer ?? {}) as Record<string, number>,
-    open: pages.at(-1)?.facets?.status?.open ?? 0,
-    stale,
-    hasNext: Boolean(query.hasNextPage) && !stale,
-    hasPrevious: Boolean(query.hasPreviousPage) && !stale,
-    aroundMissing: Boolean(around) && query.isError && errorCode(query.error) === "NOT_FOUND",
+    layers: list.facet("layer"),
+    open: list.facet("status").open ?? 0,
+    aroundMissing: isAroundMissing(around, query),
   };
 }
 

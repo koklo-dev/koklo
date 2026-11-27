@@ -3,7 +3,15 @@
 import {
   Button,
   ComparisonTable,
+  EntityChip,
   EnvironmentTable,
+  FilterChip,
+  ListFooter,
+  NfrCard,
+  NfrCategory,
+  OperationFicheTitle,
+  OperationFieldsTable,
+  OperationRow,
   ProposalDetailSection,
   ProposalDetailText,
   SpecRowsPanel,
@@ -139,7 +147,99 @@ function RubricSample() {
   );
 }
 
-/** Galerie du cahier technique (TK-115, DESIGN.md §5.26, maquette 14) : données de la planche, sans écriture. */
+/** Zones, lignes d'opération (courante, proposée) et pied de liste (TK-116). */
+function OperationSamples() {
+  return (
+    <div className="flex max-w-[560px] flex-col gap-2.5">
+      {/* biome-ignore lint/a11y/useSemanticElements: groupe de filtres, pas un jeu de champs */}
+      <div role="group" aria-label="Filtrer par zone" className="flex flex-wrap gap-1.5">
+        <FilterChip variant="zone" pressed>
+          Toutes · 132
+        </FilterChip>
+        <FilterChip variant="zone" pressed={false}>
+          Personnel · 16
+        </FilterChip>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border">
+        <div>
+          <OperationRow
+            name="reservation.cancel"
+            summary="Annule une réservation depuis le lien du SMS."
+            permission="reservation.modifier"
+            type="write"
+            current
+            onSelect={noop}
+          />
+          <OperationRow
+            name="creneau.listAvailable"
+            summary="Créneaux libres d'un service."
+            permission="public"
+            type="read"
+            proposed
+            onSelect={noop}
+          />
+          <OperationRow
+            name="rappel.send"
+            summary="Envoie le SMS de rappel."
+            permission="interne"
+            type="internal"
+            onSelect={noop}
+          />
+        </div>
+        <ListFooter state="more" pageSize={50} noun={{ one: "opération", other: "opérations" }} />
+      </div>
+    </div>
+  );
+}
+
+/** Titre de fiche, tables et puces d'une opération. */
+function OperationFicheSample() {
+  return (
+    <div className="flex min-w-0 flex-col gap-3.5">
+      <OperationFicheTitle>reservation.cancel</OperationFicheTitle>
+      <OperationFieldsTable
+        title="Erreurs"
+        columns={["Code", "Règle", "Quand"]}
+        rows={[["DELAI_DEPASSE", "R-002", "moins de 2 h avant le rendez-vous"]]}
+      />
+      <div className="flex flex-wrap gap-1.5">
+        <EntityChip kind="permission" id="PM-reservation.modifier" title="Client (les siennes)" />
+        <EntityChip kind="permission" id="" title="Accueil" />
+        <EntityChip kind="rule" icon="rule" id="R-002" />
+        <EntityChip kind="feature" id="F-002" />
+        <EntityChip kind="limit" id="limite" title="20 par minute et par IP" />
+      </div>
+    </div>
+  );
+}
+
+/** Catégorie et cartes : sans couverture, couverte, à couvrir et à revoir. */
+function NfrSamples() {
+  return (
+    <NfrCategory label="Performance" icon="speed" count={2}>
+      <NfrCard
+        id="NFR-002"
+        title="Rapidité du portail sur mobile"
+        target="LCP < 2,5 s en 4G"
+        statement="Le portail affiche les créneaux en moins de 2,5 s."
+        verification="Mesure en CI"
+        coverage="covered"
+        onEdit={noop}
+      />
+      <NfrCard
+        id="NFR-003"
+        title="Temps de réponse de l'API"
+        target="p95 < 300 ms"
+        statement="Les opérations de réservation répondent vite."
+        verification="À définir"
+        coverage="uncovered"
+        stale
+      />
+    </NfrCategory>
+  );
+}
+
+/** Galerie du cahier technique (DESIGN.md §5.26 et §5.27, maquette 14) : données de la planche, sans écriture. */
 export function TechnicalGallery() {
   return (
     <section aria-labelledby="gallery-technical" className="flex min-w-0 flex-col gap-4">
@@ -151,6 +251,9 @@ export function TechnicalGallery() {
       <EnvironmentSample />
       <PanelSamples />
       <RubricSample />
+      <OperationSamples />
+      <OperationFicheSample />
+      <NfrSamples />
     </section>
   );
 }

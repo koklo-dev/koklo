@@ -137,26 +137,35 @@ function shellResponse(projectId: string, h: Handlers): Reply {
       available: availableOf(key, available, h.scenario),
       after,
     })),
-    validatedCount: 0,
+    // Seul le scénario Technique compte ses livrables validés (compteur « SPEC N/7 » de la barre).
+    validatedCount: h.scenario.technical
+      ? DELIVERABLES.filter(([key]) => statusOf(key, h.scenario) === "validated").length
+      : 0,
     ticketCount: noSprint ? null : 8,
   });
 }
 
-/** Statut d'un livrable : le scénario du modèle de données (TK-109) pilote Fonctionnel et Données, la vue client attend le Fonctionnel (TK-104). */
-/** Un scénario de l'Architecture (TK-111) ou du Technique (TK-115) ouvre son livrable. */
+/**
+ * Un scénario de l'Architecture (TK-111) ou du Technique (TK-115) ouvre son livrable ; le Technique ouvre aussi
+ * l'Architecture, validée avant lui (maquette 14 l.826), et la Sécurité le suit une fois validé.
+ */
 const availableOf = (
   key: string,
   available: boolean,
   scenario: ShellScenario & { architecture?: string },
 ) => {
-  if (key === "architecture" && scenario.architecture !== undefined) return true;
+  const architectureOpen = scenario.architecture !== undefined || scenario.technical !== undefined;
+  if (key === "architecture" && architectureOpen) return true;
+  const technical = technicalDeliverable(scenario.technical)?.status;
+  if (key === "security" && technical === "validated") return true;
   return key === "technical" && scenario.technical !== undefined ? true : available;
 };
 
+/** Statut d'un livrable : le scénario du modèle de données (TK-109) pilote Fonctionnel et Données, la vue client attend le Fonctionnel (TK-104). */
 function statusOf(key: string, scenario: ShellScenario & { architecture?: string }): string {
   const technical = technicalDeliverable(scenario.technical);
   if (technical && key === "technical") return technical.status;
-  if (technical && key === "architecture") return "validated";
+  if (technical && ["functional", "data", "architecture"].includes(key)) return "validated";
   const data = dataDeliverable(scenario);
   if (data && key === "data") return data.status;
   if (data && key === "functional") return "validated";

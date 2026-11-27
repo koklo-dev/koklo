@@ -6,8 +6,10 @@ import { regionText } from "./features-region.ts";
 import { deriveFeaturesView } from "./features-view.ts";
 import { orpc } from "./orpc.ts";
 import { canReadRepos, canWriteTechnical } from "./roles.ts";
+import { NFR_SAVED, OPERATION_SAVED } from "./technical-api-labels.ts";
 import { technicalHeaderStateOf } from "./technical-header-state.ts";
 import { CHOICE_SAVED, ENVIRONMENT_SAVED } from "./technical-labels.ts";
+import { technicalFormOf } from "./technical-tab.ts";
 import { type FeatureWrite, useFeatureWrite } from "./use-feature-submit.ts";
 import { useDeepLink } from "./use-features.ts";
 import { useAnnouncements, useRepoCreated } from "./use-features-actions.ts";
@@ -19,6 +21,7 @@ import { useSavedToast } from "./use-saved-toast.ts";
 import { useSpecDeliverables } from "./use-spec-deliverables.ts";
 import { useSavedSync, useSpecForm } from "./use-spec-form.ts";
 import { type SpecSources, useSpecSources } from "./use-spec-sources.ts";
+import { useOperationTotal } from "./use-technical-api.ts";
 import {
   useStackTotals,
   useTechnicalDocument,
@@ -27,7 +30,7 @@ import {
 } from "./use-technical-data.ts";
 import { type TechnicalUrlModel, useTechnicalUrl } from "./use-technical-url.ts";
 import { useUnauthorizedRedirect } from "./use-unauthorized-redirect.ts";
-import { useDeliverableValidation } from "./use-validate-model.ts";
+import { useDeliverableValidation, useValidateDeliverable } from "./use-validate-model.ts";
 
 type Head = NonNullable<SpecSources["headData"]>;
 const LIST_KEYS = [
@@ -61,10 +64,12 @@ const otherEntries = (head: SpecSources["headData"]): number =>
 function useTechnicalView(projectId: string, url: TechnicalUrlModel, sources: SpecSources) {
   const { role, head, repos } = sources;
   const readable = sources.readable && canReadRepos(role);
-  const deepLink = useDeepLink(url.sel, url.q ?? "");
+  // La recherche de l'adresse appartient à l'onglet ouvert : seule la Stack filtre ses choix.
+  const q = url.tab === "stack" ? url.q : undefined;
+  const deepLink = useDeepLink(url.sel, q ?? "");
   const stack = useTechnicalStack({
     projectId,
-    q: url.q,
+    q,
     around: deepLink.around,
     enabled: readable,
   });
@@ -84,7 +89,7 @@ function useTechnicalView(projectId: string, url: TechnicalUrlModel, sources: Sp
     roleKnown: sources.roleKnown,
     role,
     redirecting,
-    filtered: Boolean(url.q),
+    filtered: Boolean(q),
     head: head.query,
     repos,
     features: {
@@ -94,21 +99,27 @@ function useTechnicalView(projectId: string, url: TechnicalUrlModel, sources: Sp
       itemCount:
         stack.items.length +
         (environments.data?.environments.length ?? 0) +
-        (url.q ? 0 : otherEntries(sources.headData)),
+        (q ? 0 : otherEntries(sources.headData)),
       fetching: stack.query.isFetching || environments.isFetching,
     },
   });
   return { stack, environments, view };
 }
 
-/** Ce que la région d'état dit quand une écriture s'achève : le choix ou l'environnement enregistré. */
+const SAVED_TEXT = {
+  stack: CHOICE_SAVED,
+  environment: ENVIRONMENT_SAVED,
+  operation: OPERATION_SAVED,
+  nfr: NFR_SAVED,
+} as const;
+
+/** Ce que la région d'état dit quand une écriture s'achève : l'élément enregistré. */
 function useSavedAnnouncement(write: FeatureWrite, announce: (text: string) => void) {
   const { saved } = write;
   useEffect(() => {
     if (!saved || saved.meta.kind === "delete") return;
-    const id = saved.meta.specId ?? "";
-    if (id.startsWith("ENV-")) announce(ENVIRONMENT_SAVED);
-    else if (id.startsWith("ST-")) announce(CHOICE_SAVED);
+    const id = saved.meta.specId;
+    if (id) announce(SAVED_TEXT[technicalFormOf(id, "stack")]);
   }, [saved, announce]);
 }
 
@@ -133,12 +144,13 @@ function useTechnicalWriting(
   return { titleRef, write, form };
 }
 
-function countsOf(head: SpecSources["headData"], open: number) {
-  if (!head) return undefined;
-  const { stack, endpoints, nfr, environments } = head.counts;
+/** Comptes de la tête ; les opérations viennent de leur liste, qui ignore les anciens points REST (B772). */
+function countsOf(head: SpecSources["headData"], open: number, operations: number | undefined) {
+  if (!head || operations === undefined) return undefined;
+  const { stack, nfr, environments } = head.counts;
   return {
     choices: stack ?? 0,
-    operations: endpoints ?? 0,
+    operations,
     requirements: nfr ?? 0,
     environments: environments ?? 0,
     open,
@@ -164,6 +176,7 @@ function useTechnicalProposing(ctx: {
   const status = useTechnicalStatus(projectId);
   const readable = canReadRepos(role) && sources.readable;
   const totals = useStackTotals(projectId, readable);
+  const operations = useOperationTotal(projectId, readable);
   const validation = useDeliverableValidation(
     "technical",
     projectId,
@@ -179,7 +192,7 @@ function useTechnicalProposing(ctx: {
     pending: propose.status.counts.pending,
     viewKind,
     tab: url.tab,
-    counts: countsOf(headData, totals.open),
+    counts: totals.total === undefined ? undefined : countsOf(headData, totals.open, operations),
     deliverable: status.deliverable,
     validation,
     ...(status.available === undefined ? {} : { available: status.available }),
@@ -198,6 +211,7 @@ export function useTechnicalPage(projectId: string) {
   const writing = useTechnicalWriting(projectId, url, sources, view.kind);
   useSavedAnnouncement(writing.write, announce);
   const proposing = useTechnicalProposing({ projectId, url, sources, viewKind: view.kind });
+  const validate = useValidateDeliverable("technical", projectId, headData?.commitSha, announce);
   return {
     url,
     projectId,
@@ -211,6 +225,7 @@ export function useTechnicalPage(projectId: string) {
     document: useTechnicalDocument(projectId, sources.readable && team && url.tab === "document"),
     ...writing,
     ...proposing,
+    validate,
     announce,
     announcement,
     statusText: regionText({ view, expired: sources.head.expired, noun: "du cahier technique" }),

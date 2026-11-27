@@ -11,7 +11,6 @@ import {
   InlineAlert,
   Pill,
   SegmentedControl,
-  Skeleton,
   STACK_STATUS_PILL,
   StackFicheTitle,
 } from "@koklo/ui";
@@ -19,8 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { orpc } from "../lib/orpc.ts";
 import { OPEN_CHOICE, openChoiceText } from "../lib/technical-labels.ts";
-import { SourceBlock } from "./data-diagram-source.tsx";
-import { GitReadError } from "./git-read-error.tsx";
+import { TechnicalYaml } from "./technical-source.tsx";
 
 /** Ce que la fiche lit d'un choix : le vocabulaire commun à l'équipe et au client. */
 export type StackFicheChoice = Omit<StackSummary, "filePath">;
@@ -137,35 +135,16 @@ function Details({ choice, client, onChoose, choosing = false }: StackFicheProps
   );
 }
 
-/** Vue YAML : le fichier du dépôt (« Source de vérité ») ou le YAML généré depuis l'index (« Généré »). */
+/** Vue YAML d'un choix. */
 function StackYaml({ projectId, id }: { projectId: string; id: string }) {
   const source = useQuery(
     orpc.spec.technical.stack.source.queryOptions({ input: { projectId, id } }),
   );
-  if (source.isPending) return <Skeleton aria-busy="true" className="h-40 rounded-[10px]" />;
-  if (source.isError || !source.data) {
-    return (
-      <GitReadError
-        error={source.error}
-        onRetry={() => void source.refetch()}
-        retrying={source.isFetching}
-        fallback="Le fichier du choix n'a pas pu être lu."
-      />
-    );
-  }
-  const { path, text, generated } = source.data;
   return (
-    <SourceBlock
-      icon="description"
-      path={path}
-      maxHeight={600}
+    <TechnicalYaml
+      query={source}
       label="YAML du choix"
-      code={text}
-      tag={
-        <Pill size="md" tone={generated ? "soft" : "success"}>
-          {generated ? "Généré" : "Source de vérité"}
-        </Pill>
-      }
+      fallback="Le fichier du choix n'a pas pu être lu."
     />
   );
 }

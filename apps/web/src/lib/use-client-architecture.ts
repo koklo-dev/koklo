@@ -99,7 +99,15 @@ export function useClientFlow(projectId: string, flowId: string | undefined) {
 }
 
 export type ClientCommentTarget = {
-  kind: "component" | "adr" | "archflow" | "stack" | "environments" | "tech_section";
+  kind:
+    | "component"
+    | "adr"
+    | "archflow"
+    | "stack"
+    | "environments"
+    | "tech_section"
+    | "operation"
+    | "requirements";
   ref: string;
 };
 

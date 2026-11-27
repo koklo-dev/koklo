@@ -9,6 +9,8 @@ import {
   StackChoiceCard,
   StackLayer,
 } from "@koklo/ui";
+import type { ReactNode } from "react";
+import { pendingUpdatesOf } from "../lib/proposal-technical.ts";
 import {
   forTextOf,
   OPEN_CHOICE,
@@ -24,8 +26,8 @@ import { OVERLAY_MAX, PHONE_MAX, useMaxWidth } from "../lib/use-max-width.ts";
 import { useStackChoice } from "../lib/use-stack-choice.ts";
 import type { TechnicalPageModel } from "../lib/use-technical-page.ts";
 import { BackToList } from "./architecture-decision-list.tsx";
+import { TechnicalFichePanel } from "./technical-fiche-panel.tsx";
 import { StackFiche, type StackFicheChoice } from "./technical-stack-fiche.tsx";
-import { StackPanel } from "./technical-stack-panel.tsx";
 
 export interface StackCardsProps {
   items: readonly StackFicheChoice[];
@@ -101,6 +103,36 @@ export function StackCountBar({
       <span>{STACK_NOTE}</span>
       {announcement ? <span className="sr-only">{announcement}</span> : null}
     </div>
+  );
+}
+
+const PANEL_CLASS =
+  "flex min-w-0 flex-[1_1_480px] flex-col gap-3 border-l px-[22px] pt-4 pb-6 xl:max-w-[580px]";
+
+/** Cadre de la fiche d'un choix : colonne de 480 à 580 px, panneau en dessous de 1280 px. */
+export function StackPanel({
+  id,
+  asked,
+  onClose,
+  children,
+}: {
+  id: string;
+  asked: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <TechnicalFichePanel
+      id={id}
+      asked={asked}
+      onClose={onClose}
+      back={<BackToList onClick={onClose} />}
+      label="Fiche du choix technique"
+      description="Rôle, options comparées et liens du choix technique ouvert."
+      className={PANEL_CLASS}
+    >
+      {children}
+    </TechnicalFichePanel>
   );
 }
 
@@ -200,11 +232,7 @@ function Footer({ page }: { page: TechnicalPageModel }) {
 
 function List({ page, selected }: { page: TechnicalPageModel; selected: string | undefined }) {
   const { stack, url, totals, upstream, review, announcement, form } = page;
-  const proposed = page.propose.reviewing
-    ? review.proposals
-        .filter((proposal) => proposal.kind === "stack" && proposal.status === "pending")
-        .map((proposal) => String(proposal.content.specId ?? ""))
-    : [];
+  const proposed = page.propose.reviewing ? pendingUpdatesOf(review.proposals, "stack") : [];
   return (
     <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-3.5 px-4 pt-4 pb-6 md:pl-7">
       {form.open ? null : (
@@ -265,7 +293,6 @@ export function TechnicalStackTab({ page }: { page: TechnicalPageModel }) {
           id={choice.specId}
           asked={url.sel !== undefined}
           onClose={() => url.select(null)}
-          back={<BackToList onClick={() => url.select(null)} />}
         >
           <Detail page={page} choice={choice} />
         </StackPanel>
