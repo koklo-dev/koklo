@@ -6,7 +6,11 @@ import { componentIdSchema } from "./schemas-spec-architecture.ts";
 import {
   environmentDataSchema,
   environmentDeploymentSchema,
+  nfrCategorySchema,
   nfrIdSchema,
+  nfrVerificationSchema,
+  operationNameSchema,
+  operationTypeSchema,
   stackStatusSchema,
 } from "./schemas-spec-technical.ts";
 import { instantSchema } from "./schemas-tickets.ts";
@@ -151,7 +155,7 @@ export type AiIdeaGapsOutput = z.output<typeof aiIdeaGapsOutputSchema>;
 export const AI_PREFILL_DESCRIPTION_MAX = 500;
 export const AI_PREFILL_LINKS_MAX = 30;
 
-export const AI_PREFILL_TYPES = ["feature", "stack", "environment"] as const;
+export const AI_PREFILL_TYPES = ["feature", "stack", "environment", "operation", "nfr"] as const;
 
 export const aiPrefillItemInputSchema = z.object({
   projectId: z.uuid(),
@@ -190,8 +194,43 @@ export const prefilledEnvironmentValuesSchema = z.object({
   access: line(200).optional(),
 });
 
+const operationFieldValue = { field: line(80), type: line(120) };
+/** Champs de la feuille « Opération » (3.18.0) : les liens sont des règles et des fonctionnalités. */
+export const prefilledOperationValuesSchema = z.object({
+  name: operationNameSchema.optional(),
+  type: operationTypeSchema.optional(),
+  zone: line(80).optional(),
+  summary: line(500).optional(),
+  permission: line(120).optional(),
+  input: z
+    .array(z.object({ ...operationFieldValue, constraint: line(300).optional() }))
+    .max(40)
+    .optional(),
+  output: z
+    .array(z.object({ ...operationFieldValue, note: line(300).optional() }))
+    .max(40)
+    .optional(),
+  errors: z
+    .array(z.object({ code: line(80), when: line(300), rule: line(100).optional() }))
+    .max(20)
+    .optional(),
+  links: z.array(line(100)).max(AI_PREFILL_LINKS_MAX).optional(),
+  rateLimit: line(200).optional(),
+});
+/** Champs de la feuille « Exigence » (3.18.0) : cible mesurable et vérification. */
+export const prefilledNfrValuesSchema = z.object({
+  category: nfrCategorySchema.optional(),
+  title: line(200).optional(),
+  target: line(120).optional(),
+  statement: line(1000).optional(),
+  verification: nfrVerificationSchema.optional(),
+  links: z.array(line(100)).max(AI_PREFILL_LINKS_MAX).optional(),
+});
+
 export const aiPrefillItemOutputSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("feature"), values: prefilledValuesSchema }),
   z.object({ type: z.literal("stack"), values: prefilledStackValuesSchema }),
   z.object({ type: z.literal("environment"), values: prefilledEnvironmentValuesSchema }),
+  z.object({ type: z.literal("operation"), values: prefilledOperationValuesSchema }),
+  z.object({ type: z.literal("nfr"), values: prefilledNfrValuesSchema }),
 ]);

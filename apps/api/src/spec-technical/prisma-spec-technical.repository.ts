@@ -8,17 +8,12 @@ import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { loadWindow } from "../tracker/long-list.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
+import { OPERATIONS_ONLY } from "./operation-where.ts";
 import type { SpecTechnicalRepository, StackRequest } from "./spec-technical.repository.ts";
 import { readTechnicalCounts } from "./technical-counts.query.ts";
-import { stackSummary } from "./technical-values.ts";
+import { countValues, stackSummary } from "./technical-values.ts";
 
 const SELECT = { specId: true, path: true, data: true } as const;
-
-const sortedCounts = (values: readonly string[]): Record<string, number> => {
-  const counts = new Map<string, number>();
-  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return Object.fromEntries([...counts].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-};
 
 /** Lectures de l'index d'entités pour la page Technique (TK-115) : une transaction courte par appel, aucun réseau. */
 @Injectable()
@@ -58,8 +53,8 @@ export class PrismaSpecTechnicalRepository implements SpecTechnicalRepository {
     const rows = await tx.specEntity.findMany({ where, select: SELECT });
     const choices = rows.map((row) => stackSummary(row.specId, row.path, row.data));
     return {
-      layer: sortedCounts(choices.map((choice) => choice.layer)),
-      status: sortedCounts(choices.map((choice) => choice.status)),
+      layer: countValues(choices.map((choice) => choice.layer)),
+      status: countValues(choices.map((choice) => choice.status)),
     };
   }
 
@@ -94,7 +89,12 @@ export class PrismaSpecTechnicalRepository implements SpecTechnicalRepository {
     return this.transactions.run(scope, async (tx) => {
       const readable = await this.readable(tx, scope, {});
       if (readable === null || "kind" in readable) return null;
-      return readTechnicalCounts(tx, readable.snapshot.id);
+      const snapshotId = readable.snapshot.id;
+      const counts = await readTechnicalCounts(tx, snapshotId);
+      const operations = await tx.specEntity.count({
+        where: { snapshotId, kind: "endpoint", AND: OPERATIONS_ONLY },
+      });
+      return { ...counts, operations };
     });
   }
 }

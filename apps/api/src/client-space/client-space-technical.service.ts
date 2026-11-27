@@ -2,12 +2,16 @@ import type {
   ClientSpaceTechnical,
   ClientSpaceTechnicalDocument,
   ClientSpaceTechnicalEnvironments,
+  ClientSpaceTechnicalNfr,
+  ClientSpaceTechnicalOp,
+  ClientSpaceTechnicalOps,
   ClientSpaceTechnicalStack,
 } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { SpecTechnicalService } from "../spec-technical/spec-technical.service.ts";
-import { clientStackChoice } from "../spec-technical/technical-values.ts";
+import { SpecTechnicalApiService } from "../spec-technical/spec-technical-api.service.ts";
+import { withClientId } from "../spec-technical/technical-values.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 
 type Validation = ClientSpaceTechnical["validation"];
@@ -25,6 +29,7 @@ export class ClientSpaceTechnicalService {
   constructor(
     @Inject(SpecDeliverablesService) private readonly deliverables: SpecDeliverablesService,
     @Inject(SpecTechnicalService) private readonly technical: SpecTechnicalService,
+    @Inject(SpecTechnicalApiService) private readonly api: SpecTechnicalApiService,
   ) {}
 
   /** Statut du livrable Technique au contenu courant ; jamais de propositions (rôle fermé par défaut). */
@@ -44,7 +49,7 @@ export class ClientSpaceTechnicalService {
       validation,
       counts: {
         choices: counts.stack,
-        operations: counts.endpoints,
+        operations: counts.operations,
         requirements: counts.nfr,
         environments: counts.environments,
       },
@@ -59,7 +64,7 @@ export class ClientSpaceTechnicalService {
     if (validation !== "validated") return { available: false, validation, items: [], ...NO_PAGE };
     const { q, cursor, around, limit } = input;
     const page = await this.technical.stackList(scope, { q, cursor, around, limit });
-    return { available: true, validation, ...page, items: page.items.map(clientStackChoice) };
+    return { available: true, validation, ...page, items: page.items.map(withClientId) };
   }
 
   async environments(scope: ProjectScope): Promise<ClientSpaceTechnicalEnvironments> {
@@ -86,5 +91,35 @@ export class ClientSpaceTechnicalService {
         markdown,
       })),
     };
+  }
+
+  async operations(
+    scope: ProjectScope,
+    input: { zone?: string; q?: string; cursor?: string; around?: string; limit?: number },
+  ): Promise<ClientSpaceTechnicalOps> {
+    const validation = await this.validation(scope);
+    if (validation !== "validated") return { available: false, validation, items: [], ...NO_PAGE };
+    const { zone, q, cursor, around, limit } = input;
+    const page = await this.api.operationList(scope, { zone, q, cursor, around, limit });
+    return { available: true, validation, ...page, items: page.items.map(withClientId) };
+  }
+
+  /** Non validé : `operation` nulle sans lecture, que le nom existe ou non. */
+  async operation(scope: ProjectScope, id: string): Promise<ClientSpaceTechnicalOp> {
+    const validation = await this.validation(scope);
+    if (validation !== "validated") return { available: false, validation, operation: null };
+    const { commitSha: _commit, ...detail } = await this.api.operation(scope, {}, id);
+    return { available: true, validation, operation: withClientId(detail) };
+  }
+
+  async requirements(
+    scope: ProjectScope,
+    input: Parameters<SpecTechnicalApiService["nfrList"]>[1],
+  ): Promise<ClientSpaceTechnicalNfr> {
+    const validation = await this.validation(scope);
+    if (validation !== "validated") return { available: false, validation, items: [], ...NO_PAGE };
+    const { category, cursor, around, limit } = input;
+    const page = await this.api.nfrList(scope, { category, cursor, around, limit });
+    return { available: true, validation, ...page, items: page.items.map(withClientId) };
   }
 }

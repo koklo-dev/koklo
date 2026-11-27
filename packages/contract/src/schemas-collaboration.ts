@@ -6,7 +6,7 @@ import {
   docSectionIdSchema,
 } from "./schemas-spec-architecture.ts";
 import { tableIdSchema } from "./schemas-spec-data.ts";
-import { stackIdSchema } from "./schemas-spec-technical.ts";
+import { operationNameSchema, stackIdSchema } from "./schemas-spec-technical.ts";
 import {
   instantSchema,
   pageInputSchema,
@@ -27,6 +27,9 @@ export const commentTargetKindSchema = z.enum([
   "stack",
   "environments",
   "tech_section",
+  /** Une opération (son nom) et le bloc des exigences (3.18.0, B777). */
+  "operation",
+  "requirements",
 ]);
 export const commentAuthorKindSchema = z.enum(["human", "agent", "client", "system"]);
 export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"]);
@@ -43,6 +46,8 @@ const REF_SCHEMA = {
   stack: stackIdSchema,
   environments: z.literal("environments"),
   tech_section: docSectionIdSchema,
+  operation: operationNameSchema,
+  requirements: z.literal("requirements"),
 } as const;
 const targetRefSchema = z.union(Object.values(REF_SCHEMA));
 
@@ -53,7 +58,8 @@ export const commentSchema = z.object({
   targetId: z.uuid(),
   /**
    * `T-<slug>` (table, 3.7.0), `C-<slug>` (composant), `ADR-<nnn>` (décision) ou `P-<slug>` (flux) en 3.11.0, `ST-<slug>`,
-   * `environments` ou `DOC-<slug>` (section du cahier technique) en 3.17.0 ; absent pour un ticket.
+   * `environments` ou `DOC-<slug>` (section du cahier technique) en 3.17.0, `<zone.verbe>` (opération) ou `requirements`
+   * en 3.18.0 ; absent pour un ticket.
    */
   targetRef: targetRefSchema.optional(),
   authorKind: commentAuthorKindSchema,
@@ -63,7 +69,7 @@ export const commentSchema = z.object({
   createdAt: instantSchema,
 });
 
-/** Une cible de la spec se désigne par `targetRef`, les autres par `targetId` seul (3.7.0, 3.11.0, 3.17.0). */
+/** Une cible de la spec se désigne par `targetRef`, les autres par `targetId` seul (3.7.0 à 3.18.0). */
 const targetShape = {
   targetKind: commentTargetKindSchema,
   targetId: z.uuid().optional(),

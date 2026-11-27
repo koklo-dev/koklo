@@ -60,6 +60,9 @@ const GROUPS: Record<string, string[]> = {
     "technical",
     "technicalDocument",
     "technicalEnvironments",
+    "technicalNfr",
+    "technicalOp",
+    "technicalOps",
     "technicalStack",
   ],
   repo: ["createSpec", "link", "list"],
@@ -375,6 +378,16 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /client-space/projects/{projectId}/technical/stack",
     "GET /client-space/projects/{projectId}/technical/environments",
     "GET /client-space/projects/{projectId}/technical/document",
+    // TK-116 (3.18.0) : opérations, contrat généré, exigences et vue client.
+    "GET /projects/{projectId}/spec/technical/operations",
+    "GET /projects/{projectId}/spec/technical/operations/{opId}",
+    "GET /projects/{projectId}/spec/technical/operations/{opId}/source",
+    "GET /projects/{projectId}/spec/technical/operation-options",
+    "GET /projects/{projectId}/spec/technical/operations/{opId}/contract",
+    "GET /projects/{projectId}/spec/technical/nfr",
+    "GET /client-space/projects/{projectId}/technical/operations",
+    "GET /client-space/projects/{projectId}/technical/operations/{opId}",
+    "GET /client-space/projects/{projectId}/technical/nfr",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -406,7 +419,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(182);
+    expect(pairs).toHaveLength(191);
   });
 });
 

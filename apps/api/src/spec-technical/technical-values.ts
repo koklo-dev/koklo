@@ -1,9 +1,4 @@
-import type {
-  ClientStackChoice,
-  StackSummary,
-  TechnicalEnvironment,
-  TechnicalEnvironments,
-} from "@koklo/contract";
+import type { StackSummary, TechnicalEnvironment, TechnicalEnvironments } from "@koklo/contract";
 import { STACK_ICONS } from "@koklo/contract";
 import { emitStackYaml, type Stack, TECHNICAL_PROPOSAL_VOCABULARY } from "@koklo/schema";
 import { isRecord, list, text, texts } from "../spec-read/entity-values.ts";
@@ -20,11 +15,11 @@ const REQUIREMENT = /^NFR-[a-z0-9][a-z0-9-]*$/;
 const DECISION = /^ADR-\d{3,}$/;
 const ENVIRONMENT = /^ENV-[a-z0-9][a-z0-9-]*$/;
 
-const record = (value: unknown): Json => (isRecord(value) ? value : {});
+export const record = (value: unknown): Json => (isRecord(value) ? value : {});
 const matching = (value: unknown, pattern: RegExp): string[] =>
   texts(value).filter((id) => pattern.test(id));
 /** Valeur du contrat dont la traduction de fichier est `value`. */
-function englishOf<K extends string>(
+export function englishOf<K extends string>(
   words: Readonly<Record<K, string>>,
   value: unknown,
   fallback: K,
@@ -33,7 +28,7 @@ function englishOf<K extends string>(
   return found ?? fallback;
 }
 /** `{ [key]: texte }` quand le texte existe, rien sinon (champs facultatifs du contrat). */
-const optional = <K extends string>(key: K, value: unknown): { [P in K]?: string } =>
+export const optional = <K extends string>(key: K, value: unknown): { [P in K]?: string } =>
   (text(value) === "" ? {} : { [key]: text(value) }) as { [P in K]?: string };
 
 const criteriaOf = (value: unknown): StackSummary["criteria"] =>
@@ -45,6 +40,27 @@ const criteriaOf = (value: unknown): StackSummary["criteria"] =>
       values: list(criterion.valeurs).map(text),
     };
   });
+
+/** Comptes par valeur, dans l'ordre `compare` des valeurs (par défaut celui des codes) ; les valeurs vides sont ignorées. */
+export function countValues(
+  values: readonly string[],
+  compare: (a: string, b: string) => number = (a, b) => (a < b ? -1 : a > b ? 1 : 0),
+): Record<string, number> {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    if (value !== "") counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return Object.fromEntries([...counts].sort(([a], [b]) => compare(a, b)));
+}
+
+/** Un élément vu du client : sans chemin de fichier ; `id` à la place de `specId`. */
+export function withClientId<T extends { specId: string; filePath: string }>({
+  specId,
+  filePath: _path,
+  ...rest
+}: T) {
+  return { id: specId, ...rest };
+}
 
 /** Un choix de la stack tel que la grille et la fiche l'affichent. */
 export function stackSummary(specId: string, path: string, data: unknown): StackSummary {
@@ -67,15 +83,6 @@ export function stackSummary(specId: string, path: string, data: unknown): Stack
     decisions: matching(json.decisions, DECISION),
     filePath: path,
   };
-}
-
-/** Le choix vu du client : sans chemin ; `id` à la place de `specId`. */
-export function clientStackChoice({
-  specId,
-  filePath: _path,
-  ...rest
-}: StackSummary): ClientStackChoice {
-  return { id: specId, ...rest };
 }
 
 function environmentOf(entry: unknown): TechnicalEnvironment[] {

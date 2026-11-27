@@ -29,6 +29,7 @@ type ConflictReason =
   | "suggestion_not_open"
   | "baseline_not_open"
   | "review_incomplete"
+  | "choices_open"
   | "no_client"
   | "slug_taken"
   | "already_member"

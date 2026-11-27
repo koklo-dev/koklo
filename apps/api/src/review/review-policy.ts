@@ -46,6 +46,16 @@ export const canReview = (
   hasClient: boolean,
 ): boolean => role !== undefined && isOneOf(validatorsOf(kind, ref, hasClient), role);
 
+/** Approuver le cahier technique exige qu'aucun choix de la stack ne reste à trancher (B775). */
+export const requiresClosedChoices = (input: {
+  targetKind: string;
+  targetRef: string;
+  status: string;
+}): boolean =>
+  input.targetKind === "deliverable" &&
+  input.targetRef === "technical" &&
+  input.status === "approved";
+
 /**
  * Filtre Prisma de `review.list` pour le client (B325 e) : les cibles qu'il valide, jamais les livrables techniques.
  * Les écrans sont déjà exclus pour tous.

@@ -9,12 +9,14 @@ import {
   environmentsEntity,
   nfrEntity,
   operationEntity,
+  restEntity,
   stackEntity,
 } from "./helpers/spec-technical.ts";
 
 /**
  * TK-115 lot B (cas 6, B725, B726) : cahier technique vu du client. Rien tant que le livrable n'est pas validé ; validé :
  * comptes, choix, environnements et document, sans YAML, chemin ni SHA ; projet non lié : 404.
+ * TK-116 (cas 5) : opérations, fiche et exigences, sans YAML, chemin, SHA ni contrat ; « validé » suppose les choix tranchés.
  */
 const bench = installBench({ beforeAll, afterAll, beforeEach });
 let scene: ReviewScene;
@@ -25,10 +27,11 @@ beforeEach(async () => {
   const seeded = await seedIndex(bench(), scene.p1, [], {
     commit: true,
     entities: [
-      stackEntity("ST-sms"),
+      stackEntity("ST-sms", { statut: "choisi", choix: "Brevo" }),
       componentEntity("C-sms"),
       nfrEntity("NFR-001"),
       operationEntity("reservation.create"),
+      restEntity("E-ancien"),
       environmentsEntity(),
     ],
   });
@@ -89,7 +92,7 @@ describe("clientSpace.technical*", () => {
     expect(stack?.body.items).toHaveLength(1);
     expect(stack?.body.items[0]).toMatchObject({
       id: "ST-sms",
-      status: "open",
+      status: "chosen",
       plain: "Le prestataire des rappels reste à choisir.",
     });
     expect(environments?.body.environments).toHaveLength(2);
@@ -128,6 +131,56 @@ describe("clientSpace.technical*", () => {
     ]) {
       expect(res.status).toBe(404);
       expect(JSON.stringify(res.body)).not.toMatch(/Brevo|recette/);
+    }
+  });
+
+  it("opérations et exigences : rien tant que ce n'est pas validé, même pour une opération inconnue", async () => {
+    const p = scene.p1.projectId;
+    const list = await client().ops(p);
+    expect(list.status, JSON.stringify(list.body)).toBe(200);
+    expect(list.body).toMatchObject({ available: false, items: [], total: 0 });
+    for (const id of ["reservation.create", "agenda.absent"]) {
+      const one = await client().op(p, id);
+      expect(one.body, id).toEqual({
+        available: false,
+        validation: "to_validate",
+        operation: null,
+      });
+    }
+    expect((await client().nfr(p)).body).toMatchObject({ available: false, items: [], total: 0 });
+  });
+
+  it("validé : liste, fiche et exigences lisibles, `id` sans chemin, SHA, YAML ni contrat", async () => {
+    await validate();
+    const p = scene.p1.projectId;
+    const [list, one, nfr] = [
+      await client().ops(p),
+      await client().op(p, "reservation.create"),
+      await client().nfr(p),
+    ];
+    expect(list.body, JSON.stringify(list.body)).toMatchObject({ available: true, total: 1 });
+    expect(list.body.items[0]).toMatchObject({ id: "reservation.create", zone: "Réservation" });
+    expect(list.body.facets).toEqual({ zone: { Réservation: 1 } });
+    expect(one.body.operation).toMatchObject({ id: "reservation.create", input: [], callers: [] });
+    expect(nfr.body.items[0]).toMatchObject({ id: "NFR-001", category: "performance" });
+    const bodies = [list.body, one.body, nfr.body];
+    const keys = [...JSON.stringify(bodies).matchAll(/"([A-Za-z_]+)":/g)].map((m) => m[1]);
+    for (const banned of ["specId", "filePath", "commitSha", "yaml", "code"]) {
+      expect(keys, banned).not.toContain(banned);
+    }
+    expect(JSON.stringify(bodies)).not.toContain(sha);
+    expect((await client().op(p, "agenda.absent")).status).toBe(404);
+  });
+
+  it("client d'un autre projet : 404 sur les opérations et les exigences", async () => {
+    await validate();
+    const other = clientTechnicalApi(bench().app, scene.c2);
+    for (const res of [
+      await other.ops(scene.p1.projectId),
+      await other.op(scene.p1.projectId, "reservation.create"),
+      await other.nfr(scene.p1.projectId),
+    ]) {
+      expect(res.status).toBe(404);
     }
   });
 });

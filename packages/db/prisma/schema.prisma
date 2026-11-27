@@ -320,6 +320,8 @@ enum CommentTargetKind {
   stack
   environments
   tech_section
+  operation
+  requirements
 
   @@map("comment_target_kind")
 }

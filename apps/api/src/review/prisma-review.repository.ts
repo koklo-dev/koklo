@@ -22,7 +22,7 @@ import type {
   SubmitReview,
   SubmittedReview,
 } from "./review.repository.ts";
-import { canReview, clientListFilter } from "./review-policy.ts";
+import { canReview, clientListFilter, requiresClosedChoices } from "./review-policy.ts";
 import { readStatusFacts } from "./status-facts.ts";
 import { type EntityHash, targetHashOf } from "./target-hash.ts";
 
@@ -104,10 +104,13 @@ async function authorNamesOf(
     }),
   );
 }
-/** Données (B449) et Architecture (TK-113) dépendent de leurs amonts : leur décision se compare à la tête de la décision. */
+const UPSTREAM_DEPENDENT: readonly string[] = ["data", "architecture", "technical"];
+/**
+ * Données (B449), Architecture (TK-113) et cahier technique (TK-116) dépendent de leurs amonts : leur décision se compare
+ * à la tête de la décision.
+ */
 const dependsOnUpstream = (input: SubmitReview) =>
-  input.targetKind === "deliverable" &&
-  (input.targetRef === "data" || input.targetRef === "architecture");
+  input.targetKind === "deliverable" && UPSTREAM_DEPENDENT.includes(input.targetRef);
 const baselineNumber = (ref: string) => Number(ref.slice("baseline-".length));
 
 /**
@@ -133,6 +136,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       if (input.version !== headSha) throw staleVersion();
       const { baseline, hash } = await this.assertTarget(tx, scope, head.snapshot.id, input);
       assertBaselineAllowsDecision(baseline, input);
+      await this.assertChoicesClosed(tx, head.snapshot.id, input);
       const same = await this.findReplay(tx, scope, input, { headSha, hash });
       if (same) return { record: same, headSha, currentHash: hash };
       if (isCahierDecision(input)) await this.assertCahierComplete(tx, scope, head.snapshot, input);
@@ -215,6 +219,19 @@ export class PrismaReviewRepository implements ReviewRepository {
     const progress = progressOf(await readStatusFacts(tx, scope, snapshot));
     const decision = input.status === "approved" ? "approved" : "changes_requested";
     if (!isCahierComplete(progress, decision)) throw conflict("review_incomplete");
+  }
+
+  /** Approuver le cahier technique exige tous les choix de la tête tranchés (B775) ; sinon rien n'est écrit. */
+  private async assertChoicesClosed(
+    tx: Tx,
+    snapshotId: string,
+    input: SubmitReview,
+  ): Promise<void> {
+    if (!requiresClosedChoices(input)) return;
+    const open = await tx.specEntity.count({
+      where: { snapshotId, kind: "stack", data: { path: ["statut"], equals: "a_trancher" } },
+    });
+    if (open > 0) throw conflict("choices_open");
   }
 
   /**
@@ -367,8 +384,8 @@ export class PrismaReviewRepository implements ReviewRepository {
       (current.hash !== null && last.version !== null
         ? last.version.contentHash === current.hash
         : last.sha === current.headSha) &&
-      // Les Données et l'Architecture dépendent aussi de leurs amonts (B449, TK-113) : sur une autre tête, une décision identique est une nouvelle
-      // décision (elle fait repartir la comparaison de l'impact amont).
+      // Un livrable qui dépend de ses amonts : sur une autre tête, une décision identique est une nouvelle décision (elle
+      // fait repartir la comparaison de l'impact amont).
       (!dependsOnUpstream(input) || last.sha === current.headSha);
     const identical =
       sameContent && last.status === input.status && last.comment === (input.comment ?? null);

@@ -53,6 +53,13 @@ export async function searchEntityRefs(
 }
 
 /**
+ * Motif du jeton exact : l'identifiant est pris à la lettre (le point d'un nom d'opération n'est pas un joker) et rien qui
+ * le prolongerait (lettre, chiffre, `-`, `_`) ne l'entoure.
+ */
+const exactTokenPattern = (specId: string): string =>
+  `(^|[^A-Za-z0-9_-])${specId.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}([^A-Za-z0-9_-]|$)`;
+
+/**
  * Éléments de l'instantané dont le contenu cite `specId` (jeton exact : `F-0031` ne cite pas `F-003`), hors l'élément
  * lui-même, triés par rang puis identifiant ; `total` les compte tous, `items` en garde `limit`.
  */
@@ -70,7 +77,7 @@ export async function entitiesReferencing(
       FROM spec_entities
      WHERE organization_id = ${organizationId}::uuid AND snapshot_id = ${snapshotId}::uuid
        AND spec_id <> ${specId}
-       AND data::text ~ ('(^|[^A-Za-z0-9-])' || ${specId} || '([^A-Za-z0-9-]|$)')
+       AND data::text ~ ${exactTokenPattern(specId)}
      ORDER BY sort, spec_id, kind
      LIMIT ${limit}`;
   return {

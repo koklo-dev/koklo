@@ -356,3 +356,44 @@ describe("entityRowsOf : cahier technique", () => {
     expect(nfrCounterOf(spec)).toEqual({ raiseTo: 2, skipped: 0 });
   });
 });
+
+/** TK-116 (B772) : l'index range les opérations par zone puis nom, les exigences par catégorie puis identifiant. */
+describe("entityRowsOf : ordre des opérations et des exigences", () => {
+  const operation = (name: string, zone: string, extra = "") => ({
+    path: `api/endpoints/${name}.yaml`,
+    content: `id: ${name}\ntype: lecture\nzone: ${zone}\ncomposant: C-api\npermission: public\nresume: R.\n${extra}`,
+  });
+  const nfr = (id: string, categorie: string) => ({
+    path: `nfr/${id}.yaml`,
+    content: `id: ${id}\ncategorie: ${categorie}\ntitre: T\ncible: c\nenonce: E\nverification:\n  mode: manuel\n`,
+  });
+  const rows = rowsFor([
+    operation("zeta.get", "Équipe"),
+    operation("beta.get", "Paiement"),
+    operation("alpha.list", "Paiement"),
+    operation(
+      "omega.get",
+      "Agenda",
+      "entree:\n  serviceId:\n    type: uuid\n  au:\n    type: date\n",
+    ),
+    nfr("NFR-001", "exploitation"),
+    nfr("NFR-1000", "donnees"),
+    nfr("NFR-002", "securite"),
+    nfr("NFR-999", "donnees"),
+  ]);
+  const ordered = (kind: string) =>
+    [...of(rows, kind)].sort((a, b) => a.sort - b.sort).map((row) => row.specId);
+
+  it("opérations par zone (ordre alphabétique) puis nom", () => {
+    expect(ordered("endpoint")).toEqual(["omega.get", "zeta.get", "alpha.list", "beta.get"]);
+  });
+
+  it("exigences par catégorie (ordre de la maquette) puis numéro", () => {
+    expect(ordered("nfr")).toEqual(["NFR-999", "NFR-1000", "NFR-002", "NFR-001"]);
+  });
+
+  it("l'ordre des champs d'entrée et de sortie est gardé (jsonb réordonne les clés)", () => {
+    const first = of(rows, "endpoint").find((row) => row.specId === "omega.get");
+    expect(first?.data).toMatchObject({ champs: { entree: ["serviceId", "au"], sortie: [] } });
+  });
+});
