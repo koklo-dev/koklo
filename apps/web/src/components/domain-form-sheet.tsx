@@ -29,7 +29,9 @@ type Type =
   | "archflow"
   | "adr"
   | "stack"
-  | "environment";
+  | "environment"
+  | "operation"
+  | "nfr";
 /** Valeurs lues d'un élément : celles du type (`RuleDetail`…) et ce que tous portent (version, fichier). */
 type Values = { commitSha: string; filePath: string };
 interface Loaded<I extends Values> {
@@ -72,6 +74,8 @@ export interface FieldsContext<V> {
   set: (patch: Partial<V>) => void;
   issues: FormIssue[];
   readOnly: boolean;
+  /** Modification d'un élément existant : son identifiant ne change pas. */
+  editing: boolean;
   /** Champs remplis par l'agent. */
   filled: ReadonlySet<string>;
 }
@@ -343,6 +347,7 @@ function Body<V, T extends Type, I extends Values>(body: BodyProps<V, T, I>) {
         set: model.set,
         issues,
         readOnly,
+        editing: mode === "edit",
         filled: prefill.filled,
       })}
     </SpecItemSheet>

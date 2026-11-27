@@ -166,3 +166,27 @@ describe("EntityChip borné à son conteneur (TK-114i, A8)", () => {
     expect(label.parentElement).toContainElement(screen.getByText(id));
   });
 });
+
+describe("EntityChip : puces d'une opération (TK-116, DESIGN.md §5.27)", () => {
+  it("icône remplacée à la demande : la règle porte « rule » sur la page Technique", async () => {
+    const { container } = render(<EntityChip kind="rule" id="R-001" icon="rule" />);
+    const expected = await iconPaths("rule");
+    expect(expected).toContain(await pathIn(container.firstElementChild as Element));
+  });
+
+  it.each([
+    ["permission", "person", "Rôle autorisé"],
+    ["limit", "speed", "Limite de débit"],
+  ] as const)("%s : icône %s et type lu", async (kind, icon, type) => {
+    const { container } = render(<EntityChip kind={kind} id="limite" title="10 par minute" />);
+    const expected = await iconPaths(icon);
+    expect(expected).toContain(await pathIn(container.firstElementChild as Element));
+    expect(container).toHaveTextContent(`${type} limite 10 par minute`);
+  });
+
+  it("sans identifiant : le libellé seul, aucun identifiant vide", () => {
+    const { container } = render(<EntityChip kind="permission" id="" title="Accueil" />);
+    expect(container.querySelector(".font-mono")).toBeNull();
+    expect(container).toHaveTextContent("Rôle autorisé Accueil");
+  });
+});

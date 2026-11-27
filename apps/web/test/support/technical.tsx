@@ -4,9 +4,16 @@ import { batch, NEW_SHA } from "./feature-form.tsx";
 import { head, PROJECT_ID, serve } from "./features.tsx";
 import { serveProposals } from "./proposals.tsx";
 import { renderWithQuery } from "./render.tsx";
+import {
+  apiItem,
+  type OPERATIONS,
+  type REQUIREMENTS,
+  serveClientApi,
+  serveTechnicalApi,
+} from "./technical-api.ts";
 import { procedures, setUrl, specDeliverables } from "./web-mocks.ts";
 
-/** Faux serveur du cahier technique (contrat 3.17.0) : choix, environnements, document, vue client, propositions. */
+/** Faux serveur du cahier technique (contrat 3.18.0) : choix, opérations, exigences, environnements, document, client. */
 export { PROJECT_ID };
 export const SHA40 = "a".repeat(40);
 
@@ -134,6 +141,8 @@ interface Options {
   environments?: Record<string, unknown>;
   sections?: readonly unknown[];
   counts?: Partial<Record<"stack" | "endpoints" | "nfr" | "environments", number>>;
+  operations?: typeof OPERATIONS;
+  requirements?: typeof REQUIREMENTS;
 }
 
 const facetsOf = (rows: readonly Choice[], key: "layer" | "status") => {
@@ -161,7 +170,8 @@ function stackPage(rows: readonly Choice[], input: Record<string, unknown>) {
 /** Fiche d'un choix ou d'un environnement (`spec.item.get`). */
 function serveItems(choices: readonly Choice[], environments: typeof ENVIRONMENTS): void {
   procedures.specItemGet.mockImplementation(async (input: unknown) => {
-    const { type, id } = input as { type: "stack" | "environment"; id: string };
+    const { type, id } = input as { type: string; id: string };
+    if (type === "operation" || type === "nfr") return apiItem(type, id);
     const found =
       type === "stack"
         ? choices.find((row) => row.specId === id)
@@ -231,6 +241,7 @@ export function serveTechnical(
     commitSha: SHA40,
   });
   serveItems(choices, environments);
+  serveTechnicalApi(options);
   procedures.commentList.mockResolvedValue({ items: [], nextCursor: null });
   procedures.reviewList.mockResolvedValue({ items: [], nextCursor: null });
 }
@@ -276,6 +287,7 @@ export function serveClientTechnical(
       : [],
   });
   procedures.commentCreate.mockResolvedValue({ id: "c1" });
+  serveClientApi(available);
 }
 
 /** Le prochain enregistrement est écrit puis indexé : la tête passe à la nouvelle version. */

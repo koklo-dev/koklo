@@ -52,7 +52,7 @@ export const EMPTY_ENVIRONMENT: EnvironmentValues = {
   access: "",
 };
 
-const REQUIRED = "Ce champ est obligatoire.";
+export const REQUIRED = "Ce champ est obligatoire.";
 const NAME_MAX = 120;
 const LINE_MAX = 200;
 const WHY_MAX = 1000;
@@ -62,10 +62,10 @@ const CRITERIA_MAX = 12;
 
 type Check = [field: string, message: string | false];
 
-const issuesFrom = (checks: Check[]): FormIssue[] =>
+export const issuesFrom = (checks: Check[]): FormIssue[] =>
   checks.flatMap(([field, message]) => (message ? [{ field, message }] : []));
 
-const lineIssue = (text: string, max: number): string | false => {
+export const lineIssue = (text: string, max: number): string | false => {
   const length = text.trim().length;
   if (length === 0) return REQUIRED;
   return length > max && `Au plus ${max} caractères.`;
@@ -180,8 +180,9 @@ const defined = (fields: Fields): Fields =>
     ),
   );
 
-function operationFor<V>(
-  kind: "stack" | "env",
+/** `<kind>.create` des champs saisis, ou `<kind>.update` des seuls champs changés ; `null` sans changement. */
+export function operationFor<V>(
+  kind: "stack" | "env" | "op" | "nfr",
   fieldsOf: (values: V) => Fields,
   values: V,
   edit: { specId: string; baseline: V } | undefined,

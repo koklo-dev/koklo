@@ -134,12 +134,18 @@ export function TextField({
   placeholder,
   maxLength,
   suggestions,
+  mono,
+  locked,
   ...common
 }: Common & {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   maxLength?: number;
+  /** Saisie en police mono (nom d'une opération). */
+  mono?: boolean;
+  /** Identifiant non modifiable : lu, jamais saisi. */
+  locked?: boolean;
   /** Valeurs déjà utilisées (zones des tables) : proposées à la saisie, une valeur nouvelle reste permise. */
   suggestions?: readonly string[];
 }) {
@@ -149,9 +155,9 @@ export function TextField({
         <>
           <Input
             {...control}
-            className="max-md:h-11"
+            className={mono ? "font-mono text-meta max-md:h-11" : "max-md:h-11"}
             value={value}
-            readOnly={common.readOnly}
+            readOnly={common.readOnly || locked}
             placeholder={placeholder}
             maxLength={maxLength}
             {...(suggestions ? { list: `${control.id}-options` } : {})}

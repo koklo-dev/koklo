@@ -18,8 +18,10 @@ import type { TechnicalMode } from "./support/stub-spec-technical.ts";
  * TK-115 lot C, page Technique (design/screens/S-spec-technical.md, maquette 14) : chaque état (Prêt, Génération,
  * Relecture, Liste · équipe, À revoir, Vue client) sur les onglets Stack, Environnements et Document, en clair, sombre
  * et à 375 px, avec axe et sans défilement horizontal de page, plus la fiche, la relecture groupée, les feuilles et la
- * vue client non validée ; puis les parcours. Pile locale : faux API (support/stub-spec-technical.ts). Captures dans
- * design/screens/captures/S-spec-technical/<état>-<onglet>-<thème>[-mobile].png.
+ * vue client non validée ; puis les parcours. TK-116 : onglets API (fiche, contrat généré, pied de liste, sans
+ * résultat) et Exigences, feuilles Opération et Exigence, cahier validé et vue client des deux onglets. Pile locale :
+ * faux API (support/stub-spec-technical.ts). Captures dans
+ * design/screens/captures/S-spec-technical/<état>[-<onglet>]-<thème>[-mobile].png.
  */
 const PATH = `/projects/${FEATURE_PROJECT_ID}/spec/technical`;
 const VIEWPORTS = [
@@ -42,6 +44,26 @@ interface View {
 const banner = (page: Page) => page.getByRole("group", { name: "Mode relecture" });
 const fiche = (page: Page) => page.getByRole("complementary", { name: "Fiche du choix technique" });
 const environments = (page: Page) => page.getByRole("table", { name: "Environnements" });
+const operation = (page: Page) => page.getByRole("article", { name: "Opération" });
+const operationRow = (page: Page, name: string) =>
+  page.getByRole("button", { name: new RegExp(` ${name} `) });
+const requirement = (page: Page, id: string) =>
+  page.getByRole("article", { name: new RegExp(`^${id} `) });
+const END_OF_LIST = "Fin de la liste · 132 opérations";
+
+/** Défile jusqu'au pied : chaque approche charge la page suivante, jusqu'à la fin. */
+async function loadAllOperations(page: Page): Promise<void> {
+  const footer = page.locator('[data-slot="list-footer"]');
+  await expect(async () => {
+    await footer.scrollIntoViewIfNeeded();
+    await expect(footer).toContainText(END_OF_LIST, { timeout: 500 });
+  }).toPass();
+}
+
+/** Fiche de l'opération de la planche, sur la vue demandée (panneau compris sur téléphone). */
+async function operationShown(page: Page): Promise<void> {
+  await expect(operation(page).getByRole("table", { name: "Erreurs" })).toBeVisible();
+}
 
 /** Ce qu'un onglet montre une fois lu. */
 const loaded: Record<Tab, (page: Page) => Promise<void>> = {
@@ -189,6 +211,90 @@ VIEWS.push(
   },
 );
 
+const API = `${PATH}?tab=api&op=reservation.cancel`;
+
+/** États à comparer à la maquette 14 (design/screens/S-spec-technical.md, TK-116). */
+VIEWS.push(
+  { name: "api", technical: "demo", path: API, visible: operationShown },
+  {
+    name: "api-contract",
+    technical: "demo",
+    path: API,
+    visible: async (page) => {
+      await operation(page).getByRole("button", { name: "Contrat généré" }).click();
+      await expect(operation(page).getByRole("region", { name: "Contrat généré" })).toBeVisible();
+    },
+  },
+  {
+    name: "api-footer",
+    technical: "demo",
+    path: `${PATH}?tab=api`,
+    visible: async (page) => {
+      await expect(page.getByText("132 opérations", { exact: true })).toBeVisible();
+      await loadAllOperations(page);
+    },
+  },
+  {
+    name: "api-no-result",
+    technical: "demo",
+    path: `${PATH}?tab=api&q=zzz`,
+    visible: async (page) => {
+      await expect(page.getByText("Aucune opération ne correspond à « zzz »")).toBeVisible();
+    },
+  },
+  {
+    name: "nfr",
+    technical: "demo",
+    path: `${PATH}?tab=nfr`,
+    visible: async (page) => {
+      await expect(requirement(page, "NFR-003")).toBeVisible();
+    },
+  },
+  {
+    name: "validated",
+    technical: "validated",
+    path: PATH,
+    visible: async (page) => {
+      await expect(page.getByText(/^Validé par Moussa le 5 nov\./)).toBeVisible();
+      await loaded.stack(page);
+    },
+  },
+  {
+    name: "client-api",
+    technical: "validated",
+    role: "client",
+    path: API,
+    visible: operationShown,
+  },
+  {
+    name: "client-nfr",
+    technical: "validated",
+    role: "client",
+    path: `${PATH}?tab=nfr`,
+    visible: async (page) => {
+      await expect(requirement(page, "NFR-003")).toBeVisible();
+    },
+  },
+  {
+    name: "sheet-operation",
+    technical: "demo",
+    path: `${PATH}?tab=api&edit=reservation.cancel`,
+    visible: async (page) => {
+      await expect(page.getByRole("textbox", { name: /^Résumé/ })).toHaveValue(
+        "Annule une réservation depuis le lien du SMS.",
+      );
+    },
+  },
+  {
+    name: "sheet-nfr",
+    technical: "demo",
+    path: `${PATH}?tab=nfr&new=1`,
+    visible: async (page) => {
+      await expect(page.getByRole("dialog", { name: "Nouvelle exigence" })).toBeVisible();
+    },
+  },
+);
+
 const scenario = (view: {
   technical: TechnicalMode;
   proposals?: ProposalsMode;
@@ -249,7 +355,7 @@ const start = async (
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 test.describe("parcours de la page Technique", () => {
-  test("en-tête : résumé, onglets Stack, Environnements et Document, jamais « Valider »", async ({
+  test("en-tête : résumé, cinq onglets, « Valider » désactivé tant qu'un choix est ouvert", async ({
     page,
   }) => {
     await start(page);
@@ -261,9 +367,15 @@ test.describe("parcours de la page Technique", () => {
       ),
     ).toBeVisible();
     const tabs = page.getByRole("navigation", { name: "Sections du cahier technique" });
-    await expect(tabs.getByRole("link")).toHaveText([/^Stack/, /^Environnements/, "Document"]);
+    await expect(tabs.getByRole("link")).toHaveText([
+      /^Stack/,
+      "API132",
+      "Exigences28",
+      /^Environnements/,
+      "Document",
+    ]);
     await expect(page.getByRole("button", { name: "Nouveau choix" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Valider/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Valider" })).toBeDisabled();
   });
 
   test("Stack : deux cartes par ligne dès 1024 px, fiche, tableau, YAML", async ({ page }) => {
@@ -370,5 +482,132 @@ test.describe("parcours de la page Technique", () => {
     await dialog.getByRole("textbox").fill("Quel coût ?");
     await dialog.getByRole("button", { name: "Envoyer" }).click();
     await expect(page.getByText("Commentaire envoyé").first()).toBeAttached();
+  });
+});
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+test.describe("parcours des onglets API et Exigences, validation (TK-116)", () => {
+  test("API : « Charger la suite » jusqu'à la fin, zone, recherche", async ({ page }) => {
+    await start(page);
+    await page.goto(`${PATH}?tab=api`);
+    await expect(page.getByText("· 50 chargées")).toBeVisible();
+    await loadAllOperations(page);
+    await expect(page.getByText("· toutes chargées")).toBeVisible();
+    const zones = page.getByRole("group", { name: "Filtrer par zone" });
+    await zones.getByRole("button", { name: "Personnel · 16" }).click();
+    await expect(page).toHaveURL(/zone=Personnel/);
+    await expect(page.getByText("16 opérations", { exact: true })).toBeVisible();
+    await zones.getByRole("button", { name: /^Toutes/ }).click();
+    await page.getByRole("searchbox", { name: "Rechercher une opération" }).fill("reservation.");
+    await expect(page).toHaveURL(/q=reservation/);
+    await expect(operationRow(page, "reservation.cancel")).toBeVisible();
+    await expect(operationRow(page, "agenda.day")).toHaveCount(0);
+  });
+
+  test("API : fiche, YAML puis contrat généré", async ({ page }) => {
+    await start(page);
+    await page.goto(API);
+    await operationShown(page);
+    await expect(operation(page)).toContainText("Client (les siennes)");
+    await operation(page).getByRole("button", { name: "YAML" }).click();
+    await expect(operation(page).getByText("Source de vérité")).toBeVisible();
+    await operation(page).getByRole("button", { name: "Contrat généré" }).click();
+    await expect(operation(page).getByText("Généré · TypeScript · oRPC")).toBeVisible();
+    const contract = operation(page).getByRole("region", { name: "Contrat généré" });
+    await expect(contract).toContainText("export const reservationCancel = oc");
+    await expect(contract).toContainText("jeton: z.string().max(64),");
+    await expect(contract).toContainText(/\n {2}\}\);/);
+    // Une entrée verrouillée est un bouton : le lien prouve que l'Architecture est ouverte (maquette 14 l.826).
+    await expect(page.getByRole("link", { name: "Architecture" })).toBeVisible();
+  });
+
+  test("sous 1280 px la fiche d'une opération est un panneau ; Échap rend le focus à la ligne", async ({
+    page,
+  }) => {
+    await start(page, {}, 1100);
+    await page.goto(`${PATH}?tab=api&q=creneau.block`);
+    const row = operationRow(page, "creneau.block");
+    await row.click();
+    await expect(page.getByRole("dialog", { name: "Fiche de l'opération" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(row).toBeFocused();
+  });
+
+  test("375 px : liste puis fiche, « Liste » pour revenir, aucun défilement horizontal", async ({
+    page,
+  }) => {
+    await start(page, {}, 375);
+    await page.goto(`${PATH}?tab=api&q=reservation.`);
+    await operationRow(page, "reservation.cancel").click();
+    await operationShown(page);
+    await expect(operationRow(page, "reservation.create")).toHaveCount(0);
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    await page.getByRole("button", { name: "Liste" }).click();
+    await expect(operationRow(page, "reservation.create")).toBeVisible();
+  });
+
+  test("feuilles Opération et Exigence : erreurs avec focus, Échap, crayon", async ({ page }) => {
+    await start(page);
+    await page.goto(`${PATH}?tab=api`);
+    const create = page.getByRole("button", { name: "Nouvelle opération" });
+    await create.click();
+    const dialog = page.getByRole("dialog", { name: "Nouvelle opération" });
+    await dialog.getByRole("button", { name: "Enregistrer dans la spec" }).click();
+    await expect(dialog.getByText(/7 points à corriger/)).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(create).toBeFocused();
+    await page.goto(`${PATH}?tab=nfr`);
+    const pencil = page.getByRole("button", { name: "Modifier NFR-003" });
+    await pencil.click();
+    const edit = page.getByRole("dialog", { name: "Modifier l'exigence" });
+    await expect(edit.getByRole("textbox", { name: /^Cible/ })).toHaveValue("p95 < 300 ms");
+    await page.keyboard.press("Escape");
+    await expect(pencil).toBeFocused();
+  });
+
+  test("Valider : les choix tranchés débloquent le bouton, puis la Sécurité", async ({ page }) => {
+    await start(page);
+    for (const [choice, option] of [
+      ["ST-paiement", "Stripe"],
+      ["ST-sms", "Brevo"],
+    ]) {
+      await page.goto(`${PATH}?sel=${choice}`);
+      await fiche(page)
+        .getByRole("button", { name: `Choisir ${option}` })
+        .click();
+      await expect(page.getByText("Choix enregistré").first()).toBeAttached();
+    }
+    await page.goto(PATH);
+    const validate = page.getByRole("button", { name: "Valider" });
+    await expect(validate).toBeEnabled();
+    await validate.click();
+    await expect(page.getByText("Cahier technique validé").first()).toBeAttached();
+    await expect(page.getByText(/^Validé par Moussa le 5 nov\./)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Valider" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Sécurité/ }).first()).toContainText("Prêt");
+  });
+
+  test("client : API sans YAML ni contrat, « Commenter » l'opération et les exigences", async ({
+    page,
+  }) => {
+    await start(page, { technical: "validated", role: "client" });
+    await page.goto(API);
+    await operationShown(page);
+    await expect(
+      page.getByRole("button", { name: /YAML|Contrat généré|^Modifier|Nouvelle/ }),
+    ).toHaveCount(0);
+    await operation(page).getByRole("button", { name: "Commenter" }).click();
+    const dialog = page.getByRole("dialog", {
+      name: "Commenter l'opération « reservation.cancel »",
+    });
+    await dialog.getByRole("textbox").fill("Quel délai ?");
+    await dialog.getByRole("button", { name: "Envoyer" }).click();
+    await expect(page.getByText("Commentaire envoyé").first()).toBeAttached();
+    await page.goto(`${PATH}?tab=nfr`);
+    await expect(requirement(page, "NFR-001")).toBeVisible();
+    await page.getByRole("button", { name: "Commenter" }).click();
+    await expect(page.getByRole("dialog", { name: "Commenter les exigences" })).toBeVisible();
   });
 });

@@ -6,12 +6,18 @@ import { orpc } from "./orpc.ts";
 import { useReviewActions } from "./use-review-actions.ts";
 
 /**
- * « Valider » un livrable (TK-109 Données, B445 ; TK-113 Architecture, B577) : `review.submit` sur le livrable, au SHA
- * de tête lu avec la page. Le serveur reste l'autorité (droits owner, admin, développeur ; version). L'annonce
- * (« Modèle validé », « Architecture validée ») passe par la région d'état de la page ; l'échec se lit dans `error`.
+ * « Valider » un livrable (TK-109 Données, B445 ; TK-113 Architecture, B577 ; TK-116 Technique) : `review.submit` sur le
+ * livrable, au SHA de tête lu avec la page. Le serveur reste l'autorité (droits owner, admin, développeur ; version ;
+ * choix tranchés). L'annonce passe par la région d'état de la page ; l'échec se lit dans `error`.
  */
+const VALIDATED_TEXT = {
+  data: "Modèle validé",
+  architecture: "Architecture validée",
+  technical: "Cahier technique validé",
+} as const;
+
 export function useValidateDeliverable(
-  key: "data" | "architecture",
+  key: keyof typeof VALIDATED_TEXT,
   projectId: string,
   sha: string | undefined,
   announce: (text: string) => void,
@@ -20,15 +26,17 @@ export function useValidateDeliverable(
   return {
     pending: actions.pending,
     error: actions.errorFor("deliverable", key),
-    validate: async () => {
-      if (!sha) return;
+    /** Résout à `true` quand la décision est enregistrée. */
+    validate: async (): Promise<boolean> => {
+      if (!sha) return false;
       const done = await actions.decide({
         targetKind: "deliverable",
         targetRef: key,
         version: sha,
         status: "approved",
       });
-      if (done) announce(key === "data" ? "Modèle validé" : "Architecture validée");
+      if (done) announce(VALIDATED_TEXT[key]);
+      return done;
     },
   };
 }

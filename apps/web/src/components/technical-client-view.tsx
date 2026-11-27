@@ -23,19 +23,20 @@ import {
   useClientTechnical,
 } from "../lib/use-client-technical.ts";
 import { PHONE_MAX, useMaxWidth } from "../lib/use-max-width.ts";
+import { useClientOperations, useClientRequirements } from "../lib/use-technical-api.ts";
 import { type TechnicalUrlModel, useTechnicalUrl } from "../lib/use-technical-url.ts";
-import { BackToList } from "./architecture-decision-list.tsx";
 import { CommentDialog, useCommentFlow } from "./client-comment-flow.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { type DocumentSection, SpecDocumentTab } from "./spec-document-tab.tsx";
+import { ClientApiTab, ClientNfrTab } from "./technical-client-api.tsx";
 import { TechnicalClientComments } from "./technical-client-comments.tsx";
 import { EnvironmentsView, NO_ENVIRONMENT_TITLE } from "./technical-environments-tab.tsx";
 import { TechnicalHeader } from "./technical-header.tsx";
 import { StackFiche } from "./technical-stack-fiche.tsx";
-import { StackPanel } from "./technical-stack-panel.tsx";
 import {
   StackCards,
   StackCountBar,
+  StackPanel,
   selectedChoiceOf,
   usePressedChoice,
 } from "./technical-stack-tab.tsx";
@@ -64,6 +65,24 @@ const choiceTarget = (choice: { specId: string; role: string }): Target => ({
   name: choice.role,
 });
 
+/** Opérations et exigences du cahier validé : lues sur leur onglet seulement. */
+function useClientApi(
+  projectId: string,
+  url: TechnicalUrlModel,
+  tab: ClientTab,
+  available: boolean,
+) {
+  const { q, zone, op, nfr } = url;
+  const enabled = available && tab === "api";
+  const operations = useClientOperations({ projectId, q, zone, op, enabled });
+  const requirements = useClientRequirements({
+    projectId,
+    nfr,
+    enabled: available && tab === "nfr",
+  });
+  return { operations, requirements, operation: op ?? operations.items[0]?.specId };
+}
+
 /** Données lues par les onglets du client : seul `clientSpace.*` est appelé. */
 function useClientTabs(projectId: string, url: TechnicalUrlModel, available: boolean) {
   const tab: ClientTab = url.tab === "review" ? "stack" : url.tab;
@@ -72,19 +91,23 @@ function useClientTabs(projectId: string, url: TechnicalUrlModel, available: boo
   const document = useClientDocument(projectId, available && tab === "document");
   const choice = selectedChoiceOf(stack.items, url.sel);
   const current = document.sections.find((item) => item.slug === url.s) ?? document.sections[0];
-  return { tab, stack, environments, document, choice, current };
+  const api = useClientApi(projectId, url, tab, available);
+  return { tab, stack, environments, document, choice, current, ...api };
 }
 
 type Tabs = ReturnType<typeof useClientTabs>;
 
+const operationTarget = (id: string): Target => ({ kind: "operation", ref: id, name: id });
+
 /** Cible de « Commenter » dans l'en-tête : l'élément ouvert de l'onglet. */
-function headerTargetOf({ tab, choice, current }: Tabs): Target | undefined {
-  if (tab === "environments") {
-    return { kind: "environments", ref: "environments", name: "Environnements" };
-  }
-  if (tab === "stack") return choice ? choiceTarget(choice) : undefined;
-  return current ? { kind: "tech_section", ref: current.specId, name: current.title } : undefined;
-}
+const HEADER_TARGETS: Record<ClientTab, (tabs: Tabs) => Target | undefined> = {
+  stack: ({ choice }) => (choice ? choiceTarget(choice) : undefined),
+  api: ({ operation }) => (operation ? operationTarget(operation) : undefined),
+  nfr: () => ({ kind: "requirements", ref: "requirements", name: "Exigences" }),
+  environments: () => ({ kind: "environments", ref: "environments", name: "Environnements" }),
+  document: ({ current }) =>
+    current ? { kind: "tech_section", ref: current.specId, name: current.title } : undefined,
+};
 
 function ClientStackTab({
   projectId,
@@ -131,7 +154,6 @@ function ClientStackTab({
           id={choice.specId}
           asked={url.sel !== undefined}
           onClose={() => url.select(null)}
-          back={<BackToList onClick={() => url.select(null)} />}
         >
           <StackFiche
             key={choice.specId}
@@ -213,21 +235,45 @@ function ReadonlyBanner({ canComment }: { canComment: boolean }) {
   );
 }
 
-/** Corps : chargement, erreur, « en cours de validation », ou bandeau et onglet choisi. */
-function ClientBody({
-  projectId,
-  query,
-  url,
-  tabs,
-  canComment,
-  onComment,
-}: {
+interface TabProps {
   projectId: string;
-  query: ReturnType<typeof useClientTechnical>;
   url: TechnicalUrlModel;
   tabs: Tabs;
   canComment: boolean;
   onComment: Comment;
+}
+
+/** Onglet choisi du cahier validé. */
+function ClientTabContent({ projectId, url, tabs, canComment, onComment }: TabProps) {
+  switch (tabs.tab) {
+    case "stack":
+      return <ClientStackTab projectId={projectId} url={url} tabs={tabs} onComment={onComment} />;
+    case "api":
+      return (
+        <ClientApiTab
+          projectId={projectId}
+          url={url}
+          list={tabs.operations}
+          onComment={onComment ? (id) => onComment(operationTarget(id)) : undefined}
+        />
+      );
+    case "nfr":
+      return <ClientNfrTab url={url} list={tabs.requirements} />;
+    case "environments":
+      return <ClientEnvironmentsTab tabs={tabs} />;
+    case "document":
+      return (
+        <ClientDocumentTab projectId={projectId} url={url} tabs={tabs} canComment={canComment} />
+      );
+  }
+}
+
+/** Corps : chargement, erreur, « en cours de validation », ou bandeau et onglet choisi. */
+function ClientBody({
+  query,
+  ...props
+}: TabProps & {
+  query: ReturnType<typeof useClientTechnical>;
 }) {
   if (query.isPending) return <div className="p-4 md:px-7">{SKELETON}</div>;
   if (query.isError) return failure(query.refetch);
@@ -245,14 +291,8 @@ function ClientBody({
   }
   return (
     <>
-      <ReadonlyBanner canComment={canComment} />
-      {tabs.tab === "stack" ? (
-        <ClientStackTab projectId={projectId} url={url} tabs={tabs} onComment={onComment} />
-      ) : null}
-      {tabs.tab === "environments" ? <ClientEnvironmentsTab tabs={tabs} /> : null}
-      {tabs.tab === "document" ? (
-        <ClientDocumentTab projectId={projectId} url={url} tabs={tabs} canComment={canComment} />
-      ) : null}
+      <ReadonlyBanner canComment={props.canComment} />
+      <ClientTabContent {...props} />
     </>
   );
 }
@@ -272,8 +312,8 @@ function CommentButton({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * Cahier technique validé, vu du client et du business (maquette 14 l.131-136, 800) : « Lecture seule », Stack,
- * Environnements et Document sans YAML ni écriture, « Commenter » (client seulement ; le serveur refuse le business).
+ * Cahier technique validé, vu du client et du business (maquette 14 l.131-136, 800) : « Lecture seule », les cinq
+ * onglets sans YAML, contrat ni écriture, « Commenter » (client seulement ; le serveur refuse le business).
  */
 export function TechnicalClientView({
   projectId,
@@ -294,7 +334,7 @@ export function TechnicalClientView({
     commentTitleFor(target.kind, target.name),
   );
   const onComment = canComment ? flow.open : undefined;
-  const target = headerTargetOf(tabs);
+  const target = HEADER_TARGETS[tabs.tab](tabs);
   const counts = available ? query.data?.counts : undefined;
   return (
     <>
@@ -311,6 +351,8 @@ export function TechnicalClientView({
               summary: clientSummaryOf(counts),
               tabCounts: {
                 stack: { value: counts.choices },
+                api: { value: counts.operations },
+                nfr: { value: counts.requirements },
                 environments: { value: counts.environments },
               },
               secondaryActions:

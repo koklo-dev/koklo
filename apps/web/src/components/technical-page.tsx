@@ -1,17 +1,23 @@
 "use client";
 
-import { Button, Icon, type IconName, Skeleton } from "@koklo/ui";
+import { Button, Icon, type IconName, InlineAlert, Skeleton } from "@koklo/ui";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { architectureTargetOf } from "../lib/architecture-upstream.ts";
 import { specPath } from "../lib/shell-routes.ts";
 import type { TechnicalHeaderAction } from "../lib/technical-header-state.ts";
 import { TECHNICAL_ERROR_TITLE } from "../lib/technical-labels.ts";
-import { withTechnicalUrl } from "../lib/technical-tab.ts";
+import {
+  type TechnicalTab,
+  technicalFormOf,
+  technicalTargetOf,
+  withTechnicalUrl,
+} from "../lib/technical-tab.ts";
 import { type TechnicalPageModel, useTechnicalPage } from "../lib/use-technical-page.ts";
 import { SpecBody } from "./features-body.tsx";
 import { ProposeEntry } from "./features-header-action.tsx";
 import { StatusBlock } from "./features-status-block.tsx";
+import { TechnicalApiTab } from "./technical-api-tab.tsx";
 import { TechnicalClientView } from "./technical-client-view.tsx";
 import { TechnicalDocumentTab } from "./technical-document-tab.tsx";
 import { TechnicalReady } from "./technical-empty.tsx";
@@ -19,6 +25,9 @@ import { TechnicalEnvironmentSheet } from "./technical-environment-sheet.tsx";
 import { TechnicalEnvironmentsTab } from "./technical-environments-tab.tsx";
 import { TechnicalGenerating } from "./technical-generating.tsx";
 import { TechnicalHeader } from "./technical-header.tsx";
+import { TechnicalNfrSheet } from "./technical-nfr-sheet.tsx";
+import { TechnicalNfrTab } from "./technical-nfr-tab.tsx";
+import { TechnicalOperationSheet } from "./technical-operation-sheet.tsx";
 import {
   TechnicalProposeDialog,
   TechnicalReviewBar,
@@ -48,21 +57,35 @@ interface ActionSpec {
   run: (page: TechnicalPageModel) => void;
 }
 
-const openForm = (tab: "stack" | "environments") => (page: TechnicalPageModel) => {
+const openForm = (tab: TechnicalTab) => (page: TechnicalPageModel) => {
   page.write.dismiss();
   page.url.openCreateOn(tab);
 };
 
+/** En relecture, l'ajout suit l'onglet ouvert ; Relecture et Document ajoutent un choix. */
+const ADD_TABS: readonly TechnicalTab[] = ["api", "nfr", "environments"];
+
 /** Boutons de l'en-tête (maquette 14 l.774-815), hors le bouton partagé de l'agent. */
-const ACTIONS: Record<Exclude<TechnicalHeaderAction, "propose">, ActionSpec> = {
+const ACTIONS: Record<Exclude<TechnicalHeaderAction, "propose" | "validate">, ActionSpec> = {
   add: {
     label: "Ajouter",
     icon: "add",
     opens: true,
-    // En relecture, l'ajout suit l'onglet ouvert.
-    run: (page) => openForm(page.url.tab === "environments" ? "environments" : "stack")(page),
+    run: (page) => openForm(ADD_TABS.find((tab) => tab === page.url.tab) ?? "stack")(page),
   },
   "create-stack": { label: "Nouveau choix", icon: "add", opens: true, run: openForm("stack") },
+  "create-operation": {
+    label: "Nouvelle opération",
+    icon: "add",
+    opens: true,
+    run: openForm("api"),
+  },
+  "create-requirement": {
+    label: "Nouvelle exigence",
+    icon: "add",
+    opens: true,
+    run: openForm("nfr"),
+  },
   "create-environment": {
     label: "Nouvel environnement",
     icon: "add",
@@ -83,6 +106,25 @@ const ACTIONS: Record<Exclude<TechnicalHeaderAction, "propose">, ActionSpec> = {
   },
 };
 
+/** « Valider » le cahier ; une fois validé, le bouton disparaît et le focus va au titre. */
+function ValidateButton({ page }: { page: TechnicalPageModel }) {
+  const { validate, header, titleRef } = page;
+  const run = async () => {
+    if (await validate.validate()) titleRef.current?.focus();
+  };
+  return (
+    <Button
+      type="button"
+      className={BUTTON}
+      disabled={header.validateBlocked || validate.pending}
+      onClick={() => void run()}
+    >
+      <Icon name="verified" size={20} />
+      Valider
+    </Button>
+  );
+}
+
 function ActionButton({
   action,
   page,
@@ -93,11 +135,13 @@ function ActionButton({
   if (action === "propose") {
     return <ProposeEntry propose={page.propose} onReview={page.url.openReview} />;
   }
+  if (action === "validate") return <ValidateButton page={page} />;
   const spec = ACTIONS[action];
+  const primary = spec.primary || (spec.opens && page.header.createPrimary);
   return (
     <Button
       type="button"
-      variant={spec.primary ? "default" : "outline"}
+      variant={primary ? "default" : "outline"}
       {...(spec.opens ? { "data-new-feature": true } : {})}
       className={BUTTON}
       onClick={() => spec.run(page)}
@@ -110,6 +154,8 @@ function ActionButton({
 
 const TABS = {
   stack: TechnicalStackTab,
+  api: TechnicalApiTab,
+  nfr: TechnicalNfrTab,
   environments: TechnicalEnvironmentsTab,
   document: TechnicalDocumentTab,
 };
@@ -159,20 +205,27 @@ function UpstreamNotice({ page }: { page: TechnicalPageModel }) {
   );
 }
 
-/** Avis au-dessus de l'onglet : à revoir, avancement de l'écriture, avis du lancement. */
+/** Onglets dont la barre de compte porte la région d'état de l'écran. */
+const COUNTED_TABS: readonly TechnicalTab[] = ["stack", "api", "nfr"];
+
+/** Avis au-dessus de l'onglet : refus de validation, à revoir, avancement de l'écriture, avis du lancement. */
 function Notices({ page }: { page: TechnicalPageModel }) {
   const { view, url, form, write, role, projectId, propose } = page;
   const listed = view.kind === "list" || view.kind === "empty-filtered";
   const hrefFor = (specId: string) =>
-    `${specPath(projectId, "technical")}${withTechnicalUrl("", { sel: specId })}`;
+    `${specPath(projectId, "technical")}${withTechnicalUrl("", technicalTargetOf(specId))}`;
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 empty:hidden md:px-7 [&:not(:has(>*:not(:empty)))]:pt-0">
+      {page.validate.error ? (
+        <InlineAlert variant="error" icon="error">
+          {page.validate.error}
+        </InlineAlert>
+      ) : null}
       <UpstreamNotice page={page} />
       <StatusBlock
         formOpen={form.open}
         region={{
-          // La barre de compte de l'onglet Stack porte la région d'état de l'écran.
-          countBar: listed && url.tab === "stack" && !form.open,
+          countBar: listed && COUNTED_TABS.includes(url.tab) && !form.open,
           busy: view.kind === "loading",
           text: page.statusText,
           srText: page.announcement,
@@ -180,7 +233,7 @@ function Notices({ page }: { page: TechnicalPageModel }) {
         write={write}
         role={role}
         hrefFor={hrefFor}
-        onOpen={(specId) => url.select(specId)}
+        onOpen={url.openElement}
         onReopen={page.reopenDraft}
         proposeNotice={propose.enabled ? propose.launch.notice : undefined}
       />
@@ -231,12 +284,18 @@ function ReviewBody({ page }: { page: TechnicalPageModel }) {
   );
 }
 
-/** Feuille du formulaire : l'environnement (`ENV-`) ou le choix ; à la création, selon l'onglet. */
+const SHEETS = {
+  stack: TechnicalStackSheet,
+  environment: TechnicalEnvironmentSheet,
+  operation: TechnicalOperationSheet,
+  nfr: TechnicalNfrSheet,
+};
+
+/** Feuille du formulaire : celle de l'élément modifié ; à la création, celle de l'onglet. */
 function FormSheet({ page }: { page: TechnicalPageModel }) {
   const { form, head, write, url } = page;
   if (!form.open || !head) return null;
-  const environment = form.specId ? form.specId.startsWith("ENV-") : url.tab === "environments";
-  const Sheet = environment ? TechnicalEnvironmentSheet : TechnicalStackSheet;
+  const Sheet = SHEETS[technicalFormOf(form.specId, url.tab)];
   return (
     <Sheet
       projectId={page.projectId}
@@ -283,8 +342,8 @@ function TeamTechnicalPage({ page }: { page: TechnicalPageModel }) {
 
 /**
  * Page Technique d'un projet (`/projects/<id>/spec/technical`, design/screens/S-spec-technical.md) : Prêt, Génération,
- * Relecture, Liste · équipe et À revoir, onglets Stack, Environnements et Document. Client et business : le cahier
- * validé, en lecture seule.
+ * Relecture, Liste · équipe et À revoir, onglets Stack, API, Exigences, Environnements et Document. Client et business :
+ * le cahier validé, en lecture seule.
  */
 export function TechnicalPage({ projectId }: { projectId: string }): ReactNode {
   const page = useTechnicalPage(projectId);

@@ -71,6 +71,15 @@ export const isTechnicalKind = (kind: string): kind is Kind => Object.hasOwn(FIE
 export const isTechnicalProposal = (proposal: ProposalOutput): boolean =>
   isTechnicalKind(proposal.kind) || isTechnicalDocument(proposal);
 
+/** Éléments existants visés par une mise à jour encore à relire : leurs cartes et lignes sont en pointillés (B761). */
+export const pendingUpdatesOf = (
+  proposals: readonly ProposalOutput[],
+  kind: "stack" | "op" | "nfr",
+): string[] =>
+  proposals
+    .filter((proposal) => proposal.kind === kind && proposal.status === "pending")
+    .map((proposal) => str(proposal.content.specId));
+
 /** Champs présents et non vides de la charge (le contrat refuse certaines listes vides). */
 const pick = (content: Content, fields: readonly string[]): Content =>
   Object.fromEntries(

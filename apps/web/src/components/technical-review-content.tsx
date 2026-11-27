@@ -1,5 +1,6 @@
 import { EntityChip, type EntityKind, ProposalDetailSection, ProposalDetailText } from "@koklo/ui";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
+import { verificationText } from "../lib/technical-api-labels.ts";
 import {
   type DATA_LABELS,
   type DEPLOYMENT_LABELS,
@@ -90,23 +91,16 @@ function OperationContent({ content }: { content: Content }) {
   );
 }
 
-const VERIFICATIONS: Record<string, string> = {
-  scenario: "Scénario du lot Qualité",
-  ci_measure: "Mesure en CI",
-  manual: "Exercice manuel",
-  to_define: "À définir",
-};
-
 function RequirementContent({ content }: { content: Content }) {
-  const verification = [
-    VERIFICATIONS[text(content.verification)] ?? "",
+  const verification = verificationText(
+    text(content.verification),
     text(content.verificationDetail),
-  ];
+  );
   return (
     <>
       <Block title="Cible" value={text(content.target)} />
       <Block title="Énoncé" value={text(content.statement)} />
-      <Block title="Vérification" value={verification.filter(Boolean).join(" · ")} />
+      <Block title="Vérification" value={verification} />
       <Links ids={strings(content.links)} />
     </>
   );
