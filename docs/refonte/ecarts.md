@@ -459,3 +459,25 @@ Tests à réécrire avec ces retraits :
 | l.230 : aucune ligne avant la première page | « Charger les précédentes » quand un lien direct ouvre une page suivante | B786, socle TK-94 |
 | l.895 : Zone en liste déroulante | Saisie libre tant qu'aucune zone n'est connue | B787 |
 
+## Lot 14 · écarts retenus à la maquette 15 (TK-117, décidés le 2026-11-27)
+
+| Maquette ou passation | Livré | Raison |
+|---|---|---|
+| Maquette 15 l.714 et préremplissage : « Conservation » remplie par l'agent | L'agent ne remplit jamais la durée ; suggestion en aide sous le champ | A7, B796 |
+| l.552-557 : nombres d'exigences par chapitre et facteur par niveau | Comptes des seules exigences listées ; « À vérifier » sinon | B798 : aucun catalogue inventé |
+| l.558-559, l.199 : secrets nommant un hébergeur, outils Semgrep, Gitleaks, OSV-Scanner | Contenu du fichier ou « À préciser » ; aucun nom d'outil | B799, A8 |
+| l.541 : « aucun transfert hors de l'Union européenne » | « transferts à préciser » tant que `data.yaml` ne le dit pas | B800 : rien d'affirmé sans donnée |
+| l.625-641 : relecture sans exigences ASVS | Groupe « Exigences » ajouté | B806 : propositions du mode `asvs` |
+| l.158-169 : tableau des données sans recherche ni filtre | Recherche et « À décider » au-delà de 50 lignes | B808, critère du ticket |
+| l.658 : « À revoir » sans « Valider » | « Valider » aussi à revoir | B804, comme B775 |
+| l.827 : résumé « relu par Moussa le 5 nov. » ; l.822 : question « la réponse arrivera ici et par e-mail » | « relu par l'équipe le … » ; « Question envoyée à l'équipe » | B802, B803 |
+| l.827 : « Résumé rédigé par l'agent depuis le livrable Sécurité » | « Résumé rédigé depuis le livrable Sécurité », sans « par l'agent » | B837 : l'auteur n'est pas au contrat |
+| l.211, 825 : contact posé d'un clic | Carte de saisie nom et téléphone | B801 : la planche ne montre pas la saisie |
+| Passation 21 §1.7 et maquette : ni « Prêt » ni « Génération » | États des autres livrables | B811 |
+| l.711-715 : feuille « Donnée » sans nom de donnée, conservation toujours obligatoire | Champ « Donnée » ajouté ; conservation obligatoire pour Personnelle, Contact, Santé ou sensible | B831 : le contrat exige le nom, le blocage ne vise que ces catégories |
+| l.106-112 : relecture d'une menace avec son Gherkin et « Modifier » | Rubriques de la proposition (dont « Quand / Alors »), Accepter, Rejeter, demande de modification à l'agent | La proposition ne porte pas de Gherkin ; relecture commune des livrables |
+| l.200 (pied des blocages) : outils retenus | La seule phrase sur les tickets « sensibles » | B799 : aucun nom d'outil codé |
+| l.206, 212, 664, 823 : prénom du client, « portail », « clientes », « salon » | Formules génériques | B834 |
+| l.505 : trois groupes ouverts sur six | Tous les groupes ouverts | Aucune règle d'ouverture dans les passations |
+| l.520 : aucune mention pour une revue humaine | « Revue humaine : <détail> » | Le contrat porte ce mode de vérification |
+| l.211 : attente du contact montrée à tout lecteur | Masquée au business | B835 |

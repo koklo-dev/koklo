@@ -2043,3 +2043,37 @@ flowchart LR
   open -->|yes| r409[409 choices_open, nothing written]
   open -->|no| reviews[(reviews)] --> sec[Security available]
 ```
+
+## Security deliverable (TK-117)
+
+**Files.** `security/threats/SEC-Txx.yaml`, `security/data.yaml`, `security/rights.yaml` (generated),
+`security/asvs.yaml`, `security/summary.md`, `security/dossier/NN-*.md`, and the generated abuse scenarios
+`quality/scenarios/abuse/*.feature`, written by the worker in the same commit as the batch. Formats and pure rules live
+in `packages/schema/src/security/`. A generated scenario whose source exists but cannot be parsed (`rights.yaml`, a
+threat file) is never deleted (B836).
+
+**API.** `spec-security/` reads the entity index only (no network call) and writes through the ordinary batch path.
+Validation is `review.submit` on `security`: the guard runs inside its transaction, on the head. The incident contact is
+the only value kept in the database (`project_incident_contacts`), never in Git, never sent to the agent.
+
+**Web.** `/projects/[id]/spec/security` (`components/security-page.tsx`). The address holds `?tab=`, `?threat=`,
+`?filter=`, `?q=`, `?data=`, `?undecided=1`, `?new=1`, `?edit=` and `?s=`. `lib/use-security-page.ts` drives the team
+screen; the sheets reuse `DomainFormSheet`, the review reuses `FeaturesReview`, the document reuses `SpecDocumentTab`,
+the threat panel reuses `TechnicalFichePanel`. Client and business get `SecurityClientView`, which calls `clientSpace.*`
+and `comment.create` only. Components of mockup 15 live in `packages/ui` (DESIGN.md §5.28).
+
+```mermaid
+flowchart LR
+  web[web: team screen] -->|reads| api[api spec-security]
+  web -->|one-operation batches, review.submit| api
+  api --> idx[(spec_entities)]
+  api -->|batch| worker[worker spec-write]
+  worker -->|one commit: files, rights.yaml, features| git[(spec repository)]
+  git -->|webhook, indexing| idx
+  client[web: client view] --> cs[clientSpace.security, securityContactSet]
+  cs --> gate{validated?} -->|yes| idx
+  cs --> contact[(project_incident_contacts)]
+  valid[review.submit security] --> open{high threat open or field to decide?}
+  open -->|yes| r409[409, nothing written]
+  open -->|no| reviews[(reviews)]
+```

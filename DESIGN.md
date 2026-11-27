@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.38)
+# Koklo : design (v2.39)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -645,6 +645,35 @@ Suite du §5.26 (même écran). Registre d'icônes ajoutées : `accessibility_ne
 | `NfrCard` | `article` rayon 12, marges 14 / 16, écart 6, bord `--border` (à revoir : 2 px `--status-pending-icon` et « à revoir » dans le nom accessible ; proposée : pointillé `--border-strong`) : identifiant mono 12/500 sur `soft` rayon 5, titre 600, bouton `edit` 28 « Modifier NFR-nnn » ; cible 22 / 1,2 / 600 ; énoncé 13 / 1,5 muet ; pied bordé : icône 16, vérification 12, pastille 22 « Couverte » `success` (`fact_check`) ou « À couvrir » `warning` (`pending`) ; sans couverture connue : icône `fact_check` muette, aucune pastille (B774) |
 | En-tête | Ajout selon l'onglet (« Nouvelle opération », « Nouvelle exigence ») ; « Valider » (`verified`) après l'ajout : primaire, ou pointillé désactivé tant qu'un choix est à trancher ; validé : ajout primaire, sans « Valider » |
 
+### 5.28 Sécurité : menaces, données, droits, exigences, résumé (v2.39, TK-117, passation 21 §1, §2, §4, maquette 15 l.59-428, 441-700, B790 à B813)
+
+Écran `S-spec-security` ; en-tête, relecture, document, bandeaux, feuilles et vue client sur les gabarits §5.20 à §5.27. Actions de l'agent : `wand_stars` (B144). Registre d'icônes ajoutées : `gpp_maybe`, `verified_user`, `contact_phone`, `location_on`, `campaign`, `download`, `table_chart`.
+
+| Élément | Règle |
+|---|---|
+| `Pill` ton `proposed` | Contour pointillé `--primary`, texte `--primary` : état « Proposée » |
+| `ThreatRow` | Bouton `aria-current` pleine largeur, 44 de haut au moins, marges 6 / 14, écart 10, bord haut `--border`, une seule ligne à toute largeur (seul le titre passe à la ligne) ; identifiant mono 12 sur 66 ; titre 13/500 ; pastilles `sm` de gravité (`danger` Élevée, `outline`) et d'état (`success` Traitée, `warning` À traiter et À revoir, `proposed`) ; courante : `--secondary` |
+| Groupe de surface (famille `GroupSection`) | Cadre rayon 12 ; en-tête `--surface`, marges 10 / 14 : chevron 18, identifiant mono 12 muet jamais coupé, titre 14/600, écart 12 entre les trois (groupe à étiquette), « N menaces » 12 muet |
+| `IconList` | Lignes 13 / 1,5, icône 18, écart 10 : `shield` (`--primary`, parades), `rule` (propriété), `block` (`--status-revise-foreground`, ce qui bloque) |
+| `ChipFacts` | Intitulé 12 muet sur 120, puces `EntityChip variant="outline"` à la suite, écart 8 entre les lignes |
+| `EntityChip variant="outline"` | Bord 1 px `--border`, sans fond, rayon 6, 26 de haut, marges 0 9 0 7, écart 5 ; icône 16 muette ; identifiant et libellé 12/500 en police du texte |
+| `InlineAlert`, action `neutral` | Dans un ton coloré : bouton `outline` 32 sur `--background`, texte `--foreground`, 13/500 (« Proposer une parade ») |
+| `ContextBanner` | Marges 12 / 14, rayon 10, `--surface` bordé, icône 18, texte 13 / 1,5 (base 420) puis actions 32 |
+| `DataClassificationTable` (famille `EnvironmentTable`) | Cadre rayon 12, défilement interne, minimum 980, 13 px ; en-tête `--surface` 12/500 muet ; champ mono 12 muet, coupé aux espaces (jamais au milieu d'un mot qui tient) ; catégorie en `Pill` `sm` (`soft` Personnelle et Contact, `warning` Santé ou sensible, `danger` Secret, `outline` Technique) ; ligne à décider sur fond ambre clair (`--status-pending`) avec « Décider » principal 30, sinon « Modifier » discret |
+| `PermissionMatrix variant="compact"` | Sans filtre ni groupes : en-têtes de rôle, cellules icône 18 `check` (`--status-validated-foreground`), `remove` (`--border-strong`), `rule` (`--status-pending-icon`) + restriction 12 muette ; nom accessible « rôle : oui, non, restreint » ; minimum 820 |
+| `StatCard` grand compte | Titre h2 15/600, valeur 30 / 1,1 / 600, texte 13 muet |
+| `CoverageTable` | Cadre rayon 12, minimum 760 ; barre 90 × 6 (`--primary`, ambre s'il manque des réponses) et « n / total » ; « Où c'est répondu » muet ; pastille `sm` `success` « Couvert », `warning` « N sans réponse », `outline` « À vérifier » |
+| `FactsPanel` (famille `SpecRowsPanel`) | Panneau bordé rayon 12, marges 14 / 16, titre 15/600 ; lignes 13 : intitulé 120 muet, valeur |
+| Niveau ASVS | `SegmentedControl` en radiogroup, options de 30 de haut ; titre 15/600 et aide 13 muette à gauche |
+| `SummaryCard` | `article` rayon 12, marges 16 / 18, écart 8 : tuile 34 rayon 10 `soft` + icône 18, titre 15/600 ; texte 14 / 1,6 ; grille `repeat(auto-fit, minmax(min(300px,100%),1fr))`, écart 12, dernière carte pleine largeur |
+| `ExpectationBox` | Rayon 12, marges 14 / 16, icône `contact_phone` 20, titre 14/600, texte 13 ; ambre (jetons d'alerte) tant que le contact manque, bordé ensuite ; action client 32 |
+| `QuestionCard` | Bord 1 px `--primary`, rayon 12, titre 14/600, zone de texte 3 lignes, « Envoyer » (`send`) et « Annuler » |
+| `ThreatFicheTitle` | Titre de la fiche d'une menace, h2 20/600 |
+| `LabeledNote` | « Ce qui peut arriver » : rayon 10 sur `--surface`, marges 10 / 12, intitulé 12 muet, texte 13 |
+| `ContextBanner variant="outline"` | Vérification d'une fiche : bord seul, texte muet |
+| `SectionLead` | Titre h2 15/600 et aide 13 muette devant un réglage (niveau ASVS) |
+| `ProposedPageCard label="summary"` | Proposition du résumé : titre « Proposition de l'agent · … », texte 15 / 1,6, « Accepter » et « Rejeter », rayon 12, marges 14 / 16 |
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -658,6 +687,7 @@ Suite du §5.26 (même écran). Registre d'icônes ajoutées : `accessibility_ne
 | Vue d'ensemble du projet | Planche « Lot 3 · Vue d'ensemble » (`07-Lot3Overview.html`) ; fiche `S-overview` |
 | Modèle de données (Prêt, Génération, Relecture, Liste · équipe, Validé, À revoir, Vue client, onglets Diagramme, Tables et Jeux d'exemple) | Planche « Lot 6 · Données » (`11-Lot6Donnees.html`) ; fiche `S-spec-data` |
 | Cahier fonctionnel (Prêt, Génération, Relecture, Liste · équipe) | Planche « Lot 5 · Fonctionnel » (`10-Lot5Fonctionnel.html`) ; fiche `S-spec-functional` |
+| Sécurité (Relecture, Liste · équipe, À revoir, Vue client ; Menaces, Données sensibles, Droits, Exigences, Résumé client, Document) | Planche « Lot 14 · Sécurité » (`15-Lot14Securite.html`) ; fiche `S-spec-security` |
 | Coquille de l'application (barre, SPEC, `ProjectHeader`, ⌘K) | Planche « Lot 1 · Shell projet et navigation » (`05-Lot1Shell.html`, barre : `10-Lot5Fonctionnel.html`) ; fiche `S-app-shell` |
 
 Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/maquettes/` (planches 05 à 25).
@@ -729,3 +759,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 27/11/2026 | v2.36 (TK-114i, maquette 13 l.175-239 et 405-441, B708 à B714) : identifiants longs de l'Architecture ; `IdTitle` ajouté à `packages/ui`, `IdTag truncate`, `ListRow fixedHeight="min"`, `EntityChip` borné à son conteneur |
 | 27/11/2026 | v2.37 (TK-115, passation 12, maquette 14, B718 à B737) : §5.26 Technique ; `StackLayer`, `StackChoiceCard`, `ComparisonTable`, `EnvironmentTable`, `SpecRowsPanel` ajoutés à `packages/ui` ; icônes `layers`, `dns`, `cable`, `help`, `monitoring`, `rocket_launch` (« queue » : `lists`, B756) |
 | 27/11/2026 | v2.38 (TK-116, passation 12, maquette 14, B768 à B779) : §5.27 onglets API et Exigences, « Valider » ; `OperationRow`, `OperationKindPill`, `OperationFieldsTable`, `OperationFicheTitle`, `NfrCategory`, `NfrCard` ajoutés à `packages/ui` ; icônes `accessibility_new`, `pending`, `code`, `rule` |
+| 27/11/2026 | v2.39 (TK-117, passation 21, maquette 15, B790 à B813) : §5.28 Sécurité ; `ThreatRow`, `IconList`, `ChipFacts`, `ContextBanner`, `DataClassificationTable`, `CoverageTable`, `FactsPanel`, `SummaryCard`, `ExpectationBox`, `QuestionCard`, `PermissionMatrix` compacte, ton `proposed` de `Pill`, dans `packages/ui` (galerie `/dev/ui`) |
