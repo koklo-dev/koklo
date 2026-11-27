@@ -112,6 +112,61 @@ describe("launchView : bilan du lancement (TK-114b)", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même fonction, un test par comportement
+describe("TK-115b (contrat 3.20.0, B849) : bilan du cahier technique et de la Sécurité", () => {
+  const STEPS = [{ step: "Stack · Services et API", reason: "truncated" }];
+  const progress = (discardReasons: object) => ({
+    ...PROGRESS,
+    coverageAfter: null,
+    coverageCalls: 0,
+    stopReason: "completed",
+    discardReasons,
+  });
+  const reportFor = (deliverable: string, discardReasons: object) =>
+    launchView(launch({ deliverable, progress: progress(discardReasons) })).report;
+
+  it.each(["technical", "security"])("%s : report avec les étapes écartées nommées", (key) => {
+    const counts = { truncated: 1, discarded_steps: STEPS, existing_section: 2 };
+    expect(reportFor(key, counts)).toEqual({
+      zonesRequested: 3,
+      zonesDone: 2,
+      zonesDiscarded: 1,
+      discardReasons: [{ reason: "truncated", count: 1 }],
+      discardedSteps: STEPS,
+      coverageCalls: 0,
+      stopReason: "completed",
+      sectionsExisting: 2,
+    });
+  });
+
+  it("Architecture : sans discardedSteps ; Fonctionnel et Données : aucun report", () => {
+    const counts = { truncated: 1, discarded_steps: STEPS };
+    expect(reportFor("architecture", counts)).toBeDefined();
+    expect(reportFor("architecture", counts)).not.toHaveProperty("discardedSteps");
+    expect(reportFor("functional", counts)).toBeUndefined();
+    expect(reportFor("data", counts)).toBeUndefined();
+  });
+
+  it("entrées illisibles ignorées, douze au plus ; aucune ou lancement antérieur : champ absent", () => {
+    const odd = [
+      null,
+      "x",
+      { step: "", reason: "truncated" },
+      { step: "A", reason: "provider" },
+      { step: "B", reason: "refused", detail: "texte" },
+      ...Array.from({ length: 14 }, (_, i) => ({ step: `É${i}`, reason: "refused" })),
+    ];
+    const steps = reportFor("technical", { refused: 14, discarded_steps: odd })?.discardedSteps;
+    expect(steps).toHaveLength(12);
+    expect(steps?.[0]).toEqual({ step: "É0", reason: "refused" });
+    for (const discarded_steps of [undefined, [], "x", [null]]) {
+      const report = reportFor("technical", { truncated: 1, discarded_steps });
+      expect(report, String(discarded_steps)).toBeDefined();
+      expect(report).not.toHaveProperty("discardedSteps");
+    }
+  });
+});
+
 describe("TK-114g (contrat 3.16.0, B700) : proposalView.discardReason", () => {
   const record = (discardReason: "already_present" | null): ProposalRecord => ({
     id: "6f1c2c1e-8d0a-4e8e-9f61-3f0b7c1a2b3d",

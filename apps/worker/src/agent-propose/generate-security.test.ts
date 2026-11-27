@@ -57,7 +57,7 @@ class FakeAi {
   }
 }
 
-async function launch(mode: string) {
+async function launch(mode: string, sources: LaunchSources = SOURCES) {
   const context = {
     id: "0195f1a0-0000-7000-8000-000000000011",
     organizationId: "0195f1a0-0000-7000-8000-000000000012",
@@ -69,7 +69,7 @@ async function launch(mode: string) {
     baseVersion: null,
   };
   const ai = new FakeAi();
-  const store = new MemoryProposeStore(context, SOURCES);
+  const store = new MemoryProposeStore(context, sources);
   const handler = createAgentProposeHandler({
     ...AGENT_PROPOSE_DEFAULTS,
     store,
@@ -81,6 +81,7 @@ async function launch(mode: string) {
   return { ai, store };
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("génération de la Sécurité", () => {
   it("menaces : surfaces sans menace, parades, droits puis sections manquantes", async () => {
     const { ai, store } = await launch("threats");
@@ -119,5 +120,60 @@ describe("génération de la Sécurité", () => {
     expect(prompt).toContain("Regarde surtout le back-office.");
     expect(prompt).toContain("never");
     expect(prompt.toLowerCase()).not.toMatch(/claude|anthropic|openai|gpt|mistral|gemini/);
+  });
+
+  const withOpen = (open: number): LaunchSources => ({
+    ...SOURCES,
+    features: Array.from({ length: 20 }, (_, i) => ({
+      specId: `F-${100 + i}`,
+      title: `f${i}`,
+      criteria: [],
+    })),
+    security: {
+      ...(SOURCES.security as NonNullable<LaunchSources["security"]>),
+      operations: Array.from({ length: 20 }, (_, i) => ({
+        id: `x.op${i}`,
+        permission: "public",
+        serves: [`F-${100 + i}`],
+      })),
+      threats: Array.from({ length: open }, (_, i) => ({
+        specId: `SEC-T${100 + i}`,
+        title: `Ouverte ${i}`,
+        surfaces: ["api"],
+        measures: [],
+      })),
+    },
+    docSections: [],
+  });
+  const stepBlock = (prompt: string) =>
+    prompt.split("Open threats of this step\n")[1]?.split("<")[0] ?? "";
+
+  it("TK-115b : 25 menaces ouvertes : deux étapes de parades de dix, douze étapes au plus", async () => {
+    const { ai, store } = await launch("threats", withOpen(25));
+    expect(store.state.zones).toHaveLength(12);
+    expect(store.state.zones.slice(8, 10)).toEqual(["Parades 1/2", "Parades 2/2"]);
+    expect(ai.calls.slice(8, 10).map((c) => c.kinds)).toEqual([["threat"], ["threat"]]);
+    const [first, second] = [8, 9].map((i) => stepBlock(ai.calls[i]?.prompt ?? ""));
+    expect(first?.match(/SEC-T/g)).toHaveLength(10);
+    expect(first).toContain("SEC-T100 | Ouverte 0");
+    expect(first).not.toContain("SEC-T110");
+    expect(second?.match(/SEC-T/g)).toHaveLength(10);
+    expect(second).toContain("SEC-T110 | Ouverte 10");
+    expect(ai.calls[0]?.prompt).not.toContain("Open threats of this step");
+  });
+
+  it("TK-115b : dix menaces ouvertes au plus : une seule étape « Parades »", async () => {
+    const { ai, store } = await launch("threats", withOpen(10));
+    expect(store.state.zones.filter((zone) => zone.startsWith("Parades"))).toEqual(["Parades"]);
+    const parades = ai.calls.find((c) => c.prompt.includes("Zone: Parades"));
+    expect(stepBlock(parades?.prompt ?? "").match(/SEC-T/g)).toHaveLength(10);
+  });
+
+  it("TK-115b : bornes par appel : 10 menaces ou parades, 15 exigences", async () => {
+    const threats = await launch("threats", withOpen(1));
+    expect(threats.ai.calls[0]?.prompt).toContain("at most 10 threats");
+    expect(threats.ai.calls[0]?.prompt).toContain("at most 10 countermeasure");
+    const asvs = await launch("asvs");
+    expect(asvs.ai.calls[0]?.prompt).toContain("at most 15 items");
   });
 });

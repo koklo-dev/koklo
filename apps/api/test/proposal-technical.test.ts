@@ -187,6 +187,40 @@ describe("proposal.list technical", () => {
   });
 });
 
+describe("proposal.list technical : bilan (TK-115b, B849)", () => {
+  it("étape écartée, toutes les propositions décidées : report présent ; client : 403", async () => {
+    const s = await techScene();
+    const created = await insertProposal(s.b.database, s.scene, {
+      kind: "nfr",
+      deliverable: "technical",
+      status: "rejected",
+    });
+    const discarded = [{ step: "Stack · Services et API", reason: "truncated" }];
+    await s.b.database.query(
+      `UPDATE agent_launches SET zones = '["Stack · Services et API", "Exigences"]'::jsonb, zones_done = 1,
+         zones_discarded = 1, discard_reasons = $2::jsonb, stop_reason = 'completed' WHERE id = $1`,
+      [created.launchId, JSON.stringify({ truncated: 1, discarded_steps: discarded })],
+    );
+    const list = (role: "dev" | "client") =>
+      proposalApi(s.b.app, s.world.actors[role]).list(s.world.projectId, {
+        deliverable: "technical",
+        groupBy: "type",
+      });
+    const res = await list("dev");
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.launch.report).toEqual({
+      zonesRequested: 2,
+      zonesDone: 1,
+      zonesDiscarded: 1,
+      discardReasons: [{ reason: "truncated", count: 1 }],
+      discardedSteps: discarded,
+      coverageCalls: 0,
+      stopReason: "completed",
+    });
+    expect((await list("client")).status).toBe(403);
+  });
+});
+
 describe("ai.prefillItem technique", () => {
   it("feuille « Choix technique » : les champs du modèle, sans identifiant ni valeur inventée par le serveur", async () => {
     const s = await techScene();

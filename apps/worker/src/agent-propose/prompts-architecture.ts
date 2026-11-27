@@ -1,3 +1,4 @@
+import type { CurrentArchitecture } from "@koklo/db";
 import {
   type AgentProposalKind,
   type FramedPrompt,
@@ -38,40 +39,55 @@ const lines = (items: readonly { specId: string; title: string }[]): string =>
     .map((item) => `${item.specId} | ${oneLine(item.title)}`)
     .join("\n");
 
+/** Composants : identifiant, nom, zone et type, un par ligne. */
+export const componentLines = (components: CurrentArchitecture["components"]): string =>
+  components
+    .map(
+      (item) =>
+        `${item.specId} | ${oneLine(item.title)} | zone: ${item.zone ?? "none"} | type: ${item.type}`,
+    )
+    .join("\n");
+
+/** Décisions et exigences non fonctionnelles connues. */
+export const knownLines = (architecture: CurrentArchitecture | undefined): string[] => [
+  `Decisions\n${lines(architecture?.decisions ?? [])}`,
+  `Known non-functional requirements\n${(architecture?.nfr ?? []).join("\n")}`,
+];
+
+export const functionalBlock = (sources: LaunchSources): Untrusted =>
+  new Untrusted(
+    "spec-file",
+    [
+      `Functional specification\nFeatures\n${lines(sources.features)}`,
+      `Business rules\n${lines(sources.rules)}`,
+      `Roles\n${lines(sources.roles)}`,
+      `User flows\n${lines(sources.flows)}`,
+    ].join("\n\n"),
+  );
+
+export const dataModelBlock = (sources: LaunchSources): Untrusted =>
+  new Untrusted(
+    "spec-file",
+    `Data model\n${(sources.tables ?? [])
+      .map(
+        (table) =>
+          `${table.specId} | ${oneLine(table.title)} | zone: ${table.zone ?? "none"} | fields: ${table.fields.join(", ")}`,
+      )
+      .join("\n")}`,
+  );
+
 /** Fonctionnel, tables, architecture actuelle, exigences connues et sections du document : aussi lus par le Technique. */
 export function architectureBlocks(sources: LaunchSources): Untrusted[] {
   const architecture = sources.architecture;
   return [
+    functionalBlock(sources),
+    dataModelBlock(sources),
     new Untrusted(
       "spec-file",
       [
-        `Functional specification\nFeatures\n${lines(sources.features)}`,
-        `Business rules\n${lines(sources.rules)}`,
-        `Roles\n${lines(sources.roles)}`,
-        `User flows\n${lines(sources.flows)}`,
-      ].join("\n\n"),
-    ),
-    new Untrusted(
-      "spec-file",
-      `Data model\n${(sources.tables ?? [])
-        .map(
-          (table) =>
-            `${table.specId} | ${oneLine(table.title)} | zone: ${table.zone ?? "none"} | fields: ${table.fields.join(", ")}`,
-        )
-        .join("\n")}`,
-    ),
-    new Untrusted(
-      "spec-file",
-      [
-        `Current architecture\nComponents\n${(architecture?.components ?? [])
-          .map(
-            (item) =>
-              `${item.specId} | ${oneLine(item.title)} | zone: ${item.zone ?? "none"} | type: ${item.type}`,
-          )
-          .join("\n")}`,
+        `Current architecture\nComponents\n${componentLines(architecture?.components ?? [])}`,
         `Technical flows\n${lines(architecture?.archflows ?? [])}`,
-        `Decisions\n${lines(architecture?.decisions ?? [])}`,
-        `Known non-functional requirements\n${(architecture?.nfr ?? []).join("\n")}`,
+        ...knownLines(architecture),
         `Document sections\n${lines(sources.docSections ?? [])}`,
       ].join("\n\n"),
     ),

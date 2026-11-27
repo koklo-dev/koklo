@@ -17,10 +17,12 @@ export const submitErrors = {
   /**
    * `choices_open` (3.18.0, B775) : un choix technique de la tête reste à trancher. Sécurité (3.19.0, B804) :
    * `threats_open` (menace élevée sans parade) puis `data_unclassified` (champ non classé ou sans durée).
+   * `stack_missing` (3.20.0, B851) : le cahier technique de la tête n'a aucun choix de stack.
    */
   ...conflictOf(
     "baseline_not_open",
     "review_incomplete",
+    "stack_missing",
     "choices_open",
     "threats_open",
     "data_unclassified",

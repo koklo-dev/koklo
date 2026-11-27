@@ -196,6 +196,29 @@ describe("store-report (TK-114b)", () => {
     expect(none.calls.at(-1)?.data).not.toHaveProperty("discardReasons");
   });
 
+  it("TK-115b : une étape écartée est nommée (120 caractères au plus), douze au plus", async () => {
+    const fake = writerOf({
+      id: LAUNCH.id,
+      status: "running",
+      proposedCount: 0,
+      discardReasons: { truncated: 1 },
+    });
+    const zone = { accepted: [], discarded: 1, reason: "output_invalid" as const };
+    await publishZoneIn(fake.client, LAUNCH, { ...zone, zone: "é".repeat(200) }, NOW);
+    expect(fake.launch.discardReasons).toStrictEqual({
+      truncated: 1,
+      output_invalid: 1,
+      discarded_steps: [{ step: "é".repeat(120), reason: "output_invalid" }],
+    });
+    for (let i = 0; i < 14; i += 1) {
+      await publishZoneIn(fake.client, LAUNCH, { ...zone, zone: `Étape ${i}` }, NOW);
+    }
+    const counts = fake.launch.discardReasons as { discarded_steps: unknown[] };
+    expect(counts.discarded_steps).toHaveLength(12);
+    expect(counts.discarded_steps.at(-1)).toEqual({ step: "Étape 10", reason: "output_invalid" });
+    expect(fake.launch.discardReasons).toMatchObject({ output_invalid: 15 });
+  });
+
   it("publishCoverageIn : complément seulement sur une proposition pending non appliquée du lancement", async () => {
     const proposals = [
       {

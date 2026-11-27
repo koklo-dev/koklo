@@ -1,4 +1,4 @@
-/** Surface exacte du contrat 3.19.0 (207 routes, 176 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
+/** Surface exacte du contrat 3.20.0 (207 routes, 176 chemins ; pilotage sous /projects/{projectId}, TK-96), partagée par les tests CT-4 et CT-6. */
 export const ALL_PAIRS: string[] = [
   "DELETE /ai/providers/{provider}",
   "DELETE /invitations/{invitationId}",

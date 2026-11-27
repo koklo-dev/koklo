@@ -90,6 +90,8 @@ export function batchPrompt(
     zone: string;
     kinds: readonly AgentProposalKind[];
     mode?: string;
+    /** Rôles de stack déjà publiés dans le lancement (cahier technique seulement). */
+    covered?: readonly string[];
   },
 ): FramedPrompt {
   // La Sécurité lit aussi le cahier technique : elle se reconnaît d'abord.

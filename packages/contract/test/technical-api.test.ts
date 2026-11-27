@@ -29,9 +29,9 @@ const CLIENT = [
 ] as const;
 
 describe("TK-116 surface", () => {
-  it("version 3.19.0 (additif : mineure)", async () => {
-    expect(CONTRACT_VERSION).toBe("3.19.0");
-    expect((await doc()).info.version).toBe("3.19.0");
+  it("version 3.20.0 (additif : mineure)", async () => {
+    expect(CONTRACT_VERSION).toBe("3.20.0");
+    expect((await doc()).info.version).toBe("3.20.0");
   });
 
   it.each(TEAM)("%s : GET %s, 403 et 404", async (name, path) => {

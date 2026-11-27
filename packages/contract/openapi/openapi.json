@@ -60,6 +60,7 @@
                 "enum": [
                   "baseline_not_open",
                   "review_incomplete",
+                  "stack_missing",
                   "choices_open",
                   "threats_open",
                   "data_unclassified"
@@ -1902,7 +1903,7 @@
   },
   "info": {
     "title": "Koklo API",
-    "version": "3.19.0"
+    "version": "3.20.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -26267,6 +26268,34 @@
                                     "type": "object"
                                   },
                                   "maxItems": 4,
+                                  "type": "array"
+                                },
+                                "discardedSteps": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "reason": {
+                                        "enum": [
+                                          "truncated",
+                                          "output_invalid",
+                                          "prompt_rejected",
+                                          "refused"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "step": {
+                                        "maxLength": 120,
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "step",
+                                      "reason"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "maxItems": 12,
                                   "type": "array"
                                 },
                                 "sectionsExisting": {

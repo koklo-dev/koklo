@@ -1,5 +1,5 @@
 import { type AgentProposalKind, slugOf } from "@koklo/domain";
-import { recordsOf, stringsOf } from "../job-support.ts";
+import { isRecord, recordsOf, stringsOf } from "../job-support.ts";
 import { titleKey } from "./title-key.ts";
 
 /**
@@ -26,10 +26,14 @@ export interface TechnicalRefs {
 
 type Payload = Record<string, unknown>;
 
-/** Une proposition gardée avec sa zone, une section déjà rédigée (comptée à part), ou `undefined` : écartée. */
+/**
+ * Une proposition gardée avec sa zone, une section déjà rédigée ou un choix aux références inconnues (comptés à part),
+ * ou `undefined` : écartée.
+ */
 export type TechnicalVerdict =
   | { readonly payload: Payload; readonly zone: string }
   | "existing_section"
+  | "invalid"
   | undefined;
 
 export const STACK_ZONE = "Stack";
@@ -42,6 +46,19 @@ const ESTIMATE = "≈";
 /** Valeur chiffrée en prix ou en performance : `€ $ ms s % /mois`. */
 const MEASURED = /[€$]\s*\d|\d\s*(?:€|\$|%|ms(?![a-zà-ÿ])|s(?![a-zà-ÿ])|\/\s*mois)/i;
 const CRITERION_VALUE_MAX = 200;
+/** Liens d'un choix : trente au plus par liste, comme le contrat. */
+const STACK_LINKS = ["components", "requirements", "decisions"] as const;
+const STACK_LINKS_MAX = 30;
+
+/** Contenu d'un choix aux listes de liens coupées ; toute autre forme est laissée au schéma. */
+export function withCappedLinks(content: unknown): unknown {
+  if (!isRecord(content)) return content;
+  const capped = STACK_LINKS.flatMap((key) => {
+    const list = content[key];
+    return Array.isArray(list) ? [[key, list.slice(0, STACK_LINKS_MAX)] as const] : [];
+  });
+  return { ...content, ...Object.fromEntries(capped) };
+}
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 const allIn = (ids: readonly string[], known: ReadonlySet<string>): boolean =>
@@ -84,15 +101,27 @@ function existingStack(payload: Payload, refs: TechnicalRefs): string | undefine
   return [...refs.stacks].find(([, stack]) => titleKey(stack.role) === role)?.[0];
 }
 
+const stackIdOf = (role: string, refs: TechnicalRefs): string =>
+  existingStack({ role }, refs) ?? `ST-${slugOf(role, "choix")}`;
+
+/** Un rôle déjà publié dans le lancement mène au même choix : même identifiant, ou même choix enregistré (B845). */
+export function isStackTaken(
+  role: string,
+  published: Iterable<string>,
+  refs: TechnicalRefs,
+): boolean {
+  const id = stackIdOf(role, refs);
+  return [...published].some((other) => stackIdOf(other, refs) === id);
+}
+
 function stackVerdict(payload: Payload, refs: TechnicalRefs): TechnicalVerdict {
   const known =
     allIn(stringsOf(payload.components), refs.components) &&
     allIn(stringsOf(payload.decisions), refs.decisions);
+  if (!known) return "invalid";
   const existing = existingStack(payload, refs);
   // Comparer ne reprend que les choix à trancher.
-  if (!known || (refs.mode === "compare" && !refs.stacks.get(existing ?? "")?.open)) {
-    return undefined;
-  }
+  if (refs.mode === "compare" && !refs.stacks.get(existing ?? "")?.open) return undefined;
   const next = {
     ...payload,
     criteria: recordsOf(payload.criteria).map(withEstimates),

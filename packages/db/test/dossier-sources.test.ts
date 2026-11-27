@@ -413,6 +413,21 @@ describe("currentTechnical", () => {
     expect(JSON.stringify(current)).not.toContain("jamais");
   });
 
+  it("TK-115b : la couche enregistrée d'un choix est rendue ; absente ou vide, aucune clé", async () => {
+    const { typed } = fakeClient({
+      ...head,
+      entities: [
+        { kind: "stack", specId: "ST-db", data: { role: "Base", couche: "donnees" } },
+        { kind: "stack", specId: "ST-sms", data: { role: "SMS", couche: "" } },
+      ],
+    });
+    const { stacks } = await currentTechnical(typed, PROJECT);
+    expect(stacks).toStrictEqual([
+      { specId: "ST-db", role: "Base", choice: null, layer: "donnees" },
+      { specId: "ST-sms", role: "SMS", choice: null },
+    ]);
+  });
+
   it("sans tête de spec : rien", async () => {
     const { typed } = fakeClient({});
     expect(await currentTechnical(typed, PROJECT)).toEqual({

@@ -14,16 +14,12 @@ import {
   securityRefs,
   securitySteps,
 } from "./generate-security.ts";
-import {
-  technicalKinds,
-  technicalKindsAt,
-  technicalRefs,
-  technicalSteps,
-} from "./generate-technical.ts";
+import { technicalKinds, technicalRefs } from "./generate-technical.ts";
 import { zonesPrompt } from "./prompts.ts";
 import { coverageCountsOf } from "./reprises.ts";
 import type { LaunchSources } from "./sources.ts";
 import type { LaunchContext, LaunchProgress } from "./store.ts";
+import { technicalKindsAt, technicalSteps } from "./technical-steps.ts";
 import { rememberPublished, type TriageContext, titleKey, zonesOf } from "./triage.ts";
 import type { ArchitectureRefs } from "./triage-architecture.ts";
 import { zonesPass } from "./zones-pass.ts";
@@ -199,10 +195,10 @@ export async function architectureEnd(
 /** Types demandés à chaque étape calculée par le code. */
 function stepKinds(launch: LaunchContext): Pick<Run, "kindsAt"> {
   if (launch.deliverable === "technical") {
-    return { kindsAt: (index, total) => technicalKindsAt(launch.mode, index, total) };
+    return { kindsAt: (index, zones) => technicalKindsAt(launch.mode, index, zones) };
   }
   if (launch.deliverable !== "security") return {};
-  return { kindsAt: (_index, _total, zone) => securityKindsAt(launch.mode, zone) };
+  return { kindsAt: (index, zones) => securityKindsAt(launch.mode, zones[index] ?? "") };
 }
 
 /**

@@ -57,6 +57,20 @@ export function batchSchema(kinds: readonly AgentProposalKind[]): Record<string,
 
 export type ZonesOutcome = "done" | "stopped" | "handoff" | "deadline";
 
+/** Livrables dont les étapes viennent du code : une étape entièrement invalide y est écartée, pas comptée traitée. */
+const CHECKED_STEPS: readonly string[] = ["technical", "security"];
+
+/** Sortie triée d'une zone ; Technique et Sécurité : toutes ses entrées invalides, l'étape est écartée (B847). */
+function publicationOf(
+  deliverable: string,
+  zone: string,
+  { invalid, ...triaged }: ReturnType<typeof triageProposals>,
+): ZonePublication {
+  const entries = triaged.accepted.length + triaged.discarded;
+  const rejected = CHECKED_STEPS.includes(deliverable) && invalid > 0 && invalid === entries;
+  return { zone, ...triaged, ...(rejected ? { reason: "output_invalid" as const } : {}) };
+}
+
 /** Une zone : la sortie triée, ou la zone écartée avec son motif (sortie coupée, refusée, invalide, prompt refusé). */
 async function zoneOf(run: Run, zone: string, kinds: Run["kinds"]): Promise<ZonePublication> {
   const context = { ...run.context, kinds };
@@ -70,11 +84,12 @@ async function zoneOf(run: Run, zone: string, kinds: Run["kinds"]): Promise<Zone
           zone,
           kinds,
           mode: run.launch.mode,
+          covered: [...(context.titles.stack ?? [])],
         }),
       schema: batchSchema(kinds),
       parse: (raw) => triageProposals(raw, context),
     });
-    return { zone, ...triaged };
+    return publicationOf(run.launch.deliverable, zone, triaged);
   } catch (error) {
     const reason = discardReasonOf(error);
     if (reason === undefined) throw error;
@@ -95,7 +110,7 @@ export async function zonesPass(
   for (const [index, zone] of [...zones.entries()].slice(start)) {
     const up = timeUp(run);
     if (up !== undefined) return up;
-    const kinds = run.kindsAt?.(index, zones.length, zone) ?? run.kinds;
+    const kinds = run.kindsAt?.(index, zones) ?? run.kinds;
     const publication = await zoneOf(run, zone, kinds);
     if ((await run.deps.store.publishZone(run.launch, publication)) === "stopped") return "stopped";
     await afterPublish();

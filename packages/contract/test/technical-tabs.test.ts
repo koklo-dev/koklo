@@ -17,9 +17,9 @@ const batch = (operations: unknown[]) => ({ projectId: UUID, idempotencyKey: "k-
 const ok = (operation: unknown) => isValid(input("specBatch.submit"), batch([operation]));
 
 describe("TK-115 surface", () => {
-  it("version 3.19.0 (additif : mineure)", async () => {
-    expect(CONTRACT_VERSION).toBe("3.19.0");
-    expect((await doc()).info.version).toBe("3.19.0");
+  it("version 3.20.0 (additif : mineure)", async () => {
+    expect(CONTRACT_VERSION).toBe("3.20.0");
+    expect((await doc()).info.version).toBe("3.20.0");
   });
 
   it.each([

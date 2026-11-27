@@ -102,4 +102,20 @@ describe("zones-pass (TK-114b)", () => {
     ).toBe("handoff");
     expect(late.requests).toHaveLength(0);
   });
+
+  it.each(["architecture", "technical", "security"])(
+    "TK-115b (B847) : toutes les entrées invalides en %s : écartée « output_invalid » hors Architecture",
+    async (deliverable) => {
+      const ai = new ScriptedAi(() => ({ output: { proposals: [null, { kind: "x" }] } }));
+      const { run, store } = benchOf(SOURCES, ai);
+      const launch = { ...run.launch, deliverable };
+      await zonesPass({ ...run, launch }, ["Achats"], async () => undefined);
+      const discarded = deliverable === "architecture" ? 0 : 1;
+      expect(store.state).toMatchObject({
+        zonesDone: 1 - discarded,
+        zonesDiscarded: discarded,
+        discardedCount: 2,
+      });
+    },
+  );
 });

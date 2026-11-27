@@ -378,7 +378,8 @@ export async function currentArchitecture(
 
 /** Cahier technique actuel de la tête (TK-115) : des noms et des titres, jamais une valeur de variable. */
 export interface CurrentTechnical {
-  stacks: { specId: string; role: string; choice: string | null }[];
+  /** `layer` : couche enregistrée (`couche`), absente d'un choix qui n'en porte pas (TK-115b). */
+  stacks: { specId: string; role: string; choice: string | null; layer?: string }[];
   operations: { specId: string; zone: string; component: string; summary: string }[];
   requirements: { specId: string; title: string; category: string; target: string }[];
   environments: { specId: string; name: string }[];
@@ -389,8 +390,15 @@ const TECHNICAL_MAX = 500;
 type EntityData = { specId: string; data: unknown };
 
 const stackOfRow = ({ specId, data }: EntityData) => {
-  const choice = textOf(recordOf(data).choix);
-  return { specId, role: textOf(recordOf(data).role), choice: choice === "" ? null : choice };
+  const { role, choix, couche } = recordOf(data);
+  const choice = textOf(choix);
+  const layer = textOf(couche);
+  return {
+    specId,
+    role: textOf(role),
+    choice: choice === "" ? null : choice,
+    ...(layer === "" ? {} : { layer }),
+  };
 };
 /** Opérations du cahier technique seules (elles nomment leur composant) : un endpoint REST n'en est pas une. */
 const operationsOf = (rows: readonly EntityData[]) =>

@@ -163,3 +163,54 @@ describe("cas 6 : valider le cahier technique", () => {
     expect(await technicalRows()).toHaveLength(2);
   });
 });
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("TK-115b : pas de validation sans choix de stack (B851)", () => {
+  const bare = () => seeds(chosen()).filter((seed) => seed.kind !== chosen().kind);
+
+  it.each(["owner", "admin", "dev"] as const)(
+    "%s : aucun choix, 409 stack_missing, ni review ni audit",
+    async (role) => {
+      const version = await head(bare());
+      await validateUpstream(version);
+      const before = await reviewAudits();
+      const res = await submit(role, version, "technical");
+      expect(res.status, JSON.stringify(res.body)).toBe(409);
+      expect(res.body).toMatchObject({ code: "CONFLICT", data: { reason: "stack_missing" } });
+      expect(await technicalRows()).toHaveLength(0);
+      expect(await reviewAudits()).toBe(before);
+    },
+  );
+
+  it("une version périmée reste STALE_VERSION ; un rôle refusé reste 403", async () => {
+    const version = await head(bare());
+    await validateUpstream(version);
+    expect((await submit("designer", version, "technical")).status).toBe(403);
+    await head(seeds(open(), "b"));
+    expect((await submit("owner", version, "technical")).body.code).toBe("STALE_VERSION");
+  });
+
+  it("demande de modifications et retrait passent sans choix", async () => {
+    const version = await head(bare());
+    await validateUpstream(version);
+    const asked = await submit("dev", version, "technical", {
+      status: "changes_requested",
+      comment: "Ajouter la stack.",
+    });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(200);
+    const withdrawn = await submit("dev", version, "technical", { status: "withdrawn" });
+    expect(withdrawn.status, JSON.stringify(withdrawn.body)).toBe(200);
+  });
+
+  it("une validation antérieure sans choix reste validée", async () => {
+    const version = await head(bare());
+    await validateUpstream(version);
+    await bench().database.query(
+      `INSERT INTO reviews (id, organization_id, project_id, repo_id, target_kind, target_ref, sha, status,
+                            author_user_id, author_role, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, 'deliverable', 'technical', $4, 'approved', $5, 'owner', now(), now())`,
+      [scene.p1.organizationId, p1(), scene.p1.repoId, version, scene.p1.world.actors.owner.userId],
+    );
+    expect((await deliverables()).of("technical")?.status).toBe("validated");
+  });
+});

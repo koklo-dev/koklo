@@ -203,3 +203,92 @@ describe("secrets (B724)", () => {
     expect(functional).toMatchObject({ accepted: [], discarded: 1 });
   });
 });
+
+const components = Array.from({ length: 44 }, (_, i) => `C-s${i}`);
+/** Sortie d'un moteur réaliste : noms de produits pointés, 44 services sur un rôle, critères estimés. */
+const realistic = (role: string, over: object = {}) =>
+  entry("stack", {
+    role,
+    layer: "services",
+    components,
+    status: "open",
+    recommended: "Node.js",
+    options: ["Node.js", "Next.js", "socket.io"],
+    criteria: [{ label: "Latence", values: ["≈ 20 ms", "≈ 35 ms", "≈ 5 ms"] }],
+    why: "Node.js et socket.io couvrent le temps réel ; Next.js pour le rendu.",
+    requirements: [],
+    decisions: ["ADR-001"],
+    ...over,
+  });
+const large = () => ({ ...context(), tech: refs({ components: new Set(components) }) });
+const triageOf = (...proposals: unknown[]) => triageProposals({ proposals }, large());
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("sortie réaliste (TK-115b, B846)", () => {
+  it("noms de produits, choix retenu ou ouvert, critères « ≈ » : tout est accepté", () => {
+    const result = triageOf(
+      realistic("Exécution Node.js"),
+      realistic("Temps réel (socket.io)", { status: "chosen", choice: "socket.io" }),
+    );
+    expect(result.accepted.map((c) => c.title)).toEqual([
+      "Exécution Node.js",
+      "Temps réel (socket.io)",
+    ]);
+    expect(result).toMatchObject({ discarded: 0, invalid: 0 });
+  });
+
+  it("listes de liens coupées à 30 avant le schéma", () => {
+    const nfrIds = Array.from({ length: 40 }, () => "NFR-001");
+    const adrIds = Array.from({ length: 40 }, () => "ADR-001");
+    const result = triageOf(realistic("API", { requirements: nfrIds, decisions: adrIds }));
+    const [payload] = result.accepted.map((c) => c.payload);
+    expect(payload?.components).toEqual(components.slice(0, 30));
+    expect(payload?.requirements).toHaveLength(30);
+    expect(payload?.decisions).toHaveLength(30);
+  });
+
+  it.each([
+    ["choix sur un rôle ouvert", { choice: "Node.js" }],
+    ["recommandation hors options", { recommended: "Deno" }],
+    ["valeurs en trop", { criteria: [{ label: "L", values: ["1", "2", "3", "4"] }] }],
+    ["champ facultatif vide", { plain: "" }],
+    ["composant inconnu", { components: ["C-absent"] }],
+    ["décision inconnue", { decisions: ["ADR-999"] }],
+    ["tableau absent", { requirements: undefined }],
+    ["liste qui n'en est pas une", { components: "C-s0" }],
+  ])("%s : écarté et compté invalide", (_name, over) => {
+    expect(triageOf(realistic("API", over))).toMatchObject({
+      accepted: [],
+      discarded: 1,
+      invalid: 1,
+    });
+  });
+
+  it("entrée illisible ou secret : invalide ; doublon et élément existant : écartés sans l'être", () => {
+    expect(triageOf(null, entry("stack", {}))).toMatchObject({ discarded: 2, invalid: 2 });
+    expect(triageOf(realistic("API", { why: `ghp_${"x".repeat(36)}` }))).toMatchObject({
+      invalid: 1,
+    });
+    const result = triageOf(
+      realistic("Base de données"),
+      realistic("Fournisseur SMS"),
+      realistic("Cache"),
+      realistic("cache"),
+    );
+    expect(result).toMatchObject({ discarded: 3, invalid: 0 });
+    expect(result.accepted).toHaveLength(1);
+  });
+
+  it("même identifiant « ST- » (accents, ponctuation) : un seul choix publié", () => {
+    const result = triageOf(realistic("Temps réel"), realistic("Temps-reel"));
+    expect(result.accepted.map((c) => c.title)).toEqual(["Temps réel"]);
+  });
+
+  it("tout reproposer : deux formulations d'un même choix enregistré, reprises une fois", () => {
+    const all = { ...large(), tech: refs({ mode: "all", components: new Set(components) }) };
+    const proposals = [realistic("Fournisseur SMS"), realistic("SMS")];
+    expect(triageProposals({ proposals }, all).accepted.map((c) => c.payload.specId)).toEqual([
+      "ST-sms",
+    ]);
+  });
+});

@@ -44,8 +44,25 @@ const sectionsExistingOf = (counts: unknown): { sectionsExisting?: number } => {
   return isCount(count) ? { sectionsExisting: count } : {};
 };
 
+/** Livrables dont la relecture reçoit le bilan (TK-115b, B849) ; ceux dont les étapes écartées sont nommées. */
+const REPORTED: readonly string[] = ["architecture", "technical", "security"];
+const NAMED_STEPS: readonly string[] = ["technical", "security"];
+const discardedStepSchema = launchReportSchema.shape.discardedSteps.unwrap().element;
+const DISCARDED_STEPS_MAX = 12;
+
+/** Étapes écartées lisibles ; champ absent s'il n'y en a aucune, ou pour un lancement antérieur. */
+const discardedStepsOf = (counts: unknown): Pick<Report, "discardedSteps"> => {
+  const stored = countsOf(counts).discarded_steps;
+  const steps = (Array.isArray(stored) ? stored : []).flatMap((entry: unknown) => {
+    const parsed = discardedStepSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+  return steps.length === 0 ? {} : { discardedSteps: steps.slice(0, DISCARDED_STEPS_MAX) };
+};
+
 /** Bilan du lancement (TK-114b, B620) : colonnes validées par le schéma du contrat, `undefined` si l'une est illisible. */
-function reportOf(progress: LaunchProgress): Report | undefined {
+function reportOf(deliverable: string, progress: LaunchProgress): Report | undefined {
+  if (!REPORTED.includes(deliverable)) return undefined;
   if (!Array.isArray(progress.zones)) return undefined;
   const parsed = launchReportSchema.safeParse({
     zonesRequested: progress.zones.length,
@@ -57,13 +74,14 @@ function reportOf(progress: LaunchProgress): Report | undefined {
     coverageCalls: progress.coverageCalls,
     ...(progress.stopReason === null ? {} : { stopReason: progress.stopReason }),
     ...sectionsExistingOf(progress.discardReasons),
+    ...(NAMED_STEPS.includes(deliverable) ? discardedStepsOf(progress.discardReasons) : {}),
   });
   return parsed.success ? parsed.data : undefined;
 }
 
 /** Le lancement tel que la relecture l'affiche : aucun identifiant d'utilisateur, aucun texte du fournisseur. */
 export const launchView = (launch: LaunchRecord): Launch => {
-  const report = launch.deliverable === "architecture" ? reportOf(launch.progress) : undefined;
+  const report = reportOf(launch.deliverable, launch.progress);
   return {
     id: launch.id,
     status: launch.status,

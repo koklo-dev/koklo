@@ -12,7 +12,7 @@ import type {
   PublishOutcome,
   ZonePublication,
 } from "../../src/agent-propose/store.ts";
-import { mergeLinks } from "../../src/agent-propose/store-report.ts";
+import { mergeLinks, zoneReasons } from "../../src/agent-propose/store-report.ts";
 
 /** État d'un lancement tenu en mémoire : les colonnes du bilan (TK-114b) et les compteurs historiques. */
 export interface MemoryLaunch {
@@ -24,7 +24,7 @@ export interface MemoryLaunch {
   zones: string[];
   zonesDone: number;
   zonesDiscarded: number;
-  discardReasons: Record<string, number>;
+  discardReasons: Record<string, unknown>;
   coverageCalls: number;
   coverageStalled: number;
   coverageBefore: CoverageCounts | null;
@@ -137,12 +137,10 @@ export class MemoryProposeStore implements ProposeStore {
     );
     this.append(rows);
     this.state.discardedCount += publication.discarded + overflow;
-    const reason = publication.reason;
-    if (reason === undefined) this.state.zonesDone += 1;
-    else {
-      this.state.zonesDiscarded += 1;
-      this.state.discardReasons[reason] = (this.state.discardReasons[reason] ?? 0) + 1;
-    }
+    if (publication.reason === undefined) this.state.zonesDone += 1;
+    else this.state.zonesDiscarded += 1;
+    const reasons = zoneReasons(this.state.discardReasons, publication);
+    if (reasons !== undefined) this.state.discardReasons = reasons;
     return "published";
   }
 
