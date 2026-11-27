@@ -1,7 +1,8 @@
 import { AGENT_PROPOSE_LIMITS, type AgentProposalKind, slugOf } from "@koklo/domain";
-import { isSafeText, PROPOSAL_SCHEMAS } from "@koklo/schema";
+import { findSecretPaths, isSafeText, PROPOSAL_SCHEMAS } from "@koklo/schema";
 import { isRecord, recordsOf, stringsOf } from "../job-support.ts";
 import { OutputInvalidError } from "./errors.ts";
+import { titleKey } from "./title-key.ts";
 import {
   type ArchitectureRefs,
   architectureKnown,
@@ -12,6 +13,7 @@ import {
   withKnownDependencies,
   withoutOwnedTables,
 } from "./triage-architecture.ts";
+import { type TechnicalRefs, technicalVerdict } from "./triage-technical.ts";
 
 const TITLE_MAX = 200;
 const ZONE_MAX = 120;
@@ -47,19 +49,36 @@ export interface TriageContext {
   };
   /** Livrable Architecture (TK-111) : identifiants que le modèle peut viser ; absent pour les autres livrables. */
   readonly arch?: ArchitectureRefs;
+  /** Livrable Technique (TK-115) : références et éléments existants ; sa présence choisit le tri du cahier technique. */
+  readonly tech?: TechnicalRefs;
 }
 
-/** Clé de comparaison de deux titres : forme NFKC, espaces repliés, casse ignorée. */
-export const titleKey = (title: string): string =>
-  title.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+export { titleKey };
 
-/** Champ qui porte le titre : le nom (rôle, table, composant), l'identifiant du parcours (flux), sinon `title`. */
+/**
+ * Champ qui porte le titre : le nom (rôle, table, composant, opération, environnement), l'identifiant du parcours (flux),
+ * le rôle d'un choix, sinon `title`.
+ */
 const TITLE_FIELD: Partial<Record<AgentProposalKind, string>> = {
   role: "name",
   table: "name",
   component: "name",
   archflow: "flow",
+  stack: "role",
+  op: "name",
+  env: "name",
 };
+
+/** Types dont le `specId` n'est posé que par le code (B615, B655, TK-115) : une sortie du modèle qui en porte un est écartée. */
+const CODE_POSED_ID: ReadonlySet<AgentProposalKind> = new Set([
+  "component",
+  "archflow",
+  "doc_section",
+  "stack",
+  "op",
+  "nfr",
+  "env",
+]);
 
 const titleOf = (kind: AgentProposalKind, payload: Record<string, unknown>): string => {
   const value = payload[TITLE_FIELD[kind] ?? "title"];
@@ -145,28 +164,49 @@ function criteriaTarget(
 const EXISTING_SECTION = "existing_section";
 type Triaged = Candidate | typeof EXISTING_SECTION | undefined;
 
-/** Une entrée de la sortie du modèle : `undefined` si elle doit être écartée (jamais publiée, comptée). */
-function candidateOf(entry: unknown, context: TriageContext): Triaged {
+/** Une entrée lue : type demandé, justification en texte brut et contenu valide ; sans valeur de secret (B724). */
+function readEntry(entry: unknown, context: TriageContext) {
   if (!isRecord(entry)) return undefined;
   const { kind, rationale, content } = entry;
   const kinds: readonly unknown[] = context.kinds;
   if (!kinds.includes(kind) || typeof rationale !== "string") return undefined;
   if (rationale.length > RATIONALE_MAX || !isSafeText(rationale, true)) return undefined;
+  if (findSecretPaths([rationale, content]).length > 0) return undefined;
   const asKind = kind as AgentProposalKind;
   const parsed = PROPOSAL_SCHEMAS[asKind].safeParse(content);
   if (!parsed.success) return undefined;
-  // `specId` n'est posé que par le code (B615, B655) : une sortie du modèle qui en porte un est écartée.
-  if ((asKind === "component" || asKind === "archflow") && "specId" in parsed.data)
-    return undefined;
-  const owned = withoutOwnedTables(asKind, parsed.data as Record<string, unknown>, context.arch);
+  const payload = parsed.data as Record<string, unknown>;
+  if (CODE_POSED_ID.has(asKind) && "specId" in payload) return undefined;
+  return { kind: asKind, rationale, payload };
+}
+
+type Entry = NonNullable<ReturnType<typeof readEntry>>;
+
+/** Cahier technique : références vérifiées et `specId` posé selon le mode, puis un titre jamais vu dans le lancement. */
+function technicalCandidate({ kind, rationale, payload }: Entry, context: TriageContext): Triaged {
+  const found = technicalVerdict(kind, payload, context.tech as TechnicalRefs);
+  if (found === undefined || found === EXISTING_SECTION) return found;
+  const title = titleOf(kind, found.payload);
+  if (knownTitles(context, kind).has(titleKey(title))) return undefined;
+  remember(context, kind, title, found.payload);
+  return { kind, title, rationale, payload: found.payload, zone: found.zone };
+}
+
+/** Une entrée de la sortie du modèle : `undefined` si elle doit être écartée (jamais publiée, comptée). */
+function candidateOf(entry: unknown, context: TriageContext): Triaged {
+  const read = readEntry(entry, context);
+  if (read === undefined) return undefined;
+  if (context.tech !== undefined) return technicalCandidate(read, context);
+  const { kind, rationale } = read;
+  const owned = withoutOwnedTables(kind, read.payload, context.arch);
   const payload = withKnownActors(
-    asKind,
-    withKnownDependencies(asKind, owned, context.arch),
+    kind,
+    withKnownDependencies(kind, owned, context.arch),
     context.arch,
   );
-  if (sectionExists(asKind, payload, context.arch)) return EXISTING_SECTION;
-  const title = titleFor(asKind, payload, context);
-  return title === undefined ? undefined : { kind: asKind, title, rationale, payload };
+  if (sectionExists(kind, payload, context.arch)) return EXISTING_SECTION;
+  const title = titleFor(kind, payload, context);
+  return title === undefined ? undefined : { kind, title, rationale, payload };
 }
 
 /** Titre d'une proposition valide, `undefined` si elle doit être écartée (cible, doublon, référence inconnue). */

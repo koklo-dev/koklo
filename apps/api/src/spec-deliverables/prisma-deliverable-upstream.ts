@@ -1,7 +1,11 @@
 import type { SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
 import type { Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
-import type { UpstreamFacts } from "./deliverable-upstream.ts";
+import type {
+  TechnicalUpstreamFacts,
+  UpstreamEntity,
+  UpstreamFacts,
+} from "./deliverable-upstream.ts";
 
 /** Livrables dont l'impact amont est calculé : les Données (B449) et l'Architecture (TK-113). */
 export type UpstreamKey = "data" | "architecture";
@@ -98,6 +102,21 @@ function citedByOf(...all: Citations[]): NonNullable<UpstreamFacts["citedBy"]> {
   return merged;
 }
 
+/** Dernière décision sur le livrable, et la tête courante lisible ; `null` : jamais décidé ou rien d'indexé. */
+async function decidedHeads(tx: Tx, resolver: SpecHeadResolver, scope: ProjectScope, key: string) {
+  const decision = await tx.review.findFirst({
+    where: { projectId: scope.projectId, targetKind: "deliverable", targetRef: key },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { sha: true },
+  });
+  if (!decision) return null;
+  const head = await resolver.resolve(tx, scope, {});
+  if (!head || head.snapshot.status === "failed") return null;
+  const decided = await resolver.resolve(tx, scope, { commitSha: decision.sha });
+  const indexed = decided !== null && decided.snapshot.status !== "failed";
+  return { headId: head.snapshot.id, decidedId: indexed ? decided.snapshot.id : null };
+}
+
 /**
  * Faits de l'impact amont (B449, TK-113) : sources citées par les éléments de la tête, hachages de ces amonts à la tête de
  * la dernière décision et à la tête courante, et pour l'Architecture les tables des deux têtes. `null` : jamais décidé, rien
@@ -110,32 +129,79 @@ export async function readUpstreamFacts(
   scope: ProjectScope,
   key: UpstreamKey = "data",
 ): Promise<UpstreamFacts | null> {
-  const decision = await tx.review.findFirst({
-    where: { projectId: scope.projectId, targetKind: "deliverable", targetRef: key },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { sha: true },
-  });
-  if (!decision) return null;
-  const head = await resolver.resolve(tx, scope, {});
-  if (!head || head.snapshot.status === "failed") return null;
-  const atHeadCited = await citationsAt(tx, head.snapshot.id, key);
+  const heads = await decidedHeads(tx, resolver, scope, key);
+  if (heads === null) return null;
+  const { headId, decidedId } = heads;
+  const atHeadCited = await citationsAt(tx, headId, key);
   const sources = [...atHeadCited.keys()];
   if (key === "data" && sources.length === 0) return null;
-  const decided = await resolver.resolve(tx, scope, { commitSha: decision.sha });
-  const indexed = decided !== null && decided.snapshot.status !== "failed";
   const base: UpstreamFacts = {
     sources,
-    atDecision: indexed ? await hashesAt(tx, decided.snapshot.id, sources) : null,
-    atHead: await hashesAt(tx, head.snapshot.id, sources),
+    atDecision: decidedId === null ? null : await hashesAt(tx, decidedId, sources),
+    atHead: await hashesAt(tx, headId, sources),
   };
   if (key === "data") return base;
-  const atDecisionCited = indexed ? await citationsAt(tx, decided.snapshot.id, key) : new Map();
+  const atDecisionCited = decidedId === null ? new Map() : await citationsAt(tx, decidedId, key);
   return {
     ...base,
     tables: {
-      atDecision: indexed ? await tableIdsAt(tx, decided.snapshot.id) : null,
-      atHead: await tableIdsAt(tx, head.snapshot.id),
+      atDecision: decidedId === null ? null : await tableIdsAt(tx, decidedId),
+      atHead: await tableIdsAt(tx, headId),
     },
     citedBy: citedByOf(atHeadCited, atDecisionCited),
+  };
+}
+
+/** Composants et décisions d'un instantané, avec leur hachage. */
+async function architectureAt(tx: Tx, snapshotId: string) {
+  const rows = await tx.specEntity.findMany({
+    where: { snapshotId, kind: { in: ["component", "adr"] } },
+    select: { specId: true, data: true, contentHash: true },
+    take: MAX_ENTITIES,
+  });
+  return new Map<string, UpstreamEntity>(
+    rows.map((row) => [
+      row.specId,
+      {
+        hash: row.contentHash,
+        accepted: (row.data as { statut?: unknown } | null)?.statut === "acceptee",
+      },
+    ]),
+  );
+}
+
+/** Champs des fichiers techniques qui citent un composant ou une décision. */
+const CITING_FIELDS = ["composants", "decisions", "liens"] as const;
+const CITED = /^(C-[a-z0-9][a-z0-9-]*|ADR-\d{3,})$/;
+
+function citedIn(data: unknown): string[] {
+  const record = (data ?? {}) as Record<string, unknown>;
+  const listed = CITING_FIELDS.flatMap((field) => {
+    const value = record[field];
+    return Array.isArray(value) ? value : [];
+  });
+  return [...listed, record.composant].filter(
+    (id): id is string => typeof id === "string" && CITED.test(id),
+  );
+}
+
+/** Faits de l'impact de l'architecture sur le cahier technique (TK-115, B735). */
+export async function readTechnicalUpstreamFacts(
+  tx: Tx,
+  resolver: SpecHeadResolver,
+  scope: ProjectScope,
+): Promise<TechnicalUpstreamFacts | null> {
+  const heads = await decidedHeads(tx, resolver, scope, "technical");
+  if (heads === null) return null;
+  const { headId, decidedId } = heads;
+  const citing = await tx.specEntity.findMany({
+    where: { snapshotId: headId, kind: { in: ["stack", "endpoint", "nfr"] } },
+    select: { specId: true, data: true },
+    take: MAX_ENTITIES,
+  });
+  return {
+    atDecision: decidedId === null ? null : await architectureAt(tx, decidedId),
+    atHead: await architectureAt(tx, headId),
+    citing: citing.map((row) => ({ id: row.specId, cites: citedIn(row.data) })),
   };
 }

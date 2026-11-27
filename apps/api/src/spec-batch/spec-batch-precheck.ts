@@ -32,10 +32,21 @@ export interface Precheck {
 }
 
 /**
- * Genres vérifiés (B671) : jamais le rôle (lu dans le contenu de `domain/roles.yaml`), la mise en page (le dernier écrit
- * gagne), la table ni le jeu d'exemple (une spec v1 migrée dans le lot change leurs chemins).
+ * Genres vérifiés (B671) : jamais le rôle ni l'environnement (lus dans le contenu de leur fichier), la mise en page (le
+ * dernier écrit gagne), la table ni le jeu d'exemple (une spec v1 migrée dans le lot change leurs chemins).
  */
-const CHECKED = new Set(["feature", "rule", "flow", "component", "archflow", "adr", "doc"]);
+const CHECKED = new Set([
+  "feature",
+  "rule",
+  "flow",
+  "component",
+  "archflow",
+  "adr",
+  "doc",
+  "stack",
+  "op",
+  "nfr",
+]);
 
 const targetOf = (operation: PreparedOperation): string | null =>
   operation.specId ?? slugSpecIdOf(operation);
@@ -68,9 +79,11 @@ export function precheckBatch(
   proposals: readonly string[],
   index: SpecPathIndex,
 ): Precheck {
+  // La charge désigne le dossier d'une section (`deliverable`).
   const targets = operations.map((operation) => ({
     kind: operation.kind,
     targetSpecId: targetOf(operation),
+    payload: operation.payload,
   }));
   const conflicts = conflictsOf(targets, (target) =>
     CHECKED.has(genreOf(target)) && target.targetSpecId !== null

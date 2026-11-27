@@ -41,6 +41,18 @@ export const OPERATION_KINDS = [
   "doc.section.create",
   "doc.section.update",
   "doc.section.delete",
+  "stack.create",
+  "stack.update",
+  "stack.delete",
+  "op.create",
+  "op.update",
+  "op.delete",
+  "nfr.create",
+  "nfr.update",
+  "nfr.delete",
+  "env.create",
+  "env.update",
+  "env.delete",
 ] as const;
 const TARGET_ID: Readonly<Record<string, RegExp>> = {
   rule: /^R-\d{3,}$/,
@@ -52,6 +64,10 @@ const TARGET_ID: Readonly<Record<string, RegExp>> = {
   archflow: /^P-[a-z0-9][a-z0-9-]*$/,
   adr: /^ADR-\d{3,}$/,
   doc: /^DOC-[a-z0-9][a-z0-9-]*$/,
+  stack: /^ST-[a-z0-9][a-z0-9-]*$/,
+  op: /^[a-z0-9][A-Za-z0-9_-]*\.[a-z0-9][A-Za-z0-9_-]*$/,
+  nfr: /^NFR-[a-z0-9][a-z0-9-]*$/,
+  env: /^ENV-[a-z0-9][a-z0-9-]*$/,
 };
 /** Opérations de publication de l'espace Idée (TK-89) : un lot n'en mêle jamais avec des features. */
 export const IDEA_OPERATION_KINDS = [

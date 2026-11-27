@@ -101,6 +101,8 @@ const DENIED = [
   "spec.data.layout.save",
   // TK-112 (contrat 3.10.0) : enregistrer les positions du schéma d'architecture relève d'owner, admin et développeur (B542).
   "spec.architecture.layout.save",
+  // TK-115 (contrat 3.17.0) : « Choisir » une option de la stack relève d'owner, admin et développeur (B725).
+  "spec.technical.stack.choose",
   "specBatch.submit",
   // TK-106 (contrat 3.4.0) : la migration du format de spec et son retour arrière relèvent d'owner seul.
   "specMigration.revert",

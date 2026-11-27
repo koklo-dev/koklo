@@ -33,6 +33,7 @@ describe("TK-100 A surface : deux routes, chemins et méthodes", () => {
       "architecture",
       "data",
       "deliverables",
+      "document",
       "forceDeliverable",
       "functional",
       "getFeature",
@@ -41,6 +42,7 @@ describe("TK-100 A surface : deux routes, chemins et méthodes", () => {
       "listFeatures",
       "refs",
       "roles",
+      "technical",
     ]);
   });
 

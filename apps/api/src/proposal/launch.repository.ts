@@ -51,6 +51,14 @@ export interface OptionFacts {
   withoutCriteria: number;
 }
 
+/** Faits de la tête dont dépendent les lancements du cahier technique (TK-115). */
+export interface TechnicalFacts {
+  components: number;
+  /** Choix de la stack à trancher. */
+  openChoices: number;
+  requirements: number;
+}
+
 /** Accès aux lancements d'agent du projet ; chaque méthode est une transaction courte, sans réseau. */
 export interface LaunchRepository {
   /** Numéro de la dernière version `idea-vN` figée (commit réglé), `null` sans version. */
@@ -65,6 +73,7 @@ export interface LaunchRepository {
   /** Échec côté API (enfilage impossible) : le lancement passe `failed`, le verrou est libéré. */
   fail(scope: ProjectScope, launchId: string, errorCode: string, now: Date): Promise<void>;
   optionFacts(scope: ProjectScope): Promise<OptionFacts>;
+  technicalFacts(scope: ProjectScope): Promise<TechnicalFacts>;
   /** Vrai si la tête de spec porte au moins une entité du Fonctionnel (fonctionnalité, règle, rôles, parcours). */
   hasFunctionalEntities(scope: ProjectScope): Promise<boolean>;
   /** Le lancement désigné, ou le dernier du livrable ; `null` s'il n'y en a pas (ou hors du projet). */

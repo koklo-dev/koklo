@@ -23,6 +23,7 @@ import { createRepoApp, insertInstallation, ProviderHarness, repoApi } from "./h
 import { reviewApi } from "./helpers/reviews.ts";
 import { settingsApi } from "./helpers/settings.ts";
 import { readScene, seedIndex } from "./helpers/spec-read.ts";
+import { stackEntity, technicalApi } from "./helpers/spec-technical.ts";
 import { suggestionApi } from "./helpers/suggestions.ts";
 import {
   apiFor,
@@ -270,6 +271,7 @@ const EXPECTED_WRITE_PROCEDURES = [
   "spec.architecture.layout.save",
   "spec.data.layout.save",
   "spec.forceDeliverable",
+  "spec.technical.stack.choose",
   "specBatch.submit",
   "sprint.activate",
   "sprint.close",
@@ -375,6 +377,22 @@ function repoPrepare(options: { seedRepo?: string } = {}) {
     return { installation };
   };
 }
+
+const BASE = {
+  role: "Base",
+  options: ["PostgreSQL", "MySQL"],
+  criteres: [],
+  recommande: undefined,
+};
+const STACK_YAML = `id: ST-base
+couche: donnees
+role: Base
+statut: a_trancher
+options:
+  - PostgreSQL
+  - MySQL
+pourquoi: Fiable.
+`;
 
 const SCENARIOS: Scenario[] = [
   {
@@ -1136,6 +1154,55 @@ const SCENARIOS: Scenario[] = [
           idempotencyKey: "audit-arch-layout-refuse",
           positions: { "C-api": { x: 10, y: 20 } },
         },
+      ),
+    deniedStatuses: [403],
+  },
+  {
+    // TK-115 : « Choisir » est un lot d'une opération `stack.update`, audité comme `specBatch.submit`.
+    procedure: "spec.technical.stack.choose",
+    role: "dev",
+    prepare: async (ctx) => {
+      await specWorkerOf();
+      const { app: repoApp, harness } = await repoRuntimeOf();
+      const runtime = { database, app: repoApp, harness } as unknown as RepoBench;
+      const scene = await readScene(runtime, { world: ctx.world });
+      await harness.inner.writeCommit({
+        auth: await harness.authFor(scene.owner),
+        repo: scene.ref,
+        branch: "cadrage",
+        author: { name: "Koklo", email: "koklo-bot@users.noreply.invalid" },
+        message: "test: choix technique",
+        files: [{ path: "tech/stack/base.yaml", content: STACK_YAML }],
+      });
+      await seedIndex(runtime, scene, [], {
+        commit: true,
+        entities: [stackEntity("ST-base", BASE)],
+      });
+      return {};
+    },
+    call: async (ctx) =>
+      technicalApi((await repoRuntimeOf()).app, ctx.world.actors.dev).choose(
+        ctx.world.projectId,
+        "ST-base",
+        "PostgreSQL",
+      ),
+    expected: async (ctx) => {
+      const [batch] = await database.query<{ id: string }>(
+        "SELECT id FROM spec_write_batches WHERE project_id = $1 ORDER BY enqueued_at DESC LIMIT 1",
+        [ctx.world.projectId],
+      );
+      return {
+        action: "spec.batch.submit",
+        targetKind: "spec_batch",
+        targetId: batch?.id ?? "",
+        ticketId: null,
+      };
+    },
+    denied: async (ctx) =>
+      technicalApi((await repoRuntimeOf()).app, ctx.world.actors.designer).choose(
+        ctx.world.projectId,
+        "ST-base",
+        "PostgreSQL",
       ),
     deniedStatuses: [403],
   },

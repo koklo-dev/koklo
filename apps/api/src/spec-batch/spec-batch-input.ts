@@ -1,9 +1,15 @@
-import type { SpecBatchSubmitInput } from "@koklo/contract";
+import { type SpecBatchSubmitInput, TECHNICAL_OPERATION_KINDS } from "@koklo/contract";
 import { isValidBranchName, SCOPING_BRANCH } from "@koklo/domain";
+import { findSecretPaths, SECRET_REFUSAL_MESSAGE } from "@koklo/schema";
 import { validation } from "../tracker/api-errors.ts";
 import type { PreparedBatch, PreparedOperation } from "./spec-batch.repository.ts";
 
 type Operation = SpecBatchSubmitInput["operations"][number];
+
+/** Opération du cahier technique : choix, opération, exigence, environnement ou section de ce document. */
+export const isTechnicalOperation = (operation: Operation): boolean =>
+  (TECHNICAL_OPERATION_KINDS as readonly string[]).includes(operation.kind) ||
+  ("deliverable" in operation && operation.deliverable === "technical");
 
 /** Saut de ligne, NUL ou séparateur Unicode de ligne : le texte sortirait de sa ligne dans l'historique git. */
 const hasLineBreak = (text: string): boolean =>
@@ -30,15 +36,36 @@ function operationOf(operation: Operation): PreparedOperation {
   return { kind, specId: kind.endsWith(".create") ? null : (specId ?? null), payload };
 }
 
+/** Une section du cahier technique et une section de l'architecture peuvent porter le même identifiant `DOC-`. */
+const targetKeyOf = ({ specId, payload }: PreparedOperation): string =>
+  `${payload.deliverable === "technical" ? "technical:" : ""}${specId}`;
+
 /** Une seule opération par élément (fonctionnalité, règle, rôle, parcours) dans un lot : l'ordre n'a de sens qu'entre fichiers distincts. */
 function assertDistinctTargets(operations: readonly PreparedOperation[]): void {
   const seen = new Set<string>();
-  for (const { specId } of operations) {
+  for (const operation of operations) {
+    const { specId } = operation;
     if (specId === null) continue;
-    if (seen.has(specId)) {
+    const key = targetKeyOf(operation);
+    if (seen.has(key)) {
       throw validation("operations", `Plusieurs opérations sur ${specId} dans le même lot.`);
     }
-    seen.add(specId);
+    seen.add(key);
+  }
+}
+
+/** Champ d'entrée désigné par un pointeur JSON du détecteur : `operations.0.variables.1.usage`. */
+const fieldAt = (base: string, pointer: string): string => `${base}${pointer.replaceAll("/", ".")}`;
+
+/** La spec ne contient jamais de valeur de secret (TK-115, B724) : refus avant toute écriture, sans recopier la valeur. */
+function assertNoSecret(operations: readonly PreparedOperation[], message: string | undefined) {
+  const texts: [string, unknown][] = [
+    ...operations.map((operation, i): [string, unknown] => [`operations.${i}`, operation.payload]),
+    ["message", message ?? ""],
+  ];
+  for (const [base, value] of texts) {
+    const [pointer] = findSecretPaths(value);
+    if (pointer !== undefined) throw validation(fieldAt(base, pointer), SECRET_REFUSAL_MESSAGE);
   }
 }
 
@@ -74,6 +101,7 @@ export function prepareBatch(input: SpecBatchSubmitInput, defaultBranch: string)
     throw validation("message", "Le message du commit tient sur une seule ligne.");
   }
   const operations = input.operations.map(operationOf);
+  assertNoSecret(operations, input.message);
   assertDistinctTargets(operations);
   assertSkipConflicts(input);
   return {

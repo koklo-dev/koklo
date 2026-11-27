@@ -212,3 +212,35 @@ describe("TK-114g (contrat 3.16.0, B700) : déjà présentes comptées à part",
     expect(group).not.toHaveProperty("alreadyPresent");
   });
 });
+
+/** TK-115 (B730) : le cahier technique se relit par type : document, stack, opérations, exigences, environnements. */
+describe("TK-115 groupes du cahier technique", () => {
+  const data = [
+    count("env", "Environnements", "pending", 3, 40),
+    count("op", "Réservation", "pending", 20, 10),
+    count("stack", "Stack", "pending", 10, 0),
+    count("nfr", "Exigences", "pending", 4, 30),
+    count("doc_section", "Document", "pending", 2, 50),
+  ];
+
+  it("par type même demandé par zone, document en tête, libellé du cahier technique", () => {
+    expect(buildGroups(data, "type_zone", "technical").map((g) => [g.key, g.label])).toEqual([
+      ["doc_section", "Document · cahier technique"],
+      ["stack", "Stack"],
+      ["op", "Opérations de l'API"],
+      ["nfr", "Exigences"],
+      ["env", "Environnements"],
+    ]);
+    expect(groupKeyOf("op", "Réservation", "type_zone")).toBe("op");
+    expect(groupFilterOf("env")).toEqual({ kind: "env" });
+  });
+
+  it("architecture inchangée : « Document · vue d'ensemble »", () => {
+    const groups = buildGroups(
+      [count("doc_section", "A", "pending", 40, 0)],
+      "type",
+      "architecture",
+    );
+    expect(groups[0]?.label).toBe("Document · vue d'ensemble");
+  });
+});

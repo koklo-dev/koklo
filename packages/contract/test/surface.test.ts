@@ -57,12 +57,17 @@ const GROUPS: Record<string, string[]> = {
     "projects",
     "roles",
     "rules",
+    "technical",
+    "technicalDocument",
+    "technicalEnvironments",
+    "technicalStack",
   ],
   repo: ["createSpec", "link", "list"],
   spec: [
     "architecture",
     "data",
     "deliverables",
+    "document",
     "forceDeliverable",
     "functional",
     "getFeature",
@@ -71,6 +76,7 @@ const GROUPS: Record<string, string[]> = {
     "listFeatures",
     "refs",
     "roles",
+    "technical",
   ],
   review: ["list", "remind", "submit"],
   specBatch: ["get", "submit"],
@@ -359,6 +365,16 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /client-space/projects/{projectId}/architecture/adrs/{adrId}",
     "GET /client-space/projects/{projectId}/architecture/flows",
     "GET /client-space/projects/{projectId}/architecture/flows/{flowId}",
+    // TK-115 (3.17.0) : cahier technique (choix, « Choisir », YAML, environnements, document) et vue client.
+    "GET /projects/{projectId}/spec/technical/stack",
+    "POST /projects/{projectId}/spec/technical/stack/{id}/choose",
+    "GET /projects/{projectId}/spec/technical/stack/{id}/source",
+    "GET /projects/{projectId}/spec/technical/environments",
+    "GET /projects/{projectId}/spec/document/sections",
+    "GET /client-space/projects/{projectId}/technical",
+    "GET /client-space/projects/{projectId}/technical/stack",
+    "GET /client-space/projects/{projectId}/technical/environments",
+    "GET /client-space/projects/{projectId}/technical/document",
     // TK-104 (3.2.0) : vue client du cahier et relance.
     "GET /client-space/projects/{projectId}/progress",
     "GET /client-space/projects/{projectId}/flows",
@@ -390,7 +406,7 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(173);
+    expect(pairs).toHaveLength(182);
   });
 });
 

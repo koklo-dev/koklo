@@ -183,3 +183,30 @@ describe("une seule implémentation de la lecture de spec", () => {
     );
   });
 });
+
+/** TK-115 : les fichiers du cahier technique sont reconnus ; ses sections seulement pour un lot `doc.section.*`. */
+describe("readSpecFiles : cahier technique", () => {
+  it("tech/, nfr/ toujours lus ; sections du cahier et de l'architecture avec `docs`", async () => {
+    const { readSpecFiles } = await load();
+    const { inner, auth, listing } = await seed({
+      "tech/stack/base.yaml": "id: ST-base\n",
+      "tech/environments.yaml": "environnements: []\n",
+      "nfr/NFR-001.yaml": "id: NFR-001\n",
+      "tech/cahier-technique/01-objet.md": "# Objet\n",
+      "architecture/overview/01-contexte.md": "# Contexte\n",
+    });
+    const read = async (docs: boolean) =>
+      (await readSpecFiles({ provider: inner, auth, repo, listing, specPath: null, docs }))
+        .map((file) => file.path)
+        .sort();
+    const entities = ["nfr/NFR-001.yaml", "tech/environments.yaml", "tech/stack/base.yaml"];
+    expect(await read(false)).toEqual(entities);
+    expect(await read(true)).toEqual(
+      [
+        ...entities,
+        "architecture/overview/01-contexte.md",
+        "tech/cahier-technique/01-objet.md",
+      ].sort(),
+    );
+  });
+});

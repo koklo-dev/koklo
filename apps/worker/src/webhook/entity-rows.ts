@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { type BusinessRule, canonicalize, type ParsedSpec, type SpecFile } from "@koklo/schema";
+import {
+  type BusinessRule,
+  canonicalize,
+  type ParsedSpec,
+  type SpecFile,
+  STACK_LAYERS,
+  type Stack,
+} from "@koklo/schema";
 
 /** Genres indexés dans `spec_entities` : le CHECK de la migration porte la même liste. */
 export type EntityKind =
@@ -15,12 +22,15 @@ export type EntityKind =
   | "adr"
   | "endpoint"
   | "screen"
-  | "test";
+  | "test"
+  | "stack"
+  | "nfr"
+  | "environments";
 
 export interface EntityRow {
   readonly kind: EntityKind;
   readonly specId: string;
-  readonly zone: "functional" | "data" | "architecture" | null;
+  readonly zone: "functional" | "data" | "architecture" | "technical" | null;
   readonly path: string;
   readonly data: unknown;
   /** sha256 hexadécimal de la forme canonique du contenu (`{ kind, data }`) : ni chemin, ni mise en page. */
@@ -42,6 +52,9 @@ const ZONE_OF: Readonly<Record<EntityKind, EntityRow["zone"]>> = {
   endpoint: null,
   screen: null,
   test: null,
+  stack: "technical",
+  nfr: "technical",
+  environments: "technical",
 };
 
 /** Une valeur lue de git, ramenée à du JSON pur (propriétés `undefined` écartées) : le hachage ne dépend d'aucun type interne. */
@@ -142,6 +155,40 @@ function architectureCandidates(spec: ParsedSpec): Candidate[] {
   ];
 }
 
+const ENVIRONMENTS_TITLE = "Environnements";
+const OPEN_CHOICE = "à trancher";
+
+/** Choix indexés par couche puis identifiant, titrés « rôle : choix » (recherche et références). */
+function stackCandidates(spec: ParsedSpec): Candidate[] {
+  const rank = (stack: Stack) => STACK_LAYERS.indexOf(stack.couche);
+  const sorted = [...spec.stacks].sort(
+    (a, b) => rank(a.value) - rank(b.value) || (a.value.id < b.value.id ? -1 : 1),
+  );
+  const titled = sorted.map(({ path, value }) => ({
+    path,
+    value: { ...value, titre: `${value.role} : ${value.choix ?? OPEN_CHOICE}` },
+  }));
+  return candidate("stack", idOf)(titled);
+}
+
+/** Cahier technique (TK-115) : choix, opérations (titre = résumé), exigences et le bloc des environnements. */
+function technicalCandidates(spec: ParsedSpec): Candidate[] {
+  const operations = spec.operations.map(({ path, value }) => ({
+    path,
+    value: { ...value, titre: value.resume },
+  }));
+  const environments = spec.environments.map(({ path, value }) => ({
+    path,
+    value: { ...value, titre: ENVIRONMENTS_TITLE },
+  }));
+  return [
+    ...stackCandidates(spec),
+    ...candidate("endpoint", idOf)(operations),
+    ...candidate("nfr", idOf)(spec.nfrs),
+    ...candidate("environments", () => "environments")(environments),
+  ];
+}
+
 function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[] {
   const of = (
     kind: EntityKind,
@@ -179,6 +226,7 @@ function candidatesOf(spec: ParsedSpec, flows: readonly SpecFile[]): Candidate[]
     ...architectureCandidates(spec),
     ...of("relations", spec.relations, () => "relations"),
     ...of("endpoint", spec.endpoints, idOf),
+    ...technicalCandidates(spec),
     ...of("screen", spec.screens, idOf),
     ...of("test", spec.tests, (entry) => entry.path),
   ];

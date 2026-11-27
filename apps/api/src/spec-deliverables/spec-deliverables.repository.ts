@@ -1,7 +1,7 @@
 import type { DeliverableKey } from "@koklo/domain";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { IdeaImpact } from "./deliverable-impact.ts";
-import type { UpstreamFacts } from "./deliverable-upstream.ts";
+import type { TechnicalUpstreamFacts, UpstreamFacts } from "./deliverable-upstream.ts";
 
 export const SPEC_DELIVERABLES_REPOSITORY = Symbol("SPEC_DELIVERABLES_REPOSITORY");
 
@@ -17,6 +17,8 @@ export interface DeliverableRecord {
   impact: IdeaImpact | null;
   /** Amonts cités et leurs hachages (impact amont des Données, B449, et de l'Architecture, TK-113) ; `null` : rien à comparer. */
   upstream: Record<"data" | "architecture", UpstreamFacts | null>;
+  /** Impact de l'architecture sur le cahier technique (TK-115, B735) ; `null` : jamais décidé ou rien d'indexé. */
+  technicalUpstream: TechnicalUpstreamFacts | null;
   /** Propositions de l'agent en attente, par livrable (vide si `withPending` est faux). */
   pendingByDeliverable: Partial<Record<DeliverableKey, number>>;
 }

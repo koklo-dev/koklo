@@ -6,7 +6,7 @@ import { recordAudit } from "../tracker/audit.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import type { IdeaImpact } from "./deliverable-impact.ts";
-import { readUpstreamFacts } from "./prisma-deliverable-upstream.ts";
+import { readTechnicalUpstreamFacts, readUpstreamFacts } from "./prisma-deliverable-upstream.ts";
 import type {
   DeliverableRecord,
   ForceResult,
@@ -124,6 +124,7 @@ export class PrismaSpecDeliverablesRepository implements SpecDeliverablesReposit
           data: await readUpstreamFacts(tx, this.resolver, scope, "data"),
           architecture: await readUpstreamFacts(tx, this.resolver, scope, "architecture"),
         },
+        technicalUpstream: await readTechnicalUpstreamFacts(tx, this.resolver, scope),
         forced: overrides.map((row) => row.deliverable as DeliverableKey),
         pendingByDeliverable: withPending ? await pendingByDeliverable(tx, scope.projectId) : {},
       };

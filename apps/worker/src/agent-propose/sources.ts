@@ -3,12 +3,14 @@ import {
   type CurrentDomainTitles,
   type CurrentFeature,
   type CurrentTable,
+  type CurrentTechnical,
   type CurrentTitle,
   currentArchitecture,
   currentDataModel,
   currentDomainTitles,
   currentFeatures,
   currentTableIds,
+  currentTechnical,
   type FrozenPage,
   frozenPages,
   frozenVersion,
@@ -20,6 +22,7 @@ import {
   withOrganization,
 } from "@koklo/db";
 import { ideaPagesDiff } from "@koklo/domain";
+import type { DocSectionDeliverable } from "@koklo/schema";
 import type { HeadDocSection, SpecHead } from "./doc-sections.ts";
 import type { LaunchContext } from "./store.ts";
 
@@ -47,12 +50,17 @@ export interface LaunchSources {
   readonly architecture?: CurrentArchitecture;
   /** Architecture (TK-114b) : identifiants de toutes les tables, pour la couverture ; jamais envoyés au modèle. */
   readonly tableIds?: readonly string[];
-  /** Architecture (TK-114e, B670) : sections du document de la tête, lues dans git (100 au plus). */
+  /** Architecture (TK-114e, B670) et Technique : sections du document de la tête, lues dans git (100 au plus). */
   readonly docSections?: readonly HeadDocSection[];
+  /** Livrable Technique (TK-115) : le cahier technique actuel ; sa présence choisit les prompts du cahier technique. */
+  readonly technical?: CurrentTechnical;
 }
 
 /** Lecture des sections de la tête (fournisseur git du worker) ; liste vide sans fournisseur. */
-export type DocSectionsReader = (head: SpecHead | null) => Promise<readonly HeadDocSection[]>;
+export type DocSectionsReader = (
+  head: SpecHead | null,
+  deliverable?: DocSectionDeliverable,
+) => Promise<readonly HeadDocSection[]>;
 export const noDocSections: DocSectionsReader = async () => [];
 
 /** Branche de travail lue d'abord, comme `headSnapshotId` de `@koklo/db` (`dossier-sources`). */
@@ -139,6 +147,29 @@ function readArchitectureSources(
   }));
 }
 
+/**
+ * Sources du Technique (TK-115) : le Fonctionnel indexé, les tables, l'architecture, le cahier technique actuel et ses
+ * sections de la tête ; ni dossier d'idée, ni synthèse, ni lignes de jeux.
+ */
+function readTechnicalSources(
+  client: TenantClient,
+  launch: LaunchContext,
+  docSections: DocSectionsReader,
+): Promise<LaunchSources> {
+  return withOrganization(launch.organizationId, async () => ({
+    tag: "technical",
+    pages: [],
+    synthesis: null,
+    risks: null,
+    features: await currentFeatures(client, launch.projectId),
+    ...(await currentDomainTitles(client, launch.projectId)),
+    tables: (await currentDataModel(client, launch.projectId)).tables,
+    architecture: await currentArchitecture(client, launch.projectId),
+    technical: await currentTechnical(client, launch.projectId),
+    docSections: await docSections(await specHeadOf(client, launch.projectId), "technical"),
+  }));
+}
+
 /** Lit les sources du lancement ; `null` sans version figée (le lancement échoue, rien n'est envoyé). */
 export function readSources(
   client: TenantClient,
@@ -148,6 +179,9 @@ export function readSources(
   if (launch.deliverable === "data") return readDataSources(client, launch);
   if (launch.deliverable === "architecture") {
     return readArchitectureSources(client, launch, docSections);
+  }
+  if (launch.deliverable === "technical") {
+    return readTechnicalSources(client, launch, docSections);
   }
   return withOrganization(launch.organizationId, async () => {
     const version = await frozenVersion(client, launch.projectId, launch.baseVersion);

@@ -12,6 +12,7 @@ import { ClientSpaceService } from "./client-space.service.ts";
 import { ClientSpaceArchitectureService } from "./client-space-architecture.service.ts";
 import { ClientSpaceDataService } from "./client-space-data.service.ts";
 import { ClientSpaceEntitiesService } from "./client-space-entities.service.ts";
+import { ClientSpaceTechnicalService } from "./client-space-technical.service.ts";
 
 /**
  * Lectures de l'espace client (CDC §14, TK-55b) : les six rôles. Le client n'atteint que ses projets
@@ -25,6 +26,8 @@ export class ClientSpaceController {
     @Inject(ClientSpaceDataService) private readonly data: ClientSpaceDataService,
     @Inject(ClientSpaceArchitectureService)
     private readonly architecture: ClientSpaceArchitectureService,
+    @Inject(ClientSpaceTechnicalService)
+    private readonly technical: ClientSpaceTechnicalService,
     @Inject(PROJECT_ACCESS) private readonly access: ProjectAccess,
   ) {}
 
@@ -295,6 +298,66 @@ export class ClientSpaceController {
         errors,
         input.projectId,
         (scope) => this.architecture.archFlow(scope, input.flowId),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technical)
+  technicalSummary(@Req() request: Request) {
+    return implement(contract.clientSpace.technical).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.summary(scope),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technicalStack)
+  technicalStack(@Req() request: Request) {
+    return implement(contract.clientSpace.technicalStack).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.stack(scope, input),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technicalEnvironments)
+  technicalEnvironments(@Req() request: Request) {
+    return implement(contract.clientSpace.technicalEnvironments).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.environments(scope),
+        this.access,
+      ),
+    );
+  }
+
+  @UseGuards(SessionGuard, RoleGuard)
+  @Roles(...CLIENT_SPACE_READ_ROLES)
+  @Implement(contract.clientSpace.technicalDocument)
+  technicalDocument(@Req() request: Request) {
+    return implement(contract.clientSpace.technicalDocument).handler(({ input, errors }) =>
+      inProject(
+        request,
+        errors,
+        input.projectId,
+        (scope) => this.technical.document(scope),
         this.access,
       ),
     );

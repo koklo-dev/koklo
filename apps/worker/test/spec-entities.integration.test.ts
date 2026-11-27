@@ -227,3 +227,33 @@ describe("réindexation", () => {
     expect(marker?.entities_indexed_at).toBeInstanceOf(Date);
   });
 });
+
+/** TK-115 : le cahier technique est indexé et le compteur `nfr` suit le plus grand identifiant du dépôt. */
+describe("cahier technique", () => {
+  it("choix, opération, exigence et environnements indexés ; compteur nfr relevé", async () => {
+    const head = await bench.commit(scene, {
+      "tech/stack/base.yaml":
+        "id: ST-base\ncouche: donnees\nrole: Base\nstatut: a_trancher\noptions: [A, B]\npourquoi: p\n",
+      "api/endpoints/creneau.listAvailable.yaml":
+        "id: creneau.listAvailable\ntype: lecture\nzone: Agenda\ncomposant: C-api\npermission: public\nresume: Liste.\n",
+      "nfr/NFR-007.yaml":
+        "id: NFR-007\ncategorie: performance\ntitre: Vite\ncible: p95\nenonce: Vite.\nverification: { mode: manuel }\n",
+      "tech/environments.yaml": "variables:\n  - nom: DATABASE_URL\n    usage: Base\n",
+      "tech/cahier-technique/01-objet.md": "# Objet\n\nBut.\n",
+    });
+    await bench.push(scene, { after: head });
+
+    const rows = await entities((await lastSnapshot())?.id);
+    expect(rows.map((r) => [r.kind, r.spec_id, r.zone])).toEqual([
+      ["endpoint", "creneau.listAvailable", null],
+      ["environments", "environments", "technical"],
+      ["nfr", "NFR-007", "technical"],
+      ["stack", "ST-base", "technical"],
+    ]);
+    const counters = await bench.query<{ last_value: number }>(
+      "SELECT last_value FROM project_counters WHERE name = 'nfr'",
+      [],
+    );
+    expect(counters.map((c) => c.last_value)).toEqual([7]);
+  });
+});

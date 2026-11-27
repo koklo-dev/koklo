@@ -1,4 +1,5 @@
-import { criteriaListSchema, featureProposalSchema, safeText } from "@koklo/schema";
+import { ENVIRONMENT_DATA, ENVIRONMENT_DEPLOYMENTS, STACK_STATUSES } from "@koklo/contract";
+import { criteriaListSchema, featureProposalSchema, PATTERNS, safeText } from "@koklo/schema";
 import { z } from "zod";
 
 export const DEFAULT_MAX_FEATURES = 8;
@@ -69,5 +70,35 @@ export const itemPrefillOutputSchema = z
       .array(safeText({ min: 1, max: 100 }))
       .max(30)
       .optional(),
+  })
+  .strict();
+
+const line = (max: number) => safeText({ min: 1, max });
+const lines = (max: number, count: number) => z.array(line(max)).max(count);
+
+/** Préremplissage de la feuille « Choix technique » (TK-115) : les critères sont des noms, sans valeur ni identifiant neuf. */
+export const stackPrefillOutputSchema = z
+  .object({
+    role: line(120).optional(),
+    components: z.array(z.string().regex(PATTERNS.component)).max(30).optional(),
+    status: z.enum(STACK_STATUSES).optional(),
+    choice: line(200).optional(),
+    options: lines(120, 8).optional(),
+    criteria: lines(120, 12).optional(),
+    why: safeText({ min: 1, max: 1000, multiline: true }).optional(),
+    requirements: z.array(z.string().regex(PATTERNS.nfr)).max(30).optional(),
+  })
+  .strict();
+
+/** Préremplissage de la feuille « Environnement » (TK-115) : ni variable, ni valeur. */
+export const environmentPrefillOutputSchema = z
+  .object({
+    name: line(120).optional(),
+    address: line(200).optional(),
+    hosting: line(200).optional(),
+    database: line(200).optional(),
+    data: z.enum(ENVIRONMENT_DATA).optional(),
+    deployment: z.enum(ENVIRONMENT_DEPLOYMENTS).optional(),
+    access: line(200).optional(),
   })
   .strict();

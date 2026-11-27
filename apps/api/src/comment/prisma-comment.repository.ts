@@ -4,18 +4,18 @@ import { recordAudit } from "../tracker/audit.ts";
 import { type CursorPosition, keysetAfter, pageOfItems } from "../tracker/cursor.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
-import type {
-  CommentPage,
-  CommentRecord,
-  CommentRepository,
-  CommentStore,
-  CommentTarget,
-  CommentTicket,
-  NewComment,
-  RefKind,
+import {
+  type CommentPage,
+  type CommentRecord,
+  type CommentRepository,
+  type CommentStore,
+  type CommentTarget,
+  type CommentTicket,
+  type IndexedRefKind,
+  type NewComment,
+  REF_KINDS,
+  type RefKind,
 } from "./comment.repository.ts";
-
-const REF_KINDS: readonly string[] = ["table", "component", "adr", "archflow"];
 
 const toRecord = (row: {
   id: string;
@@ -28,7 +28,9 @@ const toRecord = (row: {
   createdAt: Date;
 }): CommentRecord => ({
   id: row.id,
-  targetKind: REF_KINDS.includes(row.targetKind) ? (row.targetKind as RefKind) : "ticket",
+  targetKind: (REF_KINDS as readonly string[]).includes(row.targetKind)
+    ? (row.targetKind as RefKind)
+    : "ticket",
   targetId: row.targetId,
   targetRef: row.targetRef,
   authorKind: row.authorKind,
@@ -51,7 +53,7 @@ class PrismaCommentStore implements CommentStore {
     });
   }
 
-  async refExists(kind: RefKind, ref: string): Promise<boolean> {
+  async refExists(kind: IndexedRefKind, ref: string): Promise<boolean> {
     const head = await this.resolver.resolve(this.tx, this.scope, {});
     if (!head || head.snapshot.status === "failed") return false;
     const row = await this.tx.specEntity.findFirst({

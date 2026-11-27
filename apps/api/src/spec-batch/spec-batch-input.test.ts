@@ -134,3 +134,32 @@ describe("prepareBatch : skipConflicts (TK-114e, B675)", () => {
     expect(fieldOf(base({ ...ok, skipConflicts: { proposals: [A, A] } }))).toBe("skipConflicts");
   });
 });
+
+/** TK-115 (B724) : aucune valeur de secret n'entre dans un lot ; une section technique est distincte de l'architecture. */
+describe("prepareBatch : cahier technique", () => {
+  const token = `ghp_${"x".repeat(36)}`;
+
+  it("secret dans une charge ou le message : champ désigné, jamais la valeur", () => {
+    const stack: SpecBatchSubmitInput["operations"][number] = {
+      kind: "stack.create",
+      role: "Base",
+      status: "open",
+      options: ["A", "B"],
+      why: token,
+    };
+    expect(fieldOf(base({ operations: [stack] }))).toBe("operations.0.why");
+    expect(fieldOf(base({ message: `jeton ${token}` }))).toBe("message");
+    try {
+      prepareBatch(base({ operations: [stack] }), "main");
+    } catch (error) {
+      expect(JSON.stringify(error)).not.toContain(token);
+    }
+  });
+
+  it("deux sections de même identifiant, une par livrable : acceptées ; deux du même : refusées", () => {
+    const section = { kind: "doc.section.delete", specId: "DOC-objet" } as const;
+    const technical = { ...section, deliverable: "technical" } as const;
+    expect(fieldOf(base({ operations: [section, technical] }))).toBeUndefined();
+    expect(fieldOf(base({ operations: [technical, technical] }))).toBe("operations");
+  });
+});

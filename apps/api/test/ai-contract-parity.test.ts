@@ -177,8 +177,9 @@ describe("les propositions de l'agent : vocabulaires du contrat égaux à ceux d
   });
 
   it("modes du lancement : ceux du domaine", async () => {
+    // « nfr » (TK-115) est à la fois un type de proposition (sonde ci-dessus) et un mode du Technique.
     expect(await enumOf("ai.proposeDeliverable", "inputSchemas", "mode")).toEqual(
-      [...domain.FUNCTIONAL_MODES].sort(),
+      [...domain.FUNCTIONAL_MODES, "nfr"].sort(),
     );
   });
 

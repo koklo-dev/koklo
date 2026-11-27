@@ -27,7 +27,12 @@ const ID_SOURCE_LITERALS = [
   "feature: /^F-\\d{3,}$/",
   "criterion: /^AC-\\d+$/",
   slugged("table", "T"),
-  "endpoint: new RegExp(`^(E-${slug}|${slug}\\\\.${slug})$`)",
+  // TK-115 : les opérations `<zone>.<verbe>` admettent la camelCase et `_`.
+  'const segment = "[a-z0-9][A-Za-z0-9_-]*";',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: texte source relu tel quel
+  "export const OPERATION_NAME = `${segment}\\\\.${segment}`;",
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: texte source relu tel quel
+  "endpoint: new RegExp(`^(E-${slug}|${OPERATION_NAME})$`)",
   slugged("screen", "S"),
   slugged("role", "RL"),
   "rule: /^R-\\d{3,}$/",
@@ -103,6 +108,7 @@ describe("D3 paquet schema : énumérations, étapes, identifiants", () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
 describe("D3b identifiants de la spec", () => {
   it("motifs d'identifiants : mêmes regex que schema/ids.ts, mêmes verdicts côté contrat", () => {
     const ids = read("packages/schema/src/entities/ids.ts");
@@ -125,8 +131,21 @@ describe("D3b identifiants de la spec", () => {
       ],
       [
         "endpoints",
-        new RegExp(`^(E-${slug}|${slug}\\.${slug})$`),
-        ["E-login", "E-a1", "E-", "E-_x", "login", "T-login", "reservation.lister", "a.b.c", "a."],
+        new RegExp(`^(E-${slug}|[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*)$`),
+        [
+          "E-login",
+          "E-a1",
+          "E-",
+          "E-_x",
+          "login",
+          "T-login",
+          "reservation.lister",
+          "creneau.listAvailable",
+          "liste_attente.list",
+          "Creneau.list",
+          "a.b.c",
+          "a.",
+        ],
       ],
       ["screens", new RegExp(`^S-${slug}$`), ["S-login", "S-", "S-Login", "login"]],
       ["roles", new RegExp(`^RL-${slug}$`), ["RL-owner", "RL-", "RL-Owner", "owner"]],
@@ -470,6 +489,46 @@ describe("TK-113 : décisions d'architecture et cibles de commentaire (contrat 3
         (pattern) => pattern.test(id),
       );
       expect(out.safeParse([id]).success, id).toBe(expected);
+    }
+  });
+});
+
+/** TK-115 (3.17.0) : vocabulaires et identifiants du cahier technique du contrat = ceux de @koklo/schema. */
+describe("D5 cahier technique : vocabulaires et identifiants", () => {
+  const words = schema.TECHNICAL_PROPOSAL_VOCABULARY;
+
+  it.each([
+    ["couches", contract.STACK_LAYERS, words.layer],
+    ["statuts d'un choix", contract.STACK_STATUSES, words.stackStatus],
+    ["types d'opération", contract.OPERATION_TYPES, words.operationType],
+    ["catégories d'exigence", contract.NFR_CATEGORIES, words.category],
+    ["vérifications", contract.NFR_VERIFICATIONS, words.verification],
+    ["données d'un environnement", contract.ENVIRONMENT_DATA, words.environmentData],
+    ["déploiements", contract.ENVIRONMENT_DEPLOYMENTS, words.deployment],
+    ["statuts d'intégration", contract.INTEGRATION_STATUSES, words.integrationStatus],
+  ])("%s : les valeurs anglaises de la table de traduction", (_name, values, table) => {
+    expect([...values]).toEqual(Object.keys(table));
+  });
+
+  it("chaque valeur traduite est celle des fichiers, dans le même ordre", () => {
+    expect(Object.values(words.layer)).toEqual([...schema.STACK_LAYERS]);
+    expect(Object.values(words.stackStatus)).toEqual([...schema.STACK_STATUSES]);
+    expect(Object.values(words.category)).toEqual([...schema.NFR_CATEGORIES]);
+    expect([...contract.STACK_ICONS]).toEqual([...schema.STACK_ICONS]);
+  });
+
+  it.each([
+    ["stack", contract.stackIdSchema, ["ST-sms", "ST-", "ST-A", "sms"]],
+    ["environment", contract.environmentIdSchema, ["ENV-recette", "ENV-", "recette"]],
+    ["nfr", contract.nfrIdSchema, ["NFR-001", "NFR-perf", "NFR-"]],
+    [
+      "operation",
+      contract.operationNameSchema,
+      ["creneau.listAvailable", "liste_attente.list", "E-login", "A.b", "a."],
+    ],
+  ] as const)("identifiant %s : mêmes verdicts", (kind, parser, samples) => {
+    for (const sample of samples) {
+      expect(parser.safeParse(sample).success, sample).toBe(schema.PATTERNS[kind].test(sample));
     }
   });
 });

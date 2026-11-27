@@ -10,6 +10,7 @@ import type {
   LaunchRepository,
   NewLaunch,
   OptionFacts,
+  TechnicalFacts,
 } from "./launch.repository.ts";
 
 const ACTIVE: AgentLaunchStatus[] = ["queued", "running"];
@@ -133,6 +134,25 @@ export class PrismaLaunchRepository implements LaunchRepository {
     return this.transactions.run(scope, async (tx) => ({
       withoutCriteria: await this.countWithoutCriteria(tx, scope),
     }));
+  }
+
+  technicalFacts(scope: ProjectScope): Promise<TechnicalFacts> {
+    return this.transactions.run(scope, async (tx) => {
+      const found = await this.resolver.resolve(tx, scope, {});
+      if (!found || found.snapshot.status === "failed") {
+        return { components: 0, openChoices: 0, requirements: 0 };
+      }
+      const snapshotId = found.snapshot.id;
+      const count = (kind: string) => tx.specEntity.count({ where: { snapshotId, kind } });
+      const openChoices = await tx.specEntity.count({
+        where: { snapshotId, kind: "stack", data: { path: ["statut"], equals: "a_trancher" } },
+      });
+      return {
+        components: await count("component"),
+        openChoices,
+        requirements: await count("nfr"),
+      };
+    });
   }
 
   hasFunctionalEntities(scope: ProjectScope): Promise<boolean> {

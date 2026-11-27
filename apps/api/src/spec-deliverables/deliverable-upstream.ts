@@ -74,3 +74,57 @@ export function staleImpactOf(facts: UpstreamFacts | null): StaleImpact {
 /** Amonts cités dont le contenu a changé depuis la dernière décision, triés. */
 export const staleUpstreamOf = (facts: UpstreamFacts | null): string[] =>
   staleImpactOf(facts).upstream;
+
+/** Un composant ou une décision d'une tête : hachage de son contenu, et pour une décision son acceptation. */
+export interface UpstreamEntity {
+  hash: string;
+  accepted: boolean;
+}
+
+/** Faits de l'impact de l'architecture sur le cahier technique (TK-115, B735). */
+export interface TechnicalUpstreamFacts {
+  /** Composants et décisions de la tête de la dernière décision ; `null` : tête non indexée. */
+  atDecision: ReadonlyMap<string, UpstreamEntity> | null;
+  atHead: ReadonlyMap<string, UpstreamEntity>;
+  /** Choix, opérations et exigences de la tête, avec les composants et décisions qu'ils citent. */
+  citing: readonly { id: string; cites: readonly string[] }[];
+}
+
+export type TechnicalChange = "added" | "removed" | "changed" | "accepted";
+export interface TechnicalImpact {
+  changes: { id: string; change: TechnicalChange }[];
+  items: string[];
+}
+
+function changeOf(
+  before: UpstreamEntity | undefined,
+  after: UpstreamEntity | undefined,
+): TechnicalChange | undefined {
+  if (after === undefined) return "removed";
+  if (before?.hash === after.hash) return undefined;
+  if (after.accepted && before?.accepted !== true) return "accepted";
+  return before === undefined ? "added" : "changed";
+}
+
+/**
+ * Composants et décisions ajoutés, retirés, modifiés ou acceptés depuis la dernière décision sur le cahier technique, et
+ * les éléments qui les citent ; sans décision comparable, aucun impact.
+ */
+export function technicalImpactOf(facts: TechnicalUpstreamFacts | null): TechnicalImpact {
+  if (facts === null || facts.atDecision === null) return { changes: [], items: [] };
+  const { atDecision, atHead, citing } = facts;
+  const ids = [...new Set([...atDecision.keys(), ...atHead.keys()])].sort();
+  const changes = ids.flatMap((id) => {
+    const change = changeOf(atDecision.get(id), atHead.get(id));
+    return change === undefined ? [] : [{ id, change }];
+  });
+  const changed = new Set(changes.map((entry) => entry.id));
+  const concerned = citing.filter((item) => item.cites.some((id) => changed.has(id)));
+  return {
+    changes: changes.slice(0, STALE_ARTIFACTS_MAX),
+    items: firstSorted(
+      concerned.map((item) => item.id),
+      STALE_ARTIFACTS_MAX,
+    ),
+  };
+}

@@ -20,6 +20,7 @@ import {
   type LaunchRepository,
 } from "./launch.repository.ts";
 import { PROPOSAL_REPOSITORY, type ProposalRepository } from "./proposal.repository.ts";
+import { assertDeliverableRole } from "./proposal-access.ts";
 import { validContent } from "./proposal-content.ts";
 import {
   ALL_GROUP_KEY,
@@ -74,7 +75,12 @@ export class ProposalService {
     @Inject(SpecArchitectureService) private readonly architecture: SpecArchitectureService,
   ) {}
 
-  async list(scope: ProjectScope, input: ProposalListInput): Promise<ProposalListOutput> {
+  async list(
+    scope: ProjectScope,
+    role: string | undefined,
+    input: ProposalListInput,
+  ): Promise<ProposalListOutput> {
+    assertDeliverableRole(input.deliverable, role);
     const launch = await this.launches.forList(scope, input.deliverable, input.launchId);
     if (launch === null) return EMPTY_PAGE;
     await this.launches.touchSeen(
@@ -85,7 +91,11 @@ export class ProposalService {
     );
     await this.settleAlreadyPresent(scope, launch);
     const group = input.group === undefined ? {} : filterOf(input.group);
-    const groups = buildGroups(await this.proposals.groupCounts(scope, launch.id), input.groupBy);
+    const groups = buildGroups(
+      await this.proposals.groupCounts(scope, launch.id),
+      input.groupBy,
+      launch.deliverable,
+    );
     const window = await this.proposals.window(scope, {
       launchId: launch.id,
       pendingOnly: input.status === "pending",
@@ -104,8 +114,9 @@ export class ProposalService {
     };
   }
 
-  async decide(scope: ProjectScope, input: ProposalDecideInput) {
+  async decide(scope: ProjectScope, role: string | undefined, input: ProposalDecideInput) {
     const current = orNotFound(await this.proposals.find(scope, input.proposalId));
+    assertDeliverableRole(current.deliverable, role);
     if (current.discardReason !== null) throw conflict("proposal_already_present");
     if (input.edited !== undefined && input.decision !== "accept") {
       throw validation("edited", "Un contenu corrigé ne s'enregistre qu'avec l'acceptation.");
@@ -121,9 +132,10 @@ export class ProposalService {
     return proposalView(outcome.proposal);
   }
 
-  async decideMany(scope: ProjectScope, input: ProposalDecideManyInput) {
+  async decideMany(scope: ProjectScope, role: string | undefined, input: ProposalDecideManyInput) {
     const group = filterOf(input.group);
     const launch = orNotFound(await this.launches.forList(scope, undefined, input.launchId));
+    assertDeliverableRole(launch.deliverable, role);
     if (input.group === ALL_GROUP_KEY) await this.assertSingleGroup(scope, launch.id);
     const outcome = await this.proposals.decideMany(scope, launch.id, group, input.expectedPending);
     if (outcome.kind === "changed") {

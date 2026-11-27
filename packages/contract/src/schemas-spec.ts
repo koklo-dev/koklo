@@ -49,6 +49,25 @@ import {
   ruleUpdateSchema,
   specIdSchema,
 } from "./schemas-spec-domain.ts";
+import {
+  environmentCreateSchema,
+  environmentDeleteSchema,
+  environmentDetailSchema,
+  environmentIdSchema,
+  environmentUpdateSchema,
+  nfrCreateSchema,
+  nfrDeleteSchema,
+  nfrUpdateSchema,
+  operationCreateSchema,
+  operationDeleteSchema,
+  operationUpdateSchema,
+  stackCreateSchema,
+  stackDeleteSchema,
+  stackDetailSchema,
+  stackIdSchema,
+  stackUpdateSchema,
+  TECHNICAL_OPERATION_KINDS,
+} from "./schemas-spec-technical.ts";
 import { instantSchema } from "./schemas-tickets.ts";
 
 /** Valeurs et motifs identiques à ceux de @koklo/schema (parité vérifiée par apps/api/test). */
@@ -76,6 +95,7 @@ export const specOperationKindSchema = z.enum([
   ...DOMAIN_OPERATION_KINDS,
   ...DATA_OPERATION_KINDS,
   ...ARCHITECTURE_OPERATION_KINDS,
+  ...TECHNICAL_OPERATION_KINDS,
   "layout.save",
   "architecture.layout.save",
   "idea.page.write",
@@ -151,6 +171,10 @@ export const specHeadSchema = z
       fixtures: z.number().int().min(0),
       /** Composants d'architecture de la tête (3.9.0) : compteur d'onglet et résumé d'en-tête de la page Architecture. */
       components: z.number().int().min(0),
+      /** Choix techniques, exigences et environnements de la tête (3.17.0) : page Technique. */
+      stack: z.number().int().min(0),
+      nfr: z.number().int().min(0),
+      environments: z.number().int().min(0),
     }),
   })
   .nullable();
@@ -239,7 +263,7 @@ const featureDeleteSchema = z.object({
   specId: featureIdSchema,
 });
 
-/** Fonctionnalités, règles, rôles et parcours (3.1.0), tables et jeux d'exemple (3.5.0) ; endpoints, écrans : un nouveau `kind` sera un ajout mineur. */
+/** Fonctionnalités, règles, rôles et parcours (3.1.0), tables et jeux d'exemple (3.5.0), cahier technique (3.17.0) ; écrans : un nouveau `kind` sera un ajout mineur. */
 export const specOperationSchema = z.discriminatedUnion("kind", [
   featureCreateSchema,
   featureUpdateSchema,
@@ -269,6 +293,18 @@ export const specOperationSchema = z.discriminatedUnion("kind", [
   docSectionCreateSchema,
   docSectionUpdateSchema,
   docSectionDeleteSchema,
+  stackCreateSchema,
+  stackUpdateSchema,
+  stackDeleteSchema,
+  operationCreateSchema,
+  operationUpdateSchema,
+  operationDeleteSchema,
+  nfrCreateSchema,
+  nfrUpdateSchema,
+  nfrDeleteSchema,
+  environmentCreateSchema,
+  environmentUpdateSchema,
+  environmentDeleteSchema,
 ]);
 
 /** 200 opérations par lot depuis 2.9.0 (TK-99a) : un groupe de propositions se soumet en un commit. */
@@ -358,7 +394,17 @@ export const specBatchGetInputSchema = z.object({ projectId: z.uuid(), batchId: 
  * parcours. Les autres genres arriveront avec leurs formulaires.
  */
 export const SPEC_REFS_MAX = 20;
-export const specRefKindSchema = z.enum(["feature", "rule", "flow", "table", "endpoint", "screen"]);
+export const specRefKindSchema = z.enum([
+  "feature",
+  "rule",
+  "flow",
+  "table",
+  "endpoint",
+  "screen",
+  /** Liens du cahier technique (3.17.0). */
+  "component",
+  "nfr",
+]);
 /** Genres d'entités de l'index générique (`spec_entities`) : un élément peut en citer un autre quel que soit son genre. */
 const specEntityKindSchema = z.enum([
   "feature",
@@ -374,6 +420,9 @@ const specEntityKindSchema = z.enum([
   "endpoint",
   "screen",
   "test",
+  "stack",
+  "nfr",
+  "environments",
 ]);
 const refShape = { specId: z.string().min(1).max(100), title: z.string().max(300) };
 export const specRefSchema = z.object({ kind: specRefKindSchema, ...refShape });
@@ -387,6 +436,8 @@ export const SPEC_ITEM_TYPES = [
   "component",
   "archflow",
   "adr",
+  "stack",
+  "environment",
 ] as const;
 const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   feature: featureIdSchema,
@@ -397,6 +448,8 @@ const ITEM_ID: Record<(typeof SPEC_ITEM_TYPES)[number], z.ZodType<string>> = {
   component: componentIdSchema,
   archflow: flowIdSchema,
   adr: adrIdSchema,
+  stack: stackIdSchema,
+  environment: environmentIdSchema,
 };
 export const specItemGetInputSchema = z
   .object({ projectId: z.uuid(), type: z.enum(SPEC_ITEM_TYPES), id: z.string().min(1).max(100) })
@@ -428,6 +481,8 @@ export const specItemSchema = z.discriminatedUnion("type", [
   itemOf("component", componentIdSchema, componentDetailSchema),
   itemOf("archflow", flowIdSchema, archflowDetailSchema),
   itemOf("adr", adrIdSchema, adrDetailSchema),
+  itemOf("stack", stackIdSchema, stackDetailSchema),
+  itemOf("environment", environmentIdSchema, environmentDetailSchema),
 ]);
 
 export const specRefsSearchInputSchema = z.object({

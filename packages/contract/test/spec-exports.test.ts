@@ -144,6 +144,9 @@ describe("N3 types inférés exportés", () => {
         relations: number;
         fixtures: number;
         components: number;
+        stack: number;
+        nfr: number;
+        environments: number;
       };
     } | null>();
     expectTypeOf<api.FeatureDetail>().toHaveProperty("criteria");
@@ -182,6 +185,18 @@ describe("N3 types inférés exportés", () => {
       | "doc.section.create"
       | "doc.section.update"
       | "doc.section.delete"
+      | "stack.create"
+      | "stack.update"
+      | "stack.delete"
+      | "op.create"
+      | "op.update"
+      | "op.delete"
+      | "nfr.create"
+      | "nfr.update"
+      | "nfr.delete"
+      | "env.create"
+      | "env.update"
+      | "env.delete"
     >();
     expectTypeOf<Extract<api.SpecOperation, { kind: "feature.delete" }>>().toEqualTypeOf<{
       kind: "feature.delete";

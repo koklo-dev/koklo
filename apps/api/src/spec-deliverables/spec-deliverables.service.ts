@@ -12,7 +12,12 @@ import {
   DELIVERABLE_STATUS_SOURCE,
   type DeliverableStatusSource,
 } from "./deliverable-status-source.ts";
-import { type StaleImpact, staleImpactOf } from "./deliverable-upstream.ts";
+import {
+  type StaleImpact,
+  staleImpactOf,
+  type TechnicalImpact,
+  technicalImpactOf,
+} from "./deliverable-upstream.ts";
 import {
   SPEC_DELIVERABLES_REPOSITORY,
   type SpecDeliverablesRepository,
@@ -34,18 +39,29 @@ const staleStatuses = (
     ]),
   ) as Record<DeliverableKey, DeliverableStatus>;
 
-/** Un amont cité modifié depuis la décision rend les Données (B449) ou l'Architecture (TK-113) « À revoir ». */
-const withUpstream = (
-  statuses: Record<DeliverableKey, DeliverableStatus>,
-  impacts: Record<"data" | "architecture", StaleImpact>,
-) => ({
+interface Impacts {
+  data: StaleImpact;
+  architecture: StaleImpact;
+  technical: TechnicalImpact;
+}
+
+/** Un amont modifié depuis la décision rend les Données (B449), l'Architecture (TK-113) ou le Technique (TK-115) « À revoir ». */
+const withUpstream = (statuses: Record<DeliverableKey, DeliverableStatus>, impacts: Impacts) => ({
   ...statuses,
   data: staleStatus(statuses.data, impacts.data.upstream.length > 0),
   architecture: staleStatus(statuses.architecture, impacts.architecture.upstream.length > 0),
+  technical: staleStatus(statuses.technical, impacts.technical.changes.length > 0),
 });
 
-/** Ce que l'impact amont ajoute à l'entrée d'un livrable : les amonts, et pour l'Architecture les éléments concernés. */
-function impactFields(key: DeliverableKey, impacts: Record<"data" | "architecture", StaleImpact>) {
+/**
+ * Ce que l'impact amont ajoute à l'entrée d'un livrable : les amonts, pour l'Architecture les éléments concernés, pour le
+ * Technique les changements de l'architecture et ce qui les cite.
+ */
+function impactFields(key: DeliverableKey, impacts: Impacts) {
+  if (key === "technical") {
+    const impact = impacts.technical;
+    return impact.changes.length === 0 ? {} : { staleTechnical: impact };
+  }
   if (key !== "data" && key !== "architecture") return {};
   const { upstream, components, flows } = impacts[key];
   if (upstream.length === 0) return {};
@@ -79,6 +95,7 @@ export class SpecDeliverablesService {
     const impacts = {
       data: staleImpactOf(record.upstream.data),
       architecture: staleImpactOf(record.upstream.architecture),
+      technical: technicalImpactOf(record.technicalUpstream),
     };
     const deliverables: SpecDeliverable[] = deliverablesAvailabilityOf({
       ideaFrozen: record.ideaFrozen,

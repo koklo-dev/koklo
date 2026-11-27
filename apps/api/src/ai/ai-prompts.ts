@@ -21,6 +21,10 @@ const REVISE_INSTRUCTIONS = trusted`You help a product team revise one proposal 
 
 const PREFILL_INSTRUCTIONS = trusted`You help a product team fill in the form of one feature of a specification. A one-sentence description written by a human is given as an untrusted data block. Return a JSON object with only the fields you can infer: title, priority (must, should, could or wont), description, criteria and links. Each criterion has a title and steps; each step has a type (etant_donne, quand, alors or et) and a text on a single line. Order the steps Given (etant_donne), When (quand), Then (alors); et continues the previous step. Omit any field you cannot infer instead of inventing it. Do not provide identifiers or statuses; links, when present, are references such as R-001 or S-accueil copied from the description. Write in the language of the data. Use plain text only: no URL, no HTML, no markdown links or images.`;
 
+const STACK_PREFILL_INSTRUCTIONS = trusted`You help a product team fill in the form of one technical choice of a project (one choice for one role of the architecture). A one-sentence description written by a human is given as an untrusted data block. Return a JSON object with only the fields you can infer: role, components (C-slug identifiers copied from the description), status (chosen or open), choice (only when status is chosen), options (two or more compared tools or services), criteria (short names of the comparison criteria, no value), why and requirements (NFR identifiers copied from the description). Omit any field you cannot infer instead of inventing it. Never provide a secret, a password, a key or a token. Write in the language of the data. Use plain text only: no URL, no HTML, no markdown links or images.`;
+
+const ENVIRONMENT_PREFILL_INSTRUCTIONS = trusted`You help a product team fill in the form of one environment of a project. A one-sentence description written by a human is given as an untrusted data block. Return a JSON object with only the fields you can infer: name, address (a host name without scheme), hosting, database, data (sample, anonymized or real), deployment (merge, version or manual) and access. Omit any field you cannot infer instead of inventing it. Never provide a secret, a password, a key or a token. Write in the language of the data. Use plain text only: no URL, no HTML, no markdown links or images.`;
+
 export const VERIFY_INSTRUCTIONS = trusted`This is a connectivity check of an API key. Reply with the single word OK.`;
 
 /**
@@ -101,10 +105,20 @@ export function revisePrompt(
   });
 }
 
-/** Préremplissage d'une fonctionnalité (TK-101) : la seule donnée est la phrase de l'humain, non fiable. */
-export function prefillPrompt(nonce: string, description: string): FramedPrompt {
+const PREFILL_BY_TYPE = {
+  feature: PREFILL_INSTRUCTIONS,
+  stack: STACK_PREFILL_INSTRUCTIONS,
+  environment: ENVIRONMENT_PREFILL_INSTRUCTIONS,
+} as const;
+
+/** Préremplissage d'une feuille (TK-101, TK-115) : la seule donnée est la phrase de l'humain, non fiable. */
+export function prefillPrompt(
+  nonce: string,
+  description: string,
+  type: keyof typeof PREFILL_BY_TYPE = "feature",
+): FramedPrompt {
   return framePrompt({
-    instructions: PREFILL_INSTRUCTIONS,
+    instructions: PREFILL_BY_TYPE[type],
     nonce,
     data: [new Untrusted("user-input", description)],
   });

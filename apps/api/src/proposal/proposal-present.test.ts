@@ -77,3 +77,31 @@ describe("alreadyPresentIds (TK-114g, B699)", () => {
     ).toEqual([]);
   });
 });
+
+/** TK-115 : créations du cahier technique ; une section technique se cherche dans `tech/cahier-technique/`. */
+describe("TK-115 déjà présentes du cahier technique", () => {
+  const head = specPathIndex([
+    "tech/stack/base.yaml",
+    "api/endpoints/reservation.create.yaml",
+    "tech/cahier-technique/01-objet.md",
+    "architecture/overview/01-contexte.md",
+  ]);
+  const technical = (id: string, kind: string, payload: Record<string, unknown>) => ({
+    ...record(id, kind, payload),
+    deliverable: "technical",
+  });
+
+  it("choix, opération et section déjà à la tête ; une mise à jour ou une exigence jamais", () => {
+    const records = [
+      technical("st", "stack", { role: "Base" }),
+      technical("st-up", "stack", { role: "Base", specId: "ST-base" }),
+      technical("op", "op", { name: "reservation.create" }),
+      technical("doc", "doc_section", { title: "Objet" }),
+      technical("doc-up", "doc_section", { title: "Objet", specId: "DOC-objet" }),
+      technical("autre", "doc_section", { title: "Contexte" }),
+      technical("nfr", "nfr", { title: "Rapidité" }),
+      technical("env", "env", { name: "Recette" }),
+    ];
+    expect(alreadyPresentIds(records, head)).toEqual(["st", "op", "doc"]);
+  });
+});

@@ -222,6 +222,7 @@ export * from "./schemas-spec.ts";
 export * from "./schemas-spec-architecture.ts";
 export * from "./schemas-spec-data.ts";
 export * from "./schemas-spec-domain.ts";
+export * from "./schemas-spec-technical.ts";
 export * from "./schemas-suggestion.ts";
 export * from "./schemas-tickets.ts";
 export { CONTRACT_VERSION } from "./version.ts";

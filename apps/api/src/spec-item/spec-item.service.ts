@@ -7,14 +7,19 @@ import { tableDetail } from "../spec-data/data-values.ts";
 import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.service.ts";
 import { flowDetail, roleDetail, ruleDetail } from "../spec-read/entity-values.ts";
 import { SpecReadService } from "../spec-read/spec-read.service.ts";
+import { SpecTechnicalService } from "../spec-technical/spec-technical.service.ts";
 import { orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 
 const ARCHITECTURE_TYPES: readonly SpecItem["type"][] = ["component", "archflow", "adr"];
 
-/** Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant, un flux ou une décision, Fonctionnel pour le reste. */
+/**
+ * Livrable que modifier l'élément invaliderait : Données pour une table, Architecture pour un composant, un flux ou une
+ * décision, Technique pour un choix ou un environnement, Fonctionnel pour le reste.
+ */
 const deliverableOf = (type: SpecItem["type"]) => {
   if (type === "table") return "data";
+  if (type === "stack" || type === "environment") return "technical";
   return ARCHITECTURE_TYPES.includes(type) ? "architecture" : "functional";
 };
 
@@ -31,6 +36,7 @@ export class SpecItemService {
     @Inject(SpecArchitectureDiagramService)
     private readonly architecture: SpecArchitectureDiagramService,
     @Inject(SpecArchitectureService) private readonly adrs: SpecArchitectureService,
+    @Inject(SpecTechnicalService) private readonly technical: SpecTechnicalService,
   ) {}
 
   async get(
@@ -63,6 +69,8 @@ export class SpecItemService {
         roleDetail(id, file.data, { filePath: file.path, commitSha: file.commitSha }),
       );
     }
+    if (type === "stack") return this.technical.stack(scope, id);
+    if (type === "environment") return this.technical.environment(scope, id);
     if (type === "archflow") return this.architecture.flow(scope, { flowId: id });
     if (type === "adr") return this.adrs.adr(scope, { adrId: id });
     const entity = await this.specs.entity(scope, type, id);

@@ -39,6 +39,12 @@ import {
   clientSpaceRolesOutputSchema,
   clientSpaceRulesInputSchema,
   clientSpaceRulesOutputSchema,
+  clientSpaceTechnicalDocumentOutputSchema,
+  clientSpaceTechnicalEnvironmentsOutputSchema,
+  clientSpaceTechnicalInputSchema,
+  clientSpaceTechnicalOutputSchema,
+  clientSpaceTechnicalStackInputSchema,
+  clientSpaceTechnicalStackOutputSchema,
 } from "./schemas-client-space.ts";
 
 /** Lectures de l'espace client (TK-55b, TK-104) : six rôles, cloisonnement par projet côté API. */
@@ -128,4 +134,24 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceArchFlowInputSchema)
     .output(clientSpaceArchFlowOutputSchema),
+  /**
+   * Cahier technique validé (TK-115, 3.17.0) : comptes, choix, environnements et document, lecture seule ; commentaires par
+   * `comment.create`. Non validé : `available` faux et rien d'autre. Jamais de YAML.
+   */
+  technical: route("GET", "/client-space/projects/{projectId}/technical")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalInputSchema)
+    .output(clientSpaceTechnicalOutputSchema),
+  technicalStack: route("GET", "/client-space/projects/{projectId}/technical/stack")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalStackInputSchema)
+    .output(clientSpaceTechnicalStackOutputSchema),
+  technicalEnvironments: route("GET", "/client-space/projects/{projectId}/technical/environments")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalInputSchema)
+    .output(clientSpaceTechnicalEnvironmentsOutputSchema),
+  technicalDocument: route("GET", "/client-space/projects/{projectId}/technical/document")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalInputSchema)
+    .output(clientSpaceTechnicalDocumentOutputSchema),
 };

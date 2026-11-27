@@ -3,6 +3,9 @@ import { AGENT_PROPOSAL_KINDS, type AgentProposalKind } from "@koklo/domain";
 /** Au-delà de 30 propositions dans un lancement, la liste se groupe ; en deçà, un seul groupe (TK-99a). */
 export const GROUPING_THRESHOLD = 30;
 
+/** Les sections du cahier technique portent leur propre libellé de groupe. */
+const TECHNICAL_DOCUMENT_LABEL = "Document · cahier technique";
+
 /** Clé du groupe unique d'un lancement de 30 propositions ou moins. */
 export const ALL_GROUP_KEY = "all";
 
@@ -21,13 +24,27 @@ const KIND_LABELS: Record<AgentProposalKind, string> = {
   archflow: "Flux",
   adr: "Décisions",
   doc_section: "Document · vue d'ensemble",
+  stack: "Stack",
+  op: "Opérations de l'API",
+  nfr: "Exigences",
+  env: "Environnements",
 };
 
 /**
- * L'Architecture (TK-111) se relit par type, jamais par zone : le document d'abord, puis composants, flux, décisions (maquette
- * 13). Pour les autres livrables, l'ordre est celui de `AGENT_PROPOSAL_KINDS`.
+ * L'Architecture (TK-111) et le Technique (TK-115) se relisent par type, jamais par zone : le document d'abord, puis
+ * composants, flux, décisions (maquette 13) ou stack, opérations, exigences, environnements (maquette 14). Pour les autres
+ * livrables, l'ordre est celui de `AGENT_PROPOSAL_KINDS`.
  */
-const BY_TYPE_ONLY: readonly AgentProposalKind[] = ["doc_section", "component", "archflow", "adr"];
+const BY_TYPE_ONLY: readonly AgentProposalKind[] = [
+  "doc_section",
+  "component",
+  "archflow",
+  "adr",
+  "stack",
+  "op",
+  "nfr",
+  "env",
+];
 const isByTypeOnly = (kind: AgentProposalKind): boolean => BY_TYPE_ONLY.includes(kind);
 const rankOf = (kind: AgentProposalKind): number =>
   isByTypeOnly(kind)
@@ -101,21 +118,26 @@ const emptyGroup = (key: string, label: string): ProposalGroup => ({
   pending: 0,
 });
 
-const labelOf = (row: GroupCount, by: GroupBy): string => {
+const labelOf = (row: GroupCount, by: GroupBy, deliverable: string | undefined): string => {
+  if (deliverable === "technical" && row.kind === "doc_section") return TECHNICAL_DOCUMENT_LABEL;
   if (by === "type" || isByTypeOnly(row.kind)) return KIND_LABELS[row.kind];
   if (isLinksKind(row.kind)) return LINKS_GROUP_LABEL;
   return row.kind === "table" ? `Zone ${row.zone}` : row.zone;
 };
 
 /** Groupes d'un lancement, dans l'ordre des types puis de la première position ; un seul groupe sous le seuil. */
-export function buildGroups(counts: readonly GroupCount[], by: GroupBy): ProposalGroup[] {
+export function buildGroups(
+  counts: readonly GroupCount[],
+  by: GroupBy,
+  deliverable?: string,
+): ProposalGroup[] {
   const total = counts.reduce((sum, row) => sum + row.n, 0);
   const ordered = [...counts].sort((a, b) => rankOf(a.kind) - rankOf(b.kind) || a.first - b.first);
   const groups = new Map<string, ProposalGroup>();
   for (const row of ordered) {
     const single = total <= GROUPING_THRESHOLD;
     const key = single ? ALL_GROUP_KEY : groupKeyOf(row.kind, row.zone, by);
-    const label = single ? "Toutes les propositions" : labelOf(row, by);
+    const label = single ? "Toutes les propositions" : labelOf(row, by, deliverable);
     const group = groups.get(key) ?? emptyGroup(key, label);
     group.total += row.n;
     if (row.discardReason === "already_present") {

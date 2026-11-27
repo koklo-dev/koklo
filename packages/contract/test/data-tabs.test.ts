@@ -7,8 +7,8 @@ import { errors, input, isValid, output, proc, UUID } from "./support.ts";
  * lectures `spec.data.*`, `spec.item.get` de type `table`, compteurs `relations` et `fixtures`.
  */
 describe("TK-107 A surface", () => {
-  it("version 3.16.0", () => {
-    expect(CONTRACT_VERSION).toBe("3.16.0");
+  it("version 3.17.0", () => {
+    expect(CONTRACT_VERSION).toBe("3.17.0");
   });
 
   it.each([
@@ -273,6 +273,9 @@ describe("TK-107 A spec.item.get table et compteurs", () => {
         relations: 6,
         fixtures: 2,
         components: 3,
+        stack: 24,
+        nfr: 28,
+        environments: 3,
       },
     };
     expect(await isValid(output("spec.head"), head)).toBe(true);

@@ -4,6 +4,7 @@ import {
   adrCounterOf,
   featureCounterOf,
   type IndexRows,
+  nfrCounterOf,
   rowsOf,
   ruleCounterOf,
 } from "./index-rows.ts";
@@ -95,6 +96,7 @@ export class IndexWriter {
     const counter = snapshot.status === "ready" ? featureCounterOf(snapshot.spec) : { skipped: 0 };
     const rules = snapshot.status === "ready" ? ruleCounterOf(snapshot.spec) : { skipped: 0 };
     const decisions = snapshot.status === "ready" ? adrCounterOf(snapshot.spec) : { skipped: 0 };
+    const requirements = snapshot.status === "ready" ? nfrCounterOf(snapshot.spec) : { skipped: 0 };
     await withOrganization(organizationId, () =>
       this.client.$transaction(
         async (tx) => {
@@ -113,6 +115,9 @@ export class IndexWriter {
           }
           if (decisions.raiseTo !== undefined) {
             await raiseCounterTo(tx, { organizationId, projectId }, "adr", decisions.raiseTo);
+          }
+          if (requirements.raiseTo !== undefined) {
+            await raiseCounterTo(tx, { organizationId, projectId }, "nfr", requirements.raiseTo);
           }
         },
         { timeout: TRANSACTION_TIMEOUT_MS },

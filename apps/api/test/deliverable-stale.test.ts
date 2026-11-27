@@ -2,8 +2,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ago, insertReviewAt } from "./helpers/deliverable-reviews.ts";
 import { freezeIdea } from "./helpers/proposals.ts";
 import { installBench } from "./helpers/repo-scene.ts";
+import { reviewApi } from "./helpers/reviews.ts";
 import { deliverablesApi } from "./helpers/spec-deliverables.ts";
-import { readScene } from "./helpers/spec-read.ts";
+import { entity, readScene, seedIndex } from "./helpers/spec-read.ts";
+import {
+  componentEntity,
+  nfrEntity,
+  operationEntity,
+  stackEntity,
+} from "./helpers/spec-technical.ts";
 import { linkClient, type World } from "./helpers/tickets.ts";
 
 /**
@@ -139,5 +146,66 @@ describe("cas limites de l'impact amont", () => {
     );
     const entries = await entriesOf(world, "client");
     expect(entries.functional?.staleBecause?.idea).toBe("idea-v2");
+  });
+});
+
+/**
+ * TK-115 (cas 10, B735) : le cahier technique validé passe « À revoir » quand un composant est ajouté ou une décision
+ * acceptée depuis sa dernière décision ; sans décision, aucun impact.
+ */
+describe("impact de l'architecture sur le cahier technique", () => {
+  const before = () => [
+    componentEntity("C-api"),
+    entity("adr", "ADR-006", "proposee", { statut: "proposee", titre: "SMS" }),
+    stackEntity("ST-sms", { composants: ["C-sms"], decisions: ["ADR-006"], exigences: [] }),
+    nfrEntity("NFR-004", { liens: ["C-api"] }),
+  ];
+  const after = () => [
+    componentEntity("C-api"),
+    componentEntity("C-avis"),
+    entity("adr", "ADR-006", "acceptee", { statut: "acceptee", titre: "SMS" }),
+    stackEntity("ST-sms", { composants: ["C-sms"], decisions: ["ADR-006"], exigences: [] }),
+    nfrEntity("NFR-004", { liens: ["C-api"] }),
+    operationEntity("avis.create", { composant: "C-avis" }),
+  ];
+
+  async function scene(decided: boolean) {
+    const s = await readScene(bench());
+    const first = await seedIndex(bench(), s, [], { commit: true, entities: before() });
+    if (decided) {
+      const res = await reviewApi(bench().app, s.world.actors.owner).submit(
+        s.projectId,
+        first.sha,
+        {
+          targetKind: "deliverable",
+          targetRef: "technical",
+        },
+      );
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    }
+    await seedIndex(bench(), s, [], { commit: true, entities: after() });
+    return s;
+  }
+
+  it("composant ajouté et décision acceptée : « À revoir », changements et éléments concernés", async () => {
+    const s = await scene(true);
+    const entries = await entriesOf(s.world);
+    expect(entries.technical).toMatchObject({
+      status: "revise",
+      staleTechnical: {
+        changes: [
+          { id: "ADR-006", change: "accepted" },
+          { id: "C-avis", change: "added" },
+        ],
+        items: ["ST-sms", "avis.create"],
+      },
+    });
+  });
+
+  it("jamais décidé : aucun impact", async () => {
+    const s = await scene(false);
+    const entries = await entriesOf(s.world);
+    expect(entries.technical?.status).not.toBe("revise");
+    expect(entries.technical).not.toHaveProperty("staleTechnical");
   });
 });

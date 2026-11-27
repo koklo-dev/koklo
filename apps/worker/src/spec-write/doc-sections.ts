@@ -1,4 +1,5 @@
 import {
+  type DocSectionDeliverable,
   type DocSectionStatus,
   type DocSections,
   docSectionPath,
@@ -14,6 +15,8 @@ interface DocSectionPayload {
   title?: string;
   markdown?: string;
   status?: DocSectionStatus;
+  /** Absent : l'architecture. */
+  deliverable?: DocSectionDeliverable;
 }
 
 /** Slug d'un identifiant `DOC-<slug>`. */
@@ -28,21 +31,26 @@ function write(workspace: Workspace, path: string, id: string, text: () => strin
   }
 }
 
+/** Les sections d'un document à la tête, avec le prochain numéro libre (consommé par les créations du lot). */
+export type OpenSections = DocSections & { next: number };
+
 /**
- * `doc.section.create|update|delete` : le fichier est `architecture/overview/NN-<slug>.md`, NN = numéro suivant à la création.
- * Plusieurs créations d'un même lot prennent des numéros consécutifs.
+ * `doc.section.create|update|delete` : le fichier est `NN-<slug>.md` dans le dossier du livrable (architecture ou cahier
+ * technique, TK-115), NN = numéro suivant à la création. Plusieurs créations d'un même lot prennent des numéros consécutifs.
  */
 export function applyDocSection(
   workspace: Workspace,
   operation: BatchOperation,
-  sections: DocSections & { next: number },
+  documents: Readonly<Record<DocSectionDeliverable, OpenSections>>,
 ): void {
   forbidDesigner(workspace);
   const id = operation.targetSpecId ?? "";
   const payload = operation.payload as DocSectionPayload;
+  const deliverable = payload.deliverable ?? "architecture";
+  const sections = documents[deliverable];
   const path = sections.byId.get(id);
   if (operation.kind === "doc.section.create") {
-    const created = docSectionPath(sections.next, docSlugOf(id));
+    const created = docSectionPath(sections.next, docSlugOf(id), deliverable);
     write(workspace, created, id, () =>
       emitDocSection({
         title: payload.title ?? "",
