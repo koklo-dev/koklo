@@ -31,7 +31,9 @@ type Type =
   | "stack"
   | "environment"
   | "operation"
-  | "nfr";
+  | "nfr"
+  | "threat"
+  | "sensitive";
 /** Valeurs lues d'un élément : celles du type (`RuleDetail`…) et ce que tous portent (version, fichier). */
 type Values = { commitSha: string; filePath: string };
 interface Loaded<I extends Values> {
@@ -91,6 +93,8 @@ export interface DomainFormProps {
   announce: (text: string) => void;
   onClose: () => void;
   keepFocus: React.MutableRefObject<boolean>;
+  /** Champ mis au focus à l'ouverture (« Décider » : la conservation) ; le premier par défaut. */
+  focusField?: string | undefined;
 }
 
 let lastOwner = 0;
@@ -316,7 +320,8 @@ function Body<V, T extends Type, I extends Values>(body: BodyProps<V, T, I>) {
       onClose={props.onClose}
       onOpenAutoFocus={(event) => {
         event.preventDefault();
-        document.getElementById(domainFieldId(Object.keys(config.labels)[0] ?? ""))?.focus();
+        const first = props.focusField ?? Object.keys(config.labels)[0] ?? "";
+        document.getElementById(domainFieldId(first))?.focus();
       }}
       onCloseAutoFocus={onCloseAutoFocus}
       {...deleteProps}

@@ -14,6 +14,14 @@ export interface Decision {
   comment?: string;
 }
 
+/** Refus de « Valider » la Sécurité (409, B804). */
+const SECURITY_REFUSALS: Record<string, string> = {
+  threats_open:
+    "Une menace de gravité élevée reste sans parade : décidez sa parade avant de valider.",
+  data_unclassified:
+    "Des données restent à classer : décidez leur catégorie et leur conservation avant de valider.",
+};
+
 /** Phrase de l'échec d'une décision ; jamais le code technique ni le texte du serveur (B353). */
 export function decisionErrorText(error: unknown): string {
   const reason = conflictReason(error);
@@ -21,6 +29,8 @@ export function decisionErrorText(error: unknown): string {
   if (reason === "choices_open") {
     return "Un choix technique reste à trancher : tranchez-le avant de valider le cahier.";
   }
+  const refused = SECURITY_REFUSALS[reason ?? ""];
+  if (refused) return refused;
   switch (errorCode(error)) {
     case "STALE_VERSION":
       return "Le cahier a changé depuis votre lecture. Rechargez la page pour relire la version à jour.";

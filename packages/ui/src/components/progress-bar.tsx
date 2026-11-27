@@ -4,12 +4,13 @@ import { cn } from "../lib/cn.ts";
 export type ProgressBarSize = "md" | "lg";
 /** `split` : deux segments, la valeur (`--primary`) puis `secondary` (`--muted-foreground` à 50 %), maquette 10 l.119. */
 export type ProgressBarVariant = "default" | "split";
-/** Teinte du remplissage : `primary` (`--primary`) ou `success` (vert de « Validé », `--status-validated-fg`). */
-export type ProgressBarTone = "primary" | "success";
+/** Teinte du remplissage : `primary`, `success` (vert de « Validé ») ou `warning` (ambre, couverture incomplète). */
+export type ProgressBarTone = "primary" | "success" | "warning";
 
 const TONE: Record<ProgressBarTone, string> = {
   primary: "bg-primary",
   success: "bg-status-validated-foreground",
+  warning: "bg-status-pending-icon",
 };
 
 const SIZE: Record<ProgressBarSize, string> = {

@@ -135,6 +135,13 @@ export const iconLoaders = {
   pending: () => import("./pending.ts"),
   code: () => import("./code.ts"),
   rule: () => import("./rule.ts"),
+  gpp_maybe: () => import("./gpp_maybe.ts"),
+  verified_user: () => import("./verified_user.ts"),
+  contact_phone: () => import("./contact_phone.ts"),
+  location_on: () => import("./location_on.ts"),
+  campaign: () => import("./campaign.ts"),
+  download: () => import("./download.ts"),
+  table_chart: () => import("./table_chart.ts"),
 } as const;
 
 export type IconName = keyof typeof iconLoaders;

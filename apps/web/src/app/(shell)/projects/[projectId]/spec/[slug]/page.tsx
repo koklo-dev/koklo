@@ -13,7 +13,9 @@ export default async function Page({
   params: Promise<{ projectId: string; slug: string }>;
 }): Promise<ReactNode> {
   const { projectId, slug } = await params;
-  // L'architecture et le technique ont leur route dédiée, qui passe avant `[slug]`.
-  if (!isSpecSlug(slug) || slug === "architecture" || slug === "technical") notFound();
+  // L'architecture, le technique et la sécurité ont leur route dédiée, qui passe avant `[slug]`.
+  if (!isSpecSlug(slug) || slug === "architecture" || slug === "technical" || slug === "security") {
+    notFound();
+  }
   return <SoonPage projectId={projectId} slug={slug} />;
 }

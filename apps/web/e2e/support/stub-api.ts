@@ -31,6 +31,7 @@ import {
   type SpecRepoScenario,
   seedCreation,
 } from "./stub-spec-repo.ts";
+import { handleSpecSecurity, resetSecurity } from "./stub-spec-security.ts";
 import { handleSpecTechnical, resetTechnical } from "./stub-spec-technical.ts";
 
 /**
@@ -189,6 +190,7 @@ function handleControl(req: IncomingMessage, path: string, send: Send): boolean 
     resetDataModel(scenario);
     resetArchitectureReview(scenario);
     resetTechnical();
+    resetSecurity();
     resetIdea(scenario);
     if (!scenario.keepProjects) createdProjects.length = 0;
     seedCreation(scenario, addProject);
@@ -218,12 +220,21 @@ const handleAiApis = (req: IncomingMessage, url: URL, send: Send): boolean =>
 
 type Sender = (reply: ReturnType<typeof json>) => void;
 
+/** Livrables de la spec à scénario : chacun ne répond que si le sien le pilote. */
+const handleDeliverables = (req: IncomingMessage, url: URL, send: Sender): boolean => {
+  const spec = { scenario, send };
+  return (
+    handleSpecSecurity(req, url, spec) ||
+    handleSpecTechnical(req, url, spec) ||
+    handleArchitectureReview(req, url, spec) ||
+    handleDataModel(req, url, spec)
+  );
+};
+
 /** Le reste du faux API : fonctionnalités, dépôt de spec, projets, kanban, GitHub, organisations. */
 function handleRest(req: IncomingMessage, url: URL, send: Sender): void {
   const path = url.pathname;
-  if (handleSpecTechnical(req, url, { scenario, send })) return;
-  if (handleArchitectureReview(req, url, { scenario, send })) return;
-  if (handleDataModel(req, url, { scenario, send })) return;
+  if (handleDeliverables(req, url, send)) return;
   if (/^\/(client-space|projects\/[^/]+\/reviews)/.test(path) || path === "/__client-calls") {
     void handleClientSpace(req, url, { scenario, send });
     return;

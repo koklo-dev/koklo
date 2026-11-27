@@ -24,6 +24,12 @@ describe("ProgressBar split", () => {
     expect(rejected.style.width).toBe("20%");
   });
 
+  it("teinte warning (TK-117, couverture ASVS) : remplissage ambre de statut", () => {
+    render(<ProgressBar aria-label="Couverture" tone="warning" value={30} />);
+    const done = screen.getByRole("progressbar").firstElementChild;
+    expect(done).toHaveClass("bg-status-pending-icon");
+  });
+
   it("teinte success : remplissage vert de « Validé », part en cours à 50 % qui pulse sauf mouvement réduit", () => {
     render(<ProgressBar aria-label="Enregistrement" tone="success" value={40} pending={30} />);
     const bar = screen.getByRole("progressbar", { name: "Enregistrement" });

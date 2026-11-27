@@ -13,6 +13,7 @@ import { errorCode } from "../lib/api-error.ts";
 import { ARCHITECTURE_GENERATING } from "../lib/architecture-labels.ts";
 import { launchDetailOf } from "../lib/launch-report.ts";
 import { NO_ACCESS } from "../lib/proposal-labels.ts";
+import { SECURITY_GENERATING } from "../lib/security-labels.ts";
 import { TECHNICAL_GENERATING } from "../lib/technical-labels.ts";
 import { useProposalActions } from "../lib/use-proposal-actions.ts";
 import {
@@ -25,6 +26,7 @@ import { DataGenerating } from "./data-generating.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { ReviewDetail } from "./features-review-detail.tsx";
 import { SaveFailureNotice } from "./save-failure-notice.tsx";
+import { SecurityGenerating } from "./security-generating.tsx";
 import { TechnicalGenerating } from "./technical-generating.tsx";
 
 const GENERATING =
@@ -62,6 +64,10 @@ export const architectureSummary = (counts: ProposalReviewModel["counts"]): stri
 export const technicalSummary = (counts: ProposalReviewModel["counts"]): string =>
   agentSummary("l'architecture", counts);
 
+/** Sécurité (maquette 15). */
+export const securitySummary = (counts: ProposalReviewModel["counts"]): string =>
+  agentSummary("le technique", counts);
+
 /** Phrase du bandeau d'attente, résumé et note de groupe des livrables relus à part. */
 const OWN_REVIEW = {
   data: { generating: DATA_GENERATING, summary: dataSummary, note: "Groupées par zone" },
@@ -73,6 +79,11 @@ const OWN_REVIEW = {
   technical: {
     generating: TECHNICAL_GENERATING,
     summary: technicalSummary,
+    note: "Groupées par type",
+  },
+  security: {
+    generating: SECURITY_GENERATING,
+    summary: securitySummary,
     note: "Groupées par type",
   },
 } as const;
@@ -104,6 +115,7 @@ function Generating({
   if (tab === "data") return <DataGenerating onLeave={onLeave} />;
   if (tab === "architecture") return <ArchitectureGenerating onLeave={onLeave} detail={detail} />;
   if (tab === "technical") return <TechnicalGenerating onLeave={onLeave} />;
+  if (tab === "security") return <SecurityGenerating onLeave={onLeave} />;
   return (
     <>
       <ProposalGenerationBanner onLeave={onLeave}>{GENERATING}</ProposalGenerationBanner>

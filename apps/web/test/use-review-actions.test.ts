@@ -10,6 +10,14 @@ describe("decisionErrorText", () => {
   it.each([
     [apiError("CONFLICT", { reason: "review_incomplete" }), "Il reste des éléments à traiter"],
     [
+      apiError("CONFLICT", { reason: "threats_open" }),
+      "Une menace de gravité élevée reste sans parade : décidez sa parade avant de valider.",
+    ],
+    [
+      apiError("CONFLICT", { reason: "data_unclassified" }),
+      "Des données restent à classer : décidez leur catégorie et leur conservation avant de valider.",
+    ],
+    [
       apiError("STALE_VERSION"),
       "Le cahier a changé depuis votre lecture. Rechargez la page pour relire la version à jour.",
     ],

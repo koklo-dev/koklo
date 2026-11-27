@@ -42,6 +42,7 @@ describe("Pill (DESIGN.md §5.5)", () => {
     ["warning", ["bg-status-pending", "text-status-pending-foreground"]],
     ["danger", ["bg-status-revise", "text-status-revise-foreground"]],
     ["muted", ["bg-secondary", "text-muted-foreground"]],
+    ["proposed", ["border-dashed", "border-primary", "text-primary"]],
   ] as const)("ton %s : jetons de couleur", (tone, classes) => {
     render(<Pill tone={tone}>Texte</Pill>);
     expect(screen.getByText("Texte")).toHaveClass(...classes);

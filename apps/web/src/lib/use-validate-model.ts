@@ -14,6 +14,7 @@ const VALIDATED_TEXT = {
   data: "Modèle validé",
   architecture: "Architecture validée",
   technical: "Cahier technique validé",
+  security: "Sécurité validée",
 } as const;
 
 export function useValidateDeliverable(
@@ -50,7 +51,7 @@ export const useValidateModel = (
 
 /** Décision « validé » en vigueur d'un livrable : prénom (équipe), date et SHA (B451, B591). Lue seulement une fois validé. */
 export function useDeliverableValidation(
-  key: "data" | "architecture" | "technical",
+  key: keyof typeof VALIDATED_TEXT,
   projectId: string,
   enabled: boolean,
 ): DataValidation | undefined {

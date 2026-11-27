@@ -22,15 +22,21 @@ function badgeOf(
   }
 }
 
+const CLIENT_SUMMARY: SpecBadge = { label: "Résumé", tone: "soft" };
+
 /** Pastilles de `SpecNav` d'après `spec.deliverables` : un seul badge par entrée, jamais sur une entrée verrouillée. */
 export function specBadges(
   deliverables: readonly SpecDeliverable[] | undefined,
   /** Livrables dont un lancement de l'agent tourne sans rien à relire encore (maquette 10 l.686, 11 l.625 : « … »). */
   generating: ReadonlySet<SpecKey> = new Set(),
+  /** Client et business : ils ne lisent de la Sécurité que son résumé (maquette 15 l.675). */
+  client = false,
 ): Partial<Record<SpecKey, SpecBadge>> {
   const badges: Partial<Record<SpecKey, SpecBadge>> = {};
   for (const deliverable of deliverables ?? []) {
-    const badge = deliverable.available ? badgeOf(deliverable, generating) : undefined;
+    const summaryOnly = client && deliverable.key === "security";
+    const own = summaryOnly ? CLIENT_SUMMARY : badgeOf(deliverable, generating);
+    const badge = deliverable.available ? own : undefined;
     if (badge) badges[deliverable.key as SpecKey] = badge;
   }
   return badges;

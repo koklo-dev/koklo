@@ -6,8 +6,8 @@ import { useProjectShell } from "../lib/use-project-shell.ts";
 import { PageBody } from "./page-body.tsx";
 import { ShellLink } from "./shell-link.tsx";
 
-/** Livrables sans écran dédié : l'Architecture et le Technique ont le leur. */
-type SoonSlug = Exclude<SpecSlug, "architecture" | "technical">;
+/** Livrables sans écran dédié : l'Architecture, le Technique et la Sécurité ont le leur. */
+type SoonSlug = Exclude<SpecSlug, "architecture" | "technical" | "security">;
 
 /** Titre du livrable et phrase de la page « Bientôt » (DESIGN.md §5.4) : aucune promesse de date, aucune action. */
 const SOON: Record<SoonSlug, { title: string; sentence: string }> = {
@@ -16,10 +16,6 @@ const SOON: Record<SoonSlug, { title: string; sentence: string }> = {
     sentence: "Le cahier fonctionnel arrive dans une prochaine version.",
   },
   data: { title: "Données", sentence: "Le cahier des données arrive dans une prochaine version." },
-  security: {
-    title: "Sécurité",
-    sentence: "Le cahier de sécurité arrive dans une prochaine version.",
-  },
   design: { title: "Design", sentence: "Le cahier de design arrive dans une prochaine version." },
   quality: {
     title: "Qualité",

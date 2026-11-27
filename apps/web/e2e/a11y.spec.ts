@@ -28,8 +28,8 @@ type Page = {
 const PAGES: readonly Page[] = [
   { name: "login", path: "/login", session: false, projects: "data" },
   {
-    name: "security soon",
-    path: `/projects/${FEATURE_PROJECT_ID}/spec/security`,
+    name: "design soon",
+    path: `/projects/${FEATURE_PROJECT_ID}/spec/design`,
     session: true,
     projects: "data",
   },

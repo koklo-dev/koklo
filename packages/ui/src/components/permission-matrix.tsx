@@ -4,6 +4,7 @@ import type { ReactNode, Ref } from "react";
 import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { formatCount } from "../lib/format-count.ts";
+import { type CompactMatrixProps, CompactPermissionMatrix } from "./compact-permission-matrix.tsx";
 import { SearchField } from "./search-field.tsx";
 
 export type AccessLevel = "allowed" | "restricted" | "denied";
@@ -151,7 +152,14 @@ function bodyOf(props: PermissionMatrixProps, span: number): ReactNode[] {
  * colonne par rôle. Le cadre défile en horizontal et se lit au clavier ; au-delà de 20 actions, des lignes de
  * groupe par ressource se déplient.
  */
-export function PermissionMatrix(props: PermissionMatrixProps) {
+export function PermissionMatrix(
+  props: PermissionMatrixProps | (CompactMatrixProps & { variant: "compact" }),
+) {
+  if ("variant" in props) return <CompactPermissionMatrix {...props} />;
+  return <FullMatrix {...props} />;
+}
+
+function FullMatrix(props: PermissionMatrixProps) {
   const { roles, total, filter, onFilterChange, filterRef, className } = props;
   return (
     <section

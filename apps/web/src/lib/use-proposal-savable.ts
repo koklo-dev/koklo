@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { orpc } from "./orpc.ts";
 import { type Cascade, prepareDataProposals, type TableRelation } from "./proposal-data.ts";
 import type { Deliverable } from "./proposal-labels.ts";
+import { markerOf } from "./proposal-marks.ts";
 import { isSavable } from "./proposal-operations.ts";
-import { asTechnical } from "./proposal-technical.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 import { listInput } from "./use-proposal-status.ts";
 
@@ -30,13 +30,12 @@ export interface ProposalSaveFailure {
   batches: string[];
 }
 
-/** Prépare les propositions d'un livrable : cascade et relations des Données, section marquée pour le Technique. */
+/** Prépare les propositions d'un livrable : cascade et relations des Données, sections marquées d'un dossier. */
 async function preparedOf(projectId: string, deliverable: Deliverable, all: ProposalOutput[]) {
   if (deliverable === "data") {
     return prepareDataProposals(all, (id) => savedRelations(projectId, id));
   }
-  const proposals = deliverable === "technical" ? all.map(asTechnical) : all;
-  return { proposals, cascade: NO_CASCADE };
+  return { proposals: all.map(markerOf(deliverable)), cascade: NO_CASCADE };
 }
 
 /** Toutes les propositions du lancement (ou d'un seul groupe), page de 100 après page de 100. */

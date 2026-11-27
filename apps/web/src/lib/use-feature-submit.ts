@@ -39,6 +39,8 @@ export interface WriteMeta {
   priority: string;
   /** `new` ou `F-nnn` : cible du brouillon. */
   target: string;
+  /** Écriture faite sur place (niveau ASVS, résumé) : ni fiche à ouvrir, ni avis, ni déplacement du focus. */
+  inPlace?: boolean;
 }
 export type WritePhase = "idle" | "sending" | "tracking" | "indexing" | "late" | "failed" | "saved";
 export interface SavedInfo {
@@ -103,6 +105,10 @@ export interface WriteOptions {
   };
 }
 
+/** Élément écrit, à retrouver après l'enregistrement ; aucun pour une écriture faite sur place. */
+const writtenId = (meta: WriteMeta, batch: SpecBatchOutput): string | undefined =>
+  meta.inPlace ? undefined : (meta.specId ?? batch.results[0]?.specId ?? undefined);
+
 const newKey = (): string => `feature-${crypto.randomUUID()}`;
 
 interface Core {
@@ -145,7 +151,7 @@ function useBatchOutcomes({ projectId, scope, update, keyRecord, metaRef }: Core
     (batch: SpecBatchOutput) => {
       const meta = metaRef.current;
       if (batch.status === "committed" && meta) {
-        const specId = meta.specId ?? batch.results[0]?.specId ?? undefined;
+        const specId = writtenId(meta, batch);
         metaRef.current = { ...meta, specId };
         clearDraft(projectId, meta.target);
         clearPending(projectId);
@@ -161,7 +167,7 @@ function useBatchOutcomes({ projectId, scope, update, keyRecord, metaRef }: Core
   /** Réponse de `submit` : un lot non terminal est suivi (marqueur local), un lot terminal est traité tout de suite. */
   const onReply = useCallback(
     (meta: WriteMeta, batch: SpecBatchOutput) => {
-      const specId = meta.specId ?? batch.results[0]?.specId ?? undefined;
+      const specId = writtenId(meta, batch);
       metaRef.current = { ...meta, specId };
       if (batch.status !== "queued" && batch.status !== "committing") {
         update({ meta: metaRef.current, batch, batchId: batch.id });

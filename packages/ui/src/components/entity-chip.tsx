@@ -39,6 +39,24 @@ const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
   limit: { icon: "speed", type: "Limite de débit" },
 };
 
+/** `soft` (défaut) : fond --secondary, identifiant mono ; `outline` : bordée sans fond, 12/500 (maquette 15 l.818). */
+const VARIANT = {
+  soft: {
+    chip: "gap-1.5 bg-secondary pr-2 pl-1.5 text-secondary-foreground",
+    hover: "hover:bg-secondary/80",
+    icon: "",
+    id: "font-mono text-code",
+    title: "font-normal",
+  },
+  outline: {
+    chip: "gap-[5px] border border-border bg-transparent pr-[9px] pl-[7px] text-foreground",
+    hover: "hover:bg-secondary",
+    icon: "text-muted-foreground",
+    id: "font-sans text-caption font-medium",
+    title: "font-medium",
+  },
+} as const;
+
 export interface EntityPreview {
   title: string;
   summary: string;
@@ -58,6 +76,7 @@ export interface EntityChipProps
    */
   href?: string;
   preview?: EntityPreview;
+  variant?: keyof typeof VARIANT;
 }
 
 /** Contenu d'un aperçu d'entité : titre 14/600 et une ligne de résumé. */
@@ -78,37 +97,40 @@ export function EntityChip({
   href,
   preview,
   icon: replaced,
+  variant = "soft",
   className,
   ...props
 }: EntityChipProps) {
   // Type hors union (contournement du typage) : un simple lien plutôt qu'une exception au rendu.
   const { icon, type } = KIND[kind] ?? { icon: "link", type: "" };
   const Tag = href === undefined ? "span" : "a";
+  const look = VARIANT[variant];
   const chip = (
     <Tag
       data-slot="entity-chip"
       {...(href === undefined ? {} : { href })}
       className={cn(
-        "inline-flex min-h-[26px] max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-2 pl-1.5 text-secondary-foreground motion-safe:transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        href !== undefined && "hover:bg-secondary/80",
+        "inline-flex min-h-[26px] max-w-full items-center rounded-md py-0.5 motion-safe:transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        look.chip,
+        href !== undefined && look.hover,
         className,
       )}
       {...props}
     >
-      <Icon name={replaced ?? icon} size={16} />
+      <Icon name={replaced ?? icon} size={16} className={look.icon} />
       {/* Espaces explicites : le nom accessible se lit « Fonctionnalité F-001 Connexion ». */}
       {type ? <span className="sr-only">{type}</span> : null}{" "}
       {/* Le libellé passe à la ligne ; un identifiant plus large que la pastille est tronqué. */}
       <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
         {id ? (
-          <span title={id} className="min-w-0 max-w-full truncate font-mono text-code">
+          <span title={id} className={cn("min-w-0 max-w-full truncate", look.id)}>
             {id}
           </span>
         ) : null}
         {title ? (
           <>
             {" "}
-            <span className="min-w-0 break-words text-caption font-normal text-foreground">
+            <span className={cn("min-w-0 break-words text-caption text-foreground", look.title)}>
               {title}
             </span>
           </>

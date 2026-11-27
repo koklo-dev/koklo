@@ -96,9 +96,9 @@ export const PLACEMENT_TEXT: Partial<Record<Placement, string>> = {
   more: "Utilisez « Charger la suite » pour la voir.",
 };
 
-/** Féminin (fonctionnalité `F-`, règle `R-`) ou masculin (rôle `RL-`, parcours `P-`) : accord des participes. */
+/** Féminin (fonctionnalité `F-`, règle `R-`, table `T-`, menace `SEC-T`) ou masculin (rôle `RL-`, parcours `P-`) : accord des participes. */
 export const feminineId = (specId: string | undefined): boolean =>
-  specId === undefined || /^(F-|T-)/.test(specId) || /^R-\d/.test(specId);
+  specId === undefined || /^(F-|T-|SEC-T)/.test(specId) || /^R-\d/.test(specId);
 
 /** « F-001 supprimée. » (sans titre) ou « F-004 « Titre » créée. » / « … enregistrée. » ; phrase propre si l'index a échoué. */
 export function confirmationText(meta: WriteMeta, indexFailed: boolean): string {

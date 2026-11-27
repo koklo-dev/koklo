@@ -54,6 +54,17 @@ describe("ProgressBar", () => {
 });
 
 describe("StatCard", () => {
+  it("grand compte (TK-117, maquette 15 l.182) : titre h2 15/600, valeur 30, texte 13", () => {
+    render(
+      <StatCard density="hero" label="Scénarios d'abus générés" value="14" note="Un par case." />,
+    );
+    const title = screen.getByRole("heading", { level: 2, name: "Scénarios d'abus générés" });
+    expect(title.className).toContain("text-[15px]");
+    expect(screen.getByText("14").className).toContain("text-[30px]");
+    expect(screen.getByText("Un par case.").className).toContain("text-meta");
+    expect(screen.getByRole("region", { name: "Scénarios d'abus générés" })).toBeInTheDocument();
+  });
+
   it("libellé, icône décorative, valeur text-stat, note", () => {
     const { container } = render(
       <StatCard label="Projets actifs" icon="folder_open" value="12" note="dont 3 en cadrage" />,

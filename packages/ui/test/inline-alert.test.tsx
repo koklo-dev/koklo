@@ -336,6 +336,21 @@ describe("InlineAlert actions primaires (13 l.128)", () => {
     expect(screen.getByRole("button", { name: "Voir" })).not.toHaveClass("bg-primary");
   });
 
+  it("neutral : bouton contour sur --background dans un ton coloré (maquette 15 l.143)", () => {
+    render(
+      <InlineAlert
+        variant="warning"
+        icon="warning"
+        actions={[{ label: "Proposer une parade", onClick: () => undefined, neutral: true }]}
+      >
+        Texte
+      </InlineAlert>,
+    );
+    const button = screen.getByRole("button", { name: "Proposer une parade" });
+    expect(button).toHaveClass("h-8", "border-input", "bg-background", "text-foreground");
+    expect(button).not.toHaveClass("border-current", "bg-transparent");
+  });
+
   it("disabled : l'action reste dans l'ordre de lecture, désactivée, sans appeler son rappel (TK-114e)", async () => {
     const onClick = vi.fn();
     render(

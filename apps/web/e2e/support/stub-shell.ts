@@ -5,6 +5,7 @@ import {
 } from "./stub-architecture-decisions.ts";
 import { type DataModelScenario, dataDeliverable } from "./stub-data-model.ts";
 import { ideaPhase } from "./stub-idea-agent.ts";
+import { type SecurityScenario, securityDeliverable } from "./stub-spec-security.ts";
 import { type TechnicalScenario, technicalDeliverable } from "./stub-spec-technical.ts";
 
 /**
@@ -15,7 +16,8 @@ import { type TechnicalScenario, technicalDeliverable } from "./stub-spec-techni
 export type ShellMode = "data" | "noSprint" | "internal" | "loading";
 export type ShellScenario = DataModelScenario &
   ArchitectureReviewScenario &
-  TechnicalScenario & {
+  TechnicalScenario &
+  SecurityScenario & {
     shell?: ShellMode;
     /** Identifiants de projets déjà visités, du plus récent au plus ancien. */
     recent?: string[];
@@ -137,10 +139,11 @@ function shellResponse(projectId: string, h: Handlers): Reply {
       available: availableOf(key, available, h.scenario),
       after,
     })),
-    // Seul le scénario Technique compte ses livrables validés (compteur « SPEC N/7 » de la barre).
-    validatedCount: h.scenario.technical
-      ? DELIVERABLES.filter(([key]) => statusOf(key, h.scenario) === "validated").length
-      : 0,
+    // Les scénarios Technique et Sécurité comptent leurs livrables validés (compteur « SPEC N/7 » de la barre).
+    validatedCount:
+      h.scenario.technical || h.scenario.security
+        ? DELIVERABLES.filter(([key]) => statusOf(key, h.scenario) === "validated").length
+        : 0,
     ticketCount: noSprint ? null : 8,
   });
 }
@@ -156,13 +159,26 @@ const availableOf = (
 ) => {
   const architectureOpen = scenario.architecture !== undefined || scenario.technical !== undefined;
   if (key === "architecture" && architectureOpen) return true;
+  if (scenario.security && ["architecture", "technical", "security"].includes(key)) return true;
   const technical = technicalDeliverable(scenario.technical)?.status;
   if (key === "security" && technical === "validated") return true;
   return key === "technical" && scenario.technical !== undefined ? true : available;
 };
 
+/** Scénario de la Sécurité (TK-117) : son statut, et les livrables amont validés. */
+function securityStatusOf(key: string, scenario: ShellScenario): string | undefined {
+  const security = securityDeliverable(scenario.security);
+  if (!security) return undefined;
+  if (key === "security") return security.status;
+  return ["functional", "data", "architecture", "technical"].includes(key)
+    ? "validated"
+    : undefined;
+}
+
 /** Statut d'un livrable : le scénario du modèle de données (TK-109) pilote Fonctionnel et Données, la vue client attend le Fonctionnel (TK-104). */
 function statusOf(key: string, scenario: ShellScenario & { architecture?: string }): string {
+  const security = securityStatusOf(key, scenario);
+  if (security) return security;
   const technical = technicalDeliverable(scenario.technical);
   if (technical && key === "technical") return technical.status;
   if (technical && ["functional", "data", "architecture"].includes(key)) return "validated";
@@ -179,6 +195,7 @@ const pendingOf = (key: string, scenario: object): number => {
   const mode = "proposals" in scenario ? scenario.proposals : undefined;
   if (key === "data" && mode === "data") return 8;
   if (key === "technical" && mode === "technical") return 36;
+  if (key === "security" && mode === "security") return 5;
   return key === "architecture" && mode === "architecture" ? 9 : 0;
 };
 
@@ -201,14 +218,19 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
     ...(key === "technical"
       ? { staleTechnical: technicalDeliverable(h.scenario.technical)?.staleTechnical }
       : {}),
+    ...(key === "security"
+      ? { staleSecurity: securityDeliverable(h.scenario.security)?.staleSecurity }
+      : {}),
     available: availableOf(key, available, h.scenario),
     after,
   }));
   return reply(200, {
-    deliverables: entries.map(
-      ({ key, status, staleUpstream, stale, available, after, staleTechnical }) => ({
+    deliverables: entries.map(({ staleSecurity, ...entry }) => {
+      const { key, status, staleUpstream, stale, available, after, staleTechnical } = entry;
+      return {
         key,
         status,
+        ...(staleSecurity ? { staleSecurity } : {}),
         ...(staleTechnical ? { staleTechnical } : {}),
         ...(staleUpstream ? { staleUpstream } : {}),
         ...(stale?.staleUpstream
@@ -223,8 +245,8 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
         condition: after === null ? null : `Disponible après ${after}`,
         // Relecture des Données (scénario `proposals: "data"`) : la pastille de la barre dit « 8 à relire » (maquette 11 l.625).
         pendingProposals: pendingOf(key, h.scenario),
-      }),
-    ),
+      };
+    }),
     validatedCount: entries.filter((entry) => entry.status === "validated").length,
   });
 }

@@ -17,6 +17,7 @@ import { DevUiPrimitivesB } from "./dev-ui-primitives-b.tsx";
 import { DevUiPrimitivesC } from "./dev-ui-primitives-c.tsx";
 import { DevUiProjects } from "./dev-ui-projects.tsx";
 import { DevUiProposals } from "./dev-ui-proposals.tsx";
+import { SecurityGallery } from "./dev-ui-security.tsx";
 import { DevUiShell } from "./dev-ui-shell.tsx";
 import { DevUiSignature } from "./dev-ui-signature.tsx";
 import { DevUiSpecCards } from "./dev-ui-spec-cards.tsx";
@@ -118,6 +119,7 @@ export function DevUiGallery() {
         <DevUiDataClient />
         <DevUiArchitecture />
         <TechnicalGallery />
+        <SecurityGallery />
       </main>
     </div>
   );

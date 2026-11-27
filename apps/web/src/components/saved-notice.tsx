@@ -18,7 +18,7 @@ interface NoticeProps {
 
 function Confirmation({ write, role, hrefFor, onOpen }: NoticeProps) {
   const saved = write.saved;
-  if (!saved) return null;
+  if (!saved || saved.meta.inPlace) return null;
   const { meta, indexFailed, placement } = saved;
   const short = saved.commitSha?.slice(0, 7);
   const text = confirmationText(meta, indexFailed);
