@@ -1013,6 +1013,15 @@ Technical entities (TK-115, zone `technical`): `stack` (sorted by layer then id,
 one `environments` row for `tech/environments.yaml`. The sections of `tech/cahier-technique/` are never indexed. The Technical
 deliverable is also « À revoir » when a component or a decision changed since its last decision (`technicalImpactOf`).
 
+TK-116: operations are sorted by zone then name and requirements by category then id (set when a commit is indexed);
+each indexed operation also keeps `champs`, the order of its input and output names in the file. An `endpoint` row is an
+operation only if its name is `zone.verb` and it names a component. An operation created without a component gets the
+first service of its zone, else the first service, else the first component of the zone, else the first component.
+Approving the Technical deliverable requires every choice of the head to be closed (`choices_open`); once validated,
+Security (which depends on Technical) becomes available. Comment targets `operation` and `requirements` were added to
+`comment_target_kind` (migration `20261127140000_comment_operation_targets`). Requirement coverage is not modelled: it
+comes with the Quality deliverable.
+
 ### Upstream impact (TK-100 lot C)
 `DELIVERABLE_SOURCES`: Functional reads `idea`; every other deliverable reads its B1 upstream. `staleLivrables(changed)` returns the
 transitive dependents of the changed sources in graph order (a changed deliverable is not its own dependent). `ideaPagesDiff(from, to)`

@@ -444,3 +444,18 @@ Tests à réécrire avec ces retraits :
 | l.383-420 (client) : « Moussa (équipe) » | « Équipe » et la date | B759 |
 | l.162 : bouton « Modifier » sur une proposition en relecture | Absent, comme Données et Architecture | Relecture partagée des livrables de domaine ; à confirmer en recette |
 
+## TK-116, API, Exigences et validation du cahier technique (2026-11-27, maquette 14)
+
+| Maquette ou passation | Livré | Raison |
+|---|---|---|
+| l.893-897 (feuille Opération) : aucun champ Composant, contrat qui l'exigeait | Feuille sans Composant, composant déduit de la zone par le serveur | B769 |
+| l.259-278, 668-670 : pastilles « Couverte » / « À couvrir », compte des exigences couvertes | « Couverture : après la Qualité », cartes sans pastille, icône neutre | B774 : aucune couverture avant la Qualité |
+| l.786-788 : « Valider » seulement dans la liste | « Valider » aussi à l'état « À revoir » | B775 : sans lui l'état serait sans issue |
+| l.826-828, 946 : Qualité ouverte avec Sécurité | Sécurité seule s'ouvre (« Prêt », 4/7) ; la Qualité attend Sécurité et Design | B776, passation 21 |
+| l.626-651 : aperçu du contrat en PHP et Python (masqué) | Absent | B770 |
+| l.622-624 : appelants d'une opération interne « Worker » | « interne » · « Appel interne » | B778 : le contrat ne donne aucun appelant |
+| l.897 : « Limite de débit » effaçable | Une limite existante se remplace, ne se vide pas | B785 |
+| l.261 : barre des exigences sans pied de liste | Pied de liste au-delà de 50 exigences | B774, socle TK-94 |
+| l.230 : aucune ligne avant la première page | « Charger les précédentes » quand un lien direct ouvre une page suivante | B786, socle TK-94 |
+| l.895 : Zone en liste déroulante | Saisie libre tant qu'aucune zone n'est connue | B787 |
+
