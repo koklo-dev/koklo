@@ -1311,3 +1311,37 @@ Volume: `spec-security-volume` keeps the first pages of `seed:large` under 300 m
 - The screen ran against a stub API only (unit tests and Playwright); the agent only against a fake model.
 - The checks the screen describes (scenarios in CI) arrive with TK-133; the baseline with TK-126 and TK-127.
 - Retention periods and the GDPR registry need a legal review before production.
+
+## Technical and security agent steps: reasons and diagnosis (TK-115b)
+
+### Reading a launch report
+| Shown | Stored reason | Meaning | What to do |
+|-------|---------------|---------|------------|
+| réponse coupée | `truncated` | The model stopped at the output token limit | Launch again; if it persists on the same step, see below |
+| réponse invalide | `output_invalid` | Unreadable JSON, or every entry of the step failed the checks (shape, text, secret candidate, unknown reference) | Launch again; compare the step with the prompt constraints (`prompts-technical.ts`, `prompts-security.ts`) |
+| consigne refusée | `prompt_rejected` | The provider rejected the request | Check the model and the launch instruction |
+| refus du modèle | `refused` | The model declined | Rephrase the instruction |
+
+**« Réponse coupée » that persists.** The `proposal-batch` budget stays at 8,000 output tokens (B844). Some models count
+their reasoning inside that limit. If the staging run still shows cut steps after this ticket, open a ticket to raise
+`proposal-batch` to 16,000 (domain ceiling: 32,000). The cause observed on staging is not proven: no real model was
+called during this ticket (B853).
+
+**Known limits.** A launch proposes at most 30 choices (5 Stack steps of 6) and 4 to 8 operation steps of 15; a new
+"complete" launch fills the rest. "Compare" handles the first 72 open choices. A step cannot be launched again alone.
+
+### Tests (local, named files only; full suites and the other e2e run in CI)
+| Package | Main new or extended files |
+|---------|----------------------------|
+| `llm` | `sdk-truncated` |
+| `contract` | `technical-launch` |
+| `api` | `proposal-views`, `proposal-technical`, `spec-technical-validation` |
+| `worker` | `agent-propose/{technical-steps,prompts-technical,generate-technical,triage-technical,zones-pass,store-report,generate-security}` |
+| `web` | `launch-report`, `technical-{header-state,stack-tab,validate}`, `security-{page,threats-tab}`, `use-review-actions`, `e2e/spec-{technical,security}.spec.ts` (stub API) |
+
+### Deployment and acceptance
+- No migration, no new environment variable. Redeploy api, worker and web **together** (contract 3.20.0).
+- A launch started before the deployment keeps its single "Stack" step and has no step names.
+- Staging acceptance: on the large project, "Proposer avec l'agent" then "Compléter le cahier"; note the discarded steps
+  and their reason, check that Stack choices are proposed layer by layer, and that "Valider" stays disabled while the
+  specification has no stack choice.

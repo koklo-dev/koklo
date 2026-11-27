@@ -22,6 +22,10 @@ covers_commit: c2322e2c
 
    ![Relecture des propositions, thème clair](../../../design/screens/captures/S-spec-security/review-review-light.png)
 
+   Si l'agent n'a pas pu terminer une partie de son travail, un bandeau **Bilan du lancement** nomme les étapes écartées et leur motif. Il se lit en relecture et, quand il ne reste rien à relire, sur l'onglet **Menaces** vide ou à l'ouverture de la page vide. Relancez **Proposer avec l'agent** pour compléter.
+
+   ![Menaces vides et étapes écartées, thème clair](../../../design/screens/captures/S-spec-security/empty-threats-report-light.png)
+
 4. Onglet **Menaces** : les menaces sont rangées par fonctionnalité exposée. Filtrez par **Gravité élevée**, **À traiter** ou **Vérifiées par la CI**. Une ligne ouvre sa fiche ; **Scénario d'abus** montre le test écrit à partir d'elle. Sur une menace élevée sans parade, cliquez **Proposer une parade**, ou **Modifier** et écrivez une parade par ligne.
 
    ![Menaces et fiche d'une menace à traiter, thème clair](../../../design/screens/captures/S-spec-security/list-fiche-light.png)

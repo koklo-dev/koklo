@@ -1893,9 +1893,8 @@ dans la spec" all go through the ordinary spec batch (`stack|op|nfr|env.*`, `doc
 
 **Technical agent.** Launch rules are in `apps/api/src/proposal/technical-launch.ts` (deliverable open, at least one
 component; modes `complete`, `compare`, `nfr`, `all`). The steps are decided by code
-(`agent-propose/generate-technical.ts`): stack, operations by component zone (zones grouped past eight, twelve steps at
-most), requirements, environments, document; `compare` and `nfr` have one step. Each step is published at once as
-proposals; the triage discards unknown references and secret candidates and marks priced or performance values with "≈".
+(`agent-propose/technical-steps.ts`, see the TK-115b section below). Each step is published at once as proposals; the
+triage discards unknown references and secret candidates and marks priced or performance values with "≈".
 
 **Secret refusal.** `findSecretPaths` (`packages/schema/src/secrets.ts`, pure, returns JSON pointers, never the value)
 guards Koklo's ways into the spec: batch submit and `proposal.decide` (422 before any write), the agent triage,
@@ -1944,8 +1943,9 @@ YAML is read at the indexed commit through the Git read cache, outside any trans
 text. It is computed on each read when `ST-api` is chosen and its choice names oRPC; nothing is written to any
 repository. Every value of the file is escaped.
 
-**Validation.** `review.submit` on `technical` refuses an approval while a `stack` row of the head is `a_trancher`.
-A validated technical deliverable opens Security through the existing dependency graph.
+**Validation.** `review.submit` on `technical` refuses an approval when the head holds no `stack` row
+(`stack_missing`, TK-115b), then while one is `a_trancher` (`choices_open`). A validated technical deliverable opens
+Security through the existing dependency graph.
 
 **Web.** `apps/web` reads the two tabs through `lib/use-technical-api.ts` (cursor pages, `around` for a direct link);
 `OperationBrowser` and `RequirementBrowser` are shared by the team and the client, the client calling `clientSpace.*`
@@ -1960,7 +1960,9 @@ flowchart LR
   team -->|YAML at the indexed commit| git[(spec repository)]
   team --> gen[contract generator, pure]
   client --> gate{validated?} -->|yes| idx
-  valid[review.submit technical] --> open{a choice still open?}
+  valid[review.submit technical] --> any{a stack choice on the head?}
+  any -->|no| r0[409 stack_missing, nothing written]
+  any -->|yes| open{a choice still open?}
   open -->|yes| r409[409 choices_open, nothing written]
   open -->|no| reviews[(reviews)] --> sec[Security available]
 ```
@@ -1997,4 +1999,40 @@ flowchart LR
   valid[review.submit security] --> open{high threat open or field to decide?}
   open -->|yes| r409[409, nothing written]
   open -->|no| reviews[(reviews)]
+```
+
+## Bounded agent steps and discarded steps (TK-115b)
+
+**Why.** One call returns at most 8,000 output tokens (`packages/llm/src/proposals/budgets.ts`, unchanged, B844). On a
+large project a single "Stack" call could not fit. Each step is now sized by code (`apps/worker/src/agent-propose/`).
+
+| Deliverable | Steps | Bound per call |
+|-------------|-------|----------------|
+| Technical `complete`, `all` | one Stack step per layer that has components (applications, services and API, data, external services), then hosting and operations, always the last Stack step; operations on `min(8, 12 − 3 − Stack steps)` zone groups; requirements, environments, document | 6 choices, 15 operations, 20 requirements, 6 environments, 8 sections |
+| Technical `compare` | open choices in groups of 6, 12 steps at most | 6 choices |
+| Security | surfaces on 8 steps at most; counter-measures in 2 steps of 10 open threats at most; 12 steps in all | 10 threats or counter-measures, 15 ASVS requirements |
+
+A Stack step only receives the components of its layer, the known requirements and decisions, the recorded choices and
+the roles already covered; roles are deduplicated across steps by normalised title and by `ST-` identifier. Link lists
+of a choice are cut at 30, the contract bound (B846). A step whose entries are all invalid is discarded
+`output_invalid`; a duplicate or an empty answer leaves it processed (B847).
+
+**Cut answers.** `SdkLlmProvider.complete` turns a JSON answer stopped by the token limit (`finishReason` `length`,
+with or without text) into a response with `stop: "max-tokens"`: the worker discards that step alone as `truncated`.
+Invalid JSON with a normal stop is still `LlmInvalidOutputError`.
+
+**Report.** The worker stores the discarded steps in `discard_reasons.discarded_steps` (existing `jsonb` column, no
+migration); the api returns them for `technical` and `security`. The web shows them in review and, when nothing is
+left to review, on the empty Stack or Threats tab and on the "ready" state, to whoever can launch the agent
+(`components/launch-report-note.tsx`, `lib/launch-report.ts`).
+
+```mermaid
+flowchart LR
+  plan[worker: steps from component types and zones] --> call[llm: one bounded call per step]
+  call -->|stop max-tokens| trunc[step discarded: truncated]
+  call -->|all entries invalid| inval[step discarded: output_invalid]
+  call -->|valid entries| props[(agent_proposals)]
+  trunc --> rep[(discard_reasons.discarded_steps)]
+  inval --> rep
+  rep --> list[api: proposal.list launch.report] --> web[web: launch report note]
 ```

@@ -36,7 +36,7 @@ covers_commit: c2322e2c
 
 ## Le cahier technique
 
-Le cahier technique est validé par l'**équipe** (Propriétaire, Administrateur ou Développeur), pas par le client : le bouton **Valider** de la page **Cahier technique** reste désactivé tant qu'un choix est à trancher. Le client le lit ensuite et le commente. Voir [Relire et compléter le cahier technique](review-and-complete-the-technical-specification.md#valider-le-cahier-technique).
+Le cahier technique est validé par l'**équipe** (Propriétaire, Administrateur ou Développeur), pas par le client : le bouton **Valider** de la page **Cahier technique** reste désactivé tant que la stack n'a aucun choix ou qu'un choix est à trancher, et le résumé de l'en-tête dit pourquoi. Le client le lit ensuite et le commente. Voir [Relire et compléter le cahier technique](review-and-complete-the-technical-specification.md#valider-le-cahier-technique).
 
 ## La sécurité
 
