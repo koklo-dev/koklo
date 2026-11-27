@@ -42,11 +42,12 @@ const toRecord = (row: {
 
 /**
  * Entité d'index qui prouve que la cible existe : une opération est une entité `endpoint` du cahier (jamais le REST), le
- * bloc des exigences existe dès qu'une exigence est à la tête.
+ * bloc des exigences existe dès qu'une exigence est à la tête, le résumé de la Sécurité dès qu'il est indexé.
  */
 function entityOf(kind: IndexedRefKind, ref: string) {
   if (kind === "operation") return { kind: "endpoint", specId: ref, AND: OPERATIONS_ONLY };
   if (kind === "requirements") return { kind: "nfr" };
+  if (kind === "security_summary") return { kind: "security_summary" };
   return { kind, specId: ref };
 }
 

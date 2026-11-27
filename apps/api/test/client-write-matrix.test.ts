@@ -19,6 +19,8 @@ const ALLOWED = [
   // TK-90 (contrat 2.5.0) : le client dialogue avec l'agent et décide de ses propositions (mêmes droits que l'éditeur).
   "ai.ideaChat",
   "ai.ideaGaps",
+  // TK-117 (contrat 3.19.0) : le client lié indique le contact en cas d'incident (B801).
+  "clientSpace.securityContactSet",
   "comment.create",
   // TK-89 (contrat 2.4.0) : le client rédige le dossier d'idée sans le publier (décision 1).
   "idea.page.create",
@@ -103,6 +105,14 @@ const DENIED = [
   "spec.architecture.layout.save",
   // TK-115 (contrat 3.17.0) : « Choisir » une option de la stack relève d'owner, admin et développeur (B725).
   "spec.technical.stack.choose",
+  // TK-117 (contrat 3.19.0) : écrire, proposer et valider la Sécurité relève d'owner, admin et développeur (B810).
+  "security.asvs.setLevel",
+  "security.data.classify",
+  "security.summary.accept",
+  "security.summary.propose",
+  "security.threat.create",
+  "security.threat.update",
+  "security.validate",
   "specBatch.submit",
   // TK-106 (contrat 3.4.0) : la migration du format de spec et son retour arrière relèvent d'owner seul.
   "specMigration.revert",
@@ -163,6 +173,7 @@ describe("classement exhaustif des écritures du contrat", () => {
     expect(ALLOWED).toEqual([
       "ai.ideaChat",
       "ai.ideaGaps",
+      "clientSpace.securityContactSet",
       "comment.create",
       "idea.page.create",
       "idea.page.delete",
@@ -317,6 +328,20 @@ describe("les seules écritures du client : suggérer, retirer, valider, comment
       { enabled: false },
     );
     expect(pref.status, JSON.stringify(pref.body)).toBe(200);
+  });
+
+  it("clientSpace.securityContactSet : 200 sur son projet, 404 ailleurs (TK-117, B801)", async () => {
+    const set = (projectId: string) =>
+      send(
+        bench().app,
+        scene.c1.cookie,
+        "post",
+        `/client-space/projects/${projectId}/security/contact`,
+        { projectId, name: "Marie", phone: "06 00 00 00 00" },
+      );
+    const res = await set(scene.p1.projectId);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect((await set(scene.p2.projectId)).status).toBe(404);
   });
 
   it("comment.create : 200 sur un ticket de son projet", async () => {

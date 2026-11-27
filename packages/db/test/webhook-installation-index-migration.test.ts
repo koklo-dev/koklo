@@ -20,6 +20,7 @@ import { OAUTH_TABLES } from "./support/oauth-fixtures.ts";
 import {
   AGENT_PROPOSAL_TABLES,
   DELIVERABLE_OVERRIDE_TABLES,
+  INCIDENT_CONTACT_TABLES,
   PROJECT_CLIENT_TABLES,
   PROJECT_CREATION_TABLES,
   PROJECT_VISIT_TABLES,
@@ -128,6 +129,7 @@ const LATER_OBJECTS: readonly string[] = [
   ...AGENT_PROPOSAL_TABLES,
   ...DELIVERABLE_OVERRIDE_TABLES,
   ...SPEC_ENTITY_TABLES,
+  ...INCIDENT_CONTACT_TABLES,
   ...SETTINGS_TABLES,
   ...IDEA_TABLES,
   ...IDEA_ENUMS,
@@ -174,7 +176,7 @@ describe("TK-45a migration webhook_installation_index : dossier et contenu", () 
   });
 
   it("cette migration n'ajoute aucune table (50 attendues au total avec TK-97)", () => {
-    expect(expectedTables).toHaveLength(63);
+    expect(expectedTables).toHaveLength(64);
     expect(expectedTables).toContain("webhook_deliveries");
   });
 });

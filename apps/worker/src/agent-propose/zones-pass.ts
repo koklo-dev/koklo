@@ -6,17 +6,28 @@ import { batchPrompt } from "./prompts.ts";
 import type { ZonePublication } from "./store.ts";
 import { triageProposals } from "./triage.ts";
 
-/**
- * Schéma d'un type demandé au modèle : `specId` n'est jamais demandé (B615, B655, TK-115), le code seul le pose ; celui de
- * `criteria` désigne sa fonctionnalité et reste.
- */
-function modelSchemaOf(kind: AgentProposalKind) {
-  const schema = jsonSchemaOf(PROPOSAL_SCHEMAS[kind]);
-  const properties = schema.properties as Record<string, unknown> | undefined;
-  if (kind === "criteria" || properties === undefined || !("specId" in properties)) return schema;
+type JsonSchema = Record<string, unknown>;
+
+/** Schéma sans la propriété `specId` ; inchangé quand il ne la porte pas. */
+function withoutSpecId(schema: JsonSchema): JsonSchema {
+  const properties = schema.properties as JsonSchema | undefined;
+  if (properties === undefined || !("specId" in properties)) return schema;
   const { specId: _posed, ...kept } = properties;
   const required = (schema.required as string[] | undefined)?.filter((key) => key !== "specId");
   return { ...schema, properties: kept, ...(required === undefined ? {} : { required }) };
+}
+
+/**
+ * Schéma d'un type demandé au modèle : `specId` n'est jamais demandé (B615, B655, TK-115, TK-117), le code seul le pose,
+ * même dans l'exigence d'une proposition ASVS ; celui de `criteria` désigne sa fonctionnalité et reste.
+ */
+function modelSchemaOf(kind: AgentProposalKind) {
+  const schema = jsonSchemaOf(PROPOSAL_SCHEMAS[kind]);
+  if (kind === "criteria") return schema;
+  const properties = schema.properties as Record<string, JsonSchema> | undefined;
+  const nested = properties?.requirement;
+  if (nested === undefined) return withoutSpecId(schema);
+  return { ...schema, properties: { ...properties, requirement: withoutSpecId(nested) } };
 }
 
 /** Schéma demandé au fournisseur : la structure seule, les bornes sont revérifiées par Zod à la validation. */
@@ -84,7 +95,7 @@ export async function zonesPass(
   for (const [index, zone] of [...zones.entries()].slice(start)) {
     const up = timeUp(run);
     if (up !== undefined) return up;
-    const kinds = run.kindsAt?.(index, zones.length) ?? run.kinds;
+    const kinds = run.kindsAt?.(index, zones.length, zone) ?? run.kinds;
     const publication = await zoneOf(run, zone, kinds);
     if ((await run.deps.store.publishZone(run.launch, publication)) === "stopped") return "stopped";
     await afterPublish();

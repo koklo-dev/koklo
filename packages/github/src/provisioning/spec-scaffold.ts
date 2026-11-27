@@ -17,6 +17,7 @@ const EMPTY_DIRECTORIES = [
   "nfr",
   "api/endpoints",
   "tech/stack",
+  "security/threats",
   "design/tokens",
   "design/components",
   "design/screens",
@@ -35,7 +36,8 @@ const readme = (name: string): string =>
 Dépôt de spécification géré par Koklo : ne l'éditez pas à la main, les modifications passent par
 Koklo (lots d'écriture sur la branche \`cadrage\`).
 
-- \`features/\`, \`data/\`, \`api/\`, \`design/\`, \`quality/\` : le modèle de spec validé par Koklo.
+- \`features/\`, \`data/\`, \`api/\`, \`security/\`, \`design/\`, \`quality/\` : le modèle de spec validé par
+  Koklo.
 `;
 
 const OVERVIEW = `# Architecture : contexte

@@ -42,7 +42,7 @@ export const COMPONENT_TYPES = ["app", "service", "store", "queue", "ext"] as co
 export const componentTypeSchema = z.enum(COMPONENT_TYPES);
 export const DOC_SECTION_STATUSES = ["brouillon", "a_relire", "validee", "a_rediger"] as const;
 /** Livrables qui portent un document en sections (`doc.section.*`, TK-115) ; absent d'une opération : l'architecture. */
-export const DOC_SECTION_DELIVERABLES = ["architecture", "technical"] as const;
+export const DOC_SECTION_DELIVERABLES = ["architecture", "technical", "security"] as const;
 const docSectionDeliverableSchema = z.enum(DOC_SECTION_DELIVERABLES).optional();
 export const docSectionStatusSchema = z.enum(DOC_SECTION_STATUSES);
 

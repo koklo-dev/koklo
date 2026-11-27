@@ -2,6 +2,7 @@ import type { z } from "zod";
 import {
   AdrSchema,
   ArchFlowSchema,
+  AsvsFileSchema,
   BusinessRuleSchema,
   ComponentSchema,
   EndpointSchema,
@@ -14,12 +15,16 @@ import {
   OperationSchema,
   ProjectManifestSchema,
   RelationsFileSchema,
+  RightsFileSchema,
   RolesFileSchema,
   ScreenSchema,
+  SecurityDataSchema,
+  SecuritySummarySchema,
   StackSchema,
   TableSchema,
   TableV2Schema,
   TestScenarioSchema,
+  ThreatSchema,
 } from "../entities/index.ts";
 
 export type Kind =
@@ -39,7 +44,12 @@ export type Kind =
   | "adr"
   | "stack"
   | "nfr"
-  | "environments";
+  | "environments"
+  | "threat"
+  | "security_data"
+  | "rights"
+  | "asvs"
+  | "security_summary";
 
 const SLUG = "[a-z0-9][a-z0-9-]*";
 /** Table : `<slug>.yaml` (v2) ou `T-<slug>.yaml` (v1, toujours lu). */
@@ -66,6 +76,11 @@ const KIND_FILES: readonly (readonly [RegExp, Kind])[] = [
   [/^tech\/stack\/[^/]*\.yaml$/, "stack"],
   [/^nfr\/NFR-[^/]*\.yaml$/, "nfr"],
   [/^tech\/environments\.yaml$/, "environments"],
+  [/^security\/threats\/SEC-[^/]*\.yaml$/, "threat"],
+  [/^security\/data\.yaml$/, "security_data"],
+  [/^security\/rights\.yaml$/, "rights"],
+  [/^security\/asvs\.yaml$/, "asvs"],
+  [/^security\/summary\.md$/, "security_summary"],
 ];
 
 /** Type de fichier d'après son chemin ; `undefined` : hors modèle, ignoré. */
@@ -100,6 +115,11 @@ export const SCHEMAS = {
   stack: StackSchema,
   nfr: NfrSchema,
   environments: EnvironmentsFileSchema,
+  threat: ThreatSchema,
+  security_data: SecurityDataSchema,
+  rights: RightsFileSchema,
+  asvs: AsvsFileSchema,
+  security_summary: SecuritySummarySchema,
 } as const satisfies Record<string, z.ZodType>;
 
 /**

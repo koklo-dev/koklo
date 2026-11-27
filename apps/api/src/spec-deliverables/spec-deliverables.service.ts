@@ -5,7 +5,7 @@ import {
   deliverablesAvailabilityOf,
 } from "@koklo/domain";
 import { Inject, Injectable } from "@nestjs/common";
-import { STAFF_ROLES } from "../auth/roles.ts";
+import { SPEC_BATCH_ROLES, STAFF_ROLES } from "../auth/roles.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { type StaleBecause, staleBecauseOf, staleStatus } from "./deliverable-impact.ts";
 import {
@@ -13,7 +13,9 @@ import {
   type DeliverableStatusSource,
 } from "./deliverable-status-source.ts";
 import {
+  type SecurityImpact,
   type StaleImpact,
+  securityImpactOf,
   staleImpactOf,
   type TechnicalImpact,
   technicalImpactOf,
@@ -26,6 +28,10 @@ import {
 /** Seule l'équipe voit les propositions de l'agent ; un rôle absent ou inconnu est traité comme le client (fermé par défaut). */
 const sees = (role: string | undefined): boolean =>
   role !== undefined && STAFF_ROLES.some((staff) => staff === role);
+
+/** La Sécurité (ses propositions et ce qui est à revoir) : l'équipe et le designer seuls (TK-117, B803, B810). */
+const seesSecurity = (role: string | undefined): boolean =>
+  SPEC_BATCH_ROLES.some((reader) => reader === role);
 
 /** Les livrables périmés par une nouvelle version d'idée passent « À revoir », quel que soit leur statut. */
 const staleStatuses = (
@@ -43,21 +49,30 @@ interface Impacts {
   data: StaleImpact;
   architecture: StaleImpact;
   technical: TechnicalImpact;
+  security: SecurityImpact;
 }
 
-/** Un amont modifié depuis la décision rend les Données (B449), l'Architecture (TK-113) ou le Technique (TK-115) « À revoir ». */
+/**
+ * Un amont modifié depuis la décision rend les Données (B449), l'Architecture (TK-113), le Technique (TK-115) ou la
+ * Sécurité (TK-117) « À revoir ».
+ */
 const withUpstream = (statuses: Record<DeliverableKey, DeliverableStatus>, impacts: Impacts) => ({
   ...statuses,
   data: staleStatus(statuses.data, impacts.data.upstream.length > 0),
   architecture: staleStatus(statuses.architecture, impacts.architecture.upstream.length > 0),
   technical: staleStatus(statuses.technical, impacts.technical.changes.length > 0),
+  security: staleStatus(statuses.security, impacts.security.changes.length > 0),
 });
 
 /**
  * Ce que l'impact amont ajoute à l'entrée d'un livrable : les amonts, pour l'Architecture les éléments concernés, pour le
- * Technique les changements de l'architecture et ce qui les cite.
+ * Technique et la Sécurité les changements et ce qui les cite (la Sécurité : jamais au client ni au rôle business).
  */
-function impactFields(key: DeliverableKey, impacts: Impacts) {
+function impactFields(key: DeliverableKey, impacts: Impacts, security: boolean) {
+  if (key === "security") {
+    const impact = impacts.security;
+    return security && impact.changes.length > 0 ? { staleSecurity: impact } : {};
+  }
   if (key === "technical") {
     const impact = impacts.technical;
     return impact.changes.length === 0 ? {} : { staleTechnical: impact };
@@ -96,7 +111,9 @@ export class SpecDeliverablesService {
       data: staleImpactOf(record.upstream.data),
       architecture: staleImpactOf(record.upstream.architecture),
       technical: technicalImpactOf(record.technicalUpstream),
+      security: securityImpactOf(record.securityUpstream),
     };
+    const security = seesSecurity(role);
     const deliverables: SpecDeliverable[] = deliverablesAvailabilityOf({
       ideaFrozen: record.ideaFrozen,
       functionalHasEntity: record.featureCount > 0,
@@ -104,9 +121,10 @@ export class SpecDeliverablesService {
       forced: record.forced,
     }).map((entry) => ({
       ...entry,
-      pendingProposals: record.pendingByDeliverable[entry.key] ?? 0,
+      pendingProposals:
+        entry.key === "security" && !security ? 0 : (record.pendingByDeliverable[entry.key] ?? 0),
       ...(stale[entry.key] ? { staleBecause: stale[entry.key] } : {}),
-      ...impactFields(entry.key, impacts),
+      ...impactFields(entry.key, impacts, security),
     }));
     return {
       deliverables,

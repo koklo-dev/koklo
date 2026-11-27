@@ -53,6 +53,18 @@ export const OPERATION_KINDS = [
   "env.create",
   "env.update",
   "env.delete",
+  "threat.create",
+  "threat.update",
+  "threat.delete",
+  "sensitive.create",
+  "sensitive.update",
+  "sensitive.delete",
+  "right.create",
+  "right.delete",
+  "asvs.set_level",
+  "asvs.create",
+  "asvs.update",
+  "summary.update",
 ] as const;
 const TARGET_ID: Readonly<Record<string, RegExp>> = {
   rule: /^R-\d{3,}$/,
@@ -68,7 +80,11 @@ const TARGET_ID: Readonly<Record<string, RegExp>> = {
   op: /^[a-z0-9][A-Za-z0-9_-]*\.[a-z0-9][A-Za-z0-9_-]*$/,
   nfr: /^NFR-[a-z0-9][a-z0-9-]*$/,
   env: /^ENV-[a-z0-9][a-z0-9-]*$/,
+  threat: /^SEC-T\d{2,}$/,
+  sensitive: /^[a-z0-9][a-z0-9-]{0,62}\.[a-z_][a-z0-9_]{0,62}$/,
 };
+/** Genres sans cible (droits, exigences, résumé) : tout identifiant est refusé. */
+const TARGETLESS: ReadonlySet<string> = new Set(["right", "asvs", "summary"]);
 /** Opérations de publication de l'espace Idée (TK-89) : un lot n'en mêle jamais avec des features. */
 export const IDEA_OPERATION_KINDS = [
   "idea.page.write",
@@ -141,9 +157,15 @@ function migrationProblem(operation: BatchOperation, alone: boolean): string | u
   return migrationBatchIdOf(operation.payload) === undefined ? "payload" : undefined;
 }
 
-/** Identifiant cible : `layout.save` n'en a pas ; les autres genres suivent leur motif, les features `F-nnn`. */
+/** Cible attendue vide : mise en page, genres sans cible, et une donnée créée depuis une table seule. */
+const mayLackTarget = ({ kind, targetSpecId }: BatchOperation): boolean =>
+  isLayoutKind(kind) ||
+  TARGETLESS.has(kind.split(".")[0] ?? "") ||
+  (kind === "sensitive.create" && targetSpecId === null);
+
+/** Identifiant cible : les genres suivent leur motif, les features `F-nnn` ; sans cible, il est vide. */
 function targetProblem(operation: BatchOperation): string | undefined {
-  if (isLayoutKind(operation.kind)) return operation.targetSpecId === null ? undefined : "specId";
+  if (mayLackTarget(operation)) return operation.targetSpecId === null ? undefined : "specId";
   const pattern = TARGET_ID[operation.kind.split(".")[0] ?? ""];
   if (pattern !== undefined) {
     return pattern.test(operation.targetSpecId ?? "") ? undefined : "specId";

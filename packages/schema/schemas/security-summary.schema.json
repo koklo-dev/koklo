@@ -1,0 +1,52 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/security-summary.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acces": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "connexion": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "conservation": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "donnees": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "incident": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "protection": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "verification": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "donnees",
+    "protection",
+    "acces",
+    "connexion",
+    "conservation",
+    "verification",
+    "incident"
+  ],
+  "type": "object"
+}

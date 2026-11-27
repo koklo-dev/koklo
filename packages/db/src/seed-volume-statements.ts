@@ -6,6 +6,7 @@ import {
   componentData,
 } from "./seed-volume-architecture.ts";
 import { proposalStatements } from "./seed-volume-proposals.ts";
+import { securityStatements } from "./seed-volume-security.ts";
 import {
   NOUNS,
   nth,
@@ -433,6 +434,7 @@ export function buildVolumeStatements(
     ...entityStatements(profile, target),
     ...domainStatements(profile, target),
     ...technicalStatements(profile, target),
+    ...securityStatements(profile, target),
     ...trackerStatements(profile, target),
     ...proposalStatements(profile, target),
     ...architectureProposalStatements(profile, target),

@@ -128,3 +128,52 @@ export function technicalImpactOf(facts: TechnicalUpstreamFacts | null): Technic
     ),
   };
 }
+
+/** Un élément amont de la Sécurité : choix de la stack, opération, table ou rôle, haché. */
+export interface SecurityUpstreamFacts {
+  /** À la tête de la dernière décision ; `null` : tête non indexée. */
+  atDecision: ReadonlyMap<string, string> | null;
+  atHead: ReadonlyMap<string, string>;
+  /** Champs du modèle des deux têtes, `<slug>.<champ>`. */
+  fields: { atDecision: ReadonlySet<string>; atHead: ReadonlySet<string> };
+  /** Menaces de la tête et leurs liens. */
+  threats: readonly { id: string; links: readonly string[] }[];
+}
+
+export interface SecurityImpact {
+  changes: { id: string; change: Exclude<TechnicalChange, "accepted"> }[];
+  items: string[];
+}
+
+function securityChangeOf(before: string | undefined, after: string | undefined) {
+  if (before === after) return undefined;
+  if (after === undefined) return "removed" as const;
+  return before === undefined ? ("added" as const) : ("changed" as const);
+}
+
+/** Le lien d'une menace désigne l'élément changé, ou un champ d'une table changée. */
+const cites = (link: string, changed: ReadonlySet<string>): boolean => {
+  const table = /^([a-z0-9][a-z0-9-]*)\.[a-z_][a-z0-9_]*$/.exec(link)?.[1];
+  return changed.has(link) || (table !== undefined && changed.has(`T-${table}`));
+};
+
+/**
+ * Choix, opérations, tables et rôles modifiés depuis la dernière décision sur la Sécurité (B805) : sont concernées les
+ * menaces qui les citent et les champs nouveaux. Sans décision comparable, aucun impact.
+ */
+export function securityImpactOf(facts: SecurityUpstreamFacts | null): SecurityImpact {
+  if (facts === null || facts.atDecision === null) return { changes: [], items: [] };
+  const { atDecision, atHead, fields, threats } = facts;
+  const ids = [...new Set([...atDecision.keys(), ...atHead.keys()])].sort();
+  const changes = ids.flatMap((id) => {
+    const change = securityChangeOf(atDecision.get(id), atHead.get(id));
+    return change === undefined ? [] : [{ id, change }];
+  });
+  const changed = new Set(changes.map((entry) => entry.id));
+  const concerned = threats.filter((threat) => threat.links.some((link) => cites(link, changed)));
+  const added = [...fields.atHead].filter((field) => !fields.atDecision.has(field));
+  return {
+    changes: changes.slice(0, STALE_ARTIFACTS_MAX),
+    items: firstSorted([...concerned.map((threat) => threat.id), ...added], STALE_ARTIFACTS_MAX),
+  };
+}

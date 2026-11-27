@@ -216,6 +216,7 @@ export * from "./schemas-projects.ts";
 export * from "./schemas-proposals.ts";
 export * from "./schemas-provider.ts";
 export * from "./schemas-review.ts";
+export * from "./schemas-security.ts";
 export * from "./schemas-settings.ts";
 export * from "./schemas-shell.ts";
 export * from "./schemas-spec.ts";

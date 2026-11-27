@@ -44,6 +44,7 @@ import { SpecDeliverablesModule } from "./spec-deliverables/spec-deliverables.mo
 import { SpecItemModule } from "./spec-item/spec-item.module.ts";
 import { SpecMigrationModule } from "./spec-migration/spec-migration.module.ts";
 import { SpecReadModule } from "./spec-read/spec-read.module.ts";
+import { SpecSecurityModule } from "./spec-security/spec-security.module.ts";
 import { SpecTechnicalModule } from "./spec-technical/spec-technical.module.ts";
 import { SprintModule } from "./sprint/sprint.module.ts";
 import { SprintImportModule } from "./sprint-import/sprint-import.module.ts";
@@ -83,6 +84,7 @@ const SPEC_MODULES = [
   SpecArchitectureModule,
   SpecDataModule,
   SpecTechnicalModule,
+  SpecSecurityModule,
 ];
 
 /** IA (TK-95) puis propositions de l'agent (TK-99a) : le second dépend du premier. */

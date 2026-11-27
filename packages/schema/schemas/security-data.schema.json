@@ -1,0 +1,78 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/security-data.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "donnees": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "acces": {
+            "default": [],
+            "items": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "categorie": {
+            "enum": [
+              "personnelle",
+              "contact",
+              "sensible",
+              "secret",
+              "technique"
+            ],
+            "type": "string"
+          },
+          "champs": {
+            "items": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,62}\\.[a-z_][a-z0-9_]{0,62}$",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array"
+          },
+          "conservation": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "conservation_proposee": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "donnee": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "protection": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "donnee",
+          "champs",
+          "categorie"
+        ],
+        "type": "object"
+      },
+      "maxItems": 5000,
+      "type": "array"
+    },
+    "transferts": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

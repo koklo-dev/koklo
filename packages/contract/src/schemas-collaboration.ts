@@ -30,6 +30,8 @@ export const commentTargetKindSchema = z.enum([
   /** Une opération (son nom) et le bloc des exigences (3.18.0, B777). */
   "operation",
   "requirements",
+  /** Résumé client de la Sécurité (3.19.0, B802) : seule cible de ce livrable. */
+  "security_summary",
 ]);
 export const commentAuthorKindSchema = z.enum(["human", "agent", "client", "system"]);
 export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"]);
@@ -48,6 +50,7 @@ const REF_SCHEMA = {
   tech_section: docSectionIdSchema,
   operation: operationNameSchema,
   requirements: z.literal("requirements"),
+  security_summary: z.literal("summary"),
 } as const;
 const targetRefSchema = z.union(Object.values(REF_SCHEMA));
 
@@ -59,7 +62,7 @@ export const commentSchema = z.object({
   /**
    * `T-<slug>` (table, 3.7.0), `C-<slug>` (composant), `ADR-<nnn>` (décision) ou `P-<slug>` (flux) en 3.11.0, `ST-<slug>`,
    * `environments` ou `DOC-<slug>` (section du cahier technique) en 3.17.0, `<zone.verbe>` (opération) ou `requirements`
-   * en 3.18.0 ; absent pour un ticket.
+   * en 3.18.0, `summary` (résumé de la Sécurité) en 3.19.0 ; absent pour un ticket.
    */
   targetRef: targetRefSchema.optional(),
   authorKind: commentAuthorKindSchema,

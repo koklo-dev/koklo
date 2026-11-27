@@ -45,6 +45,7 @@ const EXPECTED_TENANT_MODELS = [
   "AgentProposal",
   "AgentProposalDecision",
   "DeliverableOverride",
+  "ProjectIncidentContact",
   "SpecEntity",
   "ReviewVersion",
   "InvitationProject",

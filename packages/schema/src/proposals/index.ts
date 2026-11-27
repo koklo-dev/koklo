@@ -8,6 +8,13 @@ import { fixturesProposalSchema, relationsProposalSchema, tableProposalSchema } 
 import { criteriaProposalSchema, featureProposalSchema } from "./feature.ts";
 import { flowProposalSchema, roleProposalSchema, ruleProposalSchema } from "./others.ts";
 import {
+  asvsProposalSchema,
+  rightProposalSchema,
+  sensitiveProposalSchema,
+  summaryProposalSchema,
+  threatProposalSchema,
+} from "./security.ts";
+import {
   environmentProposalSchema,
   nfrProposalSchema,
   operationProposalSchema,
@@ -36,6 +43,15 @@ export {
 export { jsonSchemaOf } from "./json-schema.ts";
 export { flowProposalSchema, roleProposalSchema, ruleProposalSchema } from "./others.ts";
 export {
+  asvsProposalSchema,
+  rightProposalSchema,
+  SECURITY_PROPOSAL_VOCABULARY,
+  securityProposalTitle,
+  sensitiveProposalSchema,
+  summaryProposalSchema,
+  threatProposalSchema,
+} from "./security.ts";
+export {
   environmentProposalSchema,
   nfrProposalSchema,
   operationProposalSchema,
@@ -61,4 +77,9 @@ export const PROPOSAL_SCHEMAS = {
   op: operationProposalSchema,
   nfr: nfrProposalSchema,
   env: environmentProposalSchema,
+  threat: threatProposalSchema,
+  sensitive: sensitiveProposalSchema,
+  right: rightProposalSchema,
+  asvs: asvsProposalSchema,
+  summary: summaryProposalSchema,
 } as const;

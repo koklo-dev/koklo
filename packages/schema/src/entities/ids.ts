@@ -31,6 +31,10 @@ export const PATTERNS = {
   /** Décision d'architecture `ADR-<nnn>` (TK-111, compteur `adr`). */
   adr: /^ADR-\d{3,}$/,
   tableField: new RegExp(`^T-${slug}\\.${field}$`),
+  /** Menace `SEC-T<nn>` (TK-117, compteur `threat`). */
+  threat: /^SEC-T\d{2,}$/,
+  /** Champ du modèle classé par la Sécurité, `<slug de table>.<champ>` (TK-117), borné pour l'index. */
+  dataField: /^[a-z0-9][a-z0-9-]{0,62}\.[a-z_][a-z0-9_]{0,62}$/,
   fieldName: new RegExp(`^${field}$`),
 } as const;
 
@@ -50,3 +54,5 @@ export const operationId = z.string().regex(PATTERNS.operation);
 export const nfrId = z.string().regex(PATTERNS.nfr);
 export const stackId = z.string().regex(PATTERNS.stack);
 export const environmentId = z.string().regex(PATTERNS.environment);
+export const threatId = z.string().regex(PATTERNS.threat);
+export const dataFieldRef = z.string().regex(PATTERNS.dataField);

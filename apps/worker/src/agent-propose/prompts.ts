@@ -8,6 +8,7 @@ import {
 } from "@koklo/domain";
 import { architectureBatchPrompt, architectureZonesPrompt } from "./prompts-architecture.ts";
 import { dataBatchPrompt, dataZonesPrompt } from "./prompts-data.ts";
+import { securityBatchPrompt } from "./prompts-security.ts";
 import { technicalBatchPrompt } from "./prompts-technical.ts";
 import type { LaunchSources } from "./sources.ts";
 
@@ -91,6 +92,8 @@ export function batchPrompt(
     mode?: string;
   },
 ): FramedPrompt {
+  // La Sécurité lit aussi le cahier technique : elle se reconnaît d'abord.
+  if (input.sources.security !== undefined) return securityBatchPrompt(nonce, input);
   if (input.sources.technical !== undefined) return technicalBatchPrompt(nonce, input);
   if (input.sources.architecture !== undefined) return architectureBatchPrompt(nonce, input);
   if (input.sources.tables !== undefined) return dataBatchPrompt(nonce, input);

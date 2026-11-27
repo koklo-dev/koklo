@@ -54,6 +54,7 @@ describe("TK-103 migration rule_counter", () => {
 
   it("down.sql retire rule sans toucher aux autres compteurs, et rejoue (up, down, up)", async () => {
     // La migration postérieure du même enum (`nfr`, TK-115) se défait d'abord.
+    await db.query(sqlOf("down.sql", "_threat_counter"));
     await db.query(sqlOf("down.sql", "_nfr_counter"));
     expect(await labels()).toEqual(["ticket", "sprint", "feature", "suggestion", "rule", "adr"]);
     await db.query(sqlOf("down.sql"));

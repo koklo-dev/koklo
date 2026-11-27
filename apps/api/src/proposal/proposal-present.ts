@@ -6,7 +6,7 @@ import type { ProposalRecord } from "./proposal.repository.ts";
 /** Ce qu'il faut d'une proposition pour savoir si sa création est déjà dans la spec. */
 export type PresentCandidate = Pick<ProposalRecord, "id" | "payload"> & {
   kind: string;
-  /** Désigne le dossier des sections (`doc_section` du cahier technique). */
+  /** Désigne le dossier des sections (`doc_section` du cahier technique ou du dossier de sécurité). */
   deliverable?: string;
 };
 
@@ -50,8 +50,9 @@ export function presentTargetOf(record: PresentCandidate): PresentTarget | null 
   if (target === undefined) return null;
   if (UPDATE_ID[record.kind]?.test(str(record.payload.specId))) return null;
   const found = target(record.payload);
-  if (found === null || record.deliverable !== "technical") return found;
-  return { ...found, payload: { deliverable: "technical" } };
+  const { deliverable } = record;
+  if (found === null || (deliverable !== "technical" && deliverable !== "security")) return found;
+  return { ...found, payload: { deliverable } };
 }
 
 /** Propositions dont la création est déjà à la tête de `index`, dans l'ordre de l'entrée. Fonction pure. */

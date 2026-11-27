@@ -87,6 +87,8 @@ export const expectedTables = [
   // TK-100 lot B : index d'entités générique et hachage du contenu validé.
   "spec_entities",
   "review_versions",
+  // TK-117 : contact en cas d'incident d'un projet (écrit par le client lié).
+  "project_incident_contacts",
 ] as const;
 
 /** Tables à clé primaire composite : pas d'`id` uuid (§18.1). */
@@ -105,13 +107,15 @@ export const compositeKeyTables: readonly string[] = [
 
 /**
  * Tables sans `created_at`/`updated_at` obligatoires : liaisons à clé composite et journaux jamais modifiés
- * (`audit_log`, `agent_proposal_decisions` : une ligne par décision, horodatée par `decided_at` ; `deliverable_overrides` : horodatée par `forced_at`).
+ * (`audit_log`, `agent_proposal_decisions` : une ligne par décision, horodatée par `decided_at` ; `deliverable_overrides` : horodatée par `forced_at` ;
+ * `project_incident_contacts` : horodatée par `updated_at`).
  */
 export const stampExemptTables: readonly string[] = [
   ...compositeKeyTables,
   "audit_log",
   "agent_proposal_decisions",
   "deliverable_overrides",
+  "project_incident_contacts",
 ];
 
 export interface CliResult {

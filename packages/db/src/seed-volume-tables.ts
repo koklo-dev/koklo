@@ -97,11 +97,21 @@ export const tableData = (profile: VolumeProfile, features: number): string => {
         ${field("nom", "'texte(120)'", ", 'contraintes', 'Obligatoire'")},
         ${field("cree_le", "'horodatage'")})
       || CASE WHEN ${chained} THEN jsonb_build_array(${field("parent_id", `'ref(T-table-' || ${previous} || ')'`)}) ELSE '[]'::jsonb END
-      || CASE WHEN n % 4 = 0 THEN jsonb_build_array(${field("email", "'texte(255)'", ", 'donnees_personnelles', true")}) ELSE '[]'::jsonb END,
+      || CASE WHEN n % 4 = 0 THEN jsonb_build_array(${field("email", "'texte(255)'", ", 'donnees_personnelles', true")}) ELSE '[]'::jsonb END${extraFieldsSql(profile)},
     'relations', CASE WHEN ${chained}
       THEN jsonb_build_array(jsonb_build_object('vers', 'T-table-' || ${previous}, 'cardinalite', 'n → 1'))
       ELSE '[]'::jsonb END || ${crossRelationsSql(profile)})`;
 };
+
+/** Mesures ajoutées à chaque table de `large` : au moins 2 000 champs à classer (TK-117). */
+const LARGE_EXTRA_FIELDS = 23;
+
+/** Rubriques supplémentaires d'une table, sur `large` seulement. */
+const extraFieldsSql = (profile: VolumeProfile): string =>
+  profile === "large"
+    ? ` || (SELECT jsonb_agg(jsonb_build_object('nom', 'mesure_' || m, 'type', 'entier') ORDER BY m)
+           FROM generate_series(1, ${LARGE_EXTRA_FIELDS}) AS m)`
+    : "";
 
 /** Lignes générées du premier jeu (B488) : 1 240 sur la planche, 5 000 sur `large`, graine égale au total. */
 const GENERATED_ROWS: Record<VolumeProfile, number> = { large: 5000, planche: 1240 };

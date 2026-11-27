@@ -7,6 +7,7 @@ import {
   noAroundWithCursor,
   pageNumberOf,
 } from "./schemas-lists.ts";
+import { incidentContactSchema, summaryCardSchema } from "./schemas-security.ts";
 import {
   criterionIdSchema,
   featureIdSchema,
@@ -510,6 +511,24 @@ export const clientSpaceTechnicalNfrInputSchema = z
   .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
 export const clientSpaceTechnicalNfrOutputSchema =
   listOf(clientNfrSchema).extend(clientTechnicalState);
+
+// --- TK-117 (3.19.0) : résumé de la Sécurité et contact en cas d'incident (B801, B803) ---
+export const clientSpaceSecurityInputSchema = z.object({ projectId: z.uuid() });
+/**
+ * Non validé : `available` faux, aucune carte, rien d'autre. Jamais de YAML, de chemin, de SHA ni d'identifiant.
+ * `contact` n'est jamais rendu au rôle business.
+ */
+export const clientSpaceSecurityOutputSchema = z.object({
+  available: z.boolean(),
+  validation: clientValidationSchema,
+  cards: z.array(summaryCardSchema),
+  validatedAt: z.iso.datetime().optional(),
+  contact: incidentContactSchema.optional(),
+});
+export const clientSpaceSecurityContactSetInputSchema = incidentContactSchema.extend({
+  projectId: z.uuid(),
+});
+export type ClientSpaceSecurity = z.output<typeof clientSpaceSecurityOutputSchema>;
 
 export type ClientSpaceTechnical = z.output<typeof clientSpaceTechnicalOutputSchema>;
 export type ClientStackChoice = z.output<typeof clientStackChoiceSchema>;

@@ -32,6 +32,9 @@ export interface SeededVolume {
   operations: number;
   nfrs: number;
   environments: number;
+  /** Sécurité (TK-117) : menaces, et entrées de données composées depuis les champs des tables. */
+  threats: number;
+  dataEntries: number;
 }
 
 export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
@@ -54,6 +57,9 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     operations: 500,
     nfrs: 200,
     environments: 3,
+    threats: 400,
+    // 72 tables classées (une sur dix reste libre), plus l'entrée e-mail des 16 qui en portent un.
+    dataEntries: 88,
   },
   // 47 « actions » de la planche = points d'accès ; la planche ne donne aucun volume de tickets,
   // 60 permettent d'exercer le kanban à l'écran (lecture prudente, B34).
@@ -78,6 +84,9 @@ export const SEED_VOLUMES: Record<VolumeProfile, SeededVolume> = {
     operations: 132,
     nfrs: 28,
     environments: 3,
+    threats: 18,
+    // Les 65 tables, la donnée sensible de la première et les 16 entrées e-mail.
+    dataEntries: 82,
   },
 };
 

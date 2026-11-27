@@ -17,7 +17,8 @@ export type EntityKind =
   | "adr"
   | "stack"
   | "endpoint"
-  | "nfr";
+  | "nfr"
+  | "threat";
 export const RULE_TYPES = ["contrainte", "calcul", "workflow"] as const;
 
 const select = { id: true, sort: true, specId: true, path: true, data: true } as const;

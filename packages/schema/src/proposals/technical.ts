@@ -6,7 +6,7 @@ import {
   stackProblems,
   VARIABLE_NAME,
 } from "../entities/technical.ts";
-import { safeText } from "./ai-text-policy.ts";
+import { anyOf, keysOf, link, links, oneLine, text } from "./fields.ts";
 
 /**
  * Types `stack`, `op`, `nfr`, `env` du livrable Technique (TK-115) : les noms des champs et les vocabulaires, en anglais,
@@ -50,15 +50,6 @@ export const TECHNICAL_PROPOSAL_VOCABULARY = {
     connected: "connecte",
   },
 } as const;
-
-const keysOf = <K extends string>(map: Readonly<Record<K, string>>) =>
-  z.enum(Object.keys(map) as [K, ...K[]]);
-
-const oneLine = (max: number) => safeText({ min: 1, max });
-const text = (max: number) => safeText({ min: 1, max, multiline: true });
-const link = (pattern: RegExp) => z.string().regex(pattern);
-const anyOf = (...patterns: RegExp[]) => link(new RegExp(patterns.map((p) => p.source).join("|")));
-const links = (pattern: RegExp, max = 30) => z.array(link(pattern)).max(max);
 
 const criterion = z
   .object({

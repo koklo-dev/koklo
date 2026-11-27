@@ -7,6 +7,7 @@ import {
   nfrCounterOf,
   rowsOf,
   ruleCounterOf,
+  threatCounterOf,
 } from "./index-rows.ts";
 import type { Target } from "./types.ts";
 
@@ -73,6 +74,21 @@ async function insertEntities(
   }
 }
 
+/** Compteurs du projet relevés depuis les identifiants de la spec indexée ; `feature` en tête. */
+const COUNTERS = [
+  ["feature", featureCounterOf],
+  ["rule", ruleCounterOf],
+  ["adr", adrCounterOf],
+  ["nfr", nfrCounterOf],
+  ["threat", threatCounterOf],
+] as const;
+const countersOf = (snapshot: SnapshotWrite) =>
+  COUNTERS.map(([name, counterOf]) => {
+    const counter: { raiseTo?: number; skipped: number } =
+      snapshot.status === "ready" ? counterOf(snapshot.spec) : { skipped: 0 };
+    return [name, counter] as const;
+  });
+
 /**
  * Écrit l'index d'un commit. Une seule transaction, sans appel réseau : snapshot (créé, ou repris
  * s'il était `building|failed` après purge de ses entités), entités, jointures, déplacement de la
@@ -93,10 +109,7 @@ export class IndexWriter {
     const { organizationId } = target.installation;
     const { id: repoId, projectId } = target.repo;
     const rows = snapshot.status === "ready" ? rowsOf(snapshot.spec, snapshot.flows) : undefined;
-    const counter = snapshot.status === "ready" ? featureCounterOf(snapshot.spec) : { skipped: 0 };
-    const rules = snapshot.status === "ready" ? ruleCounterOf(snapshot.spec) : { skipped: 0 };
-    const decisions = snapshot.status === "ready" ? adrCounterOf(snapshot.spec) : { skipped: 0 };
-    const requirements = snapshot.status === "ready" ? nfrCounterOf(snapshot.spec) : { skipped: 0 };
+    const counters = countersOf(snapshot);
     await withOrganization(organizationId, () =>
       this.client.$transaction(
         async (tx) => {
@@ -107,23 +120,17 @@ export class IndexWriter {
             create: { organizationId, repoId, branch, snapshotId },
             update: { snapshotId },
           });
-          if (counter.raiseTo !== undefined) {
-            await raiseCounterTo(tx, { organizationId, projectId }, "feature", counter.raiseTo);
-          }
-          if (rules.raiseTo !== undefined) {
-            await raiseCounterTo(tx, { organizationId, projectId }, "rule", rules.raiseTo);
-          }
-          if (decisions.raiseTo !== undefined) {
-            await raiseCounterTo(tx, { organizationId, projectId }, "adr", decisions.raiseTo);
-          }
-          if (requirements.raiseTo !== undefined) {
-            await raiseCounterTo(tx, { organizationId, projectId }, "nfr", requirements.raiseTo);
+          for (const [name, { raiseTo }] of counters) {
+            if (raiseTo !== undefined) {
+              await raiseCounterTo(tx, { organizationId, projectId }, name, raiseTo);
+            }
           }
         },
         { timeout: TRANSACTION_TIMEOUT_MS },
       ),
     );
-    return { counterRaisedTo: counter.raiseTo, counterSkipped: counter.skipped };
+    const feature = counters[0]?.[1];
+    return { counterRaisedTo: feature?.raiseTo, counterSkipped: feature?.skipped ?? 0 };
   }
 
   /** Crée le snapshot du commit, ou reprend celui qui existe en le vidant de ses entités. */

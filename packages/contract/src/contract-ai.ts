@@ -50,7 +50,7 @@ export const llmCallErrors = {
   ...llmProviderError,
 } as const;
 
-const proposalErrors = {
+export const proposalErrors = {
   ...llmCallErrors,
   ...llmCapReachedError,
   ...notFoundError,

@@ -14,7 +14,9 @@ import {
   jsonSchemaOf,
   nfrPrefillOutputSchema,
   operationPrefillOutputSchema,
+  sensitivePrefillOutputSchema,
   stackPrefillOutputSchema,
+  threatPrefillOutputSchema,
 } from "./ai-schemas.ts";
 
 /** Schéma de sortie, schéma demandé au modèle et livrable de chaque feuille préremplie. */
@@ -24,7 +26,16 @@ const SHEETS = {
   environment: { schema: environmentPrefillOutputSchema, deliverable: "technical" },
   operation: { schema: operationPrefillOutputSchema, deliverable: "technical" },
   nfr: { schema: nfrPrefillOutputSchema, deliverable: "technical" },
+  threat: { schema: threatPrefillOutputSchema, deliverable: "security" },
+  sensitive: { schema: sensitivePrefillOutputSchema, deliverable: "security" },
 } as const;
+
+/** Une durée de conservation ne vient jamais du modèle (A7) : retirée avant la validation, s'il en rend une. */
+const NEVER_PREFILLED = ["retention", "conservation"];
+function withoutRetention(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return raw;
+  return Object.fromEntries(Object.entries(raw).filter(([key]) => !NEVER_PREFILLED.includes(key)));
+}
 
 /** Un champ qui porte une valeur de secret est retiré (TK-115, B724) ; les autres restent. */
 function withoutSecrets(values: Record<string, unknown>): Record<string, unknown> {
@@ -69,7 +80,7 @@ export class AiPrefillService {
       }),
       output: { kind: "json", schema: jsonSchemaOf(schema) },
       frame: (nonce) => prefillPrompt(nonce, input.description, input.type),
-      settle: (response) => validated(response, (raw) => schema.parse(raw)),
+      settle: (response) => validated(response, (raw) => schema.parse(withoutRetention(raw))),
     });
     return aiPrefillItemOutputSchema.parse({ type: input.type, values: withoutSecrets(values) });
   }

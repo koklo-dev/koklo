@@ -6,11 +6,12 @@ import { PrismaReviewRepository } from "./prisma-review.repository.ts";
 import { ReviewController } from "./review.controller.ts";
 import { REVIEW_REPOSITORY } from "./review.repository.ts";
 import { ReviewService } from "./review.service.ts";
+import { SecurityValidateController } from "./security-validate.controller.ts";
 
 /** Le service n'est pas exporté : seul le contrôleur écrit une validation (session humaine). */
 @Module({
   imports: [TrackerModule, SpecReadModule, NotificationModule],
-  controllers: [ReviewController],
+  controllers: [ReviewController, SecurityValidateController],
   providers: [ReviewService, { provide: REVIEW_REPOSITORY, useClass: PrismaReviewRepository }],
 })
 export class ReviewModule {}

@@ -56,6 +56,16 @@ export const requiresClosedChoices = (input: {
   input.targetRef === "technical" &&
   input.status === "approved";
 
+/** Approuver la Sécurité exige aucune menace élevée sans parade et aucune donnée à classer (B804). */
+export const requiresSecurityClear = (input: {
+  targetKind: string;
+  targetRef: string;
+  status: string;
+}): boolean =>
+  input.targetKind === "deliverable" &&
+  input.targetRef === "security" &&
+  input.status === "approved";
+
 /**
  * Filtre Prisma de `review.list` pour le client (B325 e) : les cibles qu'il valide, jamais les livrables techniques.
  * Les écrans sont déjà exclus pour tous.

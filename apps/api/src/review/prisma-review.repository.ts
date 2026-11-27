@@ -5,6 +5,7 @@ import { isCahierComplete, progressOf } from "../client-space/client-space-progr
 import { NotificationEmitter } from "../notification/notification-emitter.ts";
 import { hasLinkedClient } from "../project/client-presence.ts";
 import { type Snapshot, SpecHeadResolver } from "../spec-read/spec-head-resolver.ts";
+import { readSecurityBlocker } from "../spec-security/security-blockers.query.ts";
 import { conflict, forbidden, notFound } from "../tracker/api-errors.ts";
 import { recordAudit } from "../tracker/audit.ts";
 import { keysetAfter, pageOfItems } from "../tracker/cursor.ts";
@@ -22,7 +23,12 @@ import type {
   SubmitReview,
   SubmittedReview,
 } from "./review.repository.ts";
-import { canReview, clientListFilter, requiresClosedChoices } from "./review-policy.ts";
+import {
+  canReview,
+  clientListFilter,
+  requiresClosedChoices,
+  requiresSecurityClear,
+} from "./review-policy.ts";
 import { readStatusFacts } from "./status-facts.ts";
 import { type EntityHash, targetHashOf } from "./target-hash.ts";
 
@@ -104,10 +110,10 @@ async function authorNamesOf(
     }),
   );
 }
-const UPSTREAM_DEPENDENT: readonly string[] = ["data", "architecture", "technical"];
+const UPSTREAM_DEPENDENT: readonly string[] = ["data", "architecture", "technical", "security"];
 /**
- * Données (B449), Architecture (TK-113) et cahier technique (TK-116) dépendent de leurs amonts : leur décision se compare
- * à la tête de la décision.
+ * Données (B449), Architecture (TK-113), cahier technique (TK-116) et Sécurité (TK-117) dépendent de leurs amonts : leur
+ * décision se compare à la tête de la décision.
  */
 const dependsOnUpstream = (input: SubmitReview) =>
   input.targetKind === "deliverable" && UPSTREAM_DEPENDENT.includes(input.targetRef);
@@ -137,6 +143,7 @@ export class PrismaReviewRepository implements ReviewRepository {
       const { baseline, hash } = await this.assertTarget(tx, scope, head.snapshot.id, input);
       assertBaselineAllowsDecision(baseline, input);
       await this.assertChoicesClosed(tx, head.snapshot.id, input);
+      await this.assertSecurityClear(tx, head.snapshot.id, input);
       const same = await this.findReplay(tx, scope, input, { headSha, hash });
       if (same) return { record: same, headSha, currentHash: hash };
       if (isCahierDecision(input)) await this.assertCahierComplete(tx, scope, head.snapshot, input);
@@ -232,6 +239,17 @@ export class PrismaReviewRepository implements ReviewRepository {
       where: { snapshotId, kind: "stack", data: { path: ["statut"], equals: "a_trancher" } },
     });
     if (open > 0) throw conflict("choices_open");
+  }
+
+  /** Approuver la Sécurité (B804) : `threats_open` puis `data_unclassified` sur la tête ; sinon rien n'est écrit. */
+  private async assertSecurityClear(
+    tx: Tx,
+    snapshotId: string,
+    input: SubmitReview,
+  ): Promise<void> {
+    if (!requiresSecurityClear(input)) return;
+    const reason = await readSecurityBlocker(tx, snapshotId);
+    if (reason !== undefined) throw conflict(reason);
   }
 
   /**

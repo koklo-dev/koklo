@@ -338,6 +338,9 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
       component: SEED_VOLUMES.large.components,
       archflow: SEED_VOLUMES.large.archflows,
       adr: SEED_VOLUMES.large.adrs,
+      // TK-117 : menaces et données classées de la Sécurité.
+      threat: SEED_VOLUMES.large.threats,
+      sensitive: SEED_VOLUMES.large.dataEntries,
     });
     const [snapshot] = await db.query<{ entities_indexed_at: Date | null }>(
       `SELECT s.entities_indexed_at FROM spec_snapshots s JOIN project_repos r ON r.id = s.repo_id
@@ -793,4 +796,72 @@ describe("TK-115 jeux de volume du cahier technique", () => {
     const position = stacks.findIndex((row) => String(row.data.role).includes("attestations"));
     expect(Math.floor(position / 24) + 1).toBe(5);
   }, 240_000);
+});
+
+/** Lignes `spec_entities` d'un projet de volume, désigné par son nom. */
+const volumeEntities = <T extends Record<string, unknown>>(name: string, sql: string) =>
+  db.query<T>(
+    `SELECT ${sql} FROM spec_entities e
+       JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+       JOIN projects p ON p.id = r.project_id
+      WHERE p.name = '${name}'`,
+  );
+
+type VolumeData = { champs?: unknown; id?: string };
+
+/** Champs du modèle absents de toute entrée de données. */
+function unclassifiedOf(rows: readonly { kind: string; data: VolumeData }[]) {
+  const of = (kind: string) => rows.filter((row) => row.kind === kind);
+  const model = of("table").flatMap(({ data }) =>
+    (data.champs as { nom: string }[]).map((field) => `${data.id?.slice(2)}.${field.nom}`),
+  );
+  const classified = new Set(of("sensitive").flatMap(({ data }) => data.champs as string[]));
+  return { fields: model.length, unclassified: model.filter((field) => !classified.has(field)) };
+}
+
+const securityFacts = async (name: string) => {
+  const [row] = await volumeEntities<{ threats: number; open_high: string[]; undated: string[] }>(
+    name,
+    `count(*) FILTER (WHERE e.kind = 'threat')::int AS threats,
+     coalesce(array_agg(e.spec_id) FILTER (WHERE e.kind = 'threat' AND e.data ->> 'gravite' = 'elevee'
+       AND e.data -> 'parades' = '[]'::jsonb), '{}') AS open_high,
+     coalesce(array_agg(e.data ->> 'categorie') FILTER (WHERE e.kind = 'sensitive'
+       AND e.data ->> 'categorie' <> 'technique' AND e.data ->> 'conservation' IS NULL), '{}') AS undated`,
+  );
+  const rows = await volumeEntities<{ kind: string; data: VolumeData }>(name, "e.kind, e.data");
+  return { ...row, ...unclassifiedOf(rows), kinds: new Set(rows.map((entry) => entry.kind)) };
+};
+
+/** TK-117 lot B (cas 6) : jeux de volume de la Sécurité, aux formes de l'index du worker ; aucune proposition semée. */
+describe("TK-117 seed:large et seed:planche : Sécurité", () => {
+  it("planche : 18 menaces dont SEC-T08 élevée sans parade ; tout classé, une durée manque", async () => {
+    await seedPlanche(db.url);
+    const planche = await securityFacts("Volume · planche");
+    expect(planche.threats).toBe(18);
+    expect(planche.open_high).toEqual(["SEC-T08"]);
+    expect(planche.unclassified).toEqual([]);
+    expect(planche.undated).toEqual(["sensible"]);
+    expect([...planche.kinds]).toEqual(
+      expect.arrayContaining(["rights", "asvs", "security_summary", "roles"]),
+    );
+  }, 120_000);
+
+  it("large : 400 menaces, au moins 2 000 champs dont des non classés ; idempotent, aucune proposition", async () => {
+    await seedLarge(db.url);
+    await seedLarge(db.url);
+    const large = await securityFacts("Volume · charge");
+    expect(large.threats).toBe(SEED_VOLUMES.large.threats);
+    expect(SEED_VOLUMES.large.threats).toBe(400);
+    expect(large.fields).toBeGreaterThanOrEqual(2000);
+    expect(large.unclassified.length).toBeGreaterThan(0);
+    const [security] = await db.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM agent_proposals WHERE deliverable = 'security'",
+    );
+    expect(security?.n).toBe(0);
+    const [counter] = await db.query<{ last_value: number }>(
+      `SELECT c.last_value FROM project_counters c JOIN projects p ON p.id = c.project_id
+        WHERE p.name = 'Volume · charge' AND c.name = 'threat'`,
+    );
+    expect(counter?.last_value).toBe(400);
+  }, 180_000);
 });

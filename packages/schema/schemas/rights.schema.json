@@ -1,0 +1,103 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/rights.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "matrice": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "pattern": "^PM-[a-z0-9][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*$",
+            "type": "string"
+          },
+          "cases": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "acces": {
+                  "enum": [
+                    "oui",
+                    "non",
+                    "restreint"
+                  ],
+                  "type": "string"
+                },
+                "restriction": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "role": {
+                  "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "acces"
+              ],
+              "type": "object"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "libelle": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "libelle",
+          "cases"
+        ],
+        "type": "object"
+      },
+      "maxItems": 2000,
+      "type": "array"
+    },
+    "propriete": {
+      "default": [],
+      "items": {
+        "maxLength": 300,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 100,
+      "type": "array"
+    },
+    "restrictions": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "permission": {
+            "pattern": "^PM-[a-z0-9][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*$",
+            "type": "string"
+          },
+          "restriction": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "role": {
+            "pattern": "^RL-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "permission",
+          "restriction"
+        ],
+        "type": "object"
+      },
+      "maxItems": 500,
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

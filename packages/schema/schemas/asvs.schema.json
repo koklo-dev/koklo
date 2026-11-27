@@ -1,0 +1,119 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/asvs.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "exigences": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "chapitre": {
+            "enum": [
+              "authentification",
+              "sessions",
+              "controle_acces",
+              "validation",
+              "cryptographie",
+              "journalisation",
+              "protection_donnees",
+              "configuration",
+              "api"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$",
+            "type": "string"
+          },
+          "liens": {
+            "items": {
+              "maxLength": 130,
+              "pattern": "^[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*$|^T-[a-z0-9][a-z0-9-]*$|^[a-z0-9][a-z0-9-]{0,62}\\.[a-z_][a-z0-9_]{0,62}$|^RL-[a-z0-9][a-z0-9-]*$|^NFR-[a-z0-9][a-z0-9-]*$|^ST-[a-z0-9][a-z0-9-]*$|^ENV-[a-z0-9][a-z0-9-]*$|^S-[a-z0-9][a-z0-9-]*$|^R-\\d{3,}$|^F-\\d{3,}$|^SEC-T\\d{2,}$|^ADR-\\d{3,}$|^C-[a-z0-9][a-z0-9-]*$|^PM-[a-z0-9][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*$",
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array"
+          },
+          "niveau": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 2,
+                "type": "number"
+              },
+              {
+                "const": 3,
+                "type": "number"
+              }
+            ]
+          },
+          "reponse": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "titre": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "chapitre",
+          "titre",
+          "niveau"
+        ],
+        "type": "object"
+      },
+      "maxItems": 1000,
+      "type": "array"
+    },
+    "niveau": {
+      "anyOf": [
+        {
+          "const": 1,
+          "type": "number"
+        },
+        {
+          "const": 2,
+          "type": "number"
+        },
+        {
+          "const": 3,
+          "type": "number"
+        }
+      ]
+    },
+    "secrets_et_dependances": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "libelle": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "valeur": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "libelle",
+          "valeur"
+        ],
+        "type": "object"
+      },
+      "maxItems": 20,
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

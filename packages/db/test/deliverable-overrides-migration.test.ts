@@ -48,9 +48,9 @@ describe("TK-100 migration deliverable_overrides : dossier et contenu", () => {
     );
   });
 
-  it("expectedTables contient la table (63 au total) ; le modèle est un modèle d'organisation", () => {
+  it("expectedTables contient la table (64 au total) ; le modèle est un modèle d'organisation", () => {
     expect(expectedTables).toContain("deliverable_overrides");
-    expect(expectedTables).toHaveLength(63);
+    expect(expectedTables).toHaveLength(64);
     expect(dbPackage.TENANT_MODELS).toContain("DeliverableOverride");
   });
 });

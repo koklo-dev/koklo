@@ -46,6 +46,7 @@ const CHECKED = new Set([
   "stack",
   "op",
   "nfr",
+  "threat",
 ]);
 
 const targetOf = (operation: PreparedOperation): string | null =>

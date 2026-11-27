@@ -1,10 +1,14 @@
 import {
+  DATA_CATEGORIES,
   ENVIRONMENT_DATA,
   ENVIRONMENT_DEPLOYMENTS,
   NFR_CATEGORIES,
   NFR_VERIFICATIONS,
   OPERATION_TYPES,
   STACK_STATUSES,
+  THREAT_CATEGORIES,
+  THREAT_SEVERITIES,
+  THREAT_VERIFICATIONS,
 } from "@koklo/contract";
 import {
   criteriaListSchema,
@@ -173,5 +177,30 @@ export const nfrPrefillOutputSchema = z
       .array(linkOf(PATTERNS.component, PATTERNS.stack, PATTERNS.adr, PATTERNS.rule))
       .max(30)
       .optional(),
+  })
+  .strict();
+
+/** Préremplissage de la feuille « Menace » (TK-117) : surfaces et valeurs fermées. */
+export const threatPrefillOutputSchema = z
+  .object({
+    title: line(200).optional(),
+    category: z.enum(THREAT_CATEGORIES).optional(),
+    severity: z.enum(THREAT_SEVERITIES).optional(),
+    surfaces: z.array(linkOf(PATTERNS.feature, /^api$/)).max(30).optional(),
+    risk: safeText({ min: 1, max: 2000, multiline: true }).optional(),
+    measures: lines(300, 30).optional(),
+    verification: z.enum(THREAT_VERIFICATIONS).optional(),
+  })
+  .strict();
+
+/** Préremplissage de la feuille « Donnée » (TK-117) : jamais de conservation, seulement une suggestion (A7). */
+export const sensitivePrefillOutputSchema = z
+  .object({
+    field: z.string().regex(PATTERNS.dataField).optional(),
+    data: line(200).optional(),
+    category: z.enum(DATA_CATEGORIES).optional(),
+    access: lines(120, 30).optional(),
+    protection: safeText({ min: 1, max: 1000, multiline: true }).optional(),
+    retentionSuggestion: line(300).optional(),
   })
   .strict();

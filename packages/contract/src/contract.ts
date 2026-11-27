@@ -10,6 +10,7 @@ import { projectClient } from "./contract-project-client.ts";
 import { proposal } from "./contract-proposals.ts";
 import { installation, repo } from "./contract-provider.ts";
 import { review } from "./contract-review.ts";
+import { security } from "./contract-security.ts";
 import { invitation, me, memberSettings, org } from "./contract-settings.ts";
 import { projectShell, search } from "./contract-shell.ts";
 import { spec, specBatch, specMigration } from "./contract-spec.ts";
@@ -253,6 +254,7 @@ export const contract = {
   suggestion,
   idea,
   review,
+  security,
   ticket,
   dependency,
   sprint,

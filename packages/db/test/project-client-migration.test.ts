@@ -42,7 +42,7 @@ const withoutReviewKinds = (enums: string[]) =>
       // TK-109 à TK-116 : les cibles ajoutées à `comment_target_kind` (de `table` à `requirements`) sont postérieures.
       entry.startsWith("comment_target_kind:")
         ? entry.replace(
-            /,table(,component,adr,archflow,stack,environments,tech_section,operation,requirements)?$/,
+            /,table(,component,adr,archflow,stack,environments,tech_section,operation,requirements,security_summary)?$/,
             "",
           )
         : entry,
@@ -151,7 +151,7 @@ describe("TK-55a migration project_client_access : dossier et contenu", () => {
 
   it("expectedTables contient la table (56 au total avec TK-91)", () => {
     for (const table of PROJECT_CLIENT_TABLES) expect(expectedTables).toContain(table);
-    expect(expectedTables).toHaveLength(63);
+    expect(expectedTables).toHaveLength(64);
   });
 });
 

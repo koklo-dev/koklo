@@ -6,12 +6,20 @@ import {
   emitFlowYaml,
   emitRolesYaml,
   emitRuleMarkdown,
+  emitSecurityDataYaml,
   emitTableYaml,
+  emitThreatYaml,
   parseSpecFiles,
 } from "@koklo/schema";
 import { describe, expect, it } from "vitest";
 import { entityRowsOf } from "./entity-rows.ts";
-import { adrCounterOf, nfrCounterOf, rowsOf, ruleCounterOf } from "./index-rows.ts";
+import {
+  adrCounterOf,
+  nfrCounterOf,
+  rowsOf,
+  ruleCounterOf,
+  threatCounterOf,
+} from "./index-rows.ts";
 
 /** TK-103 lot A : lignes `spec_entities` des règles (tri numérique), rôles, parcours YAML et JSON hérité ; jamais d'échec d'index. */
 const rule = (n: number, over: Record<string, unknown> = {}) => ({
@@ -395,5 +403,67 @@ describe("entityRowsOf : ordre des opérations et des exigences", () => {
   it("l'ordre des champs d'entrée et de sortie est gardé (jsonb réordonne les clés)", () => {
     const first = of(rows, "endpoint").find((row) => row.specId === "omega.get");
     expect(first?.data).toMatchObject({ champs: { entree: ["serviceId", "au"], sortie: [] } });
+  });
+});
+
+/** TK-117 lot B (B791, B792, B808) : entités de la Sécurité : menaces triées par surface, une ligne par donnée. */
+describe("TK-117 lignes de la Sécurité", () => {
+  const threat = (id: string, surface: string) => ({
+    path: `security/threats/${id}.yaml`,
+    content: emitThreatYaml({
+      id,
+      titre: `Menace ${id}`,
+      surfaces: [surface],
+      categorie: "abus",
+      gravite: "faible",
+      risque: "r",
+      verification: { mode: "revue_humaine" },
+    }),
+  });
+  const data = {
+    path: "security/data.yaml",
+    content: emitSecurityDataYaml({
+      transferts: "Aucun.",
+      donnees: [
+        { donnee: "Téléphone", champs: ["clientes.telephone"], categorie: "contact" },
+        { donnee: "Nom", champs: ["clientes.nom", "clientes.prenom"], categorie: "personnelle" },
+      ],
+    }),
+  };
+  const files = [
+    threat("SEC-T01", "api"),
+    threat("SEC-T02", "F-010"),
+    threat("SEC-T10", "F-009"),
+    threat("SEC-T03", "F-009"),
+    data,
+    { path: "security/rights.yaml", content: "propriete:\n  - R.\n" },
+    { path: "security/asvs.yaml", content: "niveau: 2\n" },
+  ];
+  const rows = entityRowsOf(parseSpecFiles(files).spec);
+  const of = (kind: string) =>
+    rows.filter((row) => row.kind === kind).sort((a, b) => a.sort - b.sort);
+
+  it("menaces triées par surface (fonctionnalités puis API) puis numéro, titrées", () => {
+    expect(of("threat").map((row) => row.specId)).toEqual([
+      "SEC-T03",
+      "SEC-T10",
+      "SEC-T02",
+      "SEC-T01",
+    ]);
+    expect(of("threat")[0]?.data).toMatchObject({ titre: "Menace SEC-T03", parades: [] });
+  });
+
+  it("une ligne par donnée (premier champ), transferts repris ; droits et exigences en une ligne", () => {
+    expect(of("sensitive").map((row) => row.specId)).toEqual([
+      "clientes.nom",
+      "clientes.telephone",
+    ]);
+    expect(of("sensitive")[1]?.data).toMatchObject({ titre: "Téléphone", transferts: "Aucun." });
+    expect(of("rights").map((row) => row.specId)).toEqual(["rights"]);
+    expect(of("asvs").map((row) => row.specId)).toEqual(["asvs"]);
+  });
+
+  it("compteur threat relevé au plus grand numéro", () => {
+    expect(threatCounterOf(parseSpecFiles(files).spec)).toEqual({ raiseTo: 10, skipped: 0 });
   });
 });

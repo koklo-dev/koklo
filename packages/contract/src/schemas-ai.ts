@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { IDEA_MESSAGE_MAX, ideaProposalSchema } from "./schemas-idea.ts";
 import { llmProviderSchema } from "./schemas-llm-credential.ts";
+import {
+  dataCategorySchema,
+  dataFieldSchema,
+  threatCategorySchema,
+  threatSeveritySchema,
+  threatVerificationSchema,
+} from "./schemas-security.ts";
 import { featureIdSchema, featurePrioritySchema, stepTypeSchema } from "./schemas-spec.ts";
 import { componentIdSchema } from "./schemas-spec-architecture.ts";
 import {
@@ -155,7 +162,15 @@ export type AiIdeaGapsOutput = z.output<typeof aiIdeaGapsOutputSchema>;
 export const AI_PREFILL_DESCRIPTION_MAX = 500;
 export const AI_PREFILL_LINKS_MAX = 30;
 
-export const AI_PREFILL_TYPES = ["feature", "stack", "environment", "operation", "nfr"] as const;
+export const AI_PREFILL_TYPES = [
+  "feature",
+  "stack",
+  "environment",
+  "operation",
+  "nfr",
+  "threat",
+  "sensitive",
+] as const;
 
 export const aiPrefillItemInputSchema = z.object({
   projectId: z.uuid(),
@@ -227,10 +242,32 @@ export const prefilledNfrValuesSchema = z.object({
   links: z.array(line(100)).max(AI_PREFILL_LINKS_MAX).optional(),
 });
 
+/** Champs de la feuille « Menace » (3.19.0). */
+export const prefilledThreatValuesSchema = z.object({
+  title: line(200).optional(),
+  category: threatCategorySchema.optional(),
+  severity: threatSeveritySchema.optional(),
+  surfaces: z.array(line(100)).max(30).optional(),
+  risk: z.string().min(1).max(2000).optional(),
+  measures: z.array(line(300)).max(30).optional(),
+  verification: threatVerificationSchema.optional(),
+});
+/** Champs de la feuille « Donnée » (3.19.0) : jamais de conservation (A7), seulement une suggestion. */
+export const prefilledSensitiveValuesSchema = z.object({
+  field: dataFieldSchema.optional(),
+  data: line(200).optional(),
+  category: dataCategorySchema.optional(),
+  access: z.array(line(120)).max(30).optional(),
+  protection: z.string().min(1).max(1000).optional(),
+  retentionSuggestion: line(300).optional(),
+});
+
 export const aiPrefillItemOutputSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("feature"), values: prefilledValuesSchema }),
   z.object({ type: z.literal("stack"), values: prefilledStackValuesSchema }),
   z.object({ type: z.literal("environment"), values: prefilledEnvironmentValuesSchema }),
   z.object({ type: z.literal("operation"), values: prefilledOperationValuesSchema }),
   z.object({ type: z.literal("nfr"), values: prefilledNfrValuesSchema }),
+  z.object({ type: z.literal("threat"), values: prefilledThreatValuesSchema }),
+  z.object({ type: z.literal("sensitive"), values: prefilledSensitiveValuesSchema }),
 ]);

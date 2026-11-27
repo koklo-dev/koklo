@@ -57,6 +57,8 @@ const GROUPS: Record<string, string[]> = {
     "projects",
     "roles",
     "rules",
+    "security",
+    "securityContactSet",
     "technical",
     "technicalDocument",
     "technicalEnvironments",
@@ -148,6 +150,7 @@ describe("R1 routeur : 22 groupes (TK-42 : +4, TK-52b : +1, TK-54b : +1, TK-55a 
         "repo",
         "review",
         "search",
+        "security",
         "spec",
         "specBatch",
         "specMigration",
@@ -395,6 +398,25 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
     "GET /client-space/projects/{projectId}/roles",
     "POST /projects/{projectId}/reviews/reminders",
   ];
+  /** TK-117 (contrat 3.19.0) : livrable Sécurité et vue client. */
+  const SECURITY_PAIRS = [
+    "GET /client-space/projects/{projectId}/security",
+    "GET /projects/{projectId}/spec/security/asvs",
+    "GET /projects/{projectId}/spec/security/data",
+    "GET /projects/{projectId}/spec/security/data/registry",
+    "GET /projects/{projectId}/spec/security/rights",
+    "GET /projects/{projectId}/spec/security/summary",
+    "GET /projects/{projectId}/spec/security/threats",
+    "GET /projects/{projectId}/spec/security/threats/{threatId}",
+    "POST /client-space/projects/{projectId}/security/contact",
+    "POST /projects/{projectId}/spec/security/asvs/level",
+    "POST /projects/{projectId}/spec/security/data",
+    "POST /projects/{projectId}/spec/security/summary/accept",
+    "POST /projects/{projectId}/spec/security/summary/proposals",
+    "POST /projects/{projectId}/spec/security/threats",
+    "POST /projects/{projectId}/spec/security/threats/{threatId}",
+    "POST /projects/{projectId}/spec/security/validate",
+  ];
   it("les 25 paires de TK-29, les 10 de TK-42, les 4 de TK-52b, les 4 de TK-54b et les 3 de TK-55a les 3 de TK-55b les 5 de TK-55c les 2 de TK-55d les 4 de TK-88 les 13 de TK-97 les 11 de TK-98 les 11 de TK-89 et les 6 de TK-90 et les 3 de TK-91 et les 4 de TK-93 et les 6 de TK-99a et les 5 de TK-100 et TK-101 et les 5 de TK-104 sont présentes (137 routes ; les 2 de TK-106)", async () => {
     const d = await doc();
     const pairs = Object.entries(d.paths).flatMap(([p, ops]) =>
@@ -416,10 +438,11 @@ describe("R2 OpenAPI : méthode et chemin de chaque nouvelle procédure", () => 
       ...CARDS_PAIRS,
       ...DELIVERABLE_PAIRS,
       ...MIGRATION_PAIRS,
+      ...SECURITY_PAIRS,
     ];
     for (const pair of expected) expect(pairs, pair).toContain(pair);
     expect(pairs).toHaveLength(8 + expected.length);
-    expect(pairs).toHaveLength(191);
+    expect(pairs).toHaveLength(207);
   });
 });
 

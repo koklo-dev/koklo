@@ -15,17 +15,25 @@ import { assertDeliverableRole } from "./proposal-access.ts";
 import { validContent } from "./proposal-content.ts";
 import { proposalView } from "./proposal-views.ts";
 
+type Payload = Record<string, unknown>;
+
+/** `specId` de l'original à la place de celui de la sortie ; sans `specId` d'origine, aucun. */
+function withOriginalSpecId(revised: Payload, original: Payload | undefined): Payload {
+  const { specId: _fromModel, ...payload } = revised;
+  const specId = original?.specId;
+  return typeof specId === "string" ? { ...payload, specId } : payload;
+}
+
 /**
- * « Retoucher » garde le `specId` de l'original (B615) : posé par le worker seul, jamais par le modèle. Sans `specId`
- * d'origine, celui de la sortie est retiré.
+ * « Retoucher » garde le `specId` de l'original (B615), y compris dans l'exigence d'une proposition ASVS (TK-117) : posé
+ * par le worker seul, jamais par le modèle.
  */
-function keepSpecId(content: RevisedContent, original: Record<string, unknown>): RevisedContent {
-  const { specId: _fromModel, ...payload } = content.payload;
-  const specId = original.specId;
-  return {
-    title: content.title,
-    payload: typeof specId === "string" ? { ...payload, specId } : payload,
-  };
+function keepSpecId(content: RevisedContent, original: Payload): RevisedContent {
+  const payload = withOriginalSpecId(content.payload, original);
+  const requirement = payload.requirement as Payload | undefined;
+  if (requirement === undefined) return { title: content.title, payload };
+  const kept = withOriginalSpecId(requirement, original.requirement as Payload | undefined);
+  return { title: content.title, payload: { ...payload, requirement: kept } };
 }
 
 /**
