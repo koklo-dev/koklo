@@ -46,13 +46,21 @@ last_reviewed: 2026-11-21
 | 025 | TK-114g (création déjà présente sur la tête : état terminal « Déjà présente dans la spec », plus de remise à relire) | ✅ fusionné (PR #240) ; décisions B697 à B705 ; contrat 3.16.0 ; DESIGN v2.35 ; migration `discard_reason` |
 | 025 | TK-114h (relecture : identifiant long, le titre passe dessous au lieu d'être écrasé en colonne ; détail : l'identifiant passe à la ligne) | ✅ fusionné (branche `fix/tk-114h-identifiant-long`) ; correction directe, sans workflow |
 | 025 | TK-114i (identifiants longs : liste des flux, en-têtes et fiche sans débordement ; compteur « Composants » en relecture limité aux créations pas encore enregistrées) | ✅ fusionné (branche `fix/tk-114i-affichage-architecture`) ; décisions B708 à B717 ; web et ui seuls, sans contrat ni migration |
+| 026 | TK-115 (Technique : formats, six états, onglets Stack, Environnements, Document, refus des secrets, contrat 3.17.0) | ✅ fusionné (PR #245, `d048a99b`) ; décisions B718 à B767 ; 5 migrations |
+| 026 | TK-116 (Technique : onglets API et Exigences, contrat généré, « Valider », contrat 3.18.0) | PR ouverte ; décisions B768 à B789 ; 1 migration. Suivis mineurs relevés en revue : erreur d'opération sans règle dont le « quand » contient « · » mal relue (bloque l'enregistrement) ; « Valider » désactivé sans raison visible en « À revoir » ; lien `?op=` périmé en vue client |
 
-Ticket en cours : aucun (TK-114i fusionné) (TK-114h fusionné) (TK-114g fusionné) (TK-114f fusionné) (TK-114e fusionné) (TK-114d fusionné) (TK-114c fusionné) (TK-114b fusionné). Prochain : TK-115 (sprint 026, Technique : formats, états, Stack, Environnements), **pas encore lancé**. DoD des sprints 022 à 025 encore à vérifier avant de les cocher ; case de TK-110 (sprint 024) à cocher après relecture des captures.
+Ticket en cours : TK-116 (PR ouverte), puis TK-117, recette staging du sprint 026, puis TK-130, TK-63, TK-64, TK-65 (mandat du 2026-11-27, voir « Règles de l'utilisateur »). Cases du sprint 026 à cocher après la recette.
 
 Interdit pour l'instant : le lot 12 (`23-Lot12Tickets`). Questions ouvertes pour l'utilisateur : A1, B16 (`questions.md`).
 
 ## Règles de l'utilisateur (ne pas redemander)
 
+- **Mandat du 2026-11-27** : livraison continue du sprint 026 sans l'utilisateur (TK-115 fusionné, PR #245, `d048a99b` ;
+  puis TK-116, TK-117, recette staging, cases du sprint), avec vérification de chaque déploiement. **S'arrêter avant le
+  Design (sprint 027, TK-118 et suivants)** : brainstorming préalable avec l'utilisateur sur les maquettes, l'interface et un
+  format d'écran portable et partageable (idée : rendu HTML/CSS annoté dans le dossier spec).
+  Complément du même jour : une fois TK-117 validé, avancer sur les sprints suivants **sans TK-118 ni aucun travail de
+  maquettage ou d'écran du Design** (ni les tickets qui en dépendent). Lot 12 toujours interdit.
 - Autonomie : fusion vers `develop` autorisée quand la CI est verte (`gh pr merge N --rebase --delete-branch`).
   **Historique linéaire** (demande du 2026-11-12, imposé par la protection de `develop`) : jamais de merge de
   `develop` dans une branche. Une branche en retard se rebase (`gh pr update-branch N --rebase`) ou se recrée depuis
