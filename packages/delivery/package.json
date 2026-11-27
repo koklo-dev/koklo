@@ -7,14 +7,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
-    },
-    "./claude-code": {
-      "types": "./dist/claude-code/index.d.ts",
-      "default": "./dist/claude-code/index.js"
     }
   },
   "scripts": {
@@ -22,10 +14,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "build": "tsc -p tsconfig.build.json"
-  },
-  "dependencies": {
-    "@koklo/domain": "workspace:*",
-    "@koklo/rules": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

@@ -6,50 +6,26 @@ import deliveryVitestConfig, { deliveryCoverageThresholds } from "../vitest.conf
 
 const root = resolve(import.meta.dirname, "..");
 const srcDir = resolve(root, "src");
+/** La machine d'étapes pure, et rien d'autre : Koklo n'exécute aucun agent (ADR 0023). */
 const FILES = [
-  "agent-budget.ts",
-  "agent-credential.ts",
-  "agent-errors.ts",
-  "agent-output.ts",
-  "agent-request.ts",
-  "agent-runtime.ts",
-  "agent-tools.ts",
   "block-cause.ts",
   "errors.ts",
   "index.ts",
-  "quota-backoff.ts",
-  "quota-policy.ts",
-  "quota-reset.ts",
-  "quota-serialize.ts",
-  "quota-signal.ts",
-  "quota-state.ts",
-  "quota-usage.ts",
+  "one-of.ts",
+  "run-counters.ts",
   "run-effects.ts",
+  "run-event-check.ts",
   "run-event.ts",
   "run-resume.ts",
   "run-state.ts",
   "run-transitions.ts",
   "run.ts",
+  "value-check.ts",
 ];
-/** Cœur pur : `src/*.ts` et `src/testing/*.ts` ; `src/claude-code/` (lot 73c, I/O) en est exclu. */
-const CORE_DIRS = ["", "testing"] as const;
 const sources = () =>
-  CORE_DIRS.flatMap((dir) =>
-    readdirSync(resolve(srcDir, dir), { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
-      .map((entry) => {
-        const file = dir === "" ? entry.name : `${dir}/${entry.name}`;
-        return { file, text: readFileSync(resolve(srcDir, file), "utf8") };
-      }),
-  );
-/** Adaptateur d'E/S (lot 73c) : seul sous-dossier autorise a importer node:child_process/fs/path. */
-const adapterSources = () =>
-  readdirSync(resolve(srcDir, "claude-code"), { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
-    .map((entry) => ({
-      file: `claude-code/${entry.name}`,
-      text: readFileSync(resolve(srcDir, "claude-code", entry.name), "utf8"),
-    }));
+  readdirSync(srcDir, { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".ts"))
+    .map((file) => ({ file, text: readFileSync(resolve(srcDir, file), "utf8") }));
 const importsOf = (source: string) =>
   [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1] as string);
 
@@ -74,25 +50,14 @@ const functionLengths = (text: string): number[] => {
 };
 
 describe("pureté de packages/delivery", () => {
-  it("contient les fichiers attendus", () => {
-    expect(readdirSync(srcDir).sort()).toEqual(expect.arrayContaining(FILES));
+  it("src/ contient exactement les fichiers de la machine, sans sous-dossier", () => {
+    expect(readdirSync(srcDir).sort()).toEqual(FILES);
   });
 
-  it("contient les fichiers du faux et de la conformité sous src/testing", () => {
-    expect(readdirSync(resolve(srcDir, "testing")).sort()).toEqual(
-      expect.arrayContaining(["agent-conformance.ts", "fake-agent-runtime.ts", "index.ts"]),
-    );
-  });
-
-  it("n'importe que du relatif, @koklo/domain ou @koklo/rules (ni node:*, fs, Prisma, Nest, Octokit)", () => {
+  it("n'importe que du relatif (ni paquet, ni node:*)", () => {
     for (const { file, text } of sources()) {
       for (const spec of importsOf(text)) {
-        const ok =
-          spec.startsWith("./") ||
-          (file.startsWith("testing/") && spec.startsWith("../")) ||
-          spec === "@koklo/domain" ||
-          spec === "@koklo/rules";
-        expect(ok, `${file} importe « ${spec} »`).toBe(true);
+        expect(spec.startsWith("./"), `${file} importe « ${spec} »`).toBe(true);
       }
     }
   });
@@ -105,21 +70,6 @@ describe("pureté de packages/delivery", () => {
       expect(forbidden.test(code), `${file} utilise une API impure`).toBe(false);
     }
   });
-});
-
-describe("pureté de packages/delivery : frontières", () => {
-  it("le cœur ne dépend jamais de l'adaptateur src/claude-code/ ni de node:*", () => {
-    for (const { file, text } of sources()) {
-      expect(/claude-code|node:|child_process/.test(importsOf(text).join("\n")), file).toBe(false);
-    }
-  });
-
-  it("l'index public n'exporte ni le faux ni la suite de conformité", () => {
-    const index = readFileSync(resolve(srcDir, "index.ts"), "utf8");
-    expect(/testing|FakeAgent|Conformance/.test(index)).toBe(false);
-    expect(delivery).not.toHaveProperty("FakeAgentRuntime");
-    expect(delivery).not.toHaveProperty("runAgentRuntimeConformance");
-  });
 
   it("garde chaque fichier à 300 lignes au plus et chaque fonction à 50 lignes au plus", () => {
     for (const { file, text } of sources()) {
@@ -128,87 +78,6 @@ describe("pureté de packages/delivery : frontières", () => {
         expect(length, `${file} : fonction de ${length} lignes`).toBeLessThanOrEqual(50);
       }
     }
-  });
-});
-
-describe("adaptateur src/claude-code/ (lot 73c)", () => {
-  const ALLOWED_NODE = ["node:child_process", "node:fs", "node:fs/promises", "node:path"];
-
-  it("contient les fichiers attendus", () => {
-    expect(readdirSync(resolve(srcDir, "claude-code")).sort()).toEqual(
-      expect.arrayContaining([
-        "classify.ts",
-        "command.ts",
-        "environment.ts",
-        "index.ts",
-        "redact.ts",
-        "runtime.ts",
-        "worktree.ts",
-      ]),
-    );
-  });
-
-  it("n'importe que du relatif, @koklo/domain, @koklo/rules ou node:child_process/fs/path", () => {
-    for (const { file, text } of adapterSources()) {
-      for (const spec of importsOf(text)) {
-        const ok =
-          spec.startsWith("./") ||
-          spec.startsWith("../") ||
-          spec === "@koklo/domain" ||
-          spec === "@koklo/rules" ||
-          ALLOWED_NODE.includes(spec);
-        expect(ok, `${file} importe « ${spec} »`).toBe(true);
-      }
-    }
-  });
-
-  it("est le SEUL a importer node:child_process, et l'importe bien", () => {
-    const withChildProcess = adapterSources().filter(({ text }) =>
-      importsOf(text).includes("node:child_process"),
-    );
-    expect(withChildProcess.length).toBeGreaterThan(0);
-    for (const { file, text } of sources()) {
-      expect(/child_process|node:fs|node:path/.test(importsOf(text).join("\n")), file).toBe(false);
-    }
-  });
-
-  it("n'emploie jamais de shell ni l'option dangereuse", () => {
-    for (const { file, text } of adapterSources()) {
-      const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-      expect(
-        /shell:\s*true|\bexec\(|execSync|--dangerously-skip-permissions/.test(code),
-        file,
-      ).toBe(false);
-    }
-  });
-});
-
-describe("adaptateur src/claude-code/ : taille et API", () => {
-  it("garde chaque fichier a 300 lignes au plus et chaque fonction a 50 lignes au plus", () => {
-    for (const { file, text } of adapterSources()) {
-      expect(text.split("\n").length, `${file} depasse 300 lignes`).toBeLessThanOrEqual(300);
-      for (const length of functionLengths(text)) {
-        expect(length, `${file} : fonction de ${length} lignes`).toBeLessThanOrEqual(50);
-      }
-    }
-  });
-
-  it("exporte l'API de l'adaptateur par le sous-chemin, hors de l'index public", async () => {
-    const adapter = await import("../src/claude-code/index.ts");
-    for (const name of [
-      "ClaudeCodeRuntime",
-      "buildClaudeArgv",
-      "claudeToolRules",
-      "buildChildEnv",
-      "CLAUDE_ENV_ALLOWLIST",
-      "redactSecrets",
-      "classifyClaudeFailure",
-      "resolveWorktree",
-      "HARD_OUTPUT_FACTOR",
-    ]) {
-      expect(adapter, name).toHaveProperty(name);
-    }
-    expect(delivery).not.toHaveProperty("ClaudeCodeRuntime");
   });
 });
 
@@ -225,88 +94,30 @@ const PUBLIC_API: readonly string[] = [
   "canApply",
   "allowedEvents",
   "resumePoint",
+  "canRestartDevelopment",
   "InvalidRunStateError",
   "InvalidRunEventError",
   "InvalidRunTransitionError",
   "StaleRunError",
   "ResumeRequiredError",
-  "canRestartDevelopment",
-  "AGENT_RUNTIME_IDS",
-  "AGENT_RESULT_STATUSES",
-  "AGENT_FAILURE_REASONS",
-  "AGENT_TRACE_PATTERN",
-  "AGENT_MAX_TIMEOUT_MS",
-  "AGENT_MAX_COST_MICRO_USD",
-  "AGENT_MAX_OUTPUT_CHARS",
-  "AGENT_MAX_PROMPT_CHARS",
-  "AGENT_TOOL_POLICY_KEYS",
-  "assertSessionRequest",
-  "assertAgentBudget",
-  "toolsForRole",
-  "isWithinRolePolicy",
-  "countsAsAgentFailure",
-  "agentCredential",
-  "isAgentCredential",
-  "revealAgentCredential",
-  "agentOutput",
-  "isAgentOutput",
-  "AgentRuntimeError",
-  "InvalidAgentRequestError",
-  "InvalidAgentBudgetError",
-  "AgentBudgetExceededError",
-  "AgentRuntimeUnavailableError",
-  "AgentAuthError",
-  "InvalidAgentCredentialError",
-  "detectQuota",
-  "classifyAgentFailure",
-  "QUOTA_PATTERNS",
-  "startQuotaState",
-  "onQuotaHit",
-  "recordUsage",
-  "canStart",
-  "nextAllowedAt",
-  "quotaDecision",
-  "clearQuota",
-  "resolveResetAt",
-  "serializeQuotaState",
-  "parseQuotaState",
-  "quotaHitEvent",
-  "assertNoQuotaBlock",
-  "InvalidQuotaError",
-  "StaleQuotaError",
 ];
 
 describe("pureté de packages/delivery : API", () => {
-  it("exporte l'API publique figée", () => {
-    for (const name of PUBLIC_API) {
-      expect(delivery, name).toHaveProperty(name);
-    }
+  it("exporte exactement l'API de la machine", () => {
+    expect(Object.keys(delivery).sort()).toEqual([...PUBLIC_API].sort());
   });
 });
 
 describe("package.json, étiquette et seuils", () => {
   const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 
-  it("ne dépend à l'exécution que de @koklo/domain et @koklo/rules, en workspace", () => {
-    expect(pkg.dependencies).toEqual({
-      "@koklo/domain": "workspace:*",
-      "@koklo/rules": "workspace:*",
-    });
+  it("n'a aucune dépendance à l'exécution", () => {
+    expect(pkg).not.toHaveProperty("dependencies");
   });
 
-  it("exporte « . », « ./testing » et « ./claude-code »", () => {
-    const keys = Object.keys(pkg.exports);
-    expect(keys).toEqual(expect.arrayContaining([".", "./testing", "./claude-code"]));
-    expect(pkg.exports["./claude-code"]).toEqual({
-      types: "./dist/claude-code/index.d.ts",
-      default: "./dist/claude-code/index.js",
-    });
-    for (const key of keys) {
-      expect([".", "./testing", "./claude-code"]).toContain(key);
-    }
-    expect(pkg.exports["./testing"]).toEqual({
-      types: "./dist/testing/index.d.ts",
-      default: "./dist/testing/index.js",
+  it("n'exporte que « . »", () => {
+    expect(pkg.exports).toEqual({
+      ".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
     });
   });
 

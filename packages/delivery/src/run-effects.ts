@@ -1,6 +1,6 @@
 import type { BlockCause } from "./block-cause.ts";
 
-/** Commandes décrites par la machine ; le runner (TK-75/76) les exécute, la machine n'exécute rien. */
+/** Commandes décrites par la machine ; elle n'exécute rien, et Koklo n'exécute aucun agent. */
 export type RunEffect =
   | { readonly type: "prepare_worktree" }
   | { readonly type: "start_dev" }

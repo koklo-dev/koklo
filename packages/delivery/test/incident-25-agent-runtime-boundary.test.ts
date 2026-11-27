@@ -1,18 +1,19 @@
-/** Critere d'acceptation de TK-73 : aucune invocation d'outil d'agent hors de l'adaptateur. */
+/** Incident 25, durci par TK-130 : Koklo n'invoque aucun outil d'agent, sans exception de chemin. */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  ADAPTER_PREFIX,
   CHILD_PROCESS_ALLOWLIST,
   type SourceFile,
   scanAgentBoundary,
+  scanAgentDependencies,
   scanChildProcessImports,
 } from "./agent-boundary-scan.ts";
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const SKIPPED = new Set(["node_modules", "dist", "coverage", ".next", "test", "tests"]);
 const SOURCE = /\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/;
+const GROUPS = ["packages", "apps"];
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -21,21 +22,32 @@ const walk = (dir: string): string[] =>
     return statSync(full).isDirectory() ? walk(full) : SOURCE.test(name) ? [full] : [];
   });
 
-/** `packages/*\/src` et `apps/*\/src`. */
-const productionSources = (): SourceFile[] =>
-  ["packages", "apps"].flatMap((group) =>
-    readdirSync(join(repoRoot, group)).flatMap((pkg) => {
-      const src = join(repoRoot, group, pkg, "src");
-      return existsSync(src)
-        ? walk(src).map((file) => ({
-            path: relative(repoRoot, file).split(sep).join("/"),
-            text: readFileSync(file, "utf8"),
-          }))
-        : [];
-    }),
+const read = (file: string): SourceFile => ({
+  path: relative(repoRoot, file).split(sep).join("/"),
+  text: readFileSync(file, "utf8"),
+});
+
+/** Dossiers des paquets et des apps. */
+const workspaces = (): string[] =>
+  GROUPS.flatMap((group) =>
+    readdirSync(join(repoRoot, group)).map((name) => join(repoRoot, group, name)),
   );
 
-describe("scan de frontiere : la fonction pure mord", () => {
+/** `packages/*\/src` et `apps/*\/src`. */
+const productionSources = (): SourceFile[] =>
+  workspaces().flatMap((dir) => {
+    const src = join(dir, "src");
+    return existsSync(src) ? walk(src).map(read) : [];
+  });
+
+/** `package.json` de la racine, des apps, des paquets et de `e2e`. */
+const manifests = (): SourceFile[] =>
+  [repoRoot, join(repoRoot, "e2e"), ...workspaces()]
+    .map((dir) => join(dir, "package.json"))
+    .filter((file) => existsSync(file))
+    .map(read);
+
+describe("scan de frontière : la fonction pure mord", () => {
   const violating = (path: string, text: string) => scanAgentBoundary([{ path, text }]);
 
   it.each([
@@ -47,41 +59,43 @@ describe("scan de frontiere : la fonction pure mord", () => {
     ["drapeau d'outils interdits", `"--disallowedTools"`],
     ["flux stream-json", `["--output-format", "stream-json"]`],
     ["contournement des permissions", `"--dangerously-skip-permissions"`],
-    ["nom francais de l'entree", "await runtime.lancerSession(role, prompt)"],
-  ])("rejette hors de l'adaptateur : %s", (_label, text) => {
+    ["nom français de l'entrée", "await runtime.lancerSession(role, prompt)"],
+  ])("rejette : %s", (_label, text) => {
     const found = violating("packages/delivery/src/runner.ts", text);
     expect(found.length).toBeGreaterThan(0);
     expect(found[0]).toMatchObject({ path: "packages/delivery/src/runner.ts", line: 1 });
   });
 
-  it("rejette la meme ligne dans une app, avec son numero de ligne", () => {
+  it("rejette la même ligne dans une app, avec son numéro de ligne", () => {
     const found = violating("apps/worker/src/job.ts", `// ok\n\nspawn("claude", ["-p"]);`);
     expect(found.map((v) => v.rule)).toContain("claude-binary-spawn");
     expect(found.every((v) => v.path === "apps/worker/src/job.ts" && v.line === 3)).toBe(true);
   });
 
-  it("autorise les memes lignes dans packages/delivery/src/claude-code/", () => {
-    const text = `spawn("claude", ["-p", "--allowedTools", "stream-json", "--dangerously-skip-permissions"])`;
-    expect(violating(`${ADAPTER_PREFIX}command.ts`, text)).toEqual([]);
-    expect(violating("packages/delivery/src/claude-code-like.ts", text)).not.toEqual([]);
+  it("n'exempte plus l'ancien dossier de l'adaptateur", () => {
+    const path = "packages/delivery/src/claude-code/x.ts";
+    const text = `spawn("claude", ["-p", "--allowedTools", "stream-json"])`;
+    expect(violating(path, text).map((v) => v.rule)).toEqual(
+      expect.arrayContaining(["claude-binary-spawn", "allowed-tools-flag", "stream-json"]),
+    );
   });
 
-  it("n'accuse pas un usage legitime (id du runtime, spawn git, mot claude en prose)", () => {
+  it("n'accuse pas un usage légitime (identifiant en chaîne, spawn git, nom en prose)", () => {
     for (const text of [
-      `export const AGENT_RUNTIME_IDS = ["claude-code", "fake"] as const;`,
+      `export const TOOL_IDS = ["claude-code", "codex"] as const;`,
       `spawn("git", ["status"])`,
-      "// Claude est un modele",
+      "// Claude est un modèle",
       `const launch = runtime.launchSession(request)`,
     ]) {
-      expect(violating("packages/delivery/src/agent-runtime.ts", text), text).toEqual([]);
+      expect(violating("packages/delivery/src/run.ts", text), text).toEqual([]);
     }
   });
 });
 
 /** Le scan par motifs est un FILET (il attrape les oublis courants), pas une preuve : un binaire
- * lance via une variable, un chemin construit ou un autre paquet l'echappe. La regle `child_process`
- * ci-dessous reduit la surface : hors de l'adaptateur, plus aucun lancement de processus possible. */
-describe("regle : node:child_process n'est importe que sous src/claude-code/", () => {
+ * lancé via une variable ou un chemin construit lui échappe. La règle `child_process` ci-dessous
+ * réduit la surface : hors de la liste blanche, aucun lancement de processus n'est possible. */
+describe("règle : node:child_process n'est importé que par les aides de test de db", () => {
   const bad = (path: string, text: string) => scanChildProcessImports([{ path, text }]);
 
   it.each([
@@ -90,76 +104,73 @@ describe("regle : node:child_process n'est importe que sous src/claude-code/", (
     `const { exec } = require("node:child_process");`,
     `const cp = await import("node:child_process");`,
     `export * from "node:child_process"`,
-  ])("rejette hors de l'adaptateur : %s", (text) => {
+  ])("rejette : %s", (text) => {
     expect(bad("apps/api/src/x.ts", text)).toEqual([{ path: "apps/api/src/x.ts", line: 1 }]);
-    expect(bad("packages/delivery/src/run.ts", `\n${text}`)[0]?.line).toBe(2);
+    expect(bad("packages/delivery/src/claude-code/x.ts", `\n${text}`)[0]?.line).toBe(2);
+    expect(bad("packages/db/src/testing/autre.ts", text)).toHaveLength(1);
   });
 
-  it("autorise l'adaptateur et ignore les autres imports", () => {
-    const text = `import { spawn } from "node:child_process";`;
-    expect(bad(`${ADAPTER_PREFIX}process.ts`, text)).toEqual([]);
+  it("ignore les autres imports et la liste blanche", () => {
     expect(bad("apps/api/src/x.ts", `import { join } from "node:path";`)).toEqual([]);
+    for (const path of CHILD_PROCESS_ALLOWLIST) {
+      expect(bad(path, `import "node:child_process";`), path).toEqual([]);
+    }
   });
 
-  it("aucun packages/*/src ni apps/*/src hors de l'adaptateur, sauf deux aides de test de db", () => {
-    expect(scanChildProcessImports(productionSources())).toEqual([]);
+  it("la liste blanche reste les deux aides de test de db, sans outil d'agent", () => {
     expect(CHILD_PROCESS_ALLOWLIST).toEqual([
       "packages/db/src/testing/prisma-cli.ts",
       "packages/db/src/testing/test-database.ts",
     ]);
     for (const file of CHILD_PROCESS_ALLOWLIST) {
       const text = readFileSync(join(repoRoot, file), "utf8");
+      expect(text, file).toMatch(/child_process/);
       expect(text, file).not.toMatch(/claude|--allowedTools|stream-json/);
     }
-    expect(
-      scanChildProcessImports([
-        { path: "packages/db/src/testing/autre.ts", text: `import "node:child_process"` },
-      ]),
-    ).toHaveLength(1);
+  });
+});
+
+describe("scan des dépendances : la fonction pure mord", () => {
+  const found = (manifest: object) =>
+    scanAgentDependencies([{ path: "apps/x/package.json", text: JSON.stringify(manifest) }]);
+
+  it.each(["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"])(
+    "rejette un outil d'agent déclaré dans %s",
+    (field) => {
+      expect(found({ [field]: { "@anthropic-ai/claude-code": "1.0.0" } })).toEqual([
+        { path: "apps/x/package.json", dependency: "@anthropic-ai/claude-code@1.0.0" },
+      ]);
+    },
+  );
+
+  it("voit un alias npm et laisse passer les autres dépendances", () => {
+    const alias = { agent: "npm:@anthropic-ai/claude-agent-sdk@1.0.0" };
+    expect(found({ dependencies: alias })).toHaveLength(1);
+    expect(found({ dependencies: { "@anthropic-ai/sdk": "1.0.0" } })).toEqual([]);
   });
 });
 
 describe("incident-25-agent-runtime-boundary", () => {
-  it("aucun fichier de packages/*/src ni apps/*/src n'invoque un outil d'agent hors de l'adaptateur", () => {
+  it("aucun packages/*/src ni apps/*/src n'invoque un outil d'agent", () => {
     const files = productionSources();
     expect(files.length).toBeGreaterThan(50);
     expect(scanAgentBoundary(files)).toEqual([]);
   });
 
-  it("l'adaptateur est l'endroit qui porte l'invocation (le scan ne passe pas a vide)", () => {
-    const adapter = productionSources().filter((file) => file.path.startsWith(ADAPTER_PREFIX));
-    const text = adapter.map((file) => file.text).join("\n");
-    expect(text).toContain("--allowedTools");
-    expect(text).toContain("stream-json");
-    expect(text).toContain("child_process");
-    expect(text).not.toContain("--dangerously-skip-permissions");
+  it("aucun packages/*/src ni apps/*/src n'importe node:child_process hors liste blanche", () => {
+    expect(scanChildProcessImports(productionSources())).toEqual([]);
   });
 
-  it("le coeur du paquet (src/*.ts, src/testing) ne reference jamais l'adaptateur", () => {
-    const core = productionSources().filter(
-      (file) =>
-        file.path.startsWith("packages/delivery/src/") && !file.path.startsWith(ADAPTER_PREFIX),
+  it("aucun package.json ne déclare un outil d'agent", () => {
+    const files = manifests();
+    expect(files.map((file) => file.path)).toEqual(
+      expect.arrayContaining([
+        "package.json",
+        "e2e/package.json",
+        "apps/api/package.json",
+        "packages/delivery/package.json",
+      ]),
     );
-    for (const file of core) {
-      expect(/from\s+["'][^"']*claude-code/.test(file.text), file.path).toBe(false);
-    }
-  });
-
-  it("aucun autre paquet ni app ne depend de l'adaptateur sauf par le sous-export", () => {
-    for (const file of productionSources()) {
-      if (file.path.startsWith("packages/delivery/")) continue;
-      expect(/delivery\/src\/claude-code/.test(file.text), file.path).toBe(false);
-    }
-  });
-
-  it("package.json : dependances inchangees et sous-export ./claude-code seulement en plus", () => {
-    const pkg = JSON.parse(
-      readFileSync(join(repoRoot, "packages/delivery/package.json"), "utf8"),
-    ) as { dependencies: unknown; exports: Record<string, unknown> };
-    expect(pkg.dependencies).toEqual({
-      "@koklo/domain": "workspace:*",
-      "@koklo/rules": "workspace:*",
-    });
-    expect(Object.keys(pkg.exports).sort()).toEqual([".", "./claude-code", "./testing"]);
+    expect(scanAgentDependencies(files)).toEqual([]);
   });
 });
