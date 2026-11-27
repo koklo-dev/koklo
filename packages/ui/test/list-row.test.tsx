@@ -91,6 +91,17 @@ describe("ListRow", () => {
     expect(screen.getByRole("listitem")).not.toHaveClass("py-3");
   });
 
+  it('`fixedHeight="min"` : 52 au minimum, la ligne grandit avec son contenu (TK-114i, A3)', () => {
+    render(
+      <ListPanel title="L">
+        <ListRow title="Au moins 52" fixedHeight="min" />
+      </ListPanel>,
+    );
+    const row = screen.getByRole("listitem");
+    expect(row).toHaveClass("min-h-[52px]", "py-1.5");
+    expect(row).not.toHaveClass("h-[52px]", "py-3");
+  });
+
   it('`as="div"` : contenu de ligne sans li ni bordure ni marge, pour un hôte qui pose déjà son li (VirtualList)', () => {
     render(
       <ul>

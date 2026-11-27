@@ -143,3 +143,26 @@ describe("EntityChip sans href", () => {
     expect(chip).toHaveTextContent("Exigence non fonctionnelle NFR-001");
   });
 });
+
+describe("EntityChip borné à son conteneur (TK-114i, A8)", () => {
+  const id = "C-service-de-consultation-de-la-transparence";
+  const title = "contrat typé · asynchrone";
+
+  it("jamais plus large que le conteneur, 26 au minimum (maquette 13 l.225)", () => {
+    render(<EntityChip kind="component" id={id} title={title} href="#" />);
+    const link = screen.getByRole("link", { name: `Composant ${id} ${title}` });
+    expect(link).toHaveClass("max-w-full", "min-h-[26px]", "py-0.5");
+    expect(link).not.toHaveClass("h-[26px]", "whitespace-nowrap");
+  });
+
+  it("l'identifiant se tronque, complet au survol ; le libellé passe à la ligne", () => {
+    render(<EntityChip kind="component" id={id} title={title} />);
+    expect(screen.getByText(id)).toHaveClass("min-w-0", "max-w-full", "truncate", "font-mono");
+    expect(screen.getByText(id)).toHaveAttribute("title", id);
+    const label = screen.getByText(title);
+    expect(label).toHaveClass("min-w-0", "break-words");
+    expect(label).not.toHaveClass("truncate");
+    expect(label.parentElement).toHaveClass("flex", "min-w-0", "flex-wrap");
+    expect(label.parentElement).toContainElement(screen.getByText(id));
+  });
+});

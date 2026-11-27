@@ -42,6 +42,7 @@ export * from "./components/hover-card.tsx";
 export * from "./components/icon-button.tsx";
 export * from "./components/icon-tile.tsx";
 export * from "./components/id-tag.tsx";
+export * from "./components/id-title.tsx";
 export * from "./components/inline-alert.tsx";
 export * from "./components/input.tsx";
 export * from "./components/kbd.tsx";
