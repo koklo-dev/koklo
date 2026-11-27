@@ -143,7 +143,9 @@ export function ProposalDetail(props: ProposalDetailProps) {
       className="flex min-w-0 flex-[999_1_420px] flex-col gap-3.5 px-4 py-5 md:px-7"
     >
       <div className="flex flex-wrap items-center gap-2.5">
-        <IdTag size="default">{item.ref}</IdTag>
+        <IdTag className="h-auto min-h-[22px] max-w-full whitespace-normal break-all">
+          {item.ref}
+        </IdTag>
         <h2 className="text-xl font-semibold">{item.title}</h2>
         <Pill tone={PILL_OF[item.status] ?? "outline"}>{state.label}</Pill>
       </div>

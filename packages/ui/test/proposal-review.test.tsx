@@ -197,9 +197,9 @@ describe("ProposalReview : liste à plat de 330 px", () => {
   });
 });
 
-describe("ProposalReview : identifiant long (TK-114g)", () => {
-  it("identifiant long : il se tronque (titre complet au survol), le titre et l'icône d'état restent sur la ligne", () => {
-    const ref = "DOC-taches-modeles-de-taches-et-cycle-de-vie";
+describe("ProposalReview : identifiant long (TK-114g, TK-114h)", () => {
+  const ref = "DOC-taches-modeles-de-taches-et-cycle-de-vie";
+  const showLong = () => {
     const [group] = flat(1);
     const long = {
       ...(group as ProposalReviewGroup).items[0],
@@ -207,14 +207,32 @@ describe("ProposalReview : identifiant long (TK-114g)", () => {
       status: "present",
     } as ProposalReviewItem;
     setup({ groups: [{ ...(group as ProposalReviewGroup), items: [long] }], selectedId: "p1" });
-    const row = within(screen.getByRole("list", { name: "Propositions à relire" })).getByRole(
+    return within(screen.getByRole("list", { name: "Propositions à relire" })).getByRole(
       "listitem",
     );
+  };
+
+  it("l'identifiant prend jusqu'à toute la ligne puis se tronque, complet au survol", () => {
+    const row = showLong();
     const tag = within(row).getByTitle(ref);
-    expect(tag).toHaveClass("min-w-0", "overflow-hidden");
+    expect(tag).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
     expect(within(tag).getByText(ref)).toHaveClass("truncate");
-    expect(within(row).getByText("Fonctionnalité 1")).toBeVisible();
     expect(within(row).getByRole("img", { name: "Déjà présente dans la spec" })).toBeVisible();
+  });
+
+  it("le titre passe sous l'identifiant au lieu d'être écrasé en colonne", () => {
+    const row = showLong();
+    const title = within(row).getByText("Fonctionnalité 1");
+    expect(title).toHaveClass("min-w-0", "flex-1", "basis-28");
+    expect(title.parentElement).toHaveClass("flex-wrap", "flex-1", "min-w-0");
+    expect(title.parentElement).toContainElement(within(row).getByTitle(ref));
+  });
+
+  it("dans le détail, l'identifiant passe à la ligne sans élargir la page", () => {
+    const long = { ...(items(1)[0] as ProposalReviewItem), ref };
+    render(<ProposalDetail item={long} onDecide={vi.fn()} />);
+    const detail = screen.getByText(ref);
+    expect(detail).toHaveClass("max-w-full", "whitespace-normal", "break-all");
   });
 });
 
