@@ -42,7 +42,7 @@ export const useValidateModel = (
 
 /** Décision « validé » en vigueur d'un livrable : prénom (équipe), date et SHA (B451, B591). Lue seulement une fois validé. */
 export function useDeliverableValidation(
-  key: "data" | "architecture",
+  key: "data" | "architecture" | "technical",
   projectId: string,
   enabled: boolean,
 ): DataValidation | undefined {

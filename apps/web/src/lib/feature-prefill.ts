@@ -2,7 +2,7 @@ import type { AiPrefillItemOutput } from "@koklo/contract";
 import type { CriterionValue, FeatureFormValues } from "./feature-form.ts";
 import { fieldOfTag, linkTags, patchForTags } from "./feature-links.ts";
 
-type Prefilled = AiPrefillItemOutput["values"];
+type Prefilled = Extract<AiPrefillItemOutput, { type: "feature" }>["values"];
 export type PrefilledKey = "title" | "priority" | "description" | "criteria" | "links";
 
 let counter = 0;

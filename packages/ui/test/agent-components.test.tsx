@@ -191,6 +191,8 @@ describe("ProposalDiff", () => {
     ["insert_after", "ajout d'une section"],
     ["replace", "remplacement"],
     ["append", "ajout"],
+    // TK-115, maquette 14 l.733 : l'agent rédige une section vide.
+    ["draft", "rédaction de la section"],
   ] as const)("%s : barre haute « Proposition de l'agent · %s » et justification", (op, label) => {
     render(
       <ProposalDiff {...base} op={op}>

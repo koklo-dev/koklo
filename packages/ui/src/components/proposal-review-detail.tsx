@@ -167,13 +167,57 @@ export function ProposalDetail(props: ProposalDetailProps) {
   );
 }
 
-/** Titre h3 d'une section du détail (« Critères d'acceptation »). */
-export function ProposalDetailSection({ title, children }: { title: string; children: ReactNode }) {
+const SECTION = {
+  heading: { section: "gap-2.5", title: "text-subsection-title" },
+  label: {
+    section: "gap-1",
+    title: "m-0 text-caption font-semibold uppercase tracking-[0.05em] text-muted-foreground",
+  },
+} as const;
+
+/**
+ * Titre h3 d'une section du détail (« Critères d'acceptation ») ; `label` : rubrique 12/600 en capitales atténuées,
+ * à 4 de son texte (maquettes 13 et 14 l.156).
+ */
+export function ProposalDetailSection({
+  title,
+  variant = "heading",
+  children,
+}: {
+  title: string;
+  variant?: keyof typeof SECTION;
+  children: ReactNode;
+}) {
   return (
-    <section className="flex flex-col gap-2.5">
-      <h3 className="text-subsection-title">{title}</h3>
+    <section className={cn("flex flex-col", SECTION[variant].section)}>
+      <h3 className={SECTION[variant].title}>{title}</h3>
       {children}
     </section>
+  );
+}
+
+/**
+ * Texte d'une section du détail, sauts de ligne gardés ; `prose` : texte d'une section de document proposée
+ * (15 px, interligne 1,65, sans encadré coloré, maquette 14 l.766).
+ */
+export function ProposalDetailText({
+  children,
+  variant = "body",
+}: {
+  children: ReactNode;
+  variant?: "body" | "prose";
+}) {
+  return (
+    <p
+      className={cn(
+        "m-0 whitespace-pre-line break-words",
+        variant === "prose"
+          ? "text-[length:var(--text-prose-body-size)] leading-[var(--text-prose-body-leading)]"
+          : "text-body",
+      )}
+    >
+      {children}
+    </p>
   );
 }
 

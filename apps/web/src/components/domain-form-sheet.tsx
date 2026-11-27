@@ -9,7 +9,9 @@ import { describeSaveError, type SaveErrorView } from "../lib/feature-errors.ts"
 import type { FormIssue } from "../lib/feature-form.ts";
 import { buildSubmitInput } from "../lib/feature-operation.ts";
 import { orpc } from "../lib/orpc.ts";
+import { serverFieldIssue } from "../lib/server-field-issue.ts";
 import { describeFeatureError } from "../lib/spec-errors.ts";
+import { type DomainAssist, useDomainPrefill } from "../lib/use-domain-prefill.ts";
 import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import { useUnauthorizedRedirect } from "../lib/use-unauthorized-redirect.ts";
 import { domainFieldId } from "./domain-form-fields.tsx";
@@ -18,7 +20,16 @@ import { FeatureError } from "./feature-error.tsx";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
 import { SaveProgress } from "./save-progress.tsx";
 
-type Type = "rule" | "role" | "flow" | "table" | "component" | "archflow" | "adr";
+type Type =
+  | "rule"
+  | "role"
+  | "flow"
+  | "table"
+  | "component"
+  | "archflow"
+  | "adr"
+  | "stack"
+  | "environment";
 /** Valeurs lues d'un élément : celles du type (`RuleDetail`…) et ce que tous portent (version, fichier). */
 type Values = { commitSha: string; filePath: string };
 interface Loaded<I extends Values> {
@@ -43,11 +54,16 @@ export interface DomainFormConfig<V, T extends Type, I extends Values> {
   conflict: string;
   empty: V;
   valuesOf: (values: I) => V;
-  issuesOf: (values: V) => FormIssue[];
+  /** `baseline` : les valeurs de départ d'une modification, absentes à la création. */
+  issuesOf: (values: V, baseline?: V) => FormIssue[];
   operationOf: (values: V, edit?: { specId: string; baseline: V }) => SpecOperation | null;
   titleOf: (values: V) => string;
   labels: Record<string, string>;
   fields: (context: FieldsContext<V>) => ReactNode;
+  /** Genre de la suppression quand il n'est pas `<type>.delete` (`env.delete`). */
+  deleteKind?: SpecOperation["kind"];
+  /** « Décrire en une phrase, l'agent remplit le formulaire » (création seulement). */
+  assist?: DomainAssist;
 }
 
 export interface FieldsContext<V> {
@@ -56,6 +72,8 @@ export interface FieldsContext<V> {
   set: (patch: Partial<V>) => void;
   issues: FormIssue[];
   readOnly: boolean;
+  /** Champs remplis par l'agent. */
+  filled: ReadonlySet<string>;
 }
 
 export interface DomainFormProps {
@@ -182,6 +200,9 @@ function useDomainForm<V, T extends Type, I extends Values>({
   const edit = mode === "edit" && specId ? { specId, baseline } : undefined;
   const mine = write.meta?.owner === owner;
   const operation = config.operationOf(values, edit);
+  // Refus du serveur sur un champ (valeur de secret, TK-115) : montré sous le champ, sans la valeur.
+  const refused =
+    mine && write.phase === "failed" ? serverFieldIssue(write.failure, config.labels) : null;
   const submit = (op: SpecOperation, kind: Kind, title: string) =>
     write.submit({
       build: (idempotencyKey) =>
@@ -198,7 +219,7 @@ function useDomainForm<V, T extends Type, I extends Values>({
       meta: { owner, kind, specId, title, status: "", priority: "", target: specId ?? "new" },
     });
   const save = () => {
-    const found = config.issuesOf(values);
+    const found = config.issuesOf(values, edit?.baseline);
     setAttempt((n) => n + 1);
     if (found.length > 0 || !operation) return;
     submit(operation, mode === "edit" ? "update" : "create", config.titleOf(values));
@@ -214,9 +235,11 @@ function useDomainForm<V, T extends Type, I extends Values>({
     save,
     submit,
     reason,
-    issues: attempt > 0 ? config.issuesOf(values) : [],
+    refused,
+    issues: refused ? [refused] : attempt > 0 ? config.issuesOf(values, edit?.baseline) : [],
     readOnly: mine && write.busy,
     set: (patch: Partial<V>) => setValues((current) => ({ ...current, ...patch })),
+    reset: () => setValues(baseline),
     dirty: !same(values, baseline) && !(mine && write.phase !== "idle" && write.phase !== "failed"),
   };
 }
@@ -246,7 +269,7 @@ function useDeleteProps<V, T extends Type, I extends Values>(
               referencedBy={item?.referencedBy ?? { items: [], total: 0 }}
               onConfirm={() =>
                 model.submit(
-                  { kind: `${config.type}.delete`, specId } as SpecOperation,
+                  { kind: config.deleteKind ?? `${config.type}.delete`, specId } as SpecOperation,
                   "delete",
                   title,
                 )
@@ -269,7 +292,15 @@ function Body<V, T extends Type, I extends Values>(body: BodyProps<V, T, I>) {
   const model = useDomainForm(body);
   const deleteProps = useDeleteProps(body, model);
   const { mine, readOnly, reason, issues } = model;
-  const failure = mine ? failureView(config, write, role, mode) : null;
+  const prefill = useDomainPrefill({
+    projectId,
+    assist: mode === "create" ? config.assist : undefined,
+    values: model.values,
+    set: model.set,
+    reset: model.reset,
+    announce: props.announce,
+  });
+  const failure = mine && !model.refused ? failureView(config, write, role, mode) : null;
   return (
     <SpecItemSheet
       open
@@ -285,6 +316,7 @@ function Body<V, T extends Type, I extends Values>(body: BodyProps<V, T, I>) {
       }}
       onCloseAutoFocus={onCloseAutoFocus}
       {...deleteProps}
+      {...prefill.sheetProps}
       {...(mode === "edit" && item?.validated ? { warning: VALIDATED_WARNING } : {})}
       {...(issues.length > 0
         ? { errorSummary: <Summary issues={issues} config={config} attempt={model.attempt} /> }
@@ -305,7 +337,14 @@ function Body<V, T extends Type, I extends Values>(body: BodyProps<V, T, I>) {
           criteriaCount={0}
         />
       ) : null}
-      {config.fields({ projectId, values: model.values, set: model.set, issues, readOnly })}
+      {config.fields({
+        projectId,
+        values: model.values,
+        set: model.set,
+        issues,
+        readOnly,
+        filled: prefill.filled,
+      })}
     </SpecItemSheet>
   );
 }

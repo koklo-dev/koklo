@@ -238,6 +238,34 @@ describe("page de projet", () => {
     );
   });
 
+  it("Technique : « … » pendant la génération ; le designer ne lit aucune proposition (TK-115)", async () => {
+    procedures.specDeliverables.mockResolvedValue(
+      specDeliverables({ open: new Set(["technical"]) }),
+    );
+    procedures.proposalList.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      previousCursor: null,
+      offset: 0,
+      total: 0,
+      groups: [],
+      launch: { id: OTHER_ID, status: "running", proposedCount: 0, discardedCount: 0 },
+    });
+    const { unmount } = renderFrame(SPEC);
+    const group = await within(nav()).findByRole("group", { name: "Spec" });
+    await waitFor(() =>
+      expect(within(group).getByRole("link", { name: /^Technique/ })).toHaveTextContent("…"),
+    );
+    unmount();
+    procedures.proposalList.mockClear();
+    asRole("designer");
+    renderFrame(SPEC);
+    await within(nav()).findByRole("link", { name: /^Technique/ });
+    expect(procedures.proposalList).not.toHaveBeenCalledWith(
+      expect.objectContaining({ deliverable: "technical" }),
+    );
+  });
+
   it("carte projet : nom et fil de phase de project.shell", async () => {
     renderFrame(SPEC);
     const card = await within(nav()).findByRole("button", { name: /Portail de réservation/ });

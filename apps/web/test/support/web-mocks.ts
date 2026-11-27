@@ -98,6 +98,16 @@ export const procedures = {
   specArchitectureAdrList: vi.fn(),
   specArchitectureAdrById: vi.fn(),
   clientSpaceArchitecture: vi.fn(),
+  // TK-115 (contrat 3.17.0) : cahier technique (choix, environnements, document) et vue client
+  specTechnicalStackList: vi.fn(),
+  specTechnicalStackChoose: vi.fn(),
+  specTechnicalStackSource: vi.fn(),
+  specTechnicalEnvironments: vi.fn(),
+  specDocumentSections: vi.fn(),
+  clientSpaceTechnical: vi.fn(),
+  clientSpaceTechnicalStack: vi.fn(),
+  clientSpaceTechnicalEnvironments: vi.fn(),
+  clientSpaceTechnicalDocument: vi.fn(),
   clientSpaceAdrs: vi.fn(),
   clientSpaceAdr: vi.fn(),
   clientSpaceArchFlows: vi.fn(),
@@ -370,6 +380,28 @@ export const orpc = {
         ),
       },
     },
+    technical: {
+      key: () => ["spec", "technical"],
+      stack: {
+        key: () => ["spec", "technical", "stack"],
+        list: queryFull(["spec", "technical", "stack", "list"], procedures.specTechnicalStackList),
+        choose: {
+          call: (input?: unknown) => procedures.specTechnicalStackChoose(input),
+        },
+        source: queryFull(
+          ["spec", "technical", "stack", "source"],
+          procedures.specTechnicalStackSource,
+        ),
+      },
+      environments: queryFull(
+        ["spec", "technical", "environments"],
+        procedures.specTechnicalEnvironments,
+      ),
+    },
+    document: {
+      key: () => ["spec", "document"],
+      sections: queryFull(["spec", "document", "sections"], procedures.specDocumentSections),
+    },
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
   },
@@ -382,6 +414,19 @@ export const orpc = {
     rules: queryFull(["clientSpace", "rules"], procedures.clientSpaceRules),
     roles: queryFull(["clientSpace", "roles"], procedures.clientSpaceRoles),
     architecture: queryFull(["clientSpace", "architecture"], procedures.clientSpaceArchitecture),
+    technical: queryFull(["clientSpace", "technical"], procedures.clientSpaceTechnical),
+    technicalStack: queryFull(
+      ["clientSpace", "technicalStack"],
+      procedures.clientSpaceTechnicalStack,
+    ),
+    technicalEnvironments: queryFull(
+      ["clientSpace", "technicalEnvironments"],
+      procedures.clientSpaceTechnicalEnvironments,
+    ),
+    technicalDocument: queryFull(
+      ["clientSpace", "technicalDocument"],
+      procedures.clientSpaceTechnicalDocument,
+    ),
     adrs: queryFull(["clientSpace", "adrs"], procedures.clientSpaceAdrs),
     adr: queryFull(["clientSpace", "adr"], procedures.clientSpaceAdr),
     archFlows: queryFull(["clientSpace", "archFlows"], procedures.clientSpaceArchFlows),
@@ -568,6 +613,8 @@ export const specDeliverables = (
     status?: Readonly<Record<string, string>>;
     /** Amont modifié depuis la dernière décision, par livrable (3.7.0). */
     staleUpstream?: Readonly<Record<string, readonly string[]>>;
+    /** Cahier technique à revoir (3.17.0). */
+    staleTechnical?: { changes: Array<{ id: string; change: string }>; items: string[] };
   } = {},
 ) => {
   const open = over.open ?? AVAILABLE;
@@ -575,6 +622,7 @@ export const specDeliverables = (
     key,
     status: over.status?.[key] ?? (over.validated?.includes(key) ? "validated" : "todo"),
     ...(over.staleUpstream?.[key] ? { staleUpstream: over.staleUpstream[key] } : {}),
+    ...(key === "technical" && over.staleTechnical ? { staleTechnical: over.staleTechnical } : {}),
     available: open.has(key),
     forced: false,
     condition: open.has(key) ? null : "Disponible après l'architecture",

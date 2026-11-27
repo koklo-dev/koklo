@@ -37,6 +37,7 @@ export function useItemPrefill({ projectId, values, setValues, announce }: Args)
   const mutation = useMutation(orpc.ai.prefillItem.mutationOptions());
 
   const apply = (output: AiPrefillItemOutput): void => {
+    if (output.type !== "feature") return;
     const patch = prefillPatch(values, output.values);
     setValues(patch.values);
     setMarked((previous) => [...new Set([...previous, ...patch.keys])]);

@@ -4,6 +4,8 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   ProposalDetail,
+  ProposalDetailSection,
+  ProposalDetailText,
   ProposalReview,
   type ProposalReviewGroup,
   type ProposalReviewItem,
@@ -541,5 +543,49 @@ describe("ProposalReview : déjà présente dans la spec", () => {
     setup({ counts: { total: 4, accepted: 1, rejected: 1, pending: 1, present: 1 } });
     const bar = screen.getByRole("progressbar", { name: "Avancement de la relecture" });
     expect((bar.children[1] as HTMLElement).style.width).toBe("50%");
+  });
+});
+
+describe("ProposalDetailText (TK-115, maquette 14 l.766)", () => {
+  it("texte proposé : 15 px, interligne 1,65, sans encadré coloré, sauts de ligne gardés", () => {
+    render(<ProposalDetailText variant="prose">Première ligne</ProposalDetailText>);
+    const text = screen.getByText("Première ligne");
+    expect(text.className).toContain("text-prose-body");
+    expect(text.className).toContain("leading-[var(--text-prose-body-leading)]");
+    expect(text.className).toContain("whitespace-pre-line");
+    expect(text.className).not.toMatch(/bg-|border/);
+  });
+
+  it("par défaut : 14 px", () => {
+    render(<ProposalDetailText>Résumé</ProposalDetailText>);
+    expect(screen.getByText("Résumé").className).toContain("text-body");
+  });
+});
+
+describe("ProposalDetailSection (TK-115, maquette 14 l.156)", () => {
+  it("label : rubrique 12/600 en capitales atténuées, écart 4, toujours un titre h3", () => {
+    render(
+      <ProposalDetailSection title="Texte proposé" variant="label">
+        <span>Corps</span>
+      </ProposalDetailSection>,
+    );
+    const title = screen.getByRole("heading", { level: 3, name: "Texte proposé" });
+    for (const name of ["text-caption", "font-semibold", "uppercase", "tracking-[0.05em]"]) {
+      expect(title.className).toContain(name);
+    }
+    expect(title.className).toContain("text-muted-foreground");
+    expect(title.parentElement?.className).toContain("gap-1");
+    expect(title.parentElement?.className).not.toContain("gap-2.5");
+  });
+
+  it("par défaut : titre de sous-section inchangé", () => {
+    render(
+      <ProposalDetailSection title="Étapes">
+        <span>Corps</span>
+      </ProposalDetailSection>,
+    );
+    const title = screen.getByRole("heading", { level: 3, name: "Étapes" });
+    expect(title.className).toContain("text-subsection-title");
+    expect(title.className).not.toContain("uppercase");
   });
 });

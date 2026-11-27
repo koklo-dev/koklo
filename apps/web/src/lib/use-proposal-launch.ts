@@ -34,7 +34,10 @@ function useLaunchOptions(projectId: string, enabled: boolean, deliverable: Deli
       title: modeTextsOf(deliverable)[option.id]?.title ?? option.id,
       description: modeTextsOf(deliverable)[option.id]?.description,
       ...(option.count !== undefined
-        ? { count: option.count, countLabel: optionCountLabel(option.id, option.count) }
+        ? {
+            count: option.count,
+            countLabel: optionCountLabel(option.id, option.count, deliverable),
+          }
         : {}),
     }));
   return {

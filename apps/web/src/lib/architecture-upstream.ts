@@ -11,3 +11,11 @@ export function upstreamTargetOf(projectId: string, id: string): string {
   }
   return featuresPath(projectId, `sel=${encodeURIComponent(id)}`);
 }
+
+/** « Voir les changements » du Technique : l'Architecture sur le premier composant ou la première décision. */
+export function architectureTargetOf(projectId: string, id: string): string {
+  const query = id.startsWith("ADR-")
+    ? `?tab=decisions&d=${encodeURIComponent(id)}`
+    : `?sel=${encodeURIComponent(id)}`;
+  return `${specPath(projectId, "architecture")}${query}`;
+}

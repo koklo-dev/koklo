@@ -5,6 +5,7 @@ import {
 } from "./stub-architecture-decisions.ts";
 import { type DataModelScenario, dataDeliverable } from "./stub-data-model.ts";
 import { ideaPhase } from "./stub-idea-agent.ts";
+import { type TechnicalScenario, technicalDeliverable } from "./stub-spec-technical.ts";
 
 /**
  * Faux API de la coquille (TK-88, contrat 2.1.0) : `project.shell`, `project.visit`, `project.recent`,
@@ -13,7 +14,8 @@ import { ideaPhase } from "./stub-idea-agent.ts";
  */
 export type ShellMode = "data" | "noSprint" | "internal" | "loading";
 export type ShellScenario = DataModelScenario &
-  ArchitectureReviewScenario & {
+  ArchitectureReviewScenario &
+  TechnicalScenario & {
     shell?: ShellMode;
     /** Identifiants de projets déjà visités, du plus récent au plus ancien. */
     recent?: string[];
@@ -141,11 +143,20 @@ function shellResponse(projectId: string, h: Handlers): Reply {
 }
 
 /** Statut d'un livrable : le scénario du modèle de données (TK-109) pilote Fonctionnel et Données, la vue client attend le Fonctionnel (TK-104). */
-/** Un scénario de l'écran Architecture (TK-111) suppose les Données validées : le livrable s'ouvre. */
-const availableOf = (key: string, available: boolean, scenario: { architecture?: string }) =>
-  key === "architecture" && scenario.architecture !== undefined ? true : available;
+/** Un scénario de l'Architecture (TK-111) ou du Technique (TK-115) ouvre son livrable. */
+const availableOf = (
+  key: string,
+  available: boolean,
+  scenario: ShellScenario & { architecture?: string },
+) => {
+  if (key === "architecture" && scenario.architecture !== undefined) return true;
+  return key === "technical" && scenario.technical !== undefined ? true : available;
+};
 
 function statusOf(key: string, scenario: ShellScenario & { architecture?: string }): string {
+  const technical = technicalDeliverable(scenario.technical);
+  if (technical && key === "technical") return technical.status;
+  if (technical && key === "architecture") return "validated";
   const data = dataDeliverable(scenario);
   if (data && key === "data") return data.status;
   if (data && key === "functional") return "validated";
@@ -158,6 +169,7 @@ function statusOf(key: string, scenario: ShellScenario & { architecture?: string
 const pendingOf = (key: string, scenario: object): number => {
   const mode = "proposals" in scenario ? scenario.proposals : undefined;
   if (key === "data" && mode === "data") return 8;
+  if (key === "technical" && mode === "technical") return 36;
   return key === "architecture" && mode === "architecture" ? 9 : 0;
 };
 
@@ -177,27 +189,33 @@ function deliverablesResponse(projectId: string, h: Handlers): Reply {
     status: statusOf(key, h.scenario),
     ...(key === "data" && data?.staleUpstream ? { staleUpstream: data.staleUpstream } : {}),
     ...(key === "architecture" ? { stale: architectureDeliverable(h.scenario) } : {}),
+    ...(key === "technical"
+      ? { staleTechnical: technicalDeliverable(h.scenario.technical)?.staleTechnical }
+      : {}),
     available: availableOf(key, available, h.scenario),
     after,
   }));
   return reply(200, {
-    deliverables: entries.map(({ key, status, staleUpstream, stale, available, after }) => ({
-      key,
-      status,
-      ...(staleUpstream ? { staleUpstream } : {}),
-      ...(stale?.staleUpstream
-        ? {
-            staleUpstream: stale.staleUpstream,
-            staleComponents: stale.staleComponents,
-            staleFlows: stale.staleFlows,
-          }
-        : {}),
-      available,
-      forced: false,
-      condition: after === null ? null : `Disponible après ${after}`,
-      // Relecture des Données (scénario `proposals: "data"`) : la pastille de la barre dit « 8 à relire » (maquette 11 l.625).
-      pendingProposals: pendingOf(key, h.scenario),
-    })),
+    deliverables: entries.map(
+      ({ key, status, staleUpstream, stale, available, after, staleTechnical }) => ({
+        key,
+        status,
+        ...(staleTechnical ? { staleTechnical } : {}),
+        ...(staleUpstream ? { staleUpstream } : {}),
+        ...(stale?.staleUpstream
+          ? {
+              staleUpstream: stale.staleUpstream,
+              staleComponents: stale.staleComponents,
+              staleFlows: stale.staleFlows,
+            }
+          : {}),
+        available,
+        forced: false,
+        condition: after === null ? null : `Disponible après ${after}`,
+        // Relecture des Données (scénario `proposals: "data"`) : la pastille de la barre dit « 8 à relire » (maquette 11 l.625).
+        pendingProposals: pendingOf(key, h.scenario),
+      }),
+    ),
     validatedCount: entries.filter((entry) => entry.status === "validated").length,
   });
 }

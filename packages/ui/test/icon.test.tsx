@@ -33,6 +33,12 @@ describe("Icon (Material Symbols Rounded, SVG)", () => {
     expect(svgOf(container)).toHaveAttribute("viewBox", "0 -960 960 960");
   });
 
+  it("registre : icônes du cahier technique (TK-115, maquette 14)", () => {
+    for (const name of ["layers", "dns", "cable", "help", "monitoring", "rocket_launch"]) {
+      expect(isIconName(name), name).toBe(true);
+    }
+  });
+
   it("taille par défaut 20", () => {
     const { container } = render(<Icon name="check" />);
     expect(svgOf(container)).toHaveAttribute("width", "20");

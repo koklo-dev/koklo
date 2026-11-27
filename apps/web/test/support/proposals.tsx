@@ -20,7 +20,11 @@ export interface Fake {
     | "component"
     | "archflow"
     | "adr"
-    | "doc_section";
+    | "doc_section"
+    | "stack"
+    | "op"
+    | "nfr"
+    | "env";
   zone: string;
   position: number;
   title: string;

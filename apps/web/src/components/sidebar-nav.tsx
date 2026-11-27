@@ -2,7 +2,7 @@
 
 import type { Role, SpecDeliverable } from "@koklo/contract";
 import { ShellNavGroup, ShellNavItem, type SpecKey, SpecNav } from "@koklo/ui";
-import { canManage, canWriteArchitecture, canWriteSpec } from "../lib/roles.ts";
+import { canManage, canWriteArchitecture, canWriteSpec, canWriteTechnical } from "../lib/roles.ts";
 import { defaultSection } from "../lib/settings-sections.ts";
 import {
   activeSpecSlug,
@@ -37,10 +37,17 @@ function useGeneratingDeliverables(
     canWriteArchitecture(role) && open("architecture"),
     "architecture",
   );
+  // Même règle pour le cahier technique (TK-115).
+  const technical = useProposalStatus(
+    projectId,
+    canWriteTechnical(role) && open("technical"),
+    "technical",
+  );
   const generating = new Set<SpecKey>();
   if (functional.active && functional.counts.total === 0) generating.add("functional");
   if (data.active && data.counts.total === 0) generating.add("data");
   if (architecture.active && architecture.counts.total === 0) generating.add("architecture");
+  if (technical.active && technical.counts.total === 0) generating.add("technical");
   return generating;
 }
 

@@ -98,9 +98,12 @@ export function useClientFlow(projectId: string, flowId: string | undefined) {
   });
 }
 
-export type ClientCommentTarget = { kind: "component" | "adr" | "archflow"; ref: string };
+export type ClientCommentTarget = {
+  kind: "component" | "adr" | "archflow" | "stack" | "environments" | "tech_section";
+  ref: string;
+};
 
-/** « Commenter » un composant, une décision ou un flux (B582) : `comment.create`, cible vérifiée par le serveur. */
+/** « Commenter » un élément de la spec (B582, TK-115) : `comment.create`, cible vérifiée par le serveur. */
 export function useArchitectureComment(projectId: string) {
   const queryClient = useQueryClient();
   const mutation = useMutation({

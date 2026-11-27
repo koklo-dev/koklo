@@ -55,6 +55,9 @@ export function canWriteData(role: Role | string | undefined): boolean {
  */
 export const canWriteArchitecture = canWriteData;
 
+/** Écrire le cahier technique, choisir et lancer l'agent (12 §7) : comme les Données ; le designer lit (403 serveur). */
+export const canWriteTechnical = canWriteData;
+
 /**
  * Écrire un onglet du cahier (B340) : l'équipe écrit les fonctionnalités ; le designer écrit aussi les parcours mais ni
  * les règles ni les rôles (vision §14). Le serveur reste l'autorité (403).

@@ -20,3 +20,5 @@ export function useMaxWidth(px: number): boolean {
 export const NARROW_MAX = 1023;
 /** Sous 1280 px : la fiche du diagramme passe en panneau superposé (B426). */
 export const OVERLAY_MAX = 1279;
+/** Sous 768 px : une colonne, la liste puis la fiche. */
+export const PHONE_MAX = 767;

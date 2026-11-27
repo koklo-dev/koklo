@@ -1,12 +1,11 @@
 "use client";
 
 import { Button, EmptyState, Icon, InlineAlert, Skeleton } from "@koklo/ui";
-import { type Ref, useRef, useState } from "react";
+import type { Ref } from "react";
 import {
   CLIENT_ARCHITECTURE_ERROR_TEXT,
   CLIENT_ARCHITECTURE_ERROR_TITLE,
   CLIENT_ARCHITECTURE_STATUS,
-  CLIENT_COMMENT_SENT,
   CLIENT_NOT_VALIDATED_TEXT,
   CLIENT_NOT_VALIDATED_TITLE,
   CLIENT_READONLY_COMMENT_TEXT,
@@ -18,7 +17,6 @@ import {
 import type { ArchitectureTab } from "../lib/architecture-tab.ts";
 import { useArchitectureUrl } from "../lib/use-architecture-url.ts";
 import {
-  useArchitectureComment,
   useClientArchitecture,
   useClientDecisions,
   useClientFlows,
@@ -31,7 +29,7 @@ import {
   type CommentTarget,
 } from "./architecture-client-tabs.tsx";
 import { ArchitectureHeader } from "./architecture-header.tsx";
-import { DataCommentDialog } from "./data-comment-dialog.tsx";
+import { CommentDialog, useCommentFlow } from "./client-comment-flow.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { PageBody } from "./page-body.tsx";
 
@@ -42,52 +40,6 @@ function ReadonlyBanner({ canComment }: { canComment: boolean }) {
       <strong className="font-semibold">{CLIENT_READONLY_LEAD}</strong>{" "}
       {canComment ? CLIENT_READONLY_COMMENT_TEXT : CLIENT_READONLY_PLAIN_TEXT}
     </InlineAlert>
-  );
-}
-
-/** Flux « Commenter » : cible nommée, ouverture (le bouton d'origine reprend le focus à la fermeture), envoi, annonce. */
-function useCommentFlow(projectId: string) {
-  const comment = useArchitectureComment(projectId);
-  const [target, setTarget] = useState<CommentTarget | null>(null);
-  const [announcement, setAnnouncement] = useState("");
-  const opener = useRef<HTMLElement | null>(null);
-  return {
-    announcement,
-    target,
-    pending: comment.pending,
-    failed: comment.failed,
-    open: (next: CommentTarget) => {
-      opener.current =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      comment.reset();
-      setAnnouncement("");
-      setTarget(next);
-    },
-    close: () => setTarget(null),
-    restoreFocus: () => opener.current?.focus(),
-    submit: async (body: string) => {
-      if (target && (await comment.send({ kind: target.kind, ref: target.ref }, body))) {
-        setTarget(null);
-        setAnnouncement(CLIENT_COMMENT_SENT);
-      }
-    },
-  };
-}
-
-type Flow = ReturnType<typeof useCommentFlow>;
-
-function CommentDialog({ flow }: { flow: Flow }) {
-  if (!flow.target) return null;
-  return (
-    <DataCommentDialog
-      open
-      title={clientCommentTitle(flow.target.kind, flow.target.name)}
-      pending={flow.pending}
-      failed={flow.failed}
-      onOpenChange={(next) => next || flow.close()}
-      onSubmit={(body) => void flow.submit(body)}
-      restoreFocus={flow.restoreFocus}
-    />
   );
 }
 
@@ -255,7 +207,9 @@ export function ArchitectureClientView({
     status: url.status,
   });
   const flows = useClientFlows(projectId, url.f, available);
-  const flow = useCommentFlow(projectId);
+  const flow = useCommentFlow<CommentTarget>(projectId, (target) =>
+    clientCommentTitle(target.kind, target.name),
+  );
   const tab = clientTabOf(url.tab);
   const data = { query, decisions, flows };
   const onComment = canComment ? flow.open : undefined;

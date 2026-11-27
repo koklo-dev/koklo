@@ -25,6 +25,7 @@ import { DevUiSpecItemSheet } from "./dev-ui-spec-item-sheet.tsx";
 import { DevUiStatuses } from "./dev-ui-statuses.tsx";
 import { DevUiSurfacesA } from "./dev-ui-surfaces.tsx";
 import { DevUiSurfacesC } from "./dev-ui-tables.tsx";
+import { TechnicalGallery } from "./dev-ui-technical.tsx";
 import { DevUiThemeSwitch } from "./dev-ui-theme-switch.tsx";
 
 function Surfaces() {
@@ -116,6 +117,7 @@ export function DevUiGallery() {
         <DevUiDiagram />
         <DevUiDataClient />
         <DevUiArchitecture />
+        <TechnicalGallery />
       </main>
     </div>
   );

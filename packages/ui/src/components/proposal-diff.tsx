@@ -6,12 +6,13 @@ import { cn } from "../lib/cn.ts";
 import { Button } from "./button.tsx";
 import { IconButton } from "./icon-button.tsx";
 
-export type ProposalOp = "insert_after" | "replace" | "append";
+export type ProposalOp = "insert_after" | "replace" | "append" | "draft";
 
 const OP_LABEL: Record<ProposalOp, string> = {
   insert_after: "ajout d'une section",
   replace: "remplacement",
   append: "ajout",
+  draft: "rédaction de la section",
 };
 
 export type ProposalPosition = {

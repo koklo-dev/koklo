@@ -10,13 +10,21 @@ export const REFS_DEBOUNCE_MS = 200;
 
 /** Genres proposés pour un lien de fonctionnalité : les `F-` et `P-` n'y sont pas admis (B329 e). */
 const FEATURE_LINK_KINDS = ["screen", "rule", "table", "endpoint"] as const;
-type Kind = "feature" | "rule" | "flow" | "table" | "endpoint" | "screen";
+export type RefKind =
+  | "feature"
+  | "rule"
+  | "flow"
+  | "table"
+  | "endpoint"
+  | "screen"
+  | "component"
+  | "nfr";
 
 /**
  * Autocomplétion des liens : `spec.refs.search` une fois la frappe posée (200 ms), jamais sur une saisie vide.
  * Les propositions déjà choisies sont écartées par la saisie à puces.
  */
-export function useRefsSearch(projectId: string, kinds: readonly Kind[] = FEATURE_LINK_KINDS) {
+export function useRefsSearch(projectId: string, kinds: readonly RefKind[] = FEATURE_LINK_KINDS) {
   const [query, setQuery] = useState("");
   const [settled, setSettled] = useState("");
   useEffect(() => {
