@@ -50,6 +50,10 @@ const specIdOf = ({ kind, content }: ProposalOutput): string | undefined => {
   return SPEC_ID[kind]?.test(specId) ? specId : undefined;
 };
 
+/** La proposition met à jour un élément indexé, elle n'en crée pas. */
+export const isArchitectureUpdate = (proposal: ProposalOutput): boolean =>
+  specIdOf(proposal) !== undefined;
+
 const dependenciesOf = (content: Content) =>
   records(content.dependsOn).map((link) => ({
     to: str(link.to),

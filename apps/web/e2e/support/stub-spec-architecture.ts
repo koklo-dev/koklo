@@ -5,9 +5,10 @@ import type { IncomingMessage } from "node:http";
  * et la lecture d'édition `spec.item.get` du type `component`. Trois jeux, choisis par le scénario (`architecture`) :
  * « empty » (aucun composant : état Prêt), « demo » (8 composants, 6 sections : la maquette 13), « volume » (120
  * composants sur 6 zones, comme `seed:large`) et « toto » (TK-114c : 23 composants en 8 zones, liens dans et entre les
- * zones, un asynchrone). Aucun appel réel, aucune donnée réelle.
+ * zones, un asynchrone), « longs » (TK-114i : 14 composants en 3 zones et 2 flux, dont des identifiants longs, un nom
+ * sans espace, des liens longs et un Mermaid à ligne très longue). Aucun appel réel, aucune donnée réelle.
  */
-export type ArchitectureMode = "empty" | "demo" | "volume" | "toto";
+export type ArchitectureMode = "empty" | "demo" | "volume" | "toto" | "longs";
 export type ArchitectureScenario = { architecture?: ArchitectureMode };
 
 export type Reply = { status: number; body: string };
@@ -261,14 +262,54 @@ const TOTO: Component[] = TOTO_SPECS.map(([specId, name, type, zone, dependsOn])
   ...(TOTO_ACTORS[specId] ? { actors: TOTO_ACTORS[specId] } : {}),
 }));
 
-export const componentsOf = (mode: ArchitectureMode): Component[] =>
-  mode === "empty"
-    ? []
-    : mode === "volume"
-      ? [...DEMO, ...GENERATED]
-      : mode === "toto"
-        ? TOTO
-        : DEMO;
+/** TK-114i : identifiants, nom et liens assez longs pour pousser la fiche et la liste des flux (données inventées). */
+const LONG_ZONES = ["Comptes et authentification", "Transparence", "Socle"];
+export const LONG_COMPONENT_ID = "C-service-de-consultation-de-la-transparence";
+const LONG_AUTH_ID = "C-service-d-authentification-et-de-sessions-partagees";
+const plain = (specId: string, name: string, zone: number): Component => ({
+  specId,
+  name,
+  type: "service",
+  zone: LONG_ZONES[zone] as string,
+  responsibility: `Responsabilité du composant ${name}.`,
+  owns: [],
+  serves: [],
+  dependsOn: [],
+  decisions: [],
+});
+const LONGS: Component[] = [
+  {
+    ...plain(LONG_COMPONENT_ID, "ServiceDeConsultationDeLaTransparenceSurLesDonnees", 0),
+    responsibility:
+      "Montre à chaque personne les données gardées à son sujet, depuis T-journal-des-consultations-de-la-transparence.",
+    owns: ["T-journal-des-consultations-de-la-transparence-sur-les-donnees"],
+    serves: ["F-001", "F-002"],
+    dependsOn: [
+      { to: LONG_AUTH_ID, via: "contrat-type-de-verification-des-jetons", async: true },
+      { to: "C-comptes", via: "lecture" },
+    ],
+    decisions: ["ADR-001"],
+  },
+  plain(LONG_AUTH_ID, "Authentification et sessions partagées", 0),
+  plain("C-comptes", "Comptes", 0),
+  plain("C-invitations", "Invitations", 0),
+  plain("C-profils", "Profils", 0),
+  ...["Registre", "Exports", "Recherche", "Archives", "Rapports"].map((name) =>
+    plain(`C-${name.toLowerCase()}`, name, 1),
+  ),
+  ...["Journal", "File", "Configuration", "Envois"].map((name) =>
+    plain(`C-${name.toLowerCase()}`, name, 2),
+  ),
+];
+
+const MODES: Record<ArchitectureMode, Component[]> = {
+  empty: [],
+  demo: DEMO,
+  volume: [...DEMO, ...GENERATED],
+  toto: TOTO,
+  longs: LONGS,
+};
+export const componentsOf = (mode: ArchitectureMode): Component[] => MODES[mode];
 
 /** Compteur de `spec.head.counts.components` d'après le mode du scénario. */
 export const architectureCounts = (mode: ArchitectureMode | undefined) =>
@@ -550,31 +591,46 @@ const FLOW_COUNT = 18;
 const flowIdOf = (n: number): string =>
   n < FLOW_COUNT ? `P-${slugOf(FLOW_TITLES[n] as string)}` : `P-flux-${pad(n + 1)}`;
 const flowTitleOf = (n: number): string => FLOW_TITLES[n] ?? `Flux ${pad(n + 1)}`;
-const flowCountOf = (mode: ArchitectureMode): number =>
-  mode === "empty" ? 0 : mode === "volume" ? 300 : FLOW_COUNT;
+/** TK-114i : un flux à identifiant long (ouvert par défaut) et un flux à identifiant court. */
+const LONG_FLOWS: ReadonlyArray<readonly [string, string]> = [
+  [
+    "P-consultation-de-la-transparence-sur-les-donnees",
+    "Consulter la transparence sur les données",
+  ],
+  ["P-reserver", "Réserver"],
+];
+const FLOW_COUNTS: Record<ArchitectureMode, number> = {
+  empty: 0,
+  demo: FLOW_COUNT,
+  volume: 300,
+  toto: FLOW_COUNT,
+  longs: LONG_FLOWS.length,
+};
+/** Identifiant et titre du flux de rang `n` dans le jeu choisi. */
+const flowEntryOf = (mode: ArchitectureMode, n: number): readonly [string, string] =>
+  (mode === "longs" ? LONG_FLOWS[n] : undefined) ?? [flowIdOf(n), flowTitleOf(n)];
+const flowRankOf = (mode: ArchitectureMode, id: string): number =>
+  Array.from({ length: FLOW_COUNTS[mode] }, (_, n) => n).findIndex(
+    (n) => flowEntryOf(mode, n)[0] === id,
+  );
 
 export function listFlows(url: URL, mode: ArchitectureMode): Reply {
-  const total = flowCountOf(mode);
+  const total = FLOW_COUNTS[mode];
   const limit = Number(url.searchParams.get("limit") ?? PAGE) || PAGE;
   const around = url.searchParams.get("around");
   const cursor = url.searchParams.get("cursor");
   let start = cursor ? Number(cursor.split(":")[1]) : 0;
   if (!cursor && around) {
-    const index = Array.from({ length: total }, (_, n) => n).findIndex(
-      (n) => flowIdOf(n) === around,
-    );
+    const index = flowRankOf(mode, around);
     if (index === -1) return typed(404, "NOT_FOUND");
     start = Math.floor(index / limit) * limit;
   }
   const end = Math.min(total, start + limit);
   return reply(200, {
-    items: Array.from({ length: end - start }, (_, i) => ({
-      specId: flowIdOf(start + i),
-      title: flowTitleOf(start + i),
-      actor: "Client",
-      componentCount: 3,
-      externalCount: 1,
-    })),
+    items: Array.from({ length: end - start }, (_, i) => {
+      const [specId, title] = flowEntryOf(mode, start + i);
+      return { specId, title, actor: "Client", componentCount: 3, externalCount: 1 };
+    }),
     nextCursor: end < total ? `a:${end}` : null,
     previousCursor: start > 0 ? `b:${start}` : null,
     offset: start,
@@ -583,11 +639,11 @@ export function listFlows(url: URL, mode: ArchitectureMode): Reply {
 }
 
 export function flowDetail(mode: ArchitectureMode, id: string): Reply {
-  const n = Array.from({ length: flowCountOf(mode) }, (_, i) => i).find((i) => flowIdOf(i) === id);
-  if (n === undefined) return typed(404, "NOT_FOUND");
+  const n = flowRankOf(mode, id);
+  if (n === -1) return typed(404, "NOT_FOUND");
   return reply(200, {
     specId: id,
-    title: flowTitleOf(n),
+    title: flowEntryOf(mode, n)[1],
     actor: "Client",
     participants: [
       { id: "RL-client", name: "Client", type: "actor" },
@@ -657,6 +713,15 @@ const componentYaml = (c: Component): string => {
   return `${lines.join("\n")}\n`;
 };
 
+/** Mode « longs » : une ligne Mermaid de plus de 300 caractères, qui doit défiler dans son cadre. */
+const LONG_MERMAID_CLASS =
+  "service_de_consultation_et_de_transparence_sur_les_donnees_des_comptes_partages";
+const longMermaidLine = (mode: ArchitectureMode): string[] => {
+  if (mode !== "longs") return [];
+  const ids = componentsOf(mode).map((c) => c.specId.replaceAll("-", "_"));
+  return [`  class ${ids.join(",")} ${LONG_MERMAID_CLASS}`];
+};
+
 function sourceOf(url: URL, mode: ArchitectureMode): Reply {
   const kind = url.searchParams.get("target[kind]");
   const id = url.searchParams.get("target[id]") ?? "";
@@ -667,6 +732,7 @@ function sourceOf(url: URL, mode: ArchitectureMode): Reply {
       ...componentsOf(mode)
         .slice(0, 12)
         .map((c) => `  ${c.specId.replace("-", "_")}["${c.name}"]`),
+      ...longMermaidLine(mode),
     ].join("\n");
     return reply(200, {
       path: "architecture/schema.mmd",

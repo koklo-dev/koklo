@@ -14,7 +14,6 @@ import {
   InlineAlert,
   ListFooter,
   ListPanel,
-  ListRow,
   SearchField,
   SequenceDiagram,
   Skeleton,
@@ -64,6 +63,8 @@ import { TypePill } from "./architecture-components-tab.tsx";
 import { ArchitectureDecisionFiche } from "./architecture-decision-fiche.tsx";
 import { ArchitectureDecisionList, BackToList } from "./architecture-decision-list.tsx";
 import { STATUS_LABELS } from "./architecture-decisions-tab.tsx";
+import { ComponentFicheHeader } from "./architecture-fiche-header.tsx";
+import { FlowHeading, FlowRow } from "./architecture-flow-parts.tsx";
 import { FicheFrame, useDiagramZoom, VIEWER_HEIGHT } from "./data-diagram-parts.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { FilterChipMenu } from "./features-filters.tsx";
@@ -88,24 +89,26 @@ function ClientComponentFiche({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <IdTag>{item.id}</IdTag>
-        <TypePill type={item.type} />
-        <span className="flex-1" />
-        {onComment ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onComment({ kind: "component", ref: item.id, name: item.name })}
-          >
-            <Icon name="add_comment" size={16} />
-            Commenter
-          </Button>
-        ) : null}
-      </div>
-      <h2 className="m-0 text-settings-title">{item.name}</h2>
-      <p className="m-0 whitespace-pre-line text-body leading-[1.55]">
+      <ComponentFicheHeader
+        id={item.id}
+        name={item.name}
+        pill={<TypePill type={item.type} className="shrink-0" />}
+        action={
+          onComment ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => onComment({ kind: "component", ref: item.id, name: item.name })}
+            >
+              <Icon name="add_comment" size={16} />
+              Commenter
+            </Button>
+          ) : null
+        }
+      />
+      <p className="m-0 whitespace-pre-line break-words text-body leading-[1.55]">
         {item.summary.length > 0 ? item.summary.join("\n") : CLIENT_SUMMARY_MISSING}
       </p>
       {item.serves.length > 0 ? (
@@ -519,14 +522,14 @@ function FlowDetailOf({
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <IdTag>{id}</IdTag>
-        <h2 className="m-0 text-section-title">{data.title}</h2>
+        <FlowHeading id={id} title={data.title} />
         <span className="flex-1" />
         {onComment ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="shrink-0"
             onClick={() => onComment({ kind: "archflow", ref: id, name: data.title })}
           >
             <Icon name="add_comment" size={16} />
@@ -586,17 +589,10 @@ export function ClientFlowsTab({
         />
         <ListPanel label="Flux de l'architecture" className="max-h-[760px] overflow-auto">
           {flows.items.map((row) => (
-            <ListRow
+            <FlowRow
               key={row.specId}
-              fixedHeight
+              row={row}
               selected={row.specId === current}
-              title={
-                <span className="flex min-w-0 items-center gap-2">
-                  <IdTag size="sm">{row.specId}</IdTag>
-                  <span className="min-w-0 truncate">{row.title}</span>
-                </span>
-              }
-              subtitle={`${row.actor} · ${row.componentCount} ${row.componentCount > 1 ? "composants" : "composant"}, ${row.externalCount} ${row.externalCount > 1 ? "externes" : "externe"}`}
               onSelect={() => url.selectFlow(row.specId)}
             />
           ))}

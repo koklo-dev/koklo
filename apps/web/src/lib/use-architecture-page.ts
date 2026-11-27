@@ -14,6 +14,7 @@ import { useArchitectureComponents } from "./use-architecture-components.ts";
 import { useArchitectureDecisions, useDecisionCount } from "./use-architecture-decisions.ts";
 import { useArchitectureChecks, useArchitectureDocument } from "./use-architecture-document.ts";
 import { useFlowCount } from "./use-architecture-flows.ts";
+import { useArchitectureProposed } from "./use-architecture-proposed.ts";
 import { type ArchitectureUrlModel, useArchitectureUrl } from "./use-architecture-url.ts";
 import { type FeatureWrite, useFeatureWrite } from "./use-feature-submit.ts";
 import { useDeepLink } from "./use-features.ts";
@@ -216,10 +217,11 @@ function useArchitectureProposing(ctx: {
     readable && (deliverable === "validated" || deliverable === "revise"),
   );
   const generating = propose.status.active && propose.status.counts.total === 0;
-  // Le total du groupe « Composants » du lancement, pas les seules propositions chargées (8 par groupe au-delà de 30).
-  const proposedComponents = propose.status.groups
-    .filter((group) => group.key.split(":")[0] === "component")
-    .reduce((total, group) => total + group.total, 0);
+  const proposedComponents = useArchitectureProposed(projectId, {
+    reviewing: propose.reviewing,
+    status: propose.status,
+    failed: review.failed,
+  });
   const header = architectureHeaderStateOf({
     team: canReadRepos(role),
     canWrite: canWriteArchitecture(role),

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DevUiAgent } from "../src/components/dev-ui-agent.tsx";
 import { DevUiArchitecture } from "../src/components/dev-ui-architecture.tsx";
@@ -19,6 +19,19 @@ describe("Galerie : architecture", () => {
     const card = screen.getByRole("group", { name: "Section proposée par l'agent" });
     expect(card).toHaveTextContent("Observabilité");
     expect(screen.getByRole("button", { name: "Ajouter la section" })).toBeInTheDocument();
+  });
+
+  it("TK-114i : montre IdTitle court et long, la ligne de 52 au minimum et une pastille longue", () => {
+    render(<DevUiArchitecture />);
+    const rows = within(screen.getByRole("region", { name: "Flux, démonstration" }));
+    expect(rows.getByTitle("P-reserver")).toBeInTheDocument();
+    expect(rows.getByTitle("P-consultation-de-la-transparence-sur-les-donnees")).toHaveClass(
+      "overflow-hidden",
+    );
+    for (const row of rows.getAllByRole("listitem")) expect(row).toHaveClass("min-h-[52px]");
+    expect(screen.getByTitle("C-service-de-consultation-de-la-transparence")).toHaveClass(
+      "truncate",
+    );
   });
 
   it("TK-113 : montre DecisionStatus (trois statuts écrits) et le nœud « à revoir »", () => {

@@ -168,6 +168,22 @@ describe("Onglet Schéma : lecteur", () => {
     expect(within(fiche).queryByRole("button", { name: "Modifier" })).toBeNull();
   });
 
+  it("fiche : identifiant tronqué, type et « Modifier » jamais rétrécis, nom coupé partout (TK-114i, A8)", async () => {
+    serveArchitecture("owner");
+    renderArchitecture({ wide: true, search: "sel=C-api" });
+    const fiche = await screen.findByRole("complementary", { name: "Fiche du composant" });
+    const tag = within(fiche).getByTitle("C-api");
+    expect(tag).toHaveAttribute("data-slot", "id-tag");
+    expect(tag).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
+    expect(await within(fiche).findByRole("button", { name: "Modifier" })).toHaveClass("shrink-0");
+    expect(within(fiche).getByText("Service", { selector: "[data-slot='pill']" })).toHaveClass(
+      "shrink-0",
+    );
+    expect(within(fiche).getByRole("heading", { level: 2 })).toHaveClass(
+      "[overflow-wrap:anywhere]",
+    );
+  });
+
   it("« / » amène le focus sur « Aller à un composant… »", async () => {
     serveArchitecture("owner");
     renderArchitecture({ wide: true });

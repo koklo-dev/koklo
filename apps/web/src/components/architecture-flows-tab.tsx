@@ -7,10 +7,8 @@ import {
   EmptyState,
   EntityChip,
   Icon,
-  IdTag,
   ListFooter,
   ListPanel,
-  ListRow,
   Pill,
   SegmentedControl,
   SequenceDiagram,
@@ -28,6 +26,7 @@ import {
 import type { ArchitecturePageModel } from "../lib/use-architecture-page.ts";
 import { useAutoLoad } from "../lib/use-auto-load.ts";
 import { useListFooter } from "../lib/use-features-list.ts";
+import { FlowHeading, FlowRow } from "./architecture-flow-parts.tsx";
 import { SourceBlock } from "./data-diagram-source.tsx";
 import { ErrorNotice } from "./error-notice.tsx";
 import { GitReadError } from "./git-read-error.tsx";
@@ -141,8 +140,7 @@ function FlowDetail({ page, flowId }: { page: ArchitecturePageModel; flowId: str
         Liste
       </button>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <IdTag>{flowId}</IdTag>
-        <h2 className="m-0 text-section-title">{data?.title ?? flowId}</h2>
+        <FlowHeading id={flowId} title={data?.title ?? flowId} />
         {data ? <span className="text-meta text-muted-foreground">{metaOf(data)}</span> : null}
         <span className="flex-1" />
         {page.form.canWrite && data ? (
@@ -150,6 +148,7 @@ function FlowDetail({ page, flowId }: { page: ArchitecturePageModel; flowId: str
             type="button"
             variant="outline"
             size="sm"
+            className="shrink-0"
             onClick={() => page.form.openEdit(flowId)}
           >
             Modifier
@@ -210,17 +209,10 @@ function FlowList({
       />
       <ListPanel label="Flux de l'architecture" className="max-h-[760px] overflow-auto">
         {flows.items.map((row) => (
-          <ListRow
+          <FlowRow
             key={row.specId}
-            fixedHeight
+            row={row}
             selected={row.specId === current}
-            title={
-              <span className="flex min-w-0 items-center gap-2">
-                <IdTag size="sm">{row.specId}</IdTag>
-                <span className="min-w-0 truncate">{row.title}</span>
-              </span>
-            }
-            subtitle={`${row.actor} · ${row.componentCount} ${row.componentCount > 1 ? "composants" : "composant"}, ${row.externalCount} ${row.externalCount > 1 ? "externes" : "externe"}`}
             onSelect={() => page.url.selectFlow(row.specId)}
           />
         ))}

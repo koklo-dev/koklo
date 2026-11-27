@@ -1,20 +1,13 @@
 "use client";
 
 import type { SpecItem } from "@koklo/contract";
-import {
-  Button,
-  EntityChip,
-  IdTag,
-  InlineAlert,
-  Pill,
-  SegmentedControl,
-  Skeleton,
-} from "@koklo/ui";
+import { Button, EntityChip, InlineAlert, Pill, SegmentedControl, Skeleton } from "@koklo/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { componentTypeLabel, staleNoteOf } from "../lib/architecture-labels.ts";
 import { orpc } from "../lib/orpc.ts";
 import { useArchitectureSource } from "../lib/use-architecture-flows.ts";
+import { ComponentFicheHeader } from "./architecture-fiche-header.tsx";
 import { CopyAction, SourceBlock } from "./data-diagram-source.tsx";
 import { SECTION } from "./data-fiche-parts.tsx";
 import { GitReadError } from "./git-read-error.tsx";
@@ -106,10 +99,10 @@ function ComponentFiche({
   const values = detail.data.values;
   return (
     <>
-      <p className="m-0 text-body leading-[1.55]">{values.responsibility}</p>
+      <p className="m-0 break-words text-body leading-[1.55]">{values.responsibility}</p>
       <Groups groups={groupsOf(values)} />
       {staleIds ? (
-        <InlineAlert variant="warning" icon="sync_problem" role="note">
+        <InlineAlert variant="warning" icon="sync_problem" role="note" className="break-words">
           {staleNoteOf(staleIds, [...values.owns, ...values.serves])}
         </InlineAlert>
       ) : null}
@@ -203,19 +196,22 @@ export function SchemaFiche({ projectId, id, name, type, onEdit, staleIds }: Sch
   const actor = type === undefined;
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <IdTag>{id}</IdTag>
-        <Pill size="md" tone="soft">
-          {actor ? "Acteur" : componentTypeLabel(type)}
-        </Pill>
-        <span className="flex-1" />
-        {!actor && onEdit ? (
-          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
-            Modifier
-          </Button>
-        ) : null}
-      </div>
-      <h2 className="m-0 text-settings-title">{name}</h2>
+      <ComponentFicheHeader
+        id={id}
+        name={name}
+        pill={
+          <Pill size="md" tone="soft" className="shrink-0">
+            {actor ? "Acteur" : componentTypeLabel(type)}
+          </Pill>
+        }
+        action={
+          !actor && onEdit ? (
+            <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={onEdit}>
+              Modifier
+            </Button>
+          ) : null
+        }
+      />
       {actor ? (
         <p className="m-0 text-body leading-[1.55]">
           Rôle du cahier fonctionnel : il participe aux flux de cette architecture.
