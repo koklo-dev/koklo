@@ -3,10 +3,10 @@ title: Valider le cahier fonctionnel
 audience: functional
 doc_version: 0.1.0
 status: draft
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-27
 covers_release: unreleased
 sources: []
-covers_commit: e30875d
+covers_commit: c2322e2c
 ---
 # Valider le cahier fonctionnel
 
@@ -33,6 +33,10 @@ covers_commit: e30875d
    ![Règles métier avec la barre de validation, thème clair](../../../design/screens/captures/S-spec-functional/client-rules-light.png)
 
 6. Quand les quatre onglets sont traités, le bouton de l'en-tête devient actif : **Valider le cahier**, ou **Envoyer mes demandes** s'il existe au moins une demande de changement. Tant que ce n'est pas le cas, il reste en pointillé avec la raison « Traitez chaque onglet pour finir ».
+
+## Le cahier technique
+
+Le cahier technique est validé par l'**équipe** (Propriétaire, Administrateur ou Développeur), pas par le client : le bouton **Valider** de la page **Cahier technique** reste désactivé tant qu'un choix est à trancher. Le client le lit ensuite et le commente. Voir [Relire et compléter le cahier technique](review-and-complete-the-technical-specification.md#valider-le-cahier-technique).
 
 ## Côté équipe
 

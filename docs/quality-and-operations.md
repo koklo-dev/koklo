@@ -1307,8 +1307,7 @@ Volume: `seed:planche` holds 24 choices, 132 operations, 28 requirements, 3 envi
 - No new environment variable. The worker needs `KOKLO_ENCRYPTION_KEY` for the AI keys: `.deploy/manifest.yaml` lists
   it under `generate`, the worker `vars` name only the GitHub App; check the injection at deployment (UNVERIFIED).
 - Redeploy api, worker and web together (contract 3.17.0).
-- Staging acceptance: there is no "Valider" button yet (TK-116); to see the client view and "À revoir", call
-  `review.submit` on the `technical` deliverable (owner, admin, developer).
+- Staging acceptance: "Valider" in the header validates the deliverable (TK-116, section below).
 
 ### Secret detector: what it does not catch
 It matches PEM private keys, known key prefixes with a minimum length, JWTs, `Bearer` tokens, URLs with a password,
@@ -1327,3 +1326,30 @@ detector misses, rotate it: removing the line does not remove it from the Git hi
 ### Not verified before merge
 The screen ran against a stub API only; the agent only against a fake model; no integration test runs a technical launch
 with the Prisma store.
+
+## Technical specification: API, requirements and validation (TK-116)
+
+### Tests (local, named files only; full suites and the other e2e run in CI)
+| Package | Main new files |
+|---------|----------------|
+| `db` | `comment-operation-targets-migration` |
+| `contract` | `technical-api` |
+| `api` | `contract-generator`, `spec-technical-{ops,nfr,contract,validation}` |
+| `worker` | `entity-rows` (order), `plan-technical` (deduced component) |
+| `ui` | `operation-row`, `operation-fields-table`, `nfr-card` |
+| `web` | `technical-{api-tab,nfr-tab,validate}`, `e2e/spec-technical.spec.ts` (stub API) |
+
+Volume: `spec-technical-ops` keeps the first page of the operations of `seed:large` under 300 ms (local test database).
+
+### Deployment and rollback
+- One more additive migration with `down.sql`, `20261127140000_comment_operation_targets` (six with TK-115). Rolling it
+  back **deletes** the comments on operations and requirements.
+- No new environment variable. Redeploy api, worker and web together (contract 3.18.0).
+- The "zone then name" order and the field order come from indexing: push a commit to the spec repository, or reindex
+  it, before checking them.
+- Staging acceptance: a repository whose `ST-api` is chosen and names oRPC is needed to see a generated contract.
+
+### Known limits and not verified before merge
+- A rate limit cannot be removed from the operation sheet (the contract has no empty value): edit the file in Git.
+- Only the TypeScript · oRPC generator exists; the contract is shown, never written to the code repository.
+- The screen ran against a stub API only (unit tests and Playwright); no run against the real API.

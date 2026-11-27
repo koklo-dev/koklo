@@ -1,5 +1,5 @@
 <!-- Copie de koklo-new/cadrage/koklo-design-v0.1.md (source), aussi dans MyVault/koklo-v2/design.md. Mettre à jour la source puis recopier. v2 (TK-87) écrite d'abord ici : recopie vers les deux autres emplacements à faire par l'orchestrateur (docs/refonte/questions.md C5). -->
-# Koklo : design (v2.37)
+# Koklo : design (v2.38)
 
 Décisions d'identité visuelle et d'interface de la plateforme Koklo (livraison produit de A à Z, web app + CLI). Document vivant : chaque décision porte son état (**retenu**, **à confirmer**, **écarté**).
 
@@ -628,6 +628,23 @@ Aucune planche : composé avec l'existant (B619). Textes du bilan en français, 
 | `ProposalDiff` op `draft` | « Proposition de l'agent · rédaction de la section » dans le texte d'une section (maquette 14 l.733) |
 | Document partagé | `SpecDocumentTab` (web) sert l'Architecture, le Technique et la vue client du Technique : sections, validation, rédaction proposée, colonne Agent ou « Questions et commentaires » |
 
+### 5.27 Technique : API, Exigences, validation (v2.38, TK-116, passation 12 §4.2, §4.3, §5, 11 §3, maquette 14 l.222-278, 588-672, 774-815, 893-902, B768 à B779)
+
+Suite du §5.26 (même écran). Registre d'icônes ajoutées : `accessibility_new`, `pending`, `code`, `rule`.
+
+| Élément | Règle |
+|---|---|
+| `OperationRow` | Ligne bouton `aria-current`, pleine largeur, marges 9 / 14, écart 12, bord haut `--border` sauf la première ; pastille de type de 72 de large ; nom mono 13/500 sur résumé 12 `--muted-foreground` tronqué ; permission mono 11 à droite ; courante : `--secondary` ; proposée : bord gauche 3 px pointillé `--border-strong`. Cadre de liste rayon 12 |
+| `OperationKindPill` (famille `Pill`) | 22 de haut, rayon 999, 11/500 : « écriture » `soft`, « lecture » contour `--border` texte muet, « interne » contour pointillé `--border-strong` texte muet |
+| `FilterChip` pour les zones | 28 de haut, marges 0 10, 12/500 : active contour `--primary` sur `soft` ; inactive contour `--border`, texte `--muted-foreground` |
+| Fiche d'une opération | `OperationFicheTitle` (h2 mono 20/500), résumé 14 / 1,55 ; segmenté Fiche · YAML · Contrat généré ; marges 4 / 28 / 32, écart 14, bordure gauche |
+| `OperationFieldsTable` | Titre h3 13/600 ; cadre rayon 10, 12 px ; en-tête `--surface` muet 500, cellules marges 6 / 10, lignes bordées en haut ; 1re colonne mono 500, 2e mono muette, 3e texte ; défilement interne focusable |
+| `EntityChip` | Types `rule` (icône `rule` sur cette page), `feature`, permission (`person`), limite (`speed`) : 26 de haut au moins, rayon 6, `soft` |
+| Source générée | Bloc source du §5.26 avec icône `code`, pastille `soft` « Généré · TypeScript · oRPC », note 12 muette sous le code ; « Source de vérité » en `success` pour le YAML |
+| `NfrCategory` (famille `StackLayer`) | Titre 12/600 capitales .06em, icône 16, compte mono ; grille `repeat(auto-fill, minmax(min(300px,100%),1fr))`, écart 10 |
+| `NfrCard` | `article` rayon 12, marges 14 / 16, écart 6, bord `--border` (à revoir : 2 px `--status-pending-icon` et « à revoir » dans le nom accessible ; proposée : pointillé `--border-strong`) : identifiant mono 12/500 sur `soft` rayon 5, titre 600, bouton `edit` 28 « Modifier NFR-nnn » ; cible 22 / 1,2 / 600 ; énoncé 13 / 1,5 muet ; pied bordé : icône 16, vérification 12, pastille 22 « Couverte » `success` (`fact_check`) ou « À couvrir » `warning` (`pending`) ; sans couverture connue : icône `fact_check` muette, aucune pastille (B774) |
+| En-tête | Ajout selon l'onglet (« Nouvelle opération », « Nouvelle exigence ») ; « Valider » (`verified`) après l'ajout : primaire, ou pointillé désactivé tant qu'un choix est à trancher ; validé : ajout primaire, sans « Valider » |
+
 ## 6. Écrans maquettés
 
 | Écran | État |
@@ -711,3 +728,4 @@ Les écrans des lots suivants de la refonte sont maquettés dans `docs/refonte/m
 | 22/11/2026 | v2.33 (TK-114d, maquette 13, B649 à B663) : §5.25 « rôles avec application » et « flux repris » dans le bilan ; trait acteur → application sans étiquette ; aucun composant ajouté à `packages/ui` |
 | 27/11/2026 | v2.36 (TK-114i, maquette 13 l.175-239 et 405-441, B708 à B714) : identifiants longs de l'Architecture ; `IdTitle` ajouté à `packages/ui`, `IdTag truncate`, `ListRow fixedHeight="min"`, `EntityChip` borné à son conteneur |
 | 27/11/2026 | v2.37 (TK-115, passation 12, maquette 14, B718 à B737) : §5.26 Technique ; `StackLayer`, `StackChoiceCard`, `ComparisonTable`, `EnvironmentTable`, `SpecRowsPanel` ajoutés à `packages/ui` ; icônes `layers`, `dns`, `cable`, `help`, `monitoring`, `rocket_launch` (« queue » : `lists`, B756) |
+| 27/11/2026 | v2.38 (TK-116, passation 12, maquette 14, B768 à B779) : §5.27 onglets API et Exigences, « Valider » ; `OperationRow`, `OperationKindPill`, `OperationFieldsTable`, `OperationFicheTitle`, `NfrCategory`, `NfrCard` ajoutés à `packages/ui` ; icônes `accessibility_new`, `pending`, `code`, `rule` |

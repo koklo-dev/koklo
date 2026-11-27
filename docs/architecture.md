@@ -1954,7 +1954,8 @@ flowchart LR
 ```
 
 ## Technical specification (TK-115)
-Screen `/projects/<id>/spec/technical` (tabs Stack, Environnements, Document, plus Relecture; decisions B718 to B767).
+Screen `/projects/<id>/spec/technical` (tabs Stack, API, Exigences, Environnements, Document, plus Relecture;
+decisions B718 to B784; API, requirements and validation: see the TK-116 section below).
 Files: `tech/stack/<slug>.yaml` (`ST-`), `api/endpoints/<zone.verbe>.yaml` (operations; the older REST format is still
 read, never written), `nfr/NFR-nnn.yaml`, `tech/environments.yaml` (variable names and usage, no value key) and the
 sections `tech/cahier-technique/NN-<slug>.md`. Schemas, emitters and the secret detector live in `@koklo/schema`.
@@ -2010,4 +2011,35 @@ flowchart LR
     tri -->|secret| drop[candidate dropped]
     props --> dec["proposal.decide (edited is checked)"] --> sb
   end
+```
+
+## Technical specification: API, requirements and validation (TK-116)
+**Reads.** The API and requirements reads live in `spec-technical-api.{controller,service,repository}.ts`: operations are
+the `endpoint` rows whose name is `zone.verb` and that name a component (B781); requirements are the `nfr` rows. The
+index stores their order (zone then name; category then id) and the field order of each operation (`champs`, B780). The
+YAML is read at the indexed commit through the Git read cache, outside any transaction.
+
+**Generated contract.** `contract-generator.ts` is a pure function from an indexed operation to a TypeScript · oRPC + zod
+text. It is computed on each read when `ST-api` is chosen and its choice names oRPC; nothing is written to any
+repository. Every value of the file is escaped.
+
+**Validation.** `review.submit` on `technical` refuses an approval while a `stack` row of the head is `a_trancher`.
+A validated technical deliverable opens Security through the existing dependency graph.
+
+**Web.** `apps/web` reads the two tabs through `lib/use-technical-api.ts` (cursor pages, `around` for a direct link);
+`OperationBrowser` and `RequirementBrowser` are shared by the team and the client, the client calling `clientSpace.*`
+only. The address holds `?op=`, `?zone=`, `?nfr=` and a per-tab `?q=`. The sheets send ordinary `op.*` and `nfr.*`
+batch operations, changed fields only.
+
+```mermaid
+flowchart LR
+  web[web: tabs API, Exigences] --> team[api spec.technical.ops, nfr, contract]
+  web2[web: client view] --> client[clientSpace.technicalOps, technicalOp, technicalNfr]
+  team --> idx[(spec_entities)]
+  team -->|YAML at the indexed commit| git[(spec repository)]
+  team --> gen[contract generator, pure]
+  client --> gate{validated?} -->|yes| idx
+  valid[review.submit technical] --> open{a choice still open?}
+  open -->|yes| r409[409 choices_open, nothing written]
+  open -->|no| reviews[(reviews)] --> sec[Security available]
 ```
