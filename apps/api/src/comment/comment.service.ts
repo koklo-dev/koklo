@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { COMMENT_DELETE_ANY_ROLES } from "../auth/roles.ts";
 import { CLOCK, type Clock } from "../clock.ts";
+import { SpecTechnicalService } from "../spec-technical/spec-technical.service.ts";
 import { orNotFound, validation } from "../tracker/api-errors.ts";
 import { DEFAULT_PAGE_SIZE, positionOf } from "../tracker/cursor.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
@@ -45,14 +46,22 @@ const REF_SHAPES: Record<RefKind, { pattern: RegExp; label: string }> = {
   component: { pattern: /^C-[a-z0-9][a-z0-9-]*$/, label: "de composant (C-slug)" },
   adr: { pattern: /^ADR-\d{3,}$/, label: "de décision (ADR-nnn)" },
   archflow: { pattern: /^P-[a-z0-9][a-z0-9-]*$/, label: "de flux (P-slug)" },
+  stack: { pattern: /^ST-[a-z0-9][a-z0-9-]*$/, label: "de choix technique (ST-slug)" },
+  environments: { pattern: /^environments$/, label: "du bloc des environnements (environments)" },
+  tech_section: { pattern: /^DOC-[a-z0-9][a-z0-9-]*$/, label: "de section (DOC-slug)" },
 };
 const isRefKind = (kind: string): kind is RefKind => kind in REF_SHAPES;
 
 /**
- * Cible d'un commentaire : un ticket du projet, ou une table, un composant, une décision ou un flux de la tête de spec
- * (`NOT_FOUND` sinon, sans fuite). Le contrat type la cible en chaîne libre : l'API la valide.
+ * Cible d'un commentaire : un ticket du projet, ou un élément de la tête de spec (`NOT_FOUND` sinon, sans fuite). Le
+ * contrat type la cible en chaîne libre : l'API la valide. Une section du cahier technique, lue en Git, est vérifiée par
+ * l'appelant avant la transaction (`sections`).
  */
-async function requireTarget(store: CommentStore, input: CommentListInput): Promise<CommentTarget> {
+async function requireTarget(
+  store: CommentStore,
+  input: CommentListInput,
+  sections: ReadonlySet<string> = new Set(),
+): Promise<CommentTarget> {
   const kind = input.targetKind;
   if (isRefKind(kind)) {
     const ref = input.targetRef;
@@ -60,13 +69,14 @@ async function requireTarget(store: CommentStore, input: CommentListInput): Prom
     if (ref === undefined || !shape.pattern.test(ref)) {
       throw validation("targetRef", `targetRef doit être un identifiant ${shape.label}`);
     }
-    orNotFound((await store.refExists(kind, ref)) || null);
+    const exists = kind === "tech_section" ? sections.has(ref) : await store.refExists(kind, ref);
+    orNotFound(exists || null);
     return { kind, ref };
   }
   if (kind !== "ticket") {
     throw validation(
       "targetKind",
-      "Seuls les commentaires de ticket, de table, de composant, de décision et de flux sont pris en charge",
+      "Seuls les commentaires d'un ticket ou d'un élément de la spec sont pris en charge",
     );
   }
   if (input.targetId === undefined || !isUuid(input.targetId)) {
@@ -90,11 +100,20 @@ export class CommentService {
   constructor(
     @Inject(COMMENT_REPOSITORY) private readonly repository: CommentRepository,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(SpecTechnicalService) private readonly technical: SpecTechnicalService,
   ) {}
 
-  create(scope: ProjectScope, role: string | undefined, input: CommentCreateInput) {
+  /** Sections du cahier technique à la tête (lecture git hors transaction), pour la seule cible `tech_section`. */
+  private async sectionsFor(scope: ProjectScope, targetKind: string): Promise<Set<string>> {
+    if (targetKind !== "tech_section") return new Set();
+    const { sections } = await this.technical.sections(scope, { deliverable: "technical" });
+    return new Set(sections.map((section) => section.specId));
+  }
+
+  async create(scope: ProjectScope, role: string | undefined, input: CommentCreateInput) {
+    const sections = await this.sectionsFor(scope, input.targetKind);
     return this.repository.run(scope, async (store) => {
-      const target = await requireTarget(store, input);
+      const target = await requireTarget(store, input, sections);
       const comment = await store.insert({
         target,
         authorKind: authorKindOf(role),
@@ -106,12 +125,13 @@ export class CommentService {
     });
   }
 
-  list(scope: ProjectScope, role: string | undefined, input: CommentListInput) {
+  async list(scope: ProjectScope, role: string | undefined, input: CommentListInput) {
     if (isRefKind(input.targetKind) && !REF_READ_ROLES.some((allowed) => allowed === role)) {
       throw new ORPCError("FORBIDDEN", { message: "Accès refusé" });
     }
+    const sections = await this.sectionsFor(scope, input.targetKind);
     return this.repository.run(scope, async (store) => {
-      const target = await requireTarget(store, input);
+      const target = await requireTarget(store, input, sections);
       const page = await store.list(
         target,
         input.limit ?? DEFAULT_PAGE_SIZE,

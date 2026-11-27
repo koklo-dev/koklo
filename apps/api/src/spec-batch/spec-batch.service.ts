@@ -2,11 +2,12 @@ import type { SpecBatchOutput, SpecBatchSubmitInput } from "@koklo/contract";
 import { specPathIndex } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
+import { DATA_PROPOSAL_ROLES } from "../auth/roles.ts";
 import type { AppConfig } from "../config.ts";
 import { APP_CONFIG } from "../database/database.module.ts";
 import { GitAccess } from "../repo/git-access.ts";
 import { GIT_PROVIDER, type GitProviderBinding } from "../repo/tokens.ts";
-import { orNotFound } from "../tracker/api-errors.ts";
+import { forbidden, orNotFound } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { replayedSubset } from "./batch-content.ts";
 import {
@@ -16,7 +17,7 @@ import {
   type SpecBatchPlan,
   type SpecBatchRepository,
 } from "./spec-batch.repository.ts";
-import { prepareBatch } from "./spec-batch-input.ts";
+import { isTechnicalOperation, prepareBatch } from "./spec-batch-input.ts";
 import {
   allSkipped,
   failureOf,
@@ -29,6 +30,12 @@ import { type Precheck, precheckBatch } from "./spec-batch-precheck.ts";
 import { specHeadPaths } from "./spec-head-paths.ts";
 import { SpecWriteQueue } from "./spec-write.queue.ts";
 import { pollUntil, SPEC_BATCH_WAIT_DEFAULT_MS } from "./wait.ts";
+
+/** Un lot qui porte une opération du cahier technique relève d'owner, admin et développeur (TK-115, B725). */
+function assertTechnicalRole(role: string, operations: SpecBatchSubmitInput["operations"]): void {
+  if (!operations.some(isTechnicalOperation)) return;
+  if (!(DATA_PROPOSAL_ROLES as readonly string[]).includes(role)) throw forbidden();
+}
 
 /**
  * Lots d'écriture de la spec. `submit` n'écrit jamais chez le fournisseur : il enregistre le lot
@@ -51,6 +58,7 @@ export class SpecBatchService {
     role: string,
     input: SpecBatchSubmitInput,
   ): Promise<SpecBatchOutput> {
+    assertTechnicalRole(role, input.operations);
     const proposals = input.skipConflicts?.proposals;
     if (proposals === undefined) {
       return this.commitPrepared(scope, role, (plan) => prepareBatch(input, plan.defaultBranch));

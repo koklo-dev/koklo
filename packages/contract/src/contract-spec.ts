@@ -89,6 +89,15 @@ import {
   rolesMatrixInputSchema,
   rolesMatrixSchema,
 } from "./schemas-spec-domain.ts";
+import {
+  documentSectionsInputSchema,
+  stackChooseInputSchema,
+  stackListInputSchema,
+  stackSourceInputSchema,
+  stackSummarySchema,
+  technicalEnvironmentsInputSchema,
+  technicalEnvironmentsSchema,
+} from "./schemas-spec-technical.ts";
 
 /** Lecture depuis l'index en base (CDC §8.2) : ouverte à tous les rôles, 404 hors projet. */
 const readIndexErrors = { ...readOneErrors, ...validationError } as const;
@@ -298,6 +307,56 @@ const spec = {
       })
       .input(architectureSourceInputSchema)
       .output(architectureSourceSchema),
+  },
+  /**
+   * Page Technique (TK-115, 3.17.0, B725, B728) : choix de la stack (pages de 24, `q`, `around`, facettes `layer` et
+   * `status`), YAML d'un choix, environnements, et « Choisir » (un lot d'une `stack.update` ; owner, admin, développeur).
+   * Lectures de l'équipe et du designer (403 client et business : ils lisent `clientSpace.technical*`).
+   */
+  technical: {
+    stack: {
+      list: route("GET", "/projects/{projectId}/spec/technical/stack")
+        .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+        .input(stackListInputSchema)
+        .output(listOf(stackSummarySchema)),
+      choose: route("POST", "/projects/{projectId}/spec/technical/stack/{id}/choose")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...providerErrors,
+          ...specIndexFailedError,
+          ...specBatchConflictError,
+          ...specInvalidError,
+        })
+        .input(stackChooseInputSchema)
+        .output(specBatchSchema),
+      /** `tech/stack/<slug>.yaml` au commit lu, sinon YAML généré depuis l'index. */
+      source: route("GET", "/projects/{projectId}/spec/technical/stack/{id}/source")
+        .errors({
+          ...writeOneErrors,
+          ...validationError,
+          ...specIndexFailedError,
+          ...providerErrors,
+        })
+        .input(stackSourceInputSchema)
+        .output(architectureSourceSchema),
+    },
+    environments: route("GET", "/projects/{projectId}/spec/technical/environments")
+      .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
+      .input(technicalEnvironmentsInputSchema)
+      .output(technicalEnvironmentsSchema),
+  },
+  /** Sections d'un document (`architecture` ou `technical`), lues en Git au commit indexé, jamais indexées (3.17.0). */
+  document: {
+    sections: route("GET", "/projects/{projectId}/spec/document/sections")
+      .errors({
+        ...writeOneErrors,
+        ...validationError,
+        ...specIndexFailedError,
+        ...providerErrors,
+      })
+      .input(documentSectionsInputSchema)
+      .output(architectureDocumentSchema),
   },
   getFeature: route("GET", "/projects/{projectId}/spec/features/{specId}")
     .errors({ ...readOneErrors, ...providerErrors, ...specIndexFailedError })

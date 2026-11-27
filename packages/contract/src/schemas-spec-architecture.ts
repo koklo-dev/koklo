@@ -41,6 +41,9 @@ export const adrLinkSchema = z
 export const COMPONENT_TYPES = ["app", "service", "store", "queue", "ext"] as const;
 export const componentTypeSchema = z.enum(COMPONENT_TYPES);
 export const DOC_SECTION_STATUSES = ["brouillon", "a_relire", "validee", "a_rediger"] as const;
+/** Livrables qui portent un document en sections (`doc.section.*`, TK-115) ; absent d'une opération : l'architecture. */
+export const DOC_SECTION_DELIVERABLES = ["architecture", "technical"] as const;
+const docSectionDeliverableSchema = z.enum(DOC_SECTION_DELIVERABLES).optional();
 export const docSectionStatusSchema = z.enum(DOC_SECTION_STATUSES);
 
 const text = (max: number) => z.string().min(1).max(max);
@@ -163,6 +166,7 @@ export const adrDeleteSchema = z.object({ kind: z.literal("adr.delete"), specId:
 /** Section du document `architecture/overview/NN-<slug>.md` : le numéro NN est posé par le worker (B508). */
 export const docSectionCreateSchema = z.object({
   kind: z.literal("doc.section.create"),
+  deliverable: docSectionDeliverableSchema,
   title: text(200),
   markdown: text(8000),
   status: docSectionStatusSchema.optional(),
@@ -171,6 +175,7 @@ export const docSectionUpdateSchema = z
   .object({
     kind: z.literal("doc.section.update"),
     specId: docSectionIdSchema,
+    deliverable: docSectionDeliverableSchema,
     title: text(200).optional(),
     markdown: text(8000).optional(),
     status: docSectionStatusSchema.optional(),
@@ -181,6 +186,7 @@ export const docSectionUpdateSchema = z
 export const docSectionDeleteSchema = z.object({
   kind: z.literal("doc.section.delete"),
   specId: docSectionIdSchema,
+  deliverable: docSectionDeliverableSchema,
 });
 
 export const ARCHITECTURE_OPERATION_KINDS = [

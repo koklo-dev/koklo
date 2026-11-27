@@ -38,7 +38,8 @@ const lines = (items: readonly { specId: string; title: string }[]): string =>
     .map((item) => `${item.specId} | ${oneLine(item.title)}`)
     .join("\n");
 
-function blocksOf(sources: LaunchSources): Untrusted[] {
+/** Fonctionnel, tables, architecture actuelle, exigences connues et sections du document : aussi lus par le Technique. */
+export function architectureBlocks(sources: LaunchSources): Untrusted[] {
   const architecture = sources.architecture;
   return [
     new Untrusted(
@@ -77,7 +78,7 @@ function blocksOf(sources: LaunchSources): Untrusted[] {
   ];
 }
 
-const withInstruction = (blocks: Untrusted[], instruction: string | null): Untrusted[] =>
+export const withInstruction = (blocks: Untrusted[], instruction: string | null): Untrusted[] =>
   instruction === null || instruction.length === 0
     ? blocks
     : [...blocks, new Untrusted("user-input", instruction)];
@@ -90,7 +91,7 @@ export function architectureZonesPrompt(
   return framePrompt({
     instructions: ARCHITECTURE_ZONES_INSTRUCTIONS,
     nonce,
-    data: withInstruction(blocksOf(sources), instruction),
+    data: withInstruction(architectureBlocks(sources), instruction),
   });
 }
 
@@ -107,7 +108,7 @@ export function architectureBatchPrompt(
     instructions: architectureInstructions(input.kinds),
     nonce,
     data: [
-      ...withInstruction(blocksOf(input.sources), input.instruction),
+      ...withInstruction(architectureBlocks(input.sources), input.instruction),
       new Untrusted("model-output", `Zone: ${input.zone}`),
     ],
   });

@@ -194,6 +194,9 @@ export const specHead = {
     relations: 1,
     fixtures: 0,
     components: 0,
+    stack: 0,
+    nfr: 0,
+    environments: 0,
   },
 };
 

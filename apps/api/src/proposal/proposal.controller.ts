@@ -13,8 +13,9 @@ import { ProposalLaunchService } from "./proposal-launch.service.ts";
 import { ProposalReviseService } from "./proposal-revise.service.ts";
 
 /**
- * Propositions de l'agent : `PROPOSAL_ROLES` partout (client et business : 403). L'organisation et l'acteur
- * viennent de la session, le projet de l'entrée (accès contrôlé avant tout travail).
+ * Propositions de l'agent : `PROPOSAL_ROLES` partout (client et business : 403), et pour le cahier technique owner, admin et
+ * développeur seuls (TK-115 : designer 403, contrôlé par les services). L'organisation et l'acteur viennent de la session,
+ * le projet de l'entrée (accès contrôlé avant tout travail).
  */
 @Controller()
 export class ProposalController {
@@ -50,7 +51,7 @@ export class ProposalController {
         request,
         errors,
         input.projectId,
-        (scope) => this.launches.options(scope, input),
+        (scope) => this.launches.options(scope, input, requireSession(request).role),
         this.access,
       ),
     );
@@ -65,7 +66,8 @@ export class ProposalController {
         request,
         errors,
         input.projectId,
-        (scope) => this.revisions.revise(scope, input, requestIdOf(request)),
+        (scope) =>
+          this.revisions.revise(scope, requireSession(request).role, input, requestIdOf(request)),
         this.access,
       ),
     );
@@ -80,7 +82,7 @@ export class ProposalController {
         request,
         errors,
         input.projectId,
-        (scope) => this.proposals.list(scope, input),
+        (scope) => this.proposals.list(scope, requireSession(request).role, input),
         this.access,
       ),
     );
@@ -95,7 +97,7 @@ export class ProposalController {
         request,
         errors,
         input.projectId,
-        (scope) => this.proposals.decide(scope, input),
+        (scope) => this.proposals.decide(scope, requireSession(request).role, input),
         this.access,
       ),
     );
@@ -110,7 +112,7 @@ export class ProposalController {
         request,
         errors,
         input.projectId,
-        (scope) => this.proposals.decideMany(scope, input),
+        (scope) => this.proposals.decideMany(scope, requireSession(request).role, input),
         this.access,
       ),
     );

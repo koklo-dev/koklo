@@ -1,7 +1,25 @@
 import { z } from "zod";
 import { overviewDeliverableStatusSchema } from "./schemas-overview.ts";
 import { deliverableKeySchema } from "./schemas-shell.ts";
-import { archFlowIdSchema, componentIdSchema } from "./schemas-spec-architecture.ts";
+import { adrIdSchema, archFlowIdSchema, componentIdSchema } from "./schemas-spec-architecture.ts";
+
+/** Changements et éléments concernés rendus au plus pour le cahier technique (3.17.0). */
+export const STALE_TECHNICAL_MAX = 50;
+/**
+ * Technique à revoir (3.17.0) : composants et décisions ajoutés, retirés, modifiés ou acceptés depuis la dernière
+ * décision, et les choix, opérations et exigences qui les citent.
+ */
+export const staleTechnicalSchema = z.object({
+  changes: z
+    .array(
+      z.object({
+        id: z.union([componentIdSchema, adrIdSchema]),
+        change: z.enum(["added", "removed", "changed", "accepted"]),
+      }),
+    )
+    .max(STALE_TECHNICAL_MAX),
+  items: z.array(z.string()).max(STALE_TECHNICAL_MAX),
+});
 
 /**
  * Livrables de la spec (TK-100, contrat 2.10.0, additif). `status` reprend les quatre statuts de la vue d'ensemble ;
@@ -29,6 +47,7 @@ export const specDeliverableSchema = z.object({
   /** Architecture à revoir (3.11.0) : composants et flux concernés par ces changements, 50 au plus chacun. */
   staleComponents: z.array(componentIdSchema).max(50).optional(),
   staleFlows: z.array(archFlowIdSchema).max(50).optional(),
+  staleTechnical: staleTechnicalSchema.optional(),
 });
 
 export const specDeliverablesInputSchema = z.object({ projectId: z.uuid() });

@@ -17,19 +17,24 @@ export const ruleIdSchema = z.string().regex(/^R-\d{3,}$/);
 export const roleIdSchema = z.string().regex(new RegExp(`^RL-${slug}$`));
 export const flowIdSchema = z.string().regex(new RegExp(`^P-${slug}$`));
 export const permissionIdSchema = z.string().regex(new RegExp(`^PM-${slug}(\\.${slug})*$`));
-/** Un identifiant d'élément écrit par un lot : fonctionnalité, règle, rôle, parcours, table ou jeu d'exemple (3.5.0). */
+/**
+ * Un identifiant d'élément écrit par un lot : fonctionnalité, règle, rôle, parcours, table ou jeu d'exemple (3.5.0),
+ * composant, décision, section (3.9.0), choix technique, exigence, environnement et opération `<zone>.<verbe>` (3.17.0).
+ */
 export const specIdSchema = z
   .string()
   .regex(
     new RegExp(
-      `^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug}|C-${slug}|ADR-\\d{3,}|DOC-${slug})$`,
+      `^(F-\\d{3,}|R-\\d{3,}|RL-${slug}|P-${slug}|T-${slug}|FX-${slug}|C-${slug}|ADR-\\d{3,}|DOC-${slug}|ST-${slug}|NFR-${slug}|ENV-${slug}|[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*)$`,
     ),
   );
 
 const featureLink = z.string().regex(/^F-\d{3,}$/);
 const tableLink = z.string().regex(new RegExp(`^T-${slug}$`));
+/** Segment d'une opération `<zone>.<verbe>` : camelCase et `_` admis après le premier caractère (3.17.0, B720). */
+const segment = "[a-z0-9][A-Za-z0-9_-]*";
 /** Endpoint : `E-<slug>` (format v1) ou `<zone>.<verbe>` (format v2, 3.4.0). */
-export const endpointLink = z.string().regex(new RegExp(`^(E-${slug}|${slug}\\.${slug})$`));
+export const endpointLink = z.string().regex(new RegExp(`^(E-${slug}|${segment}\\.${segment})$`));
 const screenLink = z.string().regex(new RegExp(`^S-${slug}$`));
 const text = (max: number) => z.string().min(1).max(max);
 

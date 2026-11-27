@@ -9,6 +9,7 @@ import {
   COMPONENT_TYPES,
   type Component,
   type ComponentType,
+  type DocSectionDeliverable,
   docSectionSlugOf,
   parseDocSection,
 } from "@koklo/schema";
@@ -122,16 +123,20 @@ export function componentDetail(
 /** Au plus 100 sections lues : le document d'une spec en compte une douzaine, le plafond protège le fournisseur. */
 export const DOC_SECTIONS_MAX = 100;
 
-/** Chemin (relatif à la spec) d'une section du document. */
-export const isDocSectionPath = (path: string): boolean => docSectionSlugOf(path) !== undefined;
+/** Chemin (relatif à la spec) d'une section du document du livrable. */
+export const isDocSectionPath = (
+  path: string,
+  deliverable: DocSectionDeliverable = "architecture",
+): boolean => docSectionSlugOf(path, deliverable) !== undefined;
 
-/** Sections du document (`architecture/overview/NN-<slug>.md`), dans l'ordre de leur numéro ; hors format : ignoré. */
+/** Sections d'un document (`NN-<slug>.md` du dossier du livrable), dans l'ordre de leur numéro ; hors format : ignoré. */
 export function docSectionsOf(
   files: readonly { path: string; content: string }[],
+  deliverable: DocSectionDeliverable = "architecture",
 ): ArchitectureDocSection[] {
   return files
     .flatMap((file) => {
-      const found = docSectionSlugOf(file.path);
+      const found = docSectionSlugOf(file.path, deliverable);
       if (found === undefined) return [];
       const section = parseDocSection(file.content);
       return [

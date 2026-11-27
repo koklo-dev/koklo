@@ -22,7 +22,15 @@ export const componentIdOf = (name: unknown): string => `C-${slugOf(name, "compo
 /** Identifiant d'une section du document nouvelle : `DOC-<slug du titre>` ; le worker pose le numéro NN du fichier. */
 export const docSectionIdOf = (title: unknown): string => `DOC-${slugOf(title, "section")}`;
 
-/** Créations dont l'identifiant se déduit du texte saisi, sans compteur : `RL-`, `P-`, `T-`, `FX-`, `C-`, `DOC-` et le flux technique. */
+/** Identifiant d'un choix technique nouveau : `ST-<slug du rôle>` (TK-115). */
+export const stackIdOf = (role: unknown): string => `ST-${slugOf(role, "choix")}`;
+/** Identifiant d'un environnement nouveau : `ENV-<slug du nom>` (TK-115). */
+export const environmentIdOf = (name: unknown): string => `ENV-${slugOf(name, "environnement")}`;
+
+/**
+ * Créations dont l'identifiant se déduit du texte saisi, sans compteur : `RL-`, `P-`, `T-`, `FX-`, `C-`, `DOC-`, `ST-`,
+ * `ENV-`, le flux technique et l'opération (son nom `<zone>.<verbe>`).
+ */
 const SLUG_IDS: Readonly<Record<string, (payload: Record<string, unknown>) => string>> = {
   "role.create": (payload) => roleIdOf(payload.name),
   "flow.create": (payload) => flowIdOf(payload.title),
@@ -31,6 +39,9 @@ const SLUG_IDS: Readonly<Record<string, (payload: Record<string, unknown>) => st
   "component.create": (payload) => componentIdOf(payload.name),
   "archflow.create": (payload) => String(payload.flow ?? ""),
   "doc.section.create": (payload) => docSectionIdOf(payload.title),
+  "stack.create": (payload) => stackIdOf(payload.role),
+  "env.create": (payload) => environmentIdOf(payload.name),
+  "op.create": (payload) => String(payload.name ?? ""),
 };
 
 /** Identifiant d'une création déduit de son texte (pré-vérification, TK-114e), `null` pour une création numérotée par compteur. */
@@ -40,8 +51,8 @@ export const slugSpecIdOf = (
 
 /**
  * Identifiant d'une création, attribué à l'enfilage : `F-nnn` et `R-nnn` par les compteurs du projet (jamais deux fois la
- * même valeur, même en concurrence), `ADR-nnn` par le compteur `adr` (TK-111), `RL-`, `P-`, `T-`, `FX-`, `C-` et `DOC-` d'après
- * le texte saisi ; un flux technique porte le `P-` du parcours qu'il détaille (`flow`).
+ * même valeur, même en concurrence), `ADR-nnn` par le compteur `adr` (TK-111), `NFR-nnn` par le compteur `nfr` (TK-115), les
+ * autres d'après le texte saisi ; un flux technique porte le `P-` du parcours qu'il détaille (`flow`).
  */
 export async function createdSpecId(
   tx: Tx,
@@ -51,5 +62,6 @@ export async function createdSpecId(
   const { kind } = operation;
   if (kind === "rule.create") return numbered("R", await nextCounterValue(tx, scope, "rule"));
   if (kind === "adr.create") return numbered("ADR", await nextCounterValue(tx, scope, "adr"));
+  if (kind === "nfr.create") return numbered("NFR", await nextCounterValue(tx, scope, "nfr"));
   return slugSpecIdOf(operation) ?? numbered("F", await nextCounterValue(tx, scope, "feature"));
 }

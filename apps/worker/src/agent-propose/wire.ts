@@ -26,8 +26,8 @@ export async function wireAgentPropose(
 ): Promise<void> {
   const { ai, ...settings } = options;
   const { cipher, provider, readCache } = keys;
-  const store = new AgentProposeStore(database, undefined, (head) =>
-    headDocSections(provider, head, logger, readCache),
+  const store = new AgentProposeStore(database, undefined, (head, deliverable) =>
+    headDocSections(provider, head, logger, readCache, deliverable),
   );
   const engine = ai ?? createAiEngine({ client: store.client, cipher, logger });
   await registerAgentPropose(boss, logger, { store, ai: engine }, settings);

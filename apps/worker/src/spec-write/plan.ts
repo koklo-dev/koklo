@@ -2,6 +2,7 @@ import type { FileChange } from "@koklo/domain";
 import {
   checkSpec,
   conflictsOf,
+  type DocSectionDeliverable,
   type DocSections,
   docSectionIndex,
   EmitFeatureError,
@@ -21,17 +22,22 @@ import { applyArchFlow } from "./archflows.ts";
 import { refreshArchitecture } from "./architecture-generated.ts";
 import { startingPoint } from "./auto-migrate.ts";
 import { applyComponent } from "./components.ts";
-import { applyDocSection } from "./doc-sections.ts";
+import { applyDocSection, type OpenSections } from "./doc-sections.ts";
+import { applyEnvironment, ENVIRONMENTS_PATH } from "./environments.ts";
 import { createdFeature, isDesignLinked, patchedFeature } from "./features.ts";
 import { applyFixture } from "./fixtures.ts";
 import { applyFlow } from "./flows.ts";
 import { applyLayout, isLayoutKind } from "./layout.ts";
+import { applyOperationFile } from "./operations.ts";
 import { featurePathOf, isIdeaKind, isMigrationKind } from "./paths.ts";
 import { planIdeaBatch } from "./plan-idea.ts";
 import { planMigrationBatch } from "./plan-migration.ts";
 import { newIssues, toStoredReport } from "./report.ts";
+import { applyRequirement } from "./requirements.ts";
 import { applyRole } from "./roles.ts";
 import { applyRule } from "./rules.ts";
+import { secretRefusal } from "./secret-check.ts";
+import { applyStack } from "./stacks.ts";
 import { applyTable } from "./tables.ts";
 import {
   type BatchOperation,
@@ -55,13 +61,17 @@ interface Planned extends Workspace {
   readonly index: Index;
   /** Jour de l'enfilage du lot (AAAA-MM-JJ) : date d'une décision nouvelle. */
   readonly today: string;
-  /** Sections du document, avec le prochain numéro libre (consommé par les créations du lot). */
-  readonly docs: DocSections & { next: number };
+  /** Sections de chaque document. */
+  readonly documents: Readonly<Record<DocSectionDeliverable, OpenSections>>;
 }
 
-/** Index par chemins de la tête (partagé avec l'API, B671) et les rôles, lus dans `domain/roles.yaml`. */
+/**
+ * Index par chemins de la tête (partagé avec l'API, B671), les rôles (`domain/roles.yaml`) et les environnements
+ * (`tech/environments.yaml`), lus dans leur fichier.
+ */
 interface Index extends SpecPathIndex {
   readonly roles: Set<string>;
+  readonly environments: Set<string>;
 }
 
 function rolesOf(files: readonly SpecFile[]): Set<string> {
@@ -73,19 +83,37 @@ function rolesOf(files: readonly SpecFile[]): Set<string> {
   return roles;
 }
 
+function environmentsOf(files: readonly SpecFile[]): Set<string> {
+  const file = files.filter((f) => f.path === ENVIRONMENTS_PATH);
+  const [parsed] = parseSpecFiles(file).spec.environments;
+  return new Set(parsed?.value.environnements.map((entry) => entry.id));
+}
+
 function indexOf(files: readonly SpecFile[], tree: readonly string[]): Index {
   const paths = files.map((file) => file.path);
+  const all = [...new Set([...tree, ...paths])];
   return {
     ...specPathIndex(paths),
     roles: rolesOf(files),
-    docs: docSectionIndex([...new Set([...tree, ...paths])]),
+    environments: environmentsOf(files),
+    docs: docSectionIndex(all),
+    techDocs: docSectionIndex(all, "technical"),
   };
 }
+
+/** Sections ouvertes à l'écriture : une copie de l'index et le numéro suivant. */
+const openSections = (sections: DocSections): OpenSections => ({
+  ...sections,
+  byId: new Map(sections.byId),
+  next: sections.last + 1,
+});
 
 /** Une identité est-elle déjà prise sur la tête ? `layout.save` n'est jamais vérifié : le dernier écrit gagne (B418). */
 function present(index: Index, operation: BatchOperation): boolean | undefined {
   if (isLayoutKind(operation.kind)) return undefined;
-  if (genreOf(operation) === "role") return index.roles.has(operation.targetSpecId ?? "");
+  const genre = genreOf(operation);
+  if (genre === "role") return index.roles.has(operation.targetSpecId ?? "");
+  if (genre === "env") return index.environments.has(operation.targetSpecId ?? "");
   return presentAtHead(index, operation) ?? false;
 }
 
@@ -132,57 +160,39 @@ function applyUpdate(workspace: Workspace, id: string, path: string, operation: 
   write(workspace, path, id, next);
 }
 
+function applyFeature(workspace: Planned, operation: BatchOperation, id: string): void {
+  const path = workspace.index.features.get(id) ?? "";
+  if (operation.kind === "feature.create") applyCreate(workspace, id, operation);
+  else if (operation.kind === "feature.delete") applyDelete(workspace, path);
+  else applyUpdate(workspace, id, path, operation);
+}
+
+type Apply = (workspace: Planned, operation: BatchOperation, id: string) => void;
+
+/** Écriture de chaque genre d'opération (préfixe du `kind`) ; la mise en page et les features sont à part. */
+const APPLY: Readonly<Record<string, Apply>> = {
+  rule: (w, op, id) => applyRule(w, op, w.index.rules.get(id)),
+  role: (w, op) => applyRole(w, op),
+  flow: (w, op, id) => applyFlow(w, op, w.index.flows.owned.get(id)),
+  table: (w, op, id) => applyTable(w, op, w.index.tables.get(id)),
+  fixture: (w, op) => applyFixture(w, op),
+  component: (w, op, id) => applyComponent(w, op, w.index.components.get(id)),
+  archflow: (w, op, id) => applyArchFlow(w, op, w.index.archflows.get(id)),
+  adr: (w, op, id) => applyAdr(w, op, w.index.adrs.get(id), w.today),
+  doc: (w, op) => applyDocSection(w, op, w.documents),
+  stack: (w, op, id) => applyStack(w, op, w.index.stacks.get(id)),
+  op: (w, op, id) => applyOperationFile(w, op, w.index.endpoints.get(id)),
+  nfr: (w, op, id) => applyRequirement(w, op, w.index.nfr.get(id)),
+  env: (w, op) => applyEnvironment(w, op),
+};
+
 function applyOperation(workspace: Planned, operation: BatchOperation): void {
-  const id = operation.targetSpecId ?? "";
-  const genre = genreOf(operation);
-  if (genre === "rule") {
-    applyRule(workspace, operation, workspace.index.rules.get(id));
-    return;
-  }
-  if (genre === "role") {
-    applyRole(workspace, operation);
-    return;
-  }
-  if (genre === "flow") {
-    applyFlow(workspace, operation, workspace.index.flows.owned.get(id));
-    return;
-  }
-  if (genre === "table") {
-    applyTable(workspace, operation, workspace.index.tables.get(id));
-    return;
-  }
-  if (genre === "fixture") {
-    applyFixture(workspace, operation);
-    return;
-  }
-  if (genre === "component") {
-    applyComponent(workspace, operation, workspace.index.components.get(id));
-    return;
-  }
-  if (genre === "archflow") {
-    applyArchFlow(workspace, operation, workspace.index.archflows.get(id));
-    return;
-  }
-  if (genre === "adr") {
-    applyAdr(workspace, operation, workspace.index.adrs.get(id), workspace.today);
-    return;
-  }
-  if (genre === "doc") {
-    applyDocSection(workspace, operation, workspace.docs);
-    return;
-  }
   if (isLayoutKind(operation.kind)) {
     applyLayout(workspace, operation);
     return;
   }
-  const path = workspace.index.features.get(id) ?? "";
-  if (operation.kind === "feature.create") {
-    applyCreate(workspace, id, operation);
-  } else if (operation.kind === "feature.delete") {
-    applyDelete(workspace, path);
-  } else {
-    applyUpdate(workspace, id, path, operation);
-  }
+  const apply = APPLY[genreOf(operation)] ?? applyFeature;
+  apply(workspace, operation, operation.targetSpecId ?? "");
 }
 
 /** Seules les erreurs NOUVELLES bloquent ; les avertissements nouveaux sont gardés au rapport. */
@@ -214,7 +224,7 @@ function refreshModel(workspace: Workspace): void {
 
 /**
  * Applique les opérations du lot, dans l'ordre, sur l'état lu (chemins relatifs à la spec) :
- * conflits d'abord, puis contrôle du designer opération par opération, puis validation. Pur, tout
+ * valeurs de secret refusées d'abord, puis conflits, puis contrôle du designer opération par opération, puis validation. Pur, tout
  * ou rien : un résultat métier n'a jamais de changement. `parentFiles` : l'état au parent du commit d'une migration (retour arrière).
  */
 export function planBatch(
@@ -223,6 +233,8 @@ export function planBatch(
   treePaths: readonly string[] = files.map((file) => file.path),
   parentFiles?: readonly SpecFile[],
 ): Plan {
+  const refused = secretRefusal(batch.operations);
+  if (refused !== undefined) return { outcome: refused };
   if (batch.operations.some((operation) => isMigrationKind(operation.kind))) {
     return planMigrationBatch(batch.operations, files, parentFiles);
   }
@@ -240,7 +252,10 @@ export function planBatch(
     changes: new Map(start.changes.map((change) => [change.path, change])),
     index,
     today: (batch.enqueuedAt ?? new Date()).toISOString().slice(0, 10),
-    docs: { ...index.docs, byId: new Map(index.docs.byId), next: index.docs.last + 1 },
+    documents: {
+      architecture: openSections(index.docs),
+      technical: openSections(index.techDocs),
+    },
   };
   try {
     for (const operation of batch.operations) applyOperation(workspace, operation);

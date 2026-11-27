@@ -2,6 +2,13 @@ import { z } from "zod";
 import { IDEA_MESSAGE_MAX, ideaProposalSchema } from "./schemas-idea.ts";
 import { llmProviderSchema } from "./schemas-llm-credential.ts";
 import { featureIdSchema, featurePrioritySchema, stepTypeSchema } from "./schemas-spec.ts";
+import { componentIdSchema } from "./schemas-spec-architecture.ts";
+import {
+  environmentDataSchema,
+  environmentDeploymentSchema,
+  nfrIdSchema,
+  stackStatusSchema,
+} from "./schemas-spec-technical.ts";
 import { instantSchema } from "./schemas-tickets.ts";
 
 /**
@@ -144,9 +151,11 @@ export type AiIdeaGapsOutput = z.output<typeof aiIdeaGapsOutputSchema>;
 export const AI_PREFILL_DESCRIPTION_MAX = 500;
 export const AI_PREFILL_LINKS_MAX = 30;
 
+export const AI_PREFILL_TYPES = ["feature", "stack", "environment"] as const;
+
 export const aiPrefillItemInputSchema = z.object({
   projectId: z.uuid(),
-  type: z.literal("feature"),
+  type: z.enum(AI_PREFILL_TYPES),
   description: nonBlank(AI_PREFILL_DESCRIPTION_MAX),
 });
 
@@ -158,7 +167,31 @@ export const prefilledValuesSchema = z.object({
   links: z.array(z.string().min(1).max(100)).max(AI_PREFILL_LINKS_MAX).optional(),
 });
 
-export const aiPrefillItemOutputSchema = z.object({
-  type: z.literal("feature"),
-  values: prefilledValuesSchema,
+const line = (max: number) => z.string().min(1).max(max);
+/** Champs de la feuille « Choix technique » (3.17.0) ; les critères sont des noms, leurs valeurs viennent ensuite. */
+export const prefilledStackValuesSchema = z.object({
+  role: line(120).optional(),
+  components: z.array(componentIdSchema).max(AI_PREFILL_LINKS_MAX).optional(),
+  status: stackStatusSchema.optional(),
+  choice: line(200).optional(),
+  options: z.array(line(120)).max(8).optional(),
+  criteria: z.array(line(120)).max(12).optional(),
+  why: line(1000).optional(),
+  requirements: z.array(nfrIdSchema).max(AI_PREFILL_LINKS_MAX).optional(),
 });
+/** Champs de la feuille « Environnement » (3.17.0) : ni variable, ni valeur. */
+export const prefilledEnvironmentValuesSchema = z.object({
+  name: line(120).optional(),
+  address: line(200).optional(),
+  hosting: line(200).optional(),
+  database: line(200).optional(),
+  data: environmentDataSchema.optional(),
+  deployment: environmentDeploymentSchema.optional(),
+  access: line(200).optional(),
+});
+
+export const aiPrefillItemOutputSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("feature"), values: prefilledValuesSchema }),
+  z.object({ type: z.literal("stack"), values: prefilledStackValuesSchema }),
+  z.object({ type: z.literal("environment"), values: prefilledEnvironmentValuesSchema }),
+]);

@@ -23,6 +23,9 @@ export const proposalModeSchema = z.enum([
   /** Architecture (3.9.0) : « Proposer une décision » et « Rédiger le document ». */
   "decision",
   "document",
+  /** Technique (3.17.0) : « Comparer les options d'un choix » et « Rendre les exigences mesurables ». */
+  "compare",
+  "nfr",
 ]);
 export const proposalKindSchema = z.enum([
   "feature",
@@ -37,6 +40,10 @@ export const proposalKindSchema = z.enum([
   "archflow",
   "adr",
   "doc_section",
+  "stack",
+  "op",
+  "nfr",
+  "env",
 ]);
 export const proposalStatusSchema = z.enum(["pending", "accepted", "rejected"]);
 export const launchStatusSchema = z.enum(["queued", "running", "done", "failed", "canceled"]);

@@ -11,6 +11,7 @@ import {
   type ProposalRepository,
   type RevisedContent,
 } from "./proposal.repository.ts";
+import { assertDeliverableRole } from "./proposal-access.ts";
 import { validContent } from "./proposal-content.ts";
 import { proposalView } from "./proposal-views.ts";
 
@@ -40,10 +41,12 @@ export class ProposalReviseService {
 
   async revise(
     scope: ProjectScope,
+    role: string | undefined,
     input: AiReviseProposalInput,
     requestId: string,
   ): Promise<AgentProposal> {
     const current = orNotFound(await this.proposals.find(scope, input.proposalId));
+    assertDeliverableRole(current.deliverable, role);
     if (current.appliedBatchId !== null) throw conflict("proposal_applied");
     if (current.discardReason !== null) throw conflict("proposal_already_present");
     const schema = PROPOSAL_SCHEMAS[current.kind];

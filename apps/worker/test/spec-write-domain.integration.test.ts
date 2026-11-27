@@ -157,3 +157,59 @@ describe("parcours", () => {
     );
   });
 });
+
+/** TK-115 (B719 à B724) : le cahier technique par le job réel ; une valeur de secret met le lot en échec sans commit. */
+describe("cahier technique", () => {
+  const stack = {
+    kind: "stack.create",
+    specId: "ST-base",
+    payload: { role: "Base", status: "open", options: ["A", "B"], why: "Fiable." },
+  };
+
+  it("choix, environnement et section du cahier : un seul commit, fichiers sous tech/", async () => {
+    const scene = await bench.scene();
+    const { row } = await run(scene, {
+      operations: [
+        stack,
+        {
+          kind: "env.create",
+          specId: "ENV-recette",
+          payload: {
+            name: "Recette",
+            address: "recette.exemple.fr",
+            hosting: "Paris",
+            database: "PostgreSQL",
+            data: "sample",
+          },
+        },
+        {
+          kind: "doc.section.create",
+          specId: "DOC-conventions",
+          payload: { deliverable: "technical", title: "Conventions", markdown: "Règles." },
+        },
+      ],
+    });
+    expect(row.status, JSON.stringify(row)).toBe("committed");
+    expect(await bench.files(scene)).toEqual(
+      expect.arrayContaining([
+        "tech/stack/base.yaml",
+        "tech/environments.yaml",
+        expect.stringMatching(/^tech\/cahier-technique\/\d{2}-conventions\.md$/),
+      ]),
+    );
+  });
+
+  it("valeur de secret : lot failed SPEC_INVALID (SECRET_VALUE), aucun commit, valeur absente du rapport", async () => {
+    const scene = await bench.scene();
+    const secret = `ghp_${"x".repeat(36)}`;
+    const before = await bench.files(scene);
+    const { row } = await run(scene, {
+      operations: [{ ...stack, payload: { ...stack.payload, why: secret } }],
+    });
+    expect(row).toMatchObject({ status: "failed", error_code: "SPEC_INVALID" });
+    expect(JSON.stringify(row)).toContain("SECRET_VALUE");
+    expect(JSON.stringify(row)).not.toContain(secret);
+    expect(await bench.files(scene)).toEqual(before);
+    expect(row.commit_sha).toBeNull();
+  });
+});

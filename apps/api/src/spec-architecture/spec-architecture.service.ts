@@ -9,7 +9,7 @@ import type {
   ArchitectureDocument,
 } from "@koklo/contract";
 import type { GitReadCache } from "@koklo/github";
-import { architectureChecks } from "@koklo/schema";
+import { architectureChecks, type DocSectionDeliverable } from "@koklo/schema";
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { GitAccess, step } from "../repo/git-access.ts";
@@ -75,8 +75,8 @@ const EMPTY_ADRS: AdrsPageOutput = {
 
 /**
  * Lectures de la page Architecture (TK-111) : composants et avertissements viennent de l'index d'entités ; seul le document
- * (sections `architecture/overview/NN-<slug>.md`, jamais indexées, B508) est lu chez le fournisseur au commit indexé, hors
- * transaction. Aucune écriture, aucune entrée d'audit ; jamais de YAML ni de Mermaid dans les réponses.
+ * (sections `NN-<slug>.md`, jamais indexées, B508 ; aussi celles du cahier technique, TK-115) est lu chez le fournisseur au
+ * commit indexé, hors transaction. Aucune écriture, aucune entrée d'audit ; jamais de YAML ni de Mermaid dans les réponses.
  */
 @Injectable()
 export class SpecArchitectureService {
@@ -143,13 +143,20 @@ export class SpecArchitectureService {
     );
   }
 
-  /** Sections du document lues dans git au commit indexé, dans l'ordre de leur numéro ; rien d'indexé : 404. */
-  async document(scope: ProjectScope, input: Revision): Promise<ArchitectureDocument> {
+  /**
+   * Sections d'un document (architecture, ou cahier technique, TK-115) lues dans git au commit indexé, dans l'ordre de leur
+   * numéro ; rien d'indexé : 404.
+   */
+  async document(
+    scope: ProjectScope,
+    input: Revision,
+    deliverable: DocSectionDeliverable = "architecture",
+  ): Promise<ArchitectureDocument> {
     const source = await this.repository.headSource(scope, input);
     if (source?.kind === "failed") throw indexFailed(source);
     const found = orNotFound(source);
     return {
-      sections: docSectionsOf(await this.readSections(found)),
+      sections: docSectionsOf(await this.readSections(found, deliverable), deliverable),
       commitSha: found.commitSha,
     };
   }
@@ -174,12 +181,17 @@ export class SpecArchitectureService {
   }
 
   /** Fichiers de section de l'arbre au commit indexé (`DOC_SECTIONS_MAX` au plus) ; sans fournisseur utilisable : indisponible. */
-  private async readSections(source: GitSource): Promise<{ path: string; content: string }[]> {
+  private async readSections(
+    source: GitSource,
+    deliverable: DocSectionDeliverable,
+  ): Promise<{ path: string; content: string }[]> {
     if (this.provider === null || !source.installation.active) {
       throw new ORPCError("PROVIDER_UNAVAILABLE");
     }
     const { reads, at, paths, prefix } = await this.treeAt(this.provider, source);
-    const sections = paths.filter(isDocSectionPath).slice(0, DOC_SECTIONS_MAX);
+    const sections = paths
+      .filter((path) => isDocSectionPath(path, deliverable))
+      .slice(0, DOC_SECTIONS_MAX);
     const files: { path: string; content: string }[] = [];
     for (const path of sections) {
       const file = await step("readFile", () =>

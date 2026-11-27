@@ -10,6 +10,7 @@ export const FEATURE_COUNTER_MAX = 999_999;
 const FEATURE_NUMBER = /^F-(\d+)$/;
 const RULE_NUMBER = /^R-(\d+)$/;
 const ADR_NUMBER = /^ADR-(\d+)$/;
+const NFR_NUMBER = /^NFR-(\d+)$/;
 
 export interface IndexRows {
   readonly features: readonly {
@@ -132,4 +133,11 @@ export const adrCounterOf = (spec: ParsedSpec) =>
   counterOf(
     spec.adrs.map(({ value }) => value.id),
     ADR_NUMBER,
+  );
+
+/** Même relevé pour les exigences `NFR-nnn` (compteur `nfr`, TK-115) ; un ancien `NFR-<texte>` n'est pas numéroté. */
+export const nfrCounterOf = (spec: ParsedSpec) =>
+  counterOf(
+    spec.nfrs.map(({ value }) => value.id).filter((id) => NFR_NUMBER.test(id)),
+    NFR_NUMBER,
   );

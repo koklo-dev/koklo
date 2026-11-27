@@ -52,6 +52,9 @@ describe("spec.head : forme et comptes", () => {
         relations: 0,
         fixtures: 0,
         components: 0,
+        stack: 0,
+        nfr: 0,
+        environments: 0,
       },
     });
   });

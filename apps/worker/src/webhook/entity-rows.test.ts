@@ -11,7 +11,7 @@ import {
 } from "@koklo/schema";
 import { describe, expect, it } from "vitest";
 import { entityRowsOf } from "./entity-rows.ts";
-import { adrCounterOf, ruleCounterOf } from "./index-rows.ts";
+import { adrCounterOf, nfrCounterOf, rowsOf, ruleCounterOf } from "./index-rows.ts";
 
 /** TK-103 lot A : lignes `spec_entities` des règles (tri numérique), rôles, parcours YAML et JSON hérité ; jamais d'échec d'index. */
 const rule = (n: number, over: Record<string, unknown> = {}) => ({
@@ -289,5 +289,70 @@ describe("entityRowsOf : architecture", () => {
     const rows = rowsFor([manifest, component("api"), broken, section]);
     expect(of(rows, "component").map((r) => r.specId)).toEqual(["C-api"]);
     expect(rows.some((r) => r.path.startsWith("architecture/overview/"))).toBe(false);
+  });
+});
+
+/** TK-115 : choix, opérations, exigences et environnements sont indexés ; les sections du cahier ne le sont pas. */
+describe("entityRowsOf : cahier technique", () => {
+  const stack = (slug: string, couche: string, extra = "") => ({
+    path: `tech/stack/${slug}.yaml`,
+    content: `id: ST-${slug}\ncouche: ${couche}\nrole: Rôle ${slug}\n${extra || "statut: a_trancher\n"}options:\n  - A\n  - B\npourquoi: p\n`,
+  });
+  const files = [
+    stack("a", "exploitation"),
+    stack("z", "applications", "statut: choisi\nchoix: Next.js\n"),
+    stack("b", "applications"),
+    stack("m", "donnees"),
+    {
+      path: "api/endpoints/avis.create.yaml",
+      content:
+        "id: avis.create\ntype: ecriture\nzone: Avis\ncomposant: C-api\npermission: public\nresume: Dépose un avis.\n",
+    },
+    {
+      path: "api/endpoints/ancien.lire.yaml",
+      content: "id: ancien.lire\nmethode: GET\nchemin: /a\n",
+    },
+    {
+      path: "nfr/NFR-002.yaml",
+      content:
+        "id: NFR-002\ncategorie: performance\ntitre: Rapidité\ncible: p95\nenonce: Vite.\nverification:\n  mode: manuel\n",
+    },
+    { path: "tech/environments.yaml", content: "variables:\n  - nom: A\n    usage: u\n" },
+    { path: "tech/cahier-technique/01-objet.md", content: "# Objet\n" },
+  ];
+  const rows = rowsFor(files);
+
+  it("choix triés par couche puis identifiant, titre « rôle : choix »", () => {
+    expect(of(rows, "stack").map((r) => [r.specId, r.sort, r.zone])).toEqual([
+      ["ST-b", 0, "technical"],
+      ["ST-z", 1, "technical"],
+      ["ST-m", 2, "technical"],
+      ["ST-a", 3, "technical"],
+    ]);
+    expect(of(rows, "stack").map((r) => (r.data as { titre: string }).titre)).toEqual([
+      "Rôle b : à trancher",
+      "Rôle z : Next.js",
+      "Rôle m : à trancher",
+      "Rôle a : à trancher",
+    ]);
+  });
+
+  it("opérations (titre = résumé) avec les endpoints REST, exigences, un seul bloc d'environnements", () => {
+    expect(of(rows, "endpoint").map((r) => r.specId)).toEqual(["ancien.lire", "avis.create"]);
+    expect(of(rows, "endpoint")[1]?.data).toMatchObject({ titre: "Dépose un avis." });
+    expect(of(rows, "nfr").map((r) => r.specId)).toEqual(["NFR-002"]);
+    expect(of(rows, "environments")).toHaveLength(1);
+    expect(of(rows, "environments")[0]).toMatchObject({
+      specId: "environments",
+      path: "tech/environments.yaml",
+      data: { titre: "Environnements", variables: [{ nom: "A", usage: "u" }] },
+    });
+    expect(rows.some((r) => r.path.startsWith("tech/cahier-technique/"))).toBe(false);
+  });
+
+  it("l'index REST et le compteur nfr : le REST seul, le plus grand NFR-nnn", () => {
+    const { spec } = parseSpecFiles(files);
+    expect(rowsOf(spec).endpoints.map((row) => row.specId)).toEqual(["ancien.lire"]);
+    expect(nfrCounterOf(spec)).toEqual({ raiseTo: 2, skipped: 0 });
   });
 });

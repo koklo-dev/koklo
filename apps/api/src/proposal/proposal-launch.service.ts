@@ -16,12 +16,18 @@ import { SpecDeliverablesService } from "../spec-deliverables/spec-deliverables.
 import { forbidden, validation } from "../tracker/api-errors.ts";
 import type { ProjectScope } from "../tracker/scope.ts";
 import { LAUNCH_REPOSITORY, type LaunchRepository, type NewLaunch } from "./launch.repository.ts";
+import { assertDeliverableRole } from "./proposal-access.ts";
+import { technicalDraft, technicalOptions } from "./technical-launch.ts";
 
-/** Livrables branchés : le Fonctionnel (TK-99a), les Données (TK-107), l'Architecture (TK-111) ; les quatre autres sont refusés (TK-100). */
+/**
+ * Livrables branchés : le Fonctionnel (TK-99a), les Données (TK-107), l'Architecture (TK-111), le Technique (TK-115) ; les
+ * trois autres sont refusés (TK-100).
+ */
 const WIRED_DELIVERABLES: Readonly<Record<string, true>> = {
   functional: true,
   data: true,
   architecture: true,
+  technical: true,
 };
 /** Modes de l'Architecture (TK-111) : compléter, une décision, le document, tout reproposer. */
 const ARCHITECTURE_MODES: readonly string[] = ["complete", "decision", "document", "all"];
@@ -42,6 +48,7 @@ const READ_LABELS: Record<string, string> = {
   "data.tables": "Modèle de données",
   "architecture.current": "Architecture actuelle",
   "nfr.known": "Exigences connues",
+  "technical.current": "Cahier technique actuel",
 };
 const readsOf = (ids: readonly string[]) => ids.map((id) => ({ id, label: READ_LABELS[id] ?? id }));
 
@@ -99,13 +106,20 @@ export class ProposalLaunchService {
   ): Promise<NewLaunch> {
     if (input.deliverable === "data") return this.dataLaunch(scope, input, role);
     if (input.deliverable === "architecture") return this.architectureLaunch(scope, input, role);
+    if (input.deliverable === "technical") return this.technicalLaunch(scope, input, role);
     return this.functionalLaunch(scope, input);
   }
 
   async options(
     scope: ProjectScope,
     input: AiProposeOptionsInput,
+    role: string | undefined,
   ): Promise<AiProposeOptionsOutput> {
+    assertDeliverableRole(input.deliverable, role);
+    if (input.deliverable === "technical") {
+      const { deliverables } = await this.deliverables.list(scope, role);
+      return technicalOptions(await this.launches.technicalFacts(scope), deliverables);
+    }
     if (input.deliverable === "data") {
       return {
         options: [
@@ -240,6 +254,17 @@ export class ProposalLaunchService {
       sources: AGENT_READS.architecture,
       baseVersion: null,
     };
+  }
+
+  /** Technique (TK-115) : owner, admin et développeur ; contrôles dans `technicalDraft`. */
+  private async technicalLaunch(
+    scope: ProjectScope,
+    input: AiProposeDeliverableInput,
+    role: string | undefined,
+  ): Promise<NewLaunch> {
+    assertDeliverableRole("technical", role);
+    const { deliverables } = await this.deliverables.list(scope, role);
+    return technicalDraft(input, await this.launches.technicalFacts(scope), deliverables);
   }
 
   private async admitOrRelease(scope: ProjectScope, launchId: string, requestId: string) {

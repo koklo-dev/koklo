@@ -1,5 +1,6 @@
 import type { GitAuth, GitProvider, RepoRef } from "@koklo/domain";
 import {
+  DOC_SECTION_DELIVERABLES,
   docSectionSlugOf,
   isFlowPath,
   isTableDirPath,
@@ -27,7 +28,7 @@ export type ReadSpecInput = {
   readonly flows?: boolean;
   /** Lire aussi les fichiers que la migration v1 -> v2 déplace ou crée (règles de design, sections) : lots de migration seulement. */
   readonly migration?: boolean;
-  /** Lire aussi les sections du document d'architecture (`architecture/overview/NN-*.md`, non indexées) : lots `doc.section.*`. */
+  /** Lire aussi les sections des documents (architecture et cahier technique, non indexées) : lots `doc.section.*`. */
   readonly docs?: boolean;
 };
 
@@ -46,7 +47,8 @@ export function recognizedSpecPaths(
       isTableDirPath(path) ||
       (options.flows === true && isFlowPath(path)) ||
       (options.migration === true && MIGRATION_EXTRA_PATHS.includes(path)) ||
-      (options.docs === true && docSectionSlugOf(path) !== undefined);
+      (options.docs === true &&
+        DOC_SECTION_DELIVERABLES.some((d) => docSectionSlugOf(path, d) !== undefined));
     return known ? [path] : [];
   });
 }

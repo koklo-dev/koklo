@@ -8,6 +8,12 @@ import {
   recordAfter,
   repriseFlows,
 } from "./coverage-pass.ts";
+import {
+  technicalKinds,
+  technicalKindsAt,
+  technicalRefs,
+  technicalSteps,
+} from "./generate-technical.ts";
 import { zonesPrompt } from "./prompts.ts";
 import { coverageCountsOf } from "./reprises.ts";
 import type { LaunchSources } from "./sources.ts";
@@ -47,6 +53,7 @@ export const kindsOfMode = (
   deliverable = "functional",
 ): readonly AgentProposalKind[] => {
   if (deliverable === "data") return DATA_KINDS;
+  if (deliverable === "technical") return technicalKinds(mode);
   if (deliverable === "architecture") {
     return ARCHITECTURE_KINDS_OF_MODE[mode] ?? ARCHITECTURE_KINDS_OF_MODE.complete ?? [];
   }
@@ -114,6 +121,7 @@ function triageContextOf(
       adr: titles(architecture?.decisions),
     },
     ...(architecture === undefined ? {} : { arch: architectureRefs(sources) }),
+    ...(sources.technical === undefined ? {} : { tech: technicalRefs(launch.mode, sources) }),
     ...(launch.deliverable === "data" ? { refs: dataRefs(sources) } : {}),
     missingCriteria: new Map(
       sources.features
@@ -129,6 +137,20 @@ const coverageIndexFor = (launch: LaunchContext, sources: LaunchSources) =>
     ? coverageIndexOf(sources)
     : undefined;
 
+/** Zones demandées au modèle (Fonctionnel, Données, Architecture) ou étapes calculées par le code (Technique). */
+function zonesOfLaunch(run: Run): Promise<readonly string[]> {
+  if (run.launch.deliverable === "technical") {
+    return Promise.resolve(technicalSteps(run.launch.mode, run.sources));
+  }
+  const isData = run.launch.deliverable === "data";
+  return ask(run, {
+    purpose: "proposal-zones",
+    prompt: (nonce) => zonesPrompt(nonce, run.sources, run.launch.instruction),
+    schema: ZONES_SCHEMA,
+    parse: (raw) => (isData ? zonesOf(raw, DATA_ZONE_MAX) : zonesOf(raw)),
+  });
+}
+
 /** Étape 1, au premier segment : les zones (douze au plus), stockées avec la couverture de l'index avant le lancement. */
 async function firstStep(
   run: Run,
@@ -136,13 +158,7 @@ async function firstStep(
 ): Promise<readonly string[] | GenerateOutcome> {
   const up = timeUp(run);
   if (up !== undefined) return up;
-  const isData = run.launch.deliverable === "data";
-  const zones = await ask(run, {
-    purpose: "proposal-zones",
-    prompt: (nonce) => zonesPrompt(nonce, run.sources, run.launch.instruction),
-    schema: ZONES_SCHEMA,
-    parse: (raw) => (isData ? zonesOf(raw, DATA_ZONE_MAX) : zonesOf(raw)),
-  });
+  const zones = await zonesOfLaunch(run);
   const before = index === undefined ? undefined : coverageCountsOf(index, []);
   const outcome = await run.deps.store.recordZones(run.launch, zones, before);
   return outcome === "stopped" ? "stopped" : zones;
@@ -180,7 +196,12 @@ export async function generate(
   rememberPublished(context, await deps.store.launchProposals(launch));
   const index = coverageIndexFor(launch, sources);
   const started = deps.now().getTime();
-  const run: Run = { deps, launch, sources, euOnly, progress, kinds, context, started };
+  const run: Run = {
+    ...{ deps, launch, sources, euOnly, progress, kinds, context, started },
+    ...(launch.deliverable === "technical"
+      ? { kindsAt: (index, total) => technicalKindsAt(launch.mode, index, total) }
+      : {}),
+  };
   const zones = progress.zones.length > 0 ? progress.zones : await firstStep(run, index);
   if (typeof zones === "string") return zones;
   const afterZone = async () => {

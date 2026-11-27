@@ -18,6 +18,7 @@ import {
   adrStatusSchema,
   archFlowIdSchema,
   archflowDetailSchema,
+  architectureDocSectionSchema,
   architectureFlowSummarySchema,
   componentIdSchema,
   componentTypeSchema,
@@ -43,6 +44,11 @@ import {
   ruleIdSchema,
   ruleTypeSchema,
 } from "./schemas-spec-domain.ts";
+import {
+  environmentsContentShape,
+  stackIdSchema,
+  stackSummarySchema,
+} from "./schemas-spec-technical.ts";
 import { pageInputSchema } from "./schemas-tickets.ts";
 
 /**
@@ -416,3 +422,53 @@ export const clientSpaceArchFlowOutputSchema = archflowDetailSchema.omit({
   commitSha: true,
   decisions: true,
 });
+
+// --- TK-115 (3.17.0) : cahier technique validé, du point de vue du client (B725, B732) ---
+// Aucun YAML, chemin ni SHA. Tant que le livrable Technique n'est pas `validated`, `available` est faux et rien d'autre
+// n'est rendu.
+const clientTechnicalState = { available: z.boolean(), validation: clientValidationSchema };
+const count = z.number().int().min(0);
+export const clientSpaceTechnicalInputSchema = z.object({ projectId: z.uuid() });
+export const clientSpaceTechnicalOutputSchema = z.object({
+  ...clientTechnicalState,
+  counts: z.object({
+    choices: count,
+    operations: count,
+    requirements: count,
+    environments: count,
+  }),
+});
+export const clientSpaceTechnicalStackInputSchema = z
+  .object({ projectId: z.uuid(), ...listInputShape(stackIdSchema) })
+  .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
+/** Un choix lisible : `id` à la place de `specId`, sans chemin de fichier. */
+export const clientStackChoiceSchema = stackSummarySchema
+  .omit({ specId: true, filePath: true })
+  .extend({ id: stackIdSchema });
+export const clientSpaceTechnicalStackOutputSchema =
+  listOf(clientStackChoiceSchema).extend(clientTechnicalState);
+export const clientSpaceTechnicalEnvironmentsOutputSchema = z.object({
+  ...clientTechnicalState,
+  ...environmentsContentShape,
+});
+export const clientSpaceTechnicalDocumentOutputSchema = z.object({
+  ...clientTechnicalState,
+  sections: z.array(
+    architectureDocSectionSchema.pick({
+      specId: true,
+      num: true,
+      title: true,
+      status: true,
+      markdown: true,
+    }),
+  ),
+});
+export type ClientSpaceTechnical = z.output<typeof clientSpaceTechnicalOutputSchema>;
+export type ClientStackChoice = z.output<typeof clientStackChoiceSchema>;
+export type ClientSpaceTechnicalStack = z.output<typeof clientSpaceTechnicalStackOutputSchema>;
+export type ClientSpaceTechnicalEnvironments = z.output<
+  typeof clientSpaceTechnicalEnvironmentsOutputSchema
+>;
+export type ClientSpaceTechnicalDocument = z.output<
+  typeof clientSpaceTechnicalDocumentOutputSchema
+>;

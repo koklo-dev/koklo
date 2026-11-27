@@ -8,6 +8,7 @@ import {
 } from "@koklo/domain";
 import { architectureBatchPrompt, architectureZonesPrompt } from "./prompts-architecture.ts";
 import { dataBatchPrompt, dataZonesPrompt } from "./prompts-data.ts";
+import { technicalBatchPrompt } from "./prompts-technical.ts";
 import type { LaunchSources } from "./sources.ts";
 
 /**
@@ -87,8 +88,10 @@ export function batchPrompt(
     instruction: string | null;
     zone: string;
     kinds: readonly AgentProposalKind[];
+    mode?: string;
   },
 ): FramedPrompt {
+  if (input.sources.technical !== undefined) return technicalBatchPrompt(nonce, input);
   if (input.sources.architecture !== undefined) return architectureBatchPrompt(nonce, input);
   if (input.sources.tables !== undefined) return dataBatchPrompt(nonce, input);
   return framePrompt({

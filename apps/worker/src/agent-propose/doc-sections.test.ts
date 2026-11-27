@@ -109,3 +109,30 @@ describe("headDocSections (TK-114e)", () => {
     expect(reads).toHaveLength(2);
   });
 });
+
+describe("headDocSections : cahier technique (TK-115)", () => {
+  it("lit le dossier du cahier et signale une section vide", async () => {
+    const { provider } = fakeProvider([
+      "spec/tech/cahier-technique/01-objet.md",
+      "spec/architecture/overview/01-contexte.md",
+    ]);
+    const sections = await headDocSections(
+      provider,
+      HEAD,
+      capture().logger,
+      undefined,
+      "technical",
+    );
+    expect(sections).toEqual([{ specId: "DOC-objet", title: "Titre objet" }]);
+    const empty = fakeProvider(["spec/tech/cahier-technique/02-tests.md"]);
+    empty.provider.readFile = async ({ path, ref }) => ({
+      path,
+      ref,
+      sha: "s",
+      content: "# Tests\n",
+    });
+    expect(
+      await headDocSections(empty.provider, HEAD, capture().logger, undefined, "technical"),
+    ).toEqual([{ specId: "DOC-tests", title: "Tests", empty: true }]);
+  });
+});

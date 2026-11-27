@@ -1,6 +1,7 @@
 import type { SpecHeadOutput, SpecItem } from "@koklo/contract";
 import { SPEC_REFS_MAX } from "@koklo/contract";
 import { Inject, Injectable } from "@nestjs/common";
+import { readTechnicalCounts } from "../spec-technical/technical-counts.query.ts";
 import { FullTextSearch } from "../tracker/full-text-search.ts";
 import { loadWindow } from "../tracker/long-list.ts";
 import { ProjectTransactions, type Tx } from "../tracker/project-transactions.ts";
@@ -52,27 +53,18 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
       const found = await this.resolver.resolve(tx, scope, revision);
       if (!found) return null;
       const where = { snapshotId: found.snapshot.id };
-      const [
-        features,
-        tables,
-        endpoints,
-        rules,
-        flows,
-        fixtures,
-        components,
-        relations,
-        rolesFile,
-      ] = await Promise.all([
-        tx.specFeature.count({ where }),
-        tx.specTable.count({ where }),
-        tx.specEndpoint.count({ where }),
-        tx.specEntity.count({ where: { ...where, kind: "rule" } }),
-        tx.specEntity.count({ where: { ...where, kind: "flow" } }),
-        tx.specEntity.count({ where: { ...where, kind: "fixture" } }),
-        tx.specEntity.count({ where: { ...where, kind: "component" } }),
-        this.search.tableRelationTotal(found.snapshot.id),
-        tx.specEntity.findFirst({ where: { ...where, kind: "roles" }, select: { data: true } }),
-      ]);
+      const [features, tables, rules, flows, fixtures, components, relations, rolesFile] =
+        await Promise.all([
+          tx.specFeature.count({ where }),
+          tx.specTable.count({ where }),
+          tx.specEntity.count({ where: { ...where, kind: "rule" } }),
+          tx.specEntity.count({ where: { ...where, kind: "flow" } }),
+          tx.specEntity.count({ where: { ...where, kind: "fixture" } }),
+          tx.specEntity.count({ where: { ...where, kind: "component" } }),
+          this.search.tableRelationTotal(found.snapshot.id),
+          tx.specEntity.findFirst({ where: { ...where, kind: "roles" }, select: { data: true } }),
+        ]);
+      const technical = await readTechnicalCounts(tx, found.snapshot.id);
       const roleList = (rolesFile?.data as { roles?: unknown } | null)?.roles;
       return {
         branch: found.branch,
@@ -83,13 +75,13 @@ export class PrismaSpecReadRepository implements SpecReadRepository {
         counts: {
           features,
           tables,
-          endpoints,
           rules,
           roles: Array.isArray(roleList) ? roleList.length : 0,
           flows,
           relations,
           fixtures,
           components,
+          ...technical,
         },
       };
     });

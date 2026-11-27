@@ -1,6 +1,12 @@
 import { z } from "zod";
-import { adrIdSchema, archFlowIdSchema, componentIdSchema } from "./schemas-spec-architecture.ts";
+import {
+  adrIdSchema,
+  archFlowIdSchema,
+  componentIdSchema,
+  docSectionIdSchema,
+} from "./schemas-spec-architecture.ts";
 import { tableIdSchema } from "./schemas-spec-data.ts";
+import { stackIdSchema } from "./schemas-spec-technical.ts";
 import {
   instantSchema,
   pageInputSchema,
@@ -17,6 +23,10 @@ export const commentTargetKindSchema = z.enum([
   "component",
   "adr",
   "archflow",
+  /** Cahier technique (3.17.0) : un choix, le bloc des environnements, une section du cahier. */
+  "stack",
+  "environments",
+  "tech_section",
 ]);
 export const commentAuthorKindSchema = z.enum(["human", "agent", "client", "system"]);
 export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"]);
@@ -25,21 +35,26 @@ export const auditActorKindSchema = z.enum(["human", "agent", "runner", "system"
 export const COMMENT_BODY_MAX = 8000;
 
 /** Cibles désignées par `targetRef` : leur identifiant lisible, vérifié contre le genre (le projet est `targetId`). */
-const REF_KINDS = ["table", "component", "adr", "archflow"] as const;
 const REF_SCHEMA = {
   table: tableIdSchema,
   component: componentIdSchema,
   adr: adrIdSchema,
   archflow: archFlowIdSchema,
+  stack: stackIdSchema,
+  environments: z.literal("environments"),
+  tech_section: docSectionIdSchema,
 } as const;
-const targetRefSchema = z.union([tableIdSchema, componentIdSchema, adrIdSchema, archFlowIdSchema]);
+const targetRefSchema = z.union(Object.values(REF_SCHEMA));
 
 export const commentSchema = z.object({
   id: z.uuid(),
   targetKind: commentTargetKindSchema,
   /** Pour une table de données : le projet (la table est repérée par `targetRef`). */
   targetId: z.uuid(),
-  /** `T-<slug>` (table, 3.7.0), `C-<slug>` (composant), `ADR-<nnn>` (décision) ou `P-<slug>` (flux) en 3.11.0 ; absent pour un ticket. */
+  /**
+   * `T-<slug>` (table, 3.7.0), `C-<slug>` (composant), `ADR-<nnn>` (décision) ou `P-<slug>` (flux) en 3.11.0, `ST-<slug>`,
+   * `environments` ou `DOC-<slug>` (section du cahier technique) en 3.17.0 ; absent pour un ticket.
+   */
   targetRef: targetRefSchema.optional(),
   authorKind: commentAuthorKindSchema,
   /** Null pour un commentaire système (aucun auteur). */
@@ -48,7 +63,7 @@ export const commentSchema = z.object({
   createdAt: instantSchema,
 });
 
-/** Une cible `table`, `component`, `adr` ou `archflow` se désigne par `targetRef`, les autres par `targetId` seul (3.7.0, 3.11.0). */
+/** Une cible de la spec se désigne par `targetRef`, les autres par `targetId` seul (3.7.0, 3.11.0, 3.17.0). */
 const targetShape = {
   targetKind: commentTargetKindSchema,
   targetId: z.uuid().optional(),
@@ -59,13 +74,13 @@ const hasCoherentTarget = (input: {
   targetId?: string | undefined;
   targetRef?: string | undefined;
 }) => {
-  const schema = REF_SCHEMA[input.targetKind as (typeof REF_KINDS)[number]];
+  const schema = REF_SCHEMA[input.targetKind as keyof typeof REF_SCHEMA];
   if (schema === undefined) return input.targetId !== undefined && input.targetRef === undefined;
   return input.targetRef !== undefined && schema.safeParse(input.targetRef).success;
 };
 const TARGET_MESSAGE = {
   message:
-    "table, component, adr et archflow exigent targetRef de leur forme ; les autres cibles exigent targetId seul",
+    "une cible de la spec exige targetRef de sa forme ; les autres cibles exigent targetId seul",
   path: ["targetRef"],
 };
 

@@ -4,6 +4,8 @@ import {
   STALE_UPSTREAM_MAX,
   staleImpactOf,
   staleUpstreamOf,
+  type TechnicalUpstreamFacts,
+  technicalImpactOf,
   type UpstreamFacts,
 } from "./deliverable-upstream.ts";
 
@@ -211,5 +213,72 @@ describe("staleImpactOf : Architecture (TK-113)", () => {
       components: [],
       flows: [],
     });
+  });
+});
+
+/**
+ * TK-115 (B735) : impact de l'architecture sur le cahier technique. Composants et décisions comparés entre la tête de la
+ * dernière décision et la tête courante ; éléments concernés : les choix, opérations et exigences qui les citent.
+ */
+describe("technicalImpactOf", () => {
+  const at = (hash: string, accepted = false) => ({ hash, accepted });
+  const facts = (over: Partial<TechnicalUpstreamFacts> = {}): TechnicalUpstreamFacts => ({
+    atDecision: new Map([
+      ["C-api", at("a")],
+      ["C-old", at("o")],
+      ["ADR-006", at("p")],
+    ]),
+    atHead: new Map([
+      ["C-api", at("a")],
+      ["C-old", at("o")],
+      ["ADR-006", at("p")],
+    ]),
+    citing: [
+      { id: "ST-sms", cites: ["C-sms", "ADR-006"] },
+      { id: "avis.create", cites: ["C-avis"] },
+      { id: "NFR-004", cites: ["C-api"] },
+    ],
+    ...over,
+  });
+
+  it("rien n'a changé, jamais décidé ou tête non indexée : aucun impact", () => {
+    const none = { changes: [], items: [] };
+    expect(technicalImpactOf(facts())).toEqual(none);
+    expect(technicalImpactOf(null)).toEqual(none);
+    expect(technicalImpactOf(facts({ atDecision: null }))).toEqual(none);
+  });
+
+  it("composant ajouté, retiré, modifié et décision acceptée ; éléments qui les citent", () => {
+    const atHead = new Map([
+      ["C-api", at("a2")],
+      ["C-avis", at("n")],
+      ["ADR-006", at("q", true)],
+    ]);
+    expect(technicalImpactOf(facts({ atHead }))).toEqual({
+      changes: [
+        { id: "ADR-006", change: "accepted" },
+        { id: "C-api", change: "changed" },
+        { id: "C-avis", change: "added" },
+        { id: "C-old", change: "removed" },
+      ],
+      items: ["NFR-004", "ST-sms", "avis.create"],
+    });
+  });
+
+  it("une décision déjà acceptée puis retouchée est « modifiée »", () => {
+    const atDecision = new Map([["ADR-001", at("a", true)]]);
+    const atHead = new Map([["ADR-001", at("b", true)]]);
+    expect(technicalImpactOf(facts({ atDecision, atHead })).changes).toEqual([
+      { id: "ADR-001", change: "changed" },
+    ]);
+  });
+
+  it("cinquante changements et cinquante éléments au plus", () => {
+    const ids = Array.from({ length: 60 }, (_, i) => `C-${String(i).padStart(3, "0")}`);
+    const atHead = new Map(ids.map((id) => [id, at("n")]));
+    const citing = ids.map((id, i) => ({ id: `NFR-${i + 100}`, cites: [id] }));
+    const impact = technicalImpactOf(facts({ atDecision: new Map(), atHead, citing }));
+    expect(impact.changes).toHaveLength(STALE_ARTIFACTS_MAX);
+    expect(impact.items).toHaveLength(STALE_ARTIFACTS_MAX);
   });
 });

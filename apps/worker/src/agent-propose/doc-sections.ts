@@ -1,11 +1,11 @@
 import type { GitInstallation, GitProvider, RepoRef } from "@koklo/domain";
 import { cachedGitReads, type GitReadCache } from "@koklo/github";
 import type { Logger } from "@koklo/observability";
-import { docSectionSlugOf, parseDocSection } from "@koklo/schema";
+import { type DocSectionDeliverable, docSectionSlugOf, parseDocSection } from "@koklo/schema";
 import { errorNameOf } from "../job-support.ts";
 import { relativeToSpec, withSpecPath } from "../spec-write/paths.ts";
 
-/** Au plus 100 sections lues par lancement d'Architecture (TK-114e, B670). */
+/** Au plus 100 sections lues par lancement (Architecture, TK-114e, B670 ; cahier technique, TK-115). */
 export const DOC_SECTIONS_MAX = 100;
 
 /** Tête indexée de la spec : dépôt, installation, dossier de la spec et commit du snapshot. */
@@ -20,14 +20,20 @@ export interface SpecHead {
 export interface HeadDocSection {
   readonly specId: string;
   readonly title: string;
+  /** Présent et vrai pour une section sans texte (« à rédiger »). */
+  readonly empty?: boolean;
 }
 
-async function readSections(provider: GitProvider, head: SpecHead): Promise<HeadDocSection[]> {
+async function readSections(
+  provider: GitProvider,
+  head: SpecHead,
+  deliverable: DocSectionDeliverable,
+): Promise<HeadDocSection[]> {
   const auth = await provider.authenticate({ installation: head.installation });
   const listing = await provider.listFiles({ auth, repo: head.repo, ref: head.commitSha });
   const found = listing.files.flatMap((file) => {
     const path = relativeToSpec(head.specPath, file.path);
-    const parsed = path === undefined ? undefined : docSectionSlugOf(path);
+    const parsed = path === undefined ? undefined : docSectionSlugOf(path, deliverable);
     return path === undefined || parsed === undefined ? [] : [{ path, slug: parsed.slug }];
   });
   const sections: HeadDocSection[] = [];
@@ -38,13 +44,18 @@ async function readSections(provider: GitProvider, head: SpecHead): Promise<Head
       ref: head.commitSha,
       path: withSpecPath(head.specPath, path),
     });
-    sections.push({ specId: `DOC-${slug}`, title: parseDocSection(file.content).title || slug });
+    const section = parseDocSection(file.content);
+    sections.push({
+      specId: `DOC-${slug}`,
+      title: section.title || slug,
+      ...(section.status === "a_rediger" ? { empty: true } : {}),
+    });
   }
   return sections;
 }
 
 /**
- * Sections du document d'architecture de la tête, lues dans git (les sections ne sont pas indexées, B508). Sans fournisseur
+ * Sections d'un document de la tête (architecture par défaut, ou cahier technique), lues dans git (les sections ne sont pas indexées, B508). Sans fournisseur
  * ni tête : liste vide. Une panne n'arrête pas le lancement : liste vide et avertissement (le nom de l'erreur seul, jamais le
  * texte du fournisseur) ; l'enregistrement rattrape un doublon. `cache` (TK-114f) : lectures au commit gardées par
  * installation, un 2e lancement sur la même tête ne relit rien.
@@ -54,6 +65,7 @@ export async function headDocSections(
   head: SpecHead | null,
   logger: Logger,
   cache?: GitReadCache,
+  deliverable: DocSectionDeliverable = "architecture",
 ): Promise<HeadDocSection[]> {
   if (provider === null || head === null) return [];
   const reads =
@@ -61,7 +73,7 @@ export async function headDocSections(
       ? provider
       : cachedGitReads(provider, cache, { installationId: head.installation.id });
   try {
-    return await readSections(reads, head);
+    return await readSections(reads, head, deliverable);
   } catch (error) {
     logger.warn({ errorName: errorNameOf(error) }, "agent-propose: doc sections unread");
     return [];
