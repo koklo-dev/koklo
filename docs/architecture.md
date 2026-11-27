@@ -114,13 +114,13 @@ flowchart LR
 - Both checks run from the root `lint` script:
   `turbo run lint && turbo boundaries && node packages/config/src/check-deep-imports.ts`.
 ### Delivery package: run state machine (TK-72 lots 1 and 2)
-`packages/delivery` (`@koklo/delivery`, tag `delivery`, private) holds the pure core of the
-delivery loop. Its only runtime dependencies are `@koklo/domain` and `@koklo/rules` (workspace); it adds no
-third-party dependency and no I/O, clock, randomness or environment access, which a
-purity test enforces (relative imports, `@koklo/domain` or `@koklo/rules` only, files at most 300 lines,
-functions at most 50). The tag `delivery` is already declared in the root `turbo.json`
-(allow: `domain`, `contract`, `rules`, `config`); `turbo boundaries` stays green. The
-package decides, the runner (TK-75/76) executes and persists.
+`packages/delivery` (`@koklo/delivery`, tag `delivery`, private) holds the pure run state
+machine, kept since TK-130 for the progress reports of the local agents (`ticket.progress`, lot 12c).
+It has no runtime dependency, exports `.` only, and does no I/O, clock, randomness or environment
+access, which a purity test enforces (exactly the 13 source files below, relative imports only, files
+at most 300 lines, functions at most 50). The tag `delivery` is declared in the root `turbo.json`
+(allow: `domain`, `contract`, `rules`, `config`); `turbo boundaries` stays green. The package decides
+and describes effects; Koklo executes none of them ([ADR 0023](adr/0023-agents-sur-les-postes.md)).
 
 | File | Responsibility |
 |---|---|
@@ -133,108 +133,28 @@ package decides, the runner (TK-75/76) executes and persists.
 | `run-counters.ts` | `checkLimits`, `applyCounters` (attempts, review rounds, CI waits, ceilings from `RunLimits`) |
 | `run-resume.ts` | `resumePoint`, `canRestartDevelopment`, resume guard (`ResumeRequiredError`) |
 | `errors.ts` | `InvalidRunStateError`, `InvalidRunEventError`, `InvalidRunTransitionError`, `StaleRunError`, `ResumeRequiredError` |
+| `one-of.ts`, `value-check.ts` | shared input checks (closed lists, counts, non-empty text) |
+| `index.ts` | public API (the only export) |
 
 ```mermaid
 flowchart LR
-  runner["runner (TK-75/76, later)"] -- "event" --> apply["applyEvent(run, event, limits)"]
+  caller["caller (none yet, lot 12c)"] -- "event" --> apply["applyEvent(run, event, limits)"]
   apply --> table["transition table (data)"]
   apply --> counters["counters and ceilings (RunLimits)"]
-  apply -- "{ run (frozen), effects }" --> runner
-  delivery["@koklo/delivery"] --> domain["@koklo/domain"]
+  apply -- "{ run (frozen), effects }" --> caller
 ```
 
 The state diagram, transitions, block causes and effects are in
 [domain-model.md](domain-model.md#run-lifecycle-tk-72-lots-1-and-2-packagesdelivery).
 Counters, ceilings, idempotent replays and resume are described there too (lot 2).
 
-### Delivery package: AgentRuntime port (TK-73 lot 73a)
-The port that runs one agent session is pure and lives next to the run state machine
-([ADR 0011](adr/0011-llm-port-and-untrusted-data.md) pattern, as for the LLM port of TK-50). One
-session is one promise and one typed result; there is no public streaming. The runner (TK-75/76)
-only talks to the port; the Claude Code adapter (`src/claude-code/`, exported later as
-`./claude-code`, lot 73c) is the only place allowed to spawn a process and is excluded from the
-purity scan. The fake and the conformance suite are exported by `./testing` only, never by the
-public index.
-
-| File | Responsibility |
-|---|---|
-| `agent-runtime.ts` | `AgentRuntime { id, launchSession }`, request/result types, closed lists, `countsAsAgentFailure` |
-| `agent-request.ts` | `assertSessionRequest`: the single guard, frozen deep snapshot, one read per field |
-| `agent-budget.ts` | `AgentBudget`, domain ceilings, `assertAgentBudget` / `snapshotAgentBudget` |
-| `agent-tools.ts` | `AgentToolPolicy`, `toolsForRole`, `isWithinRolePolicy` (never network, never MCP) |
-| `agent-credential.ts` | opaque optional key, `[redacted]` everywhere, `revealAgentCredential` |
-| `agent-output.ts` | `agentOutput`: always `Untrusted("model-output")` |
-| `agent-errors.ts` | typed errors, no key, prompt, output or `cause` |
-| `testing/` | `FakeAgentRuntime`, `runAgentRuntimeConformance` (14 cases), `AgentConformanceSubject` |
-
-```mermaid
-flowchart LR
-  runner["runner (TK-75/76)"] -- "AgentSessionRequest" --> port["AgentRuntime.launchSession"]
-  port --> guard["assertSessionRequest (frozen snapshot)"]
-  guard --> fake["FakeAgentRuntime (./testing)"]
-  guard --> cc["claude-code adapter (src/claude-code, lot 73c)"]
-  fake & cc -- "AgentSessionResult (output Untrusted)" --> runner
-  suite["runAgentRuntimeConformance"] -. "same cases" .-> fake
-  suite -. "same cases" .-> cc
-```
-
-Request, budget, tool policy, result union and errors are described in
-[domain-model.md](domain-model.md#agentruntime-port-tk-73-lot-73a-packagesdelivery).
-
-### Delivery package: Claude Code adapter and agent boundary (TK-73 lot 73c)
-`packages/delivery/src/claude-code/` implements `AgentRuntime` by running the `claude -p` CLI as a
-child process ([ADR 0014](adr/0014-agent-runtime.md)). It is exported as `@koklo/delivery/claude-code`
-(never from the public index) and is the **only** code allowed to import `node:child_process`,
-`node:fs` and `node:path` in the package, and the only place where an agent tool is invoked
-(incident 25). The pure core never references it; a CI test scans `packages/*/src` and `apps/*/src`.
-
-| File | Responsibility |
-|---|---|
-| `runtime.ts` | `ClaudeCodeRuntime(options)`: guard, worktree, spawn, result |
-| `command.ts` | frozen argv and tool rules derived from the role policy (user prompt goes to stdin) |
-| `environment.ts` | allow-listed child environment; the opaque key becomes the child's only API key |
-| `worktree.ts` | `resolveWorktree`: `realpath` strictly under an allowed root, else refusal before any spawn |
-| `process.ts` | spawn without shell in its own process group; SIGTERM then SIGKILL; hard output cap |
-| `stream.ts` / `outcome.ts` | line-by-line event reading; outcome to typed result (redacted, capped output) |
-| `classify.ts` / `redact.ts` | quota and authentication detection; secret redaction |
-
-```mermaid
-flowchart LR
-  runner["runner (TK-75/76)"] --> port["AgentRuntime (pure core)"]
-  port --> adapter["src/claude-code: ClaudeCodeRuntime"]
-  adapter -- "spawn, no shell, stdin = user prompt" --> cli["claude -p (own process group)"]
-  adapter -. "wrapCommand hook (future sandbox)" .-> cli
-  cli -- "stream-json lines" --> adapter
-  adapter -- "AgentSessionResult (redacted, Untrusted)" --> runner
-  ci["incident-25 boundary test"] -. "no agent invocation outside src/claude-code" .-> port
-```
-
-### Delivery package: quota state and global backoff (TK-74 lots 74a and 74b)
-Pure core, no clock and no randomness: the caller passes `now` (epoch ms), the jitter and the
-policies. One `QuotaState` is shared by every worker; the `Run` is never touched by a quota.
-
-| File | Responsibility |
-|---|---|
-| `quota-signal.ts` / `quota-text.ts` | `QUOTA_PATTERNS` data table, `detectQuota`, `classifyAgentFailure`; output cleaning |
-| `quota-reset.ts` | `resolveResetAt` (integer wall-clock arithmetic) |
-| `quota-backoff.ts` | `onQuotaHit`, `quotaHitEvent`, `assertNoQuotaBlock` |
-| `quota-state.ts` | `QuotaState`, `canStart`, `nextAllowedAt`, `quotaDecision`, `clearQuota` |
-| `quota-usage.ts` / `quota-window.ts` | `recordUsage`, fixed windows and ceilings |
-| `quota-serialize.ts` / `quota-state-check.ts` | strict JSON in and out |
-| `quota-check.ts`, `quota-signal-check.ts`, `quota-usage-check.ts` | input validation (`InvalidQuotaError`) |
-
-```mermaid
-stateDiagram-v2
-  [*] --> ok
-  ok --> backoff: onQuotaHit (window or 429)
-  backoff --> backoff: burst before resumeAt (same step, may extend)
-  backoff --> backoff: hit at or after resumeAt (next step, delay x2)
-  backoff --> ok: recordUsage at or after resumeAt
-  backoff --> exhausted: maxConsecutiveHits reached
-  ok --> exhausted: credit balance too low
-  backoff --> exhausted: credit balance too low
-  exhausted --> ok: clearQuota (human)
-```
+### Exécution d'agents retirée (TK-130)
+Koklo n'exécute aucun agent de code : l'agent tourne sur le poste d'un membre et parlera à Koklo par
+le MCP Koklo et le CLI `koklo` (lot 12, pas encore construits). Le port `AgentRuntime` (avec son faux
+et sa suite de conformité), l'adaptateur `claude-code` et la détection des quotas du fournisseur sont
+supprimés. Le test `incident-25-agent-runtime-boundary` n'autorise plus aucun adaptateur
+([quality-and-operations.md](quality-and-operations.md#aucun-outil-dagent-dans-le-code--garde-incident-25-tk-130)).
+Décision : [ADR 0023](adr/0023-agents-sur-les-postes.md), qui remplace l'[ADR 0014](adr/0014-agent-runtime.md).
 
 ### Rules package: catalog and parser (TK-71 lot A)
 `packages/rules` (`@koklo/rules`, tag `rules`, private) is the pure engineering-rules library.
@@ -1818,9 +1738,10 @@ Architecture decisions live in [decisions/](decisions/) as ADRs. Recorded ones a
 [0009](adr/0009-github-app-creation-repo-compte-personnel.md) (proposed: personal-account repo creation via the GitHub App user access token),
 [0010](adr/0010-e2e-single-process-stack-fake-git-provider.md) (proposed: single-process e2e stack with an injected fake Git provider),
 [0011](adr/0011-llm-port-and-untrusted-data.md) (accepted: LLM port and untrusted data),
-[0014](adr/0014-agent-runtime.md) (proposed: AgentRuntime port, Claude Code subprocess adapter and the incident 25 boundary),
+[0014](adr/0014-agent-runtime.md) (remplacée par 0023 : exécution d'agents par Koklo, retirée),
 [0015](adr/0015-anthropic-llm-adapter.md) (proposed: Anthropic adapter with direct `fetch`, no SDK; its use in the API, TK-54b),
-[0016](adr/0016-client-access-by-project.md) (proposed: client access by project, central fail-closed scoping).
+[0016](adr/0016-client-access-by-project.md) (proposed: client access by project, central fail-closed scoping),
+[0023](adr/0023-agents-sur-les-postes.md) (accepted: code agents run on members' machines, none in Koklo).
 TK-20 (multi-tenant extension) is described in [Multi-tenant isolation](#multi-tenant-isolation-tk-20); no new framework, so no ADR.
 
 ## Project creation queue (TK-93)

@@ -23,7 +23,7 @@
   2. **Validation par tête globale** : `validationOf` (`apps/api/src/client-space/validation.ts:34`) compare au SHA de tête. Tout commit invalide toutes les validations, alors que la cible invalide par élément, livrable ou écran. Seul le client valide (`REVIEW_SUBMIT_ROLES = [CLIENT_ROLE]`, `apps/api/src/auth/roles.ts:135`), alors que l'équipe doit valider 5 livrables.
   3. **Format de spec v1** : tables `T-*.yaml` en types anglais et `relations.yaml`, API REST `E-*.yaml`, tests `tests/scenarios/*.yaml`, documents en un fichier, `.koklo/rules.yaml`. Les passations définissent un autre format, d'où un `spec_version: 2` et une migration des dépôts existants.
   4. **IA synchrone et sans état** : aucune proposition persistée, pas de flux, pas de tâche de fond IA, verrou en mémoire par organisation. La cible exige des propositions persistées, une génération qui continue hors page, un verrou par livrable et un flux.
-- **À retirer** : l'Assistant de cadrage et le brief, le kanban d'organisation, les entrées Membres / GitHub / IA de la barre, la création de projet en deux étapes, et l'exécution d'agents dans `packages/delivery/src/claude-code/` (aucune app n'en dépend).
+- **À retirer** : l'Assistant de cadrage et le brief, le kanban d'organisation, les entrées Membres / GitHub / IA de la barre, la création de projet en deux étapes, et l'exécution d'agents dans `packages/delivery/src/claude-code/` (aucune app n'en dépend ; ce dernier retrait est fait, TK-130).
 - **Absents de bout en bout** : CLI `koklo`, serveur MCP, jetons, sessions d'agent, livrables 2 à 7, moteur de rendu et de règles de design, Baseline (aucun code ne crée de `Baseline` ni ne pose de tag), recette.
 
 ---
@@ -262,7 +262,7 @@
 
 | Élément (§) | État | Fichiers | Effort | Risque |
 |---|---|---|---|---|
-| Koklo n'exécute aucun agent (17 §1.1) | **contraire** (paquet isolé) | `packages/delivery/src/claude-code/*`, `agent-*.ts`, ADR `docs/adr/0014-agent-runtime.md` | S | Aucune app n'en dépend. |
+| Koklo n'exécute aucun agent (17 §1.1) | **fait** (TK-130, 2026-11-27) | `packages/delivery/src` (machine d'étapes seule), garde `incident-25-agent-runtime-boundary`, ADR `docs/adr/0023-agents-sur-les-postes.md` (0014 remplacée) | — | Garde par motifs : un filet, pas une preuve. |
 | Remontée par CLI et MCP (17 §1.2, §3) | absent | aucun `apps/cli`, aucun `@modelcontextprotocol` | L | Cœur de la phase. |
 | Baux réutilisables pour `ticket.start / progress / release` (17 §3) | partiel | `apps/api/src/lease/*`, `Lease` (worktree, heartbeat) | M | Il manque l'outil, le poste, les étapes, la tranche. |
 | État « Sans nouvelles » à 20 min, sessions (17 §2, §3) | absent | `Lease.heartbeatAt` | M | Modèle `AgentSession` à créer. |
@@ -328,8 +328,8 @@
 | Échelle typo v1, tailles en dur | `typography.css`, `text-[30px]` et `text-[22px]` dans `apps/web/src/` | Échelle 01 §0.2 | 0 |
 | Bloc Anthropic toujours déplié | `ai-send-policy.tsx` | `InlineAlert` + « Détails » | 0 |
 | Filtres en `Select` à libellé | `features-filters.tsx` | Puces pointillées | 1 |
-| Exécution d'agents par Koklo | `packages/delivery/src/claude-code/*`, `agent-{runtime,request,tools,credential,budget,output,errors}.ts`, `testing/*`, tests associés ; ADR 0014 | MCP et CLI (agents sur les postes) ; ADR 0014 « remplacée » | 12c |
-| Runner et triage autonomes | `packages/delivery/src/run*.ts`, `quota-*.ts` (garder la machine d'étapes si elle sert à `ticket.progress`) | Sessions d'agent remontées par MCP | 12c |
+| Exécution d'agents par Koklo | `packages/delivery/src/claude-code/*`, `agent-{runtime,request,tools,credential,budget,output,errors}.ts`, `testing/*`, tests associés ; ADR 0014 | fait (TK-130, 2026-11-27) : fichiers supprimés, ADR 0014 « remplacée » par 0023. MCP et CLI (agents sur les postes) restent à construire | 12c |
+| Runner et triage autonomes | `packages/delivery/src/run*.ts`, `quota-*.ts` (garder la machine d'étapes si elle sert à `ticket.progress`) | fait (TK-130, 2026-11-27) : `quota-*.ts` supprimés ; machine d'étapes gardée (les 8 fichiers `run*.ts` et leurs 5 fichiers d'appui, B839), aucun runner ni triage n'était codé. Sessions d'agent remontées par MCP à construire | 12c |
 | Titulaire « runner » | `HolderKind.runner`, `AuditActorKind.runner`, `auditActorKindSchema`, `Lease.worktree` | Membre + session d'agent (le journal garde ses anciennes lignes) | 12c |
 | Fournisseur IA codé en dur | `ai.service.ts:29`, `ai-call.ts:11,37`, `ai-results.ts:5`, `llm.module.ts`, `ai-settings-page.tsx:37`, `ai-credential-form.tsx:45` | `AiProvider` + modèle par usage | 13b |
 | Enum `TicketPackage` (paquets de Koklo) | `schema.prisma` | Paquet libre ou dérivé de l'architecture du projet | 12a |

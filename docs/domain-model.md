@@ -593,8 +593,10 @@ Test-support types, outside the public index ([ADR 0011](adr/0011-llm-port-and-u
 A `Run` is an immutable, JSON-serialisable value (`ticket`, `state`, `attempts`, `reviewRounds`,
 `ciWaits`, `blocked`, `branch`, `pullRequest`, `lastReviewedAfterFix`, `version`). `startRun`
 creates it `leased`, version 0. `applyEvent(run, event, limits)` is pure and returns
-`{ run, effects }`: a new deeply frozen run (`version + 1`) and the commands the runner must
-execute; the machine executes nothing. Checks run in this order: unknown run state
+`{ run, effects }`: a new deeply frozen run (`version + 1`) and the commands it describes; the
+machine executes nothing and Koklo runs no agent ([ADR 0023](adr/0023-agents-sur-les-postes.md)).
+It is kept for `ticket.progress` (lot 12c, which will judge its fit with the workflow steps).
+Checks run in this order: unknown run state
 (`InvalidRunStateError`), unknown or malformed event (`InvalidRunEventError`), invalid
 `RunLimits` (`InvalidRunEventError`, for every event), idempotent replay (no-op), `expectedVersion`
 different from `run.version` (`StaleRunError`), pair absent from the table
@@ -653,7 +655,9 @@ Every non-terminal state except `blocked` also accepts `block` (-> `blocked`) an
 
 **Block causes** (`BLOCK_CAUSES`, closed list, no catch-all): `dependency`, `ambiguous_spec`,
 `ci_failed`, `conflict`, `quota`, `review_exhausted`, `no_output`, `git_error`, `ci_timeout`
-(distinct from `ci_failed`). A block carries `{ cause, detail: { output, remoteBranchExists? } }`;
+(distinct from `ci_failed`). The `quota_hit` event and the `quota` cause remain in the machine; the
+detection of provider quotas was removed (TK-130). A block carries
+`{ cause, detail: { output, remoteBranchExists? } }`;
 the raw output is mandatory, `no_output` also requires `remoteBranchExists`. A `dev_done` with an
 empty diff becomes `blocked(no_output)`, never "PR impossible". `resumePoint(run)` maps a
 persisted state to the step to resume (`blocked` -> `escalate`, terminals -> `null`).
@@ -675,7 +679,7 @@ emits `notify{cause}`, with `version + 1`.
   maxReviewRounds)`; `verdict_request_changes` resets it to false. `review_exhausted` can thus only
   follow a review of the last fix, and `verdict_approve` then leads to `merge_requested`.
 - **Conflict**: `conflict_detected` (`ci_wait -> developing`) touches no counter and never blocks.
-  Repeated conflicts are not bounded here (TK-76/78).
+  Repeated conflicts are not bounded here.
 - **Escalation**: `escalate` (`blocked -> escalated`) resets the three counters to 0 and keeps the
   block cause.
 - **Idempotence**: `merge_done` on `merged`, `deploy_green` on `deployed_staging` and `escalate` on
@@ -702,135 +706,17 @@ emits `notify{cause}`, with `version + 1`.
   strings, `dev_done.diffEmpty` and `remoteBranchExists` booleans, `expectedVersion` an integer
   >= 0. Errors never echo the faulty value; `InvalidRunStateError.value` is bounded to 32 characters.
   `worktree_ready` cannot replace an already set branch with another one (incident 17).
-- **Known gaps (documented, owners TK-75/76/78)**:
-  - The runner MUST always pass `expectedVersion` for events that count (`ci_timeout`, `ci_red`,
-    `gates_red`, `verdict_request_changes`): without it a replay doubles the counter. To be made
-    mandatory in TK-75.
+- **Known gaps** (documented; the runner tickets that owned them are cancelled, lot 12c decides when
+  it connects the machine to `ticket.progress`):
+  - A caller MUST always pass `expectedVersion` for events that count (`ci_timeout`, `ci_red`,
+    `gates_red`, `verdict_request_changes`): without it a replay doubles the counter. The type does
+    not make it mandatory.
   - `lastReviewedAfterFix` is informative: the machine does not refuse `verdict_approve` on it.
   - Conflicts are accepted only in `ci_wait` (no `conflict_detected` in `reviewing` or
     `merge_requested`), repeated conflicts are unbounded, and a late `merge_done` on
-    `deployed_staging` is refused (TK-76/78).
-  - Raw git output must be redacted upstream (TK-76) before entering `Run.blocked` or `notify`.
-- **Dependencies**: `@koklo/domain` (prompts, untrusted data) and `@koklo/rules` (`AgentRole`) are
-  the only runtime dependencies, both used by the AgentRuntime port below.
-
-### AgentRuntime port (TK-73 lot 73a, `packages/delivery`)
-Pure types and guards, no persistence. One session = one promise = one typed result.
-- **AgentSessionRequest**: `role` (`AgentRole`), `prompt` (`FramedPrompt`), `worktree` (absolute
-  POSIX path supplied by the runner: not `/`, no `..` segment, no NUL), `tools`, `budget`, `signal`
-  (a real `AbortSignal`, mandatory), `trace` (`purpose`, `correlationId`, pattern
-  `[A-Za-z0-9._:-]{1,64}`, never content) and an optional opaque `credential` (absent for a
-  subscription). `assertSessionRequest` checks in this order: request, role, prompt, worktree,
-  tools, signal, trace, credential, then budget; it returns a deep-frozen snapshot, each field read
-  once (hostile getters cannot answer differently twice). An already aborted signal is not an error:
-  the runtime answers `aborted` without launching.
-- **AgentBudget**: `timeoutMs`, `maxCostMicroUsd`, `maxOutputChars`, `maxPromptChars`, positive
-  integers, all mandatory. Ceilings: 3 600 000 ms, 20 000 000 micro-USD, 1 000 000 characters of
-  output, 1 000 000 characters of prompt (`system` + `user` must fit `maxPromptChars`).
-  `InvalidAgentBudgetError(field)` for a missing or invalid field, `AgentBudgetExceededError(limit)`
-  (`timeout | cost | output-chars | prompt-chars`) above a ceiling.
-- **AgentToolPolicy**: `read`, `search` (always true), `write`, `edit`, `shell`
-  (`none | project-checks`), `writablePaths` (relative to the worktree), `network` (always `none`),
-  `mcp` (always false). No dangerous option is representable and unknown keys are refused.
-  `toolsForRole` (frozen): developer and test-writer write everywhere with the bounded shell,
-  doc-writer writes in `docs/` and `README.md`, designer in `design/` (no shell for both),
-  product-owner, analyst, qa-reviewer and tech-lead are read-only. A request may restrict a role's
-  policy but never exceed it (`isWithinRolePolicy`).
-- **AgentSessionResult** (union on `status`): `completed { output, usage { costMicroUsd,
-  durationMs } }`, `failed { reason, output }` (`agent_error | tool_denied | invalid_output |
-  process_error | budget_exceeded`), `timeout { output }`, `aborted { output }`,
-  `quota { output, retryAfterMs? }`. The output is always `Untrusted("model-output")` (possibly
-  partial). Only `failed` counts as a failure (`countsAsAgentFailure`): timeout, abort and quota are
-  never failures.
-- **AgentCredential**: opaque (private field, frozen), 1 to 512 characters without control
-  character; every rendering gives `[redacted]`; `revealAgentCredential` is for the adapter only.
-- **Errors**: root `AgentRuntimeError { operation, runtime? }` (known fields only, no `cause`);
-  `InvalidAgentRequestError(reason)`, `InvalidAgentBudgetError(field)`, `AgentBudgetExceededError(limit)`,
-  `AgentRuntimeUnavailableError`, `AgentAuthError`; `InvalidAgentCredentialError(reason)` extends
-  `Error`. Messages are fixed and never carry a key, a prompt or an output.
-- **Fake and conformance** (`@koklo/delivery/testing`): `FakeAgentRuntime` plays a script
-  (`completed`, `failed`, `timeout`, `quota`, `aborted`, `hang`, `{ fail }`), truncates the output to
-  `maxOutputChars`, turns a too long `elapsedMs` into `timeout` and a too high cost into
-  `failed/budget_exceeded`, and records calls without the key. `runAgentRuntimeConformance` runs the
-  14 shared cases against any `AgentConformanceSubject` with the engine injected by the caller.
-
-### Quotas: detection, global backoff, consumption (TK-74 lots 74a and 74b, `packages/delivery`)
-A provider quota (usage window, rate limit, empty credit) is **not a ticket defect**. The pure core
-detects it in the agent output and keeps ONE shared `QuotaState` per runner. The `Run` is never
-modified by a quota: `quota_hit` is a neutral event (`quotaHitEvent`) that leaves `attempts`,
-`reviewRounds`, `ciWaits`, `version` and the block untouched. All instants are integer epoch ms given
-by the caller; no value (base delay, ceiling, window) is coded in the package (D1): the caller passes
-`BackoffPolicy` and `UsagePolicy`.
-
-- **Detection** (`detectQuota(output)`, `classifyAgentFailure(output)`). Only the last
-  `QUOTA_SCAN_CHARS` (4000) characters are examined; ANSI sequences, controls and bidi characters are
-  removed first, and Unicode hyphens (U+2010..2012, U+2212) and no-break spaces are normalised. Quoted
-  lines are ignored, before AND after the ANSI cleaning: diff lines (`+`, `@@`, `-` unless it is a
-  `- Message` bullet and the text has no diff header), test names, `expect(`/`assert`/`toBe(`/
-  `toEqual(`/`toContain(`, `//` `#` `*` comments, `>` quotes, paired ``` blocks, assigned or lone
-  quoted strings. Each pattern runs on ONE line. `QUOTA_PATTERNS` is a data table, first match wins: `claude-usage-limit-reached-epoch` (`|<epoch s>` -> `resetAt`),
-  `five-hour-limit-resets-clock`, `weekly-limit-reached`, `opus-limit-reached`,
-  `your-limit-will-reset-at`, `hit-your-limit-resets` (wall clock `3pm`, `9:30am`; a named zone is kept
-  in `ClockHint.zone`, never interpreted), `api-429-retry-after` (`retryAfterMs`),
-  `api-429-rate-limit-error`, `api-429-too-many-requests`, `credit-balance-too-low` (kind `exhausted`),
-  `unknown-limit-heuristic` (kind `unknown_limit`, treated as a window), plus the weak safety net
-  (`rate-limit-error-bare`, `usage-limit-reached-net`, `exceeded-your-usage-limit`,
-  `out-of-usage-net`, `http-429-rate-limit-net`, `request-rejected-429`) and the strong
-  `out-of-usage-resets`. Bare `usage limit` and `429` are still NOT a quota. `overloaded_error` and
-  529 are NOT a quota (D4). **Strength** (`QuotaSignal.strength`): `strong` = provider date (epoch,
-  `retry-after`, explicit `resets <time>`) or a phrase anchored at line start / after `API Error: ` /
-  `Error: ` / a JSON `"result":"`; `weak` = bare pattern, heuristic, safety net, or any line printed
-  after an ANSI colour sequence. A weak signal backs off (`onQuotaHit`) WITHOUT counting toward
-  `exhausted`; only strong signals do. The signal is frozen, JSON-serialisable, `raw` is capped at 500 characters. The
-  patterns have no nested quantifier (a 1 MB hostile input stays under 500 ms). The formulations are
-  hypotheses: see `quality-and-operations.md`.
-- **Reset instant** (`resolveResetAt`): `resetAt`, else `now + retryAfterMs`, else the next STRICTLY
-  future wall-clock occurrence with an integer UTC offset (|offset| < 1440 min), else `null`
-  (exponential fallback). A named zone or a missing offset gives `null`. No `Date`, no `Intl`.
-- **`QuotaState`** `{ status: ok | backoff | exhausted, resumeAt, consecutiveHits, lastHitAt,
-  lastSignalId, windows, usageIds, version }`: an immutable, deeply frozen value, shared by every
-  worker (incident 26). `startQuotaState`, `canStart`, `nextAllowedAt` (`now` if free, epoch ms, or
-  `null` = human wait), `quotaDecision` (`start | wait | halt`), `clearQuota` (human re-arm).
-- **Global backoff** (`onQuotaHit(state, signal, now, jitter, policy, options?)`). Order: validation,
-  replay (same `signal.id` as `lastSignalId` = the identical state), `StaleQuotaError` on a wrong
-  `expectedVersion`, computation. Delay: provider date if in the future (capped at `maxDelayMs`), else
-  `min(maxDelayMs, baseMs * 2^consecutiveHits)`; jitter only adds: `floor(delay * (1 + jitter *
-  jitterRatio))` then capped by `min(maxDelayMs, ...)` AFTER the jitter; `jitter` in [0,1) is a
-  parameter (no randomness in the domain). Hard ceiling `QUOTA_MAX_BACKOFF_MS` = 24 h: `maxDelayMs` must
-  be <= 24 h, `jitterRatio` in [0,1], a provider `retry-after` is capped at 24 h (detection, `resolveResetAt`,
-  adapter `retryAfterMs`). `onQuotaHit` revalidates the received state (`consecutiveHits` and `version`
-  safe integers >= 0, `resumeAt` finite, known status) and throws `InvalidQuotaError`. `resumeAt` never
-  shortens. A burst (a hit while `status = backoff` and `now < resumeAt`) is ONE step: the counter is
-  unchanged and only a later provider date extends `resumeAt` (version +1 only if something changed).
-  `maxConsecutiveHits` or an `exhausted` signal gives `exhausted` (`resumeAt = null`), sticky until
-  `clearQuota`. `assertNoQuotaBlock` refuses a `block` event with cause `quota` (D2).
-- **Consumption windows** (`recordUsage(state, usage, now, policy, options?)`). Fixed aligned windows
-  `start = floor(now / windowMs) * windowMs`, keys `o:<org>`, `p:<org>/<project>`, `a:<org>/<agent>`
-  (only the levels present in the scope; an organization never contains `/`). A ceiling (`maxRuns`,
-  `maxTokens`, 0 blocks at once) is reached at `>=`; the most restrictive level wins and
-  `nextAllowedAt` is `max(resumeAt, window end)`. Expired windows are purged at each record. A
-  successful usage at or after `resumeAt` resets `consecutiveHits` to 0 and returns to `ok`.
-- **Idempotence**: an already counted `usage.id` (bounded list `usageIds`, `maxSeenIds` in 1..1000,
-  oldest evicted) returns the identical state; counters stay safe integers (overflow is refused).
-- **Serialisation** (`serializeQuotaState`, `parseQuotaState`): JSON with sorted keys, at most
-  `QUOTA_MAX_SERIALIZED_CHARS` (1 000 000). Parsing is strict: root object with exactly the 8 keys
-  (`__proto__`, `constructor` and any other key refused, also in `windows`), integers >= 0, known
-  status, `backoff` <=> `resumeAt` set, instants in [`QUOTA_MIN_EPOCH_MS`, `QUOTA_MAX_EPOCH_MS`] (2000
-  to 2100), window keys `o:`/`p:`/`a:`, at most 1000 ids; the result is deeply frozen and the error
-  message never repeats the forged text. `parseQuotaState(text, now?)`: with `now`, a persisted
-  `resumeAt` beyond `now + 24 h` is clamped to that ceiling (without `now` only the 2100 bound applies;
-  callers should pass `now`). Errors: `InvalidQuotaError(reason)`, `StaleQuotaError`.
-
-| Incident (vision annex C) | Guard | Named test |
-|---|---|---|
-| 22: a quota fell into "ambiguous spec" | `classifyAgentFailure` runs first, no `cause` | `incident-22-quota-is-never-ambiguous-spec` |
-| 22: a quota consumed attempts | `quota_hit` is neutral for the `Run` | `incident-22-quota-never-counts-as-attempt` |
-| 26: each worker rediscovered the limit | one shared state, all scopes blocked | `incident-26-one-hit-backs-off-all-workers` |
-| 26: a burst doubled the delay N times | a burst is one step | `incident-26-burst-counts-once` |
-| 26: a shorter hint reduced the wait | `resumeAt` never shortens | `incident-26-backoff-never-shortens` |
-
-Each of the 11 formulations also has a test named `incident-22-<pattern>` (stderr and result message).
-Sleeping until `resumeAt` and persisting the state are TK-75; wiring the Claude Code `classify` is 74c.
+    `deployed_staging` is refused.
+  - Raw git output must be redacted upstream before entering `Run.blocked` or `notify`.
+- **Dependencies**: none at runtime since TK-130; the package imports only its own files.
 
 ## Rules catalog (TK-71 lot A, `packages/rules`)
 A **catalog** is a versioned set of engineering rules and the profiles that group them. The

@@ -313,58 +313,12 @@ the suite (`packages/domain/test/llm-conformance.test.ts`), which also checks th
 detected. Use `FakeLlm` in tests of services that call a model; it records calls without the key.
 `pnpm --filter @koklo/domain build` must keep resolving `@koklo/domain/testing` (`dist/testing`).
 
-### Claude Code adapter: tests and manual trial (TK-73 lot 73c)
-CI never launches the real CLI: `test/claude-code/*` run the adapter against the scripted fake
-`packages/delivery/test/fixtures/fake-claude.mjs`, and `incident-25-agent-runtime-boundary` fails if any
-file under `packages/*/src` or `apps/*/src` outside `packages/delivery/src/claude-code/` invokes an agent
-tool. After the suite, no `fake-claude` process may remain (`ps -eo pid,cmd | grep fake-claude`).
-
-Manual trial of the real CLI, outside CI, on a **throwaway** repository (never a real project):
-
-1. `git init /tmp/koklo-trial && cd /tmp/koklo-trial && git commit --allow-empty -m init`.
-2. Build once: `pnpm --filter @koklo/delivery build`.
-3. From a scratch script, import `ClaudeCodeRuntime` from `@koklo/delivery/claude-code`, create it with
-   `allowedRoots: ["/tmp"]`, and launch one `qa-reviewer` session (read-only) with a small budget
-   (for example 0.50 USD, 120 s) on that worktree. Check the status, that nothing was written, and that the
-   output is non-empty.
-4. A rejected worktree (outside `allowedRoots`) must fail before any process starts.
-
-The manual trial of the real CLI (NEEDS-HUMAN) must be run, and its outcome recorded, **before the
-ticket is declared effective**: CI only proves the adapter against a fake. The option syntax was checked
-against `claude --help` of CLI 2.1.316 (`--permission-prompts <target>` with `none` exists).
-
-The boundary scan of incident 25 is a safety net, not a proof (patterns miss indirect launches); the
-extra rule "`node:child_process` is imported only under `src/claude-code/`" shrinks the surface (only the
-two `packages/db/src/testing` helpers are allow-listed). Process tests wait for `grandchild.pid`, never
-for a fixed delay.
-
-NEEDS-HUMAN: install the CLI, pin and record the tested version (2.1.316 was inspected locally), and
-authenticate it (subscription login in `HOME`, or a BYOK key passed as an opaque credential). NEEDS-HUMAN
-for TK-74: capture a real usage-limit message from the CLI (stderr and `result` event) to complete the
-quota table (`QUOTA_PATTERNS`); the adapter now classifies with that table (TK-74c), still UNVERIFIED.
-
-### Writing a reliable process test (TK-73 stabilisation)
-
-Tests that spawn a real child (`packages/delivery/test/claude-code/`, fake executable
-`test/fixtures/fake-claude.mjs`) must not depend on how fast the runner is. Measured before the fix
-(10 passes under 16 CPU-burning loops pinned to one core): the `escape` test failed 8 times out of
-10 and each conformance case 2 to 3 times out of 10; after the fix, 0 failures in 20 passes.
-
-- **Wait for an event, never for a delay.** The fake writes `ready.txt` once its output is written
-  and flushed into the pipe (`markReady`); the test waits for that file (`waitForPidFile`), then acts.
-  Bounds on such waits (`EVENT_DEADLINE_MS`) are ceilings, not expected durations.
-- **Start the adapter's `timeoutMs` clock after the child is ready.** `launchTimedOut` fakes only
-  `setTimeout`, waits for `ready.txt`, then advances the timers. A timer armed at spawn also covers
-  the Node start-up, which on a saturated runner can exceed it (the result is then `timeout`
-  instead of `failed`, `quota` or `completed`). Shorten a budget only for the scenario that is
-  meant to expire (see the conformance subject).
-- **No absolute duration assertions** (`elapsed < 3000`). Prove "does not wait for the grandchild"
-  by making the grandchild outlive the test (120 s) and letting the test timeout be the detector.
-- **One sandbox per test** (`makeSandbox`): traces, pid and ready files are never shared.
-- **Explicit `testTimeout`** for these files (`vi.setConfig` in `support.ts`) and no retry: a retry
-  would hide a real race. A product change needs a red test first.
-- **Reproduce under load** before and after: `taskset -c 0` on the test run plus 16 `taskset -c 0
-  yes > /dev/null` loops, and kill only the loops you started.
+### Aucun outil d'agent dans le code : garde incident-25 (TK-130)
+`packages/delivery/test/incident-25-agent-runtime-boundary.test.ts` échoue si une source de
+`packages/*/src` ou `apps/*/src` invoque un outil d'agent (aucun chemin exempté) ou importe
+`node:child_process` hors des deux aides de `packages/db/src/testing`, ou si un `package.json` déclare
+`@anthropic-ai/claude-*`. C'est un filet par motifs, pas une preuve : un lancement indirect lui
+échappe. Décision : [ADR 0023](adr/0023-agents-sur-les-postes.md).
 
 ### Anthropic adapter: import guard and real conformance (TK-54a)
 - **No network in CI.** `packages/llm/vitest.setup.ts` replaces `globalThis.fetch` with a function that
@@ -1249,30 +1203,6 @@ is meant to plug the Zod schema of each usage into the same runner; only Idea sp
   `strict.file-size-*` and `strict.no-dead-code-or-orphan-todo` stay UNVERIFIED.
 - **Open point**: waivers on locked limits (vision §17.2) are rejected by this package; a
   tech-lead decision or another ticket must settle it.
-
-## Provider quotas: detection and backoff (TK-74 lots 74a and 74b)
-- **UNVERIFIED, NEEDS-HUMAN**: the 11 quota formulations in `QUOTA_PATTERNS` (`packages/delivery/
-  src/quota-signal.ts`) are HYPOTHESES from the analysis; no real capture has been compared. A human
-  must capture a real usage-limit message (stderr and `result` event) of the provider and add or
-  correct the matching pattern with its test. Until then the verdict on detection stays UNVERIFIED,
-  never PASS. This now includes the strong/weak split and the safety-net phrases (`Usage limit
-  reached`, `Rate limit exceeded`, `You're out of extra usage`, `Request rejected (429)`, ...): they are
-  guesses chosen so that a real quota is never counted as a failure.
-- **Strong and weak signals**: only a strong signal (provider date, anchored phrase) counts toward
-  `exhausted`; a weak one (bare pattern, heuristic, safety net, coloured line) backs off by the base
-  delay without counting, so a quoted phrase cannot make `exhausted` sticky. Cost: a real quota
-  worded unexpectedly backs off but never escalates to `exhausted` until a human adds its pattern.
-- **Hard ceiling**: no backoff exceeds 24 h (`QUOTA_MAX_BACKOFF_MS`): policy `maxDelayMs`, provider
-  `retry-after`, the adapter `retryAfterMs` and (given `now`) a persisted `resumeAt` are all capped.
-- **Values to set by a human (D1)**: the package codes no default. The runner must give
-  `BackoffPolicy` (`baseMs`, `maxDelayMs`, `jitterRatio`, `maxConsecutiveHits`, `utcOffsetMinutes`)
-  and `UsagePolicy` (`windowMs`, `maxSeenIds`, ceilings per organization, project and agent).
-- **Operation**: `exhausted` means a human wait (empty credit or too many consecutive hits): re-arm
-  with `clearQuota` after fixing the account. A named zone (`(Europe/Paris)`) is not interpreted: the
-  exponential fallback applies unless the caller gives `utcOffsetMinutes` and the hint has no zone.
-- **Out of scope**: sleeping until `resumeAt`, the loop and the persistence of the serialised state
-  belong to TK-75. The Claude Code adapter (`classify.ts`) is wired on `detectQuota` (lot 74c): auth first,
-  then quota, only on the failure path.
 
 ## Idea agent: operation and tests (TK-90)
 

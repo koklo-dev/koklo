@@ -1,12 +1,12 @@
 ---
 doc_version: 0.1.0
-status: proposed
+status: superseded
 last_reviewed: 2026-11-01
 covers_commit: 99e638a
 ---
 # 0014 — Port AgentRuntime et adaptateur Claude Code en sous-processus
 
-- **Statut** : proposé (ticket TK-73 : lot 73a port, faux et suite de conformité ; lot 73c adaptateur Claude Code et frontière ; effectif à la fusion de la PR unique du ticket)
+- **Statut** : remplacé par ADR-0023 (TK-130, 2026-11-27) ; le texte ci-dessous décrit le code retiré et reste pour l'historique
 - **Date** : 2026-11-01
 - **Décideurs** : tech-lead, developer (ticket TK-73, lots 73a et 73c)
 
