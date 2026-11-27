@@ -126,6 +126,19 @@ export const procedures = {
   specFunctionalList: vi.fn(),
   specRolesMatrix: vi.fn(),
   aiPrefillItem: vi.fn(),
+  // TK-117 (contrat 3.19.0) : livrable Sécurité, côté équipe et client
+  securityThreatList: vi.fn(),
+  securityThreatById: vi.fn(),
+  securityDataList: vi.fn(),
+  securityRegistryExport: vi.fn(),
+  securityRightsGet: vi.fn(),
+  securityAsvsReport: vi.fn(),
+  securityAsvsSetLevel: vi.fn(),
+  securitySummaryGet: vi.fn(),
+  securitySummaryPropose: vi.fn(),
+  securitySummaryAccept: vi.fn(),
+  clientSpaceSecurity: vi.fn(),
+  clientSpaceSecurityContactSet: vi.fn(),
   // TK-100 (contrat 2.10.0) : les sept livrables de la spec (barre et compteur SPEC N/7)
   specDeliverables: vi.fn(),
   repoList: vi.fn(),
@@ -433,8 +446,29 @@ export const orpc = {
     refs: { search: queryFull(["spec", "refs", "search"], procedures.specRefsSearch) },
     deliverables: queryFull(["spec", "deliverables"], procedures.specDeliverables),
   },
+  security: {
+    key: () => ["security"],
+    threat: {
+      list: queryFull(["security", "threat", "list"], procedures.securityThreatList),
+      byId: queryFull(["security", "threat", "byId"], procedures.securityThreatById),
+    },
+    data: { list: queryFull(["security", "data", "list"], procedures.securityDataList) },
+    registry: { export: { call: (i?: unknown) => procedures.securityRegistryExport(i) } },
+    rights: { get: queryFull(["security", "rights"], procedures.securityRightsGet) },
+    asvs: {
+      report: queryFull(["security", "asvs"], procedures.securityAsvsReport),
+      setLevel: { call: (i?: unknown) => procedures.securityAsvsSetLevel(i) },
+    },
+    summary: {
+      get: queryFull(["security", "summary"], procedures.securitySummaryGet),
+      propose: mutationWithOptions(procedures.securitySummaryPropose),
+      accept: { call: (i?: unknown) => procedures.securitySummaryAccept(i) },
+    },
+  },
   clientSpace: {
     key: () => ["clientSpace"],
+    security: queryFull(["clientSpace", "security"], procedures.clientSpaceSecurity),
+    securityContactSet: mutationWithOptions(procedures.clientSpaceSecurityContactSet),
     progress: queryFull(["clientSpace", "progress"], procedures.clientSpaceProgress),
     features: queryFull(["clientSpace", "features"], procedures.clientSpaceFeatures),
     feature: queryFull(["clientSpace", "feature"], procedures.clientSpaceFeature),
@@ -646,6 +680,8 @@ export const specDeliverables = (
     staleUpstream?: Readonly<Record<string, readonly string[]>>;
     /** Cahier technique à revoir (3.17.0). */
     staleTechnical?: { changes: Array<{ id: string; change: string }>; items: string[] };
+    /** Sécurité à revoir (3.19.0). */
+    staleSecurity?: { changes: Array<{ id: string; change: string }>; items: string[] };
   } = {},
 ) => {
   const open = over.open ?? AVAILABLE;
@@ -654,6 +690,7 @@ export const specDeliverables = (
     status: over.status?.[key] ?? (over.validated?.includes(key) ? "validated" : "todo"),
     ...(over.staleUpstream?.[key] ? { staleUpstream: over.staleUpstream[key] } : {}),
     ...(key === "technical" && over.staleTechnical ? { staleTechnical: over.staleTechnical } : {}),
+    ...(key === "security" && over.staleSecurity ? { staleSecurity: over.staleSecurity } : {}),
     available: open.has(key),
     forced: false,
     condition: open.has(key) ? null : "Disponible après l'architecture",

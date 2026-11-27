@@ -1,10 +1,12 @@
 import { IdTag, ProposalDetailLines, ProposalDetailSection, WorkflowStates } from "@koklo/ui";
 import { isArchitectureKind } from "../lib/proposal-architecture.ts";
 import { isDataKind } from "../lib/proposal-data.ts";
+import { isSecurityProposal } from "../lib/proposal-security.ts";
 import { isTechnicalProposal } from "../lib/proposal-technical.ts";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
 import { ArchitectureProposalContent } from "./architecture-review-content.tsx";
 import { DataProposalContent } from "./data-review-content.tsx";
+import { SecurityProposalContent } from "./security-review-content.tsx";
 import { TechnicalProposalContent } from "./technical-review-content.tsx";
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -110,6 +112,7 @@ function FlowContent({ content }: { content: Record<string, unknown> }) {
 
 /** Contenu en lecture d'une proposition de règle, de rôle ou de parcours : nœuds texte seulement (sortie du modèle). */
 export function DomainProposalContent({ proposal }: { proposal: ProposalOutput }) {
+  if (isSecurityProposal(proposal)) return <SecurityProposalContent proposal={proposal} />;
   if (isTechnicalProposal(proposal)) return <TechnicalProposalContent proposal={proposal} />;
   if (isDataKind(proposal.kind)) return <DataProposalContent proposal={proposal} />;
   if (isArchitectureKind(proposal.kind)) return <ArchitectureProposalContent proposal={proposal} />;
@@ -124,4 +127,5 @@ export const isDomainProposal = (proposal: ProposalOutput): boolean =>
   proposal.kind === "flow" ||
   isDataKind(proposal.kind) ||
   isArchitectureKind(proposal.kind) ||
-  isTechnicalProposal(proposal);
+  isTechnicalProposal(proposal) ||
+  isSecurityProposal(proposal);

@@ -107,7 +107,8 @@ export type ClientCommentTarget = {
     | "environments"
     | "tech_section"
     | "operation"
-    | "requirements";
+    | "requirements"
+    | "security_summary";
   ref: string;
 };
 

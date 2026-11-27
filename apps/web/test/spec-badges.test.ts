@@ -53,3 +53,14 @@ describe("specBadges", () => {
     expect(specBadges(undefined)).toEqual({});
   });
 });
+
+describe("specBadges : vue client (TK-117)", () => {
+  it("client et business : « Résumé » sur la Sécurité ouverte, jamais un compte de relecture", () => {
+    const list = [base({ key: "security", status: "pending" })];
+    expect(specBadges(list, new Set(), true)).toEqual({
+      security: { label: "Résumé", tone: "soft" },
+    });
+    expect(specBadges(list)).toEqual({ security: { label: "À valider", tone: "pending" } });
+    expect(specBadges([base({ key: "security", available: false })], new Set(), true)).toEqual({});
+  });
+});

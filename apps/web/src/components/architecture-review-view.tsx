@@ -115,8 +115,8 @@ export function ArchitectureReviewBar({
   /** Texte d'état de la page (chargement, écriture) : la région d'état du bandeau est la seule de la vue. */
   statusText: string;
   onLeave: () => void;
-  /** Livrable relu : l'Architecture par défaut, le cahier technique. */
-  tab?: "architecture" | "technical";
+  /** Livrable relu : l'Architecture par défaut, le cahier technique ou la sécurité. */
+  tab?: "architecture" | "technical" | "security";
   summaryOf?: typeof architectureSummary;
 }) {
   const review = useProposalReview(projectId, true, tab);

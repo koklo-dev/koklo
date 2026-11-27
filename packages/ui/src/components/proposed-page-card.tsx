@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Icon } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { Button } from "./button.tsx";
@@ -12,23 +12,43 @@ export type ProposedPageCardProps = {
   onIgnore: () => void;
   busy?: boolean;
   className?: string;
-  /** Nom du groupe et libellé du bouton d'ajout : « page » par défaut, « section » pour le document d'architecture. */
+  /**
+   * Nom du groupe et libellés des boutons : « page » par défaut, « section » pour un document, « summary » pour le résumé
+   * client de la Sécurité (maquette 15 l.207, « Accepter » et « Rejeter »).
+   */
   label?: ProposedPageLabel;
+  /** Texte proposé, entre la justification et les boutons. */
+  children?: ReactNode;
 };
 
 /** Variante « section » (maquette 13 l.256-262) : encadré de la colonne Sections, marges 14 px au-dessus et 2 px sur les côtés. */
-export type ProposedPageLabel = "page" | "section";
+export type ProposedPageLabel = "page" | "section" | "summary";
 
-const LABELS: Record<ProposedPageLabel, { group: string; accept: string; spacing: string }> = {
+interface CardLabels {
+  group: string;
+  accept: string;
+  ignore: string;
+  spacing: string;
+}
+
+const LABELS: Record<ProposedPageLabel, CardLabels> = {
   page: {
     group: "Page proposée par l'agent",
     accept: "Ajouter la page",
+    ignore: "Ignorer",
     spacing: "mx-0.5 mt-3.5 mb-2.5",
   },
   section: {
     group: "Section proposée par l'agent",
     accept: "Ajouter la section",
+    ignore: "Ignorer",
     spacing: "mx-0.5 mt-3.5",
+  },
+  summary: {
+    group: "Proposition de l'agent",
+    accept: "Accepter",
+    ignore: "Rejeter",
+    spacing: "gap-2.5 rounded-xl px-4 py-3.5",
   },
 };
 
@@ -41,6 +61,7 @@ export function ProposedPageCard({
   busy = false,
   className,
   label = "page",
+  children,
 }: ProposedPageCardProps) {
   const text = LABELS[label];
   return (
@@ -59,13 +80,16 @@ export function ProposedPageCard({
         <Icon name="wand_stars" size={18} className="shrink-0 text-primary" />
         <span className="font-semibold">{title}</span>
       </span>
-      <span className="text-caption font-normal text-muted-foreground">{rationale}</span>
+      {rationale ? (
+        <span className="text-caption font-normal text-muted-foreground">{rationale}</span>
+      ) : null}
+      {children}
       <span className="flex gap-1.5">
         <Button size="xs" loading={busy} onClick={onAccept}>
           {text.accept}
         </Button>
         <Button variant="ghost" size="xs" disabled={busy} onClick={onIgnore}>
-          Ignorer
+          {text.ignore}
         </Button>
       </span>
     </div>

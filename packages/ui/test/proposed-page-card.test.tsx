@@ -66,3 +66,23 @@ describe("ProposedPageCard", () => {
     }
   });
 });
+
+describe("ProposedPageCard : résumé client (TK-117, maquette 15 l.207)", () => {
+  it("« Proposition de l'agent » avec son texte, « Accepter » et « Rejeter »", () => {
+    render(
+      <ProposedPageCard
+        label="summary"
+        title="Proposition de l'agent · résumé client"
+        rationale="suite au changement"
+        onAccept={() => undefined}
+        onIgnore={() => undefined}
+      >
+        <p>Nouveau texte.</p>
+      </ProposedPageCard>,
+    );
+    const card = screen.getByRole("group", { name: "Proposition de l'agent" });
+    expect(card).toHaveTextContent("Nouveau texte.");
+    expect(screen.getByRole("button", { name: "Accepter" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rejeter" })).toBeInTheDocument();
+  });
+});

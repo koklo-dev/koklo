@@ -12,6 +12,8 @@ export const PILL_TONE = {
   warning: "bg-status-pending text-status-pending-foreground",
   danger: "bg-status-revise text-status-revise-foreground",
   muted: "bg-secondary text-muted-foreground",
+  /** « Proposée » (Sécurité, DESIGN.md §5.28) : contour pointillé `--primary`. */
+  proposed: "border border-dashed border-primary text-primary",
 } as const;
 
 /**

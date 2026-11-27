@@ -14,6 +14,10 @@ export interface GroupSectionProps extends Omit<HTMLAttributes<HTMLElement>, "ch
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Identifiant mono devant le libellé (surface d'une menace, « F-004 »). */
+  tag?: string;
+  /** Compteurs en fin d'en-tête plutôt qu'à la suite du libellé (maquette 15 l.130). */
+  countsAtEnd?: boolean;
   /** Action de groupe nommée avec son compte : « Accepter les 22 restantes ». Visible replié comme ouvert. */
   action?: { label: string; onClick: () => void };
   /** `card` (défaut) : cadre arrondi ; `stacked` : sans cadre, bordure basse, pour empiler dans un `ListPanel`. */
@@ -61,6 +65,49 @@ function ShowMore({
   );
 }
 
+/** Bascule de l'en-tête : chevron, identifiant mono jamais coupé (écart 12, maquette 15 l.130), libellé. */
+function GroupToggle({
+  label,
+  tag,
+  open,
+  regionId,
+  onToggle,
+}: Pick<GroupSectionProps, "label" | "tag"> & {
+  open: boolean;
+  regionId: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={regionId}
+      className={cn(
+        "flex min-h-7 min-w-0 flex-1 items-center rounded-md px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        tag ? "gap-x-3" : "gap-x-1.5",
+      )}
+      onClick={onToggle}
+    >
+      <Icon
+        name="keyboard_arrow_down"
+        size={18}
+        className={cn(
+          "shrink-0 text-muted-foreground motion-safe:transition-transform",
+          !open && "-rotate-90",
+        )}
+      />
+      {tag ? (
+        <>
+          <span className="shrink-0 whitespace-nowrap font-mono text-code font-normal text-muted-foreground">
+            {tag}
+          </span>{" "}
+        </>
+      ) : null}
+      <span className="min-w-0 break-words text-subsection-title text-foreground">{label}</span>
+    </button>
+  );
+}
+
 /**
  * Groupe repliable (DESIGN.md v2.1 §5.3, schéma 1.4) : en-tête collant sur `--surface`, bouton `aria-expanded`,
  * action de groupe nommée avec son compte, « Afficher N de plus · M restantes dans ce groupe ».
@@ -68,6 +115,8 @@ function ShowMore({
 export function GroupSection({
   label,
   counts,
+  tag,
+  countsAtEnd = false,
   headingLevel = 3,
   variant = "card",
   actionIcon,
@@ -85,23 +134,13 @@ export function GroupSection({
   const regionId = useId();
   const [isOpen, setOpen] = useOpenState(open, defaultOpen, onOpenChange);
   const toggle = (
-    <button
-      type="button"
-      aria-expanded={isOpen}
-      aria-controls={regionId}
-      className="flex min-h-7 min-w-0 flex-1 items-center gap-x-1.5 rounded-md px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      onClick={() => setOpen(!isOpen)}
-    >
-      <Icon
-        name="keyboard_arrow_down"
-        size={18}
-        className={cn(
-          "shrink-0 text-muted-foreground motion-safe:transition-transform",
-          !isOpen && "-rotate-90",
-        )}
-      />
-      <span className="min-w-0 break-words text-subsection-title text-foreground">{label}</span>
-    </button>
+    <GroupToggle
+      label={label}
+      tag={tag}
+      open={isOpen}
+      regionId={regionId}
+      onToggle={() => setOpen(!isOpen)}
+    />
   );
   return (
     <section
@@ -120,7 +159,11 @@ export function GroupSection({
         )}
       >
         <div className="flex min-w-0 grow basis-56 flex-wrap items-center gap-x-2">
-          {createElement(`h${headingLevel}`, { className: "min-w-0 shrink" }, toggle)}
+          {createElement(
+            `h${headingLevel}`,
+            { className: cn("flex min-w-0 shrink", countsAtEnd && "grow") },
+            toggle,
+          )}
           {counts ? (
             <span className="min-w-0 text-caption font-normal text-muted-foreground">{counts}</span>
           ) : null}

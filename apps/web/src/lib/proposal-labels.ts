@@ -6,14 +6,15 @@ import {
   isArchitectureKind,
 } from "./proposal-architecture.ts";
 import { tableRefOf } from "./proposal-data.ts";
+import { isSecurityProposal, securityRefOf, securitySubtitleOf } from "./proposal-security.ts";
 import { isTechnicalProposal, technicalRefOf, technicalSubtitleOf } from "./proposal-technical.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
 /**
  * Livrables dont l'agent propose le contenu : le cahier fonctionnel (TK-99b), le modèle de données (TK-107),
- * l'architecture (TK-111) et le cahier technique (TK-115).
+ * l'architecture (TK-111), le cahier technique (TK-115) et la sécurité (TK-117).
  */
-export type Deliverable = "functional" | "data" | "architecture" | "technical";
+export type Deliverable = "functional" | "data" | "architecture" | "technical" | "security";
 /** Livrable des écrans qui ne le précisent pas : le cahier fonctionnel. */
 export const DEFAULT_DELIVERABLE: Deliverable = "functional";
 
@@ -96,11 +97,37 @@ const TECHNICAL_MODE_TEXTS: typeof MODE_TEXTS = {
   },
 };
 
+/** Textes de la modale de la sécurité (maquette 15 l.664-665), dans l'ordre du serveur. */
+const SECURITY_MODE_TEXTS: typeof MODE_TEXTS = {
+  threats: {
+    title: "Proposer les menaces",
+    description:
+      "Un modèle de menaces par fonctionnalité exposée, avec parades et scénario d'abus.",
+    noun: ["surface à compléter", "surfaces à compléter"],
+  },
+  classify: {
+    title: "Classer les données",
+    description:
+      "Repère les champs personnels ou sensibles du modèle et propose conservation et accès.",
+    noun: ["champ", "champs"],
+  },
+  asvs: {
+    title: "Vérifier les exigences ASVS",
+    description: "Compare la spec au niveau choisi et liste les exigences sans réponse.",
+    noun: ["exigence", "exigences"],
+  },
+  summary: {
+    title: "Mettre à jour le résumé client",
+    description: "Réécrit le résumé en mots simples, sans identifiants.",
+  },
+};
+
 const MODE_TEXTS_OF: Record<Deliverable, typeof MODE_TEXTS> = {
   functional: MODE_TEXTS,
   data: DATA_MODE_TEXTS,
   architecture: ARCHITECTURE_MODE_TEXTS,
   technical: TECHNICAL_MODE_TEXTS,
+  security: SECURITY_MODE_TEXTS,
 };
 
 /** Textes des choix de la modale pour un livrable. */
@@ -124,6 +151,11 @@ export const KIND_LABELS: Record<string, string> = {
   op: "Opération de l'API",
   nfr: "Exigence",
   env: "Environnement",
+  threat: "Menace",
+  sensitive: "Donnée sensible",
+  right: "Droit",
+  asvs: "Exigence",
+  summary: "Résumé client",
 };
 
 export const UNAVAILABLE_REASONS: Record<string, string> = {
@@ -241,6 +273,7 @@ const DATA_REFS: Record<string, string> = { relations: "REL" };
 /** Identifiant lisible : celui de la fiche visée, sinon rang dans le lancement (`P-007`, `RL-002`). */
 export function refOf(proposal: ProposalOutput): string {
   const specId = text(proposal.content.specId);
+  if (isSecurityProposal(proposal)) return securityRefOf(proposal);
   if (isTechnicalProposal(proposal)) return technicalRefOf(proposal);
   if (isArchitectureKind(proposal.kind)) return architectureRefOf(proposal);
   if (proposal.kind === "table") return tableRefOf(text(proposal.content.name));
@@ -277,6 +310,7 @@ function dataSubtitle(content: Record<string, unknown>): string {
 export function subtitleOf(proposal: ProposalOutput): string {
   const { content } = proposal;
   const label = KIND_LABELS[proposal.kind] ?? proposal.kind;
+  if (isSecurityProposal(proposal)) return securitySubtitleOf(proposal);
   if (isTechnicalProposal(proposal)) return technicalSubtitleOf(proposal);
   if (isArchitectureKind(proposal.kind)) return architectureSubtitleOf(proposal);
   if (proposal.kind === "table") return dataSubtitle(content);

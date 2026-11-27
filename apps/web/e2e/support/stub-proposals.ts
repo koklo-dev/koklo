@@ -1,4 +1,10 @@
 import type { IncomingMessage } from "node:http";
+import {
+  SECURITY_LABELS,
+  SECURITY_OPTIONS,
+  securityItems,
+  securitySummaryItems,
+} from "./stub-proposals-security.ts";
 import { TECHNICAL_LABELS, TECHNICAL_OPTIONS, technicalItems } from "./stub-proposals-technical.ts";
 import {
   batchReply,
@@ -52,6 +58,8 @@ export type ProposalsMode =
   | "architecturePresent"
   /** TK-115 : 36 propositions du cahier technique (document, stack, opérations, exigences, environnements). */
   | "technical"
+  | "security"
+  | "securitySummary"
   | "unavailable"
   | "notConfigured"
   | "inProgress"
@@ -86,7 +94,11 @@ export interface Item {
     | "stack"
     | "op"
     | "nfr"
-    | "env";
+    | "env"
+    | "threat"
+    | "sensitive"
+    | "right"
+    | "summary";
   zone: string;
   position: number;
   title: string;
@@ -621,6 +633,8 @@ const ITEMS_OF: Partial<Record<ProposalsMode, () => Item[]>> = {
   architectureSaveFailed: architectureSaveFailedItems,
   architecturePresent: architecturePresentItems,
   technical: technicalItems,
+  security: securityItems,
+  securitySummary: securitySummaryItems,
   volume: () => Array.from({ length: 400 }, (_, i) => make(i + 1, 16)),
   hostile: () => [make(1, 1, true)],
 };
@@ -636,6 +650,8 @@ export function resetProposals(scenario: ProposalsScenario = {}): void {
     mode === "architectureVolume" ||
     mode === "architecturePresent" ||
     mode === "technical" ||
+    mode === "security" ||
+    mode === "securitySummary" ||
     report
       ? mode
       : undefined;
@@ -673,6 +689,7 @@ const LABELS: Record<string, string> = {
 /** Libellé d'un groupe : relecture groupée des Données (TK-110), types à plat, ou fonctionnalités par zone. */
 function labelOf(key: string, flat: boolean): string {
   if (architectureMode === "technical") return TECHNICAL_LABELS[key] ?? key;
+  if (architectureMode?.startsWith("security")) return SECURITY_LABELS[key] ?? key;
   if (architectureMode) return LABELS[key] ?? key;
   if (volumeData)
     return key === "links" ? "Relations et jeux d'exemple" : `Zone ${key.split(":")[1]}`;
@@ -689,6 +706,10 @@ const ARCHITECTURE_ORDER = [
   "op",
   "nfr",
   "env",
+  "threat",
+  "sensitive",
+  "right",
+  "summary",
 ];
 
 function groups() {
@@ -760,6 +781,7 @@ function list(query: URLSearchParams, mode: ProposalsMode): Reply {
 
 function options(mode: ProposalsMode, deliverable: string | null): Reply {
   if (deliverable === "technical") return reply(200, TECHNICAL_OPTIONS);
+  if (deliverable === "security") return reply(200, SECURITY_OPTIONS);
   if (deliverable === "architecture") {
     return reply(200, {
       options: [

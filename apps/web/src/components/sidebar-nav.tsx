@@ -2,7 +2,14 @@
 
 import type { Role, SpecDeliverable } from "@koklo/contract";
 import { ShellNavGroup, ShellNavItem, type SpecKey, SpecNav } from "@koklo/ui";
-import { canManage, canWriteArchitecture, canWriteSpec, canWriteTechnical } from "../lib/roles.ts";
+import {
+  canManage,
+  canReadRepos,
+  canWriteArchitecture,
+  canWriteSecurity,
+  canWriteSpec,
+  canWriteTechnical,
+} from "../lib/roles.ts";
 import { defaultSection } from "../lib/settings-sections.ts";
 import {
   activeSpecSlug,
@@ -43,11 +50,17 @@ function useGeneratingDeliverables(
     canWriteTechnical(role) && open("technical"),
     "technical",
   );
+  const security = useProposalStatus(
+    projectId,
+    canWriteSecurity(role) && open("security"),
+    "security",
+  );
   const generating = new Set<SpecKey>();
   if (functional.active && functional.counts.total === 0) generating.add("functional");
   if (data.active && data.counts.total === 0) generating.add("data");
   if (architecture.active && architecture.counts.total === 0) generating.add("architecture");
   if (technical.active && technical.counts.total === 0) generating.add("technical");
+  if (security.active && security.counts.total === 0) generating.add("security");
   return generating;
 }
 
@@ -96,7 +109,11 @@ export function ProjectNav({
         <SpecNav
           hrefs={hrefs}
           {...(slug ? { activeKey: slug } : {})}
-          badges={specBadges(spec.data?.deliverables, generating)}
+          badges={specBadges(
+            spec.data?.deliverables,
+            generating,
+            role !== undefined && !canReadRepos(role),
+          )}
           validatedCount={spec.data?.validatedCount ?? 0}
           loading={spec.isPending}
           LinkComponent={ShellLink}

@@ -65,7 +65,16 @@ export type InlineAlertAction = {
   icon?: IconName;
   /** Action en cours : le bouton reste à sa place, désactivé (« Enregistrement… », TK-114e). */
   disabled?: boolean;
+  /** Bouton contour sur `--background`, sans la couleur d'un ton coloré (maquette 15 l.143, `btnSs`). */
+  neutral?: true;
 };
+
+/** Apparence d'un bouton de `actions` selon l'action et le ton de l'alerte. */
+function actionLook({ primary, neutral }: InlineAlertAction, tone: InlineAlertVariant) {
+  if (primary) return { variant: "default" } as const;
+  if (neutral) return { variant: "outline", className: "bg-background text-foreground" } as const;
+  return { variant: NEUTRAL_TONES.has(tone) ? "outline" : "inherit" } as const;
+}
 
 type Common = Omit<HTMLAttributes<HTMLDivElement>, "role" | "children"> & {
   variant: InlineAlertVariant;
@@ -157,9 +166,7 @@ export function InlineAlert({
               <Button
                 key={item.label}
                 size="sm"
-                variant={
-                  item.primary ? "default" : NEUTRAL_TONES.has(variant) ? "outline" : "inherit"
-                }
+                {...actionLook(item, variant)}
                 onClick={item.onClick}
                 disabled={item.disabled === true}
               >

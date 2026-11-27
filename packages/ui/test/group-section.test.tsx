@@ -18,6 +18,27 @@ describe("GroupSection", () => {
     counts: "42 · 18 acceptées · 22 à relire",
   };
 
+  it("identifiant mono avant le libellé et compte en fin d'en-tête (TK-117, maquette 15 l.130)", () => {
+    render(
+      <GroupSection
+        label="Réserver en ligne"
+        tag="F-004"
+        counts="3 menaces"
+        countsAtEnd
+        defaultOpen
+      >
+        <p>contenu</p>
+      </GroupSection>,
+    );
+    const toggle = screen.getByRole("button", { name: "F-004 Réserver en ligne" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("F-004").className).toContain("font-mono");
+    expect(screen.getByRole("heading").className).toContain("grow");
+    expect(toggle).toHaveClass("gap-x-3");
+    expect(toggle).not.toHaveClass("gap-x-1.5");
+    expect(screen.getByText("F-004")).toHaveClass("shrink-0", "whitespace-nowrap");
+  });
+
   it("en-tête : libellé et compteurs dans un titre dont le niveau est réglable", () => {
     render(
       <GroupSection {...props} headingLevel={3} defaultOpen>

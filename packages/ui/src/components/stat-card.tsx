@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import { type ComponentProps, useId } from "react";
 import { Icon, type IconName } from "../icons/icon.tsx";
 import { cn } from "../lib/cn.ts";
 import { Card } from "./card.tsx";
@@ -14,12 +14,40 @@ export type StatCardProps = Omit<ComponentProps<"div">, "children"> & {
   gauge?: { value: number; label: string };
   /** Jauge à crans (`SegmentedGauge`, DESIGN.md §5.11) : décorative, la valeur est écrite en `value` et `note`. */
   segments?: { done: number; total: number };
-  /** `comfortable` : marges 16 / 18, écart 8, valeur 26 et note 13 (maquette 07 l.115-120) ; `compact` par défaut. */
-  density?: "compact" | "comfortable";
+  /**
+   * `comfortable` : marges 16 / 18, écart 8, valeur 26 et note 13 (maquette 07 l.115-120) ; `hero` : grand compte d'une
+   * section, titre h2, valeur 30, texte 13 (maquette 15 l.182) ; `compact` par défaut.
+   */
+  density?: "compact" | "comfortable" | "hero";
 };
 
+/** Grand compte (maquette 15 l.182) : section nommée par son titre, valeur de 30, texte. */
+function HeroStat({ label, value, note }: { label: string; value: string; note?: string }) {
+  const id = useId();
+  return (
+    <section
+      aria-labelledby={id}
+      data-slot="stat-card"
+      data-density="hero"
+      className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-border px-4 py-3.5"
+    >
+      <h2 id={id} className="m-0 text-[15px] font-semibold">
+        {label}
+      </h2>
+      <span className="text-[30px] font-semibold leading-[1.1]">{value}</span>
+      {note ? <span className="text-meta leading-normal text-muted-foreground">{note}</span> : null}
+    </section>
+  );
+}
+
 /** Carte de chiffre (DESIGN.md §5.6) : libellé et icône, valeur `text-stat`, jauge et note facultatives. */
-export function StatCard({
+export function StatCard(props: StatCardProps) {
+  if (props.density !== "hero") return <FigureCard {...props} />;
+  const { label, value, note } = props;
+  return <HeroStat label={label} value={value} {...(note ? { note } : {})} />;
+}
+
+function FigureCard({
   label,
   value,
   icon,

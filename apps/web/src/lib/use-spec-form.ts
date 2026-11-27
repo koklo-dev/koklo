@@ -91,6 +91,7 @@ export function useSavedSync(
       queryClient.invalidateQueries({ queryKey: orpc.spec.deliverables.key() }),
       queryClient.invalidateQueries({ queryKey: orpc.project.shell.key() }),
     ]).then(() => {
+      if (saved.meta.inPlace) return;
       const row = specId
         ? document.querySelector<HTMLElement>(`[data-spec-id="${specId}"] button`)
         : null;

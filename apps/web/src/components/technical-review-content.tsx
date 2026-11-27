@@ -1,4 +1,4 @@
-import { EntityChip, type EntityKind, ProposalDetailSection, ProposalDetailText } from "@koklo/ui";
+import { EntityChip, type EntityKind } from "@koklo/ui";
 import type { ProposalOutput } from "../lib/proposal-types.ts";
 import { verificationText } from "../lib/technical-api-labels.ts";
 import {
@@ -7,29 +7,12 @@ import {
   environmentRowsOf,
 } from "../lib/technical-labels.ts";
 import { ProposedSectionText } from "./architecture-review-content.tsx";
+import { Block, type Content, records, strings, text } from "./proposal-content-parts.tsx";
 
 /**
  * Contenu en lecture d'une proposition du cahier technique (maquette 14 l.737-741) : nœuds texte seulement (sortie du
  * modèle : jamais de lien, de balise ni d'image).
  */
-type Content = Record<string, unknown>;
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
-const strings = (value: unknown): string[] =>
-  (Array.isArray(value) ? value : []).filter((item): item is string => typeof item === "string");
-const records = (value: unknown): Content[] =>
-  (Array.isArray(value) ? value : []).filter(
-    (item): item is Content => typeof item === "object" && item !== null,
-  );
-
-function Block({ title, value }: { title: string; value: string }) {
-  if (!value) return null;
-  return (
-    <ProposalDetailSection title={title} variant="label">
-      <ProposalDetailText>{value}</ProposalDetailText>
-    </ProposalDetailSection>
-  );
-}
-
 const KIND_OF: ReadonlyArray<[prefix: string, kind: EntityKind]> = [
   ["C-", "component"],
   ["ADR-", "decision"],

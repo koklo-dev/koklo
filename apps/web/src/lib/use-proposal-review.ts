@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { type FeaturesTab, tabOfProposalKind } from "./features-tab.ts";
 import { orpc } from "./orpc.ts";
 import { type Deliverable, refOf, subtitleOf } from "./proposal-labels.ts";
-import { asTechnical, technicalTitleOf } from "./proposal-technical.ts";
+import { markerOf } from "./proposal-marks.ts";
+import { technicalTitleOf } from "./proposal-technical.ts";
 import type { ProposalGroupOutput, ProposalOutput } from "./proposal-types.ts";
 import { NO_CASCADE, useSavable } from "./use-proposal-savable.ts";
 import {
@@ -22,10 +23,11 @@ const DELIVERABLE_OF_TAB: Record<string, Deliverable> = {
   data: "data",
   architecture: "architecture",
   technical: "technical",
+  security: "security",
 };
 
 /** Onglet de la relecture : un onglet du cahier fonctionnel ou la relecture entière d'un autre livrable. */
-export type ReviewTab = FeaturesTab | "data" | "architecture" | "technical";
+export type ReviewTab = FeaturesTab | "data" | "architecture" | "technical" | "security";
 
 export type ReviewFilter = "pending" | "all";
 const FLAT_LIMIT = PROPOSAL_GROUP_THRESHOLD;
@@ -176,8 +178,7 @@ export function useProposalReview(
     shown,
     launchStatus: status.launch?.status,
   });
-  const mark = deliverable === "technical" ? asTechnical : (proposal: ProposalOutput) => proposal;
-  const loaded = results.map((result) => (result.data?.items ?? []).map(mark));
+  const loaded = results.map((result) => (result.data?.items ?? []).map(markerOf(deliverable)));
   const proposals = loaded.flat();
   const loadedFailed = useFailedBatches(projectId, proposals);
   const savedSet = useSavable(projectId, status.launch?.id, counts.accepted, deliverable);

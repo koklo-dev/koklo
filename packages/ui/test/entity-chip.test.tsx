@@ -184,6 +184,22 @@ describe("EntityChip : puces d'une opération (TK-116, DESIGN.md §5.27)", () =>
     expect(container).toHaveTextContent(`${type} limite 10 par minute`);
   });
 
+  it("outline : bordée sans fond, 12/500 en police du texte, icône muette (maquette 15 l.818)", () => {
+    const { container } = render(
+      <EntityChip kind="feature" id="F-012" title="Fichier" variant="outline" />,
+    );
+    const chip = container.firstElementChild as Element;
+    expect(chip).toHaveClass("min-h-[26px]", "rounded-md", "border", "border-border");
+    expect(chip).toHaveClass("bg-transparent", "text-foreground", "pr-[9px]", "pl-[7px]");
+    expect(chip).toHaveClass("gap-[5px]");
+    expect(chip).not.toHaveClass("bg-secondary", "text-secondary-foreground", "gap-1.5");
+    expect(chip.querySelector("svg")).toHaveClass("text-muted-foreground");
+    expect(chip.querySelector(".font-mono")).toBeNull();
+    for (const text of ["F-012", "Fichier"]) {
+      expect(screen.getByText(text)).toHaveClass("text-caption", "font-medium");
+    }
+  });
+
   it("sans identifiant : le libellé seul, aucun identifiant vide", () => {
     const { container } = render(<EntityChip kind="permission" id="" title="Accueil" />);
     expect(container.querySelector(".font-mono")).toBeNull();

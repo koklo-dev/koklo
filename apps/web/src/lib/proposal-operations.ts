@@ -6,6 +6,7 @@ import {
 } from "@koklo/contract";
 import { architectureOperationOf, isArchitectureKind } from "./proposal-architecture.ts";
 import { isDataKind } from "./proposal-data.ts";
+import { isSecurityProposal, securityOperationOf } from "./proposal-security.ts";
 import { isTechnicalProposal, technicalOperationOf } from "./proposal-technical.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
 
@@ -150,8 +151,9 @@ export function operationsOf(proposal: ProposalOutput): Operation[] {
   return op ? [op] : [];
 }
 
-/** Opération des propositions d'un autre livrable (technique avant architecture : ils partagent `doc_section`). */
+/** Opération des propositions d'un autre livrable (sécurité et technique avant architecture : `doc_section` partagé). */
 function delegatedOperationOf(proposal: ProposalOutput): Operation | null {
+  if (isSecurityProposal(proposal)) return securityOperationOf(proposal);
   if (isTechnicalProposal(proposal)) return technicalOperationOf(proposal);
   if (isArchitectureKind(proposal.kind)) return architectureOperationOf(proposal);
   return operationOf(proposal);

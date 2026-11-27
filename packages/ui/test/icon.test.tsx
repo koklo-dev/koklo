@@ -33,6 +33,15 @@ describe("Icon (Material Symbols Rounded, SVG)", () => {
     expect(svgOf(container)).toHaveAttribute("viewBox", "0 -960 960 960");
   });
 
+  it("registre : icônes de la Sécurité (TK-117, maquette 15)", () => {
+    for (const name of ["gpp_maybe", "verified_user", "contact_phone", "location_on"]) {
+      expect(isIconName(name), name).toBe(true);
+    }
+    for (const name of ["campaign", "download", "table_chart"]) {
+      expect(isIconName(name), name).toBe(true);
+    }
+  });
+
   it("registre : icônes du cahier technique (TK-115, maquette 14)", () => {
     for (const name of ["layers", "dns", "cable", "help", "monitoring", "rocket_launch"]) {
       expect(isIconName(name), name).toBe(true);
