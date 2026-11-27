@@ -79,6 +79,18 @@ export const completeBody = (format: WireFormat, text: string): unknown => {
 export const okResponse = (format: WireFormat, text: string): Response =>
   json(200, completeBody(format, text));
 
+/** Réponse coupée par le plafond de jetons de sortie (arrêt « length » du SDK), avec ou sans texte. */
+export const cutResponse = (format: WireFormat, text: string): Response =>
+  json(
+    200,
+    JSON.parse(
+      JSON.stringify(completeBody(format, text))
+        .replace('"stop_reason":"end_turn"', '"stop_reason":"max_tokens"')
+        .replace('"finishReason":"STOP"', '"finishReason":"MAX_TOKENS"')
+        .replace('"finish_reason":"stop"', '"finish_reason":"length"'),
+    ),
+  );
+
 const sse = (events: readonly (readonly [string | undefined, unknown])[]): Response => {
   const body = events
     .map(

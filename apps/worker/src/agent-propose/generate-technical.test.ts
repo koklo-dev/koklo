@@ -83,9 +83,17 @@ const CONTENT: Record<string, (n: number) => object> = {
   doc_section: (n) => ({ title: `Section ${n}`, markdown: "Texte." }),
 };
 
+/** Réponse imposée à l'appel `n` (à partir de 1) ; `undefined` : la proposition par défaut du type demandé. */
+type Script = (n: number) => { proposals?: unknown[]; stop?: string } | undefined;
+
 class FakeAi {
   readonly calls: { purpose: string; kinds: string[]; prompt: string }[] = [];
   readonly schemas: string[] = [];
+  private readonly script: Script;
+
+  constructor(script: Script = () => undefined) {
+    this.script = script;
+  }
 
   async complete(request: AiRequest): Promise<AiResponse> {
     const schema = request.output.kind === "json" ? request.output.schema : {};
@@ -103,14 +111,16 @@ class FakeAi {
     });
     const kind = kinds[0] as string;
     const content = CONTENT[kind]?.(n) ?? {};
+    const scripted = this.script(n);
+    const proposals = scripted?.proposals ?? [{ kind, rationale: "Manquant", content }];
     return {
-      stop: "end",
-      output: { proposals: [{ kind, rationale: "Manquant", content }] },
+      stop: scripted?.stop ?? "end",
+      output: scripted?.stop === "max-tokens" ? undefined : { proposals },
     } as unknown as AiResponse;
   }
 }
 
-async function launch(mode: string, sources: LaunchSources = SOURCES) {
+async function launch(mode: string, sources: LaunchSources = SOURCES, script?: Script) {
   const context = {
     id: "0195f1a0-0000-7000-8000-000000000001",
     organizationId: "0195f1a0-0000-7000-8000-000000000002",
@@ -121,7 +131,7 @@ async function launch(mode: string, sources: LaunchSources = SOURCES) {
     requestedBy: "0195f1a0-0000-7000-8000-000000000004",
     baseVersion: null,
   };
-  const ai = new FakeAi();
+  const ai = new FakeAi(script);
   const store = new MemoryProposeStore(context, sources);
   const handler = createAgentProposeHandler({
     ...AGENT_PROPOSE_DEFAULTS,
@@ -140,7 +150,9 @@ describe("génération du cahier technique", () => {
     const { ai, store } = await launch("all");
     expect(store.state.status).toBe("done");
     expect(store.state.zones).toEqual([
-      "Stack",
+      "Stack · Applications",
+      "Stack · Services et API",
+      "Stack · Hébergement et exploitation",
       "Réservation",
       "Clients",
       "Exigences",
@@ -148,6 +160,8 @@ describe("génération du cahier technique", () => {
       "Document · cahier technique",
     ]);
     expect(ai.calls.map((c) => c.kinds)).toEqual([
+      ["stack"],
+      ["stack"],
       ["stack"],
       ["op"],
       ["op"],
@@ -158,19 +172,21 @@ describe("génération du cahier technique", () => {
     expect(ai.calls.every((c) => c.purpose === "proposal-batch")).toBe(true);
     expect(store.proposals.map((p) => p.kind)).toEqual([
       "stack",
+      "stack",
+      "stack",
       "op",
       "op",
       "nfr",
       "env",
       "doc_section",
     ]);
-    expect(store.proposals[3]?.payload.specId).toBe("NFR-001");
+    expect(store.proposals[5]?.payload.specId).toBe("NFR-001");
     expect(ai.schemas.join("")).not.toContain("specId");
   });
 
   it("consignes constantes : les données en blocs, aucun nom de fournisseur ; la zone traitée est dite", async () => {
     const { ai } = await launch("complete");
-    const second = ai.calls[1]?.prompt ?? "";
+    const second = ai.calls[3]?.prompt ?? "";
     expect(second).toContain("Zone: Réservation");
     expect(second).toContain("C-api | API");
     expect(second).toContain("ST-sms | SMS");
@@ -203,5 +219,69 @@ describe("génération du cahier technique", () => {
     });
     expect(store.state.zones).toHaveLength(12);
     expect(store.state.zones.join(" ")).toContain("Zone 19");
+  });
+
+  const stackOf = (role: string) => ({
+    kind: "stack",
+    rationale: "Manquant",
+    content: { ...(CONTENT.stack?.(0) as object), role },
+  });
+
+  it("TK-115b : étape Stack coupée : « truncated », étape nommée, lancement terminé, le reste publié", async () => {
+    const { store } = await launch("complete", SOURCES, (n) =>
+      n === 2 ? { stop: "max-tokens" } : undefined,
+    );
+    expect(store.state.status).toBe("done");
+    expect(store.state).toMatchObject({ zonesDone: 7, zonesDiscarded: 1 });
+    expect(store.state.discardReasons).toMatchObject({
+      truncated: 1,
+      discarded_steps: [{ step: "Stack · Services et API", reason: "truncated" }],
+    });
+    expect(store.proposals.filter((p) => p.kind === "stack")).toHaveLength(2);
+    expect(store.proposals.some((p) => p.kind === "env")).toBe(true);
+  });
+
+  it("TK-115b : un rôle répété entre deux étapes est publié une fois ; déjà enregistré, écarté", async () => {
+    const roles = [["Base de données", "SMS"], ["base de DONNEES"], ["Hébergement", "Sms"]];
+    const { ai, store } = await launch("complete", SOURCES, (n) =>
+      n <= 3 ? { proposals: (roles[n - 1] ?? []).map(stackOf) } : undefined,
+    );
+    const published = store.proposals.filter((p) => p.kind === "stack").map((p) => p.title);
+    expect(published).toEqual(["Base de données", "Hébergement"]);
+    expect(ai.calls[0]?.prompt).not.toContain("Roles already covered");
+    expect(ai.calls[1]?.prompt).toContain("Roles already covered\nbase de données");
+    // Trois doublons ou existants et l'exigence existante : étapes traitées, aucune écartée.
+    expect(store.state).toMatchObject({ zonesDiscarded: 0, discardedCount: 4 });
+  });
+
+  it("TK-115b : tout reproposer reprend un choix enregistré une fois, avec son identifiant", async () => {
+    const { store } = await launch("all", SOURCES, (n) =>
+      n <= 2 ? { proposals: [stackOf(n === 1 ? "SMS" : "sms")] } : undefined,
+    );
+    const taken = store.proposals.filter((p) => p.payload.specId === "ST-sms");
+    expect(taken).toHaveLength(1);
+  });
+
+  it("TK-115b : étape dont toutes les entrées sont invalides : écartée « output_invalid »", async () => {
+    const invalid = { kind: "stack", rationale: "x", content: { role: "" } };
+    const { store } = await launch("complete", SOURCES, (n) =>
+      n === 1 ? { proposals: [invalid, invalid] } : undefined,
+    );
+    expect(store.state).toMatchObject({ status: "done", zonesDiscarded: 1, zonesDone: 7 });
+    expect(store.state.discardReasons).toMatchObject({
+      output_invalid: 1,
+      discarded_steps: [{ step: "Stack · Applications", reason: "output_invalid" }],
+    });
+    // Les deux entrées invalides, plus l'exigence existante de son étape (traitée).
+    expect(store.state.discardedCount).toBe(3);
+  });
+
+  it("TK-115b : une entrée valide à côté d'une invalide, ou une sortie vide : étape traitée", async () => {
+    const invalid = { kind: "stack", rationale: "x", content: { role: "" } };
+    const { store } = await launch("complete", SOURCES, (n) => {
+      if (n === 1) return { proposals: [invalid, stackOf("Interface")] };
+      return n === 2 ? { proposals: [] } : undefined;
+    });
+    expect(store.state).toMatchObject({ zonesDiscarded: 0, zonesDone: 8 });
   });
 });

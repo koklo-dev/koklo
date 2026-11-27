@@ -88,20 +88,39 @@ export function mergeLinks(
 /** Motif de zone, ou `existing_section` (sections déjà présentes, TK-114e : hors motifs de zone, ignoré par l'API). */
 type CountedReason = LaunchDiscardReason | "existing_section";
 
-const countedReason = (current: unknown, reason: CountedReason, by = 1) => {
+const countedReason = (
+  current: unknown,
+  reason: CountedReason,
+  by = 1,
+): Record<string, unknown> => {
   const counts = isRecord(current) ? current : {};
   const previous = typeof counts[reason] === "number" ? (counts[reason] as number) : 0;
   return { ...counts, [reason]: previous + by };
 };
 
-/** `discard_reasons` après la zone : motif de la zone écartée, sections déjà présentes ; `undefined` sans changement. */
-function zoneReasons(current: unknown, publication: ZonePublication) {
-  const { reason, existingSections = 0 } = publication;
-  if (reason === undefined && existingSections === 0) return undefined;
-  const counted = reason === undefined ? current : countedReason(current, reason);
+/** Étapes écartées nommées au bilan (TK-115b, B849) : douze au plus, nom de 120 caractères au plus. */
+const DISCARDED_STEPS_MAX = 12;
+const STEP_NAME_MAX = 120;
+
+/** Motif compté et étape nommée à la suite des précédentes. */
+function discardedStep(current: unknown, step: string, reason: LaunchDiscardReason) {
+  const counts = countedReason(current, reason);
+  const steps = Array.isArray(counts.discarded_steps) ? counts.discarded_steps : [];
+  if (steps.length >= DISCARDED_STEPS_MAX) return counts;
+  const named = { step: step.slice(0, STEP_NAME_MAX), reason };
+  return { ...counts, discarded_steps: [...steps, named] };
+}
+
+/**
+ * `discard_reasons` après la zone : motif et nom de la zone écartée, sections déjà présentes ; `undefined` sans
+ * changement.
+ */
+export function zoneReasons(current: unknown, publication: ZonePublication) {
+  const { zone, reason, existingSections = 0 } = publication;
+  const named = reason === undefined ? undefined : discardedStep(current, zone, reason);
   return existingSections === 0
-    ? counted
-    : countedReason(counted, "existing_section", existingSections);
+    ? named
+    : countedReason(named ?? current, "existing_section", existingSections);
 }
 
 async function insertRows(

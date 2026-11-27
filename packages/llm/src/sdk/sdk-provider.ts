@@ -7,11 +7,12 @@ import {
   type LlmProviderId,
   type LlmRequest,
   type LlmResponse,
+  type LlmStopReason,
   type LlmStreamEvent,
   revealLlmCredential,
   unvalidated,
 } from "@koklo/domain";
-import { generateText, jsonSchema, Output, streamText } from "ai";
+import { generateText, jsonSchema, NoObjectGeneratedError, Output, streamText } from "ai";
 import { type CallOperation, diagnosticOf, type ErrorContext } from "../common/diagnostic.ts";
 import { systemHostResolver } from "../common/dns-resolver.ts";
 import type { FetchLike } from "../common/fetch-like.ts";
@@ -47,6 +48,34 @@ interface Prepared {
 
 const noop = (): void => undefined;
 
+/** Réponse du SDK avant sa mise en forme au port. */
+interface Answer {
+  readonly output: unknown;
+  readonly stop: LlmStopReason;
+  readonly usage: Parameters<typeof usageOf>[0];
+  readonly modelId: unknown;
+}
+
+/**
+ * Sortie JSON coupée par le plafond de jetons : le SDK la lève comme un objet illisible. Ce n'est pas une sortie
+ * invalide : la réponse dit « max-tokens », avec la consommation et le modèle que l'erreur porte (TK-115b).
+ */
+const truncatedOf = (error: unknown): Answer | undefined => {
+  if (!NoObjectGeneratedError.isInstance(error) || error.finishReason !== "length") {
+    return undefined;
+  }
+  return {
+    output: undefined,
+    stop: "max-tokens",
+    usage: error.usage ?? { inputTokens: undefined, outputTokens: undefined },
+    modelId: error.response?.modelId,
+  };
+};
+
+/** Sortie demandée : l'objet analysé (JSON), sinon le texte. */
+const outputOf = (request: LlmRequest, result: { output: unknown; text: string }): unknown =>
+  request.output.kind === "json" ? result.output : result.text;
+
 /** Adaptateur du port `LlmProvider` au-dessus du SDK : une classe, six fournisseurs. */
 export class SdkLlmProvider implements LlmProvider {
   readonly id: LlmProviderId;
@@ -68,14 +97,18 @@ export class SdkLlmProvider implements LlmProvider {
             ? Output.object({ schema: jsonSchema(snapshot.output.schema) })
             : Output.text(),
       });
-      return {
-        output: unvalidated(snapshot.output.kind === "json" ? result.output : result.text),
-        stop: stopOf(result, call.context),
-        usage: usageOf(result.totalUsage),
-        provider: this.id,
-        model: servedModelOf(result.response.modelId, call.context),
-      };
+      const stop = stopOf(result, call.context);
+      // Réponse JSON coupée : le SDK n'a pas de sortie (la lire lèverait), le texte partiel ne sert à rien.
+      const cut = stop === "max-tokens" && snapshot.output.kind === "json";
+      return this.#response(call.context, {
+        output: cut ? undefined : outputOf(snapshot, result),
+        stop,
+        usage: result.totalUsage,
+        modelId: result.response.modelId,
+      });
     } catch (error) {
+      const cut = truncatedOf(error);
+      if (cut !== undefined) return this.#response(call.context, cut);
       throw toPortError(error, call.context, call.signals);
     }
   }
@@ -120,6 +153,16 @@ export class SdkLlmProvider implements LlmProvider {
     } finally {
       stop.abort();
     }
+  }
+
+  #response(context: ErrorContext, answer: Answer): LlmResponse {
+    return {
+      output: unvalidated(answer.output),
+      stop: answer.stop,
+      usage: usageOf(answer.usage),
+      provider: this.id,
+      model: servedModelOf(answer.modelId, context),
+    };
   }
 
   #abortSignals({ snapshot, deadline }: Prepared): AbortSignal[] {

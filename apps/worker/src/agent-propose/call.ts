@@ -30,8 +30,8 @@ export interface Run {
   readonly euOnly: boolean;
   readonly progress: LaunchProgress;
   readonly kinds: readonly AgentProposalKind[];
-  /** Types demandés à la zone de rang `index` (cahier technique : une étape par type) ; absent : `kinds` partout. */
-  readonly kindsAt?: (index: number, total: number, zone: string) => readonly AgentProposalKind[];
+  /** Types demandés à la zone de rang `index` (cahier technique, Sécurité : un type par étape) ; absent : `kinds` partout. */
+  readonly kindsAt?: (index: number, zones: readonly string[]) => readonly AgentProposalKind[];
   readonly context: TriageContext;
   readonly started: number;
 }

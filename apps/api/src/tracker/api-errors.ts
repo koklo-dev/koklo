@@ -29,6 +29,7 @@ type ConflictReason =
   | "suggestion_not_open"
   | "baseline_not_open"
   | "review_incomplete"
+  | "stack_missing"
   | "choices_open"
   | "threats_open"
   | "data_unclassified"

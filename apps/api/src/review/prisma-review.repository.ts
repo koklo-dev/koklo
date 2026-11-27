@@ -228,15 +228,20 @@ export class PrismaReviewRepository implements ReviewRepository {
     if (!isCahierComplete(progress, decision)) throw conflict("review_incomplete");
   }
 
-  /** Approuver le cahier technique exige tous les choix de la tête tranchés (B775) ; sinon rien n'est écrit. */
+  /**
+   * Approuver le cahier technique exige au moins un choix de stack (`stack_missing`, B851), puis tous les choix de la tête
+   * tranchés (`choices_open`, B775) ; sinon rien n'est écrit.
+   */
   private async assertChoicesClosed(
     tx: Tx,
     snapshotId: string,
     input: SubmitReview,
   ): Promise<void> {
     if (!requiresClosedChoices(input)) return;
+    const stacks = { snapshotId, kind: "stack" } as const;
+    if ((await tx.specEntity.count({ where: stacks })) === 0) throw conflict("stack_missing");
     const open = await tx.specEntity.count({
-      where: { snapshotId, kind: "stack", data: { path: ["statut"], equals: "a_trancher" } },
+      where: { ...stacks, data: { path: ["statut"], equals: "a_trancher" } },
     });
     if (open > 0) throw conflict("choices_open");
   }

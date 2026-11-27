@@ -8,6 +8,7 @@ import {
   unclassifiedFields,
 } from "@koklo/schema";
 import type { LaunchSources } from "./sources.ts";
+import { groupsOf, numberedSteps, spreadOf, stepRankOf } from "./technical-steps.ts";
 import { titleKey } from "./title-key.ts";
 import {
   ASVS_ZONE,
@@ -29,8 +30,8 @@ const MODE_KINDS: Readonly<Record<string, readonly AgentProposalKind[]>> = {
   asvs: ["asvs"],
   summary: ["summary"],
 };
+/** Types des étapes qui ne portent pas sur des menaces (surfaces et parades : « threat »). */
 const CLOSING_KINDS: Readonly<Record<string, AgentProposalKind>> = {
-  [OPEN_THREATS_ZONE]: "threat",
   [RIGHTS_ZONE]: "right",
   [DOSSIER_ZONE]: "doc_section",
 };
@@ -38,6 +39,9 @@ const CLOSING_KINDS: Readonly<Record<string, AgentProposalKind>> = {
 const SURFACE_STEPS_MAX = 8;
 const STEPS_MAX = 12;
 const ZONE_MAX = 120;
+/** Menaces ouvertes traitées par appel, et appels de parades au plus (B848). */
+const PARADES_GROUP = 10;
+const PARADES_STEPS_MAX = 2;
 
 export const securityKinds = (mode: string): readonly AgentProposalKind[] => MODE_KINDS[mode] ?? [];
 
@@ -46,18 +50,29 @@ export const securityKindsAt = (mode: string, zone: string): readonly AgentPropo
   mode === "threats" ? [CLOSING_KINDS[zone] ?? "threat"] : securityKinds(mode);
 
 /** Valeurs réparties en `max` groupes au plus, chacun nommé par ses valeurs (bornées). */
-function grouped(values: readonly string[], max: number): string[] {
-  const groups = Math.min(values.length, max);
-  const startOf = (i: number) => Math.floor((i * values.length) / groups);
-  return Array.from({ length: groups }, (_, i) =>
-    values
-      .slice(startOf(i), startOf(i + 1))
-      .join(" · ")
-      .slice(0, ZONE_MAX),
-  );
-}
+const grouped = (values: readonly string[], max: number): string[] =>
+  spreadOf(values, max).map((name) => name.slice(0, ZONE_MAX));
 
 type Current = NonNullable<LaunchSources["security"]>;
+
+const paradeGroups = (current: Current) =>
+  groupsOf(
+    current.threats.filter((threat) => threat.measures.length === 0),
+    PARADES_GROUP,
+    PARADES_STEPS_MAX,
+  );
+
+/** Aucune étape sans menace ouverte ; « Parades » seul, sinon « Parades 1/2 » et « Parades 2/2 ». */
+function paradeSteps(current: Current): string[] {
+  const total = paradeGroups(current).length;
+  return total === 0 ? [] : numberedSteps(OPEN_THREATS_ZONE, total);
+}
+
+/** Menaces ouvertes d'une étape de parades ; `undefined` pour toute autre étape (une surface est un `F-` ou « api »). */
+export function openThreatsOf(zone: string, current: Current) {
+  if (!zone.startsWith(OPEN_THREATS_ZONE)) return undefined;
+  return paradeGroups(current)[stepRankOf(zone)] ?? [];
+}
 const unclassifiedOf = (current: Current): string[] => {
   const donnees = current.entries.map((entry) => ({ champs: entry.fields }));
   return unclassifiedFields({ donnees }, current.tables);
@@ -79,13 +94,12 @@ function threatSteps(sources: LaunchSources, current: Current): string[] {
     sources.features.map((feature) => feature.specId),
   );
   const covered = new Set(current.threats.flatMap((threat) => threat.surfaces));
-  const open = current.threats.some((threat) => threat.measures.length === 0);
   return [
     ...grouped(
       exposed.filter((surface) => !covered.has(surface)),
       SURFACE_STEPS_MAX,
     ),
-    ...(open ? [OPEN_THREATS_ZONE] : []),
+    ...paradeSteps(current),
     RIGHTS_ZONE,
     ...(missingSections(sources) ? [DOSSIER_ZONE] : []),
   ];

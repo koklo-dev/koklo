@@ -19,7 +19,12 @@ import {
   withoutOwnedTables,
 } from "./triage-architecture.ts";
 import { type SecurityRefs, securityVerdict } from "./triage-security.ts";
-import { type TechnicalRefs, technicalVerdict } from "./triage-technical.ts";
+import {
+  isStackTaken,
+  type TechnicalRefs,
+  technicalVerdict,
+  withCappedLinks,
+} from "./triage-technical.ts";
 
 const TITLE_MAX = 200;
 const ZONE_MAX = 120;
@@ -173,7 +178,9 @@ function criteriaTarget(
 
 /** Écart d'une section dont l'identifiant existe déjà : compté à part (`existing_section`, TK-114e). */
 const EXISTING_SECTION = "existing_section";
-type Triaged = Candidate | typeof EXISTING_SECTION | undefined;
+/** Entrée inexploitable (schéma, texte, secret, référence inconnue d'un choix) : comptée à part (TK-115b, B847). */
+const INVALID = "invalid";
+type Triaged = Candidate | typeof EXISTING_SECTION | typeof INVALID | undefined;
 
 /** Une entrée lue : type demandé, justification en texte brut et contenu valide ; sans valeur de secret (B724). */
 function readEntry(entry: unknown, context: TriageContext) {
@@ -184,7 +191,9 @@ function readEntry(entry: unknown, context: TriageContext) {
   if (rationale.length > RATIONALE_MAX || !isSafeText(rationale, true)) return undefined;
   if (findSecretPaths([rationale, content]).length > 0) return undefined;
   const asKind = kind as AgentProposalKind;
-  const parsed = PROPOSAL_SCHEMAS[asKind].safeParse(content);
+  // Un rôle partagé par des dizaines de composants dépasse les 30 liens du contrat : coupés avant le schéma (B846).
+  const bounded = asKind === "stack" ? withCappedLinks(content) : content;
+  const parsed = PROPOSAL_SCHEMAS[asKind].safeParse(bounded);
   if (!parsed.success) return undefined;
   const payload = parsed.data as Record<string, unknown>;
   if (CODE_POSED_ID.has(asKind) && "specId" in payload) return undefined;
@@ -202,17 +211,24 @@ function referencedCandidate({ kind, rationale, payload }: Entry, context: Triag
     context.sec === undefined
       ? technicalVerdict(kind, payload, context.tech as TechnicalRefs)
       : securityVerdict(kind, payload, context.sec);
-  if (found === undefined || found === EXISTING_SECTION) return found;
+  if (typeof found !== "object") return found;
   const title = titleOf(kind, found.payload);
-  if (knownTitles(context, kind).has(titleKey(title))) return undefined;
+  if (isKnown(context, kind, title)) return undefined;
   remember(context, kind, title, found.payload);
   return { kind, title, rationale, payload: found.payload, zone: found.zone };
 }
 
-/** Une entrée de la sortie du modèle : `undefined` si elle doit être écartée (jamais publiée, comptée). */
+/** Titre déjà vu dans le lancement ; pour un choix, aussi un autre rôle qui mène au même identifiant `ST-`. */
+function isKnown(context: TriageContext, kind: AgentProposalKind, title: string): boolean {
+  const known = knownTitles(context, kind);
+  if (known.has(titleKey(title))) return true;
+  return kind === "stack" && context.tech !== undefined && isStackTaken(title, known, context.tech);
+}
+
+/** Une entrée de la sortie du modèle : `undefined` ou `invalid` si elle doit être écartée (jamais publiée, comptée). */
 function candidateOf(entry: unknown, context: TriageContext): Triaged {
   const read = readEntry(entry, context);
-  if (read === undefined) return undefined;
+  if (read === undefined) return INVALID;
   if (context.tech !== undefined || context.sec !== undefined) {
     return referencedCandidate(read, context);
   }
@@ -286,26 +302,28 @@ export function rememberPublished(
 
 /**
  * Trie la sortie d'une zone : chaque entrée est validée à part (schéma du type, texte brut, doublon, cible) ; une
- * entrée refusée est écartée et comptée, jamais publiée ; une section qui existe déjà l'est aussi dans `existingSections`. Au
- * plus 25 propositions par zone, l'excédent est écarté.
+ * entrée refusée est écartée et comptée, jamais publiée ; une section qui existe déjà l'est aussi dans `existingSections`,
+ * une entrée inexploitable dans `invalid`. Au plus 25 propositions par zone, l'excédent est écarté.
  * Seule une sortie qui n'a pas la forme `{ proposals: [...] }` lève.
  */
 export function triageProposals(
   raw: unknown,
   context: TriageContext,
-): { accepted: Candidate[]; discarded: number; existingSections: number } {
+): { accepted: Candidate[]; discarded: number; existingSections: number; invalid: number } {
   if (!isRecord(raw) || !Array.isArray(raw.proposals)) throw new OutputInvalidError();
   const accepted: Candidate[] = [];
   let discarded = 0;
   let existingSections = 0;
+  let invalid = 0;
   for (const entry of raw.proposals as unknown[]) {
     const candidate =
       accepted.length < AGENT_PROPOSE_LIMITS.perZone ? candidateOf(entry, context) : undefined;
     if (typeof candidate === "object") accepted.push(candidate);
     else discarded += 1;
     if (candidate === EXISTING_SECTION) existingSections += 1;
+    if (candidate === INVALID) invalid += 1;
   }
-  return { accepted, discarded, existingSections };
+  return { accepted, discarded, existingSections, invalid };
 }
 
 /** Titres de zones du modèle : texte brut d'une ligne, `maxLength` caractères au plus (120 ; 80 pour les Données), sans doublon, douze au plus. */

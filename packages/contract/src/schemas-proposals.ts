@@ -180,10 +180,17 @@ const launchCoverageSchema = z.strictObject({
   reprises: reprisesSchema.optional(),
 });
 
+/** Étape écartée nommée (TK-115b, contrat 3.20.0, B849) : le nom que le code a donné à l'étape et son motif fermé. */
+const discardedStepSchema = z.strictObject({
+  step: z.string().min(1).max(120),
+  reason: launchDiscardReasonSchema,
+});
+
 /**
- * Bilan d'un lancement de l'Architecture (TK-114b, contrat 3.12.0, B619-B620) : zones demandées, traitées et écartées,
- * motifs comptés, couverture avant et après, appels de couverture, motif d'arrêt. Que des nombres et des motifs fermés :
- * jamais de texte du fournisseur. Absent pour les autres livrables.
+ * Bilan d'un lancement (TK-114b, contrat 3.12.0, B619-B620) : zones demandées, traitées et écartées, motifs comptés,
+ * couverture avant et après (Architecture), appels de couverture, motif d'arrêt. Des nombres, des motifs fermés et le nom
+ * des étapes calculées par le code : jamais de texte du fournisseur. Rendu pour l'Architecture et, depuis la 3.20.0, pour
+ * le cahier technique et la Sécurité ; absent pour les autres livrables.
  */
 export const launchReportSchema = z.strictObject({
   zonesRequested: counter(12),
@@ -198,6 +205,8 @@ export const launchReportSchema = z.strictObject({
   stopReason: launchStopReasonSchema.optional(),
   /** Sections déjà présentes (tête ou lancement) écartées au triage (TK-114e, contrat 3.15.0, B670) ; absent si aucune. */
   sectionsExisting: z.number().int().min(1).optional(),
+  /** Cahier technique et Sécurité (3.20.0, B849) : étapes écartées ; absent si aucune ou pour un lancement antérieur. */
+  discardedSteps: z.array(discardedStepSchema).max(12).optional(),
 });
 
 export const proposalLaunchSchema = z.object({
