@@ -1,8 +1,15 @@
 "use client";
 
 import { STACK_PAGE_SIZE } from "@koklo/contract";
-import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { orpc } from "./orpc.ts";
+import { CURSOR_PAGES, cursorOf, pagedListOf } from "./use-technical-data.ts";
+
+/** `id` côté client : les cartes, les lignes et les fiches lisent `specId`, sans chemin de fichier. */
+export const asSpecItem = <T extends { id: string }>({ id, ...rest }: T) => ({
+  ...rest,
+  specId: id,
+});
 
 /** Cahier technique validé vu du client (`clientSpace.technical*`) : rien tant qu'il n'est pas validé. */
 export function useClientTechnical(projectId: string) {
@@ -16,27 +23,18 @@ export function useClientStack(projectId: string, around: string | undefined, en
       input: (cursor: string | undefined) => ({
         projectId,
         limit: STACK_PAGE_SIZE,
-        ...(cursor ? { cursor } : around ? { around } : {}),
+        ...cursorOf(cursor, around),
       }),
-      initialPageParam: undefined,
-      getNextPageParam: (page) => page.nextCursor ?? undefined,
-      getPreviousPageParam: (page) => page.previousCursor ?? undefined,
-      placeholderData: keepPreviousData,
+      ...CURSOR_PAGES,
     }),
     enabled,
   });
-  const pages = query.data?.pages ?? [];
-  const stale = query.isPlaceholderData;
+  const list = pagedListOf(query);
   return {
-    query,
-    // `id` côté client : la fiche et les cartes lisent `specId`, sans chemin de fichier.
-    items: pages.flatMap((page) => page.items).map(({ id, ...rest }) => ({ ...rest, specId: id })),
-    total: pages.at(-1)?.total ?? 0,
-    layers: (pages.at(-1)?.facets?.layer ?? {}) as Record<string, number>,
-    open: pages.at(-1)?.facets?.status?.open ?? 0,
-    stale,
-    hasNext: Boolean(query.hasNextPage) && !stale,
-    hasPrevious: Boolean(query.hasPreviousPage) && !stale,
+    ...list,
+    items: list.items.map(asSpecItem),
+    layers: list.facet("layer"),
+    open: list.facet("status").open ?? 0,
   };
 }
 

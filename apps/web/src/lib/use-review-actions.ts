@@ -16,7 +16,11 @@ export interface Decision {
 
 /** Phrase de l'échec d'une décision ; jamais le code technique ni le texte du serveur (B353). */
 export function decisionErrorText(error: unknown): string {
-  if (conflictReason(error) === "review_incomplete") return "Il reste des éléments à traiter";
+  const reason = conflictReason(error);
+  if (reason === "review_incomplete") return "Il reste des éléments à traiter";
+  if (reason === "choices_open") {
+    return "Un choix technique reste à trancher : tranchez-le avant de valider le cahier.";
+  }
   switch (errorCode(error)) {
     case "STALE_VERSION":
       return "Le cahier a changé depuis votre lecture. Rechargez la page pour relire la version à jour.";

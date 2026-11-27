@@ -182,3 +182,23 @@ describe("SegmentedControl, mode radio", () => {
     expect(screen.getAllByRole("radio", { checked: true })).toHaveLength(1);
   });
 });
+
+describe("FilterChip de zone (TK-116, DESIGN.md §5.27, maquette 14 l.619)", () => {
+  it("28 de haut, 12/500 : active en contour primaire, inactive en texte muet", () => {
+    render(
+      <>
+        <FilterChip variant="zone" pressed>
+          Toutes · 10
+        </FilterChip>
+        <FilterChip variant="zone" pressed={false}>
+          Personnel · 1
+        </FilterChip>
+      </>,
+    );
+    const on = screen.getByRole("button", { name: "Toutes · 10" });
+    expect(on).toHaveAttribute("aria-pressed", "true");
+    expect(on).toHaveClass("h-7", "px-2.5", "border-primary", "bg-secondary");
+    const off = screen.getByRole("button", { name: "Personnel · 1" });
+    expect(off).toHaveClass("px-2.5", "text-muted-foreground");
+  });
+});

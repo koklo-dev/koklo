@@ -1,8 +1,14 @@
 import type { IncomingMessage } from "node:http";
+import {
+  apiItemRead,
+  clientApiRead,
+  teamApiRead,
+  technicalApiCounts,
+} from "./stub-spec-technical-api.ts";
 
 /**
- * Faux API de la page Technique (TK-115, contrat 3.17.0) : `spec.technical.*`, `spec.document.sections`,
- * `spec.item.get` (`stack`, `environment`), `clientSpace.technical*`, commentaires et lot de « Choisir ». Les données
+ * Faux API de la page Technique (TK-115, TK-116, contrat 3.18.0) : `spec.technical.*`, `spec.document.sections`,
+ * `spec.item.get`, `clientSpace.technical*`, commentaires, lot de « Choisir » et décision `review.submit|list`. Les données
  * sont celles de la maquette 14 (volume réel : 24 choix dont 2 à trancher). Scénario `technical` : « empty » (état
  * Prêt), « demo », « revise » (à revoir), « validated » (validé), « notValidated » (vue client avant validation).
  */
@@ -150,16 +156,22 @@ const base = (): Choice[] =>
 /** Choix retenus par « Choisir » depuis le dernier changement de scénario. */
 let chosen = new Map<string, string>();
 const comments: unknown[] = [];
+/** « Valider » accepté depuis le dernier changement de scénario. */
+let approved = false;
+const isValidated = (mode: TechnicalMode): boolean => mode === "validated" || approved;
 export function resetTechnical(): void {
   chosen = new Map();
   comments.length = 0;
+  approved = false;
 }
 
 const choicesOf = (mode: TechnicalMode): Choice[] => {
   if (mode === "empty") return [];
   return base()
     .map((choice) => {
-      const option = chosen.get(choice.specId);
+      // Un cahier validé n'a plus de choix à trancher (B775).
+      const settled = mode === "validated" ? (choice.recommended ?? choice.options[0]) : undefined;
+      const option = chosen.get(choice.specId) ?? (choice.status === "open" ? settled : undefined);
       return option ? { ...choice, status: "chosen" as const, choice: option } : choice;
     })
     .sort(
@@ -291,17 +303,22 @@ export const technicalCounts = (mode: TechnicalMode | undefined) =>
     ? {}
     : mode === "empty"
       ? { endpoints: 0, stack: 0, nfr: 0, environments: 0, components: 8 }
-      : { endpoints: 132, stack: ROWS.length, nfr: 28, environments: 3, components: 8 };
+      : {
+          // La tête compte aussi les anciens points REST : l'écran lit le total de la liste (B772).
+          endpoints: technicalApiCounts.operations + 4,
+          stack: ROWS.length,
+          nfr: technicalApiCounts.requirements,
+          environments: 3,
+          components: 8,
+        };
 
 export function technicalDeliverable(mode: TechnicalMode | undefined) {
   if (mode === undefined) return undefined;
-  const status = {
-    empty: "todo",
-    demo: "pending",
-    revise: "revise",
-    validated: "validated",
-    notValidated: "pending",
-  }[mode];
+  const status = isValidated(mode)
+    ? "validated"
+    : { empty: "todo", demo: "pending", revise: "revise", notValidated: "pending" }[
+        mode as Exclude<TechnicalMode, "validated">
+      ];
   const staleTechnical = {
     changes: [
       { id: "C-avis", change: "added" },
@@ -348,6 +365,7 @@ const yamlOf = (choice: Choice): string =>
   ].join("\n");
 
 function itemOf(mode: TechnicalMode, type: string, id: string): Reply | undefined {
+  if (type === "operation" || type === "nfr") return apiItemRead(type, id, isValidated(mode));
   const found =
     type === "stack"
       ? choicesOf(mode).find((choice) => choice.specId === id)
@@ -364,11 +382,14 @@ function itemOf(mode: TechnicalMode, type: string, id: string): Reply | undefine
 }
 
 function clientRead(url: URL, mode: TechnicalMode, route: string): Reply {
-  const available = mode === "validated";
+  const available = isValidated(mode);
   const state = { available, validation: available ? "validated" : "to_validate" };
+  if (route.startsWith("operations") || route === "nfr") {
+    return clientApiRead(url, route, available);
+  }
   if (route === "") {
     const counts = available
-      ? { choices: ROWS.length, operations: 132, requirements: 28, environments: 3 }
+      ? { choices: ROWS.length, ...technicalApiCounts, environments: 3 }
       : { choices: 0, operations: 0, requirements: 0, environments: 0 };
     return reply(200, { ...state, counts });
   }
@@ -389,15 +410,19 @@ function clientRead(url: URL, mode: TechnicalMode, route: string): Reply {
   return reply(200, { ...state, sections });
 }
 
-const CLIENT = /^\/client-space\/projects\/[^/]+\/technical(?:\/(stack|environments|document))?$/;
+const CLIENT =
+  /^\/client-space\/projects\/[^/]+\/technical(?:\/(stack|environments|document|nfr|operations(?:\/[^/]+)?))?$/;
 const READ =
   /^\/projects\/[^/]+\/spec\/(technical\/stack|technical\/environments|document\/sections)$/;
 const SOURCE = /^\/projects\/[^/]+\/spec\/technical\/stack\/([^/]+)\/source$/;
 const CHOOSE = /^\/projects\/[^/]+\/spec\/technical\/stack\/([^/]+)\/choose$/;
-const ITEM = /^\/projects\/[^/]+\/spec\/items\/(stack|environment)\/([^/]+)$/;
+const ITEM = /^\/projects\/[^/]+\/spec\/items\/(stack|environment|operation|nfr)\/([^/]+)$/;
 const COMMENTS = /^\/projects\/[^/]+\/comments$/;
+const REVIEWS = /^\/projects\/[^/]+\/reviews$/;
 
 function readOf(url: URL, mode: TechnicalMode): Reply | undefined {
+  const api = teamApiRead(url, mode === "empty");
+  if (api) return api;
   const client = CLIENT.exec(url.pathname);
   if (client) return clientRead(url, mode, client[1] ?? "");
   const item = ITEM.exec(url.pathname);
@@ -473,6 +498,54 @@ function comment(req: IncomingMessage, send: (reply: Reply) => void): boolean {
   return true;
 }
 
+const REVIEW_ID = "0190cccc-0000-7000-8000-000000000116";
+
+/** Décision du livrable : refusée tant qu'un choix reste à trancher (B775), puis le cahier est « Validé ». */
+function review(req: IncomingMessage, mode: TechnicalMode, send: (reply: Reply) => void): boolean {
+  if (req.method === "GET") {
+    const decision = {
+      id: REVIEW_ID,
+      targetKind: "deliverable",
+      targetRef: "technical",
+      sha: SHA,
+      status: "approved",
+      authorId: REVIEW_ID,
+      authorRole: "owner",
+      authorName: "Moussa",
+      comment: null,
+      createdAt: "2026-11-05T10:00:00.000Z",
+      current: true,
+      onBehalf: false,
+    };
+    send(reply(200, { items: isValidated(mode) ? [decision] : [], nextCursor: null }));
+    return true;
+  }
+  void body(req).then(() => {
+    if (choicesOf(mode).some((choice) => choice.status === "open")) {
+      send(
+        reply(409, {
+          defined: true,
+          code: "CONFLICT",
+          status: 409,
+          message: "Conflict",
+          data: { reason: "choices_open" },
+        }),
+      );
+      return;
+    }
+    approved = true;
+    send(
+      reply(200, {
+        id: REVIEW_ID,
+        status: "approved",
+        validation: "validated",
+        createdAt: "2026-11-05T10:00:00.000Z",
+      }),
+    );
+  });
+  return true;
+}
+
 /** Répond aux routes de la page Technique ; `false` quand le scénario ne la pilote pas ou pour toute autre route. */
 export function handleSpecTechnical(
   req: IncomingMessage,
@@ -486,6 +559,7 @@ export function handleSpecTechnical(
     return true;
   }
   if (COMMENTS.test(url.pathname)) return comment(req, h.send);
+  if (REVIEWS.test(url.pathname)) return review(req, mode, h.send);
   const chooseId = CHOOSE.exec(url.pathname)?.[1];
   if (req.method === "POST" && chooseId) {
     choose(req, chooseId, h.send);

@@ -17,7 +17,9 @@ export type EntityKind =
   | "nfr"
   | "component"
   | "decision"
-  | "flow";
+  | "flow"
+  | "permission"
+  | "limit";
 
 /** Icône (DESIGN.md v2 §4) et type lu par les lecteurs d'écran (questions.md B32). */
 const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
@@ -33,6 +35,8 @@ const KIND: Record<EntityKind, { icon: IconName; type: string }> = {
   component: { icon: "widgets", type: "Composant" },
   decision: { icon: "gavel", type: "Décision d'architecture" },
   flow: { icon: "route", type: "Flux" },
+  permission: { icon: "person", type: "Rôle autorisé" },
+  limit: { icon: "speed", type: "Limite de débit" },
 };
 
 export interface EntityPreview {
@@ -43,8 +47,11 @@ export interface EntityPreview {
 export interface EntityChipProps
   extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "children" | "title"> {
   kind: EntityKind;
+  /** Vide : la pastille ne porte que son libellé (appelants suivants d'une opération). */
   id: string;
   title?: string;
+  /** Icône qui remplace celle du type (règle d'une opération : « rule », DESIGN.md §5.27). */
+  icon?: IconName;
   /**
    * Un vrai lien : l'aperçu n'est jamais le seul accès à l'information. Sans `href` (cible sans page, comme les liens
    * d'une fiche vers des tables ou des exigences), la pastille n'est qu'une étiquette, ni lien ni focusable.
@@ -70,6 +77,7 @@ export function EntityChip({
   title,
   href,
   preview,
+  icon: replaced,
   className,
   ...props
 }: EntityChipProps) {
@@ -87,14 +95,16 @@ export function EntityChip({
       )}
       {...props}
     >
-      <Icon name={icon} size={16} />
+      <Icon name={replaced ?? icon} size={16} />
       {/* Espaces explicites : le nom accessible se lit « Fonctionnalité F-001 Connexion ». */}
       {type ? <span className="sr-only">{type}</span> : null}{" "}
       {/* Le libellé passe à la ligne ; un identifiant plus large que la pastille est tronqué. */}
       <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
-        <span title={id} className="min-w-0 max-w-full truncate font-mono text-code">
-          {id}
-        </span>
+        {id ? (
+          <span title={id} className="min-w-0 max-w-full truncate font-mono text-code">
+            {id}
+          </span>
+        ) : null}
         {title ? (
           <>
             {" "}

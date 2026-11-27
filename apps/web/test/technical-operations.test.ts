@@ -4,6 +4,16 @@ import { refOf, subtitleOf } from "../src/lib/proposal-labels.ts";
 import { planBatches } from "../src/lib/proposal-operations.ts";
 import { asTechnical } from "../src/lib/proposal-technical.ts";
 import {
+  EMPTY_NFR,
+  EMPTY_OPERATION,
+  nfrIssues,
+  nfrOperationOf,
+  nfrValuesOf,
+  operationIssues,
+  operationOperationOf,
+  operationValuesOf,
+} from "../src/lib/technical-api-forms.ts";
+import {
   EMPTY_ENVIRONMENT,
   EMPTY_STACK,
   environmentIssues,
@@ -253,5 +263,165 @@ describe("propositions du cahier technique", () => {
   it("asTechnical ne marque que les sections du document", () => {
     const stack = fake(6, { kind: "stack", content: { role: "API" } });
     expect(asTechnical(stack)).toBe(stack);
+  });
+});
+
+const OPERATION_VALUES = {
+  ...EMPTY_OPERATION,
+  name: "waitlist.join",
+  type: "write" as const,
+  zone: "Prise de rendez-vous",
+  summary: " Inscrit un client. ",
+  permission: "public",
+  input: "serviceId · uuid · service actif\n\nnom · texte(100)",
+  output: "position · entier",
+  errors: "DEJA_INSCRIT · même téléphone · —\nCRENEAU_PRIS · pris · R-001",
+  links: ["F-249", "R-001"],
+};
+
+const DETAIL = {
+  specId: "reservation.cancel",
+  type: "write" as const,
+  zone: "Prise de rendez-vous",
+  component: "C-api",
+  summary: "Annule.",
+  permission: "PM-reservation.modifier",
+  input: [{ field: "jeton", type: "texte(64)", constraint: "Lien\nd'annulation" }],
+  output: [],
+  errors: [{ code: "DELAI_DEPASSE", when: "moins de 2 h" }],
+  rules: ["R-002"],
+  features: ["F-002"],
+  rateLimit: "20 par minute",
+  callers: [],
+  filePath: "api/endpoints/reservation.cancel.yaml",
+  commitSha: "a".repeat(40),
+};
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
+describe("feuille « Opération » (TK-116)", () => {
+  it("op.create sans composant : lignes lues, liens séparés en règles et fonctionnalités", () => {
+    const operation = operationOperationOf(OPERATION_VALUES);
+    expect(valid(operation)).toBe(true);
+    expect(operation).toEqual({
+      kind: "op.create",
+      name: "waitlist.join",
+      type: "write",
+      zone: "Prise de rendez-vous",
+      summary: "Inscrit un client.",
+      permission: "public",
+      input: [
+        { field: "serviceId", type: "uuid", constraint: "service actif" },
+        { field: "nom", type: "texte(100)" },
+      ],
+      output: [{ field: "position", type: "entier" }],
+      errors: [
+        { code: "DEJA_INSCRIT", when: "même téléphone" },
+        { code: "CRENEAU_PRIS", when: "pris", rule: "R-001" },
+      ],
+      rules: ["R-001"],
+      features: ["F-249"],
+    });
+  });
+
+  it("champs obligatoires, nom et lignes fautives désignées par leur numéro", () => {
+    expect(operationIssues(EMPTY_OPERATION).map((issue) => issue.field)).toEqual([
+      "name",
+      "type",
+      "zone",
+      "summary",
+      "permission",
+      "input",
+      "output",
+    ]);
+    const bad = {
+      ...OPERATION_VALUES,
+      name: "sans point",
+      input: "ok · uuid\nnom",
+      output: "mauvais champ · uuid",
+      errors: "CODE · quand · F-001",
+    };
+    expect(operationIssues(bad).map((issue) => issue.message)).toEqual([
+      "Nom attendu : zone.verbe, ex. avis.create.",
+      "Ligne 2 : un nom de champ et un type sont attendus.",
+      "Ligne 1 : un nom de champ et un type sont attendus.",
+      "Ligne 1 : un code, un « quand » et, au besoin, une règle R-001 sont attendus.",
+    ]);
+  });
+
+  it("modification : seuls les champs changés ; sortie vide au départ non exigée", () => {
+    const baseline = operationValuesOf(DETAIL);
+    expect(baseline.input).toBe("jeton · texte(64) · Lien d'annulation");
+    expect(baseline.errors).toBe("DELAI_DEPASSE · moins de 2 h");
+    expect(baseline.links).toEqual(["R-002", "F-002"]);
+    expect(operationIssues(baseline, baseline)).toEqual([]);
+    const edit = { specId: "reservation.cancel", baseline };
+    expect(operationOperationOf(baseline, edit)).toBeNull();
+    const changed = { ...baseline, links: ["R-002"], summary: "Annule vite." };
+    expect(operationOperationOf(changed, edit)).toEqual({
+      kind: "op.update",
+      specId: "reservation.cancel",
+      summary: "Annule vite.",
+      features: [],
+    });
+  });
+
+  it("une limite de débit existante ne se vide pas depuis la feuille", () => {
+    const baseline = operationValuesOf(DETAIL);
+    expect(operationIssues({ ...baseline, rateLimit: "" }, baseline)).toEqual([
+      { field: "rateLimit", message: "La limite ne se retire pas d'ici : saisissez-en une." },
+    ]);
+  });
+});
+
+const NFR_VALUES = {
+  ...EMPTY_NFR,
+  category: "operations" as const,
+  title: " Ponctualité ",
+  target: "95 % avant 18 h 05",
+  statement: "Les rappels partent.",
+  verification: "ci_measure" as const,
+};
+
+describe("feuille « Exigence » (TK-116)", () => {
+  it("nfr.create : champs rognés, liens omis quand vides", () => {
+    const operation = nfrOperationOf(NFR_VALUES);
+    expect(valid(operation)).toBe(true);
+    expect(operation).toEqual({
+      ...NFR_VALUES,
+      title: "Ponctualité",
+      links: undefined,
+      kind: "nfr.create",
+    });
+  });
+
+  it("cinq champs obligatoires ; un lien hors vocabulaire est refusé", () => {
+    expect(nfrIssues(EMPTY_NFR)).toHaveLength(5);
+    expect(nfrIssues({ ...NFR_VALUES, links: ["F-001"] })[0]?.field).toBe("links");
+  });
+
+  it("modification : le détail de vérification du fichier n'est jamais envoyé", () => {
+    const baseline = nfrValuesOf({
+      specId: "NFR-001",
+      category: "data",
+      title: "Purge",
+      target: "3 ans",
+      statement: "Effacées.",
+      verification: "scenario",
+      verificationDetail: "TS-041",
+      links: ["C-api"],
+      filePath: "nfr/NFR-001.yaml",
+      commitSha: "a".repeat(40),
+    });
+    const edit = { specId: "NFR-001", baseline };
+    expect(nfrOperationOf({ ...baseline, target: "2 ans" }, edit)).toEqual({
+      kind: "nfr.update",
+      specId: "NFR-001",
+      target: "2 ans",
+    });
+    expect(nfrOperationOf({ ...baseline, links: [] }, edit)).toEqual({
+      kind: "nfr.update",
+      specId: "NFR-001",
+      links: [],
+    });
   });
 });

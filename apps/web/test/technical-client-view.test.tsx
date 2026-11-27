@@ -129,4 +129,52 @@ describe("Page Technique : vue client", () => {
     expect(screen.queryByRole("button", { name: "Commenter" })).toBeNull();
     expect(screen.queryByRole("complementary")).toBeNull();
   });
+
+  it("API : liste et fiche sans « Modifier », sans trois vues ; « Commenter » l'opération", async () => {
+    serveClientTechnical("client");
+    renderTechnical({ search: "tab=api&op=reservation.cancel" });
+    const article = await screen.findByRole("article", { name: "Opération" });
+    expect(await within(article).findByRole("table", { name: "Entrée" })).toBeInTheDocument();
+    for (const name of [/YAML/, /Contrat généré/, /^Fiche$/, /^Modifier/, /Nouvelle/]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+    await userEvent.click(within(article).getByRole("button", { name: "Commenter" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Commenter l'opération « reservation.cancel »",
+    });
+    await userEvent.type(within(dialog).getByRole("textbox"), "Quel délai ?");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Envoyer" }));
+    await waitFor(() =>
+      expect(procedures.commentCreate.mock.calls[0]?.[0]).toMatchObject({
+        targetKind: "operation",
+        targetRef: "reservation.cancel",
+      }),
+    );
+    for (const procedure of [
+      procedures.specTechnicalOpsList,
+      procedures.specTechnicalOpsById,
+      procedures.specTechnicalOpsSource,
+      procedures.specTechnicalContract,
+    ]) {
+      expect(procedure).not.toHaveBeenCalled();
+    }
+  });
+
+  it("Exigences : cartes sans crayon ; « Commenter » les exigences", async () => {
+    serveClientTechnical("client");
+    renderTechnical({ search: "tab=nfr" });
+    await screen.findByRole("article", { name: /^NFR-003 / });
+    expect(screen.queryByRole("button", { name: /^Modifier/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Commenter" }));
+    const dialog = await screen.findByRole("dialog", { name: "Commenter les exigences" });
+    await userEvent.type(within(dialog).getByRole("textbox"), "Et la nuit ?");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Envoyer" }));
+    await waitFor(() =>
+      expect(procedures.commentCreate.mock.calls[0]?.[0]).toMatchObject({
+        targetKind: "requirements",
+        targetRef: "requirements",
+      }),
+    );
+    expect(procedures.specTechnicalNfrList).not.toHaveBeenCalled();
+  });
 });

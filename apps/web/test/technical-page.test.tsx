@@ -64,7 +64,7 @@ const proposals = () => [
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas, un test par comportement
 describe("Page Technique : liste de l'équipe", () => {
-  it("en-tête : titre, statut, résumé, agent et « Nouveau choix », jamais « Valider »", async () => {
+  it("en-tête : titre, statut, résumé, agent, « Nouveau choix » puis « Valider »", async () => {
     serveTechnical("owner");
     renderTechnical();
     await technicalHeading();
@@ -78,10 +78,10 @@ describe("Page Technique : liste de l'équipe", () => {
     ).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Proposer avec l'agent/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "Nouveau choix" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: /Valider/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Valider" })).toBeDisabled();
   });
 
-  it("onglets Stack, Environnements et Document seulement (ni API ni Exigences)", async () => {
+  it("onglets Stack, API, Exigences, Environnements et Document avec leurs comptes", async () => {
     serveTechnical("owner");
     renderTechnical();
     await technicalHeading();
@@ -90,7 +90,7 @@ describe("Page Technique : liste de l'équipe", () => {
         within(tabs())
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Stack3", "Environnements3", "Document"]),
+      ).toEqual(["Stack3", "API132", "Exigences28", "Environnements3", "Document"]),
     );
     expect(within(tabs()).getByRole("link", { name: /Stack/ })).toHaveAttribute(
       "aria-current",

@@ -13,6 +13,8 @@ export interface DomainAssist {
   hint: string;
   /** « Décrivez d'abord … en une phrase. » */
   missing: string;
+  /** Valeurs du formulaire quand la sortie de l'agent n'a pas leur forme (listes saisies en lignes). */
+  toValues?: (output: AiPrefillItemOutput) => Record<string, unknown>;
 }
 
 interface Args<V> {
@@ -28,9 +30,9 @@ const isEmpty = (value: unknown): boolean =>
   value === "" || (Array.isArray(value) && value.length === 0);
 
 /** Champs encore vides que l'agent peut remplir : la saisie de l'humain n'est jamais écrasée. */
-function patchOf<V>(values: V, output: AiPrefillItemOutput) {
+function patchOf<V>(values: V, proposed: Record<string, unknown>) {
   const current = values as Record<string, unknown>;
-  const entries = Object.entries(output.values).filter(
+  const entries = Object.entries(proposed).filter(
     ([key, value]) => value !== undefined && !isEmpty(value) && isEmpty(current[key]),
   );
   return { patch: Object.fromEntries(entries) as Partial<V>, keys: entries.map(([key]) => key) };
@@ -56,7 +58,7 @@ export function useDomainPrefill<V>({ projectId, assist, values, set, reset, ann
   const mutation = useMutation(orpc.ai.prefillItem.mutationOptions());
 
   const apply = (output: AiPrefillItemOutput): void => {
-    const { patch, keys } = patchOf(values, output);
+    const { patch, keys } = patchOf(values, assist?.toValues?.(output) ?? output.values);
     set(patch);
     setFilled(new Set(keys));
     announce("Formulaire prérempli par l'agent. Vérifiez chaque champ marqué.");
