@@ -187,6 +187,7 @@ describe("TK-89 migration idea : pages des projets existants", () => {
       "_technical_launch_modes",
       "_nfr_counter",
       "_comment_technical_targets",
+      "_comment_operation_targets",
     ]) {
       apply(db, dirs().find((dir) => dir.endsWith(suffix)) as string, "migration.sql");
     }

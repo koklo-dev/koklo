@@ -1,5 +1,18 @@
-import { ENVIRONMENT_DATA, ENVIRONMENT_DEPLOYMENTS, STACK_STATUSES } from "@koklo/contract";
-import { criteriaListSchema, featureProposalSchema, PATTERNS, safeText } from "@koklo/schema";
+import {
+  ENVIRONMENT_DATA,
+  ENVIRONMENT_DEPLOYMENTS,
+  NFR_CATEGORIES,
+  NFR_VERIFICATIONS,
+  OPERATION_TYPES,
+  STACK_STATUSES,
+} from "@koklo/contract";
+import {
+  criteriaListSchema,
+  featureProposalSchema,
+  OPERATION_FIELD_NAME,
+  PATTERNS,
+  safeText,
+} from "@koklo/schema";
 import { z } from "zod";
 
 export const DEFAULT_MAX_FEATURES = 8;
@@ -74,6 +87,8 @@ export const itemPrefillOutputSchema = z
   .strict();
 
 const line = (max: number) => safeText({ min: 1, max });
+const linkOf = (...patterns: RegExp[]) =>
+  z.string().regex(new RegExp(patterns.map((pattern) => pattern.source).join("|")));
 const lines = (max: number, count: number) => z.array(line(max)).max(count);
 
 /** Préremplissage de la feuille « Choix technique » (TK-115) : les critères sont des noms, sans valeur ni identifiant neuf. */
@@ -100,5 +115,63 @@ export const environmentPrefillOutputSchema = z
     data: z.enum(ENVIRONMENT_DATA).optional(),
     deployment: z.enum(ENVIRONMENT_DEPLOYMENTS).optional(),
     access: line(200).optional(),
+  })
+  .strict();
+
+/** Préremplissage de la feuille « Opération » (TK-116) : des règles et des fonctionnalités existantes en liens. */
+const operationField = z.string().max(80).regex(OPERATION_FIELD_NAME);
+export const operationPrefillOutputSchema = z
+  .object({
+    name: z.string().max(120).regex(PATTERNS.operation).optional(),
+    type: z.enum(OPERATION_TYPES).optional(),
+    zone: line(80).optional(),
+    summary: line(500).optional(),
+    permission: z
+      .string()
+      .regex(new RegExp(`^(public|internal)$|${PATTERNS.permission.source}`))
+      .optional(),
+    input: z
+      .array(
+        z
+          .object({ field: operationField, type: line(120), constraint: line(300).optional() })
+          .strict(),
+      )
+      .max(40)
+      .optional(),
+    output: z
+      .array(
+        z.object({ field: operationField, type: line(120), note: line(300).optional() }).strict(),
+      )
+      .max(40)
+      .optional(),
+    errors: z
+      .array(
+        z
+          .object({
+            code: line(80),
+            when: line(300),
+            rule: z.string().regex(PATTERNS.rule).optional(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
+    links: z.array(linkOf(PATTERNS.rule, PATTERNS.feature)).max(30).optional(),
+    rateLimit: line(200).optional(),
+  })
+  .strict();
+
+/** Préremplissage de la feuille « Exigence » (TK-116) : liens vers composants, choix, décisions et règles. */
+export const nfrPrefillOutputSchema = z
+  .object({
+    category: z.enum(NFR_CATEGORIES).optional(),
+    title: line(200).optional(),
+    target: line(120).optional(),
+    statement: safeText({ min: 1, max: 1000, multiline: true }).optional(),
+    verification: z.enum(NFR_VERIFICATIONS).optional(),
+    links: z
+      .array(linkOf(PATTERNS.component, PATTERNS.stack, PATTERNS.adr, PATTERNS.rule))
+      .max(30)
+      .optional(),
   })
   .strict();

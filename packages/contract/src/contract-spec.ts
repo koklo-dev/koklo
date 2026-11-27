@@ -98,9 +98,62 @@ import {
   technicalEnvironmentsInputSchema,
   technicalEnvironmentsSchema,
 } from "./schemas-spec-technical.ts";
+import {
+  nfrListInputSchema,
+  nfrSummarySchema,
+  operationByIdInputSchema,
+  operationDetailSchema,
+  operationListInputSchema,
+  operationOptionsInputSchema,
+  operationOptionsSchema,
+  operationSummarySchema,
+  technicalContractSchema,
+} from "./schemas-spec-technical-api.ts";
 
 /** Lecture depuis l'index en base (CDC §8.2) : ouverte à tous les rôles, 404 hors projet. */
 const readIndexErrors = { ...readOneErrors, ...validationError } as const;
+
+/** Lecture de l'équipe et du designer sur le cahier technique (403 client et business), depuis l'index seul. */
+const technicalRead = (path: `/${string}`) =>
+  route("GET", `/projects/{projectId}/spec/technical${path}`).errors({
+    ...writeOneErrors,
+    ...validationError,
+    ...specIndexFailedError,
+  });
+
+/**
+ * Onglets API et Exigences (TK-116, 3.18.0, B770 à B774) : opérations `zone.verbe` (pages de 50, `q`, `zone`, `around`),
+ * fiche, YAML, listes de la feuille, contrat généré et exigences.
+ */
+const technicalApi = {
+  ops: {
+    list: technicalRead("/operations")
+      .input(operationListInputSchema)
+      .output(listOf(operationSummarySchema)),
+    byId: technicalRead("/operations/{opId}")
+      .input(operationByIdInputSchema)
+      .output(operationDetailSchema),
+    /** `api/endpoints/<zone.verbe>.yaml` au commit lu, sinon YAML généré depuis l'index. */
+    source: route("GET", "/projects/{projectId}/spec/technical/operations/{opId}/source")
+      .errors({
+        ...writeOneErrors,
+        ...validationError,
+        ...specIndexFailedError,
+        ...providerErrors,
+      })
+      .input(operationByIdInputSchema)
+      .output(architectureSourceSchema),
+    options: technicalRead("/operation-options")
+      .input(operationOptionsInputSchema)
+      .output(operationOptionsSchema),
+  },
+  contract: technicalRead("/operations/{opId}/contract")
+    .input(operationByIdInputSchema)
+    .output(technicalContractSchema),
+  nfr: {
+    list: technicalRead("/nfr").input(nfrListInputSchema).output(listOf(nfrSummarySchema)),
+  },
+};
 
 const spec = {
   head: route("GET", "/projects/{projectId}/spec")
@@ -345,6 +398,7 @@ const spec = {
       .errors({ ...writeOneErrors, ...validationError, ...specIndexFailedError })
       .input(technicalEnvironmentsInputSchema)
       .output(technicalEnvironmentsSchema),
+    ...technicalApi,
   },
   /** Sections d'un document (`architecture` ou `technical`), lues en Git au commit indexé, jamais indexées (3.17.0). */
   document: {

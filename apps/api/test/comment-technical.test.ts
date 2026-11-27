@@ -5,11 +5,18 @@ import { installBench } from "./helpers/repo-scene.ts";
 import { createReviewScene, type ReviewScene } from "./helpers/reviews.ts";
 import { commitAtHead } from "./helpers/spec-architecture.ts";
 import { seedIndex } from "./helpers/spec-read.ts";
-import { environmentsEntity, stackEntity } from "./helpers/spec-technical.ts";
+import {
+  environmentsEntity,
+  nfrEntity,
+  operationEntity,
+  restEntity,
+  stackEntity,
+} from "./helpers/spec-technical.ts";
 
 /**
  * TK-115 lot B (B732) : commentaires sur un choix technique (`ST-`), sur le bloc des environnements et sur une section du
  * cahier technique (`DOC-`, lue en Git). Le client commente, le business non ; élément inconnu : 404, rien d'écrit.
+ * TK-116 (B777) : sur une opération (`operation`, son nom) et sur le bloc des exigences (`requirements`).
  */
 const bench = installBench({ beforeAll, afterAll, beforeEach });
 let scene: ReviewScene;
@@ -22,7 +29,13 @@ beforeEach(async () => {
   scene = await createReviewScene(bench());
   const { snapshotId } = await seedIndex(bench(), scene.p1, [], {
     commit: true,
-    entities: [stackEntity("ST-sms"), environmentsEntity()],
+    entities: [
+      stackEntity("ST-sms"),
+      environmentsEntity(),
+      operationEntity("reservation.create"),
+      restEntity("ancien.lire"),
+      nfrEntity("NFR-001"),
+    ],
   });
   await commitAtHead(bench(), scene.p1, snapshotId, [
     { path: "tech/cahier-technique/01-objet.md", content: "# Objet\n\nTexte.\n" },
@@ -34,6 +47,8 @@ describe.each([
   ["stack", "ST-sms", "ST-absent"],
   ["environments", "environments", null],
   ["tech_section", "DOC-objet", "DOC-contexte"],
+  ["operation", "reservation.create", "ancien.lire"],
+  ["requirements", "requirements", null],
 ] as const)("commentaire %s", (kind, ref, unknown) => {
   it("client : 200, ligne sur le projet ; l'équipe liste ; le client ne liste pas", async () => {
     const res = await client().create(kind, ref, "Une question.");
@@ -52,4 +67,11 @@ describe.each([
     if (unknown !== null) expect((await client().create(kind, unknown)).status).toBe(404);
     expect(await commentRows(bench().database, scene.p1.organizationId)).toHaveLength(0);
   });
+});
+
+it("sans aucune exigence à la tête, le bloc des exigences est introuvable : 404, rien d'écrit", async () => {
+  await seedIndex(bench(), scene.p1, [], { commit: true, entities: [stackEntity("ST-sms")] });
+  expect((await client().create("requirements", "requirements")).status).toBe(404);
+  expect((await client().create("operation", "reservation.create")).status).toBe(404);
+  expect(await commentRows(bench().database, scene.p1.organizationId)).toHaveLength(0);
 });

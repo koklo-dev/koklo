@@ -5,6 +5,7 @@ import {
   isDelegatedTarget,
   REMINDERS,
   type ReviewKind,
+  requiresClosedChoices,
 } from "./review-policy.ts";
 
 /**
@@ -92,5 +93,17 @@ describe("validation déléguée (onBehalf) et lecture du client", () => {
 describe("TK-104 (B352) : relancer le client", () => {
   it("owner et admin seulement, jamais le client, le business, le développeur, le designer ni un agent", () => {
     expect(ROLES.filter((role) => REMINDERS.includes(role))).toEqual(["owner", "admin"]);
+  });
+});
+
+describe("TK-116 (B775) : choix tranchés avant de valider", () => {
+  it.each([
+    ["deliverable", "technical", "approved", true],
+    ["deliverable", "technical", "changes_requested", false],
+    ["deliverable", "technical", "withdrawn", false],
+    ["deliverable", "architecture", "approved", false],
+    ["feature", "F-001", "approved", false],
+  ])("%s %s %s : %s", (targetKind, targetRef, status, expected) => {
+    expect(requiresClosedChoices({ targetKind, targetRef, status })).toBe(expected);
   });
 });

@@ -77,6 +77,23 @@ describe("spec.refs.search", () => {
     ]);
   });
 
+  it("genres stack et adr (TK-116) : les choix et les décisions sortent quand ils sont demandés", async () => {
+    const s = await readScene(bench());
+    const { snapshotId } = await seedIndex(bench(), s, [{ id: "F-001", titre: "Connexion" }]);
+    await insertItems(bench().database, s, snapshotId, [
+      {
+        kind: "stack" as "feature",
+        specId: "ST-api",
+        data: { titre: "API : oRPC" },
+        sort: 1,
+      },
+      { kind: "adr" as "feature", specId: "ADR-001", data: { titre: "Monolithe" }, sort: 1 },
+    ]);
+    const res = await search(s, "", ["stack", "adr"]);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.items.map((i: { kind: string }) => i.kind).sort()).toEqual(["adr", "stack"]);
+  });
+
   it("snapshot non indexé en entités (entities_indexed_at nul) : liste vide, pas une erreur", async () => {
     const { s } = await volumeScene(false);
     const res = await search(s, "F-987");

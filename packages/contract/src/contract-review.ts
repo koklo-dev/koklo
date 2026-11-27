@@ -14,7 +14,8 @@ const COLLECTION = "/projects/{projectId}/reviews";
 const submitErrors = {
   ...writeOneErrors,
   ...validationError,
-  ...conflictOf("baseline_not_open", "review_incomplete"),
+  /** `choices_open` (3.18.0, B775) : un choix technique de la tête reste à trancher. */
+  ...conflictOf("baseline_not_open", "review_incomplete", "choices_open"),
   ...staleVersionError,
   ...spaceNotReadyError,
 } as const;

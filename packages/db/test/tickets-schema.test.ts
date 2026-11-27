@@ -156,6 +156,8 @@ describe("TK-28 C7 parité des valeurs fermées avec @koklo/domain", () => {
         "stack",
         "environments",
         "tech_section",
+        "operation",
+        "requirements",
       ],
     ],
     ["ticket_comments", "author_kind", ["human", "agent", "client", "system"]],

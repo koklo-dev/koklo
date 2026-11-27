@@ -12,6 +12,8 @@ import {
   itemPrefillInputSchema,
   itemPrefillOutputSchema,
   jsonSchemaOf,
+  nfrPrefillOutputSchema,
+  operationPrefillOutputSchema,
   stackPrefillOutputSchema,
 } from "./ai-schemas.ts";
 
@@ -20,6 +22,8 @@ const SHEETS = {
   feature: { schema: itemPrefillOutputSchema, deliverable: "functional" },
   stack: { schema: stackPrefillOutputSchema, deliverable: "technical" },
   environment: { schema: environmentPrefillOutputSchema, deliverable: "technical" },
+  operation: { schema: operationPrefillOutputSchema, deliverable: "technical" },
+  nfr: { schema: nfrPrefillOutputSchema, deliverable: "technical" },
 } as const;
 
 /** Un champ qui porte une valeur de secret est retiré (TK-115, B724) ; les autres restent. */
@@ -30,7 +34,7 @@ function withoutSecrets(values: Record<string, unknown>): Record<string, unknown
 }
 
 /**
- * Préremplissage du panneau d'édition (TK-101, B329 d ; choix technique et environnement, TK-115). Un appel synchrone par
+ * Préremplissage du panneau d'édition (TK-101, B329 d ; cahier technique, TK-115 et TK-116). Un appel synchrone par
  * le moteur partagé (refus, quota et audit comme les autres `ai.*`) ; la phrase entre comme donnée non fiable, la sortie
  * est du texte brut validé, sans valeur de secret. RIEN n'est écrit : ni lot, ni proposition, ni lancement. Le formulaire
  * garde la main sur ce qu'il accepte.

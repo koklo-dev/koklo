@@ -42,6 +42,12 @@ import {
   clientSpaceTechnicalDocumentOutputSchema,
   clientSpaceTechnicalEnvironmentsOutputSchema,
   clientSpaceTechnicalInputSchema,
+  clientSpaceTechnicalNfrInputSchema,
+  clientSpaceTechnicalNfrOutputSchema,
+  clientSpaceTechnicalOpInputSchema,
+  clientSpaceTechnicalOpOutputSchema,
+  clientSpaceTechnicalOpsInputSchema,
+  clientSpaceTechnicalOpsOutputSchema,
   clientSpaceTechnicalOutputSchema,
   clientSpaceTechnicalStackInputSchema,
   clientSpaceTechnicalStackOutputSchema,
@@ -154,4 +160,17 @@ export const clientSpace = {
     .errors(spaceReadErrors)
     .input(clientSpaceTechnicalInputSchema)
     .output(clientSpaceTechnicalDocumentOutputSchema),
+  /** API et Exigences validées (TK-116, 3.18.0) : mêmes règles ; jamais de contrat généré. */
+  technicalOps: route("GET", "/client-space/projects/{projectId}/technical/operations")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalOpsInputSchema)
+    .output(clientSpaceTechnicalOpsOutputSchema),
+  technicalOp: route("GET", "/client-space/projects/{projectId}/technical/operations/{opId}")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalOpInputSchema)
+    .output(clientSpaceTechnicalOpOutputSchema),
+  technicalNfr: route("GET", "/client-space/projects/{projectId}/technical/nfr")
+    .errors(spaceReadErrors)
+    .input(clientSpaceTechnicalNfrInputSchema)
+    .output(clientSpaceTechnicalNfrOutputSchema),
 };

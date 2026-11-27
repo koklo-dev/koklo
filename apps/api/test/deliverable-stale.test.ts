@@ -149,6 +149,15 @@ describe("cas limites de l'impact amont", () => {
   });
 });
 
+/** Choix tranché : un cahier dont un choix reste ouvert ne se valide pas (TK-116, B775). */
+const TRANCHE = {
+  statut: "choisi",
+  choix: "Brevo",
+  composants: ["C-sms"],
+  decisions: ["ADR-006"],
+  exigences: [],
+};
+
 /**
  * TK-115 (cas 10, B735) : le cahier technique validé passe « À revoir » quand un composant est ajouté ou une décision
  * acceptée depuis sa dernière décision ; sans décision, aucun impact.
@@ -157,14 +166,14 @@ describe("impact de l'architecture sur le cahier technique", () => {
   const before = () => [
     componentEntity("C-api"),
     entity("adr", "ADR-006", "proposee", { statut: "proposee", titre: "SMS" }),
-    stackEntity("ST-sms", { composants: ["C-sms"], decisions: ["ADR-006"], exigences: [] }),
+    stackEntity("ST-sms", TRANCHE),
     nfrEntity("NFR-004", { liens: ["C-api"] }),
   ];
   const after = () => [
     componentEntity("C-api"),
     componentEntity("C-avis"),
     entity("adr", "ADR-006", "acceptee", { statut: "acceptee", titre: "SMS" }),
-    stackEntity("ST-sms", { composants: ["C-sms"], decisions: ["ADR-006"], exigences: [] }),
+    stackEntity("ST-sms", TRANCHE),
     nfrEntity("NFR-004", { liens: ["C-api"] }),
     operationEntity("avis.create", { composant: "C-avis" }),
   ];

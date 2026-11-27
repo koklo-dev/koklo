@@ -168,3 +168,55 @@ describe("ai.prefillItem", () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+describe("ai.prefillItem : opération et exigence (TK-116)", () => {
+  const SHEETS = {
+    operation: {
+      name: "reservation.create",
+      type: "write",
+      zone: "Réservation",
+      summary: "Crée une réservation.",
+      permission: "PM-reservation.creer",
+      input: [{ field: "serviceId", type: "uuid", constraint: "Service actif" }],
+      output: [{ field: "ok", type: "booléen" }],
+      errors: [{ code: "CRENEAU_PRIS", when: "créneau pris", rule: "R-001" }],
+      links: ["R-001", "F-001"],
+      rateLimit: "20 par minute",
+    },
+    nfr: {
+      category: "performance",
+      title: "Temps de réponse",
+      target: "p95 < 300 ms",
+      statement: "Les appels répondent vite.",
+      verification: "ci_measure",
+      links: ["C-api", "ST-api", "ADR-001", "R-001"],
+    },
+  } as const;
+
+  it.each(["operation", "nfr"] as const)(
+    "%s : les champs de la feuille, quota et audit, rien d'écrit ; designer 403",
+    async (type) => {
+      const b = bench();
+      const { world } = await keyedWorld(b);
+      const fake = FakeLlm.replying(SHEETS[type]);
+      b.use(fake);
+      const res = await prefill(b, world.actors.dev.cookie, world.projectId, { type });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.body).toEqual({ type, values: SHEETS[type] });
+      expect(await countsOf(b, world.projectId)).toEqual([0, 0, 0]);
+      const denied = await prefill(b, world.actors.designer.cookie, world.projectId, { type });
+      expect(denied.status).toBe(403);
+      expect(fake.calls).toHaveLength(1);
+    },
+  );
+
+  it("un champ qui porte une valeur de secret est retiré, les autres restent", async () => {
+    const b = bench();
+    const { world } = await keyedWorld(b);
+    const secret = ["sk", "live", "x".repeat(24)].join("_");
+    b.use(FakeLlm.replying({ title: "Titre", statement: `Clé ${secret}` }));
+    const res = await prefill(b, world.actors.dev.cookie, world.projectId, { type: "nfr" });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.values).toEqual({ title: "Titre" });
+  });
+});

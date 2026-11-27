@@ -72,8 +72,8 @@ export const environmentDeploymentSchema = z.enum(ENVIRONMENT_DEPLOYMENTS);
 export const integrationStatusSchema = z.enum(INTEGRATION_STATUSES);
 
 const text = (max: number) => z.string().min(1).max(max);
-const ruleLink = z.string().regex(/^R-\d{3,}$/);
-const featureLink = z.string().regex(/^F-\d{3,}$/);
+export const technicalRuleLink = z.string().regex(/^R-\d{3,}$/);
+export const technicalFeatureLink = z.string().regex(/^F-\d{3,}$/);
 
 // --- Écriture ---
 const atLeastOne =
@@ -138,16 +138,21 @@ const operationFields = {
   output: z
     .array(z.object({ field: operationFieldName, type: text(120), note: text(300).optional() }))
     .max(40),
-  errors: z.array(z.object({ code: text(80), when: text(300), rule: ruleLink.optional() })).max(20),
-  rules: z.array(ruleLink).max(30),
-  features: z.array(featureLink).max(30),
+  errors: z
+    .array(z.object({ code: text(80), when: text(300), rule: technicalRuleLink.optional() }))
+    .max(20),
+  rules: z.array(technicalRuleLink).max(30),
+  features: z.array(technicalFeatureLink).max(30),
   rateLimit: text(200),
 };
-/** Le nom `<zone>.<verbe>` est l'identifiant : il ne se modifie pas. */
+/**
+ * Le nom `<zone>.<verbe>` est l'identifiant : il ne se modifie pas. Sans `component` (3.18.0, B769), le worker le déduit
+ * de la zone.
+ */
 export const operationCreateSchema = z
   .object(operationFields)
   .partial()
-  .required({ type: true, zone: true, component: true, summary: true, permission: true })
+  .required({ type: true, zone: true, summary: true, permission: true })
   .extend({ kind: z.literal("op.create"), name: operationNameSchema });
 export const operationUpdateSchema = z
   .object(operationFields)
@@ -159,7 +164,7 @@ export const operationDeleteSchema = z.object({
   specId: operationNameSchema,
 });
 
-const nfrLinkSchema = z
+export const nfrLinkSchema = z
   .string()
   .regex(new RegExp(`^(C-${slug}|ST-${slug}|ADR-\\d{3,}|R-\\d{3,})$`));
 const nfrFields = {
@@ -248,11 +253,15 @@ export const TECHNICAL_OPERATION_KINDS = [
 ] as const;
 
 // --- Lecture : index d'entités ; seul `stack.source` rend le YAML, à l'équipe et au designer ---
-const commitShaSchema = z.string().regex(/^[0-9a-f]{40}$/);
-const revision = { branch: z.string().min(1).optional(), commitSha: commitShaSchema.optional() };
-const exclusiveRevision = (value: { branch?: string; commitSha?: string }) =>
+export const technicalCommitSha = z.string().regex(/^[0-9a-f]{40}$/);
+/** Révision lue par les lectures `spec.technical.*` : `branch` et `commitSha` sont exclusifs. */
+export const technicalRevisionShape = {
+  branch: z.string().min(1).optional(),
+  commitSha: technicalCommitSha.optional(),
+};
+export const isExclusiveRevision = (value: { branch?: string; commitSha?: string }) =>
   value.branch === undefined || value.commitSha === undefined;
-const REVISION_MESSAGE = "branch et commitSha sont exclusifs";
+export const TECHNICAL_REVISION_MESSAGE = "branch et commitSha sont exclusifs";
 
 const stackShape = {
   specId: stackIdSchema,
@@ -274,13 +283,13 @@ const stackShape = {
   decisions: z.array(adrIdSchema),
 };
 export const stackSummarySchema = z.object({ ...stackShape, filePath: z.string() });
-export const stackDetailSchema = stackSummarySchema.extend({ commitSha: commitShaSchema });
+export const stackDetailSchema = stackSummarySchema.extend({ commitSha: technicalCommitSha });
 
 /** Pages de 24 (la grille), tri couche puis identifiant ; `q` sur toute la tête, `around` amène un choix (`?sel=ST-…`). */
 export const STACK_PAGE_SIZE = 24;
 export const stackListInputSchema = z
-  .object({ projectId: z.uuid(), ...revision, ...listInputShape(stackIdSchema) })
-  .refine(exclusiveRevision, REVISION_MESSAGE)
+  .object({ projectId: z.uuid(), ...technicalRevisionShape, ...listInputShape(stackIdSchema) })
+  .refine(isExclusiveRevision, TECHNICAL_REVISION_MESSAGE)
   .refine(noAroundWithCursor, AROUND_WITH_CURSOR_MESSAGE);
 /** « Choisir » : un lot d'une seule `stack.update`. `option` hors des options du choix : 422. */
 export const stackChooseInputSchema = z.object({
@@ -289,11 +298,11 @@ export const stackChooseInputSchema = z.object({
   option: text(120),
   idempotencyKey: idempotencyKeySchema,
   branch: z.string().min(1).optional(),
-  baseSha: commitShaSchema.optional(),
+  baseSha: technicalCommitSha.optional(),
 });
 export const stackSourceInputSchema = z
-  .object({ projectId: z.uuid(), id: stackIdSchema, ...revision })
-  .refine(exclusiveRevision, REVISION_MESSAGE);
+  .object({ projectId: z.uuid(), id: stackIdSchema, ...technicalRevisionShape })
+  .refine(isExclusiveRevision, TECHNICAL_REVISION_MESSAGE);
 
 const environmentReadShape = {
   specId: environmentIdSchema,
@@ -309,7 +318,7 @@ const environmentReadShape = {
 export const environmentSchema = z.object(environmentReadShape);
 export const environmentDetailSchema = environmentSchema.extend({
   filePath: z.string(),
-  commitSha: commitShaSchema,
+  commitSha: technicalCommitSha,
 });
 /** Contenu de `tech/environments.yaml` : jamais de valeur de variable. */
 export const environmentsContentShape = {
@@ -320,18 +329,22 @@ export const environmentsContentShape = {
   ),
 };
 export const technicalEnvironmentsInputSchema = z
-  .object({ projectId: z.uuid(), ...revision })
-  .refine(exclusiveRevision, REVISION_MESSAGE);
+  .object({ projectId: z.uuid(), ...technicalRevisionShape })
+  .refine(isExclusiveRevision, TECHNICAL_REVISION_MESSAGE);
 /** Rien d'indexé : listes vides et `commitSha` nul. */
 export const technicalEnvironmentsSchema = z.object({
   ...environmentsContentShape,
-  commitSha: commitShaSchema.nullable(),
+  commitSha: technicalCommitSha.nullable(),
 });
 
 /** Sections d'un document lues en Git (`architecture/overview/`, `tech/cahier-technique/`) : forme de l'Architecture. */
 export const documentSectionsInputSchema = z
-  .object({ projectId: z.uuid(), deliverable: z.enum(DOC_SECTION_DELIVERABLES), ...revision })
-  .refine(exclusiveRevision, REVISION_MESSAGE);
+  .object({
+    projectId: z.uuid(),
+    deliverable: z.enum(DOC_SECTION_DELIVERABLES),
+    ...technicalRevisionShape,
+  })
+  .refine(isExclusiveRevision, TECHNICAL_REVISION_MESSAGE);
 
 export type StackSummary = z.output<typeof stackSummarySchema>;
 export type StackDetail = z.output<typeof stackDetailSchema>;

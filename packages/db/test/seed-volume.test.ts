@@ -694,6 +694,23 @@ describe("TK-115 jeux de volume du cahier technique", () => {
     );
   };
   const LAYERS = ["applications", "services", "donnees", "externes", "exploitation"];
+  const CATEGORIES = [
+    "donnees",
+    "performance",
+    "securite",
+    "disponibilite",
+    "accessibilite",
+    "exploitation",
+  ];
+  const byCodeUnit = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const inOrder = (keys: string[]) => expect(keys).toEqual([...keys].sort(byCodeUnit));
+  /** TK-116 : l'index range les opérations par zone puis nom, les exigences par catégorie puis identifiant. */
+  const checkOrder = (operations: readonly Row[], requirements: readonly Row[]) => {
+    inOrder(operations.map((row) => `${row.data.zone} ${row.spec_id}`));
+    inOrder(
+      requirements.map((row) => `${CATEGORIES.indexOf(String(row.data.categorie))} ${row.spec_id}`),
+    );
+  };
 
   async function checkTechnical(project: string, profile: "planche" | "large") {
     const volume = SEED_VOLUMES[profile];
@@ -731,6 +748,7 @@ describe("TK-115 jeux de volume du cahier technique", () => {
     const requirements = await rowsOf(project, "nfr");
     expect(requirements).toHaveLength(volume.nfrs);
     expect(requirements[0]?.path).toBe("nfr/NFR-001.yaml");
+    checkOrder(operations, requirements);
     const [file] = await rowsOf(project, "environments");
     expect(file).toMatchObject({ spec_id: "environments", path: "tech/environments.yaml" });
     expect(file?.data.environnements).toHaveLength(volume.environments);

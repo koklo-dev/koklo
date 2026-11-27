@@ -17,9 +17,9 @@ const batch = (operations: unknown[]) => ({ projectId: UUID, idempotencyKey: "k-
 const ok = (operation: unknown) => isValid(input("specBatch.submit"), batch([operation]));
 
 describe("TK-115 surface", () => {
-  it("version 3.17.0 (additif : mineure)", async () => {
-    expect(CONTRACT_VERSION).toBe("3.17.0");
-    expect((await doc()).info.version).toBe("3.17.0");
+  it("version 3.18.0 (additif : mineure)", async () => {
+    expect(CONTRACT_VERSION).toBe("3.18.0");
+    expect((await doc()).info.version).toBe("3.18.0");
   });
 
   it.each([
@@ -57,11 +57,6 @@ describe("TK-115 surface", () => {
     const route = (await doc()).paths[path];
     expect(route?.get, path).toBeDefined();
     expect(JSON.stringify(route)).not.toMatch(/yaml|filePath|commitSha/i);
-  });
-
-  it("aucune lecture des opérations ni des exigences avant TK-116 (aucune route morte)", () => {
-    expect(proc("spec.technical.ops.list")).toBeUndefined();
-    expect(proc("spec.technical.nfr.list")).toBeUndefined();
   });
 });
 
