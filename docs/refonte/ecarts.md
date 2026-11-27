@@ -205,7 +205,8 @@
 | `api/endpoints/<zone.verbe>.yaml` en RPC (§1) | **contraire** | `data.ts` (`EndpointSchema` REST `E-…`), `kinds.ts`, `SpecEndpoint` (`method`, `path`), `FeatureSchema.endpoints` | M | Liens des fonctionnalités et des écrans à renommer. |
 | `nfr/NFR-nnn.yaml` (§1) | absent | `PATTERNS.nfr` existe | S | — |
 | `tech/environments.yaml`, refus de toute valeur de secret (§1, §4.4) | absent | `packages/rules/src/koklo-strict-rules.ts` (politique, pas scanner) | S | Motif de détection à brancher dans `plan.ts`. |
-| Cahier en sections `NN-*.md` (§1, §8.1) | **contraire** | `spec-scaffold.ts` (`tech/cahier-technique.md`) | S | — |
+| Cahier en sections `NN-*.md` (§1, §8.1) | scaffold conforme depuis TK-106 (`01-objet.md`) ; lecture et écriture des sections : TK-115 (B723) | `spec-scaffold.ts`, `moves.ts` | S | — |
+| Écarts retenus à la maquette 14 (TK-115, B726 à B733) : pas de « Valider », d'onglets API et Exigences (TK-116), de glisser ni d'éditeur de section, de champ libre vers l'agent ; recherche de la Stack au-delà de 24 ; menu sur « Modifier » des environnements ; `wand_stars` | prévu par TK-115 | `apps/web` | — | — |
 | Générateur de contrat dans le dépôt de code (§1, §4.2) | absent | — | L | Aucun chemin d'écriture vers le dépôt de code du client. |
 | Couverture des exigences depuis Qualité (§4.3) | absent | — | S | Dépendance circulaire 8 ↔ 10 (questions.md). |
 
@@ -424,3 +425,22 @@ Tests à réécrire avec ces retraits :
 | Maquette 13 l.391 : titre de fiche 22 px, h3 15 px | 20 px et 14 px | Pas de 22 ni de 15 dans l'échelle v2 (B333, B607) |
 | Maquette 13 l.379 (client) : puces Statut, Composant, Date | Statut seul | L'entrée `clientSpace.adrs` n'a ni `from`/`to` ni `component`, la sortie pas de facettes (B607) |
 | Maquette 13 l.566-568, l.697 : trait acteur → application étiqueté « navigateur » | Trait sans étiquette | Le moyen d'entrée n'est pas dans le modèle ; « navigateur » serait faux pour une application mobile (TK-114d, B662) |
+
+## TK-115, cahier technique (2026-11-27, maquette 14)
+
+| Maquette ou passation | Livré | Raison |
+|---|---|---|
+| l.77-86 : onglets API et Exigences | Absents | TK-116 : aucun onglet mort (fiche §1) |
+| l.804 : « Valider » dans l'en-tête | Absent | TK-116 (bouton et refus serveur) |
+| l.390-396 : glisser, « Ajouter une section », « Écrire, ou taper / », « Écrire moi-même », fil « Demander à l'agent » | Absents | Hors périmètre (fiche §1) |
+| l.188 (feuille) : Rôle en liste déroulante | Saisie libre | Aucune liste de rôles dans le contrat (B753) |
+| l.285 : cellule « à trancher » en `#d97706` | `--status-pending-fg` | Contraste AA (WCAG 1.4.3), B763 |
+| l.533-534, 570, 674-675 : ambre `#d97706` / `#fbbf24`, vert sombre `#86efac` | `--status-pending-icon` (contour à revoir, pastille Recette), `--status-validated-fg` (pastille Production) | Jetons existants, comme `ArchNodeCard` (B763) |
+| l.736 : relecture d'un choix, aucune rubrique « En clair » | Rubrique « En clair » après les critères | Texte lu par le client, relu avant d'être accepté (B764) |
+| l.800, l.801 : pastille « À revoir » ambre, `sync_problem` | `DeliverableStatus` `revise` | Même statut que les autres livrables (B607) |
+| l.795 : « Proposer avec l'agent » en contour | `AgentProposeButton` primaire | DESIGN v2.15 (B473) |
+| l.176 : aucun champ de recherche | Recherche au-delà de 24 choix ou quand `?q=` est actif | B728 |
+| l.283 : « Modifier » seul | Menu des environnements sous le bouton | B760 |
+| l.383-420 (client) : « Moussa (équipe) » | « Équipe » et la date | B759 |
+| l.162 : bouton « Modifier » sur une proposition en relecture | Absent, comme Données et Architecture | Relecture partagée des livrables de domaine ; à confirmer en recette |
+

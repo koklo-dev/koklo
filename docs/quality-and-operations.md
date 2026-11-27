@@ -3,10 +3,10 @@ title: Quality and operations
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-10
+last_reviewed: 2026-11-27
 covers_release: unreleased
 sources: []
-covers_commit: 5fa5b1c
+covers_commit: 9f186946
 ---
 # Quality and operations
 
@@ -1282,3 +1282,48 @@ is meant to plug the Zod schema of each usage into the same runner; only Idea sp
 - **Gaps**: `ai.ideaGaps` returns a result younger than 30 s without calling the model (`cached: true`).
 - **Rollback**: `packages/db/prisma/migrations/20261108120000_idea_agent/down.sql`.
 - **Gates**: full web Playwright (`apps/web`, `--workers=1`, about 20 min) rewrites every capture; sort them with `docs/refonte/outils/trier-captures.py`. The real-stack journey is `e2e/tests/idea.spec.ts`.
+
+## Technical specification: tests, deployment and limits (TK-115)
+
+### Tests (local, named files only; full suites and the other e2e run in CI)
+| Package | Main new files |
+|---------|----------------|
+| `schema` | `technical-{schema,parse,emit,rules}`, `secrets`, `proposals-technical` (secret samples are built at run time, never a literal a scanner would recognise) |
+| `db` | `technical-migration` (up, down, up, empty `migrate diff`) |
+| `contract` | `technical-tabs` |
+| `api` | `spec-technical-{stack,roles,environments,document,volume,secrets}`, `proposal-technical`, `client-space-technical`, `comment-technical` |
+| `worker` | `spec-write/plan-technical`, `agent-propose/{triage,generate}-technical` |
+| `ui`, `web` | the four new components, `technical-*.test.ts(x)`, `e2e/spec-technical.spec.ts` (captures in `design/screens/captures/S-spec-technical/`) |
+
+Volume: `seed:planche` holds 24 choices, 132 operations, 28 requirements, 3 environments; `seed:large` 300, 500, 200, 3.
+`spec-technical-volume` keeps the first page of 300 choices under 300 ms (local test database).
+
+### Deployment and rollback
+- Five additive migrations, each with `down.sql`: `20261127090000_technical_entity_kinds`,
+  `20261127100000_technical_proposal_kinds`, `20261127110000_technical_launch_modes`, `20261127120000_nfr_counter`,
+  `20261127130000_comment_technical_targets`.
+- Rolling back (newest first) **deletes** the technical rows: comments on technical targets, `nfr` counters, `compare`
+  and `nfr` launches, technical proposals, and the `stack`, `nfr`, `environments` index rows (rebuildable from Git).
+- No new environment variable. The worker needs `KOKLO_ENCRYPTION_KEY` for the AI keys: `.deploy/manifest.yaml` lists
+  it under `generate`, the worker `vars` name only the GitHub App; check the injection at deployment (UNVERIFIED).
+- Redeploy api, worker and web together (contract 3.17.0).
+- Staging acceptance: there is no "Valider" button yet (TK-116); to see the client view and "À revoir", call
+  `review.submit` on the `technical` deliverable (owner, admin, developer).
+
+### Secret detector: what it does not catch
+It matches PEM private keys, known key prefixes with a minimum length, JWTs, `Bearer` tokens, URLs with a password,
+upper-case `…SECRET|TOKEN|PASSWORD|API_KEY…=value` and `password|mot de passe|secret|token = value` (six characters or
+more). It is not exhaustive:
+- `api_key=value` in lower case passes, as does `NAME: value` (colon) without a known prefix;
+- a key without a known prefix, written alone, passes; so does an assigned value shorter than six characters;
+- placeholders (`${VAR}`, `<…>`, `***`) are accepted on purpose;
+- a prefill sentence or a launch instruction is not filtered by the detector (it does not enter the spec), and files
+  committed to Git outside Koklo are not scanned.
+
+A refusal shows « Une valeur de secret ne peut pas entrer dans la spec : gardez seulement le nom de la variable. » (api:
+422, `data.field`; worker: batch `failed`, issue `SECRET_VALUE`). If a real secret reached the repository by a way the
+detector misses, rotate it: removing the line does not remove it from the Git history.
+
+### Not verified before merge
+The screen ran against a stub API only; the agent only against a fake model; no integration test runs a technical launch
+with the Prisma store.

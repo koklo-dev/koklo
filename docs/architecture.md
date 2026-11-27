@@ -3,10 +3,10 @@ title: Architecture
 audience: technical
 doc_version: 0.2.0
 status: draft
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-27
 covers_release: unreleased
 sources: []
-covers_commit: 5fa5b1c
+covers_commit: 9f186946
 ---
 # Architecture
 
@@ -1951,4 +1951,63 @@ flowchart LR
   stale --> sd[spec.deliverables: revise + staleBecause]
   sd --> launch[ai.proposeDeliverable update / ai.proposeOptions]
   launch --> w[worker prompt update: diff only]
+```
+
+## Technical specification (TK-115)
+Screen `/projects/<id>/spec/technical` (tabs Stack, Environnements, Document, plus Relecture; decisions B718 to B767).
+Files: `tech/stack/<slug>.yaml` (`ST-`), `api/endpoints/<zone.verbe>.yaml` (operations; the older REST format is still
+read, never written), `nfr/NFR-nnn.yaml`, `tech/environments.yaml` (variable names and usage, no value key) and the
+sections `tech/cahier-technique/NN-<slug>.md`. Schemas, emitters and the secret detector live in `@koklo/schema`.
+
+**Reads.** The team (owner, admin, developer, designer) reads `spec.technical.*` (api, `spec-technical/`): choices and
+environments come from the entity index `spec_entities`; the YAML of a choice and the document sections are read from
+the provider at the indexed commit, outside any transaction (a choice file absent from Git is regenerated from the
+index). Operations are `endpoint` rows (`spec_endpoints` keeps REST only); sections are not indexed. The client and the
+business read `clientSpace.technical*`, empty until the deliverable is validated, without YAML, path or SHA.
+
+**Writes.** The sheets, "Choisir" (`spec.technical.stack.choose`, one batch of one `stack.update`) and "Enregistrer N
+dans la spec" all go through the ordinary spec batch (`stack|op|nfr|env.*`, `doc.section.*` with
+`deliverable: "technical"`). The designer is refused by the api, before the worker.
+
+**Technical agent.** Launch rules are in `apps/api/src/proposal/technical-launch.ts` (deliverable open, at least one
+component; modes `complete`, `compare`, `nfr`, `all`). The steps are decided by code
+(`agent-propose/generate-technical.ts`): stack, operations by component zone (zones grouped past eight, twelve steps at
+most), requirements, environments, document; `compare` and `nfr` have one step. Each step is published at once as
+proposals; the triage discards unknown references and secret candidates and marks priced or performance values with "≈".
+
+**Secret refusal.** `findSecretPaths` (`packages/schema/src/secrets.ts`, pure, returns JSON pointers, never the value)
+guards Koklo's ways into the spec: batch submit and `proposal.decide` (422 before any write), the agent triage,
+`ai.reviseProposal` (422) and `ai.prefillItem` (field dropped); the worker is the last arbiter, for every batch (idea
+included). A file pushed to Git outside Koklo is not scanned. Known limits:
+[quality and operations](quality-and-operations.md).
+
+**Upstream impact.** `spec.deliverables` compares components and decisions between the head of the last decision and the
+current head (`staleTechnical`, deliverable `revise`).
+
+```mermaid
+flowchart LR
+  subgraph read [Read]
+    web[web: spec/technical] --> st[api spec-technical]
+    st --> idx[(spec_entities)]
+    st -->|sections, YAML| git[(spec repository)]
+    cl[web: client view] --> cs[clientSpace.technical*] --> gate{validated?}
+    gate -->|yes| idx
+    gate -->|yes, sections| git
+  end
+  subgraph write [Write]
+    form[sheets, Choisir, review save] --> sb[specBatch.submit / stack.choose]
+    sb --> s1{findSecretPaths}
+    s1 -->|found| r422[422 VALIDATION, nothing stored]
+    s1 -->|clean| q[spec write job]
+    q --> s2{secretRefusal}
+    s2 -->|found| fail[batch failed: SECRET_VALUE, no commit]
+    s2 -->|clean| git
+    git --> iw[index writer] --> idx
+  end
+  subgraph agent [Agent]
+    ai[model] --> tri[worker triage]
+    tri -->|clean| props[(agent_proposals)]
+    tri -->|secret| drop[candidate dropped]
+    props --> dec["proposal.decide (edited is checked)"] --> sb
+  end
 ```
